@@ -59,6 +59,10 @@ The test are run with mage using the `integration` namespace:
 
 - `mage integration:matrix` to run all tests on the complete matrix of supported operating systems and architectures of the Elastic Agent.
 
+- `mage integration:kubernetes` to run kubernetes tests for the default image on the default version of kubernetes (all previous commands will not run any kubernetes tests).
+
+- `mage integration:kubernetesMatrix` to run a matrix of kubernetes tests for all image types and supported versions of kubernetes.
+
 #### Selecting specific platform
 
 By default, the runner will deploy to every combination of operating system and architecture that the tests define
@@ -73,6 +77,7 @@ between, and it can be very specific or not very specific.
 - `TEST_PLATFORMS="linux/amd64/ubuntu/20.04 mage integration:test` to execute tests only on Ubuntu 20.04 ARM64.
 - `TEST_PLATFORMS="windows/amd64/2022 mage integration:test` to execute tests only on Windows Server 2022.
 - `TEST_PLATFORMS="linux/amd64 windows/amd64/2022 mage integration:test` to execute tests on Linux AMD64 and Windows Server 2022.
+- `TEST_PLATFORMS="kubernetes/arm64/1.30.2/wolfi" mage integration:kubernetes` to execute kubernetes tests on Kubernetes version 1.30.2 with wolfi docker variant.
 
 > **_NOTE:_**  This only filters down the tests based on the platform. It will not execute a tests on a platform unless
 > the test defines as supporting it.
@@ -141,28 +146,70 @@ when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAM
 
 ### Debugging tests
 
-#### Manually debugging tests on VMs
-Many of the integration tests will install the Elastic-Agent and/or
-require root to run, which makes it hard to just run them on our work
-machines, the best way to circumvent that is to debug the tests
-directly on a VM. `mage integration:DeployDebugTools` will show a menu
-to select a VM and then install the common debugging tools: Delve,
-Mage and Docker. It will also create the `~/elastic-agent` folder
-containing the Git repository (required to package from within the VM)
+#### Connecting to VMs
+All VMs (including Windows) support connections via SSH, the framework
+generates and stores the necessary SSH keys to access the VMs, the
+easiest way to connect to them is using the SSH command returned by
+`mage integration:SSH`. It will list the VMs and ask to select
+one.
+
+On a Unix shell you can run `$(mage integration:SSH)`, the menu is
+printed to stderr and the SSH command to stdout. After selecting the
+VM you will have shell connected to it.
+
+#### Credentials for cloud stack/projects
+All cloud deployments and projects can be listed with `mage
+integration:listStacks`, they can be used to manually connect to
+Kibana and Elasticsearch.
+
+If you need to manually run tests against any deployments, `mage
+integration:GenerateEnvFile` will generate a file called `env.sh` that
+exports environment variables for Unix compatible shells, you can load
+them into your shell by running `source ./env.sh`.
+
+To easily deploy the credentials to any VM, just run `mage
+integration:DeployEnvFile`. A menu will ask for the desired Stack and
+VM.
+
+#### Manually running the tests (using `go test`)
+If you want to run the tests manually, skipping the test runner, set the
+`TEST_DEFINE_PREFIX` environment variable to any value and run your tests normally
+with `go test`. E.g.:
+
+```shell
+TEST_DEFINE_PREFIX=gambiarra go test -v -tags integration -run TestProxyURL ./testing/integration/
+```
+
+You will need the environment variables containing the stack URL and
+credentials for the tests to succeed.
+
+#### Installing debug/build tools
+`mage integration:DeployDebugTools` will install a few tools necessary
+ to build the Elastic-Agent in the VM and debug tests:
+ - Docker
+ - Delve
+ - Mage
+
+When called, it will show a menu to select a VM and then install the
+tools listed above. It will also create the `~/elastic-agent` folder
+containing the Git repository (required o package from within the VM)
 and the last version of the code uploaded to the VM. This allows you
 to easily build/package the Elastic-Agent from within the VM as well
 as run any tests.
 
-After deploying the debug tools, `mage integrationDeployEnvFile` will
-create a `env.sh` and copy it to a selected VM, sourcing it will allow
-you to any test against the Cloud Stack you selected.
+In the VM there are two important folders:
+- `agent`: that is created by the integration test framework and used
+  by `mage` to run the tests, it gets updated every time you run an
+  integration test from your machine.
+- `elastic-agen`: that is a copy `agent` with Git information created
+  by `mage integration:DeployDebugTools`, the Git information there is
+  not a copy from your machine, but it will work if you need to
+  package the Elastic-Agent from the VM. Most of the time you won't
+  need it.
 
-Example of how to run a test from within the VM:
-```
-## Run a single test
-SNAPSHOT=true TEST_PLATFORMS="linux/amd64" mage integration:single TestLogIngestionFleetManaged
-## Let's suppose it has failed
+**Step-by-Step commands**
 
+```shell
 ## Install DebugTools
 mage -v integration:DeployDebugTools
 
@@ -170,30 +217,46 @@ mage -v integration:DeployDebugTools
 mage -v integration:DeployEnvFile
 
 ## SSH into the VM
-$(mage integration:SSHVM)
+$(mage integration:SSH)
 
 ## From inside the VM, the test needs root
 sudo su
 source ./env.sh
-cd elastic-agent
+cd agent # That's the folder the mage automation uses to run the tests
+
+## Then run the test using `go test`
+
+TEST_DEFINE_PREFIX=gambiarra AGENT_VERSION="8.16.0-SNAPSHOT" go test -tags=integration -v ./testing/integration/ -run TestLogIngestionFleetManaged
+
+## Run the test using delve:
 ## Any flags passed to the test binary go after the '--', they also need to
 ## include the `test.` prefix if they're for `go test`
 TEST_DEFINE_PREFIX=gambiarra dlv test ./testing/integration/ --build-flags="-tags integration" -- -test.v -test.run TestLogIngestionFleetManaged
 ```
 
-**A Delve trick**
+**A Delve trick:**
 If you didn't build the Elastic-Agent directly on the machine you're
 debugging, it is very likely the location of the source code is
 different, hence delve cannot show you the code it is running. To
 solve this, once on Delve shell, run:
 ``
-config substitute-path /go/src/github.com/elastic/elastic-agent /home/ubuntu/elastic-agent`
+config substitute-path /go/src/github.com/elastic/elastic-agent /home/ubuntu/agent
 ``
 where:
 - `/go/src/github.com/elastic/elastic-agent` is the path annotated in
   the binary you are debugging (the one Delve shows).
-- `/home/ubuntu/elastic-agent` is where Delve should read the source
+- `/home/ubuntu/agent` is where Delve should read the source
   code form.
+
+#### Other useful mage targets:
+- `integration:stacks` lists all stack deployments and connection
+  information in a human readable table.
+- `integration:listInstances` lists all VMs and their connection
+  command in a human readable table. It also lists the URL for the
+  VM page on GCP, which is helpful to verify if the VM still exists
+  (OGC VMs are automatically deleted)
+- `integration:printState` is a shortcut for running the two commands
+  above.
 
 #### Auto diagnostics retrieval
 When an integration test fails the testing fixture will try its best to automatically collect the diagnostic
@@ -222,42 +285,6 @@ suite has this ability built into it. Using the `TEST_RUN_UNTIL_FAILURE=true` wi
 until it reports a failure.
 
 - `TEST_RUN_UNTIL_FAILURE=true mage integration:single [testName]`
-
-## Manually running the tests
-
-If you want to run the tests manually, skipping the test runner, set the
-`TEST_DEFINE_PREFIX` environment variable to any value and run your tests normally
-with `go test`. E.g.:
-
-```shell
-TEST_DEFINE_PREFIX=gambiarra go test -v -tags integration -run TestProxyURL ./testing/integration/
-```
-
-## Connecting to VMs and running tests
-### Connecting to VMs
-All VMs (including Windows) support connections via SSH, the framework
-generates and stores the necessary SSH keys to access the VMs, the
-easiest way to connect to them is using the SSH command returned by
-`mage integration:SSHVM`. It will list the VMs and ask to select
-one.
-
-On a Unix shell you can run `$(mage integration:SSHVM)`, the menu is
-printed to stderr and the SSH command to stdout. After selecting the
-VM you will have shell connected to it.
-
-### Credentials for cloud stack/projects
-All cloud deployments and projects can be listed with `mage
-integration:stacks`, they can be used to manually connect to
-Kibana and Elasticsearch.
-
-If you need to manually run tests against any deployments, `mage
-integration:GenerateEnvFile` will generate a file called `env.sh` that
-exports environment variables for Unix compatible shells, you can load
-them into your shell by running `source ./env.sh`.
-
-To easily deploy the credentials to any VM, just run `mage
-integration:DeployEnvFile`. A menu will ask for the desired Stack and
-VM.
 
 ## Writing tests
 
@@ -313,6 +340,11 @@ want to use a local VM instead of a remote VM, you can use the [Multipass](https
 
 It is always best to run `mage integration:clean` before changing the provisioner because the change will
 not cause already provisioned resources to be replaced with an instance created by a different provisioner.
+
+### Kind Instance Provisioner
+Use only when running Kubernetes tests. Uses local installed kind to create Kubernetes clusters on the fly.
+
+- `INSTANCE_PROVISIONER="kind" mage integration:kubernetes`
 
 ## Troubleshooting Tips
 

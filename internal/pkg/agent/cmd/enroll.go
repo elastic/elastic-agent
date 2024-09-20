@@ -84,6 +84,7 @@ func addEnrollFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("ca-sha256", "p", "", "Comma-separated list of certificate authority hash pins for server verification used by Elastic Agent and Fleet Server")
 	cmd.Flags().StringP("elastic-agent-cert", "", "", "Elastic Agent client certificate to use with Fleet Server during mTLS authentication")
 	cmd.Flags().StringP("elastic-agent-cert-key", "", "", "Elastic Agent client private key to use with Fleet Server during mTLS authentication")
+	cmd.Flags().StringP("elastic-agent-cert-key-passphrase", "", "", "Path for private key passphrase file used to decrypt Elastic Agent client certificate key")
 	cmd.Flags().BoolP("insecure", "i", false, "Allow insecure connection made by the Elastic Agent. It's also required to use a Fleet Server on a HTTP endpoint")
 	cmd.Flags().StringP("staging", "", "", "Configures Elastic Agent to download artifacts from a staging build")
 	cmd.Flags().StringP("proxy-url", "", "", "Configures the proxy URL: when bootstrapping Fleet Server, it's the proxy used by Fleet Server to connect to Elasticsearch; when enrolling the Elastic Agent to Fleet Server, it's the proxy used by the Elastic Agent to connect to Fleet Server")
@@ -110,6 +111,16 @@ func validateEnrollFlags(cmd *cobra.Command) error {
 	key, _ := cmd.Flags().GetString("elastic-agent-cert-key")
 	if key != "" && !filepath.IsAbs(key) {
 		return errors.New("--elastic-agent-cert-key must be provided as an absolute path", errors.M("path", key), errors.TypeConfig)
+	}
+	keyPassphrase, _ := cmd.Flags().GetString("elastic-agent-cert-key-passphrase")
+	if keyPassphrase != "" {
+		if !filepath.IsAbs(keyPassphrase) {
+			return errors.New("--elastic-agent-cert-key-passphrase must be provided as an absolute path", errors.M("path", keyPassphrase), errors.TypeConfig)
+		}
+
+		if cert == "" || key == "" {
+			return errors.New("--elastic-agent-cert and --elastic-agent-cert-key must be provided when using --elastic-agent-cert-key-passphrase", errors.M("path", keyPassphrase), errors.TypeConfig)
+		}
 	}
 	esCa, _ := cmd.Flags().GetString("fleet-server-es-ca")
 	if esCa != "" && !filepath.IsAbs(esCa) {
@@ -180,6 +191,7 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	ca, _ := cmd.Flags().GetString("certificate-authorities")
 	cert, _ := cmd.Flags().GetString("elastic-agent-cert")
 	key, _ := cmd.Flags().GetString("elastic-agent-cert-key")
+	keyPassphrase, _ := cmd.Flags().GetString("elastic-agent-cert-key-passphrase")
 	sha256, _ := cmd.Flags().GetString("ca-sha256")
 	insecure, _ := cmd.Flags().GetBool("insecure")
 	staging, _ := cmd.Flags().GetString("staging")
@@ -284,6 +296,10 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	if key != "" {
 		args = append(args, "--elastic-agent-cert-key")
 		args = append(args, key)
+	}
+	if keyPassphrase != "" {
+		args = append(args, "--elastic-agent-cert-key-passphrase")
+		args = append(args, keyPassphrase)
 	}
 	if sha256 != "" {
 		args = append(args, "--ca-sha256")
@@ -422,6 +438,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	caSHA256 := cli.StringToSlice(caSHA256str)
 	cert, _ := cmd.Flags().GetString("elastic-agent-cert")
 	key, _ := cmd.Flags().GetString("elastic-agent-cert-key")
+	keyPassphrase, _ := cmd.Flags().GetString("elastic-agent-cert-key-passphrase")
 
 	ctx := handleSignal(context.Background())
 
@@ -449,6 +466,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		CASha256:             caSHA256,
 		Certificate:          cert,
 		Key:                  key,
+		KeyPassphrasePath:    keyPassphrase,
 		Insecure:             insecure,
 		UserProvidedMetadata: make(map[string]interface{}),
 		Staging:              staging,
