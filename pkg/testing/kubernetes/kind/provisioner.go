@@ -49,7 +49,7 @@ nodes:
         secure-port: "10257"
 `
 
-func NewProvisioner(versions string) common.InstanceProvisioner {
+func NewProvisioner() common.InstanceProvisioner {
 	return &provisioner{}
 }
 
