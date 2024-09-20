@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/elastic/elastic-agent/pkg/testing/null"
 	"html/template"
 	"io/fs"
 	"log"
@@ -107,8 +108,6 @@ var (
 	goIntegTestTimeout = 2 * time.Hour
 	// goProvisionAndTestTimeout is the timeout used for both provisioning and running tests.
 	goProvisionAndTestTimeout = goIntegTestTimeout + 30*time.Minute
-
-	logIntegrationSelections = true
 )
 
 func init() {
@@ -2454,47 +2453,61 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 	return nil
 }
 
-func (Integration) Buildkite(ctx context.Context) error {
-	// don't pollute the output with log information
-	//
-	// this target outputs the YAML to stdout
-	logIntegrationSelections = false
-
+func (Integration) Buildkite() error {
 	goTestFlags := os.Getenv("GOTEST_FLAGS")
 	batches, err := define.DetermineBatches("testing/integration", goTestFlags, "integration")
 	if err != nil {
 		return fmt.Errorf("failed to determine batches: %w", err)
 	}
-	r, err := createTestRunner(false, "", goTestFlags, batches...)
+	agentVersion, agentStackVersion, err := getTestRunnerVersions()
 	if err != nil {
-		return fmt.Errorf("error creating test runner: %w", err)
+		return fmt.Errorf("failed to get agent versions: %w", err)
 	}
+	goVersion, err := mage.DefaultBeatBuildVariableSources.GetGoVersion()
+	if err != nil {
+		return fmt.Errorf("failed to get go versions: %w", err)
+	}
+
+	cfg := runner.Config{
+		AgentVersion: agentVersion,
+		StackVersion: agentStackVersion,
+		GOVersion:    goVersion,
+		BuildDir:     filepath.Join("build", "distributions"),
+		RepoDir:      ".",
+		StateDir:     ".integration-cache",
+		Platforms:    testPlatforms(),
+		Packages:     testPackages(),
+		Groups:       testGroups(),
+		Matrix:       false,
+		VerboseMode:  mg.Verbose(),
+		TestFlags:    goTestFlags,
+	}
+	r, err := runner.NewRunner(cfg, null.NewInstanceProvisioner(), null.NewStackProvisioner(), batches...)
+	if err != nil {
+		return fmt.Errorf("failed to create runner: %w", err)
+	}
+
 	steps, err := r.Buildkite()
 	if err != nil {
 		return fmt.Errorf("error generating buildkite steps: %w", err)
 	}
 
-	// output's YAML
+	// write output to steps.yaml
 	cwd, err := os.Getwd()
 	if err != nil {
-		fmt.Errorf("Error getting current working directory: %w", err)
-		return nil
+		return fmt.Errorf("error getting current working directory: %w", err)
 	}
-
 	ymlFilePath := filepath.Join(cwd, "steps.yml")
-	fmt.Printf("Steps.yml path: %s", ymlFilePath)
 	file, err := os.Create(ymlFilePath)
 	if err != nil {
-		fmt.Errorf("Error creating file: %w", err)
-		return nil
+		return fmt.Errorf("error creating file: %w", err)
 	}
 	defer file.Close()
-
-	_, err = file.WriteString(steps)
-	if err != nil {
-		fmt.Println("Error writing to file: %w", err)
-		return nil
+	if _, err := file.WriteString(steps); err != nil {
+		return fmt.Errorf("error writing to file: %w", err)
 	}
+
+	fmt.Printf(">>> Generated buildkite steps written to: %s\n", ymlFilePath)
 	return nil
 }
 
@@ -2568,18 +2581,14 @@ func integRunnerOnce(ctx context.Context, matrix bool, singleTest string) (int, 
 	return results.Failures, nil
 }
 
-func createTestRunner(matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
-	goVersion, err := mage.DefaultBeatBuildVariableSources.GetGoVersion()
-	if err != nil {
-		return nil, err
-	}
-
+func getTestRunnerVersions() (string, string, error) {
+	var err error
 	agentStackVersion := os.Getenv("AGENT_STACK_VERSION")
 	agentVersion := os.Getenv("AGENT_VERSION")
 	if agentVersion == "" {
 		agentVersion, err = mage.DefaultBeatBuildVariableSources.GetBeatVersion()
 		if err != nil {
-			return nil, err
+			return "", "", err
 		}
 		if agentStackVersion == "" {
 			// always use snapshot for stack version
@@ -2595,6 +2604,21 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if agentStackVersion == "" {
 		agentStackVersion = agentVersion
 	}
+
+	return agentVersion, agentStackVersion, nil
+}
+
+func createTestRunner(matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
+	goVersion, err := mage.DefaultBeatBuildVariableSources.GetGoVersion()
+	if err != nil {
+		return nil, err
+	}
+
+	agentVersion, agentStackVersion, err := getTestRunnerVersions()
+	if err != nil {
+		return nil, err
+	}
+
 	agentBuildDir := os.Getenv("AGENT_BUILD_DIR")
 	if agentBuildDir == "" {
 		agentBuildDir = filepath.Join("build", "distributions")
@@ -2650,9 +2674,6 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	default:
 		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'ogc' or 'multipass', not %s", instanceProvisionerMode)
 	}
-	if logIntegrationSelections {
-		fmt.Printf(">>>> Using %s instance provisioner\n", instanceProvisionerMode)
-	}
 
 	email, err := ogcCfg.ClientEmail()
 	if err != nil {
@@ -2686,9 +2707,6 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 			ess.ProvisionerStateful,
 			ess.ProvisionerServerless,
 			stackProvisionerMode)
-	}
-	if logIntegrationSelections {
-		fmt.Printf(">>>> Using %s stack provisioner\n", stackProvisionerMode)
 	}
 
 	timestamp := timestampEnabled()

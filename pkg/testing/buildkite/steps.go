@@ -21,4 +21,5 @@ type Step struct {
 	DependsOn              []string          `json:"depends_on,omitempty" yaml:"depends_on,omitempty"`
 	AllowDependencyFailure bool              `json:"allow_dependency_failure,omitempty" yaml:"allow_dependency_failure,omitempty"`
 	Steps                  []Step            `json:"steps,omitempty" yaml:"steps,omitempty"`
+	Skip                   bool              `json:"skip,omitempty" yaml:"skip,omitempty"`
 }

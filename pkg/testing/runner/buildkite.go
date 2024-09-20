@@ -5,27 +5,202 @@
 package runner
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
-	"strings"
-
 	"github.com/elastic/elastic-agent/pkg/testing/buildkite"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"gopkg.in/yaml.v3"
+	"strings"
+)
+
+const (
+	defaultProvider         = "gcp"
+	defaultImageProject     = "elastic-images-qa"
+	defaultAMD64MachineType = "n1-standard-8"
+	defaultARM64MachineType = "t2a-standard-8"
 )
 
 var (
-	StackAgent = buildkite.StepAgent{
+	bkStackAgent = buildkite.StepAgent{
 		Provider:     "gcp",
 		ImageProject: "elastic-images-qa",
 		MachineType:  "n1-standard-8",                                    // does it need to be this large?
 		Image:        "family/platform-ingest-elastic-agent-ubuntu-2204", // is this the correct image for creating a stack?
 	}
+	bkUbuntuAMD64_2004 = buildkite.StepAgent{
+		Provider:     defaultProvider,
+		ImageProject: defaultImageProject,
+		MachineType:  defaultAMD64MachineType,
+		Image:        "family/platform-ingest-elastic-agent-ubuntu-2004",
+	}
+	bkUbuntuAMD64_2204 = buildkite.StepAgent{
+		Provider:     defaultProvider,
+		ImageProject: defaultImageProject,
+		MachineType:  defaultAMD64MachineType,
+		Image:        "family/platform-ingest-elastic-agent-ubuntu-2204",
+	}
+	bkUbuntuAMD64_2404 = buildkite.StepAgent{
+		Provider:     defaultProvider,
+		ImageProject: defaultImageProject,
+		MachineType:  defaultAMD64MachineType,
+		Image:        "family/platform-ingest-elastic-agent-ubuntu-2404",
+	}
+	bkUbuntuARM64_2004 = buildkite.StepAgent{
+		Provider:     defaultProvider,
+		ImageProject: defaultImageProject,
+		MachineType:  defaultARM64MachineType,
+		Image:        "family/platform-ingest-elastic-agent-ubuntu-2004-arm",
+	}
+	bkUbuntuARM64_2204 = buildkite.StepAgent{
+		Provider:     defaultProvider,
+		ImageProject: defaultImageProject,
+		MachineType:  defaultARM64MachineType,
+		Image:        "family/platform-ingest-elastic-agent-ubuntu-2204-arm",
+	}
+	bkUbuntuARM64_2404 = buildkite.StepAgent{
+		Provider:     defaultProvider,
+		ImageProject: defaultImageProject,
+		MachineType:  defaultARM64MachineType,
+		Image:        "family/platform-ingest-elastic-agent-ubuntu-2404-arm",
+	}
+	bkRHELAMD64_8 = buildkite.StepAgent{
+		Provider:     defaultProvider,
+		ImageProject: defaultImageProject,
+		MachineType:  defaultAMD64MachineType,
+		Image:        "family/platform-ingest-elastic-agent-rhel-8",
+	}
+	bkRHELARM64_8 = buildkite.StepAgent{
+		Provider:     defaultProvider,
+		ImageProject: defaultImageProject,
+		MachineType:  defaultARM64MachineType,
+		Image:        "family/platform-ingest-elastic-agent-rhel-8-arm",
+	}
+	bkWindowsAMD64_2019 = buildkite.StepAgent{
+		Provider:     defaultProvider,
+		ImageProject: defaultImageProject,
+		MachineType:  defaultAMD64MachineType,
+		Image:        "family/platform-ingest-elastic-agent-windows-2019",
+	}
+	bkWindowsAMD64_2019_Core = buildkite.StepAgent{
+		Provider:     defaultProvider,
+		ImageProject: defaultImageProject,
+		MachineType:  defaultAMD64MachineType,
+		Image:        "family/platform-ingest-elastic-agent-windows-2019-core",
+	}
+	bkWindowsAMD64_2022 = buildkite.StepAgent{
+		Provider:     defaultProvider,
+		ImageProject: defaultImageProject,
+		MachineType:  defaultAMD64MachineType,
+		Image:        "family/platform-ingest-elastic-agent-windows-2022",
+	}
+	bkWindowsAMD64_2022_Core = buildkite.StepAgent{
+		Provider:     defaultProvider,
+		ImageProject: defaultImageProject,
+		MachineType:  defaultAMD64MachineType,
+		Image:        "family/platform-ingest-elastic-agent-windows-2022-core",
+	}
 )
+
+// getAgent returns the agent to use for the provided batch.
+func getAgent(os SupportedOS) (buildkite.StepAgent, error) {
+	switch os.Arch {
+	case define.AMD64:
+		switch os.Type {
+		case define.Linux:
+			switch os.Distro {
+			case "", "ubuntu": // default is Ubuntu
+				switch os.Version {
+				case "20.04":
+					return bkUbuntuAMD64_2004, nil
+				case "22.04":
+					return bkUbuntuAMD64_2204, nil
+				case "", "24.04": // default is 24.04
+					return bkUbuntuAMD64_2404, nil
+				default:
+					return buildkite.StepAgent{}, fmt.Errorf("unknown ubuntu version: %s", os.Version)
+				}
+			case "rhel":
+				switch os.Version {
+				case "", "8": // default is 8
+					return bkRHELAMD64_8, nil
+				default:
+					return buildkite.StepAgent{}, fmt.Errorf("unknown rhel version: %s", os.Version)
+				}
+			}
+		case define.Kubernetes:
+			return bkUbuntuAMD64_2404, nil
+		case define.Windows:
+			switch os.Version {
+			case "2019":
+				return bkWindowsAMD64_2019, nil
+			case "2019-core":
+				return bkWindowsAMD64_2019_Core, nil
+			case "", "2022": // default is 2022
+				return bkWindowsAMD64_2022, nil
+			case "2022-core":
+				return bkWindowsAMD64_2022_Core, nil
+			default:
+				return buildkite.StepAgent{}, fmt.Errorf("unknown windows version: %s", os.Version)
+			}
+		}
+	case define.ARM64:
+		switch os.Type {
+		case define.Linux:
+			switch os.Distro {
+			case "", "ubuntu": // default is Ubuntu
+				switch os.Version {
+				case "20.04":
+					return bkUbuntuARM64_2004, nil
+				case "22.04":
+					return bkUbuntuARM64_2204, nil
+				case "", "24.04": // default is 24.04
+					return bkUbuntuARM64_2404, nil
+				default:
+					return buildkite.StepAgent{}, fmt.Errorf("unknown ubuntu version: %s", os.Version)
+				}
+			case "rhel":
+				switch os.Version {
+				case "", "8": // default is 8
+					return bkRHELARM64_8, nil
+				default:
+					return buildkite.StepAgent{}, fmt.Errorf("unknown rhel version: %s", os.Version)
+				}
+			}
+		case define.Kubernetes:
+			return bkUbuntuARM64_2404, nil
+		case define.Windows:
+			return buildkite.StepAgent{}, errors.New("windows ARM support not enabled")
+		case define.Darwin:
+			return buildkite.StepAgent{}, errors.New("darwin ARM support not enabled")
+		default:
+			return buildkite.StepAgent{}, fmt.Errorf("unknown OS type: %s", os.Type)
+		}
+	default:
+		return buildkite.StepAgent{}, fmt.Errorf("unknown architecture: %s", os.Arch)
+	}
+	return buildkite.StepAgent{}, fmt.Errorf("case missing for %+v", os)
+}
+
+func getCommand(b OSBatch) string {
+	if b.OS.Type == define.Linux {
+		return "mage integration:testOnRemote"
+	}
+	return "TODO"
+}
+
+func shouldSkip(os SupportedOS) bool {
+	if os.Arch == define.AMD64 && os.Type == define.Linux {
+		// currently only linux/amd64 is being supported
+		// (but all steps are generated)
+		return false
+	}
+	return true
+}
 
 // Buildkite returns a computed set of steps to run the integration tests on buildkite.
 func (r *Runner) Buildkite() (string, error) {
 	stackSteps := map[string]buildkite.Step{}
-	stackDepends := map[string][]string{}
+	stackTeardown := map[string][]string{}
 	var steps []buildkite.Step
 
 	// create the stack steps first
@@ -38,14 +213,16 @@ func (r *Runner) Buildkite() (string, error) {
 			_, ok := stackSteps[lb.Batch.Stack.Version]
 			if !ok {
 				// add a step for creating the stack
+				stackKey := getStackKey(lb.Batch.Stack)
 				stackStep := buildkite.Step{
 					Label:   fmt.Sprintf("Integration Stack: %s", lb.Batch.Stack.Version),
-					Key:     fmt.Sprintf("integration-stack-%s", lb.Batch.Stack.Version),
+					Key:     stackKey,
 					Command: "false",
-					Agents:  []buildkite.StepAgent{StackAgent},
+					Agents:  []buildkite.StepAgent{bkStackAgent},
 				}
 				steps = append(steps, stackStep)
 				stackSteps[lb.Batch.Stack.Version] = stackStep
+				stackTeardown[stackKey] = append(stackTeardown[stackKey], stackKey)
 			}
 		}
 	}
@@ -55,7 +232,7 @@ func (r *Runner) Buildkite() (string, error) {
 		if lb.Skip {
 			continue
 		}
-		agentStep, err := buildkite.GetAgent(lb.Batch)
+		agentStep, err := getAgent(lb.OS)
 		if err != nil {
 			return "", fmt.Errorf("unable to get machine and image: %w", err)
 		}
@@ -64,18 +241,19 @@ func (r *Runner) Buildkite() (string, error) {
 			step.Label = fmt.Sprintf("Integration Test (non-sudo): %s", lb.ID)
 			step.Key = fmt.Sprintf("integration-non-sudo-%s", lb.ID)
 			if lb.Batch.Stack != nil {
-				stackKey := fmt.Sprintf("integration-stack-%s", lb.Batch.Stack.Version)
+				stackKey := getStackKey(lb.Batch.Stack)
 				step.DependsOn = append(step.DependsOn, stackKey)
-				stackDepends[stackKey] = append(stackDepends[stackKey], step.Key)
+				stackTeardown[stackKey] = append(stackTeardown[stackKey], step.Key)
 			}
 			step.ArtifactPaths = []string{"build/**"}
 			step.Agents = []buildkite.StepAgent{agentStep}
-			step.Command = "mage integration:testOnRemote"
 			step.Env = map[string]string{
 				"AGENT_VERSION":      r.cfg.AgentVersion,
 				"TEST_DEFINE_PREFIX": step.Key,
 				"TEST_DEFINE_TESTS":  strings.Join(getTestNames(lb.Batch.Tests), ","),
 			}
+			step.Command = getCommand(lb)
+			step.Skip = shouldSkip(lb.OS)
 			steps = append(steps, step)
 		}
 		if len(lb.Batch.SudoTests) > 0 {
@@ -83,18 +261,19 @@ func (r *Runner) Buildkite() (string, error) {
 			step.Label = fmt.Sprintf("Integration Test (sudo): %s", lb.ID)
 			step.Key = fmt.Sprintf("integration-sudo-%s", lb.ID)
 			if lb.Batch.Stack != nil {
-				stackKey := fmt.Sprintf("integration-stack-%s", lb.Batch.Stack.Version)
+				stackKey := getStackKey(lb.Batch.Stack)
 				step.DependsOn = append(step.DependsOn, stackKey)
-				stackDepends[stackKey] = append(stackDepends[stackKey], step.Key)
+				stackTeardown[stackKey] = append(stackTeardown[stackKey], step.Key)
 			}
 			step.ArtifactPaths = []string{"build/**"}
 			step.Agents = []buildkite.StepAgent{agentStep}
-			step.Command = "mage integration:testOnRemote"
 			step.Env = map[string]string{
 				"AGENT_VERSION":      r.cfg.AgentVersion,
 				"TEST_DEFINE_PREFIX": step.Key,
 				"TEST_DEFINE_TESTS":  strings.Join(getTestNames(lb.Batch.SudoTests), ","),
 			}
+			step.Command = getCommand(lb)
+			step.Skip = shouldSkip(lb.OS)
 			steps = append(steps, step)
 		}
 	}
@@ -104,20 +283,20 @@ func (r *Runner) Buildkite() (string, error) {
 		steps = append(steps, buildkite.Step{
 			Label:                  fmt.Sprintf("Teardown: %s", step.Label),
 			Key:                    fmt.Sprintf("teardown-%s", step.Key),
-			DependsOn:              stackDepends[step.Key],
+			DependsOn:              stackTeardown[step.Key],
 			AllowDependencyFailure: true,
 			Command:                "false",
-			Agents:                 []buildkite.StepAgent{StackAgent},
+			Agents:                 []buildkite.StepAgent{bkStackAgent},
 		})
 	}
 
-	jsonOutput, err := json.Marshal(buildkite.Step{
+	yamlOutput, err := yaml.Marshal(buildkite.Step{
 		Steps: steps,
 	})
 	if err != nil {
-		return "", fmt.Errorf("unable to marshal json: %w", err)
+		return "", fmt.Errorf("unable to marshal yaml: %w", err)
 	}
-	return string(jsonOutput), nil
+	return string(yamlOutput), nil
 }
 
 func getTestNames(pt []define.BatchPackageTests) []string {
@@ -128,4 +307,9 @@ func getTestNames(pt []define.BatchPackageTests) []string {
 		}
 	}
 	return tests
+}
+
+func getStackKey(s *define.Stack) string {
+	version := strings.Replace(s.Version, ".", "-", -1)
+	return fmt.Sprintf("integration-stack-%s", version)
 }
