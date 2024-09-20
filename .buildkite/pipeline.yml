@@ -176,6 +176,7 @@ steps:
       - unit-tests
       - extended-windows
     allow_dependency_failure: true
+    skip: "See https://github.com/elastic/ingest-dev/issues/4042"
 
   - group: "K8s tests"
     key: "k8s-tests"
