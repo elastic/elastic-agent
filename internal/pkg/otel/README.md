@@ -69,6 +69,7 @@ This section provides a summary of components included in the Elastic Distributi
 | Component | Version |
 |---|---|
 | [healthcheckextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckextension/v0.108.0/extension/healthcheckextension/README.md) | v0.108.0 |
+| [pprofextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/pprofextension/v0.108.0/extension/pprofextension/README.md) | v0.108.0 |
 | [filestorage](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/storage/filestorage/v0.108.0/extension/storage/filestorage/README.md) | v0.108.0 |
 | [memorylimiterextension](https://github.com/open-telemetry/opentelemetry-collector/blob/extension/memorylimiterextension/v0.108.1/extension/memorylimiterextension/README.md) | v0.108.1 |
 
