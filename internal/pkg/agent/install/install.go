@@ -145,6 +145,11 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 		}
 	}
 
+	println("XXXXXXXXX This is where I will add my dirty hack to make the agent work XXXXXXXXX")
+	println("XXXXXXXXX This is where I will add my dirty hack to make the agent work XXXXXXXXX")
+	println("XXXXXXXXX This is where I will add my dirty hack to make the agent work XXXXXXXXX")
+	println("XXXXXXXXX This is where I will add my dirty hack to make the agent work XXXXXXXXX")
+
 	// install service
 	pt.Describe("Installing service")
 	err = InstallService(topPath, ownership, username, groupName)
