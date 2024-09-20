@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	v1 "k8s.io/api/apps/v1"
+
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
 	"github.com/elastic/elastic-agent-autodiscover/utils"
@@ -104,11 +106,12 @@ func NewPodEventer(
 	// Deployment -> Replicaset -> Pod
 	// CronJob -> job -> Pod
 	if metaConf.Deployment {
-		replicaSetWatcher, err = kubernetes.NewNamedWatcher("resource_metadata_enricher_rs", client, &kubernetes.ReplicaSet{}, kubernetes.WatchOptions{
+		// use a custom watcher here, so we can provide a transform function and limit the data we're storing
+		replicaSetWatcher, err = NewNamedWatcher("resource_metadata_enricher_rs", client, &kubernetes.ReplicaSet{}, kubernetes.WatchOptions{
 			SyncTimeout:  cfg.SyncPeriod,
 			Namespace:    cfg.Namespace,
 			HonorReSyncs: true,
-		}, nil)
+		}, nil, removeUnnecessaryReplicaSetData)
 		if err != nil {
 			logger.Errorf("Error creating watcher for %T due to error %+v", &kubernetes.Namespace{}, err)
 		}
@@ -538,4 +541,20 @@ func hintsCheck(annotations mapstr.M, container string, prefix string, validate 
 		logger.Warnf("provided hint: %s/%s is not recognised as supported annotation for pod %s in namespace %s", prefix, value, pod.Name, pod.ObjectMeta.Namespace)
 	}
 	return hints, incorrecthints
+}
+
+// removeUnnecessaryReplicaSetData removes all data from a ReplicaSet resource, except what we need to compute
+// Pod metadata. Which is just the name and owner references.
+func removeUnnecessaryReplicaSetData(obj interface{}) (interface{}, error) {
+	old, ok := obj.(*v1.ReplicaSet)
+	if !ok {
+		return nil, fmt.Errorf("obj is not a ReplicaSet")
+	}
+	transformed := v1.ReplicaSet{}
+	transformed.ObjectMeta = kubernetes.ObjectMeta{
+		Name:            old.GetName(),
+		Namespace:       old.GetNamespace(),
+		OwnerReferences: old.GetOwnerReferences(),
+	}
+	return transformed, nil
 }
