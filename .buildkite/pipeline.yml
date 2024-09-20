@@ -176,7 +176,7 @@ steps:
       - unit-tests
       - extended-windows
     allow_dependency_failure: true
-    soft_fail: true # See https://github.com/elastic/ingest-dev/issues/4042"
+    soft_fail: true # Until https://github.com/elastic/ingest-dev/issues/4042 is resolved
 
   - group: "K8s tests"
     key: "k8s-tests"
@@ -213,6 +213,7 @@ steps:
     retry:
       manual:
         allowed: true
+    soft_fail: true # Until https://github.com/elastic/ingest-dev/issues/4042 is resolved
 
   # Triggers a dynamic step: Sync K8s
   # Runs only on main and if k8s files are changed
