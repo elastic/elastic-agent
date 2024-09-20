@@ -267,7 +267,7 @@ func getKibanaClient() (*kibana.Client, error) {
 		Host:          kibanaHost,
 		Username:      kibanaUser,
 		Password:      kibanaPass,
-		IgnoreVersion: true,
+		IgnoreVersion: false,
 	}, 0, "Elastic-Agent-Test-Define", version.GetDefaultVersion(), version.Commit(), version.BuildTime().String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kibana client: %w", err)
