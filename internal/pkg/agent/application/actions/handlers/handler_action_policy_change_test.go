@@ -742,6 +742,46 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				},
 			},
 			{
+				name: "certificate and key without passphrase clear out previous passphrase",
+				originalCfg: &configuration.Configuration{
+					Fleet: &configuration.FleetAgentConfig{
+						Client: remote.Config{
+							Host: fleetmTLSServer.URL,
+							Transport: httpcommon.HTTPTransportSettings{
+								TLS: &tlscommon.Config{
+									CAs: []string{string(fleetRootPair.Cert)},
+									Certificate: tlscommon.CertificateConfig{
+										Certificate:    "some certificate",
+										Key:            "some key",
+										Passphrase:     "",
+										PassphrasePath: "/path/to/passphrase",
+									},
+								},
+							},
+						},
+						AccessAPIKey: "ignore",
+					},
+					Settings: configuration.DefaultSettingsConfig(),
+				},
+				newCfg: map[string]interface{}{
+					"fleet.ssl.enabled":     true,
+					"fleet.ssl.certificate": string(agentChildPair.Cert),
+					"fleet.ssl.key":         string(agentChildPair.Key),
+				},
+				setterCalledCount: 1,
+				wantCAs:           []string{string(fleetRootPair.Cert)},
+				wantCertificateConfig: tlscommon.CertificateConfig{
+					Certificate:    string(agentChildPair.Cert),
+					Key:            string(agentChildPair.Key),
+					Passphrase:     "",
+					PassphrasePath: "",
+				},
+				assertErr: func(t *testing.T, err error) {
+					assert.NoError(t, err,
+						"unexpected error when applying fleet.ssl.certificate and key")
+				},
+			},
+			{
 				name: "certificate and key with passphrase_path is applied when present",
 				originalCfg: &configuration.Configuration{
 					Fleet: &configuration.FleetAgentConfig{
