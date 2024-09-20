@@ -160,6 +160,9 @@ http:
 }
 
 func TestAPMConfig(t *testing.T) {
+
+	tenPercentSamplingRate := float32(0.1)
+
 	tcs := map[string]struct {
 		in  map[string]interface{}
 		out APMConfig
@@ -191,6 +194,24 @@ func TestAPMConfig(t *testing.T) {
 					ServerCertificate: "server_cert",
 					ServerCA:          "server_ca",
 				},
+			},
+		},
+		"sampling_rate 10%": {
+			in: map[string]interface{}{
+				"traces": true,
+				"apm": map[string]interface{}{
+					"api_key":       "abc123",
+					"environment":   "production",
+					"hosts":         []string{"https://abc.123.com"},
+					"sampling_rate": &tenPercentSamplingRate,
+				},
+			},
+			out: APMConfig{
+				APIKey:       "abc123",
+				Environment:  "production",
+				Hosts:        []string{"https://abc.123.com"},
+				TLS:          APMTLS{},
+				SamplingRate: &tenPercentSamplingRate,
 			},
 		},
 	}
