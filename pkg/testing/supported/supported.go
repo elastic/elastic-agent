@@ -10,6 +10,7 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 	"github.com/elastic/elastic-agent/pkg/testing/linux"
 	"github.com/elastic/elastic-agent/pkg/testing/windows"
 )
@@ -132,7 +133,6 @@ var (
 		},
 		Runner: windows.WindowsRunner{},
 	}
-
 	// WindowsAMD64_2016 - Windows (amd64) Server 2016
 	WindowsAMD64_2016 = common.SupportedOS{
 		OS: define.OS{
@@ -178,6 +178,16 @@ var supported = []common.SupportedOS{
 	// WindowsAMD64_2016_Core,
 }
 
+// init injects the kubernetes support list into the support list above
+func init() {
+	for _, k8sSupport := range kubernetes.GetSupported() {
+		supported = append(supported, common.SupportedOS{
+			OS:     k8sSupport,
+			Runner: kubernetes.KubernetesRunner{},
+		})
+	}
+}
+
 // osMatch returns true when the specific OS is a match for a non-specific OS.
 func osMatch(specific define.OS, notSpecific define.OS) bool {
 	if specific.Type != notSpecific.Type || specific.Arch != notSpecific.Arch {
@@ -187,6 +197,9 @@ func osMatch(specific define.OS, notSpecific define.OS) bool {
 		return false
 	}
 	if notSpecific.Version != "" && specific.Version != notSpecific.Version {
+		return false
+	}
+	if notSpecific.DockerVariant != "" && specific.DockerVariant != notSpecific.DockerVariant {
 		return false
 	}
 	return true
@@ -248,6 +261,15 @@ func allowedByPlatform(os define.OS, platform define.OS) bool {
 	}
 	if os.Version != platform.Version {
 		return false
+	}
+	if platform.Type == define.Kubernetes {
+		// on kubernetes docker variant is supported
+		if platform.DockerVariant == "" {
+			return true
+		}
+		if os.DockerVariant != platform.DockerVariant {
+			return false
+		}
 	}
 	return true
 }

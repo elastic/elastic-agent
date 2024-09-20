@@ -120,6 +120,8 @@ func parsePlatform(platform string) (define.OS, error) {
 	case 4:
 		if separated[0] == define.Linux {
 			os = define.OS{Type: separated[0], Arch: separated[1], Distro: separated[2], Version: separated[3]}
+		} else if separated[0] == define.Kubernetes {
+			os = define.OS{Type: separated[0], Arch: separated[1], Version: separated[2], DockerVariant: separated[3]}
 		} else {
 			return define.OS{}, fmt.Errorf("failed to parse platform string %q: more than 2 separators", platform)
 		}

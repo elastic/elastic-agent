@@ -26,7 +26,8 @@ The outputs section specifies where to send data. You can specify multiple outpu
 
 {{ define "section.description.OutputObject.PreTable" }}
 The supported types of outputs are:
-- `ESPlainAuth`: `elasticsearch` output with the connection details specified inline the yaml
+- `ESPlainAuthBasic`: `elasticsearch` output with the connection details (url, username, password) specified inline the yaml
+- `ESPlainAuthAPI`: `elasticsearch` output with the connection details (url, api_key) specified inline the yaml
 - `ESSecretAuthBasic`: `elasticsearch` output with the connection details specified in a k8s secret
 - `ESSecretAuthAPI`: `elasticsearch` output with the connection details specified in a k8s secret
 - `ESECKRef`: `elasticsearch` output that references by name an Elasticsearch cluster managed by ECK operator
@@ -34,12 +35,13 @@ The supported types of outputs are:
 
 {{ define "section.description.OutputObject.PostTable" }}
 Examples of Helm chart arguments to define an output with name `myOutput`:
-- `ESPlainAuth`: `--set outputs.myOutput.url=https://elasticsearch:9200 --set outputs.myOutput.api_key=token`
+- `ESPlainAuthBasic`: `--set outputs.myOutput.url=https://elasticsearch:9200 --set outputs.myOutput.username=changeme --set outputs.myOutput.password=changeme`
+- `ESPlainAuthAPI`: `--set outputs.myOutput.url=https://elasticsearch:9200 --set outputs.myOutput.api_key=token`
 - `ESSecretAuthBasic`: `--set outputs.myOutput.type=ESSecretAuthBasic --set outputs.myOutput.secretName=k8s_secret_name` (required keys in the k8s secret are `url`, `username`, `password`)
 - `ESSecretAuthAPI`: `--set outputs.myOutput.type=ESSecretAuthAPI --set outputs.myOutput.secretName=k8s_secret_name` (required keys in the k8s secret are `url`, `api_key`)
 - `ESECKRef`: `--set outputs.myOutput.type=ESECKRef --set outputs.myOutput.name=eck_es_cluster_name`
 
-For `ESPlainAuth`, `ESSecretAuthBasic`, `ESSecretAuthAPI` extra fields can be specified inline the yaml following these guidelines (`ESECKRef` doesn't support them):
+For `ESPlainAuthBasic`, `ESPlainAuthAPI` `ESSecretAuthBasic`, `ESSecretAuthAPI` extra fields can be specified inline the yaml following these guidelines (`ESECKRef` doesn't support them):
  - ["Data parsing, filtering, and manipulation settings"](`https://www.elastic.co/guide/en/fleet/current/elasticsearch-output.html#output-elasticsearch-data-parsing-settings`)
  - ["Performance tuning settings"](https://www.elastic.co/guide/en/fleet/current/elasticsearch-output.html#output-elasticsearch-performance-tuning-settings)
  - ["Memory queue settings"](https://www.elastic.co/guide/en/fleet/current/elasticsearch-output.html#output-elasticsearch-memory-queue-settings)

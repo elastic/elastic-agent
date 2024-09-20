@@ -4,10 +4,10 @@ import (
 	"crypto/md5"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"strings"
 	"unicode/utf8"
 
+	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
@@ -84,6 +84,15 @@ func createBatchesFromBatch(batch define.Batch, platforms []define.OS, groups []
 	return batches, nil
 }
 
+func batchInGroups(batch define.Batch, groups []string) bool {
+	for _, g := range groups {
+		if batch.Group == g {
+			return true
+		}
+	}
+	return false
+}
+
 func filterSingleTest(batches []common.OSBatch, singleTest string) ([]common.OSBatch, error) {
 	var filtered []common.OSBatch
 	for _, batch := range batches {
@@ -140,13 +149,14 @@ func filterSingleTestBatch(batch common.OSBatch, testName string) (common.OSBatc
 	return batch, false
 }
 
-func batchInGroups(batch define.Batch, groups []string) bool {
-	for _, g := range groups {
-		if batch.Group == g {
-			return true
+func filterSupportedOS(batches []common.OSBatch, provisioner common.InstanceProvisioner) []common.OSBatch {
+	var filtered []common.OSBatch
+	for _, batch := range batches {
+		if ok := provisioner.Supported(batch.OS.OS); ok {
+			filtered = append(filtered, batch)
 		}
 	}
-	return false
+	return filtered
 }
 
 // createBatchID creates a consistent/unique ID for the batch
@@ -158,7 +168,12 @@ func createBatchID(batch common.OSBatch) string {
 	if batch.OS.Type == define.Linux {
 		id += "-" + batch.OS.Distro
 	}
-	id += "-" + strings.Replace(batch.OS.Version, ".", "", -1)
+	if batch.OS.Version != "" {
+		id += "-" + strings.Replace(batch.OS.Version, ".", "", -1)
+	}
+	if batch.OS.Type == define.Kubernetes && batch.OS.DockerVariant != "" {
+		id += "-" + batch.OS.DockerVariant
+	}
 	id += "-" + strings.Replace(batch.Batch.Group, ".", "", -1)
 
 	// The batchID needs to be at most 63 characters long otherwise
