@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package define
 
@@ -267,7 +267,7 @@ func getKibanaClient() (*kibana.Client, error) {
 		Host:          kibanaHost,
 		Username:      kibanaUser,
 		Password:      kibanaPass,
-		IgnoreVersion: true,
+		IgnoreVersion: false,
 	}, 0, "Elastic-Agent-Test-Define", version.GetDefaultVersion(), version.Commit(), version.BuildTime().String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kibana client: %w", err)

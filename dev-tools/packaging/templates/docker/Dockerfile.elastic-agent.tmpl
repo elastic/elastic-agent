@@ -108,8 +108,8 @@ LABEL \
   org.opencontainers.image.licenses="{{ .License }}" \
   org.opencontainers.image.title="{{ .BeatName | title }}" \
   org.opencontainers.image.vendor="{{ .BeatVendor }}" \
+  org.opencontainers.image.authors="infra@elastic.co" \
   name="{{ .BeatName }}" \
-  maintainer="infra@elastic.co" \
   vendor="{{ .BeatVendor }}" \
   version="{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}" \
   release="1" \
@@ -118,7 +118,7 @@ LABEL \
   license="{{ .License }}" \
   description="{{ .BeatDescription }}"
 
-ENV ELASTIC_CONTAINER "true"
+ENV ELASTIC_CONTAINER="true"
 ENV PATH={{ $beatHome }}:$PATH
 ENV GODEBUG="madvdontneed=1"
 
@@ -192,7 +192,7 @@ RUN echo \
 ENV ELASTIC_SYNTHETICS_CAPABLE=true
 ENV ELASTIC_AGENT_COMPLETE=true
 ENV TZ=UTC
-ENV NODE_VERSION=18.20.3
+ENV NODE_VERSION=18.20.4
 ENV PATH="$NODE_PATH/node/bin:$PATH"
 # Install the latest version of @elastic/synthetics forcefully ignoring the previously
 # cached node_modules, heartbeat then calls the global executable to run test suites
@@ -239,8 +239,38 @@ RUN for iter in {1..10}; do \
     (exit $exit_code)
 {{- end }}
 
+{{- if (and (eq .Variant "complete-wolfi") (contains .from "wolfi"))  }}
+USER root
+# Install required dependencies from wolfi repository
+RUN for iter in {1..10}; do \
+        apk update && \
+        apk add --no-interactive --no-progress --no-cache nodejs-18=18.20.4-r0 npm=10.8.3-r0 glib dbus-glib libatk-1.0 \
+        libatk-bridge-2.0 cups-libs libxcomposite libxdamage libxrandr libxkbcommon pango alsa-lib \
+        font-opensans fontconfig gtk icu-data-full libnss mesa font-noto-cjk font-noto-emoji && \
+        exit_code=0 && break || exit_code=$? && echo "apk error: retry $iter in 10s" && sleep 10; \
+    done; \
+    (exit $exit_code)
+
+# Setup synthetics env vars
+ENV ELASTIC_SYNTHETICS_CAPABLE=true
+ENV TZ=UTC
+ENV NPM_CONFIG_PREFIX={{ $beatHome }}/.npm
+ENV PATH="$NPM_CONFIG_PREFIX/bin:$PATH"
+
+RUN echo \
+    $NPM_CONFIG_PREFIX \
+    {{ $beatHome }}/.config \
+    {{ $beatHome }}/.synthetics \
+    {{ $beatHome }}/.npm \
+    {{ $beatHome }}/.cache \
+    | xargs -IDIR sh -c 'mkdir -m 0770 -p DIR && chown -R {{ .user }} DIR'
+
 USER {{ .user }}
 
+RUN (npm i -g --loglevel verbose --production --engine-strict  @elastic/synthetics@stack_release || sh -c 'tail -n +1 ${NPM_CONFIG_PREFIX}/_logs/* && exit 1')
+{{- end }}
+
+USER {{ .user }}
 
 {{- range $i, $port := .ExposePorts }}
 EXPOSE {{ $port }}

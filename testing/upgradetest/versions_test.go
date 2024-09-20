@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package upgradetest
 
@@ -90,6 +90,10 @@ func TestGetUpgradableVersions(t *testing.T) {
 func TestPreviousMinor(t *testing.T) {
 	currentParsed, err := version.ParseVersion(bversion.Agent)
 	require.NoError(t, err)
+
+	if currentParsed.Minor() == 0 {
+		t.Skipf("skipping TestPreviousMinor as current major version (%v) don't have previous minor", bversion.Agent)
+	}
 
 	v, err := PreviousMinor()
 	require.NoError(t, err)

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -327,6 +327,9 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
+	// We call agentFixture.Prepare to set the workdir
+	require.NoError(t, agentFixture.Prepare(ctx), "failed preparing agent fixture")
+
 	_, outputID := createMockESOutput(t, info)
 	policyID, enrollmentAPIKey := createPolicy(
 		t,
@@ -366,7 +369,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 		// the agent logs will be present in the error message
 		// which should help to explain why the agent was not
 		// healthy.
-		err := agentFixture.IsHealthy(ctx)
+		err := agentFixture.IsHealthy(ctx, withEnv(env))
 		return err == nil
 	},
 		2*time.Minute, time.Second,

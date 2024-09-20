@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package cmd
 
@@ -111,6 +111,7 @@ type enrollCmdOption struct {
 	CASha256             []string                   `yaml:"ca_sha256,omitempty"`
 	Certificate          string                     `yaml:"certificate,omitempty"`
 	Key                  string                     `yaml:"key,omitempty"`
+	KeyPassphrasePath    string                     `yaml:"key_passphrase_path,omitempty"`
 	Insecure             bool                       `yaml:"insecure,omitempty"`
 	EnrollAPIKey         string                     `yaml:"enrollment_key,omitempty"`
 	Staging              string                     `yaml:"staging,omitempty"`
@@ -149,8 +150,9 @@ func (e *enrollCmdOption) remoteConfig() (remote.Config, error) {
 	}
 	if e.Certificate != "" || e.Key != "" {
 		tlsCfg.Certificate = tlscommon.CertificateConfig{
-			Certificate: e.Certificate,
-			Key:         e.Key,
+			Certificate:    e.Certificate,
+			Key:            e.Key,
+			PassphrasePath: e.KeyPassphrasePath,
 		}
 	}
 

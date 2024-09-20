@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -102,23 +103,49 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 			return false
 		}
 
+		if client.State(status.State) != client.Healthy {
+			stateBuff.WriteString(fmt.Sprintf(
+				"agent isn't healthy: %s-%s",
+				client.State(status.State), status.Message))
+			return false
+		}
+
+		if len(status.Components) == 0 {
+			stateBuff.WriteString(fmt.Sprintf(
+				"healthy but without components: agent status: %s-%s",
+				client.State(status.State), status.Message))
+			return false
+		}
+
+		// the agent might be healthy but waiting its first configuration,
+		// in that case, there would be no components yet. Therefore, ensure
+		// the agent received the policy with components before proceeding with
+		// the test.
 		for _, c := range status.Components {
 			bs, err := json.MarshalIndent(status, "", "  ")
 			if err != nil {
-				stateBuff.WriteString(fmt.Sprintf("%s not health, could not marshal status outptu: %v",
+				stateBuff.WriteString(fmt.Sprintf(
+					"%s not healthy, could not marshal status outptu: %v",
 					c.Name, err))
 				return false
 			}
 
 			state := client.State(c.State)
 			if state != client.Healthy {
-				stateBuff.WriteString(fmt.Sprintf("%s not health, agent status output: %s",
+				stateBuff.WriteString(fmt.Sprintf(
+					"%s not health, agent status output: %s",
 					c.Name, bs))
 				return false
 			}
 
+			// there is a rare a race condition unlike to happen on a
+			// production scenario where the component is healthy but the
+			// version info delays to update. As the Status command and the
+			// diagnostics fetch this information in the same way, it guarantees
+			// the version info is up-to-date before proceeding with the test.
 			if c.VersionInfo.Meta.Commit == "" {
-				stateBuff.WriteString(fmt.Sprintf("%s health, but no versionInfo. agent status output: %s",
+				stateBuff.WriteString(fmt.Sprintf(
+					"%s health, but no versionInfo. agent status output: %s",
 					c.Name, bs))
 				return false
 			}
@@ -130,13 +157,13 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		allHealthy,
 		5*time.Minute, 10*time.Second,
 		"agent never became healthy. Last status: %v", &stateBuff)
-	t.Cleanup(func() {
+	defer func() {
 		if !t.Failed() {
 			return
 		}
 
-		t.Logf("test failed: last status output: %v", status)
-	})
+		t.Logf("test failed: last status output: %#v", status)
+	}()
 
 	agentbeat := "agentbeat"
 	if runtime.GOOS == "windows" {
@@ -173,14 +200,14 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 
 	diag := t.TempDir()
 	extractZipArchive(t, diagZip, diag)
-	// the test is flaky, so collecting some data to analyze later.
-	t.Cleanup(func() {
+	// if the test fails, the diagnostics used is useful for debugging.
+	defer func() {
 		if !t.Failed() {
 			return
 		}
 
 		t.Logf("the test failed: trying to save the diagnostics used on the test")
-		diagDir, err := f.DiagDir()
+		diagDir, err := f.DiagnosticsDir()
 		if err != nil {
 			t.Logf("could not get diagnostics directory to save the diagnostics used on the test")
 			return
@@ -194,7 +221,7 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 				diagDir, err)
 			return
 		}
-	})
+	}()
 
 	stateFilePath := filepath.Join(diag, "state.yaml")
 	stateYAML, err := os.Open(stateFilePath)
@@ -227,6 +254,19 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 			"component %s: VersionInfo.BuildHash mismatch", c.ID)
 		assert.Equalf(t, wantBuildHash, c.State.VersionInfo.Meta.Commit,
 			"component %s: VersionInfo.Meta.Commit mismatch", c.ID)
+	}
+
+	if t.Failed() {
+		_, seek := stateYAML.Seek(0, 0)
+		if seek != nil {
+			t.Logf("could not reset state.yaml offset to print it")
+			return
+		}
+		data, err := io.ReadAll(stateYAML)
+		if err != nil {
+			t.Logf("could not read state.yaml: %v", err)
+		}
+		t.Logf("test failed: state.yaml contents: %q", string(data))
 	}
 }
 

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package config
 
@@ -160,6 +160,9 @@ http:
 }
 
 func TestAPMConfig(t *testing.T) {
+
+	tenPercentSamplingRate := float32(0.1)
+
 	tcs := map[string]struct {
 		in  map[string]interface{}
 		out APMConfig
@@ -191,6 +194,24 @@ func TestAPMConfig(t *testing.T) {
 					ServerCertificate: "server_cert",
 					ServerCA:          "server_ca",
 				},
+			},
+		},
+		"sampling_rate 10%": {
+			in: map[string]interface{}{
+				"traces": true,
+				"apm": map[string]interface{}{
+					"api_key":       "abc123",
+					"environment":   "production",
+					"hosts":         []string{"https://abc.123.com"},
+					"sampling_rate": &tenPercentSamplingRate,
+				},
+			},
+			out: APMConfig{
+				APIKey:       "abc123",
+				Environment:  "production",
+				Hosts:        []string{"https://abc.123.com"},
+				TLS:          APMTLS{},
+				SamplingRate: &tenPercentSamplingRate,
 			},
 		},
 	}

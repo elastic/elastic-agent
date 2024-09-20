@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package packer
 
@@ -24,9 +24,7 @@ func TestPacker(t *testing.T) {
 
 	withFiles := func(test tt, fn func(pattern []string, t *testing.T)) func(t *testing.T) {
 		return func(t *testing.T) {
-			d, err := os.MkdirTemp("", "packer")
-			require.NoError(t, err)
-			defer os.RemoveAll(d)
+			d := t.TempDir()
 
 			for f, v := range test.content {
 				path := filepath.Join(d, f)

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package pgptest
 
@@ -14,9 +14,9 @@ import (
 	"golang.org/x/crypto/openpgp/armor" //nolint:staticcheck // It still receives security fixes and it's just test code
 )
 
-// Sing signs data using RSA. It creates the key, sings data and returns the
+// Sign signs data using RSA. It creates the key, sings data and returns the
 // ASCII armored public key and detached signature.
-func Sing(t *testing.T, data io.Reader) ([]byte, []byte) {
+func Sign(t *testing.T, data io.Reader) ([]byte, []byte) {
 	pub := &bytes.Buffer{}
 	asc := &bytes.Buffer{}
 
