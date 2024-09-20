@@ -32,6 +32,8 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
+	t.Skip("This test cannot succeed with a AGENT_PACKAGE_VERSION override. Check contents of .buildkite/scripts/steps/beats_tests.sh")
+
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
