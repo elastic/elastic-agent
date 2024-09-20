@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"io"
 	"os"
 	"os/exec"
@@ -17,8 +18,6 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
-	"github.com/elastic/elastic-agent/pkg/testing/runner"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/e2e-framework/klient"
@@ -50,12 +49,12 @@ nodes:
         secure-port: "10257"
 `
 
-func NewProvisioner(versions string) runner.InstanceProvisioner {
+func NewProvisioner(versions string) common.InstanceProvisioner {
 	return &provisioner{versions: strings.Split(versions, ",")}
 }
 
 type provisioner struct {
-	logger   runner.Logger
+	logger   common.Logger
 	versions []string
 }
 
@@ -63,11 +62,11 @@ func (p *provisioner) Name() string {
 	return Name
 }
 
-func (p *provisioner) Type() runner.ProvisionerType {
-	return runner.ProvisionerTypeK8SCluster
+func (p *provisioner) Type() common.ProvisionerType {
+	return common.ProvisionerTypeK8SCluster
 }
 
-func (p *provisioner) SetLogger(l runner.Logger) {
+func (p *provisioner) SetLogger(l common.Logger) {
 	p.logger = l
 }
 
@@ -82,7 +81,7 @@ func (p *provisioner) Supported(batch define.OS) bool {
 	return supported
 }
 
-func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches []runner.OSBatch) ([]runner.Instance, error) {
+func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches []common.OSBatch) ([]common.Instance, error) {
 
 	agentImageWithoutTests := fmt.Sprintf("docker.elastic.co/beats/elastic-agent-complete:%s", cfg.AgentVersion)
 	agentImage, err := kubernetes.AddK8STestsToImage(ctx, p.logger, agentImageWithoutTests, runtime.GOARCH)
@@ -104,7 +103,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 		versionsMap[k8sVersion] = batch.ID
 	}
 
-	var instances []runner.Instance
+	var instances []common.Instance
 	for k8sVersion, instanceID := range versionsMap {
 		instanceName := fmt.Sprintf("%s-%s", k8sVersion, instanceID)
 		exists, err := p.clusterExists(instanceName)
@@ -152,7 +151,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 			return nil, err
 		}
 
-		instances = append(instances, runner.Instance{
+		instances = append(instances, common.Instance{
 			ID:          instanceID,
 			Name:        instanceName,
 			Provisioner: Name,
@@ -220,11 +219,11 @@ func (p *provisioner) WaitForControlPlane(client klient.Client) error {
 	return nil
 }
 
-func (p *provisioner) Clean(ctx context.Context, cfg runner.Config, instances []runner.Instance) error {
+func (p *provisioner) Clean(ctx context.Context, cfg common.Config, instances []common.Instance) error {
 	// doesn't execute in parallel for the same reasons in Provision
 	// multipass just cannot handle it
 	for _, instance := range instances {
-		func(instance runner.Instance) {
+		func(instance common.Instance) {
 			err := p.deleteCluster(instance.ID)
 			if err != nil {
 				// prevent a failure from stopping the other instances and clean

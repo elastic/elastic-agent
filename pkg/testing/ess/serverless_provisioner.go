@@ -8,12 +8,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"io"
 	"net/http"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/pkg/testing/runner"
 )
 
 const ProvisionerServerless = "serverless"
@@ -21,7 +21,7 @@ const ProvisionerServerless = "serverless"
 // ServerlessProvisioner contains
 type ServerlessProvisioner struct {
 	cfg ProvisionerConfig
-	log runner.Logger
+	log common.Logger
 }
 
 type defaultLogger struct {
@@ -47,7 +47,7 @@ type ServerlessRegions struct {
 }
 
 // NewServerlessProvisioner creates a new StackProvisioner instance for serverless
-func NewServerlessProvisioner(ctx context.Context, cfg ProvisionerConfig) (runner.StackProvisioner, error) {
+func NewServerlessProvisioner(ctx context.Context, cfg ProvisionerConfig) (common.StackProvisioner, error) {
 	prov := &ServerlessProvisioner{
 		cfg: cfg,
 		log: &defaultLogger{wrapped: logp.L()},
@@ -64,12 +64,12 @@ func (prov *ServerlessProvisioner) Name() string {
 }
 
 // SetLogger sets the logger for the
-func (prov *ServerlessProvisioner) SetLogger(l runner.Logger) {
+func (prov *ServerlessProvisioner) SetLogger(l common.Logger) {
 	prov.log = l
 }
 
 // Create creates a stack.
-func (prov *ServerlessProvisioner) Create(ctx context.Context, request runner.StackRequest) (runner.Stack, error) {
+func (prov *ServerlessProvisioner) Create(ctx context.Context, request common.StackRequest) (common.Stack, error) {
 	// allow up to 4 minutes for requests
 	createCtx, createCancel := context.WithTimeout(ctx, 4*time.Minute)
 	defer createCancel()
@@ -80,13 +80,13 @@ func (prov *ServerlessProvisioner) Create(ctx context.Context, request runner.St
 	prov.log.Logf("Creating serverless stack %s [stack_id: %s]", request.Version, request.ID)
 	proj, err := client.DeployStack(createCtx, srvReq)
 	if err != nil {
-		return runner.Stack{}, fmt.Errorf("error deploying stack for request %s: %w", request.ID, err)
+		return common.Stack{}, fmt.Errorf("error deploying stack for request %s: %w", request.ID, err)
 	}
 	err = client.WaitForEndpoints(createCtx)
 	if err != nil {
-		return runner.Stack{}, fmt.Errorf("error waiting for endpoints to become available for serverless stack %s [stack_id: %s, deployment_id: %s]: %w", request.Version, request.ID, proj.ID, err)
+		return common.Stack{}, fmt.Errorf("error waiting for endpoints to become available for serverless stack %s [stack_id: %s, deployment_id: %s]: %w", request.Version, request.ID, proj.ID, err)
 	}
-	stack := runner.Stack{
+	stack := common.Stack{
 		ID:            request.ID,
 		Provisioner:   prov.Name(),
 		Version:       request.Version,
@@ -105,7 +105,7 @@ func (prov *ServerlessProvisioner) Create(ctx context.Context, request runner.St
 }
 
 // WaitForReady should block until the stack is ready or the context is cancelled.
-func (prov *ServerlessProvisioner) WaitForReady(ctx context.Context, stack runner.Stack) (runner.Stack, error) {
+func (prov *ServerlessProvisioner) WaitForReady(ctx context.Context, stack common.Stack) (common.Stack, error) {
 	deploymentID, deploymentType, err := prov.getDeploymentInfo(stack)
 	if err != nil {
 		return stack, fmt.Errorf("failed to get deployment info from the stack: %w", err)
@@ -162,7 +162,7 @@ func (prov *ServerlessProvisioner) WaitForReady(ctx context.Context, stack runne
 }
 
 // Delete deletes a stack.
-func (prov *ServerlessProvisioner) Delete(ctx context.Context, stack runner.Stack) error {
+func (prov *ServerlessProvisioner) Delete(ctx context.Context, stack common.Stack) error {
 	deploymentID, deploymentType, err := prov.getDeploymentInfo(stack)
 	if err != nil {
 		return fmt.Errorf("failed to get deployment info from the stack: %w", err)
@@ -238,7 +238,7 @@ func (prov *ServerlessProvisioner) CheckCloudRegion(ctx context.Context) error {
 	return nil
 }
 
-func (prov *ServerlessProvisioner) getDeploymentInfo(stack runner.Stack) (string, string, error) {
+func (prov *ServerlessProvisioner) getDeploymentInfo(stack common.Stack) (string, string, error) {
 	if stack.Internal == nil {
 		return "", "", fmt.Errorf("missing internal information")
 	}

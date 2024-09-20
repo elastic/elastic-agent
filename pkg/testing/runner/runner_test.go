@@ -6,6 +6,7 @@ package runner
 
 import (
 	"context"
+	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"os"
 	"path/filepath"
 	"sync"
@@ -23,7 +24,7 @@ func TestNewRunner_Clean(t *testing.T) {
 	err := os.MkdirAll(stateDir, 0755)
 	require.NoError(t, err)
 
-	cfg := Config{
+	cfg := common.Config{
 		AgentVersion: "8.10.0",
 		StackVersion: "8.10.0-SNAPSHOT",
 		BuildDir:     filepath.Join(tmpdir, "build"),
@@ -37,7 +38,7 @@ func TestNewRunner_Clean(t *testing.T) {
 	r, err := NewRunner(cfg, ip, sp)
 	require.NoError(t, err)
 
-	i1 := Instance{
+	i1 := common.Instance{
 		ID:          "id-1",
 		Name:        "name-1",
 		Provisioner: ip.Name(),
@@ -51,7 +52,7 @@ func TestNewRunner_Clean(t *testing.T) {
 		Prepared: true,
 	})
 	require.NoError(t, err)
-	i2 := Instance{
+	i2 := common.Instance{
 		ID:          "id-2",
 		Name:        "name-2",
 		Provisioner: ip.Name(),
@@ -65,7 +66,7 @@ func TestNewRunner_Clean(t *testing.T) {
 		Prepared: true,
 	})
 	require.NoError(t, err)
-	s1 := Stack{
+	s1 := common.Stack{
 		ID:          "id-1",
 		Provisioner: sp.Name(),
 		Version:     "8.10.0",
@@ -73,7 +74,7 @@ func TestNewRunner_Clean(t *testing.T) {
 	}
 	err = r.addOrUpdateStack(s1)
 	require.NoError(t, err)
-	s2 := Stack{
+	s2 := common.Stack{
 		ID:          "id-2",
 		Provisioner: sp.Name(),
 		Version:     "8.9.0",
@@ -90,35 +91,35 @@ func TestNewRunner_Clean(t *testing.T) {
 	err = r.Clean()
 	require.NoError(t, err)
 
-	assert.ElementsMatch(t, ip.instances, []Instance{i1, i2})
-	assert.ElementsMatch(t, sp.deletedStacks, []Stack{s1, s2})
+	assert.ElementsMatch(t, ip.instances, []common.Instance{i1, i2})
+	assert.ElementsMatch(t, sp.deletedStacks, []common.Stack{s1, s2})
 }
 
 type fakeInstanceProvisioner struct {
-	batches   []OSBatch
-	instances []Instance
+	batches   []common.OSBatch
+	instances []common.Instance
 }
 
 func (p *fakeInstanceProvisioner) Name() string {
 	return "fake"
 }
 
-func (p *fakeInstanceProvisioner) Type() ProvisionerType {
-	return ProvisionerTypeVM
+func (p *fakeInstanceProvisioner) Type() common.ProvisionerType {
+	return common.ProvisionerTypeVM
 }
 
-func (p *fakeInstanceProvisioner) SetLogger(_ Logger) {
+func (p *fakeInstanceProvisioner) SetLogger(_ common.Logger) {
 }
 
 func (p *fakeInstanceProvisioner) Supported(_ define.OS) bool {
 	return true
 }
 
-func (p *fakeInstanceProvisioner) Provision(_ context.Context, _ Config, batches []OSBatch) ([]Instance, error) {
+func (p *fakeInstanceProvisioner) Provision(_ context.Context, _ common.Config, batches []common.OSBatch) ([]common.Instance, error) {
 	p.batches = batches
-	var instances []Instance
+	var instances []common.Instance
 	for _, batch := range batches {
-		instances = append(instances, Instance{
+		instances = append(instances, common.Instance{
 			ID:         batch.ID,
 			Name:       batch.ID,
 			IP:         "127.0.0.1",
@@ -130,29 +131,29 @@ func (p *fakeInstanceProvisioner) Provision(_ context.Context, _ Config, batches
 	return instances, nil
 }
 
-func (p *fakeInstanceProvisioner) Clean(_ context.Context, _ Config, instances []Instance) error {
+func (p *fakeInstanceProvisioner) Clean(_ context.Context, _ common.Config, instances []common.Instance) error {
 	p.instances = instances
 	return nil
 }
 
 type fakeStackProvisioner struct {
 	mx            sync.Mutex
-	requests      []StackRequest
-	deletedStacks []Stack
+	requests      []common.StackRequest
+	deletedStacks []common.Stack
 }
 
 func (p *fakeStackProvisioner) Name() string {
 	return "fake"
 }
 
-func (p *fakeStackProvisioner) SetLogger(_ Logger) {
+func (p *fakeStackProvisioner) SetLogger(_ common.Logger) {
 }
 
-func (p *fakeStackProvisioner) Create(_ context.Context, request StackRequest) (Stack, error) {
+func (p *fakeStackProvisioner) Create(_ context.Context, request common.StackRequest) (common.Stack, error) {
 	p.mx.Lock()
 	defer p.mx.Unlock()
 	p.requests = append(p.requests, request)
-	return Stack{
+	return common.Stack{
 		ID:            request.ID,
 		Version:       request.Version,
 		Elasticsearch: "http://localhost:9200",
@@ -164,12 +165,12 @@ func (p *fakeStackProvisioner) Create(_ context.Context, request StackRequest) (
 	}, nil
 }
 
-func (p *fakeStackProvisioner) WaitForReady(_ context.Context, stack Stack) (Stack, error) {
+func (p *fakeStackProvisioner) WaitForReady(_ context.Context, stack common.Stack) (common.Stack, error) {
 	stack.Ready = true
 	return stack, nil
 }
 
-func (p *fakeStackProvisioner) Delete(_ context.Context, stack Stack) error {
+func (p *fakeStackProvisioner) Delete(_ context.Context, stack common.Stack) error {
 	p.mx.Lock()
 	defer p.mx.Unlock()
 	p.deletedStacks = append(p.deletedStacks, stack)

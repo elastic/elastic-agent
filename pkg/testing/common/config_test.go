@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package runner
+package common
 
 import (
 	"errors"
@@ -78,12 +78,12 @@ func TestConfig_GetPlatforms(t *testing.T) {
 				{
 					Type:   define.Linux,
 					Arch:   define.AMD64,
-					Distro: Ubuntu,
+					Distro: "ubuntu",
 				},
 				{
 					Type:    define.Linux,
 					Arch:    define.ARM64,
-					Distro:  Ubuntu,
+					Distro:  "ubuntu",
 					Version: "22.04",
 				},
 				{

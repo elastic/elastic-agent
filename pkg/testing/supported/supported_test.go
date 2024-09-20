@@ -2,10 +2,11 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package runner
+package supported
 
 import (
 	"errors"
+	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -18,7 +19,7 @@ func TestGetSupported(t *testing.T) {
 		Name      string
 		OS        define.OS
 		Platforms []define.OS
-		Results   []SupportedOS
+		Results   []common.SupportedOS
 		Err       error
 	}{
 		{
@@ -36,7 +37,7 @@ func TestGetSupported(t *testing.T) {
 				Arch:   define.AMD64,
 				Distro: Ubuntu,
 			},
-			Results: []SupportedOS{
+			Results: []common.SupportedOS{
 				UbuntuAMD64_2404,
 				UbuntuAMD64_2204,
 				UbuntuAMD64_2004,
@@ -50,7 +51,7 @@ func TestGetSupported(t *testing.T) {
 				Distro:  Ubuntu,
 				Version: "20.04",
 			},
-			Results: []SupportedOS{
+			Results: []common.SupportedOS{
 				UbuntuAMD64_2004,
 			},
 		},
@@ -75,7 +76,7 @@ func TestGetSupported(t *testing.T) {
 					Version: "20.04",
 				},
 			},
-			Results: []SupportedOS{
+			Results: []common.SupportedOS{
 				UbuntuAMD64_2004,
 			},
 		},
@@ -86,7 +87,7 @@ func TestGetSupported(t *testing.T) {
 				Arch:   define.AMD64,
 				Distro: Rhel,
 			},
-			Results: []SupportedOS{
+			Results: []common.SupportedOS{
 				RhelAMD64_8,
 			},
 		},
@@ -98,7 +99,7 @@ func TestGetSupported(t *testing.T) {
 				Distro:  Rhel,
 				Version: "8",
 			},
-			Results: []SupportedOS{
+			Results: []common.SupportedOS{
 				RhelAMD64_8,
 			},
 		},

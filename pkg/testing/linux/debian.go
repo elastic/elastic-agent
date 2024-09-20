@@ -2,11 +2,13 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package runner
+package linux
 
 import (
 	"context"
 	"fmt"
+	"github.com/elastic/elastic-agent/pkg/testing/common"
+	"github.com/elastic/elastic-agent/pkg/testing/ssh"
 	"path"
 	"path/filepath"
 	"strings"
@@ -19,7 +21,7 @@ import (
 type DebianRunner struct{}
 
 // Prepare the test
-func (DebianRunner) Prepare(ctx context.Context, sshClient SSHClient, logger Logger, arch string, goVersion string) error {
+func (DebianRunner) Prepare(ctx context.Context, sshClient ssh.SSHClient, logger common.Logger, arch string, goVersion string) error {
 	// prepare build-essential and unzip
 	//
 	// apt-get update and install are so terrible that we have to place this in a loop, because in some cases the
@@ -86,12 +88,12 @@ func (DebianRunner) Prepare(ctx context.Context, sshClient SSHClient, logger Log
 }
 
 // Copy places the required files on the host.
-func (DebianRunner) Copy(ctx context.Context, sshClient SSHClient, logger Logger, repoArchive string, builds []Build) error {
+func (DebianRunner) Copy(ctx context.Context, sshClient ssh.SSHClient, logger common.Logger, repoArchive string, builds []common.Build) error {
 	return linuxCopy(ctx, sshClient, logger, repoArchive, builds)
 }
 
 // Run the test
-func (DebianRunner) Run(ctx context.Context, verbose bool, sshClient SSHClient, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error) {
+func (DebianRunner) Run(ctx context.Context, verbose bool, sshClient ssh.SSHClient, logger common.Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (common.OSRunnerResult, error) {
 	var tests []string
 	for _, pkg := range batch.Tests {
 		for _, test := range pkg.Tests {
@@ -109,7 +111,7 @@ func (DebianRunner) Run(ctx context.Context, verbose bool, sshClient SSHClient, 
 	if verbose {
 		logArg = "-v"
 	}
-	var result OSRunnerResult
+	var result common.OSRunnerResult
 	if len(tests) > 0 {
 		vars := fmt.Sprintf(`GOPATH="$HOME/go" PATH="$HOME/go/bin:$PATH" AGENT_VERSION="%s" TEST_DEFINE_PREFIX="%s" TEST_DEFINE_TESTS="%s"`, agentVersion, prefix, strings.Join(tests, ","))
 		vars = extendVars(vars, env)
@@ -117,7 +119,7 @@ func (DebianRunner) Run(ctx context.Context, verbose bool, sshClient SSHClient, 
 		script := fmt.Sprintf(`cd agent && %s ~/go/bin/mage %s integration:testOnRemote`, vars, logArg)
 		results, err := runTests(ctx, logger, "non-sudo", prefix, script, sshClient, batch.Tests)
 		if err != nil {
-			return OSRunnerResult{}, fmt.Errorf("error running non-sudo tests: %w", err)
+			return common.OSRunnerResult{}, fmt.Errorf("error running non-sudo tests: %w", err)
 		}
 		result.Packages = results
 	}
@@ -130,7 +132,7 @@ func (DebianRunner) Run(ctx context.Context, verbose bool, sshClient SSHClient, 
 
 		results, err := runTests(ctx, logger, "sudo", prefix, script, sshClient, batch.SudoTests)
 		if err != nil {
-			return OSRunnerResult{}, fmt.Errorf("error running sudo tests: %w", err)
+			return common.OSRunnerResult{}, fmt.Errorf("error running sudo tests: %w", err)
 		}
 		result.SudoPackages = results
 	}
@@ -139,11 +141,11 @@ func (DebianRunner) Run(ctx context.Context, verbose bool, sshClient SSHClient, 
 }
 
 // Diagnostics gathers any diagnostics from the host.
-func (DebianRunner) Diagnostics(ctx context.Context, sshClient SSHClient, logger Logger, destination string) error {
+func (DebianRunner) Diagnostics(ctx context.Context, sshClient ssh.SSHClient, logger common.Logger, destination string) error {
 	return linuxDiagnostics(ctx, sshClient, logger, destination)
 }
 
-func runTests(ctx context.Context, logger Logger, name string, prefix string, script string, sshClient SSHClient, tests []define.BatchPackageTests) ([]OSRunnerPackageResult, error) {
+func runTests(ctx context.Context, logger common.Logger, name string, prefix string, script string, sshClient ssh.SSHClient, tests []define.BatchPackageTests) ([]common.OSRunnerPackageResult, error) {
 	execTest := strings.NewReader(script)
 
 	session, err := sshClient.NewSession()
@@ -151,8 +153,8 @@ func runTests(ctx context.Context, logger Logger, name string, prefix string, sc
 		return nil, fmt.Errorf("failed to start session: %w", err)
 	}
 
-	session.Stdout = newPrefixOutput(logger, fmt.Sprintf("Test output (%s) (stdout): ", name))
-	session.Stderr = newPrefixOutput(logger, fmt.Sprintf("Test output (%s) (stderr): ", name))
+	session.Stdout = common.NewPrefixOutput(logger, fmt.Sprintf("Test output (%s) (stdout): ", name))
+	session.Stderr = common.NewPrefixOutput(logger, fmt.Sprintf("Test output (%s) (stderr): ", name))
 	session.Stdin = execTest
 
 	// allowed to fail because tests might fail
@@ -164,7 +166,7 @@ func runTests(ctx context.Context, logger Logger, name string, prefix string, sc
 	// this seems to always return an error
 	_ = session.Close()
 
-	var result []OSRunnerPackageResult
+	var result []common.OSRunnerPackageResult
 	// fetch the contents for each package
 	for _, pkg := range tests {
 		resultPkg, err := getRunnerPackageResult(ctx, sshClient, pkg, prefix)
@@ -176,22 +178,22 @@ func runTests(ctx context.Context, logger Logger, name string, prefix string, sc
 	return result, nil
 }
 
-func getRunnerPackageResult(ctx context.Context, sshClient SSHClient, pkg define.BatchPackageTests, prefix string) (OSRunnerPackageResult, error) {
+func getRunnerPackageResult(ctx context.Context, sshClient ssh.SSHClient, pkg define.BatchPackageTests, prefix string) (common.OSRunnerPackageResult, error) {
 	var err error
-	var resultPkg OSRunnerPackageResult
+	var resultPkg common.OSRunnerPackageResult
 	resultPkg.Name = pkg.Name
 	outputPath := fmt.Sprintf("$HOME/agent/build/TEST-go-remote-%s.%s", prefix, filepath.Base(pkg.Name))
 	resultPkg.Output, err = sshClient.GetFileContents(ctx, outputPath+".out")
 	if err != nil {
-		return OSRunnerPackageResult{}, fmt.Errorf("failed to fetched test output at %s.out", outputPath)
+		return common.OSRunnerPackageResult{}, fmt.Errorf("failed to fetched test output at %s.out", outputPath)
 	}
 	resultPkg.JSONOutput, err = sshClient.GetFileContents(ctx, outputPath+".out.json")
 	if err != nil {
-		return OSRunnerPackageResult{}, fmt.Errorf("failed to fetched test output at %s.out.json", outputPath)
+		return common.OSRunnerPackageResult{}, fmt.Errorf("failed to fetched test output at %s.out.json", outputPath)
 	}
 	resultPkg.XMLOutput, err = sshClient.GetFileContents(ctx, outputPath+".xml")
 	if err != nil {
-		return OSRunnerPackageResult{}, fmt.Errorf("failed to fetched test output at %s.xml", outputPath)
+		return common.OSRunnerPackageResult{}, fmt.Errorf("failed to fetched test output at %s.xml", outputPath)
 	}
 	return resultPkg, nil
 }

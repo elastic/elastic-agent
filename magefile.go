@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/elastic/elastic-agent/pkg/testing/buildkite"
 	"html/template"
 	"io/fs"
 	"log"
@@ -39,11 +40,11 @@ import (
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	tcommon "github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/kind"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
-	"github.com/elastic/elastic-agent/pkg/testing/null"
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/git"
@@ -2116,12 +2117,12 @@ func askForVM() (runner.StateInstance, error) {
 	return instances[id], nil
 }
 
-func askForStack() (runner.Stack, error) {
+func askForStack() (tcommon.Stack, error) {
 	mg.Deps(Integration.Stacks)
 
 	state, err := readFrameworkState()
 	if err != nil {
-		return runner.Stack{}, fmt.Errorf("could not read state file: %w", err)
+		return tcommon.Stack{}, fmt.Errorf("could not read state file: %w", err)
 	}
 
 	if len(state.Stacks) == 1 {
@@ -2132,17 +2133,17 @@ func askForStack() (runner.Stack, error) {
 	id := 0
 	fmt.Print("Stack number: ")
 	if _, err := fmt.Scanf("%d", &id); err != nil {
-		return runner.Stack{}, fmt.Errorf("cannot read Stack number: %w", err)
+		return tcommon.Stack{}, fmt.Errorf("cannot read Stack number: %w", err)
 	}
 
 	if id >= len(state.Stacks) {
-		return runner.Stack{}, fmt.Errorf("Invalid Stack number, it must be between 0 and %d", len(state.Stacks)-1)
+		return tcommon.Stack{}, fmt.Errorf("Invalid Stack number, it must be between 0 and %d", len(state.Stacks)-1)
 	}
 
 	return state.Stacks[id], nil
 }
 
-func generateEnvFile(stack runner.Stack) error {
+func generateEnvFile(stack tcommon.Stack) error {
 	fileExists := true
 	stat, err := os.Stat("./env.sh")
 	if err != nil {
@@ -2468,13 +2469,10 @@ func (Integration) Buildkite() error {
 		return fmt.Errorf("failed to get go versions: %w", err)
 	}
 
-	cfg := runner.Config{
+	cfg := tcommon.Config{
 		AgentVersion: agentVersion,
 		StackVersion: agentStackVersion,
 		GOVersion:    goVersion,
-		BuildDir:     filepath.Join("build", "distributions"),
-		RepoDir:      ".",
-		StateDir:     ".integration-cache",
 		Platforms:    testPlatforms(),
 		Packages:     testPackages(),
 		Groups:       testGroups(),
@@ -2482,12 +2480,8 @@ func (Integration) Buildkite() error {
 		VerboseMode:  mg.Verbose(),
 		TestFlags:    goTestFlags,
 	}
-	r, err := runner.NewRunner(cfg, null.NewInstanceProvisioner(), null.NewStackProvisioner(), batches...)
-	if err != nil {
-		return fmt.Errorf("failed to create runner: %w", err)
-	}
 
-	steps, err := r.Buildkite()
+	steps, err := buildkite.GenerateSteps(cfg, batches...)
 	if err != nil {
 		return fmt.Errorf("error generating buildkite steps: %w", err)
 	}
@@ -2657,7 +2651,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		Datacenter:       datacenter,
 	}
 
-	var instanceProvisioner runner.InstanceProvisioner
+	var instanceProvisioner tcommon.InstanceProvisioner
 	instanceProvisionerMode := os.Getenv("INSTANCE_PROVISIONER")
 	switch instanceProvisionerMode {
 	case "", ogc.Name:
@@ -2686,7 +2680,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		Region:     essRegion,
 	}
 
-	var stackProvisioner runner.StackProvisioner
+	var stackProvisioner tcommon.StackProvisioner
 	stackProvisionerMode := os.Getenv("STACK_PROVISIONER")
 	switch stackProvisionerMode {
 	case "", ess.ProvisionerStateful:
@@ -2737,7 +2731,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	diagDir := filepath.Join("build", "diagnostics")
 	_ = os.MkdirAll(diagDir, 0755)
 
-	cfg := runner.Config{
+	cfg := tcommon.Config{
 		AgentVersion:   agentVersion,
 		StackVersion:   agentStackVersion,
 		BuildDir:       agentBuildDir,

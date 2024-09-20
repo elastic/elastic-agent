@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,11 +29,11 @@ const (
 )
 
 type provisioner struct {
-	logger runner.Logger
+	logger common.Logger
 }
 
 // NewProvisioner creates the multipass provisioner
-func NewProvisioner() runner.InstanceProvisioner {
+func NewProvisioner() common.InstanceProvisioner {
 	return &provisioner{}
 }
 
@@ -40,12 +41,12 @@ func (p *provisioner) Name() string {
 	return Name
 }
 
-func (p *provisioner) SetLogger(l runner.Logger) {
+func (p *provisioner) SetLogger(l common.Logger) {
 	p.logger = l
 }
 
-func (p *provisioner) Type() runner.ProvisionerType {
-	return runner.ProvisionerTypeVM
+func (p *provisioner) Type() common.ProvisionerType {
+	return common.ProvisionerTypeVM
 }
 
 // Supported returns true if multipass supports this OS.
@@ -68,12 +69,12 @@ func (p *provisioner) Supported(os define.OS) bool {
 	return true
 }
 
-func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches []runner.OSBatch) ([]runner.Instance, error) {
+func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches []common.OSBatch) ([]common.Instance, error) {
 	// this doesn't provision the instances in parallel on purpose
 	// multipass cannot handle it, it either results in instances sharing the same IP address
 	// or some instances stuck in Starting state
 	for _, batch := range batches {
-		err := func(batch runner.OSBatch) error {
+		err := func(batch common.OSBatch) error {
 			launchCtx, launchCancel := context.WithTimeout(ctx, 5*time.Minute)
 			defer launchCancel()
 			err := p.launch(launchCtx, cfg, batch)
@@ -87,7 +88,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 		}
 	}
 
-	var results []runner.Instance
+	var results []common.Instance
 	instances, err := p.list(ctx)
 	if err != nil {
 		return nil, err
@@ -100,7 +101,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 		if mi.State != "Running" {
 			return nil, fmt.Errorf("instance %s is not marked as running", batch.ID)
 		}
-		results = append(results, runner.Instance{
+		results = append(results, common.Instance{
 			ID:          batch.ID,
 			Provisioner: Name,
 			Name:        batch.ID,
@@ -114,11 +115,11 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 }
 
 // Clean cleans up all provisioned resources.
-func (p *provisioner) Clean(ctx context.Context, _ runner.Config, instances []runner.Instance) error {
+func (p *provisioner) Clean(ctx context.Context, _ common.Config, instances []common.Instance) error {
 	// doesn't execute in parallel for the same reasons in Provision
 	// multipass just cannot handle it
 	for _, instance := range instances {
-		func(instance runner.Instance) {
+		func(instance common.Instance) {
 			deleteCtx, deleteCancel := context.WithTimeout(ctx, 5*time.Minute)
 			defer deleteCancel()
 			err := p.delete(deleteCtx, instance)
@@ -132,7 +133,7 @@ func (p *provisioner) Clean(ctx context.Context, _ runner.Config, instances []ru
 }
 
 // launch creates an instance.
-func (p *provisioner) launch(ctx context.Context, cfg runner.Config, batch runner.OSBatch) error {
+func (p *provisioner) launch(ctx context.Context, cfg common.Config, batch common.OSBatch) error {
 	// check if instance already exists
 	err := p.ensureInstanceNotExist(ctx, batch)
 	if err != nil {
@@ -187,7 +188,7 @@ func (p *provisioner) launch(ctx context.Context, cfg runner.Config, batch runne
 	return nil
 }
 
-func (p *provisioner) ensureInstanceNotExist(ctx context.Context, batch runner.OSBatch) error {
+func (p *provisioner) ensureInstanceNotExist(ctx context.Context, batch common.OSBatch) error {
 	var output bytes.Buffer
 	var stdErr bytes.Buffer
 	proc, err := process.Start("multipass",
@@ -258,7 +259,7 @@ func (p *provisioner) ensureInstanceNotExist(ctx context.Context, batch runner.O
 }
 
 // delete deletes an instance.
-func (p *provisioner) delete(ctx context.Context, instance runner.Instance) error {
+func (p *provisioner) delete(ctx context.Context, instance common.Instance) error {
 	args := []string{
 		"delete",
 		"-p",

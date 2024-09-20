@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,12 +28,12 @@ const (
 )
 
 type provisioner struct {
-	logger runner.Logger
+	logger common.Logger
 	cfg    Config
 }
 
 // NewProvisioner creates the OGC provisioner
-func NewProvisioner(cfg Config) (runner.InstanceProvisioner, error) {
+func NewProvisioner(cfg Config) (common.InstanceProvisioner, error) {
 	err := cfg.Validate()
 	if err != nil {
 		return nil, err
@@ -46,12 +47,12 @@ func (p *provisioner) Name() string {
 	return Name
 }
 
-func (p *provisioner) SetLogger(l runner.Logger) {
+func (p *provisioner) SetLogger(l common.Logger) {
 	p.logger = l
 }
 
-func (p *provisioner) Type() runner.ProvisionerType {
-	return runner.ProvisionerTypeVM
+func (p *provisioner) Type() common.ProvisionerType {
+	return common.ProvisionerTypeVM
 }
 
 // Supported returns true when we support this OS for OGC.
@@ -60,7 +61,7 @@ func (p *provisioner) Supported(os define.OS) bool {
 	return ok
 }
 
-func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches []runner.OSBatch) ([]runner.Instance, error) {
+func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches []common.OSBatch) ([]common.Instance, error) {
 	// ensure the latest version
 	pullCtx, pullCancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer pullCancel()
@@ -99,7 +100,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 	}
 
 	// map the machines to instances
-	var instances []runner.Instance
+	var instances []common.Instance
 	for _, b := range batches {
 		machine, ok := findMachine(machines, b.ID)
 		if !ok {
@@ -109,7 +110,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 			fmt.Fprintf(os.Stdout, "%s\n", upOutput)
 			return nil, fmt.Errorf("failed to find machine for batch ID: %s", b.ID)
 		}
-		instances = append(instances, runner.Instance{
+		instances = append(instances, common.Instance{
 			ID:          b.ID,
 			Provisioner: Name,
 			Name:        machine.InstanceName,
@@ -125,7 +126,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 }
 
 // Clean cleans up all provisioned resources.
-func (p *provisioner) Clean(ctx context.Context, cfg runner.Config, _ []runner.Instance) error {
+func (p *provisioner) Clean(ctx context.Context, cfg common.Config, _ []common.Instance) error {
 	return p.ogcDown(ctx)
 }
 
@@ -151,7 +152,7 @@ func (p *provisioner) ogcPull(ctx context.Context) error {
 }
 
 // ogcImport imports all the required batches into OGC.
-func (p *provisioner) ogcImport(ctx context.Context, cfg runner.Config, batches []runner.OSBatch) error {
+func (p *provisioner) ogcImport(ctx context.Context, cfg common.Config, batches []common.OSBatch) error {
 	var layouts []Layout
 	for _, ob := range batches {
 		layouts = append(layouts, osBatchToOGC(cfg.StateDir, ob))
@@ -288,7 +289,7 @@ func (p *provisioner) ogcRun(ctx context.Context, args []string, interactive boo
 	return process.Start("docker", opts...)
 }
 
-func osBatchToOGC(cacheDir string, batch runner.OSBatch) Layout {
+func osBatchToOGC(cacheDir string, batch common.OSBatch) Layout {
 	tags := []string{
 		LayoutIntegrationTag,
 		batch.OS.Type,
