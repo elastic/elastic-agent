@@ -8,10 +8,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/elastic/elastic-agent/pkg/testing/common"
 )
 
 const ProvisionerStateful = "stateful"

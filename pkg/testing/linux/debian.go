@@ -7,14 +7,14 @@ package linux
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/testing/common"
-	"github.com/elastic/elastic-agent/pkg/testing/ssh"
 	"path"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/ssh"
 )
 
 // DebianRunner is a handler for running tests on Linux

@@ -7,7 +7,6 @@ package windows
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/testing/ssh"
 	"os"
 	"path"
 	"path/filepath"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/ssh"
 )
 
 // WindowsRunner is a handler for running tests on Windows

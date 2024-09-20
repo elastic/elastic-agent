@@ -7,11 +7,12 @@ package linux
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/testing/common"
-	"github.com/elastic/elastic-agent/pkg/testing/ssh"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/elastic/elastic-agent/pkg/testing/common"
+	"github.com/elastic/elastic-agent/pkg/testing/ssh"
 )
 
 func linuxDiagnostics(ctx context.Context, sshClient ssh.SSHClient, logger common.Logger, destination string) error {

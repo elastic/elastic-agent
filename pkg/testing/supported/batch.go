@@ -149,16 +149,6 @@ func filterSingleTestBatch(batch common.OSBatch, testName string) (common.OSBatc
 	return batch, false
 }
 
-func filterSupportedOS(batches []common.OSBatch, provisioner common.InstanceProvisioner) []common.OSBatch {
-	var filtered []common.OSBatch
-	for _, batch := range batches {
-		if ok := provisioner.Supported(batch.OS.OS); ok {
-			filtered = append(filtered, batch)
-		}
-	}
-	return filtered
-}
-
 // createBatchID creates a consistent/unique ID for the batch
 //
 // ID needs to be consistent so each execution of the runner always

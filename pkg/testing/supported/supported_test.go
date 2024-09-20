@@ -6,11 +6,11 @@ package supported
 
 import (
 	"errors"
-	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 

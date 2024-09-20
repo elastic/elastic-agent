@@ -9,11 +9,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/elastic/elastic-agent/pkg/testing/common"
 )
 
 var serverlessURL = "https://cloud.elastic.co"

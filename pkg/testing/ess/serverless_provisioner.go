@@ -8,12 +8,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"io"
 	"net/http"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+
+	"github.com/elastic/elastic-agent/pkg/testing/common"
 )
 
 const ProvisionerServerless = "serverless"

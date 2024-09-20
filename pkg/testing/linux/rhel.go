@@ -7,13 +7,13 @@ package linux
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/testing/ssh"
 	"path"
 	"strings"
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/ssh"
 )
 
 // RhelRunner is a handler for running tests on SUSE Linux Enterpriser Server
