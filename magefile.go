@@ -13,7 +13,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/testing/null"
 	"html/template"
 	"io/fs"
 	"log"
@@ -31,6 +30,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/elastic/elastic-agent/pkg/testing/null"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/otiai10/copy"
