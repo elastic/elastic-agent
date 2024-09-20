@@ -19,21 +19,21 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
-// KubernetesRunner is a handler for running tests against a Kubernetes cluster
-type KubernetesRunner struct{}
+// Runner is a handler for running tests against a Kubernetes cluster
+type Runner struct{}
 
 // Prepare configures the host for running the test
-func (KubernetesRunner) Prepare(ctx context.Context, sshClient ssh.SSHClient, logger common.Logger, arch string, goVersion string) error {
+func (Runner) Prepare(ctx context.Context, sshClient ssh.SSHClient, logger common.Logger, arch string, goVersion string) error {
 	return nil
 }
 
 // Copy places the required files on the host
-func (KubernetesRunner) Copy(ctx context.Context, sshClient ssh.SSHClient, logger common.Logger, repoArchive string, builds []common.Build) error {
+func (Runner) Copy(ctx context.Context, sshClient ssh.SSHClient, logger common.Logger, repoArchive string, builds []common.Build) error {
 	return nil
 }
 
 // Run the test
-func (KubernetesRunner) Run(ctx context.Context, verbose bool, sshClient ssh.SSHClient, logger common.Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (common.OSRunnerResult, error) {
+func (Runner) Run(ctx context.Context, verbose bool, sshClient ssh.SSHClient, logger common.Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (common.OSRunnerResult, error) {
 	var goTestFlags []string
 	rawTestFlags := os.Getenv("GOTEST_FLAGS")
 	if rawTestFlags != "" {
@@ -117,7 +117,7 @@ func (KubernetesRunner) Run(ctx context.Context, verbose bool, sshClient ssh.SSH
 }
 
 // Diagnostics gathers any diagnostics from the host.
-func (KubernetesRunner) Diagnostics(ctx context.Context, sshClient ssh.SSHClient, logger common.Logger, destination string) error {
+func (Runner) Diagnostics(ctx context.Context, sshClient ssh.SSHClient, logger common.Logger, destination string) error {
 	// does nothing for kubernetes
 	return nil
 }

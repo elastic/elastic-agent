@@ -183,7 +183,7 @@ func init() {
 	for _, k8sSupport := range kubernetes.GetSupported() {
 		supported = append(supported, common.SupportedOS{
 			OS:     k8sSupport,
-			Runner: kubernetes.KubernetesRunner{},
+			Runner: kubernetes.Runner{},
 		})
 	}
 }
