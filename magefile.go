@@ -1904,9 +1904,6 @@ func (Integration) Kubernetes(ctx context.Context) error {
 	return integRunner(ctx, false, "")
 }
 
-<<<<<<< HEAD
-// UpdateVersions runs an update on the `.agent-versions.json` fetching
-=======
 // KubernetesMatrix runs a matrix of kubernetes integration tests
 func (Integration) KubernetesMatrix(ctx context.Context) error {
 	// invoke integration tests
@@ -1918,7 +1915,6 @@ func (Integration) KubernetesMatrix(ctx context.Context) error {
 }
 
 // UpdateVersions runs an update on the `.agent-versions.yml` fetching
->>>>>>> 67b709f6e6 (Add ability to run the same tests with multi docker image variants (#5547))
 // the latest version list from the artifact API.
 func (Integration) UpdateVersions(ctx context.Context) error {
 	maxSnapshots := 3
