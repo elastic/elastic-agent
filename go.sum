@@ -220,8 +220,8 @@ github.com/docker/cli v25.0.1+incompatible h1:mFpqnrS6Hsm3v1k7Wa/BO23oz0k121MTbT
 github.com/docker/cli v25.0.1+incompatible/go.mod h1:JLrzqnKDaYBop7H2jaqPtU4hHvMKP+vjCwu2uszcLI8=
 github.com/docker/distribution v2.8.3+incompatible h1:AtKxIZ36LoNK51+Z6RpzLpddBirtxJnzDrHLEKxTAYk=
 github.com/docker/distribution v2.8.3+incompatible/go.mod h1:J2gT2udsDAN96Uj4KfcMRqY0/ypR+oyYUYmja8H+y+w=
-github.com/docker/docker v27.0.3+incompatible h1:aBGI9TeQ4MPlhquTQKq9XbK79rKFVwXNUAYz9aXyEBE=
-github.com/docker/docker v27.0.3+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
+github.com/docker/docker v27.2.1+incompatible h1:fQdiLfW7VLscyoeYEBz7/J8soYFDZV1u6VW6gJEjNMI=
+github.com/docker/docker v27.2.1+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/docker/docker-credential-helpers v0.7.0 h1:xtCHsjxogADNZcdv1pKUHXryefjlVRqWqIhk/uXJp0A=
 github.com/docker/docker-credential-helpers v0.7.0/go.mod h1:rETQfLdHNT3foU5kuNkFR1R1V12OJRRO5lzt2D1b5X0=
 github.com/docker/go-connections v0.5.0 h1:USnMq7hx7gwdVZq1L49hLXaFtUdTADjXGp+uj1Br63c=
@@ -769,6 +769,8 @@ github.com/moby/sys/sequential v0.5.0 h1:OPvI35Lzn9K04PBbCLW0g4LcFAJgHsvXsRyewg5
 github.com/moby/sys/sequential v0.5.0/go.mod h1:tH2cOOs5V9MlPiXcQzRC+eEyab644PWKGRYaaV5ZZlo=
 github.com/moby/sys/user v0.1.0 h1:WmZ93f5Ux6het5iituh9x2zAG7NFY9Aqi49jjE1PaQg=
 github.com/moby/sys/user v0.1.0/go.mod h1:fKJhFOnsCN6xZ5gSfbM6zaHGgDJMrqt9/reuj4T7MmU=
+github.com/moby/sys/userns v0.1.0 h1:tVLXkFOxVu9A64/yh59slHVv9ahO9UIev4JZusOLG/g=
+github.com/moby/sys/userns v0.1.0/go.mod h1:IHUYgu/kao6N8YZlp9Cf444ySSvCmDlmzUcYfDHOl28=
 github.com/moby/term v0.5.0 h1:xt8Q1nalod/v7BqbG21f8mQPqH+xAaC9C3N3wfWbVP0=
 github.com/moby/term v0.5.0/go.mod h1:8FzsFHVUBGZdbDsJw/ot+X+d5HLUbvklYLJ9uGfcI3Y=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
@@ -821,6 +823,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/otl
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/otlpencodingextension v0.109.0/go.mod h1:UKEwVBxPn/wRMKelq+9pdYlnkVFQ8h8yh5c8k2tRjNU=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.109.0 h1:/DYYZTFiMLxmx2XKzCepDT/VDv3u9gIgdzUQvdL2gtM=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.109.0/go.mod h1:ydMgguz0dLWUQnIK3ogZQaoFKXGeLI37KqAtpsJAI6s=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.109.0 h1:LEpo+3dMUJ7cAoX2xqQXmLuCGlA5OVSQl1c/Os3ZhYk=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.109.0/go.mod h1:1gBYb3ohJNGVaMD2N5GPhpKU8W9jvPI3uHPIgmUGcyM=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage v0.109.0 h1:49eU82qM9YhubCPh4o9z+6t8sw9ytS3sfPi/1Yzf0UQ=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage v0.109.0/go.mod h1:t+2SQm0yPa+1GYpoOg7/lzZ4cHgk3os6uqALvnBA1aU=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.109.0 h1:g79FG4aNXwnpatYBoEfSm+ngQF6gJ7MHBL9z2uzqQa4=
