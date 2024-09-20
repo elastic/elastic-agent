@@ -54,6 +54,10 @@ func DynamicProviderBuilder(logger *logger.Logger, c *config.Config, managed boo
 	return &dynamicProvider{logger, &cfg, managed}, nil
 }
 
+func NewDynamicProvider(logger *logger.Logger, c *Config, managed bool) composable.DynamicProvider {
+	return &dynamicProvider{logger, c, managed}
+}
+
 // Run runs the kubernetes context provider.
 func (p *dynamicProvider) Run(comm composable.DynamicProviderComm) error {
 	if p.config.Hints.Enabled {

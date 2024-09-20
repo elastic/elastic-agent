@@ -1,0 +1,169 @@
+# For more information refer https://www.elastic.co/guide/en/fleet/current/running-on-kubernetes-standalone.html
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k8sprovider
+  namespace: kube-system
+  labels:
+    app: k8sprovider
+spec:
+  selector:
+    matchLabels:
+      app: k8sprovider
+  template:
+    metadata:
+      labels:
+        app: k8sprovider
+    spec:
+      serviceAccountName: k8sprovider
+      containers:
+        - name: k8sprovider
+          image: docker.io/library/k8sprovider
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 0
+          resources:
+            limits:
+              memory: 700Mi
+            requests:
+              cpu: 100m
+              memory: 400Mi
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: k8sprovider
+  labels:
+    k8s-app: k8sprovider
+rules:
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - namespaces
+      - events
+      - pods
+      - services
+      - configmaps
+      - serviceaccounts
+      - persistentvolumes
+      - persistentvolumeclaims
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["extensions"]
+    resources:
+      - replicasets
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources:
+      - statefulsets
+      - deployments
+      - replicasets
+      - daemonsets
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+      - cronjobs
+    verbs: ["get", "list", "watch"]
+  - apiGroups:
+      - ""
+    resources:
+      - nodes/stats
+    verbs:
+      - get
+  - nonResourceURLs:
+      - "/metrics"
+    verbs:
+      - get
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources:
+      - clusterrolebindings
+      - clusterroles
+      - rolebindings
+      - roles
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["policy"]
+    resources:
+      - podsecuritypolicies
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [ "storage.k8s.io" ]
+    resources:
+      - storageclasses
+    verbs: [ "get", "list", "watch" ]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: k8sprovider
+  namespace: kube-system
+  labels:
+    k8s-app: k8sprovider
+rules:
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs: ["get", "create", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: k8sprovider-kubeadm-config
+  namespace: kube-system
+  labels:
+    k8s-app: k8sprovider
+rules:
+  - apiGroups: [""]
+    resources:
+      - configmaps
+    resourceNames:
+      - kubeadm-config
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: k8sprovider
+subjects:
+  - kind: ServiceAccount
+    name: k8sprovider
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: k8sprovider
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: kube-system
+  name: k8sprovider
+subjects:
+  - kind: ServiceAccount
+    name: k8sprovider
+    namespace: kube-system
+roleRef:
+  kind: Role
+  name: k8sprovider
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: k8sprovider-kubeadm-config
+  namespace: kube-system
+subjects:
+  - kind: ServiceAccount
+    name: k8sprovider
+    namespace: kube-system
+roleRef:
+  kind: Role
+  name: k8sprovider-kubeadm-config
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: k8sprovider
+  namespace: kube-system
+  labels:
+    k8s-app: k8sprovider

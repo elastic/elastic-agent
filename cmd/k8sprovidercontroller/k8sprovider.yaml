@@ -1,0 +1,212 @@
+# For more information refer https://www.elastic.co/guide/en/fleet/current/running-on-kubernetes-standalone.html
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: k8sprovidercontroller
+  namespace: kube-system
+  labels:
+    app: k8sprovidercontroller
+spec:
+  selector:
+    matchLabels:
+      app: k8sprovidercontroller
+  template:
+    metadata:
+      labels:
+        app: k8sprovidercontroller
+    spec:
+      serviceAccountName: k8sprovidercontroller
+      containers:
+        - name: k8sprovidercontroller
+          image: docker.io/library/k8sprovidercontroller
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 0
+          resources:
+            limits:
+              memory: 700Mi
+            requests:
+              cpu: 100m
+              memory: 400Mi
+          volumeMounts:
+            - name: proc
+              mountPath: /hostfs/proc
+              readOnly: true
+            - name: cgroup
+              mountPath: /hostfs/sys/fs/cgroup
+              readOnly: true
+            - name: varlibdockercontainers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+            - name: etc-full
+              mountPath: /hostfs/etc
+              readOnly: true
+            - name: var-lib
+              mountPath: /hostfs/var/lib
+              readOnly: true
+            - name: sys-kernel-debug
+              mountPath: /sys/kernel/debug
+      volumes:
+        - name: proc
+          hostPath:
+            path: /proc
+        - name: cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: etc-full
+          hostPath:
+            path: /etc
+        - name: var-lib
+          hostPath:
+            path: /var/lib
+        - name: sys-kernel-debug
+          hostPath:
+            path: /sys/kernel/debug
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: k8sprovidercontroller
+  labels:
+    k8s-app: k8sprovidercontroller
+rules:
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - namespaces
+      - events
+      - pods
+      - services
+      - configmaps
+      - serviceaccounts
+      - persistentvolumes
+      - persistentvolumeclaims
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["extensions"]
+    resources:
+      - replicasets
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources:
+      - statefulsets
+      - deployments
+      - replicasets
+      - daemonsets
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+      - cronjobs
+    verbs: ["get", "list", "watch"]
+  - apiGroups:
+      - ""
+    resources:
+      - nodes/stats
+    verbs:
+      - get
+  - nonResourceURLs:
+      - "/metrics"
+    verbs:
+      - get
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources:
+      - clusterrolebindings
+      - clusterroles
+      - rolebindings
+      - roles
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["policy"]
+    resources:
+      - podsecuritypolicies
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [ "storage.k8s.io" ]
+    resources:
+      - storageclasses
+    verbs: [ "get", "list", "watch" ]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: k8sprovidercontroller
+  namespace: kube-system
+  labels:
+    k8s-app: k8sprovidercontroller
+rules:
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs: ["get", "create", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: k8sprovidercontroller-kubeadm-config
+  namespace: kube-system
+  labels:
+    k8s-app: k8sprovidercontroller
+rules:
+  - apiGroups: [""]
+    resources:
+      - configmaps
+    resourceNames:
+      - kubeadm-config
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: k8sprovidercontroller
+subjects:
+  - kind: ServiceAccount
+    name: k8sprovidercontroller
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: k8sprovidercontroller
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: kube-system
+  name: k8sprovidercontroller
+subjects:
+  - kind: ServiceAccount
+    name: k8sprovidercontroller
+    namespace: kube-system
+roleRef:
+  kind: Role
+  name: k8sprovidercontroller
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: k8sprovidercontroller-kubeadm-config
+  namespace: kube-system
+subjects:
+  - kind: ServiceAccount
+    name: k8sprovidercontroller
+    namespace: kube-system
+roleRef:
+  kind: Role
+  name: k8sprovidercontroller-kubeadm-config
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: k8sprovidercontroller
+  namespace: kube-system
+  labels:
+    k8s-app: k8sprovidercontroller

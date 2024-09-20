@@ -46,7 +46,7 @@ type controller struct {
 	ch               chan []*transpiler.Vars
 	errCh            chan error
 	contextProviders map[string]*contextProviderState
-	dynamicProviders map[string]*dynamicProviderState
+	dynamicProviders map[string]*DynamicProviderState
 }
 
 // New creates a new controller.
@@ -73,8 +73,10 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 		pCfg, ok := providersCfg.Providers[name]
 		if (ok && !pCfg.Enabled()) || (!ok && !providersInitialDefault) {
 			// explicitly disabled; skipping
+			log.Debug("skipping provider", "provider", name)
 			continue
 		}
+		log.Debug("building provider", "provider", name)
 		provider, err := builder(l, pCfg, managed)
 		if err != nil {
 			return nil, errors.New(err, fmt.Sprintf("failed to build provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
@@ -87,20 +89,22 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 	}
 
 	// build all the dynamic providers
-	dynamicProviders := map[string]*dynamicProviderState{}
+	dynamicProviders := map[string]*DynamicProviderState{}
 	for name, builder := range Providers.dynamicProviders {
 		pCfg, ok := providersCfg.Providers[name]
 		if (ok && !pCfg.Enabled()) || (!ok && !providersInitialDefault) {
+			log.Debug("skipping provider", "provider", name)
 			// explicitly disabled; skipping
 			continue
 		}
+		log.Debug("building provider", "provider", name)
 		provider, err := builder(l.Named(strings.Join([]string{"providers", name}, ".")), pCfg, managed)
 		if err != nil {
 			return nil, errors.New(err, fmt.Sprintf("failed to build provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
 		}
-		dynamicProviders[name] = &dynamicProviderState{
+		dynamicProviders[name] = &DynamicProviderState{
 			provider: provider,
-			mappings: map[string]dynamicProviderMapping{},
+			mappings: map[string]DynamicProviderMapping{},
 		}
 	}
 
@@ -148,7 +152,7 @@ func (c *controller) Run(ctx context.Context) error {
 	for name, state := range c.dynamicProviders {
 		state.Context = localCtx
 		state.signal = stateChangedChan
-		go func(name string, state *dynamicProviderState) {
+		go func(name string, state *DynamicProviderState) {
 			defer wg.Done()
 			err := state.provider.Run(state)
 			if err != nil && !errors.Is(err, context.Canceled) {
@@ -352,19 +356,19 @@ func (c *contextProviderState) Current() map[string]interface{} {
 	return c.mapping
 }
 
-type dynamicProviderMapping struct {
+type DynamicProviderMapping struct {
 	id         string
 	priority   int
 	mapping    *transpiler.AST
 	processors transpiler.Processors
 }
 
-type dynamicProviderState struct {
+type DynamicProviderState struct {
 	context.Context
 
 	provider DynamicProvider
 	lock     sync.Mutex
-	mappings map[string]dynamicProviderMapping
+	mappings map[string]DynamicProviderMapping
 	signal   chan bool
 }
 
@@ -373,7 +377,7 @@ type dynamicProviderState struct {
 // `priority` ensures that order is maintained when adding the mapping to the current state
 // for the processor. Lower priority mappings will always be sorted before higher priority mappings
 // to ensure that matching of variables occurs on the lower priority mappings first.
-func (c *dynamicProviderState) AddOrUpdate(id string, priority int, mapping map[string]interface{}, processors []map[string]interface{}) error {
+func (c *DynamicProviderState) AddOrUpdate(id string, priority int, mapping map[string]interface{}, processors []map[string]interface{}) error {
 	var err error
 	processors, err = cloneMapArray(processors)
 	if err != nil {
@@ -390,7 +394,7 @@ func (c *dynamicProviderState) AddOrUpdate(id string, priority int, mapping map[
 		// same mapping; no need to update and signal
 		return nil
 	}
-	c.mappings[id] = dynamicProviderMapping{
+	c.mappings[id] = DynamicProviderMapping{
 		id:         id,
 		priority:   priority,
 		mapping:    ast,
@@ -405,7 +409,7 @@ func (c *dynamicProviderState) AddOrUpdate(id string, priority int, mapping map[
 }
 
 // Remove removes the current mapping for the dynamic provider.
-func (c *dynamicProviderState) Remove(id string) {
+func (c *DynamicProviderState) Remove(id string) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	_, exists := c.mappings[id]
@@ -421,16 +425,16 @@ func (c *dynamicProviderState) Remove(id string) {
 }
 
 // Mappings returns the current mappings.
-func (c *dynamicProviderState) Mappings() []dynamicProviderMapping {
+func (c *DynamicProviderState) Mappings() []DynamicProviderMapping {
 	c.lock.Lock()
-	originalMapping := make(map[string]dynamicProviderMapping)
+	originalMapping := make(map[string]DynamicProviderMapping)
 	for k, v := range c.mappings {
 		originalMapping[k] = v
 	}
 	c.lock.Unlock()
 
 	// add the mappings sorted by (priority,id)
-	mappings := make([]dynamicProviderMapping, 0)
+	mappings := make([]DynamicProviderMapping, 0)
 	priorities := make([]int, 0)
 	for _, mapping := range originalMapping {
 		priorities = addToSet(priorities, mapping.priority)
@@ -449,6 +453,10 @@ func (c *dynamicProviderState) Mappings() []dynamicProviderMapping {
 		}
 	}
 	return mappings
+}
+
+func (c *DynamicProviderState) SignalChan() chan bool {
+	return c.signal
 }
 
 func cloneMap(source map[string]interface{}) (map[string]interface{}, error) {
@@ -499,5 +507,14 @@ func drainChan(ch chan bool) {
 		default:
 			return
 		}
+	}
+}
+
+func NewStateForProvider(ctx context.Context, provider DynamicProvider) DynamicProviderState {
+	return DynamicProviderState{
+		Context:  ctx,
+		provider: provider,
+		mappings: make(map[string]DynamicProviderMapping),
+		signal:   make(chan bool, 1),
 	}
 }
