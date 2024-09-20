@@ -345,6 +345,7 @@ func (r *Runner) runK8sInstances(ctx context.Context, instances []StateInstance)
 		env["GOTEST_FLAGS"] = r.cfg.TestFlags
 		env["KUBECONFIG"] = instance.Instance.Internal["config"].(string)
 		env["TEST_BINARY_NAME"] = r.cfg.BinaryName
+		env["K8S_VERSION"] = instance.Instance.Internal["version"].(string)
 		env["AGENT_IMAGE"] = instance.Instance.Internal["agent_image"].(string)
 
 		prefix := fmt.Sprintf("%s-%s", instance.Instance.Internal["version"].(string), batch.ID)
@@ -1128,7 +1129,12 @@ func createBatchID(batch OSBatch) string {
 	if batch.OS.Type == define.Linux {
 		id += "-" + batch.OS.Distro
 	}
-	id += "-" + strings.Replace(batch.OS.Version, ".", "", -1)
+	if batch.OS.Version != "" {
+		id += "-" + strings.Replace(batch.OS.Version, ".", "", -1)
+	}
+	if batch.OS.Type == define.Kubernetes && batch.OS.DockerVariant != "" {
+		id += "-" + batch.OS.DockerVariant
+	}
 	id += "-" + strings.Replace(batch.Batch.Group, ".", "", -1)
 
 	// The batchID needs to be at most 63 characters long otherwise
