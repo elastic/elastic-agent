@@ -11,6 +11,10 @@ require (
 	github.com/blakesmith/ar v0.0.0-20150311145944-8bd4349a67f2
 	github.com/cavaliergopher/rpm v1.2.0
 	github.com/cenkalti/backoff/v4 v4.3.0
+<<<<<<< HEAD
+=======
+	github.com/docker/docker v27.2.1+incompatible
+>>>>>>> d227832515 (Update docker dependency (#5538))
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/elastic-agent-autodiscover v0.8.1
@@ -260,7 +264,14 @@ require (
 	github.com/mitchellh/iochan v1.0.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
+<<<<<<< HEAD
 	github.com/moby/spdystream v0.2.0 // indirect
+=======
+	github.com/moby/locker v1.0.1 // indirect
+	github.com/moby/spdystream v0.4.0 // indirect
+	github.com/moby/sys/userns v0.1.0 // indirect
+	github.com/moby/term v0.5.0 // indirect
+>>>>>>> d227832515 (Update docker dependency (#5538))
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mostynb/go-grpc-compression v1.2.3 // indirect
