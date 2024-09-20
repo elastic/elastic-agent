@@ -31,8 +31,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/testing/null"
-
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/otiai10/copy"
 
@@ -45,6 +43,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/kind"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
+	"github.com/elastic/elastic-agent/pkg/testing/null"
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/git"
