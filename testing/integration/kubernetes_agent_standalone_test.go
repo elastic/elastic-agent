@@ -712,7 +712,10 @@ func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, obj
 		time.Sleep(time.Second * 1)
 	}
 
-	t.Fatalf("elastic-agent never reported healthy: %+v", status)
+	t.Errorf("elastic-agent never reported healthy: %+v", status)
+	t.Logf("stdout: %s\n", stdout.String())
+	t.Logf("stderr: %s\n", stderr.String())
+	t.FailNow()
 }
 
 func getComponentState(status atesting.AgentStatusOutput, componentName string) (int, bool) {
