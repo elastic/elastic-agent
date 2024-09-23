@@ -1044,29 +1044,11 @@
                         }
                     ]
                 },
-                "rules": {
-                    "type": "array",
-                    "items": {
-                        "type": "object"
-                    },
-                    "description": "Rules for the deployment.",
-                    "examples": [
-                        [
-                            {
-                                "apiGroups": [
-                                    ""
-                                ],
-                                "resources": [
-                                    "pods"
-                                ],
-                                "verbs": [
-                                    "get",
-                                    "watch",
-                                    "list"
-                                ]
-                            }
-                        ]
-                    ]
+                "serviceAccount": {
+                    "$ref": "#/definitions/AgentPresetServiceAccount"
+                },
+                "clusterRole": {
+                    "$ref": "#/definitions/AgentPresetClusterRole"
                 },
                 "nodeSelector": {
                     "type": "object",
@@ -1247,7 +1229,173 @@
                 }
             },
             "required": [
-                "mode"
+                "mode",
+                "serviceAccount",
+                "clusterRole"
+            ]
+        },
+        "AgentPresetClusterRole": {
+            "type": "object",
+            "properties": {
+                "create": {
+                    "type": "boolean",
+                    "description": "Create the cluster role.",
+                    "default": true
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Name of the cluster role to use if create is set to false."
+                },
+                "annotations": {
+                    "type": "object",
+                    "description": "Annotations for the cluster role if create is set to true."
+                },
+                "rules": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    },
+                    "description": "Rules for the cluster role to create if create is set to true.",
+                    "examples": [
+                        [
+                            {
+                                "apiGroups": [
+                                    ""
+                                ],
+                                "resources": [
+                                    "pods"
+                                ],
+                                "verbs": [
+                                    "get",
+                                    "watch",
+                                    "list"
+                                ]
+                            }
+                        ]
+                    ]
+                }
+            },
+            "examples": [
+                {
+                    "create": true,
+                    "name": ""
+                }
+            ],
+            "required": [
+                "create"
+            ],
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "create": {
+                                "const": false
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "minLength": 1
+                            }
+                        },
+                        "required": [
+                            "create",
+                            "name"
+                        ]
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "create": {
+                                "const": true
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        },
+                        "required": [
+                            "create"
+                        ]
+                    }
+                }
+            ]
+        },
+        "AgentPresetServiceAccount": {
+            "type": "object",
+            "properties": {
+                "create": {
+                    "type": "boolean",
+                    "description": "Create the service account.",
+                    "default": true
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Name of the service account to use if create is set to false."
+                },
+                "annotations": {
+                    "type": "object",
+                    "description": "Annotations for the service account if create is set to true."
+                }
+            },
+            "examples": [
+                {
+                    "create": true,
+                    "name": ""
+                }
+            ],
+            "required": [
+                "create"
+            ],
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "create": {
+                                "const": false
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "minLength": 1
+                            }
+                        },
+                        "required": [
+                            "create",
+                            "name"
+                        ]
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "create": {
+                                "const": true
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        },
+                        "required": [
+                            "create"
+                        ]
+                    }
+                }
             ]
         },
         "SystemLogsStreamVars": {

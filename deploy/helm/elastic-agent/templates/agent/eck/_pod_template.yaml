@@ -18,7 +18,11 @@ template:
     nodeSelector:
       {{- . | toYaml | nindent 6 }}
     {{- end }}
+    {{- if eq ($presetVal).serviceAccount.create true }}
     serviceAccountName: {{ $agentName }}
+    {{- else }}
+    serviceAccountName: {{ ($presetVal).serviceAccount.name }}
+    {{- end }}
     {{- with ($presetVal).affinity }}
     affinity:
       {{- . | toYaml | nindent 6 }}

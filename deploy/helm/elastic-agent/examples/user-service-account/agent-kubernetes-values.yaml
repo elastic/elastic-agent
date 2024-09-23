@@ -1,0 +1,18 @@
+kubernetes:
+  enabled: true
+
+agent:
+  unprivileged: true
+  presets:
+    perNode:
+      serviceAccount:
+        create: false
+        name: user-sa-perNode
+    clusterWide:
+      serviceAccount:
+        create: false
+        name: user-sa-clusterWide
+    ksmSharded:
+      serviceAccount:
+        create: false
+        name: user-sa-ksmSharded
