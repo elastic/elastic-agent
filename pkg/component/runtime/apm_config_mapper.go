@@ -27,6 +27,7 @@ func MapAPMConfig(conf *config.APMConfig) *proto.APMConfig {
 		SecretToken:  conf.SecretToken,
 		Hosts:        conf.Hosts,
 		GlobalLabels: buildGlobalLabelsString(conf.GlobalLabels),
+		SamplingRate: conf.SamplingRate,
 	}
 
 	if conf.TLS != zeroElasticAPMTLS {

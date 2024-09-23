@@ -439,6 +439,7 @@ func TestPatchAPMConfig(t *testing.T) {
                       skip_verify: true
                       server_ca: ""
                       server_certificate: ""
+                    sampling_rate: null
               `,
 		},
 	}
