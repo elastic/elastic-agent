@@ -62,7 +62,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [resourcedetectionprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourcedetectionprocessor/v0.109.0/processor/resourcedetectionprocessor/README.md) | v0.109.0 |
 | [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.109.0/processor/resourceprocessor/README.md) | v0.109.0 |
 | [transformprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/transformprocessor/v0.109.0/processor/transformprocessor/README.md) | v0.109.0 |
-| [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.109.0/processor/batchprocessor/README.md) | v0.109.0 |
+| [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.110.0/processor/batchprocessor/README.md) | v0.110.0 |
 
 ### Extensions
 
