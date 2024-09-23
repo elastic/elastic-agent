@@ -59910,11 +59910,11 @@ Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/collector/conf
 
 --------------------------------------------------------------------------------
 Dependency : go.opentelemetry.io/collector/config/confignet
-Version: v0.109.0
+Version: v1.16.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/collector/config/confignet@v0.109.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/collector/config/confignet@v1.16.0/LICENSE:
 
 
                                  Apache License
