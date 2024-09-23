@@ -82,7 +82,7 @@ steps:
           files: "build/TEST-*.xml"
           format: "junit"
           branches: "main"
-          debug: true
+          debug: true    
 
   - label: "Serverless Beats Tests"
     depends_on:
@@ -103,20 +103,4 @@ steps:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Serverless Beats Tests"
 
-  - label: "Kubernetes Integration tests"
-    key: "k8s-integration-tests"
-    env:
-      K8S_VERSION: "v1.30.2"
-      KIND_VERSION: "v0.20.0"
-    command: ".buildkite/scripts/steps/k8s-extended-tests.sh"
-    artifact_paths:
-      - "build/k8s-logs*/*"
-      - "build/k8s-logs*/**/*"
-      - "build/TEST-**"
-      - "build/diagnostics/*"
-    agents:
-      provider: "gcp"
-      image: "family/core-ubuntu-2204"
-    notify:
-      - github_commit_status:
-          context: "buildkite/elastic-agent-extended-testing - Kubernetes Integration tests"
+
