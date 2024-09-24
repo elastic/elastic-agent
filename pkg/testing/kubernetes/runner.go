@@ -8,11 +8,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/testing/ssh"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/elastic/elastic-agent/pkg/testing/ssh"
 
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/pkg/testing/common"
