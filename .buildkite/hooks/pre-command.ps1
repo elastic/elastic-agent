@@ -31,4 +31,3 @@ go install github.com/elastic/go-licenser
 go install golang.org/x/tools/cmd/goimports
 go install github.com/jstemmer/go-junit-report
 go install gotest.tools/gotestsum
-
