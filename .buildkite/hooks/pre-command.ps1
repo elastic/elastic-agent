@@ -1,3 +1,5 @@
+Write-Output "BUILDKITE_MESSAGE: $env:BUILDKITE_MESSAGE"
+
 # Install gcc TODO: Move to the VM image
 choco install mingw
 Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
