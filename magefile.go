@@ -776,7 +776,7 @@ func (Cloud) Image(ctx context.Context) {
 	dev := os.Getenv(devEnv)
 	defer os.Setenv(devEnv, dev)
 
-	os.Setenv(platformsEnv, "linux/amd64")
+	//os.Setenv(platformsEnv, "linux/amd64,linux/arm64")
 	os.Setenv(packagesEnv, "docker")
 	os.Setenv(devEnv, "true")
 
@@ -790,7 +790,7 @@ func (Cloud) Image(ctx context.Context) {
 	}
 
 	devtools.DevBuild = true
-	devtools.Platforms = devtools.Platforms.Filter("linux/amd64")
+	//devtools.Platforms = devtools.Platforms.Filter("linux/amd64,linux/arm64")
 	devtools.SelectedPackageTypes = []devtools.PackageType{devtools.Docker}
 
 	if _, hasExternal := os.LookupEnv(externalArtifacts); !hasExternal {

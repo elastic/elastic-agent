@@ -185,7 +185,10 @@ func (b *dockerBuilder) dockerBuild() (string, error) {
 	if repository := b.ExtraVars["repository"]; repository != "" {
 		tag = fmt.Sprintf("%s/%s", repository, tag)
 	}
-	return tag, sh.Run("docker", "build", "-t", tag, b.buildDir)
+
+	platform := fmt.Sprintf("%s/%s", "linux", b.Arch)
+	tag = fmt.Sprintf("%s-%s", tag, b.Arch)
+	return tag, sh.Run("docker", "buildx", "build", "-t", tag, "--platform", platform, "--load", b.buildDir)
 }
 
 func (b *dockerBuilder) dockerSave(tag string) error {
