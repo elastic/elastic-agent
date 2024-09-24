@@ -1,4 +1,6 @@
 Write-Output "BUILDKITE_MESSAGE: $env:BUILDKITE_MESSAGE"
+$env:BUILDKITE_MESSAGE = $env:BUILDKITE_MESSAGE.Substring(0, [System.Math]::Min(2048, $env:BUILDKITE_MESSAGE.Length))
+Write-Output "BUILDKITE_MESSAGE: $env:BUILDKITE_MESSAGE"
 
 # Install gcc TODO: Move to the VM image
 choco install mingw
