@@ -25,6 +25,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/extension/configintegrationextension v0.0.0
 	github.com/elastic/opentelemetry-collector-components/extension/fileintegrationextension v0.0.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.11.0
+	github.com/elastic/opentelemetry-collector-components/processor/integrationprocessor v0.0.0
 	github.com/elastic/opentelemetry-collector-components/receiver/integrationreceiver v0.0.0
 	github.com/fatih/color v1.16.0
 	github.com/fsnotify/fsnotify v1.7.0
@@ -462,6 +463,7 @@ replace (
 	github.com/elastic/opentelemetry-collector-components/extension/configintegrationextension => ../../../opentelemetry-collector-components/extension/configintegrationextension
 	github.com/elastic/opentelemetry-collector-components/extension/fileintegrationextension => ../../../opentelemetry-collector-components/extension/fileintegrationextension
 	github.com/elastic/opentelemetry-collector-components/internal/integrations => ../../../opentelemetry-collector-components/internal/integrations
+	github.com/elastic/opentelemetry-collector-components/processor/integrationprocessor => ../../../opentelemetry-collector-components/processor/integrationprocessor
 	github.com/elastic/opentelemetry-collector-components/receiver/integrationreceiver => ../../../opentelemetry-collector-components/receiver/integrationreceiver
 	// openshift removed all tags from their repo, use the pseudoversion from the release-3.9 branch HEAD
 	// See https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/12d41f40b0d408b0167633d8095160d3343d46ac/go.mod#L38

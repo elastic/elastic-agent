@@ -28,6 +28,7 @@ import (
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
 
 	// Processors:
+	"github.com/elastic/opentelemetry-collector-components/processor/integrationprocessor"
 	attributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor" // for modifying signal attributes
 	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor"
 	k8sattributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor" // for adding k8s metadata
@@ -88,6 +89,7 @@ func components() (otelcol.Factories, error) {
 		transformprocessor.NewFactory(),
 		filterprocessor.NewFactory(),
 		k8sattributesprocessor.NewFactory(),
+		integrationprocessor.NewFactory(),
 		elasticinframetricsprocessor.NewFactory(),
 		resourcedetectionprocessor.NewFactory(),
 		memorylimiterprocessor.NewFactory(),
