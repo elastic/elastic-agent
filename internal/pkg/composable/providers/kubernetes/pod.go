@@ -6,10 +6,10 @@ package kubernetes
 
 import (
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sync"
 	"time"
-
-	v1 "k8s.io/api/apps/v1"
 
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/safemapstr"
 
 	k8s "k8s.io/client-go/kubernetes"
+	clientgometa "k8s.io/client-go/metadata"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
@@ -106,12 +107,21 @@ func NewPodEventer(
 	// Deployment -> Replicaset -> Pod
 	// CronJob -> job -> Pod
 	if metaConf.Deployment {
+		metadataClient, err := GetKubernetesMetadataClient(cfg.KubeConfig, cfg.KubeClientOptions)
+		if err != nil {
+			logger.Errorf("Error creating metadata client for %T due to error %+v", &kubernetes.Namespace{}, err)
+		}
 		// use a custom watcher here, so we can provide a transform function and limit the data we're storing
-		replicaSetWatcher, err = NewNamedWatcher("resource_metadata_enricher_rs", client, &kubernetes.ReplicaSet{}, kubernetes.WatchOptions{
-			SyncTimeout:  cfg.SyncPeriod,
-			Namespace:    cfg.Namespace,
-			HonorReSyncs: true,
-		}, nil, removeUnnecessaryReplicaSetData)
+		replicaSetWatcher, err = NewNamedMetaWatcher(
+			"resource_metadata_enricher_rs",
+			client,
+			metadataClient,
+			schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "replicasets"},
+			kubernetes.WatchOptions{
+				SyncTimeout:  cfg.SyncPeriod,
+				Namespace:    cfg.Namespace,
+				HonorReSyncs: true,
+			}, nil, removeUnnecessaryReplicaSetData)
 		if err != nil {
 			logger.Errorf("Error creating watcher for %T due to error %+v", &kubernetes.Namespace{}, err)
 		}
@@ -131,7 +141,7 @@ func NewPodEventer(
 	if err != nil {
 		return nil, errors.New(err, "failed to unpack configuration")
 	}
-	metaGen := metadata.GetPodMetaGen(rawConfig, watcher, nodeWatcher, namespaceWatcher, replicaSetWatcher, jobWatcher, metaConf)
+	metaGen := GetPodMetaGen(rawConfig, watcher, nodeWatcher, namespaceWatcher, replicaSetWatcher, jobWatcher, metaConf)
 
 	p := &pod{
 		logger:            logger,
@@ -546,15 +556,39 @@ func hintsCheck(annotations mapstr.M, container string, prefix string, validate 
 // removeUnnecessaryReplicaSetData removes all data from a ReplicaSet resource, except what we need to compute
 // Pod metadata. Which is just the name and owner references.
 func removeUnnecessaryReplicaSetData(obj interface{}) (interface{}, error) {
-	old, ok := obj.(*v1.ReplicaSet)
+	old, ok := obj.(*metav1.PartialObjectMetadata)
 	if !ok {
 		return nil, fmt.Errorf("obj is not a ReplicaSet")
 	}
-	transformed := v1.ReplicaSet{}
-	transformed.ObjectMeta = kubernetes.ObjectMeta{
-		Name:            old.GetName(),
-		Namespace:       old.GetNamespace(),
-		OwnerReferences: old.GetOwnerReferences(),
+	transformed := &metav1.PartialObjectMetadata{
+		ObjectMeta: kubernetes.ObjectMeta{
+			Name:            old.GetName(),
+			Namespace:       old.GetNamespace(),
+			OwnerReferences: old.GetOwnerReferences(),
+			ResourceVersion: old.GetResourceVersion(),
+		},
 	}
 	return transformed, nil
+}
+
+// GetKubernetesMetadataClient returns a kubernetes metadata client. If inCluster is true, it returns an
+// in cluster configuration based on the secrets mounted in the Pod. If kubeConfig is passed,
+// it parses the config file to get the config required to build a client.
+func GetKubernetesMetadataClient(kubeconfig string, opt kubernetes.KubeClientOptions) (clientgometa.Interface, error) {
+	if kubeconfig == "" {
+		kubeconfig = kubernetes.GetKubeConfigEnvironmentVariable()
+	}
+
+	cfg, err := kubernetes.BuildConfig(kubeconfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to build kube config due to error: %w", err)
+	}
+	cfg.QPS = opt.QPS
+	cfg.Burst = opt.Burst
+	client, err := clientgometa.NewForConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("unable to build kubernetes clientset: %w", err)
+	}
+
+	return client, nil
 }

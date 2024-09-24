@@ -7,6 +7,10 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/watch"
+	clientgometa "k8s.io/client-go/metadata"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -65,24 +69,26 @@ type watcher struct {
 
 // NewWatcher initializes the watcher client to provide a events handler for
 // resource from the cluster (filtered to the given node)
-func NewWatcher(
+func NewMetaWatcher(
 	client kubernetes.Interface,
-	resource Resource,
+	metadataClient clientgometa.Interface,
+	gvr schema.GroupVersionResource,
 	opts WatchOptions,
 	indexers cache.Indexers,
 	transformFunc cache.TransformFunc,
 ) (Watcher, error) {
-	return NewNamedWatcher("", client, resource, opts, indexers, transformFunc)
+	return NewNamedMetaWatcher("", client, metadataClient, gvr, opts, indexers, transformFunc)
 }
 
-// NewNamedWatcher initializes the watcher client to provide an events handler for
+// NewNamedMetaWatcher initializes the watcher client to provide an events handler for
 // resource from the cluster (filtered to the given node) and also allows to name the k8s
 // client's workqueue that is used by the watcher. Workqueue name is important for exposing workqueue
 // metrics, if it is empty, its metrics will not be logged by the k8s client.
-func NewNamedWatcher(
+func NewNamedMetaWatcher(
 	name string,
 	client kubernetes.Interface,
-	resource Resource,
+	metadataClient clientgometa.Interface,
+	gvr schema.GroupVersionResource,
 	opts WatchOptions,
 	indexers cache.Indexers,
 	transformFunc cache.TransformFunc,
@@ -90,10 +96,7 @@ func NewNamedWatcher(
 	var store cache.Store
 	var queue workqueue.Interface //nolint:staticcheck // TODO: use the typed version
 	var cachedObject runtime.Object
-	informer, _, err := autodiscoverK8s.NewInformer(client, resource, opts, indexers)
-	if err != nil {
-		return nil, err
-	}
+	informer := NewMetadataInformer(metadataClient, gvr, opts, indexers)
 
 	store = informer.GetStore()
 	queue = workqueue.NewNamed(name)
@@ -121,7 +124,7 @@ func NewNamedWatcher(
 		handler:      autodiscoverK8s.NoOpEventHandlerFuncs{},
 	}
 
-	_, err = w.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := w.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(o interface{}) {
 			w.enqueue(o, add)
 		},
@@ -140,14 +143,6 @@ func NewNamedWatcher(
 				// In this case, we are making sure that we are enqueueing an "add" event because, an runner that is already in Running
 				// state should just be deduped by autodiscover and not stop/started periodically as would be the case with an update.
 				w.enqueue(n, add)
-			}
-
-			//We check the type of resource and only if it is namespace or node return the cacheObject
-			switch resource.(type) {
-			case *Namespace:
-				w.cacheObject(o)
-			case *Node:
-				w.cacheObject(o)
 			}
 		},
 	})
@@ -229,15 +224,6 @@ func (w *watcher) enqueue(obj interface{}, state string) {
 	w.queue.Add(&item{key, obj, state})
 }
 
-// cacheObject updates watcher with the old version of cache objects before change during update events
-func (w *watcher) cacheObject(o interface{}) {
-	if old, ok := o.(runtime.Object); !ok {
-		utilruntime.HandleError(fmt.Errorf("expected object in cache got %#v", o))
-	} else {
-		w.cachedObject = old
-	}
-}
-
 // process gets the top of the work queue and processes the object that is received.
 func (w *watcher) process(_ context.Context) bool {
 	obj, quit := w.queue.Get()
@@ -282,4 +268,26 @@ func (w *watcher) process(_ context.Context) bool {
 	}
 
 	return true
+}
+
+// NewMetadataInformer creates an informer for a given resource that only tracks the resource metadata.
+func NewMetadataInformer(client clientgometa.Interface, gvr schema.GroupVersionResource, opts WatchOptions, indexers cache.Indexers) cache.SharedInformer {
+	ctx := context.Background()
+	if indexers == nil {
+		indexers = cache.Indexers{}
+	}
+	informer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return client.Resource(gvr).List(ctx, options)
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return client.Resource(gvr).Watch(ctx, options)
+			},
+		},
+		&metav1.PartialObjectMetadata{},
+		opts.SyncTimeout,
+		indexers,
+	)
+	return informer
 }
