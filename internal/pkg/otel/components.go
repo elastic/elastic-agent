@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/collector/receiver"
 
 	// Receivers:
+	"github.com/elastic/opentelemetry-collector-components/receiver/integrationreceiver"
 	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
 	hostmetricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver"
 	httpcheckreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver"
@@ -69,6 +70,7 @@ func components() (otelcol.Factories, error) {
 		k8sclusterreceiver.NewFactory(),
 		hostmetricsreceiver.NewFactory(),
 		httpcheckreceiver.NewFactory(),
+		integrationreceiver.NewFactory(),
 		k8sobjectsreceiver.NewFactory(),
 		prometheusreceiver.NewFactory(),
 		jaegerreceiver.NewFactory(),
