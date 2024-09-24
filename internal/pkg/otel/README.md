@@ -68,10 +68,12 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+| [configintegrationextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/configintegrationextension/v0.0.0/extension/configintegrationextension/README.md) | v0.0.0 |
 | [healthcheckextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckextension/v0.109.0/extension/healthcheckextension/README.md) | v0.109.0 |
 | [pprofextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/pprofextension/v0.109.0/extension/pprofextension/README.md) | v0.109.0 |
 | [filestorage](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/storage/filestorage/v0.109.0/extension/storage/filestorage/README.md) | v0.109.0 |
 | [memorylimiterextension](https://github.com/open-telemetry/opentelemetry-collector/blob/extension/memorylimiterextension/v0.109.0/extension/memorylimiterextension/README.md) | v0.109.0 |
+| [configintegrationextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/configintegrationextension/=&gt; ../../../opentelemetry-collector-components/extension/configintegrationextension/extension/configintegrationextension/README.md) | =&gt; ../../../opentelemetry-collector-components/extension/configintegrationextension |
 
 ### Connectors
 

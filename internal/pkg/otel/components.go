@@ -46,6 +46,7 @@ import (
 	otlphttpexporter "go.opentelemetry.io/collector/exporter/otlphttpexporter"
 
 	// Extensions
+	"github.com/elastic/opentelemetry-collector-components/extension/configintegrationextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension"
 	pprofextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension"
 	filestorage "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage"
@@ -116,6 +117,7 @@ func components() (otelcol.Factories, error) {
 		filestorage.NewFactory(),
 		healthcheckextension.NewFactory(),
 		pprofextension.NewFactory(),
+		configintegrationextension.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err

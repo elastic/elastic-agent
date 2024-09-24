@@ -22,6 +22,7 @@ require (
 	github.com/elastic/go-sysinfo v1.14.1
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015
+	github.com/elastic/opentelemetry-collector-components/extension/configintegrationextension v0.0.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.11.0
 	github.com/fatih/color v1.16.0
 	github.com/fsnotify/fsnotify v1.7.0
@@ -182,6 +183,7 @@ require (
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/lunes v0.1.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/internal/integrations v0.0.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.9.0 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
@@ -455,6 +457,8 @@ replace (
 	github.com/Shopify/sarama => github.com/elastic/sarama v1.19.1-0.20220310193331-ebc2b0d8eef3
 	github.com/dop251/goja => github.com/andrewkroh/goja v0.0.0-20190128172624-dd2ac4456e20
 	github.com/dop251/goja_nodejs => github.com/dop251/goja_nodejs v0.0.0-20171011081505-adff31b136e6
+	github.com/elastic/opentelemetry-collector-components/extension/configintegrationextension => ../../../opentelemetry-collector-components/extension/configintegrationextension
+	github.com/elastic/opentelemetry-collector-components/internal/integrations => ../../../opentelemetry-collector-components/internal/integrations
 	// openshift removed all tags from their repo, use the pseudoversion from the release-3.9 branch HEAD
 	// See https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/12d41f40b0d408b0167633d8095160d3343d46ac/go.mod#L38
 	github.com/openshift/api v3.9.0+incompatible => github.com/openshift/api v0.0.0-20180801171038-322a19404e37
