@@ -15,6 +15,7 @@ ELASTIC_AGENT_BRANCH=update-k8s-templates-$(shell date "+%Y%m%d%H%M%S")
 KUSTOMIZE=elastic-agent-kustomize
 KUSTOMIZE_DEFAULT=elastic-agent-kustomize/default
 KUSTOMIZE_KSM_AUTOSHARDING=elastic-agent-kustomize/ksm-autosharding
+KUSTOMIZE_KSM_HINTS=elastic-agent-kustomize/ksm-hints
 
 # variable for processor for elastic-agent-standalone
 define ELASTIC_PROCESSOR
@@ -117,6 +118,11 @@ $(ALL):
 	@echo "Generating $@ kustomize-ksm-autosharding files"
 	@for f in $(shell ls $@/*.yaml | grep -v elastic-agent-standalone-daemonset-configmap); do \
 		cp -r $$f  $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/base; \
+	done
+
+	@echo "Generating $@ kustomize-ksm-hints files"
+	@for f in $(shell ls elastic-agent-standalone/*.yaml | grep -v elastic-agent-standalone-daemonset-configmap); do \
+		cp -r $$f  $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone/base; \
 	done
 
 	mkdir -p $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/extra/
