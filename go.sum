@@ -624,6 +624,16 @@ github.com/json-iterator/go v1.1.10/go.mod h1:KdQUCv79m/52Kvf8AW2vK1V8akMuk1QjK/
 github.com/json-iterator/go v1.1.11/go.mod h1:KdQUCv79m/52Kvf8AW2vK1V8akMuk1QjK/uOdHXbAo4=
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
+github.com/jsoriano/opentelemetry-collector-components/extension/configintegrationextension v0.0.0-20240924085621-781f96f74764 h1:Q7tI/8Jcf6dpRLalyJ4MgIte/VI20CFcb16WiKwoXps=
+github.com/jsoriano/opentelemetry-collector-components/extension/configintegrationextension v0.0.0-20240924085621-781f96f74764/go.mod h1:SROaTDvX0LohbvGvt4m7Iwj48tOgZ06mhYUOKlhoLHs=
+github.com/jsoriano/opentelemetry-collector-components/extension/fileintegrationextension v0.0.0-20240924085621-781f96f74764 h1:/4sNs8Lli3UxwdHa19lEHSSF4Uy4e/pKmBJQWhQZIK0=
+github.com/jsoriano/opentelemetry-collector-components/extension/fileintegrationextension v0.0.0-20240924085621-781f96f74764/go.mod h1:BJqkIlUI80X91A5ByYzFno9CuH2tG/AdvmF5sKIkMuM=
+github.com/jsoriano/opentelemetry-collector-components/internal/integrations v0.0.0-20240924085621-781f96f74764 h1:Y/x3h2O2MscazdZxBs0aFlPa+kXfBoAJseqXIqAMsiU=
+github.com/jsoriano/opentelemetry-collector-components/internal/integrations v0.0.0-20240924085621-781f96f74764/go.mod h1:MuHMRusvNxwy6QxRkoFbqwahR0pMj62125mThAX1JT0=
+github.com/jsoriano/opentelemetry-collector-components/processor/integrationprocessor v0.0.0-20240924085621-781f96f74764 h1:/AiWKmhQnbo+EWQgkrYyJQ05nOzbfundngdO30HxsF8=
+github.com/jsoriano/opentelemetry-collector-components/processor/integrationprocessor v0.0.0-20240924085621-781f96f74764/go.mod h1:pmUnpSrMZSLwu9EnvPStSL2jAnD1gkmlFKiFymOwEF8=
+github.com/jsoriano/opentelemetry-collector-components/receiver/integrationreceiver v0.0.0-20240924085621-781f96f74764 h1:XQ02Q3slbbruAoRY/P/ULM3H1Wmiv3K0y3eVtoFTfLI=
+github.com/jsoriano/opentelemetry-collector-components/receiver/integrationreceiver v0.0.0-20240924085621-781f96f74764/go.mod h1:QKv/oumN1ZIDJtUjBnWXPvhq/VqqSOuNkNMewv0MiUQ=
 github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024/go.mod h1:6v2b51hI/fHJwM22ozAgKL4VKDeJcHhJFhtBdhmNjmU=
 github.com/jstemmer/go-junit-report v0.9.1/go.mod h1:Brl9GWCQeLvo8nXZwPNNblvFj/XSXhF0NWZEnDohbsk=
 github.com/julienschmidt/httprouter v1.2.0/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7VTCxuUUipMqKk8s4w=

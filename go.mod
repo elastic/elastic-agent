@@ -460,11 +460,11 @@ replace (
 	github.com/Shopify/sarama => github.com/elastic/sarama v1.19.1-0.20220310193331-ebc2b0d8eef3
 	github.com/dop251/goja => github.com/andrewkroh/goja v0.0.0-20190128172624-dd2ac4456e20
 	github.com/dop251/goja_nodejs => github.com/dop251/goja_nodejs v0.0.0-20171011081505-adff31b136e6
-	github.com/elastic/opentelemetry-collector-components/extension/configintegrationextension => github.com/jsoriano/opentelemetry-collector-components/extension/configintegrationextension templates
-	github.com/elastic/opentelemetry-collector-components/extension/fileintegrationextension => github.com/jsoriano/opentelemetry-collector-components/extension/fileintegrationextension templates
-	github.com/elastic/opentelemetry-collector-components/internal/integrations => github.com/jsoriano/opentelemetry-collector-components/internal/integrations templates
-	github.com/elastic/opentelemetry-collector-components/processor/integrationprocessor => github.com/jsoriano/opentelemetry-collector-components/processor/integrationprocessor templates
-	github.com/elastic/opentelemetry-collector-components/receiver/integrationreceiver => github.com/jsoriano/opentelemetry-collector-components/receiver/integrationreceiver templates
+	github.com/elastic/opentelemetry-collector-components/extension/configintegrationextension => github.com/jsoriano/opentelemetry-collector-components/extension/configintegrationextension v0.0.0-20240924085621-781f96f74764
+	github.com/elastic/opentelemetry-collector-components/extension/fileintegrationextension => github.com/jsoriano/opentelemetry-collector-components/extension/fileintegrationextension v0.0.0-20240924085621-781f96f74764
+	github.com/elastic/opentelemetry-collector-components/internal/integrations => github.com/jsoriano/opentelemetry-collector-components/internal/integrations v0.0.0-20240924085621-781f96f74764
+	github.com/elastic/opentelemetry-collector-components/processor/integrationprocessor => github.com/jsoriano/opentelemetry-collector-components/processor/integrationprocessor v0.0.0-20240924085621-781f96f74764
+	github.com/elastic/opentelemetry-collector-components/receiver/integrationreceiver => github.com/jsoriano/opentelemetry-collector-components/receiver/integrationreceiver v0.0.0-20240924085621-781f96f74764
 	// openshift removed all tags from their repo, use the pseudoversion from the release-3.9 branch HEAD
 	// See https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/12d41f40b0d408b0167633d8095160d3343d46ac/go.mod#L38
 	github.com/openshift/api v3.9.0+incompatible => github.com/openshift/api v0.0.0-20180801171038-322a19404e37
