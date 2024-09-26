@@ -272,7 +272,7 @@ steps:
                     - BUILDKITE_PULL_REQUEST=${BUILDKITE_PULL_REQUEST}
                     - BUILDKITE_PULL_REQUEST_BASE_BRANCH=${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
                     - GITHUB_PR_LABELS=${GITHUB_PR_LABELS}
-    soft_fail: true # https://github.com/elastic/ingest-dev/issues/4082
+                soft_fail: true # https://github.com/elastic/ingest-dev/issues/4082
 
   # Trigger for branches
   - label: "Triggering Integration tests for branches"
