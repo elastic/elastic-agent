@@ -29,9 +29,8 @@ Entrypoint for chart initialisation
 {{- define "elasticagent.init" -}}
 {{- if not (hasKey $.Values.agent "initialised") -}}
 {{/* init order matters */}}
-{{- include "elasticagent.init.engine" $ -}}
+{{- include (printf "elasticagent.engine.%s.init" $.Values.agent.engine) $ -}}
 {{- include "elasticagent.init.fleet" $ -}}
-{{- include "elasticagent.init.outputs" $ -}}
 {{- include "elasticagent.init.inputs" $ -}}
 {{- include "elasticagent.init.presets" $ -}}
 {{- $_ := set $.Values.agent "initialised" dict -}}
@@ -39,51 +38,22 @@ Entrypoint for chart initialisation
 {{- end -}}
 
 {{/*
-Check the agent.engine and fallback to "k8s"
-*/}}
-{{- define "elasticagent.init.engine" -}}
-{{- $ := . -}}
-{{- if empty (dig "engine" ("") $.Values.agent) -}}
-{{- $_ := set $.Values.agent "engine" "k8s" -}}
-{{- end -}}
-{{- include (printf "elasticagent.engine.%s.init" $.Values.agent.engine) $ -}}
-{{- end -}}
-
-{{/*
 Validate fleet configuration
 */}}
 {{- define "elasticagent.init.fleet" -}}
 {{- $ := . -}}
+{{/* check if fleet is enabled */}}
 {{- if eq $.Values.agent.fleet.enabled true -}}
-{{- $_ := required "url must be defined when fleet mode is enabled" $.Values.agent.fleet.url -}}
-{{- if empty $.Values.agent.fleet.token -}}
-{{- $_ := required "kibana host must be defined when fleet mode is enabled and a token is not supplied" $.Values.agent.fleet.kibanaHost -}}
-{{- $_ := required "kibana username must be defined when fleet mode is enabled and a token is not supplied" $.Values.agent.fleet.kibanaUser -}}
-{{- $_ := required "kibana password must be defined when fleet mode is enabled and a token is not supplied" $.Values.agent.fleet.kibanaPassword -}}
-{{- end -}}
-{{- $_ := required "preset must be defined when fleet mode is enabled" $.Values.agent.fleet.preset -}}
-{{- if not (hasKey $.Values.agent.presets $.Values.agent.fleet.preset)}}
-{{- fail (printf "specified preset \"%s\" under fleet is not found" $.Values.agent.fleet.preset) -}}
-{{- end -}}
+{{/* check if the preset exists */}}
+{{- $fleetPresetName := $.Values.agent.fleet.preset -}}
+{{- $fleetPresetVal := get $.Values.agent.presets $fleetPresetName -}}
+{{- $_ := required (printf "preset with name \"%s\" of fleet not defined" $fleetPresetName) $fleetPresetVal -}}
+{{/* disable all presets except the fleet one */}}
 {{- range $presetName, $presetVal := $.Values.agent.presets}}
-{{- if ne $presetName $.Values.agent.fleet.preset -}}
+{{- if ne $presetName $fleetPresetName -}}
 {{- $_ := unset $.Values.agent.presets $presetName}}
 {{- end -}}
 {{- end -}}
-{{- end -}}
-{{- end -}}
-
-{{/*
-Validate and initialise outputs
-*/}}
-{{- define "elasticagent.init.outputs" -}}
-{{- $ := . -}}
-{{- $supportOutputTypes := dict "ESPlainAuth" "" "ESSecretAuthBasic" "" "ESSecretAuthAPI" "" "ESECKRef" ""}}
-{{- range $outputName, $outputVal := $.Values.outputs -}}
-{{- if empty ($outputVal).type -}}
-{{- $_ := set $outputVal "type" "ESPlainAuth" -}}
-{{- end -}}
-{{- include (printf "elasticagent.output.%s.validate" ($outputVal).type) (list $ $outputName $outputVal)}}
 {{- end -}}
 {{- end -}}
 
@@ -97,13 +67,9 @@ Initialise input templates if we are not deploying as managed
 {{- include "elasticagent.kubernetes.init" $ -}}
 {{- range $customInputName, $customInputVal := $.Values.extraIntegrations -}}
 {{- $customInputPresetName := ($customInputVal).preset -}}
-{{- $_ := required (printf "customInput \"%s\" is missing required preset field" $customInputName) $customInputPresetName -}}
 {{- $presetVal := get $.Values.agent.presets $customInputPresetName -}}
 {{- $_ := required (printf "preset with name \"%s\" of customInput \"%s\" not defined" $customInputPresetName $customInputName) $customInputVal -}}
-{{- $customInputOuput := dig "use_output" (list) $customInputVal -}}
-{{- if empty $customInputOuput -}}
-{{- fail (printf "output not defined in custom integration \"%s\"" $customInputName) -}}
-{{- end -}}
+{{- $customInputOuput := ($customInputVal).use_output -}}
 {{- include "elasticagent.preset.mutate.outputs.byname" (list $ $presetVal $customInputOuput) -}}
 {{- include "elasticagent.preset.mutate.inputs" (list $ $presetVal (list $customInputVal)) -}}
 {{- end -}}
@@ -118,15 +84,7 @@ Validate and initialise the defined agent presets
 {{- range $presetName, $presetVal := $.Values.agent.presets -}}
 {{- include "elasticagent.preset.mutate.unprivileged" (list $ $presetVal) -}}
 {{- include "elasticagent.preset.mutate.fleet" (list $ $presetVal) -}}
-{{- $presetMode := dig "mode" ("") $presetVal -}}
-{{- if not $presetMode -}}
-{{- fail (printf "mode is missing from preset \"%s\"" $presetName) -}}
-{{- else if eq $presetMode "deployment" -}}
-{{- else if eq $presetMode "statefulset" -}}
-{{- else if eq $presetMode "daemonset" -}}
-{{- else -}}
-{{- fail (printf "invalid mode \"%s\" in preset \"%s\", must be one of deployment, statefulset, daemonset" $presetMode $presetName) -}}
-{{- end -}}
+{{- $presetMode := ($presetVal).mode -}}
 {{- if eq $.Values.agent.fleet.enabled false -}}
 {{- $presetInputs := dig "_inputs" (list) $presetVal -}}
 {{- if empty $presetInputs -}}
@@ -384,13 +342,12 @@ app.kubernetes.io/version: {{ .Values.agent.version}}
 {{- $ := index . 0 -}}
 {{- $preset := index . 1 -}}
 {{- $outputName := index . 2 -}}
-{{- if not (hasKey $.Values.outputs $outputName) -}}
-{{- fail (printf "output \"%s\" is not defined" $outputName) -}}
-{{- end -}}
-{{- $outputDict := deepCopy (get $.Values.outputs $outputName) -}}
+{{- $ouputVal := get $.Values.outputs $outputName }}
+{{- $_ := required (printf "output \"%s\" is not defined" $outputName) $ouputVal -}}
+{{- $outputCopy := deepCopy $ouputVal -}}
 {{- $presetOutputs := dig "outputs" (dict) $preset -}}
 {{- if not (hasKey $presetOutputs $outputName) -}}
-{{- $_ := set $presetOutputs $outputName $outputDict}}
+{{- $_ := set $presetOutputs $outputName $outputCopy}}
 {{- end -}}
 {{- $_ := set $preset "outputs" $presetOutputs -}}
 {{- end -}}

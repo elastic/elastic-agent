@@ -30,13 +30,9 @@ stringData:
     id: agent-nginx-example
     outputs:
       default:
-        api_key: ""
         hosts:
         - http://elasticsearch:9200
-        name: ""
-        namespace: ""
         password: changeme
-        secretName: ""
         type: elasticsearch
         username: elastic
     secret_references: []
@@ -219,7 +215,7 @@ spec:
       labels:
         name: agent-nginx-example
       annotations:
-        checksum/config: 5b03a8c53bfa79596ff47efff33dd02b851f81b1bdbe1581b5a485eefe26103a
+        checksum/config: 4b3a03273d11151ee0f8bbdc8e235f8b6d2b344e09dedc632ae6f7f9e8e0ef34
 
     spec:
       dnsPolicy: ClusterFirstWithHostNet
