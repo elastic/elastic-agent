@@ -823,6 +823,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/otl
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/otlpencodingextension v0.110.0/go.mod h1:Wwj3ElPPcJ1Zn/gTin2VlH2qNs71xYBSV1CAJkyC2AA=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.110.0 h1:ostm6Z/cdBruLRN83HRTyBURm+XenX9UF1HY8hn+IUo=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.110.0/go.mod h1:gt+hIrGEmp6Hm02NiKsIvajFzYyh0htTugpQHFl6Jb4=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.110.0 h1:qs+++iLQRYfGqv5yZ6F/HGaxirLKl9pG501qLBnyTt0=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.110.0/go.mod h1:9G/V2+T7dlp6pVTJKP5s5g3mhAq46pZHWl2ra5XrxFU=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage v0.110.0 h1:sGzuzjxZU/KmjKwQveFCpk7nFhIRuw7XkRKTgiky+Z8=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage v0.110.0/go.mod h1:qIakA+SRKkuNr/xy0mAwPbvWTP9Pd+Te0gtAOE4+7RA=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.110.0 h1:7awYKqb3bTYvxCFvvYcaIwH0HTkxfLnSFWxm2vchT+w=
