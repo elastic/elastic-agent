@@ -27,9 +27,6 @@ extensions:
     path: "/health/status"
   file_storage/filelogreceiver:
     create_directory: true
-
-    # RFC: The text below is just a placeholder. 
-    #      Please propose names for the default otel registry.
     directory: ${env:STORAGE_DIR}
 
 service:
