@@ -28,7 +28,7 @@ spec:
       # Uncomment if using hints feature
       #initContainers:
       #  - name: k8s-templates-downloader
-      #    image: docker.elastic.co/beats/elastic-agent:8.15.2
+      #    image: docker.elastic.co/beats/elastic-agent:8.15.3
       #    command: ['bash']
       #    args:
       #      - -c
@@ -42,7 +42,7 @@ spec:
 #      #        mountPath: /usr/share/elastic-agent/state
       containers:
         - name: elastic-agent-standalone
-          image: docker.elastic.co/beats/elastic-agent:8.15.2
+          image: docker.elastic.co/beats/elastic-agent:8.15.3
           args: ["-c", "/etc/elastic-agent/agent.yml", "-e"]
           env:
             # The API Key with access privilleges to connect to Elasticsearch. https://www.elastic.co/guide/en/fleet/current/grant-access-to-elasticsearch.html#create-api-key-standalone-agent
