@@ -30,7 +30,7 @@ extensions:
     directory: ${env:STORAGE_DIR}
 
 service:
-  extensions: [health_check, memory_limiter]
+  extensions: [health_check, memory_limiter, file_storage/filelogreceiver]
   pipelines:
     logs:
       receivers: [filelog]

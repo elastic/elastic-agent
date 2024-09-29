@@ -99,7 +99,7 @@ exporters:
 processors:
   ...
 service:
-  extensions: [file_storage]
+  extensions: [file_storage/filelogreceiver]
   pipelines:
     logs/platformlogs:
       receivers: [filelog/platformlogs]
