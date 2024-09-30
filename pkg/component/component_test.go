@@ -1,8 +1,7 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
-//nolint:dupl // duplicate code is in test cases
 package component
 
 import (
@@ -634,7 +633,7 @@ func TestToComponents(t *testing.T) {
 							ID:       "filestream-default-filestream-1",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
-							Err:      errors.New("1 decoding error(s): 'meta' expected a map, got 'slice'"),
+							Err:      fmt.Errorf("decoding error: %w", fmt.Errorf("decoding failed due to the following error(s):\n\n%w", errors.Join(errors.New("'meta' expected a map, got 'slice'")))),
 						},
 					},
 				},
@@ -722,7 +721,7 @@ func TestToComponents(t *testing.T) {
 							ID:       "cloudbeat-default-cloudbeat-1-unit",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
-							Err:      errors.New("1 decoding error(s): 'meta' expected a map, got 'slice'"),
+							Err:      fmt.Errorf("decoding error: %w", fmt.Errorf("decoding failed due to the following error(s):\n\n%w", errors.Join(errors.New("'meta' expected a map, got 'slice'")))),
 						},
 					},
 				},

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package mage
 
@@ -44,6 +44,11 @@ func Package() error {
 			for _, pkgType := range pkg.Types {
 				if !isPackageTypeSelected(pkgType) {
 					log.Printf("Skipping %s package type because it is not selected", pkgType)
+					continue
+				}
+
+				if pkgType == Docker && !isDockerVariantSelected(pkg.Spec.DockerVariant) {
+					log.Printf("Skipping %s docker variant type because it is not selected", pkg.Spec.DockerVariant)
 					continue
 				}
 
@@ -115,6 +120,21 @@ func isPackageTypeSelected(pkgType PackageType) bool {
 
 	for _, t := range SelectedPackageTypes {
 		if t == pkgType {
+			return true
+		}
+	}
+	return false
+}
+
+// isDockerVariantSelected returns true if SelectedDockerVariants is empty or if
+// docVariant is present on SelectedDockerVariants. It returns false otherwise.
+func isDockerVariantSelected(docVariant DockerVariant) bool {
+	if len(SelectedDockerVariants) == 0 {
+		return true
+	}
+
+	for _, v := range SelectedDockerVariants {
+		if v == docVariant {
 			return true
 		}
 	}

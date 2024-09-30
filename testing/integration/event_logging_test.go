@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -75,7 +75,6 @@ func TestEventLogFile(t *testing.T) {
 		Local: true,
 		Sudo:  false,
 	})
-
 	ctx, cancel := testcontext.WithDeadline(
 		t,
 		context.Background(),
@@ -163,7 +162,7 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 		},
 		Group: "container",
 	})
-
+	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/5159")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 

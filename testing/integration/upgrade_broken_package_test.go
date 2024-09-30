@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -31,6 +31,8 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
+
+	t.Skip("This test cannot succeed with a AGENT_PACKAGE_VERSION override. Check contents of .buildkite/scripts/steps/beats_tests.sh")
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()

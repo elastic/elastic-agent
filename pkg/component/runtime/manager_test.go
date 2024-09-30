@@ -1,8 +1,7 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
-//nolint:dupl // duplicate code is in test cases
 package runtime
 
 import (
@@ -18,7 +17,6 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -34,7 +32,7 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 		ai,
 		apmtest.DiscardTracer,
 		newTestMonitoringMgr(),
-		configuration.DefaultGRPCConfig(),
+		testGrpcConfig(),
 		false,
 	)
 	require.NoError(t, err)

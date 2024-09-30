@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package client
 
@@ -19,7 +19,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 func TestHTTPClient(t *testing.T) {
@@ -170,7 +170,7 @@ func TestElasticApiVersion(t *testing.T) {
 		ts := httptest.NewServer(mux)
 		defer ts.Close()
 
-		testLogger, _ := logger.NewTesting("testElasticApiVersion")
+		testLogger, _ := loggertest.New("testElasticApiVersion")
 
 		clt, err := NewWithConfig(testLogger, remote.Config{
 			Hosts: []string{ts.URL},
@@ -198,7 +198,7 @@ func TestElasticApiVersion(t *testing.T) {
 		ts := httptest.NewServer(mux)
 		defer ts.Close()
 
-		testLogger, obsLogs := logger.NewTesting("testElasticApiVersion")
+		testLogger, obsLogs := loggertest.New("testElasticApiVersion")
 
 		clt, err := NewWithConfig(testLogger, remote.Config{
 			Hosts: []string{ts.URL},
@@ -229,7 +229,7 @@ func TestElasticApiVersion(t *testing.T) {
 		ts := httptest.NewServer(mux)
 		defer ts.Close()
 
-		testLogger, obsLogs := logger.NewTesting("testElasticApiVersion")
+		testLogger, obsLogs := loggertest.New("testElasticApiVersion")
 
 		clt, err := NewWithConfig(testLogger, remote.Config{
 			Hosts: []string{ts.URL},
@@ -260,7 +260,7 @@ func TestElasticApiVersion(t *testing.T) {
 		ts := httptest.NewServer(mux)
 		defer ts.Close()
 
-		testLogger, obsLogs := logger.NewTesting("testElasticApiVersion")
+		testLogger, obsLogs := loggertest.New("testElasticApiVersion")
 
 		clt, err := NewWithConfig(testLogger, remote.Config{
 			Hosts: []string{ts.URL},

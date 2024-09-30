@@ -53,6 +53,7 @@ build/
 elastic-agent
 elastic-agent.dev.yml
 elastic-agent.yml.*
+!deploy/helm/*
 fleet.yml
 fleet.yml.lock
 fleet.yml.old

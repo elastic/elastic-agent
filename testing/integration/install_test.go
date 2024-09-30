@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -9,7 +9,7 @@ package integration
 import (
 	"context"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -334,12 +334,11 @@ func TestRepeatedInstallUninstall(t *testing.T) {
 }
 
 func randStr(length int) string {
-	rand.Seed(time.Now().UnixNano())
 	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 	runes := make([]rune, length)
 	for i := range runes {
-		runes[i] = letters[rand.Intn(len(letters))]
+		runes[i] = letters[rand.IntN(len(letters))]
 	}
 
 	return string(runes)

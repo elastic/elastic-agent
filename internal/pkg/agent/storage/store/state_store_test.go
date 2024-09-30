@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package store
 
@@ -20,7 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 type wrongAction struct{}
@@ -61,7 +61,93 @@ func createAgentVaultAndSecret(t *testing.T, ctx context.Context, tempDir string
 }
 
 func runTestStateStore(t *testing.T, ackToken string) {
-	log, _ := logger.New("state_store", false)
+	log, _ := loggertest.New("state_store")
+
+	t.Run("SetAction corner case", func(t *testing.T) {
+
+		t.Run("nil fleetapi.Action", func(t *testing.T) {
+			var action fleetapi.Action
+
+			storePath := filepath.Join(t.TempDir(), "state.json")
+			s, err := storage.NewDiskStore(storePath)
+			require.NoError(t, err, "failed creating DiskStore")
+
+			store, err := NewStateStore(log, s)
+			require.NoError(t, err)
+			require.Nil(t, store.Action())
+
+			store.SetAction(action)
+			store.SetAckToken(ackToken)
+			err = store.Save()
+			require.NoError(t, err)
+
+			assert.Empty(t, store.Action())
+			assert.Empty(t, store.Queue())
+			assert.Equal(t, ackToken, store.AckToken())
+		})
+
+		t.Run("nil concrete and accepted action", func(t *testing.T) {
+			var actionUnenroll *fleetapi.ActionUnenroll
+			actionPolicyChange := &fleetapi.ActionPolicyChange{
+				ActionID: "abc123",
+			}
+
+			storePath := filepath.Join(t.TempDir(), "state.json")
+			s, err := storage.NewDiskStore(storePath)
+			require.NoError(t, err, "failed creating DiskStore")
+
+			store, err := NewStateStore(log, s)
+			require.NoError(t, err)
+			require.Nil(t, store.Action())
+
+			// 1st set an action
+			store.SetAction(actionPolicyChange)
+			store.SetAckToken(ackToken)
+			err = store.Save()
+			require.NoError(t, err)
+
+			// then try to set a nil action
+			store.SetAction(actionUnenroll)
+			store.SetAckToken(ackToken)
+			err = store.Save()
+			require.NoError(t, err)
+
+			assert.Equal(t, actionPolicyChange, store.Action())
+			assert.Empty(t, store.Queue())
+			assert.Equal(t, ackToken, store.AckToken())
+		})
+
+		t.Run("nil concrete and ignored action", func(t *testing.T) {
+			var actionUnknown *fleetapi.ActionUnknown
+			actionPolicyChange := &fleetapi.ActionPolicyChange{
+				ActionID: "abc123",
+			}
+
+			storePath := filepath.Join(t.TempDir(), "state.json")
+			s, err := storage.NewDiskStore(storePath)
+			require.NoError(t, err, "failed creating DiskStore")
+
+			store, err := NewStateStore(log, s)
+			require.NoError(t, err)
+			require.Nil(t, store.Action())
+
+			// 1st set an action
+			store.SetAction(actionPolicyChange)
+			store.SetAckToken(ackToken)
+			err = store.Save()
+			require.NoError(t, err)
+
+			// then try to set a nil action
+			store.SetAction(actionUnknown)
+			store.SetAckToken(ackToken)
+			err = store.Save()
+			require.NoError(t, err)
+
+			assert.Equal(t, actionPolicyChange, store.Action())
+			assert.Empty(t, store.Queue())
+			assert.Equal(t, ackToken, store.AckToken())
+		})
+	})
 
 	t.Run("store is not dirty on successful save", func(t *testing.T) {
 		storePath := filepath.Join(t.TempDir(), "state.json")

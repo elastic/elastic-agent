@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package fleet
 
@@ -190,7 +190,13 @@ func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 			}
 
 			if !bo.Wait() {
-				// Something bad has happened and we log it and we should update our current state.
+				if ctx.Err() != nil {
+					// if the context is cancelled, break out of the loop
+					break
+				}
+
+				// This should not really happen, but just in-case this error is used to show that
+				// something strange occurred and we want to log it and report it.
 				err := errors.New(
 					"checkin retry loop was stopped",
 					errors.TypeNetwork,
@@ -231,31 +237,15 @@ func (f *FleetGateway) convertToCheckinComponents(components []runtime.Component
 		return nil
 	}
 	stateString := func(s eaclient.UnitState) string {
-		switch s {
-		case eaclient.UnitStateStarting:
-			return "STARTING"
-		case eaclient.UnitStateConfiguring:
-			return "CONFIGURING"
-		case eaclient.UnitStateHealthy:
-			return "HEALTHY"
-		case eaclient.UnitStateDegraded:
-			return fleetStateDegraded
-		case eaclient.UnitStateFailed:
-			return "FAILED"
-		case eaclient.UnitStateStopping:
-			return "STOPPING"
-		case eaclient.UnitStateStopped:
-			return "STOPPED"
+		if state := s.String(); state != "UNKNOWN" {
+			return state
 		}
 		return ""
 	}
 
 	unitTypeString := func(t eaclient.UnitType) string {
-		switch t {
-		case eaclient.UnitTypeInput:
-			return "input"
-		case eaclient.UnitTypeOutput:
-			return "output"
+		if typ := t.String(); typ != "unknown" {
+			return typ
 		}
 		return ""
 	}

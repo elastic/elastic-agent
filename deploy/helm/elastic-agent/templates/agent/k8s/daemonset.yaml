@@ -1,0 +1,31 @@
+{{- include "elasticagent.init" $ -}}
+{{- range $presetName, $presetVal := $.Values.agent.presets -}}
+{{- if and (eq ($presetVal).mode "daemonset") (eq $.Values.agent.engine "k8s") -}}
+{{- $agentName := include "elasticagent.preset.fullname" (list $ $presetName)  -}}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ $agentName }}
+  namespace: {{ $.Release.Namespace | quote }}
+  labels:
+    {{- include "elasticagent.labels" $ | nindent 4 }}
+    {{- with ($presetVal).labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      name: {{ $agentName }}
+  template:
+    metadata:
+      labels:
+        name: {{ $agentName }}
+      annotations:
+        checksum/config: {{ print (include "elasticagent.engine.k8s.secretData" (list $ $presetVal $agentName)) | sha256sum }}
+        {{- with ($presetVal).annotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+{{ include "elasticagent.engine.k8s.podTemplate" (list $ $presetVal $agentName) }}
+---
+{{- end -}}
+{{- end }}

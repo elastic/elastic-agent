@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package mage
 
@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/magefile/mage/sh"
-	"github.com/pkg/errors"
 )
 
 // PackageInstaller contains package dependency
@@ -121,7 +120,7 @@ func installDependencies(arch string, pkgs ...string) error {
 	if arch != "" {
 		err := sh.Run("dpkg", "--add-architecture", arch)
 		if err != nil {
-			return errors.Wrap(err, "error while adding architecture")
+			return fmt.Errorf("error while adding architecture: %w", err)
 		}
 	}
 

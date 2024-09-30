@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build !windows
 
@@ -47,6 +47,7 @@ import (
 
 	// Extensions
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension"
+	pprofextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension"
 	filestorage "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage"
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
 
@@ -114,6 +115,7 @@ func components() (otelcol.Factories, error) {
 		memorylimiterextension.NewFactory(),
 		filestorage.NewFactory(),
 		healthcheckextension.NewFactory(),
+		pprofextension.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err

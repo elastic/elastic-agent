@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build mage
 
@@ -14,8 +14,11 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io"
+	"io/fs"
 	"log"
-	"math/rand"
+	"maps"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"os/exec"
@@ -60,7 +63,12 @@ import (
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	"golang.org/x/sync/errgroup"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
+
+	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/chart/loader"
+	"helm.sh/helm/v3/pkg/chartutil"
+	"helm.sh/helm/v3/pkg/cli"
 )
 
 const (
@@ -81,6 +89,8 @@ const (
 
 	baseURLForStagingDRA = "https://staging.elastic.co/"
 	agentCoreProjectName = "elastic-agent-core"
+
+	helmChartPath = "./deploy/helm/elastic-agent"
 )
 
 var (
@@ -103,7 +113,7 @@ var (
 func init() {
 	common.RegisterCheckDeps(Update, Check.All)
 	test.RegisterDeps(UnitTest)
-	devtools.BeatLicense = "Elastic License"
+	devtools.BeatLicense = "Elastic License 2.0"
 	devtools.BeatDescription = "Elastic Agent - single, unified way to add monitoring for logs, metrics, and other types of data to a host."
 
 	devtools.Platforms = devtools.Platforms.Filter("!linux/386")
@@ -323,17 +333,50 @@ func (Build) Binary() error {
 }
 
 // Clean up dev environment.
-func (Build) Clean() {
-	os.RemoveAll(buildDir)
+func (Build) Clean() error {
+	absBuildDir, err := filepath.Abs(buildDir)
+	if err != nil {
+		return fmt.Errorf("cannot get absolute path of build dir: %w", err)
+	}
+	if err := os.RemoveAll(absBuildDir); err != nil {
+		return fmt.Errorf("cannot remove build dir '%s': %w", absBuildDir, err)
+	}
+
+	testBinariesPath, err := getTestBinariesPath()
+	if err != nil {
+		return fmt.Errorf("cannot remove test binaries: %w", err)
+	}
+
+	if mg.Verbose() {
+		fmt.Println("removed", absBuildDir)
+		for _, b := range testBinariesPath {
+			fmt.Println("removed", b)
+		}
+	}
+
+	return nil
 }
 
-// TestBinaries build the required binaries for the test suite.
-func (Build) TestBinaries() error {
-	wd, _ := os.Getwd()
+func getTestBinariesPath() ([]string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("could not get working directory: %w", err)
+	}
+
 	testBinaryPkgs := []string{
 		filepath.Join(wd, "pkg", "component", "fake", "component"),
 		filepath.Join(wd, "internal", "pkg", "agent", "install", "testblocking"),
 	}
+	return testBinaryPkgs, nil
+}
+
+// TestBinaries build the required binaries for the test suite.
+func (Build) TestBinaries() error {
+	testBinaryPkgs, err := getTestBinariesPath()
+	if err != nil {
+		fmt.Errorf("cannot build test binaries: %w", err)
+	}
+
 	for _, pkg := range testBinaryPkgs {
 		binary := filepath.Base(pkg)
 		if runtime.GOOS == "windows" {
@@ -362,7 +405,7 @@ func (Check) All() {
 func (Check) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
 	// exclude copied files until we come up with a better option
-	return sh.RunV("go-licenser", "-d", "-license", "Elastic")
+	return sh.RunV("go-licenser", "-d", "-license", "Elasticv2")
 }
 
 // Changes run git status --porcelain and return an error if we have changes or uncommitted files.
@@ -807,6 +850,10 @@ func (Cloud) Push() error {
 	fmt.Printf(">> Docker image pushed to remote registry successfully: %s\n", targetCloudImageName)
 
 	return nil
+}
+
+func Clean() {
+	mg.Deps(devtools.Clean, Build.Clean)
 }
 
 func dockerCommitHash() string {
@@ -1554,16 +1601,16 @@ func selectedPackageTypes() string {
 }
 
 func copyAll(from, to string, suffixes ...[]string) error {
-	return filepath.Walk(from, func(path string, info os.FileInfo, err error) error {
+	return filepath.WalkDir(from, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if info.IsDir() {
+		if d.IsDir() {
 			return nil
 		}
 
-		targetFile := filepath.Join(to, info.Name())
+		targetFile := filepath.Join(to, d.Name())
 
 		// overwrites with current build
 		return sh.Copy(targetFile, path)
@@ -1715,8 +1762,8 @@ func prepareIronbankBuild() error {
 		"MajorMinor": majorMinor(),
 	}
 
-	err := filepath.Walk(templatesDir, func(path string, info os.FileInfo, _ error) error {
-		if !info.IsDir() {
+	err := filepath.WalkDir(templatesDir, func(path string, d fs.DirEntry, _ error) error {
+		if !d.IsDir() {
 			target := strings.TrimSuffix(
 				filepath.Join(buildDir, filepath.Base(path)),
 				".tmpl",
@@ -1858,7 +1905,17 @@ func (Integration) Kubernetes(ctx context.Context) error {
 	return integRunner(ctx, false, "")
 }
 
-// UpdateVersions runs an update on the `.agent-versions.json` fetching
+// KubernetesMatrix runs a matrix of kubernetes integration tests
+func (Integration) KubernetesMatrix(ctx context.Context) error {
+	// invoke integration tests
+	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
+		return err
+	}
+
+	return integRunner(ctx, true, "")
+}
+
+// UpdateVersions runs an update on the `.agent-versions.yml` fetching
 // the latest version list from the artifact API.
 func (Integration) UpdateVersions(ctx context.Context) error {
 	maxSnapshots := 3
@@ -1904,11 +1961,19 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 	}
 	defer file.Close()
 
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
+	// Write header
+	header := "# This file is generated automatically. Please do not manually edit it.\n\n" +
+		"# The testVersions list in this file specifies Elastic Agent versions to be used as\n" +
+		"# the starting (pre-upgrade) or ending (post-upgrade) versions of Elastic Agent in\n" +
+		"# upgrade integration tests.\n\n"
+
+	io.WriteString(file, header)
+
+	encoder := yaml.NewEncoder(file)
+	encoder.SetIndent(2)
 	err = encoder.Encode(versionFileData)
 	if err != nil {
-		return fmt.Errorf("failed to encode JSON to file %s: %w", upgradetest.AgentVersionsFilename, err)
+		return fmt.Errorf("failed to encode YAML to file %s: %w", upgradetest.AgentVersionsFilename, err)
 	}
 	return nil
 }
@@ -2550,11 +2615,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	case multipass.Name:
 		instanceProvisioner = multipass.NewProvisioner()
 	case kind.Name:
-		k8sVersion := os.Getenv("K8S_VERSION")
-		if k8sVersion == "" {
-			return nil, errors.New("K8S_VERSION must be set to use kind instance provisioner")
-		}
-		instanceProvisioner = kind.NewProvisioner(k8sVersion)
+		instanceProvisioner = kind.NewProvisioner()
 	default:
 		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'ogc' or 'multipass', not %s", instanceProvisionerMode)
 	}
@@ -2973,8 +3034,6 @@ func stringPrompt(prompt string) (string, error) {
 			return s, nil
 		}
 	}
-
-	return "", nil
 }
 
 func writeFile(name string, data []byte, perm os.FileMode) error {
@@ -3173,4 +3232,197 @@ type otelDependencies struct {
 	Extensions []*otelDependency
 	Processors []*otelDependency
 	Receivers  []*otelDependency
+}
+
+type Helm mg.Namespace
+
+func (Helm) RenderExamples() error {
+	settings := cli.New() // Helm CLI settings
+	actionConfig := &action.Configuration{}
+
+	helmChart, err := loader.Load(helmChartPath)
+	if err != nil {
+		return fmt.Errorf("failed to load helm chart: %w", err)
+	}
+
+	err = actionConfig.Init(settings.RESTClientGetter(), "default", "",
+		func(format string, v ...interface{}) {})
+	if err != nil {
+		return fmt.Errorf("failed to init helm action config: %w", err)
+	}
+
+	examplesPath := filepath.Join(helmChartPath, "examples")
+	dirEntries, err := os.ReadDir(examplesPath)
+	if err != nil {
+		return fmt.Errorf("failed to read %s dir: %w", examplesPath, err)
+	}
+
+	for _, d := range dirEntries {
+		if !d.IsDir() {
+			continue
+		}
+
+		exampleFullPath := filepath.Join(examplesPath, d.Name())
+
+		helmValues := make(map[string]any)
+		helmValuesFiles, err := filepath.Glob(filepath.Join(exampleFullPath, "*-values.yaml"))
+		if err != nil {
+			return fmt.Errorf("failed to get helm values files: %w", err)
+		}
+
+		for _, helmValuesFile := range helmValuesFiles {
+			data, err := loadYamlFile(helmValuesFile)
+			if err != nil {
+				return fmt.Errorf("failed to load helm values file: %w", err)
+			}
+			maps.Copy(helmValues, data)
+		}
+
+		installAction := action.NewInstall(actionConfig)
+		installAction.Namespace = "default"
+		installAction.ReleaseName = "example"
+		installAction.CreateNamespace = true
+		installAction.UseReleaseName = true
+		installAction.CreateNamespace = false
+		installAction.DryRun = true
+		installAction.Replace = true
+		installAction.KubeVersion = &chartutil.KubeVersion{Version: "1.27.0"}
+		installAction.ClientOnly = true
+		release, err := installAction.Run(helmChart, helmValues)
+		if err != nil {
+			return fmt.Errorf("failed to install helm chart: %w", err)
+		}
+
+		renderedFolder := filepath.Join(exampleFullPath, "rendered")
+		err = os.Mkdir(renderedFolder, 0o755)
+		if err != nil && !errors.Is(err, os.ErrExist) {
+			return fmt.Errorf("failed to create rendered directory: %w", err)
+		}
+
+		renderedManifestPath := filepath.Join(renderedFolder, "manifest.yaml")
+
+		err = os.WriteFile(renderedManifestPath, []byte(release.Manifest), 0o644)
+		if err != nil {
+			return fmt.Errorf("failed to write rendered manifest: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (Helm) UpdateAgentVersion() error {
+	valuesFile := filepath.Join(helmChartPath, "values.yaml")
+
+	data, err := os.ReadFile(valuesFile)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	isTagged, err := devtools.TagContainsCommit()
+	if err != nil {
+		return fmt.Errorf("failed to check if tag contains commit: %w", err)
+	}
+
+	if !isTagged {
+		isTagged = os.Getenv(snapshotEnv) != ""
+	}
+
+	agentVersion := getVersion()
+
+	// Parse YAML into a Node structure because
+	// it maintains comments
+	var rootNode yaml.Node
+	err = yaml.Unmarshal(data, &rootNode)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal YAML: %w", err)
+	}
+
+	if rootNode.Kind != yaml.DocumentNode {
+		return fmt.Errorf("root node is not a document node")
+	} else if len(rootNode.Content) == 0 {
+		return fmt.Errorf("root node has no content")
+	}
+
+	if err := updateYamlNodes(rootNode.Content[0], agentVersion, "agent", "version"); err != nil {
+		return fmt.Errorf("failed to update agent version: %w", err)
+	}
+
+	if !isTagged {
+		if err := updateYamlNodes(rootNode.Content[0], fmt.Sprintf("%s-SNAPSHOT", agentVersion), "agent", "image", "tag"); err != nil {
+			return fmt.Errorf("failed to update agent image tag: %w", err)
+		}
+	}
+
+	// Truncate values file
+	file, err := os.Create(valuesFile)
+	if err != nil {
+		return fmt.Errorf("failed to open file for writing: %w", err)
+	}
+	defer file.Close()
+
+	// Create a YAML encoder with 2-space indentation
+	encoder := yaml.NewEncoder(file)
+	encoder.SetIndent(2)
+
+	// Encode the updated YAML node back to the file
+	err = encoder.Encode(&rootNode)
+	if err != nil {
+		return fmt.Errorf("failed to encode updated YAML: %w", err)
+	}
+
+	return nil
+}
+
+func (Helm) Lint() error {
+	settings := cli.New() // Helm CLI settings
+	actionConfig := &action.Configuration{}
+
+	err := actionConfig.Init(settings.RESTClientGetter(), "default", "",
+		func(format string, v ...interface{}) {})
+	if err != nil {
+		return fmt.Errorf("failed to init helm action config: %w", err)
+	}
+
+	lintAction := action.NewLint()
+	lintResult := lintAction.Run([]string{helmChartPath}, nil)
+	if len(lintResult.Errors) > 0 {
+		return fmt.Errorf("failed to lint helm chart: %w", errors.Join(lintResult.Errors...))
+	}
+	return nil
+}
+
+func updateYamlNodes(rootNode *yaml.Node, value string, keys ...string) error {
+	if len(keys) == 0 {
+		return fmt.Errorf("no keys provided")
+	}
+
+	for i := 0; i < len(rootNode.Content)-1; i += 2 {
+		agentKey := rootNode.Content[i]
+		agentValue := rootNode.Content[i+1]
+
+		if agentKey.Value == keys[0] {
+			if len(keys) == 1 {
+				agentValue.Value = value
+				return nil
+			}
+
+			return updateYamlNodes(agentValue, value, keys[1:]...)
+		}
+	}
+
+	return fmt.Errorf("key %s not found", keys[0])
+}
+
+func loadYamlFile(path string) (map[string]any, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	decoder := yaml.NewDecoder(f)
+	var data map[string]any
+	if err := decoder.Decode(&data); err != nil {
+		return nil, err
+	}
+	return data, nil
 }

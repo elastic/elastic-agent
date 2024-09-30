@@ -1,11 +1,13 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package handlers
 
 import (
 	"context"
+	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -26,7 +28,15 @@ import (
 )
 
 type mockUpgradeManager struct {
-	msgChan chan string
+	UpgradeFn func(
+		ctx context.Context,
+		version string,
+		sourceURI string,
+		action *fleetapi.ActionUpgrade,
+		details *details.Details,
+		skipVerifyOverride bool,
+		skipDefaultPgp bool,
+		pgpBytes ...string) (reexec.ShutdownCallbackFn, error)
 }
 
 func (u *mockUpgradeManager) Upgradeable() bool {
@@ -37,15 +47,25 @@ func (u *mockUpgradeManager) Reload(rawConfig *config.Config) error {
 	return nil
 }
 
-func (u *mockUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
-	select {
-	case <-time.After(2 * time.Second):
-		u.msgChan <- "completed " + version
-		return nil, nil
-	case <-ctx.Done():
-		u.msgChan <- "canceled " + version
-		return nil, ctx.Err()
-	}
+func (u *mockUpgradeManager) Upgrade(
+	ctx context.Context,
+	version string,
+	sourceURI string,
+	action *fleetapi.ActionUpgrade,
+	details *details.Details,
+	skipVerifyOverride bool,
+	skipDefaultPgp bool,
+	pgpBytes ...string) (reexec.ShutdownCallbackFn, error) {
+
+	return u.UpgradeFn(
+		ctx,
+		version,
+		sourceURI,
+		action,
+		details,
+		skipVerifyOverride,
+		skipDefaultPgp,
+		pgpBytes...)
 }
 
 func (u *mockUpgradeManager) Ack(ctx context.Context, acker acker.Acker) error {
@@ -65,7 +85,7 @@ func TestUpgradeHandler(t *testing.T) {
 	log, _ := logger.New("", false)
 
 	agentInfo := &info.AgentInfo{}
-	msgChan := make(chan string)
+	upgradeCalledChan := make(chan struct{})
 
 	// Create and start the coordinator
 	c := coordinator.New(
@@ -75,7 +95,21 @@ func TestUpgradeHandler(t *testing.T) {
 		agentInfo,
 		component.RuntimeSpecs{},
 		nil,
-		&mockUpgradeManager{msgChan: msgChan},
+		&mockUpgradeManager{
+			UpgradeFn: func(
+				ctx context.Context,
+				version string,
+				sourceURI string,
+				action *fleetapi.ActionUpgrade,
+				details *details.Details,
+				skipVerifyOverride bool,
+				skipDefaultPgp bool,
+				pgpBytes ...string) (reexec.ShutdownCallbackFn, error) {
+
+				upgradeCalledChan <- struct{}{}
+				return nil, nil
+			},
+		},
 		nil, nil, nil, nil, nil, false)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
@@ -86,8 +120,13 @@ func TestUpgradeHandler(t *testing.T) {
 	ack := noopacker.New()
 	err := u.Handle(ctx, &a, ack)
 	require.NoError(t, err)
-	msg := <-msgChan
-	require.Equal(t, "completed 8.3.0", msg)
+
+	// Make sure this test does not dead lock or wait for too long
+	select {
+	case <-time.Tick(50 * time.Millisecond):
+		t.Fatal("mockUpgradeManager.Upgrade was not called")
+	case <-upgradeCalledChan:
+	}
 }
 
 func TestUpgradeHandlerSameVersion(t *testing.T) {
@@ -99,9 +138,10 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 	log, _ := logger.New("", false)
 
 	agentInfo := &info.AgentInfo{}
-	msgChan := make(chan string)
+	upgradeCalledChan := make(chan struct{})
 
 	// Create and start the Coordinator
+	upgradeCalled := atomic.Bool{}
 	c := coordinator.New(
 		log,
 		configuration.DefaultConfiguration(),
@@ -109,7 +149,26 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 		agentInfo,
 		component.RuntimeSpecs{},
 		nil,
-		&mockUpgradeManager{msgChan: msgChan},
+		&mockUpgradeManager{
+			UpgradeFn: func(
+				ctx context.Context,
+				version string,
+				sourceURI string,
+				action *fleetapi.ActionUpgrade,
+				details *details.Details,
+				skipVerifyOverride bool,
+				skipDefaultPgp bool,
+				pgpBytes ...string) (reexec.ShutdownCallbackFn, error) {
+
+				if upgradeCalled.CompareAndSwap(false, true) {
+					upgradeCalledChan <- struct{}{}
+					return nil, nil
+				}
+				err := errors.New("mockUpgradeManager.Upgrade called more than once")
+				t.Error(err.Error())
+				return nil, err
+			},
+		},
 		nil, nil, nil, nil, nil, false)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
@@ -122,8 +181,13 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 	err2 := u.Handle(ctx, &a, ack)
 	require.NoError(t, err1)
 	require.NoError(t, err2)
-	msg := <-msgChan
-	require.Equal(t, "completed 8.3.0", msg)
+
+	// Make sure this test does not dead lock or wait for too long
+	select {
+	case <-time.Tick(50 * time.Millisecond):
+		t.Fatal("mockUpgradeManager.Upgrade was not called")
+	case <-upgradeCalledChan:
+	}
 }
 
 func TestUpgradeHandlerNewVersion(t *testing.T) {
@@ -133,9 +197,9 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 	defer cancel()
 
 	log, _ := logger.New("", false)
+	upgradeCalledChan := make(chan string)
 
 	agentInfo := &info.AgentInfo{}
-	msgChan := make(chan string)
 
 	// Create and start the Coordinator
 	c := coordinator.New(
@@ -145,7 +209,27 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 		agentInfo,
 		component.RuntimeSpecs{},
 		nil,
-		&mockUpgradeManager{msgChan: msgChan},
+		&mockUpgradeManager{
+			UpgradeFn: func(
+				ctx context.Context,
+				version string,
+				sourceURI string,
+				action *fleetapi.ActionUpgrade,
+				details *details.Details,
+				skipVerifyOverride bool,
+				skipDefaultPgp bool,
+				pgpBytes ...string) (reexec.ShutdownCallbackFn, error) {
+
+				defer func() {
+					upgradeCalledChan <- version
+				}()
+				if version == "8.2.0" {
+					return nil, errors.New("upgrade to 8.2.0 will always fail")
+				}
+
+				return nil, nil
+			},
+		},
 		nil, nil, nil, nil, nil, false)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
@@ -156,13 +240,25 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 	a2 := fleetapi.ActionUpgrade{Data: fleetapi.ActionUpgradeData{
 		Version: "8.5.0", SourceURI: "http://localhost"}}
 	ack := noopacker.New()
+
+	checkMsg := func(c <-chan string, expected, errMsg string) {
+		t.Helper()
+		// Make sure this test does not dead lock or wait for too long
+		// For some reason < 1s sometimes makes the test fail.
+		select {
+		case <-time.Tick(1300 * time.Millisecond):
+			t.Fatal("timed out waiting for Upgrade to return")
+		case msg := <-c:
+			require.Equal(t, expected, msg, errMsg)
+		}
+	}
+
+	// Send both upgrade actions, a1 will error before a2 succeeds
 	err1 := u.Handle(ctx, &a1, ack)
 	require.NoError(t, err1)
-	time.Sleep(1 * time.Second)
+	checkMsg(upgradeCalledChan, "8.2.0", "first call must be with version 8.2.0")
+
 	err2 := u.Handle(ctx, &a2, ack)
 	require.NoError(t, err2)
-	msg1 := <-msgChan
-	require.Equal(t, "canceled 8.2.0", msg1)
-	msg2 := <-msgChan
-	require.Equal(t, "completed 8.5.0", msg2)
+	checkMsg(upgradeCalledChan, "8.5.0", "second call to Upgrade must be with version 8.5.0")
 }

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package kubernetes
 
@@ -16,11 +16,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
-	"github.com/elastic/elastic-agent/pkg/testing/runner"
-
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+
+	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 )
 
 type DockerConfig struct {
@@ -46,8 +45,13 @@ type Endpoint struct {
 	Host string `json:"Host"`
 }
 
+type runnerLogger interface {
+	// Logf logs the message for this runner.
+	Logf(format string, args ...any)
+}
+
 // AddK8STestsToImage compiles and adds the k8s-inner-tests binary to the given image
-func AddK8STestsToImage(ctx context.Context, logger runner.Logger, baseImage string, arch string) (string, error) {
+func AddK8STestsToImage(ctx context.Context, logger runnerLogger, baseImage string, arch string) (string, error) {
 	// compile k8s test with tag kubernetes_inner
 	buildBase, err := filepath.Abs("build")
 	if err != nil {

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package runtime
 
@@ -27,6 +27,7 @@ func MapAPMConfig(conf *config.APMConfig) *proto.APMConfig {
 		SecretToken:  conf.SecretToken,
 		Hosts:        conf.Hosts,
 		GlobalLabels: buildGlobalLabelsString(conf.GlobalLabels),
+		SamplingRate: conf.SamplingRate,
 	}
 
 	if conf.TLS != zeroElasticAPMTLS {

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package http
 
@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 
 	"github.com/docker/go-units"
@@ -109,7 +110,7 @@ func TestDownloadBodyError(t *testing.T) {
 		Architecture:    "64",
 	}
 
-	log, obs := logger.NewTesting("downloader")
+	log, obs := loggertest.New("downloader")
 	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails)
 	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
@@ -166,7 +167,7 @@ func TestDownloadLogProgressWithLength(t *testing.T) {
 		},
 	}
 
-	log, obs := logger.NewTesting("downloader")
+	log, obs := loggertest.New("downloader")
 	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails)
 	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
@@ -249,7 +250,7 @@ func TestDownloadLogProgressWithoutLength(t *testing.T) {
 		},
 	}
 
-	log, obs := logger.NewTesting("downloader")
+	log, obs := loggertest.New("downloader")
 	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails)
 	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
@@ -510,7 +511,7 @@ func TestDownloadVersion(t *testing.T) {
 			defer server.Close()
 
 			elasticClient := server.Client()
-			log, _ := logger.NewTesting("downloader")
+			log, _ := loggertest.New("downloader")
 			upgradeDetails := details.NewDetails(tt.args.version.String(), details.StateRequested, "")
 			config := tt.fields.config
 			config.SourceURI = server.URL

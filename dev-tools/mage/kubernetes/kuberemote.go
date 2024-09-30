@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package kubernetes
 
@@ -22,7 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 
 	apiv1 "k8s.io/api/core/v1"
@@ -84,7 +83,7 @@ func NewKubeRemote(kubeconfig string, namespace string, name string, workDir str
 // Run runs the command remotely on the kubernetes cluster.
 func (r *KubeRemote) Run(env map[string]string, stdout io.Writer, stderr io.Writer, args ...string) error {
 	if err := r.syncSSHKey(); err != nil {
-		return errors.Wrap(err, "failed to sync SSH secret")
+		return fmt.Errorf("failed to sync SSH secret: %w", err)
 	}
 	defer r.deleteSSHKey()
 	if err := r.syncServiceAccount(); err != nil {
@@ -93,21 +92,21 @@ func (r *KubeRemote) Run(env map[string]string, stdout io.Writer, stderr io.Writ
 	defer r.deleteServiceAccount()
 	_, err := r.createPod(env, args...)
 	if err != nil {
-		return errors.Wrap(err, "failed to create execute pod")
+		return fmt.Errorf("failed to create execute pod: %w", err)
 	}
 	defer r.deletePod()
 
 	// wait for SSH to be up inside the init container.
 	_, err = r.waitForPod(5*time.Minute, podInitReady)
 	if err != nil {
-		return errors.Wrap(err, "execute pod init container never started")
+		return fmt.Errorf("execute pod init container never started: %w", err)
 	}
 	time.Sleep(1 * time.Second) // SSH inside of container can take a moment
 
 	// forward the SSH port so rsync can be ran.
 	randomPort, err := getFreePort()
 	if err != nil {
-		return errors.Wrap(err, "failed to find a free port")
+		return fmt.Errorf("failed to find a free port: %w", err)
 	}
 	stopChannel := make(chan struct{}, 1)
 	readyChannel := make(chan struct{}, 1)
@@ -115,11 +114,14 @@ func (r *KubeRemote) Run(env map[string]string, stdout io.Writer, stderr io.Writ
 	if err != nil {
 		return err
 	}
+	//nolint:errcheck // ignore error
 	go f.ForwardPorts()
 	<-readyChannel
 
 	// perform the rsync
-	r.rsync(randomPort, stderr, stderr)
+	if err := r.rsync(randomPort, stderr, stderr); err != nil {
+		return err
+	}
 
 	// stop port forwarding
 	close(stopChannel)
@@ -127,19 +129,19 @@ func (r *KubeRemote) Run(env map[string]string, stdout io.Writer, stderr io.Writ
 	// wait for exec container to be running
 	_, err = r.waitForPod(5*time.Minute, containerRunning("exec"))
 	if err != nil {
-		return errors.Wrap(err, "execute pod container never started")
+		return fmt.Errorf("execute pod container never started: %w", err)
 	}
 
 	// stream the logs of the container
 	err = r.streamLogs("exec", stdout)
 	if err != nil {
-		return errors.Wrap(err, "failed to stream the logs")
+		return fmt.Errorf("failed to stream the logs: %w", err)
 	}
 
 	// wait for exec container to be completely done
 	pod, err := r.waitForPod(30*time.Second, podDone)
 	if err != nil {
-		return errors.Wrap(err, "execute pod didn't terminate after 30 seconds of log stream")
+		return fmt.Errorf("execute pod didn't terminate after 30 seconds of log stream: %w", err)
 	}
 
 	// return error on failure
@@ -186,18 +188,18 @@ func (r *KubeRemote) syncServiceAccount() error {
 		createServiceAccountManifest(r.svcAccName),
 		metav1.CreateOptions{})
 	if err != nil {
-		return errors.Wrap(err, "failed to create service account")
+		return fmt.Errorf("failed to create service account: %w", err)
 	}
 	_, err = r.cs.RbacV1().ClusterRoles().Create(ctx, createClusterRoleManifest(r.name), metav1.CreateOptions{})
 	if err != nil {
-		return errors.Wrap(err, "failed to create cluster role")
+		return fmt.Errorf("failed to create cluster role: %w", err)
 	}
 	_, err = r.cs.RbacV1().ClusterRoleBindings().Create(
 		ctx,
 		createClusterRoleBindingManifest(r.name, r.namespace, r.svcAccName),
 		metav1.CreateOptions{})
 	if err != nil {
-		return errors.Wrap(err, "failed to create cluster role binding")
+		return fmt.Errorf("failed to create cluster role binding: %w", err)
 	}
 	return nil
 }
@@ -246,7 +248,7 @@ func (r *KubeRemote) portForward(ports []string, stopChannel, readyChannel chan 
 	}
 
 	path := fmt.Sprintf("/api/v1/namespaces/%s/pods/%s/portforward", r.namespace, r.name)
-	hostIP := strings.TrimLeft(r.cfg.Host, "https://")
+	hostIP := strings.TrimPrefix(r.cfg.Host, "https://")
 	serverURL := url.URL{Scheme: "https", Path: path, Host: hostIP}
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: roundTripper}, http.MethodPost, &serverURL)
 	return portforward.New(dialer, ports, stopChannel, readyChannel, stdout, stderr)
@@ -530,7 +532,7 @@ func isInitContainersReady(pod *apiv1.Pod) bool {
 }
 
 func isScheduled(pod *apiv1.Pod) bool {
-	if &pod.Status != nil && len(pod.Status.Conditions) > 0 {
+	if len(pod.Status.Conditions) > 0 {
 		for _, condition := range pod.Status.Conditions {
 			if condition.Type == apiv1.PodScheduled &&
 				condition.Status == apiv1.ConditionTrue {
@@ -542,18 +544,15 @@ func isScheduled(pod *apiv1.Pod) bool {
 }
 
 func isInitContainersRunning(pod *apiv1.Pod) bool {
-	if &pod.Status != nil {
-		if len(pod.Spec.InitContainers) != len(pod.Status.InitContainerStatuses) {
+	if len(pod.Spec.InitContainers) != len(pod.Status.InitContainerStatuses) {
+		return false
+	}
+	for _, status := range pod.Status.InitContainerStatuses {
+		if status.State.Running == nil {
 			return false
 		}
-		for _, status := range pod.Status.InitContainerStatuses {
-			if status.State.Running == nil {
-				return false
-			}
-		}
-		return true
 	}
-	return false
+	return true
 }
 
 func containerRunning(containerName string) func(watch.Event) (bool, error) {
@@ -585,7 +584,7 @@ func isContainerRunning(pod *apiv1.Pod, containerName string) (bool, error) {
 			} else if status.State.Terminated != nil {
 				return false, nil
 			} else {
-				return false, fmt.Errorf("Unknown container state")
+				return false, fmt.Errorf("unknown container state")
 			}
 		}
 	}
@@ -609,7 +608,10 @@ func podDone(event watch.Event) (bool, error) {
 
 func createTempFile(content []byte) (string, error) {
 	randBytes := make([]byte, 16)
-	rand.Read(randBytes)
+	_, err := rand.Read(randBytes)
+	if err != nil {
+		return "", err
+	}
 	tmpfile, err := os.CreateTemp("", hex.EncodeToString(randBytes))
 	if err != nil {
 		return "", err

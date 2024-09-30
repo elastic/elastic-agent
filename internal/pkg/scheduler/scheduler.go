@@ -1,11 +1,11 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package scheduler
 
 import (
-	"math/rand"
+	"math/rand/v2"
 	"time"
 )
 
@@ -129,6 +129,5 @@ func (p *PeriodicJitter) Stop() {
 }
 
 func (p *PeriodicJitter) delay() time.Duration {
-	t := int64(p.variance)
-	return time.Duration(rand.Int63n(t))
+	return rand.N(p.variance)
 }

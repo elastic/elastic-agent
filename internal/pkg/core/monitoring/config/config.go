@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package config
 
@@ -125,20 +125,21 @@ func DefaultConfig() *MonitoringConfig {
 
 // APMConfig configures APM Tracing.
 type APMConfig struct {
-	Environment  string            `config:"environment"`
-	APIKey       string            `config:"api_key"`
-	SecretToken  string            `config:"secret_token"`
-	Hosts        []string          `config:"hosts"`
-	GlobalLabels map[string]string `config:"global_labels"`
-	TLS          APMTLS            `config:"tls"`
+	Environment  string            `config:"environment" yaml:"environment,omitempty"`
+	APIKey       string            `config:"api_key" yaml:"api_key,omitempty"`
+	SecretToken  string            `config:"secret_token" yaml:"secret_token,omitempty"`
+	Hosts        []string          `config:"hosts" yaml:"hosts,omitempty"`
+	GlobalLabels map[string]string `config:"global_labels" yaml:"global_labels,omitempty"`
+	TLS          APMTLS            `config:"tls" yaml:"tls,omitempty"`
+	SamplingRate *float32          `config:"sampling_rate" yaml:"sampling_rate,omitempty"`
 }
 
 // APMTLS contains the configuration options necessary for configuring TLS in
 // apm-agent-go.
 type APMTLS struct {
-	SkipVerify        bool   `config:"skip_verify"`
-	ServerCertificate string `config:"server_certificate"`
-	ServerCA          string `config:"server_ca"`
+	SkipVerify        bool   `config:"skip_verify" yaml:"skip_verify,omitempty"`
+	ServerCertificate string `config:"server_certificate" yaml:"server_certificate,omitempty"`
+	ServerCA          string `config:"server_ca" yaml:"server_ca,omitempty"`
 }
 
 func defaultAPMConfig() APMConfig {
