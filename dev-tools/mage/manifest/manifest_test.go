@@ -135,15 +135,15 @@ func TestResolveManifestPackage(t *testing.T) {
 			projects := manifestJson.Projects
 
 			// Verify the component name is in the list of expected packages.
-			project, ok := ExpectedBinaries[tc.binary]
+			spec, ok := findBinarySpec(tc.binary)
 			assert.True(t, ok)
 
-			if !project.SupportsPlatform(tc.platform) {
-				t.Logf("Project %s does not support platform %s", project.Name, tc.platform)
+			if !spec.SupportsPlatform(tc.platform) {
+				t.Logf("Project %s does not support platform %s", spec.ProjectName, tc.platform)
 				return
 			}
 
-			urlList, err := resolveManifestPackage(projects[tc.projectName], tc.binary, PlatformPackages[tc.platform], manifestJson.Version)
+			urlList, err := resolveManifestPackage(projects[tc.projectName], spec, manifestJson.Version, tc.platform)
 			require.NoError(t, err)
 
 			assert.Len(t, urlList, 3)
@@ -152,4 +152,13 @@ func TestResolveManifestPackage(t *testing.T) {
 			}
 		})
 	}
+}
+
+func findBinarySpec(name string) (BinarySpec, bool) {
+	for _, spec := range ExpectedBinaries {
+		if spec.BinaryName == name {
+			return spec, true
+		}
+	}
+	return BinarySpec{}, false
 }
