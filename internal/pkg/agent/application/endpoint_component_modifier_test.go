@@ -445,6 +445,13 @@ func TestEndpointTLSComponentModifier_cache_miss(t *testing.T) {
 		loggertest.PrintObservedLogs(obs.TakeAll(), t.Log)
 	}()
 
+	cache := tlsCache{
+		mu: &sync.Mutex{},
+
+		PassphrasePath: "/old/path/to/key-passphrase",
+		Certificate:    "cached certificate",
+		Key:            "cached key",
+	}
 	pair, certPath, certKeyPath, certKeyPassPath := prepareEncTLSCertificates(t)
 
 	comps := makeComponent(t, fmt.Sprintf(`{
@@ -474,7 +481,6 @@ func TestEndpointTLSComponentModifier_cache_miss(t *testing.T) {
 			  }
 			}`, pair.Cert, pair.Key))
 
-	cache := tlsCache{mu: &sync.Mutex{}}
 	modifier := newEndpointTLSComponentModifier(log, &cache)
 	got, err := modifier(comps, cfg)
 	require.NoError(t, err, "unexpected error")
