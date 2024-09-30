@@ -6,6 +6,7 @@ package monitoring
 
 import (
 	"net/http"
+	_ "net/http/pprof" //nolint:gosec // this is only conditionally exposed
 	"net/url"
 	"os"
 	"path/filepath"
@@ -76,6 +77,11 @@ func exposeMetricsEndpoint(
 			r.Handle("/liveness", createHandler(livenessHandler(coord)))
 		}
 
+		if isPprofEnabled(cfg) {
+			// importing net/http/pprof adds the handlers to the right paths on the default Mux, so we just defer to it here
+			r.PathPrefix("/debug/pprof/").Handler(http.DefaultServeMux)
+		}
+
 		mux := http.NewServeMux()
 		mux.Handle("/", r)
 
@@ -130,4 +136,8 @@ func isHttpUrl(s string) bool {
 
 func isProcessStatsEnabled(cfg *monitoringCfg.MonitoringConfig) bool {
 	return cfg != nil && cfg.HTTP.Enabled
+}
+
+func isPprofEnabled(cfg *monitoringCfg.MonitoringConfig) bool {
+	return cfg != nil && cfg.Pprof != nil && cfg.Pprof.Enabled
 }
