@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
@@ -16,6 +17,20 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
+
+// tlsCache is used to cache the decrypted client certificate and key.
+// In environments with a high rate of config changes, such as in Kubernetes
+// using autodiscover, loading files and decrypting them might have a
+// non-negligible overhead.
+type tlsCache struct {
+	mu *sync.Mutex
+
+	// PassphrasePath is used as the cache key
+	PassphrasePath string
+
+	Certificate string
+	Key         string
+}
 
 // EndpointSignedComponentModifier copies "signed" properties to the top level "signed" for the endpoint input.
 // Enpoint team want to be able to validate the signature and parse the signed configuration (not trust the agent).
@@ -66,6 +81,10 @@ func EndpointSignedComponentModifier() coordinator.ComponentsModifier {
 // It does so, ONLY for the client TLS configuration for mTLS used with
 // fleet-server.
 func EndpointTLSComponentModifier(log *logger.Logger) coordinator.ComponentsModifier {
+	return newEndpointTLSComponentModifier(log, &tlsCache{mu: &sync.Mutex{}})
+}
+
+func newEndpointTLSComponentModifier(log *logger.Logger, cache *tlsCache) func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
 	return func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
 		compIdx, unitIdx, ok := findEndpointUnit(comps, client.UnitTypeInput)
 		if !ok {
@@ -106,12 +125,12 @@ func EndpointTLSComponentModifier(log *logger.Logger) coordinator.ComponentsModi
 			// if no key_passphrase_path, nothing to decrypt
 			return comps, nil
 		}
-		keyPassPathStr, ok := keyPassPathI.(string)
+		keyPassPath, ok := keyPassPathI.(string)
 		if !ok {
 			return nil, errors.New("EndpointTLSComponentModifier: 'key_passphrase_path' isn't a string")
 		}
-		if keyPassPathStr == "" {
-			// the key shouldn't be empty, but if it's, nothing to decrypt
+		if keyPassPath == "" {
+			// key_passphrase_path shouldn't be empty, but if it's, nothing to decrypt
 			return comps, nil
 		}
 
@@ -120,7 +139,7 @@ func EndpointTLSComponentModifier(log *logger.Logger) coordinator.ComponentsModi
 			// if there is a key_passphrase_path, the key must be present
 			return nil, errors.New("EndpointTLSComponentModifier: 'key_passphrase_path' present, but 'key' isn't present")
 		}
-		keyStr, ok := keyI.(string)
+		keyPath, ok := keyI.(string)
 		if !ok {
 			return nil, fmt.Errorf("EndpointTLSComponentModifier: 'key' isn't a string, it's %T", keyI)
 		}
@@ -130,53 +149,23 @@ func EndpointTLSComponentModifier(log *logger.Logger) coordinator.ComponentsModi
 			// if there is a key_passphrase_path, the certificate must be present
 			return nil, errors.New("EndpointTLSComponentModifier: 'key_passphrase_path' present, but 'certificate' isn't present")
 		}
-		certStr, ok := certI.(string)
+		certPath, ok := certI.(string)
 		if !ok {
 			return nil, errors.New("EndpointTLSComponentModifier: 'certificate' isn't a string")
 		}
 
-		// all SSL config exists and the certificate key is passphrase protected,
-		// now decrypt the key
-
-		pass, err := os.ReadFile(keyPassPathStr)
+		cert, key, err := loadCertificatesWithCache(log, cache, keyPassPath, certPath, keyPath)
 		if err != nil {
-			return nil, fmt.Errorf("EndpointTLSComponentModifier: failed to read client certificate passphrase file: %w", err)
+			return nil, err
 		}
-
-		// we don't really support encrypted certificates, but it's how
-		// tlscommon.LoadCertificate does. Thus, let's keep the same behaviour.
-		// Also, tlscommon.LoadCertificate 'loses' the type of the private key.
-		// It stores they private key as an interface and there is no way to
-		// retrieve the type os the private key without a type assertion.
-		// Therefore, instead of manually checking the type, which would mean
-		// to check for all supported private key types and keep it up to date,
-		// better to load the certificate and its key directly from the PEM file.
-		cert, err := tlscommon.ReadPEMFile(log,
-			certStr, string(pass))
-		if err != nil {
-			return nil, fmt.Errorf("EndpointTLSComponentModifier: unable to load TLS certificate: %w", err)
-		}
-		key, err := tlscommon.ReadPEMFile(log,
-			keyStr,
-			string(pass))
-		if err != nil {
-			return nil, fmt.Errorf("EndpointTLSComponentModifier: unable to load TLS certificate key: %w", err)
-		}
-
-		// tlscommon.ReadPEMFile only removes the 'DEK-Info' header, not the
-		// 'Proc-Type', so remove it now. Create a pem.Block to avoid editing
-		// the PEM data manually:
-		keyBlock, _ := pem.Decode(key)
-		delete(keyBlock.Headers, "Proc-Type")
-		key = pem.EncodeToMemory(keyBlock)
 
 		// remove 'key_passphrase_path' as the certificate key isn't encrypted
 		// anymore.
 		delete(sslMap, "key_passphrase_path")
 
 		// update the certificate and its key with their decrypted version.
-		sslMap["certificate"] = string(cert)
-		sslMap["key"] = string(key)
+		sslMap["certificate"] = cert
+		sslMap["key"] = key
 
 		unitCfg, err := component.ExpectedConfig(unitCfgMap)
 		if err != nil {
@@ -188,6 +177,68 @@ func EndpointTLSComponentModifier(log *logger.Logger) coordinator.ComponentsModi
 
 		return comps, nil
 	}
+}
+
+func loadCertificatesWithCache(log *logger.Logger, cache *tlsCache, keyPassPath string, certPath string, keyPath string) (string, string, error) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	// cache hit
+	// hot reload of TLS files isn't supported, thus using the path as key is
+	// fine.
+	if cache.PassphrasePath == keyPassPath {
+		return cache.Certificate, cache.Key, nil
+	}
+
+	cert, key, err := loadCertificates(log, keyPassPath, certPath, keyPath)
+	if err != nil {
+		return "", "", err
+	}
+
+	cache.PassphrasePath = keyPassPath
+	cache.Certificate = cert
+	cache.Key = key
+
+	return cert, key, nil
+}
+
+func loadCertificates(log *logger.Logger, keyPassPathStr string, certStr string, keyStr string) (string, string, error) {
+	// all SSL config exists and the certificate key is passphrase protected,
+	// now decrypt the key
+
+	pass, err := os.ReadFile(keyPassPathStr)
+	if err != nil {
+		return "", "", fmt.Errorf("EndpointTLSComponentModifier: failed to read client certificate passphrase file: %w", err)
+	}
+
+	// we don't really support encrypted certificates, but it's how
+	// tlscommon.LoadCertificate does. Thus, let's keep the same behaviour.
+	// Also, tlscommon.LoadCertificate 'loses' the type of the private key.
+	// It stores they private key as an interface and there is no way to
+	// retrieve the type os the private key without a type assertion.
+	// Therefore, instead of manually checking the type, which would mean
+	// to check for all supported private key types and keep it up to date,
+	// better to load the certificate and its key directly from the PEM file.
+	cert, err := tlscommon.ReadPEMFile(log,
+		certStr, string(pass))
+	if err != nil {
+		return "", "", fmt.Errorf("EndpointTLSComponentModifier: unable to load TLS certificate: %w", err)
+	}
+	key, err := tlscommon.ReadPEMFile(log,
+		keyStr,
+		string(pass))
+	if err != nil {
+		return "", "", fmt.Errorf("EndpointTLSComponentModifier: unable to load TLS certificate key: %w", err)
+	}
+
+	// tlscommon.ReadPEMFile only removes the 'DEK-Info' header, not the
+	// 'Proc-Type', so remove it now. Create a pem.Block to avoid editing
+	// the PEM data manually:
+	keyBlock, _ := pem.Decode(key)
+	delete(keyBlock.Headers, "Proc-Type")
+	key = pem.EncodeToMemory(keyBlock)
+
+	return string(cert), string(key), nil
 }
 
 // findEndpointUnit finds the endpoint component and its unit of type 'unitType'.
