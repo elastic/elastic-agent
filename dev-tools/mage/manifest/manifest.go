@@ -94,6 +94,7 @@ var PlatformPackages = map[string]string{
 // ExpectedBinaries  is a map of binaries agent needs to their project in the unified-release manager.
 // The project names are those used in the "projects" list in the unified release manifest.
 // See the sample manifests in the testdata directory.
+<<<<<<< HEAD
 var ExpectedBinaries = map[string]BinarySpec{
 	"agentbeat":             {Name: "beats", Platforms: AllPlatforms},
 	"apm-server":            {Name: "apm-server", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}}},
@@ -104,11 +105,25 @@ var ExpectedBinaries = map[string]BinarySpec{
 	"pf-elastic-collector":  {Name: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
 	"pf-elastic-symbolizer": {Name: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
 	"pf-host-agent":         {Name: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
+=======
+var ExpectedBinaries = []BinarySpec{
+	{BinaryName: "agentbeat", ProjectName: "beats", Platforms: AllPlatforms},
+	{BinaryName: "apm-server", ProjectName: "apm-server", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}}},
+	{BinaryName: "cloudbeat", ProjectName: "cloudbeat", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
+	{BinaryName: "connectors", ProjectName: "connectors", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PythonWheel: true},
+	{BinaryName: "endpoint-security", ProjectName: "endpoint-dev", Platforms: AllPlatforms},
+	{BinaryName: "fleet-server", ProjectName: "fleet-server", Platforms: AllPlatforms},
+	{BinaryName: "pf-elastic-collector", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
+	{BinaryName: "pf-elastic-symbolizer", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
+	{BinaryName: "pf-host-agent", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
+>>>>>>> 701f8b9491 (Add elastic-agent-service container to packaging (#5349))
 }
 
 type BinarySpec struct {
-	Name      string
-	Platforms []Platform
+	BinaryName  string
+	ProjectName string
+	Platforms   []Platform
+	PythonWheel bool
 }
 
 func (proj BinarySpec) SupportsPlatform(platform string) bool {
@@ -118,6 +133,13 @@ func (proj BinarySpec) SupportsPlatform(platform string) bool {
 		}
 	}
 	return false
+}
+
+func (proj BinarySpec) GetPackageName(version string, platform string) string {
+	if proj.PythonWheel {
+		return fmt.Sprintf("%s-%s.zip", proj.BinaryName, version)
+	}
+	return fmt.Sprintf("%s-%s-%s", proj.BinaryName, version, PlatformPackages[platform])
 }
 
 type Platform struct {
@@ -188,27 +210,27 @@ func DownloadComponents(ctx context.Context, manifest string, platforms []string
 
 	errGrp, downloadsCtx := errgroup.WithContext(ctx)
 	// for project, pkgs := range expectedProjectPkgs() {
-	for binary, project := range ExpectedBinaries {
+	for _, spec := range ExpectedBinaries {
 		for _, platform := range platforms {
 			targetPath := filepath.Join(dropPath)
 			err := os.MkdirAll(targetPath, 0755)
 			if err != nil {
 				return fmt.Errorf("failed to create directory %s", targetPath)
 			}
-			log.Printf("+++ Prepare to download project [%s] for [%s]", project.Name, platform)
+			log.Printf("+++ Prepare to download [%s] project [%s] for [%s]", spec.BinaryName, spec.ProjectName, platform)
 
-			if !project.SupportsPlatform(platform) {
-				log.Printf(">>>>>>>>> Binary [%s] does not support platform [%s] ", binary, platform)
+			if !spec.SupportsPlatform(platform) {
+				log.Printf(">>>>>>>>> Binary [%s] does not support platform [%s] ", spec.BinaryName, platform)
 				continue
 			}
 
-			pkgURL, err := resolveManifestPackage(projects[project.Name], binary, PlatformPackages[platform], majorMinorPatchVersion)
+			pkgURL, err := resolveManifestPackage(projects[spec.ProjectName], spec, majorMinorPatchVersion, platform)
 			if err != nil {
 				return err
 			}
 
 			for _, p := range pkgURL {
-				log.Printf(">>>>>>>>> Downloading [%s] [%s] ", binary, p)
+				log.Printf(">>>>>>>>> Downloading [%s] [%s] ", spec.BinaryName, p)
 				pkgFilename := path.Base(p)
 				downloadTarget := filepath.Join(targetPath, pkgFilename)
 				if _, err := os.Stat(downloadTarget); err != nil {
@@ -229,35 +251,35 @@ func DownloadComponents(ctx context.Context, manifest string, platforms []string
 	return nil
 }
 
-func resolveManifestPackage(project Project, binary string, platformPkg string, version string) ([]string, error) {
+func resolveManifestPackage(project Project, spec BinarySpec, version string, platform string) ([]string, error) {
 	var val Package
 	var ok bool
 
 	// Try the normal/easy case first
-	packageName := fmt.Sprintf("%s-%s-%s", binary, version, platformPkg)
+	packageName := spec.GetPackageName(version, platform)
 	val, ok = project.Packages[packageName]
 	if !ok {
 		// If we didn't find it, it may be an Independent Agent Release, where
 		// the opted-in projects will have a patch version one higher than
 		// the rest of the projects, so we need to seek that out
 		if mg.Verbose() {
-			log.Printf(">>>>>>>>>>> Looking for package [%s] of type [%s]", binary, platformPkg)
+			log.Printf(">>>>>>>>>>> Looking for package [%s] of type [%s]", spec.BinaryName, PlatformPackages[platform])
 		}
 
 		var foundIt bool
 		for pkgName := range project.Packages {
-			if strings.HasPrefix(pkgName, binary) {
-				firstSplit := strings.Split(pkgName, binary+"-")
+			if strings.HasPrefix(pkgName, spec.BinaryName) {
+				firstSplit := strings.Split(pkgName, spec.BinaryName+"-")
 				if len(firstSplit) < 2 {
 					continue
 				}
 
 				secondHalf := firstSplit[1]
 				// Make sure we're finding one w/ the same required package type
-				if strings.Contains(secondHalf, platformPkg) {
+				if strings.Contains(secondHalf, PlatformPackages[platform]) {
 
 					// Split again after the version with the required package string
-					secondSplit := strings.Split(secondHalf, "-"+platformPkg)
+					secondSplit := strings.Split(secondHalf, "-"+PlatformPackages[platform])
 					if len(secondSplit) < 2 {
 						continue
 					}
@@ -269,7 +291,7 @@ func resolveManifestPackage(project Project, binary string, platformPkg string, 
 					}
 
 					// Create a project/package key with the package, derived version, and required package
-					foundPkgKey := fmt.Sprintf("%s-%s-%s", binary, pkgVersion, platformPkg)
+					foundPkgKey := fmt.Sprintf("%s-%s-%s", spec.BinaryName, pkgVersion, PlatformPackages[platform])
 					if mg.Verbose() {
 						log.Printf(">>>>>>>>>>> Looking for project package key: [%s]", foundPkgKey)
 					}
