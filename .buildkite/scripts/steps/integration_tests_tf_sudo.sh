@@ -25,8 +25,23 @@ OVERRIDE_TEST_AGENT_VERSION=${OVERRIDE_AGENT_PACKAGE_VERSION}"-SNAPSHOT"
 echo "~~~ Building test binaries"
 mage build:testBinaries
 
-ess_up $OVERRIDE_TEST_AGENT_VERSION || echo "Failed to start ESS stack" >&2
-trap 'ess_down' EXIT
+# If the step is retried, we start the stack again.
+# BUILDKITE_RETRY_COUNT == "0" for the first run
+# BUILDKITE_RETRY_COUNT > 0 for the retries
+if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
+  echo "~~~ The steps is retried, starting the ESS stack again"
+  ess_up $OVERRIDE_TEST_AGENT_VERSION || echo "Failed to start ESS stack" >&2
+  trap 'ess_down' EXIT  
+else 
+  # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data
+  echo "~~~ Receiving ESS stack metadata"
+  export ELASTICSEARCH_HOST = $(buildkite-agent meta-data get "es.host" $ELASTICSEARCH_HOST)
+  export ELASTICSEARCH_USERNAME = $(buildkite-agent meta-data get "es.username")
+  export ELASTICSEARCH_PASSWORD = $(buildkite-agent meta-data get "es.pwd")
+  export KIBANA_HOST = $(buildkite-agent meta-data get "kibana.host")
+  export KIBANA_USERNAME = $(buildkite-agent meta-data get "kibana.username")
+  export KIBANA_PASSWORD = $(buildkite-agent meta-data get "kibana.pwd")
+fi
 
 # Run integration tests
 echo "~~~ Running integration tests"
