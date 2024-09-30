@@ -58,8 +58,7 @@ func TestDiscover(t *testing.T) {
 
 func withFiles(files []string, fn func(dst string, t *testing.T)) func(t *testing.T) {
 	return func(t *testing.T) {
-		tmp, _ := os.MkdirTemp("", "watch")
-		defer os.RemoveAll(tmp)
+		tmp := t.TempDir()
 
 		for _, file := range files {
 			path := filepath.Join(tmp, file)

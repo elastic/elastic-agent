@@ -6,7 +6,6 @@ package secret
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -67,6 +66,4 @@ func TestCreate(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-
-	os.RemoveAll(filepath.Dir(getTestVaultPath(t)))
 }
