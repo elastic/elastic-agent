@@ -159,7 +159,7 @@ func checkHealthAtStartup(t *testing.T, ctx context.Context, agentFixture *atest
 			}
 		}
 		return allHealthy
-	}, 3*time.Minute, 15*time.Second, "install never became healthy: components did not return a healthy state: %s", compDebugName)
+	}, 3*time.Minute, 3*time.Second, "install never became healthy: components did not return a healthy state: %s", compDebugName)
 }
 
 func testMonitoringLogsAreShipped(
