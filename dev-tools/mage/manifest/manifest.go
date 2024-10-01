@@ -94,18 +94,6 @@ var PlatformPackages = map[string]string{
 // ExpectedBinaries  is a map of binaries agent needs to their project in the unified-release manager.
 // The project names are those used in the "projects" list in the unified release manifest.
 // See the sample manifests in the testdata directory.
-<<<<<<< HEAD
-var ExpectedBinaries = map[string]BinarySpec{
-	"agentbeat":             {Name: "beats", Platforms: AllPlatforms},
-	"apm-server":            {Name: "apm-server", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}}},
-	"cloudbeat":             {Name: "cloudbeat", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
-	"cloud-defend":          {Name: "cloud-defend", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
-	"endpoint-security":     {Name: "endpoint-dev", Platforms: AllPlatforms},
-	"fleet-server":          {Name: "fleet-server", Platforms: AllPlatforms},
-	"pf-elastic-collector":  {Name: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
-	"pf-elastic-symbolizer": {Name: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
-	"pf-host-agent":         {Name: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
-=======
 var ExpectedBinaries = []BinarySpec{
 	{BinaryName: "agentbeat", ProjectName: "beats", Platforms: AllPlatforms},
 	{BinaryName: "apm-server", ProjectName: "apm-server", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}}},
@@ -116,7 +104,6 @@ var ExpectedBinaries = []BinarySpec{
 	{BinaryName: "pf-elastic-collector", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
 	{BinaryName: "pf-elastic-symbolizer", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
 	{BinaryName: "pf-host-agent", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
->>>>>>> 701f8b9491 (Add elastic-agent-service container to packaging (#5349))
 }
 
 type BinarySpec struct {
