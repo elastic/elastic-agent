@@ -43,7 +43,7 @@ RUN true && \
     chmod 0775 {{ $beatHome}}/{{ $modulesd }} && \
 {{- end }}
 
-{{- if eq .Variant "cloud" }}
+{{- if or (eq .Variant "cloud") (eq .Variant "service") }}
     mkdir -p /opt/agentbeat /opt/filebeat /opt/metricbeat && \
     cp -f {{ $beatHome }}/data/cloud_downloads/filebeat.sh /opt/filebeat/filebeat && \
     chmod +x /opt/filebeat/filebeat && \
@@ -170,11 +170,19 @@ RUN mkdir /licenses
 COPY --from=home {{ $beatHome }}/LICENSE.txt /licenses
 COPY --from=home {{ $beatHome }}/NOTICE.txt /licenses
 
-{{- if eq .Variant "cloud" }}
+{{- if or (eq .Variant "cloud") (eq .Variant "service") }}
 COPY --from=home /opt /opt
 # Generate folder for a stub command that will be overwritten at runtime
 RUN mkdir /app && \
     chown {{ .user }}:{{ .user }} /app
+{{- end }}
+
+{{- if eq .Variant "service" }}
+RUN apk add --no-cache git make python-3.11 py3.11-pip && \
+    unzip {{ $beatHome }}/data/service/connectors-*.zip -d {{ $beatHome }}/data/service && \
+    mv {{ $beatHome }}/data/service/elasticsearch_connectors-* /usr/share/connectors && \
+    PYTHON=python3.11 make -C /usr/share/connectors clean install install-agent && \
+    chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/connectors
 {{- end }}
 
 {{- if (and (eq .Variant "complete") (contains .from "ubuntu"))  }}
@@ -284,7 +292,7 @@ ENV LIBBEAT_MONITORING_CGROUPS_HIERARCHY_OVERRIDE=/
 
 WORKDIR {{ $beatHome }}
 
-{{- if eq .Variant "cloud" }}
+{{- if or (eq .Variant "cloud") (eq .Variant "service") }}
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/app/apm.sh"]
 # Generate a stub command that will be overwritten at runtime

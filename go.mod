@@ -14,12 +14,12 @@ require (
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/elastic-agent-autodiscover v0.8.2
 	github.com/elastic/elastic-agent-client/v7 v7.16.0
-	github.com/elastic/elastic-agent-libs v0.10.1
+	github.com/elastic/elastic-agent-libs v0.11.0
 	github.com/elastic/elastic-agent-system-metrics v0.11.2
 	github.com/elastic/elastic-transport-go/v8 v8.6.0
 	github.com/elastic/go-elasticsearch/v8 v8.15.0
 	github.com/elastic/go-licenser v0.4.2
-	github.com/elastic/go-sysinfo v1.14.1
+	github.com/elastic/go-sysinfo v1.14.2
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.11.0
@@ -65,7 +65,7 @@ require (
 	golang.org/x/crypto v0.26.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 	golang.org/x/sync v0.8.0
-	golang.org/x/sys v0.24.0
+	golang.org/x/sys v0.25.0
 	golang.org/x/term v0.23.0
 	golang.org/x/text v0.17.0
 	golang.org/x/time v0.6.0
@@ -460,8 +460,6 @@ require (
 
 replace (
 	github.com/Shopify/sarama => github.com/elastic/sarama v1.19.1-0.20220310193331-ebc2b0d8eef3
-	github.com/dop251/goja => github.com/andrewkroh/goja v0.0.0-20190128172624-dd2ac4456e20
-	github.com/dop251/goja_nodejs => github.com/dop251/goja_nodejs v0.0.0-20171011081505-adff31b136e6
 	// openshift removed all tags from their repo, use the pseudoversion from the release-3.9 branch HEAD
 	// See https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/12d41f40b0d408b0167633d8095160d3343d46ac/go.mod#L38
 	github.com/openshift/api v3.9.0+incompatible => github.com/openshift/api v0.0.0-20180801171038-322a19404e37

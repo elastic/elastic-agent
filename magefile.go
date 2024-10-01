@@ -40,6 +40,8 @@ import (
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	"github.com/elastic/elastic-agent/pkg/testing/buildkite"
+	tcommon "github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/kind"
@@ -531,11 +533,6 @@ func DownloadManifest(ctx context.Context) error {
 		return errAtLeastOnePlatform
 	}
 
-	var requiredPackages []string
-	for _, p := range platforms {
-		requiredPackages = append(requiredPackages, manifest.PlatformPackages[p])
-	}
-
 	if e := manifest.DownloadComponents(ctx, devtools.ManifestURL, platforms, dropPath); e != nil {
 		return fmt.Errorf("failed to download the manifest file, %w", e)
 	}
@@ -593,16 +590,9 @@ func FixDRADockerArtifacts() error {
 	return nil
 }
 
-func getPackageName(beat, version, pkg string) (string, string) {
-	if hasSnapshotEnv() {
-		version += "-SNAPSHOT"
-	}
-	return version, fmt.Sprintf("%s-%s-%s", beat, version, pkg)
-}
-
 func requiredPackagesPresent(basePath, beat, version string, requiredPackages []string) bool {
 	for _, pkg := range requiredPackages {
-		_, packageName := getPackageName(beat, version, pkg)
+		packageName := fmt.Sprintf("%s-%s-%s", beat, version, pkg)
 		path := filepath.Join(basePath, "build", "distributions", packageName)
 
 		if _, err := os.Stat(path); err != nil {
@@ -1021,6 +1011,10 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 		}
 		archivePath = movePackagesToArchive(dropPath, requiredPackages)
 
+		if hasSnapshotEnv() {
+			packageVersion = fmt.Sprintf("%s-SNAPSHOT", packageVersion)
+		}
+
 		os.Setenv(agentDropPath, dropPath)
 
 		if devtools.ExternalBuild == true {
@@ -1036,17 +1030,16 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 
 			errGroup, ctx := errgroup.WithContext(context.Background())
 			completedDownloads := &atomic.Int32{}
-			for binary, project := range manifest.ExpectedBinaries {
+			for _, spec := range manifest.ExpectedBinaries {
 				for _, platform := range platforms {
-					if !project.SupportsPlatform(platform) {
-						fmt.Printf("--- Binary %s does not support %s, download skipped\n", binary, platform)
+					if !spec.SupportsPlatform(platform) {
+						fmt.Printf("--- Binary %s does not support %s, download skipped\n", spec.BinaryName, platform)
 						continue
 					}
-					reqPackage := manifest.PlatformPackages[platform]
-					targetPath := filepath.Join(archivePath, reqPackage)
+					targetPath := filepath.Join(archivePath, manifest.PlatformPackages[platform])
 					os.MkdirAll(targetPath, 0755)
-					newVersion, packageName := getPackageName(binary, packageVersion, reqPackage)
-					errGroup.Go(downloadBinary(ctx, project.Name, packageName, binary, platform, newVersion, targetPath, completedDownloads))
+					packageName := spec.GetPackageName(packageVersion, platform)
+					errGroup.Go(downloadBinary(ctx, spec.ProjectName, packageName, spec.BinaryName, platform, packageVersion, targetPath, completedDownloads))
 				}
 			}
 
@@ -1124,6 +1117,27 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 	return archivePath, dropPath
 }
 
+func removePythonWheels(matches []string, version string) []string {
+	if hasSnapshotEnv() {
+		version = fmt.Sprintf("%s-SNAPSHOT", version)
+	}
+
+	var wheels []string
+	for _, spec := range manifest.ExpectedBinaries {
+		if spec.PythonWheel {
+			wheels = append(wheels, spec.GetPackageName(version, ""))
+		}
+	}
+
+	cleaned := make([]string, 0, len(matches))
+	for _, path := range matches {
+		if !slices.Contains(wheels, filepath.Base(path)) {
+			cleaned = append(cleaned, path)
+		}
+	}
+	return cleaned
+}
+
 // flattenDependencies will extract all the required packages collected in archivePath and dropPath in flatPath and
 // regenerate checksums
 func flattenDependencies(requiredPackages []string, packageVersion, archivePath, dropPath, flatPath string, manifestResponse *manifest.Build) {
@@ -1146,6 +1160,10 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 			panic(err)
 		}
 		matches = append(matches, zipMatches...)
+
+		// never flatten any python wheels, the packages.yml and docker should handle
+		// those specifically so that the python wheels are installed into the container
+		matches = removePythonWheels(matches, packageVersion)
 
 		if mg.Verbose() {
 			log.Printf("--- Extracting into the flat dir: %v", matches)
@@ -2134,12 +2152,12 @@ func askForVM() (runner.StateInstance, error) {
 	return instances[id], nil
 }
 
-func askForStack() (runner.Stack, error) {
+func askForStack() (tcommon.Stack, error) {
 	mg.Deps(Integration.Stacks)
 
 	state, err := readFrameworkState()
 	if err != nil {
-		return runner.Stack{}, fmt.Errorf("could not read state file: %w", err)
+		return tcommon.Stack{}, fmt.Errorf("could not read state file: %w", err)
 	}
 
 	if len(state.Stacks) == 1 {
@@ -2150,17 +2168,17 @@ func askForStack() (runner.Stack, error) {
 	id := 0
 	fmt.Print("Stack number: ")
 	if _, err := fmt.Scanf("%d", &id); err != nil {
-		return runner.Stack{}, fmt.Errorf("cannot read Stack number: %w", err)
+		return tcommon.Stack{}, fmt.Errorf("cannot read Stack number: %w", err)
 	}
 
 	if id >= len(state.Stacks) {
-		return runner.Stack{}, fmt.Errorf("Invalid Stack number, it must be between 0 and %d", len(state.Stacks)-1)
+		return tcommon.Stack{}, fmt.Errorf("Invalid Stack number, it must be between 0 and %d", len(state.Stacks)-1)
 	}
 
 	return state.Stacks[id], nil
 }
 
-func generateEnvFile(stack runner.Stack) error {
+func generateEnvFile(stack tcommon.Stack) error {
 	fileExists := true
 	stat, err := os.Stat("./env.sh")
 	if err != nil {
@@ -2471,6 +2489,57 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 	return nil
 }
 
+func (Integration) Buildkite() error {
+	goTestFlags := os.Getenv("GOTEST_FLAGS")
+	batches, err := define.DetermineBatches("testing/integration", goTestFlags, "integration")
+	if err != nil {
+		return fmt.Errorf("failed to determine batches: %w", err)
+	}
+	agentVersion, agentStackVersion, err := getTestRunnerVersions()
+	if err != nil {
+		return fmt.Errorf("failed to get agent versions: %w", err)
+	}
+	goVersion, err := mage.DefaultBeatBuildVariableSources.GetGoVersion()
+	if err != nil {
+		return fmt.Errorf("failed to get go versions: %w", err)
+	}
+
+	cfg := tcommon.Config{
+		AgentVersion: agentVersion,
+		StackVersion: agentStackVersion,
+		GOVersion:    goVersion,
+		Platforms:    testPlatforms(),
+		Packages:     testPackages(),
+		Groups:       testGroups(),
+		Matrix:       false,
+		VerboseMode:  mg.Verbose(),
+		TestFlags:    goTestFlags,
+	}
+
+	steps, err := buildkite.GenerateSteps(cfg, batches...)
+	if err != nil {
+		return fmt.Errorf("error generating buildkite steps: %w", err)
+	}
+
+	// write output to steps.yaml
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("error getting current working directory: %w", err)
+	}
+	ymlFilePath := filepath.Join(cwd, "steps.yml")
+	file, err := os.Create(ymlFilePath)
+	if err != nil {
+		return fmt.Errorf("error creating file: %w", err)
+	}
+	defer file.Close()
+	if _, err := file.WriteString(steps); err != nil {
+		return fmt.Errorf("error writing to file: %w", err)
+	}
+
+	fmt.Printf(">>> Generated buildkite steps written to: %s\n", ymlFilePath)
+	return nil
+}
+
 func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	if _, ok := ctx.Deadline(); !ok {
 		// If the context doesn't have a timeout (usually via the mage -t option), give it one.
@@ -2541,18 +2610,14 @@ func integRunnerOnce(ctx context.Context, matrix bool, singleTest string) (int, 
 	return results.Failures, nil
 }
 
-func createTestRunner(matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
-	goVersion, err := mage.DefaultBeatBuildVariableSources.GetGoVersion()
-	if err != nil {
-		return nil, err
-	}
-
+func getTestRunnerVersions() (string, string, error) {
+	var err error
 	agentStackVersion := os.Getenv("AGENT_STACK_VERSION")
 	agentVersion := os.Getenv("AGENT_VERSION")
 	if agentVersion == "" {
 		agentVersion, err = mage.DefaultBeatBuildVariableSources.GetBeatVersion()
 		if err != nil {
-			return nil, err
+			return "", "", err
 		}
 		if agentStackVersion == "" {
 			// always use snapshot for stack version
@@ -2568,6 +2633,21 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	if agentStackVersion == "" {
 		agentStackVersion = agentVersion
 	}
+
+	return agentVersion, agentStackVersion, nil
+}
+
+func createTestRunner(matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
+	goVersion, err := mage.DefaultBeatBuildVariableSources.GetGoVersion()
+	if err != nil {
+		return nil, err
+	}
+
+	agentVersion, agentStackVersion, err := getTestRunnerVersions()
+	if err != nil {
+		return nil, err
+	}
+
 	agentBuildDir := os.Getenv("AGENT_BUILD_DIR")
 	if agentBuildDir == "" {
 		agentBuildDir = filepath.Join("build", "distributions")
@@ -2606,7 +2686,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		Datacenter:       datacenter,
 	}
 
-	var instanceProvisioner runner.InstanceProvisioner
+	var instanceProvisioner tcommon.InstanceProvisioner
 	instanceProvisionerMode := os.Getenv("INSTANCE_PROVISIONER")
 	switch instanceProvisionerMode {
 	case "", ogc.Name:
@@ -2619,7 +2699,6 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	default:
 		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'ogc' or 'multipass', not %s", instanceProvisionerMode)
 	}
-	fmt.Printf(">>>> Using %s instance provisioner\n", instanceProvisionerMode)
 
 	email, err := ogcCfg.ClientEmail()
 	if err != nil {
@@ -2632,7 +2711,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		Region:     essRegion,
 	}
 
-	var stackProvisioner runner.StackProvisioner
+	var stackProvisioner tcommon.StackProvisioner
 	stackProvisionerMode := os.Getenv("STACK_PROVISIONER")
 	switch stackProvisionerMode {
 	case "", ess.ProvisionerStateful:
@@ -2654,7 +2733,6 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 			ess.ProvisionerServerless,
 			stackProvisionerMode)
 	}
-	fmt.Printf(">>>> Using %s stack provisioner\n", stackProvisionerMode)
 
 	timestamp := timestampEnabled()
 
@@ -2684,7 +2762,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	diagDir := filepath.Join("build", "diagnostics")
 	_ = os.MkdirAll(diagDir, 0755)
 
-	cfg := runner.Config{
+	cfg := tcommon.Config{
 		AgentVersion:   agentVersion,
 		StackVersion:   agentStackVersion,
 		BuildDir:       agentBuildDir,
