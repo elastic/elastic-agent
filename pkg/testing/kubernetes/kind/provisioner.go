@@ -14,10 +14,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/elastic/elastic-agent/pkg/testing/define"
-	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
-	"github.com/elastic/elastic-agent/pkg/testing/runner"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/e2e-framework/klient"
@@ -25,6 +21,10 @@ import (
 	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/klient/wait"
 	"sigs.k8s.io/e2e-framework/klient/wait/conditions"
+
+	"github.com/elastic/elastic-agent/pkg/testing/common"
+	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 )
 
 const (
@@ -49,23 +49,23 @@ nodes:
         secure-port: "10257"
 `
 
-func NewProvisioner() runner.InstanceProvisioner {
+func NewProvisioner() common.InstanceProvisioner {
 	return &provisioner{}
 }
 
 type provisioner struct {
-	logger runner.Logger
+	logger common.Logger
 }
 
 func (p *provisioner) Name() string {
 	return Name
 }
 
-func (p *provisioner) Type() runner.ProvisionerType {
-	return runner.ProvisionerTypeK8SCluster
+func (p *provisioner) Type() common.ProvisionerType {
+	return common.ProvisionerTypeK8SCluster
 }
 
-func (p *provisioner) SetLogger(l runner.Logger) {
+func (p *provisioner) SetLogger(l common.Logger) {
 	p.logger = l
 }
 
@@ -80,8 +80,8 @@ func (p *provisioner) Supported(batch define.OS) bool {
 	return true
 }
 
-func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches []runner.OSBatch) ([]runner.Instance, error) {
-	var instances []runner.Instance
+func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches []common.OSBatch) ([]common.Instance, error) {
+	var instances []common.Instance
 	for _, batch := range batches {
 		k8sVersion := fmt.Sprintf("v%s", batch.OS.Version)
 		instanceName := fmt.Sprintf("%s-%s", k8sVersion, batch.Batch.Group)
@@ -140,7 +140,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg runner.Config, batches 
 			return nil, err
 		}
 
-		instances = append(instances, runner.Instance{
+		instances = append(instances, common.Instance{
 			ID:          batch.ID,
 			Name:        instanceName,
 			Provisioner: Name,
@@ -208,11 +208,11 @@ func (p *provisioner) WaitForControlPlane(client klient.Client) error {
 	return nil
 }
 
-func (p *provisioner) Clean(ctx context.Context, cfg runner.Config, instances []runner.Instance) error {
+func (p *provisioner) Clean(ctx context.Context, cfg common.Config, instances []common.Instance) error {
 	// doesn't execute in parallel for the same reasons in Provision
 	// multipass just cannot handle it
 	for _, instance := range instances {
-		func(instance runner.Instance) {
+		func(instance common.Instance) {
 			err := p.deleteCluster(instance.ID)
 			if err != nil {
 				// prevent a failure from stopping the other instances and clean

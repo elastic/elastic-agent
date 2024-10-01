@@ -12,7 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/pkg/testing/runner"
+
+	"github.com/elastic/elastic-agent/pkg/testing/common"
 )
 
 func TestProvisionGetRegions(t *testing.T) {
@@ -53,7 +54,7 @@ func TestStackProvisioner(t *testing.T) {
 	cfg := ProvisionerConfig{Region: "aws-eu-west-1", APIKey: key}
 	provClient, err := NewServerlessProvisioner(ctx, cfg)
 	require.NoError(t, err)
-	request := runner.StackRequest{ID: "stack-test-one", Version: "8.9.0"}
+	request := common.StackRequest{ID: "stack-test-one", Version: "8.9.0"}
 
 	stack, err := provClient.Create(ctx, request)
 	require.NoError(t, err)
