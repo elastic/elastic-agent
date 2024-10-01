@@ -2,15 +2,11 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package runner
+package ssh
 
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"io"
 	"net"
@@ -21,99 +17,21 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// newSSHPrivateKey creates RSA private key
-func newSSHPrivateKey() (*rsa.PrivateKey, error) {
-	pk, err := rsa.GenerateKey(rand.Reader, 2056)
-	if err != nil {
-		return nil, err
-	}
-	err = pk.Validate()
-	if err != nil {
-		return nil, err
-	}
-	return pk, nil
-}
-
-// sshEncodeToPEM encodes private key to PEM format
-func sshEncodeToPEM(privateKey *rsa.PrivateKey) []byte {
-	der := x509.MarshalPKCS1PrivateKey(privateKey)
-	privBlock := pem.Block{
-		Type:    "RSA PRIVATE KEY",
-		Headers: nil,
-		Bytes:   der,
-	}
-	return pem.EncodeToMemory(&privBlock)
-}
-
-// newSSHPublicKey returns bytes for writing to .pub file
-func newSSHPublicKey(pk *rsa.PublicKey) ([]byte, error) {
-	pub, err := ssh.NewPublicKey(pk)
-	if err != nil {
-		return nil, err
-	}
-	return ssh.MarshalAuthorizedKey(pub), nil
-}
-
-type fileContentsOpts struct {
-	command string
-}
-
-// FileContentsOpt provides an option to modify how fetching files from the remote host work.
-type FileContentsOpt func(opts *fileContentsOpts)
-
-// WithContentFetchCommand changes the command to use for fetching the file contents.
-func WithContentFetchCommand(command string) FileContentsOpt {
-	return func(opts *fileContentsOpts) {
-		opts.command = command
-	}
-}
-
-// SSHClient is a *ssh.Client that provides a nice interface to work with.
-type SSHClient interface {
-	// Connect connects to the host.
-	Connect(ctx context.Context) error
-
-	// ConnectWithTimeout connects to the host with a timeout.
-	ConnectWithTimeout(ctx context.Context, timeout time.Duration) error
-
-	// Close closes the client.
-	Close() error
-
-	// Reconnect disconnects and reconnected to the host.
-	Reconnect(ctx context.Context) error
-
-	// ReconnectWithTimeout disconnects and reconnected to the host with a timeout.
-	ReconnectWithTimeout(ctx context.Context, timeout time.Duration) error
-
-	// NewSession opens a new Session for this host.
-	NewSession() (*ssh.Session, error)
-
-	// Exec runs a command on the host.
-	Exec(ctx context.Context, cmd string, args []string, stdin io.Reader) ([]byte, []byte, error)
-
-	// ExecWithRetry runs the command on loop waiting the interval between calls
-	ExecWithRetry(ctx context.Context, cmd string, args []string, interval time.Duration) ([]byte, []byte, error)
-
-	// Copy copies the filePath to the host at dest.
-	Copy(filePath string, dest string) error
-
-	// GetFileContents returns the file content.
-	GetFileContents(ctx context.Context, filename string, opts ...FileContentsOpt) ([]byte, error)
-
-	// GetFileContentsOutput returns the file content writing to output.
-	GetFileContentsOutput(ctx context.Context, filename string, output io.Writer, opts ...FileContentsOpt) error
+type logger interface {
+	// Logf logs the message for this runner.
+	Logf(format string, args ...any)
 }
 
 type sshClient struct {
 	ip       string
 	username string
 	auth     ssh.AuthMethod
-	logger   Logger
+	logger   logger
 	c        *ssh.Client
 }
 
-// NewSSHClient creates a new SSH client connection to the host.
-func NewSSHClient(ip string, username string, sshAuth ssh.AuthMethod, logger Logger) SSHClient {
+// NewClient creates a new SSH client connection to the host.
+func NewClient(ip string, username string, sshAuth ssh.AuthMethod, logger logger) SSHClient {
 	return &sshClient{
 		ip:       ip,
 		username: username,
