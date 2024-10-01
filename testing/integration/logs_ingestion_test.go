@@ -27,6 +27,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
@@ -100,6 +101,9 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 	// 3. Ensure installation is correct.
 	require.NoError(t, installtest.CheckSuccess(ctx, agentFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged}))
 
+	// 4. Ensure healthy state at startup
+	checkHealthAtStartup(t, ctx, agentFixture)
+
 	t.Run("Monitoring logs are shipped", func(t *testing.T) {
 		testMonitoringLogsAreShipped(t, ctx, info, agentFixture, policy)
 	})
@@ -125,6 +129,49 @@ func startMockES(t *testing.T) string {
 	t.Cleanup(s.Close)
 
 	return s.URL
+}
+
+// checkHealthAtStartup ensures all the beats and agent are healthy and working before we continue
+func checkHealthAtStartup(t *testing.T, ctx context.Context, agentFixture *atesting.Fixture) {
+	// because we need to separately fetch the PIDs, wait until everything is healthy before we look for running beats
+	compDebugName := ""
+	require.Eventually(t, func() bool {
+		allHealthy := true
+		status, err := agentFixture.ExecStatus(ctx)
+		if err != nil {
+			t.Logf("agent status returned an error: %v", err)
+			return false
+		}
+
+		apacheMatch := "logfile-apache"
+		foundApache := false
+		systemMatch := "system/metrics"
+		foundSystem := false
+
+		for _, comp := range status.Components {
+			// make sure the components include the expected integrations
+			for _, v := range comp.Units {
+				t.Logf("unit ID: %s", v.UnitID)
+				// the full unit ID will be something like "log-default-logfile-cef-3f0764f0-4ade-4f46-9ead-f2f0f7865676"
+				if !foundApache && strings.Contains(v.UnitID, apacheMatch) {
+					foundApache = true
+				}
+				if !foundSystem && strings.Contains(v.UnitID, systemMatch) {
+					foundSystem = true
+				}
+				t.Logf("unit state: %s", v.Message)
+				if v.State != int(cproto.State_HEALTHY) {
+					allHealthy = false
+				}
+			}
+			t.Logf("component state: %s", comp.Message)
+			if comp.State != int(cproto.State_HEALTHY) {
+				compDebugName = comp.Name
+				allHealthy = false
+			}
+		}
+		return allHealthy && foundApache && foundSystem
+	}, 3*time.Minute, 15*time.Second, "install never became healthy: components did not return a healthy state: %s", compDebugName)
 }
 
 func testMonitoringLogsAreShipped(
