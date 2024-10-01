@@ -68,8 +68,6 @@ steps:
 
       - label: "Fleet"
         key: stateful-ubuntu-fleet-sudo
-        depends_on:
-          - package-it
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           ls -lah build/distributions/
@@ -84,8 +82,6 @@ steps:
 
       - label: "FQDN"
         key: stateful-ubuntu-fqdn-sudo
-        depends_on:
-          - package-it
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           ls -lah build/distributions/
@@ -100,8 +96,6 @@ steps:
 
       - label: "Deb"
         key: stateful-ubuntu-deb-sudo
-        depends_on:
-          - package-it
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           ls -lah build/distributions/
@@ -116,8 +110,6 @@ steps:
 
       - label: "Fleet Airgapped"
         key: stateful-ubuntu-fleet-airgapped-sudo
-        depends_on:
-          - package-it
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           ls -lah build/distributions/
@@ -132,8 +124,6 @@ steps:
 
       - label: "Fleet Privileged"
         key: stateful-ubuntu-fleet-privileged-sudo
-        depends_on:
-          - package-it
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           ls -lah build/distributions/
@@ -148,8 +138,6 @@ steps:
 
       - label: "Fleet Airgapped Privileged"
         key: stateful-ubuntu-fleet-airgapped-privileged-sudo
-        depends_on:
-          - package-it
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           ls -lah build/distributions/
