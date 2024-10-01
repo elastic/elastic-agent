@@ -17,7 +17,7 @@ Go version should be at least the same than the one in [.go-version](https://git
 
 
 ### GCloud CLI
-The integration testing framework spins up resources in GCP.  To acheive this, it needs the
+The integration testing framework spins up resources in GCP.  To achieve this, it needs the
 [GCloud CLI](https://cloud.google.com/sdk/gcloud) to be installed on the system where the tests are initiated from.
 
 ### Beats
