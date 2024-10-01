@@ -166,7 +166,7 @@ steps:
     depends_on: integration-tests
     allow_dependency_failure: true
     command: |
-      buildkite-agent artifact download test_infra/ess/** .
+      buildkite-agent artifact download "test_infra/ess/**" . --step "integration-ess"
       ls -lah test_infra/ess
       .buildkite/scripts/steps/ess_down.sh
     agents:
