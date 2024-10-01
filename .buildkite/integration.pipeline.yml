@@ -31,6 +31,11 @@ steps:
       buildkite-agent meta-data set "kibana.pwd" $KIBANA_PASSWORD
     artifact_paths:
       - test_infra/ess/*.tfstate
+    agents:
+      provider: "gcp"
+      imageProject: elastic-images-qa
+      machineType: "n1-standard-2"
+      image: "family/platform-ingest-elastic-agent-ubuntu-2204"
 
   - group: "Stateful IT (Sudo): Ubuntu"
     key: integration-tests
@@ -163,11 +168,15 @@ steps:
   - label: ESS stack cleanup
     depends_on: integration-tests
     allow_dependency_failure: true
-
     command: |
       buildkite-agent artifact download test_infra/ess/*.tfstate .
       ls -lah test_infra/ess
       .buildkite/scripts/steps/ess_down.sh
+    agents:
+      provider: "gcp"
+      imageProject: elastic-images-qa
+      machineType: "n1-standard-2"
+      image: "family/platform-ingest-elastic-agent-ubuntu-2204"
 
   # - label: "Serverless integration test"
   #   key: "serverless-integration-tests"
