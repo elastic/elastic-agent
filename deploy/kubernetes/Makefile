@@ -15,6 +15,7 @@ ELASTIC_AGENT_BRANCH=update-k8s-templates-$(shell date "+%Y%m%d%H%M%S")
 KUSTOMIZE=elastic-agent-kustomize
 KUSTOMIZE_DEFAULT=elastic-agent-kustomize/default
 KUSTOMIZE_KSM_AUTOSHARDING=elastic-agent-kustomize/ksm-autosharding
+KUSTOMIZE_KSM_HINTS=elastic-agent-kustomize/ksm-hints
 
 # variable for processor for elastic-agent-standalone
 define ELASTIC_PROCESSOR
@@ -118,6 +119,8 @@ $(ALL):
 	@for f in $(shell ls $@/*.yaml | grep -v elastic-agent-standalone-daemonset-configmap); do \
 		cp -r $$f  $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/base; \
 	done
+	
+	sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g"  $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone/kustomization.yaml.original > $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone/kustomization.yaml
 
 	mkdir -p $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/extra/
 	sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" -e "/name: elastic-agent-state/,+1 s/^/#/" -e "/path: \/var\/lib\/$@\/kube-system\/state/,+1 s/^/#/" $@/$@-daemonset.yaml > $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/base/$@-daemonset.yaml

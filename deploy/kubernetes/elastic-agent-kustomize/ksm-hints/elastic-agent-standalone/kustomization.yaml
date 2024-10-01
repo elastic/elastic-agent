@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../default/elastic-agent-standalone
+
+patches:
+- patch: |-
+    apiVersion: apps/v1
+    kind: DaemonSet
+    metadata:
+      name: elastic-agent-standalone
+      namespace: kube-system
+      labels:
+        app: elastic-agent-standalone
+    spec:
+      template:
+        spec:
+          initContainers:
+            - name: k8s-templates-downloader
+              image: docker.elastic.co/beats/elastic-agent:9.0.0
+              command: ['bash']
+              args:
+                - -c
+                - >-
+                  mkdir -p /usr/share/elastic-agent/state/inputs.d &&
+                  curl -sL https://github.com/elastic/elastic-agent/archive/9.0.tar.gz | tar xz -C /usr/share/elastic-agent/state/inputs.d --strip=5 "elastic-agent-9.0/deploy/kubernetes/elastic-agent-standalone/templates.d"
+              securityContext:
+                runAsUser: 0
+              volumeMounts:
+                - name: elastic-agent-state
+                  mountPath: /usr/share/elastic-agent/state
+          

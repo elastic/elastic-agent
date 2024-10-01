@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: elastic-agent-standalone
+  namespace: kube-system
+  labels:
+    app: elastic-agent-standalone
+spec:
+  selector:
+    matchLabels:
+      app: elastic-agent-standalone
+  template:
+    metadata:
+      labels:
+        app: elastic-agent-standalone
+    spec:
+      containers:
+        - name: elastic-agent-standalone
+          env:
+          - $patch: delete
+            name: API_KEY
+          - $patch: delete
+            name: ES_HOST
