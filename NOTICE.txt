@@ -9059,11 +9059,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/winlabs/gowin32
-Version: v0.0.0-20240828142606-3c8ae9954cab
+Version: v0.0.0-20240930213947-f504d7e14639
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/winlabs/gowin32@v0.0.0-20240828142606-3c8ae9954cab/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/winlabs/gowin32@v0.0.0-20240930213947-f504d7e14639/LICENSE:
 
 ﻿
                                  Apache License
