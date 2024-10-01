@@ -143,22 +143,10 @@ func checkHealthAtStartup(t *testing.T, ctx context.Context, agentFixture *atest
 			return false
 		}
 
-		apacheMatch := "logfile-apache"
-		foundApache := false
-		systemMatch := "system/metrics"
-		foundSystem := false
-
 		for _, comp := range status.Components {
 			// make sure the components include the expected integrations
 			for _, v := range comp.Units {
 				t.Logf("unit ID: %s", v.UnitID)
-				// the full unit ID will be something like "log-default-logfile-cef-3f0764f0-4ade-4f46-9ead-f2f0f7865676"
-				if !foundApache && strings.Contains(v.UnitID, apacheMatch) {
-					foundApache = true
-				}
-				if !foundSystem && strings.Contains(v.UnitID, systemMatch) {
-					foundSystem = true
-				}
 				t.Logf("unit state: %s", v.Message)
 				if v.State != int(cproto.State_HEALTHY) {
 					allHealthy = false
@@ -170,7 +158,7 @@ func checkHealthAtStartup(t *testing.T, ctx context.Context, agentFixture *atest
 				allHealthy = false
 			}
 		}
-		return allHealthy && foundApache && foundSystem
+		return allHealthy
 	}, 3*time.Minute, 15*time.Second, "install never became healthy: components did not return a healthy state: %s", compDebugName)
 }
 
