@@ -35,12 +35,12 @@ if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
 else 
   # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data
   echo "~~~ Receiving ESS stack metadata"
-  export ELASTICSEARCH_HOST = $(buildkite-agent meta-data get "es.host")
-  export ELASTICSEARCH_USERNAME = $(buildkite-agent meta-data get "es.username")
-  export ELASTICSEARCH_PASSWORD = $(buildkite-agent meta-data get "es.pwd")
-  export KIBANA_HOST = $(buildkite-agent meta-data get "kibana.host")
-  export KIBANA_USERNAME = $(buildkite-agent meta-data get "kibana.username")
-  export KIBANA_PASSWORD = $(buildkite-agent meta-data get "kibana.pwd")
+  export ELASTICSEARCH_HOST=$(buildkite-agent meta-data get "es.host")
+  export ELASTICSEARCH_USERNAME=$(buildkite-agent meta-data get "es.username")
+  export ELASTICSEARCH_PASSWORD=$(buildkite-agent meta-data get "es.pwd")
+  export KIBANA_HOST=$(buildkite-agent meta-data get "kibana.host")
+  export KIBANA_USERNAME=$(buildkite-agent meta-data get "kibana.username")
+  export KIBANA_PASSWORD=$(buildkite-agent meta-data get "kibana.pwd")
 fi
 
 # Run integration tests
