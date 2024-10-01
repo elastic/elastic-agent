@@ -21,7 +21,7 @@ func dialContext(ctx context.Context, address string, maxMsgSize int, opts ...gr
 		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),
 	)
-	return grpc.DialContext(ctx, address, opts...)
+	return grpc.DialContext(ctx, address, opts...) //nolint:staticcheck // Only the deprecated version allows this call to be blocking
 }
 
 func dialer(ctx context.Context, addr string) (net.Conn, error) {

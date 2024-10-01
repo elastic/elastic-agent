@@ -29,7 +29,7 @@ func TestAddingHeaders(t *testing.T) {
 	rtt := WithHeaders(c.Transport, Headers)
 
 	c.Transport = rtt
-	resp, err := c.Get(server.URL)
+	resp, err := c.Get(server.URL) //nolint:noctx // this is fine in tests
 	require.NoError(t, err)
 	b, err := io.ReadAll(resp.Body)
 	defer resp.Body.Close()
