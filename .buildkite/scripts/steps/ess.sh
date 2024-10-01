@@ -56,6 +56,7 @@ function ess_down() {
   fi
   
   pushd "${TF_DIR}"
+  terraform init
   terraform destroy -auto-approve
   popd
 }
