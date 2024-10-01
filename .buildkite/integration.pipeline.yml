@@ -22,7 +22,10 @@ steps:
     # depends_on:
     #   - package-it
     command: |
-      .buildkite/scripts/steps/ess_start.sh
+      #!/usr/bin/env bash
+      set -euo pipefail
+      source .buildkite/scripts/steps/ess_start.sh
+
       buildkite-agent meta-data set "es.host" $ELASTICSEARCH_HOST
       buildkite-agent meta-data set "es.username" $ELASTICSEARCH_USERNAME
       buildkite-agent meta-data set "es.pwd" $ELASTICSEARCH_PASSWORD
