@@ -25,7 +25,7 @@ steps:
       #!/usr/bin/env bash
       set -euo pipefail
       source .buildkite/scripts/steps/ess_start.sh
-
+      echo "ES_HOST: ${ELASTICSEARCH_HOST}"
       buildkite-agent meta-data set "es.host" $ELASTICSEARCH_HOST
       buildkite-agent meta-data set "es.username" $ELASTICSEARCH_USERNAME
       buildkite-agent meta-data set "es.pwd" $ELASTICSEARCH_PASSWORD
