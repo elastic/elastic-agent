@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package runner
+package linux
 
 import (
 	"context"
@@ -11,14 +11,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/ssh"
 )
 
 // RhelRunner is a handler for running tests on SUSE Linux Enterpriser Server
 type RhelRunner struct{}
 
 // Prepare configures the host for running the test
-func (RhelRunner) Prepare(ctx context.Context, sshClient SSHClient, logger Logger, arch string, goVersion string) error {
+func (RhelRunner) Prepare(ctx context.Context, sshClient ssh.SSHClient, logger common.Logger, arch string, goVersion string) error {
 	logger.Logf("Install development tools")
 	dnfCtx, dnfCancel := context.WithTimeout(ctx, 20*time.Minute)
 	defer dnfCancel()
@@ -54,12 +56,12 @@ func (RhelRunner) Prepare(ctx context.Context, sshClient SSHClient, logger Logge
 }
 
 // Copy places the required files on the host
-func (RhelRunner) Copy(ctx context.Context, sshClient SSHClient, logger Logger, repoArchive string, builds []Build) error {
+func (RhelRunner) Copy(ctx context.Context, sshClient ssh.SSHClient, logger common.Logger, repoArchive string, builds []common.Build) error {
 	return linuxCopy(ctx, sshClient, logger, repoArchive, builds)
 }
 
 // Run the test
-func (RhelRunner) Run(ctx context.Context, verbose bool, sshClient SSHClient, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error) {
+func (RhelRunner) Run(ctx context.Context, verbose bool, sshClient ssh.SSHClient, logger common.Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (common.OSRunnerResult, error) {
 	var tests []string
 	for _, pkg := range batch.Tests {
 		for _, test := range pkg.Tests {
@@ -77,7 +79,7 @@ func (RhelRunner) Run(ctx context.Context, verbose bool, sshClient SSHClient, lo
 	if verbose {
 		logArg = "-v"
 	}
-	var result OSRunnerResult
+	var result common.OSRunnerResult
 	if len(tests) > 0 {
 		vars := fmt.Sprintf(`GOPATH="$HOME/go" PATH="$HOME/go/bin:$PATH" AGENT_VERSION="%s" TEST_DEFINE_PREFIX="%s" TEST_DEFINE_TESTS="%s"`, agentVersion, prefix, strings.Join(tests, ","))
 		vars = extendVars(vars, env)
@@ -85,7 +87,7 @@ func (RhelRunner) Run(ctx context.Context, verbose bool, sshClient SSHClient, lo
 		script := fmt.Sprintf(`cd agent && %s ~/go/bin/mage %s integration:testOnRemote`, vars, logArg)
 		results, err := runTests(ctx, logger, "non-sudo", prefix, script, sshClient, batch.Tests)
 		if err != nil {
-			return OSRunnerResult{}, fmt.Errorf("error running non-sudo tests: %w", err)
+			return common.OSRunnerResult{}, fmt.Errorf("error running non-sudo tests: %w", err)
 		}
 		result.Packages = results
 	}
@@ -98,7 +100,7 @@ func (RhelRunner) Run(ctx context.Context, verbose bool, sshClient SSHClient, lo
 
 		results, err := runTests(ctx, logger, "sudo", prefix, script, sshClient, batch.SudoTests)
 		if err != nil {
-			return OSRunnerResult{}, fmt.Errorf("error running sudo tests: %w", err)
+			return common.OSRunnerResult{}, fmt.Errorf("error running sudo tests: %w", err)
 		}
 		result.SudoPackages = results
 	}
@@ -107,6 +109,6 @@ func (RhelRunner) Run(ctx context.Context, verbose bool, sshClient SSHClient, lo
 }
 
 // Diagnostics gathers any diagnostics from the host.
-func (RhelRunner) Diagnostics(ctx context.Context, sshClient SSHClient, logger Logger, destination string) error {
+func (RhelRunner) Diagnostics(ctx context.Context, sshClient ssh.SSHClient, logger common.Logger, destination string) error {
 	return linuxDiagnostics(ctx, sshClient, logger, destination)
 }
