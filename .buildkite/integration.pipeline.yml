@@ -42,7 +42,7 @@ steps:
       - label: "Default"
         key: stateful-ubuntu-default-sudo
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0192435a-632d-4cf0-aa2f-5b803788815a
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 01924359-c420-41d6-ad55-4b4be6ea551e
           .buildkite/scripts/steps/integration_tests_tf_sudo.sh "default" "^(TestAPMConfig|TestDiagnosticsOptionalValues|TestIsolatedUnitsDiagnosticsOptionalValues|TestDiagnosticsCommand|TestIsolatedUnitsDiagnosticsCommand|TestEventLogFile|TestFakeComponent|TestFakeIsolatedUnitsComponent|TestOtelFileProcessing|TestOtelLogsIngestion|TestOtelAPMIngestion|TestPackageVersion)$$"
         artifact_paths:
           - build/**
