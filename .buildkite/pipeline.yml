@@ -192,10 +192,10 @@ steps:
         matrix:
           setup:
             k8s_version:
+              - "1.31.0"
               - "1.30.0"
               - "1.29.4"
               - "1.28.9"
-              - "1.27.13"
         retry:
           manual:
             allowed: true

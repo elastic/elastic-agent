@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package runner
+package common
 
 import (
 	"bytes"
@@ -16,7 +16,8 @@ type prefixOutput struct {
 	remainder []byte
 }
 
-func newPrefixOutput(logger Logger, prefix string) *prefixOutput {
+// NewPrefixOutput creates a prefix output `io.Writer`.
+func NewPrefixOutput(logger Logger, prefix string) *prefixOutput {
 	return &prefixOutput{
 		logger: logger,
 		prefix: prefix,
