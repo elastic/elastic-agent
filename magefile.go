@@ -1537,7 +1537,7 @@ func downloadBinary(ctx context.Context, project string, packageName string, bin
 		}
 
 		compl.Add(1)
-		fmt.Printf("Done downloading %s\n", packageName)
+		fmt.Printf("Done downloading %s into %s\n", packageName, targetPath)
 		return nil
 	}
 }
@@ -1590,7 +1590,8 @@ func movePackagesToArchive(dropPath string, platformPackageSuffixes []string, pa
 			if mg.Verbose() {
 				log.Printf("--- Evaluating moving dependency %s to archive path %s\n", f, archivePath)
 			}
-			if !strings.Contains(f, packageSuffix) && !isPythonWheelPackage(f, packageVersion) {
+			// if the matched file name does not contain the platform suffix and it's not a platform-independent package, skip it
+			if !strings.Contains(f, packageSuffix) && !isPlatformIndependentPackage(f, packageVersion) {
 				if mg.Verbose() {
 					log.Printf("--- Skipped moving dependency %s to archive path\n", f)
 				}
@@ -1613,12 +1614,12 @@ func movePackagesToArchive(dropPath string, platformPackageSuffixes []string, pa
 			if err := os.MkdirAll(targetDir, 0750); err != nil {
 				fmt.Printf("warning: failed to create directory %s: %s", targetDir, err)
 			}
-			if isPythonWheelPackage(f, packageVersion) {
 
+			// Platform-independent packages need to be placed in the archive sub-folders for all platforms, copy instead of moving
+			if isPlatformIndependentPackage(f, packageVersion) {
 				if err := copyFile(f, targetPath); err != nil {
 					panic(fmt.Errorf("failed copying file: %w", err))
 				}
-
 			} else {
 				if err := os.Rename(f, targetPath); err != nil {
 					panic(fmt.Errorf("failed renaming file: %w", err))
@@ -1651,6 +1652,7 @@ func copyFile(src, dst string) error {
 		return fmt.Errorf("opening/creating destination file %q: %w", dst, err)
 	}
 	defer dstF.Close()
+
 	_, err = io.Copy(dstF, srcF)
 	if err != nil {
 		return fmt.Errorf("copying file %q to %q: %w", src, dst, err)
@@ -1659,10 +1661,11 @@ func copyFile(src, dst string) error {
 	return nil
 }
 
-func isPythonWheelPackage(f string, packageVersion string) bool {
+func isPlatformIndependentPackage(f string, packageVersion string) bool {
 	fileBaseName := filepath.Base(f)
 	for _, spec := range manifest.ExpectedBinaries {
 		packageName := spec.GetPackageName(packageVersion, "")
+		// as of now only python wheels packages are platform-independent
 		if spec.PythonWheel && (fileBaseName == packageName || fileBaseName == packageName+sha512FileExt) {
 			return true
 		}
