@@ -12,9 +12,16 @@ provides a high level overview of the testing framework.
 
 ### Dependencies
 
-Go version should be at least the same than the one in [.go-version](https://github.com/elastic/elastic-agent/blob/main/.go-version) file at the root of this repository
+#### Go version
+Go version should be at least the same than the one in [.go-version](https://github.com/elastic/elastic-agent/blob/main/.go-version) file at the root of this repository.
 
-[GCloud CLI](https://cloud.google.com/sdk/gcloud)
+
+### GCloud CLI
+The integration testing framework spins up resources in GCP.  To achieve this, it needs the
+[GCloud CLI](https://cloud.google.com/sdk/gcloud) to be installed on the system where the tests are initiated from.
+
+### Beats
+The Elastic Agent package that is used for integration tests packages Beats built from the Unified Release (as opposed to DRA).  There is no explicit action needed for this prerequisite but just keep in mind that if any Agent integration tests rely on certain Beats features or bugfixes, they may not be available in the integration tests yet because a unified release containing those features or bugfixes may not have happened yet.
 
 ### Configuration
 
