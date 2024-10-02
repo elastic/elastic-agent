@@ -2,8 +2,6 @@ module github.com/elastic/elastic-agent
 
 go 1.22.5
 
-toolchain go1.22.7
-
 require (
 	github.com/Jeffail/gabs/v2 v2.6.0
 	github.com/Microsoft/go-winio v0.6.2
@@ -14,7 +12,7 @@ require (
 	github.com/docker/docker v27.3.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-00010101000000-000000000000
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20241002031008-e345f285634d
 	github.com/elastic/elastic-agent-autodiscover v0.8.2
 	github.com/elastic/elastic-agent-client/v7 v7.16.0
 	github.com/elastic/elastic-agent-libs v0.11.0
@@ -216,7 +214,6 @@ require (
 	github.com/aws/smithy-go v1.20.4 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.6.1 // indirect
-	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/cloudfoundry-community/go-cfclient v0.0.0-20190808214049-35bcce23fc5f // indirect
@@ -231,7 +228,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dennwc/varint v1.0.0 // indirect
 	github.com/devigned/tab v0.1.2-0.20190607222403-0c15cf42f9a2 // indirect
-	github.com/dgraph-io/badger/v3 v3.2103.5 // indirect
+	github.com/dgraph-io/badger/v4 v4.2.1-0.20240828131336-2725dc8ed5c2 // indirect
 	github.com/dgraph-io/ristretto v1.0.0 // indirect
 	github.com/digitalocean/godo v1.118.0 // indirect
 	github.com/dlclark/regexp2 v1.4.0 // indirect
@@ -391,7 +388,6 @@ require (
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/locker v1.0.1 // indirect
 	github.com/moby/spdystream v0.4.0 // indirect
-	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/moby/term v0.5.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
@@ -572,10 +568,8 @@ require (
 
 replace (
 	github.com/Shopify/sarama => github.com/elastic/sarama v1.19.1-0.20220310193331-ebc2b0d8eef3
-	github.com/dgraph-io/ristretto => github.com/elastic/ristretto v0.1.1-0.20220602190459-83b0895ca5b3 // Removes glog dependency. See https://github.com/elastic/beats/issues/31810.
 	github.com/dop251/goja => github.com/andrewkroh/goja v0.0.0-20190128172624-dd2ac4456e20
 	github.com/dop251/goja_nodejs => github.com/dop251/goja_nodejs v0.0.0-20171011081505-adff31b136e6
-	github.com/elastic/beats/v7 => ../beats
 	github.com/fsnotify/fsnotify => github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3
 	// openshift removed all tags from their repo, use the pseudoversion from the release-3.9 branch HEAD
 	// See https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/12d41f40b0d408b0167633d8095160d3343d46ac/go.mod#L38
