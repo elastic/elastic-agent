@@ -1515,7 +1515,7 @@ func downloadBinary(ctx context.Context, project string, packageName string, bin
 		}
 
 		compl.Add(1)
-		fmt.Printf("Done downloading %s\n", packageName)
+		fmt.Printf("Done downloading %s into %s\n", packageName, targetPath)
 		return nil
 	}
 }
@@ -1564,8 +1564,20 @@ func movePackagesToArchive(dropPath string, requiredPackages []string) string {
 	matches = append(matches, zipMatches...)
 
 	for _, f := range matches {
+<<<<<<< HEAD
 		for _, rp := range requiredPackages {
 			if !strings.Contains(f, rp) {
+=======
+		for _, packageSuffix := range platformPackageSuffixes {
+			if mg.Verbose() {
+				log.Printf("--- Evaluating moving dependency %s to archive path %s\n", f, archivePath)
+			}
+			// if the matched file name does not contain the platform suffix and it's not a platform-independent package, skip it
+			if !strings.Contains(f, packageSuffix) && !isPlatformIndependentPackage(f, packageVersion) {
+				if mg.Verbose() {
+					log.Printf("--- Skipped moving dependency %s to archive path\n", f)
+				}
+>>>>>>> b8a685c29c (Fix docker image build when multiple platforms are specified (#5658))
 				continue
 			}
 
@@ -1585,15 +1597,71 @@ func movePackagesToArchive(dropPath string, requiredPackages []string) string {
 			if err := os.MkdirAll(targetDir, 0750); err != nil {
 				fmt.Printf("warning: failed to create directory %s: %s", targetDir, err)
 			}
-			if err := os.Rename(f, targetPath); err != nil {
-				panic(fmt.Errorf("failed renaming file: %w", err))
+
+			// Platform-independent packages need to be placed in the archive sub-folders for all platforms, copy instead of moving
+			if isPlatformIndependentPackage(f, packageVersion) {
+				if err := copyFile(f, targetPath); err != nil {
+					panic(fmt.Errorf("failed copying file: %w", err))
+				}
+			} else {
+				if err := os.Rename(f, targetPath); err != nil {
+					panic(fmt.Errorf("failed renaming file: %w", err))
+				}
 			}
+<<<<<<< HEAD
+=======
+
+			if mg.Verbose() {
+				log.Printf("--- Moved dependency in archive path %s => %s\n", f, targetPath)
+			}
+>>>>>>> b8a685c29c (Fix docker image build when multiple platforms are specified (#5658))
 		}
 	}
 
 	return archivePath
 }
 
+<<<<<<< HEAD
+=======
+func copyFile(src, dst string) error {
+	srcStat, err := os.Stat(src)
+	if err != nil {
+		return fmt.Errorf("stat source file %q: %w", src, err)
+	}
+
+	srcF, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("opening source file %q: %w", src, err)
+	}
+	defer srcF.Close()
+
+	dstF, err := os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, srcStat.Mode()|os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("opening/creating destination file %q: %w", dst, err)
+	}
+	defer dstF.Close()
+
+	_, err = io.Copy(dstF, srcF)
+	if err != nil {
+		return fmt.Errorf("copying file %q to %q: %w", src, dst, err)
+	}
+
+	return nil
+}
+
+func isPlatformIndependentPackage(f string, packageVersion string) bool {
+	fileBaseName := filepath.Base(f)
+	for _, spec := range manifest.ExpectedBinaries {
+		packageName := spec.GetPackageName(packageVersion, "")
+		// as of now only python wheels packages are platform-independent
+		if spec.PythonWheel && (fileBaseName == packageName || fileBaseName == packageName+sha512FileExt) {
+			return true
+		}
+	}
+	return false
+}
+
+>>>>>>> b8a685c29c (Fix docker image build when multiple platforms are specified (#5658))
 func selectedPackageTypes() string {
 	if len(devtools.SelectedPackageTypes) == 0 {
 		return ""
