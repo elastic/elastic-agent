@@ -47,6 +47,11 @@ spec:
         filter_enabled: true
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
+      schedules:
+        Daily main:
+          branch: main
+          cronline: "0 0 * * 1-5"
+          message: Mon-Fri daily build
       cancel_intermediate_builds: true
       cancel_intermediate_builds_branch_filter: "!main !7.* !8.* !9.*"
       skip_intermediate_builds: true
