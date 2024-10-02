@@ -113,6 +113,9 @@ linters-settings:
     # development. The modules listed below are intended to be replaced permanently.
     replace-allow-list:
       - github.com/Shopify/sarama
+      - github.com/dop251/goja
+      - github.com/dop251/goja_nodejs
+      - github.com/fsnotify/fsnotify
       - github.com/openshift/api
 
   gosimple:
