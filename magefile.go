@@ -1613,9 +1613,18 @@ func movePackagesToArchive(dropPath string, platformPackageSuffixes []string, pa
 			if err := os.MkdirAll(targetDir, 0750); err != nil {
 				fmt.Printf("warning: failed to create directory %s: %s", targetDir, err)
 			}
-			if err := os.Rename(f, targetPath); err != nil {
-				panic(fmt.Errorf("failed renaming file: %w", err))
+			if isPythonWheelPackage(f, packageVersion) {
+
+				if err := copyFile(f, targetPath); err != nil {
+					panic(fmt.Errorf("failed copying file: %w", err))
+				}
+
+			} else {
+				if err := os.Rename(f, targetPath); err != nil {
+					panic(fmt.Errorf("failed renaming file: %w", err))
+				}
 			}
+
 			if mg.Verbose() {
 				log.Printf("--- Moved dependency in archive path %s => %s\n", f, targetPath)
 			}
@@ -1623,6 +1632,31 @@ func movePackagesToArchive(dropPath string, platformPackageSuffixes []string, pa
 	}
 
 	return archivePath
+}
+
+func copyFile(src, dst string) error {
+	srcStat, err := os.Stat(src)
+	if err != nil {
+		return fmt.Errorf("stat source file %q: %w", src, err)
+	}
+
+	srcF, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("opening source file %q: %w", src, err)
+	}
+	defer srcF.Close()
+
+	dstF, err := os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, srcStat.Mode()|os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("opening/creating destination file %q: %w", dst, err)
+	}
+	defer dstF.Close()
+	_, err = io.Copy(dstF, srcF)
+	if err != nil {
+		return fmt.Errorf("copying file %q to %q: %w", src, dst, err)
+	}
+
+	return nil
 }
 
 func isPythonWheelPackage(f string, packageVersion string) bool {
