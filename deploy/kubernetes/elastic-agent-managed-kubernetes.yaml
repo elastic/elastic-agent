@@ -31,7 +31,7 @@ spec:
           env:
             # Set to 1 for enrollment into Fleet server. If not set, Elastic Agent is run in standalone mode
             - name: FLEET_ENROLL
-              value: "1"
+              value: "2"
             # Set to true to communicate with Fleet with either insecure HTTP or unverified HTTPS
             - name: FLEET_INSECURE
               value: "false"
