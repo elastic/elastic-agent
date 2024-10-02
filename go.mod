@@ -21,7 +21,6 @@ require (
 	github.com/elastic/go-licenser v0.4.2
 	github.com/elastic/go-sysinfo v1.14.2
 	github.com/elastic/go-ucfg v0.8.8
-	github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.11.0
 	github.com/fatih/color v1.16.0
 	github.com/fsnotify/fsnotify v1.7.0
@@ -45,7 +44,6 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.109.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.109.0
 	github.com/otiai10/copy v1.14.0
-	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/rs/zerolog v1.27.0
 	github.com/sajari/regression v1.0.1
 	github.com/schollz/progressbar/v3 v3.13.1
@@ -280,7 +278,6 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/miekg/dns v1.1.61 // indirect
-	github.com/mileusna/useragent v1.3.4 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect

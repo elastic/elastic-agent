@@ -7,7 +7,9 @@
 package integration
 
 import (
+	"bufio"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -37,11 +39,8 @@ import (
 	"github.com/elastic/elastic-agent/testing/installtest"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 
-	"github.com/rcrowley/go-metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	mockes "github.com/elastic/mock-es/pkg/api"
 )
 
 func TestLogIngestionFleetManaged(t *testing.T) {
@@ -110,16 +109,56 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 }
 
 func startMockES(t *testing.T) string {
-	registry := metrics.NewRegistry()
 	uid := uuid.Must(uuid.NewV4())
 	clusterUUID := uuid.Must(uuid.NewV4()).String()
 
 	mux := http.NewServeMux()
-	mux.Handle("/", mockes.NewAPIHandler(
-		uid,
-		clusterUUID,
-		registry,
-		time.Now().Add(time.Hour), 0, 0, 0, 100, 0))
+	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Elastic-Product", "Elasticsearch")
+		w.Header().Set(http.CanonicalHeaderKey("Content-Type"), "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/":
+			root := fmt.Sprintf("{\"name\" : \"mock\", \"cluster_uuid\" : \"%s\", \"version\" : { \"number\" : \"0.0.0\", \"build_flavor\" : \"default\"}}", clusterUUID)
+			w.Write([]byte(root))
+		case r.Method == http.MethodPost && r.URL.Path == "/_bulk":
+			body := r.Body
+			switch r.Header.Get("Content-Encoding") {
+			case "gzip":
+				rd, err := gzip.NewReader(body)
+				if err != nil {
+					panic(err)
+				}
+				defer rd.Close()
+				body = rd
+			}
+
+			var b []byte
+			b = append(b, []byte(`{"items":[`)...)
+			first := true
+			scanner := bufio.NewScanner(body)
+			for scanner.Scan() {
+				if len(scanner.Bytes()) == 0 {
+					continue
+				}
+				if !scanner.Scan() {
+					panic("expected source")
+				}
+				if first {
+					first = false
+				} else {
+					b = append(b, ',')
+				}
+				b = append(b, []byte(`{"create":{"status":406}}`)...)
+			}
+			b = append(b, []byte(`]}`)...)
+			w.Write(b)
+		case r.Method == http.MethodGet && r.URL.Path == "/_license":
+			license := fmt.Sprintf("{\"license\" : {\"status\" : \"active\", \"uid\" : \"%s\", \"type\" : \"trial\", \"expiry_date_in_millis\" : %d}}", uid, time.Now().Add(time.Hour).UnixMilli())
+			w.Write([]byte(license))
+		default:
+			w.Write([]byte("{\"tagline\": \"You Know, for Testing\"}"))
+		}
+	}))
 
 	s := httptest.NewServer(mux)
 	t.Cleanup(s.Close)
