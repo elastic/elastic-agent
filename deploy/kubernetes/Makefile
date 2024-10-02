@@ -91,7 +91,7 @@ else
 		--label automation \
 		--label release_note:skip \
 		--base main \
-		--head $(ELASTIC_AGENT_BRANCH) \
+		--head $(ELASTIC_AGENT_BRANCH)
 endif
 
 else
