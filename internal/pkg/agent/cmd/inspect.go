@@ -7,7 +7,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 	"time"
@@ -17,7 +16,6 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/service"
-	"github.com/elastic/go-ucfg"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
@@ -30,6 +28,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
+	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -236,46 +235,13 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 }
 
 func printMapStringConfig(mapStr map[string]interface{}, streams *cli.IOStreams) error {
-	data, err := yaml.Marshal(redactSecretPaths(mapStr, streams.Err))
+	data, err := yaml.Marshal(diagnostics.RedactSecretPaths(mapStr, streams.Err))
 	if err != nil {
 		return errors.New(err, "could not marshal to YAML")
 	}
 
 	_, err = streams.Out.Write(data)
 	return err
-}
-
-func redactSecretPaths(mapStr map[string]interface{}, errOut io.Writer) map[string]interface{} {
-	v, ok := mapStr["secret_paths"]
-	if !ok {
-		fmt.Fprintln(errOut, "No output redaction: secret_paths attribute not found.")
-		return mapStr
-	}
-	arr, ok := v.([]interface{})
-	if !ok {
-		fmt.Fprintln(errOut, "No output redaction: secret_paths attribute is not a list.")
-		return mapStr
-	}
-	cfg := ucfg.MustNewFrom(mapStr)
-	for _, v := range arr {
-		key, ok := v.(string)
-		if !ok {
-			fmt.Fprintf(errOut, "No output redaction for %q: expected type string, is type %T.\n", v, v)
-			continue
-		}
-
-		if ok, _ := cfg.Has(key, -1, ucfg.PathSep(".")); ok {
-			err := cfg.SetString(key, -1, "[REDACTED]", ucfg.PathSep("."))
-			if err != nil {
-				fmt.Fprintf(errOut, "No output redaction for %q: %v.\n", key, err)
-			}
-		}
-	}
-	result, err := config.MustNewConfigFrom(cfg).ToMapStr()
-	if err != nil {
-		return mapStr
-	}
-	return result
 }
 
 // convert the config object to a mapstr and print to the stream specified in in streams.Out
