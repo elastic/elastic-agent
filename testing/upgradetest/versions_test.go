@@ -6,6 +6,7 @@ package upgradetest
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -83,6 +84,7 @@ func TestFetchUpgradableVersionsAfterFeatureFreeze(t *testing.T) {
 
 func TestGetUpgradableVersions(t *testing.T) {
 	versions, err := GetUpgradableVersions()
+	fmt.Println(versions)
 	require.NoError(t, err)
 	assert.Truef(t, len(versions) > 1, "expected at least one version for testing, got %d.\n%v", len(versions), versions)
 }
@@ -91,13 +93,27 @@ func TestPreviousMinor(t *testing.T) {
 	currentParsed, err := version.ParseVersion(bversion.Agent)
 	require.NoError(t, err)
 
-	if currentParsed.Minor() == 0 {
-		t.Skipf("skipping TestPreviousMinor as current major version (%v) don't have previous minor", bversion.Agent)
-	}
-
 	v, err := PreviousMinor()
 	require.NoError(t, err)
 	t.Logf("previous minor: %s", v.String())
+
+	// Special case: the current Agent version is the first release of a new
+	// major (vX.0.0). In this case we expect the previous minor to be the
+	// latest minor of the previous major.
+	if currentParsed.Minor() == 0 && currentParsed.Patch() == 0 {
+		require.Equal(t, currentParsed.Major()-1, v.Major())
+
+		// The list of versions returned by GetUpgradableVersions will not contain any
+		// versions with the same major as the current version as the current version is
+		// the first release of the major. Further, since this list is sorted in
+		// descending order (newer versions first), we should expect the first item in the
+		// list to be the latest minor of the previous major.
+		versions, err := GetUpgradableVersions()
+		require.NoError(t, err)
+		require.Equal(t, versions[0], v)
+		return
+	}
+
 	assert.Truef(t, currentParsed.Major() == v.Major() && currentParsed.Minor() > v.Minor(), "%s is not previous minor for %s", v, bversion.Agent)
 	assert.Empty(t, v.Prerelease())
 	assert.Empty(t, v.BuildMetadata())
