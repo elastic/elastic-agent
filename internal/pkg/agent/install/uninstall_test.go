@@ -131,9 +131,11 @@ func initFileVault(t *testing.T, ctx context.Context, testVaultPath string, keys
 }
 
 func TestNotifyFleetAuditUnenroll(t *testing.T) {
-	fleetAuditWait = time.Millisecond * 10
+	fleetAuditWaitInit = time.Millisecond * 10
+	fleetAuditWaitMax = time.Millisecond * 100
 	t.Cleanup(func() {
-		fleetAuditWait = time.Second * 10
+		fleetAuditWaitInit = time.Second
+		fleetAuditWaitMax = time.Second * 10
 	})
 
 	tests := []struct {

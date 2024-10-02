@@ -31,6 +31,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
+	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -43,11 +44,12 @@ import (
 // fleetAudit variables control retry attempts for contacting fleet
 var (
 	fleetAuditAttempts = 10
-	fleetAuditWait     = time.Second * 10
+	fleetAuditWaitInit = time.Second
+	fleetAuditWaitMax  = time.Second * 10
 )
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
-func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
+func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("unable to get current working directory")
@@ -68,8 +70,6 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 	if err := killWatcher(pt); err != nil {
 		return fmt.Errorf("failed trying to kill any running watcher: %w", err)
 	}
-
-	ctx := context.Background()
 
 	// check if the agent was installed using --unprivileged by checking the file vault for the agent secret (needed on darwin to correctly load the vault)
 	unprivileged, err := checkForUnprivilegedVault(ctx)
@@ -155,6 +155,8 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 //
 // There are retries for the attempt after a 10s wait, but it is a best-effort approach.
 func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai *info.AgentInfo) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	pt.Describe("Attempting to notify Fleet of uninstall")
 	client, err := fleetclient.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
 	if err != nil {
@@ -166,13 +168,8 @@ func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progre
 		Reason:    fleetapi.ReasonUninstall,
 		Timestamp: time.Now().UTC(),
 	}
-	timer := time.NewTimer(0)
+	jitterBackoff := backoffWithContext(ctx)
 	for i := 0; i < fleetAuditAttempts; i++ {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-timer.C:
-		}
 		resp, err := cmd.Execute(ctx, req)
 		if err != nil {
 			var reqErr *fleetapi.ReqError
@@ -183,8 +180,8 @@ func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progre
 				pt.Describe(fmt.Sprintf("notify Fleet: encountered unretryable error: %v", err))
 				return err
 			}
-			pt.Describe("notify Fleet: network error, retry in 10s.")
-			timer.Reset(fleetAuditWait)
+			pt.Describe(fmt.Sprintf("notify Fleet: network error, retry in %v.", jitterBackoff.NextWait()))
+			jitterBackoff.Wait()
 			continue
 		}
 		resp.Body.Close()
@@ -199,8 +196,8 @@ func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progre
 			pt.Describe(fmt.Sprintf("notify Fleet: failed with status code %d (no retries)", resp.StatusCode))
 			return fmt.Errorf("unretryable return status: %d", resp.StatusCode)
 		default:
-			pt.Describe(fmt.Sprintf("notify Fleet: failed with status code %d (retry in %v)", resp.StatusCode, fleetAuditWait))
-			timer.Reset(fleetAuditWait)
+			pt.Describe(fmt.Sprintf("notify Fleet: failed with status code %d (retry in %v)", resp.StatusCode, jitterBackoff.NextWait()))
+			jitterBackoff.Wait()
 		}
 	}
 	pt.Describe("notify Fleet: failed")
@@ -489,4 +486,14 @@ func killWatcher(pt *progressbar.ProgressBar) error {
 		// wait 1 second before performing the loop again
 		<-time.After(1 * time.Second)
 	}
+}
+
+func backoffWithContext(ctx context.Context) backoff.Backoff {
+	ch := make(chan struct{})
+	bo := backoff.NewEqualJitterBackoff(ch, fleetAuditWaitInit, fleetAuditWaitMax)
+	go func() {
+		<-ctx.Done()
+		close(ch)
+	}()
+	return bo
 }
