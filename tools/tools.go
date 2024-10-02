@@ -18,5 +18,7 @@ import (
 
 	_ "go.elastic.co/go-licence-detector"
 
+	_ "github.com/rednafi/link-patrol/cmd/link-patrol"
+
 	_ "github.com/elastic/go-licenser"
 )

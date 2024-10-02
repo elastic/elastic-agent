@@ -12,9 +12,16 @@ provides a high level overview of the testing framework.
 
 ### Dependencies
 
-Go version should be at least the same than the one in [.go-version](https://github.com/elastic/elastic-agent/blob/main/.go-version) file at the root of this repository
+#### Go version
+Go version should be at least the same than the one in [.go-version](https://github.com/elastic/elastic-agent/blob/main/.go-version) file at the root of this repository.
 
-[GCloud CLI](https://cloud.google.com/sdk/gcloud)
+
+### GCloud CLI
+The integration testing framework spins up resources in GCP.  To achieve this, it needs the
+[GCloud CLI](https://cloud.google.com/sdk/gcloud) to be installed on the system where the tests are initiated from.
+
+### Beats
+The Elastic Agent package that is used for integration tests packages Beats built from the Unified Release (as opposed to DRA).  There is no explicit action needed for this prerequisite but just keep in mind that if any Agent integration tests rely on certain Beats features or bugfixes, they may not be available in the integration tests yet because a unified release containing those features or bugfixes may not have happened yet.
 
 ### Configuration
 
@@ -77,7 +84,7 @@ between, and it can be very specific or not very specific.
 - `TEST_PLATFORMS="linux/amd64/ubuntu/20.04 mage integration:test` to execute tests only on Ubuntu 20.04 ARM64.
 - `TEST_PLATFORMS="windows/amd64/2022 mage integration:test` to execute tests only on Windows Server 2022.
 - `TEST_PLATFORMS="linux/amd64 windows/amd64/2022 mage integration:test` to execute tests on Linux AMD64 and Windows Server 2022.
-- `TEST_PLATFORMS="kubernetes/arm64/1.30.2/wolfi" mage integration:kubernetes` to execute kubernetes tests on Kubernetes version 1.30.2 with wolfi docker variant.
+- `TEST_PLATFORMS="kubernetes/arm64/1.31.0/wolfi" mage integration:kubernetes` to execute kubernetes tests on Kubernetes version 1.31.0 with wolfi docker variant.
 
 > **_NOTE:_**  This only filters down the tests based on the platform. It will not execute a tests on a platform unless
 > the test defines as supporting it.

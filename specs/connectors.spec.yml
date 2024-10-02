@@ -1,0 +1,17 @@
+version: 2
+inputs:
+  - name: connectors-py
+    description: "Connectors Python"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+      - container/amd64
+      - container/arm64
+    outputs:
+      - elasticsearch
+    command:
+      restart_monitoring_period: 5s
+      maximum_restarts_per_period: 1
+      timeouts:
+        restart: 1s
+      args: []
