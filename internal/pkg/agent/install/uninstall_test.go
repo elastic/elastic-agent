@@ -141,7 +141,7 @@ func TestNotifyFleetAuditUnenroll(t *testing.T) {
 		getServer func() *httptest.Server
 		err       error
 	}{{
-		name: "suceeds after a retry",
+		name: "succeeds after a retry",
 		getServer: func() *httptest.Server {
 			callCount := 0
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
