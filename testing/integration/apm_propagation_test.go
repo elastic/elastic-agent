@@ -55,9 +55,6 @@ func TestAPMConfig(t *testing.T) {
 		Group: Default,
 		Stack: &define.Stack{},
 	})
-
-	t.Skip("https://github.com/elastic/elastic-agent/issues/5624; apm-server not working correctly")
-
 	f, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
