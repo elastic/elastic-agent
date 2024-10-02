@@ -504,7 +504,7 @@ func TestEndpointTLSComponentModifier_cache_hit(t *testing.T) {
 
 	certPath := "/path/to/cert"
 	certKeyPath := "/path/to/key"
-	certKeyPassPath := "/path/to/key_passphrase_path"
+	certKeyPassPath := "/path/to/key_passphrase_path" //nolint:gosec // not a real key
 	cache := tlsCache{
 		mu: &sync.Mutex{},
 
