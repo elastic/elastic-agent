@@ -194,13 +194,13 @@ func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progre
 			return nil
 		case http.StatusBadRequest, http.StatusUnauthorized, http.StatusConflict:
 			// BadRequest are not retried because the request body is incorrect and will not be accepted
-			// Unauthorized are not retried because the API key has been invalidated
+			// Unauthorized are not retried because the API key has been invalidated; unauthorized is listed here but will be returned as a fleetapi.ReqError
 			// Conflict will not retry because in this case Endpoint has indicated that it is orphaned and we do not want to overwrite that annotation
 			pt.Describe(fmt.Sprintf("notify Fleet: failed with status code %d (no retries)", resp.StatusCode))
 			return fmt.Errorf("unretryable return status: %d", resp.StatusCode)
 		default:
-			pt.Describe(fmt.Sprintf("notify Fleet: failed with status code %d (retry in 10s)", resp.StatusCode))
-			timer.Reset(time.Second * 10)
+			pt.Describe(fmt.Sprintf("notify Fleet: failed with status code %d (retry in %v)", resp.StatusCode, fleetAuditWait))
+			timer.Reset(fleetAuditWait)
 		}
 	}
 	pt.Describe("notify Fleet: failed")

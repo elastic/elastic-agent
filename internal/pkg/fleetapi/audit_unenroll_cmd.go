@@ -82,6 +82,12 @@ func (e *AuditUnenrollCmd) Execute(ctx context.Context, r *AuditUnenrollRequest)
 	path := fmt.Sprintf(auditUnenrollPath, e.info.AgentID())
 	resp, err := e.client.Send(ctx, http.MethodPost, path, nil, nil, bytes.NewBuffer(p))
 	if err != nil {
+		// Invalid credentials should result in no retries
+		if errors.Is(err, client.ErrInvalidAPIKey) {
+			return nil, &ReqError{
+				err: err,
+			}
+		}
 		return nil, errors.New(err,
 			"fail to notify audit/unenroll on fleet-server",
 			errors.TypeNetwork,
