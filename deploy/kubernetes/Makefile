@@ -92,7 +92,6 @@ else
 		--label release_note:skip \
 		--base main \
 		--head $(ELASTIC_AGENT_BRANCH) \
-		--reviewer elastic/obs-cloudnative-monitoring
 endif
 
 else
