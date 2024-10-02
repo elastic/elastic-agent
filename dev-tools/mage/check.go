@@ -79,3 +79,16 @@ func CheckLicenseHeaders() error {
 	)
 
 }
+
+// CheckLinksInFileAreLive checks if all links in a file are live.
+func CheckLinksInFileAreLive(filename string) func() error {
+	return func() error {
+		fmt.Printf(">> check: Checking for invalid links in %q\n", filename)
+		mg.Deps(InstallGoLinkCheck)
+
+		linkcheck := gotool.LinkCheck
+		return linkcheck(
+			linkcheck.Path(filename),
+		)
+	}
+}
