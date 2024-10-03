@@ -13,7 +13,7 @@ require (
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20241001172226-9ae6ed1e3de1
-	github.com/elastic/elastic-agent-autodiscover v0.8.2
+	github.com/elastic/elastic-agent-autodiscover v0.9.0
 	github.com/elastic/elastic-agent-client/v7 v7.16.0
 	github.com/elastic/elastic-agent-libs v0.11.0
 	github.com/elastic/elastic-agent-system-metrics v0.11.3
