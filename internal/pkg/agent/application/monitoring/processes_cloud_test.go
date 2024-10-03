@@ -90,6 +90,7 @@ func TestExpectedCloudProcessID(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
+		tc := tc // make a copy to avoid implicit memory aliasing
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.id, expectedCloudProcessID(&tc.component))
 		})
@@ -142,6 +143,7 @@ func TestMatchesCloudProcessID(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
+		tc := tc // make a copy to avoid implicit memory aliasing
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.matches, matchesCloudProcessID(&tc.component, tc.processID))
 		})

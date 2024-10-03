@@ -64,10 +64,14 @@ func main() {
 	Headers["Elasticv2"] = string(content)
 
 	var buf bytes.Buffer
-	Template.Execute(&buf, data{
-		License:  Headers["ASL2"],
+
+	err = Template.Execute(&buf, data{
 		Licenses: Headers,
+		License:  Headers["ASL2"],
 	})
+	if err != nil {
+		panic(err)
+	}
 
 	bs, err := format.Source(buf.Bytes())
 	if err != nil {
@@ -75,8 +79,11 @@ func main() {
 	}
 
 	if output == "-" {
-		os.Stdout.Write(bs)
+		_, err = os.Stdout.Write(bs)
 	} else {
-		os.WriteFile(output, bs, 0640)
+		err = os.WriteFile(output, bs, 0640)
+	}
+	if err != nil {
+		panic(err)
 	}
 }

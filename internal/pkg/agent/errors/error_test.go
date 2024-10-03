@@ -2,17 +2,15 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 //
-// nolint:errorlint // Postpone the change here until we refactor error handling.
-//
 // Packages errors provides a small api to manager hierarchy or errors.
 package errors
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"testing"
 
-	"github.com/pkg/errors"
 	"gotest.tools/assert"
 )
 
@@ -25,11 +23,11 @@ func TestErrorsIs(t *testing.T) {
 	}
 
 	simpleErr := io.ErrNoProgress
-	simpleWrap := errors.Wrap(simpleErr, "wrapping %w")
+	simpleWrap := fmt.Errorf("wrapping %w", simpleErr)
 	agentErr := New()
 	nestedSimple := New(simpleErr)
 	nestedWrap := New(simpleWrap)
-	agentInErr := errors.Wrap(nestedWrap, "wrapping %w")
+	agentInErr := fmt.Errorf("wrapping %w", nestedWrap)
 
 	tt := []testCase{
 		{"simple wrap", simpleWrap, simpleErr, true},
@@ -64,10 +62,11 @@ func TestErrorsIs(t *testing.T) {
 
 func TestErrorsWrap(t *testing.T) {
 	ce := New("custom error", TypePath, M("k", "v"))
-	ew := errors.Wrap(ce, "wrapper")
+	ew := fmt.Errorf("wrapper for %w", ce)
 	outer := New(ew)
 
-	outerCustom, ok := outer.(Error)
+	var outerCustom Error
+	ok := errors.As(outer, &outerCustom)
 	if !ok {
 		t.Error("expected Error")
 		return
@@ -112,7 +111,8 @@ func TestErrors(t *testing.T) {
 
 	for _, tc := range cases {
 		actualErr := New(tc.args...)
-		agentErr, ok := actualErr.(Error)
+		var agentErr Error
+		ok := errors.As(actualErr, &agentErr)
 		if !ok {
 			t.Errorf("[%s] expected Error", tc.id)
 			continue
@@ -154,7 +154,8 @@ func TestMetaFold(t *testing.T) {
 	err3 := New("level3", err2, M("key1", "level3"), M("key3", "level3"))
 	err4 := New("level4", err3)
 
-	resultingErr, ok := err4.(Error)
+	var resultingErr Error
+	ok := errors.As(err4, &resultingErr)
 	if !ok {
 		t.Fatal("error is not Error")
 	}
@@ -189,7 +190,8 @@ func TestMetaCallDoesNotModifyCollection(t *testing.T) {
 	err3 := New("level3", err2, M("key1", "level3"), M("key3", "level3"))
 	err4 := New("level4", err3)
 
-	resultingErr, ok := err4.(agentError)
+	var resultingErr agentError
+	ok := errors.As(err4, &resultingErr)
 	if !ok {
 		t.Fatal("error is not Error")
 	}
