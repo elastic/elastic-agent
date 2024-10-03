@@ -5,6 +5,7 @@ resources:
   - ../../default/elastic-agent-standalone
 
 patches:
+- path: elastic-agent-standalone-daemonset-configmap.yaml
 - patch: |-
     apiVersion: apps/v1
     kind: DaemonSet
