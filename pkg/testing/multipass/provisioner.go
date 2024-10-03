@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -208,7 +209,7 @@ func (p *provisioner) ensureInstanceNotExist(ctx context.Context, batch common.O
 		p.logger.Logf(msg)
 		p.logger.Logf("output: %s", output.String())
 		p.logger.Logf("stderr: %s", stdErr.String())
-		return fmt.Errorf(msg)
+		return errors.New(msg)
 	}
 	list := struct {
 		List []struct {
@@ -248,7 +249,7 @@ func (p *provisioner) ensureInstanceNotExist(ctx context.Context, batch common.O
 				p.logger.Logf(msg)
 				p.logger.Logf("output: %s", output.String())
 				p.logger.Logf("stderr: %s", stdErr.String())
-				return fmt.Errorf(msg)
+				return errors.New(msg)
 			}
 
 			break
