@@ -47,16 +47,13 @@ type TestBinaryArgs struct {
 }
 
 func makeGoTestArgs(name string) GoTestArgs {
-	fileName := ""
-	_, isCI := os.LookupEnv("CI")
-	if isCI {
+	fileName := fmt.Sprintf("build/TEST-go-%s", strings.Replace(strings.ToLower(name), " ", "_", -1))
+	if ci, ok := os.LookupEnv("CI"); ok && ci == "true" {
 		buildkiteJobId := os.Getenv("BUILDKITE_JOB_ID")
 		fileName = fmt.Sprintf("build/TEST-go-%s-%s",
 			strings.Replace(strings.ToLower(name), " ", "_", -1),
 			buildkiteJobId,
 		)
-	} else {
-		fileName = fmt.Sprintf("build/TEST-go-%s", strings.Replace(strings.ToLower(name), " ", "_", -1))
 	}
 	params := GoTestArgs{
 		LogName:         name,
@@ -73,20 +70,18 @@ func makeGoTestArgs(name string) GoTestArgs {
 }
 
 func makeGoTestArgsForModule(name, module string) GoTestArgs {
-	fileName := ""
-	_, isCI := os.LookupEnv("CI")
-	if isCI {
+	fileName := fmt.Sprintf("build/TEST-go-%s-%s",
+		strings.Replace(strings.ToLower(name), " ", "_", -1),
+		strings.Replace(strings.ToLower(module), " ", "_", -1),
+	)
+	if ci, ok := os.LookupEnv("CI"); ok && ci == "true" {
 		buildkiteJobId := os.Getenv("BUILDKITE_JOB_ID")
 		fileName = fmt.Sprintf("build/TEST-go-%s-%s-%s",
 			strings.Replace(strings.ToLower(name), " ", "_", -1),
 			strings.Replace(strings.ToLower(module), " ", "_", -1),
 			buildkiteJobId,
 		)
-	} else {
-		fileName = fmt.Sprintf("build/TEST-go-%s-%s", strings.Replace(strings.ToLower(name), " ", "_", -1),
-			strings.Replace(strings.ToLower(module), " ", "_", -1))
 	}
-
 	params := GoTestArgs{
 		LogName:         fmt.Sprintf("%s-%s", name, module),
 		Race:            RaceDetector,
