@@ -11,6 +11,9 @@ import (
 var (
 	// GoLicenserImportPath controls the import path used to install go-licenser.
 	GoLicenserImportPath = "github.com/elastic/go-licenser"
+
+	// GoLinkCheckImportPath controls the import path used to install the link check tool
+	GoLinkCheckImportPath = "github.com/rednafi/link-patrol/cmd/link-patrol"
 )
 
 // InstallVendored uses go get to install a command from its vendored source
@@ -26,5 +29,12 @@ func InstallVendored(importPath string) error {
 func InstallGoLicenser() error {
 	return gotool.Install(
 		gotool.Install.Package(GoLicenserImportPath),
+	)
+}
+
+// InstallGoLinkCheck target installs the link check tool
+func InstallGoLinkCheck() error {
+	return gotool.Install(
+		gotool.Install.Package(GoLinkCheckImportPath),
 	)
 }
