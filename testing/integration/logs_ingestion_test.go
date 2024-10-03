@@ -142,17 +142,14 @@ func checkHealthAtStartup(t *testing.T, ctx context.Context, agentFixture *atest
 			t.Logf("agent status returned an error: %v", err)
 			return false
 		}
-
+		t.Logf("Received agent status:\n%+v\n", status) // this can be re-marshaled to JSON if we prefer that notation
 		for _, comp := range status.Components {
 			// make sure the components include the expected integrations
 			for _, v := range comp.Units {
-				t.Logf("unit ID: %s", v.UnitID)
-				t.Logf("unit state: %s", v.Message)
 				if v.State != int(cproto.State_HEALTHY) {
 					allHealthy = false
 				}
 			}
-			t.Logf("component state: %s", comp.Message)
 			if comp.State != int(cproto.State_HEALTHY) {
 				compDebugName = comp.Name
 				allHealthy = false
