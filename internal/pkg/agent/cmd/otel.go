@@ -131,7 +131,7 @@ func prepareEnv() error {
 		// because a standalone OTel collector must be able to run alongside them without issue.
 
 		// The filestorage extension will handle directory creation since create_directory: true is set by default.
-		// If the user hasn’t specified this setting, they may have opted for a custom path, and the extension will create the directory accordingly.
+		// If the user hasn’t specified the env:STORAGE_DIR in filestorage, they may have opted for a custom path, and the extension will create the directory accordingly.
 		// In this case, setting env:STORAGE_DIR will have no effect.
 		if err := os.Setenv("STORAGE_DIR", filepath.Join(paths.Top(), "otel_registry")); err != nil {
 			return err
