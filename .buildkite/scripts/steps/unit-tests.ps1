@@ -21,7 +21,7 @@ mage unitTest
 # Copy coverage file to build directory so it can be downloaded as an artifact
 $buildkiteJobId = $env:BUILDKITE_JOB_ID
 
-Copy-Item -Path "build/TEST-go-unit-$buildkiteJobId.cov" -Destination coverage.out
+Move-Item -Path "build/TEST-go-unit-$buildkiteJobId.cov" -Destination coverage.out
 if ($LASTEXITCODE -ne 0) {
   exit 1 
 }
