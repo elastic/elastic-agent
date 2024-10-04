@@ -149,6 +149,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		if err != nil {
 			return fmt.Errorf("error printing config: %w", err)
 		}
+		return nil
 	}
 
 	cfg, lvl, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait, !isAdmin)
