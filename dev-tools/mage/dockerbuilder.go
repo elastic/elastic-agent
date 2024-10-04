@@ -46,7 +46,7 @@ func (b *dockerBuilder) Build() error {
 	}
 
 	if err := b.copyFiles(); err != nil {
-		return err
+		return fmt.Errorf("error copying files for docker variant %q: %w", b.DockerVariant, err)
 	}
 
 	if err := b.prepareBuild(); err != nil {

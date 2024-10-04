@@ -16,11 +16,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
-	"github.com/elastic/elastic-agent/pkg/testing/runner"
-
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+
+	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
+	"github.com/elastic/elastic-agent/pkg/testing/common"
 )
 
 type DockerConfig struct {
@@ -47,7 +47,7 @@ type Endpoint struct {
 }
 
 // AddK8STestsToImage compiles and adds the k8s-inner-tests binary to the given image
-func AddK8STestsToImage(ctx context.Context, logger runner.Logger, baseImage string, arch string) (string, error) {
+func AddK8STestsToImage(ctx context.Context, logger common.Logger, baseImage string, arch string) (string, error) {
 	// compile k8s test with tag kubernetes_inner
 	buildBase, err := filepath.Abs("build")
 	if err != nil {

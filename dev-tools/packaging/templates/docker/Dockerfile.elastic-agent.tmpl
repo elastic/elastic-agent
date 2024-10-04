@@ -43,7 +43,7 @@ RUN true && \
     chmod 0775 {{ $beatHome}}/{{ $modulesd }} && \
 {{- end }}
 
-{{- if eq .Variant "cloud" }}
+{{- if or (eq .Variant "cloud") (eq .Variant "service") }}
     mkdir -p /opt/agentbeat /opt/filebeat /opt/metricbeat && \
     cp -f {{ $beatHome }}/data/cloud_downloads/filebeat.sh /opt/filebeat/filebeat && \
     chmod +x /opt/filebeat/filebeat && \
@@ -74,6 +74,9 @@ RUN for iter in {1..10}; do microdnf update -y && microdnf install -y tar gzip f
 {{- end }}
 
 {{- if contains .from "ubuntu" }}
+# Delete the existing "ubuntu" user to prevent conflict with the user that is added later.
+# See https://bugs.launchpad.net/cloud-images/+bug/2005129/comments/2.
+RUN touch /var/mail/ubuntu && chown ubuntu /var/mail/ubuntu && userdel -r ubuntu
 RUN for iter in {1..10}; do \
         apt-get update -y && \
         DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends --yes ca-certificates curl gawk xz-utils && \
@@ -108,8 +111,8 @@ LABEL \
   org.opencontainers.image.licenses="{{ .License }}" \
   org.opencontainers.image.title="{{ .BeatName | title }}" \
   org.opencontainers.image.vendor="{{ .BeatVendor }}" \
+  org.opencontainers.image.authors="infra@elastic.co" \
   name="{{ .BeatName }}" \
-  maintainer="infra@elastic.co" \
   vendor="{{ .BeatVendor }}" \
   version="{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}" \
   release="1" \
@@ -163,18 +166,26 @@ COPY --chown={{ .user }}:{{ .user }} --from=home {{ $beatHome }} {{ $beatHome }}
 # create fleet.yml when running as non-root.
 RUN chmod 0777 {{ $beatHome }} && \
     usermod -d {{ $beatHome}} {{ .user }} && \
-    find {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components -name "*.yml*" -type f -exec chown root:root {} \; && \
+    find {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components -name "*.yml*" -type f -exec chown {{ .user }}:{{ .user }} {} \; && \
     true
 
 RUN mkdir /licenses
 COPY --from=home {{ $beatHome }}/LICENSE.txt /licenses
 COPY --from=home {{ $beatHome }}/NOTICE.txt /licenses
 
-{{- if eq .Variant "cloud" }}
+{{- if or (eq .Variant "cloud") (eq .Variant "service") }}
 COPY --from=home /opt /opt
 # Generate folder for a stub command that will be overwritten at runtime
 RUN mkdir /app && \
     chown {{ .user }}:{{ .user }} /app
+{{- end }}
+
+{{- if eq .Variant "service" }}
+RUN apk add --no-cache git make python-3.11 py3.11-pip && \
+    unzip {{ $beatHome }}/data/service/connectors-*.zip -d {{ $beatHome }}/data/service && \
+    mv {{ $beatHome }}/data/service/elasticsearch_connectors-* /usr/share/connectors && \
+    PYTHON=python3.11 make -C /usr/share/connectors clean install install-agent && \
+    chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/connectors
 {{- end }}
 
 {{- if (and (eq .Variant "complete") (contains .from "ubuntu"))  }}
@@ -239,7 +250,7 @@ RUN for iter in {1..10}; do \
     (exit $exit_code)
 {{- end }}
 
-{{- if (and (eq .Variant "wolfi-complete") (contains .from "wolfi"))  }}
+{{- if (and (eq .Variant "complete-wolfi") (contains .from "wolfi"))  }}
 USER root
 # Install required dependencies from wolfi repository
 RUN for iter in {1..10}; do \
@@ -284,7 +295,7 @@ ENV LIBBEAT_MONITORING_CGROUPS_HIERARCHY_OVERRIDE=/
 
 WORKDIR {{ $beatHome }}
 
-{{- if eq .Variant "cloud" }}
+{{- if or (eq .Variant "cloud") (eq .Variant "service") }}
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/app/apm.sh"]
 # Generate a stub command that will be overwritten at runtime

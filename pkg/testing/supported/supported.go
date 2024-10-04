@@ -2,13 +2,17 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package runner
+package supported
 
 import (
 	"errors"
 	"fmt"
 
+	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
+	"github.com/elastic/elastic-agent/pkg/testing/linux"
+	"github.com/elastic/elastic-agent/pkg/testing/windows"
 )
 
 const (
@@ -22,157 +26,130 @@ var (
 	ErrOSNotSupported = errors.New("os/arch not currently supported")
 )
 
-// SupportedOS maps a OS definition to a OSRunner.
-type SupportedOS struct {
-	define.OS
-
-	// Runner is the runner to use for the OS.
-	Runner OSRunner
-}
-
 var (
 	// UbuntuAMD64_2404 - Ubuntu (amd64) 24.04
-	UbuntuAMD64_2404 = SupportedOS{
+	UbuntuAMD64_2404 = common.SupportedOS{
 		OS: define.OS{
 			Type:    define.Linux,
 			Arch:    define.AMD64,
 			Distro:  Ubuntu,
 			Version: "24.04",
 		},
-		Runner: DebianRunner{},
+		Runner: linux.DebianRunner{},
 	}
 	// UbuntuAMD64_2204 - Ubuntu (amd64) 22.04
-	UbuntuAMD64_2204 = SupportedOS{
+	UbuntuAMD64_2204 = common.SupportedOS{
 		OS: define.OS{
 			Type:    define.Linux,
 			Arch:    define.AMD64,
 			Distro:  Ubuntu,
 			Version: "22.04",
 		},
-		Runner: DebianRunner{},
+		Runner: linux.DebianRunner{},
 	}
 	// UbuntuAMD64_2004 - Ubuntu (amd64) 20.04
-	UbuntuAMD64_2004 = SupportedOS{
+	UbuntuAMD64_2004 = common.SupportedOS{
 		OS: define.OS{
 			Type:    define.Linux,
 			Arch:    define.AMD64,
 			Distro:  Ubuntu,
 			Version: "20.04",
 		},
-		Runner: DebianRunner{},
+		Runner: linux.DebianRunner{},
 	}
 	// UbuntuARM64_2404 - Ubuntu (arm64) 24.04
-	UbuntuARM64_2404 = SupportedOS{
+	UbuntuARM64_2404 = common.SupportedOS{
 		OS: define.OS{
 			Type:    define.Linux,
 			Arch:    define.ARM64,
 			Distro:  Ubuntu,
 			Version: "24.04",
 		},
-		Runner: DebianRunner{},
+		Runner: linux.DebianRunner{},
 	}
 	// UbuntuARM64_2204 - Ubuntu (arm64) 22.04
-	UbuntuARM64_2204 = SupportedOS{
+	UbuntuARM64_2204 = common.SupportedOS{
 		OS: define.OS{
 			Type:    define.Linux,
 			Arch:    define.ARM64,
 			Distro:  Ubuntu,
 			Version: "22.04",
 		},
-		Runner: DebianRunner{},
+		Runner: linux.DebianRunner{},
 	}
 	// UbuntuARM64_2004 - Ubuntu (arm64) 20.04
-	UbuntuARM64_2004 = SupportedOS{
+	UbuntuARM64_2004 = common.SupportedOS{
 		OS: define.OS{
 			Type:    define.Linux,
 			Arch:    define.ARM64,
 			Distro:  Ubuntu,
 			Version: "20.04",
 		},
-		Runner: DebianRunner{},
+		Runner: linux.DebianRunner{},
 	}
 	// RhelAMD64_8 - RedHat Enterprise Linux (amd64) 8
-	RhelAMD64_8 = SupportedOS{
+	RhelAMD64_8 = common.SupportedOS{
 		OS: define.OS{
 			Type:    define.Linux,
 			Arch:    define.AMD64,
 			Distro:  Rhel,
 			Version: "8",
 		},
-		Runner: RhelRunner{},
+		Runner: linux.RhelRunner{},
 	}
 	// WindowsAMD64_2022 - Windows (amd64) Server 2022
-	WindowsAMD64_2022 = SupportedOS{
+	WindowsAMD64_2022 = common.SupportedOS{
 		OS: define.OS{
 			Type:    define.Windows,
 			Arch:    define.AMD64,
 			Version: "2022",
 		},
-		Runner: WindowsRunner{},
+		Runner: windows.WindowsRunner{},
 	}
 	// WindowsAMD64_2022_Core - Windows (amd64) Server 2022 Core
-	WindowsAMD64_2022_Core = SupportedOS{
+	WindowsAMD64_2022_Core = common.SupportedOS{
 		OS: define.OS{
 			Type:    define.Windows,
 			Arch:    define.AMD64,
 			Version: "2022-core",
 		},
-		Runner: WindowsRunner{},
+		Runner: windows.WindowsRunner{},
 	}
 	// WindowsAMD64_2019 - Windows (amd64) Server 2019
-	WindowsAMD64_2019 = SupportedOS{
+	WindowsAMD64_2019 = common.SupportedOS{
 		OS: define.OS{
 			Type:    define.Windows,
 			Arch:    define.AMD64,
 			Version: "2019",
 		},
-		Runner: WindowsRunner{},
+		Runner: windows.WindowsRunner{},
 	}
 	// WindowsAMD64_2019_Core - Windows (amd64) Server 2019 Core
-	WindowsAMD64_2019_Core = SupportedOS{
+	WindowsAMD64_2019_Core = common.SupportedOS{
 		OS: define.OS{
 			Type:    define.Windows,
 			Arch:    define.AMD64,
 			Version: "2019-core",
 		},
-		Runner: WindowsRunner{},
+		Runner: windows.WindowsRunner{},
 	}
-
 	// WindowsAMD64_2016 - Windows (amd64) Server 2016
-	WindowsAMD64_2016 = SupportedOS{
+	WindowsAMD64_2016 = common.SupportedOS{
 		OS: define.OS{
 			Type:    define.Windows,
 			Arch:    define.AMD64,
 			Version: "2016",
 		},
-		Runner: WindowsRunner{},
+		Runner: windows.WindowsRunner{},
 	}
 	// WindowsAMD64_2016_Core - Windows (amd64) Server 2016 Core
-	WindowsAMD64_2016_Core = SupportedOS{
+	WindowsAMD64_2016_Core = common.SupportedOS{
 		OS: define.OS{
 			Type:    define.Windows,
 			Arch:    define.AMD64,
 			Version: "2016-core",
 		},
-		Runner: WindowsRunner{},
-	}
-
-	KubernetesAMD64 = SupportedOS{
-		OS: define.OS{
-			Type:    define.Kubernetes,
-			Arch:    define.AMD64,
-			Version: "",
-		},
-		Runner: KubernetesRunner{},
-	}
-
-	KubernetesARM64 = SupportedOS{
-		OS: define.OS{
-			Type:    define.Kubernetes,
-			Arch:    define.ARM64,
-			Version: "",
-		},
-		Runner: KubernetesRunner{},
+		Runner: windows.WindowsRunner{},
 	}
 )
 
@@ -184,7 +161,7 @@ var (
 // In the case that a batch is not specific on the version and/or distro the first
 // one in this list will be picked. So it's best to place the one that we want the
 // most testing at the top.
-var supported = []SupportedOS{
+var supported = []common.SupportedOS{
 	UbuntuAMD64_2404,
 	UbuntuAMD64_2204,
 	UbuntuAMD64_2004,
@@ -199,8 +176,16 @@ var supported = []SupportedOS{
 	// https://github.com/elastic/ingest-dev/issues/3484
 	// WindowsAMD64_2016,
 	// WindowsAMD64_2016_Core,
-	KubernetesAMD64,
-	KubernetesARM64,
+}
+
+// init injects the kubernetes support list into the support list above
+func init() {
+	for _, k8sSupport := range kubernetes.GetSupported() {
+		supported = append(supported, common.SupportedOS{
+			OS:     k8sSupport,
+			Runner: kubernetes.Runner{},
+		})
+	}
 }
 
 // osMatch returns true when the specific OS is a match for a non-specific OS.
@@ -214,13 +199,16 @@ func osMatch(specific define.OS, notSpecific define.OS) bool {
 	if notSpecific.Version != "" && specific.Version != notSpecific.Version {
 		return false
 	}
+	if notSpecific.DockerVariant != "" && specific.DockerVariant != notSpecific.DockerVariant {
+		return false
+	}
 	return true
 }
 
 // getSupported returns all the supported based on the provided OS profile while using
 // the provided platforms as a filter.
-func getSupported(os define.OS, platforms []define.OS) ([]SupportedOS, error) {
-	var match []SupportedOS
+func getSupported(os define.OS, platforms []define.OS) ([]common.SupportedOS, error) {
+	var match []common.SupportedOS
 	for _, s := range supported {
 		if osMatch(s.OS, os) && allowedByPlatforms(s.OS, platforms) {
 			match = append(match, s)
@@ -273,6 +261,15 @@ func allowedByPlatform(os define.OS, platform define.OS) bool {
 	}
 	if os.Version != platform.Version {
 		return false
+	}
+	if platform.Type == define.Kubernetes {
+		// on kubernetes docker variant is supported
+		if platform.DockerVariant == "" {
+			return true
+		}
+		if os.DockerVariant != platform.DockerVariant {
+			return false
+		}
 	}
 	return true
 }

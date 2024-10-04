@@ -203,6 +203,7 @@ steps:
       - unit-tests
       - extended-windows
     allow_dependency_failure: true
+    soft_fail: true # Until https://github.com/elastic/ingest-dev/issues/4042 is resolved
 
   - group: "K8s tests"
     key: "k8s-tests"
@@ -210,7 +211,7 @@ steps:
       - label: "K8s tests: {{matrix.k8s_version}}"
         env:
           K8S_VERSION: "v{{matrix.k8s_version}}"
-          KIND_VERSION: "v0.20.0"
+          KIND_VERSION: "v0.24.0"
         command: ".buildkite/scripts/steps/k8s-tests.sh"
         agents:
           provider: "gcp"
@@ -218,27 +219,10 @@ steps:
         matrix:
           setup:
             k8s_version:
+              - "1.31.0"
               - "1.30.0"
               - "1.29.4"
               - "1.28.9"
-              - "1.27.13"
-        retry:
-          manual:
-            allowed: true
-      - label: "K8s integration tests"
-        key: "k8s-integration-tests"
-        env:
-          K8S_VERSION: "v1.30.2,v1.29.4,v1.28.9"
-          KIND_VERSION: "v0.20.0"
-        command: ".buildkite/scripts/steps/k8s-extended-tests.sh"
-        artifact_paths:
-          - "build/k8s-logs*/*"
-          - "build/k8s-logs*/**/*"
-          - "build/TEST-**"
-          - "build/diagnostics/*"
-        agents:
-          provider: "gcp"
-          image: "family/core-ubuntu-2204"
         retry:
           manual:
             allowed: true
@@ -256,6 +240,7 @@ steps:
     retry:
       manual:
         allowed: true
+    soft_fail: true # Until https://github.com/elastic/ingest-dev/issues/4042 is resolved
 
   # Triggers a dynamic step: Sync K8s
   # Runs only on main and if k8s files are changed

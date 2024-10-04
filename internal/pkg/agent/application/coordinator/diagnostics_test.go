@@ -106,15 +106,14 @@ agent:
         - host1
         - host2
       environment: diag-unit-test
-      apikey: apikey
-      secrettoken: secret
-      globallabels:
+      api_key: apikey
+      secret_token: secret
+      global_labels:
         k1: v1
         k2: v2
       tls:
-        skipverify: false
-        servercertificate: "/path/to/server/cert"
-        serverca: "/path/to/server/ca"
+        server_certificate: "/path/to/server/cert"
+        server_ca: "/path/to/server/ca"
 fleet:
   enabled: true
   access_api_key: "test-key"
@@ -337,6 +336,7 @@ components:
             skipverify: true
             servercert: servercert
             serverca: serverca
+          samplingrate: null
 `
 
 	coord := &Coordinator{componentModel: components}
@@ -556,6 +556,7 @@ components:
               skipverify: true
               serverca: sca
               servercert: sc
+            samplingrate: null
         limits: null
       component_idx: 1
 `
