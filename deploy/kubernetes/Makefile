@@ -124,6 +124,7 @@ $(ALL):
 		cp -r $$f  $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone; \
 	done
 	sed -i.bak -e "s/#hints.enabled/hints.enabled/g" -e "s/#hints.default_container_logs/hints.default_container_logs/g" $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone/elastic-agent-standalone-daemonset-configmap.yaml
+	sed -i.bak -e "/- id: container-log/,/- \/var\/log\/containers/d" $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone/elastic-agent-standalone-daemonset-configmap.yaml
 	rm $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone/elastic-agent-standalone-daemonset-configmap.yaml.bak 
 	sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g"  $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone/kustomization.yaml.original > $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone/kustomization.yaml
 
