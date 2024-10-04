@@ -127,7 +127,7 @@ func runCollector(cmdCtx context.Context, configFiles []string) error {
 
 func prepareEnv() error {
 	if _, ok := os.LookupEnv("STORAGE_DIR"); !ok {
-		// STORAGE_DIR is not set. Set it to ${path.Top()}/otel_registry because we do not want to use any of the paths,
+		// STORAGE_DIR is not set. Set it to ${path.Top()}/otel_registry because we do not want to use any of the paths, that are also used by Beats or Agent
 		// because a standalone OTel collector must be able to run alongside them without issue.
 
 		// The filestorage extension will handle directory creation since create_directory: true is set by default.
