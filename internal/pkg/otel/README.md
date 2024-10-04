@@ -54,7 +54,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.11.0/processor/elasticinframetricsprocessor/README.md) | v0.11.0 |
+| [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.12.0/processor/elasticinframetricsprocessor/README.md) | v0.12.0 |
 | [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.110.0/processor/memorylimiterprocessor/README.md) | v0.110.0 |
 | [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.110.0/processor/attributesprocessor/README.md) | v0.110.0 |
 | [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.110.0/processor/filterprocessor/README.md) | v0.110.0 |
@@ -82,7 +82,8 @@ This section provides a summary of components included in the Elastic Distributi
 
 By default, the OpenTelemetry Collector is stateless, which means it doesn't store offsets on disk while reading files. As a result, if you restart the collector, it won't retain the last read offset, potentially leading to data duplication or loss. However, we have configured persistence in the settings provided with the Elastic Agent package. 
 
-To enable persistence for the `filelogreceiver`, we add the `file_storage` extension and activate it for `filelog`. Here’s an example:
+To enable persistence for the `filelogreceiver`, we add the `file_storage` extension and activate it for `filelog`. 
+Execute `export STORAGE_DIR=/path/to/store/otel/offsets` and use the following configuration to enable persistence:
 
 ```yaml
 receivers:
@@ -93,6 +94,7 @@ receivers:
 extensions:
   file_storage/filelogreceiver:
     directory: ${env:STORAGE_DIR}
+    create_directory: true
 exporters:
   ...
 processors:
@@ -109,10 +111,18 @@ service:
 > [!WARNING]  
 Removing the storage key from the filelog section will disable persistence, which will lead to data duplication or loss when the collector restarts.
 
+> [!IMPORTANT]  
+If you remove the `create_directory: true` option, you'll need to manually create a directory to store the data. You can ignore this option if the directory already exists.
+
 ### Persistense in standalone Docker mode
 
-By default, when running Elastic Distribution for OpenTelemetry Collector in Docker, checkpoints are stored in `/usr/share/elastic-agent/otel_registry` by default. To ensure data persists across container otel_registry, you can use the following command:
+By default, when running Elastic Distribution for OpenTelemetry Collector in Docker, checkpoints are stored in `/usr/share/elastic-agent/otel_registry` by default. To ensure data persists across container restarts, you can use the following command:
 
 ```bash
-docker run --rm -ti --entrypoint="elastic-agent" --mount type=bind,source=/path/on/host,target=/usr/share/elastic-agent/otelcol  docker.elastic.co/beats/elastic-agent:9.0.0-SNAPSHOT otel
+docker run --rm -ti --entrypoint="elastic-agent" --mount type=bind,source=/path/on/host,target=/usr/share/elastic-agent/otel_registry  docker.elastic.co/beats/elastic-agent:9.0.0-SNAPSHOT otel
 ```
+
+### Known issues:
+-  You face following `failed to build extensions: failed to create extension "file_storage/filelogreceiver": mkdir ...: permission denied` error while running the otel mode
+	- Cause: This issue is likely because the user running the executable lacks sufficient permissions to create the directory.
+	- Resolution: You can either create the directory manually or specify a path with necessary permissions.

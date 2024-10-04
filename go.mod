@@ -42,7 +42,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.110.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.110.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.110.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.109.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.110.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.110.0
 	github.com/otiai10/copy v1.14.0
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
