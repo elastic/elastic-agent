@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package runner
+package windows
 
 import (
 	"context"
@@ -13,14 +13,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/ssh"
 )
 
 // WindowsRunner is a handler for running tests on Windows
 type WindowsRunner struct{}
 
 // Prepare the test
-func (WindowsRunner) Prepare(ctx context.Context, sshClient SSHClient, logger Logger, arch string, goVersion string) error {
+func (WindowsRunner) Prepare(ctx context.Context, sshClient ssh.SSHClient, logger common.Logger, arch string, goVersion string) error {
 	// install chocolatey
 	logger.Logf("Installing chocolatey")
 	chocoInstall := `"[System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"`
@@ -69,7 +71,7 @@ func (WindowsRunner) Prepare(ctx context.Context, sshClient SSHClient, logger Lo
 }
 
 // Copy places the required files on the host.
-func (WindowsRunner) Copy(ctx context.Context, sshClient SSHClient, logger Logger, repoArchive string, builds []Build) error {
+func (WindowsRunner) Copy(ctx context.Context, sshClient ssh.SSHClient, logger common.Logger, repoArchive string, builds []common.Build) error {
 	// copy the archive and extract it on the host (tar exists and can extract zip on windows)
 	logger.Logf("Copying repo")
 	destRepoName := filepath.Base(repoArchive)
@@ -108,7 +110,7 @@ func (WindowsRunner) Copy(ctx context.Context, sshClient SSHClient, logger Logge
 			return fmt.Errorf("failed to read local SHA52 contents %s: %w", build.SHA512Path, err)
 		}
 		hostSHA512Path := filepath.Base(build.SHA512Path)
-		hostSHA512, err := sshClient.GetFileContents(ctx, hostSHA512Path, WithContentFetchCommand("type"))
+		hostSHA512, err := sshClient.GetFileContents(ctx, hostSHA512Path, ssh.WithContentFetchCommand("type"))
 		if err == nil {
 			if string(localSHA512) == string(hostSHA512) {
 				logger.Logf("Skipping copy agent build %s; already the same", filepath.Base(build.Path))
@@ -159,7 +161,7 @@ func (WindowsRunner) Copy(ctx context.Context, sshClient SSHClient, logger Logge
 }
 
 // Run the test
-func (WindowsRunner) Run(ctx context.Context, verbose bool, c SSHClient, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error) {
+func (WindowsRunner) Run(ctx context.Context, verbose bool, c ssh.SSHClient, logger common.Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (common.OSRunnerResult, error) {
 	var tests []string
 	for _, pkg := range batch.Tests {
 		for _, test := range pkg.Tests {
@@ -173,13 +175,13 @@ func (WindowsRunner) Run(ctx context.Context, verbose bool, c SSHClient, logger 
 		}
 	}
 
-	var result OSRunnerResult
+	var result common.OSRunnerResult
 	if len(tests) > 0 {
 		script := toPowershellScript(agentVersion, prefix, verbose, tests, env)
 
 		results, err := runTestsOnWindows(ctx, logger, "non-sudo", prefix, script, c, batch.SudoTests)
 		if err != nil {
-			return OSRunnerResult{}, fmt.Errorf("error running non-sudo tests: %w", err)
+			return common.OSRunnerResult{}, fmt.Errorf("error running non-sudo tests: %w", err)
 		}
 		result.Packages = results
 	}
@@ -190,7 +192,7 @@ func (WindowsRunner) Run(ctx context.Context, verbose bool, c SSHClient, logger 
 
 		results, err := runTestsOnWindows(ctx, logger, "sudo", prefix, script, c, batch.SudoTests)
 		if err != nil {
-			return OSRunnerResult{}, fmt.Errorf("error running sudo tests: %w", err)
+			return common.OSRunnerResult{}, fmt.Errorf("error running sudo tests: %w", err)
 		}
 		result.SudoPackages = results
 
@@ -199,7 +201,7 @@ func (WindowsRunner) Run(ctx context.Context, verbose bool, c SSHClient, logger 
 }
 
 // Diagnostics gathers any diagnostics from the host.
-func (WindowsRunner) Diagnostics(ctx context.Context, sshClient SSHClient, logger Logger, destination string) error {
+func (WindowsRunner) Diagnostics(ctx context.Context, sshClient ssh.SSHClient, logger common.Logger, destination string) error {
 	diagnosticDir := "agent\\build\\diagnostics"
 	stdOut, _, err := sshClient.Exec(ctx, "dir", []string{diagnosticDir, "/b"}, nil)
 	if err != nil {
@@ -224,7 +226,7 @@ func (WindowsRunner) Diagnostics(ctx context.Context, sshClient SSHClient, logge
 		if err != nil {
 			return fmt.Errorf("failed to create file %s: %w", dp, err)
 		}
-		err = sshClient.GetFileContentsOutput(ctx, fp, out, WithContentFetchCommand("type"))
+		err = sshClient.GetFileContentsOutput(ctx, fp, out, ssh.WithContentFetchCommand("type"))
 		_ = out.Close()
 		if err != nil {
 			return fmt.Errorf("failed to copy file from remote host to %s: %w", dp, err)
@@ -233,7 +235,7 @@ func (WindowsRunner) Diagnostics(ctx context.Context, sshClient SSHClient, logge
 	return nil
 }
 
-func sshRunPowershell(ctx context.Context, sshClient SSHClient, cmd string) ([]byte, []byte, error) {
+func sshRunPowershell(ctx context.Context, sshClient ssh.SSHClient, cmd string) ([]byte, []byte, error) {
 	return sshClient.Exec(ctx, "powershell", []string{
 		"-NoProfile",
 		"-InputFormat", "None",
@@ -269,7 +271,7 @@ func toPowershellScript(agentVersion string, prefix string, verbose bool, tests 
 	return sb.String()
 }
 
-func runTestsOnWindows(ctx context.Context, logger Logger, name string, prefix string, script string, sshClient SSHClient, tests []define.BatchPackageTests) ([]OSRunnerPackageResult, error) {
+func runTestsOnWindows(ctx context.Context, logger common.Logger, name string, prefix string, script string, sshClient ssh.SSHClient, tests []define.BatchPackageTests) ([]common.OSRunnerPackageResult, error) {
 	execTest := strings.NewReader(script)
 
 	session, err := sshClient.NewSession()
@@ -277,8 +279,8 @@ func runTestsOnWindows(ctx context.Context, logger Logger, name string, prefix s
 		return nil, fmt.Errorf("failed to start session: %w", err)
 	}
 
-	session.Stdout = newPrefixOutput(logger, fmt.Sprintf("Test output (%s) (stdout): ", name))
-	session.Stderr = newPrefixOutput(logger, fmt.Sprintf("Test output (%s) (stderr): ", name))
+	session.Stdout = common.NewPrefixOutput(logger, fmt.Sprintf("Test output (%s) (stdout): ", name))
+	session.Stderr = common.NewPrefixOutput(logger, fmt.Sprintf("Test output (%s) (stderr): ", name))
 	session.Stdin = execTest
 	// allowed to fail because tests might fail
 	logger.Logf("Running %s tests...", name)
@@ -289,7 +291,7 @@ func runTestsOnWindows(ctx context.Context, logger Logger, name string, prefix s
 	// this seems to always return an error
 	_ = session.Close()
 
-	var result []OSRunnerPackageResult
+	var result []common.OSRunnerPackageResult
 	// fetch the contents for each package
 	for _, pkg := range tests {
 		resultPkg, err := getWindowsRunnerPackageResult(ctx, sshClient, pkg, prefix)
@@ -305,22 +307,22 @@ func toWindowsPath(path string) string {
 	return strings.ReplaceAll(path, "/", "\\")
 }
 
-func getWindowsRunnerPackageResult(ctx context.Context, sshClient SSHClient, pkg define.BatchPackageTests, prefix string) (OSRunnerPackageResult, error) {
+func getWindowsRunnerPackageResult(ctx context.Context, sshClient ssh.SSHClient, pkg define.BatchPackageTests, prefix string) (common.OSRunnerPackageResult, error) {
 	var err error
-	var resultPkg OSRunnerPackageResult
+	var resultPkg common.OSRunnerPackageResult
 	resultPkg.Name = pkg.Name
 	outputPath := fmt.Sprintf("%%home%%\\agent\\build\\TEST-go-remote-%s.%s", prefix, filepath.Base(pkg.Name))
-	resultPkg.Output, err = sshClient.GetFileContents(ctx, outputPath+".out", WithContentFetchCommand("type"))
+	resultPkg.Output, err = sshClient.GetFileContents(ctx, outputPath+".out", ssh.WithContentFetchCommand("type"))
 	if err != nil {
-		return OSRunnerPackageResult{}, fmt.Errorf("failed to fetched test output at %s.out", outputPath)
+		return common.OSRunnerPackageResult{}, fmt.Errorf("failed to fetched test output at %s.out", outputPath)
 	}
-	resultPkg.JSONOutput, err = sshClient.GetFileContents(ctx, outputPath+".out.json", WithContentFetchCommand("type"))
+	resultPkg.JSONOutput, err = sshClient.GetFileContents(ctx, outputPath+".out.json", ssh.WithContentFetchCommand("type"))
 	if err != nil {
-		return OSRunnerPackageResult{}, fmt.Errorf("failed to fetched test output at %s.out.json", outputPath)
+		return common.OSRunnerPackageResult{}, fmt.Errorf("failed to fetched test output at %s.out.json", outputPath)
 	}
-	resultPkg.XMLOutput, err = sshClient.GetFileContents(ctx, outputPath+".xml", WithContentFetchCommand("type"))
+	resultPkg.XMLOutput, err = sshClient.GetFileContents(ctx, outputPath+".xml", ssh.WithContentFetchCommand("type"))
 	if err != nil {
-		return OSRunnerPackageResult{}, fmt.Errorf("failed to fetched test output at %s.xml", outputPath)
+		return common.OSRunnerPackageResult{}, fmt.Errorf("failed to fetched test output at %s.xml", outputPath)
 	}
 	return resultPkg, nil
 }
