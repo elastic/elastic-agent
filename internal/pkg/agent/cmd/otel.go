@@ -9,12 +9,15 @@ package cmd
 import (
 	"context"
 	goerrors "errors"
+	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
 	"github.com/elastic/elastic-agent-libs/service"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
@@ -28,6 +31,9 @@ func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Comman
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfgFiles, err := getConfigFiles(cmd, true)
 			if err != nil {
+				return err
+			}
+			if err := prepareEnv(); err != nil {
 				return err
 			}
 			return runCollector(cmd.Context(), cfgFiles)
@@ -117,4 +123,19 @@ func runCollector(cmdCtx context.Context, configFiles []string) error {
 
 	return goerrors.Join(errs...)
 
+}
+
+func prepareEnv() error {
+	if _, ok := os.LookupEnv("STORAGE_DIR"); !ok {
+		// STORAGE_DIR is not set. Set it to ${path.Top()}/otel_registry because we do not want to use any of the paths,
+		// because a standalone OTel collector must be able to run alongside them without issue.
+
+		// The filestorage extension will handle directory creation since create_directory: true is set by default.
+		// If the user hasn’t specified this setting, they may have opted for a custom path, and the extension will create the directory accordingly.
+		// In this case, setting env:STORAGE_DIR will have no effect.
+		if err := os.Setenv("STORAGE_DIR", filepath.Join(paths.Top(), "otel_registry")); err != nil {
+			return err
+		}
+	}
+	return nil
 }
