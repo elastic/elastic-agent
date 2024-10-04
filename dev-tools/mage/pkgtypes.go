@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"io/fs"
 	"log"
@@ -24,7 +25,7 @@ import (
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"github.com/mitchellh/hashstructure"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -500,12 +501,15 @@ func copyInstallScript(spec PackageSpec, script string, local *string) error {
 }
 
 func (s PackageSpec) hash() string {
-	h, err := hashstructure.Hash(s, nil)
+	out, err := yaml.Marshal(s)
 	if err != nil {
-		panic(fmt.Errorf("failed to compute hash of spec: %w", err))
+		panic(fmt.Errorf("failed to marshal spec: %w", err))
 	}
 
-	hash := strconv.FormatUint(h, 10)
+	h := fnv.New64()
+	h.Write(out)
+
+	hash := strconv.FormatUint(h.Sum64(), 10)
 	if len(hash) > 10 {
 		hash = hash[0:10]
 	}
