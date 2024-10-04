@@ -8,8 +8,11 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand/v2"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -22,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/installtest"
 )
@@ -280,6 +284,75 @@ func testSecondAgentCanInstall(ctx context.Context, fixture *atesting.Fixture, b
 			Namespace:  installOpts.Namespace,
 		}))
 	}
+}
+
+// TestInstallUninstallAudit will test to make sure that a fleet-managed agent can use the audit/unenroll endpoint when uninstalling itself.
+func TestInstallUninstallAudit(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Default,
+		Stack: &define.Stack{}, // needs a fleet-server.
+		Sudo:  true,
+		Local: false,
+	})
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	policyResp, enrollmentTokenResp := createPolicyAndEnrollmentToken(ctx, t, info.KibanaClient, createBasicPolicy())
+	t.Logf("Created policy %+v", policyResp.AgentPolicy)
+
+	t.Log("Getting default Fleet Server URL...")
+	fleetServerURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
+	require.NoError(t, err, "failed getting Fleet Server URL")
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	// Run `elastic-agent install`.  We use `--force` to prevent interactive
+	// execution.
+	opts := &atesting.InstallOpts{
+		Force: true,
+		EnrollOpts: atesting.EnrollOpts{
+			URL:             fleetServerURL,
+			EnrollmentToken: enrollmentTokenResp.APIKey,
+		},
+	}
+	out, err := fixture.Install(ctx, opts)
+	if err != nil {
+		t.Logf("install output: %s", out)
+		require.NoError(t, err)
+	}
+
+	require.Eventuallyf(t, func() bool {
+		return waitForAgentAndFleetHealthy(ctx, t, fixture)
+	}, time.Minute, time.Second, "agent never became healthy or connected to Fleet")
+
+	agentID, err := getAgentID(ctx, fixture)
+	require.NoError(t, err, "error getting the agent inspect output")
+	require.NotEmpty(t, agentID, "agent ID empty")
+
+	out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+	if err != nil {
+		t.Logf("uninstall output: %s", out)
+		require.NoError(t, err)
+	}
+
+	response, err := info.ESClient.Get(".fleet-agents", agentID, info.ESClient.Get.WithContext(ctx))
+	require.NoError(t, err)
+	defer response.Body.Close()
+	p, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+	require.Equalf(t, http.StatusOK, response.StatusCode, "ES status code expected 200, body: %s", p)
+	var res struct {
+		Source struct {
+			AuditUnenrolledReason string `json:"audit_unenrolled_reason"`
+		} `json:"_source"`
+	}
+	err = json.Unmarshal(p, &res)
+	require.NoError(t, err)
+	require.Equal(t, "uninstall", res.Source.AuditUnenrolledReason)
 }
 
 // TestRepeatedInstallUninstall will install then uninstall the agent

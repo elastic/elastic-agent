@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/collector/receiver"
 
 	// Receivers:
+
 	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
 	hostmetricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver"
 	httpcheckreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver"
@@ -36,6 +37,7 @@ import (
 	"go.opentelemetry.io/collector/processor/batchprocessor"                                                    // for batching events
 	"go.opentelemetry.io/collector/processor/memorylimiterprocessor"
 
+	"github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
 	"github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor"
 
 	// Exporters:
@@ -71,6 +73,7 @@ func components() (otelcol.Factories, error) {
 		prometheusreceiver.NewFactory(),
 		jaegerreceiver.NewFactory(),
 		zipkinreceiver.NewFactory(),
+		fbreceiver.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
