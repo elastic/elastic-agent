@@ -18,3 +18,4 @@
 {"name": "github.com/pascaldekloe/goe", "licenceFile": "LICENSE", "licenceType": "CC0-1.0"}
 {"name": "github.com/dnaeon/go-vcr", "licenceFile": "LICENSE", "licenceType": "BSD-2-Clause"}
 {"name": "github.com/grpc-ecosystem/go-grpc-middleware/v2", "licenceFile": "LICENSE", "licenceType": "Apache-2.0"}
+{"name": "github.com/JohnCGriffin/overflow", "licenceFile": "README.md", "licenceType": "MIT"}
