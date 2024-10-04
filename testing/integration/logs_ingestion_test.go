@@ -78,6 +78,13 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 				"enabled": true,
 			},
 		},
+		Overrides: map[string]interface{}{
+			"agent": map[string]interface{}{
+				"monitoring": map[string]interface{}{
+					"metrics_period": "1s",
+				},
+			},
+		},
 	}
 
 	installOpts := atesting.InstallOpts{
