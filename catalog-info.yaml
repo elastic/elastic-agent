@@ -114,7 +114,7 @@ apiVersion: backstage.io/v1alpha1
 kind: Resource
 metadata:
   name: buildkite-pipeline-elastic-agent-testing-bk
-  description: Buildkite pipeline for the Elastic Agent extended testing
+  description: Elastic Agent extended testing using buildkite agents
   links:
     - title: Pipeline
       url: https://buildkite.com/elastic/elastic-agent-extended-testing-bk
