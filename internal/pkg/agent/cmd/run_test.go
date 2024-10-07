@@ -8,8 +8,9 @@ import (
 	"fmt"
 	"testing"
 
-	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/stretchr/testify/assert"
+
+	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 )
 
 func Test_initTracer(t *testing.T) {
