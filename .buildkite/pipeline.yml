@@ -185,18 +185,10 @@ steps:
     key: "merge-coverage"
     env:
       BUILDKITE_REPO: ""
-    command: "
+    command: |
       .buildkite/scripts/steps/merge.sh
-      unit-tests-2204
-      unit-tests-2204-arm64
-      unit-tests-win2016
-      unit-tests-win2022
-      unit-tests-macos-13
-      unit-tests-win10
-      unit-tests-win11
-      "
     artifact_paths:
-      - "build/TEST-go-unit.cov"
+      - "TEST-go-unit.cov"
     agents:
       image: "golang:1.22.6"
     depends_on:
