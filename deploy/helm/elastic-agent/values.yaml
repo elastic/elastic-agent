@@ -351,7 +351,6 @@ agent:
     #    extraContainers: []
     #    resources: {}
     #    securityContext: {}
-    #    rules: []
     #    nodeSelector: {}
     #    tolerations: []
     #    topologySpreadConstraints: []
@@ -366,6 +365,10 @@ agent:
     # clusterWide preset is required by the built-in kubernetes integration
     clusterWide:
       mode: deployment
+      serviceAccount:
+        create: true
+      clusterRole:
+        create: true
       resources:
         limits:
           memory: 800Mi
@@ -397,6 +400,10 @@ agent:
     perNode:
       ## required by the built-in kubernetes integration
       mode: daemonset
+      serviceAccount:
+        create: true
+      clusterRole:
+        create: true
       resources:
         limits:
           memory: 1000Mi
@@ -424,6 +431,10 @@ agent:
     ksmSharded:
       ## required by the built-in kubernetes integration
       mode: statefulset
+      serviceAccount:
+        create: true
+      clusterRole:
+        create: true
       resources:
         limits:
           memory: 800Mi
