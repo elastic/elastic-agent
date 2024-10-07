@@ -173,12 +173,12 @@ func TestEncryptDecryptHex(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			enc, err := EncryptHex(tc.key, tc.data)
 			if !errors.Is(tc.err, err) {
-				t.Fatalf(cmp.Diff(tc.err, err))
+				t.Fatal(cmp.Diff(tc.err, err))
 			}
 
 			dec, err := DecryptHex(tc.key, enc)
 			if !errors.Is(tc.err, err) {
-				t.Fatalf(cmp.Diff(tc.err, err))
+				t.Fatal(cmp.Diff(tc.err, err))
 			}
 
 			if len(tc.data) == 0 {

@@ -67,7 +67,7 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 | kubernetes.namespace | string | `"default"` | kubernetes namespace |
 | kubernetes.hints.enabled | bool | `false` | enable [elastic-agent autodiscovery](https://www.elastic.co/guide/en/fleet/current/elastic-agent-kubernetes-autodiscovery.html) feature |
 | kubernetes.state.enabled | bool | `true` | integration global switch to enable state streams based on kube-state-metrics. Note that setting this to `false` results in overriding and *disabling all* the respective state streams |
-| kubernetes.state.deployKSM | bool | `true` | deploy kube-state-metrics service as a sidecar container to the elastic agent of `ksmShared` preset. If set to `false`, kube-state-metrics will *not* get deployed and `clusterWide` agent preset will be used for collecting kube-state-metrics. |
+| kubernetes.state.deployKSM | bool | `true` | deploy kube-state-metrics service as a sidecar container to the elastic agent of `ksmSharded` preset. If set to `false`, kube-state-metrics will *not* get deployed and `clusterWide` agent preset will be used for collecting kube-state-metrics. |
 | kubernetes.state.host | string | `"kube-state-metrics:8080"` | host of the kube-state-metrics service. Note that this used only when `deployKSM` is set to `false`. |
 | kubernetes.state.vars | object | `{}` | state streams variables such as `add_metadata`, `hosts`, `period`, `bearer_token_file`. Please note that colliding vars also defined in respective state streams will *not* be overridden. |
 | kubernetes.metrics.enabled | bool | `true` | integration global switch to enable metric streams based on kubelet. Note that setting this to false results in overriding and *disabling all* the respective metric streams |
@@ -135,7 +135,7 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 | agent.image | object | `{"pullPolicy":"IfNotPresent","repository":"docker.elastic.co/beats/elastic-agent","tag":"9.0.0-SNAPSHOT"}` | image configuration |
 | agent.engine | string | `"k8s"` | generate kubernetes manifests or [ECK](https://github.com/elastic/cloud-on-k8s) CRDs |
 | agent.unprivileged | bool | `false` | enable unprivileged mode |
-| agent.presets | map[string]{} | `{ "perNode" : {...}, "clusterWider": {...}, "ksmShared": {...} }` | Map of deployment presets for the Elastic Agent. The key of the map is the name of the preset. See more for the presets required by the built-in Kubernetes integration [here](./values.yaml) |
+| agent.presets | map[string]{} | `{ "perNode" : {...}, "clusterWide": {...}, "ksmSharded": {...} }` | Map of deployment presets for the Elastic Agent. The key of the map is the name of the preset. See more for the presets required by the built-in Kubernetes integration [here](./values.yaml) |
 
 ### 3.1 - Elastic-Agent Managed Configuration
 | Key | Type | Default | Description |

@@ -94,7 +94,7 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		fmt.Fprint(os.Stderr, logBuff.String())
 	}()
 
-	err = install.Uninstall(paths.ConfigFile(), paths.Top(), uninstallToken, log, progBar)
+	err = install.Uninstall(cmd.Context(), paths.ConfigFile(), paths.Top(), uninstallToken, log, progBar)
 	if err != nil {
 		progBar.Describe("Failed to uninstall agent")
 		return fmt.Errorf("error uninstalling agent: %w", err)

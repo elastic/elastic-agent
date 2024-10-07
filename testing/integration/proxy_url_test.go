@@ -699,6 +699,7 @@ func TestProxyURL(t *testing.T) {
 
 			// Specific testcase setup and map of created proxies
 			proxies, args := tt.setup(t, mockFleet)
+			t.Logf("Fleet-server port: %s", mockFleet.fleetServer.Port)
 
 			fixture, err := define.NewFixtureFromLocalBuild(t,
 				define.Version(),
@@ -732,6 +733,9 @@ func TestProxyURL(t *testing.T) {
 						Key:                    args.key,
 					}})
 			t.Logf("elastic-agent install output: \n%s\n", string(out))
+			for proxyName, proxy := range proxies {
+				t.Logf("Proxy %s requests: %v", proxyName, proxy.ProxiedRequests())
+			}
 			if tt.wantErr(t, err, "elastic-agent install returned an unexpected error") {
 				tt.assertFunc(ctx, t, fixture, proxies, mockFleet)
 			}
