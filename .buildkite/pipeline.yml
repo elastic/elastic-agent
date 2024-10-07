@@ -20,8 +20,8 @@ steps:
         key: "unit-tests-2204"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         artifact_paths:
-          - "build/TEST-go-unit-*.html"
-          - "build/TEST-go-unit-*.xml"
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
           - "build/diagnostics/*"
           - "coverage.out"
         agents:
@@ -35,8 +35,8 @@ steps:
         key: "unit-tests-2204-arm64"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         artifact_paths:
-          - "build/TEST-go-unit-*.html"
-          - "build/TEST-go-unit-*.xml"
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
           - "build/diagnostics/*"
           - "coverage.out"
         agents:
@@ -52,8 +52,8 @@ steps:
         key: "unit-tests-win2022"
         command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
         artifact_paths:
-          - "build/TEST-go-unit-*.html"
-          - "build/TEST-go-unit-*.xml"
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
           - "build/diagnostics/*"
           - "coverage.out"
         agents:
@@ -70,8 +70,8 @@ steps:
         key: "unit-tests-win2016"
         command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
         artifact_paths:
-          - "build/TEST-go-unit-*.html"
-          - "build/TEST-go-unit-*.xml"
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
           - "build/diagnostics/*"
           - "coverage.out"
         agents:
@@ -90,8 +90,8 @@ steps:
         command: ".buildkite/scripts/steps/unit-tests.sh"
         branches: main
         artifact_paths:
-          - "build/TEST-go-unit-*.html"
-          - "build/TEST-go-unit-*.xml"
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
           - "build/diagnostics/*"
           - "coverage.out"
         agents:
@@ -105,8 +105,8 @@ steps:
         key: "unit-tests-macos-13"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         artifact_paths:
-          - "build/TEST-go-unit-*.html"
-          - "build/TEST-go-unit-*.xml"
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
           - "build/diagnostics/*"
           - "coverage.out"
         agents:
@@ -123,8 +123,8 @@ steps:
         key: "unit-tests-win10"
         command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
         artifact_paths:
-          - "build/TEST-go-unit-*.html"
-          - "build/TEST-go-unit-*.xml"
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
           - "build/diagnostics/*"
           - "coverage.out"
         agents:
@@ -140,8 +140,8 @@ steps:
         key: "unit-tests-win11"
         command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
         artifact_paths:
-          - "build/TEST-go-unit-*.html"
-          - "build/TEST-go-unit-*.xml"
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
           - "build/diagnostics/*"
           - "coverage.out"
         agents:
