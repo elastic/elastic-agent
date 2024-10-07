@@ -6,7 +6,7 @@ package ogc
 
 import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
-	"github.com/elastic/elastic-agent/pkg/testing/runner"
+	"github.com/elastic/elastic-agent/pkg/testing/supported"
 )
 
 const (
@@ -24,7 +24,7 @@ var ogcSupported = []LayoutOS{
 		OS: define.OS{
 			Type:    define.Linux,
 			Arch:    define.AMD64,
-			Distro:  runner.Ubuntu,
+			Distro:  supported.Ubuntu,
 			Version: "24.04",
 		},
 		Provider:     Google,
@@ -37,7 +37,7 @@ var ogcSupported = []LayoutOS{
 		OS: define.OS{
 			Type:    define.Linux,
 			Arch:    define.AMD64,
-			Distro:  runner.Ubuntu,
+			Distro:  supported.Ubuntu,
 			Version: "22.04",
 		},
 		Provider:     Google,
@@ -50,7 +50,7 @@ var ogcSupported = []LayoutOS{
 		OS: define.OS{
 			Type:    define.Linux,
 			Arch:    define.AMD64,
-			Distro:  runner.Ubuntu,
+			Distro:  supported.Ubuntu,
 			Version: "20.04",
 		},
 		Provider:     Google,
@@ -103,7 +103,7 @@ var ogcSupported = []LayoutOS{
 		OS: define.OS{
 			Type:    define.Linux,
 			Arch:    define.AMD64,
-			Distro:  runner.Rhel,
+			Distro:  supported.Rhel,
 			Version: "8",
 		},
 		Provider:     Google,

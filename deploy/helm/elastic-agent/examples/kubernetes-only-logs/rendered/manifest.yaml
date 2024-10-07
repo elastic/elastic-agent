@@ -30,13 +30,9 @@ stringData:
     id: agent-pernode-example
     outputs:
       default:
-        api_key: ""
         hosts:
         - http://elasticsearch:9200
-        name: ""
-        namespace: ""
         password: changeme
-        secretName: ""
         type: elasticsearch
         username: elastic
     secret_references: []
@@ -230,7 +226,7 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: a7c974ba2737eab9abbfb69369c7652546ffbab54b4cb3e4942b083c72323b95
+        checksum/config: e4f00459bc975f20e15a69d830b8df6c1998190072d515e0c08cf5b51dd5bbc1
 
     spec:
       dnsPolicy: ClusterFirstWithHostNet

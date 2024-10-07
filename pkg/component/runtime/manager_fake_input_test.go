@@ -344,6 +344,9 @@ func (suite *FakeInputSuite) TestManager_APM() {
 	subscriptionCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
 
+	FiftyPercentSamplingRate := float32(0.5)
+	OnePercentSamplingRate := float32(0.01)
+
 	initialAPMConfig := &proto.APMConfig{
 		Elastic: &proto.ElasticAPM{
 			Environment: "test",
@@ -355,6 +358,7 @@ func (suite *FakeInputSuite) TestManager_APM() {
 				ServerCert: "servercert",
 				ServerCa:   "serverca",
 			},
+			SamplingRate: &FiftyPercentSamplingRate,
 		},
 	}
 
@@ -369,6 +373,22 @@ func (suite *FakeInputSuite) TestManager_APM() {
 				ServerCert: "",
 				ServerCa:   "",
 			},
+			SamplingRate: &OnePercentSamplingRate,
+		},
+	}
+
+	modifiedSampleRateAPMConfig := &proto.APMConfig{
+		Elastic: &proto.ElasticAPM{
+			Environment: "test-modified",
+			ApiKey:      "apiKey",
+			SecretToken: "secretToken",
+			Hosts:       []string{"newhost1", "host2", "differenthost3"},
+			Tls: &proto.ElasticAPMTLS{
+				SkipVerify: true,
+				ServerCert: "",
+				ServerCa:   "",
+			},
+			SamplingRate: &FiftyPercentSamplingRate,
 		},
 	}
 
@@ -381,8 +401,9 @@ func (suite *FakeInputSuite) TestManager_APM() {
 	// testStep tracks how far into the test sequence we've progressed.
 	// 0: When unit is healthy, set initialAPMConfig
 	// 1: When initialAPMConfig is active, set modifiedAPMConfig
-	// 2: When modifiedAPMConfig is active, clear all APMConfig
-	// 3: When APM config is empty again, succeed
+	// 2: When modifiedAPMConfig is active, set modifiedSampleRateAPMConfig
+	// 3: When modifiedSampleRateAPMConfig is active, clear all APMConfig
+	// 4: When APM config is empty again, succeed
 	var testStep int
 STATELOOP:
 	for {
@@ -457,7 +478,28 @@ STATELOOP:
 					50*time.Millisecond,
 					"Updated APM config should be reported by Actions")
 
-				// Both configs were reported correctly, now clear the APM config
+				// Config matches, we now try setting a modified sample rate config
+				comp.Component = &proto.Component{
+					ApmConfig: modifiedSampleRateAPMConfig,
+				}
+
+				m.Update(component.Model{Components: []component.Component{comp}})
+				err = <-m.errCh
+				require.NoError(t, err, "manager Update call must succeed")
+
+			case 3:
+				require.NotNil(t, componentState.Component, "ApmConfig must not be nil")
+
+				require.Eventually(t,
+					func() bool {
+						retrievedAPMConfig := fetchAPMConfigWithAction(t, ctx, m, comp)
+						return gproto.Equal(modifiedSampleRateAPMConfig, retrievedAPMConfig)
+					},
+					3*time.Second,
+					50*time.Millisecond,
+					"Updated sample rate APM config should be reported by Actions")
+
+				// All configs were reported correctly, now clear the APM config
 				comp.Component = &proto.Component{
 					ApmConfig: nil,
 				}
@@ -466,7 +508,7 @@ STATELOOP:
 				err = <-m.errCh
 				require.NoError(t, err, "manager Update call must succeed")
 
-			case 3:
+			case 4:
 				if componentState.Component != nil && componentState.Component.ApmConfig != nil {
 					// APM config is still present, wait for next update
 					continue STATELOOP
@@ -2661,6 +2703,7 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 	default:
 	}
 
+	t.Log("Apply component config 1")
 	m.Update(component.Model{Components: components})
 	err = <-m.errCh
 	require.NoError(t, err, "expected no error from the manager when applying"+
@@ -2678,6 +2721,7 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 		200*time.Millisecond,
 		"component %s did not start", comp0ID)
 
+	t.Log("Apply component config 2")
 	m.Update(component.Model{Components: components2})
 	err = <-m.errCh
 	require.NoError(t, err, "expected no error from the manager when applying"+
@@ -2698,6 +2742,7 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 	// component 1 started, we can stop the manager
 	cancel()
 
+	t.Log("Verify behaviour")
 	comp0StartLogs := logs.FilterMessageSnippet(
 		fmt.Sprintf("Starting component %q", comp0ID)).TakeAll()
 	comp0StopLogs := logs.FilterMessageSnippet(
@@ -2719,7 +2764,7 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 	assert.NoError(t, err, "Manager.Run returned and error")
 
 	if t.Failed() {
-		t.Logf("manager logs:")
+		t.Log("manager logs:")
 		for _, l := range logs.TakeAll() {
 			t.Log(l)
 		}

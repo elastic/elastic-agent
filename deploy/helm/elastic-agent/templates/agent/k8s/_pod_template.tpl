@@ -4,8 +4,8 @@
 {{- $agentName := index . 2 }}
     spec:
       dnsPolicy: ClusterFirstWithHostNet
-      {{- if eq $.Values.agent.fleet.enabled true }}
-      hostNetwork: true
+      {{- with ($presetVal).hostNetwork }}
+      hostNetwork: {{ . }}
       {{- end }}
       {{- with ($presetVal).hostPID }}
       hostPID: {{ . }}

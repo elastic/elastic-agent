@@ -516,7 +516,7 @@ func WaitHealthyAndVersion(ctx context.Context, f *atesting.Fixture, versionInfo
 			// If we're in an upgrade process, the versions might not match
 			// so we wait to see if we get to a stable version
 			if errors.Is(err, ErrVerMismatch) {
-				logger.Logf("version mismatch, ignoring it, time until timeout: %s", deadline.Sub(time.Now()))
+				logger.Logf("version mismatch, ignoring it, time until timeout: %s", time.Until(deadline))
 				continue
 			}
 			if err == nil {

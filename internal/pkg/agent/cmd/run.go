@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -611,6 +612,7 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 		envVerifyServerCert = "ELASTIC_APM_VERIFY_SERVER_CERT"
 		envServerCert       = "ELASTIC_APM_SERVER_CERT"
 		envCACert           = "ELASTIC_APM_SERVER_CA_CERT_FILE"
+		envSampleRate       = "ELASTIC_APM_TRANSACTION_SAMPLE_RATE"
 	)
 	if cfg.TLS.SkipVerify {
 		os.Setenv(envVerifyServerCert, "false")
@@ -623,6 +625,10 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 	if cfg.TLS.ServerCA != "" {
 		os.Setenv(envCACert, cfg.TLS.ServerCA)
 		defer os.Unsetenv(envCACert)
+	}
+	if cfg.SamplingRate != nil {
+		os.Setenv(envSampleRate, strconv.FormatFloat(float64(*cfg.SamplingRate), 'f', -1, 32))
+		defer os.Unsetenv(envSampleRate)
 	}
 
 	opts := apmtransport.HTTPTransportOptions{}

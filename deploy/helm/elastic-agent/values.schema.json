@@ -1,0 +1,1182 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "type": "object",
+    "title": "Elastic Agent Helm chart configuration.",
+    "description": "Schema for managing the Elastic Agent Helm chart values.",
+    "properties": {
+        "outputs": {
+            "type": "object",
+            "description": "Object containing multiple output configurations.",
+            "additionalProperties": {
+                "$ref": "#/definitions/OutputObject"
+            },
+            "examples": [
+                {
+                    "outputNamePlain": {
+                        "type": "ESPlainAuthBasic"
+                    }
+                }
+            ]
+        },
+        "kubernetes": {
+            "type": "object",
+            "description": "Configuration for Kubernetes integration.",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Enable Kubernetes integration."
+                },
+                "output": {
+                    "type": "string",
+                    "description": "Name of the output used in Kubernetes integration. Must be defined in outputs."
+                },
+                "namespace": {
+                    "type": "string",
+                    "description": "Kubernetes namespace.",
+                    "default": "default"
+                },
+                "hints": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable elastic-agent autodiscovery feature."
+                        }
+                    }
+                },
+                "state": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable state streams based on kube-state-metrics."
+                        },
+                        "deployKSM": {
+                            "type": "boolean",
+                            "description": "Deploy kube-state-metrics service as a sidecar container."
+                        },
+                        "host": {
+                            "type": "string",
+                            "description": "Host of the kube-state-metrics service, used when deployKSM is set to false."
+                        },
+                        "vars": {
+                            "type": "object",
+                            "description": "State streams variables."
+                        }
+                    },
+                    "required": [
+                        "enabled",
+                        "deployKSM"
+                    ],
+                    "if": {
+                        "properties": {
+                            "deployKSM": {
+                                "const": false
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "host": {
+                                "type": "string",
+                                "format": "uri"
+                            }
+                        },
+                        "required": [
+                            "host"
+                        ]
+                    }
+                },
+                "metrics": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable metric streams based on kubelet."
+                        },
+                        "vars": {
+                            "type": "object",
+                            "description": "Metric streams variables."
+                        }
+                    },
+                    "required": [
+                        "enabled"
+                    ]
+                },
+                "apiserver": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable apiserver input."
+                        },
+                        "vars": {
+                            "type": "object",
+                            "description": "Apiserver variables."
+                        }
+                    },
+                    "required": [
+                        "enabled"
+                    ]
+                },
+                "proxy": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable proxy input."
+                        },
+                        "vars": {
+                            "type": "object",
+                            "description": "Proxy stream variables."
+                        }
+                    },
+                    "required": [
+                        "enabled"
+                    ]
+                },
+                "scheduler": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable scheduler input."
+                        },
+                        "vars": {
+                            "type": "object",
+                            "description": "Scheduler stream variables."
+                        }
+                    },
+                    "required": [
+                        "enabled"
+                    ]
+                },
+                "controller_manager": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable controller_manager input."
+                        },
+                        "vars": {
+                            "type": "object",
+                            "description": "Controller manager stream variables."
+                        }
+                    },
+                    "required": [
+                        "enabled"
+                    ]
+                },
+                "containers": {
+                    "type": "object",
+                    "properties": {
+                        "metrics": {
+                            "$ref": "#/definitions/KubernetesStreamConfig"
+                        },
+                        "state": {
+                            "$ref": "#/definitions/KubernetesStreamConfig"
+                        },
+                        "logs": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "type": "boolean",
+                                    "description": "Enable containers logs stream."
+                                },
+                                "additionalParsersConfig": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "required": [
+                                "enabled"
+                            ]
+                        },
+                        "audit_logs": {
+                            "$ref": "#/definitions/KubernetesStreamConfig"
+                        }
+                    }
+                },
+                "pods": {
+                    "$ref": "#/definitions/KubernetesMetricsAndStateConfig"
+                },
+                "deployments": {
+                    "$ref": "#/definitions/KubernetesStateConfig"
+                },
+                "statefulsets": {
+                    "$ref": "#/definitions/KubernetesStateConfig"
+                },
+                "daemonsets": {
+                    "$ref": "#/definitions/KubernetesStateConfig"
+                },
+                "replicasets": {
+                    "$ref": "#/definitions/KubernetesStateConfig"
+                },
+                "namespaces": {
+                    "$ref": "#/definitions/KubernetesStateConfig"
+                },
+                "volumes": {
+                    "$ref": "#/definitions/KubernetesMetricsConfig"
+                },
+                "nodes": {
+                    "$ref": "#/definitions/KubernetesMetricsAndStateConfig"
+                },
+                "storageclasses": {
+                    "$ref": "#/definitions/KubernetesStateConfig"
+                },
+                "jobs": {
+                    "$ref": "#/definitions/KubernetesStateConfig"
+                },
+                "cronjobs": {
+                    "$ref": "#/definitions/KubernetesStateConfig"
+                },
+                "persistentvolumes": {
+                    "$ref": "#/definitions/KubernetesStateConfig"
+                },
+                "persistentvolumeclaims": {
+                    "$ref": "#/definitions/KubernetesStateConfig"
+                },
+                "resourcequotas": {
+                    "$ref": "#/definitions/KubernetesStateConfig"
+                },
+                "services": {
+                    "$ref": "#/definitions/KubernetesStateConfig"
+                },
+                "system": {
+                    "$ref": "#/definitions/KubernetesMetricsConfig"
+                }
+            }
+        },
+        "extraIntegrations": {
+            "type": "object",
+            "description": "Configuration for extra integrations.",
+            "additionalProperties": {
+                "$ref": "#/definitions/CustomIntegrationConfig"
+            }
+        },
+        "agent": {
+            "type": "object",
+            "description": "Configuration for the Elastic-Agent.",
+            "properties": {
+                "version": {
+                    "type": "string",
+                    "description": "Elastic-Agent version.",
+                    "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+.*$"
+                },
+                "image": {
+                    "$ref": "#/definitions/AgentImageConfig"
+                },
+                "engine": {
+                    "type": "string",
+                    "enum": [
+                        "k8s",
+                        "eck"
+                    ],
+                    "description": "Engine to use for Kubernetes manifests or ECK CRDs.",
+                    "examples": [
+                        "k8s"
+                    ],
+                    "default": "k8s"
+                },
+                "unprivileged": {
+                    "type": "boolean",
+                    "description": "Enable unprivileged mode."
+                },
+                "fleet": {
+                    "type": "object",
+                    "description": "Elastic-Agent managed configuration.",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable Elastic-Agent managed mode.",
+                            "default": false
+                        },
+                        "url": {
+                            "type": "string",
+                            "description": "Fleet server URL."
+                        },
+                        "token": {
+                            "type": "string",
+                            "description": "Fleet enrollment token."
+                        },
+                        "insecure": {
+                            "type": "boolean",
+                            "description": "Fleet insecure URL."
+                        },
+                        "kibanaHost": {
+                            "type": "string",
+                            "description": "Kibana host to fallback if enrollment token is not supplied."
+                        },
+                        "kibanaUser": {
+                            "type": "string",
+                            "description": "Kibana username to fallback if enrollment token is not supplied."
+                        },
+                        "kibanaPassword": {
+                            "type": "string",
+                            "description": "Kibana password to fallback if enrollment token is not supplied."
+                        },
+                        "preset": {
+                            "type": "string",
+                            "description": "Agent preset to deploy."
+                        }
+                    },
+                    "required": [
+                        "enabled"
+                    ],
+                    "if": {
+                        "properties": {
+                            "enabled": {
+                                "const": true
+                            }
+                        }
+                    },
+                    "then": {
+                        "anyOf": [
+                            {
+                                "required": [
+                                    "preset",
+                                    "url",
+                                    "token"
+                                ],
+                                "properties": {
+                                    "preset": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    },
+                                    "url": {
+                                        "type": "string",
+                                        "format": "uri"
+                                    },
+                                    "token": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    }
+                                }
+                            },
+                            {
+                                "required": [
+                                    "preset",
+                                    "url",
+                                    "kibanaHost",
+                                    "kibanaUser",
+                                    "kibanaPassword"
+                                ],
+                                "properties": {
+                                    "preset": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    },
+                                    "url": {
+                                        "type": "string",
+                                        "format": "uri"
+                                    },
+                                    "kibanaHost": {
+                                        "type": "string",
+                                        "format": "uri"
+                                    },
+                                    "kibanaUser": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    },
+                                    "kibanaPassword": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                "presets": {
+                    "type": "object",
+                    "description": "Map of deployment presets for the Elastic Agent.",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/AgentPreset"
+                    },
+                    "default": {
+                        "presetName": {
+                            "mode": "daemonset"
+                        }
+                    },
+                    "examples": [
+                        {
+                            "presetName": {
+                                "mode": "daemonset"
+                            }
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "version",
+                "engine",
+                "presets"
+            ]
+        }
+    },
+    "required": [
+        "outputs",
+        "agent"
+    ],
+    "if": {
+        "properties": {
+            "agent": {
+                "properties": {
+                    "engine": {
+                        "const": "k8s"
+                    }
+                }
+            }
+        }
+    },
+    "then": {
+        "not": {
+            "properties": {
+                "outputs": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "properties": {
+                            "type": {
+                                "const": "ESECKRef"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "OutputObject": {
+            "type": "object",
+            "description": "Defines the configuration for an output.",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "ESPlainAuthBasic",
+                        "ESPlainAuthAPI",
+                        "ESSecretAuthBasic",
+                        "ESSecretAuthAPI",
+                        "ESECKRef"
+                    ],
+                    "description": "Type of the output."
+                },
+                "url": {
+                    "type": "string",
+                    "description": "URL of the output (required for ESPlainAuthBasic and ESPlainAuthAPI type).",
+                    "example": "http://elasticsearch:9200"
+                },
+                "username": {
+                    "type": "string",
+                    "description": "Username to authenticate with the output (required for ESPlainAuthBasic).",
+                    "example": "elastic"
+                },
+                "password": {
+                    "type": "string",
+                    "description": "Password to authenticate with the output (required for ESPlainAuthBasic).",
+                    "example": "fantastic"
+                },
+                "api_key": {
+                    "type": "string",
+                    "description": "API key to authenticate with the output (required for ESPlainAuthAPI type)."
+                },
+                "secretName": {
+                    "type": "string",
+                    "description": "K8s secret to mount output connection details (required for ESSecretAuthBasic and ESSecretAuthAPI types)."
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Name to reference an Elasticsearch cluster managed by ECK (required for ESECKRef type)."
+                },
+                "namespace": {
+                    "type": "string",
+                    "description": "Namespace to reference an Elasticsearch cluster managed by ECK (optional for ESECKRef type)."
+                }
+            },
+            "required": [
+                "type"
+            ],
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "ESPlainAuthBasic"
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "url": {
+                                "type": "string",
+                                "format": "uri"
+                            },
+                            "username": {
+                                "type": "string",
+                                "minLength": 1
+                            },
+                            "password": {
+                                "type": "string",
+                                "minLength": 1
+                            }
+                        },
+                        "required": [
+                            "url",
+                            "username",
+                            "password"
+                        ]
+                    }
+                },{
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "ESPlainAuthAPI"
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "url": {
+                                "type": "string",
+                                "format": "uri"
+                            },
+                            "api_key": {
+                                "type": "string",
+                                "minLength": 1
+                            }
+                        },
+                        "required": [
+                            "url",
+                            "api_key"
+                        ]
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "ESSecretAuthBasic"
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "secretName": {
+                                "type": "string",
+                                "minLength": 1
+                            }
+                        },
+                        "required": [
+                            "secretName"
+                        ]
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "ESSecretAuthAPI"
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "secretName": {
+                                "type": "string",
+                                "minLength": 1
+                            }
+                        },
+                        "required": [
+                            "secretName"
+                        ]
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "ESECKRef"
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "minLength": 1
+                            },
+                            "namespace": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "name"
+                        ]
+                    }
+                }
+            ]
+        },
+        "KubernetesStreamConfig": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Enable stream."
+                },
+                "vars": {
+                    "type": "object",
+                    "description": "Stream variables."
+                }
+            },
+            "required": [
+                "enabled"
+            ]
+        },
+        "KubernetesMetricsConfig": {
+            "type": "object",
+            "properties": {
+                "metrics": {
+                    "$ref": "#/definitions/KubernetesStreamConfig"
+                }
+            }
+        },
+        "KubernetesStateConfig": {
+            "type": "object",
+            "properties": {
+                "state": {
+                    "$ref": "#/definitions/KubernetesStreamConfig"
+                }
+            }
+        },
+        "KubernetesMetricsAndStateConfig": {
+            "type": "object",
+            "properties": {
+                "metrics": {
+                    "$ref": "#/definitions/KubernetesStreamConfig"
+                },
+                "state": {
+                    "$ref": "#/definitions/KubernetesStreamConfig"
+                }
+            }
+        },
+        "CustomIntegrationConfig": {
+            "type": "object",
+            "description": "Configuration for a single integration.",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "description": "Unique identifier for the integration.",
+                    "minLength": 1
+                },
+                "preset": {
+                    "type": "string",
+                    "description": "Agent preset that this integration runs on.",
+                    "minLength": 1
+                },
+                "use_output": {
+                    "type": "string",
+                    "description": "Name of the output to use.",
+                    "minLength": 1
+                }
+            },
+            "required": [
+                "id",
+                "preset",
+                "use_output"
+            ]
+        },
+        "AgentImageConfig": {
+            "type": "object",
+            "description": "Image configuration for the Elastic-Agent.",
+            "properties": {
+                "repository": {
+                    "type": "string",
+                    "description": "Docker image repository.",
+                    "minLength": 1
+                },
+                "pullPolicy": {
+                    "type": "string",
+                    "enum": [
+                        "Always",
+                        "IfNotPresent",
+                        "Never"
+                    ],
+                    "description": "Image pull policy."
+                },
+                "tag": {
+                    "type": "string",
+                    "description": "Image tag."
+                }
+            },
+            "required": [
+                "repository",
+                "pullPolicy",
+                "tag"
+            ]
+        },
+        "AgentFleetConfig": {
+            "type": "object",
+            "description": "Elastic-Agent managed configuration.",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Enable Elastic-Agent managed mode.",
+                    "default": false
+                },
+                "url": {
+                    "type": "string",
+                    "description": "Fleet server URL."
+                },
+                "token": {
+                    "type": "string",
+                    "description": "Fleet enrollment token."
+                },
+                "insecure": {
+                    "type": "boolean",
+                    "description": "Fleet insecure URL."
+                },
+                "kibanaHost": {
+                    "type": "string",
+                    "description": "Kibana host to fallback if enrollment token is not supplied."
+                },
+                "kibanaUser": {
+                    "type": "string",
+                    "description": "Kibana username to fallback if enrollment token is not supplied."
+                },
+                "kibanaPassword": {
+                    "type": "string",
+                    "description": "Kibana password to fallback if enrollment token is not supplied."
+                },
+                "preset": {
+                    "type": "string",
+                    "description": "Agent preset to deploy."
+                }
+            },
+            "required": [
+                "enabled"
+            ],
+            "if": {
+                "properties": {
+                    "enabled": {
+                        "const": true
+                    }
+                }
+            },
+            "then": {
+                "anyOf": [
+                    {
+                        "required": [
+                            "preset",
+                            "url",
+                            "token"
+                        ],
+                        "properties": {
+                            "preset": {
+                                "type": "string",
+                                "minLength": 1
+                            },
+                            "url": {
+                                "type": "string",
+                                "format": "uri"
+                            },
+                            "token": {
+                                "type": "string",
+                                "minLength": 1
+                            }
+                        }
+                    },
+                    {
+                        "required": [
+                            "preset",
+                            "url",
+                            "kibanaHost",
+                            "kibanaUser",
+                            "kibanaPassword"
+                        ],
+                        "properties": {
+                            "preset": {
+                                "type": "string",
+                                "minLength": 1
+                            },
+                            "url": {
+                                "type": "string",
+                                "format": "uri"
+                            },
+                            "kibanaHost": {
+                                "type": "string",
+                                "format": "uri"
+                            },
+                            "kibanaUser": {
+                                "type": "string",
+                                "minLength": 1
+                            },
+                            "kibanaPassword": {
+                                "type": "string",
+                                "minLength": 1
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        "AgentPreset": {
+            "type": "object",
+            "description": "Configuration for an Agent preset.",
+            "properties": {
+                "mode": {
+                    "type": "string",
+                    "enum": [
+                        "deployment",
+                        "statefulset",
+                        "daemonset"
+                    ],
+                    "description": "Mode of the Agent preset."
+                },
+                "replicaCount": {
+                    "type": "integer",
+                    "description": "Replica count for the preset.",
+                    "examples": [
+                        1
+                    ]
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "description": "Labels for the deployment.",
+                    "examples": [
+                        {
+                            "app": "elastic-agent"
+                        }
+                    ]
+                },
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "description": "Annotations for the deployment.",
+                    "examples": [
+                        {
+                            "annotationKey": "annotationValue"
+                        }
+                    ]
+                },
+                "affinity": {
+                    "type": "object",
+                    "description": "Affinity rules for the deployment.",
+                    "examples": [
+                        {
+                            "nodeAffinity": {
+                                "requiredDuringSchedulingIgnoredDuringExecution": {
+                                    "nodeSelectorTerms": [
+                                        {
+                                            "matchExpressions": [
+                                                {
+                                                    "key": "kubernetes.io/e2e-az-name",
+                                                    "operator": "In",
+                                                    "values": [
+                                                        "e2e-az1",
+                                                        "e2e-az2"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ]
+                },
+                "initContainers": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    },
+                    "description": "Init containers for the deployment.",
+                    "examples": [
+                        [
+                            {
+                                "name": "init-container",
+                                "image": "busybox",
+                                "command": [
+                                    "sh",
+                                    "-c",
+                                    "echo Initializing..."
+                                ]
+                            }
+                        ]
+                    ]
+                },
+                "extraContainers": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    },
+                    "description": "Extra containers for the deployment.",
+                    "examples": [
+                        [
+                            {
+                                "name": "sidecar-container",
+                                "image": "nginx",
+                                "ports": [
+                                    {
+                                        "containerPort": 80
+                                    }
+                                ]
+                            }
+                        ]
+                    ]
+                },
+                "hostNetwork": {
+                    "type": "boolean",
+                    "description": "Enable host networking for the deployment.",
+                    "examples": [
+                        true
+                    ]
+                },
+                "hostPID": {
+                    "type": "boolean",
+                    "description": "Enable host PID namespace for the deployment.",
+                    "examples": [
+                        true
+                    ]
+                },
+                "resources": {
+                    "type": "object",
+                    "description": "Resource limits and requests for the deployment.",
+                    "examples": [
+                        {
+                            "limits": {
+                                "cpu": "500m",
+                                "memory": "128Mi"
+                            },
+                            "requests": {
+                                "cpu": "250m",
+                                "memory": "64Mi"
+                            }
+                        }
+                    ]
+                },
+                "securityContext": {
+                    "type": "object",
+                    "description": "Security context for the deployment.",
+                    "examples": [
+                        {
+                            "runAsUser": 1000,
+                            "runAsGroup": 3000,
+                            "fsGroup": 2000
+                        }
+                    ]
+                },
+                "rules": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    },
+                    "description": "Rules for the deployment.",
+                    "examples": [
+                        [
+                            {
+                                "apiGroups": [
+                                    ""
+                                ],
+                                "resources": [
+                                    "pods"
+                                ],
+                                "verbs": [
+                                    "get",
+                                    "watch",
+                                    "list"
+                                ]
+                            }
+                        ]
+                    ]
+                },
+                "nodeSelector": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "description": "Node selector for the deployment.",
+                    "examples": [
+                        {
+                            "disktype": "ssd"
+                        }
+                    ]
+                },
+                "tolerations": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    },
+                    "description": "Tolerations for the deployment.",
+                    "examples": [
+                        [
+                            {
+                                "key": "key1",
+                                "operator": "Exists",
+                                "effect": "NoSchedule"
+                            }
+                        ]
+                    ]
+                },
+                "topologySpreadConstraints": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    },
+                    "description": "Topology spread constraints for the deployment.",
+                    "examples": [
+                        [
+                            {
+                                "maxSkew": 1,
+                                "topologyKey": "kubernetes.io/hostname",
+                                "whenUnsatisfiable": "DoNotSchedule",
+                                "labelSelector": {
+                                    "matchLabels": {
+                                        "app": "elastic-agent"
+                                    }
+                                }
+                            }
+                        ]
+                    ]
+                },
+                "extraEnvs": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    },
+                    "description": "Extra environment variables for the deployment.",
+                    "examples": [
+                        [
+                            {
+                                "name": "ENV_VAR_NAME",
+                                "value": "value"
+                            }
+                        ]
+                    ]
+                },
+                "extraVolumes": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    },
+                    "description": "Extra volumes for the deployment.",
+                    "examples": [
+                        [
+                            {
+                                "name": "extra-volume",
+                                "emptyDir": {}
+                            }
+                        ]
+                    ]
+                },
+                "extraVolumeMounts": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    },
+                    "description": "Extra volume mounts for the deployment.",
+                    "examples": [
+                        [
+                            {
+                                "name": "extra-volume",
+                                "mountPath": "/mnt/extra"
+                            }
+                        ]
+                    ]
+                },
+                "agent": {
+                    "type": "object",
+                    "properties": {
+                        "monitoring": {
+                            "type": "object",
+                            "properties": {
+                                "namespace": {
+                                    "type": "string"
+                                },
+                                "use_output": {
+                                    "type": "string"
+                                },
+                                "enabled": {
+                                    "type": "boolean"
+                                },
+                                "logs": {
+                                    "type": "boolean"
+                                },
+                                "metrics": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "namespace",
+                                "use_output",
+                                "enabled",
+                                "logs",
+                                "metrics"
+                            ]
+                        }
+                    },
+                    "examples": [
+                        {
+                            "monitoring": {
+                                "namespace": "elastic-agent",
+                                "use_output": "default",
+                                "enabled": true,
+                                "logs": true,
+                                "metrics": true
+                            }
+                        }
+                    ]
+                },
+                "providers": {
+                    "type": "object",
+                    "description": "Providers configuration for the deployment.",
+                    "properties": {
+                        "kubernetes_leaderelection": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "type": "boolean"
+                                }
+                            }
+                        },
+                        "kubernetes": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "type": "boolean"
+                                },
+                                "node": {
+                                    "type": "string"
+                                },
+                                "scope": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "examples": [
+                        {
+                            "kubernetes_leaderelection": {
+                                "enabled": false
+                            },
+                            "kubernetes": {
+                                "enabled": true,
+                                "node": "node-1",
+                                "scope": "cluster"
+                            }
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "mode"
+            ]
+        }
+    }
+}

@@ -64,7 +64,8 @@ func TestErrorsWrap(t *testing.T) {
 	ew := fmt.Errorf("wrapper: %w", ce)
 	outer := New(ew)
 
-	outerCustom, ok := outer.(Error)
+	var outerCustom Error
+	ok := errors.As(outer, &outerCustom)
 	if !ok {
 		t.Error("expected Error")
 		return
@@ -109,7 +110,8 @@ func TestErrors(t *testing.T) {
 
 	for _, tc := range cases {
 		actualErr := New(tc.args...)
-		agentErr, ok := actualErr.(Error)
+		var agentErr Error
+		ok := errors.As(actualErr, &agentErr)
 		if !ok {
 			t.Errorf("[%s] expected Error", tc.id)
 			continue
@@ -151,7 +153,8 @@ func TestMetaFold(t *testing.T) {
 	err3 := New("level3", err2, M("key1", "level3"), M("key3", "level3"))
 	err4 := New("level4", err3)
 
-	resultingErr, ok := err4.(Error)
+	var resultingErr Error
+	ok := errors.As(err4, &resultingErr)
 	if !ok {
 		t.Fatal("error is not Error")
 	}
@@ -186,7 +189,8 @@ func TestMetaCallDoesNotModifyCollection(t *testing.T) {
 	err3 := New("level3", err2, M("key1", "level3"), M("key3", "level3"))
 	err4 := New("level4", err3)
 
-	resultingErr, ok := err4.(agentError)
+	var resultingErr agentError
+	ok := errors.As(err4, &resultingErr)
 	if !ok {
 		t.Fatal("error is not Error")
 	}
