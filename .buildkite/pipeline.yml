@@ -23,7 +23,7 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage.out"
+          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "family/core-ubuntu-2204"
@@ -38,7 +38,7 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage.out"
+          - "coverage-*.out"
         agents:
           provider: "aws"
           imagePrefix: "core-ubuntu-2204-aarch64"
@@ -55,7 +55,7 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage.out"
+          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "family/core-windows-2022"
@@ -73,7 +73,7 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage.out"
+          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "family/core-windows-2016"
@@ -93,7 +93,7 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage.out"
+          - "coverage-*.out"
         agents:
           provider: orka
           imagePrefix: generic-13-ventura-arm
@@ -108,7 +108,7 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage.out"
+          - "coverage-*.out"
         agents:
           provider: orka
           imagePrefix: generic-13-ventura-x64
@@ -126,7 +126,7 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage.out"
+          - "coverage-*.out"
         agents:
           provider: "gcp"
           # TODO create own image
@@ -143,7 +143,7 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage.out"
+          - "coverage-*.out"
         agents:
           provider: "gcp"
           # TODO create own image
