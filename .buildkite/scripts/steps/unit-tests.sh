@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-
 source .buildkite/scripts/common.sh
-set -uo pipefail
+set +euo pipefail
 
 echo "--- Unit tests"
 RACE_DETECTOR=true TEST_COVERAGE=true mage unitTest
