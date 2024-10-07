@@ -5,10 +5,10 @@ source .buildkite/scripts/common2.sh
 
 source .buildkite/scripts/steps/ess.sh
 
-OVERRIDE_AGENT_PACKAGE_VERSION="$(cat .package-version)"
-OVERRIDE_TEST_AGENT_VERSION=${OVERRIDE_AGENT_PACKAGE_VERSION}"-SNAPSHOT"
+OVERRIDE_STACK_VERSION="$(cat .package-version)"
+OVERRIDE_STACK_VERSION=${OVERRIDE_STACK_VERSION}"-SNAPSHOT"
 
-ess_up $OVERRIDE_TEST_AGENT_VERSION || echo "Failed to start ESS stack" >&2
+ess_up $OVERRIDE_STACK_VERSION || echo "Failed to start ESS stack" >&2
 
 echo "ES_HOST: ${ELASTICSEARCH_HOST}"
 buildkite-agent meta-data set "es.host" $ELASTICSEARCH_HOST

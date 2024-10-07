@@ -19,8 +19,8 @@ fi
 # Override the agent package version using a string with format <major>.<minor>.<patch>
 # There is a time when the snapshot is not built yet, so we cannot use the latest version automatically
 # This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
-OVERRIDE_AGENT_PACKAGE_VERSION="$(cat .package-version)"
-OVERRIDE_TEST_AGENT_VERSION=${OVERRIDE_AGENT_PACKAGE_VERSION}"-SNAPSHOT"
+OVERRIDE_STACK_VERSION="$(cat .package-version)"
+OVERRIDE_STACK_VERSION=${OVERRIDE_STACK_VERSION}"-SNAPSHOT"
 
 echo "~~~ Building test binaries"
 mage build:testBinaries
@@ -30,7 +30,7 @@ mage build:testBinaries
 # BUILDKITE_RETRY_COUNT > 0 for the retries
 if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
   echo "~~~ The steps is retried, starting the ESS stack again"
-  ess_up $OVERRIDE_TEST_AGENT_VERSION || echo "Failed to start ESS stack" >&2
+  ess_up $OVERRIDE_STACK_VERSION || echo "Failed to start ESS stack" >&2
   trap 'ess_down' EXIT  
 else 
   # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data
