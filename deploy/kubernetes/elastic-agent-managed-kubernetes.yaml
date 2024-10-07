@@ -27,7 +27,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: elastic-agent
-          image: docker.elastic.co/beats/elastic-agent:8.15.1
+          image: docker.elastic.co/beats/elastic-agent:8.15.3
           env:
             # Set to 1 for enrollment into Fleet server. If not set, Elastic Agent is run in standalone mode
             - name: FLEET_ENROLL
@@ -83,10 +83,10 @@ spec:
             #    - SYS_ADMIN
           resources:
             limits:
-              memory: 700Mi
+              memory: 1Gi
             requests:
               cpu: 100m
-              memory: 400Mi
+              memory: 500Mi
           volumeMounts:
             - name: proc
               mountPath: /hostfs/proc

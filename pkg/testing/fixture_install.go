@@ -402,7 +402,7 @@ func getProcesses(t *gotesting.T, regex string) []runningProcess {
 //   - an error if any.
 func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts []process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture installDeb function", f.t.Name())
-	//Prepare so that the f.srcPackage string is populated
+	// Prepare so that the f.srcPackage string is populated
 	err := f.EnsurePrepared(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare: %w", err)
@@ -416,6 +416,7 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts
 
 	f.t.Cleanup(func() {
 		f.t.Logf("[test %s] Inside fixture installDeb cleanup function", f.t.Name())
+
 		uninstallCtx, uninstallCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer uninstallCancel()
 		// stop elastic-agent, non fatal if error, might have been stopped before this.
@@ -424,6 +425,12 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts
 		if err != nil {
 			f.t.Logf("error systemctl stop elastic-agent: %s, output: %s", err, string(out))
 		}
+
+		if keepInstalledFlag() {
+			f.t.Logf("skipping uninstall; test failed and AGENT_KEEP_INSTALLED=true")
+			return
+		}
+
 		// apt-get purge elastic-agent
 		f.t.Logf("running 'sudo apt-get -y -q purge elastic-agent'")
 		out, err = exec.CommandContext(uninstallCtx, "sudo", "apt-get", "-y", "-q", "purge", "elastic-agent").CombinedOutput()
@@ -476,7 +483,7 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts
 //   - an error if any.
 func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, opts []process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture installRpm function", f.t.Name())
-	//Prepare so that the f.srcPackage string is populated
+	// Prepare so that the f.srcPackage string is populated
 	err := f.EnsurePrepared(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare: %w", err)
@@ -642,27 +649,20 @@ func (f *Fixture) collectDiagnostics() {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
-	dir, err := findProjectRoot(f.caller)
+	diagPath, err := f.DiagnosticsDir()
 	if err != nil {
-		f.t.Logf("failed to collect diagnostics; failed to find project root: %s", err)
+		f.t.Logf("failed to collect diagnostics: %v", err)
 		return
 	}
-	diagPath := filepath.Join(dir, "build", "diagnostics")
+
 	err = os.MkdirAll(diagPath, 0755)
 	if err != nil {
 		f.t.Logf("failed to collect diagnostics; failed to create %s: %s", diagPath, err)
 		return
 	}
 
-	stamp := time.Now().Format(time.RFC3339)
-	if runtime.GOOS == "windows" {
-		// on Windows a filename cannot contain a ':' as this collides with disk labels (aka. C:\)
-		stamp = strings.ReplaceAll(stamp, ":", "-")
-	}
-
-	// Sub-test names are separated by "/" characters which are not valid filenames on Linux.
-	sanitizedTestName := strings.ReplaceAll(f.t.Name(), "/", "-")
-	outputPath := filepath.Join(diagPath, fmt.Sprintf("%s-diagnostics-%s.zip", sanitizedTestName, stamp))
+	prefix := f.FileNamePrefix()
+	outputPath := filepath.Join(diagPath, prefix+"-diagnostics.zip")
 
 	output, err := f.Exec(ctx, []string{"diagnostics", "-f", outputPath})
 	if err != nil {
@@ -682,8 +682,7 @@ func (f *Fixture) collectDiagnostics() {
 		if err != nil {
 			// If collecting diagnostics fails, zip up the entire installation directory with the hope that it will contain logs.
 			f.t.Logf("creating zip archive of the installation directory: %s", f.workDir)
-			timestamp := strings.ReplaceAll(time.Now().Format(time.RFC3339), ":", "-")
-			zipPath := filepath.Join(diagPath, fmt.Sprintf("%s-install-directory-%s.zip", sanitizedTestName, timestamp))
+			zipPath := filepath.Join(diagPath, fmt.Sprintf("%s-install-directory.zip", prefix))
 			err = f.archiveInstallDirectory(f.workDir, zipPath)
 			if err != nil {
 				f.t.Logf("failed to zip install directory to %s: %s", zipPath, err)

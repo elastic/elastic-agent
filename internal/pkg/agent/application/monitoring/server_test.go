@@ -98,18 +98,18 @@ func TestHTTPReloadEnableBehavior(t *testing.T) {
 			t.Logf("starting server...")
 			serverReloader.Start()
 			if testCase.httpOnAtInit {
-				waitOnReturnCode(t, http.StatusOK, "?failon=failed", serverReloader)
+				waitOnReturnCode(t, http.StatusOK, "liveness", "?failon=failed", serverReloader)
 			} else {
-				waitOnReturnCode(t, http.StatusNotFound, "?failon=failed", serverReloader)
+				waitOnReturnCode(t, http.StatusNotFound, "liveness", "?failon=failed", serverReloader)
 			}
 
 			err = serverReloader.Reload(testCase.secondConfig)
 			require.NoError(t, err)
 
 			if testCase.httpOnAfterReload {
-				waitOnReturnCode(t, http.StatusOK, "?failon=failed", serverReloader)
+				waitOnReturnCode(t, http.StatusOK, "liveness", "?failon=failed", serverReloader)
 			} else {
-				waitOnReturnCode(t, http.StatusNotFound, "?failon=failed", serverReloader)
+				waitOnReturnCode(t, http.StatusNotFound, "liveness", "?failon=failed", serverReloader)
 			}
 
 		})
@@ -132,9 +132,9 @@ func TestBasicLivenessConfig(t *testing.T) {
 	t.Logf("starting server...")
 	serverReloader.Start()
 
-	waitOnReturnCode(t, http.StatusInternalServerError, "?failon=degraded", serverReloader)
+	waitOnReturnCode(t, http.StatusInternalServerError, "liveness", "?failon=degraded", serverReloader)
 
-	waitOnReturnCode(t, http.StatusOK, "?failon=failed", serverReloader)
+	waitOnReturnCode(t, http.StatusOK, "liveness", "?failon=failed", serverReloader)
 
 	t.Logf("stopping server...")
 	err = serverReloader.Stop()
@@ -142,14 +142,41 @@ func TestBasicLivenessConfig(t *testing.T) {
 
 }
 
-func waitOnReturnCode(t *testing.T, expectedReturnCode int, formValue string, rel *reload.ServerReloader) {
+func TestPprofEnabled(t *testing.T) {
+	_ = logp.DevelopmentSetup()
+	testAPIConfig := api.Config{}
+	testConfig := config.MonitoringConfig{
+		Enabled: true,
+		HTTP: &config.MonitoringHTTPConfig{
+			Enabled: true,
+			Port:    0,
+		},
+		Pprof: &config.PprofConfig{
+			Enabled: true,
+		},
+	}
+	serverReloader, err := NewServer(logp.L(), testAPIConfig, nil, nil, fakeCoordCfg, "linux", &testConfig)
+	require.NoError(t, err)
+
+	t.Logf("starting server...")
+	serverReloader.Start()
+
+	waitOnReturnCode(t, http.StatusOK, "debug/pprof/", "", serverReloader)
+
+	t.Logf("stopping server...")
+	err = serverReloader.Stop()
+	require.NoError(t, err)
+
+}
+
+func waitOnReturnCode(t *testing.T, expectedReturnCode int, path string, formValue string, rel *reload.ServerReloader) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 	client := &http.Client{}
 	require.Eventually(t, func() bool {
-		path := fmt.Sprintf("http://%s/liveness%s", rel.Addr().String(), formValue)
-		t.Logf("checking %s", path)
-		req, err := http.NewRequestWithContext(ctx, "GET", path, nil)
+		url := fmt.Sprintf("http://%s/%s%s", rel.Addr().String(), path, formValue)
+		t.Logf("checking %s", url)
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		require.NoError(t, err)
 
 		resp, err := client.Do(req)

@@ -231,6 +231,10 @@ func (runner *ExtendedRunner) CheckHealthAtStartup(ctx context.Context) {
 				if !foundSystem && strings.Contains(v.UnitID, systemMatch) {
 					foundSystem = true
 				}
+				runner.T().Logf("unit state: %s", v.Message)
+				if v.State != int(cproto.State_HEALTHY) {
+					allHealthy = false
+				}
 			}
 			runner.T().Logf("component state: %s", comp.Message)
 			if comp.State != int(cproto.State_HEALTHY) {
