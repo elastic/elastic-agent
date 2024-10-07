@@ -313,6 +313,9 @@ func TestInjectAPMConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if true {
+				t.Fatalf("testing the BK annotations")
+			}
 			got, err := InjectAPMConfig(tt.args.comps, tt.args.cfg)
 			if !tt.wantErr(t, err, fmt.Sprintf("InjectAPMConfig(%v, %v)", tt.args.comps, tt.args.cfg)) {
 				return
