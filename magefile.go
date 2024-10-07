@@ -93,6 +93,8 @@ const (
 	agentCoreProjectName = "elastic-agent-core"
 
 	helmChartPath = "./deploy/helm/elastic-agent"
+
+	sha512FileExt = ".sha512"
 )
 
 var (
@@ -947,16 +949,16 @@ func runAgent(ctx context.Context, env map[string]string) error {
 func packageAgent(ctx context.Context, platforms []string, dependenciesVersion string, manifestResponse *manifest.Build, agentPackaging, agentBinaryTarget mg.Fn) error {
 	fmt.Println("--- Package Elastic-Agent")
 
-	requiredPackages := []string{}
+	platformPackageSuffixes := []string{}
 	for _, p := range platforms {
-		requiredPackages = append(requiredPackages, manifest.PlatformPackages[p])
+		platformPackageSuffixes = append(platformPackageSuffixes, manifest.PlatformPackages[p])
 	}
 	if mg.Verbose() {
-		log.Printf("--- Packaging dependenciesVersion[%s], %+v \n", dependenciesVersion, requiredPackages)
+		log.Printf("--- Packaging dependenciesVersion[%s], %+v \n", dependenciesVersion, platformPackageSuffixes)
 	}
 
 	// download/copy all the necessary dependencies for packaging elastic-agent
-	archivePath, dropPath := collectPackageDependencies(platforms, dependenciesVersion, requiredPackages)
+	archivePath, dropPath := collectPackageDependencies(platforms, dependenciesVersion, platformPackageSuffixes)
 
 	// cleanup after build
 	defer os.RemoveAll(archivePath)
@@ -972,7 +974,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	defer os.RemoveAll(flatPath)
 
 	// extract all dependencies from their archives into flat dir
-	flattenDependencies(requiredPackages, dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse)
+	flattenDependencies(platformPackageSuffixes, dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse)
 
 	// package agent
 	log.Println("--- Running packaging function")
@@ -990,7 +992,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 // NOTE: after the build is done the caller must:
 // - delete archivePath and dropPath contents
 // - unset AGENT_DROP_PATH environment variable
-func collectPackageDependencies(platforms []string, packageVersion string, requiredPackages []string) (archivePath string, dropPath string) {
+func collectPackageDependencies(platforms []string, packageVersion string, platformPackageSuffixes []string) (archivePath string, dropPath string) {
 
 	dropPath, found := os.LookupEnv(agentDropPath)
 
@@ -1009,7 +1011,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 		if mg.Verbose() {
 			log.Printf(">> Creating drop-in folder %+v \n", dropPath)
 		}
-		archivePath = movePackagesToArchive(dropPath, requiredPackages)
+		archivePath = movePackagesToArchive(dropPath, platformPackageSuffixes, packageVersion)
 
 		if hasSnapshotEnv() {
 			packageVersion = fmt.Sprintf("%s-SNAPSHOT", packageVersion)
@@ -1061,7 +1063,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 
 				packagesCopied := 0
 
-				if !requiredPackagesPresent(pwd, b, packageVersion, requiredPackages) {
+				if !requiredPackagesPresent(pwd, b, packageVersion, platformPackageSuffixes) {
 					fmt.Printf("--- Package %s\n", pwd)
 					cmd := exec.Command("mage", "package")
 					cmd.Dir = pwd
@@ -1079,7 +1081,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 
 				// copy to new drop
 				sourcePath := filepath.Join(pwd, "build", "distributions")
-				for _, rp := range requiredPackages {
+				for _, rp := range platformPackageSuffixes {
 					files, err := filepath.Glob(filepath.Join(sourcePath, "*"+rp+"*"))
 					if err != nil {
 						panic(err)
@@ -1112,7 +1114,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, requi
 			}
 		}
 	} else {
-		archivePath = movePackagesToArchive(dropPath, requiredPackages)
+		archivePath = movePackagesToArchive(dropPath, platformPackageSuffixes, packageVersion)
 	}
 	return archivePath, dropPath
 }
@@ -1160,6 +1162,10 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 			panic(err)
 		}
 		matches = append(matches, zipMatches...)
+
+		if mg.Verbose() {
+			log.Printf("--- Unfiltered dependencies to flatten in %s : %v", targetPath, matches)
+		}
 
 		// never flatten any python wheels, the packages.yml and docker should handle
 		// those specifically so that the python wheels are installed into the container
@@ -1426,7 +1432,7 @@ func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir s
 					}
 
 					// download the SHA to check integrity
-					artifactSHADownloadPath := filepath.Join(draDownloadDir, pkgName+".sha512")
+					artifactSHADownloadPath := filepath.Join(draDownloadDir, pkgName+sha512FileExt)
 					err = manifest.DownloadPackage(errCtx, pkgDesc.ShaURL, artifactSHADownloadPath)
 					if err != nil {
 						return fmt.Errorf("downloading SHA for %q: %w", pkgName, err)
@@ -1531,7 +1537,7 @@ func downloadBinary(ctx context.Context, project string, packageName string, bin
 		}
 
 		compl.Add(1)
-		fmt.Printf("Done downloading %s\n", packageName)
+		fmt.Printf("Done downloading %s into %s\n", packageName, targetPath)
 		return nil
 	}
 }
@@ -1564,7 +1570,7 @@ func appendComponentChecksums(versionedDropPath string, checksums map[string]str
 }
 
 // movePackagesToArchive Create archive folder and move any pre-existing artifacts into it.
-func movePackagesToArchive(dropPath string, requiredPackages []string) string {
+func movePackagesToArchive(dropPath string, platformPackageSuffixes []string, packageVersion string) string {
 	archivePath := filepath.Join(dropPath, "archives")
 	os.MkdirAll(archivePath, 0755)
 
@@ -1580,8 +1586,15 @@ func movePackagesToArchive(dropPath string, requiredPackages []string) string {
 	matches = append(matches, zipMatches...)
 
 	for _, f := range matches {
-		for _, rp := range requiredPackages {
-			if !strings.Contains(f, rp) {
+		for _, packageSuffix := range platformPackageSuffixes {
+			if mg.Verbose() {
+				log.Printf("--- Evaluating moving dependency %s to archive path %s\n", f, archivePath)
+			}
+			// if the matched file name does not contain the platform suffix and it's not a platform-independent package, skip it
+			if !strings.Contains(f, packageSuffix) && !isPlatformIndependentPackage(f, packageVersion) {
+				if mg.Verbose() {
+					log.Printf("--- Skipped moving dependency %s to archive path\n", f)
+				}
 				continue
 			}
 
@@ -1596,18 +1609,68 @@ func movePackagesToArchive(dropPath string, requiredPackages []string) string {
 				continue
 			}
 
-			targetPath := filepath.Join(archivePath, rp, filepath.Base(f))
+			targetPath := filepath.Join(archivePath, packageSuffix, filepath.Base(f))
 			targetDir := filepath.Dir(targetPath)
 			if err := os.MkdirAll(targetDir, 0750); err != nil {
 				fmt.Printf("warning: failed to create directory %s: %s", targetDir, err)
 			}
-			if err := os.Rename(f, targetPath); err != nil {
-				panic(fmt.Errorf("failed renaming file: %w", err))
+
+			// Platform-independent packages need to be placed in the archive sub-folders for all platforms, copy instead of moving
+			if isPlatformIndependentPackage(f, packageVersion) {
+				if err := copyFile(f, targetPath); err != nil {
+					panic(fmt.Errorf("failed copying file: %w", err))
+				}
+			} else {
+				if err := os.Rename(f, targetPath); err != nil {
+					panic(fmt.Errorf("failed renaming file: %w", err))
+				}
+			}
+
+			if mg.Verbose() {
+				log.Printf("--- Moved dependency in archive path %s => %s\n", f, targetPath)
 			}
 		}
 	}
 
 	return archivePath
+}
+
+func copyFile(src, dst string) error {
+	srcStat, err := os.Stat(src)
+	if err != nil {
+		return fmt.Errorf("stat source file %q: %w", src, err)
+	}
+
+	srcF, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("opening source file %q: %w", src, err)
+	}
+	defer srcF.Close()
+
+	dstF, err := os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, srcStat.Mode()|os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("opening/creating destination file %q: %w", dst, err)
+	}
+	defer dstF.Close()
+
+	_, err = io.Copy(dstF, srcF)
+	if err != nil {
+		return fmt.Errorf("copying file %q to %q: %w", src, dst, err)
+	}
+
+	return nil
+}
+
+func isPlatformIndependentPackage(f string, packageVersion string) bool {
+	fileBaseName := filepath.Base(f)
+	for _, spec := range manifest.ExpectedBinaries {
+		packageName := spec.GetPackageName(packageVersion, "")
+		// as of now only python wheels packages are platform-independent
+		if spec.PythonWheel && (fileBaseName == packageName || fileBaseName == packageName+sha512FileExt) {
+			return true
+		}
+	}
+	return false
 }
 
 func selectedPackageTypes() string {
@@ -3168,7 +3231,14 @@ func (Otel) Readme() error {
 	}
 	defer out.Close()
 
-	return tmpl.Execute(out, data)
+	err = tmpl.Execute(out, data)
+	if err != nil {
+		return fmt.Errorf("failed to execute README template: %w", err)
+	}
+
+	// check that links are live
+	mg.Deps(devtools.CheckLinksInFileAreLive(readmeOut))
+	return nil
 }
 
 func getOtelDependencies() (*otelDependencies, error) {
