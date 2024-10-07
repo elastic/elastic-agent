@@ -28,6 +28,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
+	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -235,7 +236,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 }
 
 func printMapStringConfig(mapStr map[string]interface{}, streams *cli.IOStreams) error {
-	data, err := yaml.Marshal(mapStr)
+	data, err := yaml.Marshal(diagnostics.RedactSecretPaths(mapStr, streams.Err))
 	if err != nil {
 		return errors.New(err, "could not marshal to YAML")
 	}
