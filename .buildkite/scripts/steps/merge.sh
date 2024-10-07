@@ -9,7 +9,7 @@ MERGED_COV_FILE="TEST-go-unit.cov"
 
 go install github.com/wadey/gocovmerge@latest
 
-buildkite-agent artifact download "coverage-*.cov" .
+buildkite-agent artifact download "coverage-*.out" .
 # Space separated list of paths to coverage files
 COV_PATHS=$(find "coverage-*.cov" -print0 )
 gocovmerge "$COV_PATHS" > "$MERGED_COV_FILE"
