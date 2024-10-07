@@ -627,7 +627,7 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 		defer os.Unsetenv(envCACert)
 	}
 	if cfg.SamplingRate != nil {
-		os.Setenv(envSampleRate, strconv.FormatFloat(float64(*cfg.SamplingRate), 'b', -1, 32))
+		os.Setenv(envSampleRate, strconv.FormatFloat(float64(*cfg.SamplingRate), 'f', -1, 32))
 		defer os.Unsetenv(envSampleRate)
 	}
 
