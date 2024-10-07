@@ -25,7 +25,10 @@ import (
 type tlsCache struct {
 	mu *sync.Mutex
 
-	// PassphrasePath is used as the cache key
+	// PassphrasePath is used as the cache key.
+	// Watching the file for changes and reloading the file if any change is
+	// detected isn't supported, therefore it's safe to use the
+	// keyPassphrasePath as cache key.
 	PassphrasePath string
 
 	Certificate string
@@ -184,8 +187,6 @@ func loadCertificatesWithCache(log *logger.Logger, cache *tlsCache, keyPassPath 
 	defer cache.mu.Unlock()
 
 	// cache hit
-	// hot reload of TLS files isn't supported, thus using the path as key is
-	// fine.
 	if cache.PassphrasePath == keyPassPath {
 		return cache.Certificate, cache.Key, nil
 	}
