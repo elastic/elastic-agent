@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package handlers
 
@@ -148,10 +148,10 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 	cDiag := h.diagComponents(ctx, action)
 
 	var r io.Reader
-	// attempt to create the a temporary diagnostics file on disk in order to avoid loading a
-	// potentially large file in memory.
+	// attempt to create a temporary diagnostics file on disk in order to avoid
+	// loading a potentially large file in memory.
 	// if on-disk creation fails an in-memory buffer is used.
-	f, s, err := h.diagFile(aDiag, uDiag, cDiag, action.ExcludeEventsLog)
+	f, s, err := h.diagFile(aDiag, uDiag, cDiag, action.Data.ExcludeEventsLog)
 	if err != nil {
 		var b bytes.Buffer
 		h.log.Warnw("Diagnostics action unable to use temporary file, using buffer instead.", "error.message", err)
@@ -161,7 +161,7 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 				h.log.Warn(str)
 			}
 		}()
-		err := diagnostics.ZipArchive(&wBuf, &b, h.topPath, aDiag, uDiag, cDiag, action.ExcludeEventsLog)
+		err := diagnostics.ZipArchive(&wBuf, &b, h.topPath, aDiag, uDiag, cDiag, action.Data.ExcludeEventsLog)
 		if err != nil {
 			h.log.Errorw(
 				"diagnostics action handler failed generate zip archive",
@@ -202,7 +202,7 @@ func (h *Diagnostics) runHooks(ctx context.Context, action *fleetapi.ActionDiagn
 	// Currently CPU is the only additional metric we can collect.
 	// If this changes we would need to change how we scan AdditionalMetrics.
 	collectCPU := false
-	for _, metric := range action.AdditionalMetrics {
+	for _, metric := range action.Data.AdditionalMetrics {
 		if metric == "CPU" {
 			h.log.Debug("Diagnostics will collect CPU profile.")
 			collectCPU = true
@@ -296,7 +296,7 @@ func (h *Diagnostics) diagComponents(ctx context.Context, action *fleetapi.Actio
 		h.log.Debugf("Component diagnostics complete. Took: %s", time.Since(startTime))
 	}()
 	additionalMetrics := []cproto.AdditionalDiagnosticRequest{}
-	for _, metric := range action.AdditionalMetrics {
+	for _, metric := range action.Data.AdditionalMetrics {
 		if metric == "CPU" {
 			additionalMetrics = append(additionalMetrics, cproto.AdditionalDiagnosticRequest_CPU)
 		}

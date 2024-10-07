@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package fleetservertest
 
@@ -12,8 +12,9 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"sync/atomic"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/gorilla/mux"
 )
 
@@ -121,13 +122,18 @@ func NewRouter(handlers *Handlers) *mux.Router {
 
 					ww := &statusResponseWriter{w: w}
 
-					requestID := uuid.New().String()
+					requestID := r.Header.Get("X-Request-Id")
+					if requestID == "" {
+						requestID = uuid.Must(uuid.NewV4()).String()
+					}
+					ww.Header().Set("X-Request-Id", requestID)
+
 					handlers.logFn("[%s] STARTING - %s %s %s %s\n",
 						requestID, r.Method, r.URL, r.Proto, r.RemoteAddr)
 					route.Handler.
 						ServeHTTP(ww, r)
-					handlers.logFn("[%s] DONE %d - %s %s %s %s\n",
-						requestID, ww.statusCode, r.Method, r.URL, r.Proto, r.RemoteAddr)
+					handlers.logFn("[%s] DONE %d - %s %s %s %s %d\n",
+						requestID, ww.statusCode, r.Method, r.URL, r.Proto, r.RemoteAddr, ww.byteCount.Load())
 				}))
 	}
 
@@ -499,6 +505,7 @@ func updateLocalMetaAgentID(data []byte, agentID string) ([]byte, error) {
 type statusResponseWriter struct {
 	w          http.ResponseWriter
 	statusCode int
+	byteCount  atomic.Uint64
 }
 
 func (s *statusResponseWriter) Header() http.Header {
@@ -506,7 +513,9 @@ func (s *statusResponseWriter) Header() http.Header {
 }
 
 func (s *statusResponseWriter) Write(bs []byte) (int, error) {
-	return s.w.Write(bs)
+	n, err := s.w.Write(bs)
+	s.byteCount.Add(uint64(n))
+	return n, err
 }
 
 func (s *statusResponseWriter) WriteHeader(statusCode int) {

@@ -21,6 +21,7 @@ updates:
       - dependency-name: "github.com/elastic/*"
       - dependency-name: "go.opentelemetry.io/collector/*"
       - dependency-name: "github.com/open-telemetry/opentelemetry-collector-contrib/*"
+      - dependency-name: "github.com/elastic/opentelemetry-collector-components/*"
     reviewers:
       - "elastic/elastic-agent-control-plane"
     open-pull-requests-limit: 10

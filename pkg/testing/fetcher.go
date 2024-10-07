@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package testing
 
@@ -16,8 +16,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-
-	"github.com/hashicorp/go-multierror"
 )
 
 const extAsc = ".asc"
@@ -198,7 +196,7 @@ func unzip(archivePath string, extractDir string) error {
 		}
 		defer func() {
 			if cerr := rc.Close(); cerr != nil {
-				err = multierror.Append(err, cerr)
+				err = errors.Join(err, cerr)
 			}
 		}()
 
@@ -218,7 +216,7 @@ func unzip(archivePath string, extractDir string) error {
 			}
 			defer func() {
 				if cerr := f.Close(); cerr != nil {
-					err = multierror.Append(err, cerr)
+					err = errors.Join(err, cerr)
 				}
 			}()
 

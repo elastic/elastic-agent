@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package manifest
 
@@ -15,8 +15,6 @@ import (
 	"time"
 
 	"github.com/magefile/mage/mg"
-
-	"github.com/elastic/elastic-agent/pkg/testing/tools"
 )
 
 func doWithRetries[T any](f func() (T, error)) (T, error) {
@@ -75,9 +73,14 @@ func downloadFile(ctx context.Context, url string, filepath string) (string, err
 	return outFile.Name(), nil
 }
 
-func downloadManifestData(url string) (tools.Build, error) {
-	var response tools.Build
-	resp, err := http.Get(url) //nolint // we should have already verified that this is a proper valid url
+func downloadManifestData(ctx context.Context, url string) (Build, error) {
+	var response Build
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return response, fmt.Errorf("failed to create manifest request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return response, fmt.Errorf("failed to download manifest [%s]\n %w", url, err)
 	}

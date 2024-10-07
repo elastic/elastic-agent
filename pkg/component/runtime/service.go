@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package runtime
 
@@ -60,9 +60,6 @@ type serviceRuntime struct {
 
 // newServiceRuntime creates a new command runtime for the provided component.
 func newServiceRuntime(comp component.Component, logger *logger.Logger, isLocal bool) (*serviceRuntime, error) {
-	if comp.ShipperSpec != nil {
-		return nil, errors.New("service runtime not supported for a shipper specification")
-	}
 	if comp.InputSpec == nil {
 		return nil, errors.New("service runtime requires an input specification to be defined")
 	}
@@ -312,7 +309,8 @@ func getConnInfoServerAddress(os string, isLocal bool, port int, socket string) 
 		}
 
 		u.Scheme = "unix"
-		return u.JoinPath(paths.InstallPath(paths.DefaultBasePath), socket).String(), nil
+		// Use the path that is relative to path.top which corresponds to the agent binary directory in all installation types
+		return u.JoinPath(paths.Top(), socket).String(), nil
 	}
 
 	return fmt.Sprintf("127.0.0.1:%d", port), nil
@@ -477,7 +475,11 @@ func (s *serviceRuntime) processCheckin(checkin *proto.CheckinObserved, comm Com
 		// first check-in
 		sendExpected = true
 	}
-	*lastCheckin = time.Now().UTC()
+	// Warning lastCheckin must contain a monotonic clock.
+	// Functions like Local(), UTC(), Round(), AddDate(),
+	// etc. remove the monotonic clock.  See
+	// https://pkg.go.dev/time
+	*lastCheckin = time.Now()
 	if s.state.syncCheckin(checkin) {
 		changed = true
 	}
@@ -504,7 +506,11 @@ func (s *serviceRuntime) isRunning() bool {
 // checkStatus checks check-ins state, called on timer
 func (s *serviceRuntime) checkStatus(checkinPeriod time.Duration, lastCheckin *time.Time, missedCheckins *int) {
 	if s.isRunning() {
-		now := time.Now().UTC()
+		// Warning now must contain a monotonic clock.
+		// Functions like Local(), UTC(), Round(), AddDate(),
+		// etc. remove the monotonic clock.  See
+		// https://pkg.go.dev/time
+		now := time.Now()
 		if lastCheckin.IsZero() {
 			// never checked-in
 			*missedCheckins++

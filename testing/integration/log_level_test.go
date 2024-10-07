@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -18,7 +18,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -382,7 +382,7 @@ func createPolicyAndEnrollmentToken(ctx context.Context, t *testing.T, kibClient
 	return policyResp, enrollmentToken
 }
 func createBasicPolicy() kibana.AgentPolicy {
-	policyUUID := uuid.New().String()
+	policyUUID := uuid.Must(uuid.NewV4()).String()
 	return kibana.AgentPolicy{
 		Name:              "testloglevel-policy-" + policyUUID,
 		Namespace:         "default",

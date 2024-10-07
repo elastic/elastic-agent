@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package diagnostics
 
@@ -20,10 +20,12 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/go-ucfg"
 
 	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/version"
@@ -569,4 +571,40 @@ func saveLogs(name string, logPath string, zw *zip.Writer) error {
 	}
 
 	return nil
+}
+
+// RedactSecretPaths will check the passed mapStr input for a secret_paths attribute.
+// If found it will replace the value for every key in the paths list with <REDACTED> and return the resulting map.
+// Any issues or errors will be written to the errOut writer.
+func RedactSecretPaths(mapStr map[string]any, errOut io.Writer) map[string]any {
+	v, ok := mapStr["secret_paths"]
+	if !ok {
+		fmt.Fprintln(errOut, "No output redaction: secret_paths attribute not found.")
+		return mapStr
+	}
+	arr, ok := v.([]interface{})
+	if !ok {
+		fmt.Fprintln(errOut, "No output redaction: secret_paths attribute is not a list.")
+		return mapStr
+	}
+	cfg := ucfg.MustNewFrom(mapStr)
+	for _, v := range arr {
+		key, ok := v.(string)
+		if !ok {
+			fmt.Fprintf(errOut, "No output redaction for %q: expected type string, is type %T.\n", v, v)
+			continue
+		}
+
+		if ok, _ := cfg.Has(key, -1, ucfg.PathSep(".")); ok {
+			err := cfg.SetString(key, -1, REDACTED, ucfg.PathSep("."))
+			if err != nil {
+				fmt.Fprintf(errOut, "No output redaction for %q: %v.\n", key, err)
+			}
+		}
+	}
+	result, err := config.MustNewConfigFrom(cfg).ToMapStr()
+	if err != nil {
+		return mapStr
+	}
+	return result
 }

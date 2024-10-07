@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package transpiler
 
@@ -56,6 +56,20 @@ func TestAST(t *testing.T) {
 							},
 						},
 						},
+					},
+				},
+			},
+		},
+		"special characters in strings": {
+			hashmap: map[string]interface{}{
+				"key":            "$1$$2$$$3$$$$4",
+				"$1$$2$$$3$$$$4": "value",
+			},
+			ast: &AST{
+				root: &Dict{
+					value: []Node{
+						&Key{name: "key", value: &StrVal{value: "$1$$2$$$3$$$$4"}},
+						&Key{name: "$1$$2$$$3$$$$4", value: &StrVal{value: "value"}},
 					},
 				},
 			},

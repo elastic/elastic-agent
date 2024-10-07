@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -62,7 +62,7 @@ func (runner *EndpointMetricsMonRunner) SetupSuite() {
 	defer cancel()
 
 	runner.T().Log("Enrolling the agent in Fleet")
-	policyUUID := uuid.New().String()
+	policyUUID := uuid.Must(uuid.NewV4()).String()
 
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        "test-policy-" + policyUUID,

@@ -1,17 +1,16 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package info
 
 import (
 	"context"
 	"fmt"
-
-	"github.com/elastic/elastic-agent/pkg/features"
-
 	"runtime"
 	"strings"
+
+	"github.com/elastic/elastic-agent/pkg/features"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -173,7 +172,7 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 		Host: &HostECSMeta{
 			Arch:     info.Architecture,
 			Hostname: hostname,
-			Name:     hostname,
+			Name:     strings.ToLower(hostname),
 			ID:       info.UniqueID,
 			IP:       info.IPs,
 			MAC:      info.MACs,
@@ -211,7 +210,7 @@ func (i *AgentInfo) ECSMetadataFlatMap(l *logger.Logger) (map[string]interface{}
 	// Host
 	meta[hostArchKey] = info.Architecture
 	meta[hostHostnameKey] = hostname
-	meta[hostNameKey] = hostname
+	meta[hostNameKey] = strings.ToLower(hostname)
 	meta[hostIDKey] = info.UniqueID
 	meta[hostIPKey] = fmt.Sprintf("[%s]", strings.Join(info.IPs, ","))
 	meta[hostMACKey] = fmt.Sprintf("[%s]", strings.Join(info.MACs, ","))

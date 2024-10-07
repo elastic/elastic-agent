@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package config
 
@@ -42,9 +42,7 @@ func TestInputsResolveNOOP(t *testing.T) {
 		},
 	}
 
-	tmp, err := os.MkdirTemp("", "config")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmp)
+	tmp := t.TempDir()
 
 	cfgPath := filepath.Join(tmp, "config.yml")
 	dumpToYAML(t, cfgPath, contents)
@@ -79,7 +77,7 @@ func testToMapStr(t *testing.T) {
 }
 
 func TestCommaParsing(t *testing.T) {
-	_ = os.Setenv("testname", "motmot")
+	t.Setenv("testname", "motmot")
 	// test to make sure that we don't blow up the parsers when we have a `,` in a string
 	inMap := map[string]interface{}{
 		"test": "startsWith('${testname}','motmot')",
@@ -95,9 +93,7 @@ func TestCommaParsing(t *testing.T) {
 }
 
 func testLoadFiles(t *testing.T) {
-	tmp, err := os.MkdirTemp("", "watch")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmp)
+	tmp := t.TempDir()
 
 	f1 := filepath.Join(tmp, "1.yml")
 	dumpToYAML(t, f1, map[string]interface{}{
@@ -142,4 +138,19 @@ func dumpToYAML(t *testing.T, out string, in interface{}) {
 	require.NoError(t, err)
 	err = os.WriteFile(out, b, 0600)
 	require.NoError(t, err)
+}
+
+func TestDollarSignsInInputs(t *testing.T) {
+	in := map[string]interface{}{
+		"inputs": []interface{}{
+			map[string]interface{}{
+				"type": "logfile",
+				"what": "$$$$",
+			},
+		},
+	}
+	c := MustNewConfigFrom(in)
+	out, err := c.ToMapStr()
+	assert.NoError(t, err)
+	assert.Equal(t, in, out)
 }

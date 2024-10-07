@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package cli
 
@@ -20,7 +20,7 @@ func ReadInput(prompt string) (string, error) {
 
 func input(r io.Reader, out io.Writer, prompt string) (string, error) {
 	reader := bufio.NewScanner(r)
-	fmt.Fprintf(out, prompt+" ")
+	fmt.Fprintf(out, "%s ", prompt)
 
 	if !reader.Scan() {
 		return "", errors.New("error reading user input")

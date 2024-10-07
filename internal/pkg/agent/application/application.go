@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package application
 
@@ -13,7 +13,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/limits"
 	"github.com/elastic/elastic-agent/version"
 
-	"go.elastic.co/apm"
+	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
@@ -124,6 +124,7 @@ func New(
 		tracer,
 		monitor,
 		cfg.Settings.GRPC,
+		runAsOtel,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
@@ -174,6 +175,7 @@ func New(
 			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server),
 				InjectFleetConfigComponentModifier(cfg.Fleet, agentInfo),
 				EndpointSignedComponentModifier(),
+				InjectProxyEndpointModifier(),
 			)
 
 			// TODO: stop using global state

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package protection
 
@@ -20,8 +20,12 @@ var (
 	ErrInvalidSignatureValue  = errors.New("invalid signature value")
 )
 
+// fleetActionWithAgents represents an action signed by Kibana. Its schema
+// differs from the fleet-server API.
+// Notably, in this struct, the action ID is referred to as `action_id` instead of `id`.
+// The fleet-server API schema is documented at: https://raw.githubusercontent.com/elastic/fleet-server/main/model/openapi.yml.
 type fleetActionWithAgents struct {
-	ActionID         string          `json:"action_id"` // Note the action_id here, since the signed action uses action_id for id
+	ActionID         string          `json:"action_id"`
 	ActionType       string          `json:"type,omitempty"`
 	InputType        string          `json:"input_type,omitempty"`
 	Timestamp        string          `json:"@timestamp"`

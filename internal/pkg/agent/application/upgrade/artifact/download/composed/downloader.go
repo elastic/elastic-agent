@@ -1,14 +1,14 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package composed
 
 import (
 	"context"
+	goerrors "errors"
 
-	"github.com/hashicorp/go-multierror"
-	"go.elastic.co/apm"
+	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
@@ -37,7 +37,7 @@ func NewDownloader(downloaders ...download.Downloader) *Downloader {
 // Download fetches the package from configured source.
 // Returns absolute path to downloaded package and an error.
 func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *version.ParsedSemVer) (string, error) {
-	var err error
+	var errs []error
 	span, ctx := apm.StartSpan(ctx, "download", "app.internal")
 	defer span.End()
 
@@ -47,10 +47,10 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 			return s, nil
 		}
 
-		err = multierror.Append(err, e)
+		errs = append(errs, e)
 	}
 
-	return "", err
+	return "", goerrors.Join(errs...)
 }
 
 func (e *Downloader) Reload(c *artifact.Config) error {

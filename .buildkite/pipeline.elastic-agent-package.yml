@@ -1,8 +1,6 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 env:
   DOCKER_REGISTRY: "docker.elastic.co"
-  SETUP_GVM_VERSION: 'v0.5.0' # https://github.com/andrewkroh/gvm/issues/44#issuecomment-1013231151
-  SETUP_MAGE_VERSION: '1.14.0'
   # this is required in order to allow the build process to override the default PWD of the BEAT_NAME.
   BEAT_NAME: "elastic-agent"
   # after moving elastic-agent out of beats, we should update the URL of the packaging.
@@ -63,14 +61,14 @@ steps:
           machineType: "c2-standard-16"
           diskSizeGb: 400
         command: |
-          if [[ -z "${MANIFEST_URL}" ]]; then
+          if [[ -z "$${MANIFEST_URL}" ]]; then
             export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
-            if [[ -z "${MANIFEST_URL}" ]]; then
+            if [[ -z "$${MANIFEST_URL}" ]]; then
               echo ":broken_heart: Missing MANIFEST_URL variable or empty string provided"
               exit 1
             fi
           fi
-          if [[ -z "${MAGEFILE_VERBOSE}" ]]; then
+          if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
             export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
           fi
           .buildkite/scripts/steps/package.sh
@@ -86,17 +84,18 @@ steps:
           PLATFORMS: "linux/arm64"
           PACKAGES: "docker"
         command: |
-          if [[ -z "${MANIFEST_URL}" ]]; then
+          if [[ -z "$${MANIFEST_URL}" ]]; then
             export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
-            if [[ -z "${MANIFEST_URL}" ]]; then
+            if [[ -z "$${MANIFEST_URL}" ]]; then
               echo ":broken_heart: Missing MANIFEST_URL variable or empty string provided"
               exit 1
             fi
           fi
-          if [[ -z "${MAGEFILE_VERBOSE}" ]]; then
+          if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
             export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
           fi
           .buildkite/scripts/steps/package.sh
+          ls -lahR build/
         artifact_paths:
           - "build/distributions/**/*"
 
@@ -111,20 +110,28 @@ steps:
       DRA_PROJECT_ARTIFACT_ID: "agent-package"
     command: |
       echo "+++ Restoring Artifacts"
-      buildkite-agent artifact download "build/**/*" .
-      echo "+++ Changing permissions for the release manager"
+      buildkite-agent artifact download "build/**/*" . 
+
+      echo "+++ Changing permissions for the release manager"      
+      sudo chmod -R a+r build/distributions/ 
       sudo chown -R :1000 build/distributions/
+      ls -lahR build/
+
       echo "+++ Running DRA publish step"
-      if [[ -z "${MAGEFILE_VERBOSE}" ]]; then
+      if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
         export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
       fi
-      if [[ -z "${DRA_DRY_RUN}" ]]; then
+      if [[ -z "$${DRA_DRY_RUN}" ]]; then
         DRA_DRY_RUN=$(buildkite-agent meta-data get DRA_DRY_RUN --default "")
         export DRA_DRY_RUN
       fi
-      if [[ -z "${DRA_VERSION}" ]]; then
+      if [[ -z "$${DRA_VERSION}" ]]; then
         DRA_VERSION=$(buildkite-agent meta-data get DRA_VERSION --default "")
         export DRA_VERSION
+      fi
+      if [[ -z "$${DRA_WORKFLOW}" ]]; then
+        DRA_WORKFLOW=$(buildkite-agent meta-data get DRA_WORKFLOW --default "")
+        export DRA_WORKFLOW
       fi
       .buildkite/scripts/steps/dra-publish.sh
 
@@ -158,7 +165,7 @@ steps:
       .buildkite/scripts/steps/dra-publish.sh
       # Artifacts will be uploaded via the artifact_paths entry above
       echo "+++ Set job metadata if TRIGGER_JOB_ID is properly set"
-      if [[ -z "${TRIGGER_JOB_ID}" ]]; then
+      if [[ -z "$${TRIGGER_JOB_ID}" ]]; then
         echo "TRIGGER_JOB_ID is not set, so not setting metadata"
       else
         # If a pipeline that triggered this build passes in a "TRIGGER_JOB_ID" env var, that

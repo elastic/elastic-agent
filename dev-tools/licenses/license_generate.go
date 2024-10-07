@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package licenses
 
@@ -51,23 +51,19 @@ func init() {
 
 func main() {
 	Headers := make(map[string]string)
-	content, err := os.ReadFile("ELASTIC-LICENSE-header.txt")
-	if err != nil {
-		panic("could not read Elastic license.")
-	}
-	Headers["Elastic"] = string(content)
-
-	content, err = os.ReadFile("ELASTIC-LICENSE-2.0-header.txt")
+	content, err := os.ReadFile("ELASTIC-LICENSE-2.0-header.txt")
 	if err != nil {
 		panic("could not read Elastic License 2.0 license.")
 	}
 	Headers["Elasticv2"] = string(content)
 
 	var buf bytes.Buffer
-	Template.Execute(&buf, data{
-		License:  Headers["ASL2"],
+	err = Template.Execute(&buf, data{
 		Licenses: Headers,
 	})
+	if err != nil {
+		panic(err)
+	}
 
 	bs, err := format.Source(buf.Bytes())
 	if err != nil {
@@ -75,8 +71,11 @@ func main() {
 	}
 
 	if output == "-" {
-		os.Stdout.Write(bs)
+		_, err = os.Stdout.Write(bs)
 	} else {
-		os.WriteFile(output, bs, 0640)
+		err = os.WriteFile(output, bs, 0640)
+	}
+	if err != nil {
+		panic(err)
 	}
 }

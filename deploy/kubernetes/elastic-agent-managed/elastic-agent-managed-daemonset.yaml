@@ -24,9 +24,6 @@ spec:
           effect: NoSchedule
       serviceAccountName: elastic-agent
       hostNetwork: true
-      # 'hostPID: true' enables the Elastic Security integration to observe all process exec events on the host.
-      # Sharing the host process ID namespace gives visibility of all processes running on the same host.
-      hostPID: true
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: elastic-agent
@@ -86,10 +83,10 @@ spec:
             #    - SYS_ADMIN
           resources:
             limits:
-              memory: 700Mi
+              memory: 1Gi
             requests:
               cpu: 100m
-              memory: 400Mi
+              memory: 500Mi
           volumeMounts:
             - name: proc
               mountPath: /hostfs/proc
@@ -116,9 +113,6 @@ spec:
               mountPath: /sys/kernel/debug
             - name: elastic-agent-state
               mountPath: /usr/share/elastic-agent/state
-            # If you are using the Universal Profiling integration, please uncomment these lines before applying.
-            #- name: universal-profiling-cache
-            #  mountPath: /var/cache/Elastic
       volumes:
         - name: proc
           hostPath:
@@ -142,7 +136,7 @@ spec:
           hostPath:
             path: /var/lib
         # Mount /etc/machine-id from the host to determine host ID
-        # Needed for Elastic Security integration
+        # Needed for Kubernetes node autodiscovery
         - name: etc-mid
           hostPath:
             path: /etc/machine-id
@@ -159,9 +153,3 @@ spec:
           hostPath:
             path: /var/lib/elastic-agent-managed/kube-system/state
             type: DirectoryOrCreate
-        # Mount required for Universal Profiling.
-        # If you are using the Universal Profiling integration, please uncomment these lines before applying.
-        #- name: universal-profiling-cache
-        #  hostPath:
-        #    path: /var/cache/Elastic
-        #    type: DirectoryOrCreate

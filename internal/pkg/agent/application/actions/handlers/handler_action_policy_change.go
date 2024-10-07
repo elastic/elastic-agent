@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package handlers
 
@@ -46,6 +46,7 @@ type PolicyChangeHandler struct {
 	ch                   chan coordinator.ConfigChange
 	setters              []actions.ClientSetter
 	policyLogLevelSetter logLevelSetter
+	coordinator          *coordinator.Coordinator
 	// Disabled for 8.8.0 release in order to limit the surface
 	// https://github.com/elastic/security-team/issues/6501
 	// // Last known valid signature validation key
@@ -60,6 +61,7 @@ func NewPolicyChangeHandler(
 	store storage.Store,
 	ch chan coordinator.ConfigChange,
 	policyLogLevelSetter logLevelSetter,
+	coordinator *coordinator.Coordinator,
 	setters ...actions.ClientSetter,
 ) *PolicyChangeHandler {
 	return &PolicyChangeHandler{
@@ -69,6 +71,7 @@ func NewPolicyChangeHandler(
 		store:                store,
 		ch:                   ch,
 		setters:              setters,
+		coordinator:          coordinator,
 		policyLogLevelSetter: policyLogLevelSetter,
 	}
 }
@@ -103,7 +106,7 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 	// // Cache signature validation key for the next policy handling
 	// h.signatureValidationKey = signatureValidationKey
 
-	c, err := config.NewConfigFrom(action.Policy)
+	c, err := config.NewConfigFrom(action.Data.Policy)
 	if err != nil {
 		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
 	}
@@ -176,6 +179,12 @@ func testFleetConfig(ctx context.Context, log *logger.Logger, clientConfig remot
 	if err != nil {
 		return errors.New(
 			err, "fail to communicate with Fleet Server API client hosts",
+			errors.TypeNetwork, errors.M("hosts", clientConfig.Hosts))
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return errors.New(
+			err, fmt.Sprintf("fleet server ping returned a bad status code: %d", resp.StatusCode),
 			errors.TypeNetwork, errors.M("hosts", clientConfig.Hosts))
 	}
 
@@ -299,6 +308,15 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		h.config.Fleet.Client = *validatedConfig
 	}
 
+	cfg, err := configuration.NewFromConfig(c)
+	if err != nil {
+		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
+	}
+	hasEventLoggingOutputChanged := h.hasEventLoggingOutputChanged(cfg)
+	if hasEventLoggingOutputChanged {
+		h.config.Settings.EventLoggingConfig = cfg.Settings.EventLoggingConfig
+	}
+
 	// persist configuration
 	err = saveConfig(h.agentInfo, h.config, h.store)
 	if err != nil {
@@ -311,7 +329,28 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		return fmt.Errorf("applying FleetClientConfig: %w", err)
 	}
 
+	// If the event logging output has changed, we need to
+	// re-exec the Elastic-Agent to apply the new logging
+	// output.
+	// The new logging configuration has already been persisted
+	// to the disk, the Elastic-Agent will pick it up once it starts.
+	if hasEventLoggingOutputChanged {
+		h.coordinator.ReExec(nil)
+	}
+
 	return nil
+}
+
+// hasEventLoggingOutputChanged returns true if the output of the event logger has changed
+func (h *PolicyChangeHandler) hasEventLoggingOutputChanged(new *configuration.Configuration) bool {
+	switch {
+	case h.config.Settings.EventLoggingConfig.ToFiles != new.Settings.EventLoggingConfig.ToFiles:
+		return true
+	case h.config.Settings.EventLoggingConfig.ToStderr != new.Settings.EventLoggingConfig.ToStderr:
+		return true
+	default:
+		return false
+	}
 }
 
 func validateLoggingConfig(cfg *config.Config) (*logger.Config, error) {
@@ -439,12 +478,14 @@ func clientEqual(k1 remote.Config, k2 remote.Config) bool {
 func fleetToReader(agentID string, headers map[string]string, cfg *configuration.Configuration) (io.Reader, error) {
 	configToStore := map[string]interface{}{
 		"fleet": cfg.Fleet,
-		"agent": map[string]interface{}{
-			"id":               agentID,
-			"headers":          headers,
-			"logging.level":    cfg.Settings.LoggingConfig.Level,
-			"monitoring.http":  cfg.Settings.MonitoringConfig.HTTP,
-			"monitoring.pprof": cfg.Settings.MonitoringConfig.Pprof,
+		"agent": map[string]interface{}{ // Add event logging configuration here!
+			"id":                           agentID,
+			"headers":                      headers,
+			"logging.level":                cfg.Settings.LoggingConfig.Level,
+			"logging.event_data.to_files":  cfg.Settings.EventLoggingConfig.ToFiles,
+			"logging.event_data.to_stderr": cfg.Settings.EventLoggingConfig.ToStderr,
+			"monitoring.http":              cfg.Settings.MonitoringConfig.HTTP,
+			"monitoring.pprof":             cfg.Settings.MonitoringConfig.Pprof,
 		},
 	}
 

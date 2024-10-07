@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -24,6 +24,10 @@ const (
 	// FleetAirgappedPrivileged group of tests. Used for testing Elastic Agent with Fleet installed
 	// privileged and airgapped.
 	FleetAirgappedPrivileged = "fleet-airgapped-privileged"
+
+	// FleetUpgradeToPRBuild group of tests. Used for testing Elastic Agent
+	// upgrading to a build built from the PR being tested.
+	FleetUpgradeToPRBuild = "fleet-upgrade-to-pr-build"
 
 	// FQDN group of tests. Used for testing Elastic Agent with FQDN enabled.
 	FQDN = "fqdn"

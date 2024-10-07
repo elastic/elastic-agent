@@ -3,7 +3,8 @@
 # Downloads and merges coverage files from multiple steps into a single file (build/TEST-go-unit.cov).
 # Usage: merge.sh <step1> <step2> ... Where <step> is the id of the step that contains the coverage artifact.#  
 
-set -exuo pipefail
+set -euo pipefail
+set -x # for debugging
 
 COV_ARTIFACT="coverage.out"
 MERGED_COV_FILE="build/TEST-go-unit.cov"

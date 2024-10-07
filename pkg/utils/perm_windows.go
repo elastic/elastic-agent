@@ -1,13 +1,14 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build windows
 
 package utils
 
 import (
-	"os/user"
+	"fmt"
+	"syscall"
 )
 
 const (
@@ -26,20 +27,38 @@ type FileOwner struct {
 }
 
 // CurrentFileOwner returns the executing UID and GID of the current process.
-//
-// Note: Very unlikely for this to panic if this function is unable to get the current
-// user. Not being able to get the current user, is a critical problem and nothing
-// can continue so a panic is appropriate.
-func CurrentFileOwner() FileOwner {
-	u, err := user.Current()
+func CurrentFileOwner() (FileOwner, error) {
+	// os/user.Current() is not used here, because it tries to access the users home
+	// directory. It is possible during installation that the users home directory
+	// is not created yet. See issue https://github.com/elastic/elastic-agent/issues/5019
+	// for more information.
+	t, err := syscall.OpenCurrentProcessToken()
 	if err != nil {
-		// should not fail; if it does then there is a big problem
-		panic(err)
+		return FileOwner{}, fmt.Errorf("failed to open current process token: %w", err)
+	}
+	defer func() {
+		_ = t.Close()
+	}()
+	u, err := t.GetTokenUser()
+	if err != nil {
+		return FileOwner{}, fmt.Errorf("failed to get token user: %w", err)
+	}
+	pg, err := t.GetTokenPrimaryGroup()
+	if err != nil {
+		return FileOwner{}, fmt.Errorf("failed to get token primary group: %w", err)
+	}
+	uid, err := u.User.Sid.String()
+	if err != nil {
+		return FileOwner{}, fmt.Errorf("failed to convert token user sid to string: %w", err)
+	}
+	gid, err := pg.PrimaryGroup.String()
+	if err != nil {
+		return FileOwner{}, fmt.Errorf("failed to convert token primary group sid to string: %w", err)
 	}
 	return FileOwner{
-		UID: u.Uid,
-		GID: u.Gid,
-	}
+		UID: uid,
+		GID: gid,
+	}, nil
 }
 
 // HasStrictExecPerms ensures that the path is executable by the owner and that the owner of the file

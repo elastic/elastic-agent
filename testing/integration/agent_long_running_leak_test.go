@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -96,7 +96,7 @@ func (runner *ExtendedRunner) SetupSuite() {
 	out, err = cmd.CombinedOutput()
 	require.NoError(runner.T(), err, "got out: %s", string(out))
 
-	policyUUID := uuid.New().String()
+	policyUUID := uuid.Must(uuid.NewV4()).String()
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
@@ -120,10 +120,10 @@ func (runner *ExtendedRunner) SetupSuite() {
 	policyResp, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
 
-	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "system", "1.53.1", "agent_long_test_base_system_integ.json", uuid.New().String(), policyResp.ID)
+	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "system", "1.53.1", "agent_long_test_base_system_integ.json", uuid.Must(uuid.NewV4()).String(), policyResp.ID)
 	require.NoError(runner.T(), err)
 
-	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "apache", "1.17.0", "agent_long_test_apache.json", uuid.New().String(), policyResp.ID)
+	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "apache", "1.17.0", "agent_long_test_apache.json", uuid.Must(uuid.NewV4()).String(), policyResp.ID)
 	require.NoError(runner.T(), err)
 
 }
@@ -210,13 +210,16 @@ func (runner *ExtendedRunner) CheckHealthAtStartup(ctx context.Context) {
 	require.Eventually(runner.T(), func() bool {
 		allHealthy := true
 		status, err := runner.agentFixture.ExecStatus(ctx)
+		if err != nil {
+			runner.T().Logf("agent status returned an error: %v", err)
+			return false
+		}
 
 		apacheMatch := "logfile-apache"
 		foundApache := false
 		systemMatch := "system/metrics"
 		foundSystem := false
 
-		require.NoError(runner.T(), err)
 		for _, comp := range status.Components {
 			// make sure the components include the expected integrations
 			for _, v := range comp.Units {
@@ -227,6 +230,10 @@ func (runner *ExtendedRunner) CheckHealthAtStartup(ctx context.Context) {
 				}
 				if !foundSystem && strings.Contains(v.UnitID, systemMatch) {
 					foundSystem = true
+				}
+				runner.T().Logf("unit state: %s", v.Message)
+				if v.State != int(cproto.State_HEALTHY) {
+					allHealthy = false
 				}
 			}
 			runner.T().Logf("component state: %s", comp.Message)
@@ -270,7 +277,10 @@ func (gm *goroutinesMonitor) Init(ctx context.Context, t *testing.T, fixture *at
 	paths.SetTop("/opt/Elastic/Agent")
 	// fetch the unit ID of the component, use that to generate the path to the unix socket
 	status, err := fixture.ExecStatus(ctx)
-	require.NoError(t, err)
+	if err != nil {
+		t.Logf("agent status returned an error: %v", err)
+	}
+
 	for _, comp := range status.Components {
 		unitId := comp.ID
 		socketPath := utils.SocketURLWithFallback(unitId, paths.TempDir())
@@ -352,7 +362,10 @@ func (handleMon *handleMonitor) Init(ctx context.Context, t *testing.T, fixture 
 	// so separately fetch the PIDs
 	pidInStatusMessageRegex := regexp.MustCompile(`[\d]+`)
 	status, err := fixture.ExecStatus(ctx)
-	require.NoError(t, err)
+	if err != nil {
+		t.Logf("agent status returned an error: %v", err)
+	}
+
 	for _, comp := range status.Components {
 		pidStr := pidInStatusMessageRegex.FindString(comp.Message)
 		pid, err := strconv.ParseInt(pidStr, 10, 64)

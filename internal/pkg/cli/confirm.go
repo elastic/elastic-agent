@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package cli
 
@@ -22,14 +22,14 @@ func Confirm(prompt string, def bool) (bool, error) {
 }
 
 func confirm(r io.Reader, out io.Writer, prompt string, def bool) (bool, error) {
-	options := " [Y/n]"
+	options := "[Y/n]"
 	if !def {
-		options = " [y/N]"
+		options = "[y/N]"
 	}
 
 	reader := bufio.NewScanner(r)
 	for {
-		fmt.Fprintf(out, prompt+options+":")
+		fmt.Fprintf(out, "%s %s:", prompt, options)
 
 		if !reader.Scan() {
 			break

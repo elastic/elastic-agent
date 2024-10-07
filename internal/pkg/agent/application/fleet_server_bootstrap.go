@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package application
 
@@ -125,6 +125,10 @@ func InjectFleetConfigComponentModifier(fleetCfg *configuration.FleetAgentConfig
 		for _, host := range hostsStr {
 			fleetHosts = append(fleetHosts, host)
 		}
+		// add host val to hosts array for use in injectProxyURL
+		if host, ok := cfg["host"].(string); ok && host != "" {
+			hostsStr = append(hostsStr, host)
+		}
 
 		for i, comp := range comps {
 			if comp.InputSpec != nil && (comp.InputSpec.InputType == endpoint || comp.InputSpec.InputType == apmServer) {
@@ -146,6 +150,8 @@ func InjectFleetConfigComponentModifier(fleetCfg *configuration.FleetAgentConfig
 
 								// Inject agent log level
 								injectAgentLoggingLevel(m, agentInfo)
+								// Inject proxy_url
+								injectProxyURL(m, hostsStr)
 							}
 						}
 						unitCfg, err := component.ExpectedConfig(unitCfgMap)

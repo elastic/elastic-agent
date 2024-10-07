@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package backoff
 
@@ -45,7 +45,10 @@ func (b *ExpBackoff) NextWait() time.Duration {
 	return nextWait
 }
 
-// Wait block until either the timer is completed or channel is done.
+// Wait blocks until either the exponential backoff timer is completed or the
+// done channel is closed.
+// Wait returns true until done is closed. When done is closed, wait returns
+// immediately, therefore callers should always check the return value.
 func (b *ExpBackoff) Wait() bool {
 	b.duration = b.NextWait()
 

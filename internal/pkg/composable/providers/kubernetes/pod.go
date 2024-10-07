@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package kubernetes
 
@@ -75,14 +75,14 @@ func NewPodEventer(
 
 	var replicaSetWatcher, jobWatcher, namespaceWatcher, nodeWatcher kubernetes.Watcher
 
-	options := kubernetes.WatchOptions{
-		SyncTimeout: cfg.SyncPeriod,
-		Node:        cfg.Node,
-	}
 	metaConf := cfg.AddResourceMetadata
 
 	if metaConf.Node.Enabled() || cfg.Hints.Enabled {
-		nodeWatcher, err = kubernetes.NewNamedWatcher("agent-node", client, &kubernetes.Node{}, options, nil)
+		nodeWatcher, err = kubernetes.NewNamedWatcher("agent-node", client, &kubernetes.Node{}, kubernetes.WatchOptions{
+			SyncTimeout:  cfg.SyncPeriod,
+			Node:         cfg.Node,
+			HonorReSyncs: true,
+		}, nil)
 		if err != nil {
 			logger.Errorf("couldn't create watcher for %T due to error %+v", &kubernetes.Node{}, err)
 		}
@@ -90,20 +90,24 @@ func NewPodEventer(
 
 	if metaConf.Namespace.Enabled() || cfg.Hints.Enabled {
 		namespaceWatcher, err = kubernetes.NewNamedWatcher("agent-namespace", client, &kubernetes.Namespace{}, kubernetes.WatchOptions{
-			SyncTimeout: cfg.SyncPeriod,
+			SyncTimeout:  cfg.SyncPeriod,
+			Namespace:    cfg.Namespace,
+			HonorReSyncs: true,
 		}, nil)
 		if err != nil {
 			logger.Errorf("couldn't create watcher for %T due to error %+v", &kubernetes.Namespace{}, err)
 		}
 	}
 
-	// Resource is Pod so we need to create watchers for Replicasets and Jobs that it might belong to
+	// Resource is Pod, so we need to create watchers for Replicasets and Jobs that it might belong to
 	// in order to be able to retrieve 2nd layer Owner metadata like in case of:
 	// Deployment -> Replicaset -> Pod
 	// CronJob -> job -> Pod
 	if metaConf.Deployment {
 		replicaSetWatcher, err = kubernetes.NewNamedWatcher("resource_metadata_enricher_rs", client, &kubernetes.ReplicaSet{}, kubernetes.WatchOptions{
-			SyncTimeout: cfg.SyncPeriod,
+			SyncTimeout:  cfg.SyncPeriod,
+			Namespace:    cfg.Namespace,
+			HonorReSyncs: true,
 		}, nil)
 		if err != nil {
 			logger.Errorf("Error creating watcher for %T due to error %+v", &kubernetes.Namespace{}, err)
@@ -111,7 +115,9 @@ func NewPodEventer(
 	}
 	if metaConf.CronJob {
 		jobWatcher, err = kubernetes.NewNamedWatcher("resource_metadata_enricher_job", client, &kubernetes.Job{}, kubernetes.WatchOptions{
-			SyncTimeout: cfg.SyncPeriod,
+			SyncTimeout:  cfg.SyncPeriod,
+			Namespace:    cfg.Namespace,
+			HonorReSyncs: true,
 		}, nil)
 		if err != nil {
 			logger.Errorf("Error creating watcher for %T due to error %+v", &kubernetes.Job{}, err)

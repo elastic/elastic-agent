@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package fleetapi
 
@@ -175,7 +175,7 @@ func TestCheckin(t *testing.T) {
 			// UnknownAction
 			require.Equal(t, "id2", r.Actions[1].ID())
 			require.Equal(t, "UNKNOWN", r.Actions[1].Type())
-			require.Equal(t, "WHAT_TO_DO_WITH_IT", r.Actions[1].(*ActionUnknown).OriginalType())
+			require.Equal(t, "WHAT_TO_DO_WITH_IT", r.Actions[1].(*ActionUnknown).OriginalType)
 		},
 	))
 

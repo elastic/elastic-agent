@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package runtime
 
@@ -55,24 +55,22 @@ func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, 
 	// channel for the last error message from the stderr output
 	errch := make(chan string, 1)
 	ctxStderr := contextio.NewReader(ctx, proc.Stderr)
-	if ctxStderr != nil {
-		go func() {
-			var errText string
-			scanner := bufio.NewScanner(ctxStderr)
-			for scanner.Scan() {
-				line := scanner.Text()
-				if len(line) > 0 {
-					txt := strings.TrimSpace(line)
-					if len(txt) > 0 {
-						errText = txt
-						// Log error output line
-						log.Error(errText)
-					}
+	go func() {
+		var errText string
+		scanner := bufio.NewScanner(ctxStderr)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if len(line) > 0 {
+				txt := strings.TrimSpace(line)
+				if len(txt) > 0 {
+					errText = txt
+					// Log error output line
+					log.Error(errText)
 				}
 			}
-			errch <- errText
-		}()
-	}
+		}
+		errch <- errText
+	}()
 
 	procState := <-proc.Wait()
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {

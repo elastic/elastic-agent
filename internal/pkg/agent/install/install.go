@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package install
 
@@ -44,26 +44,6 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	dir, err := findDirectory()
 	if err != nil {
 		return utils.FileOwner{}, errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
-	}
-
-	// We only uninstall Agent if it is currently installed.
-	status, _ := Status(topPath)
-	if status == Installed {
-		// Uninstall current installation
-		//
-		// There is no uninstall token for "install" command.
-		// Uninstall will fail on protected agent.
-		// The protected Agent will need to be uninstalled first before it can be installed.
-		pt.Describe("Uninstalling current Elastic Agent")
-		err = Uninstall(cfgFile, topPath, "", log, pt)
-		if err != nil {
-			pt.Describe("Failed to uninstall current Elastic Agent")
-			return utils.FileOwner{}, errors.New(
-				err,
-				fmt.Sprintf("failed to uninstall Agent at (%s)", filepath.Dir(topPath)),
-				errors.M("directory", filepath.Dir(topPath)))
-		}
-		pt.Describe("Successfully uninstalled current Elastic Agent")
 	}
 
 	var ownership utils.FileOwner

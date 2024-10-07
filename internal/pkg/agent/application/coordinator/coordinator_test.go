@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package coordinator
 
@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.elastic.co/apm/apmtest"
+	"go.elastic.co/apm/v2/apmtest"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
@@ -52,7 +52,7 @@ var (
 	fakeInputSpec = component.InputSpec{
 		Name:      "fake",
 		Platforms: []string{fmt.Sprintf("%s/%s", goruntime.GOOS, goruntime.GOARCH)},
-		Shippers:  []string{"fake-shipper"},
+		Outputs:   []string{"fake-output"},
 		Command: &component.CommandSpec{
 			Timeouts: component.CommandTimeoutSpec{
 				Checkin: 30 * time.Second,
@@ -64,7 +64,7 @@ var (
 	fakeIsolatedUnitsInputSpec = component.InputSpec{
 		Name:      "fake-isolated-units",
 		Platforms: []string{fmt.Sprintf("%s/%s", goruntime.GOOS, goruntime.GOARCH)},
-		Shippers:  []string{"fake-shipper"},
+		Outputs:   []string{"fake-output"},
 		Command: &component.CommandSpec{
 			Timeouts: component.CommandTimeoutSpec{
 				Checkin: 30 * time.Second,
@@ -73,18 +73,6 @@ var (
 			},
 		},
 		IsolateUnits: true,
-	}
-	fakeShipperSpec = component.ShipperSpec{
-		Name:      "fake-shipper",
-		Platforms: []string{fmt.Sprintf("%s/%s", goruntime.GOOS, goruntime.GOARCH)},
-		Outputs:   []string{"fake-action-output"},
-		Command: &component.CommandSpec{
-			Timeouts: component.CommandTimeoutSpec{
-				Checkin: 30 * time.Second,
-				Restart: 10 * time.Millisecond, // quick restart during tests
-				Stop:    30 * time.Second,
-			},
-		},
 	}
 )
 
@@ -511,15 +499,13 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 				return
 			case state := <-subChan:
 				t.Logf("%+v", state)
-				if len(state.Components) == 2 {
-					compState := getComponentState(state.Components, "fake-default")
-					if compState != nil {
-						unit, ok := compState.State.Units[runtime.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default-fake"}]
-						if ok {
-							if unit.State == client.UnitStateHealthy && unit.Message == "Healthy From Fake Config" {
-								resultChan <- nil
-								return
-							}
+				compState := getComponentState(state.Components, "fake-default")
+				if compState != nil {
+					unit, ok := compState.State.Units[runtime.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default-fake"}]
+					if ok {
+						if unit.State == client.UnitStateHealthy && unit.Message == "Healthy From Fake Config" {
+							resultChan <- nil
+							return
 						}
 					}
 				}
@@ -534,10 +520,7 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 	cfg, err := config.NewConfigFrom(map[string]interface{}{
 		"outputs": map[string]interface{}{
 			"default": map[string]interface{}{
-				"type": "fake-action-output",
-				"shipper": map[string]interface{}{
-					"enabled": true,
-				},
+				"type": "fake-output",
 			},
 		},
 		"inputs": []interface{}{
@@ -587,7 +570,7 @@ func TestCoordinator_StateSubscribeIsolatedUnits(t *testing.T) {
 				resultChan <- ctx.Err()
 				return
 			case state := <-subChan:
-				if len(state.Components) == 3 {
+				if len(state.Components) == 2 {
 					compState0 := getComponentState(state.Components, "fake-isolated-units-default-fake-isolated-units-0")
 					compState1 := getComponentState(state.Components, "fake-isolated-units-default-fake-isolated-units-1")
 					if compState0 != nil && compState1 != nil {
@@ -618,10 +601,7 @@ func TestCoordinator_StateSubscribeIsolatedUnits(t *testing.T) {
 	cfg, err := config.NewConfigFrom(map[string]interface{}{
 		"outputs": map[string]interface{}{
 			"default": map[string]interface{}{
-				"type": "fake-action-output",
-				"shipper": map[string]interface{}{
-					"enabled": true,
-				},
+				"type": "fake-output",
 			},
 		},
 		"inputs": []interface{}{
@@ -658,7 +638,6 @@ func TestCollectManagerErrorsTimeout(t *testing.T) {
 	// in collectManagerErrors
 	waitAndTestError(t, func(err error) bool {
 		return err != nil &&
-			strings.Contains(err.Error(), "1 error occurred") &&
 			strings.Contains(err.Error(), "timeout while waiting for managers")
 	}, handlerChan)
 }
@@ -673,7 +652,6 @@ func TestCollectManagerErrorsOneResponse(t *testing.T) {
 
 	waitAndTestError(t, func(err error) bool {
 		return err != nil &&
-			strings.Contains(err.Error(), "2 errors occurred") &&
 			strings.Contains(err.Error(), cfgErrStr) &&
 			strings.Contains(err.Error(), "timeout while waiting for managers")
 	}, handlerChan)
@@ -691,7 +669,6 @@ func TestCollectManagerErrorsAllResponses(t *testing.T) {
 
 	waitAndTestError(t, func(err error) bool {
 		return err != nil &&
-			strings.Contains(err.Error(), "3 errors occurred") &&
 			strings.Contains(err.Error(), runtimeErrStr) &&
 			strings.Contains(err.Error(), varsErrStr) &&
 			strings.Contains(err.Error(), upgradeMarkerWatcherErrStr)
@@ -887,7 +864,7 @@ func WithComponentInputSpec(spec component.InputSpec) CoordinatorOpt {
 
 // createCoordinator creates a coordinator that using a fake config manager and a fake vars manager.
 //
-// The runtime specifications is set up to use both the fake component and fake shipper.
+// The runtime specifications is set up to use the fake component.
 func createCoordinator(t *testing.T, ctx context.Context, opts ...CoordinatorOpt) (*Coordinator, *fakeConfigManager, *fakeVarsManager) {
 	t.Helper()
 
@@ -909,20 +886,16 @@ func createCoordinator(t *testing.T, ctx context.Context, opts ...CoordinatorOpt
 		BinaryPath: testBinary(t, "component"),
 		Spec:       o.compInputSpec,
 	}
-	shipperSpec := component.ShipperRuntimeSpec{
-		ShipperType: "fake-shipper",
-		BinaryName:  "",
-		BinaryPath:  testBinary(t, "shipper"),
-		Spec:        fakeShipperSpec,
-	}
 
 	platform, err := component.LoadPlatformDetail()
 	require.NoError(t, err)
-	specs, err := component.NewRuntimeSpecs(platform, []component.InputRuntimeSpec{componentSpec}, []component.ShipperRuntimeSpec{shipperSpec})
+	specs, err := component.NewRuntimeSpecs(platform, []component.InputRuntimeSpec{componentSpec})
 	require.NoError(t, err)
 
 	monitoringMgr := newTestMonitoringMgr()
-	rm, err := runtime.NewManager(l, l, ai, apmtest.DiscardTracer, monitoringMgr, configuration.DefaultGRPCConfig())
+	cfg := configuration.DefaultGRPCConfig()
+	cfg.Port = 0
+	rm, err := runtime.NewManager(l, l, ai, apmtest.DiscardTracer, monitoringMgr, cfg, false)
 	require.NoError(t, err)
 
 	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), l)

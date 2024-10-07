@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build !windows
 
@@ -16,7 +16,10 @@ import (
 
 // FixPermissions fixes the permissions so only root:root is the owner and no world read-able permissions
 func FixPermissions(topPath string, opts ...OptFunc) error {
-	o := newOpts(opts...)
+	o, err := newOpts(opts...)
+	if err != nil {
+		return err
+	}
 	return filepath.Walk(topPath, func(name string, info fs.FileInfo, err error) error {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil

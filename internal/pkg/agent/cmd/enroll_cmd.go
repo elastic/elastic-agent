@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package cmd
 
@@ -9,13 +9,13 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 
-	"go.elastic.co/apm"
+	"go.elastic.co/apm/v2"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
@@ -111,6 +111,7 @@ type enrollCmdOption struct {
 	CASha256             []string                   `yaml:"ca_sha256,omitempty"`
 	Certificate          string                     `yaml:"certificate,omitempty"`
 	Key                  string                     `yaml:"key,omitempty"`
+	KeyPassphrasePath    string                     `yaml:"key_passphrase_path,omitempty"`
 	Insecure             bool                       `yaml:"insecure,omitempty"`
 	EnrollAPIKey         string                     `yaml:"enrollment_key,omitempty"`
 	Staging              string                     `yaml:"staging,omitempty"`
@@ -149,8 +150,9 @@ func (e *enrollCmdOption) remoteConfig() (remote.Config, error) {
 	}
 	if e.Certificate != "" || e.Key != "" {
 		tlsCfg.Certificate = tlscommon.CertificateConfig{
-			Certificate: e.Certificate,
-			Key:         e.Key,
+			Certificate:    e.Certificate,
+			Key:            e.Key,
+			PassphrasePath: e.KeyPassphrasePath,
 		}
 	}
 
@@ -704,7 +706,7 @@ func yamlToReader(in interface{}) (io.Reader, error) {
 }
 
 func delay(ctx context.Context, d time.Duration) {
-	t := time.NewTimer(time.Duration(rand.Int63n(int64(d))))
+	t := time.NewTimer(rand.N(d))
 	defer t.Stop()
 	select {
 	case <-ctx.Done():
@@ -751,8 +753,16 @@ func waitForFleetServer(ctx context.Context, agentSubproc <-chan *os.ProcessStat
 		msg := ""
 		msgCount := 0
 		backExp := expBackoffWithContext(innerCtx, 1*time.Second, maxBackoff)
+
 		for {
-			backExp.Wait()
+			// if the timeout is reached, no response was sent on `res`, therefore
+			// send an error
+			if !backExp.Wait() {
+				resChan <- waitResult{err: fmt.Errorf(
+					"timed out waiting for Fleet Server to start after %s",
+					timeout)}
+			}
+
 			state, err := getDaemonState(innerCtx)
 			if errors.Is(err, context.Canceled) {
 				resChan <- waitResult{err: err}

@@ -1,0 +1,13 @@
+action_id: abc123
+action_type: POLICY_CHANGE
+policy:
+  answer: 42
+  hello: world
+  phi: 1.618
+  a_map:
+    - nested_map1:
+        nested_map1_key1: value1
+        nested_map1_key2: value2
+    - nested_map2:
+        nested_map2_key1: value1
+        nested_map2_key2: value2

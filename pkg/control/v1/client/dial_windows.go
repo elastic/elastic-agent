@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build windows
 
@@ -19,7 +19,7 @@ import (
 )
 
 func dialContext(ctx context.Context) (*grpc.ClientConn, error) {
-	return grpc.DialContext(
+	return grpc.DialContext( //nolint:staticcheck // Only the deprecated version allows this call to be blocking
 		ctx,
 		control.Address(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),

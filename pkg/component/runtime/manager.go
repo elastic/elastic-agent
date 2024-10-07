@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package runtime
 
@@ -16,12 +16,11 @@ import (
 	"path"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
-	"github.com/gofrs/uuid"
-	"go.elastic.co/apm"
-	"go.elastic.co/apm/module/apmgrpc"
+	"github.com/gofrs/uuid/v5"
+	"go.elastic.co/apm/module/apmgrpc/v2"
+	"go.elastic.co/apm/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -109,7 +108,7 @@ type Manager struct {
 	grpcConfig *configuration.GRPCConfig
 
 	// Set when the RPC server is ready to receive requests, for use by tests.
-	serverReady *atomic.Bool
+	serverReady chan struct{}
 
 	// updateChan forwards component model updates from the public Update method
 	// to the internal run loop.
@@ -137,8 +136,6 @@ type Manager struct {
 	currentMx sync.RWMutex
 	current   map[string]*componentRuntimeState
 
-	shipperConns map[string]*shipperConn
-
 	subMx         sync.RWMutex
 	subscriptions map[string][]*Subscription
 	subAllMx      sync.RWMutex
@@ -148,7 +145,8 @@ type Manager struct {
 
 	// doneChan is closed when Manager is shutting down to signal that any
 	// pending requests should be canceled.
-	doneChan chan struct{}
+	doneChan  chan struct{}
+	runAsOtel bool
 }
 
 // NewManager creates a new manager.
@@ -159,6 +157,7 @@ func NewManager(
 	tracer *apm.Tracer,
 	monitor MonitoringManager,
 	grpcConfig *configuration.GRPCConfig,
+	runAsOtel bool,
 ) (*Manager, error) {
 	ca, err := authority.NewCA()
 	if err != nil {
@@ -186,15 +185,15 @@ func NewManager(
 		agentInfo:      agentInfo,
 		tracer:         tracer,
 		current:        make(map[string]*componentRuntimeState),
-		shipperConns:   make(map[string]*shipperConn),
 		subscriptions:  make(map[string][]*Subscription),
 		updateChan:     make(chan component.Model),
 		updateDoneChan: make(chan struct{}),
 		errCh:          make(chan error),
 		monitor:        monitor,
 		grpcConfig:     grpcConfig,
-		serverReady:    &atomic.Bool{},
+		serverReady:    make(chan struct{}),
 		doneChan:       make(chan struct{}),
+		runAsOtel:      runAsOtel,
 	}
 	return m, nil
 }
@@ -210,58 +209,59 @@ func (m *Manager) Run(ctx context.Context) error {
 	var (
 		listener net.Listener
 		err      error
+		server   *grpc.Server
+		wgServer sync.WaitGroup
 	)
-	if m.isLocal {
-		listener, err = ipc.CreateListener(m.logger, m.listenAddr)
-	} else {
-		listener, err = net.Listen("tcp", m.listenAddr)
-	}
+	if !m.runAsOtel {
+		if m.isLocal {
+			listener, err = ipc.CreateListener(m.logger, m.listenAddr)
+		} else {
+			listener, err = net.Listen("tcp", m.listenAddr)
+		}
 
-	if err != nil {
-		return fmt.Errorf("error starting tcp listener for runtime manager: %w", err)
-	}
+		if err != nil {
+			return fmt.Errorf("error starting tcp listener for runtime manager: %w", err)
+		}
 
-	if m.isLocal {
-		defer ipc.CleanupListener(m.logger, m.listenAddr)
-	} else {
-		m.listenPort = listener.Addr().(*net.TCPAddr).Port
-	}
+		if m.isLocal {
+			defer ipc.CleanupListener(m.logger, m.listenAddr)
+		} else {
+			m.listenPort = listener.Addr().(*net.TCPAddr).Port
+		}
 
-	certPool := x509.NewCertPool()
-	if ok := certPool.AppendCertsFromPEM(m.ca.Crt()); !ok {
-		return errors.New("failed to append root CA")
-	}
-	creds := credentials.NewTLS(&tls.Config{
-		ClientAuth:     tls.RequireAndVerifyClientCert,
-		ClientCAs:      certPool,
-		GetCertificate: m.getCertificate,
-		MinVersion:     tls.VersionTLS12,
-	})
+		certPool := x509.NewCertPool()
+		if ok := certPool.AppendCertsFromPEM(m.ca.Crt()); !ok {
+			return errors.New("failed to append root CA")
+		}
+		creds := credentials.NewTLS(&tls.Config{
+			ClientAuth:     tls.RequireAndVerifyClientCert,
+			ClientCAs:      certPool,
+			GetCertificate: m.getCertificate,
+			MinVersion:     tls.VersionTLS12,
+		})
+		m.logger.Infof("Starting grpc control protocol listener on port %v with max_message_size %v", m.grpcConfig.Port, m.grpcConfig.MaxMsgSize)
+		if m.tracer != nil {
+			apmInterceptor := apmgrpc.NewUnaryServerInterceptor(apmgrpc.WithRecovery(), apmgrpc.WithTracer(m.tracer))
+			server = grpc.NewServer(
+				grpc.UnaryInterceptor(apmInterceptor),
+				grpc.Creds(creds),
+				grpc.MaxRecvMsgSize(m.grpcConfig.MaxMsgSize),
+			)
+		} else {
+			server = grpc.NewServer(
+				grpc.Creds(creds),
+				grpc.MaxRecvMsgSize(m.grpcConfig.MaxMsgSize),
+			)
+		}
+		proto.RegisterElasticAgentServer(server, m)
 
-	var server *grpc.Server
-	m.logger.Infof("Starting grpc control protocol listener on port %v with max_message_size %v", m.grpcConfig.Port, m.grpcConfig.MaxMsgSize)
-	if m.tracer != nil {
-		apmInterceptor := apmgrpc.NewUnaryServerInterceptor(apmgrpc.WithRecovery(), apmgrpc.WithTracer(m.tracer))
-		server = grpc.NewServer(
-			grpc.UnaryInterceptor(apmInterceptor),
-			grpc.Creds(creds),
-			grpc.MaxRecvMsgSize(m.grpcConfig.MaxMsgSize),
-		)
-	} else {
-		server = grpc.NewServer(
-			grpc.Creds(creds),
-			grpc.MaxRecvMsgSize(m.grpcConfig.MaxMsgSize),
-		)
+		// start serving GRPC connections
+		wgServer.Add(1)
+		go func() {
+			defer wgServer.Done()
+			m.serverLoop(ctx, listener, server)
+		}()
 	}
-	proto.RegisterElasticAgentServer(server, m)
-
-	// start serving GRPC connections
-	var wgServer sync.WaitGroup
-	wgServer.Add(1)
-	go func() {
-		defer wgServer.Done()
-		m.serverLoop(ctx, listener, server)
-	}()
 
 	// Start the run loop, which continues on the main goroutine
 	// until the context is canceled.
@@ -271,11 +271,13 @@ func (m *Manager) Run(ctx context.Context) error {
 	m.shutdown()
 
 	// Close the rpc listener and wait for serverLoop to return
-	listener.Close()
-	wgServer.Wait()
+	if !m.runAsOtel {
+		listener.Close()
+		wgServer.Wait()
 
-	// Cancel any remaining connections
-	server.Stop()
+		// Cancel any remaining connections
+		server.Stop()
+	}
 	return ctx.Err()
 }
 
@@ -340,7 +342,7 @@ LOOP:
 }
 
 func (m *Manager) serverLoop(ctx context.Context, listener net.Listener, server *grpc.Server) {
-	m.serverReady.Store(true)
+	close(m.serverReady)
 	for ctx.Err() == nil {
 		err := server.Serve(listener)
 		if err != nil && ctx.Err() == nil {
@@ -765,13 +767,6 @@ func (m *Manager) Actions(server proto.ElasticAgent_ActionsServer) error {
 //
 // This returns as soon as possible, work is performed in the background.
 func (m *Manager) update(model component.Model, teardown bool) error {
-	// prepare the components to add consistent shipper connection information between
-	// the connected components in the model
-	err := m.connectShippers(model.Components)
-	if err != nil {
-		return err
-	}
-
 	touched := make(map[string]bool)
 	newComponents := make([]component.Component, 0, len(model.Components))
 	for _, comp := range model.Components {
@@ -1062,7 +1057,7 @@ func (m *Manager) performDiagAction(ctx context.Context, comp component.Componen
 	res, err := runtime.performAction(ctx, req)
 	// the only way this can return an error is a context Done(), be sure to make that explicit.
 	if err != nil {
-		if errors.Is(context.DeadlineExceeded, err) {
+		if errors.Is(err, context.DeadlineExceeded) {
 			return nil, fmt.Errorf("diagnostic action timed out, deadline is %s: %w", finalDiagnosticTime, err)
 		}
 		return nil, fmt.Errorf("error running performAction: %w", err)

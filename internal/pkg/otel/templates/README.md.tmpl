@@ -4,15 +4,14 @@ This is an Elastic supported distribution of the [OpenTelemetry Collector](https
 
 ## Running the Elastic Distribution for OpenTelemetry Collector
 
-To run the Elastic Distribution for OpenTelemetry Collector you can use Elastic-Agent binary downloaded for your OS and architecture. 
-Running command 
+To run the Elastic Distribution for OpenTelemetry Collector you can use Elastic-Agent binary downloaded for your OS and architecture.
+Running command
 
 ```bash
 ./elastic-agent otel --config otel.yml
 ```
 
 from unpacked Elastic Agent package will run Elastic-Agent as an OpenTelemetry Collector. The `--config` flag needs to point to [OpenTelemetry Collector Configuration file](https://opentelemetry.io/docs/collector/configuration/). OTel mode is available only using `otel` subcommand. Elastic Agent will not do any autodetection of configuration file passed when used without `otel` subcommand and will try to run normally.
-
 
 To validate OTel configuration run `otel validate` subcommand:
 
@@ -26,47 +25,52 @@ To validate OTel configuration run `otel validate` subcommand:
 
 This section provides a summary of components included in the Elastic Distribution for OpenTelemetry Collector.
 
-{{ if .Receivers }}
+{{ if .Receivers -}}
 ### Receivers
 
 | Component | Version |
 |---|---|
-{{ range .Receivers }}| {{ .Name }} | {{ .Version -}} |
-{{ end }}
-{{ end }}
+{{ range .Receivers -}}
+| [{{ .Name }}]({{ .Link }}) | {{ .Version }} |
+{{ end -}}
+{{ end -}}
 
 {{ if .Exporters }}
 ### Exporters
 
 | Component | Version |
 |---|---|
-{{ range .Exporters }}| {{ .Name }} | {{ .Version -}} |
-{{ end }}
-{{ end }}
+{{ range .Exporters -}}
+| [{{ .Name }}]({{ .Link }}) | {{ .Version }} |
+{{ end -}}
+{{ end -}}
 
 {{ if .Processors }}
 ### Processors
 
 | Component | Version |
 |---|---|
-{{ range .Processors }}| {{ .Name }} | {{ .Version -}} |
-{{ end }}
-{{ end }}
+{{ range .Processors -}}
+| [{{ .Name }}]({{ .Link }}) | {{ .Version }} |
+{{ end -}}
+{{ end -}}
 
 {{ if .Extensions }}
 ### Extensions
 
 | Component | Version |
 |---|---|
-{{ range .Extensions }}| {{ .Name }} | {{ .Version -}} |
-{{ end }}
-{{ end }}
+{{ range .Extensions -}}
+| [{{ .Name }}]({{ .Link }}) | {{ .Version }} |
+{{ end -}}
+{{ end -}}
 
 {{ if .Connectors }}
 ### Connectors
 
 | Component | Version |
 |---|---|
-{{ range .Connectors }}| {{ .Name }} | {{ .Version -}} |
-{{ end }}
-{{ end }}
+{{ range .Connectors -}}
+| [{{ .Name }}]({{ .Link }}) | {{ .Version }} |
+{{ end -}}
+{{ end -}}

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package fleetservertest
 
@@ -171,7 +171,7 @@ func ExampleNewServer_checkin() {
 
 	fmt.Println(got.Actions)
 	// Output:
-	// [action_id: anActionID, type: POLICY_CHANGE]
+	// [id: anActionID, type: POLICY_CHANGE]
 }
 
 func ExampleNewServer_checkin_fleetConnectionParams() {
@@ -209,7 +209,7 @@ func ExampleNewServer_checkin_fleetConnectionParams() {
 
 	fmt.Println(got.Actions)
 	if len(got.Actions) > 0 {
-		policy := got.Actions[0].(*fleetapi.ActionPolicyChange).Policy
+		policy := got.Actions[0].(*fleetapi.ActionPolicyChange).Data.Policy
 		b := new(strings.Builder)
 		encoder := json.NewEncoder(b)
 		encoder.SetIndent("", "  ")
@@ -221,7 +221,7 @@ func ExampleNewServer_checkin_fleetConnectionParams() {
 	}
 
 	// Output:
-	// [action_id: anActionID, type: POLICY_CHANGE]
+	// [id: anActionID, type: POLICY_CHANGE]
 	// {
 	//   "agent": {
 	//     "download": {
@@ -271,6 +271,7 @@ func ExampleNewServer_checkin_fleetConnectionParams() {
 	//       "name": "fake-input",
 	//       "package_policy_id": "",
 	//       "revision": 1,
+	//       "secret_key": "secretValue",
 	//       "streams": [],
 	//       "type": "fake-input",
 	//       "use_output": "default"
@@ -287,6 +288,9 @@ func ExampleNewServer_checkin_fleetConnectionParams() {
 	//     }
 	//   },
 	//   "revision": 2,
+	//   "secret_paths": [
+	//     "inputs.0.secret_key"
+	//   ],
 	//   "secret_references": [],
 	//   "signed": {
 	//     "data": "eyJpZCI6IjI0ZTRkMDMwLWZmYTctMTFlZC1iMDQwLTlkZWJhYTVmZWNiOCIsImFnZW50Ijp7InByb3RlY3Rpb24iOnsiZW5hYmxlZCI6ZmFsc2UsInVuaW5zdGFsbF90b2tlbl9oYXNoIjoibE9SU2FESVFxNG5nbFVNSndXaktyd2V4ajRJRFJKQStGdG9RZWVxS0gvST0iLCJzaWduaW5nX2tleSI6Ik1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRVE5QlBvSFVDeUx5RWxWcGZ3dktlRmRVdDZVOXdCYitRbFpOZjRjeTVlQXdLOVhoNEQ4ZkNsZ2NpUGVSczNqNjJpNklFZUd5dk9zOVUzK2ZFbHlVaWdnPT0ifX19",
@@ -477,7 +481,7 @@ func ExampleNewServer_checkin_fakeComponent() {
 	fmt.Println(resp.Actions)
 
 	// Output:
-	// [action_id: anActionID, type: POLICY_CHANGE]
+	// [id: anActionID, type: POLICY_CHANGE]
 	// Error: status code: 418, fleet-server returned an error: I'm a teapot
 	// []
 }
@@ -547,7 +551,7 @@ func ExampleNewServer_checkin_withDelay() {
 		resp.Actions)
 
 	// Output:
-	// took more than 250ms: true. response: [action_id: anActionID, type: POLICY_CHANGE]
+	// took more than 250ms: true. response: [id: anActionID, type: POLICY_CHANGE]
 	// took more than 250ms: false. response: []
 }
 
@@ -771,7 +775,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 
 	// Output:
 	// [1st ack] &fleetapi.AckResponse{Action:"acks", Errors:true, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:404, Message:"action anActionID not found"}}}
-	// [1st checkin] [action_id: anActionID, type: POLICY_CHANGE]
+	// [1st checkin] [id: anActionID, type: POLICY_CHANGE]
 	// [2nd ack] &fleetapi.AckResponse{Action:"acks", Errors:false, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:200, Message:"OK"}}}
 	// [2nd checkin] Error: status code: 418, fleet-server returned an error: I'm a teapot
 	// [3rd ack] &fleetapi.AckResponse{Action:"acks", Errors:true, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:404, Message:"action not-received-on-checkin not found"}}}

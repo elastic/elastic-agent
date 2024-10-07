@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package coordinator
 
@@ -106,15 +106,14 @@ agent:
         - host1
         - host2
       environment: diag-unit-test
-      apikey: apikey
-      secrettoken: secret
-      globallabels:
+      api_key: apikey
+      secret_token: secret
+      global_labels:
         k1: v1
         k2: v2
       tls:
-        skipverify: false
-        servercertificate: "/path/to/server/cert"
-        serverca: "/path/to/server/ca"
+        server_certificate: "/path/to/server/cert"
+        server_ca: "/path/to/server/ca"
 fleet:
   enabled: true
   access_api_key: "test-key"
@@ -256,23 +255,6 @@ func TestDiagnosticComponentsExpected(t *testing.T) {
 				{ID: "filestream-output", Type: client.UnitTypeOutput, LogLevel: 2},
 			},
 		},
-		{
-			ID:         "shipper-component",
-			OutputType: "elasticsearch",
-			ShipperSpec: &component.ShipperRuntimeSpec{
-				ShipperType: "shipper",
-				BinaryName:  "shipper-binary",
-				BinaryPath:  "shipper-path",
-				Spec: component.ShipperSpec{
-					Name:        "shipper-spec",
-					Description: "shipper description",
-				},
-			},
-			Units: []component.Unit{
-				{ID: "shipper-input", Type: client.UnitTypeInput, LogLevel: 3},
-				{ID: "shipper-output", Type: client.UnitTypeOutput, LogLevel: 3},
-			},
-		},
 	}
 
 	expected := `
@@ -294,25 +276,6 @@ components:
         type: 0
       - id: filestream-output
         log_level: 2
-        type: 1
-  - id: shipper-component
-    input_type: ""
-    output_type: elasticsearch
-    shipper_spec:
-      binary_name: shipper-binary
-      binary_path: shipper-path
-      shipper_type: shipper
-      spec:
-        name: shipper-spec
-        description: "shipper description"
-        outputs: []
-        platforms: []
-    units:
-      - id: shipper-input
-        log_level: 3
-        type: 0
-      - id: shipper-output
-        log_level: 3
         type: 1
 `
 
@@ -373,6 +336,7 @@ components:
             skipverify: true
             servercert: servercert
             serverca: serverca
+          samplingrate: null
 `
 
 	coord := &Coordinator{componentModel: components}
@@ -592,6 +556,7 @@ components:
               skipverify: true
               serverca: sca
               servercert: sc
+            samplingrate: null
         limits: null
       component_idx: 1
 `

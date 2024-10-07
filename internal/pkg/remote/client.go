@@ -1,22 +1,21 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package remote
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"sort"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/hashicorp/go-multierror"
 
 	urlutil "github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
@@ -173,7 +172,7 @@ func (c *Client) Send(
 	c.log.Debugf("Request method: %s, path: %s, reqID: %s", method, path, reqID)
 
 	var resp *http.Response
-	var multiErr error
+	var errs []error
 
 	clients := c.sortClients()
 
@@ -215,7 +214,7 @@ func (c *Client) Send(
 		if err != nil {
 			msg := fmt.Sprintf("requester %d/%d to host %s errored",
 				i, len(clients), requester.host)
-			multiErr = multierror.Append(multiErr, fmt.Errorf("%s: %w", msg, err))
+			errs = append(errs, fmt.Errorf("%s: %w", msg, err))
 
 			// Using debug level as the error is only relevant if all clients fail.
 			c.log.With("error", err).Debugf(msg)
@@ -226,7 +225,7 @@ func (c *Client) Send(
 		return resp, nil
 	}
 
-	return nil, fmt.Errorf("all hosts failed: %w", multiErr)
+	return nil, fmt.Errorf("all hosts failed: %w", errors.Join(errs...))
 }
 
 func (c *Client) checkApiVersionHeaders(req *http.Request, resp *http.Response) {

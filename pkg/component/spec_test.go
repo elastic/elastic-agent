@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package component
 
@@ -38,7 +38,7 @@ func TestSpec_Validation(t *testing.T) {
             platforms:
               - linux/amd64
             outputs:
-              - shipper
+              - elasticsearch
         `,
 			Err: "input 'testing' must define either command or service accessing 'inputs.0'",
 		},
@@ -53,7 +53,7 @@ func TestSpec_Validation(t *testing.T) {
               - linux/amd64
               - linux/amd64
             outputs:
-              - shipper
+              - elasticsearch
             command: {}
         `,
 			Err: "input 'testing' defines the platform 'linux/amd64' more than once accessing 'inputs.0'",
@@ -68,7 +68,7 @@ func TestSpec_Validation(t *testing.T) {
             platforms:
               - unknown/amd64
             outputs:
-              - shipper
+              - elasticsearch
             command: {}
         `,
 			Err: "input 'testing' defines an unknown platform 'unknown/amd64' accessing 'inputs.0'",
@@ -83,11 +83,11 @@ func TestSpec_Validation(t *testing.T) {
             platforms:
               - linux/amd64
             outputs:
-              - shipper
-              - shipper
+              - elasticsearch
+              - elasticsearch
             command: {}
         `,
-			Err: "input 'testing' defines the output 'shipper' more than once accessing 'inputs.0'",
+			Err: "input 'testing' defines the output 'elasticsearch' more than once accessing 'inputs.0'",
 		},
 		{
 			Name: "Duplicate Platform Same Input Name",
@@ -99,14 +99,14 @@ func TestSpec_Validation(t *testing.T) {
             platforms:
               - linux/amd64
             outputs:
-              - shipper
+              - elasticsearch
             command: {}
           - name: testing
             description: Testing Input
             platforms:
               - linux/amd64
             outputs:
-              - shipper
+              - elasticsearch
             command: {}
         `,
 			Err: "input 'testing' at inputs.1 defines the same platform as a previous definition accessing config",
@@ -122,14 +122,14 @@ func TestSpec_Validation(t *testing.T) {
               - linux/amd64
               - windows/amd64
             outputs:
-              - shipper
+              - elasticsearch
             command: {}
           - name: testing
             description: Testing Input
             platforms:
               - darwin/amd64
             outputs:
-              - shipper
+              - elasticsearch
             service:
               name: "co.elastic.endpoint"
               cport: 6788

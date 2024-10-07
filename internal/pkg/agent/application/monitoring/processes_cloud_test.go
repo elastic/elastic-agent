@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package monitoring
 
@@ -90,6 +90,7 @@ func TestExpectedCloudProcessID(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
+		tc := tc // make a copy to avoid implicit memory aliasing
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.id, expectedCloudProcessID(&tc.component))
 		})
@@ -142,6 +143,7 @@ func TestMatchesCloudProcessID(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
+		tc := tc // make a copy to avoid implicit memory aliasing
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.matches, matchesCloudProcessID(&tc.component, tc.processID))
 		})

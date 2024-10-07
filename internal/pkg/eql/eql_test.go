@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package eql
 
@@ -9,7 +9,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/antlr4-go/antlr/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -58,6 +58,10 @@ func TestEql(t *testing.T) {
 		result           bool
 		err              bool
 	}{
+		// escaped variables (not allowed)
+		{expression: "$${env.HOSTNAME|host.name|'fallback'}", err: true},
+		{expression: "$${env.HOSTNAME}", err: true},
+
 		// variables
 		{expression: "${env.HOSTNAME|host.name|'fallback'} == 'my-hostname'", result: true},
 		{expression: "${env.MISSING|host.name|'fallback'} == 'host-name'", result: true},
@@ -71,6 +75,12 @@ func TestEql(t *testing.T) {
 		{expression: "${data.with-dash} == 'dash-value'", result: true},
 		{expression: "${'dash-value'} == 'dash-value'", result: true},
 		{expression: "${data.with/slash} == 'some/path'", result: true},
+
+		// constant of variables
+		{expression: "'${env.HOSTNAME}' == '${env.HOSTNAME}'", result: true},
+		{expression: "'${env.HOSTNAME}' == '${env.HOSTSAME}'", result: false},
+		{expression: "'$${env.HOSTNAME}' == '$${env.HOSTNAME}'", result: true},
+		{expression: "'$${env.HOSTNAME}' == '$${env.HOSTSAME}'", result: false},
 
 		// boolean
 		{expression: "true", result: true},
@@ -356,6 +366,7 @@ func TestEql(t *testing.T) {
 	store := &testVarStore{
 		vars: map[string]interface{}{
 			"env.HOSTNAME":    "my-hostname",
+			"env.HOSTSAME":    "my-hostname",
 			"host.name":       "host-name",
 			"data.array":      []interface{}{"array1", "array2", "array3"},
 			"data.with-dash":  "dash-value",

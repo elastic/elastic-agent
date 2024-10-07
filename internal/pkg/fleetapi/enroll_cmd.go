@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package fleetapi
 
@@ -8,13 +8,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	goerrors "errors"
 	"fmt"
 	"net"
 	"net/http"
 	"net/url"
 	"time"
-
-	"github.com/hashicorp/go-multierror"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -111,17 +110,17 @@ type Metadata struct {
 
 // Validate validates the enrollment request before sending it to the API.
 func (e *EnrollRequest) Validate() error {
-	var err error
+	var errs []error
 
 	if len(e.EnrollAPIKey) == 0 {
-		err = multierror.Append(err, errors.New("missing enrollment api key"))
+		errs = append(errs, errors.New("missing enrollment api key"))
 	}
 
 	if len(e.Type) == 0 {
-		err = multierror.Append(err, errors.New("missing enrollment type"))
+		errs = append(errs, errors.New("missing enrollment type"))
 	}
 
-	return err
+	return goerrors.Join(errs...)
 }
 
 // EnrollResponse is the data received after enrolling an Agent into fleet.
@@ -163,21 +162,21 @@ type EnrollItemResponse struct {
 
 // Validate validates the response send from the server.
 func (e *EnrollResponse) Validate() error {
-	var err error
+	var errs []error
 
 	if len(e.Item.ID) == 0 {
-		err = multierror.Append(err, errors.New("missing ID"))
+		errs = append(errs, errors.New("missing ID"))
 	}
 
 	if len(e.Item.Type) == 0 {
-		err = multierror.Append(err, errors.New("missing enrollment type"))
+		errs = append(errs, errors.New("missing enrollment type"))
 	}
 
 	if len(e.Item.AccessAPIKey) == 0 {
-		err = multierror.Append(err, errors.New("access api key is missing"))
+		errs = append(errs, errors.New("access api key is missing"))
 	}
 
-	return err
+	return goerrors.Join(errs...)
 }
 
 // EnrollCmd is the command to be executed to enroll an elastic-agent into Fleet Server.

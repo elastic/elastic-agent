@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package proxytest
 
@@ -17,7 +17,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 )
 
 type Proxy struct {
@@ -126,7 +126,7 @@ func New(t *testing.T, optns ...Option) *Proxy {
 		http.HandlerFunc(func(ww http.ResponseWriter, r *http.Request) {
 			w := &statusResponseWriter{w: ww}
 
-			requestID := uuid.New().String()
+			requestID := uuid.Must(uuid.NewV4()).String()
 			opts.logFn("[%s] STARTING - %s %s %s %s\n",
 				requestID, r.Method, r.URL, r.Proto, r.RemoteAddr)
 

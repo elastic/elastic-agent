@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package uploader
 
@@ -135,6 +135,12 @@ func Test_retrySender_Send(t *testing.T) {
 				assert.Equal(t, tc.err, err)
 				assert.Equal(t, tc.status, resp.StatusCode)
 			}
+			defer func() {
+				if resp != nil && resp.Body != nil {
+					err := resp.Body.Close()
+					assert.NoError(t, err)
+				}
+			}()
 			sender.AssertExpectations(t)
 		})
 	}
@@ -166,6 +172,12 @@ func Test_retrySender_bodyValidation(t *testing.T) {
 		wait: backoff,
 	}
 	resp, err := c.Send(context.Background(), "POST", "/", nil, nil, bytes.NewReader([]byte("abcd")))
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			err := resp.Body.Close()
+			assert.NoError(t, err)
+		}
+	}()
 	require.NoError(t, err)
 	assert.Equal(t, resp.StatusCode, 200)
 	assert.Equal(t, []byte("abcd"), body1)

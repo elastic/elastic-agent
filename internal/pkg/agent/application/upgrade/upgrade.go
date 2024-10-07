@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package upgrade
 
@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/otiai10/copy"
-	"go.elastic.co/apm"
+	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -353,14 +353,14 @@ func waitForWatcherWithTimeoutCreationFunc(ctx context.Context, log *logger.Logg
 		return fmt.Errorf("error starting update marker watcher: %w", err)
 	}
 
-	log.Info("waiting up to %s for upgrade watcher to set %s state in upgrade marker", waitTime, details.StateWatching)
+	log.Infof("waiting up to %s for upgrade watcher to set %s state in upgrade marker", waitTime, details.StateWatching)
 
 	for {
 		select {
 		case updMarker := <-markerWatcher.Watch():
 			if updMarker.Details != nil && updMarker.Details.State == details.StateWatching {
 				// watcher started and it is watching, all good
-				log.Info("upgrade watcher set %s state in upgrade marker: exiting wait loop", details.StateWatching)
+				log.Infof("upgrade watcher set %s state in upgrade marker: exiting wait loop", details.StateWatching)
 				return nil
 			}
 

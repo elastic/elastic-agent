@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package download
 
@@ -29,7 +29,7 @@ func TestAddingHeaders(t *testing.T) {
 	rtt := WithHeaders(c.Transport, Headers)
 
 	c.Transport = rtt
-	resp, err := c.Get(server.URL)
+	resp, err := c.Get(server.URL) //nolint:noctx // this is fine in tests
 	require.NoError(t, err)
 	b, err := io.ReadAll(resp.Body)
 	defer resp.Body.Close()

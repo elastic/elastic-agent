@@ -1,0 +1,145 @@
+receivers:
+  # Receiver for platform specific log files
+  filelog/platformlogs:
+    include: [ /var/log/*.log ]
+    retry_on_failure:
+      enabled: true
+    start_at: end
+    storage: file_storage
+#    start_at: beginning
+
+  # Receiver for CPU, Disk, Memory, and Filesystem metrics
+  hostmetrics/system:
+    collection_interval: 30s
+    scrapers:
+      disk:
+      filesystem:
+      cpu:
+        metrics:
+          system.cpu.utilization:
+            enabled: true
+          system.cpu.logical.count:
+            enabled: true
+      memory:
+        metrics:
+          system.memory.utilization:
+            enabled: true
+      process:
+        mute_process_exe_error: true
+        mute_process_io_error: true
+        mute_process_user_error: true
+        metrics:
+          process.threads:
+            enabled: true
+          process.open_file_descriptors:
+            enabled: true
+          process.memory.utilization:
+            enabled: true
+          process.disk.operations:
+            enabled: true
+      network:
+      processes:
+      load:
+
+  # Receiver for logs, traces, and metrics from SDKs
+  otlp/fromsdk:
+    protocols:
+      grpc:
+      http:
+
+extensions:
+  file_storage:
+    directory: ${env:STORAGE_DIR}
+
+processors:
+  elasticinframetrics:
+  resourcedetection:
+    detectors: ["system"]
+    system:
+      hostname_sources: ["os"]
+      resource_attributes:
+        host.name:
+          enabled: true
+        host.id:
+          enabled: false
+        host.arch:
+          enabled: true
+        host.ip:
+          enabled: true
+        host.mac:
+          enabled: true
+        host.cpu.vendor.id:
+          enabled: true
+        host.cpu.family:
+          enabled: true
+        host.cpu.model.id:
+          enabled: true
+        host.cpu.model.name:
+          enabled: true
+        host.cpu.stepping:
+          enabled: true
+        host.cpu.cache.l2.size:
+          enabled: true
+        os.description:
+          enabled: true
+        os.type:
+          enabled: true
+  attributes/dataset:
+    actions:
+      - key: event.dataset
+        from_attribute: data_stream.dataset
+        action: upsert
+  resource/process:
+    attributes:
+      - key: process.executable.name
+        action: delete
+      - key: process.executable.path
+        action: delete
+
+exporters:
+
+  otlp/apm:
+    endpoint: "${env:APM_ENDPOINT}"
+    headers:
+    # Elastic APM Server secret token or API key
+      Authorization: "Bearer ${env:APM_SECRET_KEY}"
+
+  elasticsearch:
+    endpoints: ["${env:ELASTIC_ENDPOINT}"]
+    api_key: ${env:ELASTIC_API_KEY}
+    mapping:
+      mode: ecs
+    logs_dynamic_index:
+      enabled: true
+    metrics_dynamic_index:
+      enabled: true
+    traces_dynamic_index:
+      enabled: true
+
+service:
+  extensions: [file_storage]
+  pipelines:
+    traces/fromsdk:
+      receivers: [otlp/fromsdk]
+      processors: []
+      exporters: [otlp/apm]
+
+    metrics/fromsdk:
+      receivers: [otlp/fromsdk]
+      processors: []
+      exporters: [otlp/apm]
+
+    metrics/hostmetrics:
+      receivers: [hostmetrics/system]
+      processors: [elasticinframetrics, resourcedetection, attributes/dataset, resource/process]
+      exporters: [elasticsearch]
+
+    logs/fromsdk:
+      receivers: [otlp/fromsdk]
+      processors: []
+      exporters: [otlp/apm]
+
+    logs/platformlogs:
+      receivers: [filelog/platformlogs]
+      processors: [resourcedetection]
+      exporters: [elasticsearch]

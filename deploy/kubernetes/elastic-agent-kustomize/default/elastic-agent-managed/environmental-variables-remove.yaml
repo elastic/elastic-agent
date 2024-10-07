@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: elastic-agent
+  namespace: kube-system
+  labels:
+    app: elastic-agent
+spec:
+  selector:
+    matchLabels:
+      app: elastic-agent
+  template:
+      metadata:
+        labels:
+          app: elastic-agent
+      spec:
+        containers:
+          - name: elastic-agent
+            env:
+              - $patch: delete
+                name: FLEET_ENROLLMENT_TOKEN
+              - $patch: delete
+                name: FLEET_URL

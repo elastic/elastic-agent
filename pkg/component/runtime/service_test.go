@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package runtime
 
@@ -236,7 +236,7 @@ func TestGetConnInfoServerAddress(t *testing.T) {
 				u := url.URL{}
 				u.Path = "/"
 				u.Scheme = "unix"
-				return u.JoinPath(paths.InstallPath(paths.DefaultBasePath), "test.sock").String()
+				return u.JoinPath(paths.Top(), "test.sock").String()
 			}(),
 		},
 	}

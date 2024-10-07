@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package fleetapi
 
@@ -51,9 +51,11 @@ func TestAck(t *testing.T) {
 			action := &ActionPolicyChange{
 				ActionID:   "my-id",
 				ActionType: "POLICY_CHANGE",
-				Policy: map[string]interface{}{
+				Data: struct {
+					Policy map[string]interface{} `json:"policy" yaml:"policy,omitempty"`
+				}{Policy: map[string]interface{}{
 					"id": "config_id",
-				},
+				}},
 			}
 
 			cmd := NewAckCmd(&agentinfo{}, client)

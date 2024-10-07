@@ -6,6 +6,15 @@
 # the final image because of permission changes.
 FROM {{ .buildFrom }} AS home
 
+{{- if contains .buildFrom "wolfi" }}
+RUN for iter in {1..10}; do \
+        apk update && \
+        apk add --no-cache shadow libcap-utils && \
+        exit_code=0 && break || exit_code=$? && echo "apk error: retry $iter in 10s" && sleep 10; \
+    done; \
+    (exit $exit_code)
+{{- end }}
+
 COPY beat {{ $beatHome }}
 
 RUN true && \
@@ -25,15 +34,16 @@ RUN true && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/cloud-defend || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/endpoint-security || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/fleet-server || true) && \
-    (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/elastic-agent-shipper || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-elastic-collector || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-elastic-symbolizer || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-host-agent || true) && \
     find {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components -name "*.yml*" -type f -exec chmod 0644 {} \; && \
+
 {{- range $i, $modulesd := .ModulesDirs }}
     chmod 0775 {{ $beatHome}}/{{ $modulesd }} && \
 {{- end }}
-{{- if contains .image_name "-cloud" }}
+
+{{- if or (eq .Variant "cloud") (eq .Variant "service") }}
     mkdir -p /opt/agentbeat /opt/filebeat /opt/metricbeat && \
     cp -f {{ $beatHome }}/data/cloud_downloads/filebeat.sh /opt/filebeat/filebeat && \
     chmod +x /opt/filebeat/filebeat && \
@@ -44,19 +54,43 @@ RUN true && \
 {{- end }}
     true
 
+# Keep this after any chown command, chown resets any applied capabilities
+RUN setcap =p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/elastic-agent && \
+{{- if .linux_capabilities }}
+# Since the beat is stored at the other end of a symlink we must follow the symlink first
+# For security reasons setcap does not support symlinks. This is smart in the general case
+# but in our specific case since we're building a trusted image from trusted binaries this is
+# fine. Thus, we use readlink to follow the link and setcap on the actual binary
+   setcap {{ .linux_capabilities }}  $(readlink -f {{ $beatBinary }}) && \
+{{- end }}
+true
+
 FROM {{ .from }}
 
 ENV BEAT_SETUID_AS={{ .user }}
 
 {{- if contains .from "ubi-minimal" }}
 RUN for iter in {1..10}; do microdnf update -y && microdnf install -y tar gzip findutils shadow-utils && microdnf clean all && exit_code=0 && break || exit_code=$? && echo "microdnf error: retry $iter in 10s" && sleep 10; done; (exit $exit_code)
-{{- else }}
+{{- end }}
 
+{{- if contains .from "ubuntu" }}
+# Delete the existing "ubuntu" user to prevent conflict with the user that is added later.
+# See https://bugs.launchpad.net/cloud-images/+bug/2005129/comments/2.
+RUN touch /var/mail/ubuntu && chown ubuntu /var/mail/ubuntu && userdel -r ubuntu
 RUN for iter in {1..10}; do \
         apt-get update -y && \
-        DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends --yes ca-certificates curl gawk libcap2-bin xz-utils && \
+        DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends --yes ca-certificates curl gawk xz-utils && \
         apt-get clean all && \
         exit_code=0 && break || exit_code=$? && echo "apt-get error: retry $iter in 10s" && sleep 10; \
+    done; \
+    (exit $exit_code)
+{{- end }}
+
+{{- if contains .from "wolfi" }}
+RUN for iter in {1..10}; do \
+        apk update && \
+        apk add --no-cache ca-certificates curl gawk shadow bash && \
+        exit_code=0 && break || exit_code=$? && echo "apk error: retry $iter in 10s" && sleep 10; \
     done; \
     (exit $exit_code)
 {{- end }}
@@ -77,8 +111,8 @@ LABEL \
   org.opencontainers.image.licenses="{{ .License }}" \
   org.opencontainers.image.title="{{ .BeatName | title }}" \
   org.opencontainers.image.vendor="{{ .BeatVendor }}" \
+  org.opencontainers.image.authors="infra@elastic.co" \
   name="{{ .BeatName }}" \
-  maintainer="infra@elastic.co" \
   vendor="{{ .BeatVendor }}" \
   version="{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}" \
   release="1" \
@@ -87,7 +121,7 @@ LABEL \
   license="{{ .License }}" \
   description="{{ .BeatDescription }}"
 
-ENV ELASTIC_CONTAINER "true"
+ENV ELASTIC_CONTAINER="true"
 ENV PATH={{ $beatHome }}:$PATH
 ENV GODEBUG="madvdontneed=1"
 
@@ -115,8 +149,14 @@ RUN set -e ; \
   chmod +x /usr/bin/tini
 
 COPY docker-entrypoint /usr/local/bin/docker-entrypoint
+
+# We do not want to add the agent user to the root group and because of backwards compatibility we can do it only for the new Wolfi image
 RUN groupadd --gid 1000 {{ .BeatName }} && \
+{{- if contains .from "wolfi" }}
+    useradd -M --uid 1000 --gid 1000 {{ .user }} && \
+{{- else }}
     useradd -M --uid 1000 --gid 1000 --groups 0 {{ .user }} && \
+{{- end }}
     chmod 755 /usr/local/bin/docker-entrypoint && \
     true
 
@@ -126,35 +166,29 @@ COPY --chown={{ .user }}:{{ .user }} --from=home {{ $beatHome }} {{ $beatHome }}
 # create fleet.yml when running as non-root.
 RUN chmod 0777 {{ $beatHome }} && \
     usermod -d {{ $beatHome}} {{ .user }} && \
-    find {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components -name "*.yml*" -type f -exec chown root:root {} \; && \
+    find {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components -name "*.yml*" -type f -exec chown {{ .user }}:{{ .user }} {} \; && \
     true
 
 RUN mkdir /licenses
 COPY --from=home {{ $beatHome }}/LICENSE.txt /licenses
 COPY --from=home {{ $beatHome }}/NOTICE.txt /licenses
 
-{{- if contains .image_name "-cloud" }}
+{{- if or (eq .Variant "cloud") (eq .Variant "service") }}
 COPY --from=home /opt /opt
-{{- end }}
-
-{{- if contains .image_name "-cloud" }}
 # Generate folder for a stub command that will be overwritten at runtime
 RUN mkdir /app && \
     chown {{ .user }}:{{ .user }} /app
 {{- end }}
 
-# Keep this after any chown command, chown resets any applied capabilities
-RUN setcap cap_net_raw,cap_setuid+p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components/heartbeat && \
-{{- if .linux_capabilities }}
-# Since the beat is stored at the other end of a symlink we must follow the symlink first
-# For security reasons setcap does not support symlinks. This is smart in the general case
-# but in our specific case since we're building a trusted image from trusted binaries this is
-# fine. Thus, we use readlink to follow the link and setcap on the actual binary
-   setcap {{ .linux_capabilities }}  $(readlink -f {{ $beatBinary }}) && \
+{{- if eq .Variant "service" }}
+RUN apk add --no-cache git make python-3.11 py3.11-pip && \
+    unzip {{ $beatHome }}/data/service/connectors-*.zip -d {{ $beatHome }}/data/service && \
+    mv {{ $beatHome }}/data/service/elasticsearch_connectors-* /usr/share/connectors && \
+    PYTHON=python3.11 make -C /usr/share/connectors clean install install-agent && \
+    chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/connectors
 {{- end }}
-true
 
-{{- if (and (contains .image_name "-complete") (not (contains .from "ubi-minimal")))  }}
+{{- if (and (eq .Variant "complete") (contains .from "ubuntu"))  }}
 USER root
 ENV NODE_PATH={{ $beatHome }}/.node
 RUN echo \
@@ -169,7 +203,7 @@ RUN echo \
 ENV ELASTIC_SYNTHETICS_CAPABLE=true
 ENV ELASTIC_AGENT_COMPLETE=true
 ENV TZ=UTC
-ENV NODE_VERSION=18.18.2
+ENV NODE_VERSION=18.20.4
 ENV PATH="$NODE_PATH/node/bin:$PATH"
 # Install the latest version of @elastic/synthetics forcefully ignoring the previously
 # cached node_modules, heartbeat then calls the global executable to run test suites
@@ -198,7 +232,7 @@ RUN cd {{$beatHome}}/.node \
    && chown -R {{ .user }}:{{ .user }} $NODE_PATH
 USER {{ .user }}
 # If this fails dump the NPM logs
-RUN (npm i -g --loglevel verbose --engine-strict @elastic/synthetics@stack_release || sh -c 'tail -n +1 /root/.npm/_logs/* && exit 1') && \
+RUN (npm i -g --loglevel verbose --production --engine-strict @elastic/synthetics@stack_release || sh -c 'tail -n +1 /root/.npm/_logs/* && exit 1') && \
     chmod ugo+rwX -R $NODE_PATH
 USER root
 
@@ -214,10 +248,40 @@ RUN for iter in {1..10}; do \
     exit_code=0 && break || exit_code=$? && echo "apt-get error: retry $iter in 10s" && sleep 10; \
     done; \
     (exit $exit_code)
-
 {{- end }}
+
+{{- if (and (eq .Variant "complete-wolfi") (contains .from "wolfi"))  }}
+USER root
+# Install required dependencies from wolfi repository
+RUN for iter in {1..10}; do \
+        apk update && \
+        apk add --no-interactive --no-progress --no-cache nodejs-18=18.20.4-r0 npm=10.8.3-r0 glib dbus-glib libatk-1.0 \
+        libatk-bridge-2.0 cups-libs libxcomposite libxdamage libxrandr libxkbcommon pango alsa-lib \
+        font-opensans fontconfig gtk icu-data-full libnss mesa font-noto-cjk font-noto-emoji && \
+        exit_code=0 && break || exit_code=$? && echo "apk error: retry $iter in 10s" && sleep 10; \
+    done; \
+    (exit $exit_code)
+
+# Setup synthetics env vars
+ENV ELASTIC_SYNTHETICS_CAPABLE=true
+ENV TZ=UTC
+ENV NPM_CONFIG_PREFIX={{ $beatHome }}/.npm
+ENV PATH="$NPM_CONFIG_PREFIX/bin:$PATH"
+
+RUN echo \
+    $NPM_CONFIG_PREFIX \
+    {{ $beatHome }}/.config \
+    {{ $beatHome }}/.synthetics \
+    {{ $beatHome }}/.npm \
+    {{ $beatHome }}/.cache \
+    | xargs -IDIR sh -c 'mkdir -m 0770 -p DIR && chown -R {{ .user }} DIR'
+
 USER {{ .user }}
 
+RUN (npm i -g --loglevel verbose --production --engine-strict  @elastic/synthetics@stack_release || sh -c 'tail -n +1 ${NPM_CONFIG_PREFIX}/_logs/* && exit 1')
+{{- end }}
+
+USER {{ .user }}
 
 {{- range $i, $port := .ExposePorts }}
 EXPOSE {{ $port }}
@@ -231,7 +295,7 @@ ENV LIBBEAT_MONITORING_CGROUPS_HIERARCHY_OVERRIDE=/
 
 WORKDIR {{ $beatHome }}
 
-{{- if contains .image_name "-cloud" }}
+{{- if or (eq .Variant "cloud") (eq .Variant "service") }}
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/app/apm.sh"]
 # Generate a stub command that will be overwritten at runtime
@@ -240,4 +304,3 @@ RUN echo -e '#!/bin/sh\nexec /usr/local/bin/docker-entrypoint' > /app/apm.sh && 
 {{- else }}
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint"]
 {{- end }}
-

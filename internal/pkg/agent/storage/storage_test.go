@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package storage
 
@@ -28,10 +28,9 @@ func TestReplaceOrRollbackStore(t *testing.T) {
 	failure := NewHandlerStore(func(_ io.Reader) error { return errors.New("fail") })
 
 	t.Run("when the save is successful with target and source don't match", func(t *testing.T) {
-		target, err := genFile(oldContent)
+		target, err := genFile(t, oldContent)
 		require.NoError(t, err)
 		dir := filepath.Dir(target)
-		defer os.RemoveAll(dir)
 
 		requireFilesCount(t, dir, 1)
 
@@ -53,10 +52,9 @@ func TestReplaceOrRollbackStore(t *testing.T) {
 	})
 
 	t.Run("when save is not successful", func(t *testing.T) {
-		target, err := genFile(oldContent)
+		target, err := genFile(t, oldContent)
 		require.NoError(t, err)
 		dir := filepath.Dir(target)
-		defer os.RemoveAll(dir)
 
 		requireFilesCount(t, dir, 1)
 
@@ -77,10 +75,9 @@ func TestReplaceOrRollbackStore(t *testing.T) {
 	})
 
 	t.Run("when save is successful with target and source content match", func(t *testing.T) {
-		target, err := genFile(replaceWith)
+		target, err := genFile(t, replaceWith)
 		require.NoError(t, err)
 		dir := filepath.Dir(target)
-		defer os.RemoveAll(dir)
 
 		requireFilesCount(t, dir, 1)
 
@@ -104,11 +101,10 @@ func TestReplaceOrRollbackStore(t *testing.T) {
 	t.Run("when replace is skipped due to target already containing source content", func(t *testing.T) {
 		yamlTarget := []byte("fleet:\n  enabled: true\nother: value\n")
 		yamlReplaceWith := []byte("#This comment is left out\nfleet:\n  enabled: true\n")
-		target, err := genFile(yamlTarget)
+		target, err := genFile(t, yamlTarget)
 
 		require.NoError(t, err)
 		dir := filepath.Dir(target)
-		defer os.RemoveAll(dir)
 
 		requireFilesCount(t, dir, 1)
 
@@ -141,9 +137,8 @@ func TestReplaceOrRollbackStore(t *testing.T) {
 
 func TestDiskStore(t *testing.T) {
 	t.Run("when the target file already exists", func(t *testing.T) {
-		target, err := genFile([]byte("hello world"))
+		target, err := genFile(t, []byte("hello world"))
 		require.NoError(t, err)
-		defer os.Remove(target)
 		d, err := NewDiskStore(target)
 		require.NoError(t, err)
 
@@ -159,9 +154,7 @@ func TestDiskStore(t *testing.T) {
 	})
 
 	t.Run("when the target do no exist", func(t *testing.T) {
-		dir, err := os.MkdirTemp("", "configs")
-		require.NoError(t, err)
-		defer os.Remove(dir)
+		dir := t.TempDir()
 
 		target := filepath.Join(dir, "hello.txt")
 		d, err := NewDiskStore(target)
@@ -180,7 +173,7 @@ func TestDiskStore(t *testing.T) {
 
 	t.Run("return an io.ReadCloser to the target file", func(t *testing.T) {
 		msg := []byte("bonjour la famille")
-		target, err := genFile(msg)
+		target, err := genFile(t, msg)
 		require.NoError(t, err)
 
 		d, err := NewDiskStore(target)
@@ -197,11 +190,8 @@ func TestDiskStore(t *testing.T) {
 	})
 }
 
-func genFile(b []byte) (string, error) {
-	dir, err := os.MkdirTemp("", "configs")
-	if err != nil {
-		return "", err
-	}
+func genFile(t *testing.T, b []byte) (string, error) {
+	dir := t.TempDir()
 
 	f, err := os.CreateTemp(dir, "config-")
 	if err != nil {

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
@@ -699,6 +699,7 @@ func TestProxyURL(t *testing.T) {
 
 			// Specific testcase setup and map of created proxies
 			proxies, args := tt.setup(t, mockFleet)
+			t.Logf("Fleet-server port: %s", mockFleet.fleetServer.Port)
 
 			fixture, err := define.NewFixtureFromLocalBuild(t,
 				define.Version(),
@@ -732,6 +733,9 @@ func TestProxyURL(t *testing.T) {
 						Key:                    args.key,
 					}})
 			t.Logf("elastic-agent install output: \n%s\n", string(out))
+			for proxyName, proxy := range proxies {
+				t.Logf("Proxy %s requests: %v", proxyName, proxy.ProxiedRequests())
+			}
 			if tt.wantErr(t, err, "elastic-agent install returned an unexpected error") {
 				tt.assertFunc(ctx, t, fixture, proxies, mockFleet)
 			}
@@ -766,7 +770,7 @@ func createBasicFleetPolicyData(t *testing.T, fleetHost string) (fleetservertest
 	}
 
 	agentID := strings.Replace(t.Name(), "/", "-", -1) + "-agent-id"
-	policyUUID, err := uuid.NewUUID()
+	policyUUID, err := uuid.NewV4()
 	require.NoError(t, err, "error generating UUID for policy")
 
 	policyID := policyUUID.String()

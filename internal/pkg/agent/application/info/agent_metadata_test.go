@@ -1,10 +1,11 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package info
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -50,7 +51,7 @@ func TestECSMetadata(t *testing.T) {
 
 	assert.Equal(t, info.Architecture, metadata.Host.Arch)
 	assert.Equal(t, hostname, metadata.Host.Hostname)
-	assert.Equal(t, hostname, metadata.Host.Name)
+	assert.Equal(t, strings.ToLower(hostname), metadata.Host.Name) // host.name is always lower-case
 	assert.Equal(t, info.UniqueID, metadata.Host.ID)
 	assert.Equal(t, info.IPs, metadata.Host.IP)
 	assert.Equal(t, info.MACs, metadata.Host.MAC)

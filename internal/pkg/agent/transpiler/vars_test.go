@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package transpiler
 
@@ -33,6 +33,14 @@ func TestVars_Replace(t *testing.T) {
 		},
 		"other": map[string]interface{}{
 			"data": "info",
+		},
+		"special": map[string]interface{}{
+			"key1": "$1$$2",
+			"key2": "1$2$$",
+			"key3": "${abcd}",
+			"key4": "$${abcd}",
+			"key5": "${",
+			"key6": "$${",
 		},
 	})
 	tests := []struct {
@@ -202,6 +210,48 @@ func TestVars_Replace(t *testing.T) {
 			}),
 			false,
 			true,
+		},
+		{
+			`start $${keep} ${un-der_score.key1} $${un-der_score.key1}`,
+			NewStrVal(`start ${keep} data1 ${un-der_score.key1}`),
+			false,
+			false,
+		},
+		{
+			`${special.key1}`,
+			NewStrVal("$1$$2"),
+			false,
+			false,
+		},
+		{
+			`${special.key2}`,
+			NewStrVal("1$2$$"),
+			false,
+			false,
+		},
+		{
+			`${special.key3}`,
+			NewStrVal("${abcd}"),
+			false,
+			false,
+		},
+		{
+			`${special.key4}`,
+			NewStrVal("$${abcd}"),
+			false,
+			false,
+		},
+		{
+			`${special.key5}`,
+			NewStrVal("${"),
+			false,
+			false,
+		},
+		{
+			`${special.key6}`,
+			NewStrVal("$${"),
+			false,
+			false,
 		},
 	}
 	for _, test := range tests {

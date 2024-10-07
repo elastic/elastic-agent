@@ -1,11 +1,12 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package monitoring
 
 import (
 	"net/http"
+	_ "net/http/pprof" //nolint:gosec // this is only conditionally exposed
 	"net/url"
 	"os"
 	"path/filepath"
@@ -13,8 +14,8 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
-	"go.elastic.co/apm"
-	"go.elastic.co/apm/module/apmgorilla"
+	"go.elastic.co/apm/module/apmgorilla/v2"
+	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/elastic-agent-libs/api"
 	"github.com/elastic/elastic-agent-libs/monitoring"
@@ -76,6 +77,11 @@ func exposeMetricsEndpoint(
 			r.Handle("/liveness", createHandler(livenessHandler(coord)))
 		}
 
+		if isPprofEnabled(cfg) {
+			// importing net/http/pprof adds the handlers to the right paths on the default Mux, so we just defer to it here
+			r.PathPrefix("/debug/pprof/").Handler(http.DefaultServeMux)
+		}
+
 		mux := http.NewServeMux()
 		mux.Handle("/", r)
 
@@ -130,4 +136,8 @@ func isHttpUrl(s string) bool {
 
 func isProcessStatsEnabled(cfg *monitoringCfg.MonitoringConfig) bool {
 	return cfg != nil && cfg.HTTP.Enabled
+}
+
+func isPprofEnabled(cfg *monitoringCfg.MonitoringConfig) bool {
+	return cfg != nil && cfg.Pprof != nil && cfg.Pprof.Enabled
 }

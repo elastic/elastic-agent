@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package runtime
 
@@ -67,6 +67,7 @@ type procState struct {
 
 // commandRuntime provides the command runtime for running a component as a subprocess.
 type commandRuntime struct {
+	log    *logger.Logger
 	logStd *logWriter
 	logErr *logWriter
 
@@ -108,6 +109,7 @@ type commandRuntime struct {
 // newCommandRuntime creates a new command runtime for the provided component.
 func newCommandRuntime(comp component.Component, log *logger.Logger, monitor MonitoringManager) (*commandRuntime, error) {
 	c := &commandRuntime{
+		log:         log,
 		current:     comp,
 		monitor:     monitor,
 		ch:          make(chan ComponentState),
@@ -195,7 +197,12 @@ func (c *commandRuntime) Run(ctx context.Context, comm Communicator) error {
 				// first check-in
 				sendExpected = true
 			}
-			c.lastCheckin = time.Now().UTC()
+			// Warning lastCheckin must contain a
+			// monotonic clock.  Functions like Local(),
+			// UTC(), Round(), AddDate(), etc. remove the
+			// monotonic clock.  See
+			// https://pkg.go.dev/time
+			c.lastCheckin = time.Now()
 			if c.state.syncCheckin(checkin) {
 				changed = true
 			}
@@ -222,11 +229,18 @@ func (c *commandRuntime) Run(ctx context.Context, comm Communicator) error {
 					}
 				} else {
 					// running and should be running
-					now := time.Now().UTC()
+					//
+					// Warning now must contain a
+					// monotonic clock.  Functions like Local(),
+					// UTC(), Round(), AddDate(), etc. remove the
+					// monotonic clock.  See
+					// https://pkg.go.dev/time
+					now := time.Now()
 					if now.Sub(c.lastCheckin) <= checkinPeriod {
 						c.missedCheckins = 0
 					} else {
 						c.missedCheckins++
+						c.log.Debugf("Last check-in was: %s, now is: %s. The diff %s is higher than allowed %s.", c.lastCheckin.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano), now.Sub(c.lastCheckin), checkinPeriod)
 					}
 					if c.missedCheckins == 0 {
 						c.compState(client.UnitStateHealthy)
@@ -490,9 +504,6 @@ func (c *commandRuntime) getSpecType() string {
 	if c.current.InputSpec != nil {
 		return c.current.InputSpec.InputType
 	}
-	if c.current.ShipperSpec != nil {
-		return c.current.ShipperSpec.ShipperType
-	}
 	return ""
 }
 
@@ -504,18 +515,12 @@ func (c *commandRuntime) getSpecBinaryPath() string {
 	if c.current.InputSpec != nil {
 		return c.current.InputSpec.BinaryPath
 	}
-	if c.current.ShipperSpec != nil {
-		return c.current.ShipperSpec.BinaryPath
-	}
 	return ""
 }
 
 func (c *commandRuntime) getCommandSpec() *component.CommandSpec {
 	if c.current.InputSpec != nil {
 		return c.current.InputSpec.Spec.Command
-	}
-	if c.current.ShipperSpec != nil {
-		return c.current.ShipperSpec.Spec.Command
 	}
 	return nil
 }

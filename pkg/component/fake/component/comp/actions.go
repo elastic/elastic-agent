@@ -1,15 +1,13 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package comp
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -25,10 +23,6 @@ type retrieveFeaturesAction struct {
 }
 
 type stateSetterAction struct {
-	input *fakeInput
-}
-
-type sendEventAction struct {
 	input *fakeInput
 }
 
@@ -70,44 +64,6 @@ func (a *retrieveFeaturesAction) Execute(
 	return map[string]interface{}{"features": a.input.features}, nil
 }
 
-func (s *sendEventAction) Name() string {
-	return "send_event"
-}
-
-func (s *sendEventAction) Execute(_ context.Context, params map[string]interface{}) (map[string]interface{}, error) {
-	const (
-		timeoutField   = "timeout"
-		timeoutDefault = 3 * time.Second
-	)
-
-	s.input.logger.Trace().Msg("executing send_event action")
-
-	// timeout is taken from the action to define the timeout
-	timeout := timeoutDefault
-	if timeoutRaw, ok := params[timeoutField]; ok {
-		if timeoutStr, ok := timeoutRaw.(string); ok {
-			dur, err := time.ParseDuration(timeoutStr)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse timeout duration: %w", err)
-			}
-			timeout = dur
-		}
-	}
-
-	if s.input.manager.output != nil {
-		output, ok := s.input.manager.output.(*fakeShipperOutput)
-		if !ok {
-			return nil, fmt.Errorf("output is not fake-shipper output, cannot send event, got type %T", s.input.manager.output)
-		}
-		err := output.sendEvent(params, timeout)
-		if err != nil {
-			return nil, err
-		}
-		return nil, nil
-	}
-	return nil, errors.New("no output configured to send event")
-}
-
 func (s *killAction) Name() string {
 	return "kill"
 }
@@ -125,9 +81,8 @@ func newRunningUnit(logger zerolog.Logger, manager *StateManager, unit *client.U
 	}
 	if unit.Type() == client.UnitTypeOutput {
 		switch expected.Config.Type {
-		case fakeShipper:
-			return newFakeShipperOutput(
-				logger, expected.LogLevel, unit, expected.Config)
+		case FakeOutput:
+			return newFakeOutput(logger, expected.LogLevel, manager, unit, expected.Config)
 		}
 		return nil, fmt.Errorf("unknown output unit config type: %s",
 			expected.Config.Type)

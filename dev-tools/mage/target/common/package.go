@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package common
 
@@ -48,7 +48,11 @@ func PackageSystemTests() error {
 	parent := filepath.Dir(targetFile)
 	if !fileExists(parent) {
 		fmt.Printf(">> creating parent dir: %s", parent)
-		os.Mkdir(parent, 0750)
+		err = os.Mkdir(parent, 0750)
+		if err != nil {
+			fmt.Printf(">> %s", err)
+			return err
+		}
 	}
 
 	err = devtools.Tar(systemTestsDir, targetFile)

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package mage
 
@@ -174,6 +174,33 @@ func InstallGoTestTools() error {
 	return gotool.Install(
 		gotool.Install.Package("gotest.tools/gotestsum"),
 	)
+}
+
+func GoTestBuild(ctx context.Context, params GoTestArgs) error {
+	if params.OutputFile == "" {
+		return fmt.Errorf("missing output file")
+	}
+
+	fmt.Println(">> go test:", params.LogName, "Building Test Binary")
+
+	args := []string{"test", "-c", "-o", params.OutputFile}
+
+	if len(params.Tags) > 0 {
+		params := strings.Join(params.Tags, " ")
+		if params != "" {
+			args = append(args, "-tags", params)
+		}
+	}
+
+	args = append(args, params.Packages...)
+
+	goTestBuild := makeCommand(ctx, params.Env, "go", args...)
+
+	err := goTestBuild.Run()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // GoTest invokes "go test" and reports the results to stdout. It returns an

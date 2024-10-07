@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package handlers
 
@@ -39,6 +39,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	mockhandlers "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/actions/handlers"
 )
 
@@ -56,18 +57,47 @@ func TestPolicyChange(t *testing.T) {
 		action := &fleetapi.ActionPolicyChange{
 			ActionID:   "abc123",
 			ActionType: "POLICY_CHANGE",
-			Policy:     conf,
+			Data: fleetapi.ActionPolicyChangeData{
+				Policy: conf,
+			},
 		}
 
 		cfg := configuration.DefaultConfiguration()
-
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch, nilLogLevelSet(t))
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
 
 		err := handler.Handle(context.Background(), action, ack)
 		require.NoError(t, err)
 
 		change := <-ch
 		require.Equal(t, config.MustNewConfigFrom(conf), change.Config())
+	})
+	t.Run("Received config with $$ in inputs", func(t *testing.T) {
+		ch := make(chan coordinator.ConfigChange, 1)
+
+		conf := map[string]interface{}{
+			"inputs": []interface{}{map[string]interface{}{
+				"type": "key",
+				"key":  "$$$$",
+			}}}
+		action := &fleetapi.ActionPolicyChange{
+			ActionID:   "abc123",
+			ActionType: "POLICY_CHANGE",
+			Data: fleetapi.ActionPolicyChangeData{
+				Policy: conf,
+			},
+		}
+
+		cfg := configuration.DefaultConfiguration()
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
+
+		err := handler.Handle(context.Background(), action, ack)
+		require.NoError(t, err)
+
+		change := <-ch
+		m, err := change.Config().ToMapStr()
+		require.NoError(t, err)
+
+		require.Equal(t, conf, m)
 	})
 }
 
@@ -86,11 +116,13 @@ func TestPolicyAcked(t *testing.T) {
 		action := &fleetapi.ActionPolicyChange{
 			ActionID:   actionID,
 			ActionType: "POLICY_CHANGE",
-			Policy:     config,
+			Data: fleetapi.ActionPolicyChangeData{
+				Policy: config,
+			},
 		}
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch, nilLogLevelSet(t))
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
 
 		err := handler.Handle(context.Background(), action, tacker)
 		require.NoError(t, err)
@@ -112,7 +144,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 		}))
 
 	fleetServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "api/status" {
+		if r.URL.Path != "/api/status" {
 			w.WriteHeader(http.StatusNotFound)
 			_, err := w.Write(nil)
 			require.NoError(t, err)
@@ -134,7 +166,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 	t.Run("policy with proxy config", func(t *testing.T) {
 		t.Run("rollback client changes when cannot create client",
 			func(t *testing.T) {
-				log, _ := logger.NewTesting("TestPolicyChangeHandler")
+				log, _ := loggertest.New("TestPolicyChangeHandler")
 				var setterCalledCount int
 				setter := testSetter{SetClientFn: func(c client.Sender) {
 					setterCalledCount++
@@ -190,7 +222,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 
 		t.Run("rollback client changes when cannot reach fleet-server",
 			func(t *testing.T) {
-				log, _ := logger.NewTesting("TestPolicyChangeHandler")
+				log, _ := loggertest.New("TestPolicyChangeHandler")
 				var setterCalledCount int
 				setter := testSetter{SetClientFn: func(c client.Sender) {
 					setterCalledCount++
@@ -246,7 +278,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 			})
 
 		t.Run("a new Hosts and no proxy changes the remote config", func(t *testing.T) {
-			log, _ := logger.NewTesting("TestPolicyChangeHandler")
+			log, _ := loggertest.New("TestPolicyChangeHandler")
 			var setterCalledCount int
 			setter := testSetter{SetClientFn: func(c client.Sender) {
 				setterCalledCount++
@@ -290,7 +322,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 		})
 
 		t.Run("a proxy changes the fleet client", func(t *testing.T) {
-			log, _ := logger.NewTesting("TestPolicyChangeHandler")
+			log, _ := loggertest.New("TestPolicyChangeHandler")
 			var setterCalledCount int
 			setter := testSetter{SetClientFn: func(c client.Sender) {
 				setterCalledCount++
@@ -340,7 +372,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 			func(t *testing.T) {
 				wantProxy := mockProxy.URL
 
-				log, _ := logger.NewTesting("TestPolicyChangeHandler")
+				log, _ := loggertest.New("TestPolicyChangeHandler")
 				var setterCalledCount int
 				setter := testSetter{SetClientFn: func(c client.Sender) {
 					setterCalledCount++
@@ -391,6 +423,65 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 			})
 	})
 
+	t.Run("Bad http status from new fleet host does not change remote config", func(t *testing.T) {
+		badStatusCodes := []int{http.StatusInternalServerError, http.StatusNotFound}
+		for _, httpStatusCode := range badStatusCodes {
+			t.Run(fmt.Sprintf("HTTP %d", httpStatusCode), func(t *testing.T) {
+				alwaysErroringServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(httpStatusCode)
+					_, err := w.Write(nil)
+					require.NoError(t, err)
+				}))
+				defer alwaysErroringServer.Close()
+
+				log, _ := loggertest.New("TestPolicyChangeHandler")
+				var setterCalledCount int
+				setter := testSetter{SetClientFn: func(c client.Sender) {
+					setterCalledCount++
+				}}
+
+				originalCfg := &configuration.Configuration{
+					Fleet: &configuration.FleetAgentConfig{
+						Server: &configuration.FleetServerConfig{
+							Host: fleetServerHost,
+							Port: uint16(fleetServerPort),
+						},
+						AccessAPIKey: "ignore",
+						Client: remote.Config{
+							Transport: httpcommon.HTTPTransportSettings{
+								Proxy: httpcommon.HTTPClientProxySettings{
+									URL: nil,
+								}}},
+					},
+					Settings: configuration.DefaultSettingsConfig()}
+
+				h := PolicyChangeHandler{
+					agentInfo:            &info.AgentInfo{},
+					config:               originalCfg,
+					store:                &storage.NullStore{},
+					setters:              []actions.ClientSetter{&setter},
+					log:                  log,
+					policyLogLevelSetter: mockhandlers.NewLogLevelSetter(t),
+				}
+
+				cfg := config.MustNewConfigFrom(
+					map[string]interface{}{
+						"fleet.proxy_url": "",
+						"fleet.hosts":     []string{alwaysErroringServer.URL},
+					})
+
+				err = h.handlePolicyChange(context.Background(), cfg)
+				if assert.Error(t, err, "action policy change handler should return an error if new fleet server sends back a bad status code") {
+					// check that we have the correct error contents
+					assert.ErrorContains(t, err, fmt.Sprintf("fleet server ping returned a bad status code: %d", httpStatusCode))
+				}
+
+				assert.Equal(t, 0, setterCalledCount, "client setter should nopt have been called as the new policy was invalid")
+				assert.Equal(t, fleetServerHost, h.config.Fleet.Server.Host, "fleet server host should be unchanged since new policy has been rejected")
+			})
+		}
+	})
+
 	t.Run("policy with SSL config", func(t *testing.T) {
 		agentChildEncPassphrase := `reallySecurePassword`
 		passphrasePath := filepath.Join(t.TempDir(), "passphrase")
@@ -426,7 +517,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 		require.NoError(t, err, "failed creating root and child certs")
 
 		statusHandler := func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path != "api/status" {
+			if r.URL.Path != "/api/status" {
 				w.WriteHeader(http.StatusNotFound)
 				_, err := w.Write(nil)
 				require.NoError(t, err)
@@ -651,6 +742,46 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				},
 			},
 			{
+				name: "certificate and key without passphrase clear out previous passphrase",
+				originalCfg: &configuration.Configuration{
+					Fleet: &configuration.FleetAgentConfig{
+						Client: remote.Config{
+							Host: fleetmTLSServer.URL,
+							Transport: httpcommon.HTTPTransportSettings{
+								TLS: &tlscommon.Config{
+									CAs: []string{string(fleetRootPair.Cert)},
+									Certificate: tlscommon.CertificateConfig{
+										Certificate:    "some certificate",
+										Key:            "some key",
+										Passphrase:     "",
+										PassphrasePath: "/path/to/passphrase",
+									},
+								},
+							},
+						},
+						AccessAPIKey: "ignore",
+					},
+					Settings: configuration.DefaultSettingsConfig(),
+				},
+				newCfg: map[string]interface{}{
+					"fleet.ssl.enabled":     true,
+					"fleet.ssl.certificate": string(agentChildPair.Cert),
+					"fleet.ssl.key":         string(agentChildPair.Key),
+				},
+				setterCalledCount: 1,
+				wantCAs:           []string{string(fleetRootPair.Cert)},
+				wantCertificateConfig: tlscommon.CertificateConfig{
+					Certificate:    string(agentChildPair.Cert),
+					Key:            string(agentChildPair.Key),
+					Passphrase:     "",
+					PassphrasePath: "",
+				},
+				assertErr: func(t *testing.T, err error) {
+					assert.NoError(t, err,
+						"unexpected error when applying fleet.ssl.certificate and key")
+				},
+			},
+			{
 				name: "certificate and key with passphrase_path is applied when present",
 				originalCfg: &configuration.Configuration{
 					Fleet: &configuration.FleetAgentConfig{
@@ -796,7 +927,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 
 		for _, tc := range tcs {
 			t.Run(tc.name, func(t *testing.T) {
-				log, logs := logger.NewTesting(tc.name)
+				log, logs := loggertest.New(tc.name)
 				defer func() {
 					if t.Failed() {
 						t.Log("test failed, see handler logs below:")
@@ -991,7 +1122,7 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelSet(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			log, _ := logger.NewTesting(tt.name)
+			log, _ := loggertest.New(tt.name)
 			mockLogLevelSetter := mockhandlers.NewLogLevelSetter(t)
 
 			if tt.setupExpectations != nil {

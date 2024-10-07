@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package dispatcher
 
@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"go.elastic.co/apm"
+	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
@@ -306,7 +306,7 @@ func (ad *ActionDispatcher) handleExpired(
 			version := "unknown"
 			expiration := "unknown"
 			if upgrade, ok := e.(*fleetapi.ActionUpgrade); ok {
-				version = upgrade.Version
+				version = upgrade.Data.Version
 				expiration = upgrade.ActionExpiration
 			}
 			ad.lastUpgradeDetails = details.NewDetails(version, details.StateFailed, e.ID())
@@ -358,7 +358,7 @@ func (ad *ActionDispatcher) reportNextScheduledUpgrade(input []fleetapi.Action, 
 	}
 
 	upgradeDetails := details.NewDetails(
-		nextUpgrade.Version,
+		nextUpgrade.Data.Version,
 		details.StateScheduled,
 		nextUpgrade.ID())
 	startTime, err := nextUpgrade.StartTime()

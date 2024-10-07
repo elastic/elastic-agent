@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package ess
 
@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/testing/runner"
+	"github.com/elastic/elastic-agent/pkg/testing/common"
 )
 
 const ProvisionerStateful = "stateful"
@@ -39,13 +39,13 @@ func (c *ProvisionerConfig) Validate() error {
 }
 
 type statefulProvisioner struct {
-	logger runner.Logger
+	logger common.Logger
 	cfg    ProvisionerConfig
 	client *Client
 }
 
 // NewProvisioner creates the ESS stateful Provisioner
-func NewProvisioner(cfg ProvisionerConfig) (runner.StackProvisioner, error) {
+func NewProvisioner(cfg ProvisionerConfig) (common.StackProvisioner, error) {
 	err := cfg.Validate()
 	if err != nil {
 		return nil, err
@@ -63,12 +63,12 @@ func (p *statefulProvisioner) Name() string {
 	return ProvisionerStateful
 }
 
-func (p *statefulProvisioner) SetLogger(l runner.Logger) {
+func (p *statefulProvisioner) SetLogger(l common.Logger) {
 	p.logger = l
 }
 
 // Create creates a stack.
-func (p *statefulProvisioner) Create(ctx context.Context, request runner.StackRequest) (runner.Stack, error) {
+func (p *statefulProvisioner) Create(ctx context.Context, request common.StackRequest) (common.Stack, error) {
 	// allow up to 2 minutes for request
 	createCtx, createCancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer createCancel()
@@ -88,9 +88,9 @@ func (p *statefulProvisioner) Create(ctx context.Context, request runner.StackRe
 	}
 	resp, err := p.createDeployment(createCtx, request, deploymentTags)
 	if err != nil {
-		return runner.Stack{}, err
+		return common.Stack{}, err
 	}
-	return runner.Stack{
+	return common.Stack{
 		ID:            request.ID,
 		Provisioner:   p.Name(),
 		Version:       request.Version,
@@ -106,7 +106,7 @@ func (p *statefulProvisioner) Create(ctx context.Context, request runner.StackRe
 }
 
 // WaitForReady should block until the stack is ready or the context is cancelled.
-func (p *statefulProvisioner) WaitForReady(ctx context.Context, stack runner.Stack) (runner.Stack, error) {
+func (p *statefulProvisioner) WaitForReady(ctx context.Context, stack common.Stack) (common.Stack, error) {
 	deploymentID, err := p.getDeploymentID(stack)
 	if err != nil {
 		return stack, fmt.Errorf("failed to get deployment ID from the stack: %w", err)
@@ -127,7 +127,7 @@ func (p *statefulProvisioner) WaitForReady(ctx context.Context, stack runner.Sta
 }
 
 // Delete deletes a stack.
-func (p *statefulProvisioner) Delete(ctx context.Context, stack runner.Stack) error {
+func (p *statefulProvisioner) Delete(ctx context.Context, stack common.Stack) error {
 	deploymentID, err := p.getDeploymentID(stack)
 	if err != nil {
 		return err
@@ -141,7 +141,7 @@ func (p *statefulProvisioner) Delete(ctx context.Context, stack runner.Stack) er
 	return p.client.ShutdownDeployment(ctx, deploymentID)
 }
 
-func (p *statefulProvisioner) createDeployment(ctx context.Context, r runner.StackRequest, tags map[string]string) (*CreateDeploymentResponse, error) {
+func (p *statefulProvisioner) createDeployment(ctx context.Context, r common.StackRequest, tags map[string]string) (*CreateDeploymentResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 
@@ -173,7 +173,7 @@ func (p *statefulProvisioner) createDeployment(ctx context.Context, r runner.Sta
 	return resp, nil
 }
 
-func (p *statefulProvisioner) getDeploymentID(stack runner.Stack) (string, error) {
+func (p *statefulProvisioner) getDeploymentID(stack common.Stack) (string, error) {
 	if stack.Internal == nil {
 		return "", fmt.Errorf("missing internal information")
 	}

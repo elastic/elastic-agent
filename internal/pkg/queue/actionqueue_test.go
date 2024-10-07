@@ -1,8 +1,7 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
-//nolint:dupl // lots of casting in test cases
 package queue
 
 import (
@@ -56,7 +55,7 @@ type mockSaver struct {
 	mock.Mock
 }
 
-func (m *mockSaver) SetQueue(a []fleetapi.Action) {
+func (m *mockSaver) SetQueue(a []fleetapi.ScheduledAction) {
 	m.Called(a)
 }
 
@@ -85,14 +84,14 @@ func TestNewQueue(t *testing.T) {
 	})
 
 	t.Run("empty actions slice", func(t *testing.T) {
-		q, err := newQueue([]fleetapi.Action{})
+		q, err := newQueue([]fleetapi.ScheduledAction{})
 		require.NoError(t, err)
 		assert.NotNil(t, q)
 		assert.Empty(t, q)
 	})
 
 	t.Run("ordered actions list", func(t *testing.T) {
-		q, err := newQueue([]fleetapi.Action{a1, a2, a3})
+		q, err := newQueue([]fleetapi.ScheduledAction{a1, a2, a3})
 		assert.NotNil(t, q)
 		require.NoError(t, err)
 		assert.Len(t, *q, 3)
@@ -107,7 +106,7 @@ func TestNewQueue(t *testing.T) {
 	})
 
 	t.Run("unordered actions list", func(t *testing.T) {
-		q, err := newQueue([]fleetapi.Action{a3, a2, a1})
+		q, err := newQueue([]fleetapi.ScheduledAction{a3, a2, a1})
 		require.NoError(t, err)
 		assert.NotNil(t, q)
 		assert.Len(t, *q, 3)
@@ -124,7 +123,7 @@ func TestNewQueue(t *testing.T) {
 	t.Run("start time error", func(t *testing.T) {
 		a := &mockAction{}
 		a.On("StartTime").Return(time.Time{}, errors.New("oh no"))
-		q, err := newQueue([]fleetapi.Action{a})
+		q, err := newQueue([]fleetapi.ScheduledAction{a})
 		assert.EqualError(t, err, "oh no")
 		assert.Nil(t, q)
 	})

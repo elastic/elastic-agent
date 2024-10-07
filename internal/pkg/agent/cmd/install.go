@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package cmd
 
@@ -23,10 +23,11 @@ import (
 )
 
 const (
-	flagInstallBasePath     = "base-path"
-	flagInstallUnprivileged = "unprivileged"
-	flagInstallDevelopment  = "develop"
-	flagInstallNamespace    = "namespace"
+	flagInstallBasePath               = "base-path"
+	flagInstallUnprivileged           = "unprivileged"
+	flagInstallDevelopment            = "develop"
+	flagInstallNamespace              = "namespace"
+	flagInstallRunUninstallFromBinary = "run-uninstall-from-binary"
 )
 
 func newInstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -50,6 +51,9 @@ would like the Agent to operate.
 	cmd.Flags().BoolP("non-interactive", "n", false, "Install Elastic Agent in non-interactive mode which will not prompt on missing parameters but fails instead.")
 	cmd.Flags().String(flagInstallBasePath, paths.DefaultBasePath, "The path where the Elastic Agent will be installed. It must be an absolute path.")
 	cmd.Flags().Bool(flagInstallUnprivileged, false, "Install in unprivileged mode, limiting the access of the Elastic Agent. (beta)")
+
+	cmd.Flags().Bool(flagInstallRunUninstallFromBinary, false, "Run the uninstall command from this binary instead of using the binary found in the system's path.")
+	_ = cmd.Flags().MarkHidden(flagInstallRunUninstallFromBinary) // Advanced option to force a new agent to override an existing installation, it may orphan installed components.
 
 	cmd.Flags().String(flagInstallNamespace, "", "Install into an isolated namespace. Allows multiple Elastic Agents to be installed at once. (experimental)")
 	_ = cmd.Flags().MarkHidden(flagInstallNamespace) // For internal use only.
@@ -108,6 +112,11 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	force, _ := cmd.Flags().GetBool("force")
 	if status == install.Installed && !force {
 		return fmt.Errorf("already installed at: %s", topPath)
+	}
+
+	runUninstallBinary, _ := cmd.Flags().GetBool(flagInstallRunUninstallFromBinary)
+	if status == install.Installed && force && runUninstallBinary {
+		fmt.Fprintln(streams.Out, "Uninstall will not be ran from the agent installed in system path, components may persist.")
 	}
 
 	nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
@@ -221,6 +230,24 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	var ownership utils.FileOwner
 	cfgFile := paths.ConfigFile()
+	if status == install.Installed {
+		// Uninstall the agent
+		progBar.Describe("Uninstalling current Elastic Agent")
+		if !runUninstallBinary {
+			err := execUninstall(streams)
+			if err != nil {
+				progBar.Describe("Uninstall failed")
+				return err
+			}
+		} else {
+			err := install.Uninstall(cmd.Context(), cfgFile, topPath, "", log, progBar)
+			if err != nil {
+				progBar.Describe("Uninstall from binary failed")
+				return err
+			}
+		}
+		progBar.Describe("Successfully uninstalled Elastic Agent")
+	}
 	if status != install.PackageInstall {
 		ownership, err = install.Install(cfgFile, topPath, unprivileged, log, progBar, streams)
 		if err != nil {
@@ -230,7 +257,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		defer func() {
 			if err != nil {
 				progBar.Describe("Uninstalling")
-				innerErr := install.Uninstall(cfgFile, topPath, "", log, progBar)
+				innerErr := install.Uninstall(cmd.Context(), cfgFile, topPath, "", log, progBar)
 				if innerErr != nil {
 					progBar.Describe("Failed to Uninstall")
 				} else {
@@ -298,5 +325,27 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	_ = progBar.Finish()
 	_ = progBar.Exit()
 	fmt.Fprint(streams.Out, "\nElastic Agent has been successfully installed.\n")
+	return nil
+}
+
+// execUninstall execs "elastic-agent uninstall --force" from the elastic agent installed on the system (found in PATH)
+func execUninstall(streams *cli.IOStreams) error {
+	args := []string{
+		"uninstall",
+		"--force",
+	}
+	execPath, err := exec.LookPath(paths.BinaryName)
+	if err != nil {
+		return fmt.Errorf("unable to find %s on path: %w", paths.BinaryName, err)
+	}
+	uninstall := exec.Command(execPath, args...)
+	uninstall.Stdout = streams.Out
+	uninstall.Stderr = streams.Err
+	if err := uninstall.Start(); err != nil {
+		return fmt.Errorf("unable to start elastic-agent uninstall: %w", err)
+	}
+	if err := uninstall.Wait(); err != nil {
+		return fmt.Errorf("failed to uninstall elastic-agent: %w", err)
+	}
 	return nil
 }

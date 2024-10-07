@@ -16,6 +16,11 @@ KUSTOMIZE=elastic-agent-kustomize
 KUSTOMIZE_DEFAULT=elastic-agent-kustomize/default
 KUSTOMIZE_KSM_AUTOSHARDING=elastic-agent-kustomize/ksm-autosharding
 
+# variable for processor for elastic-agent-standalone
+define ELASTIC_PROCESSOR
+processors:\n            - add_fields:\n                fields:\n                  onboarding_id: '%ONBOARDING_ID%'
+endef
+
 .PHONY: generate-k8s $(ALL)
 generate-k8s: $(ALL)
 
@@ -86,8 +91,7 @@ else
 		--label automation \
 		--label release_note:skip \
 		--base main \
-		--head $(ELASTIC_AGENT_BRANCH) \
-		--reviewer elastic/obs-cloudnative-monitoring
+		--head $(ELASTIC_AGENT_BRANCH)
 endif
 
 else
@@ -95,14 +99,15 @@ else
 endif
 
 
-## ci-create-kustomize-default : Create default kustomize folder 
+## ci-create-kustomize : Create default kustomize folder 
 .PHONY: ci-create-kustomize $(ALL)
 ci-create-kustomize: $(ALL)
 
 ifdef GENERATEKUSTOMIZE
+export ELASTIC_PROCESSOR
 $(ALL):
 	@echo "Generating $@ kustomize-default files"
-	@for f in $(shell ls $@/*.yaml); do \
+	@for f in $(shell ls $@/*.yaml | grep -v elastic-agent-standalone-daemonset-configmap); do \
 		cp -r $$f  $(KUSTOMIZE_DEFAULT)/$@/base; \
 	done
 
@@ -115,9 +120,13 @@ $(ALL):
 
 	mkdir -p $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/extra/
 	sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" -e "/name: elastic-agent-state/,+1 s/^/#/" -e "/path: \/var\/lib\/$@\/kube-system\/state/,+1 s/^/#/" $@/$@-daemonset.yaml > $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/base/$@-daemonset.yaml
+	sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" -e "/name: elastic-agent-state/,+1 s/^/#/" -e "/path: \/var\/lib\/$@\/kube-system\/state/,+1 s/^/#/" $@/$@-daemonset.yaml > $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/base/$@-daemonset.yaml
+
 	sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" -e "s/hostNetwork: true/hostNetwork: false/g" -e "s/DaemonSet/StatefulSet/g" -e "s/agent-node-datastreams/agent-ksm-datastreams/g" -e "/name: elastic-agent-state/,+1 s/^/#/" -e "/path: \/var\/lib\/$@\/kube-system\/state/,+1 s/^/#/" $@/$@-daemonset.yaml > $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/extra/$@-statefulset.yaml
 
+	@echo "Generating processor $$ELASTIC_PROCESSOR"
+	sed -e "s/#<processors_placeholder>/$$ELASTIC_PROCESSOR/g"  elastic-agent-standalone/elastic-agent-standalone-daemonset-configmap.yaml > $(KUSTOMIZE_DEFAULT)/elastic-agent-standalone/base/elastic-agent-standalone-daemonset-configmap.yaml
+	
 else
 	echo "No KSM templates generated. Please run: GENERATEKUSTOMIZE=true make ci-create-kustomize "
-
 endif

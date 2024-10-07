@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package runtime
 
@@ -71,12 +71,6 @@ func newComponentRuntime(
 			return newServiceRuntime(comp, logger, isLocal)
 		}
 		return nil, errors.New("unknown component runtime")
-	}
-	if comp.ShipperSpec != nil {
-		if comp.ShipperSpec.Spec.Command != nil {
-			return newCommandRuntime(comp, logger, monitor)
-		}
-		return nil, errors.New("components for shippers can only support command runtime")
 	}
 	return nil, errors.New("component missing specification")
 }

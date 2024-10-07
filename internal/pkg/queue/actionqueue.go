@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package queue
 
@@ -11,9 +11,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
-// saver is an the minimal interface needed for state storage.
+// saver is the minimal interface needed for state storage.
 type saver interface {
-	SetQueue(a []fleetapi.Action)
+	SetQueue(a []fleetapi.ScheduledAction)
 	Save() error
 }
 
@@ -55,7 +55,7 @@ func (q queue) Swap(i, j int) {
 // When using the queue, the Add method should be used instead.
 func (q *queue) Push(x interface{}) {
 	n := len(*q)
-	e := x.(*item) //nolint:errcheck // should be an *item
+	e := x.(*item)
 	e.index = n
 	*q = append(*q, e)
 }
@@ -74,13 +74,9 @@ func (q *queue) Pop() interface{} {
 
 // newQueue creates a new priority queue using container/heap.
 // Will return an error if StartTime fails for any action.
-func newQueue(actions []fleetapi.Action) (*queue, error) {
+func newQueue(actions []fleetapi.ScheduledAction) (*queue, error) {
 	q := make(queue, len(actions))
-	for i, a := range actions {
-		action, ok := a.(fleetapi.ScheduledAction)
-		if !ok {
-			continue
-		}
+	for i, action := range actions {
 		ts, err := action.StartTime()
 		if err != nil {
 			return nil, err
@@ -95,8 +91,8 @@ func newQueue(actions []fleetapi.Action) (*queue, error) {
 	return &q, nil
 }
 
-// NewActionQueue creates a new queue with the passed actions using the persistor for state storage.
-func NewActionQueue(actions []fleetapi.Action, s saver) (*ActionQueue, error) {
+// NewActionQueue creates a new queue with the passed actions using the saver for state storage.
+func NewActionQueue(actions []fleetapi.ScheduledAction, s saver) (*ActionQueue, error) {
 	q, err := newQueue(actions)
 	if err != nil {
 		return nil, err
@@ -127,7 +123,7 @@ func (q *ActionQueue) DequeueActions() []fleetapi.ScheduledAction {
 		if (*q.q)[0].priority > ts {
 			break
 		}
-		item := heap.Pop(q.q).(*item) //nolint:errcheck // should be an *item
+		item := heap.Pop(q.q).(*item)
 		actions = append(actions, item.action)
 	}
 	return actions
@@ -148,9 +144,9 @@ func (q *ActionQueue) Cancel(actionID string) int {
 	return len(items)
 }
 
-// Actions returns all actions in the queue, item 0 is garunteed to be the min, the rest may not be in sorted order.
-func (q *ActionQueue) Actions() []fleetapi.Action {
-	actions := make([]fleetapi.Action, q.q.Len())
+// Actions returns all actions in the queue, item 0 is guaranteed to be the min, the rest may not be in sorted order.
+func (q *ActionQueue) Actions() []fleetapi.ScheduledAction {
+	actions := make([]fleetapi.ScheduledAction, q.q.Len())
 	for i, item := range *q.q {
 		actions[i] = item.action
 	}

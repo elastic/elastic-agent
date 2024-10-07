@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -19,7 +19,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -260,7 +260,9 @@ func (runner *BeatRunner) SubtestExportDashboards() {
 	runner.T().Logf("got output: %s", exportOut)
 	assert.NoError(runner.T(), err)
 
-	inFolder, err := os.ReadDir(filepath.Join(outDir, "/_meta/kibana/8/dashboard"))
+	// The folder matches the major version of Kibana, so we read it from the API
+	dashboardFolder := fmt.Sprintf("/_meta/kibana/%d/dashboard", runner.requirementsInfo.KibanaClient.GetVersion().Major)
+	inFolder, err := os.ReadDir(filepath.Join(outDir, dashboardFolder))
 	require.NoError(runner.T(), err)
 	runner.T().Logf("got log contents: %#v", inFolder)
 	require.NotEmpty(runner.T(), inFolder)

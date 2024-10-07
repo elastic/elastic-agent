@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package upgrade
 
@@ -8,7 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"sync"
@@ -159,7 +159,7 @@ func randomBytes(length int) []byte {
 
 	var b []byte
 	for i := 0; i < length; i++ {
-		rune := chars[rand.Intn(len(chars))]
+		rune := chars[rand.IntN(len(chars))]
 		b = append(b, byte(rune))
 	}
 

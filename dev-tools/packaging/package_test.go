@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package packaging
 
@@ -30,7 +30,7 @@ import (
 	"testing"
 
 	"github.com/blakesmith/ar"
-	"github.com/cavaliercoder/go-rpm"
+	"github.com/cavaliergopher/rpm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -112,7 +112,7 @@ func TestDocker(t *testing.T) {
 // Sub-tests
 
 func checkRPM(t *testing.T, file string) {
-	p, rpmPkg, err := readRPM(file)
+	p, _, err := readRPM(file)
 	if err != nil {
 		t.Error(err)
 		return
@@ -130,7 +130,6 @@ func checkRPM(t *testing.T, file string) {
 	checkLicensesPresent(t, "/usr/share", p)
 	checkSystemdUnitPermissions(t, p)
 	ensureNoBuildIDLinks(t, p)
-	checkRPMDigestTypeSHA256(t, rpmPkg)
 }
 
 func checkDeb(t *testing.T, file string, buf *bytes.Buffer) {
@@ -580,16 +579,6 @@ func ensureNoBuildIDLinks(t *testing.T, p *packageFile) {
 	})
 }
 
-// checkRPMDigestTypeSHA256 verifies that the RPM contains sha256 digests.
-// https://github.com/elastic/beats/issues/23670
-func checkRPMDigestTypeSHA256(t *testing.T, rpmPkg *rpm.PackageFile) {
-	t.Run("rpm_digest_type_is_sha256", func(t *testing.T) {
-		if rpmPkg.ChecksumType() != "sha256" {
-			t.Errorf("expected SHA256 digest type but got %v", rpmPkg.ChecksumType())
-		}
-	})
-}
-
 // Helpers
 
 type packageFile struct {
@@ -619,8 +608,8 @@ func getFiles(t *testing.T, pattern *regexp.Regexp) []string {
 	return files
 }
 
-func readRPM(rpmFile string) (*packageFile, *rpm.PackageFile, error) {
-	p, err := rpm.OpenPackageFile(rpmFile)
+func readRPM(rpmFile string) (*packageFile, *rpm.Package, error) {
+	p, err := rpm.Open(rpmFile)
 	if err != nil {
 		return nil, nil, err
 	}

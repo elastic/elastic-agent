@@ -1,11 +1,12 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package upgrade
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"google.golang.org/grpc"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -68,8 +68,12 @@ func Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPa
 
 // Cleanup removes all artifacts and files related to a specified version.
 func Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool) error {
+	return cleanup(log, topDirPath, currentVersionedHome, currentHash, removeMarker, keepLogs, afterRestartDelay)
+}
+
+func cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool, delay time.Duration) error {
 	log.Infow("Cleaning up upgrade", "hash", currentHash, "remove_marker", removeMarker)
-	<-time.After(afterRestartDelay)
+	<-time.After(delay)
 
 	// data directory path
 	dataDirPath := paths.DataFrom(topDirPath)
@@ -114,6 +118,7 @@ func Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash s
 		currentDir = fmt.Sprintf("%s-%s", agentName, currentHash)
 	}
 
+	var errs []error
 	for _, dir := range subdirs {
 		if dir == currentDir {
 			continue
@@ -130,11 +135,11 @@ func Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash s
 			ignoredDirs = append(ignoredDirs, "logs")
 		}
 		if cleanupErr := install.RemoveBut(hashedDir, true, ignoredDirs...); cleanupErr != nil {
-			err = multierror.Append(err, cleanupErr)
+			errs = append(errs, cleanupErr)
 		}
 	}
 
-	return err
+	return goerrors.Join(errs...)
 }
 
 // InvokeWatcher invokes an agent instance using watcher argument for watching behavior of
@@ -170,6 +175,7 @@ func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) erro
 	restartViaDaemonFn := func(ctx context.Context) error {
 		connectCtx, connectCancel := context.WithTimeout(ctx, 3*time.Second)
 		defer connectCancel()
+		//nolint:staticcheck // requires changing client signature
 		err := c.Connect(connectCtx, grpc.WithBlock(), grpc.WithDisableRetry())
 		if err != nil {
 			return errors.New(err, "failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
@@ -199,7 +205,10 @@ func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) erro
 	root, _ := utils.HasRoot() // error ignored
 
 	for restartAttempt := 1; restartAttempt <= maxRestartCount; restartAttempt++ {
-		backExp.Wait()
+		// only use exp backoff when retrying
+		if restartAttempt != 1 {
+			backExp.Wait()
+		}
 		log.Infof("Restarting Agent via control protocol; attempt %d of %d", restartAttempt, maxRestartCount)
 		// First, try to restart Agent by sending a restart command
 		// to its daemon (via GRPC).

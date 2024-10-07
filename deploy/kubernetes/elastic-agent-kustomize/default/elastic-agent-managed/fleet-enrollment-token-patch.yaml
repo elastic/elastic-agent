@@ -1,0 +1,19 @@
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value: 
+    name: FLEET_ENROLLMENT_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: elastic-agent-creds
+        key: enrollment_token
+
+
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value: 
+    name: FLEET_URL
+    valueFrom:
+      configMapKeyRef:
+        name: elastic-agent-configs
+        key: host
+
