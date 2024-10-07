@@ -12,5 +12,5 @@ go install github.com/wadey/gocovmerge@latest
 buildkite-agent artifact download "coverage-*.out" .
 # Space separated list of paths to coverage files
 COV_PATHS=$(find coverage-*.out -exec printf '%s ' {} \;)
-gocovmerge "$COV_PATHS" > "$MERGED_COV_FILE"
+gocovmerge $COV_PATHS > "$MERGED_COV_FILE"
 echo "Merged coverage file: $MERGED_COV_FILE. See artifacts"
