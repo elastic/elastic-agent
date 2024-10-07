@@ -36,6 +36,15 @@ processors:
     check_interval: 1s
     limit_mib: 4000
     spike_limit_mib: 800
+  elastictrace:
+  lsminterval:
+    intervals:
+      - duration: 1m
+        statements:
+          - set(resource.attributes["metricset.interval"], "1m")
+      - duration: 10m
+        statements:
+          - set(resource.attributes["metricset.interval"], "10m")
 
 receivers:
   filelog:
@@ -62,7 +71,7 @@ receivers:
           static_configs:
             - targets: ['0.0.0.0:8888']
 
-connectors: 
+connectors:
   spanmetrics:
     histogram:
       explicit:
@@ -75,7 +84,7 @@ connectors:
       enabled: true
     exclude_dimensions: ['status.code']
     dimensions_cache_size: 1000
-    aggregation_temporality: "AGGREGATION_TEMPORALITY_CUMULATIVE"    
+    aggregation_temporality: "AGGREGATION_TEMPORALITY_CUMULATIVE"
     metrics_flush_interval: 15s
     metrics_expiration: 5m
     events:
@@ -87,6 +96,19 @@ connectors:
       - service.name
       - telemetry.sdk.language
       - telemetry.sdk.name
+  spanmetricsv2:
+    spans:
+      - name: span.histogram
+        description: Span histogram metric
+        include_resource_attributes:
+          - key: service.name
+          - key: deployment.environment
+        attributes:
+          - key: transaction.type
+        histogram:
+          exponential:
+            max_size: 2
+  count:
 
 service:
   extensions:
@@ -99,6 +121,7 @@ service:
         - elasticsearch
         - file
         - otlp
+        - count
       processors:
         - attributes
         - batch
@@ -115,6 +138,7 @@ service:
       exporters:
         - debug
         - otlp
+        - count
       processors:
         - attributes
         - batch
@@ -129,6 +153,16 @@ service:
         - spanmetrics
         - prometheus
 
+    metrics/aggregated:
+      exporters:
+        - debug
+        - otlp
+      processors:
+        - lsminterval
+      receivers:
+        - spanmetricsv2
+        - count
+
     traces:
       exporters:
         - debug
@@ -136,6 +170,8 @@ service:
         - otlp
         - otlphttp
         - spanmetrics
+        - spanmetricsv2
+        - count
       processors:
         - attributes
         - batch
@@ -143,6 +179,7 @@ service:
         - resource
         - resourcedetection
         - transform
+        - elastictrace
       receivers:
         - otlp
         - jaeger

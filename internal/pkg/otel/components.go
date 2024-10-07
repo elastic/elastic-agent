@@ -36,6 +36,9 @@ import (
 	"go.opentelemetry.io/collector/processor/batchprocessor"                                                    // for batching events
 	"go.opentelemetry.io/collector/processor/memorylimiterprocessor"
 
+	"github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor"
+	"github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor"
+
 	"github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor"
 
 	// Exporters:
@@ -52,7 +55,10 @@ import (
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
 
 	// Connectors
+	"github.com/open-telemetry/opentelemetry-collector-contrib/connector/countconnector"
 	spanmetricsconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector"
+
+	"github.com/elastic/opentelemetry-collector-components/connector/spanmetricsconnectorv2"
 )
 
 func components() (otelcol.Factories, error) {
@@ -87,6 +93,8 @@ func components() (otelcol.Factories, error) {
 		elasticinframetricsprocessor.NewFactory(),
 		resourcedetectionprocessor.NewFactory(),
 		memorylimiterprocessor.NewFactory(),
+		lsmintervalprocessor.NewFactory(),
+		elastictraceprocessor.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
@@ -106,6 +114,8 @@ func components() (otelcol.Factories, error) {
 
 	factories.Connectors, err = connector.MakeFactoryMap(
 		spanmetricsconnector.NewFactory(),
+		spanmetricsconnectorv2.NewFactory(),
+		countconnector.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
