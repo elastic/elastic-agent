@@ -38,11 +38,11 @@ require (
 	github.com/kardianos/service v1.2.1-0.20210728001519-a323c3813bc7
 	github.com/magefile/mage v1.15.0
 	github.com/oklog/ulid/v2 v2.1.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.110.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.110.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.110.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.110.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.110.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.111.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.111.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.111.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.111.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.111.0
 	github.com/otiai10/copy v1.14.0
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/rednafi/link-patrol v0.0.0-20240826150821-057643e74d4d
@@ -59,7 +59,7 @@ require (
 	go.elastic.co/apm/v2 v2.6.0
 	go.elastic.co/ecszap v1.0.2
 	go.elastic.co/go-licence-detector v0.6.1
-	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.110.0
+	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.111.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.27.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
