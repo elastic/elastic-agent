@@ -3152,7 +3152,14 @@ func (Otel) Readme() error {
 	}
 	defer out.Close()
 
-	return tmpl.Execute(out, data)
+	err = tmpl.Execute(out, data)
+	if err != nil {
+		return fmt.Errorf("failed to execute README template: %w", err)
+	}
+
+	// check that links are live
+	mg.Deps(devtools.CheckLinksInFileAreLive(readmeOut))
+	return nil
 }
 
 func getOtelDependencies() (*otelDependencies, error) {
