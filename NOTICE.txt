@@ -10297,11 +10297,19 @@ Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/collector/comp
 
 --------------------------------------------------------------------------------
 Dependency : go.opentelemetry.io/collector/confmap
+<<<<<<< HEAD
 Version: v1.15.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/collector/confmap@v1.15.0/LICENSE:
+=======
+Version: v1.17.0
+Licence type (autodetected): Apache-2.0
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/collector/confmap@v1.17.0/LICENSE:
+>>>>>>> 948ffcf00b (build(deps): bump go.opentelemetry.io/collector/confmap/provider/httpsprovider from 0.110.0 to 1.17.0 (#5707))
 
 
                                  Apache License
@@ -11357,11 +11365,19 @@ Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/collector/conf
 
 --------------------------------------------------------------------------------
 Dependency : go.opentelemetry.io/collector/confmap/provider/httpsprovider
+<<<<<<< HEAD
 Version: v0.109.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/collector/confmap/provider/httpsprovider@v0.109.0/LICENSE:
+=======
+Version: v1.17.0
+Licence type (autodetected): Apache-2.0
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/collector/confmap/provider/httpsprovider@v1.17.0/LICENSE:
+>>>>>>> 948ffcf00b (build(deps): bump go.opentelemetry.io/collector/confmap/provider/httpsprovider from 0.110.0 to 1.17.0 (#5707))
 
 
                                  Apache License
