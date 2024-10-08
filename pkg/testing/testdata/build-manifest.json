@@ -4357,36 +4357,6 @@
       },
       "dependencies": []
     },
-    "cloud-defend": {
-      "branch": "main",
-      "commit_hash": "27215867e613177b0ca57d0357c421c646fac0b5",
-      "commit_url": "https://github.com/elastic/cloud-defend/commits/27215867e613177b0ca57d0357c421c646fac0b5",
-      "external_artifacts_manifest_url": "https://artifacts-snapshot.elastic.co/cloud-defend/8.13.0-b12322fc/manifest-8.13.0-SNAPSHOT.json",
-      "build_duration_seconds": 0,
-      "packages": {
-        "cloud-defend-8.13.0-SNAPSHOT-linux-x86_64.tar.gz": {
-          "url": "https://snapshots.elastic.co/8.13.0-l5snflwr/downloads/cloud-defend/cloud-defend-8.13.0-SNAPSHOT-linux-x86_64.tar.gz",
-          "sha_url": "https://snapshots.elastic.co/8.13.0-l5snflwr/downloads/cloud-defend/cloud-defend-8.13.0-SNAPSHOT-linux-x86_64.tar.gz.sha512",
-          "asc_url": "https://snapshots.elastic.co/8.13.0-l5snflwr/downloads/cloud-defend/cloud-defend-8.13.0-SNAPSHOT-linux-x86_64.tar.gz.asc",
-          "type": "tar",
-          "architecture": "x86_64",
-          "os": [
-            "linux"
-          ]
-        },
-        "cloud-defend-8.13.0-SNAPSHOT-linux-arm64.tar.gz": {
-          "url": "https://snapshots.elastic.co/8.13.0-l5snflwr/downloads/cloud-defend/cloud-defend-8.13.0-SNAPSHOT-linux-arm64.tar.gz",
-          "sha_url": "https://snapshots.elastic.co/8.13.0-l5snflwr/downloads/cloud-defend/cloud-defend-8.13.0-SNAPSHOT-linux-arm64.tar.gz.sha512",
-          "asc_url": "https://snapshots.elastic.co/8.13.0-l5snflwr/downloads/cloud-defend/cloud-defend-8.13.0-SNAPSHOT-linux-arm64.tar.gz.asc",
-          "type": "tar",
-          "architecture": "arm64",
-          "os": [
-            "linux"
-          ]
-        }
-      },
-      "dependencies": []
-    },
     "beats": {
       "branch": "main",
       "commit_hash": "d4d2ddce3230f21f01a19afdb836626f7b0af4b5",
