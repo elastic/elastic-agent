@@ -104,11 +104,11 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.110.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver v0.110.0
 	go.opentelemetry.io/collector/component v0.110.0
-	go.opentelemetry.io/collector/confmap v1.16.0
+	go.opentelemetry.io/collector/confmap v1.17.0
 	go.opentelemetry.io/collector/confmap/converter/expandconverter v0.110.0
 	go.opentelemetry.io/collector/confmap/provider/envprovider v1.16.0
 	go.opentelemetry.io/collector/confmap/provider/fileprovider v1.16.0
-	go.opentelemetry.io/collector/confmap/provider/httpprovider v0.110.0
+	go.opentelemetry.io/collector/confmap/provider/httpprovider v1.17.0
 	go.opentelemetry.io/collector/confmap/provider/httpsprovider v0.110.0
 	go.opentelemetry.io/collector/confmap/provider/yamlprovider v0.110.0
 	go.opentelemetry.io/collector/connector v0.110.0
