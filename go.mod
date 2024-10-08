@@ -39,6 +39,7 @@ require (
 	github.com/magefile/mage v1.15.0
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.109.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.109.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.109.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.109.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.109.0
