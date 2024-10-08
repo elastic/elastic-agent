@@ -254,6 +254,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 	testArgs = append(testArgs, params.Packages...)
 
 	args := append(gotestsumArgs, append([]string{"--"}, testArgs...)...)
+	fmt.Println(">> ARGS:", params.LogName, "Command:", "gotestsum", strings.Join(args, " "))
 
 	goTest := makeCommand(ctx, params.Env, "gotestsum", args...)
 	// Wire up the outputs.
