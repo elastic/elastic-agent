@@ -4,6 +4,9 @@
 {{- $agentName := index . 2 }}
       spec:
         dnsPolicy: ClusterFirstWithHostNet
+        {{- with ($presetVal).hostNetwork }}
+        hostNetwork: {{ . }}
+        {{- end }}
         {{- with ($presetVal).hostPID }}
         hostPID: {{ . }}
         {{- end }}

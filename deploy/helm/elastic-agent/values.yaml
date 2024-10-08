@@ -7,28 +7,27 @@
 outputs:
   # name of the output
   default:
-    # -- type of the output [one of `ESPlainAuth`, `ESSecretAuthBasic`, `ESSecretAuthAPI`, `ESECKRef`]
+    # -- type of the output [one of `ESPlainAuthBasic`, `ESPlainAuthAPI`, `ESSecretAuthBasic`, `ESSecretAuthAPI`, `ESECKRef`]
     # @section -- 1.1 - Output Object
     # @sectionDescriptionTemplate -- OutputObject
     # @key -- outputs.{name}.type
-    type: ESPlainAuth
-    # -- url of the output [required for type `ESPlainAuth`]
+    type: ESPlainAuthBasic
+    # -- url of the output [required for types `ESPlainAuthBasic` and `ESPlainAuthAPI`]
     # @section -- 1.1 - Output Object
     # @default -- `""`
     # @key -- outputs.{name}.url
     url: "http://elasticsearch:9200"
-    # -- the username to use to authenticate with the output [required for type `ESPlainAuth` if `api_key` is not set]
+    # -- the username to use to authenticate with the output [required for type `ESPlainAuthBasic`]
     # @section -- 1.1 - Output Object
     # @default -- `""`
     # @key -- outputs.{name}.username
     username: "elastic"
-    # -- the password to use to authenticate with the output [required for type `ESPlainAuth` if `api_key` is not set]
+    # -- the password to use to authenticate with the output [required for type `ESPlainAuthBasic`]
     # @section -- 1.1 - Output Object
     # @default -- `""`
     # @key -- outputs.{name}.password
     password: "changeme"
-    # -- the API key use to authenticate with the output [required for type `ESPlainAuth` if `username` and `password`
-    # are not set]
+    # -- the API key use to authenticate with the output [required for type `ESPlainAuthAPI`]
     # @section -- 1.1 - Output Object
     # @key -- outputs.{name}.api_key
     api_key: ""
@@ -337,12 +336,14 @@ agent:
   # required by the built-in Kubernetes integration [here](./values.yaml)
   # @notationType -- map[string]{}
   # @section -- 3 - Elastic-Agent Configuration
-  # @default -- `{ "perNode" : {...}, "clusterWider": {...}, "ksmShared": {...} }`
+  # @default -- `{ "perNode" : {...}, "clusterWide": {...}, "ksmSharded": {...} }`
   presets:
     #  examplePreset:
     #    mode: [deployment, statefulset, daemonset]
     #    replicaCount: 1
     #    labels: {}
+    #    hostPID: boolean
+    #    hostNetwork: boolean
     #    imagePullPolicy: [Always, IfNotPresent, Never]
     #    annotations: {}
     #    affinity: {}

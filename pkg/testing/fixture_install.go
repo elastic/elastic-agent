@@ -238,9 +238,7 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 	f.setClient(c)
 
 	f.t.Cleanup(func() {
-		if f.t.Failed() {
-			f.DumpProcesses("-cleanup")
-		}
+		f.DumpProcesses("-post-uninstall")
 	})
 
 	f.t.Cleanup(func() {
@@ -649,7 +647,7 @@ func (f *Fixture) collectDiagnostics() {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 
-	diagPath, err := f.DiagDir()
+	diagPath, err := f.DiagnosticsDir()
 	if err != nil {
 		f.t.Logf("failed to collect diagnostics: %v", err)
 		return
@@ -661,15 +659,8 @@ func (f *Fixture) collectDiagnostics() {
 		return
 	}
 
-	stamp := time.Now().Format(time.RFC3339)
-	if runtime.GOOS == "windows" {
-		// on Windows a filename cannot contain a ':' as this collides with disk labels (aka. C:\)
-		stamp = strings.ReplaceAll(stamp, ":", "-")
-	}
-
-	// Sub-test names are separated by "/" characters which are not valid filenames on Linux.
-	sanitizedTestName := strings.ReplaceAll(f.t.Name(), "/", "-")
-	outputPath := filepath.Join(diagPath, fmt.Sprintf("%s-diagnostics-%s.zip", sanitizedTestName, stamp))
+	prefix := f.FileNamePrefix()
+	outputPath := filepath.Join(diagPath, prefix+"-diagnostics.zip")
 
 	output, err := f.Exec(ctx, []string{"diagnostics", "-f", outputPath})
 	if err != nil {
@@ -689,26 +680,13 @@ func (f *Fixture) collectDiagnostics() {
 		if err != nil {
 			// If collecting diagnostics fails, zip up the entire installation directory with the hope that it will contain logs.
 			f.t.Logf("creating zip archive of the installation directory: %s", f.workDir)
-			timestamp := strings.ReplaceAll(time.Now().Format(time.RFC3339), ":", "-")
-			zipPath := filepath.Join(diagPath, fmt.Sprintf("%s-install-directory-%s.zip", sanitizedTestName, timestamp))
+			zipPath := filepath.Join(diagPath, fmt.Sprintf("%s-install-directory.zip", prefix))
 			err = f.archiveInstallDirectory(f.workDir, zipPath)
 			if err != nil {
 				f.t.Logf("failed to zip install directory to %s: %s", zipPath, err)
 			}
 		}
 	}
-}
-
-// DiagDir returned {projectRoot}/build/diagnostics path. Files on this path
-// are saved if any test fails. Use it to save files for further investigation.
-func (f *Fixture) DiagDir() (string, error) {
-	dir, err := findProjectRoot(f.caller)
-	if err != nil {
-		return "", fmt.Errorf("failed to find project root: %w", err)
-	}
-
-	diagPath := filepath.Join(dir, "build", "diagnostics")
-	return diagPath, nil
 }
 
 func (f *Fixture) archiveInstallDirectory(installPath string, outputPath string) error {

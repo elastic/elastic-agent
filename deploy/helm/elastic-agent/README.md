@@ -22,28 +22,30 @@ The outputs section specifies where to send data. You can specify multiple outpu
 
 ### 1.1 - Output Object
 The supported types of outputs are:
-- `ESPlainAuth`: `elasticsearch` output with the connection details specified inline the yaml
+- `ESPlainAuthBasic`: `elasticsearch` output with the connection details (url, username, password) specified inline the yaml
+- `ESPlainAuthAPI`: `elasticsearch` output with the connection details (url, api_key) specified inline the yaml
 - `ESSecretAuthBasic`: `elasticsearch` output with the connection details specified in a k8s secret
 - `ESSecretAuthAPI`: `elasticsearch` output with the connection details specified in a k8s secret
 - `ESECKRef`: `elasticsearch` output that references by name an Elasticsearch cluster managed by ECK operator
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| outputs.{name}.type | string | `"ESPlainAuth"` | type of the output [one of `ESPlainAuth`, `ESSecretAuthBasic`, `ESSecretAuthAPI`, `ESECKRef`] |
-| outputs.{name}.url | string | `""` | url of the output [required for type `ESPlainAuth`] |
-| outputs.{name}.username | string | `""` | the username to use to authenticate with the output [required for type `ESPlainAuth` if `api_key` is not set] |
-| outputs.{name}.password | string | `""` | the password to use to authenticate with the output [required for type `ESPlainAuth` if `api_key` is not set] |
-| outputs.{name}.api_key | string | `""` | the API key use to authenticate with the output [required for type `ESPlainAuth` if `username` and `password` are not set] |
+| outputs.{name}.type | string | `"ESPlainAuthBasic"` | type of the output [one of `ESPlainAuthBasic`, `ESPlainAuthAPI`, `ESSecretAuthBasic`, `ESSecretAuthAPI`, `ESECKRef`] |
+| outputs.{name}.url | string | `""` | url of the output [required for types `ESPlainAuthBasic` and `ESPlainAuthAPI`] |
+| outputs.{name}.username | string | `""` | the username to use to authenticate with the output [required for type `ESPlainAuthBasic`] |
+| outputs.{name}.password | string | `""` | the password to use to authenticate with the output [required for type `ESPlainAuthBasic`] |
+| outputs.{name}.api_key | string | `""` | the API key use to authenticate with the output [required for type `ESPlainAuthAPI`] |
 | outputs.{name}.secretName | string | `""` | the k8s secret to mount output connection details [required for types `ESSecretAuthBasic` and `ESSecretAuthAPI`] |
 | outputs.{name}.name | string | `""` | name to reference an Elasticsearch cluster managed by ECK [required for type `ESECKRef`] |
 | outputs.{name}.namespace | string | `""` | namespace to reference an Elasticsearch cluster managed by ECK [optional for type `ESECKRef`] |
 Examples of Helm chart arguments to define an output with name `myOutput`:
-- `ESPlainAuth`: `--set outputs.myOutput.url=https://elasticsearch:9200 --set outputs.myOutput.api_key=token`
+- `ESPlainAuthBasic`: `--set outputs.myOutput.url=https://elasticsearch:9200 --set outputs.myOutput.username=changeme --set outputs.myOutput.password=changeme`
+- `ESPlainAuthAPI`: `--set outputs.myOutput.url=https://elasticsearch:9200 --set outputs.myOutput.api_key=token`
 - `ESSecretAuthBasic`: `--set outputs.myOutput.type=ESSecretAuthBasic --set outputs.myOutput.secretName=k8s_secret_name` (required keys in the k8s secret are `url`, `username`, `password`)
 - `ESSecretAuthAPI`: `--set outputs.myOutput.type=ESSecretAuthAPI --set outputs.myOutput.secretName=k8s_secret_name` (required keys in the k8s secret are `url`, `api_key`)
 - `ESECKRef`: `--set outputs.myOutput.type=ESECKRef --set outputs.myOutput.name=eck_es_cluster_name`
 
-For `ESPlainAuth`, `ESSecretAuthBasic`, `ESSecretAuthAPI` extra fields can be specified inline the yaml following these guidelines (`ESECKRef` doesn't support them):
+For `ESPlainAuthBasic`, `ESPlainAuthAPI` `ESSecretAuthBasic`, `ESSecretAuthAPI` extra fields can be specified inline the yaml following these guidelines (`ESECKRef` doesn't support them):
  - ["Data parsing, filtering, and manipulation settings"](`https://www.elastic.co/guide/en/fleet/current/elasticsearch-output.html#output-elasticsearch-data-parsing-settings`)
  - ["Performance tuning settings"](https://www.elastic.co/guide/en/fleet/current/elasticsearch-output.html#output-elasticsearch-performance-tuning-settings)
  - ["Memory queue settings"](https://www.elastic.co/guide/en/fleet/current/elasticsearch-output.html#output-elasticsearch-memory-queue-settings)
@@ -65,7 +67,7 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 | kubernetes.namespace | string | `"default"` | kubernetes namespace |
 | kubernetes.hints.enabled | bool | `false` | enable [elastic-agent autodiscovery](https://www.elastic.co/guide/en/fleet/current/elastic-agent-kubernetes-autodiscovery.html) feature |
 | kubernetes.state.enabled | bool | `true` | integration global switch to enable state streams based on kube-state-metrics. Note that setting this to `false` results in overriding and *disabling all* the respective state streams |
-| kubernetes.state.deployKSM | bool | `true` | deploy kube-state-metrics service as a sidecar container to the elastic agent of `ksmShared` preset. If set to `false`, kube-state-metrics will *not* get deployed and `clusterWide` agent preset will be used for collecting kube-state-metrics. |
+| kubernetes.state.deployKSM | bool | `true` | deploy kube-state-metrics service as a sidecar container to the elastic agent of `ksmSharded` preset. If set to `false`, kube-state-metrics will *not* get deployed and `clusterWide` agent preset will be used for collecting kube-state-metrics. |
 | kubernetes.state.host | string | `"kube-state-metrics:8080"` | host of the kube-state-metrics service. Note that this used only when `deployKSM` is set to `false`. |
 | kubernetes.state.vars | object | `{}` | state streams variables such as `add_metadata`, `hosts`, `period`, `bearer_token_file`. Please note that colliding vars also defined in respective state streams will *not* be overridden. |
 | kubernetes.metrics.enabled | bool | `true` | integration global switch to enable metric streams based on kubelet. Note that setting this to false results in overriding and *disabling all* the respective metric streams |
@@ -129,11 +131,11 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 ### 3 - Elastic-Agent Configuration
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| agent.version | string | `"8.15.0"` | elastic-agent version |
-| agent.image | object | `{"pullPolicy":"IfNotPresent","repository":"docker.elastic.co/beats/elastic-agent-complete","tag":""}` | image configuration |
+| agent.version | string | `"9.0.0"` | elastic-agent version |
+| agent.image | object | `{"pullPolicy":"IfNotPresent","repository":"docker.elastic.co/beats/elastic-agent","tag":"9.0.0-SNAPSHOT"}` | image configuration |
 | agent.engine | string | `"k8s"` | generate kubernetes manifests or [ECK](https://github.com/elastic/cloud-on-k8s) CRDs |
 | agent.unprivileged | bool | `false` | enable unprivileged mode |
-| agent.presets | map[string]{} | `{ "perNode" : {...}, "clusterWider": {...}, "ksmShared": {...} }` | Map of deployment presets for the Elastic Agent. The key of the map is the name of the preset. See more for the presets required by the built-in Kubernetes integration [here](./values.yaml) |
+| agent.presets | map[string]{} | `{ "perNode" : {...}, "clusterWide": {...}, "ksmSharded": {...} }` | Map of deployment presets for the Elastic Agent. The key of the map is the name of the preset. See more for the presets required by the built-in Kubernetes integration [here](./values.yaml) |
 
 ### 3.1 - Elastic-Agent Managed Configuration
 | Key | Type | Default | Description |
