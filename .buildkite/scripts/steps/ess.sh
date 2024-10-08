@@ -2,7 +2,7 @@
 set -euo pipefail
 
 function ess_up() {
-  echo "~~~ Staring ESS Stack"
+  echo "~~~ Starting ESS Stack"
   local WORKSPACE=$(git rev-parse --show-toplevel)
   local TF_DIR="${WORKSPACE}/test_infra/ess/"
   local STACK_VERSION=$1
