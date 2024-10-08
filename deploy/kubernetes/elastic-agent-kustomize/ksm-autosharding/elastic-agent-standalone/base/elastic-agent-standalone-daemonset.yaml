@@ -5,15 +5,15 @@ metadata:
   name: elastic-agent-standalone
   namespace: kube-system
   labels:
-    app: elastic-agent-standalone
+    app.kubernetes.io/name: elastic-agent-standalone
 spec:
   selector:
     matchLabels:
-      app: elastic-agent-standalone
+      app.kubernetes.io/name: elastic-agent-standalone
   template:
     metadata:
       labels:
-        app: elastic-agent-standalone
+        app.kubernetes.io/name: elastic-agent-standalone
     spec:
       # Tolerations are needed to run Elastic Agent on Kubernetes control-plane nodes.
       # Agents running on control-plane nodes collect metrics from the control plane components (scheduler, controller manager) of Kubernetes
@@ -61,9 +61,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            - name: STATE_PATH
-              value: "/etc/elastic-agent"
-            # The following ELASTIC_NETINFO:false variable will disable the netinfo.enabled option of add-host-metadata processor. This will remove fields host.ip and host.mac.  
+            # The following ELASTIC_NETINFO:false variable will disable the netinfo.enabled option of add-host-metadata processor. This will remove fields host.ip and host.mac.
             # For more info: https://www.elastic.co/guide/en/beats/metricbeat/current/add-host-metadata.html
             - name: ELASTIC_NETINFO
               value: "false"
