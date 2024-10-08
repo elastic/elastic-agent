@@ -77,5 +77,5 @@ receives.
 
 ## Total footprint
 Given the two log outputs and their default log rotation policies, the
-Elastic-Agent needs about 210Mb (20Mb x 7 + 10Mb + 7 = 210Mb) of disk
+Elastic-Agent needs about 210Mb (20Mb x 7 + 10Mb x 7 = 210Mb) of disk
 for logging.
