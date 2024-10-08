@@ -336,7 +336,7 @@ agent:
   # required by the built-in Kubernetes integration [here](./values.yaml)
   # @notationType -- map[string]{}
   # @section -- 3 - Elastic-Agent Configuration
-  # @default -- `{ "perNode" : {...}, "clusterWider": {...}, "ksmShared": {...} }`
+  # @default -- `{ "perNode" : {...}, "clusterWide": {...}, "ksmSharded": {...} }`
   presets:
     #  examplePreset:
     #    mode: [deployment, statefulset, daemonset]

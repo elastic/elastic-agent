@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package runner
+package linux
 
 import (
 	"context"
@@ -10,9 +10,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/elastic/elastic-agent/pkg/testing/common"
+	"github.com/elastic/elastic-agent/pkg/testing/ssh"
 )
 
-func linuxDiagnostics(ctx context.Context, sshClient SSHClient, logger Logger, destination string) error {
+func linuxDiagnostics(ctx context.Context, sshClient ssh.SSHClient, logger common.Logger, destination string) error {
 	// take ownership, as sudo tests will create with root permissions (allow to fail in the case it doesn't exist)
 	diagnosticDir := "$HOME/agent/build/diagnostics"
 	_, _, _ = sshClient.Exec(ctx, "sudo", []string{"chown", "-R", "$USER:$USER", diagnosticDir}, nil)
@@ -48,7 +51,7 @@ func linuxDiagnostics(ctx context.Context, sshClient SSHClient, logger Logger, d
 	return nil
 }
 
-func linuxCopy(ctx context.Context, sshClient SSHClient, logger Logger, repoArchive string, builds []Build) error {
+func linuxCopy(ctx context.Context, sshClient ssh.SSHClient, logger common.Logger, repoArchive string, builds []common.Build) error {
 	// copy the archive and extract it on the host
 	logger.Logf("Copying repo")
 	destRepoName := filepath.Base(repoArchive)

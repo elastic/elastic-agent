@@ -18,6 +18,11 @@ var arches = []string{define.AMD64, define.ARM64}
 
 // versions defines the list of supported version of Kubernetes.
 var versions = []define.OS{
+	// Kubernetes 1.31
+	{
+		Type:    define.Kubernetes,
+		Version: "1.31.0",
+	},
 	// Kubernetes 1.30
 	{
 		Type:    define.Kubernetes,
@@ -66,6 +71,10 @@ var variants = []struct {
 	{
 		Name:  "cloud",
 		Image: "docker.elastic.co/beats-ci/elastic-agent-cloud",
+	},
+	{
+		Name:  "service",
+		Image: "docker.elastic.co/beats-ci/elastic-agent-service",
 	},
 }
 

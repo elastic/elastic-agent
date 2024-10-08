@@ -238,9 +238,7 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 	f.setClient(c)
 
 	f.t.Cleanup(func() {
-		if f.t.Failed() {
-			f.DumpProcesses("-cleanup")
-		}
+		f.DumpProcesses("-post-uninstall")
 	})
 
 	f.t.Cleanup(func() {
