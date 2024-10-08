@@ -13,7 +13,11 @@ function ess_up() {
     return 1
   fi
 
+<<<<<<< HEAD
   export EC_API_KEY=$(retry -t 5 -- vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
+=======
+  export EC_API_KEY=$(retry 5 vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
+>>>>>>> 7aa8bb222f (Ess terraform + run integration tests on BK agents (#5113))
   
   if [[ -z "${EC_API_KEY}" ]]; then
     echo "Error: Failed to get EC API key from vault" >&2
@@ -48,7 +52,11 @@ function ess_down() {
   local WORKSPACE=$(git rev-parse --show-toplevel)
   local TF_DIR="${WORKSPACE}/test_infra/ess/"
   if [ -z "${EC_API_KEY:-}" ]; then
+<<<<<<< HEAD
     export EC_API_KEY=$(retry -t 5 -- vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)    
+=======
+    export EC_API_KEY=$(retry 5 vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)    
+>>>>>>> 7aa8bb222f (Ess terraform + run integration tests on BK agents (#5113))
   fi
   
   pushd "${TF_DIR}"
