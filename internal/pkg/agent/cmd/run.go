@@ -64,7 +64,6 @@ const (
 
 type (
 	cfgOverrider func(cfg *configuration.Configuration)
-	awaiters     []<-chan struct{}
 )
 
 func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
