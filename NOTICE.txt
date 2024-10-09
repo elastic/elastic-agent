@@ -2766,11 +2766,11 @@ limitations under the License.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/opentelemetry-collector-components/connector/spanmetricsconnectorv2
-Version: v0.0.0-20241004111153-9e723e51485b
+Version: v0.1.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/opentelemetry-collector-components/connector/spanmetricsconnectorv2@v0.0.0-20241004111153-9e723e51485b/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/opentelemetry-collector-components/connector/spanmetricsconnectorv2@v0.1.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3188,11 +3188,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/opentelemetry-c
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor
-Version: v0.0.0-20241004111153-9e723e51485b
+Version: v0.1.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor@v0.0.0-20241004111153-9e723e51485b/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor@v0.1.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3399,11 +3399,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/opentelemetry-c
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor
-Version: v0.0.0-20241004111153-9e723e51485b
+Version: v0.1.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor@v0.0.0-20241004111153-9e723e51485b/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor@v0.1.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
