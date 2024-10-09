@@ -22,10 +22,10 @@ require (
 	github.com/elastic/go-sysinfo v1.14.2
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015
-	github.com/elastic/opentelemetry-collector-components/connector/spanmetricsconnectorv2 v0.0.0-20241004111153-9e723e51485b
+	github.com/elastic/opentelemetry-collector-components/connector/spanmetricsconnectorv2 v0.1.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.12.0
-	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.0.0-20241004111153-9e723e51485b
-	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.0.0-20241004111153-9e723e51485b
+	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.1.0
+	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.1.0
 	github.com/fatih/color v1.17.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-viper/mapstructure/v2 v2.1.0
