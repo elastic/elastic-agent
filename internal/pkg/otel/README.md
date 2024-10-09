@@ -55,8 +55,8 @@ This section provides a summary of components included in the Elastic Distributi
 | Component | Version |
 |---|---|
 | [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.12.0/processor/elasticinframetricsprocessor/README.md) | v0.12.0 |
-| [elastictraceprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elastictraceprocessor/v0.0.0-20241004111153-9e723e51485b/processor/elastictraceprocessor/README.md) | v0.0.0-20241004111153-9e723e51485b |
-| [lsmintervalprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/lsmintervalprocessor/v0.0.0-20241004111153-9e723e51485b/processor/lsmintervalprocessor/README.md) | v0.0.0-20241004111153-9e723e51485b |
+| [elastictraceprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elastictraceprocessor/v0.1.1/processor/elastictraceprocessor/README.md) | v0.1.1 |
+| [lsmintervalprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/lsmintervalprocessor/v0.1.0/processor/lsmintervalprocessor/README.md) | v0.1.0 |
 | [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.111.0/processor/memorylimiterprocessor/README.md) | v0.111.0 |
 | [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.111.0/processor/attributesprocessor/README.md) | v0.111.0 |
 | [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.111.0/processor/filterprocessor/README.md) | v0.111.0 |
@@ -79,6 +79,6 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| [spanmetricsconnectorv2](https://github.com/elastic/opentelemetry-collector-components/blob/connector/spanmetricsconnectorv2/v0.0.0-20241004111153-9e723e51485b/connector/spanmetricsconnectorv2/README.md) | v0.0.0-20241004111153-9e723e51485b |
+| [spanmetricsconnectorv2](https://github.com/elastic/opentelemetry-collector-components/blob/connector/spanmetricsconnectorv2/v0.1.0/connector/spanmetricsconnectorv2/README.md) | v0.1.0 |
 | [countconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/countconnector/v0.111.0/connector/countconnector/README.md) | v0.111.0 |
 | [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.111.0/connector/spanmetricsconnector/README.md) | v0.111.0 |
