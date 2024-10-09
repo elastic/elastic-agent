@@ -225,11 +225,11 @@ shared:
   - &docker_ubuntu_spec
     docker_variant: 'basic'
     extra_vars:
-      from: '--platform=linux/amd64 ubuntu:20.04'
+      from: '--platform=linux/amd64 ubuntu:24.04'
   - &docker_ubuntu_arm_spec
     docker_variant: 'basic'
     extra_vars:
-      from: '--platform=linux/arm64 ubuntu:20.04'
+      from: '--platform=linux/arm64 ubuntu:24.04'
 
   - &docker_ubi_spec
     docker_variant: 'ubi'
