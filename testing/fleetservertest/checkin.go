@@ -174,11 +174,11 @@ const (
             "hosts": {{ toJson .FleetHosts }}
           },
           "id": "{{.PolicyID}}",
-          "secret_paths": ["inputs.0.secret_key"],
+          "secret_paths": ["inputs.0.custom_attr"],
           "inputs": [
             {
               "id": "fake-input",
-              "secret_key": "secretValue",
+              "custom_attr": "secretValue",
               "revision": 1,
               "name": "fake-input",
               "type": "fake-input",
