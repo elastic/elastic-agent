@@ -157,6 +157,8 @@ func newEndpointTLSComponentModifier(log *logger.Logger, cache *tlsCache) func(c
 			return nil, errors.New("EndpointTLSComponentModifier: 'certificate' isn't a string")
 		}
 
+		// all TLS config exists and the certificate key is passphrase protected,
+		// now load and decrypt the key.
 		cert, key, err := loadCertificatesWithCache(log, cache, keyPassPath, certPath, keyPath)
 		if err != nil {
 			return nil, err
@@ -204,9 +206,6 @@ func loadCertificatesWithCache(log *logger.Logger, cache *tlsCache, keyPassPath 
 }
 
 func loadCertificates(log *logger.Logger, keyPassPathStr string, certStr string, keyStr string) (string, string, error) {
-	// all SSL config exists and the certificate key is passphrase protected,
-	// now decrypt the key
-
 	pass, err := os.ReadFile(keyPassPathStr)
 	if err != nil {
 		return "", "", fmt.Errorf("EndpointTLSComponentModifier: failed to read client certificate passphrase file: %w", err)
