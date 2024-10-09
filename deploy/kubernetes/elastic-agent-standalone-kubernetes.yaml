@@ -5,7 +5,7 @@ metadata:
   name: agent-node-datastreams
   namespace: kube-system
   labels:
-    k8s-app: elastic-agent-standalone
+    app.kubernetes.io/name: elastic-agent-standalone
 data:
   agent.yml: |-
     outputs:
@@ -674,15 +674,15 @@ metadata:
   name: elastic-agent-standalone
   namespace: kube-system
   labels:
-    app: elastic-agent-standalone
+    app.kubernetes.io/name: elastic-agent-standalone
 spec:
   selector:
     matchLabels:
-      app: elastic-agent-standalone
+      app.kubernetes.io/name: elastic-agent-standalone
   template:
     metadata:
       labels:
-        app: elastic-agent-standalone
+        app.kubernetes.io/name: elastic-agent-standalone
     spec:
       # Tolerations are needed to run Elastic Agent on Kubernetes control-plane nodes.
       # Agents running on control-plane nodes collect metrics from the control plane components (scheduler, controller manager) of Kubernetes
@@ -867,7 +867,7 @@ kind: ClusterRole
 metadata:
   name: elastic-agent-standalone
   labels:
-    k8s-app: elastic-agent-standalone
+    app.kubernetes.io/name: elastic-agent-standalone
 rules:
   - apiGroups: [""]
     resources:
@@ -939,7 +939,7 @@ metadata:
   # Should be the namespace where elastic-agent is running
   namespace: kube-system
   labels:
-    k8s-app: elastic-agent-standalone
+    app.kubernetes.io/name: elastic-agent-standalone
 rules:
   - apiGroups:
       - coordination.k8s.io
@@ -953,7 +953,7 @@ metadata:
   name: elastic-agent-standalone-kubeadm-config
   namespace: kube-system
   labels:
-    k8s-app: elastic-agent-standalone
+    app.kubernetes.io/name: elastic-agent-standalone
 rules:
   - apiGroups: [""]
     resources:
@@ -968,5 +968,5 @@ metadata:
   name: elastic-agent-standalone
   namespace: kube-system
   labels:
-    k8s-app: elastic-agent-standalone
+    app.kubernetes.io/name: elastic-agent-standalone
 ---
