@@ -339,6 +339,8 @@ func TestInstallUninstallAudit(t *testing.T) {
 		require.NoError(t, err)
 	}
 
+	// TODO: replace direct query to ES index with API call to Fleet
+	// Blocked on https://github.com/elastic/kibana/issues/194884
 	response, err := info.ESClient.Get(".fleet-agents", agentID, info.ESClient.Get.WithContext(ctx))
 	require.NoError(t, err)
 	defer response.Body.Close()
