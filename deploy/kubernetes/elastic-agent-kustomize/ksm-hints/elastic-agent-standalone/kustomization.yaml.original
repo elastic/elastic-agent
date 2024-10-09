@@ -24,11 +24,17 @@ patches:
               args:
                 - -c
                 - >-
-                  mkdir -p /usr/share/elastic-agent/state/inputs.d &&
-                  curl -sL https://github.com/elastic/elastic-agent/archive/%BRANCH%.tar.gz | tar xz -C /usr/share/elastic-agent/state/inputs.d --strip=5 "elastic-agent-%BRANCH%/deploy/kubernetes/elastic-agent-standalone/templates.d"
-              securityContext:
-                runAsUser: 0
+                  mkdir -p /etc/elastic-agent/inputs.d &&
+                  curl -sL https://github.com/elastic/elastic-agent/archive/%BRANCH%.tar.gz | tar xz -C /etc/elastic-agent/inputs.d --strip=5 "elastic-agent-%BRANCH%/deploy/kubernetes/elastic-agent-standalone/templates.d"
               volumeMounts:
-                - name: elastic-agent-state
-                  mountPath: /usr/share/elastic-agent/state
+                - mountPath: /etc/elastic-agent/inputs.d
+                  name: external-inputs
+          containers:
+            - name: elastic-agent-standalone
+              volumeMounts:
+                - name: external-inputs
+                  mountPath: /usr/share/elastic-agent/state/inputs.d
+          volumes:
+            - name: external-inputs
+              emptyDir: {}
           
