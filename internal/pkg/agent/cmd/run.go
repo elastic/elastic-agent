@@ -397,9 +397,6 @@ LOOP:
 	}
 	cancel()
 	err = <-appErr
-	for _, a := range awaiters {
-		<-a // wait for awaiter to be done
-	}
 
 	if logShutdown {
 		l.Info("Shutting down completed.")
