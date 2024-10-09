@@ -2703,6 +2703,7 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 	default:
 	}
 
+	t.Log("Apply component config 1")
 	m.Update(component.Model{Components: components})
 	err = <-m.errCh
 	require.NoError(t, err, "expected no error from the manager when applying"+
@@ -2720,6 +2721,7 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 		200*time.Millisecond,
 		"component %s did not start", comp0ID)
 
+	t.Log("Apply component config 2")
 	m.Update(component.Model{Components: components2})
 	err = <-m.errCh
 	require.NoError(t, err, "expected no error from the manager when applying"+
@@ -2740,6 +2742,7 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 	// component 1 started, we can stop the manager
 	cancel()
 
+	t.Log("Verify behaviour")
 	comp0StartLogs := logs.FilterMessageSnippet(
 		fmt.Sprintf("Starting component %q", comp0ID)).TakeAll()
 	comp0StopLogs := logs.FilterMessageSnippet(
@@ -2761,7 +2764,7 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 	assert.NoError(t, err, "Manager.Run returned and error")
 
 	if t.Failed() {
-		t.Logf("manager logs:")
+		t.Log("manager logs:")
 		for _, l := range logs.TakeAll() {
 			t.Log(l)
 		}

@@ -48,7 +48,7 @@ func (h *apiHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		}
 
-		writeResponse(w, unexpectedErrorWithReason(err.Error()))
+		writeResponse(w, unexpectedErrorWithReason("%s", err.Error()))
 	}
 }
 
