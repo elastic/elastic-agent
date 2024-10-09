@@ -8,14 +8,10 @@ package cmd
 
 import (
 	"context"
-	goerrors "errors"
-	"sync"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
 	"github.com/elastic/elastic-agent-libs/service"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 )
@@ -79,42 +75,5 @@ func runCollector(cmdCtx context.Context, configFiles []string) error {
 	defer cancel()
 	go service.ProcessWindowsControlEvents(stopCollector)
 
-	var otelStartWg sync.WaitGroup
-	var errs []error
-	var awaiters awaiters
-
-	otelAwaiter := make(chan struct{})
-	awaiters = append(awaiters, otelAwaiter)
-
-	otelStartWg.Add(1)
-	go func() {
-		otelStartWg.Done()
-		if err := otel.Run(ctx, stop, configFiles); err != nil {
-			errs = append(errs, err)
-			// otel collector finished with an error, exit run loop
-			cancel()
-		}
-
-		// close awaiter handled in run loop
-		close(otelAwaiter)
-	}()
-
-	// wait for otel to start
-	otelStartWg.Wait()
-
-	if err := runElasticAgent(
-		ctx,
-		cancel,
-		nil,      // no config overrides
-		stop,     // service hook
-		false,    // not in testing mode
-		0,        // no fleet config
-		true,     // is otel mode
-		awaiters, // wait for otel to finish
-	); err != nil && !errors.Is(err, context.Canceled) {
-		errs = append(errs, err)
-	}
-
-	return goerrors.Join(errs...)
-
+	return otel.Run(ctx, stop, configFiles)
 }
