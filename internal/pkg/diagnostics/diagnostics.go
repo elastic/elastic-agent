@@ -580,7 +580,6 @@ func saveLogs(name string, logPath string, zw *zip.Writer) error {
 func RedactSecretPaths(mapStr map[string]any, errOut io.Writer) map[string]any {
 	v, ok := mapStr["secret_paths"]
 	if !ok {
-		fmt.Fprintln(errOut, "No output redaction: secret_paths attribute not found.")
 		return mapStr
 	}
 	arr, ok := v.([]interface{})

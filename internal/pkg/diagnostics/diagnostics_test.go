@@ -84,7 +84,6 @@ i4EFZLWrFRsAAAARYWxleGtAZ3JlbWluLm5lc3QBAg==
 -----END OPENSSH PRIVATE KEY-----`
 
 	exampleConfig := mapstr.M{
-		"secret_paths": []string{},
 		"root": mapstr.M{
 			"passphrase": "unredacted",
 			"nested1": mapstr.M{
@@ -260,7 +259,7 @@ func TestUnitAndStateMapping(t *testing.T) {
 	err = writeRedacted(&errOut, &outWriter, "test/path", res)
 	require.NoError(t, err)
 
-	require.Equal(t, "No output redaction: secret_paths attribute not found.\n", errOut.String())
+	require.Empty(t, errOut.String())
 }
 
 type zippedItem struct {
