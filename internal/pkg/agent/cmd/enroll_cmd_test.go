@@ -817,7 +817,7 @@ func mTLSServer(t *testing.T, agentPassphrase string) (
 	// configure server's TLS
 	fleetRootCertPool := x509.NewCertPool()
 	fleetRootCertPool.AppendCertsFromPEM(fleetRootPair.Cert)
-	cert, err := tls.X509KeyPair(fleetRootPair.Cert, fleetRootPair.Key)
+	cert, err := tls.X509KeyPair(fleetChildPair.Cert, fleetChildPair.Key)
 	require.NoError(t, err, "could not create tls.Certificates from child certificate")
 
 	agentRootCertPool := x509.NewCertPool()
