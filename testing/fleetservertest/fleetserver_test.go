@@ -271,6 +271,7 @@ func ExampleNewServer_checkin_fleetConnectionParams() {
 	//       "name": "fake-input",
 	//       "package_policy_id": "",
 	//       "revision": 1,
+	//       "secret_key": "secretValue",
 	//       "streams": [],
 	//       "type": "fake-input",
 	//       "use_output": "default"
@@ -287,6 +288,9 @@ func ExampleNewServer_checkin_fleetConnectionParams() {
 	//     }
 	//   },
 	//   "revision": 2,
+	//   "secret_paths": [
+	//     "inputs.0.secret_key"
+	//   ],
 	//   "secret_references": [],
 	//   "signed": {
 	//     "data": "eyJpZCI6IjI0ZTRkMDMwLWZmYTctMTFlZC1iMDQwLTlkZWJhYTVmZWNiOCIsImFnZW50Ijp7InByb3RlY3Rpb24iOnsiZW5hYmxlZCI6ZmFsc2UsInVuaW5zdGFsbF90b2tlbl9oYXNoIjoibE9SU2FESVFxNG5nbFVNSndXaktyd2V4ajRJRFJKQStGdG9RZWVxS0gvST0iLCJzaWduaW5nX2tleSI6Ik1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRVE5QlBvSFVDeUx5RWxWcGZ3dktlRmRVdDZVOXdCYitRbFpOZjRjeTVlQXdLOVhoNEQ4ZkNsZ2NpUGVSczNqNjJpNklFZUd5dk9zOVUzK2ZFbHlVaWdnPT0ifX19",

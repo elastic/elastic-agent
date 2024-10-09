@@ -1,0 +1,4 @@
+kind: breaking-change
+summary: Remove cloud-defend from agent package
+component: elastic-agent
+pr: https://github.com/elastic/elastic-agent/pull/5481
