@@ -14,13 +14,8 @@ require (
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
 	github.com/elastic/elastic-agent-client/v7 v7.16.0
-<<<<<<< HEAD
-	github.com/elastic/elastic-agent-libs v0.11.0
-	github.com/elastic/elastic-agent-system-metrics v0.11.2
-=======
 	github.com/elastic/elastic-agent-libs v0.12.1-0.20241009140206-6634efed32ab
 	github.com/elastic/elastic-agent-system-metrics v0.11.3
->>>>>>> 26f3d5975e ([testing/integration]: fix TestLogIngestionFleetManaged (#5648))
 	github.com/elastic/elastic-transport-go/v8 v8.6.0
 	github.com/elastic/go-elasticsearch/v8 v8.15.0
 	github.com/elastic/go-licenser v0.4.2
