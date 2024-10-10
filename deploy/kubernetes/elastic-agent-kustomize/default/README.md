@@ -39,7 +39,7 @@ Users can use following commands:
 Managed Elastic Agent:
 
 ```bash
-❯ kubectl https://github.com/elastic/elastic-agent/deploy/kubernetes/elastic-agent-kustomize/default/elastic-agent-maanged\?ref\=main | sed -e "s/JUVOUk9MTE1FTlRfVE9LRU4l/base64_ENCODED_ENROLLMENT_TOKEN/g" -e "s/%FLEET_URL%/https:\/\/localhost:9200/g" | kubectl apply -f-
+❯ kubectl kustomize https://github.com/elastic/elastic-agent/deploy/kubernetes/elastic-agent-kustomize/default/elastic-agent-maanged\?ref\=main | sed -e "s/JUVOUk9MTE1FTlRfVE9LRU4l/base64_ENCODED_ENROLLMENT_TOKEN/g" -e "s/%FLEET_URL%/https:\/\/localhost:9200/g" | kubectl apply -f-
 
 ```
 
