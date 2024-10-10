@@ -20,11 +20,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
+	"github.com/elastic/elastic-agent/testing/fleetservertest"
 )
 
 const diagnosticsArchiveGlobPattern = "elastic-agent-diagnostics-*.zip"
@@ -198,6 +201,90 @@ func TestIsolatedUnitsDiagnosticsCommand(t *testing.T) {
 		After:      testDiagnosticsFactory(t, isolatedUnitsComponentSetup, diagnosticsFiles, compDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
 	})
 	assert.NoError(t, err)
+}
+
+func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
+	_ = define.Require(t, define.Requirements{
+		Group: Fleet,
+		Local: false,
+		Sudo:  true,
+	})
+
+	ctx, cancel := testcontext.WithTimeout(t, context.Background(), time.Minute*10)
+	defer cancel()
+
+	t.Log("Setup fake fleet-server")
+	apiKey, policy := createBasicFleetPolicyData(t, "http://fleet-server:8220")
+	checkinWithAcker := fleetservertest.NewCheckinActionsWithAcker()
+	fleet := fleetservertest.NewServerWithHandlers(
+		apiKey,
+		"enrollmentToken",
+		policy.AgentID,
+		policy.PolicyID,
+		checkinWithAcker.ActionsGenerator(),
+		checkinWithAcker.Acker(),
+		fleetservertest.WithRequestLog(t.Logf),
+	)
+	defer fleet.Close()
+	policyChangeAction, err := fleetservertest.NewActionPolicyChangeWithFakeComponent("test-policy-change", fleetservertest.TmplPolicy{
+		AgentID:    policy.AgentID,
+		PolicyID:   policy.PolicyID,
+		FleetHosts: []string{fleet.LocalhostURL},
+	})
+	require.NoError(t, err)
+	checkinWithAcker.AddCheckin("token", 0, policyChangeAction)
+
+	t.Log("Enroll agent in fake fleet-server")
+	fixture, err := define.NewFixtureFromLocalBuild(t,
+		define.Version(),
+		integrationtest.WithAllowErrors(),
+		integrationtest.WithLogOutput())
+	require.NoError(t, err, "SetupTest: NewFixtureFromLocalBuild failed")
+	err = fixture.EnsurePrepared(ctx)
+	require.NoError(t, err, "SetupTest: fixture.Prepare failed")
+
+	out, err := fixture.Install(
+		ctx,
+		&integrationtest.InstallOpts{
+			Force:          true,
+			NonInteractive: true,
+			Insecure:       true,
+			Privileged:     false,
+			EnrollOpts: integrationtest.EnrollOpts{
+				URL:             fleet.LocalhostURL,
+				EnrollmentToken: "anythingWillDO",
+			}})
+	require.NoErrorf(t, err, "Error when installing agent, output: %s", out)
+	check.ConnectedToFleet(ctx, t, fixture, 5*time.Minute)
+
+	t.Log("Gather diagnostics.")
+	diagZip, err := fixture.ExecDiagnostics(ctx)
+	require.NoError(t, err, "error when gathering diagnostics")
+	stat, err := os.Stat(diagZip)
+	require.NoErrorf(t, err, "stat file %q failed", diagZip)
+	require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", diagZip)
+
+	t.Log("Check if config files have been redacted.")
+	extractionDir := t.TempDir()
+	extractZipArchive(t, diagZip, extractionDir)
+	path := filepath.Join(extractionDir, "computed-config.yaml")
+	stat, err = os.Stat(path)
+	require.NoErrorf(t, err, "stat file %q failed", path)
+	require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", path)
+	f, err := os.Open(path)
+	require.NoErrorf(t, err, "open file %q failed", path)
+	defer f.Close()
+	var yObj struct {
+		SecretPaths []string `yaml:"secret_paths"`
+		Inputs      []struct {
+			CustomAttr string `yaml:"custom_attr"`
+		} `yaml:"inputs"`
+	}
+	err = yaml.NewDecoder(f).Decode(&yObj)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"inputs.0.custom_attr"}, yObj.SecretPaths)
+	require.Len(t, yObj.Inputs, 1)
+	assert.Equal(t, "<REDACTED>", yObj.Inputs[0].CustomAttr)
 }
 
 func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string) func(ctx context.Context) error {
