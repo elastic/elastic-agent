@@ -152,9 +152,12 @@ If you are in the 7.13 branch, this will create the `docker.elastic.co/beats/ela
 elastic-package stack up --version=7.13.0-SNAPSHOT -v
 ```
 
-Please note that the docker container is built in both standard and 'complete' variants.
-The 'complete' variant contains extra files, like the chromium browser, that are too large
-for the standard variant.
+Please note that the docker container is built in standard, 'service', 'cloud' and 'complete' variants. The variants technical specificities can be found [here](https://github.com/elastic/elastic-agent/blob/main/dev-tools/packaging/templates/docker/Dockerfile.elastic-agent.tmpl).
+- The 'service' variant contains python libs and connectors that allows it to collect data using [search_connectors](https://www.elastic.co/guide/en/enterprise-search/current/connectors.html).
+- The 'cloud' variant is the one used for ESS deployment.
+- The 'complete' variant contains extra files, like the chromium browser, that are too large
+for the standard variant which allows this docker image to run Synthetics.
+
 
 ### Testing Elastic Agent on Kubernetes
 
