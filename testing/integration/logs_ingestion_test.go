@@ -27,6 +27,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
@@ -77,6 +78,13 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 				"enabled": true,
 			},
 		},
+		Overrides: map[string]interface{}{
+			"agent": map[string]interface{}{
+				"monitoring": map[string]interface{}{
+					"metrics_period": "1s",
+				},
+			},
+		},
 	}
 
 	installOpts := atesting.InstallOpts{
@@ -99,6 +107,9 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 
 	// 3. Ensure installation is correct.
 	require.NoError(t, installtest.CheckSuccess(ctx, agentFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged}))
+
+	// 4. Ensure healthy state at startup
+	checkHealthAtStartup(t, ctx, agentFixture)
 
 	t.Run("Monitoring logs are shipped", func(t *testing.T) {
 		testMonitoringLogsAreShipped(t, ctx, info, agentFixture, policy)
@@ -125,6 +136,34 @@ func startMockES(t *testing.T) string {
 	t.Cleanup(s.Close)
 
 	return s.URL
+}
+
+// checkHealthAtStartup ensures all the beats and agent are healthy and working before we continue
+func checkHealthAtStartup(t *testing.T, ctx context.Context, agentFixture *atesting.Fixture) {
+	// because we need to separately fetch the PIDs, wait until everything is healthy before we look for running beats
+	compDebugName := ""
+	require.Eventually(t, func() bool {
+		allHealthy := true
+		status, err := agentFixture.ExecStatus(ctx)
+		if err != nil {
+			t.Logf("agent status returned an error: %v", err)
+			return false
+		}
+		t.Logf("Received agent status:\n%+v\n", status) // this can be re-marshaled to JSON if we prefer that notation
+		for _, comp := range status.Components {
+			// make sure the components include the expected integrations
+			for _, v := range comp.Units {
+				if v.State != int(cproto.State_HEALTHY) {
+					allHealthy = false
+				}
+			}
+			if comp.State != int(cproto.State_HEALTHY) {
+				compDebugName = comp.Name
+				allHealthy = false
+			}
+		}
+		return allHealthy
+	}, 3*time.Minute, 3*time.Second, "install never became healthy: components did not return a healthy state: %s", compDebugName)
 }
 
 func testMonitoringLogsAreShipped(
