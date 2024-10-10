@@ -20,10 +20,10 @@ steps:
         key: "unit-tests-2204"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         artifact_paths:
-          - "build/TEST-go-unit.html"
-          - "build/TEST-go-unit.xml"
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage.out"
+          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "family/core-ubuntu-2204"
@@ -35,10 +35,10 @@ steps:
         key: "unit-tests-2204-arm64"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         artifact_paths:
-          - "build/TEST-go-unit.html"
-          - "build/TEST-go-unit.xml"
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage.out"
+          - "coverage-*.out"
         agents:
           provider: "aws"
           imagePrefix: "core-ubuntu-2204-aarch64"
@@ -52,10 +52,10 @@ steps:
         key: "unit-tests-win2022"
         command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
         artifact_paths:
-          - "build/TEST-go-unit.html"
-          - "build/TEST-go-unit.xml"
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage.out"
+          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "family/core-windows-2022"
@@ -70,10 +70,10 @@ steps:
         key: "unit-tests-win2016"
         command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
         artifact_paths:
-          - "build/TEST-go-unit.html"
-          - "build/TEST-go-unit.xml"
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage.out"
+          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "family/core-windows-2016"
@@ -90,10 +90,10 @@ steps:
         command: ".buildkite/scripts/steps/unit-tests.sh"
         branches: main
         artifact_paths:
-          - "build/TEST-go-unit.html"
-          - "build/TEST-go-unit.xml"
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage.out"
+          - "coverage-*.out"
         agents:
           provider: orka
           imagePrefix: generic-13-ventura-arm
@@ -105,10 +105,10 @@ steps:
         key: "unit-tests-macos-13"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         artifact_paths:
-          - "build/TEST-go-unit.html"
-          - "build/TEST-go-unit.xml"
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage.out"
+          - "coverage-*.out"
         agents:
           provider: orka
           imagePrefix: generic-13-ventura-x64
@@ -123,10 +123,10 @@ steps:
         key: "unit-tests-win10"
         command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
         artifact_paths:
-          - "build/TEST-go-unit.html"
-          - "build/TEST-go-unit.xml"
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage.out"
+          - "coverage-*.out"
         agents:
           provider: "gcp"
           # TODO create own image
@@ -140,10 +140,10 @@ steps:
         key: "unit-tests-win11"
         command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
         artifact_paths:
-          - "build/TEST-go-unit.html"
-          - "build/TEST-go-unit.xml"
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage.out"
+          - "coverage-*.out"
         agents:
           provider: "gcp"
           # TODO create own image
@@ -154,22 +154,41 @@ steps:
           manual:
             allowed: true
 
+
+  - label: ":junit: Junit annotate"
+    plugins:
+      - junit-annotate#v2.5.0:
+          artifacts: "build/*.xml"
+          always-annotate: true
+    agents:
+      provider: "gcp"
+    depends_on:
+      - step: "unit-tests-2204"
+        allow_failure: true
+      - step: "unit-tests-2204-arm64"
+        allow_failure: true
+      - step: "unit-tests-win2022"
+        allow_failure: true
+      - step: "unit-tests-win2016"
+        allow_failure: true
+      - step: "unit-tests-macos-13-arm"
+        allow_failure: true
+      - step: "unit-tests-macos-13"
+        allow_failure: true
+      - step: "unit-tests-win10"
+        allow_failure: true
+      - step: "unit-tests-win11"
+        allow_failure: true
+
+
   - label: "Merge coverage reports"
     key: "merge-coverage"
     env:
       BUILDKITE_REPO: ""
-    command: "
+    command: |
       .buildkite/scripts/steps/merge.sh
-      unit-tests-2204
-      unit-tests-2204-arm64
-      unit-tests-win2016
-      unit-tests-win2022
-      unit-tests-macos-13
-      unit-tests-win10
-      unit-tests-win11
-      "
     artifact_paths:
-      - "build/TEST-go-unit.cov"
+      - "TEST-go-unit.cov"
     agents:
       image: "golang:1.22.6"
     depends_on:
@@ -206,7 +225,7 @@ steps:
     agents:
       image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
     command:
-      - "buildkite-agent artifact download --step merge-coverage build/TEST-go-unit.cov ."
+      - "buildkite-agent artifact download --step merge-coverage TEST-go-unit.cov ."
       - "/scan-source-code.sh"
     depends_on:
       - "merge-coverage"
