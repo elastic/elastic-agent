@@ -123,7 +123,7 @@ func TestKubernetesAgentService(t *testing.T) {
 
 	ctx := context.Background()
 
-	deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, false, testLogsBasePath, map[string]bool{
+	deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, false, testLogsBasePath, true, map[string]bool{
 		"connectors-py": true,
 	})
 }

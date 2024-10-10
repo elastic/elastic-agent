@@ -32,9 +32,7 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 		ai,
 		apmtest.DiscardTracer,
 		newTestMonitoringMgr(),
-		testGrpcConfig(),
-		false,
-	)
+		testGrpcConfig())
 	require.NoError(t, err)
 
 	errCh := make(chan error)

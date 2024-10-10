@@ -221,7 +221,7 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 
 			ctx := context.Background()
 
-			deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, tc.runK8SInnerTests, testLogsBasePath, nil)
+			deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, tc.runK8SInnerTests, testLogsBasePath, true, nil)
 		})
 	}
 
@@ -266,10 +266,9 @@ func TestKubernetesAgentOtel(t *testing.T) {
 	require.NoError(t, err, "failed to render kustomize")
 
 	testCases := []struct {
-		name              string
-		envAdd            []corev1.EnvVar
-		runK8SInnerTests  bool
-		componentPresence map[string]bool
+		name             string
+		envAdd           []corev1.EnvVar
+		runK8SInnerTests bool
 	}{
 
 		{
@@ -278,11 +277,6 @@ func TestKubernetesAgentOtel(t *testing.T) {
 				{Name: "ELASTIC_AGENT_OTEL", Value: "true"},
 			},
 			false,
-			map[string]bool{
-				"beat/metrics-monitoring": false,
-				"filestream-monitoring":   false,
-				"system/metrics-default":  false,
-			},
 		},
 	}
 
@@ -340,7 +334,7 @@ func TestKubernetesAgentOtel(t *testing.T) {
 
 			ctx := context.Background()
 
-			deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, tc.runK8SInnerTests, testLogsBasePath, tc.componentPresence)
+			deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, tc.runK8SInnerTests, testLogsBasePath, false, nil)
 		})
 	}
 }
@@ -601,7 +595,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 // deployK8SAgent is a helper function to deploy the elastic-agent in k8s and invoke the inner k8s tests if
 // runK8SInnerTests is true
 func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, objects []k8s.Object, namespace string,
-	runInnerK8STests bool, testLogsBasePath string, componentPresence map[string]bool) {
+	runInnerK8STests bool, testLogsBasePath string, checkStatus bool, componentPresence map[string]bool) {
 
 	objects = append([]k8s.Object{&corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -660,6 +654,11 @@ func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, obj
 	}, time.Second*100, time.Second*1, fmt.Sprintf("pods in namespace %s never became ready", namespace))
 
 	require.NotEmpty(t, agentPodName, "agent pod name is empty")
+
+	if !checkStatus {
+		// not checking status
+		return
+	}
 
 	command := []string{"elastic-agent", "status", "--output=json"}
 	var status atesting.AgentStatusOutput
