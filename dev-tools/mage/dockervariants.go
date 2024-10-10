@@ -17,6 +17,7 @@ const (
 	complete      = "complete"
 	completeWolfi = "complete-wolfi"
 	cloud         = "cloud"
+	service       = "service"
 )
 
 // DockerVariant defines the docker variant to build.
@@ -31,6 +32,7 @@ const (
 	WolfiComplete
 	Complete
 	Cloud
+	Service
 )
 
 // String returns the name of the docker variant type.
@@ -50,6 +52,8 @@ func (typ DockerVariant) String() string {
 		return complete
 	case Cloud:
 		return cloud
+	case Service:
+		return service
 	default:
 		return invalid
 	}
@@ -77,6 +81,8 @@ func (typ *DockerVariant) UnmarshalText(text []byte) error {
 		*typ = Complete
 	case cloud:
 		*typ = Cloud
+	case service:
+		*typ = Service
 	default:
 		return fmt.Errorf("unknown docker variant: %v", string(text))
 	}

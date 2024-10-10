@@ -115,7 +115,9 @@ steps:
       - "build/diagnostics/*"
     agents:
       provider: "gcp"
+      machineType: "c2-standard-16"
       image: "family/core-ubuntu-2204"
+      diskSizeGb: 400
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Kubernetes Integration tests"

@@ -291,6 +291,20 @@ shared:
         source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/agentbeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
         mode: 0755
 
+  # service build is based on previous cloud variant
+  - &agent_docker_service_spec
+    docker_variant: 'service'
+    files:
+      'data/service/connectors-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip':
+        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/connectors-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip'
+        mode: 0755
+      'data/{{.BeatName}}-{{ commit_short }}/components/connectors':
+        source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/connectors.sh'
+        mode: 0755
+      'data/{{.BeatName}}-{{ commit_short }}/components/connectors.spec.yml':
+        source: '{{ elastic_beats_dir }}/specs/connectors.spec.yml'
+        mode: 0644
+
   # includes nodejs with @elastic/synthetics
   - &agent_docker_complete_spec
     <<: *agent_docker_spec
@@ -1021,6 +1035,35 @@ specs:
         <<: *docker_wolfi_arm_spec
         <<: *docker_builder_arm_spec
         <<: *agent_docker_cloud_spec
+        <<: *elastic_license_for_binaries
+        files:
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+    #### Service specific docker images ####
+    - os: linux
+      arch: amd64
+      types: [ docker ]
+      spec:
+        <<: *agent_docker_spec
+        # The service image is always based on Wolfi
+        <<: *docker_wolfi_spec
+        <<: *docker_builder_spec
+        <<: *agent_docker_cloud_spec
+        <<: *agent_docker_service_spec
+        <<: *elastic_license_for_binaries
+        files:
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+    - os: linux
+      arch: arm64
+      types: [ docker ]
+      spec:
+        <<: *agent_docker_spec
+        # The service image is always based on Wolfi
+        <<: *docker_wolfi_arm_spec
+        <<: *docker_builder_arm_spec
+        <<: *agent_docker_cloud_spec
+        <<: *agent_docker_service_spec
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
