@@ -112,7 +112,7 @@ Removing the storage key from the filelog section will disable persistence, whic
 > [!IMPORTANT]  
 If you remove the `create_directory: true` option, you'll need to manually create a directory to store the data. You can ignore this option if the directory already exists.
 
-### Persistense in standalone Docker mode
+### Persistence in standalone Docker mode
 
 By default, when running Elastic Distribution for OpenTelemetry Collector in Docker, checkpoints are stored in `/usr/share/elastic-agent/otel_registry` by default. To ensure data persists across container restarts, you can use the following command:
 
