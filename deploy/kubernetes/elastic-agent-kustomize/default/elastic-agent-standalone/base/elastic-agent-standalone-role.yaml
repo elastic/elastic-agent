@@ -3,7 +3,7 @@ kind: ClusterRole
 metadata:
   name: elastic-agent-standalone
   labels:
-    k8s-app: elastic-agent-standalone
+    app.kubernetes.io/name: elastic-agent-standalone
 rules:
   - apiGroups: [""]
     resources:
@@ -75,7 +75,7 @@ metadata:
   # Should be the namespace where elastic-agent is running
   namespace: kube-system
   labels:
-    k8s-app: elastic-agent-standalone
+    app.kubernetes.io/name: elastic-agent-standalone
 rules:
   - apiGroups:
       - coordination.k8s.io
@@ -89,7 +89,7 @@ metadata:
   name: elastic-agent-standalone-kubeadm-config
   namespace: kube-system
   labels:
-    k8s-app: elastic-agent-standalone
+    app.kubernetes.io/name: elastic-agent-standalone
 rules:
   - apiGroups: [""]
     resources:
