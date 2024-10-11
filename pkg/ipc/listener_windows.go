@@ -12,7 +12,6 @@ import (
 	"os/user"
 	"strings"
 
-	"github.com/hectane/go-acl/api"
 	"golang.org/x/sys/windows"
 
 	"github.com/elastic/elastic-agent-libs/api/npipe"
@@ -83,26 +82,18 @@ func securityDescriptor(log *logger.Logger) (string, error) {
 }
 
 func pathGID(path string) (string, error) {
-	var group *windows.SID
-	var secDesc windows.Handle
-	err := api.GetNamedSecurityInfo(
+	sd, err := windows.GetNamedSecurityInfo(
 		path,
-		api.SE_FILE_OBJECT,
-		api.GROUP_SECURITY_INFORMATION,
-		nil,
-		&group,
-		nil,
-		nil,
-		&secDesc,
+		windows.SE_FILE_OBJECT,
+		windows.GROUP_SECURITY_INFORMATION,
 	)
 	if err != nil {
 		return "", fmt.Errorf("call to GetNamedSecurityInfo at %s failed: %w", path, err)
 	}
-	defer func() {
-		_, _ = windows.LocalFree(secDesc)
-	}()
-	if group == nil {
-		return "", fmt.Errorf("failed to determine group using GetNamedSecurityInfo at %s", path)
+
+	group, _, err := sd.Group()
+	if err != nil {
+		return "", fmt.Errorf("failed to determine group using GetNamedSecurityInfo at %s: %w", path, err)
 	}
 	return group.String(), nil
 }

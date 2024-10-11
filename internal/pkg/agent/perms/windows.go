@@ -11,11 +11,8 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
-	"syscall"
 
 	"github.com/Microsoft/go-winio"
-	"github.com/hectane/go-acl"
-	"github.com/hectane/go-acl/api"
 	"golang.org/x/sys/windows"
 
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -40,9 +37,9 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 	}
 
 	// https://docs.microsoft.com/en-us/windows/win32/secauthz/access-mask
-	grants := make([]api.ExplicitAccess, 0, 4)
-	grants = append(grants, acl.GrantSid(0xF10F0000, systemSID))         // full control of all acl's
-	grants = append(grants, acl.GrantSid(0xF10F0000, administratorsSID)) // full control of all acl's
+	grants := make([]windows.EXPLICIT_ACCESS, 0, 4)
+	grants = append(grants, grantSid(0xF10F0000, systemSID))         // full control of all acl's
+	grants = append(grants, grantSid(0xF10F0000, administratorsSID)) // full control of all acl's
 
 	// user gets grant based on the mask
 	userSID := administratorsSID // defaults to owned by Administrators
@@ -51,7 +48,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 		if err != nil {
 			return fmt.Errorf("failed to get user %s: %w", o.ownership.UID, err)
 		}
-		grants = append(grants, acl.GrantSid(uint32(((o.mask&0700)<<23)|((o.mask&0200)<<9)), userSID))
+		grants = append(grants, grantSid(uint32(((o.mask&0700)<<23)|((o.mask&0200)<<9)), userSID))
 	}
 
 	// group gets grant based on the mask
@@ -61,7 +58,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 		if err != nil {
 			return fmt.Errorf("failed to get group %s: %w", o.ownership.GID, err)
 		}
-		grants = append(grants, acl.GrantSid(uint32(((o.mask&0070)<<26)|((o.mask&0020)<<12)), groupSID))
+		grants = append(grants, grantSid(uint32(((o.mask&0070)<<26)|((o.mask&0020)<<12)), groupSID))
 	}
 
 	// everyone gets grant based on the mask
@@ -70,7 +67,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 		if err != nil {
 			return fmt.Errorf("failed to get Everyone SID: %w", err)
 		}
-		grants = append(grants, acl.GrantSid(uint32(((o.mask&0007)<<29)|((o.mask&0002)<<15)), everyoneSID))
+		grants = append(grants, grantSid(uint32(((o.mask&0007)<<29)|((o.mask&0002)<<15)), everyoneSID))
 	}
 
 	// ownership can only be change to another user when running as Administrator
@@ -90,17 +87,13 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 						inherit = false
 					}
 
-					err = acl.Apply(name, true, inherit, grants...)
+					err = apply(name, inherit, grants...)
 					if err != nil {
-						// Check for Errno = 0 which indicates success
-						// https://pkg.go.dev/golang.org/x/sys/windows#Errno
-						if errors.Is(err, syscall.Errno(0)) {
-							return nil
-						}
 						return err
 					}
 					if userSID != nil && groupSID != nil {
 						err = takeOwnership(name, userSID, groupSID)
+
 					}
 				} else if errors.Is(err, fs.ErrNotExist) {
 					return nil
@@ -118,13 +111,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 			if topPath == name {
 				inherit = false
 			}
-			err = acl.Apply(name, true, inherit, grants...)
-			// Check for Errno = 0 which indicates success
-			// https://pkg.go.dev/golang.org/x/sys/windows#Errno
-			if errors.Is(err, syscall.Errno(0)) {
-				return nil
-			}
-			return err
+			return apply(name, inherit, grants...)
 		} else if errors.Is(err, fs.ErrNotExist) {
 			return nil
 		}
@@ -133,13 +120,57 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 }
 
 func takeOwnership(name string, owner *windows.SID, group *windows.SID) error {
-	return api.SetNamedSecurityInfo(
+	if err := windows.SetNamedSecurityInfo(
 		name,
-		api.SE_FILE_OBJECT,
-		api.OWNER_SECURITY_INFORMATION|api.GROUP_SECURITY_INFORMATION,
+		windows.SE_FILE_OBJECT,
+		windows.OWNER_SECURITY_INFORMATION|windows.GROUP_SECURITY_INFORMATION,
 		owner,
 		group,
-		0,
-		0,
+		nil,
+		nil,
+	); err != nil {
+		return fmt.Errorf("failed take ownership: %w", err)
+	}
+	return nil
+}
+
+func grantSid(accessPermissions uint32, sid *windows.SID) windows.EXPLICIT_ACCESS {
+	return windows.EXPLICIT_ACCESS{
+		AccessPermissions: windows.ACCESS_MASK(accessPermissions),
+		AccessMode:        windows.GRANT_ACCESS,
+		Inheritance:       windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT,
+		Trustee: windows.TRUSTEE{
+			TrusteeForm:  windows.TRUSTEE_IS_SID,
+			TrusteeValue: windows.TrusteeValueFromSID(sid),
+		},
+	}
+}
+
+func apply(name string, inherit bool, entries ...windows.EXPLICIT_ACCESS) error {
+	var oldAcl windows.ACL
+	acl, err := windows.ACLFromEntries(
+		entries,
+		&oldAcl,
 	)
+	if err != nil {
+		return fmt.Errorf("failed to get ACL from entries: %w", err)
+	}
+	var secInfo windows.SECURITY_INFORMATION
+	if !inherit {
+		secInfo = windows.PROTECTED_DACL_SECURITY_INFORMATION
+	} else {
+		secInfo = windows.UNPROTECTED_DACL_SECURITY_INFORMATION
+	}
+	if err := windows.SetNamedSecurityInfo(
+		name,
+		windows.SE_FILE_OBJECT,
+		windows.DACL_SECURITY_INFORMATION|secInfo,
+		nil,
+		nil,
+		acl,
+		nil,
+	); err != nil {
+		return fmt.Errorf("failed to set named security info: %w", err)
+	}
+	return nil
 }
