@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package diagnostics
 
@@ -20,10 +20,12 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/go-ucfg"
 
 	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/version"
@@ -171,7 +173,15 @@ func CreateCPUProfile(ctx context.Context, period time.Duration) ([]byte, error)
 
 // ZipArchive creates a zipped diagnostics bundle using the passed writer with the passed diagnostics and local logs.
 // If any error is encountered when writing the contents of the archive it is returned.
-func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, unitDiags []client.DiagnosticUnitResult, compDiags []client.DiagnosticComponentResult) error {
+func ZipArchive(
+	errOut,
+	w io.Writer,
+	topPath string,
+	agentDiag []client.DiagnosticFileResult,
+	unitDiags []client.DiagnosticUnitResult,
+	compDiags []client.DiagnosticComponentResult,
+	excludeEvents bool) error {
+
 	ts := time.Now().UTC()
 	zw := zip.NewWriter(w)
 	defer zw.Close()
@@ -291,7 +301,7 @@ func ZipArchive(errOut, w io.Writer, agentDiag []client.DiagnosticFileResult, un
 	}
 
 	// Gather Logs:
-	return zipLogs(zw, ts)
+	return zipLogs(zw, ts, topPath, excludeEvents)
 }
 
 func writeErrorResult(zw *zip.Writer, path string, errBody string) error {
@@ -389,15 +399,17 @@ func redactKey(k string) bool {
 		strings.Contains(k, "key")
 }
 
-func zipLogs(zw *zip.Writer, ts time.Time) error {
-	currentDir := filepath.Base(paths.Home())
+func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool) error {
+	homePath := paths.HomeFrom(topPath)
+	dataPath := paths.DataFrom(topPath)
+	currentDir := filepath.Base(homePath)
 	if !paths.IsVersionHome() {
 		// running in a container with custom top path set
 		// logs are directly under top path
-		return zipLogsWithPath(paths.Home(), currentDir, true, zw, ts)
+		return zipLogsWithPath(homePath, currentDir, true, excludeEvents, zw, ts)
 	}
 
-	dataDir, err := os.Open(paths.Data())
+	dataDir, err := os.Open(dataPath)
 	if err != nil {
 		return err
 	}
@@ -414,8 +426,8 @@ func zipLogs(zw *zip.Writer, ts time.Time) error {
 			continue
 		}
 		collectServices := dir == currentDir
-		path := filepath.Join(paths.Data(), dir)
-		if err := zipLogsWithPath(path, dir, collectServices, zw, ts); err != nil {
+		path := filepath.Join(dataPath, dir)
+		if err := zipLogsWithPath(path, dir, collectServices, excludeEvents, zw, ts); err != nil {
 			return err
 		}
 	}
@@ -424,7 +436,7 @@ func zipLogs(zw *zip.Writer, ts time.Time) error {
 }
 
 // zipLogs walks paths.Logs() and copies the file structure into zw in "logs/"
-func zipLogsWithPath(pathsHome, commitName string, collectServices bool, zw *zip.Writer, ts time.Time) error {
+func zipLogsWithPath(pathsHome, commitName string, collectServices, excludeEvents bool, zw *zip.Writer, ts time.Time) error {
 	_, err := zw.CreateHeader(&zip.FileHeader{
 		Name:     "logs/",
 		Method:   zip.Deflate,
@@ -463,6 +475,14 @@ func zipLogsWithPath(pathsHome, commitName string, collectServices bool, zw *zip
 		// this will clean log names on windows machines and will nop on *nix
 		name := filepath.ToSlash(strings.TrimPrefix(path, logPath))
 		if name == "" {
+			return nil
+		}
+
+		// Skip events logs, if necessary
+		// name can either be the folder name 'events' or the folder plus
+		// the file name like 'events/elastic-agent-events-log.ndjson'
+		// we need to skip both.
+		if excludeEvents && strings.HasPrefix(name, "events") {
 			return nil
 		}
 
@@ -551,4 +571,40 @@ func saveLogs(name string, logPath string, zw *zip.Writer) error {
 	}
 
 	return nil
+}
+
+// RedactSecretPaths will check the passed mapStr input for a secret_paths attribute.
+// If found it will replace the value for every key in the paths list with <REDACTED> and return the resulting map.
+// Any issues or errors will be written to the errOut writer.
+func RedactSecretPaths(mapStr map[string]any, errOut io.Writer) map[string]any {
+	v, ok := mapStr["secret_paths"]
+	if !ok {
+		fmt.Fprintln(errOut, "No output redaction: secret_paths attribute not found.")
+		return mapStr
+	}
+	arr, ok := v.([]interface{})
+	if !ok {
+		fmt.Fprintln(errOut, "No output redaction: secret_paths attribute is not a list.")
+		return mapStr
+	}
+	cfg := ucfg.MustNewFrom(mapStr)
+	for _, v := range arr {
+		key, ok := v.(string)
+		if !ok {
+			fmt.Fprintf(errOut, "No output redaction for %q: expected type string, is type %T.\n", v, v)
+			continue
+		}
+
+		if ok, _ := cfg.Has(key, -1, ucfg.PathSep(".")); ok {
+			err := cfg.SetString(key, -1, REDACTED, ucfg.PathSep("."))
+			if err != nil {
+				fmt.Fprintf(errOut, "No output redaction for %q: %v.\n", key, err)
+			}
+		}
+	}
+	result, err := config.MustNewConfigFrom(cfg).ToMapStr()
+	if err != nil {
+		return mapStr
+	}
+	return result
 }

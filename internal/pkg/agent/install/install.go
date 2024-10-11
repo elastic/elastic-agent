@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package install
 
@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/jaypipes/ghw"
 	"github.com/kardianos/service"
@@ -31,6 +32,11 @@ const (
 
 	ElasticUsername  = "elastic-agent-user"
 	ElasticGroupName = "elastic-agent"
+
+	// DefaultStopTimeout is the default stop timeout that can be used to stop a running daemon.
+	DefaultStopTimeout = 30 * time.Second
+	// DefaultStopInterval is the check interval to determine if the service has stopped.
+	DefaultStopInterval = 250 * time.Millisecond
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
@@ -40,66 +46,16 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 		return utils.FileOwner{}, errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
 	}
 
-	// We only uninstall Agent if it is currently installed.
-	status, _ := Status(topPath)
-	if status == Installed {
-		// Uninstall current installation
-		//
-		// There is no uninstall token for "install" command.
-		// Uninstall will fail on protected agent.
-		// The protected Agent will need to be uninstalled first before it can be installed.
-		pt.Describe("Uninstalling current Elastic Agent")
-		err = Uninstall(cfgFile, topPath, "", log, pt)
-		if err != nil {
-			pt.Describe("Failed to uninstall current Elastic Agent")
-			return utils.FileOwner{}, errors.New(
-				err,
-				fmt.Sprintf("failed to uninstall Agent at (%s)", filepath.Dir(topPath)),
-				errors.M("directory", filepath.Dir(topPath)))
-		}
-		pt.Describe("Successfully uninstalled current Elastic Agent")
-	}
-
 	var ownership utils.FileOwner
 	username := ""
 	groupName := ""
 	if unprivileged {
 		username = ElasticUsername
 		groupName = ElasticGroupName
-
-		// ensure required group
-		ownership.GID, err = FindGID(groupName)
-		if err != nil && !errors.Is(err, ErrGroupNotFound) {
-			return utils.FileOwner{}, fmt.Errorf("failed finding group %s: %w", groupName, err)
-		}
-		if errors.Is(err, ErrGroupNotFound) {
-			pt.Describe(fmt.Sprintf("Creating group %s", groupName))
-			ownership.GID, err = CreateGroup(groupName)
-			if err != nil {
-				pt.Describe(fmt.Sprintf("Failed to create group %s", groupName))
-				return utils.FileOwner{}, fmt.Errorf("failed to create group %s: %w", groupName, err)
-			}
-			pt.Describe(fmt.Sprintf("Successfully created group %s", groupName))
-		}
-
-		// ensure required user
-		ownership.UID, err = FindUID(username)
-		if err != nil && !errors.Is(err, ErrUserNotFound) {
-			return utils.FileOwner{}, fmt.Errorf("failed finding username %s: %w", username, err)
-		}
-		if errors.Is(err, ErrUserNotFound) {
-			pt.Describe(fmt.Sprintf("Creating user %s", username))
-			ownership.UID, err = CreateUser(username, ownership.GID)
-			if err != nil {
-				pt.Describe(fmt.Sprintf("Failed to create user %s", username))
-				return utils.FileOwner{}, fmt.Errorf("failed to create user %s: %w", username, err)
-			}
-			err = AddUserToGroup(username, groupName)
-			if err != nil {
-				pt.Describe(fmt.Sprintf("Failed to add user %s to group %s", username, groupName))
-				return utils.FileOwner{}, fmt.Errorf("failed to add user %s to group %s: %w", username, groupName, err)
-			}
-			pt.Describe(fmt.Sprintf("Successfully created user %s", username))
+		ownership, err = EnsureUserAndGroup(username, groupName, pt)
+		if err != nil {
+			// error context already added by EnsureUserAndGroup
+			return utils.FileOwner{}, err
 		}
 	}
 
@@ -126,13 +82,13 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	pt.Describe("Successfully copied files")
 
 	// place shell wrapper, if present on platform
-	if paths.ShellWrapperPath != "" {
-		pathDir := filepath.Dir(paths.ShellWrapperPath)
+	if paths.ShellWrapperPath() != "" {
+		pathDir := filepath.Dir(paths.ShellWrapperPath())
 		err = os.MkdirAll(pathDir, 0755)
 		if err != nil {
 			return utils.FileOwner{}, errors.New(
 				err,
-				fmt.Sprintf("failed to create directory (%s) for shell wrapper (%s)", pathDir, paths.ShellWrapperPath),
+				fmt.Sprintf("failed to create directory (%s) for shell wrapper (%s)", pathDir, paths.ShellWrapperPath()),
 				errors.M("directory", pathDir))
 		}
 		// Install symlink for darwin instead of the wrapper script.
@@ -141,32 +97,32 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 		// This is specifically important for osquery FDA permissions at the moment.
 		if runtime.GOOS == darwin {
 			// Check if previous shell wrapper or symlink exists and remove it so it can be overwritten
-			if _, err := os.Lstat(paths.ShellWrapperPath); err == nil {
-				if err := os.Remove(paths.ShellWrapperPath); err != nil {
+			if _, err := os.Lstat(paths.ShellWrapperPath()); err == nil {
+				if err := os.Remove(paths.ShellWrapperPath()); err != nil {
 					return utils.FileOwner{}, errors.New(
 						err,
-						fmt.Sprintf("failed to remove (%s)", paths.ShellWrapperPath),
-						errors.M("destination", paths.ShellWrapperPath))
+						fmt.Sprintf("failed to remove (%s)", paths.ShellWrapperPath()),
+						errors.M("destination", paths.ShellWrapperPath()))
 				}
 			}
-			err = os.Symlink(filepath.Join(topPath, paths.BinaryName), paths.ShellWrapperPath)
+			err = os.Symlink(filepath.Join(topPath, paths.BinaryName), paths.ShellWrapperPath())
 			if err != nil {
 				return utils.FileOwner{}, errors.New(
 					err,
-					fmt.Sprintf("failed to create elastic-agent symlink (%s)", paths.ShellWrapperPath),
-					errors.M("destination", paths.ShellWrapperPath))
+					fmt.Sprintf("failed to create elastic-agent symlink (%s)", paths.ShellWrapperPath()),
+					errors.M("destination", paths.ShellWrapperPath()))
 			}
 		} else {
 			// We use strings.Replace instead of fmt.Sprintf here because, with the
 			// latter, govet throws a false positive error here: "fmt.Sprintf call has
 			// arguments but no formatting directives".
-			shellWrapper := strings.Replace(paths.ShellWrapper, "%s", topPath, -1)
-			err = os.WriteFile(paths.ShellWrapperPath, []byte(shellWrapper), 0755)
+			shellWrapper := strings.Replace(paths.ShellWrapperFmt, "%s", topPath, -1)
+			err = os.WriteFile(paths.ShellWrapperPath(), []byte(shellWrapper), 0755)
 			if err != nil {
 				return utils.FileOwner{}, errors.New(
 					err,
-					fmt.Sprintf("failed to write shell wrapper (%s)", paths.ShellWrapperPath),
-					errors.M("destination", paths.ShellWrapperPath))
+					fmt.Sprintf("failed to write shell wrapper (%s)", paths.ShellWrapperPath()),
+					errors.M("destination", paths.ShellWrapperPath()))
 			}
 		}
 	}
@@ -182,43 +138,20 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	if err != nil {
 		return ownership, fmt.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
 	}
-	if paths.ShellWrapperPath != "" {
-		err = perms.FixPermissions(paths.ShellWrapperPath, perms.WithOwnership(ownership))
+	if paths.ShellWrapperPath() != "" {
+		err = perms.FixPermissions(paths.ShellWrapperPath(), perms.WithOwnership(ownership))
 		if err != nil {
-			return ownership, fmt.Errorf("failed to perform permission changes on path %s: %w", paths.ShellWrapperPath, err)
+			return ownership, fmt.Errorf("failed to perform permission changes on path %s: %w", paths.ShellWrapperPath(), err)
 		}
 	}
 
 	// install service
 	pt.Describe("Installing service")
-	opts, err := withServiceOptions(username, groupName)
+	err = InstallService(topPath, ownership, username, groupName)
 	if err != nil {
 		pt.Describe("Failed to install service")
-		return ownership, fmt.Errorf("error getting service installation options: %w", err)
-	}
-	svc, err := newService(topPath, opts...)
-	if err != nil {
-		pt.Describe("Failed to install service")
-		return ownership, fmt.Errorf("error installing new service: %w", err)
-	}
-	err = svc.Install()
-	if err != nil {
-		pt.Describe("Failed to install service")
-		return ownership, errors.New(
-			err,
-			fmt.Sprintf("failed to install service (%s)", paths.ServiceName),
-			errors.M("service", paths.ServiceName))
-	}
-	err = servicePostInstall(ownership)
-	if err != nil {
-		pt.Describe("Failed to configure service")
-
-		// ignore error
-		_ = svc.Uninstall()
-		return ownership, errors.New(
-			err,
-			fmt.Sprintf("failed to configure service (%s)", paths.ServiceName),
-			errors.M("service", paths.ServiceName))
+		// error context already added by InstallService
+		return ownership, err
 	}
 	pt.Describe("Installed service")
 
@@ -387,31 +320,29 @@ func StartService(topPath string) error {
 	// only starting the service, so no need to set the username and group to any value
 	svc, err := newService(topPath)
 	if err != nil {
-		return fmt.Errorf("error creating new service handler: %w", err)
+		return fmt.Errorf("error creating new service handler for start: %w", err)
 	}
 	err = svc.Start()
 	if err != nil {
-		return errors.New(
-			err,
-			fmt.Sprintf("failed to start service (%s)", paths.ServiceName),
-			errors.M("service", paths.ServiceName))
+		return fmt.Errorf("failed to start service (%s): %w", paths.ServiceName(), err)
 	}
 	return nil
 }
 
 // StopService stops the installed service.
-func StopService(topPath string) error {
+func StopService(topPath string, timeout time.Duration, interval time.Duration) error {
 	// only stopping the service, so no need to set the username and group to any value
 	svc, err := newService(topPath)
 	if err != nil {
-		return fmt.Errorf("error creating new service handler: %w", err)
+		return fmt.Errorf("error creating new service handler for stop: %w", err)
 	}
 	err = svc.Stop()
 	if err != nil {
-		return errors.New(
-			err,
-			fmt.Sprintf("failed to stop service (%s)", paths.ServiceName),
-			errors.M("service", paths.ServiceName))
+		return fmt.Errorf("failed to stop service (%s): %w", paths.ServiceName(), err)
+	}
+	err = isStopped(timeout, interval, paths.ServiceName())
+	if err != nil {
+		return fmt.Errorf("failed to stop service (%s): %w", paths.ServiceName(), err)
 	}
 	return nil
 }
@@ -421,14 +352,11 @@ func RestartService(topPath string) error {
 	// only restarting the service, so no need to set the username and group to any value
 	svc, err := newService(topPath)
 	if err != nil {
-		return fmt.Errorf("error creating new service handler: %w", err)
+		return fmt.Errorf("error creating new service handler for restart: %w", err)
 	}
 	err = svc.Restart()
 	if err != nil {
-		return errors.New(
-			err,
-			fmt.Sprintf("failed to restart service (%s)", paths.ServiceName),
-			errors.M("service", paths.ServiceName))
+		return fmt.Errorf("failed to restart service (%s): %w", paths.ServiceName(), err)
 	}
 	return nil
 }
@@ -437,9 +365,45 @@ func RestartService(topPath string) error {
 func StatusService(topPath string) (service.Status, error) {
 	svc, err := newService(topPath)
 	if err != nil {
-		return service.StatusUnknown, err
+		return service.StatusUnknown, fmt.Errorf("error creating new service handler for status: %w", err)
 	}
 	return svc.Status()
+}
+
+// InstallService installs the service.
+func InstallService(topPath string, ownership utils.FileOwner, username string, groupName string) error {
+	opts, err := withServiceOptions(username, groupName)
+	if err != nil {
+		return fmt.Errorf("error getting service installation options: %w", err)
+	}
+	svc, err := newService(topPath, opts...)
+	if err != nil {
+		return fmt.Errorf("error creating new service handler for install: %w", err)
+	}
+	err = svc.Install()
+	if err != nil {
+		return fmt.Errorf("failed to install service (%s): %w", paths.ServiceName(), err)
+	}
+	err = serviceConfigure(ownership)
+	if err != nil {
+		// ignore error
+		_ = svc.Uninstall()
+		return fmt.Errorf("failed to configure service (%s): %w", paths.ServiceName(), err)
+	}
+	return nil
+}
+
+// UninstallService uninstalls the service.
+func UninstallService(topPath string) error {
+	svc, err := newService(topPath)
+	if err != nil {
+		return fmt.Errorf("error creating new service handler for uninstall: %w", err)
+	}
+	err = svc.Uninstall()
+	if err != nil {
+		return fmt.Errorf("failed to uninstall service (%s): %w", paths.ServiceName(), err)
+	}
+	return nil
 }
 
 // findDirectory returns the directory to copy into the installation location.

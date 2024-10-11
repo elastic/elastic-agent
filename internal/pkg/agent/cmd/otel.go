@@ -1,14 +1,16 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
+
+//go:build !windows
 
 package cmd
 
 import (
 	"context"
+	goerrors "errors"
 	"sync"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -16,11 +18,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
-)
-
-const (
-	configFlagName = "config"
-	setFlagName    = "set"
 )
 
 func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
@@ -83,7 +80,7 @@ func runCollector(cmdCtx context.Context, configFiles []string) error {
 	go service.ProcessWindowsControlEvents(stopCollector)
 
 	var otelStartWg sync.WaitGroup
-	var resErr error
+	var errs []error
 	var awaiters awaiters
 
 	otelAwaiter := make(chan struct{})
@@ -93,7 +90,7 @@ func runCollector(cmdCtx context.Context, configFiles []string) error {
 	go func() {
 		otelStartWg.Done()
 		if err := otel.Run(ctx, stop, configFiles); err != nil {
-			resErr = multierror.Append(resErr, err)
+			errs = append(errs, err)
 			// otel collector finished with an error, exit run loop
 			cancel()
 		}
@@ -115,9 +112,9 @@ func runCollector(cmdCtx context.Context, configFiles []string) error {
 		true,     // is otel mode
 		awaiters, // wait for otel to finish
 	); err != nil && !errors.Is(err, context.Canceled) {
-		resErr = multierror.Append(resErr, err)
+		errs = append(errs, err)
 	}
 
-	return resErr
+	return goerrors.Join(errs...)
 
 }

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package testing
 
@@ -195,6 +195,21 @@ func findLatestSnapshot(ctx context.Context, doer httpDoer, version string) (bui
 }
 
 func DownloadPackage(ctx context.Context, l Logger, doer httpDoer, downloadPath string, packageFile string) error {
+	for i := 0; i < 3; i++ {
+		err := func() error {
+			ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+			defer cancel()
+			return downloadPackage(ctx, l, doer, downloadPath, packageFile)
+		}()
+		if err == nil {
+			return nil
+		}
+		l.Logf("Download artifact from %s failed: %s", downloadPath, err)
+	}
+	return fmt.Errorf("downloading package failed after 3 retries")
+}
+
+func downloadPackage(ctx context.Context, l Logger, doer httpDoer, downloadPath string, packageFile string) error {
 	l.Logf("Downloading artifact from %s", downloadPath)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", downloadPath, nil)

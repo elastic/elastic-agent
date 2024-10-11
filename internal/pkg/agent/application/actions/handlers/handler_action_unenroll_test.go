@@ -1,18 +1,21 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package handlers
 
 import (
 	"context"
+	"path/filepath"
+	"sync/atomic"
 	"testing"
-
-	"github.com/elastic/elastic-agent-libs/atomic"
+	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -43,7 +46,7 @@ func makeComponentState(name string, proxiedActions []string) runtime.ComponentC
 
 type MockActionCoordinator struct {
 	st               coordinator.State
-	performedActions atomic.Int
+	performedActions atomic.Int64
 }
 
 func (c *MockActionCoordinator) State() coordinator.State {
@@ -51,7 +54,7 @@ func (c *MockActionCoordinator) State() coordinator.State {
 }
 
 func (c *MockActionCoordinator) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
-	c.performedActions.Inc()
+	c.performedActions.Add(1)
 	return nil, nil
 }
 
@@ -106,7 +109,13 @@ func TestActionUnenrollHandler(t *testing.T) {
 		}
 	}()
 
-	handler := NewUnenroll(log, coord, ch, nil, nil)
+	storePath := filepath.Join(t.TempDir(), "state.json")
+	s, err := storage.NewDiskStore(storePath)
+	require.NoError(t, err, "failed creating DiskStore")
+
+	st, err := store.NewStateStore(log, s)
+	require.NoError(t, err)
+	handler := NewUnenroll(log, coord, ch, nil, st)
 
 	getTamperProtectionFunc := func(enabled bool) func() bool {
 		return func() bool {
@@ -118,11 +127,16 @@ func TestActionUnenrollHandler(t *testing.T) {
 		name                 string
 		st                   coordinator.State
 		wantErr              error // Handler error
-		wantPerformedActions int
+		wantPerformedActions int64
 		tamperProtectionFn   func() bool
+		autoUnenroll         bool
 	}{
 		{
-			name: "no running components",
+			name: "fleet unenroll with no running components",
+		},
+		{
+			name:         "auto unenroll with no running components",
+			autoUnenroll: true,
 		},
 		{
 			name: "endpoint no dispatch",
@@ -201,10 +215,17 @@ func TestActionUnenrollHandler(t *testing.T) {
 				handler.tamperProtectionFn = tc.tamperProtectionFn
 			}
 
-			err := handler.Handle(ctx, action, acker)
+			a := new(fleetapi.ActionUnenroll)
+			*a = *action
+			if tc.autoUnenroll {
+				a.IsDetected = true
+			}
+			err := handler.handle(ctx, a, acker, 100*time.Millisecond)
 
 			require.ErrorIs(t, err, tc.wantErr)
-			if tc.wantErr == nil {
+
+			// autoUnenroll isn't acked
+			if tc.wantErr == nil && !tc.autoUnenroll {
 				require.Len(t, acker.Acked, 1)
 			}
 			require.Equal(t, tc.wantPerformedActions, coord.performedActions.Load())

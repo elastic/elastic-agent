@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package handlers
 
@@ -47,7 +47,7 @@ func (h *Settings) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 		return fmt.Errorf("invalid type, expected ActionSettings and received %T", a)
 	}
 
-	logLevel := action.LogLevel
+	logLevel := action.Data.LogLevel
 	return h.handleLogLevel(ctx, logLevel, acker, action)
 }
 
@@ -103,10 +103,19 @@ func (h *Settings) SetLogLevel(ctx context.Context, lvl *logp.Level) error {
 	h.fallbackLogLevel = lvl
 	rawLogLevel := h.agentInfo.RawLogLevel()
 	h.log.Debugf("received fallback loglevel %s, raw loglevel %s", lvl, rawLogLevel)
-	if rawLogLevel == "" && lvl != nil {
-		h.log.Debugf("setting log level %s", lvl)
-		// set the runtime log level only if we don't have one set for the specific agent
-		return h.logLevelSetter.SetLogLevel(ctx, lvl)
+	if rawLogLevel == "" {
+		// There's no log level set for this specific agent
+		if lvl != nil {
+			// log level set on the policy
+			h.log.Debugf("setting log level %s", lvl)
+			// set the runtime log level only if we don't have one set for the specific agent
+			return h.logLevelSetter.SetLogLevel(ctx, lvl)
+		} else {
+			// Both the policy log level and the agent-specific log level are not set: set the default agent level
+			h.log.Debugf("setting log level to default")
+			defaultLogLevel := logger.DefaultLogLevel
+			return h.logLevelSetter.SetLogLevel(ctx, &defaultLogLevel)
+		}
 	}
 	return nil
 }

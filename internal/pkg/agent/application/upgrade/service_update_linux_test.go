@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build linux
 
@@ -94,7 +94,7 @@ WantedBy=multi-user.target
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			unitFilePath := filepath.Join(t.TempDir(), paths.ServiceName+".service")
+			unitFilePath := filepath.Join(t.TempDir(), paths.ServiceName()+".service")
 			err := os.WriteFile(unitFilePath, []byte(test.unitFileInitialContents), 0644)
 			require.NoError(t, err)
 

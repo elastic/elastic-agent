@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package runtime
 
@@ -12,13 +12,15 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
+	"path"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/gofrs/uuid"
-	"go.elastic.co/apm"
-	"go.elastic.co/apm/module/apmgrpc"
+	"github.com/gofrs/uuid/v5"
+	"go.elastic.co/apm/module/apmgrpc/v2"
+	"go.elastic.co/apm/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -26,14 +28,16 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/atomic"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/ipc"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
@@ -97,13 +101,14 @@ type Manager struct {
 	ca         *authority.CertificateAuthority
 	listenAddr string
 	listenPort int
+	isLocal    bool
 	agentInfo  info.Agent
 	tracer     *apm.Tracer
 	monitor    MonitoringManager
 	grpcConfig *configuration.GRPCConfig
 
 	// Set when the RPC server is ready to receive requests, for use by tests.
-	serverReady *atomic.Bool
+	serverReady chan struct{}
 
 	// updateChan forwards component model updates from the public Update method
 	// to the internal run loop.
@@ -131,8 +136,6 @@ type Manager struct {
 	currentMx sync.RWMutex
 	current   map[string]*componentRuntimeState
 
-	shipperConns map[string]*shipperConn
-
 	subMx         sync.RWMutex
 	subscriptions map[string][]*Subscription
 	subAllMx      sync.RWMutex
@@ -142,18 +145,19 @@ type Manager struct {
 
 	// doneChan is closed when Manager is shutting down to signal that any
 	// pending requests should be canceled.
-	doneChan chan struct{}
+	doneChan  chan struct{}
+	runAsOtel bool
 }
 
 // NewManager creates a new manager.
 func NewManager(
 	logger,
 	baseLogger *logger.Logger,
-	listenAddr string,
 	agentInfo info.Agent,
 	tracer *apm.Tracer,
 	monitor MonitoringManager,
 	grpcConfig *configuration.GRPCConfig,
+	runAsOtel bool,
 ) (*Manager, error) {
 	ca, err := authority.NewCA()
 	if err != nil {
@@ -163,23 +167,33 @@ func NewManager(
 	if agentInfo == nil {
 		return nil, errors.New("agentInfo cannot be nil")
 	}
+
+	controlAddress := control.Address()
+	// [gRPC:8.15] For 8.14 this always returns local TCP address, until Endpoint is modified to support domain sockets gRPC
+	listenAddr, err := deriveCommsAddress(controlAddress, grpcConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive comms GRPC: %w", err)
+	}
+	logger.With("address", listenAddr).Infof("GRPC comms socket listening at %s", listenAddr)
+
 	m := &Manager{
 		logger:         logger,
 		baseLogger:     baseLogger,
 		ca:             ca,
 		listenAddr:     listenAddr,
+		isLocal:        ipc.IsLocal(listenAddr),
 		agentInfo:      agentInfo,
 		tracer:         tracer,
 		current:        make(map[string]*componentRuntimeState),
-		shipperConns:   make(map[string]*shipperConn),
 		subscriptions:  make(map[string][]*Subscription),
 		updateChan:     make(chan component.Model),
 		updateDoneChan: make(chan struct{}),
 		errCh:          make(chan error),
 		monitor:        monitor,
 		grpcConfig:     grpcConfig,
-		serverReady:    atomic.NewBool(false),
+		serverReady:    make(chan struct{}),
 		doneChan:       make(chan struct{}),
+		runAsOtel:      runAsOtel,
 	}
 	return m, nil
 }
@@ -192,47 +206,62 @@ func NewManager(
 //
 // Blocks until the context is done.
 func (m *Manager) Run(ctx context.Context) error {
-	listener, err := net.Listen("tcp", m.listenAddr)
-	if err != nil {
-		return fmt.Errorf("error starting tcp listener for runtime manager: %w", err)
-	}
-	m.listenPort = listener.Addr().(*net.TCPAddr).Port
+	var (
+		listener net.Listener
+		err      error
+		server   *grpc.Server
+		wgServer sync.WaitGroup
+	)
+	if !m.runAsOtel {
+		if m.isLocal {
+			listener, err = ipc.CreateListener(m.logger, m.listenAddr)
+		} else {
+			listener, err = net.Listen("tcp", m.listenAddr)
+		}
 
-	certPool := x509.NewCertPool()
-	if ok := certPool.AppendCertsFromPEM(m.ca.Crt()); !ok {
-		return errors.New("failed to append root CA")
-	}
-	creds := credentials.NewTLS(&tls.Config{
-		ClientAuth:     tls.RequireAndVerifyClientCert,
-		ClientCAs:      certPool,
-		GetCertificate: m.getCertificate,
-		MinVersion:     tls.VersionTLS12,
-	})
+		if err != nil {
+			return fmt.Errorf("error starting tcp listener for runtime manager: %w", err)
+		}
 
-	var server *grpc.Server
-	m.logger.Infof("Starting grpc control protocol listener on port %v with max_message_size %v", m.grpcConfig.Port, m.grpcConfig.MaxMsgSize)
-	if m.tracer != nil {
-		apmInterceptor := apmgrpc.NewUnaryServerInterceptor(apmgrpc.WithRecovery(), apmgrpc.WithTracer(m.tracer))
-		server = grpc.NewServer(
-			grpc.UnaryInterceptor(apmInterceptor),
-			grpc.Creds(creds),
-			grpc.MaxRecvMsgSize(m.grpcConfig.MaxMsgSize),
-		)
-	} else {
-		server = grpc.NewServer(
-			grpc.Creds(creds),
-			grpc.MaxRecvMsgSize(m.grpcConfig.MaxMsgSize),
-		)
-	}
-	proto.RegisterElasticAgentServer(server, m)
+		if m.isLocal {
+			defer ipc.CleanupListener(m.logger, m.listenAddr)
+		} else {
+			m.listenPort = listener.Addr().(*net.TCPAddr).Port
+		}
 
-	// start serving GRPC connections
-	var wgServer sync.WaitGroup
-	wgServer.Add(1)
-	go func() {
-		defer wgServer.Done()
-		m.serverLoop(ctx, listener, server)
-	}()
+		certPool := x509.NewCertPool()
+		if ok := certPool.AppendCertsFromPEM(m.ca.Crt()); !ok {
+			return errors.New("failed to append root CA")
+		}
+		creds := credentials.NewTLS(&tls.Config{
+			ClientAuth:     tls.RequireAndVerifyClientCert,
+			ClientCAs:      certPool,
+			GetCertificate: m.getCertificate,
+			MinVersion:     tls.VersionTLS12,
+		})
+		m.logger.Infof("Starting grpc control protocol listener on port %v with max_message_size %v", m.grpcConfig.Port, m.grpcConfig.MaxMsgSize)
+		if m.tracer != nil {
+			apmInterceptor := apmgrpc.NewUnaryServerInterceptor(apmgrpc.WithRecovery(), apmgrpc.WithTracer(m.tracer))
+			server = grpc.NewServer(
+				grpc.UnaryInterceptor(apmInterceptor),
+				grpc.Creds(creds),
+				grpc.MaxRecvMsgSize(m.grpcConfig.MaxMsgSize),
+			)
+		} else {
+			server = grpc.NewServer(
+				grpc.Creds(creds),
+				grpc.MaxRecvMsgSize(m.grpcConfig.MaxMsgSize),
+			)
+		}
+		proto.RegisterElasticAgentServer(server, m)
+
+		// start serving GRPC connections
+		wgServer.Add(1)
+		go func() {
+			defer wgServer.Done()
+			m.serverLoop(ctx, listener, server)
+		}()
+	}
 
 	// Start the run loop, which continues on the main goroutine
 	// until the context is canceled.
@@ -242,11 +271,13 @@ func (m *Manager) Run(ctx context.Context) error {
 	m.shutdown()
 
 	// Close the rpc listener and wait for serverLoop to return
-	listener.Close()
-	wgServer.Wait()
+	if !m.runAsOtel {
+		listener.Close()
+		wgServer.Wait()
 
-	// Cancel any remaining connections
-	server.Stop()
+		// Cancel any remaining connections
+		server.Stop()
+	}
 	return ctx.Err()
 }
 
@@ -311,7 +342,7 @@ LOOP:
 }
 
 func (m *Manager) serverLoop(ctx context.Context, listener net.Listener, server *grpc.Server) {
-	m.serverReady.Store(true)
+	close(m.serverReady)
 	for ctx.Err() == nil {
 		err := server.Serve(listener)
 		if err != nil && ctx.Err() == nil {
@@ -736,13 +767,6 @@ func (m *Manager) Actions(server proto.ElasticAgent_ActionsServer) error {
 //
 // This returns as soon as possible, work is performed in the background.
 func (m *Manager) update(model component.Model, teardown bool) error {
-	// prepare the components to add consistent shipper connection information between
-	// the connected components in the model
-	err := m.connectShippers(model.Components)
-	if err != nil {
-		return err
-	}
-
 	touched := make(map[string]bool)
 	newComponents := make([]component.Component, 0, len(model.Components))
 	for _, comp := range model.Components {
@@ -796,7 +820,7 @@ func (m *Manager) update(model component.Model, teardown bool) error {
 	for _, comp := range newComponents {
 		// new component; create its runtime
 		logger := m.baseLogger.Named(fmt.Sprintf("component.runtime.%s", comp.ID))
-		state, err := newComponentRuntimeState(m, logger, m.monitor, comp)
+		state, err := newComponentRuntimeState(m, logger, m.monitor, comp, m.isLocal)
 		if err != nil {
 			return fmt.Errorf("failed to create new component %s: %w", comp.ID, err)
 		}
@@ -968,6 +992,9 @@ func (m *Manager) getRuntimeFromComponent(comp component.Component) *componentRu
 }
 
 func (m *Manager) getListenAddr() string {
+	if m.isLocal {
+		return m.listenAddr
+	}
 	addr := strings.SplitN(m.listenAddr, ":", 2)
 	if len(addr) == 2 && addr[1] == "0" {
 		return fmt.Sprintf("%s:%d", addr[0], m.listenPort)
@@ -1030,7 +1057,7 @@ func (m *Manager) performDiagAction(ctx context.Context, comp component.Componen
 	res, err := runtime.performAction(ctx, req)
 	// the only way this can return an error is a context Done(), be sure to make that explicit.
 	if err != nil {
-		if errors.Is(context.DeadlineExceeded, err) {
+		if errors.Is(err, context.DeadlineExceeded) {
 			return nil, fmt.Errorf("diagnostic action timed out, deadline is %s: %w", finalDiagnosticTime, err)
 		}
 		return nil, fmt.Errorf("error running performAction: %w", err)
@@ -1053,4 +1080,33 @@ func (m *Manager) performDiagAction(ctx context.Context, comp component.Componen
 		return nil, errors.New("unit failed to perform diagnostics, no error could be extracted from response")
 	}
 	return res.Diagnostic, nil
+}
+
+// deriveCommsAddress derives the comms socket/pipe path/name from given control address and GRPC config
+func deriveCommsAddress(controlAddress string, grpc *configuration.GRPCConfig) (string, error) {
+	if grpc.IsLocal() {
+		return deriveCommsSocketName(controlAddress)
+	}
+	return grpc.String(), nil
+}
+
+var errInvalidUri = errors.New("invalid uri")
+
+// deriveCommsSocketName derives the agent communication unix/npipe path
+// currently from the control socket path, since it's already set properly
+// matching the socket path length to meet the system limits of the platform
+func deriveCommsSocketName(uri string) (string, error) {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return "", err
+	}
+
+	if len(u.Path) == 0 || (u.Scheme != "unix" && u.Scheme != "npipe") {
+		return "", fmt.Errorf("%w %s", errInvalidUri, uri)
+	}
+
+	// The base name without extension and use it as id argument for SocketURLWithFallback call
+	// THe idea it to use the same logic for the comms path as for the control socket/pipe path
+	base := strings.TrimSuffix(path.Base(u.Path), path.Ext(u.Path))
+	return utils.SocketURLWithFallback(base, path.Dir(u.Path)), nil
 }

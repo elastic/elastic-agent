@@ -1,0 +1,74 @@
+receivers:
+  # Receiver for platform specific log files
+  filelog/platformlogs:
+    include: [ /var/log/*.log ]
+    retry_on_failure:
+      enabled: true
+    start_at: end
+    storage: file_storage
+#   start_at: beginning
+
+extensions:
+  file_storage:
+    directory: ${env:STORAGE_DIR}
+  
+processors:
+  resourcedetection:
+    detectors: ["system"]
+    system:
+      hostname_sources: ["os"]
+      resource_attributes:
+        host.name:
+          enabled: true
+        host.id:
+          enabled: false
+        host.arch:
+          enabled: true
+        host.ip:
+          enabled: true
+        host.mac:
+          enabled: true
+        host.cpu.vendor.id:
+          enabled: true
+        host.cpu.family:
+          enabled: true
+        host.cpu.model.id:
+          enabled: true
+        host.cpu.model.name:
+          enabled: true
+        host.cpu.stepping:
+          enabled: true
+        host.cpu.cache.l2.size:
+          enabled: true
+        os.description:
+          enabled: true
+        os.type:
+          enabled: true
+
+exporters:
+  # Exporter to print the first 5 logs/metrics and then every 1000th
+  debug:
+    verbosity: detailed
+    sampling_initial: 5
+    sampling_thereafter: 1000
+
+  # Exporter to send logs and metrics to Elasticsearch
+  elasticsearch:
+    endpoints: ["${env:ELASTIC_ENDPOINT}"]
+    api_key: ${env:ELASTIC_API_KEY}
+    mapping:
+      mode: ecs
+    logs_dynamic_index:
+      enabled: true
+    metrics_dynamic_index:
+      enabled: true
+    traces_dynamic_index:
+      enabled: true
+
+service:
+  extensions: [file_storage]
+  pipelines:
+    logs/platformlogs:
+      receivers: [filelog/platformlogs]
+      processors: [resourcedetection]
+      exporters: [debug, elasticsearch]

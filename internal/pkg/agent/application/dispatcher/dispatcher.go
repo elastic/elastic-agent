@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package dispatcher
 
@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"go.elastic.co/apm"
+	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
@@ -44,12 +44,13 @@ type ActionDispatcher struct {
 	queue    priorityQueue
 	rt       *retryConfig
 	errCh    chan error
+	topPath  string
 
 	lastUpgradeDetails *details.Details
 }
 
 // New creates a new action dispatcher.
-func New(log *logger.Logger, def actions.Handler, queue priorityQueue) (*ActionDispatcher, error) {
+func New(log *logger.Logger, topPath string, def actions.Handler, queue priorityQueue) (*ActionDispatcher, error) {
 	var err error
 	if log == nil {
 		log, err = logger.New("action_dispatcher", false)
@@ -69,6 +70,7 @@ func New(log *logger.Logger, def actions.Handler, queue priorityQueue) (*ActionD
 		queue:    queue,
 		rt:       defaultRetryConfig(),
 		errCh:    make(chan error),
+		topPath:  topPath,
 	}, nil
 }
 
@@ -156,7 +158,7 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, detailsSetter details.
 				ad.scheduleRetry(ctx, rAction, acker)
 				continue
 			}
-			ad.log.Debugf("Failed to dispatch action '%+v', error: %+v", action, err)
+			ad.log.Errorf("Failed to dispatch action id %q of type %q, error: %+v", action.ID(), action.Type(), err)
 			reportedErr = err
 			continue
 		}
@@ -304,7 +306,7 @@ func (ad *ActionDispatcher) handleExpired(
 			version := "unknown"
 			expiration := "unknown"
 			if upgrade, ok := e.(*fleetapi.ActionUpgrade); ok {
-				version = upgrade.Version
+				version = upgrade.Data.Version
 				expiration = upgrade.ActionExpiration
 			}
 			ad.lastUpgradeDetails = details.NewDetails(version, details.StateFailed, e.ID())
@@ -356,7 +358,7 @@ func (ad *ActionDispatcher) reportNextScheduledUpgrade(input []fleetapi.Action, 
 	}
 
 	upgradeDetails := details.NewDetails(
-		nextUpgrade.Version,
+		nextUpgrade.Data.Version,
 		details.StateScheduled,
 		nextUpgrade.ID())
 	startTime, err := nextUpgrade.StartTime()

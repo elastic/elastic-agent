@@ -3,21 +3,64 @@
 [![Build status](https://badge.buildkite.com/1d35bb40427cc6833979645b61ea214fc4b686a2ffe3a68bdf.svg)](https://buildkite.com/elastic/elastic-agent)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=elastic_elastic-agent&metric=coverage)](https://sonarcloud.io/summary/new_code?id=elastic_elastic-agent)
 
-## Architecture / internal docs
+## Architecture and Internals
 
 - [Agent architecture](docs/architecture.md)
 - [Component spec files](docs/component-specs.md)
 - [Policy configuration](docs/agent-policy.md)
 
+## Official Documentation
+
+See https://www.elastic.co/guide/en/fleet/current/index.html.
+
+The source files for the offical Elastic Agent documentation are currently stored
+in the [ingest-docs](https://github.com/elastic/ingest-docs/tree/main/docs/en/ingest-management) repository.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Developer docs
+## Developing
 
-The source files for the general Elastic Agent documentation are currently stored
-in the [ingest-docs](https://github.com/elastic/ingest-docs/tree/main/docs/en/ingest-management) repository.
-The following docs are only focused on getting developers started building code for Elastic Agent.
+The following are exclusively focused on getting developers started building code for Elastic Agent.
+
+### Development Installations
+
+> :warning: Development installations are not officially supported and are intended for Elastic Agent developers.
+
+If you are an Elastic employee, you already have an Information Security managed Elastic Agent installed on your machine for endpoint protection.
+This prevents you from installing the Elastic Agent a second time for development without using a VM or Docker container. To eliminate this point
+of friction, Elastic Agent has a development mode that permits installing the Elastic Agent on your machine a second time:
+
+```sh
+# All other arguments to the install command are still supported when --develop is specified.
+sudo ./elastic-agent install --develop
+# The run command also supports the --develop option to allow running without installing when there is another agent on the machine.
+./elastic-agent run -e --develop
+```
+
+Using the `--develop` option will install the agent in an isolated `Agent-Development` agent directory in the chosen base path.
+Development agents enrolled in Fleet will have the `Development` tag added automatically. Using the default base path on MacOS you will see:
+
+```sh
+sudo ls /Library/Elastic/
+Agent
+Agent-Development
+```
+
+The `elastic-agent` command in the shell is replaced with `elastic-development-agent` to interact with the development agent:
+
+```sh
+# For a privileged agent
+sudo elastic-development-agent status
+# For an unprivileged agent
+sudo -u elastic-agent-user elastic-development-agent status
+```
+
+The primary restriction of `--develop` installations is that they cannot run Elastic Defend. Defend requires the agent to be
+in the default path, the same restrictions applies for the `--base-path` option. All other integrations should be usable provided
+conflicting configurations are changed ahead of time. For example two agents cannot bind to the same `agent.monitoring.http.port`
+to expose their monitoring servers.
 
 ### Test Framework
 
@@ -47,7 +90,7 @@ pr: https://github.com/elastic/elastic-agent/pull/823
 Prerequisites:
 - installed [mage](https://github.com/magefile/mage)
 - [Docker](https://docs.docker.com/get-docker/)
-- [X-pack](https://github.com/elastic/beats/tree/main/x-pack) to pre-exist in the parent folder of the local Git repository checkout
+- [beats](https://github.com/elastic/beats) to pre-exist in the parent folder of the local Git repository checkout if, and only if, packaging with `EXTERNAL=false` to package the beats as well
 - [elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool) to add changelog fragments for changelog generation
 
 To build a local version of the agent for development, run the command below. The following platforms are supported:
@@ -109,9 +152,12 @@ If you are in the 7.13 branch, this will create the `docker.elastic.co/beats/ela
 elastic-package stack up --version=7.13.0-SNAPSHOT -v
 ```
 
-Please note that the docker container is built in both standard and 'complete' variants.
-The 'complete' variant contains extra files, like the chromium browser, that are too large
-for the standard variant.
+Please note that the docker container is built in standard, 'service', 'cloud' and 'complete' variants. The variants technical specificities can be found [here](https://github.com/elastic/elastic-agent/blob/main/dev-tools/packaging/templates/docker/Dockerfile.elastic-agent.tmpl).
+- The 'service' variant contains python libs and connectors that allows it to collect data using [search_connectors](https://www.elastic.co/guide/en/enterprise-search/current/connectors.html).
+- The 'cloud' variant is the one used for ESS deployment.
+- The 'complete' variant contains extra files, like the chromium browser, that are too large
+for the standard variant which allows this docker image to run Synthetics.
+
 
 ### Testing Elastic Agent on Kubernetes
 

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package aesgcm
 
@@ -173,12 +173,12 @@ func TestEncryptDecryptHex(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			enc, err := EncryptHex(tc.key, tc.data)
 			if !errors.Is(tc.err, err) {
-				t.Fatalf(cmp.Diff(tc.err, err))
+				t.Fatal(cmp.Diff(tc.err, err))
 			}
 
 			dec, err := DecryptHex(tc.key, enc)
 			if !errors.Is(tc.err, err) {
-				t.Fatalf(cmp.Diff(tc.err, err))
+				t.Fatal(cmp.Diff(tc.err, err))
 			}
 
 			if len(tc.data) == 0 {

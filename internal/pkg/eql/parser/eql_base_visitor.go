@@ -1,12 +1,12 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
-// Code generated from Eql.g4 by ANTLR 4.12.0. DO NOT EDIT.
+// Code generated from Eql.g4 by ANTLR 4.13.1. DO NOT EDIT.
 
 package parser // Eql
 
-import "github.com/antlr/antlr4/runtime/Go/antlr/v4"
+import "github.com/antlr4-go/antlr/v4"
 
 type BaseEqlVisitor struct {
 	*antlr.BaseParseTreeVisitor
@@ -33,6 +33,10 @@ func (v *BaseEqlVisitor) VisitVariableExp(ctx *VariableExpContext) interface{} {
 }
 
 func (v *BaseEqlVisitor) VisitExpArithmeticNEQ(ctx *ExpArithmeticNEQContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseEqlVisitor) VisitExpEVariable(ctx *ExpEVariableContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

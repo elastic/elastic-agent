@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -23,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
@@ -135,8 +136,14 @@ inputs:
 		state, err := client.State(ctx)
 		require.NoError(t, err)
 
-		require.NotNil(t, state.UpgradeDetails)
-		require.Equal(t, details.StateRollback, details.State(state.UpgradeDetails.State))
+		if state.State == cproto.State_UPGRADING {
+			if state.UpgradeDetails == nil {
+				t.Fatal("upgrade details in the state cannot be nil")
+			}
+			require.Equal(t, details.StateRollback, details.State(state.UpgradeDetails.State))
+		} else {
+			t.Logf("rollback finished, status is '%s', cannot check UpgradeDetails", state.State.String())
+		}
 	}
 
 	// rollback should stop the watcher
@@ -205,7 +212,7 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 		topPath := paths.Top()
 
 		t.Logf("Stopping agent via service to simulate crashing")
-		err = install.StopService(topPath)
+		err = install.StopService(topPath, install.DefaultStopTimeout, install.DefaultStopInterval)
 		if err != nil && runtime.GOOS == define.Windows && strings.Contains(err.Error(), "The service has not been started.") {
 			// Due to the quick restarts every 10 seconds its possible that this is faster than Windows
 			// can handle. Decrementing restartIdx means that the loop will occur again.

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package handlers
 
@@ -18,6 +18,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -45,6 +46,7 @@ type PolicyChangeHandler struct {
 	ch                   chan coordinator.ConfigChange
 	setters              []actions.ClientSetter
 	policyLogLevelSetter logLevelSetter
+	coordinator          *coordinator.Coordinator
 	// Disabled for 8.8.0 release in order to limit the surface
 	// https://github.com/elastic/security-team/issues/6501
 	// // Last known valid signature validation key
@@ -59,6 +61,7 @@ func NewPolicyChangeHandler(
 	store storage.Store,
 	ch chan coordinator.ConfigChange,
 	policyLogLevelSetter logLevelSetter,
+	coordinator *coordinator.Coordinator,
 	setters ...actions.ClientSetter,
 ) *PolicyChangeHandler {
 	return &PolicyChangeHandler{
@@ -68,6 +71,7 @@ func NewPolicyChangeHandler(
 		store:                store,
 		ch:                   ch,
 		setters:              setters,
+		coordinator:          coordinator,
 		policyLogLevelSetter: policyLogLevelSetter,
 	}
 }
@@ -102,7 +106,7 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 	// // Cache signature validation key for the next policy handling
 	// h.signatureValidationKey = signatureValidationKey
 
-	c, err := config.NewConfigFrom(action.Policy)
+	c, err := config.NewConfigFrom(action.Data.Policy)
 	if err != nil {
 		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
 	}
@@ -122,23 +126,33 @@ func (h *PolicyChangeHandler) Watch() <-chan coordinator.ConfigChange {
 	return h.ch
 }
 
-func (h *PolicyChangeHandler) validateFleetServerHosts(ctx context.Context, cfg *configuration.Configuration) (*remote.Config, error) {
+func (h *PolicyChangeHandler) validateFleetServerHosts(ctx context.Context, cfg *config.Config) (*remote.Config, error) {
 	// do not update fleet-server host from policy; no setters provided with local Fleet Server
 	if len(h.setters) == 0 {
 		return nil, nil
 	}
 
-	if clientEqual(h.config.Fleet.Client, cfg.Fleet.Client) {
+	parsedConfig, err := configuration.NewPartialFromConfigNoDefaults(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("parsing fleet config: %w", err)
+	}
+
+	if parsedConfig.Fleet == nil {
+		// there is no client config (weird)
+		return nil, nil
+	}
+
+	if clientEqual(h.config.Fleet.Client, parsedConfig.Fleet.Client) {
 		// already the same hosts
 		return nil, nil
 	}
 
-	// make a copy the current client config and apply the changes in place on this copy
+	// make a copy the current client config and apply the changes on this copy
 	newFleetClientConfig := h.config.Fleet.Client
-	updateFleetConfig(h.log, cfg.Fleet.Client, &newFleetClientConfig)
+	updateFleetConfig(h.log, parsedConfig.Fleet.Client, &newFleetClientConfig)
 
 	// Test new config
-	err := testFleetConfig(ctx, h.log, newFleetClientConfig, h.config.Fleet.AccessAPIKey)
+	err = testFleetConfig(ctx, h.log, newFleetClientConfig, h.config.Fleet.AccessAPIKey)
 	if err != nil {
 		return nil, fmt.Errorf("validating fleet client config: %w", err)
 	}
@@ -168,6 +182,12 @@ func testFleetConfig(ctx context.Context, log *logger.Logger, clientConfig remot
 			errors.TypeNetwork, errors.M("hosts", clientConfig.Hosts))
 	}
 
+	if resp.StatusCode != http.StatusOK {
+		return errors.New(
+			err, fmt.Sprintf("fleet server ping returned a bad status code: %d", resp.StatusCode),
+			errors.TypeNetwork, errors.M("hosts", clientConfig.Hosts))
+	}
+
 	// discard body for proper cancellation and connection reuse
 	_, _ = io.Copy(io.Discard, resp.Body)
 	resp.Body.Close()
@@ -175,52 +195,82 @@ func testFleetConfig(ctx context.Context, log *logger.Logger, clientConfig remot
 	return nil
 }
 
-// updateFleetConfig copies the relevant Fleet client settings from src on dst. The destination struct is modified in-place
-func updateFleetConfig(log *logger.Logger, src remote.Config, dst *remote.Config) {
-	dst.Protocol = src.Protocol
-	dst.Path = src.Path
-	dst.Host = src.Host
-	dst.Hosts = src.Hosts
+// updateFleetConfig copies the relevant Fleet client settings from policyConfig on agentConfig. The destination struct is modified in-place
+func updateFleetConfig(log *logger.Logger, policyConfig remote.Config, agentConfig *remote.Config) {
+
+	// Hosts is the only connectivity field sent Fleet, let's clear everything else aside from Hosts
+	if len(policyConfig.Hosts) > 0 {
+		agentConfig.Hosts = make([]string, len(policyConfig.Hosts))
+		copy(agentConfig.Hosts, policyConfig.Hosts)
+
+		agentConfig.Host = ""
+		agentConfig.Protocol = ""
+		agentConfig.Path = ""
+	}
 
 	// Empty proxies from fleet are ignored. That way a proxy set by --proxy-url
 	// it won't be overridden by an absent or empty proxy from fleet-server.
 	// However, if there is a proxy sent by fleet-server, it'll take precedence.
 	// Therefore, it's not possible to remove a proxy once it's set.
 
-	if src.Transport.Proxy.URL == nil ||
-		src.Transport.Proxy.URL.String() == "" {
-		log.Debug("proxy from fleet is empty or null, the proxy will not be changed")
+	if policyConfig.Transport.Proxy.URL == nil ||
+		policyConfig.Transport.Proxy.URL.String() == "" {
+		log.Debugw("proxy from fleet is empty or null, the proxy will not be changed", "current_proxy", agentConfig.Transport.Proxy.URL)
 	} else {
+		log.Debugw("received proxy from fleet, applying it", "old_proxy", agentConfig.Transport.Proxy.URL, "new_proxy", policyConfig.Transport.Proxy.URL)
 		// copy the proxy struct
-		dst.Transport.Proxy = src.Transport.Proxy
+		agentConfig.Transport.Proxy = policyConfig.Transport.Proxy
 
-		// replace in dst the attributes that are passed by reference within the proxy struct
+		// replace in agentConfig the attributes that are passed by reference within the proxy struct
 
 		// Headers map
-		dst.Transport.Proxy.Headers = map[string]string{}
-		for k, v := range src.Transport.Proxy.Headers {
-			dst.Transport.Proxy.Headers[k] = v
+		agentConfig.Transport.Proxy.Headers = map[string]string{}
+		for k, v := range policyConfig.Transport.Proxy.Headers {
+			agentConfig.Transport.Proxy.Headers[k] = v
 		}
 
 		// Proxy URL
-		urlCopy := *src.Transport.Proxy.URL
-		dst.Transport.Proxy.URL = &urlCopy
+		urlCopy := *policyConfig.Transport.Proxy.URL
+		agentConfig.Transport.Proxy.URL = &urlCopy
+	}
 
-		log.Debug("received proxy from fleet, applying it")
+	if policyConfig.Transport.TLS != nil {
+
+		tlsCopy := tlscommon.Config{}
+		if agentConfig.Transport.TLS != nil {
+			// copy the TLS struct
+			tlsCopy = *agentConfig.Transport.TLS
+		}
+
+		if policyConfig.Transport.TLS.Certificate == emptyCertificateConfig() {
+			log.Debug("TLS certificates from fleet are empty or null, the TLS config will not be changed")
+		} else {
+			tlsCopy.Certificate = policyConfig.Transport.TLS.Certificate
+			log.Debug("received TLS certificate/key from fleet, applying it")
+		}
+
+		if len(policyConfig.Transport.TLS.CAs) == 0 {
+			log.Debug("TLS CAs from fleet are empty or null, the TLS config will not be changed")
+		} else {
+			tlsCopy.CAs = make([]string, len(policyConfig.Transport.TLS.CAs))
+			copy(tlsCopy.CAs, policyConfig.Transport.TLS.CAs)
+			log.Debug("received TLS CAs from fleet, applying it")
+		}
+
+		agentConfig.Transport.TLS = &tlsCopy
 	}
 }
 
-func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.Config) (err error) {
-	cfg, err := configuration.NewFromConfig(c)
-	if err != nil {
-		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
-	}
+func emptyCertificateConfig() tlscommon.CertificateConfig {
+	return tlscommon.CertificateConfig{}
+}
 
+func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.Config) (err error) {
 	var validationErr error
 
 	// validate Fleet connectivity with the new configuration
 	var validatedConfig *remote.Config
-	validatedConfig, err = h.validateFleetServerHosts(ctx, cfg)
+	validatedConfig, err = h.validateFleetServerHosts(ctx, c)
 	if err != nil {
 		validationErr = goerrors.Join(validationErr, fmt.Errorf("validating Fleet client config: %w", err))
 	}
@@ -258,6 +308,15 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		h.config.Fleet.Client = *validatedConfig
 	}
 
+	cfg, err := configuration.NewFromConfig(c)
+	if err != nil {
+		return errors.New(err, "could not parse the configuration from the policy", errors.TypeConfig)
+	}
+	hasEventLoggingOutputChanged := h.hasEventLoggingOutputChanged(cfg)
+	if hasEventLoggingOutputChanged {
+		h.config.Settings.EventLoggingConfig = cfg.Settings.EventLoggingConfig
+	}
+
 	// persist configuration
 	err = saveConfig(h.agentInfo, h.config, h.store)
 	if err != nil {
@@ -270,7 +329,28 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		return fmt.Errorf("applying FleetClientConfig: %w", err)
 	}
 
+	// If the event logging output has changed, we need to
+	// re-exec the Elastic-Agent to apply the new logging
+	// output.
+	// The new logging configuration has already been persisted
+	// to the disk, the Elastic-Agent will pick it up once it starts.
+	if hasEventLoggingOutputChanged {
+		h.coordinator.ReExec(nil)
+	}
+
 	return nil
+}
+
+// hasEventLoggingOutputChanged returns true if the output of the event logger has changed
+func (h *PolicyChangeHandler) hasEventLoggingOutputChanged(new *configuration.Configuration) bool {
+	switch {
+	case h.config.Settings.EventLoggingConfig.ToFiles != new.Settings.EventLoggingConfig.ToFiles:
+		return true
+	case h.config.Settings.EventLoggingConfig.ToStderr != new.Settings.EventLoggingConfig.ToStderr:
+		return true
+	default:
+		return false
+	}
 }
 
 func validateLoggingConfig(cfg *config.Config) (*logger.Config, error) {
@@ -355,6 +435,10 @@ func clientEqual(k1 remote.Config, k2 remote.Config) bool {
 		return false
 	}
 
+	if k1.Host != k2.Host {
+		return false
+	}
+
 	sort.Strings(k1.Hosts)
 	sort.Strings(k2.Hosts)
 	if len(k1.Hosts) != len(k2.Hosts) {
@@ -394,12 +478,14 @@ func clientEqual(k1 remote.Config, k2 remote.Config) bool {
 func fleetToReader(agentID string, headers map[string]string, cfg *configuration.Configuration) (io.Reader, error) {
 	configToStore := map[string]interface{}{
 		"fleet": cfg.Fleet,
-		"agent": map[string]interface{}{
-			"id":               agentID,
-			"headers":          headers,
-			"logging.level":    cfg.Settings.LoggingConfig.Level,
-			"monitoring.http":  cfg.Settings.MonitoringConfig.HTTP,
-			"monitoring.pprof": cfg.Settings.MonitoringConfig.Pprof,
+		"agent": map[string]interface{}{ // Add event logging configuration here!
+			"id":                           agentID,
+			"headers":                      headers,
+			"logging.level":                cfg.Settings.LoggingConfig.Level,
+			"logging.event_data.to_files":  cfg.Settings.EventLoggingConfig.ToFiles,
+			"logging.event_data.to_stderr": cfg.Settings.EventLoggingConfig.ToStderr,
+			"monitoring.http":              cfg.Settings.MonitoringConfig.HTTP,
+			"monitoring.pprof":             cfg.Settings.MonitoringConfig.Pprof,
 		},
 	}
 

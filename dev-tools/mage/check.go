@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package mage
 
@@ -24,7 +24,7 @@ import (
 // It checks the file permissions of python test cases and YAML files.
 // It checks .go source files using 'go vet'.
 func Check() error {
-	fmt.Println(">> check: Checking source code for common problems") //nolint:forbidigo // it's ok to use fmt.println in mage
+	fmt.Println(">> check: Checking source code for common problems")
 
 	mg.Deps(GoVet, CheckYAMLNotExecutable, devtools.CheckNoChanges)
 
@@ -69,13 +69,26 @@ func GoVet() error {
 
 // CheckLicenseHeaders checks license headers in .go files.
 func CheckLicenseHeaders() error {
-	fmt.Println(">> fmt - go-licenser: Checking for missing headers") //nolint:forbidigo // it's ok to use fmt.println in mage
+	fmt.Println(">> fmt - go-licenser: Checking for missing headers")
 	mg.Deps(InstallGoLicenser)
 
 	licenser := gotool.Licenser
 	return licenser(
 		licenser.Check(),
-		licenser.License("Elastic"),
+		licenser.License("Elasticv2"),
 	)
 
+}
+
+// CheckLinksInFileAreLive checks if all links in a file are live.
+func CheckLinksInFileAreLive(filename string) func() error {
+	return func() error {
+		fmt.Printf(">> check: Checking for invalid links in %q\n", filename)
+		mg.Deps(InstallGoLinkCheck)
+
+		linkcheck := gotool.LinkCheck
+		return linkcheck(
+			linkcheck.Path(filename),
+		)
+	}
 }

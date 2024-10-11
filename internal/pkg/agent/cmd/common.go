@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package cmd
 
@@ -37,6 +37,14 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "elastic-agent [subcommand]",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if cmd.Name() == "container" {
+				// need to initialize container and try to chown agent-related paths
+				// before tryContainerLoadPaths as this will try to read/write from
+				// the agent state dir which might not have proper permissions when
+				// running inside a container
+				initContainer(streams)
+			}
+
 			return tryContainerLoadPaths()
 		},
 	}
@@ -72,18 +80,21 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	run := newRunCommandWithArgs(args, streams)
 	cmd.AddCommand(basecmd.NewDefaultCommandsWithArgs(args, streams)...)
 	cmd.AddCommand(run)
-	cmd.AddCommand(newInstallCommandWithArgs(args, streams))
-	cmd.AddCommand(newUninstallCommandWithArgs(args, streams))
-	cmd.AddCommand(newUpgradeCommandWithArgs(args, streams))
-	cmd.AddCommand(newEnrollCommandWithArgs(args, streams))
-	cmd.AddCommand(newInspectCommandWithArgs(args, streams))
-	cmd.AddCommand(newWatchCommandWithArgs(args, streams))
-	cmd.AddCommand(newContainerCommand(args, streams))
-	cmd.AddCommand(newStatusCommand(args, streams))
-	cmd.AddCommand(newDiagnosticsCommand(args, streams))
-	cmd.AddCommand(newComponentCommandWithArgs(args, streams))
-	cmd.AddCommand(newLogsCommandWithArgs(args, streams))
-	cmd.AddCommand(newOtelCommandWithArgs(args, streams))
+
+	addCommandIfNotNil(cmd, newInstallCommandWithArgs(args, streams))
+	addCommandIfNotNil(cmd, newUninstallCommandWithArgs(args, streams))
+	addCommandIfNotNil(cmd, newUpgradeCommandWithArgs(args, streams))
+	addCommandIfNotNil(cmd, newEnrollCommandWithArgs(args, streams))
+	addCommandIfNotNil(cmd, newInspectCommandWithArgs(args, streams))
+	addCommandIfNotNil(cmd, newPrivilegedCommandWithArgs(args, streams))
+	addCommandIfNotNil(cmd, newUnprivilegedCommandWithArgs(args, streams))
+	addCommandIfNotNil(cmd, newWatchCommandWithArgs(args, streams))
+	addCommandIfNotNil(cmd, newContainerCommand(args, streams))
+	addCommandIfNotNil(cmd, newStatusCommand(args, streams))
+	addCommandIfNotNil(cmd, newDiagnosticsCommand(args, streams))
+	addCommandIfNotNil(cmd, newComponentCommandWithArgs(args, streams))
+	addCommandIfNotNil(cmd, newLogsCommandWithArgs(args, streams))
+	addCommandIfNotNil(cmd, newOtelCommandWithArgs(args, streams))
 
 	// windows special hidden sub-command (only added on Windows)
 	reexec := newReExecWindowsCommand(args, streams)
@@ -94,4 +105,12 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.RunE = run.RunE
 
 	return cmd
+}
+
+func addCommandIfNotNil(parent, cmd *cobra.Command) {
+	if cmd == nil || parent == nil {
+		return
+	}
+
+	parent.AddCommand(cmd)
 }

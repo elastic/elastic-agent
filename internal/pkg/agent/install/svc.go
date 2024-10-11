@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package install
 
@@ -15,9 +15,6 @@ import (
 )
 
 const (
-	// ServiceDisplayName is the service display name for the service.
-	ServiceDisplayName = "Elastic Agent"
-
 	// ServiceDescription is the description for the service.
 	ServiceDescription = "Elastic Agent is a unified agent to observe, monitor and protect your system."
 
@@ -31,8 +28,8 @@ const (
 // ExecutablePath returns the path for the installed Agents executable.
 func ExecutablePath(topPath string) string {
 	exec := filepath.Join(topPath, paths.BinaryName)
-	if paths.ShellWrapperPath != "" {
-		exec = paths.ShellWrapperPath
+	if paths.ShellWrapperPath() != "" {
+		exec = paths.ShellWrapperPath()
 	}
 	return exec
 }
@@ -75,8 +72,8 @@ func newService(topPath string, opt ...serviceOpt) (service.Service, error) {
 	}
 
 	cfg := &service.Config{
-		Name:             paths.ServiceName,
-		DisplayName:      ServiceDisplayName,
+		Name:             paths.ServiceName(),
+		DisplayName:      paths.ServiceDisplayName(),
 		Description:      ServiceDescription,
 		Executable:       ExecutablePath(topPath),
 		WorkingDirectory: topPath,
@@ -107,8 +104,8 @@ func newService(topPath string, opt ...serviceOpt) (service.Service, error) {
 
 		// Set the stdout and stderr logs to be inside the installation directory, ensures that the
 		// executing user for the service can write to the directory for the logs.
-		cfg.Option["StandardOutPath"] = filepath.Join(topPath, fmt.Sprintf("%s.out.log", paths.ServiceName))
-		cfg.Option["StandardErrorPath"] = filepath.Join(topPath, fmt.Sprintf("%s.err.log", paths.ServiceName))
+		cfg.Option["StandardOutPath"] = filepath.Join(topPath, fmt.Sprintf("%s.out.log", paths.ServiceName()))
+		cfg.Option["StandardErrorPath"] = filepath.Join(topPath, fmt.Sprintf("%s.err.log", paths.ServiceName()))
 	}
 
 	return service.New(nil, cfg)

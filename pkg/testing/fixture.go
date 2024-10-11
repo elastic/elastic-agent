@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package testing
 
@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -60,6 +62,11 @@ type Fixture struct {
 
 	// Uninstall token value that is needed for the agent uninstall if it's tamper protected
 	uninstallToken string
+
+	// fileNamePrefix is a prefix to be used when saving files from this test.
+	// it's set by FileNamePrefix and once it's set, FileNamePrefix will return
+	// its value.
+	fileNamePrefix string
 }
 
 // FixtureOpt is an option for the fixture.
@@ -205,7 +212,7 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	if err != nil {
 		return err
 	}
-	workDir := f.t.TempDir()
+	workDir := createTempDir(f.t)
 	finalDir := filepath.Join(workDir, name)
 	err = ExtractArtifact(f.t, src, workDir)
 	if err != nil {
@@ -708,26 +715,20 @@ func (e *ExecErr) Unwrap() error {
 // ExecStatus executes the status subcommand on the prepared Elastic Agent binary.
 // It returns the parsed output and the error from the execution. Keep in mind
 // the agent exits with status 1 if it's unhealthy, but it still outputs the
-// status successfully. Therefore, a non-empty AgentStatusOutput is valid
-// regardless of the error. An empty AgentStatusOutput and non nil error
-// means the output could not be parsed. Use AgentStatusOutput.IsZero() to
-// determine if the returned AgentStatusOutput is empty or not.
+// status successfully. An empty AgentStatusOutput and non nil error
+// means the output could not be parsed.
+// As long as we get some output, we don't return any error.
 // It should work with any 8.6+ agent
 func (f *Fixture) ExecStatus(ctx context.Context, opts ...process.CmdOption) (AgentStatusOutput, error) {
 	out, err := f.Exec(ctx, []string{"status", "--output", "json"}, opts...)
 	status := AgentStatusOutput{}
 	if uerr := json.Unmarshal(out, &status); uerr != nil {
 		return AgentStatusOutput{},
-			fmt.Errorf("could not unmarshal agent status output: %w",
-				errors.Join(&ExecErr{
-					err:    err,
-					Output: out,
-				}, uerr))
+			fmt.Errorf("could not unmarshal agent status output: %w", errors.Join(uerr, err))
+	} else if status.IsZero() {
+		return status, fmt.Errorf("agent status output is empty: %w", err)
 	}
 
-	if err != nil {
-		return status, fmt.Errorf("error running command (output: %s): %w", string(out), err)
-	}
 	return status, nil
 }
 
@@ -831,10 +832,15 @@ func (f *Fixture) EnsurePrepared(ctx context.Context) error {
 func (f *Fixture) binaryPath() string {
 	workDir := f.workDir
 	if f.installed {
+		installDir := "Agent"
+		if f.installOpts != nil && f.installOpts.Namespace != "" {
+			installDir = paths.InstallDirNameForNamespace(f.installOpts.Namespace)
+		}
+
 		if f.installOpts != nil && f.installOpts.BasePath != "" {
-			workDir = filepath.Join(f.installOpts.BasePath, "Elastic", "Agent")
+			workDir = filepath.Join(f.installOpts.BasePath, "Elastic", installDir)
 		} else {
-			workDir = filepath.Join(paths.DefaultBasePath, "Elastic", "Agent")
+			workDir = filepath.Join(paths.DefaultBasePath, "Elastic", installDir)
 		}
 	}
 	if f.packageFormat == "deb" || f.packageFormat == "rpm" {
@@ -1007,6 +1013,102 @@ func (f *Fixture) setClient(c client.Client) {
 	f.c = c
 }
 
+func (f *Fixture) DumpProcesses(suffix string) {
+	procs := getProcesses(f.t, `.*`)
+	dir, err := f.DiagnosticsDir()
+	if err != nil {
+		f.t.Logf("failed to dump process: %s", err)
+		return
+	}
+
+	filePath := filepath.Join(dir, fmt.Sprintf("%s-ProcessDump%s.json", f.FileNamePrefix(), suffix))
+	fileDir := path.Dir(filePath)
+	if err := os.MkdirAll(fileDir, 0777); err != nil {
+		f.t.Logf("failed to dump process; failed to create directory %s: %s", fileDir, err)
+		return
+	}
+
+	f.t.Logf("Dumping running processes in %s", filePath)
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+	if err != nil {
+		f.t.Logf("failed to dump process; failed to create output file %s root: %s", filePath, err)
+		return
+	}
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			f.t.Logf("error closing file %s: %s", file.Name(), err)
+		}
+	}(file)
+	err = json.NewEncoder(file).Encode(procs)
+	if err != nil {
+		f.t.Logf("error serializing processes: %s", err)
+	}
+}
+
+// MoveToDiagnosticsDir moves file to 'build/diagnostics' which contents are
+// available on CI if the test fails or on the agent's 'build/diagnostics'
+// if the test is run locally.
+// If the file name does nos start with Fixture.FileNamePrefix(), it'll be added
+// to the filename when moving.
+func (f *Fixture) MoveToDiagnosticsDir(file string) {
+	dir, err := f.DiagnosticsDir()
+	if err != nil {
+		f.t.Logf("failed to move file to diagnostcs directory: %s", err)
+		return
+	}
+
+	filename := filepath.Base(file)
+	if !strings.HasPrefix(filename, f.FileNamePrefix()) {
+		filename = fmt.Sprintf("%s-%s", f.FileNamePrefix(), filename)
+	}
+	destFile := filepath.Join(dir, filename)
+
+	f.t.Logf("moving %q to %q", file, destFile)
+	err = os.Rename(file, destFile)
+	if err != nil {
+		f.t.Logf("failed to move %q to %q: %v", file, destFile, err)
+	}
+}
+
+// FileNamePrefix returns a sanitized and unique name to be used as prefix for
+// files to be kept as resources for investigation when the test fails.
+func (f *Fixture) FileNamePrefix() string {
+	if f.fileNamePrefix != "" {
+		return f.fileNamePrefix
+	}
+
+	stamp := time.Now().Format(time.RFC3339)
+	// on Windows a filename cannot contain a ':' as this collides with disk
+	// labels (aka. C:\)
+	stamp = strings.ReplaceAll(stamp, ":", "-")
+
+	// Subtest names are separated by "/" characters which are not valid
+	// filenames on Linux.
+	sanitizedTestName := strings.ReplaceAll(f.t.Name(), "/", "-")
+	prefix := fmt.Sprintf("%s-%s", sanitizedTestName, stamp)
+
+	f.fileNamePrefix = prefix
+	return f.fileNamePrefix
+}
+
+// DiagnosticsDir returned {projectRoot}/build/diagnostics path. Files on this path
+// are saved if any test fails. Use it to save files for further investigation.
+func (f *Fixture) DiagnosticsDir() (string, error) {
+	dir, err := findProjectRoot(f.caller)
+	if err != nil {
+		return "", fmt.Errorf("failed to find project root: %w", err)
+	}
+
+	diagPath := filepath.Join(dir, "build", "diagnostics")
+
+	if err := os.MkdirAll(diagPath, 0777); err != nil {
+		return "", fmt.Errorf("failed to create directory %s: %w", diagPath, err)
+	}
+
+	return diagPath, nil
+}
+
 // validateComponents ensures that the provided UsableComponent's are valid.
 func validateComponents(components ...UsableComponent) error {
 	for idx, comp := range components {
@@ -1160,6 +1262,31 @@ func performConfigure(ctx context.Context, c client.Client, cfg string, timeout 
 	return nil
 }
 
+// createTempDir creates a temporary directory that will be
+// removed after the tests passes. If the test fails, the
+// directory is kept for further investigation.
+//
+// If the test is run with -v and fails the temporary directory is logged
+func createTempDir(t *testing.T) string {
+	tempDir, err := os.MkdirTemp("", strings.ReplaceAll(t.Name(), "/", "-"))
+	if err != nil {
+		t.Fatalf("failed to make temp directory: %s", err)
+	}
+
+	cleanup := func() {
+		if !t.Failed() {
+			if err := install.RemovePath(tempDir); err != nil {
+				t.Errorf("could not remove temp dir '%s': %s", tempDir, err)
+			}
+		} else {
+			t.Logf("Temporary directory %q preserved for investigation/debugging", tempDir)
+		}
+	}
+	t.Cleanup(cleanup)
+
+	return tempDir
+}
+
 type AgentStatusOutput struct {
 	Info struct {
 		ID           string `json:"id"`
@@ -1201,7 +1328,7 @@ type AgentStatusOutput struct {
 }
 
 func (aso *AgentStatusOutput) IsZero() bool {
-	return aso.Info.ID == ""
+	return aso.Info.ID == "" && aso.Message == "" && aso.Info.Version == ""
 }
 
 type AgentInspectOutput struct {

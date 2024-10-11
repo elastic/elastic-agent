@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package vault
 
@@ -27,7 +27,10 @@ type Vault interface {
 }
 
 func New(ctx context.Context, opts ...OptionFunc) (Vault, error) {
-	options := ApplyOptions(opts...)
+	options, err := ApplyOptions(opts...)
+	if err != nil {
+		return nil, err
+	}
 
 	if runtime.GOOS == "darwin" && !options.unprivileged {
 		return NewDarwinKeyChainVault(ctx, options)

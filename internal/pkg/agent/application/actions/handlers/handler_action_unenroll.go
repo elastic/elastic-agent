@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package handlers
 
@@ -22,11 +22,11 @@ const (
 )
 
 type stateStore interface {
-	Add(fleetapi.Action)
+	SetAction(fleetapi.Action)
 	AckToken() string
 	SetAckToken(ackToken string)
 	Save() error
-	Actions() []fleetapi.Action
+	Action() fleetapi.Action
 }
 
 // Unenroll results in  running agent entering idle state, non managed non standalone.
@@ -61,6 +61,10 @@ func NewUnenroll(
 
 // Handle handles UNENROLL action.
 func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {
+	return h.handle(ctx, a, acker, unenrollTimeout)
+}
+
+func (h *Unenroll) handle(ctx context.Context, a fleetapi.Action, acker acker.Acker, timeout time.Duration) error {
 	h.log.Debugf("handlerUnenroll: action '%+v' received", a)
 	action, ok := a.(*fleetapi.ActionUnenroll)
 	if !ok {
@@ -92,15 +96,13 @@ func (h *Unenroll) Handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 	unenrollPolicy := newPolicyChange(ctx, config.New(), a, acker, true)
 	h.ch <- unenrollPolicy
 
-	if h.stateStore != nil {
-		// backup action for future start to avoid starting fleet gateway loop
-		h.stateStore.Add(a)
-		if err := h.stateStore.Save(); err != nil {
-			h.log.Warnf("Failed to update state store: %v", err)
-		}
+	// backup action for future start to avoid starting fleet gateway loop
+	h.stateStore.SetAction(a)
+	if err := h.stateStore.Save(); err != nil {
+		h.log.Warnf("Failed to update state store: %v", err)
 	}
 
-	unenrollCtx, cancel := context.WithTimeout(ctx, unenrollTimeout)
+	unenrollCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	unenrollPolicy.WaitAck(unenrollCtx)

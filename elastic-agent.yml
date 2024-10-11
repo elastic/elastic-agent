@@ -66,6 +66,8 @@ inputs:
 #   logs: true
 #   # enables metrics monitoring
 #   metrics: true
+#   # metrics_period defines how frequent we should sample monitoring metrics. Default is 60 seconds.
+#   metrics_period: 60s
 #   # exposes /debug/pprof/ endpoints
 #   # recommended that these endpoints are only enabled if the monitoring endpoint is set to localhost
 #   pprof.enabled: false
@@ -83,7 +85,7 @@ inputs:
 #   # The possible values for `failon` are:
 #   # `degraded`: return an error if a component is in a degraded state or failed state, or if the agent coordinator is unresponsive.
 #   # `failed`: return an error if a unit is in a failed state, or if the agent coordinator is unresponsive.
-#   # `heartbeat`: return an error only if the agent coordinator is unresponsive. 
+#   # `heartbeat`: return an error only if the agent coordinator is unresponsive.
 #   # If no `failon` parameter is provided, the default behavior is `failon=heartbeat`
 #   http:
 #       # enables http endpoint

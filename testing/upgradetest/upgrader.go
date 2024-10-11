@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package upgradetest
 
@@ -281,7 +281,7 @@ func PerformUpgrade(
 
 	// validate installation is correct
 	if InstallChecksAllowed(!installOpts.Privileged, startVersion) {
-		err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, !installOpts.Privileged)
+		err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged})
 		if err != nil {
 			return fmt.Errorf("pre-upgrade installation checks failed: %w", err)
 		}
@@ -382,11 +382,11 @@ func PerformUpgrade(
 	}
 
 	// it is unstable to continue until the watcher is done
-	// the maximum wait time is 1 minutes (2 minutes for grace) some older versions
+	// the maximum wait time is 10 minutes (12 minutes for grace) some older versions
 	// do not respect the `ConfigureFastWatcher` so we have to kill the watcher after the
-	// 1 minute window (1 min 15 seconds for grace) has passed.
+	// 10 minute window (10 min 15 seconds for grace) has passed.
 	logger.Logf("waiting for upgrade watcher to finish")
-	err = WaitForNoWatcher(ctx, 2*time.Minute, 10*time.Second, 1*time.Minute+15*time.Second)
+	err = WaitForNoWatcher(ctx, 12*time.Minute, 10*time.Second, 10*time.Minute+15*time.Second)
 	if err != nil {
 		return fmt.Errorf("watcher never stopped running: %w", err)
 	}
@@ -412,7 +412,7 @@ func PerformUpgrade(
 
 	// validate again that the installation is correct, upgrade should not have changed installation validation
 	if InstallChecksAllowed(!installOpts.Privileged, startVersion, endVersion) {
-		err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, !installOpts.Privileged)
+		err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged})
 		if err != nil {
 			return fmt.Errorf("post-upgrade installation checks failed: %w", err)
 		}
@@ -421,6 +421,8 @@ func PerformUpgrade(
 	return nil
 }
 
+var ErrVerMismatch = errors.New("versions don't match")
+
 func CheckHealthyAndVersion(ctx context.Context, f *atesting.Fixture, versionInfo atesting.AgentBinaryVersion) error {
 	checkFunc := func() error {
 		status, err := f.ExecStatus(ctx)
@@ -428,7 +430,8 @@ func CheckHealthyAndVersion(ctx context.Context, f *atesting.Fixture, versionInf
 			return err
 		}
 		if status.Info.Version != versionInfo.Version {
-			return fmt.Errorf("versions don't match: got %s, want %s",
+			return fmt.Errorf("%w: got %s, want %s",
+				ErrVerMismatch,
 				status.Info.Version, versionInfo.Version)
 		}
 		if status.Info.Snapshot != versionInfo.Snapshot {
@@ -494,6 +497,9 @@ func WaitHealthyAndVersion(ctx context.Context, f *atesting.Fixture, versionInfo
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	// The deadline was set above, we don't need to check for it.
+	deadline, _ := ctx.Deadline()
+
 	t := time.NewTicker(interval)
 	defer t.Stop()
 
@@ -507,6 +513,12 @@ func WaitHealthyAndVersion(ctx context.Context, f *atesting.Fixture, versionInfo
 			return ctx.Err()
 		case <-t.C:
 			err := CheckHealthyAndVersion(ctx, f, versionInfo)
+			// If we're in an upgrade process, the versions might not match
+			// so we wait to see if we get to a stable version
+			if errors.Is(err, ErrVerMismatch) {
+				logger.Logf("version mismatch, ignoring it, time until timeout: %s", time.Until(deadline))
+				continue
+			}
 			if err == nil {
 				return nil
 			}

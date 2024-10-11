@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package fleetapi
 
@@ -30,20 +30,13 @@ type CheckinUnit struct {
 	Payload map[string]interface{} `json:"payload,omitempty"`
 }
 
-// CheckinShipperReference provides information about a component shipper connection during checkin.
-type CheckinShipperReference struct {
-	ComponentID string `json:"component_id"`
-	UnitID      string `json:"unit_id"`
-}
-
 // CheckinComponent provides information about a component during checkin.
 type CheckinComponent struct {
-	ID      string                   `json:"id"`
-	Type    string                   `json:"type"`
-	Status  string                   `json:"status"`
-	Message string                   `json:"message"`
-	Units   []CheckinUnit            `json:"units,omitempty"`
-	Shipper *CheckinShipperReference `json:"shipper,omitempty"`
+	ID      string        `json:"id"`
+	Type    string        `json:"type"`
+	Status  string        `json:"status"`
+	Message string        `json:"message"`
+	Units   []CheckinUnit `json:"units,omitempty"`
 }
 
 // CheckinRequest consists of multiple events reported to fleet ui.

@@ -24,13 +24,10 @@ spec:
           effect: NoSchedule
       serviceAccountName: elastic-agent
       hostNetwork: false
-      # 'hostPID: true' enables the Elastic Security integration to observe all process exec events on the host.
-      # Sharing the host process ID namespace gives visibility of all processes running on the same host.
-      hostPID: true
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: elastic-agent
-          image: docker.elastic.co/beats/elastic-agent:8.8.1
+          image: docker.elastic.co/beats/elastic-agent:9.0.0
           env:
             # Set to 1 for enrollment into Fleet server. If not set, Elastic Agent is run in standalone mode
             - name: FLEET_ENROLL
@@ -68,14 +65,6 @@ spec:
               value: "false"
           securityContext:
             runAsUser: 0
-            # The following capabilities are needed for 'Defend for containers' integration (cloud-defend)
-            # If you are using this integration, please uncomment these lines before applying.
-            #capabilities:
-            #  add:
-            #    - BPF # (since Linux 5.8) allows loading of BPF programs, create most map types, load BTF, iterate programs and maps.
-            #    - PERFMON # (since Linux 5.8) allows attaching of BPF programs used for performance metrics and observability operations.
-            #    - SYS_RESOURCE # Allow use of special resources or raising of resource limits. Used by 'Defend for Containers' to modify 'rlimit_memlock'
-            ########################################################################################
             # The following capabilities are needed for Universal Profiling.
             # More fine graded capabilities are only available for newer Linux kernels.
             # If you are using the Universal Profiling integration, please uncomment these lines before applying.
@@ -86,10 +75,10 @@ spec:
             #    - SYS_ADMIN
           resources:
             limits:
-              memory: 700Mi
+              memory: 1Gi
             requests:
               cpu: 100m
-              memory: 400Mi
+              memory: 500Mi
           volumeMounts:
             - name: proc
               mountPath: /hostfs/proc
@@ -116,9 +105,6 @@ spec:
               mountPath: /sys/kernel/debug
 #            - name: elastic-agent-state
 #              mountPath: /usr/share/elastic-agent/state
-            # If you are using the Universal Profiling integration, please uncomment these lines before applying.
-            #- name: universal-profiling-cache
-            #  mountPath: /var/cache/Elastic
       volumes:
         - name: proc
           hostPath:
@@ -142,13 +128,13 @@ spec:
           hostPath:
             path: /var/lib
         # Mount /etc/machine-id from the host to determine host ID
-        # Needed for Elastic Security integration
+        # Needed for Kubernetes node autodiscovery
         - name: etc-mid
           hostPath:
             path: /etc/machine-id
             type: File
-        # Needed for 'Defend for containers' integration (cloud-defend) and Universal Profiling
-        # If you are not using one of these integrations, then these volumes and the corresponding
+        # Needed for Universal Profiling
+        # If you are not using this integration, then these volumes and the corresponding
         # mounts can be removed.
         - name: sys-kernel-debug
           hostPath:
@@ -159,9 +145,3 @@ spec:
 #          hostPath:
 #            path: /var/lib/elastic-agent-managed/kube-system/state
 #            type: DirectoryOrCreate
-        # Mount required for Universal Profiling.
-        # If you are using the Universal Profiling integration, please uncomment these lines before applying.
-        #- name: universal-profiling-cache
-        #  hostPath:
-        #    path: /var/cache/Elastic
-        #    type: DirectoryOrCreate

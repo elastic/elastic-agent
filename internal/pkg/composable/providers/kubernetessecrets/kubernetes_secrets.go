@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package kubernetessecrets
 
@@ -45,7 +45,7 @@ type secretsData struct {
 }
 
 // ContextProviderBuilder builds the context provider.
-func ContextProviderBuilder(logger *logger.Logger, c *config.Config, managed bool) (corecomp.ContextProvider, error) {
+func ContextProviderBuilder(logger *logger.Logger, c *config.Config, _ bool) (corecomp.ContextProvider, error) {
 	var cfg Config
 	if c == nil {
 		c = config.New()

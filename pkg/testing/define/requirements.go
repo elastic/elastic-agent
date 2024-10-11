@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package define
 
@@ -23,6 +23,8 @@ const (
 	Linux = component.Linux
 	// Windows is Windows platform
 	Windows = component.Windows
+	// Kubernetes is Kubernetes platform
+	Kubernetes = "kubernetes"
 )
 
 const (
@@ -50,8 +52,12 @@ type OS struct {
 	// defined the test is run on a selected version for this operating system.
 	Version string `json:"version"`
 	// Distro allows in the Linux case for a specific distribution to be
-	// selected for running on. Example would be "ubuntu".
+	// selected for running on. Example would be "ubuntu". In the Kubernetes case
+	// for a specific distribution of kubernetes. Example would be "kind".
 	Distro string `json:"distro"`
+	// DockerVariant allows in the Kubernetes case for a specific variant to
+	// be selected for running with. Example would be "wolfi".
+	DockerVariant string `json:"docker_variant"`
 }
 
 // Validate returns an error if not valid.
@@ -59,8 +65,8 @@ func (o OS) Validate() error {
 	if o.Type == "" {
 		return errors.New("type must be defined")
 	}
-	if o.Type != Darwin && o.Type != Linux && o.Type != Windows {
-		return errors.New("type must be either darwin, linux, or windows")
+	if o.Type != Darwin && o.Type != Linux && o.Type != Windows && o.Type != Kubernetes {
+		return errors.New("type must be either darwin, linux, windows, or kubernetes")
 	}
 	if o.Arch != "" {
 		if o.Arch != AMD64 && o.Arch != ARM64 {
@@ -70,8 +76,11 @@ func (o OS) Validate() error {
 			return errors.New("windows on arm64 not supported")
 		}
 	}
-	if o.Distro != "" && o.Type != Linux {
-		return errors.New("distro can only be set when type is linux")
+	if o.Distro != "" && (o.Type != Linux && o.Type != Kubernetes) {
+		return errors.New("distro can only be set when type is linux or kubernetes")
+	}
+	if o.DockerVariant != "" && o.Type != Kubernetes {
+		return errors.New("docker variant can only be set when type is kubernetes")
 	}
 	return nil
 }
@@ -134,7 +143,7 @@ func (r Requirements) runtimeAllowed(os string, arch string, version string, dis
 		return true
 	}
 	for _, o := range r.OS {
-		if o.Type != os {
+		if o.Type != Kubernetes && o.Type != os {
 			// not valid on this runtime
 			continue
 		}

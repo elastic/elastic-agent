@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package fleetservertest
 
@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -43,7 +44,7 @@ func TestRunFleetServer(t *testing.T) {
 	// address from it.
 	// If you want to predefine an address for the server to listen on, pass
 	// WithAddress(addr) to NewServer.
-	fleetHosts := "host1"
+	fleetHosts := []string{"host1"}
 	var actionsIdx int
 
 	tmpl := TmplPolicy{
@@ -55,7 +56,7 @@ func TestRunFleetServer(t *testing.T) {
 		// get the port the server is listening on. Therefore, the action generator
 		// captures the 'fleetHosts' variable, so it can read the real fleet-server
 		// address from it.
-		FleetHosts: `"host1", "host2"`,
+		FleetHosts: []string{"host1", "host2"},
 		SourceURI:  "http://source.uri",
 		CreatedAt:  "2023-05-31T11:37:50.607Z",
 		Output: struct {
@@ -104,7 +105,7 @@ func TestRunFleetServer(t *testing.T) {
 		WithRequestLog(t.Logf))
 	defer ts.Close()
 
-	fleetHosts = fmt.Sprintf(`"%s"`, ts.URL)
+	fleetHosts = []string{fmt.Sprintf(`"%s"`, ts.URL)}
 
 	fmt.Println("listening on:", fleetHosts)               //nolint:forbidigo // it's a test
 	fmt.Println("press CTRL + C or kill the test to stop") //nolint:forbidigo // it's a test
@@ -170,7 +171,133 @@ func ExampleNewServer_checkin() {
 
 	fmt.Println(got.Actions)
 	// Output:
-	// [action_id: anActionID, type: POLICY_CHANGE]
+	// [id: anActionID, type: POLICY_CHANGE]
+}
+
+func ExampleNewServer_checkin_fleetConnectionParams() {
+	agentID := "agentID"
+	tmpl := TmplPolicy{
+		FleetHosts: []string{"https://fleet.somehost.somedomain"},
+		SSL: &SSL{
+			Renegotiation:          "never",
+			VerificationMode:       "",
+			CertificateAuthorities: []string{"/path/to/CA1", "/path/to/CA2"},
+			Certificate:            "/path/to/certificate",
+			Key:                    "/path/to/key",
+		},
+	}
+
+	actions, err := NewActionPolicyChangeWithFakeComponent("anActionID", tmpl)
+	if err != nil {
+		panic(fmt.Sprintf("failed to get new actions: %v", err))
+	}
+
+	// NewHandlerCheckin
+	ts := NewServer(&Handlers{
+		CheckinFn: NewHandlerCheckin(func() (CheckinAction, *HTTPError) {
+			return CheckinAction{Actions: []string{actions.data}}, nil
+		})},
+		WithAgentID(agentID))
+
+	cmd := fleetapi.NewCheckinCmd(
+		agentInfo(agentID), sender{url: ts.URL, path: NewPathCheckin(agentID)})
+
+	got, _, err := cmd.Execute(context.Background(), &fleetapi.CheckinRequest{})
+	if err != nil {
+		panic(fmt.Sprintf("ExampleNewServer_checkin_fleetConnectionParams failed executing checkin: %v", err))
+	}
+
+	fmt.Println(got.Actions)
+	if len(got.Actions) > 0 {
+		policy := got.Actions[0].(*fleetapi.ActionPolicyChange).Data.Policy
+		b := new(strings.Builder)
+		encoder := json.NewEncoder(b)
+		encoder.SetIndent("", "  ")
+		err = encoder.Encode(policy)
+		if err != nil {
+			panic(fmt.Sprintf("Error marshaling received policy: %v", err))
+		}
+		fmt.Println(b.String())
+	}
+
+	// Output:
+	// [id: anActionID, type: POLICY_CHANGE]
+	// {
+	//   "agent": {
+	//     "download": {
+	//       "sourceURI": ""
+	//     },
+	//     "features": {},
+	//     "monitoring": {
+	//       "enabled": true,
+	//       "logs": true,
+	//       "metrics": true,
+	//       "namespace": "default",
+	//       "use_output": "default"
+	//     },
+	//     "protection": {
+	//       "enabled": false,
+	//       "signing_key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQ9BPoHUCyLyElVpfwvKeFdUt6U9wBb+QlZNf4cy5eAwK9Xh4D8fClgciPeRs3j62i6IEeGyvOs9U3+fElyUigg==",
+	//       "uninstall_token_hash": "lORSaDIQq4nglUMJwWjKrwexj4IDRJA+FtoQeeqKH/I="
+	//     }
+	//   },
+	//   "fleet": {
+	//     "hosts": [
+	//       "https://fleet.somehost.somedomain"
+	//     ],
+	//     "ssl": {
+	//       "certificate": "/path/to/certificate",
+	//       "certificate_authorities": [
+	//         "/path/to/CA1",
+	//         "/path/to/CA2"
+	//       ],
+	//       "key": "/path/to/key",
+	//       "renegotiation": "never"
+	//     }
+	//   },
+	//   "id": "",
+	//   "inputs": [
+	//     {
+	//       "data_stream": {
+	//         "namespace": "default"
+	//       },
+	//       "id": "fake-input",
+	//       "meta": {
+	//         "package": {
+	//           "name": "fake-input",
+	//           "version": "0.0.1"
+	//         }
+	//       },
+	//       "name": "fake-input",
+	//       "package_policy_id": "",
+	//       "revision": 1,
+	//       "secret_key": "secretValue",
+	//       "streams": [],
+	//       "type": "fake-input",
+	//       "use_output": "default"
+	//     }
+	//   ],
+	//   "output_permissions": {
+	//     "default": {}
+	//   },
+	//   "outputs": {
+	//     "default": {
+	//       "api_key": "",
+	//       "hosts": [],
+	//       "type": ""
+	//     }
+	//   },
+	//   "revision": 2,
+	//   "secret_paths": [
+	//     "inputs.0.secret_key"
+	//   ],
+	//   "secret_references": [],
+	//   "signed": {
+	//     "data": "eyJpZCI6IjI0ZTRkMDMwLWZmYTctMTFlZC1iMDQwLTlkZWJhYTVmZWNiOCIsImFnZW50Ijp7InByb3RlY3Rpb24iOnsiZW5hYmxlZCI6ZmFsc2UsInVuaW5zdGFsbF90b2tlbl9oYXNoIjoibE9SU2FESVFxNG5nbFVNSndXaktyd2V4ajRJRFJKQStGdG9RZWVxS0gvST0iLCJzaWduaW5nX2tleSI6Ik1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRVE5QlBvSFVDeUx5RWxWcGZ3dktlRmRVdDZVOXdCYitRbFpOZjRjeTVlQXdLOVhoNEQ4ZkNsZ2NpUGVSczNqNjJpNklFZUd5dk9zOVUzK2ZFbHlVaWdnPT0ifX19",
+	//     "signature": "MEUCIQCfS6wPj/AvfFA79dwKATnvyFl/ZeyA8eKOLHg1XuA9NgIgNdhjIT+G/GZFqsVoWk5jThONhpqPhfiHLE5OkTdrwT0="
+	//   }
+	// }
+
 }
 
 func ExampleNewServer_ack() {
@@ -296,7 +423,7 @@ func ExampleNewServer_checkin_fakeComponent() {
 	tmpl := TmplPolicy{
 		AgentID:    "AgentID",
 		PolicyID:   policyID,
-		FleetHosts: `"host1", "host2"`,
+		FleetHosts: []string{"host1", "host2"},
 		SourceURI:  "http://source.uri",
 		CreatedAt:  "2023-05-31T11:37:50.607Z",
 		Output: struct {
@@ -354,7 +481,7 @@ func ExampleNewServer_checkin_fakeComponent() {
 	fmt.Println(resp.Actions)
 
 	// Output:
-	// [action_id: anActionID, type: POLICY_CHANGE]
+	// [id: anActionID, type: POLICY_CHANGE]
 	// Error: status code: 418, fleet-server returned an error: I'm a teapot
 	// []
 }
@@ -365,7 +492,7 @@ func ExampleNewServer_checkin_withDelay() {
 	tmpl := TmplPolicy{
 		AgentID:    "AgentID",
 		PolicyID:   policyID,
-		FleetHosts: `"host1", "host2"`,
+		FleetHosts: []string{"host1", "host2"},
 		SourceURI:  "http://source.uri",
 		CreatedAt:  "2023-05-31T11:37:50.607Z",
 		Output: struct {
@@ -424,7 +551,7 @@ func ExampleNewServer_checkin_withDelay() {
 		resp.Actions)
 
 	// Output:
-	// took more than 250ms: true. response: [action_id: anActionID, type: POLICY_CHANGE]
+	// took more than 250ms: true. response: [id: anActionID, type: POLICY_CHANGE]
 	// took more than 250ms: false. response: []
 }
 
@@ -508,7 +635,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 	tmpl := TmplPolicy{
 		AgentID:    agentID,
 		PolicyID:   policyID,
-		FleetHosts: `"host1", "host2"`,
+		FleetHosts: []string{"host1", "host2"},
 		SourceURI:  "http://source.uri",
 		CreatedAt:  "2023-05-31T11:37:50.607Z",
 		Output: struct {
@@ -648,7 +775,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 
 	// Output:
 	// [1st ack] &fleetapi.AckResponse{Action:"acks", Errors:true, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:404, Message:"action anActionID not found"}}}
-	// [1st checkin] [action_id: anActionID, type: POLICY_CHANGE]
+	// [1st checkin] [id: anActionID, type: POLICY_CHANGE]
 	// [2nd ack] &fleetapi.AckResponse{Action:"acks", Errors:false, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:200, Message:"OK"}}}
 	// [2nd checkin] Error: status code: 418, fleet-server returned an error: I'm a teapot
 	// [3rd ack] &fleetapi.AckResponse{Action:"acks", Errors:true, Items:[]fleetapi.AckResponseItem{fleetapi.AckResponseItem{Status:404, Message:"action not-received-on-checkin not found"}}}

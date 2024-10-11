@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package kubernetes
 
@@ -95,24 +95,4 @@ func kubectlIn(env map[string]string, stdout, stderr io.Writer, input string, ar
 	}
 
 	return c.Run()
-}
-
-func kubectlStart(env map[string]string, stdout, stderr io.Writer, args ...string) (*exec.Cmd, error) {
-	c := exec.Command("kubectl", args...)
-	c.Env = os.Environ()
-	for k, v := range env {
-		c.Env = append(c.Env, k+"="+v)
-	}
-	c.Stdout = stdout
-	c.Stderr = stderr
-	c.Stdin = nil
-
-	if mg.Verbose() {
-		fmt.Println("exec:", "kubectl", strings.Join(args, " "))
-	}
-
-	if err := c.Start(); err != nil {
-		return nil, err
-	}
-	return c, nil
 }

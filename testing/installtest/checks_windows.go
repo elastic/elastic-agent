@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build windows
 
@@ -36,7 +36,7 @@ type accessAllowedAce struct {
 	SidStart   uint32
 }
 
-func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, unprivileged bool) error {
+func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, opts *CheckOpts) error {
 	secInfo, err := windows.GetNamedSecurityInfo(topPath, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION)
 	if err != nil {
 		return fmt.Errorf("GetNamedSecurityInfo failed for %s: %w", topPath, err)
@@ -52,7 +52,7 @@ func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, unp
 	if err != nil {
 		return fmt.Errorf("failed to get allowed SID's for %s: %w", topPath, err)
 	}
-	if unprivileged {
+	if !opts.Privileged {
 		// Check that the elastic-agent user/group exist.
 		uid, err := install.FindUID(install.ElasticUsername)
 		if err != nil {

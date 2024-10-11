@@ -45,7 +45,10 @@ spec:
           image: docker.elastic.co/beats/elastic-agent:%VERSION%
           args: ["-c", "/etc/elastic-agent/agent.yml", "-e"]
           env:
-            # The basic authentication username used to connect to Elasticsearch
+            # The API Key with access privilleges to connect to Elasticsearch. https://www.elastic.co/guide/en/fleet/current/grant-access-to-elasticsearch.html#create-api-key-standalone-agent
+            - name: API_KEY
+              value: ""
+            # The basic authentication username used to connect to Elasticsearch. Alternative to API_KEY access.
             # This user needs the privileges required to publish events to Elasticsearch.
             - name: ES_USERNAME
               value: "elastic"
@@ -69,14 +72,6 @@ spec:
               value: "false"
           securityContext:
             runAsUser: 0
-            # The following capabilities are needed for 'Defend for containers' integration (cloud-defend)
-            # If you are using this integration, please uncomment these lines before applying.
-            #capabilities:
-            #  add:
-            #    - BPF # (since Linux 5.8) allows loading of BPF programs, create most map types, load BTF, iterate programs and maps.
-            #    - PERFMON # (since Linux 5.8) allows attaching of BPF programs used for performance metrics and observability operations.
-            #    - SYS_RESOURCE # Allow use of special resources or raising of resource limits. Used by 'Defend for Containers' to modify 'rlimit_memlock'
-            ########################################################################################
             # The following capabilities are needed for Universal Profiling.
             # More fine graded capabilities are only available for newer Linux kernels.
             # If you are using the Universal Profiling integration, please uncomment these lines before applying.
@@ -87,10 +82,10 @@ spec:
             #    - SYS_ADMIN
           resources:
             limits:
-              memory: 700Mi
+              memory: 1Gi
             requests:
               cpu: 100m
-              memory: 400Mi
+              memory: 500Mi
           volumeMounts:
             - name: datastreams
               mountPath: /etc/elastic-agent/agent.yml
@@ -118,13 +113,10 @@ spec:
               mountPath: /sys/kernel/debug
             - name: elastic-agent-state
               mountPath: /usr/share/elastic-agent/state
-            # If you are using the Universal Profiling integration, please uncomment these lines before applying.
-            #- name: universal-profiling-cache
-            #  mountPath: /var/cache/Elastic
       volumes:
         - name: datastreams
           configMap:
-            defaultMode: 0640
+            defaultMode: 0644
             name: agent-node-datastreams
         - name: proc
           hostPath:
@@ -147,8 +139,8 @@ spec:
         - name: var-lib
           hostPath:
             path: /var/lib
-        # Needed for 'Defend for containers' integration (cloud-defend) and Universal Profiling
-        # If you are not using one of these integrations, then these volumes and the corresponding
+        # Needed for Universal Profiling
+        # If you are not using this integration, then these volumes and the corresponding
         # mounts can be removed.
         - name: sys-kernel-debug
           hostPath:
@@ -159,9 +151,3 @@ spec:
           hostPath:
             path: /var/lib/elastic-agent-standalone/kube-system/state
             type: DirectoryOrCreate
-        # Mount required for Universal Profiling.
-        # If you are using the Universal Profiling integration, please uncomment these lines before applying.
-        #- name: universal-profiling-cache
-        #  hostPath:
-        #    path: /var/cache/Elastic
-        #    type: DirectoryOrCreate

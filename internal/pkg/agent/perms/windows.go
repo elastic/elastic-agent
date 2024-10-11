@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build windows
 
@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
+	"syscall"
 
 	"github.com/Microsoft/go-winio"
 	"github.com/hectane/go-acl"
@@ -22,7 +23,10 @@ import (
 
 // FixPermissions fixes the permissions so only SYSTEM and Administrators have access to the files in the install path
 func FixPermissions(topPath string, opts ...OptFunc) error {
-	o := newOpts(opts...)
+	o, err := newOpts(opts...)
+	if err != nil {
+		return err
+	}
 
 	// SYSTEM and Administrators always get permissions
 	// https://support.microsoft.com/en-us/help/243330/well-known-security-identifiers-in-windows-operating-systems
@@ -41,7 +45,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 	grants = append(grants, acl.GrantSid(0xF10F0000, administratorsSID)) // full control of all acl's
 
 	// user gets grant based on the mask
-	var userSID *windows.SID
+	userSID := administratorsSID // defaults to owned by Administrators
 	if o.mask&0700 != 0 && o.ownership.UID != "" {
 		userSID, err = windows.StringToSid(o.ownership.UID)
 		if err != nil {
@@ -51,7 +55,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 	}
 
 	// group gets grant based on the mask
-	var groupSID *windows.SID
+	groupSID := administratorsSID // defaults to owned by Administrators
 	if o.mask&0070 != 0 && o.ownership.GID != "" {
 		groupSID, err = windows.StringToSid(o.ownership.GID)
 		if err != nil {
@@ -78,7 +82,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 		// call to `takeOwnership` which sets the ownership information requires the current process
 		// token to have the 'SeRestorePrivilege' or it's unable to adjust the ownership
 		return winio.RunWithPrivileges([]string{winio.SeRestorePrivilege}, func() error {
-			return filepath.Walk(topPath, func(name string, info fs.FileInfo, err error) error {
+			return filepath.WalkDir(topPath, func(name string, _ fs.DirEntry, err error) error {
 				if err == nil {
 					// first level doesn't inherit
 					inherit := true
@@ -88,6 +92,11 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 
 					err = acl.Apply(name, true, inherit, grants...)
 					if err != nil {
+						// Check for Errno = 0 which indicates success
+						// https://pkg.go.dev/golang.org/x/sys/windows#Errno
+						if errors.Is(err, syscall.Errno(0)) {
+							return nil
+						}
 						return err
 					}
 					if userSID != nil && groupSID != nil {
@@ -102,14 +111,20 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 	}
 
 	// ownership cannot be changed, this will keep the ownership as it currently is but apply the ACL's
-	return filepath.Walk(topPath, func(name string, info fs.FileInfo, err error) error {
+	return filepath.WalkDir(topPath, func(name string, _ fs.DirEntry, err error) error {
 		if err == nil {
 			// first level doesn't inherit
 			inherit := true
 			if topPath == name {
 				inherit = false
 			}
-			return acl.Apply(name, true, inherit, grants...)
+			err = acl.Apply(name, true, inherit, grants...)
+			// Check for Errno = 0 which indicates success
+			// https://pkg.go.dev/golang.org/x/sys/windows#Errno
+			if errors.Is(err, syscall.Errno(0)) {
+				return nil
+			}
+			return err
 		} else if errors.Is(err, fs.ErrNotExist) {
 			return nil
 		}

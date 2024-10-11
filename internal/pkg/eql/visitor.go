@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package eql
 
@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/antlr4-go/antlr/v4"
 
 	"github.com/elastic/elastic-agent/internal/pkg/eql/parser"
 )
@@ -248,6 +248,13 @@ func (v *expVisitor) VisitExpNot(ctx *parser.ExpNotContext) interface{} {
 	}
 
 	return !val
+}
+
+func (v *expVisitor) VisitExpEVariable(ctx *parser.ExpEVariableContext) interface{} {
+	// escaped variables are not allowed in Eql conditions
+	// they should be wrapped in a constant to be allowed as a valid string in the expression
+	v.err = errors.New("escaped variable $${ is not allowed")
+	return nil
 }
 
 func (v *expVisitor) VisitExpVariable(ctx *parser.ExpVariableContext) interface{} {

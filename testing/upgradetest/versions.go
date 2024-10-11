@@ -1,12 +1,11 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package upgradetest
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -14,6 +13,8 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/version"
@@ -68,11 +69,11 @@ type VersionRequirements struct {
 	SnapshotBranches []string
 }
 
-const AgentVersionsFilename = ".agent-versions.json"
+var AgentVersionsFilename string
 
 type AgentVersions struct {
 	// TestVersions contains semver-compliant versions of the agent to run integration tests against.
-	TestVersions []string `json:"testVersions"`
+	TestVersions []string `yaml:"testVersions"`
 }
 
 var (
@@ -80,6 +81,8 @@ var (
 )
 
 func init() {
+	AgentVersionsFilename = filepath.Join("testing", "integration", "testdata", ".upgrade-test-agent-versions.yml")
+
 	v, err := getAgentVersions()
 	if err != nil {
 		panic(err)
@@ -116,11 +119,11 @@ func getAgentVersions() (*AgentVersions, error) {
 	}
 	defer f.Close()
 
-	d := json.NewDecoder(f)
+	d := yaml.NewDecoder(f)
 	var versionFile AgentVersions
 	err = d.Decode(&versionFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode JSON in %s: %w", filePath, err)
+		return nil, fmt.Errorf("failed to decode YAML in %s: %w", filePath, err)
 	}
 
 	return &versionFile, nil

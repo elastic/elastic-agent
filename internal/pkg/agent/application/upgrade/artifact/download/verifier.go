@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package download
 
@@ -10,6 +10,7 @@ import (
 	"context"
 	"crypto/sha512"
 	"encoding/hex"
+	goerrors "errors"
 	"fmt"
 	"hash"
 	"io"
@@ -20,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"golang.org/x/crypto/openpgp" //nolint:staticcheck // crypto/openpgp is only receiving security updates.
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
@@ -309,7 +309,7 @@ func CheckValidDownloadUri(rawURI string) error {
 	}
 
 	if !strings.EqualFold(uri.Scheme, "https") {
-		return multierror.Append(fmt.Errorf("failed to check URI %q: HTTPS is required", rawURI), ErrInvalidLocation)
+		return fmt.Errorf("failed to check URI %q: HTTPS is required: %w", rawURI, ErrInvalidLocation)
 	}
 
 	return nil
@@ -329,7 +329,7 @@ func fetchPgpFromURI(uri string, client HTTPClient) ([]byte, error) {
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, multierror.Append(err, ErrRemotePGPDownloadFailed)
+		return nil, goerrors.Join(err, ErrRemotePGPDownloadFailed)
 	}
 	defer resp.Body.Close()
 

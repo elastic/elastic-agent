@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package info
 
@@ -11,7 +11,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
@@ -42,7 +42,7 @@ type ioStore interface {
 
 // updateLogLevel updates log level and persists it to disk.
 func updateLogLevel(ctx context.Context, level string) error {
-	ai, err := loadAgentInfoWithBackoff(ctx, false, defaultLogLevel, false)
+	ai, _, err := loadAgentInfoWithBackoff(ctx, false, defaultLogLevel, false)
 	if err != nil {
 		return err
 	}
@@ -71,17 +71,19 @@ func generateAgentID() (string, error) {
 	return uid.String(), nil
 }
 
-func getInfoFromStore(s ioStore, logLevel string) (*persistentAgentInfo, error) {
+// getInfoFromStore uses the IO store to return the config from agent.* fields in the config,
+// as well as a bool indicating if agent is running in standalone mode.
+func getInfoFromStore(s ioStore, logLevel string) (*persistentAgentInfo, bool, error) {
 	agentConfigFile := paths.AgentConfigFile()
 	reader, err := s.Load()
 	if err != nil {
-		return nil, fmt.Errorf("failed to load from ioStore: %w", err)
+		return nil, false, fmt.Errorf("failed to load from ioStore: %w", err)
 	}
 
 	// reader is closed by this function
 	cfg, err := config.NewConfigFrom(reader)
 	if err != nil {
-		return nil, errors.New(err,
+		return nil, false, errors.New(err,
 			fmt.Sprintf("fail to read configuration %s for the agent", agentConfigFile),
 			errors.TypeFilesystem,
 			errors.M(errors.MetaKeyPath, agentConfigFile))
@@ -89,9 +91,21 @@ func getInfoFromStore(s ioStore, logLevel string) (*persistentAgentInfo, error) 
 
 	configMap, err := cfg.ToMapStr()
 	if err != nil {
-		return nil, errors.New(err,
+		return nil, false, errors.New(err,
 			"failed to unpack stored config to map",
 			errors.TypeFilesystem)
+	}
+
+	// check fleet config. This behavior emulates configuration.IsStandalone
+	fleetmode, fleetExists := configMap["fleet"]
+	isStandalone := true
+	if fleetExists {
+		fleetCfg, ok := fleetmode.(map[string]interface{})
+		if ok {
+			if fleetCfg["enabled"] == true {
+				isStandalone = false
+			}
+		}
 	}
 
 	agentInfoSubMap, found := configMap[agentInfoKey]
@@ -99,12 +113,12 @@ func getInfoFromStore(s ioStore, logLevel string) (*persistentAgentInfo, error) 
 		return &persistentAgentInfo{
 			LogLevel:       logLevel,
 			MonitoringHTTP: monitoringConfig.DefaultConfig().HTTP,
-		}, nil
+		}, isStandalone, nil
 	}
 
 	cc, err := config.NewConfigFrom(agentInfoSubMap)
 	if err != nil {
-		return nil, errors.New(err, "failed to create config from agent info submap")
+		return nil, false, errors.New(err, "failed to create config from agent info submap")
 	}
 
 	pid := &persistentAgentInfo{
@@ -112,10 +126,10 @@ func getInfoFromStore(s ioStore, logLevel string) (*persistentAgentInfo, error) 
 		MonitoringHTTP: monitoringConfig.DefaultConfig().HTTP,
 	}
 	if err := cc.Unpack(&pid); err != nil {
-		return nil, errors.New(err, "failed to unpack stored config to map")
+		return nil, false, errors.New(err, "failed to unpack stored config to map")
 	}
 
-	return pid, nil
+	return pid, isStandalone, nil
 }
 
 func updateAgentInfo(s ioStore, agentInfo *persistentAgentInfo) error {
@@ -177,29 +191,30 @@ func yamlToReader(in interface{}) (io.Reader, error) {
 	return bytes.NewReader(data), nil
 }
 
-func loadAgentInfoWithBackoff(ctx context.Context, forceUpdate bool, logLevel string, createAgentID bool) (*persistentAgentInfo, error) {
+func loadAgentInfoWithBackoff(ctx context.Context, forceUpdate bool, logLevel string, createAgentID bool) (*persistentAgentInfo, bool, error) {
 	var err error
 	var ai *persistentAgentInfo
+	var isStandalone bool
 
 	signal := make(chan struct{})
 	backExp := backoff.NewExpBackoff(signal, 100*time.Millisecond, 3*time.Second)
 
 	for i := 0; i <= maxRetriesloadAgentInfo; i++ {
 		backExp.Wait()
-		ai, err = loadAgentInfo(ctx, forceUpdate, logLevel, createAgentID)
+		ai, isStandalone, err = loadAgentInfo(ctx, forceUpdate, logLevel, createAgentID)
 		if !errors.Is(err, filelock.ErrAppAlreadyRunning) {
 			break
 		}
 	}
 
 	close(signal)
-	return ai, err
+	return ai, isStandalone, err
 }
 
-func loadAgentInfo(ctx context.Context, forceUpdate bool, logLevel string, createAgentID bool) (*persistentAgentInfo, error) {
+func loadAgentInfo(ctx context.Context, forceUpdate bool, logLevel string, createAgentID bool) (*persistentAgentInfo, bool, error) {
 	idLock := paths.AgentConfigFileLock()
 	if err := idLock.TryLock(); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	//nolint:errcheck // keeping the same behavior, and making linter happy
 	defer idLock.Unlock()
@@ -207,23 +222,23 @@ func loadAgentInfo(ctx context.Context, forceUpdate bool, logLevel string, creat
 	agentConfigFile := paths.AgentConfigFile()
 	diskStore, err := storage.NewEncryptedDiskStore(ctx, agentConfigFile)
 	if err != nil {
-		return nil, fmt.Errorf("error instantiating encrypted disk store: %w", err)
+		return nil, false, fmt.Errorf("error instantiating encrypted disk store: %w", err)
 	}
 
-	agentInfo, err := getInfoFromStore(diskStore, logLevel)
+	agentInfo, isStandalone, err := getInfoFromStore(diskStore, logLevel)
 	if err != nil {
-		return nil, fmt.Errorf("could not get agent info from store: %w", err)
+		return nil, false, fmt.Errorf("could not get agent info from store: %w", err)
 	}
 
 	if agentInfo != nil && !forceUpdate && (agentInfo.ID != "" || !createAgentID) {
-		return agentInfo, nil
+		return agentInfo, isStandalone, nil
 	}
 
 	if err := updateID(agentInfo, diskStore); err != nil {
-		return nil, fmt.Errorf("could not update agent ID on disk store: %w", err)
+		return nil, false, fmt.Errorf("could not update agent ID on disk store: %w", err)
 	}
 
-	return agentInfo, nil
+	return agentInfo, isStandalone, nil
 }
 
 func updateID(agentInfo *persistentAgentInfo, s ioStore) error {

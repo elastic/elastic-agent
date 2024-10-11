@@ -1,8 +1,7 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
-//nolint:dupl // duplicate code is in test cases
 package runtime
 
 import (
@@ -13,12 +12,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.elastic.co/apm/apmtest"
+	"go.elastic.co/apm/v2/apmtest"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -31,11 +29,11 @@ func TestManager_SimpleComponentErr(t *testing.T) {
 	m, err := NewManager(
 		newDebugLogger(t),
 		newDebugLogger(t),
-		"localhost:0",
 		ai,
 		apmtest.DiscardTracer,
 		newTestMonitoringMgr(),
-		configuration.DefaultGRPCConfig(),
+		testGrpcConfig(),
+		false,
 	)
 	require.NoError(t, err)
 
@@ -133,7 +131,11 @@ func newDebugLogger(t *testing.T) *logger.Logger {
 	loggerCfg.Level = logp.DebugLevel
 	loggerCfg.ToStderr = true
 
-	log, err := logger.NewFromConfig("", loggerCfg, false)
+	eventLoggerCfg := logger.DefaultEventLoggingConfig()
+	eventLoggerCfg.Level = loggerCfg.Level
+	eventLoggerCfg.ToStderr = loggerCfg.ToStderr
+
+	log, err := logger.NewFromConfig("", loggerCfg, eventLoggerCfg, false)
 	require.NoError(t, err)
 	return log
 }
@@ -162,12 +164,89 @@ func (*testMonitoringManager) Cleanup(string) error                             
 
 // waitForReady waits until the RPC server is ready to be used.
 func waitForReady(ctx context.Context, m *Manager) error {
-	for !m.serverReady.Load() {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(100 * time.Millisecond):
-		}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-m.serverReady:
+		return nil
 	}
-	return nil
 }
+
+// [gRPC:8.15] Uncomment this test only after Agent/Endpoint switches fully to local gRPC, post 8.14
+// func TestDeriveCommsSocketName(t *testing.T) {
+// 	const controlAddressNix = "unix:///tmp/elastic-agent/pge4ao-u1YaV1dmSBfVX4saT8BL7b-Ey.sock"
+// 	const controlAddressWin = "npipe:///_HZ8OL-9bNW-SIU0joRfgUsej2KX0Sra.sock"
+
+// 	validControlAddress := func() string {
+// 		if runtime.GOOS == "windows" {
+// 			return controlAddressWin
+// 		}
+// 		return controlAddressNix
+// 	}
+
+// 	defaultCfg := configuration.DefaultGRPCConfig()
+
+// 	tests := []struct {
+// 		name           string
+// 		controlAddress string
+// 		port           int32
+// 		wantErr        error
+// 		want           string
+// 	}{
+// 		{
+// 			name: "empty uri not local",
+// 			port: 6789,
+// 			want: func() string {
+// 				grpcCfg := *defaultCfg
+// 				grpcCfg.Port = 6789
+// 				return grpcCfg.String()
+// 			}(),
+// 		},
+// 		{
+// 			name:    "empty uri local",
+// 			port:    -1,
+// 			wantErr: errInvalidUri,
+// 		},
+// 		{
+// 			name:           "invalid schema",
+// 			port:           -1,
+// 			controlAddress: "lunix:///2323",
+// 			wantErr:        errInvalidUri,
+// 		},
+// 		{
+// 			name:           "valid schema empty path",
+// 			port:           -1,
+// 			controlAddress: "unix://",
+// 			wantErr:        errInvalidUri,
+// 		},
+// 		{
+// 			name:           "valid path",
+// 			port:           -1,
+// 			controlAddress: validControlAddress(),
+// 			want:           validControlAddress(),
+// 		},
+// 	}
+
+// 	for _, tc := range tests {
+// 		t.Run(tc.name, func(t *testing.T) {
+// 			// Copy default config
+// 			grpcCfg := *defaultCfg // default rpc has port set to -1 == local rpc
+// 			grpcCfg.Port = tc.port
+// 			s, err := deriveCommsAddress(tc.controlAddress, &grpcCfg)
+
+// 			// If want error, test error and return
+// 			if tc.wantErr != nil {
+// 				diff := cmp.Diff(tc.wantErr, err, cmpopts.EquateErrors())
+// 				if diff != "" {
+// 					t.Fatal(diff)
+// 				}
+// 				return
+// 			}
+
+// 			diff := cmp.Diff(len(tc.want), len(s))
+// 			if diff != "" {
+// 				t.Fatal(diff)
+// 			}
+// 		})
+// 	}
+// }

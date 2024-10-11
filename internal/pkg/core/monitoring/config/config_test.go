@@ -1,14 +1,14 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package config
 
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gotest.tools/assert"
 
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
@@ -160,6 +160,9 @@ http:
 }
 
 func TestAPMConfig(t *testing.T) {
+
+	tenPercentSamplingRate := float32(0.1)
+
 	tcs := map[string]struct {
 		in  map[string]interface{}
 		out APMConfig
@@ -193,6 +196,24 @@ func TestAPMConfig(t *testing.T) {
 				},
 			},
 		},
+		"sampling_rate 10%": {
+			in: map[string]interface{}{
+				"traces": true,
+				"apm": map[string]interface{}{
+					"api_key":       "abc123",
+					"environment":   "production",
+					"hosts":         []string{"https://abc.123.com"},
+					"sampling_rate": &tenPercentSamplingRate,
+				},
+			},
+			out: APMConfig{
+				APIKey:       "abc123",
+				Environment:  "production",
+				Hosts:        []string{"https://abc.123.com"},
+				TLS:          APMTLS{},
+				SamplingRate: &tenPercentSamplingRate,
+			},
+		},
 	}
 
 	for name, tc := range tcs {
@@ -204,7 +225,7 @@ func TestAPMConfig(t *testing.T) {
 			require.NoError(t, in.Unpack(cfg))
 			require.NotNil(t, cfg)
 
-			assert.DeepEqual(t, tc.out, cfg.APM)
+			assert.Equal(t, tc.out, cfg.APM)
 		})
 	}
 }

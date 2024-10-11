@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build windows
 
@@ -46,7 +46,7 @@ func reexec(log *logger.Logger, executable string, argOverrides ...string) error
 			_ = t.Close()
 		}()
 
-		args := []string{filepath.Base(executable), "reexec_windows", paths.ServiceName, strconv.Itoa(os.Getpid())}
+		args := []string{filepath.Base(executable), "reexec_windows", paths.ServiceName(), strconv.Itoa(os.Getpid())}
 		args = append(args, argOverrides...)
 		cmd := exec.Cmd{
 			Path:        executable,

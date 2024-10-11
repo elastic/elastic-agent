@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package runtime
 
@@ -106,6 +106,10 @@ func (r *logWriter) Write(p []byte) (int, error) {
 			continue
 		}
 		str := strings.TrimSpace(string(line))
+		if len(str) == 0 {
+			// empty line after trim
+			continue
+		}
 		// try to parse line as JSON
 		if str[0] == '{' && r.handleJSON(str) {
 			// handled as JSON

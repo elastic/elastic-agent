@@ -14,8 +14,11 @@ data:
         hosts:
           - >-
             ${ES_HOST}
-        username: ${ES_USERNAME}
-        password: ${ES_PASSWORD}
+        api_key: ${API_KEY}
+        ssl.ca_trusted_fingerprint: ${CA_TRUSTED}
+        # Uncomment username/password and remove api_key if you want to use alternative authentication method
+        # username: ${ES_USERNAME}
+        # password: ${ES_PASSWORD}
     agent:
       monitoring:
         enabled: true
@@ -25,8 +28,9 @@ data:
     providers.kubernetes:
       node: ${NODE_NAME}
       scope: node
-      #Uncomment to enable hints' support
+      #Uncomment to enable hints' support - https://www.elastic.co/guide/en/fleet/current/hints-annotations-autodiscovery.html
       #hints.enabled: true
+      #hints.default_container_logs: true
     inputs:
       - id: kubernetes-cluster-metrics
         condition: ${kubernetes_leaderelection.leader} == true
@@ -201,6 +205,10 @@ data:
             hosts:
               - 'kube-state-metrics:8080'
             period: 10s
+            processors:
+            - add_fields:
+                fields:
+                  onboarding_id: '%ONBOARDING_ID%'
             # Openshift:
             # if to access 'kube-state-metrics' are used third party tools, like kube-rbac-proxy or similar, that perform RBAC authorization
             # and/or tls termination, then configuration below should be considered:

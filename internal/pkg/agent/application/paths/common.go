@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package paths
 
@@ -119,10 +119,15 @@ func TempDir() string {
 
 // Home returns a directory where binary lives
 func Home() string {
+	return HomeFrom(topPath)
+}
+
+func HomeFrom(topDirPath string) string {
 	if unversionedHome {
-		return topPath
+		return topDirPath
 	}
-	return VersionedHome(topPath)
+
+	return VersionedHome(topDirPath)
 }
 
 // IsVersionHome returns true if the Home path is versioned based on build.
@@ -314,11 +319,6 @@ func binaryDir(baseDir string) string {
 // BinaryPath returns the application binary path that is concatenation of the directory and the agentName
 func BinaryPath(baseDir, agentName string) string {
 	return filepath.Join(binaryDir(baseDir), agentName)
-}
-
-// InstallPath returns the top level directory Agent will be installed into.
-func InstallPath(basePath string) string {
-	return filepath.Join(basePath, "Elastic", "Agent")
 }
 
 // TopBinaryPath returns the path to the Elastic Agent binary that is inside the Top directory.

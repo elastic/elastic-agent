@@ -1,10 +1,11 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package vault
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -70,7 +71,11 @@ func WithUnprivileged(unprivileged bool) OptionFunc {
 }
 
 // ApplyOptions applies options for Windows, Linux and Mac, not all the options may be used
-func ApplyOptions(opts ...OptionFunc) Options {
+func ApplyOptions(opts ...OptionFunc) (Options, error) {
+	ownership, err := utils.CurrentFileOwner()
+	if err != nil {
+		return Options{}, fmt.Errorf("failed to get current file owner: %w", err)
+	}
 	o := Options{
 		CommonVaultOptions: CommonVaultOptions{
 			readonly:     false,
@@ -79,7 +84,7 @@ func ApplyOptions(opts ...OptionFunc) Options {
 		FileVaultOptions: FileVaultOptions{
 			vaultPath:      paths.AgentVaultPath(),
 			lockRetryDelay: defaultFlockRetryDelay,
-			ownership:      utils.CurrentFileOwner(),
+			ownership:      ownership,
 		},
 		KeychainVaultOptions: KeychainVaultOptions{
 			entryName: paths.AgentKeychainName(),
@@ -89,5 +94,5 @@ func ApplyOptions(opts ...OptionFunc) Options {
 	for _, opt := range opts {
 		opt(&o)
 	}
-	return o
+	return o, nil
 }

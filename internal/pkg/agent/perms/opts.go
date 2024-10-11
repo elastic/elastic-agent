@@ -1,10 +1,11 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package perms
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -35,13 +36,17 @@ func WithOwnership(ownership utils.FileOwner) OptFunc {
 	}
 }
 
-func newOpts(optFuncs ...OptFunc) *opts {
+func newOpts(optFuncs ...OptFunc) (*opts, error) {
+	ownership, err := utils.CurrentFileOwner()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current file owner: %w", err)
+	}
 	o := &opts{
 		mask:      defaultMask,
-		ownership: utils.CurrentFileOwner(),
+		ownership: ownership,
 	}
 	for _, f := range optFuncs {
 		f(o)
 	}
-	return o
+	return o, nil
 }

@@ -1,6 +1,8 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
+
+//go:build !windows
 
 package cmd
 
@@ -16,11 +18,16 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
+const (
+	otelConfigFlagName = "config"
+	otelSetFlagName    = "set"
+)
+
 func setupOtelFlags(flags *pflag.FlagSet) {
-	flags.StringArray(configFlagName, []string{}, "Locations to the config file(s), note that only a"+
+	flags.StringArray(otelConfigFlagName, []string{}, "Locations to the config file(s), note that only a"+
 		" single location can be set per flag entry e.g. `--config=file:/path/to/first --config=file:path/to/second`.")
 
-	flags.StringArray(setFlagName, []string{}, "Set arbitrary component config property. The component has to be defined in the config file and the flag"+
+	flags.StringArray(otelSetFlagName, []string{}, "Set arbitrary component config property. The component has to be defined in the config file and the flag"+
 		" has a higher precedence. Array config properties are overridden and maps are joined. Example --set=processors.batch.timeout=2s")
 
 	goFlags := new(flag.FlagSet)
@@ -30,7 +37,7 @@ func setupOtelFlags(flags *pflag.FlagSet) {
 }
 
 func getConfigFiles(cmd *cobra.Command, useDefault bool) ([]string, error) {
-	configFiles, err := cmd.Flags().GetStringArray(configFlagName)
+	configFiles, err := cmd.Flags().GetStringArray(otelConfigFlagName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve config flags: %w", err)
 	}
@@ -42,7 +49,7 @@ func getConfigFiles(cmd *cobra.Command, useDefault bool) ([]string, error) {
 		configFiles = append(configFiles, paths.OtelConfigFile())
 	}
 
-	setVals, err := cmd.Flags().GetStringArray(setFlagName)
+	setVals, err := cmd.Flags().GetStringArray(otelSetFlagName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve set flags: %w", err)
 	}

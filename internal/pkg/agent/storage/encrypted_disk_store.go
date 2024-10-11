@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package storage
 
@@ -114,8 +114,13 @@ func (d *EncryptedDiskStore) ensureKey(ctx context.Context) error {
 	return nil
 }
 
-// Save will write the encrypted storage to disk.
-// Specifically it will write to a .tmp file then rotate the file to the target name to ensure that an error does not corrupt the previously written file.
+// Save will read 'in' and write its contents encrypted to disk.
+// If EncryptedDiskStore.Load() was called, the io.ReadCloser it returns MUST be
+// closed before Save() can be called. It is so because Save() writes to a .tmp
+// file then rotate the file to the target name to ensure that an error does not
+// corrupt the previously written file.
+// Specially on windows systems, if the original files is still open because of
+// Load(), Save() would fail.
 func (d *EncryptedDiskStore) Save(in io.Reader) error {
 	// Ensure has agent key
 	err := d.ensureKey(d.ctx)

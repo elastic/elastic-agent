@@ -1,22 +1,22 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package artifact
 
 import (
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/slices"
 
 	agentlibsconfig "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 func TestReload(t *testing.T) {
@@ -224,7 +224,7 @@ func TestReload(t *testing.T) {
 		},
 	}
 
-	l, _ := logger.NewTesting("t")
+	l, _ := loggertest.New("t")
 	for _, tc := range testCases {
 		cfg := tc.initialConfig
 		reloader := NewReloader(cfg, l)

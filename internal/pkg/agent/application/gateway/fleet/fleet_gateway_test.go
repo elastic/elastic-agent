@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package fleet
 
@@ -9,18 +9,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gotest.tools/assert"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
@@ -32,6 +30,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 type clientCallbackFunc func(headers http.Header, body io.Reader) (*http.Response, error)
@@ -317,7 +316,7 @@ func TestFleetGateway(t *testing.T) {
 		scheduler := scheduler.NewStepper()
 		client := newTestingClient()
 
-		log, _ := logger.NewTesting("fleet_gateway")
+		log, _ := loggertest.New("fleet_gateway")
 
 		stateStore := newStateStore(t, log)
 
@@ -498,18 +497,13 @@ func runFleetGateway(ctx context.Context, g coordinator.FleetGateway) <-chan err
 }
 
 func newStateStore(t *testing.T, log *logger.Logger) *store.StateStore {
-	dir, err := os.MkdirTemp("", "fleet-gateway-unit-test")
-	require.NoError(t, err)
+	dir := t.TempDir()
 
 	filename := filepath.Join(dir, "state.enc")
 	diskStore, err := storage.NewDiskStore(filename)
 	require.NoError(t, err)
 	stateStore, err := store.NewStateStore(log, diskStore)
 	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		os.RemoveAll(dir)
-	})
 
 	return stateStore
 }

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build linux
 
@@ -14,21 +14,24 @@ const (
 	// for installing Elastic Agent's files.
 	DefaultBasePath = "/opt"
 
-	// ServiceName is the service name when installed.
-	ServiceName = "elastic-agent"
+	// serviceName is the service name when installed.
+	serviceName             = "elastic-agent"
+	serviceNameNamespaceFmt = "elastic-agent-%s"
 
-	// ShellWrapperPath is the path to the installed shell wrapper.
-	ShellWrapperPath = "/usr/bin/elastic-agent"
+	// shellWrapperPath is the path to the installed shell wrapper.
+	shellWrapperPath             = "/usr/bin/elastic-agent"
+	shellWrapperPathNamespaceFmt = "/usr/bin/elastic-%s-agent"
 
 	// ShellWrapper is the wrapper that is installed.  The %s must
 	// be substituted with the appropriate top path.
-	ShellWrapper = `#!/bin/sh
+	ShellWrapperFmt = `#!/bin/sh
 exec %s/elastic-agent $@
 `
 
-	// ControlSocketRunSymlink is the path to the symlink that should be
+	// controlSocketRunSymlink is the path to the symlink that should be
 	// created to the control socket when Elastic Agent is running with root.
-	ControlSocketRunSymlink = "/run/elastic-agent.sock"
+	controlSocketRunSymlink             = "/run/elastic-agent.sock"
+	controlSocketRunSymlinkNamespaceFmt = "/run/elastic-agent-%s.sock"
 )
 
 // ArePathsEqual determines whether paths are equal taking case sensitivity of os into account.

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package comp
 
@@ -16,8 +16,8 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
-	"go.elastic.co/apm"
-	apmtransport "go.elastic.co/apm/transport"
+	"go.elastic.co/apm/v2"
+	apmtransport "go.elastic.co/apm/v2/transport"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 )
@@ -133,10 +133,7 @@ func (ats *apmTracesSender) createNewTracer(cfg *proto.APMConfig) (*apm.Tracer, 
 		defer os.Unsetenv(envGlobalLabels)
 	}
 
-	ts, err := apmtransport.NewHTTPTransport()
-	if err != nil {
-		return nil, err
-	}
+	opts := apmtransport.HTTPTransportOptions{}
 
 	if len(cfg.Elastic.Hosts) > 0 {
 		hosts := make([]*url.URL, 0, len(cfg.Elastic.Hosts))
@@ -147,13 +144,19 @@ func (ats *apmTracesSender) createNewTracer(cfg *proto.APMConfig) (*apm.Tracer, 
 			}
 			hosts = append(hosts, u)
 		}
-		ts.SetServerURL(hosts...)
+		opts.ServerURLs = hosts
 	}
 	if cfg.Elastic.ApiKey != "" {
-		ts.SetAPIKey(cfg.Elastic.ApiKey)
+		opts.APIKey = cfg.Elastic.ApiKey
 	} else if cfg.Elastic.SecretToken != "" {
-		ts.SetSecretToken(cfg.Elastic.SecretToken)
+		opts.SecretToken = cfg.Elastic.SecretToken
 	}
+
+	ts, err := apmtransport.NewHTTPTransport(opts)
+	if err != nil {
+		return nil, err
+	}
+
 	return apm.NewTracerOptions(apm.TracerOptions{
 		ServiceName:        "fake-apm",
 		ServiceVersion:     "0.1",
@@ -204,7 +207,7 @@ func newFakeAPMInput(logger zerolog.Logger, logLevel client.UnitLogLevel, unit *
 	logger = logger.Level(toZerologLevel(logLevel))
 
 	// close the default tracer to avoid unnecessary logs
-	apm.DefaultTracer.Close()
+	apm.DefaultTracer().Close()
 
 	apmInput := &fakeAPMInput{
 		logger: logger,

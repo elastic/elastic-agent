@@ -1,14 +1,13 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package mage
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/pkg/errors"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 )
@@ -25,7 +24,7 @@ func CopyFilesToVendor(vendorFolder string, modulesToCopy []CopyModule) error {
 	for _, p := range modulesToCopy {
 		path, err := gotool.ListModuleCacheDir(p.Name)
 		if err != nil {
-			return errors.Wrapf(err, "error while looking up cached dir of module: %s", p.Name)
+			return fmt.Errorf("error while looking up cached dir of module: %s: %w", p.Name, err)
 		}
 
 		for _, f := range p.FilesToCopy {
@@ -34,7 +33,7 @@ func CopyFilesToVendor(vendorFolder string, modulesToCopy []CopyModule) error {
 			copyTask := &CopyTask{Source: from, Dest: to, Mode: 0600, DirMode: os.ModeDir | 0750}
 			err = copyTask.Execute()
 			if err != nil {
-				return errors.Wrapf(err, "error while copying file from %s to %s", from, to)
+				return fmt.Errorf("error while copying file from %s to %s: %w", from, to, err)
 			}
 		}
 	}

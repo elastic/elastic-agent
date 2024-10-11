@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build windows
 
@@ -20,18 +20,31 @@ const (
 	// for installing Elastic Agent's files.
 	DefaultBasePath = `C:\Program Files`
 
-	// ControlSocketRunSymlink is not created on Windows.
-	ControlSocketRunSymlink = ""
+	// controlSocketRunSymlink is not created on Windows.
+	controlSocketRunSymlink = ""
 
-	// ServiceName is the service name when installed.
-	ServiceName = "Elastic Agent"
+	// serviceName is the service name when installed.
+	serviceName             = "Elastic Agent"
+	serviceNameNamespaceFmt = "Elastic Agent - %s"
 
-	// ShellWrapperPath is the path to the installed shell wrapper.
-	ShellWrapperPath = "" // no wrapper on Windows
+	// shellWrapperPath is the path to the installed shell wrapper.
+	shellWrapperPath = ""
 
 	// ShellWrapper is the wrapper that is installed.
-	ShellWrapper = "" // no wrapper on Windows
+	ShellWrapperFmt = "" // no wrapper on Windows
 )
+
+// ShellWrapperPathForNamespace is a helper to work around not being able to use fmt.Sprintf
+// unconditionally since shellWrapperPath is empty on Windows.
+func ShellWrapperPathForNamespace(namespace string) string {
+	return ""
+}
+
+// controlSocketRunSymlinkForNamespace is a helper to work around not being able to use fmt.Sprintf
+// unconditionally since controlSocketRunSymlink is empty on Windows.
+func controlSocketRunSymlinkForNamespace(namespace string) string {
+	return ""
+}
 
 // ArePathsEqual determines whether paths are equal taking case sensitivity of os into account.
 func ArePathsEqual(expected, actual string) bool {

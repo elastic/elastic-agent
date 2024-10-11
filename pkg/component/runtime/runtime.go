@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package runtime
 
@@ -8,10 +8,10 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/atomic"
 	"github.com/elastic/elastic-agent/internal/pkg/runner"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -58,6 +58,7 @@ func newComponentRuntime(
 	comp component.Component,
 	logger *logger.Logger,
 	monitor MonitoringManager,
+	isLocal bool,
 ) (componentRuntime, error) {
 	if comp.Err != nil {
 		return newFailedRuntime(comp)
@@ -67,15 +68,9 @@ func newComponentRuntime(
 			return newCommandRuntime(comp, logger, monitor)
 		}
 		if comp.InputSpec.Spec.Service != nil {
-			return newServiceRuntime(comp, logger)
+			return newServiceRuntime(comp, logger, isLocal)
 		}
 		return nil, errors.New("unknown component runtime")
-	}
-	if comp.ShipperSpec != nil {
-		if comp.ShipperSpec.Spec.Command != nil {
-			return newCommandRuntime(comp, logger, monitor)
-		}
-		return nil, errors.New("components for shippers can only support command runtime")
 	}
 	return nil, errors.New("component missing specification")
 }
@@ -99,12 +94,12 @@ type componentRuntimeState struct {
 	actions   map[string]func(*proto.ActionResponse)
 }
 
-func newComponentRuntimeState(m *Manager, logger *logger.Logger, monitor MonitoringManager, comp component.Component) (*componentRuntimeState, error) {
+func newComponentRuntimeState(m *Manager, logger *logger.Logger, monitor MonitoringManager, comp component.Component, isLocal bool) (*componentRuntimeState, error) {
 	comm, err := newRuntimeComm(logger, m.getListenAddr(), m.ca, m.agentInfo, m.grpcConfig.MaxMsgSize)
 	if err != nil {
 		return nil, err
 	}
-	runtime, err := newComponentRuntime(comp, logger, monitor)
+	runtime, err := newComponentRuntime(comp, logger, monitor, isLocal)
 	if err != nil {
 		return nil, err
 	}
@@ -187,11 +182,10 @@ func (s *componentRuntimeState) start() error {
 }
 
 func (s *componentRuntimeState) stop(teardown bool, signed *component.Signed) error {
-	if s.shuttingDown.Load() {
+	if !s.shuttingDown.CompareAndSwap(false, true) {
 		// already stopping
 		return nil
 	}
-	s.shuttingDown.Store(true)
 	if teardown {
 		return s.runtime.Teardown(signed)
 	}

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package cmd
 
@@ -63,37 +63,38 @@ func newEnrollCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command
 func addEnrollFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("url", "", "", "URL to enroll Agent into Fleet")
 	cmd.Flags().StringP("enrollment-token", "t", "", "Enrollment token to use to enroll Agent into Fleet")
-	cmd.Flags().StringP("fleet-server-es", "", "", "Start and run a Fleet Server along side this Elastic Agent connecting to the provided elasticsearch")
-	cmd.Flags().StringP("fleet-server-es-ca", "", "", "Path to certificate authority to use with communicate with elasticsearch")
-	cmd.Flags().StringP("fleet-server-es-ca-trusted-fingerprint", "", "", "Elasticsearch certificate authority's SHA256 fingerprint")
-	cmd.Flags().BoolP("fleet-server-es-insecure", "", false, "Disables validation of certificates")
-	cmd.Flags().StringP("fleet-server-es-cert", "", "", "Client certificate to use when connecting to Elasticsearch.")
-	cmd.Flags().StringP("fleet-server-es-cert-key", "", "", "Client private key to use when connecing to Elasticsearch.")
-	cmd.Flags().StringP("fleet-server-service-token", "", "", "Service token to use for communication with elasticsearch")
-	cmd.Flags().StringP("fleet-server-service-token-path", "", "", "Filepath for service token secret file to use for communication with elasticsearch")
+	cmd.Flags().StringP("fleet-server-es", "", "", "Start and run a Fleet Server alongside this Elastic Agent connecting to the provided Elasticsearch")
+	cmd.Flags().StringP("fleet-server-es-ca", "", "", "Path to certificate authority for Fleet Server to use to communicate with Elasticsearch")
+	cmd.Flags().StringP("fleet-server-es-ca-trusted-fingerprint", "", "", "Elasticsearch certificate authority's SHA256 fingerprint for Fleet Server to use")
+	cmd.Flags().BoolP("fleet-server-es-insecure", "", false, "Disables validation of Elasticsearch certificates for Fleet Server")
+	cmd.Flags().StringP("fleet-server-es-cert", "", "", "Client certificate for Fleet Server to use when connecting to Elasticsearch")
+	cmd.Flags().StringP("fleet-server-es-cert-key", "", "", "Client private key for Fleet Server to use when connecting to Elasticsearch")
+	cmd.Flags().StringP("fleet-server-service-token", "", "", "Service token for Fleet Server to use for communication with Elasticsearch")
+	cmd.Flags().StringP("fleet-server-service-token-path", "", "", "Filepath for the service token secret file used by Fleet Server for communication with Elasticsearch")
 	cmd.Flags().StringP("fleet-server-policy", "", "", "Start and run a Fleet Server on this specific policy")
 	cmd.Flags().StringP("fleet-server-host", "", "", "Fleet Server HTTP binding host (overrides the policy)")
 	cmd.Flags().Uint16P("fleet-server-port", "", 0, "Fleet Server HTTP binding port (overrides the policy)")
-	cmd.Flags().StringP("fleet-server-cert", "", "", "Certificate to use for exposed Fleet Server HTTPS endpoint")
-	cmd.Flags().StringP("fleet-server-cert-key", "", "", "Private key to use for exposed Fleet Server HTTPS endpoint")
-	cmd.Flags().StringP("fleet-server-cert-key-passphrase", "", "", "Path for private key passphrase file used to decrypt certificate key")
-	cmd.Flags().StringP("fleet-server-client-auth", "", "none", "Fleet-server mTLS client authentication for connecting elastic-agents. Must be one of [none, optional, required]")
-	cmd.Flags().StringSliceP("header", "", []string{}, "Headers used in communication with elasticsearch")
+	cmd.Flags().StringP("fleet-server-cert", "", "", "Certificate for Fleet Server to use for exposed HTTPS endpoint")
+	cmd.Flags().StringP("fleet-server-cert-key", "", "", "Private key for the certificate used by Fleet Server for exposed HTTPS endpoint")
+	cmd.Flags().StringP("fleet-server-cert-key-passphrase", "", "", "Path for private key passphrase file used to decrypt Fleet Server certificate key")
+	cmd.Flags().StringP("fleet-server-client-auth", "", "none", "Fleet Server mTLS client authentication for connecting Elastic Agents. Must be one of [none, optional, required]")
+	cmd.Flags().StringSliceP("header", "", []string{}, "Headers used by Fleet Server when communicating with Elasticsearch")
 	cmd.Flags().BoolP("fleet-server-insecure-http", "", false, "Expose Fleet Server over HTTP (not recommended; insecure)")
-	cmd.Flags().StringP("certificate-authorities", "a", "", "Comma separated list of root certificate for server verifications")
-	cmd.Flags().StringP("ca-sha256", "p", "", "Comma separated list of certificate authorities hash pins used for certificate verifications")
-	cmd.Flags().StringP("elastic-agent-cert", "", "", "Elastic-agent client certificate to use with fleet-server during authentication")
-	cmd.Flags().StringP("elastic-agent-cert-key", "", "", "Elastic-agent client certificate to use with fleet-server during authentication")
-	cmd.Flags().BoolP("insecure", "i", false, "Allow insecure connection to fleet-server")
-	cmd.Flags().StringP("staging", "", "", "Configures agent to download artifacts from a staging build")
-	cmd.Flags().StringP("proxy-url", "", "", "Configures the proxy url")
-	cmd.Flags().BoolP("proxy-disabled", "", false, "Disable proxy support including environment variables")
-	cmd.Flags().StringSliceP("proxy-header", "", []string{}, "Proxy headers used with CONNECT request")
+	cmd.Flags().StringP("certificate-authorities", "a", "", "Comma-separated list of root certificates for server verification used by Elastic Agent and Fleet Server")
+	cmd.Flags().StringP("ca-sha256", "p", "", "Comma-separated list of certificate authority hash pins for server verification used by Elastic Agent and Fleet Server")
+	cmd.Flags().StringP("elastic-agent-cert", "", "", "Elastic Agent client certificate to use with Fleet Server during mTLS authentication")
+	cmd.Flags().StringP("elastic-agent-cert-key", "", "", "Elastic Agent client private key to use with Fleet Server during mTLS authentication")
+	cmd.Flags().StringP("elastic-agent-cert-key-passphrase", "", "", "Path for private key passphrase file used to decrypt Elastic Agent client certificate key")
+	cmd.Flags().BoolP("insecure", "i", false, "Allow insecure connection made by the Elastic Agent. It's also required to use a Fleet Server on a HTTP endpoint")
+	cmd.Flags().StringP("staging", "", "", "Configures Elastic Agent to download artifacts from a staging build")
+	cmd.Flags().StringP("proxy-url", "", "", "Configures the proxy URL: when bootstrapping Fleet Server, it's the proxy used by Fleet Server to connect to Elasticsearch; when enrolling the Elastic Agent to Fleet Server, it's the proxy used by the Elastic Agent to connect to Fleet Server")
+	cmd.Flags().BoolP("proxy-disabled", "", false, "Disable proxy support including environment variables: when bootstrapping Fleet Server, it's the proxy used by Fleet Server to connect to Elasticsearch; when enrolling the Elastic Agent to Fleet Server, it's the proxy used by the Elastic Agent to connect to Fleet Server")
+	cmd.Flags().StringSliceP("proxy-header", "", []string{}, "Proxy headers used with CONNECT request: when bootstrapping Fleet Server, it's the proxy used by Fleet Server to connect to Elasticsearch; when enrolling the Elastic Agent to Fleet Server, it's the proxy used by the Elastic Agent to connect to Fleet Server")
 	cmd.Flags().BoolP("delay-enroll", "", false, "Delays enrollment to occur on first start of the Elastic Agent service")
 	cmd.Flags().DurationP("daemon-timeout", "", 0, "Timeout waiting for Elastic Agent daemon")
-	cmd.Flags().DurationP("fleet-server-timeout", "", 0, "Timeout waiting for Fleet Server to be ready to start enrollment")
+	cmd.Flags().DurationP("fleet-server-timeout", "", 0, "When bootstrapping Fleet Server, timeout waiting for Fleet Server to be ready to start enrollment")
 	cmd.Flags().Bool("skip-daemon-reload", false, "Skip daemon reload after enrolling")
-	cmd.Flags().StringSliceP("tag", "", []string{}, "User set tags")
+	cmd.Flags().StringSliceP("tag", "", []string{}, "User-set tags")
 
 	cmd.Flags().MarkHidden("skip-daemon-reload") //nolint:errcheck // an error is only returned if the flag does not exist.
 }
@@ -110,6 +111,16 @@ func validateEnrollFlags(cmd *cobra.Command) error {
 	key, _ := cmd.Flags().GetString("elastic-agent-cert-key")
 	if key != "" && !filepath.IsAbs(key) {
 		return errors.New("--elastic-agent-cert-key must be provided as an absolute path", errors.M("path", key), errors.TypeConfig)
+	}
+	keyPassphrase, _ := cmd.Flags().GetString("elastic-agent-cert-key-passphrase")
+	if keyPassphrase != "" {
+		if !filepath.IsAbs(keyPassphrase) {
+			return errors.New("--elastic-agent-cert-key-passphrase must be provided as an absolute path", errors.M("path", keyPassphrase), errors.TypeConfig)
+		}
+
+		if cert == "" || key == "" {
+			return errors.New("--elastic-agent-cert and --elastic-agent-cert-key must be provided when using --elastic-agent-cert-key-passphrase", errors.M("path", keyPassphrase), errors.TypeConfig)
+		}
 	}
 	esCa, _ := cmd.Flags().GetString("fleet-server-es-ca")
 	if esCa != "" && !filepath.IsAbs(esCa) {
@@ -180,6 +191,7 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	ca, _ := cmd.Flags().GetString("certificate-authorities")
 	cert, _ := cmd.Flags().GetString("elastic-agent-cert")
 	key, _ := cmd.Flags().GetString("elastic-agent-cert-key")
+	keyPassphrase, _ := cmd.Flags().GetString("elastic-agent-cert-key-passphrase")
 	sha256, _ := cmd.Flags().GetString("ca-sha256")
 	insecure, _ := cmd.Flags().GetBool("insecure")
 	staging, _ := cmd.Flags().GetString("staging")
@@ -285,6 +297,10 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 		args = append(args, "--elastic-agent-cert-key")
 		args = append(args, key)
 	}
+	if keyPassphrase != "" {
+		args = append(args, "--elastic-agent-cert-key-passphrase")
+		args = append(args, keyPassphrase)
+	}
 	if sha256 != "" {
 		args = append(args, "--ca-sha256")
 		args = append(args, sha256)
@@ -381,7 +397,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	cfg.Settings.LoggingConfig.ToFiles = false
 	cfg.Settings.LoggingConfig.ToStderr = true
 
-	logger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, false)
+	logger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, cfg.Settings.EventLoggingConfig, false)
 	if err != nil {
 		return err
 	}
@@ -422,6 +438,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	caSHA256 := cli.StringToSlice(caSHA256str)
 	cert, _ := cmd.Flags().GetString("elastic-agent-cert")
 	key, _ := cmd.Flags().GetString("elastic-agent-cert-key")
+	keyPassphrase, _ := cmd.Flags().GetString("elastic-agent-cert-key-passphrase")
 
 	ctx := handleSignal(context.Background())
 
@@ -449,6 +466,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		CASha256:             caSHA256,
 		Certificate:          cert,
 		Key:                  key,
+		KeyPassphrasePath:    keyPassphrase,
 		Insecure:             insecure,
 		UserProvidedMetadata: make(map[string]interface{}),
 		Staging:              staging,

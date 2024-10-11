@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package kubernetes
 
@@ -49,6 +49,7 @@ func NewServiceEventer(
 	watcher, err := kubernetes.NewNamedWatcher("agent-service", client, &kubernetes.Service{}, kubernetes.WatchOptions{
 		SyncTimeout:  cfg.SyncPeriod,
 		Node:         cfg.Node,
+		Namespace:    cfg.Namespace,
 		HonorReSyncs: true,
 	}, nil)
 	if err != nil {
@@ -62,8 +63,9 @@ func NewServiceEventer(
 
 	if metaConf.Namespace.Enabled() || cfg.Hints.Enabled {
 		namespaceWatcher, err = kubernetes.NewNamedWatcher("agent-namespace", client, &kubernetes.Namespace{}, kubernetes.WatchOptions{
-			SyncTimeout: cfg.SyncPeriod,
-			Namespace:   cfg.Namespace,
+			SyncTimeout:  cfg.SyncPeriod,
+			Namespace:    cfg.Namespace,
+			HonorReSyncs: true,
 		}, nil)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create watcher for %T due to error %w", &kubernetes.Namespace{}, err)

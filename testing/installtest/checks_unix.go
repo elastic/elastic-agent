@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build !windows
 
@@ -9,6 +9,7 @@ package installtest
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,8 +21,8 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 )
 
-func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, unprivileged bool) error {
-	if unprivileged {
+func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opts *CheckOpts) error {
+	if !opts.Privileged {
 		// Check that the elastic-agent user/group exist.
 		uid, err := install.FindUID(install.ElasticUsername)
 		if err != nil {
@@ -64,10 +65,15 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, unp
 		}
 
 		// Executing `elastic-agent status` as the `elastic-agent-user` user should work.
+		shellWrapperName := "elastic-agent"
+		if opts.Namespace != "" {
+			shellWrapperName = paths.ShellWrapperPathForNamespace(opts.Namespace)
+		}
+
 		var output []byte
 		err = waitForNoError(ctx, func(_ context.Context) error {
 			// #nosec G204 -- user cannot inject any parameters to this command
-			cmd := exec.Command("sudo", "-u", install.ElasticUsername, "elastic-agent", "status")
+			cmd := exec.Command("sudo", "-u", install.ElasticUsername, shellWrapperName, "status")
 			output, err = cmd.CombinedOutput()
 			if err != nil {
 				return fmt.Errorf("elastic-agent status failed: %w (output: %s)", err, output)
@@ -80,7 +86,7 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, unp
 		originalUser := os.Getenv("SUDO_USER")
 		if originalUser != "" {
 			// #nosec G204 -- user cannot inject any parameters to this command
-			cmd := exec.Command("sudo", "-u", originalUser, "elastic-agent", "status")
+			cmd := exec.Command("sudo", "-u", originalUser, shellWrapperName, "status")
 			output, err := cmd.CombinedOutput()
 			if err == nil {
 				return fmt.Errorf("sudo -u %s elastic-agent didn't fail: got output: %s", originalUser, output)
@@ -98,13 +104,17 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, unp
 }
 
 func validateFileTree(dir string, uid uint32, gid uint32) error {
-	return filepath.Walk(dir, func(file string, info os.FileInfo, err error) error {
+	return filepath.WalkDir(dir, func(file string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return fmt.Errorf("error traversing the file tree: %w", err)
 		}
-		if info.Mode().Type() == os.ModeSymlink {
+		if d.Type() == os.ModeSymlink {
 			// symlink don't check permissions
 			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return fmt.Errorf("error caling info: %w", err)
 		}
 		fs, ok := info.Sys().(*syscall.Stat_t)
 		if !ok {

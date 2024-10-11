@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package coordinator
 
@@ -135,9 +135,14 @@ func (c *Coordinator) refreshState() {
 // Coordinator state and sets stateNeedsRefresh.
 // Must be called on the main Coordinator goroutine.
 func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState) {
+
+	// check for any component updates to the known PID, so we can update the component monitoring
 	found := false
 	for i, other := range c.state.Components {
 		if other.Component.ID == state.Component.ID {
+			if other.State.Pid != state.State.Pid {
+				c.componentPidRequiresUpdate.Store(true)
+			}
 			c.state.Components[i] = state
 			found = true
 			break
@@ -145,6 +150,9 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 	}
 	if !found {
 		c.state.Components = append(c.state.Components, state)
+		if state.State.Pid != 0 {
+			c.componentPidRequiresUpdate.Store(true)
+		}
 	}
 
 	// In the case that the component has stopped, it is now removed.
@@ -160,6 +168,7 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 	}
 
 	c.stateNeedsRefresh = true
+
 }
 
 // generateReportableState aggregates the internal state of the Coordinator

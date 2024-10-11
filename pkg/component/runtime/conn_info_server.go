@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package runtime
 
@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/ipc"
 )
 
 const (
@@ -27,8 +28,18 @@ type connInfoServer struct {
 	stopTimeout time.Duration
 }
 
-func newConnInfoServer(log *logger.Logger, comm Communicator, port int) (*connInfoServer, error) {
-	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+func newConnInfoServer(log *logger.Logger, comm Communicator, address string) (*connInfoServer, error) {
+	var (
+		listener net.Listener
+		err      error
+	)
+
+	if ipc.IsLocal(address) {
+		listener, err = ipc.CreateListener(log, address)
+	} else {
+		listener, err = net.Listen("tcp", address)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to start connection credentials listener: %w", err)
 	}

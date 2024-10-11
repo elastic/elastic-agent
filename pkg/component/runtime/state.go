@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package runtime
 
@@ -74,6 +74,11 @@ type ComponentState struct {
 	ComponentIdx uint64           `yaml:"component_idx"`
 
 	VersionInfo ComponentVersionInfo `yaml:"version_info"`
+
+	// The PID of the process, as obtained from the *from the Protobuf API*
+	// As of now, this is only used by Endpoint, as agent doesn't know the PID
+	// of the endpoint service. If you need the PID for beats, use the coordinator/communicator
+	Pid uint64
 
 	// internal
 	expectedUnits map[ComponentUnitKey]expectedUnitState
@@ -269,6 +274,12 @@ func (s *ComponentState) syncUnits(comp *component.Component) bool {
 
 func (s *ComponentState) syncCheckin(checkin *proto.CheckinObserved) bool {
 	changed := false
+
+	if s.Pid != checkin.Pid {
+		changed = true
+		s.Pid = checkin.Pid
+	}
+
 	touched := make(map[ComponentUnitKey]bool)
 	for _, unit := range checkin.Units {
 		key := ComponentUnitKey{

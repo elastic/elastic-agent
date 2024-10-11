@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package cmd
 
@@ -16,6 +16,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 )
@@ -35,6 +36,8 @@ func newDiagnosticsCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 
 	cmd.Flags().StringP("file", "f", "", "name of the output diagnostics zip archive")
 	cmd.Flags().BoolP("cpu-profile", "p", false, "wait to collect a CPU profile")
+	cmd.Flags().BoolP("skip-conn", "", false, "Skip connection request diagnostics")
+	cmd.Flags().Bool("exclude-events", false, "do not collect events log file")
 
 	return cmd
 }
@@ -44,6 +47,11 @@ func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	if filepath == "" {
 		ts := time.Now().UTC()
 		filepath = "elastic-agent-diagnostics-" + ts.Format("2006-01-02T15-04-05Z07-00") + ".zip" // RFC3339 format that replaces : with -, so it will work on Windows
+	}
+
+	excludeEvents, err := cmd.Flags().GetBool("exclude-events")
+	if err != nil {
+		return fmt.Errorf("cannot get 'exclude-events' flag: %w", err)
 	}
 
 	ctx := handleSignal(context.Background())
@@ -57,12 +65,13 @@ func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	defer f.Close()
 
 	cpuProfile, _ := cmd.Flags().GetBool("cpu-profile")
-	agentDiag, unitDiags, compDiags, err := collectDiagnostics(ctx, streams, cpuProfile)
+	connSkip, _ := cmd.Flags().GetBool("skip-conn")
+	agentDiag, unitDiags, compDiags, err := collectDiagnostics(ctx, streams, cpuProfile, connSkip)
 	if err != nil {
 		return fmt.Errorf("failed collecting diagnostics: %w", err)
 	}
 
-	if err := diagnostics.ZipArchive(streams.Err, f, agentDiag, unitDiags, compDiags); err != nil {
+	if err := diagnostics.ZipArchive(streams.Err, f, paths.Top(), agentDiag, unitDiags, compDiags, excludeEvents); err != nil {
 		return fmt.Errorf("unable to create archive %q: %w", filepath, err)
 	}
 	fmt.Fprintf(streams.Out, "Created diagnostics archive %q\n", filepath)
@@ -70,7 +79,7 @@ func diagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	return nil
 }
 
-func collectDiagnostics(ctx context.Context, streams *cli.IOStreams, cpuProfile bool) ([]client.DiagnosticFileResult, []client.DiagnosticUnitResult, []client.DiagnosticComponentResult, error) {
+func collectDiagnostics(ctx context.Context, streams *cli.IOStreams, cpuProfile, connSkip bool) ([]client.DiagnosticFileResult, []client.DiagnosticUnitResult, []client.DiagnosticComponentResult, error) {
 	daemon := client.New()
 	err := daemon.Connect(ctx)
 	if err != nil {
@@ -79,10 +88,13 @@ func collectDiagnostics(ctx context.Context, streams *cli.IOStreams, cpuProfile 
 	defer daemon.Disconnect()
 
 	var additionalDiags []cproto.AdditionalDiagnosticRequest
+	if !connSkip {
+		additionalDiags = append(additionalDiags, cproto.AdditionalDiagnosticRequest_CONN)
+	}
 	if cpuProfile {
 		// console will just hang while we wait for the CPU profile; print something so user doesn't get confused
 		fmt.Fprintf(streams.Out, "Creating diagnostics archive, waiting for CPU profile...\n")
-		additionalDiags = []cproto.AdditionalDiagnosticRequest{cproto.AdditionalDiagnosticRequest_CPU}
+		additionalDiags = append(additionalDiags, cproto.AdditionalDiagnosticRequest_CPU)
 	}
 
 	agentDiag, err := daemon.DiagnosticAgent(ctx, additionalDiags)

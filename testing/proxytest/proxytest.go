@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package proxytest
 
@@ -17,7 +17,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 )
 
 type Proxy struct {
@@ -26,7 +26,7 @@ type Proxy struct {
 	// Port is the port Server is listening on.
 	Port string
 
-	// LocalhostURL is the server URL as "http://localhost:PORT".
+	// LocalhostURL is the server URL as "http(s)://localhost:PORT".
 	LocalhostURL string
 
 	// proxiedRequests is a "request log" for every request the proxy receives.
@@ -126,7 +126,7 @@ func New(t *testing.T, optns ...Option) *Proxy {
 		http.HandlerFunc(func(ww http.ResponseWriter, r *http.Request) {
 			w := &statusResponseWriter{w: ww}
 
-			requestID := uuid.New().String()
+			requestID := uuid.Must(uuid.NewV4()).String()
 			opts.logFn("[%s] STARTING - %s %s %s %s\n",
 				requestID, r.Method, r.URL, r.Proto, r.RemoteAddr)
 
@@ -176,7 +176,7 @@ func (p *Proxy) StartTLS() error {
 	}
 
 	p.Port = u.Port()
-	p.LocalhostURL = "http://localhost:" + p.Port
+	p.LocalhostURL = "https://localhost:" + p.Port
 
 	p.opts.logFn("running on %s -> %s", p.URL, p.LocalhostURL)
 	return nil

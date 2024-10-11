@@ -1,11 +1,7 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
-//
-// This file is for runtime manager tests that use the FakeInput component.
-// All FakeInput tests should go here, since these tests require consistent
-// setup of global config state to avoid triggering an error in the data race
-// detector.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
+
 package runtime
 
 import (
@@ -24,14 +20,13 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	gproto "google.golang.org/protobuf/proto"
 
-	fakecmp "github.com/elastic/elastic-agent/pkg/component/fake/component/comp"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
-
-	"github.com/gofrs/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"go.elastic.co/apm/apmtest"
+	"go.elastic.co/apm/v2/apmtest"
+
+	fakecmp "github.com/elastic/elastic-agent/pkg/component/fake/component/comp"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -59,16 +54,6 @@ var (
 			},
 		},
 	}
-	fakeShipperSpec = component.ShipperSpec{
-		Name: "fake-shipper",
-		Command: &component.CommandSpec{
-			Timeouts: component.CommandTimeoutSpec{
-				Checkin: 30 * time.Second,
-				Restart: 10 * time.Millisecond, // quick restart during tests
-				Stop:    30 * time.Second,
-			},
-		},
-	}
 )
 
 type FakeInputSuite struct {
@@ -76,7 +61,7 @@ type FakeInputSuite struct {
 }
 
 func (suite *FakeInputSuite) SetupSuite() {
-	// Tests using the fake input / shipper need to override the
+	// Tests using the fake input need to override the
 	// versionedHome and topPath globals to reference the temporary
 	// directory the test is running in.
 	// That's why these tests run in their own suite: it's hard to properly
@@ -109,11 +94,11 @@ func (suite *FakeInputSuite) TestManager_Features() {
 	m, err := NewManager(
 		newDebugLogger(t),
 		newDebugLogger(t),
-		"localhost:0",
 		agentInfo,
 		apmtest.DiscardTracer,
 		newTestMonitoringMgr(),
-		configuration.DefaultGRPCConfig())
+		testGrpcConfig(),
+		false)
 	require.NoError(t, err)
 
 	managerErrCh := make(chan error)
@@ -310,11 +295,11 @@ func (suite *FakeInputSuite) TestManager_APM() {
 	m, err := NewManager(
 		newDebugLogger(t),
 		newDebugLogger(t),
-		"localhost:0",
 		agentInfo,
 		apmtest.DiscardTracer,
 		newTestMonitoringMgr(),
-		configuration.DefaultGRPCConfig())
+		testGrpcConfig(),
+		false)
 	require.NoError(t, err)
 
 	managerErrCh := make(chan error)
@@ -359,6 +344,9 @@ func (suite *FakeInputSuite) TestManager_APM() {
 	subscriptionCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
 
+	FiftyPercentSamplingRate := float32(0.5)
+	OnePercentSamplingRate := float32(0.01)
+
 	initialAPMConfig := &proto.APMConfig{
 		Elastic: &proto.ElasticAPM{
 			Environment: "test",
@@ -370,6 +358,7 @@ func (suite *FakeInputSuite) TestManager_APM() {
 				ServerCert: "servercert",
 				ServerCa:   "serverca",
 			},
+			SamplingRate: &FiftyPercentSamplingRate,
 		},
 	}
 
@@ -384,6 +373,22 @@ func (suite *FakeInputSuite) TestManager_APM() {
 				ServerCert: "",
 				ServerCa:   "",
 			},
+			SamplingRate: &OnePercentSamplingRate,
+		},
+	}
+
+	modifiedSampleRateAPMConfig := &proto.APMConfig{
+		Elastic: &proto.ElasticAPM{
+			Environment: "test-modified",
+			ApiKey:      "apiKey",
+			SecretToken: "secretToken",
+			Hosts:       []string{"newhost1", "host2", "differenthost3"},
+			Tls: &proto.ElasticAPMTLS{
+				SkipVerify: true,
+				ServerCert: "",
+				ServerCa:   "",
+			},
+			SamplingRate: &FiftyPercentSamplingRate,
 		},
 	}
 
@@ -396,8 +401,9 @@ func (suite *FakeInputSuite) TestManager_APM() {
 	// testStep tracks how far into the test sequence we've progressed.
 	// 0: When unit is healthy, set initialAPMConfig
 	// 1: When initialAPMConfig is active, set modifiedAPMConfig
-	// 2: When modifiedAPMConfig is active, clear all APMConfig
-	// 3: When APM config is empty again, succeed
+	// 2: When modifiedAPMConfig is active, set modifiedSampleRateAPMConfig
+	// 3: When modifiedSampleRateAPMConfig is active, clear all APMConfig
+	// 4: When APM config is empty again, succeed
 	var testStep int
 STATELOOP:
 	for {
@@ -472,7 +478,28 @@ STATELOOP:
 					50*time.Millisecond,
 					"Updated APM config should be reported by Actions")
 
-				// Both configs were reported correctly, now clear the APM config
+				// Config matches, we now try setting a modified sample rate config
+				comp.Component = &proto.Component{
+					ApmConfig: modifiedSampleRateAPMConfig,
+				}
+
+				m.Update(component.Model{Components: []component.Component{comp}})
+				err = <-m.errCh
+				require.NoError(t, err, "manager Update call must succeed")
+
+			case 3:
+				require.NotNil(t, componentState.Component, "ApmConfig must not be nil")
+
+				require.Eventually(t,
+					func() bool {
+						retrievedAPMConfig := fetchAPMConfigWithAction(t, ctx, m, comp)
+						return gproto.Equal(modifiedSampleRateAPMConfig, retrievedAPMConfig)
+					},
+					3*time.Second,
+					50*time.Millisecond,
+					"Updated sample rate APM config should be reported by Actions")
+
+				// All configs were reported correctly, now clear the APM config
 				comp.Component = &proto.Component{
 					ApmConfig: nil,
 				}
@@ -481,7 +508,7 @@ STATELOOP:
 				err = <-m.errCh
 				require.NoError(t, err, "manager Update call must succeed")
 
-			case 3:
+			case 4:
 				if componentState.Component != nil && componentState.Component.ApmConfig != nil {
 					// APM config is still present, wait for next update
 					continue STATELOOP
@@ -545,11 +572,11 @@ func (suite *FakeInputSuite) TestManager_Limits() {
 	m, err := NewManager(
 		newDebugLogger(t),
 		newDebugLogger(t),
-		"localhost:0",
 		agentInfo,
 		apmtest.DiscardTracer,
 		newTestMonitoringMgr(),
-		configuration.DefaultGRPCConfig(),
+		testGrpcConfig(),
+		false,
 	)
 	require.NoError(t, err)
 
@@ -583,170 +610,6 @@ func (suite *FakeInputSuite) TestManager_Limits() {
 			BinaryName: "",
 			BinaryPath: binaryPath,
 			Spec:       fakeInputSpec,
-		},
-		Units: []component.Unit{},
-	}
-
-	subscriptionCtx, subCancel := context.WithCancel(context.Background())
-	defer subCancel()
-	subscriptionErrCh := make(chan error)
-	doneCh := make(chan struct{})
-
-	go func() {
-		sub := m.Subscribe(subscriptionCtx, compID)
-		var healthyIteration int
-
-		for {
-			select {
-			case <-subscriptionCtx.Done():
-				return
-
-			case componentState := <-sub.Ch():
-
-				t.Logf("component state changed: %+v", componentState)
-
-				switch componentState.State {
-				case client.UnitStateHealthy:
-					compMu.Lock()
-					comp := comp // local copy for changes
-					compMu.Unlock()
-					healthyIteration++
-
-					switch healthyIteration {
-					// check that the initial value was set correctly
-					case 1:
-						assert.NotNil(t, componentState.Component)
-						assert.NotNil(t, componentState.Component.Limits)
-						assert.Equal(t, uint64(99), componentState.Component.Limits.GoMaxProcs)
-
-						// then make a change and see how it's reflected on the next healthy state
-						// we must replace the whole section to keep it thread-safe
-						comp.Component = &proto.Component{
-							Limits: &proto.ComponentLimits{
-								GoMaxProcs: 101,
-							},
-						}
-						m.Update(component.Model{
-							Components: []component.Component{comp},
-						})
-						err := <-m.errCh
-						if err != nil {
-							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
-								healthyIteration, err)
-							return
-						}
-					// check if the change was handled
-					case 2:
-						assert.NotNil(t, componentState.Component)
-						assert.NotNil(t, componentState.Component.Limits)
-						assert.Equal(t, uint64(101), componentState.Component.Limits.GoMaxProcs)
-
-						comp.Component = nil
-						m.Update(component.Model{
-							Components: []component.Component{comp},
-						})
-						err := <-m.errCh
-						if err != nil {
-							subscriptionErrCh <- fmt.Errorf("[case %d]: failed to update component: %w",
-								healthyIteration, err)
-							return
-						}
-					// check if the empty config is handled
-					case 3:
-						assert.Nil(t, componentState.Component)
-						doneCh <- struct{}{}
-					}
-				// allowed states
-				case client.UnitStateStarting:
-				case client.UnitStateConfiguring:
-				default:
-					// unexpected state that should not have occurred
-					subscriptionErrCh <- fmt.Errorf("unit reported unexpected state: %v",
-						componentState.State)
-				}
-			}
-		}
-	}()
-
-	defer drainErrChan(managerErrCh)
-	defer drainErrChan(subscriptionErrCh)
-
-	m.Update(component.Model{Components: []component.Component{comp}})
-	err = <-m.errCh
-	require.NoError(t, err)
-
-	timeout := 30 * time.Second
-	timeoutTimer := time.NewTimer(timeout)
-	defer timeoutTimer.Stop()
-
-	// Wait for a success, an error or time out
-	for {
-		select {
-		case <-timeoutTimer.C:
-			t.Fatalf("timed out after %s", timeout)
-		case err := <-managerErrCh:
-			require.NoError(t, err)
-		case err := <-subscriptionErrCh:
-			require.NoError(t, err)
-		case <-doneCh:
-			subCancel()
-			cancel()
-
-			err = <-managerErrCh
-			require.NoError(t, err)
-			return
-		}
-	}
-}
-
-func (suite *FakeInputSuite) TestManager_ShipperLimits() {
-	t := suite.T()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	agentInfo := &info.AgentInfo{}
-	m, err := NewManager(
-		newDebugLogger(t),
-		newDebugLogger(t),
-		"localhost:0",
-		agentInfo,
-		apmtest.DiscardTracer,
-		newTestMonitoringMgr(),
-		configuration.DefaultGRPCConfig(),
-	)
-	require.NoError(t, err)
-
-	managerErrCh := make(chan error)
-	go func() {
-		err := m.Run(ctx)
-		if errors.Is(err, context.Canceled) {
-			err = nil
-		}
-		managerErrCh <- err
-	}()
-
-	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
-	defer waitCancel()
-	if err := waitForReady(waitCtx, m); err != nil {
-		require.NoError(t, err)
-	}
-
-	shipperPath := testBinary(t, "shipper")
-	const compID = "fake-shipper-default"
-	var compMu sync.Mutex
-	comp := component.Component{
-		ID: compID,
-		ShipperSpec: &component.ShipperRuntimeSpec{
-			ShipperType: "fake-shipper",
-			BinaryName:  "",
-			BinaryPath:  shipperPath,
-			Spec:        fakeShipperSpec,
-		},
-		Component: &proto.Component{
-			Limits: &proto.ComponentLimits{
-				GoMaxProcs: 99,
-			},
 		},
 		Units: []component.Unit{},
 	}
@@ -870,7 +733,8 @@ func (suite *FakeInputSuite) TestManager_BadUnitToGood() {
 	defer cancel()
 
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
+		false)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1039,7 +903,8 @@ func (suite *FakeInputSuite) TestManager_GoodUnitToBad() {
 	defer cancel()
 
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
+		false)
 	require.NoError(t, err)
 	runResultChan := make(chan error, 1)
 	go func() {
@@ -1221,7 +1086,8 @@ func (suite *FakeInputSuite) TestManager_NoDeadlock() {
 
 	// Create the runtime manager
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
+		false)
 	require.NoError(t, err)
 
 	// Start the runtime manager in a goroutine, passing its termination state
@@ -1295,7 +1161,8 @@ func (suite *FakeInputSuite) TestManager_Configure() {
 	defer cancel()
 
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
+		false)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1417,7 +1284,8 @@ func (suite *FakeInputSuite) TestManager_RemoveUnit() {
 	defer cancel()
 
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
+		false)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1572,7 +1440,8 @@ func (suite *FakeInputSuite) TestManager_ActionState() {
 	defer cancel()
 
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
+		false)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1697,7 +1566,8 @@ func (suite *FakeInputSuite) TestManager_Restarts() {
 	defer cancel()
 
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
+		false)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1833,7 +1703,8 @@ func (suite *FakeInputSuite) TestManager_Restarts_ConfigKill() {
 	defer cancel()
 
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
+		false)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -1977,7 +1848,8 @@ func (suite *FakeInputSuite) TestManager_KeepsRestarting() {
 	defer cancel()
 
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
+		false)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -2121,7 +1993,8 @@ func (suite *FakeInputSuite) TestManager_RestartsOnMissedCheckins() {
 	defer cancel()
 
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
+		false)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -2240,7 +2113,8 @@ func (suite *FakeInputSuite) TestManager_InvalidAction() {
 	defer cancel()
 
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), testGrpcConfig(),
+		false)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -2361,11 +2235,11 @@ func (suite *FakeInputSuite) TestManager_MultiComponent() {
 	m, err := NewManager(
 		newDebugLogger(t),
 		newDebugLogger(t),
-		"localhost:0",
 		agentInfo,
 		apmtest.DiscardTracer,
 		newTestMonitoringMgr(),
-		configuration.DefaultGRPCConfig())
+		testGrpcConfig(),
+		false)
 	require.NoError(t, err)
 
 	errCh := make(chan error)
@@ -2575,11 +2449,11 @@ func (suite *FakeInputSuite) TestManager_LogLevel() {
 	m, err := NewManager(
 		newDebugLogger(t),
 		newDebugLogger(t),
-		"localhost:0",
 		ai,
 		apmtest.DiscardTracer,
 		newTestMonitoringMgr(),
-		configuration.DefaultGRPCConfig())
+		testGrpcConfig(),
+		false)
 	require.NoError(t, err)
 
 	errCh := make(chan error)
@@ -2706,330 +2580,22 @@ LOOP:
 	require.NoError(t, err)
 }
 
-func (suite *FakeInputSuite) TestManager_Shipper() {
-	/*
-		This test runs one instance of the fake/component and an instance of the fake/shipper. They get connected
-		together, and it ensures that a test event is sent between each instance. Below is a breakdown on how this
-		test performs this work and ensures that an event is sent between the two instances.
-
-		1. Wait for the shipper input (GRPC server) is healthy.
-		2. Wait for the component output (GRPC client) is healthy.
-		3. Create a unique ID to use for the event ID.
-		4. Send `record_event` action to the shipper input (GRPC server); won't return until it actually gets the event.
-		5. Send `send_event` action to the component fake input (GRPC client); returns once sent.
-		6. Wait for `record_event` action to return from the shipper input (GRPC server).
-	*/
-	t := suite.T()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), configuration.DefaultGRPCConfig())
-	require.NoError(t, err)
-	errCh := make(chan error)
-	go func() {
-		err := m.Run(ctx)
-		if errors.Is(err, context.Canceled) {
-			err = nil
-		}
-		errCh <- err
-	}()
-
-	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
-	defer waitCancel()
-	if err := waitForReady(waitCtx, m); err != nil {
-		require.NoError(t, err)
-	}
-
-	componentPath := testBinary(t, "component")
-	shipperPath := testBinary(t, "shipper")
-	comps := []component.Component{
-		{
-			ID: "fake-default",
-			InputSpec: &component.InputRuntimeSpec{
-				InputType:  "fake",
-				BinaryName: "",
-				BinaryPath: componentPath,
-				Spec:       fakeInputSpec,
-			},
-			Units: []component.Unit{
-				{
-					ID:       "fake-input",
-					Type:     client.UnitTypeInput,
-					LogLevel: client.UnitLogLevelTrace,
-					Config: component.MustExpectedConfig(map[string]interface{}{
-						"type":    "fake",
-						"state":   int(client.UnitStateHealthy),
-						"message": "Fake Healthy",
-					}),
-				},
-				{
-					ID:       "fake-default",
-					Type:     client.UnitTypeOutput,
-					LogLevel: client.UnitLogLevelTrace,
-					Config: component.MustExpectedConfig(map[string]interface{}{
-						"type": "fake-shipper",
-					}),
-				},
-			},
-			ShipperRef: &component.ShipperReference{
-				ComponentID: "fake-shipper-default",
-				UnitID:      "fake-default",
-			},
-		},
-		{
-			ID: "fake-shipper-default",
-			ShipperSpec: &component.ShipperRuntimeSpec{
-				ShipperType: "fake-shipper",
-				BinaryName:  "",
-				BinaryPath:  shipperPath,
-				Spec:        fakeShipperSpec,
-			},
-			Units: []component.Unit{
-				{
-					ID:       "fake-default",
-					Type:     client.UnitTypeInput,
-					LogLevel: client.UnitLogLevelTrace,
-					Config: component.MustExpectedConfig(map[string]interface{}{
-						"id":   "fake-default",
-						"type": "fake-shipper",
-						"units": []interface{}{
-							map[string]interface{}{
-								"id": "fake-input",
-								"config": map[string]interface{}{
-									"type":    "fake",
-									"state":   int(client.UnitStateHealthy),
-									"message": "Fake Healthy",
-								},
-							},
-						},
-					}),
-				},
-				{
-					ID:       "fake-default",
-					Type:     client.UnitTypeOutput,
-					LogLevel: client.UnitLogLevelTrace,
-					Config: component.MustExpectedConfig(map[string]interface{}{
-						"type": "fake-action-output",
-					}),
-				},
-			},
-		},
-	}
-
-	subCtx, subCancel := context.WithCancel(context.Background())
-	defer subCancel()
-	subErrCh := make(chan error)
-	go func() {
-		shipperInputOn := false
-		shipperOutputOn := false
-		compConnected := false
-		eventSent := false
-
-		sendEvent := func() (bool, error) {
-			if !shipperInputOn || !shipperOutputOn || !compConnected {
-				// wait until connected
-				return false, nil
-			}
-			if eventSent {
-				// other path already sent event
-				return false, nil
-			}
-			eventSent = true
-
-			// send an event between component and the fake shipper
-			eventID, err := uuid.NewV4()
-			if err != nil {
-				return true, err
-			}
-
-			// wait for the event on the shipper side
-			gotEvt := make(chan error)
-			go func() {
-				actionCtx, actionCancel := context.WithTimeout(context.Background(), 30*time.Second)
-				_, err := m.PerformAction(actionCtx, comps[1], comps[1].Units[1], "record_event", map[string]interface{}{
-					"id": eventID.String(),
-				})
-				actionCancel()
-				gotEvt <- err
-			}()
-
-			// send the fake event
-			actionCtx, actionCancel := context.WithTimeout(context.Background(), 15*time.Second)
-			_, err = m.PerformAction(actionCtx, comps[0], comps[0].Units[0], "send_event", map[string]interface{}{
-				"id": eventID.String(),
-			})
-			actionCancel()
-			if err != nil {
-				return true, err
-			}
-
-			err = <-gotEvt
-			if err == nil {
-				t.Logf("successfully sent event from fake input to fake shipper, event ID: %s", eventID.String())
-			}
-			return true, err
-		}
-
-		shipperSub := m.Subscribe(subCtx, "fake-shipper-default")
-		compSub := m.Subscribe(subCtx, "fake-default")
-		for {
-			select {
-			case <-subCtx.Done():
-				return
-			case state := <-shipperSub.Ch():
-				t.Logf("shipper state changed: %+v", state)
-				if state.State == client.UnitStateFailed {
-					subErrCh <- fmt.Errorf("shipper failed: %s", state.Message)
-				} else {
-					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-default"}]
-					if ok {
-						if unit.State == client.UnitStateFailed {
-							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
-						} else if unit.State == client.UnitStateHealthy {
-							shipperInputOn = true
-							ok, err := sendEvent()
-							if ok {
-								if err != nil {
-									subErrCh <- err
-								} else {
-									// successful; turn it all off
-									m.Update(component.Model{Components: []component.Component{}})
-									err = <-m.errCh
-									if err != nil {
-										subErrCh <- err
-									}
-								}
-							}
-						} else if unit.State == client.UnitStateStopped {
-							subErrCh <- nil
-						} else if unit.State == client.UnitStateStarting {
-							// acceptable
-						} else {
-							// unknown state that should not have occurred
-							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
-						}
-					} else {
-						subErrCh <- errors.New("input unit missing: fake-default")
-					}
-					unit, ok = state.Units[ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}]
-					if ok {
-						if unit.State == client.UnitStateFailed {
-							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
-						} else if unit.State == client.UnitStateHealthy {
-							shipperOutputOn = true
-							ok, err := sendEvent()
-							if ok {
-								if err != nil {
-									subErrCh <- err
-								} else {
-									// successful; turn it all off
-									m.Update(component.Model{Components: []component.Component{}})
-									err := <-m.errCh
-									if err != nil {
-										subErrCh <- err
-									}
-								}
-							}
-						} else if unit.State == client.UnitStateStopped {
-							subErrCh <- nil
-						} else if unit.State == client.UnitStateStarting {
-							// acceptable
-						} else {
-							// unknown state that should not have occurred
-							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
-						}
-					} else {
-						subErrCh <- errors.New("output unit missing: fake-default")
-					}
-				}
-			case state := <-compSub.Ch():
-				t.Logf("component state changed: %+v", state)
-				if state.State == client.UnitStateFailed {
-					subErrCh <- fmt.Errorf("component failed: %s", state.Message)
-				} else {
-					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "fake-default"}]
-					if ok {
-						if unit.State == client.UnitStateFailed {
-							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
-						} else if unit.State == client.UnitStateHealthy {
-							compConnected = true
-							ok, err := sendEvent()
-							if ok {
-								if err != nil {
-									subErrCh <- err
-								} else {
-									// successful; turn it all off
-									m.Update(component.Model{Components: []component.Component{}})
-									err := <-m.errCh
-									if err != nil {
-										subErrCh <- err
-									}
-								}
-							}
-						} else if unit.State == client.UnitStateStopped {
-							subErrCh <- nil
-						} else if unit.State == client.UnitStateStarting || unit.State == client.UnitStateConfiguring {
-							// acceptable
-						} else {
-							// unknown state that should not have occurred
-							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
-						}
-					} else {
-						subErrCh <- errors.New("unit missing: fake-input")
-					}
-				}
-			}
-		}
-	}()
-
-	defer drainErrChan(errCh)
-	defer drainErrChan(subErrCh)
-
-	m.Update(component.Model{Components: comps})
-	err = <-m.errCh
-	require.NoError(t, err)
-
-	timeout := 2 * time.Minute
-	endTimer := time.NewTimer(timeout)
-	defer endTimer.Stop()
-LOOP:
-	for {
-		select {
-		case <-endTimer.C:
-			t.Fatalf("timed out after %s", timeout)
-		case err := <-errCh:
-			require.NoError(t, err)
-		case err := <-subErrCh:
-			require.NoError(t, err)
-			break LOOP
-		}
-	}
-
-	subCancel()
-	cancel()
-
-	err = <-errCh
-	require.NoError(t, err)
-}
-
 func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 	t := suite.T()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	log, logs := logger.NewTesting("TestManager_StartStopComponent")
+	log, logs := loggertest.New("TestManager_StartStopComponent")
 	ai := &info.AgentInfo{}
 	m, err := NewManager(
 		log,
 		newDebugLogger(t),
-		"localhost:0",
 		ai,
 		apmtest.DiscardTracer,
 		newTestMonitoringMgr(),
-		configuration.DefaultGRPCConfig())
+		testGrpcConfig(),
+		false)
 	require.NoError(t, err, "could not crete new manager")
 
 	managerErrCh := make(chan error)
@@ -3137,6 +2703,7 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 	default:
 	}
 
+	t.Log("Apply component config 1")
 	m.Update(component.Model{Components: components})
 	err = <-m.errCh
 	require.NoError(t, err, "expected no error from the manager when applying"+
@@ -3154,6 +2721,7 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 		200*time.Millisecond,
 		"component %s did not start", comp0ID)
 
+	t.Log("Apply component config 2")
 	m.Update(component.Model{Components: components2})
 	err = <-m.errCh
 	require.NoError(t, err, "expected no error from the manager when applying"+
@@ -3174,6 +2742,7 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 	// component 1 started, we can stop the manager
 	cancel()
 
+	t.Log("Verify behaviour")
 	comp0StartLogs := logs.FilterMessageSnippet(
 		fmt.Sprintf("Starting component %q", comp0ID)).TakeAll()
 	comp0StopLogs := logs.FilterMessageSnippet(
@@ -3195,7 +2764,7 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 	assert.NoError(t, err, "Manager.Run returned and error")
 
 	if t.Failed() {
-		t.Logf("manager logs:")
+		t.Log("manager logs:")
 		for _, l := range logs.TakeAll() {
 			t.Log(l)
 		}
@@ -3209,11 +2778,11 @@ func (suite *FakeInputSuite) TestManager_Chunk() {
 	defer cancel()
 
 	const grpcDefaultSize = 1024 * 1024 * 4
-	grpcConfig := configuration.DefaultGRPCConfig()
+	grpcConfig := testGrpcConfig()
 	grpcConfig.MaxMsgSize = grpcDefaultSize * 2 // set to double the default size
 
 	ai := &info.AgentInfo{}
-	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), "localhost:0", ai, apmtest.DiscardTracer, newTestMonitoringMgr(), grpcConfig)
+	m, err := NewManager(newDebugLogger(t), newDebugLogger(t), ai, apmtest.DiscardTracer, newTestMonitoringMgr(), grpcConfig, false)
 	require.NoError(t, err)
 	errCh := make(chan error)
 	go func() {
@@ -3407,6 +2976,12 @@ func testBinary(t *testing.T, name string) string {
 	}
 
 	return binaryPath
+}
+
+func testGrpcConfig() *configuration.GRPCConfig {
+	grpcConfig := configuration.DefaultGRPCConfig()
+	grpcConfig.Port = 0 // this means that we choose a random available port
+	return grpcConfig
 }
 
 func fakeBinaryPath(name string) string {

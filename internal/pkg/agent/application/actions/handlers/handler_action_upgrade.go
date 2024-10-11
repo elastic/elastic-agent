@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package handlers
 
@@ -74,9 +74,9 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 	}
 
 	go func() {
-		h.log.Infof("starting upgrade to version %s in background", action.Version)
-		if err := h.coord.Upgrade(asyncCtx, action.Version, action.SourceURI, action, false, false); err != nil {
-			h.log.Errorf("upgrade to version %s failed: %v", action.Version, err)
+		h.log.Infof("starting upgrade to version %s in background", action.Data.Version)
+		if err := h.coord.Upgrade(asyncCtx, action.Data.Version, action.Data.SourceURI, action, false, false); err != nil {
+			h.log.Errorf("upgrade to version %s failed: %v", action.Data.Version, err)
 			// If context is cancelled in getAsyncContext, the actions are acked there
 			if !errors.Is(asyncCtx.Err(), context.Canceled) {
 				h.bkgMutex.Lock()
@@ -125,14 +125,17 @@ func (h *Upgrade) getAsyncContext(ctx context.Context, action fleetapi.Action, a
 		h.log.Errorf("invalid type, expected ActionUpgrade and received %T", action)
 		return nil, false
 	}
-	if (upgradeAction.Version == bkgAction.Version) && (upgradeAction.SourceURI == bkgAction.SourceURI) {
-		h.log.Infof("Duplicate upgrade to version %s received", bkgAction.Version)
+	if (upgradeAction.Data.Version == bkgAction.Data.Version) &&
+		(upgradeAction.Data.SourceURI == bkgAction.Data.SourceURI) {
+		h.log.Infof("Duplicate upgrade to version %s received",
+			bkgAction.Data.Version)
 		h.bkgActions = append(h.bkgActions, action)
 		return nil, false
 	}
 
 	// Versions must be different, cancel the first upgrade and run the new one
-	h.log.Infof("Canceling upgrade to version %s received", bkgAction.Version)
+	h.log.Infof("Canceling upgrade to version %s received",
+		bkgAction.Data.Version)
 	h.bkgCancel()
 
 	// Ack here because we have the lock, and we need to clear out the saved actions

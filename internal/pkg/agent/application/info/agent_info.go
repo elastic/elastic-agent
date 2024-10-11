@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package info
 
@@ -40,6 +40,9 @@ type Agent interface {
 
 	// Unprivileged returns true when this Agent is running unprivileged.
 	Unprivileged() bool
+
+	// IsStandalone returns true is the agent is running in standalone mode, i.e, without fleet
+	IsStandalone() bool
 }
 
 // AgentInfo is a collection of information about agent.
@@ -47,6 +50,7 @@ type AgentInfo struct {
 	agentID      string
 	logLevel     string
 	unprivileged bool
+	isStandalone bool
 
 	// esHeaders will be injected into the headers field of any elasticsearch
 	// output created by this agent (see component.toIntermediate).
@@ -60,7 +64,7 @@ type AgentInfo struct {
 // If agent config file does not exist it gets created.
 // Initiates log level to predefined value.
 func NewAgentInfoWithLog(ctx context.Context, level string, createAgentID bool) (*AgentInfo, error) {
-	agentInfo, err := loadAgentInfoWithBackoff(ctx, false, level, createAgentID)
+	agentInfo, isStandalone, err := loadAgentInfoWithBackoff(ctx, false, level, createAgentID)
 	if err != nil {
 		return nil, err
 	}
@@ -74,6 +78,7 @@ func NewAgentInfoWithLog(ctx context.Context, level string, createAgentID bool) 
 		logLevel:     agentInfo.LogLevel,
 		unprivileged: !isRoot,
 		esHeaders:    agentInfo.Headers,
+		isStandalone: isStandalone,
 	}, nil
 }
 
@@ -143,4 +148,8 @@ func (i *AgentInfo) Headers() map[string]string {
 // Unprivileged returns true when this Agent is running unprivileged.
 func (i *AgentInfo) Unprivileged() bool {
 	return i.unprivileged
+}
+
+func (i *AgentInfo) IsStandalone() bool {
+	return i.isStandalone
 }

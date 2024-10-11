@@ -5,8 +5,9 @@ outputs:
   default:
     type: elasticsearch
     hosts: '${ELASTICSEARCH_HOSTS:http://elasticsearch:9200}'
-    username: '${ELASTICSEARCH_USERNAME:elastic}'
-    password: '${ELASTICSEARCH_PASSWORD:changeme}'
+    username: '${ELASTICSEARCH_USERNAME:}'
+    password: '${ELASTICSEARCH_PASSWORD:}'
+    api_key: '${ELASTICSEARCH_API_KEY:}'
     preset: balanced
 
 inputs:
@@ -18,17 +19,17 @@ inputs:
     data_stream.namespace: default
     use_output: default
     streams:
-      - metricsets: 
+      - metricsets:
         - cpu
         # Dataset name must conform to the naming conventions for Elasticsearch indices, cannot contain dashes (-), and cannot exceed 100 bytes
         data_stream.dataset: system.cpu
-      - metricsets: 
+      - metricsets:
         - memory
         data_stream.dataset: system.memory
-      - metricsets: 
+      - metricsets:
         - network
         data_stream.dataset: system.network
-      - metricsets: 
+      - metricsets:
         - filesystem
         data_stream.dataset: system.filesystem
 
@@ -112,6 +113,8 @@ inputs:
 #   logs: false
 #   # enables metrics monitoring
 #   metrics: false
+#   # metrics_period defines how frequent we should sample monitoring metrics. Default is 60 seconds.
+#   metrics_period: 60s
 #   # exposes /debug/pprof/ endpoints
 #   # recommended that these endpoints are only enabled if the monitoring endpoint is set to localhost
 #   pprof.enabled: false
@@ -127,7 +130,7 @@ inputs:
 #   # The possible values for `failon` are:
 #   # `degraded`: return an error if a component is in a degraded state or failed state, or if the agent coordinator is unresponsive.
 #   # `failed`: return an error if a unit is in a failed state, or if the agent coordinator is unresponsive.
-#   # `heartbeat`: return an error only if the agent coordinator is unresponsive. 
+#   # `heartbeat`: return an error only if the agent coordinator is unresponsive.
 #   # If no `failon` parameter is provided, the default behavior is `failon=heartbeat`
 #   http:
 #       # enables http endpoint

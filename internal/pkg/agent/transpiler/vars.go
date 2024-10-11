@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package transpiler
 
@@ -14,7 +14,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/composable"
 )
 
-var varsRegex = regexp.MustCompile(`\${([\p{L}\d\s\\\-_|.'":\/]*)}`)
+var varsRegex = regexp.MustCompile(`\$\$?{([\p{L}\d\s\\\-_|.'":\/]*)}`)
 
 // ErrNoMatch is return when the replace didn't fail, just that no vars match to perform the replace.
 var ErrNoMatch = fmt.Errorf("no matching vars")
@@ -53,6 +53,13 @@ func (v *Vars) Replace(value string) (Node, error) {
 	lastIndex := 0
 	for _, r := range matchIdxs {
 		for i := 0; i < len(r); i += 4 {
+			if value[r[i]+1] == '$' {
+				// match on an escaped var, append the raw string with the '$' prefix removed
+				result += value[lastIndex:r[0]] + value[r[i]+1:r[i+1]]
+				lastIndex = r[1]
+				continue
+			}
+			// match on a non-escaped var
 			vars, err := extractVars(value[r[i+2]:r[i+3]])
 			if err != nil {
 				return nil, fmt.Errorf(`error parsing variable "%s": %w`, value[r[i]:r[i+1]], err)

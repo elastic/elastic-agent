@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package testutils
 
@@ -37,7 +37,10 @@ func NewErrorLogger(t *testing.T) *logger.Logger {
 	loggerCfg := logger.DefaultLoggingConfig()
 	loggerCfg.Level = logp.ErrorLevel
 
-	log, err := logger.NewFromConfig("", loggerCfg, false)
+	eventLoggerCfg := logger.DefaultEventLoggingConfig()
+	eventLoggerCfg.Level = loggerCfg.Level
+
+	log, err := logger.NewFromConfig("", loggerCfg, eventLoggerCfg, false)
 	require.NoError(t, err)
 	return log
 }

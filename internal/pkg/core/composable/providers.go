@@ -1,10 +1,12 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package composable
 
-import "context"
+import (
+	"context"
+)
 
 // FetchContextProvider is the interface that a context provider uses allow variable values to be determined when the
 // configuration is rendered versus it being known in advanced.

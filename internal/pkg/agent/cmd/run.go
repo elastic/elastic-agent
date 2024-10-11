@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package cmd
 
@@ -11,12 +11,13 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
-	"go.elastic.co/apm"
-	apmtransport "go.elastic.co/apm/transport"
+	"go.elastic.co/apm/v2"
+	apmtransport "go.elastic.co/apm/v2/transport"
 	"gopkg.in/yaml.v2"
 
 	"github.com/spf13/cobra"
@@ -58,10 +59,13 @@ import (
 const (
 	agentName            = "elastic-agent"
 	fleetInitTimeoutName = "FLEET_SERVER_INIT_TIMEOUT"
+	flagRunDevelopment   = "develop"
 )
 
-type cfgOverrider func(cfg *configuration.Configuration)
-type awaiters []<-chan struct{}
+type (
+	cfgOverrider func(cfg *configuration.Configuration)
+	awaiters     []<-chan struct{}
+)
 
 func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
@@ -69,15 +73,24 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 		Short: "Start the Elastic Agent",
 		Long:  "This command starts the Elastic Agent.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// done very early so the encrypted store is never used
+			isDevelopmentMode, _ := cmd.Flags().GetBool(flagInstallDevelopment)
+			if isDevelopmentMode {
+				fmt.Fprintln(streams.Out, "Development installation mode enabled; this is an experimental feature.")
+				// For now, development mode only makes the agent behave as if it was running in a namespace to allow
+				// multiple agents on the same machine.
+				paths.SetInstallNamespace(paths.DevelopmentNamespace)
+			}
+
+			// done very early so the encrypted store is never used. Always done in development mode to remove the need to be root.
 			disableEncryptedStore, _ := cmd.Flags().GetBool("disable-encrypted-store")
-			if disableEncryptedStore {
+			if disableEncryptedStore || isDevelopmentMode {
 				storage.DisableEncryptionDarwin()
 			}
 			fleetInitTimeout, _ := cmd.Flags().GetDuration("fleet-init-timeout")
 			testingMode, _ := cmd.Flags().GetBool("testing-mode")
 			if err := run(nil, testingMode, fleetInitTimeout); err != nil && !errors.Is(err, context.Canceled) {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				logExternal(fmt.Sprintf("%s run failed: %s", paths.BinaryName, err))
 				return err
 			}
 			return nil
@@ -101,6 +114,9 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 
 	cmd.Flags().Duration("fleet-init-timeout", envTimeout(fleetInitTimeoutName), " Sets the initial timeout when starting up the fleet server under agent")
 	_ = cmd.Flags().MarkHidden("testing-mode")
+
+	cmd.Flags().Bool(flagRunDevelopment, false, "Run agent in development mode. Allows running when there is already an installed Elastic Agent. (experimental)")
+	_ = cmd.Flags().MarkHidden(flagRunDevelopment) // For internal use only.
 
 	return cmd
 }
@@ -132,7 +148,7 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	// register as a service
 	stop := make(chan bool)
 	ctx, cancel := context.WithCancel(context.Background())
-	var stopBeat = func() {
+	stopBeat := func() {
 		close(stop)
 	}
 
@@ -159,7 +175,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	if cfg.Settings.LoggingConfig != nil {
 		logLvl = cfg.Settings.LoggingConfig.Level
 	}
-	baseLogger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, true)
+	baseLogger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, cfg.Settings.EventLoggingConfig, true)
 	if err != nil {
 		return err
 	}
@@ -212,7 +228,9 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	}
 
 	// the encrypted state does not exist but the unencrypted file does
-	err = migration.MigrateToEncryptedConfig(ctx, l, paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile())
+	err = migration.MigrateToEncryptedConfig(ctx, l,
+		paths.AgentStateStoreYmlFile(),
+		paths.AgentStateStoreFile())
 	if err != nil {
 		return logReturn(l, errors.New(err, "error migrating agent state"))
 	}
@@ -271,7 +289,11 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	if err != nil {
 		return logReturn(l, err)
 	}
-	defer composable.Close()
+	defer func() {
+		if composable != nil {
+			composable.Close()
+		}
+	}()
 
 	monitoringServer, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {
@@ -307,23 +329,24 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 	// this provides backwards compatibility as the control socket was moved with the addition of --unprivileged
 	// option during installation
 	//
-	// Windows `paths.ControlSocketRunSymlink` is `""` so this is always skipped on Windows.
-	if isRoot && paths.RunningInstalled() && paths.ControlSocketRunSymlink != "" {
+	// Windows `paths.ControlSocketRunSymlink()` is `""` so this is always skipped on Windows.
+	controlSocketRunSymlink := paths.ControlSocketRunSymlink(paths.InstallNamespace())
+	if isRoot && paths.RunningInstalled() && controlSocketRunSymlink != "" {
 		socketPath := strings.TrimPrefix(paths.ControlSocket(), "unix://")
-		socketLog := controlLog.With("path", socketPath).With("link", paths.ControlSocketRunSymlink)
+		socketLog := controlLog.With("path", socketPath).With("link", controlSocketRunSymlink)
 		// ensure it doesn't exist before creating the symlink
-		if err := os.Remove(paths.ControlSocketRunSymlink); err != nil && !errors.Is(err, os.ErrNotExist) {
-			socketLog.Errorf("Failed to remove existing control socket symlink %s: %s", paths.ControlSocketRunSymlink, err)
+		if err := os.Remove(controlSocketRunSymlink); err != nil && !errors.Is(err, os.ErrNotExist) {
+			socketLog.Errorf("Failed to remove existing control socket symlink %s: %s", controlSocketRunSymlink, err)
 		}
-		if err := os.Symlink(socketPath, paths.ControlSocketRunSymlink); err != nil {
-			socketLog.Errorf("Failed to create control socket symlink %s -> %s: %s", paths.ControlSocketRunSymlink, socketPath, err)
+		if err := os.Symlink(socketPath, controlSocketRunSymlink); err != nil {
+			socketLog.Errorf("Failed to create control socket symlink %s -> %s: %s", controlSocketRunSymlink, socketPath, err)
 		} else {
-			socketLog.Infof("Created control socket symlink %s -> %s; allowing unix://%s connection", paths.ControlSocketRunSymlink, socketPath, paths.ControlSocketRunSymlink)
+			socketLog.Infof("Created control socket symlink %s -> %s; allowing unix://%s connection", controlSocketRunSymlink, socketPath, controlSocketRunSymlink)
 		}
 		defer func() {
 			// delete the symlink on exit; ignore the error
-			if err := os.Remove(paths.ControlSocketRunSymlink); err != nil {
-				socketLog.Errorf("Failed to remove control socket symlink %s: %s", paths.ControlSocketRunSymlink, err)
+			if err := os.Remove(controlSocketRunSymlink); err != nil {
+				socketLog.Errorf("Failed to remove control socket symlink %s: %s", controlSocketRunSymlink, err)
 			}
 		}()
 	}
@@ -573,7 +596,7 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 }
 
 func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig) (*apm.Tracer, error) {
-	apm.DefaultTracer.Close()
+	apm.DefaultTracer().Close()
 
 	if !mcfg.Enabled || !mcfg.MonitorTraces {
 		return nil, nil
@@ -589,6 +612,7 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 		envVerifyServerCert = "ELASTIC_APM_VERIFY_SERVER_CERT"
 		envServerCert       = "ELASTIC_APM_SERVER_CERT"
 		envCACert           = "ELASTIC_APM_SERVER_CA_CERT_FILE"
+		envSampleRate       = "ELASTIC_APM_TRANSACTION_SAMPLE_RATE"
 	)
 	if cfg.TLS.SkipVerify {
 		os.Setenv(envVerifyServerCert, "false")
@@ -602,11 +626,12 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 		os.Setenv(envCACert, cfg.TLS.ServerCA)
 		defer os.Unsetenv(envCACert)
 	}
-
-	ts, err := apmtransport.NewHTTPTransport()
-	if err != nil {
-		return nil, err
+	if cfg.SamplingRate != nil {
+		os.Setenv(envSampleRate, strconv.FormatFloat(float64(*cfg.SamplingRate), 'f', -1, 32))
+		defer os.Unsetenv(envSampleRate)
 	}
+
+	opts := apmtransport.HTTPTransportOptions{}
 
 	if len(cfg.Hosts) > 0 {
 		hosts := make([]*url.URL, 0, len(cfg.Hosts))
@@ -617,12 +642,17 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 			}
 			hosts = append(hosts, u)
 		}
-		ts.SetServerURL(hosts...)
+		opts.ServerURLs = hosts
 	}
 	if cfg.APIKey != "" {
-		ts.SetAPIKey(cfg.APIKey)
+		opts.APIKey = cfg.APIKey
 	} else {
-		ts.SetSecretToken(cfg.SecretToken)
+		opts.SecretToken = cfg.SecretToken
+	}
+
+	ts, err := apmtransport.NewHTTPTransport(opts)
+	if err != nil {
+		return nil, err
 	}
 
 	return apm.NewTracerOptions(apm.TracerOptions{
@@ -700,7 +730,11 @@ func ensureInstallMarkerPresent() error {
 	// Otherwise, we're being upgraded from a version of an installed Agent
 	// that didn't use an installation marker file (that is, before v8.8.0).
 	// So create the file now.
-	if err := install.CreateInstallMarker(paths.Top(), utils.CurrentFileOwner()); err != nil {
+	ownership, err := utils.CurrentFileOwner()
+	if err != nil {
+		return fmt.Errorf("failed to get current file owner: %w", err)
+	}
+	if err := install.CreateInstallMarker(paths.Top(), ownership); err != nil {
 		return fmt.Errorf("unable to create installation marker file during upgrade: %w", err)
 	}
 

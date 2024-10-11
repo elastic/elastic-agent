@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package diagnostics
 
@@ -165,25 +165,66 @@ func TestUnitAndStateMapping(t *testing.T) {
 	require.Empty(t, errOut.String())
 }
 
+type zippedItem struct {
+	Name  string
+	IsDir bool
+}
+
 func TestZipLogs(t *testing.T) {
-	// Setup a directory structure of: logs/httpjson/log.ndjson
-	{
-		paths.SetTop(t.TempDir())
-		dir := filepath.Join(paths.Home(), "logs/sub-dir")
-		require.NoError(t, os.MkdirAll(dir, 0o700))
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "log.ndjson"), []byte(".\n"), 0o600))
+	topPath := t.TempDir()
+	dir := filepath.Join(paths.HomeFrom(topPath), "logs", "sub-dir")
+	require.NoError(t, os.MkdirAll(dir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "log.ndjson"), []byte(".\n"), 0o600))
+
+	eventLogs := filepath.Join(paths.HomeFrom(topPath), "logs", "events")
+	require.NoError(t, os.MkdirAll(eventLogs, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(eventLogs, "elastic-agent-events-log.ndjson"), []byte(".\n"), 0o600))
+
+	testCases := []struct {
+		name             string
+		excludeEventsLog bool
+		expectedItems    []zippedItem
+	}{
+		{
+			name:             "include events logs",
+			excludeEventsLog: false,
+			expectedItems: []zippedItem{
+				{"logs/", true},
+				{"logs/elastic-agent-unknow/", true},
+				{"logs/elastic-agent-unknow/events/", true},
+				{"logs/elastic-agent-unknow/events/elastic-agent-events-log.ndjson", false},
+				{"logs/elastic-agent-unknow/sub-dir/", true},
+				{"logs/elastic-agent-unknow/sub-dir/log.ndjson", false},
+			},
+		},
+
+		{
+			name:             "exclude events logs",
+			excludeEventsLog: true,
+			expectedItems: []zippedItem{
+				{"logs/", true},
+				{"logs/elastic-agent-unknow/", true},
+				{"logs/elastic-agent-unknow/sub-dir/", true},
+				{"logs/elastic-agent-unknow/sub-dir/log.ndjson", false},
+			},
+		},
 	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			zipLogsAndAssertFiles(t, topPath, tc.excludeEventsLog, tc.expectedItems)
+		})
+	}
+}
+
+func zipLogsAndAssertFiles(t *testing.T, topPath string, excludeEvents bool, expected []zippedItem) {
+	t.Helper()
 
 	// Zip the logs directory.
 	buf := new(bytes.Buffer)
 	w := zip.NewWriter(buf)
-	require.NoError(t, zipLogs(w, time.Now()))
+	require.NoError(t, zipLogs(w, time.Now(), topPath, excludeEvents))
 	require.NoError(t, w.Close())
-
-	type zippedItem struct {
-		Name  string
-		IsDir bool
-	}
 
 	// Read back the contents.
 	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
@@ -193,14 +234,18 @@ func TestZipLogs(t *testing.T) {
 		observed = append(observed, zippedItem{Name: f.Name, IsDir: f.FileInfo().IsDir()})
 	}
 
-	// Verify the results.
-	expected := []zippedItem{
-		{"logs/", true},
-		{"logs/elastic-agent-unknow/", true},
-		{"logs/elastic-agent-unknow/sub-dir/", true},
-		{"logs/elastic-agent-unknow/sub-dir/log.ndjson", false},
-	}
 	assert.Equal(t, expected, observed)
+	if t.Failed() {
+		t.Log("Expected")
+		for _, f := range expected {
+			t.Logf("name: %s, dir? %t", f.Name, f.IsDir)
+		}
+
+		t.Log("Got")
+		for _, f := range observed {
+			t.Logf("name: %s, dir? %t", f.Name, f.IsDir)
+		}
+	}
 }
 
 func TestGlobalHooks(t *testing.T) {
@@ -294,4 +339,198 @@ func isPprof(input []byte) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+func TestRedactSecretPaths(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  map[string]interface{}
+		expect map[string]interface{}
+	}{{
+		name: "no secret_paths",
+		input: map[string]interface{}{
+			"outputs": map[string]interface{}{
+				"default": map[string]interface{}{
+					"type":    "elasticsearch",
+					"api_key": "apikeyvalue",
+				},
+			},
+			"inputs": []interface{}{
+				map[string]interface{}{
+					"type":   "example",
+					"secret": "secretvalue",
+				},
+			},
+		},
+		expect: map[string]interface{}{
+			"outputs": map[string]interface{}{
+				"default": map[string]interface{}{
+					"type":    "elasticsearch",
+					"api_key": "apikeyvalue",
+				},
+			},
+			"inputs": []interface{}{
+				map[string]interface{}{
+					"type":   "example",
+					"secret": "secretvalue",
+				},
+			},
+		},
+	}, {
+		name: "secret paths is not an array",
+		input: map[string]interface{}{
+			"secret_paths": "inputs.0.secret,outputs.default.api_key",
+			"outputs": map[string]interface{}{
+				"default": map[string]interface{}{
+					"type":    "elasticsearch",
+					"api_key": "apikeyvalue",
+				},
+			},
+			"inputs": []interface{}{
+				map[string]interface{}{
+					"type":   "example",
+					"secret": "secretvalue",
+				},
+			},
+		},
+		expect: map[string]interface{}{
+			"secret_paths": "inputs.0.secret,outputs.default.api_key",
+			"outputs": map[string]interface{}{
+				"default": map[string]interface{}{
+					"type":    "elasticsearch",
+					"api_key": "apikeyvalue",
+				},
+			},
+			"inputs": []interface{}{
+				map[string]interface{}{
+					"type":   "example",
+					"secret": "secretvalue",
+				},
+			},
+		},
+	}, {
+		name: "secret_paths are redacted",
+		input: map[string]interface{}{
+			"secret_paths": []interface{}{
+				"inputs.0.secret",
+				"outputs.default.api_key",
+			},
+			"outputs": map[string]interface{}{
+				"default": map[string]interface{}{
+					"type":    "elasticsearch",
+					"api_key": "apikeyvalue",
+				},
+			},
+			"inputs": []interface{}{
+				map[string]interface{}{
+					"type":   "example",
+					"secret": "secretvalue",
+				},
+			},
+		},
+		expect: map[string]interface{}{
+			"secret_paths": []interface{}{
+				"inputs.0.secret",
+				"outputs.default.api_key",
+			},
+			"outputs": map[string]interface{}{
+				"default": map[string]interface{}{
+					"type":    "elasticsearch",
+					"api_key": REDACTED,
+				},
+			},
+			"inputs": []interface{}{
+				map[string]interface{}{
+					"type":   "example",
+					"secret": REDACTED,
+				},
+			},
+		},
+	}, {
+		name: "secret_paths contains extra keys",
+		input: map[string]interface{}{
+			"secret_paths": []interface{}{
+				"inputs.0.secret",
+				"outputs.default.api_key",
+				"inputs.1.secret",
+			},
+			"outputs": map[string]interface{}{
+				"default": map[string]interface{}{
+					"type":    "elasticsearch",
+					"api_key": "apikeyvalue",
+				},
+			},
+			"inputs": []interface{}{
+				map[string]interface{}{
+					"type":   "example",
+					"secret": "secretvalue",
+				},
+			},
+		},
+		expect: map[string]interface{}{
+			"secret_paths": []interface{}{
+				"inputs.0.secret",
+				"outputs.default.api_key",
+				"inputs.1.secret",
+			},
+			"outputs": map[string]interface{}{
+				"default": map[string]interface{}{
+					"type":    "elasticsearch",
+					"api_key": REDACTED,
+				},
+			},
+			"inputs": []interface{}{
+				map[string]interface{}{
+					"type":   "example",
+					"secret": REDACTED,
+				},
+			},
+		},
+	}, {
+		name: "secret_paths contains non string key",
+		input: map[string]interface{}{
+			"secret_paths": []interface{}{
+				"inputs.0.secret",
+				"outputs.default.api_key",
+				2,
+			},
+			"outputs": map[string]interface{}{
+				"default": map[string]interface{}{
+					"type":    "elasticsearch",
+					"api_key": "apikeyvalue",
+				},
+			},
+			"inputs": []interface{}{
+				map[string]interface{}{
+					"type":   "example",
+					"secret": "secretvalue",
+				},
+			},
+		},
+		expect: map[string]interface{}{
+			"secret_paths": []interface{}{
+				"inputs.0.secret",
+				"outputs.default.api_key",
+				uint64(2), // go-ucfg serializing/deserializing flattens types
+			},
+			"outputs": map[string]interface{}{
+				"default": map[string]interface{}{
+					"type":    "elasticsearch",
+					"api_key": REDACTED,
+				},
+			},
+			"inputs": []interface{}{
+				map[string]interface{}{
+					"type":   "example",
+					"secret": REDACTED,
+				},
+			},
+		},
+	}}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := RedactSecretPaths(tc.input, io.Discard)
+			assert.Equal(t, tc.expect, result)
+		})
+	}
 }

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package remote
 
@@ -34,8 +34,8 @@ const (
 
 // Unpack the protocol.
 func (p *Protocol) Unpack(from string) error {
-	if Protocol(from) != ProtocolHTTPS && Protocol(from) != ProtocolHTTP {
-		return fmt.Errorf("invalid protocol %s, accepted values are 'http' and 'https'", from)
+	if from != "" && Protocol(from) != ProtocolHTTPS && Protocol(from) != ProtocolHTTP {
+		return fmt.Errorf("invalid protocol %q, accepted values are 'http' and 'https'", from)
 	}
 
 	*p = Protocol(from)

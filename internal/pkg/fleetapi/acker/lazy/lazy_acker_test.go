@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package lazy
 
@@ -87,7 +87,12 @@ func TestLazyAcker(t *testing.T) {
 	cfg.Level = logp.DebugLevel
 	// cfg.ToFiles = false
 	cfg.ToStderr = true
-	log, _ := logger.NewFromConfig("", cfg, true)
+
+	eventLoggerCfg := logger.DefaultEventLoggingConfig()
+	eventLoggerCfg.Level = cfg.Level
+	eventLoggerCfg.ToStderr = cfg.ToStderr
+
+	log, _ := logger.NewFromConfig("", cfg, eventLoggerCfg, true)
 
 	// Tests
 	tests := []struct {

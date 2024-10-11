@@ -1,0 +1,60 @@
+<!--
+(NOTE: Do not edit README.md directly. It is a generated file!)
+(      To make changes, please modify README.md.gotmpl and run `helm-docs`)
+-->
+
+{{ template "chart.header" . }}
+{{ template "chart.deprecationWarning" . }}
+
+{{ template "chart.badgesSection" . }}
+
+{{ template "chart.description" . }}
+
+{{ template "chart.homepageLine" . }}
+
+This chart simplifies the deployment of Elastic Agent in Kubernetes and features a built-in Kubernetes policy.
+
+{{ template "chart.maintainersSection" . }}
+
+{{ template "chart.sourcesSection" . }}
+
+{{ template "chart.valuesSection" . }}
+
+{{ define "section.description.Output.PreTable" }}
+The outputs section specifies where to send data. You can specify multiple outputs to pair specific inputs with specific outputs.
+{{ end }}
+
+{{ define "section.description.OutputObject.PreTable" }}
+The supported types of outputs are:
+- `ESPlainAuthBasic`: `elasticsearch` output with the connection details (url, username, password) specified inline the yaml
+- `ESPlainAuthAPI`: `elasticsearch` output with the connection details (url, api_key) specified inline the yaml
+- `ESSecretAuthBasic`: `elasticsearch` output with the connection details specified in a k8s secret
+- `ESSecretAuthAPI`: `elasticsearch` output with the connection details specified in a k8s secret
+- `ESECKRef`: `elasticsearch` output that references by name an Elasticsearch cluster managed by ECK operator
+{{ end }}
+
+{{ define "section.description.OutputObject.PostTable" }}
+Examples of Helm chart arguments to define an output with name `myOutput`:
+- `ESPlainAuthBasic`: `--set outputs.myOutput.url=https://elasticsearch:9200 --set outputs.myOutput.username=changeme --set outputs.myOutput.password=changeme`
+- `ESPlainAuthAPI`: `--set outputs.myOutput.url=https://elasticsearch:9200 --set outputs.myOutput.api_key=token`
+- `ESSecretAuthBasic`: `--set outputs.myOutput.type=ESSecretAuthBasic --set outputs.myOutput.secretName=k8s_secret_name` (required keys in the k8s secret are `url`, `username`, `password`)
+- `ESSecretAuthAPI`: `--set outputs.myOutput.type=ESSecretAuthAPI --set outputs.myOutput.secretName=k8s_secret_name` (required keys in the k8s secret are `url`, `api_key`)
+- `ESECKRef`: `--set outputs.myOutput.type=ESECKRef --set outputs.myOutput.name=eck_es_cluster_name`
+
+For `ESPlainAuthBasic`, `ESPlainAuthAPI` `ESSecretAuthBasic`, `ESSecretAuthAPI` extra fields can be specified inline the yaml following these guidelines (`ESECKRef` doesn't support them):
+ - ["Data parsing, filtering, and manipulation settings"](`https://www.elastic.co/guide/en/fleet/current/elasticsearch-output.html#output-elasticsearch-data-parsing-settings`)
+ - ["Performance tuning settings"](https://www.elastic.co/guide/en/fleet/current/elasticsearch-output.html#output-elasticsearch-performance-tuning-settings)
+ - ["Memory queue settings"](https://www.elastic.co/guide/en/fleet/current/elasticsearch-output.html#output-elasticsearch-memory-queue-settings)
+{{ end }}
+
+{{ define "section.description.Kubernetes.PreTable" }}
+
+The chart built-in [kubernetes integration](https://docs.elastic.co/integrations/kubernetes) is used to collect logs and metrics from [Kubernetes clusters](https://kubernetes.io/). This integration is capable of fetching metrics from several components:
+- [kubelet](https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/)
+- [kube-state-metrics](https://github.com/kubernetes/kube-state-metrics)
+- [apiserver](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/)
+- [controller-manager](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/)
+- [scheduler](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-scheduler/)
+- [proxy](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-proxy/)
+
+{{ end }}

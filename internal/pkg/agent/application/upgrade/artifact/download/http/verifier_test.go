@@ -1,13 +1,13 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package http
 
 import (
 	"context"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -111,8 +111,8 @@ func runTests(t *testing.T, testCases []testCase, config *artifact.Config, log *
 func getRandomTestCases() []testCase {
 	tt := getTestCases()
 
-	first := rand.Intn(len(tt))
-	second := rand.Intn(len(tt))
+	first := rand.IntN(len(tt))
+	second := rand.IntN(len(tt))
 
 	return []testCase{
 		tt[first],

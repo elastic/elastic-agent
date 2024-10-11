@@ -1,15 +1,32 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build !windows
 
 package paths
 
 import (
+	"fmt"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
+
+const ()
+
+// shellWrapperPathForNamespace is a helper to work around not being able to use fmt.Sprintf
+// unconditionally since shellWrapperPathNamespaceFmt is empty on Windows. The provided namespace is
+// always lowercased for consistency.
+func ShellWrapperPathForNamespace(namespace string) string {
+	return fmt.Sprintf(shellWrapperPathNamespaceFmt, strings.ToLower(namespace))
+}
+
+// controlSocketRunSymlinkForNamespace is a helper to work around not being able to use fmt.Sprintf
+// unconditionally since controlSocketRunSymlinkNamespaceFmt is empty on Windows.
+func controlSocketRunSymlinkForNamespace(namespace string) string {
+	return fmt.Sprintf(controlSocketRunSymlinkNamespaceFmt, namespace)
+}
 
 func initialControlSocketPath(topPath string) string {
 	return ControlSocketFromPath(runtime.GOOS, topPath)

@@ -14,9 +14,6 @@ inputs:
       - kafka
       - logstash
       - redis
-    # Introduced for isolated units tests, not used by cloudbeat
-    shippers: &shippers
-      - shipper
     command: &command
       restart_monitoring_period: 5s
       maximum_restarts_per_period: 1
@@ -37,53 +34,62 @@ inputs:
         - "logging.to_stderr=true"
         - "-E"
         - "gc_percent=${CLOUDBEAT_GOGC:100}"
+        - "-E"
+        - "logging.event_data.to_stderr=true"
+        - "-E"
+        - "logging.event_data.to_files=false"
     isolate_units: true
   - name: cloudbeat/cis_k8s
     description: "CIS Kubernetes monitoring"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
     isolate_units: true
   - name: cloudbeat/cis_eks
     description: "CIS elastic Kubernetes monitoring"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
     isolate_units: true
   - name: cloudbeat/cis_aws
     description: "CIS AWS monitoring"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
     isolate_units: true
   - name: cloudbeat/cis_gcp
     description: "CIS GCP monitoring"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
     isolate_units: true
   - name: cloudbeat/cis_azure
     description: "CIS AZURE monitoring"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
     isolate_units: true
   - name: cloudbeat/vuln_mgmt_aws
     description: "AWS Vulnerabilities management"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
     command: *command
     isolate_units: true
   - name: cloudbeat/asset_inventory_aws
     description: "AWS Asset Inventory Discovery"
     platforms: *platforms
     outputs: *outputs
-    shippers: *shippers
+    command: *command
+    isolate_units: true
+  - name: cloudbeat/asset_inventory_azure
+    description: "Azure Asset Inventory Discovery"
+    platforms: *platforms
+    outputs: *outputs
+    command: *command
+    isolate_units: true
+  - name: cloudbeat/asset_inventory_gcp
+    description: "GCP Asset Inventory Discovery"
+    platforms: *platforms
+    outputs: *outputs
     command: *command
     isolate_units: true

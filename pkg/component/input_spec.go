@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package component
 
@@ -18,7 +18,6 @@ type InputSpec struct {
 	Platforms      []string    `config:"platforms" yaml:"platforms" validate:"required,min=1"`
 	Outputs        []string    `config:"outputs,omitempty" yaml:"outputs,omitempty"`
 	ProxiedActions []string    `config:"proxied_actions,omitempty" yaml:"proxied_actions,omitempty"`
-	Shippers       []string    `config:"shippers,omitempty" yaml:"shippers,omitempty"`
 	Runtime        RuntimeSpec `config:"runtime,omitempty" yaml:"runtime,omitempty"`
 
 	Command      *CommandSpec `config:"command,omitempty" yaml:"command,omitempty"`
@@ -41,20 +40,13 @@ func (s *InputSpec) Validate() error {
 			}
 		}
 	}
-	if len(s.Outputs) == 0 && len(s.Shippers) == 0 {
-		return fmt.Errorf("input '%s' must define at least one output or one shipper", s.Name)
+	if len(s.Outputs) == 0 {
+		return fmt.Errorf("input '%s' must define at least one output", s.Name)
 	}
 	for i, a := range s.Outputs {
 		for j, b := range s.Outputs {
 			if i != j && a == b {
 				return fmt.Errorf("input '%s' defines the output '%s' more than once", s.Name, a)
-			}
-		}
-	}
-	for i, a := range s.Shippers {
-		for j, b := range s.Shippers {
-			if i != j && a == b {
-				return fmt.Errorf("input '%s' defines the shipper '%s' more than once", s.Name, a)
 			}
 		}
 	}

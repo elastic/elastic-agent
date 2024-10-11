@@ -1,14 +1,23 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package fleetservertest
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"text/template"
 )
+
+type SSL struct {
+	Renegotiation          string   `json:"renegotiation,omitempty"`
+	VerificationMode       string   `json:"verification_mode,omitempty"`
+	CertificateAuthorities []string `json:"certificate_authorities,omitempty"`
+	Certificate            string   `json:"certificate,omitempty"`
+	Key                    string   `json:"key,omitempty"`
+}
 
 // TmplPolicy is all the data used to create a policy. Therefore, all the properties
 // should be populated with valid JSON without the surrounding double quotes.
@@ -16,12 +25,12 @@ import (
 type TmplPolicy struct {
 	AgentID  string
 	PolicyID string
-	// FleetHosts should be a JSON array without the square brackets:
-	// - `"host1", "host2"`
-	// - `"host"`
-	FleetHosts string
+	// FleetHosts should be a regular string array containing fleet hosts
+	// []string{"host1", "host2"}
+	FleetHosts []string
 	// AddFleetProxyURL bool
 	FleetProxyURL *string
+	SSL           *SSL
 	SourceURI     string
 	CreatedAt     string
 	Output        struct {
@@ -40,8 +49,8 @@ func NewCheckinResponse(ackToken string, actions ...string) string {
 
 // NewEmptyPolicy returns an policy without any input and monitoring disabled.
 func NewEmptyPolicy(data TmplPolicy) (string, error) {
-	t := template.Must(template.New("policyEmpryTmpl").
-		Parse(policyEmpryTmpl))
+	t := template.Must(template.New("policyEmptyTmpl").Funcs(funcMap).
+		Parse(policyEmptyTmpl))
 
 	buf := &strings.Builder{}
 	err := t.Execute(buf, data)
@@ -102,7 +111,7 @@ func NewAction(data ActionTmpl) (AckableAction, error) {
 // integration uses the fake component. All variable data in the policy
 // comes from the data parameter.
 func NewActionPolicyChangeWithFakeComponent(actionID string, data TmplPolicy) (AckableAction, error) {
-	t := template.Must(template.New("actionPolicyChangeFakeComponentTmpl").
+	t := template.Must(template.New("actionPolicyChangeFakeComponentTmpl").Funcs(funcMap).
 		Parse(actionPolicyChangeFakeComponentTmpl))
 
 	buf := &strings.Builder{}
@@ -117,6 +126,16 @@ func NewActionPolicyChangeWithFakeComponent(actionID string, data TmplPolicy) (A
 		Data:     buf.String(),
 		Type:     "POLICY_CHANGE",
 	})
+}
+
+// template functions
+var funcMap = map[string]any{"toJson": toJson}
+
+func toJson(v any) (string, error) {
+	b := new(strings.Builder)
+	encoder := json.NewEncoder(b)
+	err := encoder.Encode(v)
+	return b.String(), err
 }
 
 const (
@@ -149,12 +168,17 @@ const (
             }
           },
           "fleet": {
-            "hosts": [{{.FleetHosts}}]
+            {{ if ne .SSL nil }}
+            "ssl": {{ toJson .SSL}},
+            {{ end }}
+            "hosts": {{ toJson .FleetHosts }}
           },
           "id": "{{.PolicyID}}",
+          "secret_paths": ["inputs.0.secret_key"],
           "inputs": [
             {
               "id": "fake-input",
+              "secret_key": "secretValue",
               "revision": 1,
               "name": "fake-input",
               "type": "fake-input",
@@ -191,7 +215,7 @@ const (
         }
       }`
 
-	policyEmpryTmpl = `
+	policyEmptyTmpl = `
     {
         "policy": {
           "agent": {
@@ -216,7 +240,10 @@ const (
             {{ if ne .FleetProxyURL nil }}
             "proxy_url": "{{.FleetProxyURL}}",
             {{ end }}
-            "hosts": [{{.FleetHosts}}]
+            {{ if ne .SSL nil }}
+            "ssl": {{ toJson .SSL}},
+            {{ end }}
+            "hosts": {{ toJson .FleetHosts }}
           },
           "id": "{{.PolicyID}}",
           "inputs": [],

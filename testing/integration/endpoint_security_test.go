@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -8,10 +8,8 @@ package integration
 
 import (
 	"archive/zip"
-	"bytes"
 	"context"
-	_ "embed"
-	"encoding/json"
+
 	"fmt"
 	"io/fs"
 	"os"
@@ -20,10 +18,9 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"text/template"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -39,20 +36,8 @@ import (
 )
 
 const (
-	// TODO: Setup a GitHub Action to update this for each release of https://github.com/elastic/endpoint-package
-	endpointPackageVersion       = "8.11.0"
 	endpointHealthPollingTimeout = 2 * time.Minute
 )
-
-//go:embed endpoint_security_package.json.tmpl
-var endpointPackagePolicyTemplate string
-
-type endpointPackageTemplateVars struct {
-	ID       string
-	Name     string
-	PolicyID string
-	Version  string
-}
 
 var protectionTests = []struct {
 	name      string
@@ -148,29 +133,17 @@ func TestInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T) {
 	}
 }
 
-// buildPolicyWithTamperProtection helper function to build the policy request with or without tamper protection
-func buildPolicyWithTamperProtection(policy kibana.AgentPolicy, protected bool) kibana.AgentPolicy {
-	if protected {
-		policy.AgentFeatures = append(policy.AgentFeatures, map[string]interface{}{
-			"name":    "tamper_protection",
-			"enabled": true,
-		})
-	}
-	policy.IsProtected = protected
-	return policy
-}
-
-func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.Info, protected bool) {
-	deadline := time.Now().Add(10 * time.Minute)
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), deadline)
-	defer cancel()
+// installSecurityAgent is a helper function to install an elastic-agent in priviliged mode with the force+non-interactve flags.
+// the policy the agent is enrolled with can have protection enabled if passed
+func installSecurityAgent(ctx context.Context, t *testing.T, info *define.Info, protected bool) (*atesting.Fixture, kibana.PolicyResponse) {
+	t.Helper()
 
 	// Get path to agent executable.
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err, "could not create agent fixture")
 
 	t.Log("Enrolling the agent in Fleet")
-	policyUUID := uuid.New().String()
+	policyUUID := uuid.Must(uuid.NewV4()).String()
 
 	createPolicyReq := buildPolicyWithTamperProtection(
 		kibana.AgentPolicy{
@@ -194,6 +167,27 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 	policy, err := tools.InstallAgentWithPolicy(ctx, t,
 		installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoError(t, err, "failed to install agent with policy")
+	return fixture, policy
+}
+
+// buildPolicyWithTamperProtection helper function to build the policy request with or without tamper protection
+func buildPolicyWithTamperProtection(policy kibana.AgentPolicy, protected bool) kibana.AgentPolicy {
+	if protected {
+		policy.AgentFeatures = append(policy.AgentFeatures, map[string]interface{}{
+			"name":    "tamper_protection",
+			"enabled": true,
+		})
+	}
+	policy.IsProtected = protected
+	return policy
+}
+
+func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.Info, protected bool) {
+	deadline := time.Now().Add(10 * time.Minute)
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), deadline)
+	defer cancel()
+
+	fixture, policy := installSecurityAgent(ctx, t, info, protected)
 
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")
@@ -225,39 +219,13 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 }
 
 func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info, protected bool) {
-	// Get path to agent executable.
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-	require.NoError(t, err)
-
-	t.Log("Enrolling the agent in Fleet")
-	policyUUID := uuid.New().String()
-	createPolicyReq := buildPolicyWithTamperProtection(
-		kibana.AgentPolicy{
-			Name:        "test-policy-" + policyUUID,
-			Namespace:   "default",
-			Description: "Test policy " + policyUUID,
-			MonitoringEnabled: []kibana.MonitoringEnabledOption{
-				kibana.MonitoringEnabledLogs,
-				kibana.MonitoringEnabledMetrics,
-			},
-		},
-		protected,
-	)
-
-	installOpts := atesting.InstallOpts{
-		NonInteractive: true,
-		Force:          true,
-		Privileged:     true,
-	}
-
 	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cn()
 
-	policy, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
-	require.NoError(t, err)
+	fixture, policy := installSecurityAgent(ctx, t, info, protected)
 
 	t.Log("Installing Elastic Defend")
-	_, err = installElasticDefendPackage(t, info, policy.ID)
+	_, err := installElasticDefendPackage(t, info, policy.ID)
 	require.NoError(t, err)
 
 	t.Log("Polling for endpoint-security to become Healthy")
@@ -307,11 +275,6 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 				return false
 			}
 
-			if state.FleetState != client.Failed {
-				t.Logf("Fleet state has not been marked as failed yet!\n%+v", state)
-				return false
-			}
-
 			return true
 		},
 		endpointHealthPollingTimeout,
@@ -338,36 +301,10 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 }
 
 func testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T, info *define.Info, protected bool) {
-	// Get path to agent executable.
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-	require.NoError(t, err)
-
-	t.Log("Enrolling the agent in Fleet")
-	policyUUID := uuid.New().String()
-	createPolicyReq := buildPolicyWithTamperProtection(
-		kibana.AgentPolicy{
-			Name:        "test-policy-" + policyUUID,
-			Namespace:   "default",
-			Description: "Test policy " + policyUUID,
-			MonitoringEnabled: []kibana.MonitoringEnabledOption{
-				kibana.MonitoringEnabledLogs,
-				kibana.MonitoringEnabledMetrics,
-			},
-		},
-		protected,
-	)
-
-	installOpts := atesting.InstallOpts{
-		NonInteractive: true,
-		Force:          true,
-		Privileged:     true,
-	}
-
 	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cn()
 
-	policy, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
-	require.NoError(t, err)
+	fixture, policy := installSecurityAgent(ctx, t, info, protected)
 
 	t.Log("Installing Elastic Defend")
 	pkgPolicyResp, err := installElasticDefendPackage(t, info, policy.ID)
@@ -451,52 +388,6 @@ type agentPolicyUpdateRequest struct {
 	IsProtected bool   `json:"is_protected"`
 }
 
-// Installs the Elastic Defend package to cause the agent to install the endpoint-security service.
-func installElasticDefendPackage(t *testing.T, info *define.Info, policyID string) (r kibana.PackagePolicyResponse, err error) {
-	t.Helper()
-
-	t.Log("Templating endpoint package policy request")
-	tmpl, err := template.New("pkgpolicy").Parse(endpointPackagePolicyTemplate)
-	if err != nil {
-		return r, fmt.Errorf("error creating new template: %w", err)
-	}
-
-	packagePolicyID := uuid.New().String()
-	var pkgPolicyBuf bytes.Buffer
-
-	// Need unique name for Endpoint integration otherwise on multiple runs on the same instance you get
-	// http error response with code 409: {StatusCode:409 Error:Conflict Message:An integration policy with the name Defend-cbomziz4uvn5fov9t1gsrcvdwn2p1s7tefnvgsye already exists. Please rename it or choose a different name.}
-	err = tmpl.Execute(&pkgPolicyBuf, endpointPackageTemplateVars{
-		ID:       packagePolicyID,
-		Name:     "Defend-" + packagePolicyID,
-		PolicyID: policyID,
-		Version:  endpointPackageVersion,
-	})
-	if err != nil {
-		return r, fmt.Errorf("error executing template: %w", err)
-	}
-
-	// Make sure the templated value is actually valid JSON before making the API request.
-	// Using json.Unmarshal will give us the actual syntax error, calling json.Valid() would not.
-	packagePolicyReq := kibana.PackagePolicyRequest{}
-	err = json.Unmarshal(pkgPolicyBuf.Bytes(), &packagePolicyReq)
-	if err != nil {
-		return r, fmt.Errorf("templated package policy is not valid JSON: %s, %w", pkgPolicyBuf.String(), err)
-	}
-
-	t.Log("POST /api/fleet/package_policies")
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-
-	pkgResp, err := info.KibanaClient.InstallFleetPackage(ctx, packagePolicyReq)
-	if err != nil {
-		t.Logf("Error installing fleet package: %v", err)
-		return r, fmt.Errorf("error installing fleet package: %w", err)
-	}
-	t.Logf("Endpoint package Policy Response:\n%+v", pkgResp)
-	return pkgResp, err
-}
-
 // Tests that install of Elastic Defend fails if Agent is installed in a base
 // path other than default
 func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
@@ -515,7 +406,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Enrolling the agent in Fleet")
-	policyUUID := uuid.New().String()
+	policyUUID := uuid.Must(uuid.NewV4()).String()
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        "test-policy-" + policyUUID,
 		Namespace:   "default",
@@ -593,7 +484,7 @@ func TestEndpointSecurityUnprivileged(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Enrolling the agent in Fleet")
-	policyUUID := uuid.New().String()
+	policyUUID := uuid.Must(uuid.NewV4()).String()
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        "test-policy-" + policyUUID,
 		Namespace:   "default",
@@ -649,6 +540,76 @@ func TestEndpointSecurityUnprivileged(t *testing.T) {
 	}, 2*time.Minute, 10*time.Second, "Agent never became DEGRADED with root/Administrator install message")
 }
 
+// Tests that trying to switch from privileged to unprivileged with Elastic Defend fails.
+func TestEndpointSecurityCannotSwitchToUnprivileged(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Fleet,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+
+		// Only supports Linux at the moment.
+		OS: []define.OS{
+			{
+				Type: define.Linux,
+			},
+		},
+	})
+
+	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cn()
+
+	// Get path to agent executable.
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	t.Log("Enrolling the agent in Fleet")
+	policyUUID := uuid.Must(uuid.NewV4()).String()
+	createPolicyReq := kibana.AgentPolicy{
+		Name:        "test-policy-" + policyUUID,
+		Namespace:   "default",
+		Description: "Test policy " + policyUUID,
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+	}
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+		Privileged:     true, // ensure always privileged
+	}
+	policyResp, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
+	require.NoErrorf(t, err, "Policy Response was: %v", policyResp)
+
+	t.Log("Installing Elastic Defend")
+	pkgPolicyResp, err := installElasticDefendPackage(t, info, policyResp.ID)
+	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
+
+	t.Log("Polling for endpoint-security to become Healthy")
+	healthyCtx, cancel := context.WithTimeout(ctx, endpointHealthPollingTimeout)
+	defer cancel()
+
+	agentClient := fixture.Client()
+	err = agentClient.Connect(healthyCtx)
+	require.NoError(t, err)
+
+	require.Eventually(t,
+		func() bool { return agentAndEndpointAreHealthy(t, healthyCtx, agentClient) },
+		endpointHealthPollingTimeout,
+		time.Second,
+		"Endpoint component or units are not healthy.",
+	)
+	t.Log("Verified endpoint component and units are healthy")
+
+	performSwitchCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	output, err := fixture.Exec(performSwitchCtx, []string{"unprivileged", "-f"})
+	require.Errorf(t, err, "unprivileged command should have failed")
+	assert.Contains(t, string(output), "unable to switch to unprivileged mode due to the following service based components having issues")
+	assert.Contains(t, string(output), "endpoint")
+}
+
 // TestEndpointLogsAreCollectedInDiagnostics tests that diagnostics archive contain endpoint logs
 func TestEndpointLogsAreCollectedInDiagnostics(t *testing.T) {
 	info := define.Require(t, define.Requirements{
@@ -669,7 +630,7 @@ func TestEndpointLogsAreCollectedInDiagnostics(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Enrolling the agent in Fleet")
-	policyUUID := uuid.New().String()
+	policyUUID := uuid.Must(uuid.NewV4()).String()
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        "test-policy-" + policyUUID,
 		Namespace:   "default",
@@ -813,55 +774,6 @@ func checkDiagnosticsForEndpointFiles(t *testing.T, diagsPath string, endpointCo
 	}
 }
 
-func agentAndEndpointAreHealthy(t *testing.T, ctx context.Context, agentClient client.Client) bool {
-	t.Helper()
-
-	state, err := agentClient.State(ctx)
-	if err != nil {
-		t.Logf("Error getting agent state: %s", err)
-		return false
-	}
-
-	if state.State != client.Healthy {
-		t.Logf("local Agent is not Healthy: current state: %+v", state)
-		return false
-	}
-
-	foundEndpointInputUnit := false
-	foundEndpointOutputUnit := false
-	for _, comp := range state.Components {
-		isEndpointComponent := strings.Contains(comp.Name, "endpoint")
-		if comp.State != client.Healthy {
-			t.Logf("endpoint component is not Healthy: current state: %+v", comp)
-			return false
-		}
-
-		for _, unit := range comp.Units {
-			if isEndpointComponent {
-				if unit.UnitType == client.UnitTypeInput {
-					foundEndpointInputUnit = true
-				}
-				if unit.UnitType == client.UnitTypeOutput {
-					foundEndpointOutputUnit = true
-				}
-			}
-
-			if unit.State != client.Healthy {
-				t.Logf("unit %q is not Healthy\n%+v", unit.UnitID, unit)
-				return false
-			}
-		}
-	}
-
-	// Ensure both the endpoint input and output units were found and healthy.
-	if !foundEndpointInputUnit || !foundEndpointOutputUnit {
-		t.Logf("State did not contain endpoint units (input: %v/output: %v) state: %+v. ", foundEndpointInputUnit, foundEndpointOutputUnit, state)
-		return false
-	}
-
-	return true
-}
-
 func agentIsHealthyNoEndpoint(t *testing.T, ctx context.Context, agentClient client.Client) bool {
 	t.Helper()
 
@@ -913,4 +825,72 @@ func agentIsHealthyNoEndpoint(t *testing.T, ctx context.Context, agentClient cli
 	}
 
 	return true
+}
+
+// TestForceInstallOverProtectedPolicy tests that running `elastic-agent install -f`
+// when an installed agent is running a policy with tamper protection enabled fails.
+func TestForceInstallOverProtectedPolicy(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Fleet,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+	})
+
+	deadline := time.Now().Add(10 * time.Minute)
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), deadline)
+	defer cancel()
+
+	fixture, policy := installSecurityAgent(ctx, t, info, true)
+
+	t.Cleanup(func() {
+		t.Log("Un-enrolling Elastic Agent...")
+		// Use a separate context as the one in the test body will have been cancelled at this point.
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cleanupCancel()
+		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, policy.ID))
+	})
+
+	t.Log("Installing Elastic Defend")
+	pkgPolicyResp, err := installElasticDefendPackage(t, info, policy.ID)
+	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
+
+	t.Log("Polling for endpoint-security to become Healthy")
+	ctx, cancel = context.WithTimeout(ctx, endpointHealthPollingTimeout)
+	defer cancel()
+
+	agentClient := fixture.Client()
+	err = agentClient.Connect(ctx)
+	require.NoError(t, err, "could not connect to local agent")
+
+	require.Eventually(t,
+		func() bool { return agentAndEndpointAreHealthy(t, ctx, agentClient) },
+		endpointHealthPollingTimeout,
+		time.Second,
+		"Endpoint component or units are not healthy.",
+	)
+	t.Log("Verified endpoint component and units are healthy")
+
+	t.Log("Run elastic-agent install -f...")
+	// We use the same policy with tamper protection enabled for this test and expect it to fail.
+	token, err := info.KibanaClient.CreateEnrollmentAPIKey(ctx, kibana.CreateEnrollmentAPIKeyRequest{
+		PolicyID: policy.ID,
+	})
+	require.NoError(t, err)
+	url, err := fleettools.DefaultURL(ctx, info.KibanaClient)
+	require.NoError(t, err)
+
+	args := []string{
+		"install",
+		"--force",
+		"--url",
+		url,
+		"--enrollment-token",
+		token.APIKey,
+	}
+	out, err := fixture.Exec(ctx, args)
+	require.Errorf(t, err, "No error detected, command output: %s", out)
 }

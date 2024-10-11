@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package application
 
@@ -65,6 +65,7 @@ func newManagedConfigManager(
 	storeSaver storage.Store,
 	runtime *runtime.Manager,
 	fleetInitTimeout time.Duration,
+	topPath string,
 	clientSetters ...actions.ClientSetter,
 ) (*managedConfigManager, error) {
 	client, err := fleetclient.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
@@ -78,7 +79,7 @@ func newManagedConfigManager(
 	// Create the state store that will persist the last good policy change on disk.
 	stateStore, err := store.NewStateStoreWithMigration(ctx, log, paths.AgentActionStoreFile(), paths.AgentStateStoreFile())
 	if err != nil {
-		return nil, errors.New(err, fmt.Sprintf("fail to read action store '%s'", paths.AgentActionStoreFile()))
+		return nil, errors.New(err, fmt.Sprintf("fail to read state store '%s'", paths.AgentStateStoreFile()))
 	}
 
 	actionQueue, err := queue.NewActionQueue(stateStore.Queue(), stateStore)
@@ -86,7 +87,7 @@ func newManagedConfigManager(
 		return nil, fmt.Errorf("unable to initialize action queue: %w", err)
 	}
 
-	actionDispatcher, err := dispatcher.New(log, handlers.NewDefault(log), actionQueue)
+	actionDispatcher, err := dispatcher.New(log, topPath, handlers.NewDefault(log), actionQueue)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize action dispatcher: %w", err)
 	}
@@ -157,14 +158,14 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		close(retrierRun)
 	}()
 
-	actions := m.stateStore.Actions()
+	action := m.stateStore.Action()
 	stateRestored := false
-	if len(actions) > 0 && !m.wasUnenrolled() {
+	if action != nil && !m.wasUnenrolled() {
 		// TODO(ph) We will need an improvement on fleet, if there is an error while dispatching a
 		// persisted action on disk we should be able to ask Fleet to get the latest configuration.
 		// But at the moment this is not possible because the policy change was acked.
 		m.log.Info("restoring current policy from disk")
-		m.dispatcher.Dispatch(ctx, m.coord.SetUpgradeDetails, actionAcker, actions...)
+		m.dispatcher.Dispatch(ctx, m.coord.SetUpgradeDetails, actionAcker, action)
 		stateRestored = true
 	}
 
@@ -268,13 +269,8 @@ func (m *managedConfigManager) Watch() <-chan coordinator.ConfigChange {
 }
 
 func (m *managedConfigManager) wasUnenrolled() bool {
-	actions := m.stateStore.Actions()
-	for _, a := range actions {
-		if a.Type() == "UNENROLL" {
-			return true
-		}
-	}
-	return false
+	return m.stateStore.Action() != nil &&
+		m.stateStore.Action().Type() == fleetapi.ActionTypeUnenroll
 }
 
 func (m *managedConfigManager) initFleetServer(ctx context.Context, cfg *configuration.FleetServerConfig) error {
@@ -347,6 +343,7 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 		m.store,
 		m.ch,
 		settingsHandler,
+		m.coord,
 	)
 
 	m.dispatcher.MustRegister(
@@ -392,6 +389,7 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 		&fleetapi.ActionDiagnostics{},
 		handlers.NewDiagnostics(
 			m.log,
+			paths.Top(), // TODO: stop using global state
 			m.coord,
 			m.cfg.Settings.MonitoringConfig.Diagnostics.Limit,
 			uploader.New(m.agentInfo.AgentID(), m.client, m.cfg.Settings.MonitoringConfig.Diagnostics.Uploader),

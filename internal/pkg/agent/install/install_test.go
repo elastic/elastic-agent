@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package install
 
@@ -177,7 +177,9 @@ func TestCopyFiles(t *testing.T) {
 
 func TestSetupInstallPath(t *testing.T) {
 	tmpdir := t.TempDir()
-	err := setupInstallPath(tmpdir, utils.CurrentFileOwner())
+	ownership, err := utils.CurrentFileOwner()
+	require.NoError(t, err)
+	err = setupInstallPath(tmpdir, ownership)
 	require.NoError(t, err)
 	require.FileExists(t, filepath.Join(tmpdir, paths.MarkerFileName))
 }

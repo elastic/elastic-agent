@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package logger
 
@@ -49,7 +49,8 @@ var internalLevelEnabler *zap.AtomicLevel
 // New returns a configured ECS Logger
 func New(name string, logInternal bool) (*Logger, error) {
 	defaultCfg := DefaultLoggingConfig()
-	return new(name, defaultCfg, logInternal)
+	defaultEventLogCfg := DefaultEventLoggingConfig()
+	return new(name, defaultCfg, defaultEventLogCfg, logInternal)
 }
 
 // NewWithLogpLevel returns a configured logp Logger with specified level.
@@ -57,13 +58,16 @@ func NewWithLogpLevel(name string, level logp.Level, logInternal bool) (*Logger,
 	defaultCfg := DefaultLoggingConfig()
 	defaultCfg.Level = level
 
-	return new(name, defaultCfg, logInternal)
+	defaultEventLogCfg := DefaultEventLoggingConfig()
+	defaultEventLogCfg.Level = level
+
+	return new(name, defaultCfg, defaultEventLogCfg, logInternal)
 }
 
 // NewFromConfig takes the user configuration and generate the right logger.
 // We should finish implementation, need support on the library that we use.
-func NewFromConfig(name string, cfg *Config, logInternal bool) (*Logger, error) {
-	return new(name, cfg, logInternal)
+func NewFromConfig(name string, cfg, eventLogCfg *Config, logInternal bool) (*Logger, error) {
+	return new(name, cfg, eventLogCfg, logInternal)
 }
 
 // NewWithoutConfig returns a new logger without having a configuration.
@@ -105,10 +109,10 @@ func AddCallerSkip(l *Logger, skip int) *Logger {
 	return l.WithOptions(zap.AddCallerSkip(skip))
 }
 
-func new(name string, cfg *Config, logInternal bool) (*Logger, error) {
+func new(name string, cfg, eventLoggerCfg *Config, logInternal bool) (*Logger, error) {
 	commonCfg, err := ToCommonConfig(cfg)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not convert log config: %w", err)
 	}
 
 	var outputs []zapcore.Core
@@ -121,9 +125,15 @@ func new(name string, cfg *Config, logInternal bool) (*Logger, error) {
 		outputs = append(outputs, internal)
 	}
 
-	if err := configure.LoggingWithOutputs("", commonCfg, outputs...); err != nil {
+	eventLoggercommonCfg, err := ToCommonConfig(eventLoggerCfg)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert event log config: %w", err)
+	}
+
+	if err := configure.LoggingWithTypedOutputs("", commonCfg, eventLoggercommonCfg, "log.type", "event", outputs...); err != nil {
 		return nil, fmt.Errorf("error initializing logging: %w", err)
 	}
+
 	return logp.NewLogger(name), nil
 }
 
@@ -165,6 +175,23 @@ func DefaultLoggingConfig() *Config {
 	cfg.Files.MaxSize = 20 * 1024 * 1024
 	cfg.Files.Permissions = 0600 // default user only
 	root, _ := utils.HasRoot()   // error ignored
+	if !root {
+		// when not running as root, the default changes to include the group
+		cfg.Files.Permissions = 0660
+	}
+
+	return &cfg
+}
+
+// DefaultLoggingConfig returns default configuration for agent logging.
+func DefaultEventLoggingConfig() *Config {
+	cfg := logp.DefaultEventConfig(logp.DefaultEnvironment)
+
+	// That's the same path useb by MakeInternalFileOutput
+	cfg.Files.Path = filepath.Join(paths.Home(), DefaultLogDirectory, "events")
+	cfg.Files.Name = agentName + "-event-log"
+
+	root, _ := utils.HasRoot() // error ignored
 	if !root {
 		// when not running as root, the default changes to include the group
 		cfg.Files.Permissions = 0660

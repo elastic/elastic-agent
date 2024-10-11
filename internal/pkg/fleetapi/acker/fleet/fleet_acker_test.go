@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package fleet
 
@@ -125,14 +125,18 @@ func TestAcker_Ack(t *testing.T) {
 				&fleetapi.ActionUpgrade{
 					ActionID:   "upgrade-retry",
 					ActionType: fleetapi.ActionTypeUpgrade,
-					Retry:      1,
-					Err:        errors.New("upgrade failed"),
+					Data: fleetapi.ActionUpgradeData{
+						Retry: 1,
+					},
+					Err: errors.New("upgrade failed"),
 				},
 				&fleetapi.ActionUpgrade{
 					ActionID:   "upgrade-failed",
 					ActionType: fleetapi.ActionTypeUpgrade,
-					Retry:      -1,
-					Err:        errors.New("upgrade failed"),
+					Data: fleetapi.ActionUpgradeData{
+						Retry: -1,
+					},
+					Err: errors.New("upgrade failed"),
 				},
 			},
 		},
@@ -165,7 +169,8 @@ func TestAcker_Ack(t *testing.T) {
 					}
 					err := json.Unmarshal(req.Events[i].Payload, &pl)
 					require.NoError(t, err)
-					assert.Equal(t, a.Retry, pl.Attempt, "action ID %s failed", a.ActionID)
+					assert.Equal(t, a.Data.Retry, pl.Attempt,
+						"action ID %s failed", a.ActionID)
 					// Check retry flag
 					if pl.Attempt > 0 {
 						assert.True(t, pl.Retry)

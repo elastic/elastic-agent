@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package ess
 
@@ -9,6 +9,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -251,20 +252,19 @@ func (c *Client) DeploymentIsReady(ctx context.Context, deploymentID string, tic
 	ticker := time.NewTicker(tick)
 	defer ticker.Stop()
 
+	var errs error
 	statusCh := make(chan DeploymentStatus, 1)
-	errCh := make(chan error)
-
 	for {
 		select {
 		case <-ctx.Done():
-			return false, ctx.Err()
+			return false, errors.Join(errs, ctx.Err())
 		case <-ticker.C:
-			statusCtx, statusCancel := context.WithTimeout(ctx, tick)
-			defer statusCancel()
 			go func() {
+				statusCtx, statusCancel := context.WithTimeout(ctx, tick)
+				defer statusCancel()
 				status, err := c.DeploymentStatus(statusCtx, deploymentID)
 				if err != nil {
-					errCh <- err
+					errs = errors.Join(errs, err)
 					return
 				}
 				statusCh <- status.Overall
@@ -273,8 +273,6 @@ func (c *Client) DeploymentIsReady(ctx context.Context, deploymentID string, tic
 			if status == DeploymentStatusStarted {
 				return true, nil
 			}
-		case err := <-errCh:
-			return false, err
 		}
 	}
 }

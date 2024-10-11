@@ -260,6 +260,7 @@ message DiagnosticAgentRequest {
 // DiagnosticAgentRequestAdditional is an enum of additional diagnostic metrics that can be requested from Elastic Agent.
 enum AdditionalDiagnosticRequest {
   CPU = 0;
+  CONN = 1;
 }
 
 // DiagnosticComponentsRequest is the message to request diagnostics from individual components.

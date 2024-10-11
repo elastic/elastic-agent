@@ -1,8 +1,7 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
-//nolint:dupl // duplicate code is in test cases
 package component
 
 import (
@@ -28,7 +27,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gopkg.in/yaml.v2"
 
@@ -464,7 +462,7 @@ func TestToComponents(t *testing.T) {
 			},
 		},
 		{
-			Name:     "Invalid: inputs endpoint doesn't support logstash",
+			Name:     "Invalid: inputs fleet-server doesn't support logstash",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
@@ -545,8 +543,12 @@ func TestToComponents(t *testing.T) {
 					InputType:  "endpoint",
 					OutputType: "elasticsearch",
 					ID:         "endpoint-default",
-					InputSpec:  &InputRuntimeSpec{},
-					Err:        NewErrInputRuntimeCheckFail("Elastic Defend doesn't support RHEL7 on arm64"),
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "endpoint",
+						BinaryName: "endpoint-security",
+						BinaryPath: filepath.Join("..", "..", "specs", "endpoint-security"),
+					},
+					Err: NewErrInputRuntimeCheckFail("Elastic Defend doesn't support RHEL7 on arm64"),
 					Units: []Unit{
 						{
 							ID:       "endpoint-default",
@@ -606,8 +608,8 @@ func TestToComponents(t *testing.T) {
 					ID:         "filestream-default",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
 					},
 					Units: []Unit{
 						{
@@ -631,7 +633,7 @@ func TestToComponents(t *testing.T) {
 							ID:       "filestream-default-filestream-1",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
-							Err:      errors.New("1 decoding error(s): 'meta' expected a map, got 'slice'"),
+							Err:      fmt.Errorf("decoding error: %w", fmt.Errorf("decoding failed due to the following error(s):\n\n%w", errors.Join(errors.New("'meta' expected a map, got 'slice'")))),
 						},
 					},
 				},
@@ -719,7 +721,7 @@ func TestToComponents(t *testing.T) {
 							ID:       "cloudbeat-default-cloudbeat-1-unit",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
-							Err:      errors.New("1 decoding error(s): 'meta' expected a map, got 'slice'"),
+							Err:      fmt.Errorf("decoding error: %w", fmt.Errorf("decoding failed due to the following error(s):\n\n%w", errors.Join(errors.New("'meta' expected a map, got 'slice'")))),
 						},
 					},
 				},
@@ -835,8 +837,8 @@ func TestToComponents(t *testing.T) {
 					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
 					},
 					Units: []Unit{
 						{
@@ -944,8 +946,8 @@ func TestToComponents(t *testing.T) {
 					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
 					},
 					Units: []Unit{
 						{
@@ -1055,8 +1057,8 @@ func TestToComponents(t *testing.T) {
 					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
 					},
 					Units: []Unit{
 						{
@@ -1215,8 +1217,8 @@ func TestToComponents(t *testing.T) {
 					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
 					},
 					Units: []Unit{
 						{
@@ -1252,8 +1254,8 @@ func TestToComponents(t *testing.T) {
 					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
 					},
 					Units: []Unit{
 						{
@@ -1289,8 +1291,8 @@ func TestToComponents(t *testing.T) {
 					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
 					},
 					Units: []Unit{
 						{
@@ -1312,7 +1314,6 @@ func TestToComponents(t *testing.T) {
 						},
 						{
 							ID:       "log-default-logfile-1",
-							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "log",
@@ -1326,8 +1327,8 @@ func TestToComponents(t *testing.T) {
 					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
 					},
 					Units: []Unit{
 						{
@@ -1354,8 +1355,8 @@ func TestToComponents(t *testing.T) {
 					OutputType: "logstash",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
 					},
 					Units: []Unit{
 						{
@@ -1382,8 +1383,8 @@ func TestToComponents(t *testing.T) {
 					OutputType: "redis",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
 					},
 					Units: []Unit{
 						{
@@ -1792,1260 +1793,6 @@ func TestToComponents(t *testing.T) {
 			},
 		},
 		{
-			Name:     "Simple w/ shipper",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-						"shipper": map[string]interface{}{
-							"enabled": true,
-						},
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type":    "filestream",
-						"id":      "filestream-0",
-						"enabled": true,
-					},
-					map[string]interface{}{
-						"type":    "filestream",
-						"id":      "filestream-1",
-						"enabled": false,
-					},
-				},
-			},
-			Result: []Component{
-				{
-					ID:         "filestream-default",
-					InputType:  "filestream",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "filestream",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "filestream-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "shipper",
-							}),
-						},
-						{
-							ID:       "filestream-default-filestream-0",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "filestream",
-								"id":   "filestream-0",
-							}),
-						},
-					},
-					ShipperRef: &ShipperReference{
-						ShipperType: "shipper",
-						ComponentID: "shipper-default",
-						UnitID:      "filestream-default",
-					},
-				},
-				{
-					ID:         "shipper-default",
-					OutputType: "elasticsearch",
-					ShipperSpec: &ShipperRuntimeSpec{
-						ShipperType: "shipper",
-						BinaryName:  "shipper",
-						BinaryPath:  filepath.Join("..", "..", "specs", "shipper"),
-					},
-					Units: []Unit{
-						{
-							ID:       "shipper-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "filestream-default",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"id":   "filestream-default",
-								"type": "shipper",
-								"units": []interface{}{
-									map[string]interface{}{
-										"id": "filestream-default-filestream-0",
-										"config": map[string]interface{}{
-											"type": "filestream",
-											"id":   "filestream-0",
-										},
-									},
-								},
-							}),
-						},
-					},
-				},
-			},
-		},
-		{
-			Name:     "Simple w/ shipper (isolated units)",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-						"shipper": map[string]interface{}{
-							"enabled": true,
-						},
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type":    "cloudbeat",
-						"id":      "cloudbeat-0",
-						"enabled": true,
-					},
-					map[string]interface{}{
-						"type":    "cloudbeat",
-						"id":      "cloudbeat-1",
-						"enabled": false,
-					},
-				},
-			},
-			Result: []Component{
-				{
-					ID:         "cloudbeat-default",
-					InputType:  "cloudbeat",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "cloudbeat",
-						BinaryName: "cloudbeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "cloudbeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "cloudbeat-default-cloudbeat-0",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "shipper",
-							}),
-						},
-						{
-							ID:       "cloudbeat-default-cloudbeat-0-unit",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "cloudbeat",
-								"id":   "cloudbeat-0",
-							}),
-						},
-					},
-					ShipperRef: &ShipperReference{
-						ShipperType: "shipper",
-						ComponentID: "shipper-default",
-						UnitID:      "cloudbeat-default-cloudbeat-0",
-					},
-				},
-				{
-					ID:         "shipper-default",
-					OutputType: "elasticsearch",
-					ShipperSpec: &ShipperRuntimeSpec{
-						ShipperType: "shipper",
-						BinaryName:  "shipper",
-						BinaryPath:  filepath.Join("..", "..", "specs", "shipper"),
-					},
-					Units: []Unit{
-						{
-							ID:       "shipper-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "cloudbeat-default-cloudbeat-0",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"id":   "cloudbeat-default-cloudbeat-0",
-								"type": "shipper",
-								"units": []interface{}{
-									map[string]interface{}{
-										"id": "cloudbeat-default-cloudbeat-0-unit",
-										"config": map[string]interface{}{
-											"type": "cloudbeat",
-											"id":   "cloudbeat-0",
-										},
-									},
-								},
-							}),
-						},
-					},
-				},
-			},
-		},
-		{
-			Name:     "Complex w/ shipper",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type": "elasticsearch",
-						"shipper": map[string]interface{}{
-							"enabled": true,
-						},
-					},
-					"other": map[string]interface{}{
-						"type": "elasticsearch",
-						"shipper": map[string]interface{}{
-							"enabled": false,
-						},
-					},
-					"stashit": map[string]interface{}{
-						"type": "logstash",
-						"shipper": map[string]interface{}{
-							"enabled": true,
-						},
-					},
-					"redis": map[string]interface{}{
-						"type": "redis",
-						"shipper": map[string]interface{}{
-							"enabled": true,
-						},
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type": "filestream",
-						"id":   "filestream-0",
-					},
-					map[string]interface{}{
-						"type": "filestream",
-						"id":   "filestream-1",
-					},
-					map[string]interface{}{
-						"type":    "filestream",
-						"id":      "filestream-2",
-						"enabled": false,
-					},
-					map[string]interface{}{
-						"type":       "filestream",
-						"id":         "filestream-3",
-						"use_output": "other",
-					},
-					map[string]interface{}{
-						"type":       "filestream",
-						"id":         "filestream-4",
-						"use_output": "other",
-					},
-					map[string]interface{}{
-						"type":       "logfile",
-						"id":         "logfile-0",
-						"use_output": "default",
-					},
-					map[string]interface{}{
-						"type":       "log",
-						"id":         "logfile-1",
-						"use_output": "default",
-					},
-					map[string]interface{}{
-						"type":       "logfile",
-						"id":         "logfile-2",
-						"use_output": "other",
-					},
-					map[string]interface{}{
-						"type":       "logfile",
-						"id":         "logfile-3",
-						"use_output": "stashit",
-					},
-					map[string]interface{}{
-						"type":       "logfile",
-						"id":         "logfile-4",
-						"use_output": "redis",
-					},
-					map[string]interface{}{
-						"type": "apm",
-						"id":   "apm-server-0",
-					},
-				},
-			},
-			Result: []Component{
-				{
-					ID:         "filestream-default",
-					InputType:  "filestream",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "filestream",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "filestream-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "shipper",
-							}),
-						},
-						{
-							ID:       "filestream-default-filestream-0",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "filestream",
-								"id":   "filestream-0",
-							}),
-						},
-						{
-							ID:       "filestream-default-filestream-1",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "filestream",
-								"id":   "filestream-1",
-							}),
-						},
-					},
-					ShipperRef: &ShipperReference{
-						ShipperType: "shipper",
-						ComponentID: "shipper-default",
-						UnitID:      "filestream-default",
-					},
-				},
-				{
-					ID:         "filestream-other",
-					InputType:  "filestream",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "filestream",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "filestream-other",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "filestream-other-filestream-3",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "filestream",
-								"id":   "filestream-3",
-							}),
-						},
-						{
-							ID:       "filestream-other-filestream-4",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "filestream",
-								"id":   "filestream-4",
-							}),
-						},
-					},
-				},
-				{
-					ID:         "log-default",
-					InputType:  "log",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "log",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "log-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "shipper",
-							}),
-						},
-						{
-							ID:       "log-default-logfile-0",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "log",
-								"id":   "logfile-0",
-							}, "log"),
-						},
-						{
-							ID:       "log-default-logfile-1",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "log",
-								"id":   "logfile-1",
-							}),
-						},
-					},
-					ShipperRef: &ShipperReference{
-						ShipperType: "shipper",
-						ComponentID: "shipper-default",
-						UnitID:      "log-default",
-					},
-				},
-				{
-					ID:         "shipper-default",
-					OutputType: "elasticsearch",
-					ShipperSpec: &ShipperRuntimeSpec{
-						ShipperType: "shipper",
-						BinaryName:  "shipper",
-						BinaryPath:  filepath.Join("..", "..", "specs", "shipper"),
-					},
-					Units: []Unit{
-						{
-							ID:       "filestream-default",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"id":   "filestream-default",
-								"type": "shipper",
-								"units": []interface{}{
-									map[string]interface{}{
-										"id": "filestream-default-filestream-0",
-										"config": map[string]interface{}{
-											"type": "filestream",
-											"id":   "filestream-0",
-										},
-									},
-									map[string]interface{}{
-										"id": "filestream-default-filestream-1",
-										"config": map[string]interface{}{
-											"type": "filestream",
-											"id":   "filestream-1",
-										},
-									},
-								},
-							}),
-						},
-						{
-							ID:       "log-default",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"id":   "log-default",
-								"type": "shipper",
-								"units": []interface{}{
-									map[string]interface{}{
-										"id": "log-default-logfile-0",
-										"config": map[string]interface{}{
-											"type": "log",
-											"id":   "logfile-0",
-										},
-									},
-									map[string]interface{}{
-										"id": "log-default-logfile-1",
-										"config": map[string]interface{}{
-											"type": "log",
-											"id":   "logfile-1",
-										},
-									},
-								},
-							}),
-						},
-						{
-							ID:       "shipper-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-					},
-				},
-				{
-					ID:         "log-other",
-					InputType:  "log",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "log",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "log-other",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "log-other-logfile-2",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "log",
-								"id":   "logfile-2",
-							}, "log"),
-						},
-					},
-				},
-				{
-					ID:         "log-stashit",
-					InputType:  "log",
-					OutputType: "logstash",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "log",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "log-stashit",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "shipper",
-							}),
-						},
-						{
-							ID:       "log-stashit-logfile-3",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "log",
-								"id":   "logfile-3",
-							}, "log"),
-						},
-					},
-					ShipperRef: &ShipperReference{
-						ShipperType: "shipper",
-						ComponentID: "shipper-stashit",
-						UnitID:      "log-stashit",
-					},
-				},
-				{
-					ID:         "shipper-stashit",
-					OutputType: "logstash",
-					ShipperSpec: &ShipperRuntimeSpec{
-						ShipperType: "shipper",
-						BinaryName:  "shipper",
-						BinaryPath:  filepath.Join("..", "..", "specs", "shipper"),
-					},
-					Units: []Unit{
-						{
-							ID:       "log-stashit",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"id":   "log-stashit",
-								"type": "shipper",
-								"units": []interface{}{
-									map[string]interface{}{
-										"id": "log-stashit-logfile-3",
-										"config": map[string]interface{}{
-											"type": "log",
-											"id":   "logfile-3",
-										},
-									},
-								},
-							}),
-						},
-						{
-							ID:       "shipper-stashit",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "logstash",
-							}),
-						},
-					},
-				},
-				{
-					ID:         "log-redis",
-					InputType:  "log",
-					OutputType: "redis",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "log",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "log-redis",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "shipper",
-							}),
-						},
-						{
-							ID:       "log-redis-logfile-4",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "log",
-								"id":   "logfile-4",
-							}, "log"),
-						},
-					},
-					ShipperRef: &ShipperReference{
-						ShipperType: "shipper",
-						ComponentID: "shipper-redis",
-						UnitID:      "log-redis",
-					},
-				},
-				{
-					ID:         "shipper-redis",
-					OutputType: "redis",
-					ShipperSpec: &ShipperRuntimeSpec{
-						ShipperType: "shipper",
-						BinaryName:  "shipper",
-						BinaryPath:  filepath.Join("..", "..", "specs", "shipper"),
-					},
-					Units: []Unit{
-						{
-							ID:       "log-redis",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"id":   "log-redis",
-								"type": "shipper",
-								"units": []interface{}{
-									map[string]interface{}{
-										"id": "log-redis-logfile-4",
-										"config": map[string]interface{}{
-											"type": "log",
-											"id":   "logfile-4",
-										},
-									},
-								},
-							}),
-						},
-						{
-							ID:       "shipper-redis",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "redis",
-							}),
-						},
-					},
-				},
-				{
-					ID:         "apm-default",
-					InputType:  "apm",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "apm",
-						BinaryName: "apm-server",
-						BinaryPath: filepath.Join("..", "..", "specs", "apm-server"),
-					},
-					Units: []Unit{
-						{
-							ID:       "apm-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "apm-default-apm-server-0",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "apm",
-								"id":   "apm-server-0",
-							}),
-						},
-					},
-				},
-			},
-		},
-		{
-			Name:     "Complex w/ shipper (isolated units)",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type": "elasticsearch",
-						"shipper": map[string]interface{}{
-							"enabled": true,
-						},
-					},
-					"other": map[string]interface{}{
-						"type": "elasticsearch",
-						"shipper": map[string]interface{}{
-							"enabled": false,
-						},
-					},
-					"stashit": map[string]interface{}{
-						"type": "logstash",
-						"shipper": map[string]interface{}{
-							"enabled": true,
-						},
-					},
-					"redis": map[string]interface{}{
-						"type": "redis",
-						"shipper": map[string]interface{}{
-							"enabled": true,
-						},
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type": "cloudbeat",
-						"id":   "cloudbeat-0",
-					},
-					map[string]interface{}{
-						"type": "cloudbeat",
-						"id":   "cloudbeat-1",
-					},
-					map[string]interface{}{
-						"type":    "cloudbeat",
-						"id":      "cloudbeat-2",
-						"enabled": false,
-					},
-					map[string]interface{}{
-						"type":       "cloudbeat",
-						"id":         "cloudbeat-3",
-						"use_output": "other",
-					},
-					map[string]interface{}{
-						"type":       "cloudbeat",
-						"id":         "cloudbeat-4",
-						"use_output": "other",
-					},
-					map[string]interface{}{
-						"type":       "cloudbeat",
-						"id":         "cloudbeat-5",
-						"use_output": "default",
-					},
-					map[string]interface{}{
-						"type":       "cloudbeat",
-						"id":         "cloudbeat-6",
-						"use_output": "default",
-					},
-					map[string]interface{}{
-						"type":       "cloudbeat",
-						"id":         "cloudbeat-7",
-						"use_output": "other",
-					},
-					map[string]interface{}{
-						"type":       "cloudbeat",
-						"id":         "cloudbeat-8",
-						"use_output": "stashit",
-					},
-					map[string]interface{}{
-						"type":       "cloudbeat",
-						"id":         "cloudbeat-9",
-						"use_output": "redis",
-					},
-					map[string]interface{}{
-						"type": "apm",
-						"id":   "apm-server-0",
-					},
-				},
-			},
-			Result: []Component{
-				{
-					ID:         "cloudbeat-default-cloudbeat-0",
-					InputType:  "cloudbeat",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "cloudbeat",
-						BinaryName: "cloudbeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "cloudbeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "cloudbeat-default-cloudbeat-0",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "shipper",
-							}),
-						},
-						{
-							ID:       "cloudbeat-default-cloudbeat-0-unit",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "cloudbeat",
-								"id":   "cloudbeat-0",
-							}),
-						},
-					},
-					ShipperRef: &ShipperReference{
-						ShipperType: "shipper",
-						ComponentID: "shipper-default",
-						UnitID:      "cloudbeat-default-cloudbeat-0",
-					},
-				},
-				{
-					ID:         "cloudbeat-default-cloudbeat-1",
-					InputType:  "cloudbeat",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "cloudbeat",
-						BinaryName: "cloudbeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "cloudbeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "cloudbeat-default-cloudbeat-1",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "shipper",
-							}),
-						},
-						{
-							ID:       "cloudbeat-default-cloudbeat-1-unit",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "cloudbeat",
-								"id":   "cloudbeat-1",
-							}),
-						},
-					},
-					ShipperRef: &ShipperReference{
-						ShipperType: "shipper",
-						ComponentID: "shipper-default",
-						UnitID:      "cloudbeat-default-cloudbeat-1",
-					},
-				},
-				{
-					ID:         "cloudbeat-other-cloudbeat-3",
-					InputType:  "cloudbeat",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "cloudbeat",
-						BinaryName: "cloudbeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "cloudbeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "cloudbeat-other-cloudbeat-3",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "cloudbeat-other-cloudbeat-3-unit",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "cloudbeat",
-								"id":   "cloudbeat-3",
-							}),
-						},
-					},
-				},
-				{
-					ID:         "cloudbeat-other-cloudbeat-4",
-					InputType:  "cloudbeat",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "cloudbeat",
-						BinaryName: "cloudbeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "cloudbeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "cloudbeat-other-cloudbeat-4",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "cloudbeat-other-cloudbeat-4-unit",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "cloudbeat",
-								"id":   "cloudbeat-4",
-							}),
-						},
-					},
-				},
-				{
-					ID:         "cloudbeat-default-cloudbeat-5",
-					InputType:  "cloudbeat",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "cloudbeat",
-						BinaryName: "cloudbeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "cloudbeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "cloudbeat-default-cloudbeat-5",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "shipper",
-							}),
-						},
-						{
-							ID:       "cloudbeat-default-cloudbeat-5-unit",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "cloudbeat",
-								"id":   "cloudbeat-5",
-							}, "cloudbeat"),
-						},
-					},
-					ShipperRef: &ShipperReference{
-						ShipperType: "shipper",
-						ComponentID: "shipper-default",
-						UnitID:      "cloudbeat-default-cloudbeat-5",
-					},
-				},
-				{
-					ID:         "cloudbeat-default-cloudbeat-6",
-					InputType:  "cloudbeat",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "cloudbeat",
-						BinaryName: "cloudbeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "cloudbeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "cloudbeat-default-cloudbeat-6",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "shipper",
-							}),
-						},
-						{
-							ID:       "cloudbeat-default-cloudbeat-6-unit",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "cloudbeat",
-								"id":   "cloudbeat-6",
-							}, "cloudbeat"),
-						},
-					},
-					ShipperRef: &ShipperReference{
-						ShipperType: "shipper",
-						ComponentID: "shipper-default",
-						UnitID:      "cloudbeat-default-cloudbeat-6",
-					},
-				},
-				{
-					ID:         "shipper-default",
-					OutputType: "elasticsearch",
-					ShipperSpec: &ShipperRuntimeSpec{
-						ShipperType: "shipper",
-						BinaryName:  "shipper",
-						BinaryPath:  filepath.Join("..", "..", "specs", "shipper"),
-					},
-					Units: []Unit{
-						{
-							ID:       "cloudbeat-default-cloudbeat-0",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"id":   "cloudbeat-default-cloudbeat-0",
-								"type": "shipper",
-								"units": []interface{}{
-									map[string]interface{}{
-										"id": "cloudbeat-default-cloudbeat-0-unit",
-										"config": map[string]interface{}{
-											"type": "cloudbeat",
-											"id":   "cloudbeat-0",
-										},
-									},
-								},
-							}),
-						},
-						{
-							ID:       "cloudbeat-default-cloudbeat-1",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"id":   "cloudbeat-default-cloudbeat-1",
-								"type": "shipper",
-								"units": []interface{}{
-									map[string]interface{}{
-										"id": "cloudbeat-default-cloudbeat-1-unit",
-										"config": map[string]interface{}{
-											"type": "cloudbeat",
-											"id":   "cloudbeat-1",
-										},
-									},
-								},
-							}),
-						},
-						{
-							ID:       "cloudbeat-default-cloudbeat-5",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"id":   "cloudbeat-default-cloudbeat-5",
-								"type": "shipper",
-								"units": []interface{}{
-									map[string]interface{}{
-										"id": "cloudbeat-default-cloudbeat-5-unit",
-										"config": map[string]interface{}{
-											"type": "cloudbeat",
-											"id":   "cloudbeat-5",
-										},
-									},
-								},
-							}),
-						},
-						{
-							ID:       "cloudbeat-default-cloudbeat-6",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"id":   "cloudbeat-default-cloudbeat-6",
-								"type": "shipper",
-								"units": []interface{}{
-									map[string]interface{}{
-										"id": "cloudbeat-default-cloudbeat-6-unit",
-										"config": map[string]interface{}{
-											"type": "cloudbeat",
-											"id":   "cloudbeat-6",
-										},
-									},
-								},
-							}),
-						},
-						{
-							ID:       "shipper-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-					},
-				},
-				{
-					ID:         "cloudbeat-other-cloudbeat-7",
-					InputType:  "cloudbeat",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "cloudbeat",
-						BinaryName: "cloudbeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "cloudbeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "cloudbeat-other-cloudbeat-7",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "cloudbeat-other-cloudbeat-7-unit",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "cloudbeat",
-								"id":   "cloudbeat-7",
-							}, "cloudbeat"),
-						},
-					},
-				},
-				{
-					ID:         "cloudbeat-stashit-cloudbeat-8",
-					InputType:  "cloudbeat",
-					OutputType: "logstash",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "cloudbeat",
-						BinaryName: "cloudbeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "cloudbeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "cloudbeat-stashit-cloudbeat-8",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "shipper",
-							}),
-						},
-						{
-							ID:       "cloudbeat-stashit-cloudbeat-8-unit",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "cloudbeat",
-								"id":   "cloudbeat-8",
-							}, "cloudbeat"),
-						},
-					},
-					ShipperRef: &ShipperReference{
-						ShipperType: "shipper",
-						ComponentID: "shipper-stashit",
-						UnitID:      "cloudbeat-stashit-cloudbeat-8",
-					},
-				},
-				{
-					ID:         "shipper-stashit",
-					OutputType: "logstash",
-					ShipperSpec: &ShipperRuntimeSpec{
-						ShipperType: "shipper",
-						BinaryName:  "shipper",
-						BinaryPath:  filepath.Join("..", "..", "specs", "shipper"),
-					},
-					Units: []Unit{
-						{
-							ID:       "cloudbeat-stashit-cloudbeat-8",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"id":   "cloudbeat-stashit-cloudbeat-8",
-								"type": "shipper",
-								"units": []interface{}{
-									map[string]interface{}{
-										"id": "cloudbeat-stashit-cloudbeat-8-unit",
-										"config": map[string]interface{}{
-											"type": "cloudbeat",
-											"id":   "cloudbeat-8",
-										},
-									},
-								},
-							}),
-						},
-						{
-							ID:       "shipper-stashit",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "logstash",
-							}),
-						},
-					},
-				},
-				{
-					ID:         "cloudbeat-redis-cloudbeat-9",
-					InputType:  "cloudbeat",
-					OutputType: "redis",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "cloudbeat",
-						BinaryName: "cloudbeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "cloudbeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "cloudbeat-redis-cloudbeat-9",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "shipper",
-							}),
-						},
-						{
-							ID:       "cloudbeat-redis-cloudbeat-9-unit",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: mustExpectedConfigForceType(map[string]interface{}{
-								"type": "cloudbeat",
-								"id":   "cloudbeat-9",
-							}, "cloudbeat"),
-						},
-					},
-					ShipperRef: &ShipperReference{
-						ShipperType: "shipper",
-						ComponentID: "shipper-redis",
-						UnitID:      "cloudbeat-redis-cloudbeat-9",
-					},
-				},
-				{
-					ID:         "shipper-redis",
-					OutputType: "redis",
-					ShipperSpec: &ShipperRuntimeSpec{
-						ShipperType: "shipper",
-						BinaryName:  "shipper",
-						BinaryPath:  filepath.Join("..", "..", "specs", "shipper"),
-					},
-					Units: []Unit{
-						{
-							ID:       "cloudbeat-redis-cloudbeat-9",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"id":   "cloudbeat-redis-cloudbeat-9",
-								"type": "shipper",
-								"units": []interface{}{
-									map[string]interface{}{
-										"id": "cloudbeat-redis-cloudbeat-9-unit",
-										"config": map[string]interface{}{
-											"type": "cloudbeat",
-											"id":   "cloudbeat-9",
-										},
-									},
-								},
-							}),
-						},
-						{
-							ID:       "shipper-redis",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "redis",
-							}),
-						},
-					},
-				},
-				{
-					ID:         "apm-default",
-					InputType:  "apm",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "apm",
-						BinaryName: "apm-server",
-						BinaryPath: filepath.Join("..", "..", "specs", "apm-server"),
-					},
-					Units: []Unit{
-						{
-							ID:       "apm-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "apm-default-apm-server-0",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "apm",
-								"id":   "apm-server-0",
-							}),
-						},
-					},
-				},
-			},
-		},
-		{
 			Name:     "Alias representation",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
@@ -3074,8 +1821,8 @@ func TestToComponents(t *testing.T) {
 					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "log",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
 					},
 					Units: []Unit{
 						{
@@ -3132,8 +1879,8 @@ func TestToComponents(t *testing.T) {
 					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
 					},
 					Units: []Unit{
 						{
@@ -3245,8 +1992,8 @@ func TestToComponents(t *testing.T) {
 					OutputType: "elasticsearch",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
 					},
 					Units: []Unit{
 						{
@@ -3360,8 +2107,8 @@ func TestToComponents(t *testing.T) {
 					OutputType: "kafka",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
 					},
 					Units: []Unit{
 						{
@@ -3464,8 +2211,8 @@ func TestToComponents(t *testing.T) {
 					OutputType: "logstash",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "filestream",
-						BinaryName: "filebeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "filebeat"),
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
 					},
 					Units: []Unit{
 						{
@@ -3551,7 +2298,7 @@ func TestToComponents(t *testing.T) {
 			runtime, err := LoadRuntimeSpecs(filepath.Join("..", "..", "specs"), scenario.Platform, SkipBinaryCheck())
 			require.NoError(t, err)
 
-			result, err := runtime.ToComponents(scenario.Policy, nil, scenario.LogLevel, scenario.headers)
+			result, err := runtime.ToComponents(scenario.Policy, nil, scenario.LogLevel, scenario.headers, map[string]uint64{})
 			if scenario.Err != "" {
 				assert.Equal(t, scenario.Err, err.Error())
 			} else {
@@ -3562,6 +2309,7 @@ func TestToComponents(t *testing.T) {
 				for i, expected := range scenario.Result {
 					actual := result[i]
 					if expected.Err != nil {
+						require.NotNil(t, actual.Err, "should have errored")
 						assert.Contains(t, actual.Err.Error(), expected.Err.Error())
 						assert.EqualValues(t, expected.Units, actual.Units)
 					} else {
@@ -3569,32 +2317,13 @@ func TestToComponents(t *testing.T) {
 					}
 					assert.Equal(t, expected.InputType, actual.InputType, "%q: component %q has wrong input type", scenario.Name, actual.ID)
 					assert.Equal(t, expected.OutputType, actual.OutputType, "%q: component %q has wrong output type", scenario.Name, actual.ID)
-					if expected.InputSpec != nil {
-						assert.Nil(t, actual.ShipperSpec)
-						assert.Equal(t, expected.InputSpec.InputType, actual.InputSpec.InputType)
-						assert.Equal(t, expected.InputSpec.BinaryName, actual.InputSpec.BinaryName)
-						assert.Equal(t, expected.InputSpec.BinaryPath, actual.InputSpec.BinaryPath)
-						for i, eu := range expected.Units {
-							assert.EqualValues(t, eu.Config, actual.Units[i].Config)
-						}
-						assert.EqualValues(t, expected.Units, actual.Units)
-						if expected.ShipperRef != nil {
-							assert.Equal(t, *expected.ShipperRef, *actual.ShipperRef)
-						} else {
-							assert.Nil(t, actual.ShipperRef)
-						}
-					} else if expected.ShipperSpec != nil {
-						assert.Nil(t, actual.InputSpec)
-						assert.Equal(t, expected.ShipperSpec.ShipperType, actual.ShipperSpec.ShipperType)
-						assert.Equal(t, expected.ShipperSpec.BinaryName, actual.ShipperSpec.BinaryName)
-						assert.Equal(t, expected.ShipperSpec.BinaryPath, actual.ShipperSpec.BinaryPath)
-
-						assert.Nil(t, actual.ShipperRef)
-						assert.Len(t, actual.Units, len(expected.Units))
-						for i := range expected.Units {
-							assertEqualUnitExpectedConfigs(t, &expected.Units[i], &actual.Units[i])
-						}
+					assert.Equal(t, expected.InputSpec.InputType, actual.InputSpec.InputType)
+					assert.Equal(t, expected.InputSpec.BinaryName, actual.InputSpec.BinaryName)
+					assert.Equal(t, expected.InputSpec.BinaryPath, actual.InputSpec.BinaryPath)
+					for i, eu := range expected.Units {
+						assert.EqualValues(t, eu.Config, actual.Units[i].Config)
 					}
+					assert.EqualValues(t, expected.Units, actual.Units)
 				}
 			}
 		})
@@ -3644,13 +2373,6 @@ func TestPreventionsAreValid(t *testing.T) {
 				_, err := eql.Eval(prevention.Condition, vars, false)
 				assert.NoErrorf(t, err, "input '%v' in spec file '%v' has error in prevention [%v]",
 					input.Name, path, prevention.Condition)
-			}
-		}
-		for _, shipper := range spec.Shippers {
-			for _, prevention := range shipper.Runtime.Preventions {
-				_, err := eql.Eval(prevention.Condition, vars, false)
-				assert.NoErrorf(t, err, "shipper '%v' in spec file '%v' has error in prevention [%v]",
-					shipper.Name, path, prevention.Condition)
 			}
 		}
 	}
@@ -3769,16 +2491,6 @@ func TestInjectingInputPolicyID(t *testing.T) {
 			assert.Equal(t, tc.out, tc.in)
 		})
 	}
-}
-
-func assertEqualUnitExpectedConfigs(t *testing.T, expected *Unit, actual *Unit) {
-	t.Helper()
-	assert.Equal(t, expected.ID, actual.ID)
-	assert.Equal(t, expected.Type, actual.Type)
-	assert.Equal(t, expected.LogLevel, actual.LogLevel)
-	assert.Equal(t, expected.Err, actual.Err)
-	diff := cmp.Diff(expected.Config, actual.Config, protocmp.Transform())
-	assert.Empty(t, diff)
 }
 
 func sortComponents(components []Component) {
@@ -4062,7 +2774,7 @@ func TestFlattenedDataStream(t *testing.T) {
 		t.Fatalf("cannot load runtime specs: %s", err)
 	}
 
-	result, err := runtime.ToComponents(policy, nil, logp.DebugLevel, nil)
+	result, err := runtime.ToComponents(policy, nil, logp.DebugLevel, nil, map[string]uint64{})
 	if err != nil {
 		t.Fatalf("cannot convert policy to component: %s", err)
 	}
@@ -4163,7 +2875,7 @@ func TestFlattenedDataStreamIsolatedUnits(t *testing.T) {
 		t.Fatalf("cannot load runtime specs: %s", err)
 	}
 
-	result, err := runtime.ToComponents(policy, nil, logp.DebugLevel, nil)
+	result, err := runtime.ToComponents(policy, nil, logp.DebugLevel, nil, map[string]uint64{})
 	if err != nil {
 		t.Fatalf("cannot convert policy to component: %s", err)
 	}

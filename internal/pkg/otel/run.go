@@ -1,6 +1,8 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
+
+//go:build !windows
 
 package otel
 
@@ -68,15 +70,11 @@ func newSettings(version string, configPaths []string) (*otelcol.CollectorSettin
 			},
 		},
 	}
-	provider, err := otelcol.NewConfigProvider(configProviderSettings)
-	if err != nil {
-		return nil, err
-	}
 
 	return &otelcol.CollectorSettings{
-		Factories:      components,
-		BuildInfo:      buildInfo,
-		ConfigProvider: provider,
+		Factories:              components,
+		BuildInfo:              buildInfo,
+		ConfigProviderSettings: configProviderSettings,
 		// we're handling DisableGracefulShutdown via the cancelCtx being passed
 		// to the collector's Run method in the Run function
 		DisableGracefulShutdown: true,

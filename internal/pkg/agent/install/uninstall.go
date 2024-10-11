@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package install
 
@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -19,8 +20,10 @@ import (
 	"github.com/schollz/progressbar/v3"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	aerrors "github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vars"
@@ -28,6 +31,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
+	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/pkg/component"
 	comprt "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -35,8 +41,15 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
+// fleetAudit variables control retry attempts for contacting fleet
+var (
+	fleetAuditAttempts = 10
+	fleetAuditWaitInit = time.Second
+	fleetAuditWaitMax  = time.Second * 10
+)
+
 // Uninstall uninstalls persistently Elastic Agent on the system.
-func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
+func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("unable to get current working directory")
@@ -45,45 +58,18 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 	if runtime.GOOS == "windows" && paths.HasPrefix(cwd, topPath) {
 		return fmt.Errorf("uninstall must be run from outside the installed path '%s'", topPath)
 	}
-	// uninstall the current service
-	// not creating the service, so no need to set the username and group to any value
-	svc, err := newService(topPath)
-	if err != nil {
-		return fmt.Errorf("error creating new service handler: %w", err)
-	}
-	status, _ := svc.Status()
 
-	pt.Describe("Stopping service")
-	if status == service.StatusRunning {
-		err := svc.Stop()
-		if err != nil {
-			pt.Describe("Failed to issue stop service")
-			return aerrors.New(
-				err,
-				fmt.Sprintf("failed to issue stop service (%s)", paths.ServiceName),
-				aerrors.M("service", paths.ServiceName))
-		}
-	}
-	// The kardianos service manager can't tell the difference
-	// between 'Stopped' and 'StopPending' on Windows, so make
-	// sure the service is stopped.
-	err = isStopped(30*time.Second, 250*time.Millisecond, paths.ServiceName)
+	// ensure service is stopped
+	status, err := EnsureStoppedService(topPath, pt)
 	if err != nil {
-		pt.Describe("Failed to complete stop of service")
-		return aerrors.New(
-			err,
-			fmt.Sprintf("failed to complete stop service (%s)", paths.ServiceName),
-			aerrors.M("service", paths.ServiceName))
+		// context for the error already provided in the EnsureStoppedService function
+		return err
 	}
-
-	pt.Describe("Successfully stopped service")
 
 	// kill any running watcher
 	if err := killWatcher(pt); err != nil {
 		return fmt.Errorf("failed trying to kill any running watcher: %w", err)
 	}
-
-	ctx := context.Background()
 
 	// check if the agent was installed using --unprivileged by checking the file vault for the agent secret (needed on darwin to correctly load the vault)
 	unprivileged, err := checkForUnprivilegedVault(ctx)
@@ -96,11 +82,9 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 		// If service status was running it was stopped to uninstall the components.
 		// If the components uninstall failed start the service again
 		if status == service.StatusRunning {
-			if startErr := svc.Start(); startErr != nil {
-				return aerrors.New(
-					err,
-					fmt.Sprintf("failed to restart service (%s), after failed components uninstall: %v", paths.ServiceName, startErr),
-					aerrors.M("service", paths.ServiceName))
+			if startErr := StartService(topPath); startErr != nil {
+				// context for the error already provided in the StartService function
+				return err
 			}
 		}
 		return fmt.Errorf("error uninstalling components: %w", err)
@@ -108,7 +92,7 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 
 	// Uninstall service only after components were uninstalled successfully
 	pt.Describe("Removing service")
-	err = svc.Uninstall()
+	err = UninstallService(topPath)
 	// Is there a reason why we don't want to hard-fail on this?
 	if err != nil {
 		pt.Describe(fmt.Sprintf("Failed to Uninstall existing service: %s", err))
@@ -117,13 +101,34 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 	}
 
 	// remove, if present on platform
-	if paths.ShellWrapperPath != "" {
-		err = os.Remove(paths.ShellWrapperPath)
+	if paths.ShellWrapperPath() != "" {
+		err = os.Remove(paths.ShellWrapperPath())
 		if !os.IsNotExist(err) && err != nil {
 			return aerrors.New(
 				err,
-				fmt.Sprintf("failed to remove shell wrapper (%s)", paths.ShellWrapperPath),
-				aerrors.M("destination", paths.ShellWrapperPath))
+				fmt.Sprintf("failed to remove shell wrapper (%s)", paths.ShellWrapperPath()),
+				aerrors.M("destination", paths.ShellWrapperPath()))
+		}
+	}
+
+	// will only notify fleet of the uninstall command if it can gather config and agentinfo, and is not a stand-alone install
+	notifyFleet := false
+	var ai *info.AgentInfo
+	c, err := operations.LoadFullAgentConfig(ctx, log, cfgFile, false, unprivileged)
+	if err != nil {
+		pt.Describe(fmt.Sprintf("unable to read agent config to determine if notifying Fleet is needed: %v", err))
+	}
+	cfg, err := configuration.NewFromConfig(c)
+	if err != nil {
+		pt.Describe(fmt.Sprintf("notify Fleet: unable to transform *config.Config to *configuration.Configuration: %v", err))
+	}
+
+	if cfg != nil && !configuration.IsStandalone(cfg.Fleet) {
+		ai, err = info.NewAgentInfo(ctx, false)
+		if err != nil {
+			pt.Describe(fmt.Sprintf("unable to read agent info, Fleet will not be notified of uninstall: %v", err))
+		} else {
+			notifyFleet = true
 		}
 	}
 
@@ -139,13 +144,91 @@ func Uninstall(cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *pr
 	}
 	pt.Describe("Removed install directory")
 
+	if notifyFleet {
+		notifyFleetAuditUninstall(ctx, log, pt, cfg, ai) //nolint:errcheck // ignore the error as we can't act on it
+	}
+
 	return nil
+}
+
+// notifyFleetAuditUninstall will attempt to notify fleet-server of the agent's uninstall.
+//
+// There are retries for the attempt after a 10s wait, but it is a best-effort approach.
+func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai *info.AgentInfo) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	pt.Describe("Attempting to notify Fleet of uninstall")
+	client, err := fleetclient.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
+	if err != nil {
+		pt.Describe(fmt.Sprintf("notify Fleet: unable to create fleetapi client: %v", err))
+		return err
+	}
+	cmd := fleetapi.NewAuditUnenrollCmd(ai, client)
+	req := &fleetapi.AuditUnenrollRequest{
+		Reason:    fleetapi.ReasonUninstall,
+		Timestamp: time.Now().UTC(),
+	}
+	jitterBackoff := backoffWithContext(ctx)
+	for i := 0; i < fleetAuditAttempts; i++ {
+		resp, err := cmd.Execute(ctx, req)
+		if err != nil {
+			var reqErr *fleetapi.ReqError
+			// Do not retry if it was a context error, or an error with the request.
+			if errors.Is(err, context.Canceled) {
+				return ctx.Err()
+			} else if errors.As(err, &reqErr) {
+				pt.Describe(fmt.Sprintf("notify Fleet: encountered unretryable error: %v", err))
+				return err
+			}
+			pt.Describe(fmt.Sprintf("notify Fleet: network error, retry in %v.", jitterBackoff.NextWait()))
+			jitterBackoff.Wait()
+			continue
+		}
+		resp.Body.Close()
+		switch resp.StatusCode {
+		case http.StatusOK:
+			pt.Describe("Successfully notified Fleet about uninstall")
+			return nil
+		case http.StatusBadRequest, http.StatusUnauthorized, http.StatusConflict:
+			// BadRequest are not retried because the request body is incorrect and will not be accepted
+			// Unauthorized are not retried because the API key has been invalidated; unauthorized is listed here but will be returned as a fleetapi.ReqError
+			// Conflict will not retry because in this case Endpoint has indicated that it is orphaned and we do not want to overwrite that annotation
+			pt.Describe(fmt.Sprintf("notify Fleet: failed with status code %d (no retries)", resp.StatusCode))
+			return fmt.Errorf("unretryable return status: %d", resp.StatusCode)
+		default:
+			pt.Describe(fmt.Sprintf("notify Fleet: failed with status code %d (retry in %v)", resp.StatusCode, jitterBackoff.NextWait()))
+			jitterBackoff.Wait()
+		}
+	}
+	pt.Describe("notify Fleet: failed")
+	return fmt.Errorf("notify Fleet: failed")
+}
+
+// EnsureStoppedService ensures that the installed service is stopped.
+func EnsureStoppedService(topPath string, pt *progressbar.ProgressBar) (service.Status, error) {
+	status, _ := StatusService(topPath)
+	if status == service.StatusRunning {
+		pt.Describe("Stopping service")
+		err := StopService(topPath, 30*time.Second, 250*time.Millisecond)
+		if err != nil {
+			pt.Describe("Failed to issue stop service")
+			// context for the error already provided in the StopService function
+			return status, err
+		}
+		pt.Describe("Successfully stopped service")
+	} else {
+		pt.Describe("Service already stopped")
+	}
+	return status, nil
 }
 
 func checkForUnprivilegedVault(ctx context.Context, opts ...vault.OptionFunc) (bool, error) {
 	// check if we have a file vault to detect if we have to use it for reading config
 	opts = append(opts, vault.WithReadonly(true))
-	vaultOpts := vault.ApplyOptions(opts...)
+	vaultOpts, err := vault.ApplyOptions(opts...)
+	if err != nil {
+		return false, err
+	}
 	fileVault, fileVaultErr := vault.NewFileVault(ctx, vaultOpts)
 	if fileVaultErr == nil {
 		ok, keyErr := fileVault.Exists(ctx, secret.AgentSecretKey)
@@ -168,7 +251,7 @@ func checkForUnprivilegedVault(ctx context.Context, opts ...vault.OptionFunc) (b
 // to an ERROR_SHARING_VIOLATION. RemovePath will retry up to 2
 // seconds if it keeps getting that error.
 func RemovePath(path string) error {
-	const arbitraryTimeout = 30 * time.Second
+	const arbitraryTimeout = 60 * time.Second
 	start := time.Now()
 	var lastErr error
 	for time.Since(start) <= arbitraryTimeout {
@@ -230,7 +313,6 @@ func containsString(str string, a []string, caseSensitive bool) bool {
 }
 
 func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar, unprivileged bool) error {
-
 	platform, err := component.LoadPlatformDetail()
 	if err != nil {
 		return fmt.Errorf("failed to gather system information: %w", err)
@@ -310,7 +392,7 @@ func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Confi
 	if err != nil {
 		return nil, aerrors.New("failed to create a map from config", err)
 	}
-	allComps, err := specs.ToComponents(mm, nil, logp.InfoLevel, nil)
+	allComps, err := specs.ToComponents(mm, nil, logp.InfoLevel, nil, map[string]uint64{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to render components: %w", err)
 	}
@@ -404,4 +486,14 @@ func killWatcher(pt *progressbar.ProgressBar) error {
 		// wait 1 second before performing the loop again
 		<-time.After(1 * time.Second)
 	}
+}
+
+func backoffWithContext(ctx context.Context) backoff.Backoff {
+	ch := make(chan struct{})
+	bo := backoff.NewEqualJitterBackoff(ch, fleetAuditWaitInit, fleetAuditWaitMax)
+	go func() {
+		<-ctx.Done()
+		close(ch)
+	}()
+	return bo
 }

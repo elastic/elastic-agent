@@ -26,8 +26,10 @@ jobs:
         with:
           go-version: 1.21
 
-      - name: Set up branch
-        run: git checkout -b update-agent-versions-$GITHUB_RUN_ID
+      - name: Set git config
+        run: |
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
 
       - name: Install mage
         uses: magefile/mage-action@v3
@@ -42,7 +44,7 @@ jobs:
         run: ./.github/workflows/bump-agent-versions.sh
 
       - if: ${{ failure()  }}
-        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        uses: slackapi/slack-github-action@37ebaef184d7626c5f204ab8d3baff4262dd30f0 # v1.27.0
         with:
           channel-id: '#ingest-notifications'
           payload: |
@@ -64,7 +66,7 @@ jobs:
 
         # if a PR was created as a result of this job, we notify on the Slack channel
       - if: ${{ startsWith(steps.update.outputs.pr, 'https') }}
-        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        uses: slackapi/slack-github-action@37ebaef184d7626c5f204ab8d3baff4262dd30f0 # v1.27.0
         with:
           channel-id: '#ingest-notifications'
           payload: |
@@ -83,4 +85,3 @@ jobs:
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           SLACK_MESSAGE: "Update for Elastic Agent versions has been created: ${{ steps.update.outputs.pr }}"
-

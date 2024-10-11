@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package coordinator
 
@@ -10,11 +10,10 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
-
-	"go.elastic.co/apm"
+	"go.elastic.co/apm/v2"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -82,7 +81,12 @@ type MonitorManager interface {
 	Reload(rawConfig *config.Config) error
 
 	// MonitoringConfig injects monitoring configuration into resolved ast tree.
-	MonitoringConfig(map[string]interface{}, []component.Component, map[string]string) (map[string]interface{}, error)
+	// args:
+	// - the existing config policy
+	// - a list of the expected running components
+	// - a map of component IDs to binary names
+	// - a map of component IDs to the PIDs of the running components.
+	MonitoringConfig(map[string]interface{}, []component.Component, map[string]string, map[string]uint64) (map[string]interface{}, error)
 }
 
 // Runner provides interface to run a manager and receive running errors.
@@ -284,6 +288,14 @@ type Coordinator struct {
 	// loop in runLoopIteration() is active and listening.
 	// Should only be interacted with via CoordinatorActive() or runLoopIteration()
 	heartbeatChan chan struct{}
+
+	// if a component (mostly endpoint) has a new PID, we need to update
+	// the monitoring components so they have a PID to monitor
+	// however, if endpoint is in some kind of restart loop,
+	// we could DOS the config system. Instead,
+	// run a ticker that checks to see if we have a new PID.
+	componentPIDTicker         *time.Ticker
+	componentPidRequiresUpdate *atomic.Bool
 }
 
 // The channels Coordinator reads to receive updates from the various managers.
@@ -374,10 +386,12 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		// synchronization in the subscriber API, just set the input buffer to 0.
 		stateBroadcaster: broadcaster.New(state, 64, 32),
 
-		logLevelCh:         make(chan logp.Level),
-		overrideStateChan:  make(chan *coordinatorOverrideState),
-		upgradeDetailsChan: make(chan *details.Details),
-		heartbeatChan:      make(chan struct{}),
+		logLevelCh:                 make(chan logp.Level),
+		overrideStateChan:          make(chan *coordinatorOverrideState),
+		upgradeDetailsChan:         make(chan *details.Details),
+		heartbeatChan:              make(chan struct{}),
+		componentPIDTicker:         time.NewTicker(time.Second * 30),
+		componentPidRequiresUpdate: &atomic.Bool{},
 	}
 	// Setup communication channels for any non-nil components. This pattern
 	// lets us transparently accept nil managers / simulated events during
@@ -683,10 +697,16 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	// shutdown state.
 	defer close(c.stateBroadcaster.InputChan)
 
+	if c.varsMgr != nil {
+		c.setCoordinatorState(agentclient.Starting, "Waiting for initial configuration and composable variables")
+	} else {
+		// vars not initialized, go directly to running
+		c.setCoordinatorState(agentclient.Healthy, "Running")
+	}
+
 	// The usual state refresh happens in the main run loop in Coordinator.runner,
 	// so before/after the runner call we need to trigger state change broadcasts
 	// manually with refreshState.
-	c.setCoordinatorState(agentclient.Starting, "Waiting for initial configuration and composable variables")
 	c.refreshState()
 
 	err := c.runner(ctx)
@@ -920,6 +940,8 @@ func (c *Coordinator) runner(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	defer c.componentPIDTicker.Stop()
+
 	// We run nil checks before starting the various managers so that unit tests
 	// only have to initialize / mock the specific components they're testing.
 	// If a manager is nil, we prebuffer its return channel with nil also so
@@ -1031,6 +1053,18 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 		c.setUpgradeDetails(upgradeDetails)
 
 	case c.heartbeatChan <- struct{}{}:
+
+	case <-c.componentPIDTicker.C:
+		// if we hit the ticker and we've got a new PID,
+		// reload the component model
+		if c.componentPidRequiresUpdate.Swap(false) {
+			err := c.refreshComponentModel(ctx)
+			if err != nil {
+				err = fmt.Errorf("error refreshing component model for PID update: %w", err)
+				c.setConfigManagerError(err)
+				c.logger.Errorf("%s", err)
+			}
+		}
 
 	case componentState := <-c.managerChans.runtimeManagerUpdate:
 		// New component change reported by the runtime manager via
@@ -1234,7 +1268,6 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 	}
 
 	c.logger.Info("Updating running component model")
-	c.logger.With("components", model.Components).Debug("Updating running component model")
 	c.runtimeMgr.Update(model)
 	return nil
 }
@@ -1271,11 +1304,17 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		configInjector = c.monitorMgr.MonitoringConfig
 	}
 
+	var existingCompState = make(map[string]uint64, len(c.state.Components))
+	for _, comp := range c.state.Components {
+		existingCompState[comp.Component.ID] = comp.State.Pid
+	}
+
 	comps, err := c.specs.ToComponents(
 		cfg,
 		configInjector,
 		c.state.LogLevel,
 		c.agentInfo,
+		existingCompState,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to render components: %w", err)
@@ -1446,7 +1485,6 @@ func (c *Coordinator) filterByCapabilities(comps []component.Component) []compon
 	}
 	result := []component.Component{}
 	for _, component := range comps {
-		// If this is an input component (not a shipper), make sure its type is allowed
 		if component.InputSpec != nil && !c.caps.AllowInput(component.InputType) {
 			c.logger.Infof("Component '%v' with input type '%v' filtered by capabilities.yml", component.ID, component.InputType)
 			continue
@@ -1530,7 +1568,7 @@ func collectManagerErrors(timeout time.Duration, varsErrCh, runtimeErrCh, config
 
 	// combinedErr will store any reported errors as well as timeout errors
 	// for unresponsive managers.
-	var combinedErr error
+	var errs []error
 
 waitLoop:
 	for !returnedRuntime || !returnedConfig || !returnedVars || !returnedUpgradeMarkerWatcher {
@@ -1558,23 +1596,23 @@ waitLoop:
 				timeouts = append(timeouts, "no response from upgrade marker watcher")
 			}
 			timeoutStr := strings.Join(timeouts, ", ")
-			combinedErr = multierror.Append(combinedErr, fmt.Errorf("timeout while waiting for managers to shut down: %v", timeoutStr))
+			errs = append(errs, fmt.Errorf("timeout while waiting for managers to shut down: %v", timeoutStr))
 			break waitLoop
 		}
 	}
 	if runtimeErr != nil && !errors.Is(runtimeErr, context.Canceled) {
-		combinedErr = multierror.Append(combinedErr, fmt.Errorf("runtime manager: %w", runtimeErr))
+		errs = append(errs, fmt.Errorf("runtime manager: %w", runtimeErr))
 	}
 	if configErr != nil && !errors.Is(configErr, context.Canceled) {
-		combinedErr = multierror.Append(combinedErr, fmt.Errorf("config manager: %w", configErr))
+		errs = append(errs, fmt.Errorf("config manager: %w", configErr))
 	}
 	if varsErr != nil && !errors.Is(varsErr, context.Canceled) {
-		combinedErr = multierror.Append(combinedErr, fmt.Errorf("vars manager: %w", varsErr))
+		errs = append(errs, fmt.Errorf("vars manager: %w", varsErr))
 	}
 	if upgradeMarkerWatcherErr != nil && !errors.Is(upgradeMarkerWatcherErr, context.Canceled) {
-		combinedErr = multierror.Append(combinedErr, fmt.Errorf("upgrade marker watcher: %w", upgradeMarkerWatcherErr))
+		errs = append(errs, fmt.Errorf("upgrade marker watcher: %w", upgradeMarkerWatcherErr))
 	}
-	return combinedErr
+	return errors.Join(errs...)
 }
 
 type coordinatorComponentLog struct {

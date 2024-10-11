@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package ess
 
@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/testing/runner"
+	"github.com/elastic/elastic-agent/pkg/testing/common"
 )
 
 var serverlessURL = "https://cloud.elastic.co"
@@ -25,7 +25,7 @@ type ServerlessClient struct {
 	projectType string
 	api         string
 	proj        Project
-	log         runner.Logger
+	log         common.Logger
 }
 
 // ServerlessRequest contains the data needed for a new serverless instance
@@ -62,7 +62,7 @@ type CredResetResponse struct {
 }
 
 // NewServerlessClient creates a new instance of the serverless client
-func NewServerlessClient(region, projectType, api string, logger runner.Logger) *ServerlessClient {
+func NewServerlessClient(region, projectType, api string, logger common.Logger) *ServerlessClient {
 	return &ServerlessClient{
 		region:      region,
 		api:         api,

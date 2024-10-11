@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package runtime
 
@@ -15,7 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 	protobuf "google.golang.org/protobuf/proto"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client/chunk"
@@ -130,9 +130,11 @@ func (c *runtimeComm) WriteStartUpInfo(w io.Writer, services ...client.Service) 
 		Supports:       []proto.ConnectionSupports{proto.ConnectionSupports_CheckinChunking},
 		MaxMessageSize: uint32(c.maxMessageSize),
 		AgentInfo: &proto.AgentInfo{
-			Id:       c.agentInfo.AgentID(),
-			Version:  c.agentInfo.Version(),
-			Snapshot: c.agentInfo.Snapshot(),
+			Id:           c.agentInfo.AgentID(),
+			Version:      c.agentInfo.Version(),
+			Snapshot:     c.agentInfo.Snapshot(),
+			Mode:         protoAgentMode(c.agentInfo),
+			Unprivileged: c.agentInfo.Unprivileged(),
 		},
 	}
 	infoBytes, err := protobuf.Marshal(startupInfo)
@@ -150,11 +152,14 @@ func (c *runtimeComm) CheckinExpected(
 	expected *proto.CheckinExpected,
 	observed *proto.CheckinObserved,
 ) {
+	c.agentInfo.Unprivileged()
 	if c.agentInfo != nil && c.agentInfo.AgentID() != "" {
 		expected.AgentInfo = &proto.AgentInfo{
-			Id:       c.agentInfo.AgentID(),
-			Version:  c.agentInfo.Version(),
-			Snapshot: c.agentInfo.Snapshot(),
+			Id:           c.agentInfo.AgentID(),
+			Version:      c.agentInfo.Version(),
+			Snapshot:     c.agentInfo.Snapshot(),
+			Mode:         protoAgentMode(c.agentInfo),
+			Unprivileged: c.agentInfo.Unprivileged(),
 		}
 	} else {
 		expected.AgentInfo = nil
@@ -432,4 +437,12 @@ func sendExpectedChunked(server proto.ElasticAgent_CheckinV2Server, msg *proto.C
 		}
 	}
 	return nil
+}
+
+// protoAgentMode converts the agent info mode bool to the AgentManagedMode enum
+func protoAgentMode(agent info.Agent) proto.AgentManagedMode {
+	if agent.IsStandalone() {
+		return proto.AgentManagedMode_STANDALONE
+	}
+	return proto.AgentManagedMode_MANAGED
 }

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build !windows
 
@@ -32,7 +32,7 @@ func withServiceOptions(username string, groupName string) ([]serviceOpt, error)
 	return []serviceOpt{withUserGroup(username, groupName)}, nil
 }
 
-func servicePostInstall(ownership utils.FileOwner) error {
+func serviceConfigure(ownership utils.FileOwner) error {
 	// do nothing on unix
 	return nil
 }

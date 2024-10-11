@@ -1,8 +1,8 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
-// Code generated from Eql.g4 by ANTLR 4.12.0. DO NOT EDIT.
+// Code generated from Eql.g4 by ANTLR 4.13.1. DO NOT EDIT.
 
 package parser // Eql
 
@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/antlr4-go/antlr/v4"
 )
 
 // Suppress unused import errors
@@ -23,100 +23,102 @@ type EqlParser struct {
 	*antlr.BaseParser
 }
 
-var eqlParserStaticData struct {
+var EqlParserStaticData struct {
 	once                   sync.Once
 	serializedATN          []int32
-	literalNames           []string
-	symbolicNames          []string
-	ruleNames              []string
-	predictionContextCache *antlr.PredictionContextCache
+	LiteralNames           []string
+	SymbolicNames          []string
+	RuleNames              []string
+	PredictionContextCache *antlr.PredictionContextCache
 	atn                    *antlr.ATN
 	decisionToDFA          []*antlr.DFA
 }
 
 func eqlParserInit() {
-	staticData := &eqlParserStaticData
-	staticData.literalNames = []string{
+	staticData := &EqlParserStaticData
+	staticData.LiteralNames = []string{
 		"", "'|'", "','", "':'", "'=='", "'!='", "'>'", "'<'", "'>='", "'<='",
 		"'+'", "'-'", "'*'", "'/'", "'%'", "", "", "", "", "", "", "", "", "",
-		"", "", "", "'('", "')'", "'['", "']'", "'{'", "'}'", "'${'",
+		"", "", "", "'('", "')'", "'['", "']'", "'{'", "'}'", "'$${'", "'${'",
 	}
-	staticData.symbolicNames = []string{
+	staticData.SymbolicNames = []string{
 		"", "", "", "", "EQ", "NEQ", "GT", "LT", "GTE", "LTE", "ADD", "SUB",
 		"MUL", "DIV", "MOD", "AND", "OR", "TRUE", "FALSE", "FLOAT", "NUMBER",
 		"WHITESPACE", "NOT", "NAME", "VNAME", "STEXT", "DTEXT", "LPAR", "RPAR",
-		"LARR", "RARR", "LDICT", "RDICT", "BEGIN_VARIABLE",
+		"LARR", "RARR", "LDICT", "RDICT", "BEGIN_EVARIABLE", "BEGIN_VARIABLE",
 	}
-	staticData.ruleNames = []string{
+	staticData.RuleNames = []string{
 		"expList", "boolean", "constant", "variable", "variableExp", "exp",
 		"arguments", "array", "key", "dict",
 	}
-	staticData.predictionContextCache = antlr.NewPredictionContextCache()
+	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
-		4, 1, 33, 142, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
+		4, 1, 34, 146, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
 		4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 1, 0, 1,
 		0, 1, 0, 1, 1, 1, 1, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 3, 2, 31, 8, 2, 1, 3,
 		1, 3, 1, 3, 3, 3, 36, 8, 3, 1, 4, 1, 4, 1, 4, 5, 4, 41, 8, 4, 10, 4, 12,
 		4, 44, 9, 4, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5,
-		1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 3, 5, 61, 8, 5, 1, 5, 1, 5, 1, 5, 3, 5, 66,
-		8, 5, 1, 5, 1, 5, 1, 5, 3, 5, 71, 8, 5, 1, 5, 1, 5, 1, 5, 1, 5, 3, 5, 77,
-		8, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5,
-		1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5,
-		1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 5, 5, 109, 8, 5, 10, 5, 12, 5,
-		112, 9, 5, 1, 6, 1, 6, 1, 6, 5, 6, 117, 8, 6, 10, 6, 12, 6, 120, 9, 6,
-		1, 7, 1, 7, 1, 7, 5, 7, 125, 8, 7, 10, 7, 12, 7, 128, 9, 7, 1, 8, 1, 8,
-		1, 8, 1, 8, 1, 9, 1, 9, 1, 9, 5, 9, 137, 8, 9, 10, 9, 12, 9, 140, 9, 9,
-		1, 9, 0, 1, 10, 10, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 0, 5, 1, 0, 17,
-		18, 1, 0, 25, 26, 1, 0, 12, 14, 1, 0, 10, 11, 2, 0, 23, 23, 25, 26, 163,
-		0, 20, 1, 0, 0, 0, 2, 23, 1, 0, 0, 0, 4, 30, 1, 0, 0, 0, 6, 35, 1, 0, 0,
-		0, 8, 37, 1, 0, 0, 0, 10, 76, 1, 0, 0, 0, 12, 113, 1, 0, 0, 0, 14, 121,
-		1, 0, 0, 0, 16, 129, 1, 0, 0, 0, 18, 133, 1, 0, 0, 0, 20, 21, 3, 10, 5,
-		0, 21, 22, 5, 0, 0, 1, 22, 1, 1, 0, 0, 0, 23, 24, 7, 0, 0, 0, 24, 3, 1,
-		0, 0, 0, 25, 31, 5, 25, 0, 0, 26, 31, 5, 26, 0, 0, 27, 31, 5, 19, 0, 0,
-		28, 31, 5, 20, 0, 0, 29, 31, 3, 2, 1, 0, 30, 25, 1, 0, 0, 0, 30, 26, 1,
-		0, 0, 0, 30, 27, 1, 0, 0, 0, 30, 28, 1, 0, 0, 0, 30, 29, 1, 0, 0, 0, 31,
-		5, 1, 0, 0, 0, 32, 36, 5, 23, 0, 0, 33, 36, 5, 24, 0, 0, 34, 36, 3, 4,
-		2, 0, 35, 32, 1, 0, 0, 0, 35, 33, 1, 0, 0, 0, 35, 34, 1, 0, 0, 0, 36, 7,
-		1, 0, 0, 0, 37, 42, 3, 6, 3, 0, 38, 39, 5, 1, 0, 0, 39, 41, 3, 6, 3, 0,
-		40, 38, 1, 0, 0, 0, 41, 44, 1, 0, 0, 0, 42, 40, 1, 0, 0, 0, 42, 43, 1,
-		0, 0, 0, 43, 9, 1, 0, 0, 0, 44, 42, 1, 0, 0, 0, 45, 46, 6, 5, -1, 0, 46,
-		47, 5, 27, 0, 0, 47, 48, 3, 10, 5, 0, 48, 49, 5, 28, 0, 0, 49, 77, 1, 0,
-		0, 0, 50, 51, 5, 22, 0, 0, 51, 77, 3, 10, 5, 17, 52, 77, 3, 2, 1, 0, 53,
-		54, 5, 33, 0, 0, 54, 55, 3, 8, 4, 0, 55, 56, 5, 32, 0, 0, 56, 77, 1, 0,
-		0, 0, 57, 58, 5, 23, 0, 0, 58, 60, 5, 27, 0, 0, 59, 61, 3, 12, 6, 0, 60,
-		59, 1, 0, 0, 0, 60, 61, 1, 0, 0, 0, 61, 62, 1, 0, 0, 0, 62, 77, 5, 28,
-		0, 0, 63, 65, 5, 29, 0, 0, 64, 66, 3, 14, 7, 0, 65, 64, 1, 0, 0, 0, 65,
-		66, 1, 0, 0, 0, 66, 67, 1, 0, 0, 0, 67, 77, 5, 30, 0, 0, 68, 70, 5, 31,
-		0, 0, 69, 71, 3, 18, 9, 0, 70, 69, 1, 0, 0, 0, 70, 71, 1, 0, 0, 0, 71,
-		72, 1, 0, 0, 0, 72, 77, 5, 32, 0, 0, 73, 77, 7, 1, 0, 0, 74, 77, 5, 19,
-		0, 0, 75, 77, 5, 20, 0, 0, 76, 45, 1, 0, 0, 0, 76, 50, 1, 0, 0, 0, 76,
-		52, 1, 0, 0, 0, 76, 53, 1, 0, 0, 0, 76, 57, 1, 0, 0, 0, 76, 63, 1, 0, 0,
-		0, 76, 68, 1, 0, 0, 0, 76, 73, 1, 0, 0, 0, 76, 74, 1, 0, 0, 0, 76, 75,
-		1, 0, 0, 0, 77, 110, 1, 0, 0, 0, 78, 79, 10, 19, 0, 0, 79, 80, 7, 2, 0,
-		0, 80, 109, 3, 10, 5, 20, 81, 82, 10, 18, 0, 0, 82, 83, 7, 3, 0, 0, 83,
-		109, 3, 10, 5, 19, 84, 85, 10, 16, 0, 0, 85, 86, 5, 4, 0, 0, 86, 109, 3,
-		10, 5, 17, 87, 88, 10, 15, 0, 0, 88, 89, 5, 5, 0, 0, 89, 109, 3, 10, 5,
-		16, 90, 91, 10, 14, 0, 0, 91, 92, 5, 9, 0, 0, 92, 109, 3, 10, 5, 15, 93,
-		94, 10, 13, 0, 0, 94, 95, 5, 8, 0, 0, 95, 109, 3, 10, 5, 14, 96, 97, 10,
-		12, 0, 0, 97, 98, 5, 7, 0, 0, 98, 109, 3, 10, 5, 13, 99, 100, 10, 11, 0,
-		0, 100, 101, 5, 6, 0, 0, 101, 109, 3, 10, 5, 12, 102, 103, 10, 10, 0, 0,
-		103, 104, 5, 15, 0, 0, 104, 109, 3, 10, 5, 11, 105, 106, 10, 9, 0, 0, 106,
-		107, 5, 16, 0, 0, 107, 109, 3, 10, 5, 10, 108, 78, 1, 0, 0, 0, 108, 81,
-		1, 0, 0, 0, 108, 84, 1, 0, 0, 0, 108, 87, 1, 0, 0, 0, 108, 90, 1, 0, 0,
-		0, 108, 93, 1, 0, 0, 0, 108, 96, 1, 0, 0, 0, 108, 99, 1, 0, 0, 0, 108,
-		102, 1, 0, 0, 0, 108, 105, 1, 0, 0, 0, 109, 112, 1, 0, 0, 0, 110, 108,
-		1, 0, 0, 0, 110, 111, 1, 0, 0, 0, 111, 11, 1, 0, 0, 0, 112, 110, 1, 0,
-		0, 0, 113, 118, 3, 10, 5, 0, 114, 115, 5, 2, 0, 0, 115, 117, 3, 10, 5,
-		0, 116, 114, 1, 0, 0, 0, 117, 120, 1, 0, 0, 0, 118, 116, 1, 0, 0, 0, 118,
-		119, 1, 0, 0, 0, 119, 13, 1, 0, 0, 0, 120, 118, 1, 0, 0, 0, 121, 126, 3,
-		4, 2, 0, 122, 123, 5, 2, 0, 0, 123, 125, 3, 4, 2, 0, 124, 122, 1, 0, 0,
-		0, 125, 128, 1, 0, 0, 0, 126, 124, 1, 0, 0, 0, 126, 127, 1, 0, 0, 0, 127,
-		15, 1, 0, 0, 0, 128, 126, 1, 0, 0, 0, 129, 130, 7, 4, 0, 0, 130, 131, 5,
-		3, 0, 0, 131, 132, 3, 4, 2, 0, 132, 17, 1, 0, 0, 0, 133, 138, 3, 16, 8,
-		0, 134, 135, 5, 2, 0, 0, 135, 137, 3, 16, 8, 0, 136, 134, 1, 0, 0, 0, 137,
-		140, 1, 0, 0, 0, 138, 136, 1, 0, 0, 0, 138, 139, 1, 0, 0, 0, 139, 19, 1,
-		0, 0, 0, 140, 138, 1, 0, 0, 0, 12, 30, 35, 42, 60, 65, 70, 76, 108, 110,
-		118, 126, 138,
+		1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 3, 5, 65, 8, 5, 1,
+		5, 1, 5, 1, 5, 3, 5, 70, 8, 5, 1, 5, 1, 5, 1, 5, 3, 5, 75, 8, 5, 1, 5,
+		1, 5, 1, 5, 1, 5, 3, 5, 81, 8, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1,
+		5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1,
+		5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 5,
+		5, 113, 8, 5, 10, 5, 12, 5, 116, 9, 5, 1, 6, 1, 6, 1, 6, 5, 6, 121, 8,
+		6, 10, 6, 12, 6, 124, 9, 6, 1, 7, 1, 7, 1, 7, 5, 7, 129, 8, 7, 10, 7, 12,
+		7, 132, 9, 7, 1, 8, 1, 8, 1, 8, 1, 8, 1, 9, 1, 9, 1, 9, 5, 9, 141, 8, 9,
+		10, 9, 12, 9, 144, 9, 9, 1, 9, 0, 1, 10, 10, 0, 2, 4, 6, 8, 10, 12, 14,
+		16, 18, 0, 5, 1, 0, 17, 18, 1, 0, 25, 26, 1, 0, 12, 14, 1, 0, 10, 11, 2,
+		0, 23, 23, 25, 26, 168, 0, 20, 1, 0, 0, 0, 2, 23, 1, 0, 0, 0, 4, 30, 1,
+		0, 0, 0, 6, 35, 1, 0, 0, 0, 8, 37, 1, 0, 0, 0, 10, 80, 1, 0, 0, 0, 12,
+		117, 1, 0, 0, 0, 14, 125, 1, 0, 0, 0, 16, 133, 1, 0, 0, 0, 18, 137, 1,
+		0, 0, 0, 20, 21, 3, 10, 5, 0, 21, 22, 5, 0, 0, 1, 22, 1, 1, 0, 0, 0, 23,
+		24, 7, 0, 0, 0, 24, 3, 1, 0, 0, 0, 25, 31, 5, 25, 0, 0, 26, 31, 5, 26,
+		0, 0, 27, 31, 5, 19, 0, 0, 28, 31, 5, 20, 0, 0, 29, 31, 3, 2, 1, 0, 30,
+		25, 1, 0, 0, 0, 30, 26, 1, 0, 0, 0, 30, 27, 1, 0, 0, 0, 30, 28, 1, 0, 0,
+		0, 30, 29, 1, 0, 0, 0, 31, 5, 1, 0, 0, 0, 32, 36, 5, 23, 0, 0, 33, 36,
+		5, 24, 0, 0, 34, 36, 3, 4, 2, 0, 35, 32, 1, 0, 0, 0, 35, 33, 1, 0, 0, 0,
+		35, 34, 1, 0, 0, 0, 36, 7, 1, 0, 0, 0, 37, 42, 3, 6, 3, 0, 38, 39, 5, 1,
+		0, 0, 39, 41, 3, 6, 3, 0, 40, 38, 1, 0, 0, 0, 41, 44, 1, 0, 0, 0, 42, 40,
+		1, 0, 0, 0, 42, 43, 1, 0, 0, 0, 43, 9, 1, 0, 0, 0, 44, 42, 1, 0, 0, 0,
+		45, 46, 6, 5, -1, 0, 46, 47, 5, 27, 0, 0, 47, 48, 3, 10, 5, 0, 48, 49,
+		5, 28, 0, 0, 49, 81, 1, 0, 0, 0, 50, 51, 5, 22, 0, 0, 51, 81, 3, 10, 5,
+		18, 52, 81, 3, 2, 1, 0, 53, 54, 5, 33, 0, 0, 54, 55, 3, 8, 4, 0, 55, 56,
+		5, 32, 0, 0, 56, 81, 1, 0, 0, 0, 57, 58, 5, 34, 0, 0, 58, 59, 3, 8, 4,
+		0, 59, 60, 5, 32, 0, 0, 60, 81, 1, 0, 0, 0, 61, 62, 5, 23, 0, 0, 62, 64,
+		5, 27, 0, 0, 63, 65, 3, 12, 6, 0, 64, 63, 1, 0, 0, 0, 64, 65, 1, 0, 0,
+		0, 65, 66, 1, 0, 0, 0, 66, 81, 5, 28, 0, 0, 67, 69, 5, 29, 0, 0, 68, 70,
+		3, 14, 7, 0, 69, 68, 1, 0, 0, 0, 69, 70, 1, 0, 0, 0, 70, 71, 1, 0, 0, 0,
+		71, 81, 5, 30, 0, 0, 72, 74, 5, 31, 0, 0, 73, 75, 3, 18, 9, 0, 74, 73,
+		1, 0, 0, 0, 74, 75, 1, 0, 0, 0, 75, 76, 1, 0, 0, 0, 76, 81, 5, 32, 0, 0,
+		77, 81, 7, 1, 0, 0, 78, 81, 5, 19, 0, 0, 79, 81, 5, 20, 0, 0, 80, 45, 1,
+		0, 0, 0, 80, 50, 1, 0, 0, 0, 80, 52, 1, 0, 0, 0, 80, 53, 1, 0, 0, 0, 80,
+		57, 1, 0, 0, 0, 80, 61, 1, 0, 0, 0, 80, 67, 1, 0, 0, 0, 80, 72, 1, 0, 0,
+		0, 80, 77, 1, 0, 0, 0, 80, 78, 1, 0, 0, 0, 80, 79, 1, 0, 0, 0, 81, 114,
+		1, 0, 0, 0, 82, 83, 10, 20, 0, 0, 83, 84, 7, 2, 0, 0, 84, 113, 3, 10, 5,
+		21, 85, 86, 10, 19, 0, 0, 86, 87, 7, 3, 0, 0, 87, 113, 3, 10, 5, 20, 88,
+		89, 10, 17, 0, 0, 89, 90, 5, 4, 0, 0, 90, 113, 3, 10, 5, 18, 91, 92, 10,
+		16, 0, 0, 92, 93, 5, 5, 0, 0, 93, 113, 3, 10, 5, 17, 94, 95, 10, 15, 0,
+		0, 95, 96, 5, 9, 0, 0, 96, 113, 3, 10, 5, 16, 97, 98, 10, 14, 0, 0, 98,
+		99, 5, 8, 0, 0, 99, 113, 3, 10, 5, 15, 100, 101, 10, 13, 0, 0, 101, 102,
+		5, 7, 0, 0, 102, 113, 3, 10, 5, 14, 103, 104, 10, 12, 0, 0, 104, 105, 5,
+		6, 0, 0, 105, 113, 3, 10, 5, 13, 106, 107, 10, 11, 0, 0, 107, 108, 5, 15,
+		0, 0, 108, 113, 3, 10, 5, 12, 109, 110, 10, 10, 0, 0, 110, 111, 5, 16,
+		0, 0, 111, 113, 3, 10, 5, 11, 112, 82, 1, 0, 0, 0, 112, 85, 1, 0, 0, 0,
+		112, 88, 1, 0, 0, 0, 112, 91, 1, 0, 0, 0, 112, 94, 1, 0, 0, 0, 112, 97,
+		1, 0, 0, 0, 112, 100, 1, 0, 0, 0, 112, 103, 1, 0, 0, 0, 112, 106, 1, 0,
+		0, 0, 112, 109, 1, 0, 0, 0, 113, 116, 1, 0, 0, 0, 114, 112, 1, 0, 0, 0,
+		114, 115, 1, 0, 0, 0, 115, 11, 1, 0, 0, 0, 116, 114, 1, 0, 0, 0, 117, 122,
+		3, 10, 5, 0, 118, 119, 5, 2, 0, 0, 119, 121, 3, 10, 5, 0, 120, 118, 1,
+		0, 0, 0, 121, 124, 1, 0, 0, 0, 122, 120, 1, 0, 0, 0, 122, 123, 1, 0, 0,
+		0, 123, 13, 1, 0, 0, 0, 124, 122, 1, 0, 0, 0, 125, 130, 3, 4, 2, 0, 126,
+		127, 5, 2, 0, 0, 127, 129, 3, 4, 2, 0, 128, 126, 1, 0, 0, 0, 129, 132,
+		1, 0, 0, 0, 130, 128, 1, 0, 0, 0, 130, 131, 1, 0, 0, 0, 131, 15, 1, 0,
+		0, 0, 132, 130, 1, 0, 0, 0, 133, 134, 7, 4, 0, 0, 134, 135, 5, 3, 0, 0,
+		135, 136, 3, 4, 2, 0, 136, 17, 1, 0, 0, 0, 137, 142, 3, 16, 8, 0, 138,
+		139, 5, 2, 0, 0, 139, 141, 3, 16, 8, 0, 140, 138, 1, 0, 0, 0, 141, 144,
+		1, 0, 0, 0, 142, 140, 1, 0, 0, 0, 142, 143, 1, 0, 0, 0, 143, 19, 1, 0,
+		0, 0, 144, 142, 1, 0, 0, 0, 12, 30, 35, 42, 64, 69, 74, 80, 112, 114, 122,
+		130, 142,
 	}
 	deserializer := antlr.NewATNDeserializer(nil)
 	staticData.atn = deserializer.Deserialize(staticData.serializedATN)
@@ -133,7 +135,7 @@ func eqlParserInit() {
 // NewEqlParser(). You can call this function if you wish to initialize the static state ahead
 // of time.
 func EqlParserInit() {
-	staticData := &eqlParserStaticData
+	staticData := &EqlParserStaticData
 	staticData.once.Do(eqlParserInit)
 }
 
@@ -142,11 +144,11 @@ func NewEqlParser(input antlr.TokenStream) *EqlParser {
 	EqlParserInit()
 	this := new(EqlParser)
 	this.BaseParser = antlr.NewBaseParser(input)
-	staticData := &eqlParserStaticData
-	this.Interpreter = antlr.NewParserATNSimulator(this, staticData.atn, staticData.decisionToDFA, staticData.predictionContextCache)
-	this.RuleNames = staticData.ruleNames
-	this.LiteralNames = staticData.literalNames
-	this.SymbolicNames = staticData.symbolicNames
+	staticData := &EqlParserStaticData
+	this.Interpreter = antlr.NewParserATNSimulator(this, staticData.atn, staticData.decisionToDFA, staticData.PredictionContextCache)
+	this.RuleNames = staticData.RuleNames
+	this.LiteralNames = staticData.LiteralNames
+	this.SymbolicNames = staticData.SymbolicNames
 	this.GrammarFileName = "Eql.g4"
 
 	return this
@@ -154,40 +156,41 @@ func NewEqlParser(input antlr.TokenStream) *EqlParser {
 
 // EqlParser tokens.
 const (
-	EqlParserEOF            = antlr.TokenEOF
-	EqlParserT__0           = 1
-	EqlParserT__1           = 2
-	EqlParserT__2           = 3
-	EqlParserEQ             = 4
-	EqlParserNEQ            = 5
-	EqlParserGT             = 6
-	EqlParserLT             = 7
-	EqlParserGTE            = 8
-	EqlParserLTE            = 9
-	EqlParserADD            = 10
-	EqlParserSUB            = 11
-	EqlParserMUL            = 12
-	EqlParserDIV            = 13
-	EqlParserMOD            = 14
-	EqlParserAND            = 15
-	EqlParserOR             = 16
-	EqlParserTRUE           = 17
-	EqlParserFALSE          = 18
-	EqlParserFLOAT          = 19
-	EqlParserNUMBER         = 20
-	EqlParserWHITESPACE     = 21
-	EqlParserNOT            = 22
-	EqlParserNAME           = 23
-	EqlParserVNAME          = 24
-	EqlParserSTEXT          = 25
-	EqlParserDTEXT          = 26
-	EqlParserLPAR           = 27
-	EqlParserRPAR           = 28
-	EqlParserLARR           = 29
-	EqlParserRARR           = 30
-	EqlParserLDICT          = 31
-	EqlParserRDICT          = 32
-	EqlParserBEGIN_VARIABLE = 33
+	EqlParserEOF             = antlr.TokenEOF
+	EqlParserT__0            = 1
+	EqlParserT__1            = 2
+	EqlParserT__2            = 3
+	EqlParserEQ              = 4
+	EqlParserNEQ             = 5
+	EqlParserGT              = 6
+	EqlParserLT              = 7
+	EqlParserGTE             = 8
+	EqlParserLTE             = 9
+	EqlParserADD             = 10
+	EqlParserSUB             = 11
+	EqlParserMUL             = 12
+	EqlParserDIV             = 13
+	EqlParserMOD             = 14
+	EqlParserAND             = 15
+	EqlParserOR              = 16
+	EqlParserTRUE            = 17
+	EqlParserFALSE           = 18
+	EqlParserFLOAT           = 19
+	EqlParserNUMBER          = 20
+	EqlParserWHITESPACE      = 21
+	EqlParserNOT             = 22
+	EqlParserNAME            = 23
+	EqlParserVNAME           = 24
+	EqlParserSTEXT           = 25
+	EqlParserDTEXT           = 26
+	EqlParserLPAR            = 27
+	EqlParserRPAR            = 28
+	EqlParserLARR            = 29
+	EqlParserRARR            = 30
+	EqlParserLDICT           = 31
+	EqlParserRDICT           = 32
+	EqlParserBEGIN_EVARIABLE = 33
+	EqlParserBEGIN_VARIABLE  = 34
 )
 
 // EqlParser rules.
@@ -220,15 +223,20 @@ type IExpListContext interface {
 }
 
 type ExpListContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyExpListContext() *ExpListContext {
 	var p = new(ExpListContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = EqlParserRULE_expList
 	return p
+}
+
+func InitEmptyExpListContext(p *ExpListContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = EqlParserRULE_expList
 }
 
 func (*ExpListContext) IsExpListContext() {}
@@ -236,7 +244,7 @@ func (*ExpListContext) IsExpListContext() {}
 func NewExpListContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ExpListContext {
 	var p = new(ExpListContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = EqlParserRULE_expList
@@ -297,28 +305,8 @@ func (s *ExpListContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *EqlParser) ExpList() (localctx IExpListContext) {
-	this := p
-	_ = this
-
 	localctx = NewExpListContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, EqlParserRULE_expList)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(20)
@@ -327,8 +315,24 @@ func (p *EqlParser) ExpList() (localctx IExpListContext) {
 	{
 		p.SetState(21)
 		p.Match(EqlParserEOF)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
+	if false {
+		goto errorExit // Trick to prevent compiler error if the label is not used
+	}
 	return localctx
 }
 
@@ -348,15 +352,20 @@ type IBooleanContext interface {
 }
 
 type BooleanContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyBooleanContext() *BooleanContext {
 	var p = new(BooleanContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = EqlParserRULE_boolean
 	return p
+}
+
+func InitEmptyBooleanContext(p *BooleanContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = EqlParserRULE_boolean
 }
 
 func (*BooleanContext) IsBooleanContext() {}
@@ -364,7 +373,7 @@ func (*BooleanContext) IsBooleanContext() {}
 func NewBooleanContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *BooleanContext {
 	var p = new(BooleanContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = EqlParserRULE_boolean
@@ -413,28 +422,9 @@ func (s *BooleanContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *EqlParser) Boolean() (localctx IBooleanContext) {
-	this := p
-	_ = this
-
 	localctx = NewBooleanContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, EqlParserRULE_boolean)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -449,6 +439,18 @@ func (p *EqlParser) Boolean() (localctx IBooleanContext) {
 		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
+	if false {
+		goto errorExit // Trick to prevent compiler error if the label is not used
+	}
 	return localctx
 }
 
@@ -471,15 +473,20 @@ type IConstantContext interface {
 }
 
 type ConstantContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyConstantContext() *ConstantContext {
 	var p = new(ConstantContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = EqlParserRULE_constant
 	return p
+}
+
+func InitEmptyConstantContext(p *ConstantContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = EqlParserRULE_constant
 }
 
 func (*ConstantContext) IsConstantContext() {}
@@ -487,7 +494,7 @@ func (*ConstantContext) IsConstantContext() {}
 func NewConstantContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ConstantContext {
 	var p = new(ConstantContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = EqlParserRULE_constant
@@ -560,30 +567,13 @@ func (s *ConstantContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *EqlParser) Constant() (localctx IConstantContext) {
-	this := p
-	_ = this
-
 	localctx = NewConstantContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, EqlParserRULE_constant)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(30)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case EqlParserSTEXT:
@@ -591,6 +581,10 @@ func (p *EqlParser) Constant() (localctx IConstantContext) {
 		{
 			p.SetState(25)
 			p.Match(EqlParserSTEXT)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case EqlParserDTEXT:
@@ -598,6 +592,10 @@ func (p *EqlParser) Constant() (localctx IConstantContext) {
 		{
 			p.SetState(26)
 			p.Match(EqlParserDTEXT)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case EqlParserFLOAT:
@@ -605,6 +603,10 @@ func (p *EqlParser) Constant() (localctx IConstantContext) {
 		{
 			p.SetState(27)
 			p.Match(EqlParserFLOAT)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case EqlParserNUMBER:
@@ -612,6 +614,10 @@ func (p *EqlParser) Constant() (localctx IConstantContext) {
 		{
 			p.SetState(28)
 			p.Match(EqlParserNUMBER)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case EqlParserTRUE, EqlParserFALSE:
@@ -622,9 +628,22 @@ func (p *EqlParser) Constant() (localctx IConstantContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
+	if false {
+		goto errorExit // Trick to prevent compiler error if the label is not used
+	}
 	return localctx
 }
 
@@ -645,15 +664,20 @@ type IVariableContext interface {
 }
 
 type VariableContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyVariableContext() *VariableContext {
 	var p = new(VariableContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = EqlParserRULE_variable
 	return p
+}
+
+func InitEmptyVariableContext(p *VariableContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = EqlParserRULE_variable
 }
 
 func (*VariableContext) IsVariableContext() {}
@@ -661,7 +685,7 @@ func (*VariableContext) IsVariableContext() {}
 func NewVariableContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *VariableContext {
 	var p = new(VariableContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = EqlParserRULE_variable
@@ -726,30 +750,13 @@ func (s *VariableContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *EqlParser) Variable() (localctx IVariableContext) {
-	this := p
-	_ = this
-
 	localctx = NewVariableContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, EqlParserRULE_variable)
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.SetState(35)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case EqlParserNAME:
@@ -757,6 +764,10 @@ func (p *EqlParser) Variable() (localctx IVariableContext) {
 		{
 			p.SetState(32)
 			p.Match(EqlParserNAME)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case EqlParserVNAME:
@@ -764,6 +775,10 @@ func (p *EqlParser) Variable() (localctx IVariableContext) {
 		{
 			p.SetState(33)
 			p.Match(EqlParserVNAME)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case EqlParserTRUE, EqlParserFALSE, EqlParserFLOAT, EqlParserNUMBER, EqlParserSTEXT, EqlParserDTEXT:
@@ -774,9 +789,22 @@ func (p *EqlParser) Variable() (localctx IVariableContext) {
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
+	if false {
+		goto errorExit // Trick to prevent compiler error if the label is not used
+	}
 	return localctx
 }
 
@@ -796,15 +824,20 @@ type IVariableExpContext interface {
 }
 
 type VariableExpContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyVariableExpContext() *VariableExpContext {
 	var p = new(VariableExpContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = EqlParserRULE_variableExp
 	return p
+}
+
+func InitEmptyVariableExpContext(p *VariableExpContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = EqlParserRULE_variableExp
 }
 
 func (*VariableExpContext) IsVariableExpContext() {}
@@ -812,7 +845,7 @@ func (*VariableExpContext) IsVariableExpContext() {}
 func NewVariableExpContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *VariableExpContext {
 	var p = new(VariableExpContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = EqlParserRULE_variableExp
@@ -894,28 +927,9 @@ func (s *VariableExpContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 func (p *EqlParser) VariableExp() (localctx IVariableExpContext) {
-	this := p
-	_ = this
-
 	localctx = NewVariableExpContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 8, EqlParserRULE_variableExp)
 	var _la int
-
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
 
 	p.EnterOuterAlt(localctx, 1)
 	{
@@ -924,12 +938,19 @@ func (p *EqlParser) VariableExp() (localctx IVariableExpContext) {
 	}
 	p.SetState(42)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == EqlParserT__0 {
 		{
 			p.SetState(38)
 			p.Match(EqlParserT__0)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(39)
@@ -938,9 +959,24 @@ func (p *EqlParser) VariableExp() (localctx IVariableExpContext) {
 
 		p.SetState(44)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
+	if false {
+		goto errorExit // Trick to prevent compiler error if the label is not used
+	}
 	return localctx
 }
 
@@ -955,15 +991,20 @@ type IExpContext interface {
 }
 
 type ExpContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyExpContext() *ExpContext {
 	var p = new(ExpContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = EqlParserRULE_exp
 	return p
+}
+
+func InitEmptyExpContext(p *ExpContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = EqlParserRULE_exp
 }
 
 func (*ExpContext) IsExpContext() {}
@@ -971,7 +1012,7 @@ func (*ExpContext) IsExpContext() {}
 func NewExpContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ExpContext {
 	var p = new(ExpContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = EqlParserRULE_exp
@@ -981,8 +1022,8 @@ func NewExpContext(parser antlr.Parser, parent antlr.ParserRuleContext, invoking
 
 func (s *ExpContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *ExpContext) CopyFrom(ctx *ExpContext) {
-	s.BaseParserRuleContext.CopyFrom(ctx.BaseParserRuleContext)
+func (s *ExpContext) CopyAll(ctx *ExpContext) {
+	s.CopyFrom(&ctx.BaseParserRuleContext)
 }
 
 func (s *ExpContext) GetRuleContext() antlr.RuleContext {
@@ -994,7 +1035,7 @@ func (s *ExpContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) st
 }
 
 type ExpArithmeticNEQContext struct {
-	*ExpContext
+	ExpContext
 	left  IExpContext
 	right IExpContext
 }
@@ -1002,9 +1043,9 @@ type ExpArithmeticNEQContext struct {
 func NewExpArithmeticNEQContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpArithmeticNEQContext {
 	var p = new(ExpArithmeticNEQContext)
 
-	p.ExpContext = NewEmptyExpContext()
+	InitEmptyExpContext(&p.ExpContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpContext))
+	p.CopyAll(ctx.(*ExpContext))
 
 	return p
 }
@@ -1088,8 +1129,72 @@ func (s *ExpArithmeticNEQContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 	}
 }
 
+type ExpEVariableContext struct {
+	ExpContext
+}
+
+func NewExpEVariableContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpEVariableContext {
+	var p = new(ExpEVariableContext)
+
+	InitEmptyExpContext(&p.ExpContext)
+	p.parser = parser
+	p.CopyAll(ctx.(*ExpContext))
+
+	return p
+}
+
+func (s *ExpEVariableContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *ExpEVariableContext) BEGIN_EVARIABLE() antlr.TerminalNode {
+	return s.GetToken(EqlParserBEGIN_EVARIABLE, 0)
+}
+
+func (s *ExpEVariableContext) VariableExp() IVariableExpContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IVariableExpContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IVariableExpContext)
+}
+
+func (s *ExpEVariableContext) RDICT() antlr.TerminalNode {
+	return s.GetToken(EqlParserRDICT, 0)
+}
+
+func (s *ExpEVariableContext) EnterRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(EqlListener); ok {
+		listenerT.EnterExpEVariable(s)
+	}
+}
+
+func (s *ExpEVariableContext) ExitRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(EqlListener); ok {
+		listenerT.ExitExpEVariable(s)
+	}
+}
+
+func (s *ExpEVariableContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case EqlVisitor:
+		return t.VisitExpEVariable(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
 type ExpArithmeticEQContext struct {
-	*ExpContext
+	ExpContext
 	left  IExpContext
 	right IExpContext
 }
@@ -1097,9 +1202,9 @@ type ExpArithmeticEQContext struct {
 func NewExpArithmeticEQContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpArithmeticEQContext {
 	var p = new(ExpArithmeticEQContext)
 
-	p.ExpContext = NewEmptyExpContext()
+	InitEmptyExpContext(&p.ExpContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpContext))
+	p.CopyAll(ctx.(*ExpContext))
 
 	return p
 }
@@ -1184,7 +1289,7 @@ func (s *ExpArithmeticEQContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 type ExpArithmeticGTEContext struct {
-	*ExpContext
+	ExpContext
 	left  IExpContext
 	right IExpContext
 }
@@ -1192,9 +1297,9 @@ type ExpArithmeticGTEContext struct {
 func NewExpArithmeticGTEContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpArithmeticGTEContext {
 	var p = new(ExpArithmeticGTEContext)
 
-	p.ExpContext = NewEmptyExpContext()
+	InitEmptyExpContext(&p.ExpContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpContext))
+	p.CopyAll(ctx.(*ExpContext))
 
 	return p
 }
@@ -1279,7 +1384,7 @@ func (s *ExpArithmeticGTEContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 type ExpArithmeticLTEContext struct {
-	*ExpContext
+	ExpContext
 	left  IExpContext
 	right IExpContext
 }
@@ -1287,9 +1392,9 @@ type ExpArithmeticLTEContext struct {
 func NewExpArithmeticLTEContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpArithmeticLTEContext {
 	var p = new(ExpArithmeticLTEContext)
 
-	p.ExpContext = NewEmptyExpContext()
+	InitEmptyExpContext(&p.ExpContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpContext))
+	p.CopyAll(ctx.(*ExpContext))
 
 	return p
 }
@@ -1374,7 +1479,7 @@ func (s *ExpArithmeticLTEContext) Accept(visitor antlr.ParseTreeVisitor) interfa
 }
 
 type ExpArithmeticGTContext struct {
-	*ExpContext
+	ExpContext
 	left  IExpContext
 	right IExpContext
 }
@@ -1382,9 +1487,9 @@ type ExpArithmeticGTContext struct {
 func NewExpArithmeticGTContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpArithmeticGTContext {
 	var p = new(ExpArithmeticGTContext)
 
-	p.ExpContext = NewEmptyExpContext()
+	InitEmptyExpContext(&p.ExpContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpContext))
+	p.CopyAll(ctx.(*ExpContext))
 
 	return p
 }
@@ -1469,7 +1574,7 @@ func (s *ExpArithmeticGTContext) Accept(visitor antlr.ParseTreeVisitor) interfac
 }
 
 type ExpArithmeticMulDivModContext struct {
-	*ExpContext
+	ExpContext
 	left  IExpContext
 	right IExpContext
 }
@@ -1477,9 +1582,9 @@ type ExpArithmeticMulDivModContext struct {
 func NewExpArithmeticMulDivModContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpArithmeticMulDivModContext {
 	var p = new(ExpArithmeticMulDivModContext)
 
-	p.ExpContext = NewEmptyExpContext()
+	InitEmptyExpContext(&p.ExpContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpContext))
+	p.CopyAll(ctx.(*ExpContext))
 
 	return p
 }
@@ -1572,15 +1677,15 @@ func (s *ExpArithmeticMulDivModContext) Accept(visitor antlr.ParseTreeVisitor) i
 }
 
 type ExpDictContext struct {
-	*ExpContext
+	ExpContext
 }
 
 func NewExpDictContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpDictContext {
 	var p = new(ExpDictContext)
 
-	p.ExpContext = NewEmptyExpContext()
+	InitEmptyExpContext(&p.ExpContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpContext))
+	p.CopyAll(ctx.(*ExpContext))
 
 	return p
 }
@@ -1636,15 +1741,15 @@ func (s *ExpDictContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 type ExpTextContext struct {
-	*ExpContext
+	ExpContext
 }
 
 func NewExpTextContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpTextContext {
 	var p = new(ExpTextContext)
 
-	p.ExpContext = NewEmptyExpContext()
+	InitEmptyExpContext(&p.ExpContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpContext))
+	p.CopyAll(ctx.(*ExpContext))
 
 	return p
 }
@@ -1684,15 +1789,15 @@ func (s *ExpTextContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 type ExpNumberContext struct {
-	*ExpContext
+	ExpContext
 }
 
 func NewExpNumberContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpNumberContext {
 	var p = new(ExpNumberContext)
 
-	p.ExpContext = NewEmptyExpContext()
+	InitEmptyExpContext(&p.ExpContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpContext))
+	p.CopyAll(ctx.(*ExpContext))
 
 	return p
 }
@@ -1728,7 +1833,7 @@ func (s *ExpNumberContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 type ExpLogicalAndContext struct {
-	*ExpContext
+	ExpContext
 	left  IExpContext
 	right IExpContext
 }
@@ -1736,9 +1841,9 @@ type ExpLogicalAndContext struct {
 func NewExpLogicalAndContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpLogicalAndContext {
 	var p = new(ExpLogicalAndContext)
 
-	p.ExpContext = NewEmptyExpContext()
+	InitEmptyExpContext(&p.ExpContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpContext))
+	p.CopyAll(ctx.(*ExpContext))
 
 	return p
 }
@@ -1823,7 +1928,7 @@ func (s *ExpLogicalAndContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 }
 
 type ExpLogicalORContext struct {
-	*ExpContext
+	ExpContext
 	left  IExpContext
 	right IExpContext
 }
@@ -1831,9 +1936,9 @@ type ExpLogicalORContext struct {
 func NewExpLogicalORContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpLogicalORContext {
 	var p = new(ExpLogicalORContext)
 
-	p.ExpContext = NewEmptyExpContext()
+	InitEmptyExpContext(&p.ExpContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpContext))
+	p.CopyAll(ctx.(*ExpContext))
 
 	return p
 }
@@ -1918,15 +2023,15 @@ func (s *ExpLogicalORContext) Accept(visitor antlr.ParseTreeVisitor) interface{}
 }
 
 type ExpFloatContext struct {
-	*ExpContext
+	ExpContext
 }
 
 func NewExpFloatContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpFloatContext {
 	var p = new(ExpFloatContext)
 
-	p.ExpContext = NewEmptyExpContext()
+	InitEmptyExpContext(&p.ExpContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpContext))
+	p.CopyAll(ctx.(*ExpContext))
 
 	return p
 }
@@ -1962,15 +2067,15 @@ func (s *ExpFloatContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 type ExpVariableContext struct {
-	*ExpContext
+	ExpContext
 }
 
 func NewExpVariableContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpVariableContext {
 	var p = new(ExpVariableContext)
 
-	p.ExpContext = NewEmptyExpContext()
+	InitEmptyExpContext(&p.ExpContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpContext))
+	p.CopyAll(ctx.(*ExpContext))
 
 	return p
 }
@@ -2026,15 +2131,15 @@ func (s *ExpVariableContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 type ExpArrayContext struct {
-	*ExpContext
+	ExpContext
 }
 
 func NewExpArrayContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpArrayContext {
 	var p = new(ExpArrayContext)
 
-	p.ExpContext = NewEmptyExpContext()
+	InitEmptyExpContext(&p.ExpContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpContext))
+	p.CopyAll(ctx.(*ExpContext))
 
 	return p
 }
@@ -2090,15 +2195,15 @@ func (s *ExpArrayContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 type ExpNotContext struct {
-	*ExpContext
+	ExpContext
 }
 
 func NewExpNotContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpNotContext {
 	var p = new(ExpNotContext)
 
-	p.ExpContext = NewEmptyExpContext()
+	InitEmptyExpContext(&p.ExpContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpContext))
+	p.CopyAll(ctx.(*ExpContext))
 
 	return p
 }
@@ -2150,15 +2255,15 @@ func (s *ExpNotContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 type ExpInParenContext struct {
-	*ExpContext
+	ExpContext
 }
 
 func NewExpInParenContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpInParenContext {
 	var p = new(ExpInParenContext)
 
-	p.ExpContext = NewEmptyExpContext()
+	InitEmptyExpContext(&p.ExpContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpContext))
+	p.CopyAll(ctx.(*ExpContext))
 
 	return p
 }
@@ -2214,15 +2319,15 @@ func (s *ExpInParenContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 type ExpBooleanContext struct {
-	*ExpContext
+	ExpContext
 }
 
 func NewExpBooleanContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpBooleanContext {
 	var p = new(ExpBooleanContext)
 
-	p.ExpContext = NewEmptyExpContext()
+	InitEmptyExpContext(&p.ExpContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpContext))
+	p.CopyAll(ctx.(*ExpContext))
 
 	return p
 }
@@ -2270,7 +2375,7 @@ func (s *ExpBooleanContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 type ExpArithmeticAddSubContext struct {
-	*ExpContext
+	ExpContext
 	left  IExpContext
 	right IExpContext
 }
@@ -2278,9 +2383,9 @@ type ExpArithmeticAddSubContext struct {
 func NewExpArithmeticAddSubContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpArithmeticAddSubContext {
 	var p = new(ExpArithmeticAddSubContext)
 
-	p.ExpContext = NewEmptyExpContext()
+	InitEmptyExpContext(&p.ExpContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpContext))
+	p.CopyAll(ctx.(*ExpContext))
 
 	return p
 }
@@ -2369,15 +2474,15 @@ func (s *ExpArithmeticAddSubContext) Accept(visitor antlr.ParseTreeVisitor) inte
 }
 
 type ExpFunctionContext struct {
-	*ExpContext
+	ExpContext
 }
 
 func NewExpFunctionContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpFunctionContext {
 	var p = new(ExpFunctionContext)
 
-	p.ExpContext = NewEmptyExpContext()
+	InitEmptyExpContext(&p.ExpContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpContext))
+	p.CopyAll(ctx.(*ExpContext))
 
 	return p
 }
@@ -2437,7 +2542,7 @@ func (s *ExpFunctionContext) Accept(visitor antlr.ParseTreeVisitor) interface{} 
 }
 
 type ExpArithmeticLTContext struct {
-	*ExpContext
+	ExpContext
 	left  IExpContext
 	right IExpContext
 }
@@ -2445,9 +2550,9 @@ type ExpArithmeticLTContext struct {
 func NewExpArithmeticLTContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *ExpArithmeticLTContext {
 	var p = new(ExpArithmeticLTContext)
 
-	p.ExpContext = NewEmptyExpContext()
+	InitEmptyExpContext(&p.ExpContext)
 	p.parser = parser
-	p.CopyFrom(ctx.(*ExpContext))
+	p.CopyAll(ctx.(*ExpContext))
 
 	return p
 }
@@ -2536,10 +2641,8 @@ func (p *EqlParser) Exp() (localctx IExpContext) {
 }
 
 func (p *EqlParser) exp(_p int) (localctx IExpContext) {
-	this := p
-	_ = this
-
 	var _parentctx antlr.ParserRuleContext = p.GetParserRuleContext()
+
 	_parentState := p.GetState()
 	localctx = NewExpContext(p, p.GetParserRuleContext(), _parentState)
 	var _prevctx IExpContext = localctx
@@ -2548,27 +2651,14 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 	p.EnterRecursionRule(localctx, 10, EqlParserRULE_exp, _p)
 	var _la int
 
-	defer func() {
-		p.UnrollRecursionContexts(_parentctx)
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(76)
+	p.SetState(80)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 
 	switch p.GetTokenStream().LA(1) {
 	case EqlParserLPAR:
@@ -2579,6 +2669,10 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 		{
 			p.SetState(46)
 			p.Match(EqlParserLPAR)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(47)
@@ -2587,6 +2681,10 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 		{
 			p.SetState(48)
 			p.Match(EqlParserRPAR)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case EqlParserNOT:
@@ -2596,10 +2694,14 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 		{
 			p.SetState(50)
 			p.Match(EqlParserNOT)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(51)
-			p.exp(17)
+			p.exp(18)
 		}
 
 	case EqlParserTRUE, EqlParserFALSE:
@@ -2611,13 +2713,17 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 			p.Boolean()
 		}
 
-	case EqlParserBEGIN_VARIABLE:
-		localctx = NewExpVariableContext(p, localctx)
+	case EqlParserBEGIN_EVARIABLE:
+		localctx = NewExpEVariableContext(p, localctx)
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
 			p.SetState(53)
-			p.Match(EqlParserBEGIN_VARIABLE)
+			p.Match(EqlParserBEGIN_EVARIABLE)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
 			p.SetState(54)
@@ -2626,6 +2732,35 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 		{
 			p.SetState(55)
 			p.Match(EqlParserRDICT)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
+		}
+
+	case EqlParserBEGIN_VARIABLE:
+		localctx = NewExpVariableContext(p, localctx)
+		p.SetParserRuleContext(localctx)
+		_prevctx = localctx
+		{
+			p.SetState(57)
+			p.Match(EqlParserBEGIN_VARIABLE)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
+		}
+		{
+			p.SetState(58)
+			p.VariableExp()
+		}
+		{
+			p.SetState(59)
+			p.Match(EqlParserRDICT)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case EqlParserNAME:
@@ -2633,27 +2768,42 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(57)
+			p.SetState(61)
 			p.Match(EqlParserNAME)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
-			p.SetState(58)
+			p.SetState(62)
 			p.Match(EqlParserLPAR)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
-		p.SetState(60)
+		p.SetState(64)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
-		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&11523719168) != 0 {
+		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&28703588352) != 0 {
 			{
-				p.SetState(59)
+				p.SetState(63)
 				p.Arguments()
 			}
 
 		}
 		{
-			p.SetState(62)
+			p.SetState(66)
 			p.Match(EqlParserRPAR)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case EqlParserLARR:
@@ -2661,23 +2811,34 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(63)
+			p.SetState(67)
 			p.Match(EqlParserLARR)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
-		p.SetState(65)
+		p.SetState(69)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&102629376) != 0 {
 			{
-				p.SetState(64)
+				p.SetState(68)
 				p.Array()
 			}
 
 		}
 		{
-			p.SetState(67)
+			p.SetState(71)
 			p.Match(EqlParserRARR)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case EqlParserLDICT:
@@ -2685,23 +2846,34 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(68)
+			p.SetState(72)
 			p.Match(EqlParserLDICT)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
-		p.SetState(70)
+		p.SetState(74)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 
 		if (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&109051904) != 0 {
 			{
-				p.SetState(69)
+				p.SetState(73)
 				p.Dict()
 			}
 
 		}
 		{
-			p.SetState(72)
+			p.SetState(76)
 			p.Match(EqlParserRDICT)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case EqlParserSTEXT, EqlParserDTEXT:
@@ -2709,7 +2881,7 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(73)
+			p.SetState(77)
 			_la = p.GetTokenStream().LA(1)
 
 			if !(_la == EqlParserSTEXT || _la == EqlParserDTEXT) {
@@ -2725,8 +2897,12 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(74)
+			p.SetState(78)
 			p.Match(EqlParserFLOAT)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	case EqlParserNUMBER:
@@ -2734,39 +2910,54 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 		p.SetParserRuleContext(localctx)
 		_prevctx = localctx
 		{
-			p.SetState(75)
+			p.SetState(79)
 			p.Match(EqlParserNUMBER)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 	p.GetParserRuleContext().SetStop(p.GetTokenStream().LT(-1))
-	p.SetState(110)
+	p.SetState(114)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 8, p.GetParserRuleContext())
-
+	if p.HasError() {
+		goto errorExit
+	}
+	_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 8, p.GetParserRuleContext())
+	if p.HasError() {
+		goto errorExit
+	}
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			if p.GetParseListeners() != nil {
 				p.TriggerExitRuleEvent()
 			}
 			_prevctx = localctx
-			p.SetState(108)
+			p.SetState(112)
 			p.GetErrorHandler().Sync(p)
-			switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 7, p.GetParserRuleContext()) {
+			if p.HasError() {
+				goto errorExit
+			}
+
+			switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 7, p.GetParserRuleContext()) {
 			case 1:
 				localctx = NewExpArithmeticMulDivModContext(p, NewExpContext(p, _parentctx, _parentState))
 				localctx.(*ExpArithmeticMulDivModContext).left = _prevctx
 
 				p.PushNewRecursionContext(localctx, _startState, EqlParserRULE_exp)
-				p.SetState(78)
+				p.SetState(82)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 19)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 19)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 20)) {
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 20)", ""))
+					goto errorExit
 				}
 				{
-					p.SetState(79)
+					p.SetState(83)
 					_la = p.GetTokenStream().LA(1)
 
 					if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&28672) != 0) {
@@ -2777,9 +2968,9 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 					}
 				}
 				{
-					p.SetState(80)
+					p.SetState(84)
 
-					var _x = p.exp(20)
+					var _x = p.exp(21)
 
 					localctx.(*ExpArithmeticMulDivModContext).right = _x
 				}
@@ -2789,13 +2980,14 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 				localctx.(*ExpArithmeticAddSubContext).left = _prevctx
 
 				p.PushNewRecursionContext(localctx, _startState, EqlParserRULE_exp)
-				p.SetState(81)
+				p.SetState(85)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 18)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 18)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 19)) {
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 19)", ""))
+					goto errorExit
 				}
 				{
-					p.SetState(82)
+					p.SetState(86)
 					_la = p.GetTokenStream().LA(1)
 
 					if !(_la == EqlParserADD || _la == EqlParserSUB) {
@@ -2806,9 +2998,9 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 					}
 				}
 				{
-					p.SetState(83)
+					p.SetState(87)
 
-					var _x = p.exp(19)
+					var _x = p.exp(20)
 
 					localctx.(*ExpArithmeticAddSubContext).right = _x
 				}
@@ -2818,19 +3010,24 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 				localctx.(*ExpArithmeticEQContext).left = _prevctx
 
 				p.PushNewRecursionContext(localctx, _startState, EqlParserRULE_exp)
-				p.SetState(84)
+				p.SetState(88)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 16)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 16)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 17)) {
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 17)", ""))
+					goto errorExit
 				}
 				{
-					p.SetState(85)
+					p.SetState(89)
 					p.Match(EqlParserEQ)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
-					p.SetState(86)
+					p.SetState(90)
 
-					var _x = p.exp(17)
+					var _x = p.exp(18)
 
 					localctx.(*ExpArithmeticEQContext).right = _x
 				}
@@ -2840,19 +3037,24 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 				localctx.(*ExpArithmeticNEQContext).left = _prevctx
 
 				p.PushNewRecursionContext(localctx, _startState, EqlParserRULE_exp)
-				p.SetState(87)
+				p.SetState(91)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 15)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 15)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 16)) {
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 16)", ""))
+					goto errorExit
 				}
 				{
-					p.SetState(88)
+					p.SetState(92)
 					p.Match(EqlParserNEQ)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
-					p.SetState(89)
+					p.SetState(93)
 
-					var _x = p.exp(16)
+					var _x = p.exp(17)
 
 					localctx.(*ExpArithmeticNEQContext).right = _x
 				}
@@ -2862,19 +3064,24 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 				localctx.(*ExpArithmeticLTEContext).left = _prevctx
 
 				p.PushNewRecursionContext(localctx, _startState, EqlParserRULE_exp)
-				p.SetState(90)
+				p.SetState(94)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 14)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 14)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 15)) {
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 15)", ""))
+					goto errorExit
 				}
 				{
-					p.SetState(91)
+					p.SetState(95)
 					p.Match(EqlParserLTE)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
-					p.SetState(92)
+					p.SetState(96)
 
-					var _x = p.exp(15)
+					var _x = p.exp(16)
 
 					localctx.(*ExpArithmeticLTEContext).right = _x
 				}
@@ -2884,19 +3091,24 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 				localctx.(*ExpArithmeticGTEContext).left = _prevctx
 
 				p.PushNewRecursionContext(localctx, _startState, EqlParserRULE_exp)
-				p.SetState(93)
+				p.SetState(97)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 13)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 13)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 14)) {
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 14)", ""))
+					goto errorExit
 				}
 				{
-					p.SetState(94)
+					p.SetState(98)
 					p.Match(EqlParserGTE)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
-					p.SetState(95)
+					p.SetState(99)
 
-					var _x = p.exp(14)
+					var _x = p.exp(15)
 
 					localctx.(*ExpArithmeticGTEContext).right = _x
 				}
@@ -2906,19 +3118,24 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 				localctx.(*ExpArithmeticLTContext).left = _prevctx
 
 				p.PushNewRecursionContext(localctx, _startState, EqlParserRULE_exp)
-				p.SetState(96)
+				p.SetState(100)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 12)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 12)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 13)) {
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 13)", ""))
+					goto errorExit
 				}
 				{
-					p.SetState(97)
+					p.SetState(101)
 					p.Match(EqlParserLT)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
-					p.SetState(98)
+					p.SetState(102)
 
-					var _x = p.exp(13)
+					var _x = p.exp(14)
 
 					localctx.(*ExpArithmeticLTContext).right = _x
 				}
@@ -2928,19 +3145,24 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 				localctx.(*ExpArithmeticGTContext).left = _prevctx
 
 				p.PushNewRecursionContext(localctx, _startState, EqlParserRULE_exp)
-				p.SetState(99)
+				p.SetState(103)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 11)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 11)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 12)) {
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 12)", ""))
+					goto errorExit
 				}
 				{
-					p.SetState(100)
+					p.SetState(104)
 					p.Match(EqlParserGT)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
-					p.SetState(101)
+					p.SetState(105)
 
-					var _x = p.exp(12)
+					var _x = p.exp(13)
 
 					localctx.(*ExpArithmeticGTContext).right = _x
 				}
@@ -2950,19 +3172,24 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 				localctx.(*ExpLogicalAndContext).left = _prevctx
 
 				p.PushNewRecursionContext(localctx, _startState, EqlParserRULE_exp)
-				p.SetState(102)
+				p.SetState(106)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 10)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 10)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 11)) {
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 11)", ""))
+					goto errorExit
 				}
 				{
-					p.SetState(103)
+					p.SetState(107)
 					p.Match(EqlParserAND)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
-					p.SetState(104)
+					p.SetState(108)
 
-					var _x = p.exp(11)
+					var _x = p.exp(12)
 
 					localctx.(*ExpLogicalAndContext).right = _x
 				}
@@ -2972,31 +3199,56 @@ func (p *EqlParser) exp(_p int) (localctx IExpContext) {
 				localctx.(*ExpLogicalORContext).left = _prevctx
 
 				p.PushNewRecursionContext(localctx, _startState, EqlParserRULE_exp)
-				p.SetState(105)
+				p.SetState(109)
 
-				if !(p.Precpred(p.GetParserRuleContext(), 9)) {
-					panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 9)", ""))
+				if !(p.Precpred(p.GetParserRuleContext(), 10)) {
+					p.SetError(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 10)", ""))
+					goto errorExit
 				}
 				{
-					p.SetState(106)
+					p.SetState(110)
 					p.Match(EqlParserOR)
+					if p.HasError() {
+						// Recognition error - abort rule
+						goto errorExit
+					}
 				}
 				{
-					p.SetState(107)
+					p.SetState(111)
 
-					var _x = p.exp(10)
+					var _x = p.exp(11)
 
 					localctx.(*ExpLogicalORContext).right = _x
 				}
 
+			case antlr.ATNInvalidAltNumber:
+				goto errorExit
 			}
 
 		}
-		p.SetState(112)
+		p.SetState(116)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 8, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
+		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 8, p.GetParserRuleContext())
+		if p.HasError() {
+			goto errorExit
+		}
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.UnrollRecursionContexts(_parentctx)
+	if false {
+		goto errorExit // Trick to prevent compiler error if the label is not used
+	}
 	return localctx
 }
 
@@ -3016,15 +3268,20 @@ type IArgumentsContext interface {
 }
 
 type ArgumentsContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyArgumentsContext() *ArgumentsContext {
 	var p = new(ArgumentsContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = EqlParserRULE_arguments
 	return p
+}
+
+func InitEmptyArgumentsContext(p *ArgumentsContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = EqlParserRULE_arguments
 }
 
 func (*ArgumentsContext) IsArgumentsContext() {}
@@ -3032,7 +3289,7 @@ func (*ArgumentsContext) IsArgumentsContext() {}
 func NewArgumentsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ArgumentsContext {
 	var p = new(ArgumentsContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = EqlParserRULE_arguments
@@ -3114,53 +3371,56 @@ func (s *ArgumentsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *EqlParser) Arguments() (localctx IArgumentsContext) {
-	this := p
-	_ = this
-
 	localctx = NewArgumentsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, EqlParserRULE_arguments)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(113)
+		p.SetState(117)
 		p.exp(0)
 	}
-	p.SetState(118)
+	p.SetState(122)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == EqlParserT__1 {
 		{
-			p.SetState(114)
+			p.SetState(118)
 			p.Match(EqlParserT__1)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
-			p.SetState(115)
+			p.SetState(119)
 			p.exp(0)
 		}
 
-		p.SetState(120)
+		p.SetState(124)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
+	if false {
+		goto errorExit // Trick to prevent compiler error if the label is not used
+	}
 	return localctx
 }
 
@@ -3180,15 +3440,20 @@ type IArrayContext interface {
 }
 
 type ArrayContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyArrayContext() *ArrayContext {
 	var p = new(ArrayContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = EqlParserRULE_array
 	return p
+}
+
+func InitEmptyArrayContext(p *ArrayContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = EqlParserRULE_array
 }
 
 func (*ArrayContext) IsArrayContext() {}
@@ -3196,7 +3461,7 @@ func (*ArrayContext) IsArrayContext() {}
 func NewArrayContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *ArrayContext {
 	var p = new(ArrayContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = EqlParserRULE_array
@@ -3278,53 +3543,56 @@ func (s *ArrayContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *EqlParser) Array() (localctx IArrayContext) {
-	this := p
-	_ = this
-
 	localctx = NewArrayContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, EqlParserRULE_array)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(121)
+		p.SetState(125)
 		p.Constant()
 	}
-	p.SetState(126)
+	p.SetState(130)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == EqlParserT__1 {
 		{
-			p.SetState(122)
+			p.SetState(126)
 			p.Match(EqlParserT__1)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
-			p.SetState(123)
+			p.SetState(127)
 			p.Constant()
 		}
 
-		p.SetState(128)
+		p.SetState(132)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
+	if false {
+		goto errorExit // Trick to prevent compiler error if the label is not used
+	}
 	return localctx
 }
 
@@ -3346,15 +3614,20 @@ type IKeyContext interface {
 }
 
 type KeyContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyKeyContext() *KeyContext {
 	var p = new(KeyContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = EqlParserRULE_key
 	return p
+}
+
+func InitEmptyKeyContext(p *KeyContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = EqlParserRULE_key
 }
 
 func (*KeyContext) IsKeyContext() {}
@@ -3362,7 +3635,7 @@ func (*KeyContext) IsKeyContext() {}
 func NewKeyContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *KeyContext {
 	var p = new(KeyContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = EqlParserRULE_key
@@ -3431,32 +3704,13 @@ func (s *KeyContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *EqlParser) Key() (localctx IKeyContext) {
-	this := p
-	_ = this
-
 	localctx = NewKeyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 16, EqlParserRULE_key)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(129)
+		p.SetState(133)
 		_la = p.GetTokenStream().LA(1)
 
 		if !((int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&109051904) != 0) {
@@ -3467,14 +3721,30 @@ func (p *EqlParser) Key() (localctx IKeyContext) {
 		}
 	}
 	{
-		p.SetState(130)
+		p.SetState(134)
 		p.Match(EqlParserT__2)
+		if p.HasError() {
+			// Recognition error - abort rule
+			goto errorExit
+		}
 	}
 	{
-		p.SetState(131)
+		p.SetState(135)
 		p.Constant()
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
+	if false {
+		goto errorExit // Trick to prevent compiler error if the label is not used
+	}
 	return localctx
 }
 
@@ -3494,15 +3764,20 @@ type IDictContext interface {
 }
 
 type DictContext struct {
-	*antlr.BaseParserRuleContext
+	antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
 func NewEmptyDictContext() *DictContext {
 	var p = new(DictContext)
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
 	p.RuleIndex = EqlParserRULE_dict
 	return p
+}
+
+func InitEmptyDictContext(p *DictContext) {
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
+	p.RuleIndex = EqlParserRULE_dict
 }
 
 func (*DictContext) IsDictContext() {}
@@ -3510,7 +3785,7 @@ func (*DictContext) IsDictContext() {}
 func NewDictContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *DictContext {
 	var p = new(DictContext)
 
-	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
 
 	p.parser = parser
 	p.RuleIndex = EqlParserRULE_dict
@@ -3592,53 +3867,56 @@ func (s *DictContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 }
 
 func (p *EqlParser) Dict() (localctx IDictContext) {
-	this := p
-	_ = this
-
 	localctx = NewDictContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 18, EqlParserRULE_dict)
 	var _la int
 
-	defer func() {
-		p.ExitRule()
-	}()
-
-	defer func() {
-		if err := recover(); err != nil {
-			if v, ok := err.(antlr.RecognitionException); ok {
-				localctx.SetException(v)
-				p.GetErrorHandler().ReportError(p, v)
-				p.GetErrorHandler().Recover(p, v)
-			} else {
-				panic(err)
-			}
-		}
-	}()
-
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(133)
+		p.SetState(137)
 		p.Key()
 	}
-	p.SetState(138)
+	p.SetState(142)
 	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == EqlParserT__1 {
 		{
-			p.SetState(134)
+			p.SetState(138)
 			p.Match(EqlParserT__1)
+			if p.HasError() {
+				// Recognition error - abort rule
+				goto errorExit
+			}
 		}
 		{
-			p.SetState(135)
+			p.SetState(139)
 			p.Key()
 		}
 
-		p.SetState(140)
+		p.SetState(144)
 		p.GetErrorHandler().Sync(p)
+		if p.HasError() {
+			goto errorExit
+		}
 		_la = p.GetTokenStream().LA(1)
 	}
 
+errorExit:
+	if p.HasError() {
+		v := p.GetError()
+		localctx.SetException(v)
+		p.GetErrorHandler().ReportError(p, v)
+		p.GetErrorHandler().Recover(p, v)
+		p.SetError(nil)
+	}
+	p.ExitRule()
+	if false {
+		goto errorExit // Trick to prevent compiler error if the label is not used
+	}
 	return localctx
 }
 
@@ -3657,39 +3935,36 @@ func (p *EqlParser) Sempred(localctx antlr.RuleContext, ruleIndex, predIndex int
 }
 
 func (p *EqlParser) Exp_Sempred(localctx antlr.RuleContext, predIndex int) bool {
-	this := p
-	_ = this
-
 	switch predIndex {
 	case 0:
-		return p.Precpred(p.GetParserRuleContext(), 19)
+		return p.Precpred(p.GetParserRuleContext(), 20)
 
 	case 1:
-		return p.Precpred(p.GetParserRuleContext(), 18)
+		return p.Precpred(p.GetParserRuleContext(), 19)
 
 	case 2:
-		return p.Precpred(p.GetParserRuleContext(), 16)
+		return p.Precpred(p.GetParserRuleContext(), 17)
 
 	case 3:
-		return p.Precpred(p.GetParserRuleContext(), 15)
+		return p.Precpred(p.GetParserRuleContext(), 16)
 
 	case 4:
-		return p.Precpred(p.GetParserRuleContext(), 14)
+		return p.Precpred(p.GetParserRuleContext(), 15)
 
 	case 5:
-		return p.Precpred(p.GetParserRuleContext(), 13)
+		return p.Precpred(p.GetParserRuleContext(), 14)
 
 	case 6:
-		return p.Precpred(p.GetParserRuleContext(), 12)
+		return p.Precpred(p.GetParserRuleContext(), 13)
 
 	case 7:
-		return p.Precpred(p.GetParserRuleContext(), 11)
+		return p.Precpred(p.GetParserRuleContext(), 12)
 
 	case 8:
-		return p.Precpred(p.GetParserRuleContext(), 10)
+		return p.Precpred(p.GetParserRuleContext(), 11)
 
 	case 9:
-		return p.Precpred(p.GetParserRuleContext(), 9)
+		return p.Precpred(p.GetParserRuleContext(), 10)
 
 	default:
 		panic("No predicate with index: " + fmt.Sprint(predIndex))

@@ -139,6 +139,8 @@ inputs:
 #   logs: false
 #   # enables metrics monitoring
 #   metrics: false
+#   # metrics_period defines how frequent we should sample monitoring metrics. Default is 60 seconds.
+#   metrics_period: 60s
 #   # exposes /debug/pprof/ endpoints
 #   # recommended that these endpoints are only enabled if the monitoring endpoint is set to localhost
 #   pprof.enabled: false
@@ -156,7 +158,7 @@ inputs:
 #   # The possible values for `failon` are:
 #   # `degraded`: return an error if a component is in a degraded state or failed state, or if the agent coordinator is unresponsive.
 #   # `failed`: return an error if a unit is in a failed state, or if the agent coordinator is unresponsive.
-#   # `heartbeat`: return an error only if the agent coordinator is unresponsive. 
+#   # `heartbeat`: return an error only if the agent coordinator is unresponsive.
 #   # If no `failon` parameter is provided, the default behavior is `failon=heartbeat`
 #   http:
 #       # enables http endpoint
@@ -271,5 +273,53 @@ agent.logging.to_stderr: true
 
 # Set to true to log messages in JSON format.
 #agent.logging.json: false
+
+#=============================== Events Logging ===============================
+# Some outputs will log raw events on errors like indexing errors in the
+# Elasticsearch output, to prevent logging raw events (that may contain
+# sensitive information) together with other log messages, a different
+# log file, only for log entries containing raw events, is used. It will
+# use the same level, selectors and all other configurations from the
+# default logger, but it will have it's own file configuration.
+#
+# Having a different log file for raw events also prevents event data
+# from drowning out the regular log files.
+#
+# IMPORTANT: No matter the default logger output configuration, raw events
+# will **always** be logged to a file configured by `agent.logging.event_data.files`.
+
+# agent.logging.event_data:
+# Logging to rotating files. Set agent.logging.to_files to false to disable logging to
+# files.
+#agent.logging.event_data.to_files: true
+#agent.logging.event_data:
+  # Configure the path where the logs are written. The default is the logs directory
+  # under the home path (the binary location).
+  #path: /var/log/filebeat
+
+  # The name of the files where the logs are written to.
+  #name: filebeat-event-data
+
+  # Configure log file size limit. If the limit is reached, log file will be
+  # automatically rotated.
+  #rotateeverybytes: 5242880 # = 5MB
+
+  # Number of rotated log files to keep. The oldest files will be deleted first.
+  #keepfiles: 2
+
+  # The permissions mask to apply when rotating log files. The default value is 0600.
+  # Must be a valid Unix-style file permissions mask expressed in octal notation.
+  #permissions: 0600
+
+  # Enable log file rotation on time intervals in addition to the size-based rotation.
+  # Intervals must be at least 1s. Values of 1m, 1h, 24h, 7*24h, 30*24h, and 365*24h
+  # are boundary-aligned with minutes, hours, days, weeks, months, and years as
+  # reported by the local system clock. All other intervals are calculated from the
+  # Unix epoch. Defaults to disabled.
+  #interval: 0
+
+  # Rotate existing logs on startup rather than appending them to the existing
+  # file. Defaults to false.
+  # rotateonstartup: false
 
 {{template "providers.yml.tmpl" .}}

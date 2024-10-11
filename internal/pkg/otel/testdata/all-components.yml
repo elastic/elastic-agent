@@ -2,13 +2,16 @@ exporters:
   debug:
   elasticsearch:
     endpoints:
-      - localhost:9200
+      - http://localhost:9200
   file:
     path: /tmp/file-exporter-output.json
   otlp:
     endpoint: localhots:4317
+  otlphttp:
+    endpoint: https://localhost.com:4318
 
 extensions:
+  health_check:
   memory_limiter:
     check_interval: 5s
     limit_mib: 100
@@ -20,13 +23,19 @@ processors:
         key: key1
         value: value1
   batch:
+  elasticinframetrics:
   filter:
   resource:
     attributes:
       - action: insert
         key: key1
         value: value1
+  resourcedetection:
   transform:
+  memory_limiter/processor:
+    check_interval: 1s
+    limit_mib: 4000
+    spike_limit_mib: 800
 
 receivers:
   filelog:
@@ -36,10 +45,53 @@ receivers:
     protocols:
       grpc:
       http:
+  httpcheck:
+    targets:
+      - endpoint: http://localhost:80
+        method: GET
+    collection_interval: 10s
+  jaeger:
+    protocols:
+      grpc:
+  zipkin:
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector'
+          scrape_interval: 5s
+          static_configs:
+            - targets: ['0.0.0.0:8888']
+
+connectors: 
+  spanmetrics:
+    histogram:
+      explicit:
+        buckets: [100us, 1ms, 2ms, 6ms, 10ms, 100ms, 250ms]
+    dimensions:
+      - name: http.method
+        default: GET
+      - name: http.status_code
+    exemplars:
+      enabled: true
+    exclude_dimensions: ['status.code']
+    dimensions_cache_size: 1000
+    aggregation_temporality: "AGGREGATION_TEMPORALITY_CUMULATIVE"    
+    metrics_flush_interval: 15s
+    metrics_expiration: 5m
+    events:
+      enabled: true
+      dimensions:
+        - name: exception.type
+        - name: exception.message
+    resource_metrics_key_attributes:
+      - service.name
+      - telemetry.sdk.language
+      - telemetry.sdk.name
 
 service:
   extensions:
     - memory_limiter
+    - health_check
   pipelines:
     logs:
       exporters:
@@ -52,7 +104,9 @@ service:
         - batch
         - filter
         - resource
+        - resourcedetection
         - transform
+        - memory_limiter/processor
       receivers:
         - filelog
         - otlp
@@ -60,28 +114,36 @@ service:
     metrics:
       exporters:
         - debug
-        - file
         - otlp
       processors:
         - attributes
         - batch
+        - elasticinframetrics
         - filter
         - resource
+        - resourcedetection
         - transform
       receivers:
         - otlp
+        - httpcheck
+        - spanmetrics
+        - prometheus
 
     traces:
       exporters:
         - debug
         - elasticsearch
-        - file
         - otlp
+        - otlphttp
+        - spanmetrics
       processors:
         - attributes
         - batch
         - filter
         - resource
+        - resourcedetection
         - transform
       receivers:
         - otlp
+        - jaeger
+        - zipkin

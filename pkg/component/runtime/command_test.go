@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package runtime
 
@@ -9,7 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 func TestAddToBucket(t *testing.T) {
@@ -50,4 +55,152 @@ func TestAddToBucket(t *testing.T) {
 			require.Equal(t, tc.shouldBlock, blocked)
 		})
 	}
+}
+
+// TestSyncExpected verifies that the command runtime correctly establish if we need to send a CheckinObserved after an
+// update in the model coming from the coordinator
+func TestSyncExpected(t *testing.T) {
+
+	tenPercentSamplingRate := float32(0.1)
+	anotherTenPercentSamplingRate := tenPercentSamplingRate
+	t.Run("TestAPMConfig", func(t *testing.T) {
+		testcases := []struct {
+			name          string
+			initialConfig *proto.APMConfig
+			updatedConfig *proto.APMConfig
+			syncExpected  bool
+		}{
+			{
+				name:          "No config (both nil)",
+				initialConfig: nil,
+				updatedConfig: nil,
+				syncExpected:  false,
+			},
+			{
+				name:          "Config added",
+				initialConfig: nil,
+				updatedConfig: &proto.APMConfig{
+					Elastic: &proto.ElasticAPM{
+						Environment: "test",
+						ApiKey:      "apikey",
+						Hosts:       []string{"some.somedomain"},
+					},
+				},
+				syncExpected: true,
+			},
+			{
+				name: "Same config",
+				initialConfig: &proto.APMConfig{
+					Elastic: &proto.ElasticAPM{
+						Environment: "test",
+						ApiKey:      "apikey",
+						Hosts:       []string{"some.somedomain"},
+					},
+				},
+				updatedConfig: &proto.APMConfig{
+					Elastic: &proto.ElasticAPM{
+						Environment: "test",
+						ApiKey:      "apikey",
+						Hosts:       []string{"some.somedomain"},
+					},
+				},
+				syncExpected: false,
+			},
+			{
+				name: "Added sampling rate",
+				initialConfig: &proto.APMConfig{
+					Elastic: &proto.ElasticAPM{
+						Environment: "test",
+						ApiKey:      "apikey",
+						Hosts:       []string{"some.somedomain"},
+					},
+				},
+				updatedConfig: &proto.APMConfig{
+					Elastic: &proto.ElasticAPM{
+						Environment:  "test",
+						ApiKey:       "apikey",
+						Hosts:        []string{"some.somedomain"},
+						SamplingRate: &tenPercentSamplingRate,
+					},
+				},
+				syncExpected: true,
+			},
+			{
+				name: "Same sampling rate",
+				initialConfig: &proto.APMConfig{
+					Elastic: &proto.ElasticAPM{
+						Environment:  "test",
+						ApiKey:       "apikey",
+						Hosts:        []string{"some.somedomain"},
+						SamplingRate: &tenPercentSamplingRate,
+					},
+				},
+				updatedConfig: &proto.APMConfig{
+					Elastic: &proto.ElasticAPM{
+						Environment:  "test",
+						ApiKey:       "apikey",
+						Hosts:        []string{"some.somedomain"},
+						SamplingRate: &anotherTenPercentSamplingRate,
+					},
+				},
+				syncExpected: false,
+			},
+			{
+				name: "Remove sampling rate",
+				initialConfig: &proto.APMConfig{
+					Elastic: &proto.ElasticAPM{
+						Environment:  "test",
+						ApiKey:       "apikey",
+						Hosts:        []string{"some.somedomain"},
+						SamplingRate: &tenPercentSamplingRate,
+					},
+				},
+				updatedConfig: &proto.APMConfig{
+					Elastic: &proto.ElasticAPM{
+						Environment: "test",
+						ApiKey:      "apikey",
+						Hosts:       []string{"some.somedomain"},
+					},
+				},
+				syncExpected: true,
+			},
+		}
+
+		for _, tt := range testcases {
+			t.Run(tt.name, func(t *testing.T) {
+				compState := ComponentState{
+					State:       client.UnitStateHealthy,
+					Message:     "fake component state running",
+					Features:    nil,
+					FeaturesIdx: 0,
+					Component: &proto.Component{
+						ApmConfig: tt.initialConfig,
+					},
+					ComponentIdx: 0,
+					VersionInfo: ComponentVersionInfo{
+						Name:      "fake component",
+						BuildHash: "abcdefgh",
+					},
+					Pid:                 123,
+					expectedUnits:       nil,
+					expectedFeatures:    nil,
+					expectedFeaturesIdx: 0,
+					expectedComponent: &proto.Component{
+						ApmConfig: tt.initialConfig,
+					},
+					expectedComponentIdx: 0,
+				}
+
+				actualSyncExpected := compState.syncExpected(&component.Component{
+					ID: "fakecomponent",
+					Component: &proto.Component{
+						ApmConfig: tt.updatedConfig,
+					},
+				})
+
+				assert.Equal(t, tt.syncExpected, actualSyncExpected)
+			})
+		}
+	})
+
 }

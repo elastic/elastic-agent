@@ -1,0 +1,4 @@
+config:
+  - path: dev-tools/packaging/templates/ironbank
+    dockerfile: Dockerfile.tmpl
+    manifest: hardening_manifest.yaml.tmpl

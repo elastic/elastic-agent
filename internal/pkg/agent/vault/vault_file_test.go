@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package vault
 
@@ -33,7 +33,10 @@ func TestFileVaultRekey(t *testing.T) {
 	defer cn()
 
 	vaultPath := getTestFileVaultPath(t)
-	options := ApplyOptions(WithVaultPath(vaultPath))
+	options, err := ApplyOptions(WithVaultPath(vaultPath))
+	if err != nil {
+		t.Fatal(err)
+	}
 	v, err := NewFileVault(ctx, options)
 	if err != nil {
 		t.Fatal(err)
@@ -83,7 +86,10 @@ func TestFileVault(t *testing.T) {
 
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
-	options := ApplyOptions(WithVaultPath(vaultPath))
+	options, err := ApplyOptions(WithVaultPath(vaultPath))
+	if err != nil {
+		t.Fatal(err)
+	}
 	v, err := NewFileVault(ctx, options)
 	if err != nil {
 		t.Fatal(err)
@@ -209,7 +215,10 @@ func TestFileVaultConcurrent(t *testing.T) {
 }
 
 func doCrud(t *testing.T, ctx context.Context, vaultPath, key string) error {
-	options := ApplyOptions(WithVaultPath(vaultPath))
+	options, err := ApplyOptions(WithVaultPath(vaultPath))
+	if err != nil {
+		return err
+	}
 	v, err := NewFileVault(ctx, options)
 	if err != nil {
 		return fmt.Errorf("could not create new vault: %w", err)

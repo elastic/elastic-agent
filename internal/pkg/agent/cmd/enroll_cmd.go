@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package cmd
 
@@ -9,13 +9,13 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 
-	"go.elastic.co/apm"
+	"go.elastic.co/apm/v2"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
@@ -38,6 +38,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client/wait"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -110,6 +111,7 @@ type enrollCmdOption struct {
 	CASha256             []string                   `yaml:"ca_sha256,omitempty"`
 	Certificate          string                     `yaml:"certificate,omitempty"`
 	Key                  string                     `yaml:"key,omitempty"`
+	KeyPassphrasePath    string                     `yaml:"key_passphrase_path,omitempty"`
 	Insecure             bool                       `yaml:"insecure,omitempty"`
 	EnrollAPIKey         string                     `yaml:"enrollment_key,omitempty"`
 	Staging              string                     `yaml:"staging,omitempty"`
@@ -148,8 +150,9 @@ func (e *enrollCmdOption) remoteConfig() (remote.Config, error) {
 	}
 	if e.Certificate != "" || e.Key != "" {
 		tlsCfg.Certificate = tlscommon.CertificateConfig{
-			Certificate: e.Certificate,
-			Key:         e.Key,
+			Certificate:    e.Certificate,
+			Key:            e.Key,
+			PassphrasePath: e.KeyPassphrasePath,
 		}
 	}
 
@@ -335,7 +338,7 @@ func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig m
 	if err != nil {
 		if !c.options.FleetServer.SpawnAgent {
 			// wait longer to try and communicate with the Elastic Agent
-			err = waitForAgent(ctx, c.options.DaemonTimeout)
+			err = wait.ForAgent(ctx, c.options.DaemonTimeout)
 			if err != nil {
 				return "", errors.New("failed to communicate with elastic-agent daemon; is elastic-agent running?")
 			}
@@ -556,6 +559,12 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 		return errors.New(err, "acquiring metadata failed")
 	}
 
+	// Automatically add the namespace as a tag when installed into a namepsace.
+	// Ensures the development agent is differentiated from others when on the same host.
+	if namespace := paths.InstallNamespace(); namespace != "" {
+		c.options.Tags = append(c.options.Tags, namespace)
+	}
+
 	r := &fleetapi.EnrollRequest{
 		EnrollAPIKey: c.options.EnrollAPIKey,
 		Type:         fleetapi.PermanentEnroll,
@@ -697,7 +706,7 @@ func yamlToReader(in interface{}) (io.Reader, error) {
 }
 
 func delay(ctx context.Context, d time.Duration) {
-	t := time.NewTimer(time.Duration(rand.Int63n(int64(d))))
+	t := time.NewTimer(rand.N(d))
 	defer t.Stop()
 	select {
 	case <-ctx.Done():
@@ -722,54 +731,6 @@ type waitResult struct {
 	err             error
 }
 
-func waitForAgent(ctx context.Context, timeout time.Duration) error {
-	if timeout == 0 {
-		timeout = 1 * time.Minute
-	}
-	if timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-	maxBackoff := timeout
-	if maxBackoff <= 0 {
-		// indefinite timeout
-		maxBackoff = 10 * time.Minute
-	}
-
-	resChan := make(chan waitResult)
-	innerCtx, innerCancel := context.WithCancel(context.Background())
-	defer innerCancel()
-	go func() {
-		backOff := expBackoffWithContext(innerCtx, 1*time.Second, maxBackoff)
-		for {
-			backOff.Wait()
-			_, err := getDaemonState(innerCtx)
-			if errors.Is(err, context.Canceled) {
-				resChan <- waitResult{err: err}
-				return
-			}
-			if err == nil {
-				resChan <- waitResult{}
-				break
-			}
-		}
-	}()
-
-	var res waitResult
-	select {
-	case <-ctx.Done():
-		innerCancel()
-		res = <-resChan
-	case res = <-resChan:
-	}
-
-	if res.err != nil {
-		return res.err
-	}
-	return nil
-}
-
 func waitForFleetServer(ctx context.Context, agentSubproc <-chan *os.ProcessState, log *logger.Logger, timeout time.Duration) (string, error) {
 	if timeout == 0 {
 		timeout = 2 * time.Minute
@@ -792,8 +753,16 @@ func waitForFleetServer(ctx context.Context, agentSubproc <-chan *os.ProcessStat
 		msg := ""
 		msgCount := 0
 		backExp := expBackoffWithContext(innerCtx, 1*time.Second, maxBackoff)
+
 		for {
-			backExp.Wait()
+			// if the timeout is reached, no response was sent on `res`, therefore
+			// send an error
+			if !backExp.Wait() {
+				resChan <- waitResult{err: fmt.Errorf(
+					"timed out waiting for Fleet Server to start after %s",
+					timeout)}
+			}
+
 			state, err := getDaemonState(innerCtx)
 			if errors.Is(err, context.Canceled) {
 				resChan <- waitResult{err: err}

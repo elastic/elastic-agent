@@ -99,6 +99,11 @@ linters-settings:
               - errors
               - fmt
             reason: "This package is deprecated, use `fmt.Errorf` with `%w` instead"
+        - github.com/google/uuid:
+            # Recommended modules that should be used instead. (Optional)
+            recommendations:
+              - github.com/gofrs/uuid/v5
+            reason: "Use one uuid library consistently across the codebase"
 
   gomoddirectives:
     # Forbid local `replace` directives
@@ -107,20 +112,15 @@ linters-settings:
     # Forbid any `replace` directives that are intended temporarily only during
     # development. The modules listed below are intended to be replaced permanently.
     replace-allow-list:
-      - github.com/Microsoft/go-winio
       - github.com/Shopify/sarama
       - github.com/dop251/goja
       - github.com/dop251/goja_nodejs
       - github.com/fsnotify/fsnotify
-      - github.com/tonistiigi/fifo
+      - github.com/openshift/api
 
   gosimple:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.21.10"
-
-  nakedret:
-    # make an issue if func has more lines of code than this setting and it has naked returns; default is 30
-    max-func-lines: 0
+    go: "1.22.8"
 
   nolintlint:
     # Enable to ensure that nolint directives are all used. Default is true.
@@ -136,17 +136,17 @@ linters-settings:
 
   staticcheck:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.21.10"
+    go: "1.22.8"
     checks: ["all"]
 
   stylecheck:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.21.10"
+    go: "1.22.8"
     checks: ["all"]
 
   unused:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.21.10"
+    go: "1.22.8"
 
   gosec:
     excludes:

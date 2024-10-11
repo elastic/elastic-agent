@@ -1,83 +1,32 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package runner
 
 import (
 	"bytes"
 	"context"
-	"crypto/md5"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
-	"unicode/utf8"
-
-	"gopkg.in/yaml.v2"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
-	"k8s.io/utils/strings/slices"
+	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/pkg/testing"
+	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	tssh "github.com/elastic/elastic-agent/pkg/testing/ssh"
+	"github.com/elastic/elastic-agent/pkg/testing/supported"
 )
-
-// OSBatch defines the mapping between a SupportedOS and a define.Batch.
-type OSBatch struct {
-	// ID is the unique ID for the batch.
-	ID string
-	// LayoutOS provides all the OS information to create an instance.
-	OS SupportedOS
-	// Batch defines the batch of tests to run on this layout.
-	Batch define.Batch
-	// Skip defines if this batch will be skipped because no supported layout exists yet.
-	Skip bool
-}
-
-// OSRunnerPackageResult is the result for each package.
-type OSRunnerPackageResult struct {
-	// Name is the package name.
-	Name string
-	// Output is the raw test output.
-	Output []byte
-	// XMLOutput is the XML Junit output.
-	XMLOutput []byte
-	// JSONOutput is the JSON output.
-	JSONOutput []byte
-}
-
-// OSRunnerResult is the result of the test run provided by a OSRunner.
-type OSRunnerResult struct {
-	// Packages is the results for each package.
-	Packages []OSRunnerPackageResult
-
-	// SudoPackages is the results for each package that need to run as sudo.
-	SudoPackages []OSRunnerPackageResult
-}
-
-// OSRunner provides an interface to run the tests on the OS.
-type OSRunner interface {
-	// Prepare prepares the runner to actual run on the host.
-	Prepare(ctx context.Context, sshClient SSHClient, logger Logger, arch string, goVersion string) error
-	// Copy places the required files on the host.
-	Copy(ctx context.Context, sshClient SSHClient, logger Logger, repoArchive string, builds []Build) error
-	// Run runs the actual tests and provides the result.
-	Run(ctx context.Context, verbose bool, sshClient SSHClient, logger Logger, agentVersion string, prefix string, batch define.Batch, env map[string]string) (OSRunnerResult, error)
-	// Diagnostics gathers any diagnostics from the host.
-	Diagnostics(ctx context.Context, sshClient SSHClient, logger Logger, destination string) error
-}
-
-// Logger is a simple logging interface used by each runner type.
-type Logger interface {
-	// Logf logs the message for this runner.
-	Logf(format string, args ...any)
-}
 
 // Result is the complete result from the runner.
 type Result struct {
@@ -99,39 +48,25 @@ type State struct {
 	Instances []StateInstance `yaml:"instances"`
 
 	// Stacks store provisioned stacks.
-	Stacks []Stack `yaml:"stacks"`
+	Stacks []common.Stack `yaml:"stacks"`
 }
 
 // StateInstance is an instance stored in the state.
 type StateInstance struct {
-	Instance
+	common.Instance
 
 	// Prepared set to true when the instance is prepared.
 	Prepared bool `yaml:"prepared"`
 }
 
-// Build describes a build and its paths.
-type Build struct {
-	// Version of the Elastic Agent build.
-	Version string
-	// Type of OS this build is for.
-	Type string
-	// Arch is architecture this build is for.
-	Arch string
-	// Path is the path to the build.
-	Path string
-	// SHA512 is the path to the SHA512 file.
-	SHA512Path string
-}
-
 // Runner runs the tests on remote instances.
 type Runner struct {
-	cfg    Config
-	logger Logger
-	ip     InstanceProvisioner
-	sp     StackProvisioner
+	cfg    common.Config
+	logger common.Logger
+	ip     common.InstanceProvisioner
+	sp     common.StackProvisioner
 
-	batches []OSBatch
+	batches []common.OSBatch
 
 	batchToStack   map[string]stackRes
 	batchToStackCh map[string]chan stackRes
@@ -142,7 +77,7 @@ type Runner struct {
 }
 
 // NewRunner creates a new runner based on the provided batches.
-func NewRunner(cfg Config, ip InstanceProvisioner, sp StackProvisioner, batches ...define.Batch) (*Runner, error) {
+func NewRunner(cfg common.Config, ip common.InstanceProvisioner, sp common.StackProvisioner, batches ...define.Batch) (*Runner, error) {
 	err := cfg.Validate()
 	if err != nil {
 		return nil, err
@@ -152,30 +87,18 @@ func NewRunner(cfg Config, ip InstanceProvisioner, sp StackProvisioner, batches 
 		return nil, err
 	}
 
+	osBatches, err := supported.CreateBatches(batches, platforms, cfg.Groups, cfg.Matrix, cfg.SingleTest)
+	if err != nil {
+		return nil, err
+	}
+	osBatches = filterSupportedOS(osBatches, ip)
+
 	logger := &runnerLogger{
 		writer:    os.Stdout,
 		timestamp: cfg.Timestamp,
 	}
 	ip.SetLogger(logger)
 	sp.SetLogger(logger)
-
-	var osBatches []OSBatch
-	for _, b := range batches {
-		lbs, err := createBatches(b, platforms, cfg.Groups, cfg.Matrix)
-		if err != nil {
-			return nil, err
-		}
-		if lbs != nil {
-			osBatches = append(osBatches, lbs...)
-		}
-	}
-	if cfg.SingleTest != "" {
-		osBatches, err = filterSingleTest(osBatches, cfg.SingleTest)
-		if err != nil {
-			return nil, err
-		}
-	}
-	osBatches = filterSupportedOS(osBatches, ip)
 
 	r := &Runner{
 		cfg:            cfg,
@@ -195,7 +118,7 @@ func NewRunner(cfg Config, ip InstanceProvisioner, sp StackProvisioner, batches 
 }
 
 // Logger returns the logger used by the runner.
-func (r *Runner) Logger() Logger {
+func (r *Runner) Logger() common.Logger {
 	return r.logger
 }
 
@@ -223,7 +146,7 @@ func (r *Runner) Run(ctx context.Context) (Result, error) {
 
 	// only send to the provisioner the batches that need to be created
 	var instances []StateInstance
-	var batches []OSBatch
+	var batches []common.OSBatch
 	for _, b := range r.batches {
 		if !b.Skip {
 			i, ok := r.findInstance(b.ID)
@@ -247,10 +170,22 @@ func (r *Runner) Run(ctx context.Context) (Result, error) {
 		}
 	}
 
-	// use SSH to perform all the required work on the instances
-	results, err := r.runInstances(ctx, sshAuth, repoArchive, instances)
-	if err != nil {
-		return Result{}, err
+	var results map[string]common.OSRunnerResult
+	switch r.ip.Type() {
+	case common.ProvisionerTypeVM:
+		// use SSH to perform all the required work on the instances
+		results, err = r.runInstances(ctx, sshAuth, repoArchive, instances)
+		if err != nil {
+			return Result{}, err
+		}
+	case common.ProvisionerTypeK8SCluster:
+		results, err = r.runK8sInstances(ctx, instances)
+		if err != nil {
+			return Result{}, err
+		}
+
+	default:
+		return Result{}, fmt.Errorf("invalid provisioner type %d", r.ip.Type())
 	}
 
 	// merge the results
@@ -262,12 +197,12 @@ func (r *Runner) Clean() error {
 	r.stateMx.Lock()
 	defer r.stateMx.Unlock()
 
-	var instances []Instance
+	var instances []common.Instance
 	for _, i := range r.state.Instances {
 		instances = append(instances, i.Instance)
 	}
 	r.state.Instances = nil
-	stacks := make([]Stack, len(r.state.Stacks))
+	stacks := make([]common.Stack, len(r.state.Stacks))
 	copy(stacks, r.state.Stacks)
 	r.state.Stacks = nil
 	err := r.writeState()
@@ -282,7 +217,7 @@ func (r *Runner) Clean() error {
 		return r.ip.Clean(ctx, r.cfg, instances)
 	})
 	for _, stack := range stacks {
-		g.Go(func(stack Stack) func() error {
+		g.Go(func(stack common.Stack) func() error {
 			return func() error {
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 				defer cancel()
@@ -293,10 +228,71 @@ func (r *Runner) Clean() error {
 	return g.Wait()
 }
 
+func (r *Runner) runK8sInstances(ctx context.Context, instances []StateInstance) (map[string]common.OSRunnerResult, error) {
+	results := make(map[string]common.OSRunnerResult)
+	var resultsMx sync.Mutex
+	var err error
+	for _, instance := range instances {
+		batch, ok := findBatchByID(instance.ID, r.batches)
+		if !ok {
+			err = fmt.Errorf("unable to find batch with ID: %s", instance.ID)
+			continue
+		}
+
+		logger := &batchLogger{wrapped: r.logger, prefix: instance.ID}
+		// start with the ExtraEnv first preventing the other environment flags below
+		// from being overwritten
+		env := map[string]string{}
+		for k, v := range r.cfg.ExtraEnv {
+			env[k] = v
+		}
+		// ensure that we have all the requirements for the stack if required
+		if batch.Batch.Stack != nil {
+			// wait for the stack to be ready before continuing
+			logger.Logf("Waiting for stack to be ready...")
+			stack, stackErr := r.getStackForBatchID(batch.ID)
+			if stackErr != nil {
+				err = stackErr
+				continue
+			}
+			env["ELASTICSEARCH_HOST"] = stack.Elasticsearch
+			env["ELASTICSEARCH_USERNAME"] = stack.Username
+			env["ELASTICSEARCH_PASSWORD"] = stack.Password
+			env["KIBANA_HOST"] = stack.Kibana
+			env["KIBANA_USERNAME"] = stack.Username
+			env["KIBANA_PASSWORD"] = stack.Password
+			logger.Logf("Using Stack with Kibana host %s, credentials available under .integration-cache", stack.Kibana)
+		}
+
+		// set the go test flags
+		env["GOTEST_FLAGS"] = r.cfg.TestFlags
+		env["KUBECONFIG"] = instance.Instance.Internal["config"].(string)
+		env["TEST_BINARY_NAME"] = r.cfg.BinaryName
+		env["K8S_VERSION"] = instance.Instance.Internal["version"].(string)
+		env["AGENT_IMAGE"] = instance.Instance.Internal["agent_image"].(string)
+
+		prefix := fmt.Sprintf("%s-%s", instance.Instance.Internal["version"].(string), batch.ID)
+
+		// run the actual tests on the host
+		result, runErr := batch.OS.Runner.Run(ctx, r.cfg.VerboseMode, nil, logger, r.cfg.AgentVersion, prefix, batch.Batch, env)
+		if runErr != nil {
+			logger.Logf("Failed to execute tests on instance: %s", err)
+			err = fmt.Errorf("failed to execute tests on instance %s: %w", instance.Name, err)
+		}
+		resultsMx.Lock()
+		results[batch.ID] = result
+		resultsMx.Unlock()
+	}
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
 // runInstances runs the batch on each instance in parallel.
-func (r *Runner) runInstances(ctx context.Context, sshAuth ssh.AuthMethod, repoArchive string, instances []StateInstance) (map[string]OSRunnerResult, error) {
+func (r *Runner) runInstances(ctx context.Context, sshAuth ssh.AuthMethod, repoArchive string, instances []StateInstance) (map[string]common.OSRunnerResult, error) {
 	g, ctx := errgroup.WithContext(ctx)
-	results := make(map[string]OSRunnerResult)
+	results := make(map[string]common.OSRunnerResult)
 	var resultsMx sync.Mutex
 	for _, i := range instances {
 		func(i StateInstance) {
@@ -326,20 +322,20 @@ func (r *Runner) runInstances(ctx context.Context, sshAuth ssh.AuthMethod, repoA
 }
 
 // runInstance runs the batch on the machine.
-func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger Logger, repoArchive string, batch OSBatch, instance StateInstance) (OSRunnerResult, error) {
+func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger common.Logger, repoArchive string, batch common.OSBatch, instance StateInstance) (common.OSRunnerResult, error) {
 	sshPrivateKeyPath, err := filepath.Abs(filepath.Join(r.cfg.StateDir, "id_rsa"))
 	if err != nil {
-		return OSRunnerResult{}, fmt.Errorf("failed to determine OGC SSH private key path: %w", err)
+		return common.OSRunnerResult{}, fmt.Errorf("failed to determine OGC SSH private key path: %w", err)
 	}
 
 	logger.Logf("Starting SSH; connect with `ssh -i %s %s@%s`", sshPrivateKeyPath, instance.Username, instance.IP)
-	client := NewSSHClient(instance.IP, instance.Username, sshAuth, logger)
+	client := tssh.NewClient(instance.IP, instance.Username, sshAuth, logger)
 	connectCtx, connectCancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer connectCancel()
 	err = client.Connect(connectCtx)
 	if err != nil {
 		logger.Logf("Failed to connect to instance %s: %s", instance.IP, err)
-		return OSRunnerResult{}, fmt.Errorf("failed to connect to instance %s: %w", instance.Name, err)
+		return common.OSRunnerResult{}, fmt.Errorf("failed to connect to instance %s: %w", instance.Name, err)
 	}
 	defer client.Close()
 	logger.Logf("Connected over SSH")
@@ -350,14 +346,14 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		err = batch.OS.Runner.Prepare(ctx, client, logger, batch.OS.Arch, r.cfg.GOVersion)
 		if err != nil {
 			logger.Logf("Failed to prepare instance: %s", err)
-			return OSRunnerResult{}, fmt.Errorf("failed to prepare instance %s: %w", instance.Name, err)
+			return common.OSRunnerResult{}, fmt.Errorf("failed to prepare instance %s: %w", instance.Name, err)
 		}
 
 		// now its prepared, add to state
 		instance.Prepared = true
 		err = r.addOrUpdateInstance(instance)
 		if err != nil {
-			return OSRunnerResult{}, fmt.Errorf("failed to save instance state %s: %w", instance.Name, err)
+			return common.OSRunnerResult{}, fmt.Errorf("failed to save instance state %s: %w", instance.Name, err)
 		}
 	}
 
@@ -365,7 +361,7 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 	err = batch.OS.Runner.Copy(ctx, client, logger, repoArchive, r.getBuilds(batch))
 	if err != nil {
 		logger.Logf("Failed to copy files instance: %s", err)
-		return OSRunnerResult{}, fmt.Errorf("failed to copy files to instance %s: %w", instance.Name, err)
+		return common.OSRunnerResult{}, fmt.Errorf("failed to copy files to instance %s: %w", instance.Name, err)
 	}
 	// start with the ExtraEnv first preventing the other environment flags below
 	// from being overwritten
@@ -380,7 +376,7 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		logger.Logf("Waiting for stack to be ready...")
 		stack, err := r.getStackForBatchID(batch.ID)
 		if err != nil {
-			return OSRunnerResult{}, err
+			return common.OSRunnerResult{}, err
 		}
 		env["ELASTICSEARCH_HOST"] = stack.Elasticsearch
 		env["ELASTICSEARCH_USERNAME"] = stack.Username
@@ -399,7 +395,7 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 	result, err := batch.OS.Runner.Run(ctx, r.cfg.VerboseMode, client, logger, r.cfg.AgentVersion, batch.ID, batch.Batch, env)
 	if err != nil {
 		logger.Logf("Failed to execute tests on instance: %s", err)
-		return OSRunnerResult{}, fmt.Errorf("failed to execute tests on instance %s: %w", instance.Name, err)
+		return common.OSRunnerResult{}, fmt.Errorf("failed to execute tests on instance %s: %w", instance.Name, err)
 	}
 
 	// fetch any diagnostics
@@ -446,8 +442,8 @@ func (r *Runner) validate() error {
 }
 
 // getBuilds returns the build for the batch.
-func (r *Runner) getBuilds(b OSBatch) []Build {
-	var builds []Build
+func (r *Runner) getBuilds(b common.OSBatch) []common.Build {
+	var builds []common.Build
 	formats := []string{"targz", "zip", "rpm", "deb"}
 	binaryName := "elastic-agent"
 
@@ -487,7 +483,7 @@ func (r *Runner) getBuilds(b OSBatch) []Build {
 			continue
 		}
 		packageName := filepath.Join(r.cfg.BuildDir, fmt.Sprintf("%s-%s-%s", binaryName, r.cfg.AgentVersion, suffix))
-		build := Build{
+		build := common.Build{
 			Version:    r.cfg.ReleaseVersion,
 			Type:       b.OS.Type,
 			Arch:       arch,
@@ -558,15 +554,15 @@ func (r *Runner) createSSHKey(dir string) (ssh.AuthMethod, error) {
 		r.logger.Logf("Create SSH keys to use for SSH")
 		_ = os.Remove(privateKey)
 		_ = os.Remove(publicKey)
-		pri, err := newSSHPrivateKey()
+		pri, err := tssh.NewPrivateKey()
 		if err != nil {
 			return nil, fmt.Errorf("failed to create ssh private key: %w", err)
 		}
-		pubBytes, err := newSSHPublicKey(&pri.PublicKey)
+		pubBytes, err := tssh.NewPublicKey(&pri.PublicKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create ssh public key: %w", err)
 		}
-		priBytes := sshEncodeToPEM(pri)
+		priBytes := tssh.EncodeToPEM(pri)
 		err = os.WriteFile(privateKey, priBytes, 0600)
 		if err != nil {
 			return nil, fmt.Errorf("failed to write ssh private key: %w", err)
@@ -631,12 +627,12 @@ func (r *Runner) startStacks(ctx context.Context) error {
 	for _, version := range versions {
 		id := strings.Replace(version, ".", "", -1)
 		requests = append(requests, stackReq{
-			request: StackRequest{ID: id, Version: version},
+			request: common.StackRequest{ID: id, Version: version},
 			stack:   r.findStack(id),
 		})
 	}
 
-	reportResult := func(version string, stack Stack, err error) {
+	reportResult := func(version string, stack common.Stack, err error) {
 		r.batchToStackMx.Lock()
 		defer r.batchToStackMx.Unlock()
 		res := stackRes{
@@ -658,7 +654,7 @@ func (r *Runner) startStacks(ctx context.Context) error {
 	for _, request := range requests {
 		go func(ctx context.Context, req stackReq) {
 			var err error
-			var stack Stack
+			var stack common.Stack
 			if req.stack != nil {
 				stack = *req.stack
 			} else {
@@ -698,7 +694,7 @@ func (r *Runner) startStacks(ctx context.Context) error {
 	return nil
 }
 
-func (r *Runner) getStackForBatchID(id string) (Stack, error) {
+func (r *Runner) getStackForBatchID(id string) (common.Stack, error) {
 	r.batchToStackMx.Lock()
 	res, ok := r.batchToStack[id]
 	if ok {
@@ -707,7 +703,7 @@ func (r *Runner) getStackForBatchID(id string) (Stack, error) {
 	}
 	_, ok = r.batchToStackCh[id]
 	if ok {
-		return Stack{}, fmt.Errorf("getStackForBatchID called twice; this is not allowed")
+		return common.Stack{}, fmt.Errorf("getStackForBatchID called twice; this is not allowed")
 	}
 	ch := make(chan stackRes, 1)
 	r.batchToStackCh[id] = ch
@@ -719,7 +715,7 @@ func (r *Runner) getStackForBatchID(id string) (Stack, error) {
 	defer t.Stop()
 	select {
 	case <-t.C:
-		return Stack{}, fmt.Errorf("failed waiting for a response after 12 minutes")
+		return common.Stack{}, fmt.Errorf("failed waiting for a response after 12 minutes")
 	case res = <-ch:
 		return res.stack, res.err
 	}
@@ -730,7 +726,7 @@ func (r *Runner) findInstance(id string) (StateInstance, bool) {
 	defer r.stateMx.Unlock()
 	for _, existing := range r.state.Instances {
 		if existing.Same(StateInstance{
-			Instance: Instance{ID: id, Provisioner: r.ip.Name()}}) {
+			Instance: common.Instance{ID: id, Provisioner: r.ip.Name()}}) {
 			return existing, true
 		}
 	}
@@ -757,18 +753,18 @@ func (r *Runner) addOrUpdateInstance(instance StateInstance) error {
 	return r.writeState()
 }
 
-func (r *Runner) findStack(id string) *Stack {
+func (r *Runner) findStack(id string) *common.Stack {
 	r.stateMx.Lock()
 	defer r.stateMx.Unlock()
 	for _, existing := range r.state.Stacks {
-		if existing.Same(Stack{ID: id, Provisioner: r.sp.Name()}) {
+		if existing.Same(common.Stack{ID: id, Provisioner: r.sp.Name()}) {
 			return &existing
 		}
 	}
 	return nil
 }
 
-func (r *Runner) addOrUpdateStack(stack Stack) error {
+func (r *Runner) addOrUpdateStack(stack common.Stack) error {
 	r.stateMx.Lock()
 	defer r.stateMx.Unlock()
 
@@ -818,7 +814,7 @@ func (r *Runner) getStatePath() string {
 	return filepath.Join(r.cfg.StateDir, "state.yml")
 }
 
-func (r *Runner) mergeResults(results map[string]OSRunnerResult) (Result, error) {
+func (r *Runner) mergeResults(results map[string]common.OSRunnerResult) (Result, error) {
 	var rawOutput bytes.Buffer
 	var jsonOutput bytes.Buffer
 	var suites JUnitTestSuites
@@ -860,14 +856,7 @@ func (s StateInstance) Same(other StateInstance) bool {
 		s.ID == other.ID
 }
 
-// Same returns true if other is the same stack as this one.
-// Two stacks are considered the same if their provisioner and ID are the same.
-func (s Stack) Same(other Stack) bool {
-	return s.Provisioner == other.Provisioner &&
-		s.ID == other.ID
-}
-
-func mergePackageResult(pkg OSRunnerPackageResult, batchName string, sudo bool, rawOutput io.Writer, jsonOutput io.Writer, suites *JUnitTestSuites) error {
+func mergePackageResult(pkg common.OSRunnerPackageResult, batchName string, sudo bool, rawOutput io.Writer, jsonOutput io.Writer, suites *JUnitTestSuites) error {
 	suffix := ""
 	sudoStr := "false"
 	if sudo {
@@ -876,7 +865,7 @@ func mergePackageResult(pkg OSRunnerPackageResult, batchName string, sudo bool, 
 	}
 	if pkg.Output != nil {
 		rawLogger := &runnerLogger{writer: rawOutput, timestamp: false}
-		pkgWriter := newPrefixOutput(rawLogger, fmt.Sprintf("%s(%s)%s: ", pkg.Name, batchName, suffix))
+		pkgWriter := common.NewPrefixOutput(rawLogger, fmt.Sprintf("%s(%s)%s: ", pkg.Name, batchName, suffix))
 		_, err := pkgWriter.Write(pkg.Output)
 		if err != nil {
 			return fmt.Errorf("failed to write raw output from %s %s: %w", batchName, pkg.Name, err)
@@ -913,162 +902,13 @@ func mergePackageResult(pkg OSRunnerPackageResult, batchName string, sudo bool, 
 	return nil
 }
 
-func findBatchByID(id string, batches []OSBatch) (OSBatch, bool) {
+func findBatchByID(id string, batches []common.OSBatch) (common.OSBatch, bool) {
 	for _, batch := range batches {
 		if batch.ID == id {
 			return batch, true
 		}
 	}
-	return OSBatch{}, false
-}
-
-func batchInGroups(batch define.Batch, groups []string) bool {
-	for _, g := range groups {
-		if batch.Group == g {
-			return true
-		}
-	}
-	return false
-}
-
-func createBatches(batch define.Batch, platforms []define.OS, groups []string, matrix bool) ([]OSBatch, error) {
-	var batches []OSBatch
-	if len(groups) > 0 && !batchInGroups(batch, groups) {
-		return nil, nil
-	}
-	specifics, err := getSupported(batch.OS, platforms)
-	if errors.Is(err, ErrOSNotSupported) {
-		var s SupportedOS
-		s.OS.Type = batch.OS.Type
-		s.OS.Arch = batch.OS.Arch
-		s.OS.Distro = batch.OS.Distro
-		if s.OS.Distro == "" {
-			s.OS.Distro = "unknown"
-		}
-		if s.OS.Version == "" {
-			s.OS.Version = "unknown"
-		}
-		b := OSBatch{
-			OS:    s,
-			Batch: batch,
-			Skip:  true,
-		}
-		b.ID = createBatchID(b)
-		batches = append(batches, b)
-		return batches, nil
-	} else if err != nil {
-		return nil, err
-	}
-	if matrix {
-		for _, s := range specifics {
-			b := OSBatch{
-				OS:    s,
-				Batch: batch,
-				Skip:  false,
-			}
-			b.ID = createBatchID(b)
-			batches = append(batches, b)
-		}
-	} else {
-		b := OSBatch{
-			OS:    specifics[0],
-			Batch: batch,
-			Skip:  false,
-		}
-		b.ID = createBatchID(b)
-		batches = append(batches, b)
-	}
-	return batches, nil
-}
-
-func filterSingleTest(batches []OSBatch, singleTest string) ([]OSBatch, error) {
-	var filtered []OSBatch
-	for _, batch := range batches {
-		batch, ok := filterSingleTestBatch(batch, singleTest)
-		if ok {
-			filtered = append(filtered, batch)
-		}
-	}
-	if len(filtered) == 0 {
-		return nil, fmt.Errorf("test not found: %s", singleTest)
-	}
-	return filtered, nil
-}
-
-func filterSingleTestBatch(batch OSBatch, testName string) (OSBatch, bool) {
-	for _, pt := range batch.Batch.Tests {
-		for _, t := range pt.Tests {
-			if t.Name == testName {
-				// filter batch to only run one test
-				batch.Batch.Tests = []define.BatchPackageTests{
-					{
-						Name:  pt.Name,
-						Tests: []define.BatchPackageTest{t},
-					},
-				}
-				batch.Batch.SudoTests = nil
-				// remove stack requirement when the test doesn't need a stack
-				if !t.Stack {
-					batch.Batch.Stack = nil
-				}
-				return batch, true
-			}
-		}
-	}
-	for _, pt := range batch.Batch.SudoTests {
-		for _, t := range pt.Tests {
-			if t.Name == testName {
-				// filter batch to only run one test
-				batch.Batch.SudoTests = []define.BatchPackageTests{
-					{
-						Name:  pt.Name,
-						Tests: []define.BatchPackageTest{t},
-					},
-				}
-				batch.Batch.Tests = nil
-				// remove stack requirement when the test doesn't need a stack
-				if !t.Stack {
-					batch.Batch.Stack = nil
-				}
-				return batch, true
-			}
-		}
-	}
-	return batch, false
-}
-
-func filterSupportedOS(batches []OSBatch, provisioner InstanceProvisioner) []OSBatch {
-	var filtered []OSBatch
-	for _, batch := range batches {
-		if ok := provisioner.Supported(batch.OS.OS); ok {
-			filtered = append(filtered, batch)
-		}
-	}
-	return filtered
-}
-
-// createBatchID creates a consistent/unique ID for the batch
-//
-// ID needs to be consistent so each execution of the runner always
-// selects the same ID for each batch.
-func createBatchID(batch OSBatch) string {
-	id := batch.OS.Type + "-" + batch.OS.Arch
-	if batch.OS.Type == define.Linux {
-		id += "-" + batch.OS.Distro
-	}
-	id += "-" + strings.Replace(batch.OS.Version, ".", "", -1)
-	id += "-" + strings.Replace(batch.Batch.Group, ".", "", -1)
-
-	// The batchID needs to be at most 63 characters long otherwise
-	// OGC will fail to instantiate the VM.
-	maxIDLen := 63
-	if len(id) > maxIDLen {
-		hash := fmt.Sprintf("%x", md5.Sum([]byte(id)))
-		hashLen := utf8.RuneCountInString(hash)
-		id = id[:maxIDLen-hashLen-1] + "-" + hash
-	}
-
-	return strings.ToLower(id)
+	return common.OSBatch{}, false
 }
 
 type runnerLogger struct {
@@ -1085,8 +925,18 @@ func (l *runnerLogger) Logf(format string, args ...any) {
 }
 
 type batchLogger struct {
-	wrapped Logger
+	wrapped common.Logger
 	prefix  string
+}
+
+func filterSupportedOS(batches []common.OSBatch, provisioner common.InstanceProvisioner) []common.OSBatch {
+	var filtered []common.OSBatch
+	for _, batch := range batches {
+		if ok := provisioner.Supported(batch.OS.OS); ok {
+			filtered = append(filtered, batch)
+		}
+	}
+	return filtered
 }
 
 func (b *batchLogger) Logf(format string, args ...any) {
@@ -1094,11 +944,11 @@ func (b *batchLogger) Logf(format string, args ...any) {
 }
 
 type stackRes struct {
-	stack Stack
+	stack common.Stack
 	err   error
 }
 
 type stackReq struct {
-	request StackRequest
-	stack   *Stack
+	request common.StackRequest
+	stack   *common.Stack
 }

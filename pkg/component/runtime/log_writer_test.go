@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package runtime
 
@@ -118,6 +118,33 @@ func TestLogWriter(t *testing.T) {
 						Level:   zapcore.InfoLevel,
 						Time:    time.Time{},
 						Message: "another line split on multi writes",
+					},
+				},
+			},
+		},
+		{
+			Name:      "multi empty text line",
+			LogLevel:  zapcore.InfoLevel,
+			LogSource: logSourceStdout,
+			Lines: []string{
+				"simple written line\r\n",
+				"\r\n",  // empty line
+				" \r\n", // empty line with space
+				"another line\n",
+			},
+			Wrote: []wrote{
+				{
+					entry: zapcore.Entry{
+						Level:   zapcore.InfoLevel,
+						Time:    time.Time{},
+						Message: "simple written line",
+					},
+				},
+				{
+					entry: zapcore.Entry{
+						Level:   zapcore.InfoLevel,
+						Time:    time.Time{},
+						Message: "another line",
 					},
 				},
 			},

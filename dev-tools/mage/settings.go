@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package mage
 
@@ -23,7 +23,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/magefile/mage/sh"
-	"golang.org/x/tools/go/vcs" //nolint:staticcheck // this deprecation will be handled in https://github.com/elastic/elastic-agent/issues/4138
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
@@ -80,7 +79,7 @@ var (
 	BeatIndexPrefix = EnvOr("BEAT_INDEX_PREFIX", BeatName)
 	BeatDescription = EnvOr("BEAT_DESCRIPTION", "")
 	BeatVendor      = EnvOr("BEAT_VENDOR", "Elastic")
-	BeatLicense     = EnvOr("BEAT_LICENSE", "ASL 2.0")
+	BeatLicense     = EnvOr("BEAT_LICENSE", "Elastic License 2.0")
 	BeatURL         = EnvOr("BEAT_URL", "https://www.elastic.co/beats/"+BeatName)
 	BeatUser        = EnvOr("BEAT_USER", "root")
 
@@ -304,6 +303,21 @@ func CommitHashShort() (string, error) {
 		shortHash = shortHash[:6]
 	}
 	return shortHash, err
+}
+
+// TagContainsCommit returns true or false depending on if the current commit is part of a git tag.
+func TagContainsCommit() (bool, error) {
+	commitHash, err := CommitHash()
+	if err != nil {
+		return false, err
+	}
+
+	out, err := sh.Output("git", "tag", "--contains", commitHash)
+	if err != nil {
+		return false, err
+	}
+
+	return strings.TrimSpace(out) != "", nil
 }
 
 func AgentPackageVersion() (string, error) {
@@ -787,7 +801,7 @@ func getProjectRepoInfoUnderGopath() (*ProjectRepoInfo, error) {
 	}
 
 	for _, srcDir := range srcDirs {
-		_, root, err := vcs.FromDir(cwd, srcDir)
+		root, err := fromDir(cwd, srcDir)
 		if err != nil {
 			// Try the next gopath.
 			errs = append(errs, err.Error())
@@ -819,6 +833,62 @@ func getProjectRepoInfoUnderGopath() (*ProjectRepoInfo, error) {
 		SubDir:                  subDir,
 		ImportPath:              filepath.ToSlash(filepath.Join(rootImportPath, subDir)),
 	}, nil
+}
+
+var vcsList = []string{
+	"hg",
+	"git",
+	"svn",
+	"bzr",
+}
+
+func fromDir(dir, srcRoot string) (root string, err error) {
+	// Clean and double-check that dir is in (a subdirectory of) srcRoot.
+	dir = filepath.Clean(dir)
+	srcRoot = filepath.Clean(srcRoot)
+	if len(dir) <= len(srcRoot) || dir[len(srcRoot)] != filepath.Separator {
+		return "", fmt.Errorf("directory %q is outside source root %q", dir, srcRoot)
+	}
+
+	var vcsRet string
+	var rootRet string
+
+	origDir := dir
+	for len(dir) > len(srcRoot) {
+		for _, vcs := range vcsList {
+			if _, err := os.Stat(filepath.Join(dir, "."+vcs)); err == nil {
+				root := filepath.ToSlash(dir[len(srcRoot)+1:])
+				// Record first VCS we find, but keep looking,
+				// to detect mistakes like one kind of VCS inside another.
+				if vcsRet == "" {
+					vcsRet = vcs
+					rootRet = root
+					continue
+				}
+				// Allow .git inside .git, which can arise due to submodules.
+				if vcsRet == vcs && vcs == "git" {
+					continue
+				}
+				// Otherwise, we have one VCS inside a different VCS.
+				return "", fmt.Errorf("directory %q uses %s, but parent %q uses %s",
+					filepath.Join(srcRoot, rootRet), vcsRet, filepath.Join(srcRoot, root), vcs)
+			}
+		}
+
+		// Move to parent.
+		ndir := filepath.Dir(dir)
+		if len(ndir) >= len(dir) {
+			// Shouldn't happen, but just in case, stop.
+			break
+		}
+		dir = ndir
+	}
+
+	if vcsRet != "" {
+		return rootRet, nil
+	}
+
+	return "", fmt.Errorf("directory %q is not using a known version control system", origDir)
 }
 
 func extractCanonicalRootImportPath(rootImportPath string) string {

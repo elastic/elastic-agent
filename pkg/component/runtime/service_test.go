@@ -1,17 +1,20 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package runtime
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/component"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 func makeComponent(name string, config map[string]interface{}) (component.Component, error) {
@@ -171,6 +174,83 @@ func TestResolveUninstallTokenArg(t *testing.T) {
 				if diff != "" {
 					t.Fatal(diff)
 				}
+			}
+		})
+	}
+}
+
+func TestGetConnInfoServerAddress(t *testing.T) {
+	tests := []struct {
+		name     string
+		os       string
+		isLocal  bool
+		port     int
+		socket   string
+		expected string
+		wantErr  error
+	}{
+		{
+			name:     "windows.port",
+			os:       "windows",
+			isLocal:  false,
+			port:     6788,
+			expected: "127.0.0.1:6788",
+		},
+		{
+			name:     "unix.port",
+			os:       "linux",
+			isLocal:  false,
+			port:     6788,
+			expected: "127.0.0.1:6788",
+		},
+		{
+			name:    "windows.local.socket.empty",
+			os:      "windows",
+			isLocal: true,
+			wantErr: errEmptySocketValue,
+		},
+		{
+			name:    "unix.local.socket.empty",
+			os:      "linux",
+			isLocal: true,
+			wantErr: errEmptySocketValue,
+		},
+		{
+			name:    "windows.local.socket",
+			os:      "windows",
+			isLocal: true,
+			socket:  "test.sock",
+			expected: func() string {
+				u := url.URL{}
+				u.Path = "/"
+				u.Scheme = "npipe"
+				return u.JoinPath("/", "test.sock").String()
+			}(),
+		},
+		{
+			name:    "unix.local.socket",
+			os:      "linux",
+			isLocal: true,
+			socket:  "test.sock",
+			expected: func() string {
+				u := url.URL{}
+				u.Path = "/"
+				u.Scheme = "unix"
+				return u.JoinPath(paths.Top(), "test.sock").String()
+			}(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			address, err := getConnInfoServerAddress(tc.os, tc.isLocal, tc.port, tc.socket)
+			diff := cmp.Diff(tc.wantErr, err, cmpopts.EquateErrors())
+			if diff != "" {
+				t.Fatal(diff)
+			}
+			diff = cmp.Diff(address, tc.expected)
+			if diff != "" {
+				t.Error(diff)
 			}
 		})
 	}

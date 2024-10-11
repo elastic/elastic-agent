@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package runtime
 
@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"runtime"
 	"syscall"
 	"testing"
@@ -22,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
+	"github.com/elastic/elastic-agent/pkg/ipc"
 )
 
 type mockCommunicator struct {
@@ -29,11 +31,11 @@ type mockCommunicator struct {
 	startupInfo *proto.StartUpInfo
 }
 
-func newMockCommunicator() *mockCommunicator {
+func newMockCommunicator(address string) *mockCommunicator {
 	return &mockCommunicator{
 		ch: make(chan *proto.CheckinObserved, 1),
 		startupInfo: &proto.StartUpInfo{
-			Addr:       getAddress(),
+			Addr:       address,
 			ServerName: "endpoint",
 			Token:      "some token",
 			CaCert:     []byte("some CA cert"),
@@ -69,22 +71,78 @@ func (c *mockCommunicator) CheckinObserved() <-chan *proto.CheckinObserved {
 
 const testPort = 6788
 
-func getAddress() string {
+// Test Elastic Agent Connection Info sock
+const testSock = ".teaci.sock"
+
+func getAddress(dir string, isLocal bool) string {
+	if isLocal {
+		u := url.URL{}
+		u.Path = "/"
+
+		if runtime.GOOS == "windows" {
+			u.Scheme = "npipe"
+			return u.JoinPath("/", testSock).String()
+		}
+
+		u.Scheme = "unix"
+		return u.JoinPath(dir, testSock).String()
+	}
 	return fmt.Sprintf("127.0.0.1:%d", testPort)
 }
 
+func runTests(t *testing.T, fn func(*testing.T, string)) {
+	sockdir := t.TempDir()
+
+	tests := []struct {
+		name    string
+		address string
+	}{
+		{
+			name:    "port",
+			address: getAddress("", false),
+		},
+		{
+			name:    "local",
+			address: getAddress(sockdir, true),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fn(t, tc.address)
+		})
+	}
+}
+
 func TestConnInfoNormal(t *testing.T) {
+	runTests(t, testConnInfoNormal)
+}
+
+func dialAddress(address string) (net.Conn, error) {
+	// Connect to the server
+	if ipc.IsLocal(address) {
+		return dialLocal(address)
+	}
+
+	return net.Dial("tcp", address)
+}
+
+func testConnInfoNormal(t *testing.T, address string) {
 	log := testutils.NewErrorLogger(t)
 
-	comm := newMockCommunicator()
+	comm := newMockCommunicator(address)
 
 	// Start server
-	srv, err := newConnInfoServer(log, comm, testPort)
+	srv, err := newConnInfoServer(log, comm, address)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
+
 		err := srv.stop()
+		if ipc.IsLocal(address) {
+			ipc.CleanupListener(log, address)
+		}
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -93,8 +151,7 @@ func TestConnInfoNormal(t *testing.T) {
 	const count = 2 // read connection info a couple of times to make sure the server keeps working for multiple calls
 
 	for i := 0; i < count; i++ {
-		// Connect to the server
-		conn, err := net.Dial("tcp", getAddress())
+		conn, err := dialAddress(address)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -119,12 +176,16 @@ func TestConnInfoNormal(t *testing.T) {
 }
 
 func TestConnInfoConnCloseThenAnotherConn(t *testing.T) {
+	runTests(t, testConnInfoConnCloseThenAnotherConn)
+}
+
+func testConnInfoConnCloseThenAnotherConn(t *testing.T, address string) {
 	log := testutils.NewErrorLogger(t)
 
-	comm := newMockCommunicator()
+	comm := newMockCommunicator("")
 
 	// Start server
-	srv, err := newConnInfoServer(log, comm, testPort)
+	srv, err := newConnInfoServer(log, comm, address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +197,7 @@ func TestConnInfoConnCloseThenAnotherConn(t *testing.T) {
 	}()
 
 	// Connect to the server
-	conn, err := net.Dial("tcp", getAddress())
+	conn, err := dialAddress(address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +209,7 @@ func TestConnInfoConnCloseThenAnotherConn(t *testing.T) {
 	}
 
 	// Connect again after closed
-	conn, err = net.Dial("tcp", getAddress())
+	conn, err = dialAddress(address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,12 +233,16 @@ func TestConnInfoConnCloseThenAnotherConn(t *testing.T) {
 }
 
 func TestConnInfoClosed(t *testing.T) {
+	runTests(t, testConnInfoClosed)
+}
+
+func testConnInfoClosed(t *testing.T, address string) {
 	log := testutils.NewErrorLogger(t)
 
-	comm := newMockCommunicator()
+	comm := newMockCommunicator("")
 
 	// Start server
-	srv, err := newConnInfoServer(log, comm, testPort)
+	srv, err := newConnInfoServer(log, comm, address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +252,7 @@ func TestConnInfoClosed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = net.Dial("tcp", getAddress())
+	_, err = dialAddress(address)
 	if err == nil {
 		t.Fatal("want non-nil err")
 	}
@@ -198,9 +263,19 @@ func TestConnInfoClosed(t *testing.T) {
 	// causes issue for *nix builds: "imports golang.org/x/sys/windows: build constraints exclude all Go files".
 	// In order to avoid creating extra plaform specific files compare just errno for this test.
 	wantErrNo := int(syscall.ECONNREFUSED)
-	if runtime.GOOS == windows {
-		wantErrNo = 10061 // windows.WSAECONNREFUSED
+	if ipc.IsLocal(address) {
+		if runtime.GOOS == windows {
+			wantErrNo = 2 // windows.ERROR_FILE_NOT_FOUND
+		} else {
+			// For local IPC on *nix the syscall.ENOENT is expected
+			wantErrNo = int(syscall.ENOENT)
+		}
+	} else {
+		if runtime.GOOS == windows {
+			wantErrNo = 10061 // windows.WSAECONNREFUSED
+		}
 	}
+
 	var (
 		syserr syscall.Errno
 		errno  int
@@ -216,12 +291,16 @@ func TestConnInfoClosed(t *testing.T) {
 }
 
 func TestConnInfoDoubleStop(t *testing.T) {
+	runTests(t, testConnInfoDoubleStop)
+}
+
+func testConnInfoDoubleStop(t *testing.T, address string) {
 	log := testutils.NewErrorLogger(t)
 
-	comm := newMockCommunicator()
+	comm := newMockCommunicator("")
 
 	// Start server
-	srv, err := newConnInfoServer(log, comm, testPort)
+	srv, err := newConnInfoServer(log, comm, address)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,18 +311,25 @@ func TestConnInfoDoubleStop(t *testing.T) {
 	}
 
 	err = srv.stop()
-	if err == nil {
-		t.Fatal("want err, got nil ")
+	// Double close on named pipe doesn't cause the error
+	if !(ipc.IsLocal(address) && runtime.GOOS == "windows") {
+		if err == nil {
+			t.Fatal("want err, got nil ")
+		}
 	}
 }
 
 func TestConnInfoStopTimeout(t *testing.T) {
+	runTests(t, testConnInfoStopTimeout)
+}
+
+func testConnInfoStopTimeout(t *testing.T, address string) {
 	log := testutils.NewErrorLogger(t)
 
-	comm := newMockCommunicator()
+	comm := newMockCommunicator("")
 
 	// Start server
-	srv, err := newConnInfoServer(log, comm, testPort)
+	srv, err := newConnInfoServer(log, comm, address)
 	if err != nil {
 		t.Fatal(err)
 	}

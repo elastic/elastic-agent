@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package mage
 
@@ -10,7 +10,9 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
+	"hash/fnv"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -23,7 +25,7 @@ import (
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"github.com/mitchellh/hashstructure"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -91,6 +93,7 @@ type PackageSpec struct {
 	License           string                 `yaml:"license,omitempty"`
 	URL               string                 `yaml:"url,omitempty"`
 	Description       string                 `yaml:"description,omitempty"`
+	DockerVariant     DockerVariant          `yaml:"docker_variant,omitempty"`
 	PreInstallScript  string                 `yaml:"pre_install_script,omitempty"`
 	PostInstallScript string                 `yaml:"post_install_script,omitempty"`
 	PostRmScript      string                 `yaml:"post_rm_script,omitempty"`
@@ -271,11 +274,7 @@ func (typ PackageType) AddFileExtension(file string) string {
 func (typ PackageType) PackagingDir(home string, target BuildPlatform, spec PackageSpec) (string, error) {
 	root := home
 	if typ == Docker {
-		imageName, err := spec.ImageName()
-		if err != nil {
-			return "", err
-		}
-		root = filepath.Join(root, imageName)
+		root = filepath.Join(root, spec.ImageName())
 	}
 
 	targetPath := typ.AddFileExtension(spec.Name + "-" + target.GOOS() + "-" + target.Arch())
@@ -467,17 +466,13 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 	return s
 }
 
-// ImageName computes the image name from the spec. A template for the image
-// name can be configured by adding image_name to extra_vars.
-func (s PackageSpec) ImageName() (string, error) {
-	if name := s.ExtraVars["image_name"]; name != "" {
-		imageName, err := s.Expand(name)
-		if err != nil {
-			return "", fmt.Errorf("failed to expand image_name: %w", err)
-		}
-		return imageName, nil
+// ImageName computes the image name from the spec.
+func (s PackageSpec) ImageName() string {
+	if s.DockerVariant == Basic {
+		// no suffix for basic docker variant
+		return s.Name
 	}
-	return s.Name, nil
+	return fmt.Sprintf("%s-%s", s.Name, s.DockerVariant)
 }
 
 func copyInstallScript(spec PackageSpec, script string, local *string) error {
@@ -506,12 +501,15 @@ func copyInstallScript(spec PackageSpec, script string, local *string) error {
 }
 
 func (s PackageSpec) hash() string {
-	h, err := hashstructure.Hash(s, nil)
+	out, err := yaml.Marshal(s)
 	if err != nil {
-		panic(fmt.Errorf("failed to compute hash of spec: %w", err))
+		panic(fmt.Errorf("failed to marshal spec: %w", err))
 	}
 
-	hash := strconv.FormatUint(h, 10)
+	h := fnv.New64()
+	h.Write(out)
+
+	hash := strconv.FormatUint(h.Sum64(), 10)
 	if len(hash) > 10 {
 		hash = hash[0:10]
 	}
@@ -835,7 +833,7 @@ func addUIDGidEnvArgs(args []string) ([]string, error) {
 
 // addFileToZip adds a file (or directory) to a zip archive.
 func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
-	return filepath.Walk(pkgFile.Source, func(path string, info os.FileInfo, err error) error {
+	return filepath.Walk(pkgFile.Source, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			if pkgFile.SkipOnMissing && os.IsNotExist(err) {
 				return nil
@@ -905,12 +903,9 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 
 // addFileToTar adds a file (or directory) to a tar archive.
 func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
-	excludedFiles := []string{
-		"cloud-defend",
-		"cloud-defend.spec.yml",
-	}
+	excludedFiles := []string{}
 
-	return filepath.Walk(pkgFile.Source, func(path string, info os.FileInfo, err error) error {
+	return filepath.WalkDir(pkgFile.Source, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if pkgFile.SkipOnMissing && os.IsNotExist(err) {
 				return nil
@@ -918,12 +913,17 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 			return err
 		}
 
-		if slices.Contains(excludedFiles, info.Name()) {
+		if slices.Contains(excludedFiles, d.Name()) {
 			// it's a file we have to exclude
 			if mg.Verbose() {
 				log.Printf("Skipping file %q...", path)
 			}
 			return nil
+		}
+
+		info, err := d.Info()
+		if err != nil {
+			return err
 		}
 
 		header, err := tar.FileInfoHeader(info, info.Name())
@@ -991,7 +991,7 @@ func addSymlinkToTar(tmpdir string, ar *tar.Writer, baseDir string, pkgFile Pack
 		return err
 	}
 
-	return filepath.Walk(link, func(path string, info os.FileInfo, err error) error {
+	return filepath.Walk(link, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			if pkgFile.SkipOnMissing && os.IsNotExist(err) {
 				return nil
