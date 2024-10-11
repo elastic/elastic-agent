@@ -5,15 +5,15 @@ metadata:
   name: elastic-agent
   namespace: kube-system
   labels:
-    app: elastic-agent
+    app.kubernetes.io/name: elastic-agent
 spec:
   selector:
     matchLabels:
-      app: elastic-agent
+      app.kubernetes.io/name: elastic-agent
   template:
     metadata:
       labels:
-        app: elastic-agent
+        app.kubernetes.io/name: elastic-agent
     spec:
       # Tolerations are needed to run Elastic Agent on Kubernetes control-plane nodes.
       # Agents running on control-plane nodes collect metrics from the control plane components (scheduler, controller manager) of Kubernetes
