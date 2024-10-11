@@ -6,6 +6,7 @@ package config
 
 import (
 	"fmt"
+	"go.opentelemetry.io/collector/confmap"
 	"path/filepath"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -34,6 +35,7 @@ func NewLoader(logger *logger.Logger, inputsFolder string) *Loader {
 func (l *Loader) Load(files []string) (*Config, error) {
 	inputsList := make([]*ucfg.Config, 0)
 	merger := cfgutil.NewCollector(nil)
+	var otelCfg *confmap.Retrieved
 	for _, f := range files {
 		cfg, err := LoadFile(f)
 		if err != nil {
@@ -55,6 +57,9 @@ func (l *Loader) Load(files []string) (*Config, error) {
 				return nil, fmt.Errorf("failed to merge configuration file '%s' to existing one: %w", f, err)
 			}
 			l.logger.Debugf("Merged configuration from %s into result", f)
+			if cfg.OTel != nil {
+				otelCfg = cfg.OTel
+			}
 		}
 	}
 	config := merger.Config()
@@ -62,7 +67,7 @@ func (l *Loader) Load(files []string) (*Config, error) {
 	// if there is no input configuration, return what we have collected.
 	if len(inputsList) == 0 {
 		l.logger.Debugf("Merged all configuration files from %v, no external input files", files)
-		return newConfigFrom(config), nil
+		return newConfigFrom(config, otelCfg), nil
 	}
 
 	// merge inputs sections from the last standalone configuration
@@ -82,7 +87,7 @@ func (l *Loader) Load(files []string) (*Config, error) {
 	}
 
 	l.logger.Debugf("Merged all configuration files from %v, with external input files", files)
-	return newConfigFrom(config), nil
+	return newConfigFrom(config, otelCfg), nil
 }
 
 func getInput(c *Config) ([]*ucfg.Config, error) {

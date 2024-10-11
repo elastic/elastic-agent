@@ -28,11 +28,7 @@ const buildDescription = "Elastic opentelemetry-collector distribution"
 
 func Run(ctx context.Context, stop chan bool, configFiles []string) error {
 	fmt.Fprintln(os.Stdout, "Starting in otel mode")
-	settings, err := newSettings(release.Version(), configFiles)
-	if err != nil {
-		return err
-	}
-
+	settings := NewSettings(release.Version(), configFiles)
 	svc, err := otelcol.NewCollector(*settings)
 	if err != nil {
 		return err
@@ -49,22 +45,26 @@ func Run(ctx context.Context, stop chan bool, configFiles []string) error {
 	return svc.Run(cancelCtx)
 }
 
-func newSettings(version string, configPaths []string) (*otelcol.CollectorSettings, error) {
+func NewSettings(version string, configPaths []string, providerFactories ...confmap.ProviderFactory) *otelcol.CollectorSettings {
 	buildInfo := component.BuildInfo{
 		Command:     os.Args[0],
 		Description: buildDescription,
 		Version:     version,
 	}
+	if len(providerFactories) == 0 {
+		// use defaults when non provided
+		providerFactories = []confmap.ProviderFactory{
+			fileprovider.NewFactory(),
+			envprovider.NewFactory(),
+			yamlprovider.NewFactory(),
+			httpprovider.NewFactory(),
+			httpsprovider.NewFactory(),
+		}
+	}
 	configProviderSettings := otelcol.ConfigProviderSettings{
 		ResolverSettings: confmap.ResolverSettings{
-			URIs: configPaths,
-			ProviderFactories: []confmap.ProviderFactory{
-				fileprovider.NewFactory(),
-				envprovider.NewFactory(),
-				yamlprovider.NewFactory(),
-				httpprovider.NewFactory(),
-				httpsprovider.NewFactory(),
-			},
+			URIs:              configPaths,
+			ProviderFactories: providerFactories,
 			ConverterFactories: []confmap.ConverterFactory{
 				expandconverter.NewFactory(),
 			},
@@ -78,5 +78,5 @@ func newSettings(version string, configPaths []string) (*otelcol.CollectorSettin
 		// we're handling DisableGracefulShutdown via the cancelCtx being passed
 		// to the collector's Run method in the Run function
 		DisableGracefulShutdown: true,
-	}, nil
+	}
 }

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"go.elastic.co/apm/v2"
+	"go.opentelemetry.io/collector/confmap"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -30,6 +31,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -122,6 +124,17 @@ type RuntimeManager interface {
 	PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error)
 }
 
+// OTelManager provides an interface to run and update the runtime.
+type OTelManager interface {
+	Runner
+
+	// Update updates the current configuration for OTel.
+	Update(cfg *confmap.Retrieved)
+
+	// Watch returns the chanel to watch for configuration changes.
+	Watch() <-chan otelmanager.OTelState
+}
+
 // ConfigChange provides an interface for receiving a new configuration.
 //
 // Ack must be called if the configuration change was accepted and Fail should be called if it fails to be accepted.
@@ -192,6 +205,7 @@ type Coordinator struct {
 	runtimeMgr RuntimeManager
 	configMgr  ConfigManager
 	varsMgr    VarsManager
+	otelMgr    OTelManager
 
 	caps      capabilities.Capabilities
 	modifiers []ComponentsModifier
@@ -264,6 +278,7 @@ type Coordinator struct {
 	configErr        error
 	componentGenErr  error
 	runtimeUpdateErr error
+	otelErr          error
 
 	// The raw policy before spec lookup or variable substitution
 	ast *transpiler.AST
@@ -313,6 +328,9 @@ type managerChans struct {
 	varsManagerUpdate <-chan []*transpiler.Vars
 	varsManagerError  <-chan error
 
+	otelManagerUpdate <-chan otelmanager.OTelState
+	otelManagerError  <-chan error
+
 	upgradeMarkerUpdate <-chan upgrade.UpdateMarker
 }
 
@@ -339,7 +357,7 @@ type UpdateComponentChange struct {
 }
 
 // New creates a new coordinator.
-func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo info.Agent, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capabilities, monitorMgr MonitorManager, isManaged bool, modifiers ...ComponentsModifier) *Coordinator {
+func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo info.Agent, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capabilities, monitorMgr MonitorManager, isManaged bool, otelMgr OTelManager, modifiers ...ComponentsModifier) *Coordinator {
 	var fleetState cproto.State
 	var fleetMessage string
 	if !isManaged {
@@ -366,6 +384,7 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		runtimeMgr: runtimeMgr,
 		configMgr:  configMgr,
 		varsMgr:    varsMgr,
+		otelMgr:    otelMgr,
 		caps:       caps,
 		modifiers:  modifiers,
 		state:      state,
@@ -419,6 +438,10 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 	if varsMgr != nil {
 		c.managerChans.varsManagerUpdate = varsMgr.Watch()
 		c.managerChans.varsManagerError = varsMgr.Errors()
+	}
+	if otelMgr != nil {
+		c.managerChans.otelManagerUpdate = otelMgr.Watch()
+		c.managerChans.otelManagerError = otelMgr.Errors()
 	}
 	if upgradeMgr != nil && upgradeMgr.MarkerWatcher() != nil {
 		c.managerChans.upgradeMarkerUpdate = upgradeMgr.MarkerWatcher().Watch()
@@ -981,6 +1004,17 @@ func (c *Coordinator) runner(ctx context.Context) error {
 		varsErrCh <- nil
 	}
 
+	otelErrCh := make(chan error, 1)
+	if c.otelMgr != nil {
+		go func() {
+			err := c.otelMgr.Run(ctx)
+			cancel()
+			otelErrCh <- err
+		}()
+	} else {
+		otelErrCh <- nil
+	}
+
 	upgradeMarkerWatcherErrCh := make(chan error, 1)
 	if c.upgradeMgr != nil && c.upgradeMgr.MarkerWatcher() != nil {
 		err := c.upgradeMgr.MarkerWatcher().Run(ctx)
@@ -1000,7 +1034,7 @@ func (c *Coordinator) runner(ctx context.Context) error {
 
 	// If we got fatal errors from any of the managers, return them.
 	// Otherwise, just return the context's closing error.
-	err := collectManagerErrors(managerShutdownTimeout, varsErrCh, runtimeErrCh, configErrCh, upgradeMarkerWatcherErrCh)
+	err := collectManagerErrors(managerShutdownTimeout, varsErrCh, runtimeErrCh, configErrCh, otelErrCh, upgradeMarkerWatcherErrCh)
 	if err != nil {
 		c.logger.Debugf("Manager errors on Coordinator shutdown: %v", err.Error())
 		return err
@@ -1045,6 +1079,9 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 
 	case varsErr := <-c.managerChans.varsManagerError:
 		c.setVarsManagerError(varsErr)
+
+	case otelErr := <-c.managerChans.otelManagerError:
+		c.setOTelError(otelErr)
 
 	case overrideState := <-c.overrideStateChan:
 		c.setOverrideState(overrideState)
@@ -1101,6 +1138,10 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 			c.processVars(ctx, vars)
 		}
 
+	case otelState := <-c.managerChans.otelManagerUpdate:
+		// TODO (blakerouse): Parse the state information
+		_ = otelState
+
 	case ll := <-c.logLevelCh:
 		if ctx.Err() == nil {
 			c.processLogLevel(ctx, ll)
@@ -1121,6 +1162,14 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 
 // Always called on the main Coordinator goroutine.
 func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (err error) {
+	if c.otelMgr != nil {
+		c.otelMgr.Update(cfg.OTel)
+	}
+	return c.processConfigAgent(ctx, cfg)
+}
+
+// Always called on the main Coordinator goroutine.
+func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config) (err error) {
 	span, ctx := apm.StartSpan(ctx, "config", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
@@ -1547,9 +1596,9 @@ func diffUnitList(old, new []component.Unit) map[string]diffCheck {
 // It returns any resulting errors as a multierror, or nil if no errors
 // were reported.
 // Called on the main Coordinator goroutine.
-func collectManagerErrors(timeout time.Duration, varsErrCh, runtimeErrCh, configErrCh, upgradeMarkerWatcherErrCh chan error) error {
-	var runtimeErr, configErr, varsErr, upgradeMarkerWatcherErr error
-	var returnedRuntime, returnedConfig, returnedVars, returnedUpgradeMarkerWatcher bool
+func collectManagerErrors(timeout time.Duration, varsErrCh, runtimeErrCh, configErrCh, otelErrCh, upgradeMarkerWatcherErrCh chan error) error {
+	var runtimeErr, configErr, varsErr, otelErr, upgradeMarkerWatcherErr error
+	var returnedRuntime, returnedConfig, returnedVars, returnedOtel, returnedUpgradeMarkerWatcher bool
 
 	// in case other components are locked up, let us time out
 	timeoutWait := time.NewTimer(timeout)
@@ -1571,7 +1620,7 @@ func collectManagerErrors(timeout time.Duration, varsErrCh, runtimeErrCh, config
 	var errs []error
 
 waitLoop:
-	for !returnedRuntime || !returnedConfig || !returnedVars || !returnedUpgradeMarkerWatcher {
+	for !returnedRuntime || !returnedConfig || !returnedVars || !returnedOtel || !returnedUpgradeMarkerWatcher {
 		select {
 		case runtimeErr = <-runtimeErrCh:
 			returnedRuntime = true
@@ -1579,6 +1628,8 @@ waitLoop:
 			returnedConfig = true
 		case varsErr = <-varsErrCh:
 			returnedVars = true
+		case otelErr = <-otelErrCh:
+			returnedOtel = true
 		case upgradeMarkerWatcherErr = <-upgradeMarkerWatcherErrCh:
 			returnedUpgradeMarkerWatcher = true
 		case <-timeoutWait.C:
@@ -1608,6 +1659,9 @@ waitLoop:
 	}
 	if varsErr != nil && !errors.Is(varsErr, context.Canceled) {
 		errs = append(errs, fmt.Errorf("vars manager: %w", varsErr))
+	}
+	if otelErr != nil && !errors.Is(otelErr, context.Canceled) {
+		errs = append(errs, fmt.Errorf("otel manager: %w", otelErr))
 	}
 	if upgradeMarkerWatcherErr != nil && !errors.Is(upgradeMarkerWatcherErr, context.Canceled) {
 		errs = append(errs, fmt.Errorf("upgrade marker watcher: %w", upgradeMarkerWatcherErr))

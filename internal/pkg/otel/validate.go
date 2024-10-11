@@ -15,15 +15,10 @@ import (
 )
 
 func Validate(ctx context.Context, configPaths []string) error {
-	settings, err := newSettings(release.Version(), configPaths)
-	if err != nil {
-		return err
-	}
-
+	settings := NewSettings(release.Version(), configPaths)
 	col, err := otelcol.NewCollector(*settings)
 	if err != nil {
 		return err
 	}
 	return col.DryRun(ctx)
-
 }

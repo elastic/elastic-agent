@@ -39,8 +39,7 @@ func TestStartCollector(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.configFile, func(t *testing.T) {
 			configFiles := getConfigFiles(tc.configFile)
-			settings, err := newSettings("test", configFiles)
-			require.NoError(t, err)
+			settings := NewSettings("test", configFiles)
 
 			collector, err := otelcol.NewCollector(*settings)
 			require.NoError(t, err)

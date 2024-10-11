@@ -70,6 +70,13 @@ func (c *Coordinator) setRuntimeUpdateError(err error) {
 	c.stateNeedsRefresh = true
 }
 
+// setOTelError reports a failed error for otel manager.
+// Called on the main Coordinator goroutine.
+func (c *Coordinator) setOTelError(err error) {
+	c.otelErr = err
+	c.stateNeedsRefresh = true
+}
+
 // setConfigManagerError updates the error state for the config manager.
 // Called on the main Coordinator goroutine.
 func (c *Coordinator) setConfigManagerError(err error) {
@@ -204,6 +211,9 @@ func (c *Coordinator) generateReportableState() (s State) {
 	} else if c.runtimeUpdateErr != nil {
 		s.State = agentclient.Failed
 		s.Message = fmt.Sprintf("Runtime update failed: %s", c.runtimeUpdateErr.Error())
+	} else if c.otelErr != nil {
+		s.State = agentclient.Failed
+		s.Message = fmt.Sprintf("OTel manager failed: %s", c.otelErr.Error())
 	} else if c.configMgrErr != nil {
 		s.State = agentclient.Failed
 		s.Message = fmt.Sprintf("Config manager: %s", c.configMgrErr.Error())
