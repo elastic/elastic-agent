@@ -53,8 +53,11 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 		Sudo:  true,
 	})
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
-	defer cancel()
+	if d, ok := t.Deadline(); ok {
+		t.Logf("test global timeout: %s", d.Sub(time.Now()))
+	} else {
+		t.Logf("test global timeout not defined")
+	}
 
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
@@ -92,6 +95,14 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 		Force:          true,
 	}
 
+	ctx, cancel := testcontext.WithTimeout(t, context.Background(), 5*time.Minute)
+	defer cancel()
+	if d, ok := ctx.Deadline(); ok {
+		t.Logf("context timeout: %s", d.Sub(time.Now()))
+	} else {
+		t.Fatal("context without deadline after calling context.WithDeadline")
+	}
+
 	// 2. Install the Elastic-Agent with the policy that
 	// was just created.
 	policy, err := tools.InstallAgentWithPolicy(
@@ -111,10 +122,24 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 	// 4. Ensure healthy state at startup
 	checkHealthAtStartup(t, ctx, agentFixture)
 
+	ctx, cancel = testcontext.WithTimeout(t, context.Background(), 10*time.Minute)
+	defer cancel()
+	if d, ok := ctx.Deadline(); ok {
+		t.Logf("context timeout: %s", d.Sub(time.Now()))
+	} else {
+		t.Fatal("context without deadline after calling context.WithDeadline")
+	}
 	t.Run("Monitoring logs are shipped", func(t *testing.T) {
 		testMonitoringLogsAreShipped(t, ctx, info, agentFixture, policy)
 	})
 
+	ctx, cancel = testcontext.WithTimeout(t, context.Background(), 10*time.Minute)
+	defer cancel()
+	if d, ok := ctx.Deadline(); ok {
+		t.Logf("context timeout: %s", d.Sub(time.Now()))
+	} else {
+		t.Fatal("context without deadline after calling context.WithDeadline")
+	}
 	t.Run("Normal logs with flattened data_stream are shipped", func(t *testing.T) {
 		testFlattenedDatastreamFleetPolicy(t, ctx, info, policy)
 	})
@@ -404,7 +429,7 @@ func testFlattenedDatastreamFleetPolicy(
 	require.Eventually(
 		t,
 		ensureDocumentsInES(t, ctx, info.ESClient, dsType, dsDataset, dsNamespace, numEvents),
-		120*time.Second,
+		3*time.Minute,
 		time.Second,
 		"could not get all expected documents form ES")
 }

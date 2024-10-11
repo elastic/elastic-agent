@@ -172,12 +172,12 @@ func (runner *MonitoringRunner) AllComponentsHealthy(ctx context.Context) {
 		}
 
 		for _, comp := range status.Components {
-			runner.T().Logf("component state: %s", comp.Message)
+			runner.T().Logf("%s current state: %s", comp.Name, comp.Message)
 			if comp.State != int(cproto.State_HEALTHY) {
 				compDebugName = comp.Name
 				allHealthy = false
 			}
 		}
 		return allHealthy
-	}, runner.healthCheckTime, runner.healthCheckRefreshTime, "install never became healthy: components did not return a healthy state: %s", compDebugName)
+	}, runner.healthCheckTime, runner.healthCheckRefreshTime, "install never became healthy: components did not return a healthy state: %q", compDebugName)
 }

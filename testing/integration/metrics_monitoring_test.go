@@ -7,6 +7,7 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"testing"
@@ -17,6 +18,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
@@ -76,15 +78,53 @@ func (runner *MetricsRunner) SetupSuite() {
 
 	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "system", "1.53.1", "system_integration_setup.json", uuid.Must(uuid.NewV4()).String(), policyResp.ID)
 	require.NoError(runner.T(), err)
-
 }
 
 func (runner *MetricsRunner) TestBeatsMetrics() {
 	UnitOutputName := "default"
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*20)
 	defer cancel()
-	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
-	require.NoError(runner.T(), err)
+
+	var agentStatus atesting.AgentStatusOutput
+	f := runner.agentFixture
+	stateBuff := bytes.Buffer{}
+	require.Eventuallyf(runner.T(), func() bool {
+		stateBuff.Reset()
+
+		status, err := f.ExecStatus(ctx)
+		if err != nil {
+			stateBuff.WriteString(fmt.Sprintf("failed to get agent status: %v",
+				err))
+			return false
+		}
+
+		if client.State(status.State) != client.Healthy {
+			stateBuff.WriteString(fmt.Sprintf(
+				"agent isn't healthy: %s-%s",
+				client.State(status.State), status.Message))
+			return false
+		}
+
+		if len(status.Components) == 0 {
+			stateBuff.WriteString(fmt.Sprintf(
+				"healthy but without components: agent status: %s-%s",
+				client.State(status.State), status.Message))
+			return false
+		}
+
+		for _, c := range status.Components {
+
+			state := client.State(c.State)
+			if state != client.Healthy {
+				stateBuff.WriteString(fmt.Sprintf(
+					"%s not health: %s: %s",
+					c.Name, state, c.Message))
+				return false
+			}
+		}
+
+		return true
+	}, 2*time.Minute, 15*time.Second, "agent never became healthy. Last status: %v", &stateBuff)
 
 	componentIds := []string{
 		fmt.Sprintf("system/metrics-%s", UnitOutputName),
