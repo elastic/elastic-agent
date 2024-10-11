@@ -96,7 +96,7 @@ connectors:
       - service.name
       - telemetry.sdk.language
       - telemetry.sdk.name
-  spanmetricsv2:
+  signaltometrics:
     spans:
       - name: span.histogram
         description: Span histogram metric
@@ -105,10 +105,25 @@ connectors:
           - key: deployment.environment
         attributes:
           - key: transaction.type
-        histogram:
-          exponential:
-            max_size: 2
-  count:
+        exponential_histogram:
+          max_size: 2
+          value: Microseconds(end_time - start_time)
+    datapoints:
+      - name: datapoint.total
+        description: Count of all datapoints
+        include_resource_attributes:
+          - key: service.name
+          - key: deployment.environment
+        sum:
+          value: "1"
+    logs:
+      - name: logrecord.total
+        description: Count of all log records
+        include_resource_attributes:
+          - key: service.name
+          - key: deployment.environment
+        sum:
+          value: "1"
 
 service:
   extensions:
@@ -121,7 +136,6 @@ service:
         - elasticsearch
         - file
         - otlp
-        - count
       processors:
         - attributes
         - batch
@@ -138,7 +152,6 @@ service:
       exporters:
         - debug
         - otlp
-        - count
       processors:
         - attributes
         - batch
@@ -160,8 +173,7 @@ service:
       processors:
         - lsminterval
       receivers:
-        - spanmetricsv2
-        - count
+        - signaltometrics
 
     traces:
       exporters:
@@ -170,8 +182,7 @@ service:
         - otlp
         - otlphttp
         - spanmetrics
-        - spanmetricsv2
-        - count
+        - signaltometrics
       processors:
         - attributes
         - batch

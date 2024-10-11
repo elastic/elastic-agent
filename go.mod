@@ -22,7 +22,7 @@ require (
 	github.com/elastic/go-sysinfo v1.14.2
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015
-	github.com/elastic/opentelemetry-collector-components/connector/spanmetricsconnectorv2 v0.2.0
+	github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector v0.1.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.12.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.2.0
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.2.0
@@ -41,7 +41,6 @@ require (
 	github.com/kardianos/service v1.2.1-0.20210728001519-a323c3813bc7
 	github.com/magefile/mage v1.15.0
 	github.com/oklog/ulid/v2 v2.1.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/connector/countconnector v0.111.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.111.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.111.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.111.0

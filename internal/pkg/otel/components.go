@@ -55,10 +55,9 @@ import (
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
 
 	// Connectors
-	"github.com/open-telemetry/opentelemetry-collector-contrib/connector/countconnector"
 	spanmetricsconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector"
 
-	"github.com/elastic/opentelemetry-collector-components/connector/spanmetricsconnectorv2"
+	"github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector"
 )
 
 func components() (otelcol.Factories, error) {
@@ -114,8 +113,7 @@ func components() (otelcol.Factories, error) {
 
 	factories.Connectors, err = connector.MakeFactoryMap(
 		spanmetricsconnector.NewFactory(),
-		spanmetricsconnectorv2.NewFactory(),
-		countconnector.NewFactory(),
+		signaltometricsconnector.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
