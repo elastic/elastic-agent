@@ -17,7 +17,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/elastic/elastic-agent-libs/service"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
@@ -127,13 +126,17 @@ func runCollector(cmdCtx context.Context, configFiles []string) error {
 
 func prepareEnv() error {
 	if _, ok := os.LookupEnv("STORAGE_DIR"); !ok {
-		// STORAGE_DIR is not set. Set it to ${path.Top()}/otel_registry because we do not want to use any of the paths, that are also used by Beats or Agent
+		// STORAGE_DIR is not set. Set it to ${STATE_PATH}/otel_registry because we do not want to use any of the paths, that are also used by Beats or Agent
 		// because a standalone OTel collector must be able to run alongside them without issue.
 
 		// The filestorage extension will handle directory creation since create_directory: true is set by default.
 		// If the user hasn’t specified the env:STORAGE_DIR in filestorage, they may have opted for a custom path, and the extension will create the directory accordingly.
 		// In this case, setting env:STORAGE_DIR will have no effect.
-		if err := os.Setenv("STORAGE_DIR", filepath.Join(paths.Top(), "otel_registry")); err != nil {
+		statePath := os.Getenv("STATE_PATH")
+		if statePath == "" {
+			statePath = defaultStateDirectory
+		}
+		if err := os.Setenv("STORAGE_DIR", filepath.Join(statePath, "otel")); err != nil {
 			return err
 		}
 	}
