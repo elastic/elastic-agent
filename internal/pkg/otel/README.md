@@ -55,6 +55,7 @@ This section provides a summary of components included in the Elastic Distributi
 | Component | Version |
 |---|---|
 | [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.12.0/processor/elasticinframetricsprocessor/README.md) | v0.12.0 |
+<<<<<<< HEAD
 | [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.110.0/processor/memorylimiterprocessor/README.md) | v0.110.0 |
 | [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.110.0/processor/attributesprocessor/README.md) | v0.110.0 |
 | [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.110.0/processor/filterprocessor/README.md) | v0.110.0 |
@@ -63,6 +64,18 @@ This section provides a summary of components included in the Elastic Distributi
 | [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.110.0/processor/resourceprocessor/README.md) | v0.110.0 |
 | [transformprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/transformprocessor/v0.110.0/processor/transformprocessor/README.md) | v0.110.0 |
 | [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.110.0/processor/batchprocessor/README.md) | v0.110.0 |
+=======
+| [elastictraceprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elastictraceprocessor/v0.2.0/processor/elastictraceprocessor/README.md) | v0.2.0 |
+| [lsmintervalprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/lsmintervalprocessor/v0.2.0/processor/lsmintervalprocessor/README.md) | v0.2.0 |
+| [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.111.0/processor/memorylimiterprocessor/README.md) | v0.111.0 |
+| [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.111.0/processor/attributesprocessor/README.md) | v0.111.0 |
+| [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.111.0/processor/filterprocessor/README.md) | v0.111.0 |
+| [k8sattributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/k8sattributesprocessor/v0.111.0/processor/k8sattributesprocessor/README.md) | v0.111.0 |
+| [resourcedetectionprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourcedetectionprocessor/v0.111.0/processor/resourcedetectionprocessor/README.md) | v0.111.0 |
+| [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.111.0/processor/resourceprocessor/README.md) | v0.111.0 |
+| [transformprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/transformprocessor/v0.111.0/processor/transformprocessor/README.md) | v0.111.0 |
+| [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.111.0/processor/batchprocessor/README.md) | v0.111.0 |
+>>>>>>> f560826112 (Add components for supporting APM functions (#5713))
 
 ### Extensions
 
@@ -77,4 +90,9 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+<<<<<<< HEAD
 | [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.110.0/connector/spanmetricsconnector/README.md) | v0.110.0 |
+=======
+| [signaltometricsconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/signaltometricsconnector/v0.1.0/connector/signaltometricsconnector/README.md) | v0.1.0 |
+| [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.111.0/connector/spanmetricsconnector/README.md) | v0.111.0 |
+>>>>>>> f560826112 (Add components for supporting APM functions (#5713))
