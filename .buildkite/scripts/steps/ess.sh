@@ -13,7 +13,7 @@ function ess_up() {
     return 1
   fi
 
-  export EC_API_KEY=$(retry 5 vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
+  export EC_API_KEY=$(retry -t 5 -- vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
   
   if [[ -z "${EC_API_KEY}" ]]; then
     echo "Error: Failed to get EC API key from vault" >&2
