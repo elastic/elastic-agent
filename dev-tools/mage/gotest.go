@@ -63,8 +63,10 @@ func makeGoTestArgs(name string) GoTestArgs {
 }
 
 func makeGoTestArgsForModule(name, module string) GoTestArgs {
-	fileName := fmt.Sprintf("build/TEST-go-%s-%s", strings.Replace(strings.ToLower(name), " ", "_", -1),
-		strings.Replace(strings.ToLower(module), " ", "_", -1))
+	fileName := fmt.Sprintf("build/TEST-go-%s-%s",
+		strings.Replace(strings.ToLower(name), " ", "_", -1),
+		strings.Replace(strings.ToLower(module), " ", "_", -1),
+	)
 	params := GoTestArgs{
 		LogName:         fmt.Sprintf("%s-%s", name, module),
 		Race:            RaceDetector,
@@ -281,6 +283,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 	testArgs = append(testArgs, params.Packages...)
 
 	args := append(gotestsumArgs, append([]string{"--"}, testArgs...)...)
+	fmt.Println(">> ARGS:", params.LogName, "Command:", "gotestsum", strings.Join(args, " "))
 
 	goTest := makeCommand(ctx, params.Env, "gotestsum", args...)
 	// Wire up the outputs.
