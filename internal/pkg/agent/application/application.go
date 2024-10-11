@@ -7,8 +7,9 @@ package application
 import (
 	"context"
 	"fmt"
-	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"time"
+
+	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/limits"

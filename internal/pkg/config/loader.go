@@ -6,8 +6,9 @@ package config
 
 import (
 	"fmt"
-	"go.opentelemetry.io/collector/confmap"
 	"path/filepath"
+
+	"go.opentelemetry.io/collector/confmap"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/go-ucfg"
