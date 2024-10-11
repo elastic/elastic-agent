@@ -11,7 +11,7 @@
 kind: feature
 
 # Change summary; a 80ish characters long description of the change.
-summary: Provide a Kustomize template which enables hints based autodiscovery by default when deploying standalone elastic-agent into a Kubernetes cluster.
+summary: Kustomize template to enables hints based autodiscovery by default when deploying standalone elastic-agent into a Kubernetes cluster. Remove root privileges of init container.
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
