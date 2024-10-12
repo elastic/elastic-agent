@@ -96,7 +96,7 @@ func getInput(c *Config) ([]*ucfg.Config, error) {
 		Inputs []*ucfg.Config `config:"inputs"`
 	}{make([]*ucfg.Config, 0)}
 
-	if err := c.Unpack(&tmpConfig); err != nil {
+	if err := c.UnpackTo(&tmpConfig); err != nil {
 		return nil, fmt.Errorf("failed to parse inputs section from configuration: %w", err)
 	}
 	return tmpConfig.Inputs, nil

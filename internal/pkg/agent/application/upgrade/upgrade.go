@@ -110,7 +110,7 @@ func (u *Upgrader) Reload(rawConfig *config.Config) error {
 		FleetSourceURI string `json:"agent.download.source_uri" config:"agent.download.source_uri"`
 	}
 	fleetSourceURI := &fleetCfg{}
-	if err := rawConfig.Unpack(&fleetSourceURI); err != nil {
+	if err := rawConfig.UnpackTo(&fleetSourceURI); err != nil {
 		return errors.New(err, "failed to unpack config during reload")
 	}
 

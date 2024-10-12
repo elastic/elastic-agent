@@ -165,8 +165,16 @@ func newConfigFrom(in *ucfg.Config, otel *confmap.Retrieved) *Config {
 	}
 }
 
-// Unpack unpacks a struct to Config.
-func (c *Config) Unpack(to interface{}, opts ...interface{}) error {
+// Unpack implements the ucfg.Unpacker interface.
+func (c *Config) Unpack(val interface{}) error {
+	if c.Agent == nil {
+		c.Agent = ucfg.New()
+	}
+	return c.Agent.Merge(val)
+}
+
+// UnpackTo unpacks this config into to with the given options.
+func (c *Config) UnpackTo(to interface{}, opts ...interface{}) error {
 	ucfgOpts, _, err := getOptions(opts...)
 	if err != nil {
 		return err
@@ -261,7 +269,7 @@ func (c *Config) Enabled() bool {
 	if c == nil {
 		return false
 	}
-	if err := c.Unpack(&testEnabled); err != nil {
+	if err := c.UnpackTo(&testEnabled); err != nil {
 		// if unpacking fails, expect 'enabled' being set to default value
 		return true
 	}

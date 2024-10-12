@@ -87,7 +87,7 @@ func NewWithRawConfig(log *logger.Logger, config *config.Config, wrapper wrapper
 	}
 
 	cfg := Config{}
-	if err := config.Unpack(&cfg); err != nil {
+	if err := config.UnpackTo(&cfg); err != nil {
 		return nil, fmt.Errorf("invalidate configuration: %w", err)
 	}
 
