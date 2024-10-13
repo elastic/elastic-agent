@@ -24,7 +24,9 @@ func (WindowsRunner) Prepare(ctx context.Context, sshClient SSHClient, logger Lo
 	// install chocolatey
 	logger.Logf("Installing chocolatey")
 	chocoInstall := `"[System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"`
-	stdOut, errOut, err := sshRunPowershell(ctx, sshClient, chocoInstall)
+	updateCtx, updateCancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer updateCancel()
+	stdOut, errOut, err := sshRunPowershell(updateCtx, sshClient, chocoInstall)
 	if err != nil {
 		return fmt.Errorf("failed to install chocolatey: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
@@ -233,13 +235,18 @@ func (WindowsRunner) Diagnostics(ctx context.Context, sshClient SSHClient, logge
 	return nil
 }
 
+<<<<<<< HEAD:pkg/testing/runner/windows.go
 func sshRunPowershell(ctx context.Context, sshClient SSHClient, cmd string) ([]byte, []byte, error) {
 	return sshClient.Exec(ctx, "powershell", []string{
+=======
+func sshRunPowershell(ctx context.Context, sshClient ssh.SSHClient, cmd string) ([]byte, []byte, error) {
+	return sshClient.ExecWithRetry(ctx, "powershell", []string{
+>>>>>>> d6da7eb25d (Attempt at retrying choco install (#5764)):pkg/testing/windows/windows.go
 		"-NoProfile",
 		"-InputFormat", "None",
 		"-ExecutionPolicy", "Bypass",
 		"-Command", cmd,
-	}, nil)
+	}, 15*time.Second)
 }
 
 func toPowershellScript(agentVersion string, prefix string, verbose bool, tests []string, env map[string]string) string {
