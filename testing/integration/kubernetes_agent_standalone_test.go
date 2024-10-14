@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	"io"
 	"os"
 	"path/filepath"
@@ -25,8 +26,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/pkg/testing/define"
-	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/go-elasticsearch/v8"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -47,6 +46,11 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
+
+	aclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
+	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 )
 
 const (
@@ -657,46 +661,71 @@ func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, obj
 
 	require.NotEmpty(t, agentPodName, "agent pod name is empty")
 
-	command := []string{"elastic-agent", "status"}
+	command := []string{"elastic-agent", "status", "--output=json"}
+	var status atesting.AgentStatusOutput
 	var stdout, stderr bytes.Buffer
 	var agentHealthyErr error
 	// we will wait maximum 120 seconds for the agent to report healthy
 	for i := 0; i < 120; i++ {
+		status = atesting.AgentStatusOutput{} // clear status output
 		stdout.Reset()
 		stderr.Reset()
 		agentHealthyErr = client.Resources().ExecInPod(ctx, namespace, agentPodName, "elastic-agent-standalone", command, &stdout, &stderr)
 		if agentHealthyErr == nil {
-			break
+			if uerr := json.Unmarshal(stdout.Bytes(), &status); uerr == nil {
+				if status.State == int(aclient.Healthy) {
+					// agent is healthy innner tests should now pass
+					if runInnerK8STests {
+						err := client.Resources().ExecInPod(ctx, namespace, agentPodName, "elastic-agent-standalone",
+							[]string{"/usr/share/elastic-agent/k8s-inner-tests", "-test.v"}, &stdout, &stderr)
+						t.Log(stdout.String())
+						if err != nil {
+							t.Log(stderr.String())
+						}
+						require.NoError(t, err, "error at k8s inner tests execution")
+					}
+
+					// validate that the components defined are also healthy if they should exist
+					componentsCorrect := true
+					for component, shouldBePresent := range componentPresence {
+						compState, ok := getComponentState(status, component)
+						if shouldBePresent {
+							if !ok {
+								// doesn't exist
+								componentsCorrect = false
+							} else if compState != int(aclient.Healthy) {
+								// not healthy
+								componentsCorrect = false
+							}
+						} else if ok {
+							// should not be present
+							// break instantly and fail (as it existing should never happen)
+							break
+						}
+					}
+					if componentsCorrect {
+						// agent health and components are correct
+						return
+					}
+				}
+			}
 		}
 		time.Sleep(time.Second * 1)
 	}
 
-	statusString := stdout.String()
-	if agentHealthyErr != nil {
-		t.Errorf("elastic-agent never reported healthy: %v", agentHealthyErr)
-		t.Logf("stdout: %s\n", statusString)
-		t.Logf("stderr: %s\n", stderr.String())
-		t.FailNow()
-		return
-	}
+	t.Errorf("elastic-agent never reported healthy: %+v", status)
+	t.Logf("stdout: %s\n", stdout.String())
+	t.Logf("stderr: %s\n", stderr.String())
+	t.FailNow()
+}
 
-	stdout.Reset()
-	stderr.Reset()
-
-	for component, shouldBePresent := range componentPresence {
-		isPresent := strings.Contains(statusString, component)
-		require.Equal(t, shouldBePresent, isPresent)
-	}
-
-	if runInnerK8STests {
-		err := client.Resources().ExecInPod(ctx, namespace, agentPodName, "elastic-agent-standalone",
-			[]string{"/usr/share/elastic-agent/k8s-inner-tests", "-test.v"}, &stdout, &stderr)
-		t.Log(stdout.String())
-		if err != nil {
-			t.Log(stderr.String())
+func getComponentState(status atesting.AgentStatusOutput, componentName string) (int, bool) {
+	for _, comp := range status.Components {
+		if comp.Name == componentName {
+			return comp.State, true
 		}
-		require.NoError(t, err, "error at k8s inner tests execution")
 	}
+	return -1, false
 }
 
 // dumpLogs dumps the logs of all pods in the given namespace to the given target directory
