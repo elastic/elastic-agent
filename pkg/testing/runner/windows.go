@@ -235,13 +235,8 @@ func (WindowsRunner) Diagnostics(ctx context.Context, sshClient SSHClient, logge
 	return nil
 }
 
-<<<<<<< HEAD:pkg/testing/runner/windows.go
 func sshRunPowershell(ctx context.Context, sshClient SSHClient, cmd string) ([]byte, []byte, error) {
-	return sshClient.Exec(ctx, "powershell", []string{
-=======
-func sshRunPowershell(ctx context.Context, sshClient ssh.SSHClient, cmd string) ([]byte, []byte, error) {
 	return sshClient.ExecWithRetry(ctx, "powershell", []string{
->>>>>>> d6da7eb25d (Attempt at retrying choco install (#5764)):pkg/testing/windows/windows.go
 		"-NoProfile",
 		"-InputFormat", "None",
 		"-ExecutionPolicy", "Bypass",
