@@ -20,7 +20,7 @@ steps:
   - label: Start ESS stack for integration tests
     key: integration-ess
     depends_on:
-      - package-it
+      # - package-it
     command: |
       #!/usr/bin/env bash
       set -euo pipefail
