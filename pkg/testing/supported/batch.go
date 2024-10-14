@@ -5,7 +5,7 @@
 package supported
 
 import (
-	"crypto/md5"
+	"crypto/sha512"
 	"errors"
 	"fmt"
 	"strings"
@@ -174,7 +174,7 @@ func createBatchID(batch common.OSBatch) string {
 	// OGC will fail to instantiate the VM.
 	maxIDLen := 63
 	if len(id) > maxIDLen {
-		hash := fmt.Sprintf("%x", md5.Sum([]byte(id)))
+		hash := fmt.Sprintf("%x", sha512.Sum384([]byte(id)))
 		hashLen := utf8.RuneCountInString(hash)
 		id = id[:maxIDLen-hashLen-1] + "-" + hash
 	}
