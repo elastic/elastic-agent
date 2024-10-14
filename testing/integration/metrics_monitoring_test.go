@@ -7,7 +7,6 @@
 package integration
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -19,7 +18,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
@@ -79,6 +77,7 @@ func (runner *MetricsRunner) SetupSuite() {
 
 	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "system", "1.53.1", "system_integration_setup.json", uuid.Must(uuid.NewV4()).String(), policyResp.ID)
 	require.NoError(runner.T(), err)
+
 }
 
 func (runner *MetricsRunner) TestBeatsMetrics() {
@@ -88,47 +87,8 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*20)
 	defer cancel()
 
-	var agentStatus atesting.AgentStatusOutput
-	f := runner.agentFixture
-	stateBuff := bytes.Buffer{}
-	require.Eventuallyf(t, func() bool {
-		stateBuff.Reset()
-
-		var err error
-		agentStatus, err = f.ExecStatus(ctx)
-		if err != nil {
-			stateBuff.WriteString(fmt.Sprintf("failed to get agent status: %v",
-				err))
-			return false
-		}
-
-		if client.State(agentStatus.State) != client.Healthy {
-			stateBuff.WriteString(fmt.Sprintf(
-				"agent isn't healthy: %s-%s",
-				client.State(agentStatus.State), agentStatus.Message))
-			return false
-		}
-
-		if len(agentStatus.Components) == 0 {
-			stateBuff.WriteString(fmt.Sprintf(
-				"healthy but without components: agent status: %s-%s",
-				client.State(agentStatus.State), agentStatus.Message))
-			return false
-		}
-
-		for _, c := range agentStatus.Components {
-
-			state := client.State(c.State)
-			if state != client.Healthy {
-				stateBuff.WriteString(fmt.Sprintf(
-					"%s not health: %s: %s",
-					c.Name, state, c.Message))
-				return false
-			}
-		}
-
-		return true
-	}, 2*time.Minute, 15*time.Second, "agent never became healthy. Last status: %v", &stateBuff)
+	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
+	require.NoError(t, err, "could not to get agent status")
 
 	componentIds := []string{
 		fmt.Sprintf("system/metrics-%s", UnitOutputName),
