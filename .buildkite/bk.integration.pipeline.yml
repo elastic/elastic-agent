@@ -8,19 +8,19 @@ env:
   ASDF_TERRAFORM_VERSION: 1.9.2
 
 steps:
-  # - label: "Integration tests: packaging"
-  #   key: "package-it"
-  #   command: ".buildkite/scripts/steps/integration-package.sh"
-  #   artifact_paths:
-  #     - build/distributions/**
-  #   agents:
-  #     provider: "gcp"
-  #     machineType: "n1-standard-8"
+  - label: "Integration tests: packaging"
+    key: "package-it"
+    command: ".buildkite/scripts/steps/integration-package.sh"
+    artifact_paths:
+      - build/distributions/**
+    agents:
+      provider: "gcp"
+      machineType: "n1-standard-8"
 
   - label: Start ESS stack for integration tests
     key: integration-ess
     depends_on:
-      # - package-it
+      - package-it
     command: |
       #!/usr/bin/env bash
       set -euo pipefail
@@ -35,13 +35,13 @@ steps:
   - group: "Stateful IT (Sudo): Ubuntu"
     key: integration-tests
     depends_on:
-      # - package-it
+      - package-it
       - integration-ess
     steps:
       - label: "Default"
         key: stateful-ubuntu-default-sudo
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 01928a64-bd17-46a6-b789-20319a36ed01
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf_sudo.sh "default" "^(TestAPMConfig|TestDiagnosticsOptionalValues|TestIsolatedUnitsDiagnosticsOptionalValues|TestDiagnosticsCommand|TestIsolatedUnitsDiagnosticsCommand|TestEventLogFile|TestFakeComponent|TestFakeIsolatedUnitsComponent|TestOtelFileProcessing|TestOtelLogsIngestion|TestOtelAPMIngestion|TestPackageVersion)$$"
         artifact_paths:
           - build/**
@@ -54,7 +54,7 @@ steps:
       - label: "Upgrade"
         key: stateful-ubuntu-upgrade-sudo
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 01928a64-bd17-46a6-b789-20319a36ed01
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf_sudo.sh "upgrade" "^(TestUpgradeBrokenPackageVersion|TestStandaloneUpgradeWithGPGFallback|TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing|TestStandaloneUpgradeRollback|TestStandaloneUpgradeRollbackOnRestarts|TestStandaloneUpgradeFailsWhenUpgradeIsInProgress|TestStandaloneUpgradeRetryDownload|TestStandaloneUpgradeSameCommit|TestStandaloneUpgrade|TestStandaloneUpgradeUninstallKillWatcher)$$"
         artifact_paths:
           - build/**
@@ -67,7 +67,7 @@ steps:
       - label: "Fleet"
         key: stateful-ubuntu-fleet-sudo
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 01928a64-bd17-46a6-b789-20319a36ed01
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
           ls -lah build/distributions/
           .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fleet" "^(TestLongRunningAgentForLeaks|TestDelayEnroll|TestDelayEnrollUnprivileged|TestInstallAndCLIUninstallWithEndpointSecurity|TestInstallAndUnenrollWithEndpointSecurity|TestInstallWithEndpointSecurityAndRemoveEndpointIntegration|TestEndpointSecurityNonDefaultBasePath|TestEndpointSecurityUnprivileged|TestEndpointSecurityCannotSwitchToUnprivileged|TestEndpointLogsAreCollectedInDiagnostics|TestForceInstallOverProtectedPolicy|TestSetLogLevelFleetManaged|TestLogIngestionFleetManaged|TestMetricsMonitoringCorrectBinaries|TestEndpointAgentServiceMonitoring|TestMonitoringPreserveTextConfig|TestMonitoringLivenessReloadable|TestComponentBuildHashInDiagnostics|TestProxyURL|TestFleetManagedUpgradeUnprivileged)$$"
         artifact_paths:
@@ -81,7 +81,7 @@ steps:
       - label: "FQDN"
         key: stateful-ubuntu-fqdn-sudo
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 01928a64-bd17-46a6-b789-20319a36ed01
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
           ls -lah build/distributions/
           .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fqdn" "^(TestFQDN)$$"
         artifact_paths:
@@ -95,7 +95,7 @@ steps:
       - label: "Deb"
         key: stateful-ubuntu-deb-sudo
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 01928a64-bd17-46a6-b789-20319a36ed01
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
           ls -lah build/distributions/
           .buildkite/scripts/steps/integration_tests_tf_sudo.sh "deb" "^(TestDebLogIngestFleetManaged|TestDebFleetUpgrade)$$"
         artifact_paths:
@@ -109,7 +109,7 @@ steps:
       - label: "Fleet Airgapped"
         key: stateful-ubuntu-fleet-airgapped-sudo
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 01928a64-bd17-46a6-b789-20319a36ed01
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
           ls -lah build/distributions/
           .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fleet-airgapped" "^(TestFleetAirGappedUpgradeUnprivileged)$$"
         artifact_paths:
@@ -123,7 +123,7 @@ steps:
       - label: "Fleet Privileged"
         key: stateful-ubuntu-fleet-privileged-sudo
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 01928a64-bd17-46a6-b789-20319a36ed01
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
           ls -lah build/distributions/
           .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fleet-privileged" "^(TestInstallFleetServerBootstrap|TestFleetManagedUpgradePrivileged)$$"
         artifact_paths:
@@ -137,7 +137,7 @@ steps:
       - label: "Fleet Airgapped Privileged"
         key: stateful-ubuntu-fleet-airgapped-privileged-sudo
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 01928a64-bd17-46a6-b789-20319a36ed01
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
           ls -lah build/distributions/
           .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fleet-airgapped-privileged" "^(TestFleetAirGappedUpgradePrivileged)$$"
         artifact_paths:
