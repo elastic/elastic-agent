@@ -33,7 +33,7 @@ func NewProvider(cfg *confmap.Retrieved) *Provider {
 	return &Provider{
 		uri:     uri,
 		cfg:     cfg,
-		updated: make(chan struct{}),
+		updated: make(chan struct{}, 1), // buffer of 1, stores the updated state
 	}
 }
 
@@ -54,6 +54,7 @@ func (p *Provider) Update(cfg *confmap.Retrieved) {
 	select {
 	case p.updated <- struct{}{}:
 	default:
+		// already has an updated state
 	}
 }
 
@@ -69,14 +70,13 @@ func (p *Provider) Retrieve(ctx context.Context, uri string, watcher confmap.Wat
 	p.cfgMu.RUnlock()
 
 	// don't use passed in context, as the cancel comes from Shutdown
-	p.cancelledMu.Lock()
-	if p.canceller != nil {
-		p.canceller()
-	}
+	p.cleanCanceller()
 	ctx, cancel := context.WithCancel(context.Background())
+	p.cancelledMu.Lock()
 	p.canceller = cancel
 	p.cancelledMu.Unlock()
 	go func() {
+		defer p.cleanCanceller() // ensure the context is always cleaned up
 		select {
 		case <-ctx.Done():
 			return
@@ -95,16 +95,21 @@ func (p *Provider) Scheme() string {
 
 // Shutdown called by collect when stopping.
 func (p *Provider) Shutdown(ctx context.Context) error {
-	p.cancelledMu.Lock()
-	defer p.cancelledMu.Unlock()
-	if p.canceller != nil {
-		p.canceller()
-		p.canceller = nil
-	}
+	p.cleanCanceller()
 	return nil
 }
 
 // URI returns the URI to be used for this provider.
 func (p *Provider) URI() string {
 	return p.uri
+}
+
+func (p *Provider) cleanCanceller() {
+	p.cancelledMu.Lock()
+	canceller := p.canceller
+	p.canceller = nil
+	p.cancelledMu.Unlock()
+	if canceller != nil {
+		canceller()
+	}
 }
