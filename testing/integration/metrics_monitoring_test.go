@@ -9,6 +9,7 @@ package integration
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -81,6 +82,8 @@ func (runner *MetricsRunner) SetupSuite() {
 }
 
 func (runner *MetricsRunner) TestBeatsMetrics() {
+	t := runner.T()
+
 	UnitOutputName := "default"
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*20)
 	defer cancel()
@@ -88,31 +91,32 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 	var agentStatus atesting.AgentStatusOutput
 	f := runner.agentFixture
 	stateBuff := bytes.Buffer{}
-	require.Eventuallyf(runner.T(), func() bool {
+	require.Eventuallyf(t, func() bool {
 		stateBuff.Reset()
 
-		status, err := f.ExecStatus(ctx)
+		var err error
+		agentStatus, err = f.ExecStatus(ctx)
 		if err != nil {
 			stateBuff.WriteString(fmt.Sprintf("failed to get agent status: %v",
 				err))
 			return false
 		}
 
-		if client.State(status.State) != client.Healthy {
+		if client.State(agentStatus.State) != client.Healthy {
 			stateBuff.WriteString(fmt.Sprintf(
 				"agent isn't healthy: %s-%s",
-				client.State(status.State), status.Message))
+				client.State(agentStatus.State), agentStatus.Message))
 			return false
 		}
 
-		if len(status.Components) == 0 {
+		if len(agentStatus.Components) == 0 {
 			stateBuff.WriteString(fmt.Sprintf(
 				"healthy but without components: agent status: %s-%s",
-				client.State(status.State), status.Message))
+				client.State(agentStatus.State), agentStatus.Message))
 			return false
 		}
 
-		for _, c := range status.Components {
+		for _, c := range agentStatus.Components {
 
 			state := client.State(c.State)
 			if state != client.Healthy {
@@ -135,19 +139,36 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 		"filestream-monitoring",
 	}
 
-	require.Eventually(runner.T(), func() bool {
+	now := time.Now()
+	var query map[string]any
+	defer func() {
+		if t.Failed() {
+			bs, err := json.Marshal(query)
+			if err != nil {
+				// nothing we can do, just log the map
+				t.Errorf("executed at %s: %v",
+					now.Format(time.RFC3339Nano), query)
+				return
+			}
+			t.Errorf("executed at %s: query: %s",
+				now.Format(time.RFC3339Nano), string(bs))
+		}
+	}()
+
+	t.Logf("starting to ES for metrics at %s", now.Format(time.RFC3339Nano))
+	require.Eventually(t, func() bool {
 		for _, cid := range componentIds {
-			query := genESQuery(agentStatus.Info.ID, cid)
+			query = genESQuery(agentStatus.Info.ID, cid)
+			now = time.Now()
 			res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
-			require.NoError(runner.T(), err)
-			runner.T().Logf("Fetched metrics for %s, got %d hits", cid, res.Hits.Total.Value)
+			require.NoError(t, err)
+			t.Logf("Fetched metrics for %s, got %d hits", cid, res.Hits.Total.Value)
 			if res.Hits.Total.Value < 1 {
 				return false
 			}
-
 		}
 		return true
-	}, time.Minute*10, time.Second*10, "could not fetch metrics for all known beats in default install: %v", componentIds)
+	}, time.Minute*10, time.Second*10, "could not fetch metrics for all known components in default install: %v", componentIds)
 }
 
 func genESQuery(agentID string, componentID string) map[string]interface{} {
