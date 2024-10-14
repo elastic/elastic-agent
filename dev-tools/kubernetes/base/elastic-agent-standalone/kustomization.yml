@@ -1,6 +1,6 @@
 namespace: kube-system
 commonLabels:
-  k8s-app: elastic-agent
+  app.kubernetes.io/name: elastic-agent
 namePrefix: elastic-agent-standalone-
 
 images:
