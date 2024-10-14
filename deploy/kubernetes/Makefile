@@ -15,6 +15,7 @@ ELASTIC_AGENT_BRANCH=update-k8s-templates-$(shell date "+%Y%m%d%H%M%S")
 KUSTOMIZE=elastic-agent-kustomize
 KUSTOMIZE_DEFAULT=elastic-agent-kustomize/default
 KUSTOMIZE_KSM_AUTOSHARDING=elastic-agent-kustomize/ksm-autosharding
+KUSTOMIZE_KSM_HINTS=elastic-agent-kustomize/ksm-hints
 
 # variable for processor for elastic-agent-standalone
 define ELASTIC_PROCESSOR
@@ -118,6 +119,15 @@ $(ALL):
 	@for f in $(shell ls $@/*.yaml | grep -v elastic-agent-standalone-daemonset-configmap); do \
 		cp -r $$f  $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/base; \
 	done
+	
+	@echo "Generating $@ kustomize-ksm-hints files"
+	@for f in $(shell ls elastic-agent-standalone/*.yaml | grep elastic-agent-standalone-daemonset-configmap.yaml); do \
+		cp -r $$f  $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone; \
+	done
+	sed -i.bak -e "s/#hints.enabled/hints.enabled/g" -e "s/#hints.default_container_logs/hints.default_container_logs/g" $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone/elastic-agent-standalone-daemonset-configmap.yaml
+	sed -i.bak -e "/- id: container-log/,/- \/var\/log\/containers/d" $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone/elastic-agent-standalone-daemonset-configmap.yaml
+	rm $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone/elastic-agent-standalone-daemonset-configmap.yaml.bak 
+	sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g"  $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone/kustomization.yaml.original > $(KUSTOMIZE_KSM_HINTS)/elastic-agent-standalone/kustomization.yaml
 
 	mkdir -p $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/extra/
 	sed -e "s/%VERSION%/${BEAT_VERSION}/g" -e "s/%BRANCH%/${BRANCH_VERSION}/g" -e "/name: elastic-agent-state/,+1 s/^/#/" -e "/path: \/var\/lib\/$@\/kube-system\/state/,+1 s/^/#/" $@/$@-daemonset.yaml > $(KUSTOMIZE_KSM_AUTOSHARDING)/$@/base/$@-daemonset.yaml
