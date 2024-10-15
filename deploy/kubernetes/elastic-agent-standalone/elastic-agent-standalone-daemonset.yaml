@@ -5,15 +5,15 @@ metadata:
   name: elastic-agent-standalone
   namespace: kube-system
   labels:
-    app: elastic-agent-standalone
+    app.kubernetes.io/name: elastic-agent-standalone
 spec:
   selector:
     matchLabels:
-      app: elastic-agent-standalone
+      app.kubernetes.io/name: elastic-agent-standalone
   template:
     metadata:
       labels:
-        app: elastic-agent-standalone
+        app.kubernetes.io/name: elastic-agent-standalone
     spec:
       # Tolerations are needed to run Elastic Agent on Kubernetes control-plane nodes.
       # Agents running on control-plane nodes collect metrics from the control plane components (scheduler, controller manager) of Kubernetes
@@ -33,13 +33,11 @@ spec:
       #    args:
       #      - -c
       #      - >-
-      #        mkdir -p /usr/share/elastic-agent/state/inputs.d &&
-      #        curl -sL https://github.com/elastic/elastic-agent/archive/%BRANCH%.tar.gz | tar xz -C /usr/share/elastic-agent/state/inputs.d --strip=5 "elastic-agent-%BRANCH%/deploy/kubernetes/elastic-agent-standalone/templates.d"
-      #    securityContext:
-      #      runAsUser: 0
+      #        mkdir -p /etc/elastic-agent/inputs.d &&
+      #        curl -sL https://github.com/elastic/elastic-agent/archive/%BRANCH%.tar.gz | tar xz -C /etc/elastic-agent/inputs.d --strip=5 "elastic-agent-%BRANCH%/deploy/kubernetes/elastic-agent-standalone/templates.d"
       #    volumeMounts:
-      #      - name: elastic-agent-state
-      #        mountPath: /usr/share/elastic-agent/state
+      #      - name: external-inputs
+      #        mountPath: /etc/elastic-agent/inputs.d
       containers:
         - name: elastic-agent-standalone
           image: docker.elastic.co/beats/elastic-agent:%VERSION%
@@ -113,6 +111,9 @@ spec:
               mountPath: /sys/kernel/debug
             - name: elastic-agent-state
               mountPath: /usr/share/elastic-agent/state
+            # Uncomment if using hints feature
+            # - name: external-inputs
+            #   mountPath: /usr/share/elastic-agent/state/inputs.d
       volumes:
         - name: datastreams
           configMap:
@@ -151,3 +152,6 @@ spec:
           hostPath:
             path: /var/lib/elastic-agent-standalone/kube-system/state
             type: DirectoryOrCreate
+        # Uncomment if using hints feature
+        # - name: external-inputs
+        #   emptyDir: {}

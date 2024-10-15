@@ -6,27 +6,27 @@ metadata:
   name: elastic-agent
   namespace: kube-system
   labels:
-    app: elastic-agent
+    app.kubernetes.io/name: elastic-agent
 spec:
   selector:
     matchLabels:
-      app: elastic-agent
+      app.kubernetes.io/name: elastic-agent
   template:
     metadata:
       labels:
-        app: elastic-agent
+        app.kubernetes.io/name: elastic-agent
     spec:
       nodeName: gke-kubernetes-scale-kubernetes-scale-0f73d58f-8cz4
-      # Affinity (aka podAntiAffinity here) is used to determine if a specific pod is already installed in a node. 
+      # Affinity (aka podAntiAffinity here) is used to determine if a specific pod is already installed in a node.
       #This way we can prevent an elastic daemonset to be installed in the same node where elastic-agent deployment exists
       # affinity:
-      #   podAntiAffinity:  
+      #   podAntiAffinity:
       #     requiredDuringSchedulingIgnoredDuringExecution:
       #     - labelSelector:
-      #         matchExpressions:                            
+      #         matchExpressions:
       #         - key: app
       #           operator: In
-      #           values:                          
+      #           values:
       #             - "elastic-agent"
       #       topologyKey: "kubernetes.io/hostname"
       # Tolerations are needed to run Elastic Agent on Kubernetes control-plane nodes.
@@ -186,7 +186,7 @@ kind: ClusterRole
 metadata:
   name: elastic-agent
   labels:
-    k8s-app: elastic-agent
+    app.kubernetes.io/name: elastic-agent
 rules:
   - apiGroups: [""]
     resources:
@@ -258,7 +258,7 @@ metadata:
   # Should be the namespace where elastic-agent is running
   namespace: kube-system
   labels:
-    k8s-app: elastic-agent
+    app.kubernetes.io/name: elastic-agent
 rules:
   - apiGroups:
       - coordination.k8s.io
@@ -272,7 +272,7 @@ metadata:
   name: elastic-agent-kubeadm-config
   namespace: kube-system
   labels:
-    k8s-app: elastic-agent
+    app.kubernetes.io/name: elastic-agent
 rules:
   - apiGroups: [""]
     resources:
@@ -287,6 +287,6 @@ metadata:
   name: elastic-agent
   namespace: kube-system
   labels:
-    k8s-app: elastic-agent
+    app.kubernetes.io/name: elastic-agent
 ---
 
