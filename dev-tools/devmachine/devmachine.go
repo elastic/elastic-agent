@@ -63,8 +63,8 @@ func Run(instanceName string, imageName string, zone string) error {
 		log.Fatalf("Failed to create instance: %v", err)
 	}
 
-	fmt.Printf("Instance creation initiated: %s\n", op.Name)
-	fmt.Printf("Instance name: %s\n", instanceName)
+	log.Printf("Instance creation initiated: %s\n", op.Name)
+	log.Printf("Instance name: %s\n", instanceName)
 
 	retriesLimit := 24
 	retryCount := 0
@@ -76,10 +76,10 @@ func Run(instanceName string, imageName string, zone string) error {
 			log.Fatalf("Failed to get operation status: %v", err)
 		}
 		if op.Status != "DONE" {
-			fmt.Print(".")
+			log.Print(".")
 		}
 		if op.Status == "DONE" {
-			fmt.Println("Instance creation complete!")
+			log.Println("Instance creation complete!")
 			break
 		}
 		if retryCount == retriesLimit {
