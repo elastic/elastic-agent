@@ -94,15 +94,15 @@ func Run(instanceName string, imageName string, zone string) error {
 		return err
 	}
 
-	fmt.Printf("Instance created: %s\n", instanceDetails.Name)
+	log.Printf("Instance created: %s\n", instanceDetails.Name)
 
-	fmt.Printf(
+	log.Printf(
 		`SSH into your instance using: 
   gcloud compute ssh --zone "%s" buildkite-agent@%s --project "elastic-platform-ingest"
 	Once you are in the instance, type "bash" to start a bash shell.
 	`, zone, instanceName)
 
-	fmt.Printf(
+	log.Printf(
 		`Copy files to your instance using: 
   gcloud compute scp --recurse --compress --zone "%s"  buildkite-agent%s:~ [your_file/your_current_dir] --project "elastic-platform-ingest"
 	TIP: Better use git on the remote machine.
