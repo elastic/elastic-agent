@@ -448,11 +448,12 @@ func TestEndpointTLSComponentModifier_cache_miss(t *testing.T) {
 	cache := tlsCache{
 		mu: &sync.Mutex{},
 
-		PassphrasePath: "/old/path/to/key-passphrase",
-		Certificate:    "cached certificate",
-		Key:            "cached key",
+		CacheKey:    "/old-cache-key",
+		Certificate: "cached certificate",
+		Key:         "cached key",
 	}
 	pair, certPath, certKeyPath, certKeyPassPath := prepareEncTLSCertificates(t)
+	cackeKey := cache.MakeKey(certKeyPassPath, certPath, certKeyPath)
 
 	comps := makeComponent(t, fmt.Sprintf(`{
 			  "fleet": {
@@ -485,7 +486,7 @@ func TestEndpointTLSComponentModifier_cache_miss(t *testing.T) {
 	got, err := modifier(comps, cfg)
 	require.NoError(t, err, "unexpected error")
 
-	assert.Equal(t, certKeyPassPath, cache.PassphrasePath, "passphrase path did not match")
+	assert.Equal(t, cackeKey, cache.CacheKey, "passphrase path did not match")
 	assert.Equal(t, string(pair.Cert), cache.Certificate, "certificate did not match")
 	assert.Equal(t, string(pair.Key), cache.Key, "key did not match")
 
@@ -505,13 +506,15 @@ func TestEndpointTLSComponentModifier_cache_hit(t *testing.T) {
 	certPath := "/path/to/cert"
 	certKeyPath := "/path/to/key"
 	certKeyPassPath := "/path/to/key_passphrase_path" //nolint:gosec // not a real key
+
 	cache := tlsCache{
 		mu: &sync.Mutex{},
 
-		PassphrasePath: certKeyPassPath,
-		Certificate:    "cached certificate",
-		Key:            "cached key",
+		Certificate: "cached certificate",
+		Key:         "cached key",
 	}
+	cacheKey := cache.MakeKey(certKeyPassPath, certPath, certKeyPath)
+	cache.CacheKey = cacheKey
 
 	comps := makeComponent(t, fmt.Sprintf(`{
 			  "fleet": {
@@ -527,7 +530,7 @@ func TestEndpointTLSComponentModifier_cache_hit(t *testing.T) {
 			"ssl": map[string]interface{}{
 				"certificate":         cache.Certificate,
 				"key":                 cache.Key,
-				"key_passphrase_path": cache.PassphrasePath,
+				"key_passphrase_path": cache.CacheKey,
 			},
 		},
 	}
@@ -545,7 +548,7 @@ func TestEndpointTLSComponentModifier_cache_hit(t *testing.T) {
 	got, err := modifier(comps, cfg)
 	require.NoError(t, err, "unexpected error")
 
-	assert.Equal(t, certKeyPassPath, cache.PassphrasePath, "passphrase should not have changed")
+	assert.Equal(t, cacheKey, cache.CacheKey, "passphrase should not have changed")
 	compareComponents(t, got, wantComps)
 }
 

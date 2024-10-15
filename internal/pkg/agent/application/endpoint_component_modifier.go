@@ -25,14 +25,14 @@ import (
 type tlsCache struct {
 	mu *sync.Mutex
 
-	// PassphrasePath is used as the cache key.
-	// Watching the file for changes and reloading the file if any change is
-	// detected isn't supported, therefore it's safe to use the
-	// keyPassphrasePath as cache key.
-	PassphrasePath string
+	CacheKey string
 
 	Certificate string
 	Key         string
+}
+
+func (tlsCache) MakeKey(keyPassPath, certPath, keyPath string) string {
+	return keyPassPath + certPath + keyPath
 }
 
 // EndpointSignedComponentModifier copies "signed" properties to the top level "signed" for the endpoint input.
@@ -188,8 +188,10 @@ func loadCertificatesWithCache(log *logger.Logger, cache *tlsCache, keyPassPath 
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
+	cacheKey := cache.MakeKey(keyPassPath, certPath, keyPath)
+
 	// cache hit
-	if cache.PassphrasePath == keyPassPath {
+	if cache.CacheKey == cacheKey {
 		return cache.Certificate, cache.Key, nil
 	}
 
@@ -198,7 +200,7 @@ func loadCertificatesWithCache(log *logger.Logger, cache *tlsCache, keyPassPath 
 		return "", "", err
 	}
 
-	cache.PassphrasePath = keyPassPath
+	cache.CacheKey = cacheKey
 	cache.Certificate = cert
 	cache.Key = key
 
