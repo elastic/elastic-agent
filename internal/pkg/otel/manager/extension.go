@@ -28,6 +28,7 @@ type AgentStatusExtension struct {
 	eventCh    chan *evtPair
 	readyCh    chan struct{}
 	kickCh     chan struct{}
+	ctx        context.Context
 	canceller  context.CancelFunc
 	host       component.Host
 }
@@ -48,6 +49,7 @@ func NewAgentStatusExtension(ctx context.Context, set extension.Settings, mgr *O
 		eventCh:    make(chan *evtPair),
 		readyCh:    make(chan struct{}),
 		kickCh:     make(chan struct{}, 1),
+		ctx:        ctx,
 		canceller:  cancel,
 	}
 
@@ -113,7 +115,10 @@ func (as *AgentStatusExtension) ComponentStatusChanged(
 			)
 		}
 	}()
-	as.eventCh <- &evtPair{source: source, event: event}
+	select {
+	case as.eventCh <- &evtPair{source: source, event: event}:
+	case <-as.ctx.Done():
+	}
 }
 
 func (as *AgentStatusExtension) eventLoop(ctx context.Context) {
@@ -124,10 +129,7 @@ func (as *AgentStatusExtension) eventLoop(ctx context.Context) {
 LOOP:
 	for {
 		select {
-		case esp, ok := <-as.eventCh:
-			if !ok {
-				return
-			}
+		case esp := <-as.eventCh:
 			if esp.event.Status() != componentstatus.StatusStarting {
 				eventQueue = append(eventQueue, esp)
 				continue
@@ -146,7 +148,6 @@ LOOP:
 		case <-as.kickCh:
 			as.publishStatus()
 		case <-ctx.Done():
-			close(as.eventCh)
 			as.aggregator.Close()
 			return
 		}
@@ -155,16 +156,12 @@ LOOP:
 	// After PipelineWatcher.Ready, record statuses as they are received.
 	for {
 		select {
-		case esp, ok := <-as.eventCh:
-			if !ok {
-				return
-			}
+		case esp := <-as.eventCh:
 			as.aggregator.RecordStatus(esp.source, esp.event)
 			as.triggerKickCh()
 		case <-as.kickCh:
 			as.publishStatus()
 		case <-ctx.Done():
-			close(as.eventCh)
 			as.aggregator.Close()
 			return
 		}
