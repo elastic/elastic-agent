@@ -8,6 +8,7 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -80,11 +81,14 @@ func (runner *MetricsRunner) SetupSuite() {
 }
 
 func (runner *MetricsRunner) TestBeatsMetrics() {
+	t := runner.T()
+
 	UnitOutputName := "default"
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*20)
 	defer cancel()
+
 	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
-	require.NoError(runner.T(), err)
+	require.NoError(t, err, "could not to get agent status")
 
 	componentIds := []string{
 		fmt.Sprintf("system/metrics-%s", UnitOutputName),
@@ -95,19 +99,36 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 		"filestream-monitoring",
 	}
 
-	require.Eventually(runner.T(), func() bool {
+	now := time.Now()
+	var query map[string]any
+	defer func() {
+		if t.Failed() {
+			bs, err := json.Marshal(query)
+			if err != nil {
+				// nothing we can do, just log the map
+				t.Errorf("executed at %s: %v",
+					now.Format(time.RFC3339Nano), query)
+				return
+			}
+			t.Errorf("executed at %s: query: %s",
+				now.Format(time.RFC3339Nano), string(bs))
+		}
+	}()
+
+	t.Logf("starting to ES for metrics at %s", now.Format(time.RFC3339Nano))
+	require.Eventually(t, func() bool {
 		for _, cid := range componentIds {
-			query := genESQuery(agentStatus.Info.ID, cid)
+			query = genESQuery(agentStatus.Info.ID, cid)
+			now = time.Now()
 			res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
-			require.NoError(runner.T(), err)
-			runner.T().Logf("Fetched metrics for %s, got %d hits", cid, res.Hits.Total.Value)
+			require.NoError(t, err)
+			t.Logf("Fetched metrics for %s, got %d hits", cid, res.Hits.Total.Value)
 			if res.Hits.Total.Value < 1 {
 				return false
 			}
-
 		}
 		return true
-	}, time.Minute*10, time.Second*10, "could not fetch metrics for all known beats in default install: %v", componentIds)
+	}, time.Minute*10, time.Second*10, "could not fetch metrics for all known components in default install: %v", componentIds)
 }
 
 func genESQuery(agentID string, componentID string) map[string]interface{} {

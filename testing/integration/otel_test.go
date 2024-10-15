@@ -20,10 +20,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	aTesting "github.com/elastic/elastic-agent/pkg/testing"
-	atesting "github.com/elastic/elastic-agent/pkg/testing"
-	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
@@ -146,7 +143,7 @@ func TestOtelFileProcessing(t *testing.T) {
 	fixtureWg.Add(1)
 	go func() {
 		defer fixtureWg.Done()
-		err = fixture.RunOtelWithClient(ctx, false, false)
+		err = fixture.RunOtelWithClient(ctx)
 	}()
 
 	var content []byte
@@ -156,22 +153,6 @@ func TestOtelFileProcessing(t *testing.T) {
 	})
 
 	validateCommandIsWorking(t, ctx, fixture, tempDir)
-
-	// check `elastic-agent status` returns successfully
-	require.Eventuallyf(t, func() bool {
-		// This will return errors until it connects to the agent,
-		// they're mostly noise because until the agent starts running
-		// we will get connection errors. If the test fails
-		// the agent logs will be present in the error message
-		// which should help to explain why the agent was not
-		// healthy.
-		err = fixture.IsHealthy(ctx)
-		return err == nil
-	},
-		2*time.Minute, time.Second,
-		"Elastic-Agent did not report healthy. Agent status error: \"%v\"",
-		err,
-	)
 
 	require.Eventually(t,
 		func() bool {
@@ -194,8 +175,6 @@ func TestOtelFileProcessing(t *testing.T) {
 		},
 		3*time.Minute, 500*time.Millisecond,
 		fmt.Sprintf("there should be exported logs by now"))
-
-	testAgentCanRun(ctx, t, fixture)
 
 	cancel()
 	fixtureWg.Wait()
@@ -314,26 +293,10 @@ func TestOtelLogsIngestion(t *testing.T) {
 	fixtureWg.Add(1)
 	go func() {
 		defer fixtureWg.Done()
-		err = fixture.RunOtelWithClient(ctx, false, false)
+		err = fixture.RunOtelWithClient(ctx)
 	}()
 
 	validateCommandIsWorking(t, ctx, fixture, tempDir)
-
-	// check `elastic-agent status` returns successfully
-	require.Eventuallyf(t, func() bool {
-		// This will return errors until it connects to the agent,
-		// they're mostly noise because until the agent starts running
-		// we will get connection errors. If the test fails
-		// the agent logs will be present in the error message
-		// which should help to explain why the agent was not
-		// healthy.
-		err = fixture.IsHealthy(ctx)
-		return err == nil
-	},
-		2*time.Minute, time.Second,
-		"Elastic-Agent did not report healthy. Agent status error: \"%v\"",
-		err,
-	)
 
 	// Write logs to input file.
 	logsCount := 10_000
@@ -451,7 +414,7 @@ func TestOtelAPMIngestion(t *testing.T) {
 	var fixtureWg sync.WaitGroup
 	fixtureWg.Add(1)
 	go func() {
-		fixture.RunOtelWithClient(ctx, false, false)
+		fixture.RunOtelWithClient(ctx)
 		fixtureWg.Done()
 	}()
 
@@ -462,22 +425,6 @@ func TestOtelAPMIngestion(t *testing.T) {
 		apmReadyLog,
 	)
 	require.NoError(t, err, "APM not initialized")
-
-	// wait for otel collector to start
-	require.Eventuallyf(t, func() bool {
-		// This will return errors until it connects to the agent,
-		// they're mostly noise because until the agent starts running
-		// we will get connection errors. If the test fails
-		// the agent logs will be present in the error message
-		// which should help to explain why the agent was not
-		// healthy.
-		err = fixture.IsHealthy(ctx)
-		return err == nil
-	},
-		2*time.Minute, time.Second,
-		"Elastic-Agent did not report healthy. Agent status error: \"%v\"",
-		err,
-	)
 
 	require.NoError(t, os.WriteFile(filepath.Join(tempDir, fileName), []byte(apmProcessingContent), 0600))
 
@@ -587,31 +534,4 @@ func mapAtLeastOneTrue(mm map[string]bool) bool {
 	}
 
 	return false
-}
-
-func testAgentCanRun(ctx context.Context, t *testing.T, fixture *atesting.Fixture) func(*testing.T) {
-	tCtx, cancel := testcontext.WithDeadline(t, ctx, time.Now().Add(5*time.Minute))
-	defer cancel()
-
-	return func(t *testing.T) {
-		// Get path to Elastic Agent executable
-		devFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-		require.NoError(t, err)
-
-		// Prepare the Elastic Agent so the binary is extracted and ready to use.
-		err = devFixture.Prepare(tCtx)
-		require.NoError(t, err)
-
-		require.Eventually(
-			t,
-			func() bool {
-				return nil == devFixture.Run(tCtx, integrationtest.State{
-					Configure:  complexIsolatedUnitsConfig,
-					AgentState: integrationtest.NewClientState(client.Healthy),
-				})
-			},
-			5*time.Minute, 500*time.Millisecond,
-			"Agent should not return error",
-		)
-	}
 }
