@@ -258,6 +258,7 @@ func ExampleNewServer_checkin_fleetConnectionParams() {
 	//   "id": "",
 	//   "inputs": [
 	//     {
+	//       "custom_attr": "secretValue",
 	//       "data_stream": {
 	//         "namespace": "default"
 	//       },
@@ -271,7 +272,6 @@ func ExampleNewServer_checkin_fleetConnectionParams() {
 	//       "name": "fake-input",
 	//       "package_policy_id": "",
 	//       "revision": 1,
-	//       "secret_key": "secretValue",
 	//       "streams": [],
 	//       "type": "fake-input",
 	//       "use_output": "default"
@@ -289,7 +289,7 @@ func ExampleNewServer_checkin_fleetConnectionParams() {
 	//   },
 	//   "revision": 2,
 	//   "secret_paths": [
-	//     "inputs.0.secret_key"
+	//     "inputs.0.custom_attr"
 	//   ],
 	//   "secret_references": [],
 	//   "signed": {
