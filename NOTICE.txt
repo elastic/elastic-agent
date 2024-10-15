@@ -1264,11 +1264,11 @@ SOFTWARE
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-libs
-Version: v0.12.1-0.20241009140206-6634efed32ab
+Version: v0.12.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-libs@v0.12.1-0.20241009140206-6634efed32ab/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-libs@v0.12.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -2766,11 +2766,11 @@ limitations under the License.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector
-Version: v0.1.0
+Version: v0.2.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector@v0.1.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector@v0.2.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3188,11 +3188,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/opentelemetry-c
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor
-Version: v0.2.0
+Version: v0.2.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor@v0.2.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor@v0.2.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -28546,11 +28546,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/lunes@v0.1.0/LI
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/opentelemetry-lib
-Version: v0.11.0
+Version: v0.12.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/opentelemetry-lib@v0.11.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/opentelemetry-lib@v0.12.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004

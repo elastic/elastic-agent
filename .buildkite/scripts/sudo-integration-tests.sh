@@ -9,10 +9,13 @@ TESTS_TO_RUN=$2
 
 echo "~~~ Running integration tests as $USER"
 echo "~~~ Integration tests: ${GROUP_NAME}"
-# TODO: Pass the actual version of the agen
 gotestsum --version
+PACKAGE_VERSION="$(cat .package-version)"
+if [[ -n "$PACKAGE_VERSION" ]]; then
+    PACKAGE_VERSION=${PACKAGE_VERSION}"-SNAPSHOT"
+fi
 set +e
-SNAPSHOT=true TEST_DEFINE_PREFIX="sudo_${GROUP_NAME}_ubuntu" gotestsum --no-color -f standard-quiet --junitfile "build/${GROUP_NAME}.integration.xml" --jsonfile "build/${GROUP_NAME}.integration.out.json" -- -tags integration -test.shuffle on -test.timeout 2h0m0s -test.run "${TESTS_TO_RUN}" github.com/elastic/elastic-agent/testing/integration
+AGENT_VERSION="${PACKAGE_VERSION}" SNAPSHOT=true TEST_DEFINE_PREFIX="sudo_${GROUP_NAME}_ubuntu" gotestsum --no-color -f standard-quiet --junitfile "build/${GROUP_NAME}.integration.xml" --jsonfile "build/${GROUP_NAME}.integration.out.json" -- -tags integration -test.shuffle on -test.timeout 2h0m0s -test.run "${TESTS_TO_RUN}" github.com/elastic/elastic-agent/testing/integration
 TESTS_EXIT_STATUS=$?
 set -e
 
