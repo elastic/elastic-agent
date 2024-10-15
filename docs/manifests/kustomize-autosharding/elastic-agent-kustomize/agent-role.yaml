@@ -5,7 +5,7 @@ metadata:
   # Should be the namespace where elastic-agent is running
   namespace: kube-system
   labels:
-    k8s-app: elastic-agent
+    app.kubernetes.io/name: elastic-agent
 rules:
   - apiGroups:
       - coordination.k8s.io

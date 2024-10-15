@@ -26,7 +26,9 @@ func (WindowsRunner) Prepare(ctx context.Context, sshClient ssh.SSHClient, logge
 	// install chocolatey
 	logger.Logf("Installing chocolatey")
 	chocoInstall := `"[System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"`
-	stdOut, errOut, err := sshRunPowershell(ctx, sshClient, chocoInstall)
+	updateCtx, updateCancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer updateCancel()
+	stdOut, errOut, err := sshRunPowershell(updateCtx, sshClient, chocoInstall)
 	if err != nil {
 		return fmt.Errorf("failed to install chocolatey: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
@@ -38,13 +40,17 @@ func (WindowsRunner) Prepare(ctx context.Context, sshClient ssh.SSHClient, logge
 
 	// install curl
 	logger.Logf("Installing curl")
-	stdOut, errOut, err = sshClient.Exec(ctx, "choco", []string{"install", "-y", "curl"}, nil)
+	curlCtx, curlCancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer curlCancel()
+	stdOut, errOut, err = sshClient.ExecWithRetry(curlCtx, "choco", []string{"install", "-y", "curl"}, 15*time.Second)
 	if err != nil {
 		return fmt.Errorf("failed to install curl: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
 	// install make
 	logger.Logf("Installing make")
-	stdOut, errOut, err = sshClient.Exec(ctx, "choco", []string{"install", "-y", "make"}, nil)
+	makeCtx, makeCancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer makeCancel()
+	stdOut, errOut, err = sshClient.ExecWithRetry(makeCtx, "choco", []string{"install", "-y", "make"}, 15*time.Second)
 	if err != nil {
 		return fmt.Errorf("failed to install make: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
@@ -53,7 +59,9 @@ func (WindowsRunner) Prepare(ctx context.Context, sshClient ssh.SSHClient, logge
 	logger.Logf("Installing golang %s (%s)", goVersion, arch)
 	downloadURL := fmt.Sprintf("https://go.dev/dl/go%s.windows-%s.msi", goVersion, arch)
 	filename := path.Base(downloadURL)
-	stdOut, errOut, err = sshClient.Exec(ctx, "curl", []string{"-Ls", downloadURL, "--output", filename}, nil)
+	goCtx, goCancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer goCancel()
+	stdOut, errOut, err = sshClient.ExecWithRetry(goCtx, "curl", []string{"-Ls", downloadURL, "--output", filename}, 15*time.Second)
 	if err != nil {
 		return fmt.Errorf("failed to download go from %s with curl: %w (stdout: %s, stderr: %s)", downloadURL, err, stdOut, errOut)
 	}
@@ -236,12 +244,12 @@ func (WindowsRunner) Diagnostics(ctx context.Context, sshClient ssh.SSHClient, l
 }
 
 func sshRunPowershell(ctx context.Context, sshClient ssh.SSHClient, cmd string) ([]byte, []byte, error) {
-	return sshClient.Exec(ctx, "powershell", []string{
+	return sshClient.ExecWithRetry(ctx, "powershell", []string{
 		"-NoProfile",
 		"-InputFormat", "None",
 		"-ExecutionPolicy", "Bypass",
 		"-Command", cmd,
-	}, nil)
+	}, 15*time.Second)
 }
 
 func toPowershellScript(agentVersion string, prefix string, verbose bool, tests []string, env map[string]string) string {
