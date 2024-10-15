@@ -172,9 +172,11 @@ func New(
 			log.Info("Parsed configuration and determined agent is managed by Fleet")
 
 			composableManaged = true
-			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server),
+			compModifiers = append(compModifiers,
+				FleetServerComponentModifier(cfg.Fleet.Server),
 				InjectFleetConfigComponentModifier(cfg.Fleet, agentInfo),
 				EndpointSignedComponentModifier(),
+				EndpointTLSComponentModifier(log),
 				InjectProxyEndpointModifier(),
 			)
 
