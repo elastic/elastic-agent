@@ -7,6 +7,8 @@ package coordinator
 import (
 	"fmt"
 
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -173,6 +175,17 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 			}
 		}
 	}
+
+	c.stateNeedsRefresh = true
+
+}
+
+// applyOTelState merges the current OTel collector state with the
+// Coordinator state and sets stateNeedsRefresh.
+// Must be called on the main Coordinator goroutine.
+func (c *Coordinator) applyOTelStatus(current *status.AggregateStatus) {
+
+	// TODO (blakerouse): Update the status information
 
 	c.stateNeedsRefresh = true
 

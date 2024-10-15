@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/otelcol"
 	"go.uber.org/zap"
@@ -18,11 +19,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
-
-// OTelState holds the current state information for the running collector.
-type OTelState struct {
-	// TODO (blakerouse): Actually collect state information.
-}
 
 // OTelManager is a manager that manages the lifecycle of the OTel collector inside of the Elastic Agent.
 type OTelManager struct {
@@ -38,15 +34,16 @@ type OTelManager struct {
 	cfgCh chan *confmap.Retrieved
 
 	// stateCh passes the state information of the collector.
-	stateCh chan OTelState
+	statusCh chan *status.AggregateStatus
 }
 
 // NewOTelManager returns a OTelManager.
 func NewOTelManager(logger *logger.Logger) *OTelManager {
 	return &OTelManager{
-		logger: logger,
-		errCh:  make(chan error),
-		cfgCh:  make(chan *confmap.Retrieved),
+		logger:   logger,
+		errCh:    make(chan error),
+		cfgCh:    make(chan *confmap.Retrieved),
+		statusCh: make(chan *status.AggregateStatus),
 	}
 }
 
@@ -76,6 +73,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				cancel = nil
 				provider = nil
 				// don't wait here for <-runErrCh, already occurred
+				m.statusCh <- nil // clear status, no longer running
 			}
 			// pass the error to the errCh so the coordinator, unless it's a cancel error
 			if !errors.Is(err, context.Canceled) {
@@ -93,7 +91,8 @@ func (m *OTelManager) Run(ctx context.Context) error {
 					cancel()
 					cancel = nil
 					provider = nil
-					<-runErrCh // wait for collector to be stopped
+					<-runErrCh        // wait for collector to be stopped
+					m.statusCh <- nil // clear status, no longer running
 				}
 				// ensure that the coordinator knows that there is no error
 				// as the collector is not running anymore
@@ -139,24 +138,31 @@ func (m *OTelManager) Update(cfg *confmap.Retrieved) {
 }
 
 // Watch returns a channel to watch for state information.
-func (m *OTelManager) Watch() <-chan OTelState {
-	return m.stateCh
+//
+// This must be called and the channel must be read from, or it will block this manager.
+func (m *OTelManager) Watch() <-chan *status.AggregateStatus {
+	return m.statusCh
 }
 
 func (m *OTelManager) startCollector(cfg *confmap.Retrieved, errCh chan error) (context.CancelFunc, *agentprovider.Provider, error) {
-	provider := agentprovider.NewProvider(cfg)
-	settings := otel.NewSettings(release.Version(), []string{provider.URI()}, provider.NewFactory())
+	ctx, cancel := context.WithCancel(context.Background())
+	ap := agentprovider.NewProvider(cfg)
+	settings := otel.NewSettings(
+		release.Version(), []string{ap.URI()},
+		otel.WithConfigProviderFactory(ap.NewFactory()),
+		otel.WithConfigConvertorFactory(NewForceExtensionConverterFactory(AgentStatusExtensionType.String())),
+		otel.WithExtensionFactory(NewAgentStatusFactory(m)))
 	settings.DisableGracefulShutdown = true // managed by this manager
 	settings.LoggingOptions = []zap.Option{zap.WrapCore(func(zapcore.Core) zapcore.Core {
 		return m.logger.Core() // use same zap as agent
 	})}
 	svc, err := otelcol.NewCollector(*settings)
 	if err != nil {
+		cancel()
 		return nil, nil, err
 	}
-	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		errCh <- svc.Run(ctx)
 	}()
-	return cancel, provider, nil
+	return cancel, ap, nil
 }

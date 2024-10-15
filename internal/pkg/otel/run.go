@@ -9,14 +9,16 @@ import (
 	"fmt"
 	"os"
 
-	"go.opentelemetry.io/collector/component"
-	"go.opentelemetry.io/collector/confmap"
-	"go.opentelemetry.io/collector/confmap/converter/expandconverter"
 	"go.opentelemetry.io/collector/confmap/provider/envprovider"
 	"go.opentelemetry.io/collector/confmap/provider/fileprovider"
 	"go.opentelemetry.io/collector/confmap/provider/httpprovider"
 	"go.opentelemetry.io/collector/confmap/provider/httpsprovider"
 	"go.opentelemetry.io/collector/confmap/provider/yamlprovider"
+	"go.opentelemetry.io/collector/extension"
+
+	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/confmap"
+	"go.opentelemetry.io/collector/confmap/converter/expandconverter"
 	"go.opentelemetry.io/collector/otelcol"
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -43,34 +45,66 @@ func Run(ctx context.Context, stop chan bool, configFiles []string) error {
 	return svc.Run(cancelCtx)
 }
 
-func NewSettings(version string, configPaths []string, providerFactories ...confmap.ProviderFactory) *otelcol.CollectorSettings {
+type options struct {
+	resolverConfigProviders    []confmap.ProviderFactory
+	resolverConverterFactories []confmap.ConverterFactory
+	extensionFactories         []extension.Factory
+}
+
+type SettingOpt func(o *options)
+
+func WithConfigProviderFactory(provider confmap.ProviderFactory) SettingOpt {
+	return func(o *options) {
+		o.resolverConfigProviders = append(o.resolverConfigProviders, provider)
+	}
+}
+
+func WithConfigConvertorFactory(converter confmap.ConverterFactory) SettingOpt {
+	return func(o *options) {
+		o.resolverConverterFactories = append(o.resolverConverterFactories, converter)
+	}
+}
+
+func WithExtensionFactory(factory extension.Factory) SettingOpt {
+	return func(o *options) {
+		o.extensionFactories = append(o.extensionFactories, factory)
+	}
+}
+
+func NewSettings(version string, configPaths []string, opts ...SettingOpt) *otelcol.CollectorSettings {
 	buildInfo := component.BuildInfo{
 		Command:     os.Args[0],
 		Description: buildDescription,
 		Version:     version,
 	}
-	if len(providerFactories) == 0 {
-		// use defaults when non provided
-		providerFactories = []confmap.ProviderFactory{
-			fileprovider.NewFactory(),
-			envprovider.NewFactory(),
-			yamlprovider.NewFactory(),
-			httpprovider.NewFactory(),
-			httpsprovider.NewFactory(),
-		}
+
+	var o options
+	for _, opt := range opts {
+		opt(&o)
 	}
+
+	providerFactories := []confmap.ProviderFactory{
+		fileprovider.NewFactory(),
+		envprovider.NewFactory(),
+		yamlprovider.NewFactory(),
+		httpprovider.NewFactory(),
+		httpsprovider.NewFactory(),
+	}
+	providerFactories = append(providerFactories, o.resolverConfigProviders...)
+	converterFactories := []confmap.ConverterFactory{
+		expandconverter.NewFactory(),
+	}
+	converterFactories = append(converterFactories, o.resolverConverterFactories...)
 	configProviderSettings := otelcol.ConfigProviderSettings{
 		ResolverSettings: confmap.ResolverSettings{
-			URIs:              configPaths,
-			ProviderFactories: providerFactories,
-			ConverterFactories: []confmap.ConverterFactory{
-				expandconverter.NewFactory(),
-			},
+			URIs:               configPaths,
+			ProviderFactories:  providerFactories,
+			ConverterFactories: converterFactories,
 		},
 	}
 
 	return &otelcol.CollectorSettings{
-		Factories:              components,
+		Factories:              components(o.extensionFactories...),
 		BuildInfo:              buildInfo,
 		ConfigProviderSettings: configProviderSettings,
 		// we're handling DisableGracefulShutdown via the cancelCtx being passed

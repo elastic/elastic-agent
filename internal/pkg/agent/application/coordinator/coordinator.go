@@ -13,6 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+
 	"go.elastic.co/apm/v2"
 	"go.opentelemetry.io/collector/confmap"
 	"gopkg.in/yaml.v2"
@@ -31,7 +33,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
-	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -132,7 +133,7 @@ type OTelManager interface {
 	Update(cfg *confmap.Retrieved)
 
 	// Watch returns the chanel to watch for configuration changes.
-	Watch() <-chan otelmanager.OTelState
+	Watch() <-chan *status.AggregateStatus
 }
 
 // ConfigChange provides an interface for receiving a new configuration.
@@ -205,7 +206,9 @@ type Coordinator struct {
 	runtimeMgr RuntimeManager
 	configMgr  ConfigManager
 	varsMgr    VarsManager
-	otelMgr    OTelManager
+
+	otelMgr OTelManager
+	otelCfg *confmap.Retrieved
 
 	caps      capabilities.Capabilities
 	modifiers []ComponentsModifier
@@ -328,7 +331,7 @@ type managerChans struct {
 	varsManagerUpdate <-chan []*transpiler.Vars
 	varsManagerError  <-chan error
 
-	otelManagerUpdate <-chan otelmanager.OTelState
+	otelManagerUpdate <-chan *status.AggregateStatus
 	otelManagerError  <-chan error
 
 	upgradeMarkerUpdate <-chan upgrade.UpdateMarker
@@ -952,6 +955,26 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 				return o
 			},
 		},
+		{
+			Name:        "otel",
+			Filename:    "otel.yaml",
+			Description: "current otel configuration used by the Elastic Agent",
+			ContentType: "application/yaml",
+			Hook: func(_ context.Context) []byte {
+				if c.otelCfg == nil {
+					return []byte("no active OTel configuration")
+				}
+				cfg, err := c.otelCfg.AsConf()
+				if err != nil {
+					return []byte(fmt.Sprintf("error: failed to convert to configuration: %v", err))
+				}
+				o, err := yaml.Marshal(cfg.ToStringMap())
+				if err != nil {
+					return []byte(fmt.Sprintf("error: failed to convert to yaml: %v", err))
+				}
+				return o
+			},
+		},
 	}
 }
 
@@ -1138,9 +1161,8 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 			c.processVars(ctx, vars)
 		}
 
-	case otelState := <-c.managerChans.otelManagerUpdate:
-		// TODO (blakerouse): Parse the state information
-		_ = otelState
+	case otelStatus := <-c.managerChans.otelManagerUpdate:
+		c.applyOTelStatus(otelStatus)
 
 	case ll := <-c.logLevelCh:
 		if ctx.Err() == nil {
@@ -1163,6 +1185,7 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 // Always called on the main Coordinator goroutine.
 func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (err error) {
 	if c.otelMgr != nil {
+		c.otelCfg = cfg.OTel
 		c.otelMgr.Update(cfg.OTel)
 	}
 	return c.processConfigAgent(ctx, cfg)
@@ -1642,6 +1665,9 @@ waitLoop:
 			}
 			if !returnedVars {
 				timeouts = append(timeouts, "no response from vars manager")
+			}
+			if !returnedOtel {
+				timeouts = append(timeouts, "no response from otel manager")
 			}
 			if !returnedUpgradeMarkerWatcher {
 				timeouts = append(timeouts, "no response from upgrade marker watcher")

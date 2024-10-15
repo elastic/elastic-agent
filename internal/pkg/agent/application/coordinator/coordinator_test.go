@@ -15,16 +15,12 @@ import (
 	"testing"
 	"time"
 
-	"go.opentelemetry.io/collector/confmap"
-
-	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
-
-	"google.golang.org/protobuf/types/known/structpb"
-
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	"go.elastic.co/apm/v2/apmtest"
+	"go.opentelemetry.io/collector/confmap"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
@@ -1111,13 +1107,13 @@ func (f *fakeVarsManager) Vars(ctx context.Context, vars []*transpiler.Vars) {
 }
 
 type fakeOTelManager struct {
-	watchCh chan otelmanager.OTelState
+	watchCh chan *status.AggregateStatus
 	errCh   chan error
 }
 
 func newFakeOTelManager() *fakeOTelManager {
 	return &fakeOTelManager{
-		watchCh: make(chan otelmanager.OTelState),
+		watchCh: make(chan *status.AggregateStatus),
 		errCh:   make(chan error),
 	}
 }
@@ -1134,7 +1130,7 @@ func (f *fakeOTelManager) Errors() <-chan error {
 func (f *fakeOTelManager) Update(_ *confmap.Retrieved) {
 }
 
-func (f *fakeOTelManager) Watch() <-chan otelmanager.OTelState {
+func (f *fakeOTelManager) Watch() <-chan *status.AggregateStatus {
 	return f.watchCh
 }
 
