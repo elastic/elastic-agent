@@ -80,12 +80,12 @@ func TestInspect(t *testing.T) {
 	var yObj struct {
 		SecretPaths []string `yaml:"secret_paths"`
 		Inputs      []struct {
-			SecretKey string `yaml:"secret_key"`
+			CustomAttr string `yaml:"custom_attr"`
 		} `yaml:"inputs"`
 	}
 	err = yaml.Unmarshal(p, &yObj)
 	require.NoError(t, err)
-	assert.ElementsMatch(t, []string{"inputs.0.secret_key"}, yObj.SecretPaths)
+	assert.ElementsMatch(t, []string{"inputs.0.custom_attr"}, yObj.SecretPaths)
 	require.Len(t, yObj.Inputs, 1)
-	assert.Equalf(t, "<REDACTED>", yObj.Inputs[0].SecretKey, "inspect output: %s", p)
+	assert.Equalf(t, "<REDACTED>", yObj.Inputs[0].CustomAttr, "inspect output: %s", p)
 }
