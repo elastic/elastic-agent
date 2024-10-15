@@ -20,7 +20,7 @@ func Run(instanceName string, imageName string, zone string) error {
 	}
 
 	imageProject := "elastic-images-prod"
-	machineType := fmt.Sprintf("zones/%s/machineTypes/n1-standard-1", zone)
+	machineType := fmt.Sprintf("zones/%s/machineTypes/n1-standard-4", zone)
 	sourceImage := fmt.Sprintf("projects/%s/global/images/%s", imageProject, imageName)
 
 	instance := &compute.Instance{
@@ -98,8 +98,15 @@ func Run(instanceName string, imageName string, zone string) error {
 
 	fmt.Printf(
 		`SSH into your instance using: 
-  gcloud compute ssh --zone "us-central1-a" "%s" --project "elastic-platform-ingest"
-	`, instanceName)
+  gcloud compute ssh --zone "%s" buildkite-agent@%s --project "elastic-platform-ingest"
+	Once you are in the instance, type "bash" to start a bash shell.
+	`, zone, instanceName)
+
+	fmt.Printf(
+		`Copy files to your instance using: 
+  gcloud compute scp --recurse --compress --zone "%s"  buildkite-agent%s:~ [your_file/your_current_dir] --project "elastic-platform-ingest"
+	TIP: Better use git on the remote machine.
+	`, zone, instanceName)
 
 	return nil
 }
