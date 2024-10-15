@@ -22,7 +22,7 @@ import (
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
+	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
