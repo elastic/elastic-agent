@@ -63,8 +63,10 @@ func makeGoTestArgs(name string) GoTestArgs {
 }
 
 func makeGoTestArgsForModule(name, module string) GoTestArgs {
-	fileName := fmt.Sprintf("build/TEST-go-%s-%s", strings.Replace(strings.ToLower(name), " ", "_", -1),
-		strings.Replace(strings.ToLower(module), " ", "_", -1))
+	fileName := fmt.Sprintf("build/TEST-go-%s-%s",
+		strings.Replace(strings.ToLower(name), " ", "_", -1),
+		strings.Replace(strings.ToLower(module), " ", "_", -1),
+	)
 	params := GoTestArgs{
 		LogName:         fmt.Sprintf("%s-%s", name, module),
 		Race:            RaceDetector,

@@ -6,7 +6,7 @@ metadata:
   name: agent-ksm-datastreams
   namespace: kube-system
   labels:
-    k8s-app: elastic-agent-standalone
+    app.kubernetes.io/name: elastic-agent-standalone
 data:
   agent.yml: |-
     outputs:

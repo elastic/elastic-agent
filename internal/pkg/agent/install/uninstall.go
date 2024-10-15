@@ -43,7 +43,7 @@ import (
 
 // fleetAudit variables control retry attempts for contacting fleet
 var (
-	fleetAuditAttempts = 10
+	fleetAuditAttempts = 5
 	fleetAuditWaitInit = time.Second
 	fleetAuditWaitMax  = time.Second * 10
 )
@@ -180,7 +180,7 @@ func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progre
 				pt.Describe(fmt.Sprintf("notify Fleet: encountered unretryable error: %v", err))
 				return err
 			}
-			pt.Describe(fmt.Sprintf("notify Fleet: network error, retry in %v.", jitterBackoff.NextWait()))
+			pt.Describe(fmt.Sprintf("notify Fleet: network error: %v (retry in %v)", err, jitterBackoff.NextWait()))
 			jitterBackoff.Wait()
 			continue
 		}
