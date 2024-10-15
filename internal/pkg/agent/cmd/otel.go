@@ -10,7 +10,6 @@ import (
 	"context"
 	goerrors "errors"
 	"os"
-	"path/filepath"
 	"sync"
 
 	"github.com/spf13/cobra"
@@ -125,18 +124,14 @@ func runCollector(cmdCtx context.Context, configFiles []string) error {
 }
 
 func prepareEnv() error {
-	if _, ok := os.LookupEnv("STORAGE_DIR"); !ok {
-		// STORAGE_DIR is not set. Set it to ${STATE_PATH}/otel_registry because we do not want to use any of the paths, that are also used by Beats or Agent
+	if _, ok := os.LookupEnv("STATE_PATH"); !ok {
+		// STATE_PATH is not set. Set it to defaultStateDirectory because we do not want to use any of the paths, that are also used by Beats or Agent
 		// because a standalone OTel collector must be able to run alongside them without issue.
 
 		// The filestorage extension will handle directory creation since create_directory: true is set by default.
-		// If the user hasn’t specified the env:STORAGE_DIR in filestorage, they may have opted for a custom path, and the extension will create the directory accordingly.
-		// In this case, setting env:STORAGE_DIR will have no effect.
-		statePath := os.Getenv("STATE_PATH")
-		if statePath == "" {
-			statePath = defaultStateDirectory
-		}
-		if err := os.Setenv("STORAGE_DIR", filepath.Join(statePath, "otel")); err != nil {
+		// If the user hasn’t specified the env:STATE_PATH in filestorage config, they may have opted for a custom path, and the extension will create the directory accordingly.
+		// In this case, setting env:STATE_PATH will have no effect.
+		if err := os.Setenv("STATE_PATH", defaultStateDirectory); err != nil {
 			return err
 		}
 	}

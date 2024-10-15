@@ -27,7 +27,7 @@ extensions:
     path: "/health/status"
   file_storage/filelogreceiver:
     create_directory: true
-    directory: ${env:STORAGE_DIR}
+    directory: ${env:STATE_PATH}
 
 service:
   extensions: [health_check, memory_limiter, file_storage/filelogreceiver]
