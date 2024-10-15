@@ -9,12 +9,6 @@ import (
 	"fmt"
 	"time"
 
-	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
-
-	"github.com/elastic/elastic-agent/pkg/features"
-	"github.com/elastic/elastic-agent/pkg/limits"
-	"github.com/elastic/elastic-agent/version"
-
 	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -30,10 +24,14 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/elastic-agent/pkg/limits"
+	"github.com/elastic/elastic-agent/version"
 )
 
 // New creates a new Agent and bootstrap the required subsystem.
