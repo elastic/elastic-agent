@@ -28,7 +28,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -47,13 +46,11 @@ func New(
 	testingMode bool,
 	fleetInitTimeout time.Duration,
 	disableMonitoring bool,
-	runAsOtel bool,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
 	err := version.InitVersionError()
-	if err != nil && !runAsOtel {
-		// ignore this error when running in otel mode
+	if err != nil {
 		// non-fatal error, log a warning and move on
 		log.With("error.message", err).Warnf("Error initializing version information: falling back to %s", release.Version())
 	}
@@ -92,13 +89,7 @@ func New(
 		log.Infof("Loading baseline config from %v", pathConfigFile)
 		rawConfig, err = config.LoadFile(pathConfigFile)
 		if err != nil {
-			if !runAsOtel {
-				return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
-			}
-
-			// initialize with empty config, configuration file is not necessary in otel mode,
-			// best effort is fine
-			rawConfig = config.New()
+			return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
 		}
 	}
 	if err := info.InjectAgentConfig(rawConfig); err != nil {
@@ -124,7 +115,6 @@ func New(
 		tracer,
 		monitor,
 		cfg.Settings.GRPC,
-		runAsOtel,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
@@ -141,9 +131,6 @@ func New(
 
 		// testing mode uses a config manager that takes configuration from over the control protocol
 		configMgr = newTestingModeConfigManager(log)
-	} else if runAsOtel {
-		// ignoring configuration in elastic-agent.yml
-		configMgr = otel.NewOtelModeConfigManager()
 	} else if configuration.IsStandalone(cfg.Fleet) {
 		log.Info("Parsed configuration and determined agent is managed locally")
 
@@ -189,13 +176,10 @@ func New(
 		}
 	}
 
-	var varsManager composable.Controller
-	if !runAsOtel {
-		// no need for vars in otel mode
-		varsManager, err = composable.New(log, rawConfig, composableManaged)
-		if err != nil {
-			return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
-		}
+	// no need for vars in otel mode
+	varsManager, err := composable.New(log, rawConfig, composableManaged)
+	if err != nil {
+		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
 	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, compModifiers...)
