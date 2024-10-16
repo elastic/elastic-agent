@@ -243,7 +243,7 @@ service:
 
 func TestOtelLogsIngestion(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Default,
+		Group: DefaultStack,
 		Local: true,
 		OS: []define.OS{
 			// input path missing on windows
@@ -335,7 +335,7 @@ func TestOtelLogsIngestion(t *testing.T) {
 
 func TestOtelAPMIngestion(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Default,
+		Group: DefaultStack,
 		Stack: &define.Stack{},
 		Local: true,
 		OS: []define.OS{

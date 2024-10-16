@@ -12,6 +12,9 @@ const (
 	// Default group.
 	Default = define.Default
 
+	// DefaultStack is a default group of tests, but also want a stack.
+	DefaultStack = "default-stack"
+
 	// Fleet group of tests. Used for testing Elastic Agent with Fleet.
 	Fleet = "fleet"
 

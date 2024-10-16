@@ -289,7 +289,7 @@ func testSecondAgentCanInstall(ctx context.Context, fixture *atesting.Fixture, b
 // TestInstallUninstallAudit will test to make sure that a fleet-managed agent can use the audit/unenroll endpoint when uninstalling itself.
 func TestInstallUninstallAudit(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Default,
+		Group: DefaultStack,
 		Stack: &define.Stack{}, // needs a fleet-server.
 		Sudo:  true,
 		Local: false,
