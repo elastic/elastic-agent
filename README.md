@@ -14,7 +14,7 @@
 See https://www.elastic.co/guide/en/fleet/current/index.html.
 
 The source files for the offical Elastic Agent documentation are currently stored
-in the [ingest-docs](https://github.com/elastic/ingest-docs/tree/main/docs/en/ingest-management) repository.
+in the [ingest-docs](https://github.com/elastic/ingest-docs/tree/8.16/docs/en/ingest-management) repository.
 
 ## Contributing
 
@@ -69,8 +69,8 @@ For details on writing and running tests see the [Test Framework Developer Guide
 
 ### Changelog
 
-The changelog for the Elastic Agent is generated and maintained using the [elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool). Read the [installation](https://github.com/elastic/elastic-agent-changelog-tool/blob/main/docs/install.md)
-and [usage](https://github.com/elastic/elastic-agent-changelog-tool/blob/main/docs/usage.md#im-a-developer) instructions to get started.
+The changelog for the Elastic Agent is generated and maintained using the [elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool). Read the [installation](https://github.com/elastic/elastic-agent-changelog-tool/blob/8.16/docs/install.md)
+and [usage](https://github.com/elastic/elastic-agent-changelog-tool/blob/8.16/docs/usage.md#im-a-developer) instructions to get started.
 
 The changelog tool produces fragement files that are consolidated to generate a changelog for each release. Each PR containing a change with user
 impact (new feature, bug fix, etc.) must contain a changelog fragement describing the change. There is a GitHub action in CI that will fail
@@ -152,7 +152,7 @@ If you are in the 7.13 branch, this will create the `docker.elastic.co/beats/ela
 elastic-package stack up --version=7.13.0-SNAPSHOT -v
 ```
 
-Please note that the docker container is built in standard, 'service', 'cloud' and 'complete' variants. The variants technical specificities can be found [here](https://github.com/elastic/elastic-agent/blob/main/dev-tools/packaging/templates/docker/Dockerfile.elastic-agent.tmpl).
+Please note that the docker container is built in standard, 'service', 'cloud' and 'complete' variants. The variants technical specificities can be found [here](https://github.com/elastic/elastic-agent/blob/8.16/dev-tools/packaging/templates/docker/Dockerfile.elastic-agent.tmpl).
 - The 'service' variant contains python libs and connectors that allows it to collect data using [search_connectors](https://www.elastic.co/guide/en/enterprise-search/current/connectors.html).
 - The 'cloud' variant is the one used for ESS deployment.
 - The 'complete' variant contains extra files, like the chromium browser, that are too large
@@ -162,10 +162,10 @@ for the standard variant which allows this docker image to run Synthetics.
 ### Testing Elastic Agent on Kubernetes
 
 #### Prerequisites
-- create kubernetes cluster using kind, check [here](https://github.com/elastic/beats/blob/main/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
-- deploy kube-state-metrics, check [here](https://github.com/elastic/beats/blob/main/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
+- create kubernetes cluster using kind, check [here](https://github.com/elastic/beats/blob/8.16/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
+- deploy kube-state-metrics, check [here](https://github.com/elastic/beats/blob/8.16/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
 - deploy required infrastructure:
-    - for elastic agent in standalone mode: EK stack or use [elastic cloud](https://cloud.elastic.co), check [here](https://github.com/elastic/beats/blob/main/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
+    - for elastic agent in standalone mode: EK stack or use [elastic cloud](https://cloud.elastic.co), check [here](https://github.com/elastic/beats/blob/8.16/metricbeat/module/kubernetes/_meta/test/docs/README.md) for details
     - for managed mode: use [elastic cloud](https://cloud.elastic.co) or bring up the stack on docker and then connect docker network with kubernetes kind nodes:
   ```
   elastic-package stack up -d -v
