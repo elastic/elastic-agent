@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -143,6 +144,12 @@ func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Inf
 	if err := req.Validate(); err != nil {
 		panic(fmt.Sprintf("test %s has invalid requirements: %s", t.Name(), err))
 	}
+
+	if len(Groups) > 0 && !slices.Contains(Groups, req.Group) {
+		t.Skip("group % not selected. Skipping")
+		return nil
+	}
+
 	if !req.Local && local {
 		t.Skip("running local only tests and this test doesn't support local")
 		return nil
