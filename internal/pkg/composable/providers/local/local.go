@@ -36,7 +36,7 @@ func (c *contextProvider) Run(ctx context.Context, comm corecomp.ContextProvider
 func ContextProviderBuilder(_ *logger.Logger, c *config.Config, _ bool) (corecomp.ContextProvider, error) {
 	p := &contextProvider{}
 	if c != nil {
-		err := c.Unpack(p)
+		err := c.UnpackTo(p)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unpack vars: %w", err)
 		}

@@ -206,7 +206,7 @@ func containerCmd(streams *cli.IOStreams) error {
 			return fmt.Errorf("parsing config file(%s): %w", f, err)
 		}
 		if c != nil {
-			err = c.Unpack(&cfg)
+			err = c.UnpackTo(&cfg)
 			if err != nil {
 				return fmt.Errorf("unpacking config file(%s): %w", f, err)
 			}
@@ -899,7 +899,7 @@ func tryContainerLoadPaths() error {
 		return fmt.Errorf("failed to load %s: %w", pathFile, err)
 	}
 	var paths containerPaths
-	err = cfg.Unpack(&paths)
+	err = cfg.UnpackTo(&paths)
 	if err != nil {
 		return fmt.Errorf("failed to unpack %s: %w", pathFile, err)
 	}
