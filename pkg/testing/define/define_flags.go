@@ -1,9 +1,6 @@
 package define
 
 import (
-	"fmt"
-	"sync"
-
 	"github.com/spf13/pflag"
 )
 
