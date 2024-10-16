@@ -5,7 +5,8 @@
 set -euo pipefail
 set -x # for debugging
 
-MERGED_COV_FILE="TEST-go-unit.cov"
+mkdir -p build
+MERGED_COV_FILE="build/TEST-go-unit.cov"
 
 go install github.com/wadey/gocovmerge@latest
 
