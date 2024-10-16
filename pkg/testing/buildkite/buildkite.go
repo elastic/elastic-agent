@@ -186,7 +186,7 @@ func getAgent(os common.SupportedOS) (StepAgent, error) {
 
 func getCommand(b common.OSBatch) string {
 	if b.OS.Type == define.Linux {
-		return "mage integration:testOnRemote"
+		return ".buildkite/scripts/steps/integration_upload_run.sh"
 	}
 	return "TODO"
 }
