@@ -6,10 +6,9 @@ import (
 	"testing"
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
-	"github.com/spf13/pflag"
 )
 
-var flagSet = pflag.CommandLine
+var flagSet = flag.CommandLine
 
 func init() {
 	define.RegisterFlags("integration.", flagSet)
@@ -17,7 +16,7 @@ func init() {
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-
+	define.ParseFlags()
 	runExitCode := m.Run()
 
 	if define.DryRun {
