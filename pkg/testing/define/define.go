@@ -146,7 +146,7 @@ func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Inf
 	}
 
 	if len(Groups) > 0 && !slices.Contains(Groups, req.Group) {
-		t.Skip("group % not selected. Skipping")
+		t.Skipf("group %s not found in %s. Skipping", req.Group, Groups)
 		return nil
 	}
 
@@ -180,6 +180,11 @@ func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Inf
 		t.Skipf("platform: %s, architecture: %s, version: %s, and distro: %s combination is not supported by test.  required: %v", runtime.GOOS, runtime.GOARCH, osInfo.Version, osInfo.Platform, req.OS)
 		return nil
 	}
+
+	if DryRun {
+		return dryRun(t, req)
+	}
+
 	namespace, err := getNamespace(t, local)
 	if err != nil {
 		panic(err)
