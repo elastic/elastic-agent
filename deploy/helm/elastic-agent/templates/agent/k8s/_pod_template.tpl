@@ -15,7 +15,11 @@
       nodeSelector:
         {{- . | toYaml | nindent 8 }}
       {{- end }}
+      {{- if eq ($presetVal).serviceAccount.create true }}
       serviceAccountName: {{ $agentName }}
+      {{- else }}
+      serviceAccountName: {{ ($presetVal).serviceAccount.name }}
+      {{- end }}
       {{- with ($presetVal).affinity }}
       affinity:
         {{- . | toYaml | nindent 8 }}
