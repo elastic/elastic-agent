@@ -12,9 +12,6 @@ import (
 )
 
 func defineAction(t *testing.T, req Requirements) *Info {
-	if DryRun {
-		return dryRun(t, req)
-	}
 	return runOrSkip(t, req, false, false)
 }
 
