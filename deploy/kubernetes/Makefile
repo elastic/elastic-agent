@@ -91,6 +91,7 @@ else
 		--body "Automated by ${BUILDKITE_BUILD_URL}" \
 		--label automation \
 		--label release_note:skip \
+		--label backport:skip \
 		--base main \
 		--head $(ELASTIC_AGENT_BRANCH)
 endif
