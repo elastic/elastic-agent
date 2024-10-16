@@ -1,17 +1,33 @@
 package define
 
 import (
-	"github.com/spf13/pflag"
+	"flag"
+	"strings"
 )
 
 var (
 	DryRun    bool
 	Groups    []string
 	Platforms []string
+
+	groupStringFlag    *string
+	platformStringFlag *string
 )
 
-func RegisterFlags(prefix string, set *pflag.FlagSet) {
+func RegisterFlags(prefix string, set *flag.FlagSet) {
 	set.BoolVar(&DryRun, prefix+"dry-run", false, "Forces test in dry-run mode: drops platform/group/sudo requirements")
-	set.StringArrayVar(&Groups, prefix+"groups", nil, "test groups")
-	set.StringArrayVar(&Platforms, prefix+"plarforms", nil, "test platforms")
+	groupStringFlag = set.String(prefix+"groups", "", "test groups, comma-separated")
+	platformStringFlag = set.String(prefix+"plarforms", "", "test platforms, comma-separated")
+}
+
+func ParseFlags() {
+	Groups = splitStringToArray(groupStringFlag)
+	Platforms = splitStringToArray(platformStringFlag)
+}
+
+func splitStringToArray(stringFlag *string) []string {
+	if stringFlag == nil {
+		return nil
+	}
+	return strings.Split(*stringFlag, ",")
 }
