@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
+
 package define
 
 import (
@@ -5,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"testing"
 )
 
 var (
@@ -28,7 +33,21 @@ func ParseFlags() {
 }
 
 func splitStringToArray(stringFlag string) []string {
-	trimmed := strings.Trim(stringFlag, " ")
-	fmt.Fprintf(os.Stderr, "Splitting %q...", trimmed)
-	return strings.Split(trimmed, ",")
+	if stringFlag == "" {
+		return nil
+	}
+	fmt.Fprintf(os.Stderr, "Splitting %q...", stringFlag)
+	return strings.Split(stringFlag, ",")
+}
+
+func dryRun(t *testing.T, req Requirements) *Info {
+	// always validate requirement is valid
+	if err := req.Validate(); err != nil {
+		t.Logf("test %s has invalid requirements: %s", t.Name(), err)
+		t.FailNow()
+		return nil
+	}
+	// skip the test as we are in dry run
+	t.Skip(fmt.Sprintf("Skipped because dry-run mode has been specified."))
+	return nil
 }
