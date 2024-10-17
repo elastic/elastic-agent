@@ -32,7 +32,9 @@ func ParseFlags() {
 }
 
 func splitStringToArray(stringFlag string) []string {
-	trimmed := strings.Trim(stringFlag, " ")
-	fmt.Fprintf(os.Stderr, "Splitting %q...", trimmed)
-	return strings.Split(trimmed, ",")
+	if stringFlag == "" {
+		return nil
+	}
+	fmt.Fprintf(os.Stderr, "Splitting %q...", stringFlag)
+	return strings.Split(stringFlag, ",")
 }
