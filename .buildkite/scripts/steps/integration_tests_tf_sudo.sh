@@ -10,11 +10,11 @@ if [ -z "$GROUP_NAME" ]; then
   echo "Error: Specify the group name: sudo-integration-tests.sh [group_name] [tests_to_run]" >&2
   exit 1
 fi
-TESTS_TO_RUN=$2
-if [ -z "$TESTS_TO_RUN" ]; then
-  echo "Error: Specify the tests to run: sudo-integration-tests.sh [group_name] [tests_to_run]" >&2
-  exit 1
-fi
+# TESTS_TO_RUN=$2
+# if [ -z "$TESTS_TO_RUN" ]; then
+#   echo "Error: Specify the tests to run: sudo-integration-tests.sh [group_name] [tests_to_run]" >&2
+#   exit 1
+# fi
 
 # Override the agent package version using a string with format <major>.<minor>.<patch>
 # There is a time when the snapshot is not built yet, so we cannot use the latest version automatically
