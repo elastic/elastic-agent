@@ -5,7 +5,7 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   ASDF_MAGE_VERSION: 1.14.0
   ASDF_GOLANG_VERSION: 1.22.6
-  ASDF_TERRAFORM_VERSION: 1.9.3
+  ASDF_TERRAFORM_VERSION: 1.9.2
 
 steps:
   - label: "Integration tests: packaging"
