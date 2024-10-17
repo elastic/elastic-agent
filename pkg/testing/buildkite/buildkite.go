@@ -19,7 +19,7 @@ import (
 const (
 	defaultProvider         = "gcp"
 	defaultImageProject     = "elastic-images-qa"
-	defaultAMD64MachineType = "n1-standard-8"
+	defaultAMD64MachineType = "e2-standard-8"
 	defaultARM64MachineType = "t2a-standard-8"
 )
 
