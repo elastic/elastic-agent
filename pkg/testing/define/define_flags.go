@@ -2,6 +2,8 @@ package define
 
 import (
 	"flag"
+	"fmt"
+	"os"
 	"strings"
 )
 
@@ -10,14 +12,14 @@ var (
 	Groups    []string
 	Platforms []string
 
-	groupStringFlag    *string
-	platformStringFlag *string
+	groupStringFlag    string
+	platformStringFlag string
 )
 
 func RegisterFlags(prefix string, set *flag.FlagSet) {
 	set.BoolVar(&DryRun, prefix+"dry-run", false, "Forces test in dry-run mode: drops platform/group/sudo requirements")
-	groupStringFlag = set.String(prefix+"groups", "", "test groups, comma-separated")
-	platformStringFlag = set.String(prefix+"plarforms", "", "test platforms, comma-separated")
+	set.StringVar(&groupStringFlag, prefix+"groups", "", "test groups, comma-separated")
+	set.StringVar(&platformStringFlag, prefix+"platforms", "", "test platforms, comma-separated")
 }
 
 func ParseFlags() {
@@ -25,9 +27,8 @@ func ParseFlags() {
 	Platforms = splitStringToArray(platformStringFlag)
 }
 
-func splitStringToArray(stringFlag *string) []string {
-	if stringFlag == nil {
-		return nil
-	}
-	return strings.Split(*stringFlag, ",")
+func splitStringToArray(stringFlag string) []string {
+	trimmed := strings.Trim(stringFlag, " ")
+	fmt.Fprintf(os.Stderr, "Splitting %q...", trimmed)
+	return strings.Split(trimmed, ",")
 }
