@@ -19,7 +19,7 @@ import (
 const (
 	defaultProvider         = "gcp"
 	defaultImageProject     = "elastic-images-qa"
-	defaultAMD64MachineType = "n1-standard-8"
+	defaultAMD64MachineType = "e2-standard-8"
 	defaultARM64MachineType = "t2a-standard-8"
 )
 
@@ -186,7 +186,7 @@ func getAgent(os common.SupportedOS) (StepAgent, error) {
 
 func getCommand(b common.OSBatch) string {
 	if b.OS.Type == define.Linux {
-		return "mage integration:testOnRemote"
+		return ".buildkite/scripts/steps/integration_upload_run.sh"
 	}
 	return "TODO"
 }
