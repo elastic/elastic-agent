@@ -14,7 +14,7 @@ The DaemonSet collectors handle the following data:
 
 - Host Metrics: Collects host metrics (hostmetrics receiver) specific to each node.
 - Kubernetes Metrics: Captures metrics related to the Kubernetes infrastructure on each node.
-- Logs: Utilizes a filelog receiver to gather logs from all Pods running on the respective node.
+- Logs: Utilizes [filelog receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/filelogreceiver) to gather logs from all Pods running on the respective node.
 - OTLP Traces: Utilizes [Otlp receiver]( https://github.com/open-telemetry/opentelemetry-collector/blob/main/receiver/otlpreceiver/README.md) which configures both HTTP and GRPC endpoints on the node to receive OTLP trace data.
 
 ### Deployment collector
