@@ -11,11 +11,11 @@ import (
 // OSBatch defines the mapping between a SupportedOS and a define.Batch.
 type OSBatch struct {
 	// ID is the unique ID for the batch.
-	ID string
+	ID string `yaml:"id"`
 	// LayoutOS provides all the OS information to create an instance.
-	OS SupportedOS
+	OS SupportedOS `yaml:"os"`
 	// Batch defines the batch of tests to run on this layout.
-	Batch define.Batch
+	Batch define.Batch `yaml:"batch"`
 	// Skip defines if this batch will be skipped because no supported layout exists yet.
-	Skip bool
+	Skip bool `yaml:"skip,omitempty"`
 }
