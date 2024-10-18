@@ -479,7 +479,7 @@ require (
 replace (
 	github.com/Shopify/sarama => github.com/elastic/sarama v1.19.1-0.20220310193331-ebc2b0d8eef3
 
-	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter => github.com/carsonip/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.94.1-0.20241018065606-86e80087a522
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter => github.com/carsonip/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.94.1-0.20241018084159-ae9f8a3e4dcb
 	// openshift removed all tags from their repo, use the pseudoversion from the release-3.9 branch HEAD
 	// See https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/12d41f40b0d408b0167633d8095160d3343d46ac/go.mod#L38
 	github.com/openshift/api v3.9.0+incompatible => github.com/openshift/api v0.0.0-20180801171038-322a19404e37
