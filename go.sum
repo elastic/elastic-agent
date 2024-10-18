@@ -167,8 +167,8 @@ github.com/bugsnag/osext v0.0.0-20130617224835-0dd3f918b21b h1:otBG+dV+YK+Soembj
 github.com/bugsnag/osext v0.0.0-20130617224835-0dd3f918b21b/go.mod h1:obH5gd0BsqsP2LwDJ9aOkm/6J86V6lyAXCoQWGw3K50=
 github.com/bugsnag/panicwrap v0.0.0-20151223152923-e2c28503fcd0 h1:nvj0OLI3YqYXer/kZD8Ri1aaunCxIEsOst1BVJswV0o=
 github.com/bugsnag/panicwrap v0.0.0-20151223152923-e2c28503fcd0/go.mod h1:D/8v3kj0zr8ZAKg1AQ6crr+5VwKN5eIywRkfhyM/+dE=
-github.com/carsonip/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.94.1-0.20241018060219-f20e1a6915c4 h1:VJxusmJ7/pxrxni2b0kzJVtSk+Vwge9VtO5F6aOWjsQ=
-github.com/carsonip/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.94.1-0.20241018060219-f20e1a6915c4/go.mod h1:A/Va6YLk3LaorgO+Mh3JKbUZZjFKY5NlEJBih9NQ49A=
+github.com/carsonip/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.94.1-0.20241018065606-86e80087a522 h1:JMddUOjPN9E+UGNL84tS+B9zvv+B29jTCQcASCNOqE8=
+github.com/carsonip/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.94.1-0.20241018065606-86e80087a522/go.mod h1:A/Va6YLk3LaorgO+Mh3JKbUZZjFKY5NlEJBih9NQ49A=
 github.com/cavaliergopher/rpm v1.2.0 h1:s0h+QeVK252QFTolkhGiMeQ1f+tMeIMhGl8B1HUmGUc=
 github.com/cavaliergopher/rpm v1.2.0/go.mod h1:R0q3vTqa7RUvPofAZYrnjJ63hh2vngjFfphuXiExVos=
 github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
