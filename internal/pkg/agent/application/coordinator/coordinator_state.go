@@ -7,6 +7,8 @@ package coordinator
 import (
 	"fmt"
 
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -67,6 +69,13 @@ func (c *Coordinator) SetUpgradeDetails(upgradeDetails *details.Details) {
 // Called on the main Coordinator goroutine.
 func (c *Coordinator) setRuntimeUpdateError(err error) {
 	c.runtimeUpdateErr = err
+	c.stateNeedsRefresh = true
+}
+
+// setOTelError reports a failed error for otel manager.
+// Called on the main Coordinator goroutine.
+func (c *Coordinator) setOTelError(err error) {
+	c.otelErr = err
 	c.stateNeedsRefresh = true
 }
 
@@ -171,6 +180,17 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 
 }
 
+// applyOTelState merges the current OTel collector state with the
+// Coordinator state and sets stateNeedsRefresh.
+// Must be called on the main Coordinator goroutine.
+func (c *Coordinator) applyOTelStatus(current *status.AggregateStatus) {
+
+	// TODO (blakerouse): Update the status information
+
+	c.stateNeedsRefresh = true
+
+}
+
 // generateReportableState aggregates the internal state of the Coordinator
 // and its subcomponents for external listeners. The returned state will be
 // healthy only if the internal coordinator state.State is healthy and all
@@ -204,6 +224,9 @@ func (c *Coordinator) generateReportableState() (s State) {
 	} else if c.runtimeUpdateErr != nil {
 		s.State = agentclient.Failed
 		s.Message = fmt.Sprintf("Runtime update failed: %s", c.runtimeUpdateErr.Error())
+	} else if c.otelErr != nil {
+		s.State = agentclient.Failed
+		s.Message = fmt.Sprintf("OTel manager failed: %s", c.otelErr.Error())
 	} else if c.configMgrErr != nil {
 		s.State = agentclient.Failed
 		s.Message = fmt.Sprintf("Config manager: %s", c.configMgrErr.Error())

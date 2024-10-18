@@ -15,12 +15,12 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/protobuf/types/known/structpb"
-
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	"go.elastic.co/apm/v2/apmtest"
+	"go.opentelemetry.io/collector/confmap"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
@@ -633,7 +633,7 @@ func TestCoordinator_StateSubscribeIsolatedUnits(t *testing.T) {
 }
 
 func TestCollectManagerErrorsTimeout(t *testing.T) {
-	handlerChan, _, _, _, _ := setupManagerShutdownChannels(time.Millisecond)
+	handlerChan, _, _, _, _, _ := setupManagerShutdownChannels(time.Millisecond)
 	// Don't send anything to the shutdown channels, causing a timeout
 	// in collectManagerErrors
 	waitAndTestError(t, func(err error) bool {
@@ -643,7 +643,7 @@ func TestCollectManagerErrorsTimeout(t *testing.T) {
 }
 
 func TestCollectManagerErrorsOneResponse(t *testing.T) {
-	handlerChan, _, _, config, _ := setupManagerShutdownChannels(10 * time.Millisecond)
+	handlerChan, _, _, config, _, _ := setupManagerShutdownChannels(10 * time.Millisecond)
 
 	// Send an error for the config manager -- we should also get a
 	// timeout error since we don't send anything on the other two channels.
@@ -658,28 +658,32 @@ func TestCollectManagerErrorsOneResponse(t *testing.T) {
 }
 
 func TestCollectManagerErrorsAllResponses(t *testing.T) {
-	handlerChan, runtime, varWatcher, config, upgradeMarkerWatcher := setupManagerShutdownChannels(5 * time.Second)
+	handlerChan, runtime, varWatcher, config, otel, upgradeMarkerWatcher := setupManagerShutdownChannels(5 * time.Second)
 	runtimeErrStr := "runtime error"
 	varsErrStr := "vars error"
+	otelErrStr := "otel error"
 	upgradeMarkerWatcherErrStr := "upgrade marker watcher error"
 	runtime <- errors.New(runtimeErrStr)
 	varWatcher <- errors.New(varsErrStr)
 	config <- nil
+	otel <- errors.New(otelErrStr)
 	upgradeMarkerWatcher <- errors.New(upgradeMarkerWatcherErrStr)
 
 	waitAndTestError(t, func(err error) bool {
 		return err != nil &&
 			strings.Contains(err.Error(), runtimeErrStr) &&
 			strings.Contains(err.Error(), varsErrStr) &&
+			strings.Contains(err.Error(), otelErrStr) &&
 			strings.Contains(err.Error(), upgradeMarkerWatcherErrStr)
 	}, handlerChan)
 }
 
 func TestCollectManagerErrorsAllResponsesNoErrors(t *testing.T) {
-	handlerChan, runtime, varWatcher, config, upgradeMarkerWatcher := setupManagerShutdownChannels(5 * time.Second)
+	handlerChan, runtime, varWatcher, config, otel, upgradeMarkerWatcher := setupManagerShutdownChannels(5 * time.Second)
 	runtime <- nil
 	varWatcher <- nil
 	config <- context.Canceled
+	otel <- nil
 	upgradeMarkerWatcher <- nil
 
 	// All errors are nil or context.Canceled, so collectManagerErrors
@@ -710,19 +714,20 @@ func waitAndTestError(t *testing.T, check func(error) bool, handlerErr chan erro
 	}
 }
 
-func setupManagerShutdownChannels(timeout time.Duration) (chan error, chan error, chan error, chan error, chan error) {
+func setupManagerShutdownChannels(timeout time.Duration) (chan error, chan error, chan error, chan error, chan error, chan error) {
 	runtime := make(chan error)
 	varWatcher := make(chan error)
 	config := make(chan error)
+	otelWatcher := make(chan error)
 	upgradeMarkerWatcher := make(chan error)
 
 	handlerChan := make(chan error)
 	go func() {
-		handlerErr := collectManagerErrors(timeout, varWatcher, runtime, config, upgradeMarkerWatcher)
+		handlerErr := collectManagerErrors(timeout, varWatcher, runtime, config, otelWatcher, upgradeMarkerWatcher)
 		handlerChan <- handlerErr
 	}()
 
-	return handlerChan, runtime, varWatcher, config, upgradeMarkerWatcher
+	return handlerChan, runtime, varWatcher, config, otelWatcher, upgradeMarkerWatcher
 }
 
 func TestCoordinator_ReExec(t *testing.T) {
@@ -903,13 +908,14 @@ func createCoordinator(t *testing.T, ctx context.Context, opts ...CoordinatorOpt
 
 	cfgMgr := newFakeConfigManager()
 	varsMgr := newFakeVarsManager()
+	otelMgr := newFakeOTelManager()
 
 	upgradeManager := o.upgradeManager
 	if upgradeManager == nil {
 		upgradeManager = &fakeUpgradeManager{}
 	}
 
-	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed)
+	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelMgr)
 	return coord, cfgMgr, varsMgr
 }
 
@@ -1098,6 +1104,34 @@ func (f *fakeVarsManager) Vars(ctx context.Context, vars []*transpiler.Vars) {
 	case <-ctx.Done():
 	case f.varsCh <- vars:
 	}
+}
+
+type fakeOTelManager struct {
+	watchCh chan *status.AggregateStatus
+	errCh   chan error
+}
+
+func newFakeOTelManager() *fakeOTelManager {
+	return &fakeOTelManager{
+		watchCh: make(chan *status.AggregateStatus),
+		errCh:   make(chan error),
+	}
+}
+
+func (f *fakeOTelManager) Run(ctx context.Context) error {
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func (f *fakeOTelManager) Errors() <-chan error {
+	return f.errCh
+}
+
+func (f *fakeOTelManager) Update(_ *confmap.Retrieved) {
+}
+
+func (f *fakeOTelManager) Watch() <-chan *status.AggregateStatus {
+	return f.watchCh
 }
 
 // An implementation of the RuntimeManager interface for use in testing.

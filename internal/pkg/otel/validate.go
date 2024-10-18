@@ -2,8 +2,6 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build !windows
-
 package otel
 
 import (
@@ -15,15 +13,10 @@ import (
 )
 
 func Validate(ctx context.Context, configPaths []string) error {
-	settings, err := newSettings(release.Version(), configPaths)
-	if err != nil {
-		return err
-	}
-
+	settings := NewSettings(release.Version(), configPaths)
 	col, err := otelcol.NewCollector(*settings)
 	if err != nil {
 		return err
 	}
 	return col.DryRun(ctx)
-
 }

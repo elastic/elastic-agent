@@ -110,7 +110,7 @@ func TestUpgradeHandler(t *testing.T) {
 				return nil, nil
 			},
 		},
-		nil, nil, nil, nil, nil, false)
+		nil, nil, nil, nil, nil, false, nil)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 
@@ -169,7 +169,7 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 				return nil, err
 			},
 		},
-		nil, nil, nil, nil, nil, false)
+		nil, nil, nil, nil, nil, false, nil)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 
@@ -230,7 +230,7 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 				return nil, nil
 			},
 		},
-		nil, nil, nil, nil, nil, false)
+		nil, nil, nil, nil, nil, false, nil)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 
