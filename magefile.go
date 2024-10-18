@@ -32,6 +32,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/testing/supported"
+
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/otiai10/copy"
 
@@ -2552,19 +2554,19 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 	return nil
 }
 
-func (Integration) Buildkite() error {
+func getSupportedBatches(matrix bool) ([]tcommon.OSBatch, tcommon.Config, error) {
 	goTestFlags := os.Getenv("GOTEST_FLAGS")
 	batches, err := define.DetermineBatches("testing/integration", goTestFlags, "integration")
 	if err != nil {
-		return fmt.Errorf("failed to determine batches: %w", err)
+		return nil, tcommon.Config{}, fmt.Errorf("failed to determine batches: %w", err)
 	}
 	agentVersion, agentStackVersion, err := getTestRunnerVersions()
 	if err != nil {
-		return fmt.Errorf("failed to get agent versions: %w", err)
+		return nil, tcommon.Config{}, fmt.Errorf("failed to get agent versions: %w", err)
 	}
 	goVersion, err := mage.DefaultBeatBuildVariableSources.GetGoVersion()
 	if err != nil {
-		return fmt.Errorf("failed to get go versions: %w", err)
+		return nil, tcommon.Config{}, fmt.Errorf("failed to get go versions: %w", err)
 	}
 
 	cfg := tcommon.Config{
@@ -2574,9 +2576,76 @@ func (Integration) Buildkite() error {
 		Platforms:    testPlatforms(),
 		Packages:     testPackages(),
 		Groups:       testGroups(),
-		Matrix:       false,
+		Matrix:       matrix,
 		VerboseMode:  mg.Verbose(),
 		TestFlags:    goTestFlags,
+	}
+
+	platforms, err := cfg.GetPlatforms()
+	if err != nil {
+		return nil, cfg, err
+	}
+	osBatches, err := supported.CreateBatches(batches, platforms, cfg.Groups, cfg.Matrix, cfg.SingleTest)
+	if err != nil {
+		return nil, cfg, err
+	}
+
+	return osBatches, cfg, nil
+}
+
+func writeBreakdown(matrix bool) error {
+	batches, cfg, err := getSupportedBatches(matrix)
+	if err != nil {
+		return err
+	}
+
+	// cleanup OS duplicate information no longer needed as it
+	// was used to create the OSBatch, but no longer needed in this
+	// representation
+	for i, batch := range batches {
+		batch.Batch.OS = define.OS{}
+		if batch.Batch.Stack != nil {
+			batch.Batch.Stack.Version = cfg.StackVersion
+		}
+		batches[i] = batch
+	}
+
+	data, err := yaml.Marshal(batches)
+	if err != nil {
+		return err
+	}
+
+	// write output to tests.yaml
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("error getting current working directory: %w", err)
+	}
+	ymlFilePath := filepath.Join(cwd, "tests.yml")
+	file, err := os.Create(ymlFilePath)
+	if err != nil {
+		return fmt.Errorf("error creating file: %w", err)
+	}
+	defer file.Close()
+	if _, err := file.Write(data); err != nil {
+		return fmt.Errorf("error writing to file: %w", err)
+	}
+
+	fmt.Printf(">>> Generated breakdown steps written to: %s\n", ymlFilePath)
+	return nil
+}
+
+func (Integration) Breakdown() error {
+	return writeBreakdown(false)
+}
+
+func (Integration) BreakdownMatrix() error {
+	return writeBreakdown(true)
+}
+
+func writeBuildkite(matrix bool) error {
+	batches, cfg, err := getSupportedBatches(matrix)
+	if err != nil {
+		return err
 	}
 
 	steps, err := buildkite.GenerateSteps(cfg, batches...)
@@ -2601,6 +2670,14 @@ func (Integration) Buildkite() error {
 
 	fmt.Printf(">>> Generated buildkite steps written to: %s\n", ymlFilePath)
 	return nil
+}
+
+func (Integration) Buildkite() error {
+	return writeBuildkite(false)
+}
+
+func (Integration) BuildkiteMatrix() error {
+	return writeBuildkite(true)
 }
 
 func integRunner(ctx context.Context, matrix bool, singleTest string) error {

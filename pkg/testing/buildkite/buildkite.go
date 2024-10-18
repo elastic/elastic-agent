@@ -13,7 +13,6 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
-	"github.com/elastic/elastic-agent/pkg/testing/supported"
 )
 
 const (
@@ -201,23 +200,13 @@ func shouldSkip(os common.SupportedOS) bool {
 }
 
 // GenerateSteps returns a computed set of steps to run the integration tests on buildkite.
-func GenerateSteps(cfg common.Config, batches ...define.Batch) (string, error) {
+func GenerateSteps(cfg common.Config, batches ...common.OSBatch) (string, error) {
 	stackSteps := map[string]Step{}
 	stackTeardown := map[string][]string{}
 	var steps []Step
 
-	// create the supported batches first
-	platforms, err := cfg.GetPlatforms()
-	if err != nil {
-		return "", err
-	}
-	osBatches, err := supported.CreateBatches(batches, platforms, cfg.Groups, cfg.Matrix, cfg.SingleTest)
-	if err != nil {
-		return "", err
-	}
-
 	// create the stack steps first
-	for _, lb := range osBatches {
+	for _, lb := range batches {
 		if !lb.Skip && lb.Batch.Stack != nil {
 			if lb.Batch.Stack.Version == "" {
 				// no version defined on the stack; set it to the defined stack version
@@ -241,7 +230,7 @@ func GenerateSteps(cfg common.Config, batches ...define.Batch) (string, error) {
 	}
 
 	// generate the steps for the tests
-	for _, lb := range osBatches {
+	for _, lb := range batches {
 		if lb.Skip {
 			continue
 		}

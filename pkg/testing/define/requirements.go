@@ -40,24 +40,24 @@ type OS struct {
 	//
 	// This is always required to be defined on the OS structure.
 	// If it is not defined the test runner will error.
-	Type string `json:"type"`
+	Type string `json:"type,omitempty" yaml:"type,omitempty"`
 	// Arch is the architecture type (amd64 or arm64).
 	//
 	// In the case that it's not provided the test will run on every
 	// architecture that is supported.
-	Arch string `json:"arch"`
+	Arch string `json:"arch,omitempty" yaml:"arch,omitempty"`
 	// Version is a specific version of the OS type to run this test on
 	//
 	// When defined the test runs on this specific version only. When not
 	// defined the test is run on a selected version for this operating system.
-	Version string `json:"version"`
+	Version string `json:"version,omitempty" yaml:"version,omitempty"`
 	// Distro allows in the Linux case for a specific distribution to be
 	// selected for running on. Example would be "ubuntu". In the Kubernetes case
 	// for a specific distribution of kubernetes. Example would be "kind".
-	Distro string `json:"distro"`
+	Distro string `json:"distro,omitempty" yaml:"distro,omitempty"`
 	// DockerVariant allows in the Kubernetes case for a specific variant to
 	// be selected for running with. Example would be "wolfi".
-	DockerVariant string `json:"docker_variant"`
+	DockerVariant string `json:"docker_variant,omitempty" yaml:"docker_variant,omitempty"`
 }
 
 // Validate returns an error if not valid.
@@ -91,7 +91,7 @@ type Stack struct {
 	//
 	// In the case that no version is provided the same version being used for
 	// the current test execution is used.
-	Version string `json:"version"`
+	Version string `json:"version" yaml:"version"`
 }
 
 // Requirements defines the testing requirements for the test to run.
