@@ -38,11 +38,10 @@ steps:
       # - package-it
       - integration-ess
     steps:
-      - label: "Default"
-        key: stateful-ubuntu-default-sudo
+      - label: "Group: {{matrix}}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it' --build "01928ad3-fc0a-45de-81d5-0bfb1fdc0caa"
-          .buildkite/scripts/steps/integration_tests_tf_sudo.sh "default"
+          .buildkite/scripts/steps/integration_tests_tf_sudo.sh "{{matrix}}"
         artifact_paths:
           - build/**
         agents:
@@ -50,6 +49,15 @@ steps:
           imageProject: elastic-images-qa
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-ubuntu-2204"
+        matrix:
+          - default
+          - upgrade
+          - fleet
+          - fqdn
+          - deb
+          - fleet-airgapped
+          - fleet-privileged
+          - fleet-airgapped-privileged
 
       # - label: "Upgrade"
       #   key: stateful-ubuntu-upgrade-sudo
