@@ -73,8 +73,6 @@ func Run(instanceName string, imageName string, zone string) error {
 	retriesLimit := 24
 	retryCount := 0
 	for {
-		time.Sleep(5 * time.Second)
-
 		op, err = computeService.ZoneOperations.Get(projectID, zone, op.Name).Context(ctx).Do()
 		if err != nil {
 			log.Fatalf("Failed to get operation status: %v", err)
@@ -89,6 +87,7 @@ func Run(instanceName string, imageName string, zone string) error {
 		if retryCount == retriesLimit {
 			log.Fatalf("Instance creation failed after %d retries", retriesLimit)
 		}
+		time.Sleep(5 * time.Second)
 		retryCount++
 	}
 
