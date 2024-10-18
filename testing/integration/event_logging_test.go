@@ -70,7 +70,7 @@ agent.grpc:
 
 func TestEventLogFile(t *testing.T) {
 	_ = define.Require(t, define.Requirements{
-		Group: Default,
+		Group: DefaultStack,
 		Stack: &define.Stack{},
 		Local: true,
 		Sudo:  false,
