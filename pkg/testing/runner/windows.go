@@ -38,13 +38,17 @@ func (WindowsRunner) Prepare(ctx context.Context, sshClient SSHClient, logger Lo
 
 	// install curl
 	logger.Logf("Installing curl")
-	stdOut, errOut, err = sshClient.Exec(ctx, "choco", []string{"install", "-y", "curl"}, nil)
+	curlCtx, curlCancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer curlCancel()
+	stdOut, errOut, err = sshClient.ExecWithRetry(curlCtx, "choco", []string{"install", "-y", "curl"}, 15*time.Second)
 	if err != nil {
 		return fmt.Errorf("failed to install curl: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
 	// install make
 	logger.Logf("Installing make")
-	stdOut, errOut, err = sshClient.Exec(ctx, "choco", []string{"install", "-y", "make"}, nil)
+	makeCtx, makeCancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer makeCancel()
+	stdOut, errOut, err = sshClient.ExecWithRetry(makeCtx, "choco", []string{"install", "-y", "make"}, 15*time.Second)
 	if err != nil {
 		return fmt.Errorf("failed to install make: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
@@ -53,7 +57,9 @@ func (WindowsRunner) Prepare(ctx context.Context, sshClient SSHClient, logger Lo
 	logger.Logf("Installing golang %s (%s)", goVersion, arch)
 	downloadURL := fmt.Sprintf("https://go.dev/dl/go%s.windows-%s.msi", goVersion, arch)
 	filename := path.Base(downloadURL)
-	stdOut, errOut, err = sshClient.Exec(ctx, "curl", []string{"-Ls", downloadURL, "--output", filename}, nil)
+	goCtx, goCancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer goCancel()
+	stdOut, errOut, err = sshClient.ExecWithRetry(goCtx, "curl", []string{"-Ls", downloadURL, "--output", filename}, 15*time.Second)
 	if err != nil {
 		return fmt.Errorf("failed to download go from %s with curl: %w (stdout: %s, stderr: %s)", downloadURL, err, stdOut, errOut)
 	}
