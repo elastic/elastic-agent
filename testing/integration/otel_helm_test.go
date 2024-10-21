@@ -17,7 +17,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/stretchr/testify/require"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
@@ -25,6 +24,8 @@ import (
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
 var (
@@ -44,6 +45,14 @@ func TestOtelKubeStackHelm(t *testing.T) {
 		},
 		Group: define.Kubernetes,
 	})
+
+	agentImage := os.Getenv("AGENT_IMAGE")
+	require.NotEmpty(t, agentImage, "AGENT_IMAGE must be set")
+
+	agentImageParts := strings.SplitN(agentImage, ":", 2)
+	require.Len(t, agentImageParts, 2, "AGENT_IMAGE must be in the form '<repository>:<version>'")
+	agentImageRepo := agentImageParts[0]
+	agentImageTag := agentImageParts[1]
 
 	client, err := info.KubeClient()
 	require.NoError(t, err)
@@ -113,6 +122,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 
 			options := values.Options{
 				ValueFiles: []string{tc.valuesFile},
+				Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", agentImageTag)},
 			}
 			providers := getter.All(settings)
 			helmValues, err = options.MergeValues(providers)
