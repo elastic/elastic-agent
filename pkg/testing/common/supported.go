@@ -8,8 +8,8 @@ import "github.com/elastic/elastic-agent/pkg/testing/define"
 
 // SupportedOS maps a OS definition to a OSRunner.
 type SupportedOS struct {
-	define.OS
+	define.OS `yaml:",inline"`
 
 	// Runner is the runner to use for the OS.
-	Runner OSRunner
+	Runner OSRunner `yaml:"-"`
 }
