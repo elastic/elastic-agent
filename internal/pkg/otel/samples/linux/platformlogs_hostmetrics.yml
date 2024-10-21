@@ -91,9 +91,20 @@ processors:
         action: delete
 
 exporters:
-  # Exporter to send logs and metrics to Elasticsearch
-  elasticsearch:
+  # Exporter to send logs and metrics to elasticsearch
+  elasticsearch/ecs:
     endpoints: ["${env:ELASTIC_ENDPOINT}"]
+    api_key: ${env:ELASTIC_API_KEY}
+    mapping:
+      mode: ecs
+    logs_dynamic_index:
+      enabled: true
+    metrics_dynamic_index:
+      enabled: true
+    traces_dynamic_index:
+      enabled: true
+  elasticsearch/otel:
+    endpoints: [ "${env:ELASTIC_ENDPOINT}" ]
     api_key: ${env:ELASTIC_API_KEY}
     mapping:
       mode: ecs
@@ -110,8 +121,8 @@ service:
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
       processors: [elasticinframetrics, resourcedetection, attributes/dataset, resource/process]
-      exporters: [elasticsearch]
+      exporters: [elasticsearch/ecs]
     logs/platformlogs:
       receivers: [filelog/platformlogs]
       processors: [resourcedetection]
-      exporters: [elasticsearch]
+      exporters: [elasticsearch/otel]
