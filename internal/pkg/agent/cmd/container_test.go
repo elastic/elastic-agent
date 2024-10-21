@@ -85,7 +85,7 @@ func TestContainerTestPaths(t *testing.T) {
 			require.NoError(t, err)
 
 			var paths containerPaths
-			err = cfg.Unpack(&paths)
+			err = cfg.UnpackTo(&paths)
 			require.NoError(t, err)
 
 			require.Equal(t, c.expected, paths)
