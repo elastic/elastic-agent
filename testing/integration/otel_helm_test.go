@@ -11,7 +11,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,10 +19,11 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
+	"helm.sh/helm/v3/pkg/cli/values"
+	"helm.sh/helm/v3/pkg/getter"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -108,18 +108,16 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				func(format string, v ...interface{}) {})
 			require.NoError(t, err, "failed to init helm action config")
 
-			yamlFile, err := os.ReadFile(tc.valuesFile)
-			if err != nil {
-				require.NoError(t, err, "failed to read helm chart values file")
-			}
-
 			// Initialize a map to hold the parsed data
 			helmValues := make(map[string]any)
 
-			// Unmarshal the YAML into the map
-			err = yaml.Unmarshal(yamlFile, &helmValues)
+			options := values.Options{
+				ValueFiles: []string{tc.valuesFile},
+			}
+			providers := getter.All(settings)
+			helmValues, err = options.MergeValues(providers)
 			if err != nil {
-				log.Fatalf("Error unmarshalling YAML: %v", err)
+				require.NoError(t, err, "failed to helm values")
 			}
 
 			t.Cleanup(func() {
