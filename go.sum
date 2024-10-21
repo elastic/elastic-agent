@@ -167,8 +167,6 @@ github.com/bugsnag/osext v0.0.0-20130617224835-0dd3f918b21b h1:otBG+dV+YK+Soembj
 github.com/bugsnag/osext v0.0.0-20130617224835-0dd3f918b21b/go.mod h1:obH5gd0BsqsP2LwDJ9aOkm/6J86V6lyAXCoQWGw3K50=
 github.com/bugsnag/panicwrap v0.0.0-20151223152923-e2c28503fcd0 h1:nvj0OLI3YqYXer/kZD8Ri1aaunCxIEsOst1BVJswV0o=
 github.com/bugsnag/panicwrap v0.0.0-20151223152923-e2c28503fcd0/go.mod h1:D/8v3kj0zr8ZAKg1AQ6crr+5VwKN5eIywRkfhyM/+dE=
-github.com/carsonip/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.94.1-0.20241018084159-ae9f8a3e4dcb h1:y+DfLcOSUImzls8Ye7ywqK2Ty3+IsDzWBP1TTPTAwUg=
-github.com/carsonip/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.94.1-0.20241018084159-ae9f8a3e4dcb/go.mod h1:A/Va6YLk3LaorgO+Mh3JKbUZZjFKY5NlEJBih9NQ49A=
 github.com/cavaliergopher/rpm v1.2.0 h1:s0h+QeVK252QFTolkhGiMeQ1f+tMeIMhGl8B1HUmGUc=
 github.com/cavaliergopher/rpm v1.2.0/go.mod h1:R0q3vTqa7RUvPofAZYrnjJ63hh2vngjFfphuXiExVos=
 github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
@@ -841,6 +839,8 @@ github.com/onsi/gomega v1.34.1 h1:EUMJIKUjM8sKjYbtxQI9A4z2o+rruxnzNvpknOXie6k=
 github.com/onsi/gomega v1.34.1/go.mod h1:kU1QgUvBDLXBJq618Xvm2LUX6rSAfRaFRTcdOeDLwwY=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.111.0 h1:9rSlNU6xUEcgneB7Pm502VMH63Abc8Ibpd9y0fBit3Q=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.111.0/go.mod h1:J87FjckPF9jl1MLA36Yemp6JfsCMNk0QDUBb+7rLw7E=
+github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.111.1-0.20241021033937-1ef15b92559b h1:oGCxYV2Lpz1/mBTJGt2s5e+78nPw2ny8tZohLCeV8p0=
+github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.111.1-0.20241021033937-1ef15b92559b/go.mod h1:8Mf1nyGllM+QpmfRjM1kyQmYxSnBOTdenUGJ2Rt/5B4=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.111.0 h1:0u/131/ZxkKM1maVu6u/FLy/zvtuSbKm+p3sWxcynGE=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.111.0/go.mod h1:uu9yUMMXELC2TNc6j1FJ4gleN5JHMM3LRbVksQjIFtI=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusremotewriteexporter v0.111.0 h1:p8vV11sj1cJFbd3B9tuGiA9gMGTvaSR4A57qQvVs9iY=
