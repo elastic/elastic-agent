@@ -91,7 +91,7 @@ processors:
         action: delete
 
 exporters:
-  # Exporter to send logs and metrics to elasticsearch
+  # Exporter to send logs and metrics to Elasticsearch
   elasticsearch/ecs:
     endpoints: ["${env:ELASTIC_ENDPOINT}"]
     api_key: ${env:ELASTIC_API_KEY}
@@ -107,7 +107,7 @@ exporters:
     endpoints: [ "${env:ELASTIC_ENDPOINT}" ]
     api_key: ${env:ELASTIC_API_KEY}
     mapping:
-      mode: ecs
+      mode: otel
     logs_dynamic_index:
       enabled: true
     metrics_dynamic_index:
