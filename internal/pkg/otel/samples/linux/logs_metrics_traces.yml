@@ -355,11 +355,6 @@ processors:
           - set(attributes["service.name"], Concat([attributes["service.name"], "otel-collector"], "-"))
           - set(attributes["deployment.environment"], "otel-collector")
       # copy attributes from old SemConv version into new SemConv fields. With this we can set destination service resource in enrichment.
-      - context: span
-        statements:
-          - set(attributes["url.full"], attributes["http.url"])
-          - set(attributes["url.domain"], attributes["net.peer.name"])
-          - set(attributes["url.port"], attributes["net.peer.port"])
     metric_statements:
       #appending '-otel-collector' to all service name
       - context: resource
