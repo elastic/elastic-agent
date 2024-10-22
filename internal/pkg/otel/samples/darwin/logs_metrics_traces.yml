@@ -340,26 +340,6 @@ processors:
           - set(resource.attributes["metricset.interval"], "60m")
           - set(attributes["data_stream.dataset"], Concat([attributes["metricset.name"], "60m"], "."))
           - set(attributes["processor.event"], "metric")
-  transform:
-    trace_statements:
-      #appending '-otel-collector' to all service name
-      - context: resource
-        statements:
-          - set(attributes["service.name"], Concat([attributes["service.name"], "otel-collector"], "-"))
-          - set(attributes["deployment.environment"], "otel-collector")
-      # copy attributes from old SemConv version into new SemConv fields. With this we can set destination service resource in enrichment.
-    metric_statements:
-      #appending '-otel-collector' to all service name
-      - context: resource
-        statements:
-          - set(attributes["service.name"], Concat([attributes["service.name"], "otel-collector"], "-"))
-          - set(attributes["deployment.environment"], "otel-collector")
-    log_statements:
-      #appending '-otel-collector' to all service name
-      - context: resource
-        statements:
-          - set(attributes["service.name"], Concat([attributes["service.name"], "otel-collector"], "-"))
-          - set(attributes["deployment.environment"], "otel-collector")
 
 exporters:
   elasticsearch/ecs:
@@ -391,12 +371,12 @@ service:
   pipelines:
     traces/fromsdk:
       receivers: [otlp/fromsdk]
-      processors: [transform, elastictrace]
+      processors: [elastictrace]
       exporters: [signaltometrics, elasticsearch/otel]
 
     metrics/fromsdk:
       receivers: [otlp/fromsdk]
-      processors: [transform]
+      processors: []
       exporters: [signaltometrics, elasticsearch/otel]
 
     metrics/hostmetrics:
@@ -411,10 +391,10 @@ service:
 
     logs/fromsdk:
       receivers: [otlp/fromsdk]
-      processors: [transform]
+      processors: []
       exporters: [signaltometrics, elasticsearch/otel]
 
     logs/platformlogs:
       receivers: [filelog/platformlogs]
-      processors: [resourcedetection, transform]
-      exporters: [signaltometrics, elasticsearch/otel]
+      processors: [resourcedetection]
+      exporters: [elasticsearch/otel]
