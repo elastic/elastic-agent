@@ -25,7 +25,7 @@ spec:
         {{- with ($presetVal).annotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-{{ include "elasticagent.engine.k8s.podTemplate" (list $ $presetVal $agentName) }}
+{{ include "elasticagent.engine.k8s.podTemplate" (list $ $presetVal $agentName) | indent 4 }}
 ---
 {{- end -}}
 {{- end }}
