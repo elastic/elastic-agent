@@ -327,12 +327,13 @@ func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResu
 
 	// Should we support json too?
 	if fileResult.ContentType == "application/yaml" {
-		unmarshalled := map[interface{}]interface{}{}
+		unmarshalled := map[string]interface{}{}
 		err := yaml.Unmarshal(fileResult.Content, &unmarshalled)
 		if err != nil {
 			// Best effort, output a warning but still include the file
 			fmt.Fprintf(errOut, "[WARNING] Could not redact %s due to unmarshalling error: %s\n", fullFilePath, err)
 		} else {
+			unmarshalled = RedactSecretPaths(unmarshalled, errOut)
 			redacted, err := yaml.Marshal(redactMap(errOut, unmarshalled))
 			if err != nil {
 				// Best effort, output a warning but still include the file
@@ -579,7 +580,6 @@ func saveLogs(name string, logPath string, zw *zip.Writer) error {
 func RedactSecretPaths(mapStr map[string]any, errOut io.Writer) map[string]any {
 	v, ok := mapStr["secret_paths"]
 	if !ok {
-		fmt.Fprintln(errOut, "No output redaction: secret_paths attribute not found.")
 		return mapStr
 	}
 	arr, ok := v.([]interface{})

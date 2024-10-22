@@ -8,14 +8,12 @@ package cmd
 
 import (
 	"context"
-	goerrors "errors"
-	"sync"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
 	"github.com/elastic/elastic-agent-libs/service"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 )
@@ -28,6 +26,9 @@ func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Comman
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfgFiles, err := getConfigFiles(cmd, true)
 			if err != nil {
+				return err
+			}
+			if err := prepareEnv(); err != nil {
 				return err
 			}
 			return runCollector(cmd.Context(), cfgFiles)
@@ -79,42 +80,20 @@ func runCollector(cmdCtx context.Context, configFiles []string) error {
 	defer cancel()
 	go service.ProcessWindowsControlEvents(stopCollector)
 
-	var otelStartWg sync.WaitGroup
-	var errs []error
-	var awaiters awaiters
+	return otel.Run(ctx, stop, configFiles)
+}
 
-	otelAwaiter := make(chan struct{})
-	awaiters = append(awaiters, otelAwaiter)
+func prepareEnv() error {
+	if _, ok := os.LookupEnv("STATE_PATH"); !ok {
+		// STATE_PATH is not set. Set it to defaultStateDirectory because we do not want to use any of the paths, that are also used by Beats or Agent
+		// because a standalone OTel collector must be able to run alongside them without issue.
 
-	otelStartWg.Add(1)
-	go func() {
-		otelStartWg.Done()
-		if err := otel.Run(ctx, stop, configFiles); err != nil {
-			errs = append(errs, err)
-			// otel collector finished with an error, exit run loop
-			cancel()
+		// The filestorage extension will handle directory creation since create_directory: true is set by default.
+		// If the user hasn’t specified the env:STATE_PATH in filestorage config, they may have opted for a custom path, and the extension will create the directory accordingly.
+		// In this case, setting env:STATE_PATH will have no effect.
+		if err := os.Setenv("STATE_PATH", defaultStateDirectory); err != nil {
+			return err
 		}
-
-		// close awaiter handled in run loop
-		close(otelAwaiter)
-	}()
-
-	// wait for otel to start
-	otelStartWg.Wait()
-
-	if err := runElasticAgent(
-		ctx,
-		cancel,
-		nil,      // no config overrides
-		stop,     // service hook
-		false,    // not in testing mode
-		0,        // no fleet config
-		true,     // is otel mode
-		awaiters, // wait for otel to finish
-	); err != nil && !errors.Is(err, context.Canceled) {
-		errs = append(errs, err)
 	}
-
-	return goerrors.Join(errs...)
-
+	return nil
 }

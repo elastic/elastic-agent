@@ -33,13 +33,11 @@ spec:
       #    args:
       #      - -c
       #      - >-
-      #        mkdir -p /usr/share/elastic-agent/state/inputs.d &&
-      #        curl -sL https://github.com/elastic/elastic-agent/archive/9.0.tar.gz | tar xz -C /usr/share/elastic-agent/state/inputs.d --strip=5 "elastic-agent-9.0/deploy/kubernetes/elastic-agent-standalone/templates.d"
-      #    securityContext:
-      #      runAsUser: 0
+      #        mkdir -p /etc/elastic-agent/inputs.d &&
+      #        curl -sL https://github.com/elastic/elastic-agent/archive/9.0.tar.gz | tar xz -C /etc/elastic-agent/inputs.d --strip=5 "elastic-agent-9.0/deploy/kubernetes/elastic-agent-standalone/templates.d"
       #    volumeMounts:
-      #      - name: elastic-agent-state
-      #        mountPath: /usr/share/elastic-agent/state
+      #      - name: external-inputs
+      #        mountPath: /etc/elastic-agent/inputs.d
       containers:
         - name: elastic-agent-standalone
           image: docker.elastic.co/beats/elastic-agent:9.0.0
@@ -113,6 +111,9 @@ spec:
               mountPath: /sys/kernel/debug
             - name: elastic-agent-state
               mountPath: /usr/share/elastic-agent/state
+            # Uncomment if using hints feature
+            # - name: external-inputs
+            #   mountPath: /usr/share/elastic-agent/state/inputs.d
       volumes:
         - name: datastreams
           configMap:
@@ -151,3 +152,6 @@ spec:
           hostPath:
             path: /var/lib/elastic-agent-standalone/kube-system/state
             type: DirectoryOrCreate
+        # Uncomment if using hints feature
+        # - name: external-inputs
+        #   emptyDir: {}

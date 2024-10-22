@@ -477,8 +477,8 @@ func RunProcess(t *testing.T,
 // when `Run` is called.
 //
 // if shouldWatchState is set to false, communicating state does not happen.
-func (f *Fixture) RunOtelWithClient(ctx context.Context, shouldWatchState bool, enableTestingMode bool, states ...State) error {
-	return f.executeWithClient(ctx, "otel", false, shouldWatchState, enableTestingMode, states...)
+func (f *Fixture) RunOtelWithClient(ctx context.Context, states ...State) error {
+	return f.executeWithClient(ctx, "otel", false, false, false, states...)
 }
 
 func (f *Fixture) executeWithClient(ctx context.Context, command string, disableEncryptedStore bool, shouldWatchState bool, enableTestingMode bool, states ...State) error {

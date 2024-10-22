@@ -63,7 +63,6 @@ func TestLimitsLog(t *testing.T) {
 		true,              // testingMode
 		time.Millisecond,  // fleetInitTimeout
 		true,              // disable monitoring
-		false,             // not otel mode
 	)
 	require.NoError(t, err)
 
