@@ -84,7 +84,7 @@
             "version": "{{ .request.Version }}",
             "user_settings_json": {
               "xpack.fleet.enableExperimental": ["agentTamperProtectionEnabled"],
-              "xpack.fleet.internal.registry.kibanaVersionCheckEnabled": false,
+              "xpack.fleet.internal.registry.kibanaVersionCheckEnabled": false
             }
           }
         },
