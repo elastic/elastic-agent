@@ -50,8 +50,12 @@ func Run(instanceName string, imageName string, zone string) error {
 				Network: "global/networks/default", // Use default network
 			},
 		},
-		Tags: &compute.Tags{
-			Items: []string{"http-server", "https-server"},
+		Labels: map[string]string{
+			"division": "engineering",
+			"org":      "platform-ingest",
+			"project":  "elastic-agent",
+			"team":     "elastic-agent",
+			"max-age":  "6h",
 		},
 		Scheduling: &compute.Scheduling{
 			MaxRunDuration: &compute.Duration{
