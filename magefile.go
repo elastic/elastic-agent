@@ -849,20 +849,16 @@ func (Cloud) Push() error {
 }
 
 // Creates a new devmachine that will be auto-deleted in 6 hours.
-// Example: mage devmachine:create "pavel-dev-machine" "family/platform-ingest-elastic-agent-ubuntu-2204" "us-central1-a"
-func (Devmachine) Create(instanceName string, imageName string, zone string) error {
-	if instanceName == "" || imageName == "" {
+// Example: MACHINE_IMAGE="family/platform-ingest-elastic-agent-ubuntu-2204" ZONE="us-central1-a" mage devmachine:create "pavel-dev-machine"
+// ZONE defaults to 'us-central1-a', MACHINE_IMAGE defaults to 'family/platform-ingest-elastic-agent-ubuntu-2204'
+func (Devmachine) Create(instanceName string) error {
+	if instanceName == "" {
 		return errors.New(
-			`instanceName and imageName are required.
+			`instanceName is required.
 	Example: 
-	mage devmachine:create "pavel-dev-machine" "family/platform-ingest-elastic-agent-ubuntu-2204" "us-central1-a"`)
+	mage devmachine:create "pavel-dev-machine"  `)
 	}
-
-	if zone == "" {
-		zone = "us-central1-a"
-	}
-	log.Println(">> Creating devmachine")
-	return devmachine.Run(instanceName, imageName, zone)
+	return devmachine.Run(instanceName)
 }
 
 func Clean() {
