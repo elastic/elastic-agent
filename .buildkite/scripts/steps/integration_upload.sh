@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source .buildkite/scripts/common.sh
+source .buildkite/scripts/common2.sh
 
 AGENT_PACKAGE_VERSION=8.16.0 SNAPSHOT=true mage integration:buildkite
 echo "=== Start Generated Pipeline ==="

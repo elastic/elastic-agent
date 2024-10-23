@@ -5,10 +5,11 @@
 package buildkite
 
 type StepAgent struct {
-	Provider     string `json:"provider,omitempty" yaml:"provider,omitempty"`
-	ImageProject string `json:"imageProject,omitempty" yaml:"imageProject,omitempty"`
-	MachineType  string `json:"machineType,omitempty" yaml:"machineType,omitempty"`
-	Image        string `json:"image,omitempty" yaml:"image,omitempty"`
+	Provider             string `json:"provider,omitempty" yaml:"provider,omitempty"`
+	ImageProject         string `json:"imageProject,omitempty" yaml:"imageProject,omitempty"`
+	MachineType          string `json:"machineType,omitempty" yaml:"machineType,omitempty"`
+	Image                string `json:"image,omitempty" yaml:"image,omitempty"`
+	UseCustomGlobalHooks bool   `json:"useCustomGlobalHooks,omitempty" yaml:"useCustomGlobalHooks,omitempty"`
 }
 
 type Step struct {
