@@ -13,6 +13,11 @@ import (
 	compute "google.golang.org/api/compute/v1"
 )
 
+const (
+	ZONE_TEMPLATE  = "zones/%s/machineTypes/n1-standard-4"
+	IMAGE_TEMPLATE = "projects/%s/global/images/%s"
+)
+
 func Run(instanceName string, imageName string, zone string) error {
 	ctx := context.Background()
 
@@ -24,8 +29,8 @@ func Run(instanceName string, imageName string, zone string) error {
 	}
 
 	imageProject := "elastic-images-prod"
-	machineType := fmt.Sprintf("zones/%s/machineTypes/n1-standard-4", zone)
-	sourceImage := fmt.Sprintf("projects/%s/global/images/%s", imageProject, imageName)
+	machineType := fmt.Sprintf(ZONE_TEMPLATE, zone)
+	sourceImage := fmt.Sprintf(IMAGE_TEMPLATE, imageProject, imageName)
 
 	instance := &compute.Instance{
 		Name:        instanceName,
