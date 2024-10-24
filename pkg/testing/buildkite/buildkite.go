@@ -256,9 +256,11 @@ func GenerateSteps(cfg common.Config, batches ...define.Batch) (string, error) {
 			step.Label = fmt.Sprintf("Integration Test (non-sudo): %s", lb.ID)
 			step.Key = fmt.Sprintf("integration-non-sudo-%s", lb.ID)
 			step.Env = map[string]string{
-				"AGENT_VERSION":      cfg.AgentVersion,
-				"TEST_DEFINE_PREFIX": step.Key,
-				"TEST_DEFINE_TESTS":  strings.Join(getTestNames(lb.Batch.Tests), ","),
+				"AGENT_VERSION":       cfg.AgentVersion,
+				"TEST_DEFINE_PREFIX":  step.Key,
+				"TEST_DEFINE_TESTS":   strings.Join(getTestNames(lb.Batch.Tests), ","),
+				"TEST_REQUIRES_SUDO":  "0",
+				"TEST_REQUIRES_STACK": "0",
 			}
 			if lb.Batch.Stack != nil {
 				stackKey := getStackKey(lb.Batch.Stack)
@@ -277,10 +279,11 @@ func GenerateSteps(cfg common.Config, batches ...define.Batch) (string, error) {
 			step.Label = fmt.Sprintf("Integration Test (sudo): %s", lb.ID)
 			step.Key = fmt.Sprintf("integration-sudo-%s", lb.ID)
 			step.Env = map[string]string{
-				"AGENT_VERSION":      cfg.AgentVersion,
-				"TEST_DEFINE_PREFIX": step.Key,
-				"TEST_DEFINE_TESTS":  strings.Join(getTestNames(lb.Batch.SudoTests), ","),
-				"TEST_REQUIRES_SUDO": "1",
+				"AGENT_VERSION":       cfg.AgentVersion,
+				"TEST_DEFINE_PREFIX":  step.Key,
+				"TEST_DEFINE_TESTS":   strings.Join(getTestNames(lb.Batch.SudoTests), ","),
+				"TEST_REQUIRES_SUDO":  "1",
+				"TEST_REQUIRES_STACK": "0",
 			}
 			if lb.Batch.Stack != nil {
 				stackKey := getStackKey(lb.Batch.Stack)

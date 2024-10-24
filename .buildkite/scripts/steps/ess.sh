@@ -2,29 +2,39 @@
 set -euo pipefail
 
 function ess_up() {
-  echo "~~~ Staring ESS Stack"  
+  echo "~~~ Staring ESS Stack"
   local WORKSPACE=$(git rev-parse --show-toplevel)
   local TF_DIR="${WORKSPACE}/test_infra/ess/"
   local STACK_VERSION=$1
   local ESS_REGION=${2:-"gcp-us-west2"}
-    
+
   if [ -z "$STACK_VERSION" ]; then
     echo "Error: Specify stack version: ess_up [stack_version]" >&2
     return 1
   fi
 
-  export EC_API_KEY=$(retry -t 5 -- vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
-  
+  retries=3
+  while [[ $retries -gt 0 ]]; do
+    export EC_API_KEY=$(vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
+    if [[ -z "${EC_API_KEY}" ]]; then
+      echo "Error: Failed to get EC API key from vault (will retry in 1 second)" >&2
+      sleep 2
+      retries=$((retries - 1))
+    else
+      break
+    fi
+  done
+
   if [[ -z "${EC_API_KEY}" ]]; then
-    echo "Error: Failed to get EC API key from vault" >&2
+    echo "Error: Failed to get EC API key from vault (max retries exhausted)" >&2
     exit 1
   fi
 
   BUILDKITE_BUILD_CREATOR="${BUILDKITE_BUILD_CREATOR:-"$(get_git_user_email)"}"
   BUILDKITE_BUILD_NUMBER="${BUILDKITE_BUILD_NUMBER:-"0"}"
   BUILDKITE_PIPELINE_SLUG="${BUILDKITE_PIPELINE_SLUG:-"elastic-agent-integration-tests"}"
-  
-  pushd "${TF_DIR}"    
+
+  pushd "${TF_DIR}"
   terraform init
   terraform apply \
     -auto-approve \
@@ -44,13 +54,29 @@ function ess_up() {
 }
 
 function ess_down() {
-  echo "~~~ Tearing down the ESS Stack"  
+  echo "~~~ Tearing down the ESS Stack"
   local WORKSPACE=$(git rev-parse --show-toplevel)
   local TF_DIR="${WORKSPACE}/test_infra/ess/"
+
   if [ -z "${EC_API_KEY:-}" ]; then
-    export EC_API_KEY=$(retry -t 5 -- vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)    
+    retries=3
+    while [[ $retries -gt 0 ]]; do
+      export EC_API_KEY=$(vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
+      if [[ -z "${EC_API_KEY}" ]]; then
+        echo "Error: Failed to get EC API key from vault (will retry in 1 second)" >&2
+        sleep 2
+        retries=$((retries - 1))
+      else
+        break
+      fi
+    done
+
+    if [[ -z "${EC_API_KEY}" ]]; then
+      echo "Error: Failed to get EC API key from vault (max retries exhausted)" >&2
+      exit 1
+    fi
   fi
-  
+
   pushd "${TF_DIR}"
   terraform init
   terraform destroy -auto-approve
@@ -59,15 +85,15 @@ function ess_down() {
 
 function get_git_user_email() {
   if ! git rev-parse --is-inside-work-tree &>/dev/null; then
-    echo "unknown"  
+    echo "unknown"
     return
   fi
 
   local email
   email=$(git config --get user.email)
-  
+
   if [ -z "$email" ]; then
-    echo "unknown"  
+    echo "unknown"
   else
     echo "$email"
   fi
