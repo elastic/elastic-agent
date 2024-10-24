@@ -8,6 +8,7 @@ package cmd
 
 import (
 	"context"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -25,6 +26,9 @@ func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Comman
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfgFiles, err := getConfigFiles(cmd, true)
 			if err != nil {
+				return err
+			}
+			if err := prepareEnv(); err != nil {
 				return err
 			}
 			return runCollector(cmd.Context(), cfgFiles)
@@ -77,4 +81,19 @@ func runCollector(cmdCtx context.Context, configFiles []string) error {
 	go service.ProcessWindowsControlEvents(stopCollector)
 
 	return otel.Run(ctx, stop, configFiles)
+}
+
+func prepareEnv() error {
+	if _, ok := os.LookupEnv("STATE_PATH"); !ok {
+		// STATE_PATH is not set. Set it to defaultStateDirectory because we do not want to use any of the paths, that are also used by Beats or Agent
+		// because a standalone OTel collector must be able to run alongside them without issue.
+
+		// The filestorage extension will handle directory creation since create_directory: true is set by default.
+		// If the user hasn’t specified the env:STATE_PATH in filestorage config, they may have opted for a custom path, and the extension will create the directory accordingly.
+		// In this case, setting env:STATE_PATH will have no effect.
+		if err := os.Setenv("STATE_PATH", defaultStateDirectory); err != nil {
+			return err
+		}
+	}
+	return nil
 }
