@@ -1,0 +1,4 @@
+kind: breaking-change
+summary: crossbuild-debian11
+description: We're dropping support for Debian 10, so no need to crossbuild using the outdated image anymore. This also updates the statically linked glibc from 2.19 to 2.31.
+component: elastic-agent
