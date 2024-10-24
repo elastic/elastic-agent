@@ -43,37 +43,37 @@ var defaultOS = []OS{
 type Batch struct {
 	// Group must be set on each test to define which group the tests belongs.
 	// Tests that are in the same group are executed on the same runner.
-	Group string `json:"group"`
+	Group string `json:"group" yaml:"group"`
 
 	// OS defines the operating systems this test batch needs.
-	OS OS `json:"os"`
+	OS OS `json:"os,omitempty" yaml:"os,omitempty"`
 
 	// Stack defines the stack required for this batch.
-	Stack *Stack `json:"stack,omitempty"`
+	Stack *Stack `json:"stack,omitempty" yaml:"stack,omitempty"`
 
 	// Tests define the set of packages and tests that do not require sudo
 	// privileges to be performed.
-	Tests []BatchPackageTests `json:"tests"`
+	Tests []BatchPackageTests `json:"tests,omitempty" yaml:"tests,omitempty"`
 
 	// SudoTests define the set of packages and tests that do require sudo
 	// privileges to be performed.
-	SudoTests []BatchPackageTests `json:"sudo_tests"`
+	SudoTests []BatchPackageTests `json:"sudo_tests,omitempty" yaml:"sudo_tests,omitempty"`
 }
 
 // BatchPackageTests is a package and its tests that belong to a batch.
 type BatchPackageTests struct {
 	// Name is the package name.
-	Name string `json:"name"`
+	Name string `json:"name" yaml:"name"`
 	// Tests is the set of tests in the package.
-	Tests []BatchPackageTest `json:"tests"`
+	Tests []BatchPackageTest `json:"tests" yaml:"tests"`
 }
 
 // BatchPackageTest is a specific test in a package.
 type BatchPackageTest struct {
 	// Name of the test.
-	Name string `json:"name"`
+	Name string `json:"name" yaml:"name"`
 	// Stack needed for test.
-	Stack bool `json:"stack"`
+	Stack bool `json:"stack" yaml:"stack"`
 }
 
 // DetermineBatches parses the package directory with the possible extra build
