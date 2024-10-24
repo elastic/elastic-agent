@@ -34,6 +34,7 @@ const (
 	flagPGPBytes       = "pgp"
 	flagPGPBytesPath   = "pgp-path"
 	flagPGPBytesURI    = "pgp-uri"
+	flagForce          = "force"
 )
 
 func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -64,73 +65,74 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 	c := client.New()
 	return upgradeCmdWithClient(streams, cmd, args, c)
 }
+
 func shouldUpgrade(ctx context.Context, cmd *cobra.Command) (bool, error) {
-  // Check if the agent is installed by dpkg or rpm
-  if pkgmgr.InstalledViaExternalPkgMgr() {
-    return false, fmt.Errorf("upgrading the elastic-agent is not support if the agent is installed using dpkg or rpm")
-  }
+	// Check if the agent is installed by dpkg or rpm
+	if pkgmgr.InstalledViaExternalPkgMgr() {
+		return false, fmt.Errorf("upgrading the elastic-agent is not support if the agent is installed using dpkg or rpm")
+	}
 
-  // Check if the agent is running in a container
-  details, err  := component.LoadPlatformDetail()
-  if err != nil {
-    return false, fmt.Errorf("failed to load platform details while trying to upgrade the agent")
-  }
+	// Check if the agent is running in a container
+	details, err := component.LoadPlatformDetail()
+	if err != nil {
+		return false, fmt.Errorf("failed to load platform details while trying to upgrade the agent")
+	}
 
-  if details.OS == component.Container {
-    return false, fmt.Errorf("upgrading an elastic-agent running in a container is not supported")
-  }
+	if details.OS == component.Container {
+		return false, fmt.Errorf("upgrading an elastic-agent running in a container is not supported")
+	}
 
-  agentInfo, err := info.NewAgentInfoWithLog(ctx, "error", false)
-  if err != nil {
-    return false, fmt.Errorf("failed to retrieve agent info while tring to upgrade the agent")
-  }
+	agentInfo, err := info.NewAgentInfoWithLog(ctx, "error", false)
+	if err != nil {
+		return false, fmt.Errorf("failed to retrieve agent info while tring to upgrade the agent")
+	}
 
-  isAdmin, err := utils.HasRoot()
-  if err != nil {
-    return false, fmt.Errorf("failed checking root/Administrator rights while trying to upgrade the agent")
-  }
+	isAdmin, err := utils.HasRoot()
+	if err != nil {
+		return false, fmt.Errorf("failed checking root/Administrator rights while trying to upgrade the agent")
+	}
 
-  // Check if the agent is fleet managed
-  if !agentInfo.IsStandalone() {
-    // Check if the upgrade command is executed as root
-    if !isAdmin {
-      return false, fmt.Errorf("need to execute the \"upgrade\" command as root if the agent is fleet managed")
-    }
+	// Check if the agent is fleet managed
+	if !agentInfo.IsStandalone() {
+		// Check if the upgrade command is executed as root
+		if !isAdmin {
+			return false, fmt.Errorf("need to execute the \"upgrade\" command as root if the agent is fleet managed")
+		}
 
-    force, err := cmd.Flags().GetBool("force")
-    if err != nil {
-      return false, fmt.Errorf("failed to retrieve command flag information while trying to upgrade the agent")
-    }
+		force, err := cmd.Flags().GetBool("force")
+		if err != nil {
+			return false, fmt.Errorf("failed to retrieve command flag information while trying to upgrade the agent")
+		}
 
-    if !force {
-      return false, fmt.Errorf("upgrading a fleet managed agent is not supported")
-    }
+		if !force {
+			return false, fmt.Errorf("upgrading a fleet managed agent is not supported")
+		}
 
-    cf, err := cli.Confirm("Upgrading a fleet managed agent is not supported. Would you still like to proceed?", false)
-    if err != nil {
-      return false, fmt.Errorf("failed while confirming action")
-    }
+		cf, err := cli.Confirm("Upgrading a fleet managed agent is not supported. Would you still like to proceed?", false)
+		if err != nil {
+			return false, fmt.Errorf("failed while confirming action")
+		}
 
-    if !cf {
-      return false, fmt.Errorf("upgrade not confirmed")
-    }
-  }
+		if !cf {
+			return false, fmt.Errorf("upgrade not confirmed")
+		}
+	}
 
-  return true, nil
+	return true, nil
 }
 
 func upgradeCmdWithClient(streams *cli.IOStreams, cmd *cobra.Command, args []string, c client.Client) error {
 	version := args[0]
 	sourceURI, _ := cmd.Flags().GetString(flagSourceURI)
 
-  ctx := context.Background()
+	ctx := context.Background()
 
-  su, err := shouldUpgrade(ctx, cmd)
-  if !su {
-    return fmt.Errorf("aborting upgrade: %w", err)
-  }
+	su, err := shouldUpgrade(ctx, cmd)
+	if !su {
+		return fmt.Errorf("aborting upgrade: %w", err)
+	}
 
-  err = c.Connect(ctx)
+	err = c.Connect(ctx)
 	if err != nil {
 		return errors.New(err, "Failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
 	}
