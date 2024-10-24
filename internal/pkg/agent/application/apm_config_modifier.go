@@ -97,7 +97,7 @@ func getAPMConfigFromMap(cfg map[string]any) (*monitoringcfg.APMConfig, error) {
 	}
 
 	monitoringConfig := new(monitoringcfg.APMConfig)
-	err = newConfigFrom.Unpack(monitoringConfig)
+	err = newConfigFrom.UnpackTo(monitoringConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error unpacking apm config: %w", err)
 	}

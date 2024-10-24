@@ -154,3 +154,123 @@ func TestDollarSignsInInputs(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, in, out)
 }
+
+func TestConfigUnpack(t *testing.T) {
+	c := &struct {
+		// go-ucfg will call the Unpacker interface
+		Inner *Config
+	}{}
+	in := map[string]interface{}{
+		"inner": map[string]interface{}{
+			"key": "value",
+		},
+	}
+	cfg := MustNewConfigFrom(in)
+	require.NoError(t, cfg.UnpackTo(c))
+
+	require.NotNil(t, c.Inner.Agent)
+	val, err := c.Inner.Agent.String("key", 0)
+	require.NoError(t, err)
+	assert.Equal(t, "value", val)
+}
+
+func TestConfigOTelNNil(t *testing.T) {
+	c, err := NewConfigFrom(map[string]interface{}{
+		"outputs": map[string]interface{}{
+			"default": map[string]interface{}{
+				"type":     "elasticsearch",
+				"hosts":    []interface{}{"127.0.0.1:9200"},
+				"username": "elastic",
+				"password": "changeme",
+			},
+		},
+		"inputs": []interface{}{
+			map[string]interface{}{
+				"type": "logfile",
+				"streams": []interface{}{
+					map[string]interface{}{
+						"paths": []interface{}{"/var/log/syslog"},
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, c.Agent)
+	assert.Nil(t, c.OTel)
+}
+
+func TestConfigOTelNotNil(t *testing.T) {
+	c, err := NewConfigFrom(map[string]interface{}{
+		"outputs": map[string]interface{}{
+			"default": map[string]interface{}{
+				"type":     "elasticsearch",
+				"hosts":    []interface{}{"127.0.0.1:9200"},
+				"username": "elastic",
+				"password": "changeme",
+			},
+		},
+		"inputs": []interface{}{
+			map[string]interface{}{
+				"type": "logfile",
+				"streams": []interface{}{
+					map[string]interface{}{
+						"paths": []interface{}{"/var/log/syslog"},
+					},
+				},
+			},
+		},
+		"receivers": map[string]interface{}{
+			"otlp": map[string]interface{}{
+				"protocols": map[string]interface{}{
+					"grpc": map[string]interface{}{
+						"endpoint": "0.0.0.0:4317",
+					},
+				},
+			},
+		},
+		"processors": map[string]interface{}{
+			"batch": map[string]interface{}{},
+		},
+		"exporters": map[string]interface{}{
+			"otlp": map[string]interface{}{
+				"endpoint": "otelcol:4317",
+			},
+		},
+		"extensions": map[string]interface{}{
+			"health_check": map[string]interface{}{},
+			"pprof":        map[string]interface{}{},
+		},
+		"service": map[string]interface{}{
+			"extensions": []string{"health_check", "pprof"},
+			"pipelines": map[string]interface{}{
+				"traces": map[string]interface{}{
+					"receivers":  []string{"otlp"},
+					"processors": []string{"batch"},
+					"exporters":  []string{"otlp"},
+				},
+				"metrics": map[string]interface{}{
+					"receivers":  []string{"otlp"},
+					"processors": []string{"batch"},
+					"exporters":  []string{"otlp"},
+				},
+				"logs": map[string]interface{}{
+					"receivers":  []string{"otlp"},
+					"processors": []string{"batch"},
+					"exporters":  []string{"otlp"},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, c.Agent)
+	require.NotNil(t, c.OTel)
+
+	conf, err := c.OTel.AsConf()
+	require.NoError(t, err)
+	assert.NotNil(t, conf.Get("receivers"))
+	assert.NotNil(t, conf.Get("processors"))
+	assert.NotNil(t, conf.Get("exporters"))
+	assert.NotNil(t, conf.Get("extensions"))
+	assert.NotNil(t, conf.Get("service"))
+}

@@ -1076,7 +1076,7 @@ func getPersistentConfig(pathConfigFile string) (map[string]interface{}, error) 
 		MonitoringHTTP: monitoringConfig.DefaultConfig().HTTP,
 	}
 
-	if err := rawConfig.Unpack(&pc); err != nil {
+	if err := rawConfig.UnpackTo(&pc); err != nil {
 		return nil, err
 	}
 

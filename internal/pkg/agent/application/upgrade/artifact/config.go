@@ -133,7 +133,7 @@ func (r *Reloader) reloadConfig(rawConfig *config.Config) error {
 	tmp := &reloadConfig{
 		C: DefaultConfig(),
 	}
-	if err := rawConfig.Unpack(&tmp); err != nil {
+	if err := rawConfig.UnpackTo(&tmp); err != nil {
 		return err
 	}
 
@@ -160,7 +160,7 @@ func (r *Reloader) reloadSourceURI(rawConfig *config.Config) error {
 		FleetSourceURI string `json:"agent.download.source_uri" config:"agent.download.source_uri"`
 	}
 	cfg := &reloadConfig{}
-	if err := rawConfig.Unpack(&cfg); err != nil {
+	if err := rawConfig.UnpackTo(&cfg); err != nil {
 		return errors.New(err, "failed to unpack config during reload")
 	}
 
@@ -274,7 +274,7 @@ func (c *Config) Unpack(cfg *c.C) error {
 		return err
 	}
 	// HTTPTransportSettings.Proxy.Headers defaults to empty. If absent in cfg,
-	// Unpack will set it to nil. To ensure consistency, we reset it to empty.
+	// UnpackTo will set it to nil. To ensure consistency, we reset it to empty.
 	if transport.Proxy.Headers == nil {
 		transport.Proxy.Headers = map[string]string{}
 	}

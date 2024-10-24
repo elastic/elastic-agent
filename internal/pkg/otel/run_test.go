@@ -2,8 +2,6 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build !windows
-
 package otel
 
 import (
@@ -39,8 +37,7 @@ func TestStartCollector(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.configFile, func(t *testing.T) {
 			configFiles := getConfigFiles(tc.configFile)
-			settings, err := newSettings("test", configFiles)
-			require.NoError(t, err)
+			settings := NewSettings("test", configFiles)
 
 			collector, err := otelcol.NewCollector(*settings)
 			require.NoError(t, err)

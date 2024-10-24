@@ -176,7 +176,7 @@ func TestGenerateContainerPodData(t *testing.T) {
 	logger := getLogger()
 	var cfg Config
 	c := config.New()
-	_ = c.Unpack(&cfg)
+	_ = c.UnpackTo(&cfg)
 	generateContainerData(
 		&comm,
 		pod,
@@ -306,7 +306,7 @@ func TestEphemeralContainers(t *testing.T) {
 	logger := getLogger()
 	var cfg Config
 	c := config.New()
-	_ = c.Unpack(&cfg)
+	_ = c.UnpackTo(&cfg)
 	generateContainerData(
 		&comm,
 		pod,
