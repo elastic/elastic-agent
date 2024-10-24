@@ -6,7 +6,7 @@ source .buildkite/scripts/common.sh
 source .buildkite/scripts/steps/ess.sh
 
 echo "~~~ Downloading packaging artifacts"
-buildkite-agent artifact download build/distributions/** . --step 'package-it'
+buildkite-agent artifact download build/distributions/** . --step "${TEST_PACKAGE_KEY}"
 
 # Override the agent package version using a string with format <major>.<minor>.<patch>
 # There is a time when the snapshot is not built yet, so we cannot use the latest version automatically

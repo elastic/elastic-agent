@@ -8,19 +8,8 @@ env:
   ASDF_TERRAFORM_VERSION: 1.9.2
 
 steps:
-  - label: "Integration tests: packaging"
-    key: "package-it"
-    command: ".buildkite/scripts/steps/integration-package.sh"
-    artifact_paths:
-      - build/distributions/**
-    agents:
-      provider: "gcp"
-      machineType: "n1-standard-8"
-
-  - label: "Integration tests: upload"
-    key: "upload-it"
-    depends_on:
-      - package-it
+  - label: "Integration: Generate"
+    key: "generate-it"
     command: ".buildkite/scripts/steps/integration_upload.sh"
     artifact_paths:
       - steps.yml
