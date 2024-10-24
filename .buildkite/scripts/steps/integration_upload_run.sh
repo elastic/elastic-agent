@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source .buildkite/scripts/common2.sh
+source .buildkite/scripts/common.sh
 
 source .buildkite/scripts/steps/ess.sh
 
