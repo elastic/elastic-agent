@@ -188,7 +188,7 @@ steps:
     command: |
       .buildkite/scripts/steps/merge.sh
     artifact_paths:
-      - "TEST-go-unit.cov"
+      - "build/TEST-go-unit.cov"
     agents:
       image: "golang:1.22.6"
     depends_on:
@@ -225,7 +225,7 @@ steps:
     agents:
       image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
     command:
-      - "buildkite-agent artifact download --step merge-coverage TEST-go-unit.cov ."
+      - "buildkite-agent artifact download --step merge-coverage build/TEST-go-unit.cov ."
       - "/scan-source-code.sh"
     depends_on:
       - "merge-coverage"
