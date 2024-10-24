@@ -57,6 +57,8 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 	cmd.Flags().String(flagPGPBytes, "", "PGP to use for package verification")
 	cmd.Flags().String(flagPGPBytesURI, "", "Path to a web location containing PGP to use for package verification")
 	cmd.Flags().String(flagPGPBytesPath, "", "Path to a file containing PGP to use for package verification")
+  cmd.Flags().BoolP(flagForce, "f", false, "Advanced option to force an upgrade on a fleet managed agent")
+  cmd.Flags().MarkHidden(flagForce)
 
 	return cmd
 }
@@ -99,7 +101,7 @@ func shouldUpgrade(ctx context.Context, cmd *cobra.Command) (bool, error) {
 			return false, fmt.Errorf("need to execute the \"upgrade\" command as root if the agent is fleet managed")
 		}
 
-		force, err := cmd.Flags().GetBool("force")
+		force, err := cmd.Flags().GetBool(flagForce)
 		if err != nil {
 			return false, fmt.Errorf("failed to retrieve command flag information while trying to upgrade the agent")
 		}
