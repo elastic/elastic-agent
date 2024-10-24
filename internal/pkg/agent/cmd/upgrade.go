@@ -120,13 +120,17 @@ func shouldUpgrade(ctx context.Context, cmd *cobra.Command) (bool, error) {
 }
 
 func upgradeCmdWithClient(streams *cli.IOStreams, cmd *cobra.Command, args []string, c client.Client) error {
-// agentInfo, err := info.NewAgentInfo(ctx context.Context, createAgentID bool)
 	version := args[0]
 	sourceURI, _ := cmd.Flags().GetString(flagSourceURI)
 
   ctx := context.Background()
 
-  err := c.Connect(ctx)
+  su, err := shouldUpgrade(ctx, cmd)
+  if !su {
+    return fmt.Errorf("aborting upgrade: %w", err)
+  }
+
+  err = c.Connect(ctx)
 	if err != nil {
 		return errors.New(err, "Failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
 	}
