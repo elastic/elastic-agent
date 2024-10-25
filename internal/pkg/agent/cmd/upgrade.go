@@ -14,7 +14,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -23,7 +22,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/install/pkgmgr"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
@@ -69,56 +67,41 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 }
 
 func shouldUpgrade(ctx context.Context, cmd *cobra.Command) (bool, error) {
-	// Check if the agent is installed by dpkg or rpm
-	if pkgmgr.InstalledViaExternalPkgMgr() {
-		return false, fmt.Errorf("upgrading the elastic-agent is not support if the agent is installed using dpkg or rpm")
-	}
-
-	// Check if the agent is running in a container
-	details, err := component.LoadPlatformDetail()
-	if err != nil {
-		return false, fmt.Errorf("failed to load platform details while trying to upgrade the agent")
-	}
-
-	if details.OS == component.Container {
-		return false, fmt.Errorf("upgrading an elastic-agent running in a container is not supported")
-	}
-
 	agentInfo, err := info.NewAgentInfoWithLog(ctx, "error", false)
 	if err != nil {
 		return false, fmt.Errorf("failed to retrieve agent info while tring to upgrade the agent")
 	}
+
+  if agentInfo.IsStandalone() {
+    return true, nil
+  }
 
 	isAdmin, err := utils.HasRoot()
 	if err != nil {
 		return false, fmt.Errorf("failed checking root/Administrator rights while trying to upgrade the agent")
 	}
 
-	// Check if the agent is fleet managed
-	if !agentInfo.IsStandalone() {
-		// Check if the upgrade command is executed as root
-		if !isAdmin {
-			return false, fmt.Errorf("need to execute the \"upgrade\" command as root if the agent is fleet managed")
-		}
+  if !isAdmin {
+    return false, fmt.Errorf("upgrade command needs to be executed as root for fleet managed agents")
+  }
 
-		force, err := cmd.Flags().GetBool(flagForce)
-		if err != nil {
-			return false, fmt.Errorf("failed to retrieve command flag information while trying to upgrade the agent")
-		}
+  force, err := cmd.Flags().GetBool(flagForce)
+  if err != nil {
+    return false, fmt.Errorf("failed to retrieve command flag information while trying to upgrade the agent")
+  }
 
-		if !force {
-			return false, fmt.Errorf("upgrading a fleet managed agent is not supported")
-		}
+  if !force {
+    return false, fmt.Errorf("upgrading fleet managed agents is not supported")
+  }
 
-		cf, err := cli.Confirm("Upgrading a fleet managed agent is not supported. Would you still like to proceed?", false)
-		if err != nil {
-			return false, fmt.Errorf("failed while confirming action")
-		}
+  cf, err := cli.Confirm("Upgrading fleet managed agents is not supported. Would you still like to proceed?", false)
+  if err != nil {
+    return false, fmt.Errorf("failed while confirming action")
+  }
 
-		if !cf {
-			return false, fmt.Errorf("upgrade not confirmed")
-		}
-	}
+  if !cf {
+    return false, fmt.Errorf("upgrade not confirmed")
+  }
 
 	return true, nil
 }
