@@ -23,8 +23,13 @@ require (
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015
 	github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector v0.2.1
+<<<<<<< HEAD
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.12.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.2.1
+=======
+	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.13.0
+	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.3.0
+>>>>>>> 30688d4eb8 (build(deps): bump github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor (#5843))
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.2.0
 	github.com/fatih/color v1.17.0
 	github.com/fsnotify/fsnotify v1.7.0

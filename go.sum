@@ -296,10 +296,17 @@ github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015 h1:z8cC8GASpPo8yKl
 github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015/go.mod h1:qH9DX/Dmflz6EAtaks/+2SsdQzecVAKE174Zl66hk7E=
 github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector v0.2.1 h1:OLpob3qEleqQnlgnBRJyClWr63TVThJd5s06CFnzKFI=
 github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector v0.2.1/go.mod h1:zIiDkPObWcSOpOzD3iWkaGawMs97oYLFA6i0T5Uv1EI=
+<<<<<<< HEAD
 github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.12.0 h1:G5JJsgbpD+8ZXZ17UlDLOgW9E8nwLdmSjm1sppDi/cU=
 github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.12.0/go.mod h1:TO8sejwFXzqSyOmL9M8lL6baavxERg9UGJXfYKHdlfA=
 github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.2.1 h1:7cCOF19TJPivDc/QjV0VxU1ySwDib6TS2WJ9TP3iEpk=
 github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.2.1/go.mod h1:GSVGd0yJHBXevzOdChtzJFAcrex+iHCNju3fu5QwW14=
+=======
+github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.13.0 h1:Y8DWrxdpNMscYXTN3EoK509vqf+0aD1RfNZF5wOtsQs=
+github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.13.0/go.mod h1:iLTitn5RdFtBHYLC2YVAgjv2OxCKY51rdhtrsT1hQ8I=
+github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.3.0 h1:LgVBXE5ASDsheFLyM4ILG3jTuK3eJ6S67/NcKsHKP2Q=
+github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.3.0/go.mod h1:G0l0UkTeT1lxWCvURonQQLgNcaWX6bBuQexp5tubUZ8=
+>>>>>>> 30688d4eb8 (build(deps): bump github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor (#5843))
 github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.2.0 h1:hS4YRZG4W50od8HMbZM9EQTe0fxWDpCAgo7tAVxuFFE=
 github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.2.0/go.mod h1:/bETRmbfuqPwSI0Y/lVRCGRXhjbnTNKfHZS0NEKffGQ=
 github.com/elastic/opentelemetry-lib v0.12.0 h1:SiCGkT7gLOzkl0wQosQrIWjHWb5eJY18Cm3V3GmdU0o=
