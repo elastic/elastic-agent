@@ -55,8 +55,8 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 	cmd.Flags().String(flagPGPBytes, "", "PGP to use for package verification")
 	cmd.Flags().String(flagPGPBytesURI, "", "Path to a web location containing PGP to use for package verification")
 	cmd.Flags().String(flagPGPBytesPath, "", "Path to a file containing PGP to use for package verification")
-  cmd.Flags().BoolP(flagForce, "f", false, "Advanced option to force an upgrade on a fleet managed agent")
-  cmd.Flags().MarkHidden(flagForce)
+	cmd.Flags().BoolP(flagForce, "f", false, "Advanced option to force an upgrade on a fleet managed agent")
+	cmd.Flags().MarkHidden(flagForce)
 
 	return cmd
 }
@@ -69,39 +69,39 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 func shouldUpgrade(ctx context.Context, cmd *cobra.Command) (bool, error) {
 	agentInfo, err := info.NewAgentInfoWithLog(ctx, "error", false)
 	if err != nil {
-		return false, fmt.Errorf("failed to retrieve agent info while tring to upgrade the agent")
+		return false, fmt.Errorf("failed to retrieve agent info while tring to upgrade the agent: %w", err)
 	}
 
-  if agentInfo.IsStandalone() {
-    return true, nil
-  }
+	if agentInfo.IsStandalone() {
+		return true, nil
+	}
 
 	isAdmin, err := utils.HasRoot()
 	if err != nil {
-		return false, fmt.Errorf("failed checking root/Administrator rights while trying to upgrade the agent")
+		return false, fmt.Errorf("failed checking root/Administrator rights while trying to upgrade the agent: %w", err)
 	}
 
-  if !isAdmin {
-    return false, fmt.Errorf("upgrade command needs to be executed as root for fleet managed agents")
-  }
+	if !isAdmin {
+		return false, fmt.Errorf("upgrade command needs to be executed as root for fleet managed agents")
+	}
 
-  force, err := cmd.Flags().GetBool(flagForce)
-  if err != nil {
-    return false, fmt.Errorf("failed to retrieve command flag information while trying to upgrade the agent")
-  }
+	force, err := cmd.Flags().GetBool(flagForce)
+	if err != nil {
+		return false, fmt.Errorf("failed to retrieve command flag information while trying to upgrade the agent: %w", err)
+	}
 
-  if !force {
-    return false, fmt.Errorf("upgrading fleet managed agents is not supported")
-  }
+	if !force {
+		return false, fmt.Errorf("upgrading fleet managed agents is not supported")
+	}
 
-  cf, err := cli.Confirm("Upgrading fleet managed agents is not supported. Would you still like to proceed?", false)
-  if err != nil {
-    return false, fmt.Errorf("failed while confirming action")
-  }
+	cf, err := cli.Confirm("Upgrading fleet managed agents is not supported. Would you still like to proceed?", false)
+	if err != nil {
+		return false, fmt.Errorf("failed while confirming action: %w", err)
+	}
 
-  if !cf {
-    return false, fmt.Errorf("upgrade not confirmed")
-  }
+	if !cf {
+		return false, fmt.Errorf("upgrade not confirmed")
+	}
 
 	return true, nil
 }
