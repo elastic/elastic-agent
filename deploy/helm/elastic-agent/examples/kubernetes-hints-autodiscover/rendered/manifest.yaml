@@ -435,6 +435,7 @@ stringData:
         streams:
         - data_stream:
             dataset: kubernetes.container_logs
+            type: logs
           id: kubernetes-container-logs-${kubernetes.pod.name}-${kubernetes.container.id}
           parsers:
           - container:
@@ -442,43 +443,6 @@ stringData:
               stream: all
           paths:
           - /var/log/containers/*${kubernetes.container.id}.log
-          processors:
-          - add_fields:
-              fields:
-                annotations.elastic_co/dataset: ${kubernetes.annotations.elastic.co/dataset|""}
-                annotations.elastic_co/namespace: ${kubernetes.annotations.elastic.co/namespace|""}
-                annotations.elastic_co/preserve_original_event: ${kubernetes.annotations.elastic.co/preserve_original_event|""}
-              target: kubernetes
-          - drop_fields:
-              fields:
-              - kubernetes.annotations.elastic_co/dataset
-              ignore_missing: true
-              when:
-                equals:
-                  kubernetes.annotations.elastic_co/dataset: ""
-          - drop_fields:
-              fields:
-              - kubernetes.annotations.elastic_co/namespace
-              ignore_missing: true
-              when:
-                equals:
-                  kubernetes.annotations.elastic_co/namespace: ""
-          - drop_fields:
-              fields:
-              - kubernetes.annotations.elastic_co/preserve_original_event
-              ignore_missing: true
-              when:
-                equals:
-                  kubernetes.annotations.elastic_co/preserve_original_event: ""
-          - add_tags:
-              tags:
-              - preserve_original_event
-              when:
-                and:
-                - has_fields:
-                  - kubernetes.annotations.elastic_co/preserve_original_event
-                - regexp:
-                    kubernetes.annotations.elastic_co/preserve_original_event: ^(?i)true$
           prospector.scanner.symlinks: true
         type: filestream
         use_output: default
@@ -1090,7 +1054,7 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: f81171bdf0eed2d3bc8492050be0e6763188e3731e5cfc2b675f6ad8810c6fb7
+        checksum/config: a0992804c5782a0f4c3b4eeae610ff3d222fc7f3e219658cf9787fbe4e5202f1
 
     spec:
       dnsPolicy: ClusterFirstWithHostNet

@@ -56,6 +56,7 @@ stringData:
         streams:
         - data_stream:
             dataset: kubernetes.container_logs
+            type: logs
           id: kubernetes-container-logs-${kubernetes.pod.name}-${kubernetes.container.id}
           parsers:
           - container:
@@ -63,43 +64,6 @@ stringData:
               stream: all
           paths:
           - /var/log/containers/*${kubernetes.container.id}.log
-          processors:
-          - add_fields:
-              fields:
-                annotations.elastic_co/dataset: ${kubernetes.annotations.elastic.co/dataset|""}
-                annotations.elastic_co/namespace: ${kubernetes.annotations.elastic.co/namespace|""}
-                annotations.elastic_co/preserve_original_event: ${kubernetes.annotations.elastic.co/preserve_original_event|""}
-              target: kubernetes
-          - drop_fields:
-              fields:
-              - kubernetes.annotations.elastic_co/dataset
-              ignore_missing: true
-              when:
-                equals:
-                  kubernetes.annotations.elastic_co/dataset: ""
-          - drop_fields:
-              fields:
-              - kubernetes.annotations.elastic_co/namespace
-              ignore_missing: true
-              when:
-                equals:
-                  kubernetes.annotations.elastic_co/namespace: ""
-          - drop_fields:
-              fields:
-              - kubernetes.annotations.elastic_co/preserve_original_event
-              ignore_missing: true
-              when:
-                equals:
-                  kubernetes.annotations.elastic_co/preserve_original_event: ""
-          - add_tags:
-              tags:
-              - preserve_original_event
-              when:
-                and:
-                - has_fields:
-                  - kubernetes.annotations.elastic_co/preserve_original_event
-                - regexp:
-                    kubernetes.annotations.elastic_co/preserve_original_event: ^(?i)true$
           prospector.scanner.symlinks: true
         type: filestream
         use_output: default
@@ -226,7 +190,7 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: e4f00459bc975f20e15a69d830b8df6c1998190072d515e0c08cf5b51dd5bbc1
+        checksum/config: eccba05d4529b7e88754b86e1d7f671436f99a9968e0df202730569e2bd31816
 
     spec:
       dnsPolicy: ClusterFirstWithHostNet
