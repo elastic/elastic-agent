@@ -98,6 +98,7 @@ var ExpectedBinaries = []BinarySpec{
 	{BinaryName: "agentbeat", ProjectName: "beats", Platforms: AllPlatforms},
 	{BinaryName: "apm-server", ProjectName: "apm-server", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}}},
 	{BinaryName: "cloudbeat", ProjectName: "cloudbeat", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
+	{BinaryName: "cloud-defend", ProjectName: "cloud-defend", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
 	{BinaryName: "connectors", ProjectName: "connectors", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PythonWheel: true},
 	{BinaryName: "endpoint-security", ProjectName: "endpoint-dev", Platforms: AllPlatforms},
 	{BinaryName: "fleet-server", ProjectName: "fleet-server", Platforms: AllPlatforms},
