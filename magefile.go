@@ -2593,24 +2593,58 @@ func getSupportedBatches(matrix bool) ([]tcommon.OSBatch, tcommon.Config, error)
 	return osBatches, cfg, nil
 }
 
+type groupSummary struct {
+	Name        string                `yaml:"name"`
+	OS          []tcommon.SupportedOS `yaml:"os"`
+	RequireSudo bool                  `yaml:"require_sudo"`
+	Tests       []string              `yaml:"tests"`
+}
+
 func writeBreakdown(matrix bool) error {
-	batches, cfg, err := getSupportedBatches(matrix)
+	batches, _, err := getSupportedBatches(matrix)
 	if err != nil {
 		return err
 	}
 
-	// cleanup OS duplicate information no longer needed as it
-	// was used to create the OSBatch, but no longer needed in this
-	// representation
-	for i, batch := range batches {
-		batch.Batch.OS = define.OS{}
-		if batch.Batch.Stack != nil {
-			batch.Batch.Stack.Version = cfg.StackVersion
+	groupsByName := make(map[string]groupSummary)
+	for _, batch := range batches {
+		if len(batch.Batch.SudoTests) > 0 {
+			groupName := fmt.Sprintf("%s-sudo", batch.Batch.Group)
+			group, _ := groupsByName[groupName]
+			group.Name = groupName
+			group.RequireSudo = true
+			group.OS = append(group.OS, batch.OS)
+			for _, pack := range batch.Batch.SudoTests {
+				for _, packTest := range pack.Tests {
+					if !slices.Contains(group.Tests, packTest.Name) {
+						group.Tests = append(group.Tests, packTest.Name)
+					}
+				}
+			}
+			groupsByName[groupName] = group
 		}
-		batches[i] = batch
+		if len(batch.Batch.Tests) > 0 {
+			groupName := batch.Batch.Group
+			group, _ := groupsByName[groupName]
+			group.Name = groupName
+			group.OS = append(group.OS, batch.OS)
+			for _, pack := range batch.Batch.SudoTests {
+				for _, packTest := range pack.Tests {
+					if !slices.Contains(group.Tests, packTest.Name) {
+						group.Tests = append(group.Tests, packTest.Name)
+					}
+				}
+			}
+			groupsByName[groupName] = group
+		}
 	}
 
-	data, err := yaml.Marshal(batches)
+	groups := make([]groupSummary, 0, len(groupsByName))
+	for _, group := range groupsByName {
+		groups = append(groups, group)
+	}
+
+	data, err := yaml.Marshal(groups)
 	if err != nil {
 		return err
 	}
