@@ -7,6 +7,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -57,7 +58,10 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 	cmd.Flags().String(flagPGPBytesURI, "", "Path to a web location containing PGP to use for package verification")
 	cmd.Flags().String(flagPGPBytesPath, "", "Path to a file containing PGP to use for package verification")
 	cmd.Flags().BoolP(flagForce, "f", false, "Advanced option to force an upgrade on a fleet managed agent")
-	cmd.Flags().MarkHidden(flagForce)
+	err := cmd.Flags().MarkHidden(flagForce)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	return cmd
 }
