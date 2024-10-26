@@ -297,13 +297,13 @@ func TestUpgradeCmd(t *testing.T) {
 
 		clientCh := make(chan struct{})
 
-		// Execute upgrade command and validate shouldUpgrade error
+		// Execute upgrade command and validate that there are no errors
 		go func() {
 			err = upgradeCmdWithClient(commandInput)
 
 			assert.NoError(t, err)
 
-			// Verify counter has not incremented since upgrade should not proceed
+			// Verify counter is incremented
 			counter := atomic.LoadInt32(&mock.upgrades)
 			assert.Equal(t, int32(1), counter, "server should handle exactly one upgrade")
 
