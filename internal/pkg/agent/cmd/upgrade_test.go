@@ -6,6 +6,7 @@ package cmd
 
 import (
 	"context"
+	"log"
 	"net"
 	"sync/atomic"
 	"testing"
@@ -222,7 +223,10 @@ func TestUpgradeCmd(t *testing.T) {
 		streams := cli.NewIOStreams()
 		cmd := newUpgradeCommandWithArgs(args, streams)
 		cmd.SetContext(context.Background())
-		cmd.Flags().Set("force", "true")
+		err = cmd.Flags().Set("force", "true")
+		if err != nil {
+			log.Fatal(err)
+		}
 
 		commandInput := &upgradeInput{
 			streams,
@@ -282,7 +286,10 @@ func TestUpgradeCmd(t *testing.T) {
 		streams := cli.NewIOStreams()
 		cmd := newUpgradeCommandWithArgs(args, streams)
 		cmd.SetContext(context.Background())
-		cmd.Flags().Set("force", "true")
+		err = cmd.Flags().Set("force", "true")
+		if err != nil {
+			log.Fatal(err)
+		}
 
 		commandInput := &upgradeInput{
 			streams,
