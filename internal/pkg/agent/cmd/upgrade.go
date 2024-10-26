@@ -42,6 +42,7 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 		Long:  "This command upgrades the currently installed Elastic Agent to the specified version.",
 		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
+			c.SetContext(context.Background())
 			if err := upgradeCmd(streams, c, args); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 				os.Exit(1)
@@ -61,27 +62,40 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 	return cmd
 }
 
-func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
-	c := client.New()
-	return upgradeCmdWithClient(streams, cmd, args, c)
+type upgradeInput struct {
+	streams   *cli.IOStreams
+	cmd       *cobra.Command
+	args      []string
+	c         client.Client
+	agentInfo info.Agent
+	cFunc     confirmFunc
 }
 
-func shouldUpgrade(ctx context.Context, cmd *cobra.Command) (bool, error) {
-	agentInfo, err := info.NewAgentInfoWithLog(ctx, "error", false)
-	if err != nil {
-		return false, fmt.Errorf("failed to retrieve agent info while tring to upgrade the agent: %w", err)
-	}
+type confirmFunc func(string, bool) (bool, error)
 
+func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
+	c := client.New()
+	agentInfo, err := info.NewAgentInfoWithLog(cmd.Context(), "error", false)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve agent info while tring to upgrade the agent: %w", err)
+	}
+	input := &upgradeInput{
+		streams,
+		cmd,
+		args,
+		c,
+		agentInfo,
+		cli.Confirm,
+	}
+	return upgradeCmdWithClient(input)
+}
+
+func shouldUpgrade(cmd *cobra.Command, agentInfo info.Agent, cFunc confirmFunc) (bool, error) {
 	if agentInfo.IsStandalone() {
 		return true, nil
 	}
 
-	isAdmin, err := utils.HasRoot()
-	if err != nil {
-		return false, fmt.Errorf("failed checking root/Administrator rights while trying to upgrade the agent: %w", err)
-	}
-
-	if !isAdmin {
+	if agentInfo.Unprivileged() {
 		return false, fmt.Errorf("upgrade command needs to be executed as root for fleet managed agents")
 	}
 
@@ -94,7 +108,7 @@ func shouldUpgrade(ctx context.Context, cmd *cobra.Command) (bool, error) {
 		return false, fmt.Errorf("upgrading fleet managed agents is not supported")
 	}
 
-	cf, err := cli.Confirm("Upgrading fleet managed agents is not supported. Would you still like to proceed?", false)
+	cf, err := cFunc("Upgrading fleet managed agents is not supported. Would you still like to proceed?", false)
 	if err != nil {
 		return false, fmt.Errorf("failed while confirming action: %w", err)
 	}
@@ -106,18 +120,18 @@ func shouldUpgrade(ctx context.Context, cmd *cobra.Command) (bool, error) {
 	return true, nil
 }
 
-func upgradeCmdWithClient(streams *cli.IOStreams, cmd *cobra.Command, args []string, c client.Client) error {
-	version := args[0]
+func upgradeCmdWithClient(input *upgradeInput) error {
+	cmd := input.cmd
+	c := input.c
+	version := input.args[0]
 	sourceURI, _ := cmd.Flags().GetString(flagSourceURI)
 
-	ctx := context.Background()
-
-	su, err := shouldUpgrade(ctx, cmd)
+	su, err := shouldUpgrade(cmd, input.agentInfo, input.cFunc)
 	if !su {
 		return fmt.Errorf("aborting upgrade: %w", err)
 	}
 
-	err = c.Connect(ctx)
+	err = c.Connect(cmd.Context())
 	if err != nil {
 		return errors.New(err, "Failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
 	}
@@ -173,6 +187,6 @@ func upgradeCmdWithClient(streams *cli.IOStreams, cmd *cobra.Command, args []str
 			return errors.New(err, "Failed trigger upgrade of daemon")
 		}
 	}
-	fmt.Fprintf(streams.Out, "Upgrade triggered to version %s, Elastic Agent is currently restarting\n", version)
+	fmt.Fprintf(input.streams.Out, "Upgrade triggered to version %s, Elastic Agent is currently restarting\n", version)
 	return nil
 }
