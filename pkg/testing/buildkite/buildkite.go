@@ -24,11 +24,13 @@ const (
 )
 
 var (
+	bkPackageAgent = StepAgent{
+		Provider:    defaultProvider,
+		MachineType: defaultAMD64MachineType,
+	}
 	bkStackAgent = StepAgent{
-		Provider:     "gcp",
-		ImageProject: "elastic-images-qa",
-		MachineType:  "n1-standard-8",                                    // does it need to be this large?
-		Image:        "family/platform-ingest-elastic-agent-ubuntu-2204", // is this the correct image for creating a stack?
+		Image:                "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5",
+		UseCustomGlobalHooks: true,
 	}
 	bkUbuntuAMD64_2004 = StepAgent{
 		Provider:     defaultProvider,
@@ -186,7 +188,7 @@ func getAgent(os common.SupportedOS) (StepAgent, error) {
 
 func getCommand(b common.OSBatch) string {
 	if b.OS.Type == define.Linux {
-		return "mage integration:testOnRemote"
+		return ".buildkite/scripts/steps/integration_upload_run.sh"
 	}
 	return "TODO"
 }
@@ -202,6 +204,7 @@ func shouldSkip(os common.SupportedOS) bool {
 
 // GenerateSteps returns a computed set of steps to run the integration tests on buildkite.
 func GenerateSteps(cfg common.Config, batches ...define.Batch) (string, error) {
+	packageSteps := map[string]Step{}
 	stackSteps := map[string]Step{}
 	stackTeardown := map[string][]string{}
 	var steps []Step
@@ -214,6 +217,35 @@ func GenerateSteps(cfg common.Config, batches ...define.Batch) (string, error) {
 	osBatches, err := supported.CreateBatches(batches, platforms, cfg.Groups, cfg.Matrix, cfg.SingleTest)
 	if err != nil {
 		return "", err
+	}
+
+	// create the packaging steps first
+	// - only package what is being built
+	// - each as/arch gets its own step to run in parallel
+	for _, lb := range osBatches {
+		if lb.Skip {
+			continue
+		}
+
+		stepKey := getPackageKey(lb.OS)
+		_, ok := packageSteps[stepKey]
+		if !ok {
+			// add the package step for this type
+			packageStep := Step{
+				Label:   fmt.Sprintf("Integration Package: %s/%s", lb.OS.Type, lb.OS.Arch),
+				Key:     stepKey,
+				Command: ".buildkite/scripts/steps/integration-package.sh",
+				Env: map[string]string{
+					"PLATFORMS": fmt.Sprintf("%s/%s", lb.OS.Type, lb.OS.Arch),
+				},
+				ArtifactPaths: []string{
+					"build/distributions/**",
+				},
+				Agents: []StepAgent{bkPackageAgent},
+			}
+			steps = append(steps, packageStep)
+			packageSteps[stepKey] = packageStep
+		}
 	}
 
 	// create the stack steps first
@@ -230,8 +262,12 @@ func GenerateSteps(cfg common.Config, batches ...define.Batch) (string, error) {
 				stackStep := Step{
 					Label:   fmt.Sprintf("Integration Stack: %s", lb.Batch.Stack.Version),
 					Key:     stackKey,
-					Command: "false",
-					Agents:  []StepAgent{bkStackAgent},
+					Command: ".buildkite/scripts/steps/ess_start.sh",
+					ArtifactPaths: []string{
+						"test_infra/ess/*.tfstate",
+						"test_infra/ess/*.lock.hcl",
+					},
+					Agents: []StepAgent{bkStackAgent},
 				}
 				steps = append(steps, stackStep)
 				stackSteps[lb.Batch.Stack.Version] = stackStep
@@ -245,6 +281,7 @@ func GenerateSteps(cfg common.Config, batches ...define.Batch) (string, error) {
 		if lb.Skip {
 			continue
 		}
+		packageKey := getPackageKey(lb.OS)
 		agentStep, err := getAgent(lb.OS)
 		if err != nil {
 			return "", fmt.Errorf("unable to get machine and image: %w", err)
@@ -253,18 +290,23 @@ func GenerateSteps(cfg common.Config, batches ...define.Batch) (string, error) {
 			var step Step
 			step.Label = fmt.Sprintf("Integration Test (non-sudo): %s", lb.ID)
 			step.Key = fmt.Sprintf("integration-non-sudo-%s", lb.ID)
+			step.Env = map[string]string{
+				"AGENT_VERSION":       cfg.AgentVersion,
+				"TEST_PACKAGE_KEY":    packageKey,
+				"TEST_DEFINE_PREFIX":  step.Key,
+				"TEST_DEFINE_TESTS":   strings.Join(getTestNames(lb.Batch.Tests), ","),
+				"TEST_REQUIRES_SUDO":  "0",
+				"TEST_REQUIRES_STACK": "0",
+			}
+			step.DependsOn = []string{packageKey}
 			if lb.Batch.Stack != nil {
 				stackKey := getStackKey(lb.Batch.Stack)
 				step.DependsOn = append(step.DependsOn, stackKey)
 				stackTeardown[stackKey] = append(stackTeardown[stackKey], step.Key)
+				step.Env["TEST_REQUIRES_STACK"] = "1"
 			}
 			step.ArtifactPaths = []string{"build/**"}
 			step.Agents = []StepAgent{agentStep}
-			step.Env = map[string]string{
-				"AGENT_VERSION":      cfg.AgentVersion,
-				"TEST_DEFINE_PREFIX": step.Key,
-				"TEST_DEFINE_TESTS":  strings.Join(getTestNames(lb.Batch.Tests), ","),
-			}
 			step.Command = getCommand(lb)
 			step.Skip = shouldSkip(lb.OS)
 			steps = append(steps, step)
@@ -273,18 +315,23 @@ func GenerateSteps(cfg common.Config, batches ...define.Batch) (string, error) {
 			var step Step
 			step.Label = fmt.Sprintf("Integration Test (sudo): %s", lb.ID)
 			step.Key = fmt.Sprintf("integration-sudo-%s", lb.ID)
+			step.Env = map[string]string{
+				"AGENT_VERSION":       cfg.AgentVersion,
+				"TEST_PACKAGE_KEY":    packageKey,
+				"TEST_DEFINE_PREFIX":  step.Key,
+				"TEST_DEFINE_TESTS":   strings.Join(getTestNames(lb.Batch.SudoTests), ","),
+				"TEST_REQUIRES_SUDO":  "1",
+				"TEST_REQUIRES_STACK": "0",
+			}
+			step.DependsOn = []string{packageKey}
 			if lb.Batch.Stack != nil {
 				stackKey := getStackKey(lb.Batch.Stack)
 				step.DependsOn = append(step.DependsOn, stackKey)
 				stackTeardown[stackKey] = append(stackTeardown[stackKey], step.Key)
+				step.Env["TEST_REQUIRES_STACK"] = "1"
 			}
 			step.ArtifactPaths = []string{"build/**"}
 			step.Agents = []StepAgent{agentStep}
-			step.Env = map[string]string{
-				"AGENT_VERSION":      cfg.AgentVersion,
-				"TEST_DEFINE_PREFIX": step.Key,
-				"TEST_DEFINE_TESTS":  strings.Join(getTestNames(lb.Batch.SudoTests), ","),
-			}
 			step.Command = getCommand(lb)
 			step.Skip = shouldSkip(lb.OS)
 			steps = append(steps, step)
@@ -298,7 +345,7 @@ func GenerateSteps(cfg common.Config, batches ...define.Batch) (string, error) {
 			Key:                    fmt.Sprintf("teardown-%s", step.Key),
 			DependsOn:              stackTeardown[step.Key],
 			AllowDependencyFailure: true,
-			Command:                "false",
+			Command:                fmt.Sprintf(`buildkite-agent artifact download "test_infra/ess/**" . --step "%s" && .buildkite/scripts/steps/ess_down.sh`, step.Key),
 			Agents:                 []StepAgent{bkStackAgent},
 		})
 	}
@@ -320,6 +367,15 @@ func getTestNames(pt []define.BatchPackageTests) []string {
 		}
 	}
 	return tests
+}
+
+func getPackageKey(os common.SupportedOS) string {
+	osType := os.Type
+	if osType == "kubernetes" {
+		// uses linux packaging
+		osType = "linux"
+	}
+	return fmt.Sprintf("package-it-%s-%s", osType, os.Arch)
 }
 
 func getStackKey(s *define.Stack) string {
