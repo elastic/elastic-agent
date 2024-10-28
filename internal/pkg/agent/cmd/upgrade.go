@@ -7,7 +7,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
@@ -60,7 +59,8 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 	cmd.Flags().BoolP(flagForce, "", false, "Advanced option to force an upgrade on a fleet managed agent")
 	err := cmd.Flags().MarkHidden(flagForce)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Fprintf(streams.Err, "error while setting upgrade force flag attributes: %s", err.Error())
+		os.Exit(1)
 	}
 
 	return cmd
