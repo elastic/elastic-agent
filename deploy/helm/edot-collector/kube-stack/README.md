@@ -12,7 +12,7 @@ The OpenTelemetry components deployed within the DaemonSet EDOT collectors are r
 
 The DaemonSet collectors handle the following data:
 
-- Host Metrics: Collects host metrics specific to each node, utilizing the [filelog receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/hostmetricsreceiver/README.md)
+- Host Metrics: Collects host metrics specific to each node, utilizing the [hostmetrics receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/hostmetricsreceiver/README.md)
 - Kubernetes Metrics: Captures metrics related to the Kubernetes infrastructure on each node, utlilizing [kubeletstats](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/kubeletstatsreceiver/README.md) receiver
 - Logs: Utilizes [File Log Receiver receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/filelogreceiver#readme) to gather logs from all Pods running on the respective node.
 - OTLP Traces: Utilizes [OTLP Receiver]( https://github.com/open-telemetry/opentelemetry-collector/blob/main/receiver/otlpreceiver#readme) which configures both HTTP and GRPC endpoints on the node to receive OTLP trace data.
