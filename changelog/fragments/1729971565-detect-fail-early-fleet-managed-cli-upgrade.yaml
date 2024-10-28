@@ -11,7 +11,7 @@
 kind: enhancement
 
 # Change summary; a 80ish characters long description of the change.
-summary: detect-fail-early-fleet-managed-cli-upgrade
+summary: Detect and fail-early cli upgrades if agent is fleet-managed
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
