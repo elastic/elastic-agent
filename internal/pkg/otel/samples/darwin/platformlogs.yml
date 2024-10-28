@@ -11,7 +11,7 @@ receivers:
 extensions:
   file_storage:
     directory: ${env:STORAGE_DIR}
-  
+
 processors:
   resourcedetection:
     detectors: ["system"]
@@ -53,11 +53,11 @@ exporters:
     sampling_thereafter: 1000
 
   # Exporter to send logs and metrics to Elasticsearch
-  elasticsearch:
+  elasticsearch/otel:
     endpoints: ["${env:ELASTIC_ENDPOINT}"]
     api_key: ${env:ELASTIC_API_KEY}
     mapping:
-      mode: ecs
+      mode: otel
     logs_dynamic_index:
       enabled: true
     metrics_dynamic_index:
@@ -71,4 +71,4 @@ service:
     logs/platformlogs:
       receivers: [filelog/platformlogs]
       processors: [resourcedetection]
-      exporters: [debug, elasticsearch]
+      exporters: [debug, elasticsearch/otel]

@@ -140,6 +140,103 @@ mapping:
 	require.Empty(t, errOut.String())
 }
 
+func TestRedactWithSecretPaths(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  []byte
+		expect string
+	}{{
+		name: "no secret paths",
+		input: []byte(`id: test-policy
+inputs:
+  - type: test_input
+    redactKey: secretValue
+outputs:
+  default:
+    type: elasticsearch
+    api_key: secretKey
+    redactOtherKey: secretOutputValue
+`),
+		expect: `id: test-policy
+inputs:
+    - redactKey: secretValue
+      type: test_input
+outputs:
+    default:
+        api_key: <REDACTED>
+        redactOtherKey: secretOutputValue
+        type: elasticsearch
+`,
+	}, {
+		name: "secret_paths are redacted",
+		input: []byte(`id: test-policy
+secret_paths:
+  - inputs.0.redactKey
+  - outputs.default.redactOtherKey
+inputs:
+  - type: test_input
+    redactKey: secretValue
+outputs:
+  default:
+    type: elasticsearch
+    api_key: secretKey
+    redactOtherKey: secretOutputValue
+`),
+		expect: `id: test-policy
+inputs:
+    - redactKey: <REDACTED>
+      type: test_input
+outputs:
+    default:
+        api_key: <REDACTED>
+        redactOtherKey: <REDACTED>
+        type: elasticsearch
+secret_paths:
+    - inputs.0.redactKey
+    - outputs.default.redactOtherKey
+`,
+	}, {
+		name: "secret_paths contains extra keys",
+		input: []byte(`id: test-policy
+secret_paths:
+  - inputs.0.redactKey
+  - inputs.1.missingKey
+  - outputs.default.redactOtherKey
+inputs:
+  - type: test_input
+    redactKey: secretValue
+outputs:
+  default:
+    type: elasticsearch
+    api_key: secretKey
+`),
+		expect: `id: test-policy
+inputs:
+    - redactKey: <REDACTED>
+      type: test_input
+outputs:
+    default:
+        api_key: <REDACTED>
+        type: elasticsearch
+secret_paths:
+    - inputs.0.redactKey
+    - inputs.1.missingKey
+    - outputs.default.redactOtherKey
+`,
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			file := client.DiagnosticFileResult{Content: tc.input, ContentType: "application/yaml"}
+			var out bytes.Buffer
+			err := writeRedacted(io.Discard, &out, "testPath", file)
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.expect, out.String())
+		})
+	}
+}
+
 func TestUnitAndStateMapping(t *testing.T) {
 	// this structure causes problems due to the compound agentruntime.ComponentUnitKey map key
 	exampleState := agentruntime.ComponentState{
