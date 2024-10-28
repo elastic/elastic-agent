@@ -96,8 +96,8 @@ func TestUpgradeCmd(t *testing.T) {
 		upgradeCh := make(chan struct{})
 		mock := &mockServer{upgradeStop: upgradeCh}
 		mockAgentInfo := mockinfo.NewAgent(t)
-		mockAgentInfo.On("IsStandalone").Return(false) // Simulate fleet-managed agent
-		mockAgentInfo.On("Unprivileged").Return(true)  // Simulate unprivileged mode
+		mockAgentInfo.EXPECT().IsStandalone().Return(false) // Simulate fleet-managed agent
+		mockAgentInfo.EXPECT().Unprivileged().Return(true)  // Simulate unprivileged mode
 		cproto.RegisterElasticAgentControlServer(s, mock)
 
 		wg.Add(1)
