@@ -35,7 +35,7 @@ func TestUpgradeCmd(t *testing.T) {
 		upgradeCh := make(chan struct{})
 		mock := &mockServer{upgradeStop: upgradeCh}
 		mockAgentInfo := mockinfo.NewAgent(t)
-		mockAgentInfo.On("IsStandalone").Return(true)
+		mockAgentInfo.EXPECT().IsStandalone().Return(true)
 		cproto.RegisterElasticAgentControlServer(s, mock)
 		go func() {
 			err := s.Serve(tcpServer)
@@ -162,8 +162,8 @@ func TestUpgradeCmd(t *testing.T) {
 		// Define mock server and agent information
 		mock := &mockServer{}
 		mockAgentInfo := mockinfo.NewAgent(t)
-		mockAgentInfo.On("IsStandalone").Return(false) // Simulate fleet-managed agent
-		mockAgentInfo.On("Unprivileged").Return(false) // Simulate privileged mode
+		mockAgentInfo.EXPECT().IsStandalone().Return(false) // Simulate fleet-managed agent
+		mockAgentInfo.EXPECT().Unprivileged().Return(false) // Simulate privileged mode
 		cproto.RegisterElasticAgentControlServer(s, mock)
 
 		wg.Add(1)
@@ -227,8 +227,8 @@ func TestUpgradeCmd(t *testing.T) {
 		// Define mock server and agent information
 		mock := &mockServer{}
 		mockAgentInfo := mockinfo.NewAgent(t)
-		mockAgentInfo.On("IsStandalone").Return(false) // Simulate fleet-managed agent
-		mockAgentInfo.On("Unprivileged").Return(false) // Simulate privileged mode
+		mockAgentInfo.EXPECT().IsStandalone().Return(false) // Simulate fleet-managed agent
+		mockAgentInfo.EXPECT().Unprivileged().Return(false) // Simulate privileged mode
 		cproto.RegisterElasticAgentControlServer(s, mock)
 
 		wg.Add(1)
@@ -300,8 +300,8 @@ func TestUpgradeCmd(t *testing.T) {
 		upgradeCh := make(chan struct{})
 		mock := &mockServer{upgradeStop: upgradeCh}
 		mockAgentInfo := mockinfo.NewAgent(t)
-		mockAgentInfo.On("IsStandalone").Return(false) // Simulate fleet-managed agent
-		mockAgentInfo.On("Unprivileged").Return(false) // Simulate privileged mode
+		mockAgentInfo.EXPECT().IsStandalone().Return(false) // Simulate fleet-managed agent
+		mockAgentInfo.EXPECT().Unprivileged().Return(false) // Simulate privileged mode
 		cproto.RegisterElasticAgentControlServer(s, mock)
 
 		wg.Add(1)
