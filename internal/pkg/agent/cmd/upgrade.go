@@ -35,6 +35,8 @@ const (
 	flagForce          = "force"
 )
 
+var upgradeUnconfErr error = errors.New("upgrade not confirmed")
+
 func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade <version>",
@@ -118,7 +120,7 @@ func shouldUpgrade(cmd *cobra.Command, agentInfo info.Agent, cFunc confirmFunc) 
 	}
 
 	if !cf {
-		return false, fmt.Errorf("upgrade not confirmed")
+		return false, upgradeUnconfErr
 	}
 
 	return true, nil
