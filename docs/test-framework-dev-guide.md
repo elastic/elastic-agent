@@ -25,9 +25,7 @@ The Elastic Agent package that is used for integration tests packages Beats buil
 
 ### Configuration
 
-ESS (staging) API Key to create on https://staging.found.no/account/keys
-
-ESS (staging) API Key to create on <https://cloud.elastic.co/account/keys>
+ESS (production) API Key to create on <https://cloud.elastic.co/account/keys>
 Warning: if you never created a deployment on it, you won't have permission to get this key, so you will need to create one first.
 
 ## Running tests
