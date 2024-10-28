@@ -263,6 +263,7 @@ func TestHTTPSProxy(t *testing.T) {
 			name:   "request_failure",
 			target: "https://any.not.target.will.do",
 			assertFn: func(t *testing.T, got *http.Response, err error) {
+				assert.NoError(t, err, "request to an invalid host should not fail, but succeed with a HTTP error")
 				assert.Equal(t, http.StatusBadGateway, got.StatusCode)
 
 				body, err := io.ReadAll(got.Body)
