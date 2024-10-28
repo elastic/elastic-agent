@@ -2,7 +2,7 @@
 
 **More detailed documentation can be found [here](https://github.com/elastic/opentelemetry/blob/main/docs/kubernetes/operator/README.md).**
 
-The [kube-stack Helm Chart](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-kube-stack) is used to manage the installation of the OpenTelemetry operator (including its CRDs) and to configure a suite of EDOT collectors, which instrument various Kubernetes components to enable comprehensive observability and monitoring.
+The [kube-stack Helm Chart](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-kube-stack#readme) is used to manage the installation of the OpenTelemetry operator (including its CRDs) and to configure a suite of EDOT collectors, which instrument various Kubernetes components to enable comprehensive observability and monitoring.
 
 The chart is installed with a provided default `values.yaml` file that can be customized when needed.
 
