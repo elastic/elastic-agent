@@ -8,6 +8,7 @@ import (
 	"context"
 	"log"
 	"net"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -83,13 +84,13 @@ func TestUpgradeCmd(t *testing.T) {
 		<-clientCh
 	})
 	t.Run("fail if fleet managed and unprivileged", func(t *testing.T) {
+		var wg sync.WaitGroup
 		// Set up mock TCP server for gRPC connection
 		tcpServer, err := net.Listen("tcp", "127.0.0.1:")
 		require.NoError(t, err)
 		defer tcpServer.Close()
 
 		s := grpc.NewServer()
-		defer s.Stop()
 
 		// Define mock server and agent information
 		upgradeCh := make(chan struct{})
@@ -99,7 +100,9 @@ func TestUpgradeCmd(t *testing.T) {
 		mockAgentInfo.On("Unprivileged").Return(true)  // Simulate unprivileged mode
 		cproto.RegisterElasticAgentControlServer(s, mock)
 
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			err := s.Serve(tcpServer)
 			assert.NoError(t, err)
 		}()
@@ -120,10 +123,11 @@ func TestUpgradeCmd(t *testing.T) {
 			nil,
 		}
 
-		clientCh := make(chan struct{})
-
+		term := make(chan int)
+		wg.Add(1)
 		// Execute upgrade command and validate shouldUpgrade error
 		go func() {
+			defer wg.Done()
 			err = upgradeCmdWithClient(commandInput)
 
 			// Expect an error due to unprivileged fleet-managed mode
@@ -133,21 +137,27 @@ func TestUpgradeCmd(t *testing.T) {
 			// Verify counter has not incremented since upgrade should not proceed
 			counter := atomic.LoadInt32(&mock.upgrades)
 			assert.Equal(t, int32(0), counter, "server should not have handled any upgrades")
-
-			close(clientCh)
+			close(term)
 		}()
 
-		<-clientCh // Ensure goroutine completes before ending test
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-term
+			s.Stop()
+		}()
+
+		wg.Wait()
 	})
 
 	t.Run("fail if fleet managed privileged but no force flag", func(t *testing.T) {
+		var wg sync.WaitGroup
 		// Set up mock TCP server for gRPC connection
 		tcpServer, err := net.Listen("tcp", "127.0.0.1:")
 		require.NoError(t, err)
 		defer tcpServer.Close()
 
 		s := grpc.NewServer()
-		defer s.Stop()
 
 		// Define mock server and agent information
 		mock := &mockServer{}
@@ -156,7 +166,9 @@ func TestUpgradeCmd(t *testing.T) {
 		mockAgentInfo.On("Unprivileged").Return(false) // Simulate privileged mode
 		cproto.RegisterElasticAgentControlServer(s, mock)
 
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			err := s.Serve(tcpServer)
 			assert.NoError(t, err)
 		}()
@@ -177,10 +189,11 @@ func TestUpgradeCmd(t *testing.T) {
 			nil,
 		}
 
-		clientCh := make(chan struct{})
-
+		term := make(chan int)
+		wg.Add(1)
 		// Execute upgrade command and validate shouldUpgrade error
 		go func() {
+			defer wg.Done()
 			err = upgradeCmdWithClient(commandInput)
 
 			// Expect an error due to unprivileged fleet-managed mode
@@ -190,20 +203,26 @@ func TestUpgradeCmd(t *testing.T) {
 			// Verify counter has not incremented since upgrade should not proceed
 			counter := atomic.LoadInt32(&mock.upgrades)
 			assert.Equal(t, int32(0), counter, "server should not have handled any upgrades")
-
-			close(clientCh)
+			close(term)
 		}()
 
-		<-clientCh // Ensure goroutine completes before ending test
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-term
+			s.Stop()
+		}()
+
+		wg.Wait()
 	})
 	t.Run("abort upgrade if fleet managed, privileged, --force is set, and user does not confirm", func(t *testing.T) {
+		var wg sync.WaitGroup
 		// Set up mock TCP server for gRPC connection
 		tcpServer, err := net.Listen("tcp", "127.0.0.1:")
 		require.NoError(t, err)
 		defer tcpServer.Close()
 
 		s := grpc.NewServer()
-		defer s.Stop()
 
 		// Define mock server and agent information
 		mock := &mockServer{}
@@ -212,7 +231,9 @@ func TestUpgradeCmd(t *testing.T) {
 		mockAgentInfo.On("Unprivileged").Return(false) // Simulate privileged mode
 		cproto.RegisterElasticAgentControlServer(s, mock)
 
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			err := s.Serve(tcpServer)
 			assert.NoError(t, err)
 		}()
@@ -239,10 +260,11 @@ func TestUpgradeCmd(t *testing.T) {
 			},
 		}
 
-		clientCh := make(chan struct{})
-
+		term := make(chan int)
+		wg.Add(1)
 		// Execute upgrade command and validate shouldUpgrade error
 		go func() {
+			defer wg.Done()
 			err = upgradeCmdWithClient(commandInput)
 
 			// Expect an error because user does not confirm the upgrade
@@ -253,19 +275,26 @@ func TestUpgradeCmd(t *testing.T) {
 			counter := atomic.LoadInt32(&mock.upgrades)
 			assert.Equal(t, int32(0), counter, "server should not have handled any upgrades")
 
-			close(clientCh)
+			close(term)
 		}()
 
-		<-clientCh // Ensure goroutine completes before ending test
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-term
+			s.Stop()
+		}()
+
+		wg.Wait()
 	})
 	t.Run("proceed with upgrade if fleet managed, privileged, --force is set, and user confirms upgrade", func(t *testing.T) {
+		var wg sync.WaitGroup
 		// Set up mock TCP server for gRPC connection
 		tcpServer, err := net.Listen("tcp", "127.0.0.1:")
 		require.NoError(t, err)
 		defer tcpServer.Close()
 
 		s := grpc.NewServer()
-		defer s.Stop()
 
 		// Define mock server and agent information
 		upgradeCh := make(chan struct{})
@@ -275,7 +304,9 @@ func TestUpgradeCmd(t *testing.T) {
 		mockAgentInfo.On("Unprivileged").Return(false) // Simulate privileged mode
 		cproto.RegisterElasticAgentControlServer(s, mock)
 
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			err := s.Serve(tcpServer)
 			assert.NoError(t, err)
 		}()
@@ -302,10 +333,11 @@ func TestUpgradeCmd(t *testing.T) {
 			},
 		}
 
-		clientCh := make(chan struct{})
-
+		term := make(chan int)
+		wg.Add(1)
 		// Execute upgrade command and validate that there are no errors
 		go func() {
+			defer wg.Done()
 			err = upgradeCmdWithClient(commandInput)
 
 			assert.NoError(t, err)
@@ -314,12 +346,19 @@ func TestUpgradeCmd(t *testing.T) {
 			counter := atomic.LoadInt32(&mock.upgrades)
 			assert.Equal(t, int32(1), counter, "server should handle exactly one upgrade")
 
-			close(clientCh)
+			close(term)
 		}()
 
 		close(upgradeCh)
 
-		<-clientCh // Ensure goroutine completes before ending test
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-term
+			s.Stop()
+		}()
+
+		wg.Wait()
 	})
 }
 
