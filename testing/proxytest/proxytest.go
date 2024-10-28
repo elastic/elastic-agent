@@ -5,10 +5,15 @@
 package proxytest
 
 import (
+	"bufio"
+	"context"
+	"crypto"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -27,6 +32,7 @@ type Proxy struct {
 	Port string
 
 	// LocalhostURL is the server URL as "http(s)://localhost:PORT".
+	// Deprecated. Use Proxy.URL instead.
 	LocalhostURL string
 
 	// proxiedRequests is a "request log" for every request the proxy receives.
@@ -34,6 +40,10 @@ type Proxy struct {
 	proxiedRequestsMu sync.Mutex
 
 	opts options
+	log  *slog.Logger
+
+	ca     ca
+	client *http.Client
 }
 
 type Option func(o *options)
@@ -46,6 +56,14 @@ type options struct {
 	logFn           func(format string, a ...any)
 	verbose         bool
 	serverTLSConfig *tls.Config
+	capriv          crypto.PrivateKey
+	cacert          *x509.Certificate
+	client          *http.Client
+}
+
+type ca struct {
+	capriv crypto.PrivateKey
+	cacert *x509.Certificate
 }
 
 // WithAddress will set the address the server will listen on. The format is as
@@ -53,6 +71,24 @@ type options struct {
 func WithAddress(addr string) Option {
 	return func(o *options) {
 		o.addr = addr
+	}
+}
+
+// WithHTTPClient sets http.Client used to proxy requests to the target host.
+func WithHTTPClient(c *http.Client) Option {
+	return func(o *options) {
+		o.client = c
+	}
+}
+
+// WithMITMCA sets the CA used for MITM (men in the middle) when proxying HTTPS
+// requests. It's used to generate TLS certificates matching the target host.
+// Ideally the CA is the same as the one issuing the TLS certificate for the
+// proxy set by WithServerTLSConfig.
+func WithMITMCA(priv crypto.PrivateKey, cert *x509.Certificate) func(o *options) {
+	return func(o *options) {
+		o.capriv = priv
+		o.cacert = cert
 	}
 }
 
@@ -75,14 +111,6 @@ func WithRewrite(old, new string) Option {
 	}
 }
 
-// WithVerboseLog sets the proxy to log every request verbosely. WithRequestLog
-// must be used as well, otherwise WithVerboseLog will not take effect.
-func WithVerboseLog() Option {
-	return func(o *options) {
-		o.verbose = true
-	}
-}
-
 // WithRewriteFn calls f on the request *url.URL before forwarding it.
 // It takes precedence over WithRewrite. Use if more control over the rewrite
 // is needed.
@@ -92,9 +120,19 @@ func WithRewriteFn(f func(u *url.URL)) Option {
 	}
 }
 
+// WithServerTLSConfig sets the TLS config for the server.
 func WithServerTLSConfig(tc *tls.Config) Option {
 	return func(o *options) {
 		o.serverTLSConfig = tc
+	}
+}
+
+// WithVerboseLog sets the proxy to log every request verbosely and enables
+// debug level logging. WithRequestLog must be used as well, otherwise
+// WithVerboseLog will not take effect.
+func WithVerboseLog() Option {
+	return func(o *options) {
+		o.verbose = true
 	}
 }
 
@@ -106,7 +144,7 @@ func WithServerTLSConfig(tc *tls.Config) Option {
 func New(t *testing.T, optns ...Option) *Proxy {
 	t.Helper()
 
-	opts := options{addr: ":0"}
+	opts := options{addr: "127.0.0.1:0", client: &http.Client{}}
 	for _, o := range optns {
 		o(&opts)
 	}
@@ -120,17 +158,35 @@ func New(t *testing.T, optns ...Option) *Proxy {
 		t.Fatalf("NewServer failed to create a net.Listener: %v", err)
 	}
 
-	p := Proxy{opts: opts}
+	// Create a text handler that writes to standard output
+	lv := slog.LevelInfo
+	if opts.verbose {
+		lv = slog.LevelDebug
+	}
+	p := Proxy{
+		opts:   opts,
+		client: opts.client,
+		log: slog.New(slog.NewTextHandler(logfWriter(opts.logFn), &slog.HandlerOptions{
+			AddSource: true,
+			Level:     lv,
+		})),
+	}
+	if opts.capriv != nil && opts.cacert != nil {
+		p.ca = ca{capriv: opts.capriv, cacert: opts.cacert}
+	}
 
 	p.Server = httptest.NewUnstartedServer(
 		http.HandlerFunc(func(ww http.ResponseWriter, r *http.Request) {
-			w := &statusResponseWriter{w: ww}
+			w := &proxyResponseWriter{w: ww}
 
 			requestID := uuid.Must(uuid.NewV4()).String()
-			opts.logFn("[%s] STARTING - %s %s %s %s\n",
-				requestID, r.Method, r.URL, r.Proto, r.RemoteAddr)
+			p.log.Info(fmt.Sprintf("STARTING - %s '%s' %s %s",
+				r.Method, r.URL, r.Proto, r.RemoteAddr))
 
-			p.ServeHTTP(w, r)
+			rr := addIDToReqCtx(r, requestID)
+			rrr := addLoggerReqCtx(rr, p.log.With("req_id", requestID))
+
+			p.ServeHTTP(w, rrr)
 
 			opts.logFn(fmt.Sprintf("[%s] DONE %d - %s %s %s %s\n",
 				requestID, w.statusCode, r.Method, r.URL, r.Proto, r.RemoteAddr))
@@ -150,7 +206,6 @@ func New(t *testing.T, optns ...Option) *Proxy {
 	p.Port = u.Port()
 	p.LocalhostURL = "http://localhost:" + p.Port
 
-	opts.logFn("running on %s -> %s", p.URL, p.LocalhostURL)
 	return &p
 }
 
@@ -164,7 +219,7 @@ func (p *Proxy) Start() error {
 	p.Port = u.Port()
 	p.LocalhostURL = "http://localhost:" + p.Port
 
-	p.opts.logFn("running on %s -> %s", p.URL, p.LocalhostURL)
+	p.log.Info(fmt.Sprintf("running on %s -> %s", p.URL, p.LocalhostURL))
 	return nil
 }
 
@@ -178,34 +233,21 @@ func (p *Proxy) StartTLS() error {
 	p.Port = u.Port()
 	p.LocalhostURL = "https://localhost:" + p.Port
 
-	p.opts.logFn("running on %s -> %s", p.URL, p.LocalhostURL)
+	p.log.Info(fmt.Sprintf("running on %s -> %s", p.URL, p.LocalhostURL))
 	return nil
 }
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	origURL := r.URL.String()
-
-	switch {
-	case p.opts.rewriteURL != nil:
-		p.opts.rewriteURL(r.URL)
-	case p.opts.rewriteHost != nil:
-		r.URL.Host = p.opts.rewriteHost(r.URL.Host)
+	if r.Method == http.MethodConnect {
+		p.serveHTTPS(w, r)
+		return
 	}
 
-	if p.opts.verbose {
-		p.opts.logFn("original URL: %s, new URL: %s",
-			origURL, r.URL.String())
-	}
+	p.serveHTTP(w, r)
+}
 
-	p.proxiedRequestsMu.Lock()
-	p.proxiedRequests = append(p.proxiedRequests,
-		fmt.Sprintf("%s - %s %s %s",
-			r.Method, r.URL.Scheme, r.URL.Host, r.URL.String()))
-	p.proxiedRequestsMu.Unlock()
-
-	r.RequestURI = ""
-
-	resp, err := http.DefaultClient.Do(r)
+func (p *Proxy) serveHTTP(w http.ResponseWriter, r *http.Request) {
+	resp, err := p.processRequest(r)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		msg := fmt.Sprintf("could not make request: %#v", err.Error())
@@ -225,6 +267,34 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// processRequest executes the configured request manipulation and perform the
+// request.
+func (p *Proxy) processRequest(r *http.Request) (*http.Response, error) {
+	origURL := r.URL.String()
+
+	switch {
+	case p.opts.rewriteURL != nil:
+		p.opts.rewriteURL(r.URL)
+	case p.opts.rewriteHost != nil:
+		r.URL.Host = p.opts.rewriteHost(r.URL.Host)
+	}
+
+	p.log.Debug(fmt.Sprintf("original URL: %s, new URL: %s",
+		origURL, r.URL.String()))
+
+	p.proxiedRequestsMu.Lock()
+	p.proxiedRequests = append(p.proxiedRequests,
+		fmt.Sprintf("%s - %s %s %s",
+			r.Method, r.URL.Scheme, r.URL.Host, r.URL.String()))
+	p.proxiedRequestsMu.Unlock()
+
+	// when modifying the request, RequestURI isn't updated, and it isn't
+	// needed anyway, so remove it.
+	r.RequestURI = ""
+
+	return p.client.Do(r)
+}
+
 // ProxiedRequests returns a slice with the "request log" with every request the
 // proxy received.
 func (p *Proxy) ProxiedRequests() []string {
@@ -236,26 +306,67 @@ func (p *Proxy) ProxiedRequests() []string {
 	return rs
 }
 
-// statusResponseWriter wraps a http.ResponseWriter to expose the status code
-// through statusResponseWriter.statusCode
-type statusResponseWriter struct {
+var _ http.Hijacker = &proxyResponseWriter{}
+
+// proxyResponseWriter wraps a http.ResponseWriter to expose the status code
+// through proxyResponseWriter.statusCode
+type proxyResponseWriter struct {
 	w          http.ResponseWriter
 	statusCode int
 }
 
-func (s *statusResponseWriter) Header() http.Header {
+func (s *proxyResponseWriter) Header() http.Header {
 	return s.w.Header()
 }
 
-func (s *statusResponseWriter) Write(bs []byte) (int, error) {
+func (s *proxyResponseWriter) Write(bs []byte) (int, error) {
 	return s.w.Write(bs)
 }
 
-func (s *statusResponseWriter) WriteHeader(statusCode int) {
+func (s *proxyResponseWriter) WriteHeader(statusCode int) {
 	s.statusCode = statusCode
 	s.w.WriteHeader(statusCode)
 }
 
-func (s *statusResponseWriter) StatusCode() int {
+func (s *proxyResponseWriter) StatusCode() int {
 	return s.statusCode
+}
+
+func (s *proxyResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := s.w.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("%T does not support hijacking", s.w)
+	}
+
+	return hijacker.Hijack()
+}
+
+type ctxKeyRecID struct{}
+type ctxKeyLogger struct{}
+
+func addIDToReqCtx(r *http.Request, id string) *http.Request {
+	return r.WithContext(context.WithValue(r.Context(), ctxKeyRecID{}, id))
+}
+
+func idFromReqCtx(r *http.Request) string { //nolint:unused // kept for completeness
+	return r.Context().Value(ctxKeyRecID{}).(string)
+}
+
+func addLoggerReqCtx(r *http.Request, log *slog.Logger) *http.Request {
+	return r.WithContext(context.WithValue(r.Context(), ctxKeyLogger{}, log))
+}
+
+func loggerFromReqCtx(r *http.Request) *slog.Logger {
+	l, ok := r.Context().Value(ctxKeyLogger{}).(*slog.Logger)
+	if !ok {
+		return slog.Default()
+	}
+	return l
+}
+
+type logfWriter func(format string, a ...any)
+
+func (w logfWriter) Write(p []byte) (n int, err error) {
+	w(string(p))
+	return len(p), nil
 }
