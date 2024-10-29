@@ -35,7 +35,7 @@ const (
 	flagForce          = "force"
 )
 
-var upgradeUnconfErr error = errors.New("upgrade not confirmed")
+var unsupportedUpgrade error = errors.New("upgrading fleet managed agents is not supported")
 
 func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
@@ -74,10 +74,7 @@ type upgradeInput struct {
 	args      []string
 	c         client.Client
 	agentInfo info.Agent
-	cFunc     confirmFunc
 }
-
-type confirmFunc func(string, bool) (bool, error)
 
 func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
 	c := client.New()
@@ -91,12 +88,11 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 		args,
 		c,
 		agentInfo,
-		cli.Confirm,
 	}
 	return upgradeCmdWithClient(input)
 }
 
-func shouldUpgrade(cmd *cobra.Command, agentInfo info.Agent, cFunc confirmFunc) (bool, error) {
+func shouldUpgrade(cmd *cobra.Command, agentInfo info.Agent) (bool, error) {
 	if agentInfo.IsStandalone() {
 		return true, nil
 	}
@@ -111,16 +107,7 @@ func shouldUpgrade(cmd *cobra.Command, agentInfo info.Agent, cFunc confirmFunc) 
 	}
 
 	if !force {
-		return false, fmt.Errorf("upgrading fleet managed agents is not supported")
-	}
-
-	cf, err := cFunc("Upgrading fleet managed agents is not supported. Would you still like to proceed?", false)
-	if err != nil {
-		return false, fmt.Errorf("failed while confirming action: %w", err)
-	}
-
-	if !cf {
-		return false, upgradeUnconfErr
+		return false, unsupportedUpgrade
 	}
 
 	return true, nil
@@ -132,7 +119,7 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 	version := input.args[0]
 	sourceURI, _ := cmd.Flags().GetString(flagSourceURI)
 
-	su, err := shouldUpgrade(cmd, input.agentInfo, input.cFunc)
+	su, err := shouldUpgrade(cmd, input.agentInfo)
 	if !su {
 		return fmt.Errorf("aborting upgrade: %w", err)
 	}

@@ -56,7 +56,6 @@ func TestUpgradeCmd(t *testing.T) {
 			args,
 			c,
 			mockAgentInfo,
-			nil,
 		}
 
 		// the upgrade command will hang until the server shut down
@@ -83,6 +82,7 @@ func TestUpgradeCmd(t *testing.T) {
 		// this makes sure all client assertions are done
 		<-clientCh
 	})
+
 	t.Run("fail if fleet managed and unprivileged", func(t *testing.T) {
 		var wg sync.WaitGroup
 		// Set up mock TCP server for gRPC connection
@@ -120,7 +120,6 @@ func TestUpgradeCmd(t *testing.T) {
 			args,
 			c,
 			mockAgentInfo,
-			nil,
 		}
 
 		term := make(chan int)
@@ -186,7 +185,6 @@ func TestUpgradeCmd(t *testing.T) {
 			args,
 			c,
 			mockAgentInfo,
-			nil,
 		}
 
 		term := make(chan int)
@@ -215,79 +213,8 @@ func TestUpgradeCmd(t *testing.T) {
 
 		wg.Wait()
 	})
-	t.Run("abort upgrade if fleet managed, privileged, --force is set, and user does not confirm", func(t *testing.T) {
-		var wg sync.WaitGroup
-		// Set up mock TCP server for gRPC connection
-		tcpServer, err := net.Listen("tcp", "127.0.0.1:")
-		require.NoError(t, err)
-		defer tcpServer.Close()
 
-		s := grpc.NewServer()
-
-		// Define mock server and agent information
-		mock := &mockServer{}
-		mockAgentInfo := mockinfo.NewAgent(t)
-		mockAgentInfo.EXPECT().IsStandalone().Return(false) // Simulate fleet-managed agent
-		mockAgentInfo.EXPECT().Unprivileged().Return(false) // Simulate privileged mode
-		cproto.RegisterElasticAgentControlServer(s, mock)
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			err := s.Serve(tcpServer)
-			assert.NoError(t, err)
-		}()
-
-		// Create client and command
-		c := client.New(client.WithAddress("http://" + tcpServer.Addr().String()))
-		args := []string{"8.13.0"} // Version argument
-		streams := cli.NewIOStreams()
-		cmd := newUpgradeCommandWithArgs(args, streams)
-		cmd.SetContext(context.Background())
-		err = cmd.Flags().Set("force", "true")
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		commandInput := &upgradeInput{
-			streams,
-			cmd,
-			args,
-			c,
-			mockAgentInfo,
-			func(s string, b bool) (bool, error) {
-				return false, nil
-			},
-		}
-
-		term := make(chan int)
-		wg.Add(1)
-		// Execute upgrade command and validate shouldUpgrade error
-		go func() {
-			defer wg.Done()
-			err = upgradeCmdWithClient(commandInput)
-
-			// Expect an error because user does not confirm the upgrade
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), "upgrade not confirmed")
-
-			// Verify counter has not incremented since upgrade should not proceed
-			counter := atomic.LoadInt32(&mock.upgrades)
-			assert.Equal(t, int32(0), counter, "server should not have handled any upgrades")
-
-			close(term)
-		}()
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			<-term
-			s.Stop()
-		}()
-
-		wg.Wait()
-	})
-	t.Run("proceed with upgrade if fleet managed, privileged, --force is set, and user confirms upgrade", func(t *testing.T) {
+	t.Run("proceed with upgrade if fleet managed, privileged, --force is set", func(t *testing.T) {
 		var wg sync.WaitGroup
 		// Set up mock TCP server for gRPC connection
 		tcpServer, err := net.Listen("tcp", "127.0.0.1:")
@@ -328,9 +255,6 @@ func TestUpgradeCmd(t *testing.T) {
 			args,
 			c,
 			mockAgentInfo,
-			func(s string, b bool) (bool, error) {
-				return true, nil
-			},
 		}
 
 		term := make(chan int)
