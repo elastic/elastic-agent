@@ -234,7 +234,8 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		// Uninstall the agent
 		progBar.Describe("Uninstalling current Elastic Agent")
 		if !runUninstallBinary {
-			err := execUninstall(streams)
+			bn := getBinaryName(isDevelopmentMode)
+			err := execUninstall(bn, streams)
 			if err != nil {
 				progBar.Describe("Uninstall failed")
 				return err
@@ -328,13 +329,20 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	return nil
 }
 
+func getBinaryName(isDev bool) string {
+	if isDev {
+		return paths.DevelopmentBinaryName
+	}
+	return paths.BinaryName
+}
+
 // execUninstall execs "elastic-agent uninstall --force" from the elastic agent installed on the system (found in PATH)
-func execUninstall(streams *cli.IOStreams) error {
+func execUninstall(binaryName string, streams *cli.IOStreams) error {
 	args := []string{
 		"uninstall",
 		"--force",
 	}
-	execPath, err := exec.LookPath(paths.BinaryName)
+	execPath, err := exec.LookPath(binaryName)
 	if err != nil {
 		return fmt.Errorf("unable to find %s on path: %w", paths.BinaryName, err)
 	}
