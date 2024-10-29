@@ -29,6 +29,43 @@ Config input for container logs
           stream: {{ dig "vars" "stream" "all" .Values.kubernetes.containers.logs }}
           format: {{ dig "vars" "format" "auto" .Values.kubernetes.containers.logs }}
       {{- with $.Values.kubernetes.containers.logs.additionalParsersConfig }}
-      {{- . | toYaml | nindent 6 }}
+      {{ . | toYaml | nindent 6 }}
       {{- end }}
+    processors:
+      - add_fields:
+          target: kubernetes
+          fields:
+            annotations.elastic_co/dataset: '${kubernetes.annotations.elastic.co/dataset|""}'
+            annotations.elastic_co/namespace: '${kubernetes.annotations.elastic.co/namespace|""}'
+            annotations.elastic_co/preserve_original_event: '${kubernetes.annotations.elastic.co/preserve_original_event|""}'
+      - drop_fields:
+          fields:
+            - kubernetes.annotations.elastic_co/dataset
+          when:
+            equals:
+              kubernetes.annotations.elastic_co/dataset: ''
+          ignore_missing: true
+      - drop_fields:
+          fields:
+            - kubernetes.annotations.elastic_co/namespace
+          when:
+            equals:
+              kubernetes.annotations.elastic_co/namespace: ''
+          ignore_missing: true
+      - drop_fields:
+          fields:
+            - kubernetes.annotations.elastic_co/preserve_original_event
+          when:
+            equals:
+              kubernetes.annotations.elastic_co/preserve_original_event: ''
+          ignore_missing: true
+      - add_tags:
+          tags:
+            - preserve_original_event
+          when:
+            and:
+              - has_fields:
+                  - kubernetes.annotations.elastic_co/preserve_original_event
+              - regexp:
+                  kubernetes.annotations.elastic_co/preserve_original_event: ^(?i)true$
 {{- end -}}

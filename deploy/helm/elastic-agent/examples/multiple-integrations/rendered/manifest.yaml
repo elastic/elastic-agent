@@ -469,6 +469,43 @@ stringData:
               stream: all
           paths:
           - /var/log/containers/*${kubernetes.container.id}.log
+          processors:
+          - add_fields:
+              fields:
+                annotations.elastic_co/dataset: ${kubernetes.annotations.elastic.co/dataset|""}
+                annotations.elastic_co/namespace: ${kubernetes.annotations.elastic.co/namespace|""}
+                annotations.elastic_co/preserve_original_event: ${kubernetes.annotations.elastic.co/preserve_original_event|""}
+              target: kubernetes
+          - drop_fields:
+              fields:
+              - kubernetes.annotations.elastic_co/dataset
+              ignore_missing: true
+              when:
+                equals:
+                  kubernetes.annotations.elastic_co/dataset: ""
+          - drop_fields:
+              fields:
+              - kubernetes.annotations.elastic_co/namespace
+              ignore_missing: true
+              when:
+                equals:
+                  kubernetes.annotations.elastic_co/namespace: ""
+          - drop_fields:
+              fields:
+              - kubernetes.annotations.elastic_co/preserve_original_event
+              ignore_missing: true
+              when:
+                equals:
+                  kubernetes.annotations.elastic_co/preserve_original_event: ""
+          - add_tags:
+              tags:
+              - preserve_original_event
+              when:
+                and:
+                - has_fields:
+                  - kubernetes.annotations.elastic_co/preserve_original_event
+                - regexp:
+                    kubernetes.annotations.elastic_co/preserve_original_event: ^(?i)true$
           prospector.scanner.symlinks: true
         type: filestream
         use_output: default
@@ -1080,7 +1117,7 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: a0992804c5782a0f4c3b4eeae610ff3d222fc7f3e219658cf9787fbe4e5202f1
+        checksum/config: 21fb7e317577410096de8d8e0fb03b32ad2e406b549f75085ae6907d38678e46
 
     spec:
       dnsPolicy: ClusterFirstWithHostNet
