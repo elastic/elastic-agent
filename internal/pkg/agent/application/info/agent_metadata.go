@@ -18,7 +18,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 
-	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
 )
 
@@ -146,7 +145,7 @@ func Metadata(ctx context.Context, l *logger.Logger) (*ECSMeta, error) {
 
 // ECSMetadata returns an agent ECS compliant metadata.
 func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
-	sysInfo, err := sysinfo.Host()
+	sysInfo, err := util.GetHost()
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +194,7 @@ func (i *AgentInfo) ECSMetadataFlatMap(l *logger.Logger) (map[string]interface{}
 	// TODO: remove these values when kibana migrates to ECS
 	meta := make(map[string]interface{})
 
-	sysInfo, err := sysinfo.Host()
+	sysInfo, err := util.GetHost()
 	if err != nil {
 		return nil, err
 	}

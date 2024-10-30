@@ -6,9 +6,11 @@ package util
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
 )
 
@@ -30,4 +32,62 @@ func GetHostName(isFqdnFeatureEnabled bool, hostInfo types.HostInfo, host types.
 	}
 
 	return fqdn
+}
+
+var _ types.Host = &threadSafeHost{}
+
+// threadSafeHost is a thread-safe wrapper around types.Host.
+// It exists so we can only create it once, as some of the setup it does is relatively expensive.
+type threadSafeHost struct {
+	sync.Mutex
+	inner types.Host
+}
+
+func newThreadSafeHost(inner types.Host) *threadSafeHost {
+	return &threadSafeHost{inner: inner}
+}
+
+func (s *threadSafeHost) CPUTime() (types.CPUTimes, error) {
+	s.Lock()
+	defer s.Unlock()
+	return s.inner.CPUTime()
+}
+
+func (s *threadSafeHost) Info() types.HostInfo {
+	s.Lock()
+	defer s.Unlock()
+	return s.inner.Info()
+}
+
+func (s *threadSafeHost) Memory() (*types.HostMemoryInfo, error) {
+	s.Lock()
+	defer s.Unlock()
+	return s.inner.Memory()
+}
+
+func (s *threadSafeHost) FQDNWithContext(ctx context.Context) (string, error) {
+	s.Lock()
+	defer s.Unlock()
+	return s.inner.FQDNWithContext(ctx)
+}
+
+func (s *threadSafeHost) FQDN() (string, error) {
+	s.Lock()
+	defer s.Unlock()
+	return s.inner.FQDN()
+}
+
+var (
+	sharedHost types.Host
+	once       sync.Once
+	hostErr    error
+)
+
+func GetHost() (types.Host, error) {
+	once.Do(func() {
+		var innerHost types.Host
+		innerHost, hostErr = sysinfo.Host()
+		sharedHost = newThreadSafeHost(innerHost)
+	})
+	return sharedHost, hostErr
 }

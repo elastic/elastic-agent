@@ -11,6 +11,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/go-sysinfo/types"
@@ -57,6 +58,25 @@ func TestGetHostName(t *testing.T) {
 			require.Equal(t, test.expected, hostname)
 		})
 	}
+}
+
+func TestSharedHost(t *testing.T) {
+	innerHost := &mockHost{}
+	shared := newThreadSafeHost(innerHost)
+
+	innerCpuTime, _ := innerHost.CPUTime()
+	sharedCpuTime, _ := shared.CPUTime()
+	assert.Equal(t, innerCpuTime, sharedCpuTime)
+
+	assert.Equal(t, innerHost.Info(), shared.Info())
+
+	innerMemoryInfo, _ := innerHost.Memory()
+	sharedMemoryInfo, _ := shared.Memory()
+	assert.Equal(t, innerMemoryInfo, sharedMemoryInfo)
+
+	innerFQDN, _ := innerHost.FQDN()
+	sharedFQDN, _ := shared.FQDN()
+	assert.Equal(t, innerFQDN, sharedFQDN)
 }
 
 type mockHost struct {

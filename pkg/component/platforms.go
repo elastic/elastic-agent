@@ -9,8 +9,7 @@ import (
 	goruntime "runtime"
 	"strings"
 
-	"github.com/elastic/go-sysinfo"
-
+	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -126,7 +125,7 @@ func LoadPlatformDetail(modifiers ...PlatformModifier) (PlatformDetail, error) {
 	if err != nil {
 		return PlatformDetail{}, err
 	}
-	info, err := sysinfo.Host()
+	info, err := util.GetHost()
 	if err != nil {
 		return PlatformDetail{}, err
 	}

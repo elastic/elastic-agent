@@ -132,6 +132,7 @@ func ContextProviderBuilder(log *logger.Logger, c *config.Config, _ bool) (corec
 
 func getHostInfo(log *logger.Logger) func() (map[string]interface{}, error) {
 	return func() (map[string]interface{}, error) {
+		// We don't use the shared host info from util here, as we explicitly want the latest host information on every call.
 		sysInfo, err := sysinfo.Host()
 		if err != nil {
 			return nil, err
