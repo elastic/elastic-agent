@@ -133,6 +133,7 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 |-----|------|---------|-------------|
 | agent.version | string | `"9.0.0"` | elastic-agent version |
 | agent.image | object | `{"pullPolicy":"IfNotPresent","repository":"docker.elastic.co/beats/elastic-agent","tag":"9.0.0-SNAPSHOT"}` | image configuration |
+| agent.imagePullSecrets | list | `[]` | image pull secrets |
 | agent.engine | string | `"k8s"` | generate kubernetes manifests or [ECK](https://github.com/elastic/cloud-on-k8s) CRDs |
 | agent.unprivileged | bool | `false` | enable unprivileged mode |
 | agent.presets | map[string]{} | `{ "perNode" : {...}, "clusterWide": {...}, "ksmSharded": {...} }` | Map of deployment presets for the Elastic Agent. The key of the map is the name of the preset. See more for the presets required by the built-in Kubernetes integration [here](./values.yaml) |

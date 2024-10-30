@@ -63,6 +63,10 @@
       initContainers:
         {{- . | toYaml | nindent 8 }}
       {{- end }}
+      {{- with $.Values.agent.imagePullSecrets }}
+      imagePullSecrets:
+        {{- . | toYaml | nindent 8 }}
+      {{- end }}
       containers:
         {{- with ($presetVal).extraContainers }}
         {{- . | toYaml | nindent 8 }}
