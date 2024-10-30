@@ -55,10 +55,15 @@ func fixInstallMarkerPermissions(markerFilePath string, ownership utils.FileOwne
 }
 
 // withServiceOptions just sets the user/group for the service.
-func withServiceOptions(username string, groupName string) ([]serviceOpt, error) {
+func withServiceOptions(username string, groupName string, password string) ([]serviceOpt, error) {
 	if username == "" {
 		// not installed with --unprivileged; nothing to do
 		return []serviceOpt{}, nil
+	}
+
+	if password != "" {
+		// existing user
+		return []serviceOpt{withUserGroup(username, groupName), withPassword(password)}, nil
 	}
 
 	// service requires a password to launch as the user

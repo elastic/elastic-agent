@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/spf13/cobra"
 
@@ -28,6 +29,10 @@ const (
 	flagInstallDevelopment            = "develop"
 	flagInstallNamespace              = "namespace"
 	flagInstallRunUninstallFromBinary = "run-uninstall-from-binary"
+
+	flagInstallADUser  = "ad-user"
+	flagInstallADGroup = "ad-group"
+	flagInstallADPass  = "ad-password"
 )
 
 func newInstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -60,6 +65,13 @@ would like the Agent to operate.
 
 	cmd.Flags().Bool(flagInstallDevelopment, false, "Install into a standardized development namespace, may enable development specific options. Allows multiple Elastic Agents to be installed at once. (experimental)")
 	_ = cmd.Flags().MarkHidden(flagInstallDevelopment) // For internal use only.
+
+	// Active directory user specification
+	if runtime.GOOS == "windows" {
+		cmd.Flags().String(flagInstallADUser, "", "Active directory user used to run Elastic Agent")
+		cmd.Flags().String(flagInstallADGroup, "", "Active directory group used to access Elastic Agent files")
+		cmd.Flags().String(flagInstallADPass, "", "Password for Active directory user used to run Elastic Agent")
+	}
 
 	addEnrollFlags(cmd)
 
@@ -249,7 +261,16 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		progBar.Describe("Successfully uninstalled Elastic Agent")
 	}
 	if status != install.PackageInstall {
-		ownership, err = install.Install(cfgFile, topPath, unprivileged, log, progBar, streams)
+		adUser, _ := cmd.Flags().GetString(flagInstallADUser)
+		adGroup, _ := cmd.Flags().GetString(flagInstallADGroup)
+		adPass, _ := cmd.Flags().GetString(flagInstallADPass)
+
+		if (adUser != "" || adPass != "") &&
+			(adUser == "" || adPass == "") {
+			return fmt.Errorf("error installing package: all Active Directory parameters must be provided")
+		}
+
+		ownership, err = install.Install(cfgFile, topPath, unprivileged, log, progBar, streams, adUser, adGroup, adPass)
 		if err != nil {
 			return fmt.Errorf("error installing package: %w", err)
 		}

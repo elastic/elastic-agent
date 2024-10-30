@@ -78,7 +78,7 @@ func SwitchExecutingMode(topPath string, pt *progressbar.ProgressBar, username s
 
 	// re-install service
 	pt.Describe("Installing service")
-	err = InstallService(topPath, ownership, username, groupName)
+	err = InstallService(topPath, ownership, username, groupName, "")
 	if err != nil {
 		pt.Describe("Failed to install service")
 		// error context already added by InstallService
