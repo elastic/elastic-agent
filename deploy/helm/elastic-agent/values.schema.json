@@ -18,6 +18,71 @@
                 }
             ]
         },
+        "system": {
+            "type": "object",
+            "description": "Configuration for system integration.",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Enable system integration."
+                },
+                "output": {
+                    "type": "string",
+                    "description": "Name of the output used in system integration. Must be defined in outputs."
+                },
+                "namespace": {
+                    "type": "string",
+                    "description": "output namespace.",
+                    "default": "default"
+                },
+                "authLogs": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable system auth logs stream."
+                        },
+                        "vars": {
+                            "$ref": "#/definitions/SystemLogsStreamVars"
+                        }
+                    },
+                    "required": [
+                        "enabled"
+                    ]
+                },
+                "syslog": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable system syslog stream."
+                        },
+                        "vars": {
+                            "$ref": "#/definitions/SystemLogsStreamVars"
+                        }
+                    },
+                    "required": [
+                        "enabled"
+                    ]
+                },
+                "metrics": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable system metrics stream."
+                        }
+                    },
+                    "required": [
+                        "enabled"
+                    ]
+                }
+            },
+            "required": [
+                "enabled",
+                "output"
+            ]
+        },
         "kubernetes": {
             "type": "object",
             "description": "Configuration for Kubernetes integration.",
@@ -534,7 +599,8 @@
                             "password"
                         ]
                     }
-                },{
+                },
+                {
                     "if": {
                         "properties": {
                             "type": {
@@ -1183,6 +1249,44 @@
             "required": [
                 "mode"
             ]
+        },
+        "SystemLogsStreamVars": {
+            "type": "object",
+            "description": "System integration log stream variables.",
+            "properties": {
+                "paths": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Paths to scan for logs."
+                },
+                "exclude_files": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Files to exclude from logs."
+                },
+                "processors": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    },
+                    "description": "Processors for the system auth logs stream."
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Tags for the logs stream."
+                },
+                "ignore_older": {
+                    "type": "string",
+                    "description": "If this option is specified, events that are older than the specified amount of time are ignored. Valid time units are \"ns\", \"us\" (or \"µs\"), \"ms\", \"s\", \"m\", \"h\"."
+                }
+            }
         }
     }
 }
