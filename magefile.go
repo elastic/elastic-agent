@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build mage
+//  go:build mage
 
 package main
 
@@ -2759,7 +2759,8 @@ func osMatches(os define.OS, currOs *types.HostInfo) bool {
 	if (os.Arch != "" && os.Arch != "unknown") && !strings.EqualFold(os.Arch, currOs.Architecture) {
 		return false
 	}
-	if (os.Version != "" && os.Version != "unknown") && !strings.EqualFold(os.Version, currOs.OS.Version) {
+	// TODO: parse major/minor/patch versions
+	if (os.Version != "" && os.Version != "unknown") && !strings.Contains(currOs.OS.Version, os.Version) {
 		return false
 	}
 	if (os.Distro != "" && os.Distro != "unknown") && strings.EqualFold(os.Distro, currOs.OS.Name) {
