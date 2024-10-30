@@ -33,6 +33,8 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/testing/supported"
+	"github.com/elastic/go-sysinfo"
+	"github.com/elastic/go-sysinfo/types"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/otiai10/copy"
@@ -2600,10 +2602,10 @@ type groupSummary struct {
 	Tests       []string              `yaml:"tests"`
 }
 
-func writeBreakdown(matrix bool) error {
+func createBreakdown(matrix bool) ([]groupSummary, error) {
 	batches, _, err := getSupportedBatches(matrix)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	groupsByName := make(map[string]groupSummary)
@@ -2643,7 +2645,29 @@ func writeBreakdown(matrix bool) error {
 	for _, group := range groupsByName {
 		groups = append(groups, group)
 	}
+	return groups, nil
+}
+func defineOS() (*types.HostInfo, error) {
+	sysInfo, err := sysinfo.Host()
+	if err != nil {
+		return nil, err
+	}
+	hostInfo := sysInfo.Info()
+	log.Println("OS:", sysInfo.Info())
+	log.Println("Platform: ", hostInfo.OS.Platform)
+	log.Println("Family: ", hostInfo.OS.Family)
+	log.Println("Version: ", hostInfo.OS.Version)
+	log.Println("Name: ", hostInfo.OS.Name)
+	log.Println("Major: ", hostInfo.OS.Major)
 
+	return &hostInfo, nil
+}
+
+func writeBreakdown(matrix bool) error {
+	groups, err := createBreakdown(matrix)
+	if err != nil {
+		return err
+	}
 	data, err := yaml.Marshal(groups)
 	if err != nil {
 		return err
@@ -2666,6 +2690,82 @@ func writeBreakdown(matrix bool) error {
 
 	fmt.Printf(">>> Generated breakdown steps written to: %s\n", ymlFilePath)
 	return nil
+}
+
+func (Integration) GetTests() error {
+	groupName := os.Getenv("TEST_GROUP")
+	if groupName == "" {
+		return errors.New("TEST_GROUP environment variable must be set")
+	}
+	sudo := os.Getenv("TEST_SUDO")
+	if sudo == "" {
+		return errors.New("TEST_SUDO environment variable must be set")
+	}
+
+	group, err := findTestGroup(groupName, sudo)
+	if err != nil {
+		return err
+	}
+	log.Println("Group:", group.Name)
+	log.Println(strings.Join(group.Tests, "|"))
+	return nil
+}
+
+func findTestGroup(groupName string, sudo string) (groupSummary, error) {
+	groups, err := createBreakdown(false)
+	if err != nil {
+		return groupSummary{}, err
+	}
+	currOs, err := defineOS()
+	if err != nil {
+		return groupSummary{}, err
+	}
+
+	for _, group := range groups {
+		if !strings.EqualFold(strings.TrimSpace(groupName), strings.TrimSuffix(group.Name, "-sudo")) {
+			log.Println("Skipping group:", group.Name)
+			log.Println("required group:", strings.TrimSpace(groupName))
+			continue
+		}
+		if group.RequireSudo && sudo != "true" {
+			continue
+		}
+		osMatched := false
+		for _, os := range group.OS {
+			if osMatches(os.OS, currOs) {
+				osMatched = true
+				break
+			}
+		}
+		if !osMatched {
+			continue
+		}
+		return group, nil
+	}
+
+	log.Println("No group found for", groupName)
+	log.Println("Current OS name:", currOs.OS.Name)
+	log.Println("Current OS Version:", currOs.OS.Version)
+	log.Println("Current OS Arch:", currOs.Architecture)
+	log.Println("Current OS Family:", currOs.OS.Family)
+
+	return groupSummary{}, fmt.Errorf("no group found for %s", groupName)
+}
+
+func osMatches(os define.OS, currOs *types.HostInfo) bool {
+	if (os.Type != "" && os.Type != "unknown") && !strings.EqualFold(os.Type, currOs.OS.Family) {
+		return false
+	}
+	if (os.Arch != "" && os.Arch != "unknown") && !strings.EqualFold(os.Arch, currOs.Architecture) {
+		return false
+	}
+	if (os.Version != "" && os.Version != "unknown") && !strings.EqualFold(os.Version, currOs.OS.Version) {
+		return false
+	}
+	if (os.Distro != "" && os.Distro != "unknown") && strings.EqualFold(os.Distro, currOs.OS.Name) {
+		return false
+	}
+	return true
 }
 
 func (Integration) Breakdown() error {
