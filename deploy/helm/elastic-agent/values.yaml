@@ -324,13 +324,8 @@ system:
 extraIntegrations: {}
 agent:
   # -- elastic-agent version
-<<<<<<< HEAD
-  # @section -- 3 - Elastic-Agent Configuration
-  version: 8.16.0
-=======
   # @section -- 6 - Elastic-Agent Configuration
-  version: 9.0.0
->>>>>>> e6f281aa4d ([helm]: implement system integration as chart built-in (#5855))
+  version: 8.16.0
   # -- image configuration
   # @section -- 6 - Elastic-Agent Configuration
   image:
