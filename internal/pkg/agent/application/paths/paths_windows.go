@@ -65,8 +65,13 @@ func initialControlSocketPath(topPath string) string {
 // RunningInstalled will always be false, even when it is an installed version. Once
 // that is fixed from the upgrade process the control socket path needs to be updated.
 func ResolveControlSocket() {
+	ResolveControlSocketWithInstalledState(RunningInstalled())
+}
+
+// ResolveControlSocketWithInstalledState updates the control socket path.
+func ResolveControlSocketWithInstalledState(runningInstalled bool) {
 	currentPath := ControlSocket()
-	if currentPath == ControlSocketFromPath(runtime.GOOS, topPath) && RunningInstalled() {
+	if currentPath == ControlSocketFromPath(runtime.GOOS, topPath) && runningInstalled {
 		// path is not correct being that it's installed
 		// reset the control socket path to be the installed path
 		SetControlSocket(WindowsControlSocketInstalledPath)
