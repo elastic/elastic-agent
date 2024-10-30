@@ -5,12 +5,12 @@
 package info
 
 import (
+	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"runtime"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/go-sysinfo"
 )
 
 // InjectAgentConfig injects config to a provided configuration.
@@ -30,7 +30,7 @@ func InjectAgentConfig(c *config.Config) error {
 // agentGlobalConfig gets global config used for resolution of variables inside configuration
 // such as ${path.data}.
 func agentGlobalConfig() (map[string]interface{}, error) {
-	hostInfo, err := sysinfo.Host()
+	hostInfo, err := util.GetHost()
 	if err != nil {
 		return nil, err
 	}

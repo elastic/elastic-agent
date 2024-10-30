@@ -23,9 +23,9 @@ import (
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
 
+	"github.com/elastic/elastic-agent/internal/pkg/util"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	semver "github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/version"
@@ -222,7 +222,7 @@ func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Inf
 
 func getOSInfo() (*types.OSInfo, error) {
 	osInfoOnce.Do(func() {
-		sysInfo, err := sysinfo.Host()
+		sysInfo, err := util.GetHost()
 		if err != nil {
 			osInfoErr = err
 		} else {

@@ -11,8 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/go-sysinfo"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
@@ -34,7 +32,7 @@ func TestECSMetadata(t *testing.T) {
 		assert.NotNil(t, metadata.Elastic.Agent, "metadata.Elastic.Agent must not be nil")
 	}
 
-	sysInfo, err := sysinfo.Host()
+	sysInfo, err := util.GetHost()
 	require.NoError(t, err)
 
 	info := sysInfo.Info()
