@@ -5,7 +5,7 @@
 package composable
 
 import (
-	"maps"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"os"
 	"path/filepath"
 	"strings"
@@ -54,7 +54,8 @@ func BenchmarkGenerateVars100Pods(b *testing.B) {
 				mappings: make(map[string]dynamicProviderMapping),
 			}
 			for i := 0; i < podCount; i++ {
-				podData := maps.Clone(providerMapping)
+				podData, err := transpiler.NewAST(providerMapping)
+				require.NoError(b, err)
 				podUID := uuid.NewUUID()
 				podMapping := dynamicProviderMapping{
 					mapping: podData,
