@@ -127,9 +127,12 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | system.enabled | bool | `false` | enable System integration. |
-| system.output | string | `"default"` | name of the output used in kubernetes integration. Note that this output needs to be defined in [outputs](#1-outputs) |
+| system.output | string | `"default"` | name of the output used in System integration. Note that this output needs to be defined in [outputs](#1-outputs) |
 | system.namespace | string | `"default"` | output namespace |
-| system.logs.enabled | bool | `true` | enable logs |
+| system.authLogs.enabled | bool | `true` | enable auth logs |
+| system.authLogs.vars | object | `{}` | override default variables of auth logs stream. Look in the [values.schema.json](values.schema.json) to see the available variables |
+| system.syslog.enabled | bool | `true` | enable syslog |
+| system.syslog.vars | object | `{}` | override default variables of syslog stream. Look in the [values.schema.json](values.schema.json) to see the available variables |
 | system.metrics.enabled | bool | `true` | enable metrics |
 
 ### 5 - User Extra Integrations

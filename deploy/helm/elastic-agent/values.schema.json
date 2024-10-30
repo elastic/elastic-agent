@@ -35,12 +35,30 @@
                     "description": "output namespace.",
                     "default": "default"
                 },
-                "logs": {
+                "authLogs": {
                     "type": "object",
                     "properties": {
                         "enabled": {
                             "type": "boolean",
-                            "description": "Enable system logs stream."
+                            "description": "Enable system auth logs stream."
+                        },
+                        "vars": {
+                            "$ref": "#/definitions/SystemLogsStreamVars"
+                        }
+                    },
+                    "required": [
+                        "enabled"
+                    ]
+                },
+                "syslog": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable system syslog stream."
+                        },
+                        "vars": {
+                            "$ref": "#/definitions/SystemLogsStreamVars"
                         }
                     },
                     "required": [
@@ -1231,6 +1249,44 @@
             "required": [
                 "mode"
             ]
+        },
+        "SystemLogsStreamVars": {
+            "type": "object",
+            "description": "System integration log stream variables.",
+            "properties": {
+                "paths": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Paths to scan for logs."
+                },
+                "exclude_files": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Files to exclude from logs."
+                },
+                "processors": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    },
+                    "description": "Processors for the system auth logs stream."
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Tags for the logs stream."
+                },
+                "ignore_older": {
+                    "type": "string",
+                    "description": "If this option is specified, events that are older than the specified amount of time are ignored. Valid time units are \"ns\", \"us\" (or \"µs\"), \"ms\", \"s\", \"m\", \"h\"."
+                }
+            }
         }
     }
 }
