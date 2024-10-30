@@ -42,7 +42,7 @@ RUN true && \
     chmod 0775 {{ $beatHome}}/{{ $modulesd }} && \
 {{- end }}
 
-{{- if or (eq .Variant "cloud") (eq .Variant "service") }}
+{{- if or (eq .Variant "cloud") }}
     mkdir -p /opt/agentbeat /opt/filebeat /opt/metricbeat && \
     cp -f {{ $beatHome }}/data/cloud_downloads/filebeat.sh /opt/filebeat/filebeat && \
     chmod +x /opt/filebeat/filebeat && \
@@ -172,7 +172,7 @@ RUN mkdir /licenses
 COPY --from=home {{ $beatHome }}/LICENSE.txt /licenses
 COPY --from=home {{ $beatHome }}/NOTICE.txt /licenses
 
-{{- if or (eq .Variant "cloud") (eq .Variant "service") }}
+{{- if or (eq .Variant "cloud") }}
 COPY --from=home /opt /opt
 # Generate folder for a stub command that will be overwritten at runtime
 RUN mkdir /app && \
@@ -294,7 +294,7 @@ ENV LIBBEAT_MONITORING_CGROUPS_HIERARCHY_OVERRIDE=/
 
 WORKDIR {{ $beatHome }}
 
-{{- if or (eq .Variant "cloud") (eq .Variant "service") }}
+{{- if or (eq .Variant "cloud") }}
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/app/apm.sh"]
 # Generate a stub command that will be overwritten at runtime
