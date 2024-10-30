@@ -4,6 +4,10 @@ system:
     vars:
       paths:
         - /var/log/custom_auth.log
+  syslog:
+    vars:
+      paths:
+        - /var/log/custom_syslog.log
 
 agent:
   unprivileged: true
