@@ -37,5 +37,5 @@ hosts:
 period: "10s"
 bearer_token_file: "/var/run/secrets/kubernetes.io/serviceaccount/token"
 ssl.verification_mode: "none"
-condition: "${kubernetes.labels.component} == ''kube-scheduler''"
+condition: "${kubernetes.labels.component} == 'kube-scheduler'"
 {{- end -}}
