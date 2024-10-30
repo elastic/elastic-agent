@@ -1,0 +1,9 @@
+system:
+  enabled: true
+  authLogs:
+    vars:
+      paths:
+        - /var/log/custom_auth.log
+
+agent:
+  unprivileged: true
