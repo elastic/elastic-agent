@@ -25,8 +25,13 @@ else
   exit 10
 fi
 
+<<<<<<< HEAD
 AGENT_PACKAGE_VERSION="8.16.0" DEV=true SNAPSHOT=true EXTERNAL=true PACKAGES=docker mage -v package
 AGENT_VERSION="8.16.0-SNAPSHOT" AGENT_STACK_VERSION="8.16.0-SNAPSHOT" TEST_INTEG_CLEAN_ON_EXIT=true INSTANCE_PROVISIONER=kind STACK_PROVISIONER=stateful SNAPSHOT=true mage integration:kubernetesMatrix
+=======
+SNAPSHOT=true EXTERNAL=true PACKAGES=docker mage -v package
+TEST_INTEG_CLEAN_ON_EXIT=true INSTANCE_PROVISIONER=kind STACK_PROVISIONER=stateful SNAPSHOT=true mage integration:kubernetesMatrix
+>>>>>>> a5de3206e8 (Revert forcing Agent version to be 8.16.0 (#5617))
 TESTS_EXIT_STATUS=$?
 set -e
 
