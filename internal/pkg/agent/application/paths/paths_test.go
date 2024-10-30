@@ -118,6 +118,21 @@ func TestResolveControlSocketWithInstalledState(t *testing.T) {
 			ControlSocketFromPath("darwin", "/top"),
 		},
 		{
+			"darwin",
+			"/control/socket",
+			"/top",
+			true,
+			"/control/socket",
+		},
+		{
+			"darwin",
+			"/control/socket",
+			"/top",
+			false,
+			"/control/socket",
+		},
+
+		{
 			"linux",
 			ControlSocketFromPath("linux", "/top"),
 			"/top",
@@ -130,6 +145,20 @@ func TestResolveControlSocketWithInstalledState(t *testing.T) {
 			"/top",
 			false,
 			ControlSocketFromPath("linux", "/top"),
+		},
+		{
+			"linux",
+			"/control/socket",
+			"/top",
+			true,
+			"/control/socket",
+		},
+		{
+			"linux",
+			"/control/socket",
+			"/top",
+			false,
+			"/control/socket",
 		},
 
 		{
