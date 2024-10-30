@@ -168,6 +168,13 @@ func TestResolveControlSocketWithInstalledState(t *testing.T) {
 			continue
 		}
 		t.Run(fmt.Sprintf("test case %d", i), func(t *testing.T) {
+			prevControlSocketPath := controlSocketPath
+			prevTopPath := topPath
+			defer func() {
+				// just to be sure
+				controlSocketPath = prevControlSocketPath
+				topPath = prevTopPath
+			}()
 			controlSocketPath = tc.controlSocket
 			topPath = tc.topPath
 
