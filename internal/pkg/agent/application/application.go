@@ -145,6 +145,7 @@ func New(
 		}
 	} else {
 		isManaged = true
+		apmConfigPatcher := PatchAPMConfig(log, rawConfig)
 		var store storage.Store
 		store, cfg, err = mergeFleetConfig(ctx, rawConfig)
 		if err != nil {
@@ -152,9 +153,8 @@ func New(
 		}
 		if configuration.IsFleetServerBootstrap(cfg.Fleet) {
 			log.Info("Parsed configuration and determined agent is in Fleet Server bootstrap mode")
-
 			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server))
-			configMgr = coordinator.NewConfigPatchManager(newFleetServerBootstrapManager(log), PatchAPMConfig(log, rawConfig))
+			configMgr = coordinator.NewConfigPatchManager(newFleetServerBootstrapManager(log), apmConfigPatcher)
 		} else {
 			log.Info("Parsed configuration and determined agent is managed by Fleet")
 
@@ -172,7 +172,7 @@ func New(
 			if err != nil {
 				return nil, nil, nil, err
 			}
-			configMgr = coordinator.NewConfigPatchManager(managed, PatchAPMConfig(log, rawConfig))
+			configMgr = coordinator.NewConfigPatchManager(managed, apmConfigPatcher)
 		}
 	}
 
