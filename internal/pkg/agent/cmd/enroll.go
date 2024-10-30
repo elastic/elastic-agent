@@ -512,12 +512,19 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	if err != nil {
 		return fmt.Errorf("failed to create encrypted disk store: %w", err)
 	}
-	store := storage.NewReplaceOnSuccessStore(
-		pathConfigFile,
-		application.DefaultAgentFleetConfig,
-		encStore,
-		storeOpts...,
-	)
+
+	var store saver
+
+	if cfg.Fleet != nil && cfg.Fleet.Enabled {
+		store = encStore
+	} else {
+		store = storage.NewReplaceOnSuccessStore(
+			pathConfigFile,
+			application.DefaultAgentFleetConfig,
+			encStore,
+			storeOpts...,
+		)
+	}
 
 	c, err := newEnrollCmd(
 		logger,
