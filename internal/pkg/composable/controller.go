@@ -287,8 +287,7 @@ func (c *controller) generateVars(fetchContextProviders mapstr.M) []*transpiler.
 	for name, state := range c.dynamicProviders {
 		for _, mappings := range state.Mappings() {
 			local := mappingAst.ShallowClone()
-			dynamicAst, _ := transpiler.NewAST(mappings.mapping)
-			_ = local.Insert(dynamicAst, name)
+			_ = local.Insert(mappings.mapping, name)
 			id := fmt.Sprintf("%s-%s", name, mappings.id)
 			v := transpiler.NewVarsWithProcessorsFromAst(id, local, name, mappings.processors, fetchContextProviders)
 			vars = append(vars, v)
@@ -356,7 +355,7 @@ func (c *contextProviderState) Current() map[string]interface{} {
 type dynamicProviderMapping struct {
 	id         string
 	priority   int
-	mapping    map[string]interface{}
+	mapping    *transpiler.AST
 	processors transpiler.Processors
 }
 
@@ -376,31 +375,25 @@ type dynamicProviderState struct {
 // to ensure that matching of variables occurs on the lower priority mappings first.
 func (c *dynamicProviderState) AddOrUpdate(id string, priority int, mapping map[string]interface{}, processors []map[string]interface{}) error {
 	var err error
-	mapping, err = cloneMap(mapping)
-	if err != nil {
-		return err
-	}
 	processors, err = cloneMapArray(processors)
 	if err != nil {
 		return err
 	}
-	// ensure creating vars will not error
-	_, err = transpiler.NewVars("", mapping, nil)
+	ast, err := transpiler.NewAST(mapping)
 	if err != nil {
 		return err
 	}
-
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	curr, ok := c.mappings[id]
-	if ok && reflect.DeepEqual(curr.mapping, mapping) && reflect.DeepEqual(curr.processors, processors) {
+	if ok && curr.mapping.Equal(ast) && reflect.DeepEqual(curr.processors, processors) {
 		// same mapping; no need to update and signal
 		return nil
 	}
 	c.mappings[id] = dynamicProviderMapping{
 		id:         id,
 		priority:   priority,
-		mapping:    mapping,
+		mapping:    ast,
 		processors: processors,
 	}
 
