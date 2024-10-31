@@ -1003,6 +1003,14 @@
                         ]
                     ]
                 },
+                "automountServiceAccountToken": {
+                    "type": "boolean",
+                    "description": "Automount service account token for the deployment.",
+                    "examples": [
+                        true
+                    ],
+                    "default": true
+                },
                 "hostNetwork": {
                     "type": "boolean",
                     "description": "Enable host networking for the deployment.",
