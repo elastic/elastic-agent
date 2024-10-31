@@ -9,9 +9,13 @@ package integration
 import (
 	"archive/zip"
 	"context"
-
+	"crypto"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io/fs"
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -25,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/testing/certutil"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
@@ -33,10 +38,11 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
+	"github.com/elastic/elastic-agent/testing/proxytest"
 )
 
 const (
-	endpointHealthPollingTimeout = 2 * time.Minute
+	endpointHealthPollingTimeout = 5 * time.Minute
 )
 
 var protectionTests = []struct {
@@ -52,8 +58,8 @@ var protectionTests = []struct {
 	},
 }
 
-// Tests that the agent can install and uninstall the endpoint-security service while remaining
-// healthy.
+// TestInstallAndCLIUninstallWithEndpointSecurity tests that the agent can
+// install and uninstall the endpoint-security service while remaining healthy.
 //
 // Installing endpoint-security requires a Fleet managed agent with the Elastic Defend integration
 // installed. The endpoint-security service is uninstalled when the agent is uninstalled.
@@ -79,8 +85,9 @@ func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 	}
 }
 
-// Tests that the agent can install and uninstall the endpoint-security service while remaining
-// healthy. In this case endpoint-security is uninstalled because the agent was unenrolled, which
+// TestInstallAndUnenrollWithEndpointSecurity tests that the agent can install
+// and uninstall the endpoint-security service while remaining healthy. In
+// this case endpoint-security is uninstalled because the agent was unenrolled, which
 // triggers the creation of an empty agent policy removing all inputs (only when not force
 // unenrolling). The empty agent policy triggers the uninstall of endpoint because endpoint was
 // removed from the policy.
@@ -105,16 +112,16 @@ func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 	}
 }
 
-// Tests that the agent can install and uninstall the endpoint-security service
-// after the Elastic Defend integration was removed from the policy
-// while remaining healthy.
+// TestInstallWithEndpointSecurityAndRemoveEndpointIntegration tests that the
+// agent can install and uninstall the endpoint-security service after the
+// Elastic Defend integration was removed from the policy while remaining
+// healthy.
 //
 // Installing endpoint-security requires a Fleet managed agent with the Elastic Defend integration
 // installed. The endpoint-security service is uninstalled the Elastic Defend integration was removed from the policy.
 //
 // Like the CLI uninstall test, the agent is uninstalled from the command line at the end of the test
 // but at this point endpoint should be already uninstalled.
-
 func TestInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Fleet,
@@ -893,4 +900,534 @@ func TestForceInstallOverProtectedPolicy(t *testing.T) {
 	}
 	out, err := fixture.Exec(ctx, args)
 	require.Errorf(t, err, "No error detected, command output: %s", out)
+}
+
+func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
+	stack := define.Require(t, define.Requirements{
+		Group: Fleet,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+	})
+	ctx := context.Background()
+	testUUID := uuid.Must(uuid.NewV4()).String()
+	policyID := "mTLS-defend-" + testUUID
+
+	fleetServerURL, err := fleettools.DefaultURL(ctx, stack.KibanaClient)
+	require.NoError(t, err, "failed getting Fleet Server URL")
+
+	defaultFleetHost := fleetServerURL[8:]
+	fleethostWrong, err := url.Parse("https://fixme.elastic.co:443")
+	require.NoError(t, err, "failed parsing fleethostWrong")
+
+	// ================================= proxy =================================
+	mtlsCLI, mtlsPolicy, oneWayTLSPolicy, proxyCLI, proxyPolicymTLS, proxyPolicyOneWayTLS := prepareProxies(t, fleethostWrong, defaultFleetHost)
+
+	// =================== Prepare fleet hosts and proxies ===================
+
+	// create mTLS proxy
+	fleetProxymTLS, err := stack.KibanaClient.CreateFleetProxy(ctx, kibana.ProxiesRequest{
+		CertificateAuthorities: mtlsPolicy.proxyCAPath,
+		Certificate:            mtlsPolicy.clientCertPath,
+		CertificateKey:         mtlsPolicy.clientCertKeyPath,
+		ID:                     "mTLS" + testUUID,
+		Name:                   "mTLS" + testUUID,
+		URL:                    proxyPolicymTLS.URL,
+	})
+	require.NoError(t, err, "error creating proxy on fleet")
+
+	// create TLS proxy
+	fleetProxyOneWay, err := stack.KibanaClient.CreateFleetProxy(ctx, kibana.ProxiesRequest{
+		CertificateAuthorities: oneWayTLSPolicy.proxyCAPath,
+		ID:                     "oneWayTLS" + testUUID,
+		Name:                   "oneWayTLS" + testUUID,
+		URL:                    proxyPolicyOneWayTLS.URL,
+	})
+	require.NoError(t, err, "error creating proxy on fleet")
+
+	// add new fleet-server host with mTLS proxy
+	fleetKibanaHostmTLS, err := stack.KibanaClient.NewFleetServerHosts(ctx, kibana.ListFleetServerHostsRequest{
+		ID:        "proxyPolicymTLS" + testUUID,
+		Name:      "proxyPolicymTLS" + testUUID,
+		HostURLs:  []string{fleethostWrong.String()},
+		IsDefault: false,
+		ProxyID:   fleetProxymTLS.Item.ID,
+	})
+	require.NoError(t, err, "error creating fleet host with mTLS proxy")
+
+	// add new fleet-server host with oen way TLS proxy
+	fleetKibanaHostOneWayTLS, err := stack.KibanaClient.NewFleetServerHosts(ctx, kibana.ListFleetServerHostsRequest{
+		ID:        "proxyPolicyOneWayTLS" + testUUID,
+		Name:      "proxyPolicyOneWayTLS" + testUUID,
+		HostURLs:  []string{fleethostWrong.String()},
+		IsDefault: false,
+		ProxyID:   fleetProxyOneWay.Item.ID,
+	})
+	require.NoError(t, err, "error creating fleet host with one way TLS proxy")
+
+	// create policy without proxy and respective enrollment token
+	policyNoProxyTmpl := kibana.AgentPolicy{
+		ID:          policyID,
+		Name:        policyID,
+		Namespace:   "default",
+		Description: policyID,
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+	}
+
+	// ============================ Create policies ============================
+
+	policyNoProxy, err := stack.KibanaClient.CreatePolicy(ctx, policyNoProxyTmpl)
+	require.NoErrorf(t, err, "failed creating policy %s", policyID)
+	pkgPolicyNoProxyResp, err := installElasticDefendPackage(t, stack, policyNoProxyTmpl.ID)
+	require.NoErrorf(t, err, "failed adding Elastic Defend to policy: response was: %v", pkgPolicyNoProxyResp)
+	enrollmentTokenNoProxyResp, err := stack.KibanaClient.CreateEnrollmentAPIKey(
+		ctx, kibana.CreateEnrollmentAPIKeyRequest{
+			PolicyID: policyNoProxy.ID,
+		})
+	require.NoError(t, err, "failed creating enrollment API key for policy with no proxy")
+
+	// create policy with mTLS proxy and respective enrollment token
+	policymTLSProxyTmpl := kibana.AgentPolicy{
+		ID:                "with-mTLS-Proxy-" + policyID,
+		Name:              "with-mTLS-Proxy-" + policyID,
+		Namespace:         "default",
+		Description:       "with-mTLS-Proxy-" + policyID,
+		FleetServerHostID: fleetKibanaHostmTLS.Item.ID,
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+	}
+	policymTLSProxy, err := stack.KibanaClient.CreatePolicy(ctx, policymTLSProxyTmpl)
+	require.NoErrorf(t, err, "failed creating policy %s", policyID)
+	pkgPolicymTLSProxyResp, err := installElasticDefendPackage(t, stack, policymTLSProxy.ID)
+	require.NoErrorf(t, err, "failed adding Elastic Defend to policy: response was: %v", pkgPolicymTLSProxyResp)
+	enrollmentTokenmTLSProxyResp, err := stack.KibanaClient.CreateEnrollmentAPIKey(
+		ctx, kibana.CreateEnrollmentAPIKeyRequest{
+			PolicyID: policymTLSProxy.ID,
+		})
+	require.NoError(t, err, "failed creating enrollment API key for policy with mTLS proxy")
+
+	// create policy with one way TLS proxy and respective enrollment token
+	policyOneWayTLSProxyTmpl := kibana.AgentPolicy{
+		ID:                "with-oneWay-Proxy-" + policyID,
+		Name:              "with-oneWay-Proxy-" + policyID,
+		Namespace:         "default",
+		Description:       "with-oneWay-Proxy-" + policyID,
+		FleetServerHostID: fleetKibanaHostOneWayTLS.Item.ID,
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+	}
+	policyOneWayProxy, err := stack.KibanaClient.CreatePolicy(ctx, policyOneWayTLSProxyTmpl)
+	require.NoErrorf(t, err, "failed creating policy %s", policyID)
+	pkgPolicyOneWayProxy, err := installElasticDefendPackage(t, stack, policyOneWayProxy.ID)
+	require.NoErrorf(t, err, "failed adding Elastic Defend to policy: response was: %v", pkgPolicyOneWayProxy)
+	enrollmentTokenOneWayProxyResp, err := stack.KibanaClient.CreateEnrollmentAPIKey(
+		ctx, kibana.CreateEnrollmentAPIKeyRequest{
+			PolicyID: policyOneWayProxy.ID,
+		})
+	require.NoError(t, err, "failed creating enrollment API key for policy with one way TLS proxy")
+
+	// =============================== test cases ==============================
+	tcs := []struct {
+		Name                   string
+		URL                    string
+		EnrollmentToken        string
+		ProxyURL               string
+		CertificateAuthorities []string
+		Certificate            string
+		Key                    string
+
+		KeyPassphrase string
+		assertInspect func(*testing.T, *atesting.Fixture)
+	}{
+		{
+			Name:            "proxy-from-cli-and-plain-cert-key",
+			URL:             fleethostWrong.String(),
+			EnrollmentToken: enrollmentTokenNoProxyResp.APIKey,
+			ProxyURL:        proxyCLI.URL,
+
+			CertificateAuthorities: []string{mtlsCLI.proxyCAPath},
+			Certificate:            mtlsCLI.clientCertPath,
+			Key:                    mtlsCLI.clientCertKeyPath,
+			assertInspect: func(t *testing.T, f *atesting.Fixture) {
+				got, err := f.ExecInspect(ctx)
+				require.NoErrorf(t, err, "error running inspect cmd")
+
+				assert.Equal(t, proxyCLI.URL, got.Fleet.ProxyURL)
+				assert.Equal(t, mtlsCLI.clientCertPath, got.Fleet.Ssl.Certificate)
+				assert.Equal(t, mtlsCLI.clientCertKeyPath, got.Fleet.Ssl.Key)
+				assert.Empty(t, got.Fleet.Ssl.KeyPassphrasePath, "policy should have removed key_passphrase_path as key isn't passphrase protected anymore")
+			},
+		},
+		{
+			Name:            "proxy-from-cli-and-passphrase-protected-cert-key",
+			URL:             fleethostWrong.String(),
+			EnrollmentToken: enrollmentTokenNoProxyResp.APIKey,
+			ProxyURL:        proxyCLI.URL,
+
+			CertificateAuthorities: []string{mtlsCLI.proxyCAPath},
+			Certificate:            mtlsCLI.clientCertPath,
+			Key:                    mtlsCLI.clientCertKeyEncPath,
+			KeyPassphrase:          mtlsCLI.clientCertKeyPassPath,
+			assertInspect: func(t *testing.T, f *atesting.Fixture) {
+				got, err := f.ExecInspect(ctx)
+				require.NoErrorf(t, err, "error running inspect cmd")
+
+				assert.Equal(t, proxyCLI.URL, got.Fleet.ProxyURL)
+				assert.Equal(t, mtlsCLI.clientCertPath, got.Fleet.Ssl.Certificate)
+				assert.Equal(t, mtlsCLI.clientCertKeyEncPath, got.Fleet.Ssl.Key)
+				assert.Equal(t, mtlsCLI.clientCertKeyPassPath, got.Fleet.Ssl.KeyPassphrasePath)
+			},
+		},
+		{
+			Name:            "proxy-from-cli-and-passphrase-protected-cert-key-proxy-from-policy-one-way-TLS",
+			URL:             fleethostWrong.String(),
+			EnrollmentToken: enrollmentTokenOneWayProxyResp.APIKey,
+			ProxyURL:        proxyCLI.URL,
+
+			CertificateAuthorities: []string{mtlsCLI.proxyCAPath},
+			Certificate:            mtlsCLI.clientCertPath,
+			Key:                    mtlsCLI.clientCertKeyEncPath,
+			KeyPassphrase:          mtlsCLI.clientCertKeyPassPath,
+			assertInspect: func(t *testing.T, f *atesting.Fixture) {
+				// wait for the agent to apply the policy coming from fleet-server
+				buff := &strings.Builder{}
+				assert.Eventuallyf(t, func() bool {
+					buff.Reset()
+
+					got, err := f.ExecInspect(ctx)
+					if err != nil {
+						buff.WriteString(fmt.Sprintf("error running inspect cmd: %v", err))
+						return false
+					}
+
+					return proxyPolicyOneWayTLS.URL == got.Fleet.ProxyURL
+				}, time.Minute, time.Second, "inspect never showed proxy from policy: %s", buff)
+
+				t.Skip("remove skip once https://github.com/elastic/elastic-agent/issues/5888 is fixed")
+				got, err := f.ExecInspect(ctx)
+				require.NoErrorf(t, err, "error running inspect cmd")
+
+				assert.Equal(t, proxyPolicyOneWayTLS.URL, got.Fleet.ProxyURL)
+				assert.Equal(t, []string{oneWayTLSPolicy.proxyCAPath}, got.Fleet.Ssl.CertificateAuthorities)
+				assert.Empty(t, got.Fleet.Ssl.Certificate, "client certificate isn't present in the proxy from the policy")
+				assert.Empty(t, got.Fleet.Ssl.Key, "client certificate key isn't present in the proxy from the policy")
+				assert.Empty(t, got.Fleet.Ssl.KeyPassphrasePath, "client certificate key passphrase isn't present in the proxy from the policy")
+			},
+		},
+		{
+			Name:            "proxy-from-cli-and-policy-both-with-plain-cert-key",
+			URL:             fleethostWrong.String(),
+			EnrollmentToken: enrollmentTokenmTLSProxyResp.APIKey,
+			ProxyURL:        proxyCLI.URL,
+
+			CertificateAuthorities: []string{mtlsCLI.proxyCAPath},
+			Certificate:            mtlsCLI.clientCertPath,
+			Key:                    mtlsCLI.clientCertKeyPath,
+
+			assertInspect: func(t *testing.T, f *atesting.Fixture) {
+				// wait for the agent to apply the policy coming from fleet-server
+				buff := &strings.Builder{}
+				assert.Eventuallyf(t, func() bool {
+					buff.Reset()
+
+					got, err := f.ExecInspect(ctx)
+					if err != nil {
+						buff.WriteString(fmt.Sprintf("error running inspect cmd: %v", err))
+						return false
+					}
+
+					return proxyPolicymTLS.URL == got.Fleet.ProxyURL
+				}, time.Minute, time.Second, "inspect never showed proxy from policy: %s", buff)
+
+				got, err := f.ExecInspect(ctx)
+				if err != nil {
+					require.NoError(t, err, "error running inspect cmd")
+					return
+				}
+				assert.Equal(t, proxyPolicymTLS.URL, got.Fleet.ProxyURL)
+				assert.Equal(t, mtlsPolicy.clientCertPath, got.Fleet.Ssl.Certificate)
+				assert.Equal(t, mtlsPolicy.clientCertKeyPath, got.Fleet.Ssl.Key)
+				assert.Empty(t, got.Fleet.Ssl.KeyPassphrasePath, "policy should have removed key_passphrase_path as key isn't passphrase protected anymore")
+			},
+		},
+		{
+			Name:            "proxy-from-cli-with-passphrase-protected-cert-key-and-policy-with-plain-cert-key",
+			URL:             fleethostWrong.String(),
+			EnrollmentToken: enrollmentTokenmTLSProxyResp.APIKey,
+			ProxyURL:        proxyCLI.URL,
+
+			CertificateAuthorities: []string{mtlsCLI.proxyCAPath},
+			Certificate:            mtlsCLI.clientCertPath,
+			Key:                    mtlsCLI.clientCertKeyEncPath,
+			KeyPassphrase:          mtlsCLI.clientCertKeyPassPath,
+
+			assertInspect: func(t *testing.T, f *atesting.Fixture) {
+				// wait for the agent to apply the policy coming from fleet-server
+				buff := &strings.Builder{}
+				assert.Eventuallyf(t, func() bool {
+					buff.Reset()
+
+					got, err := f.ExecInspect(ctx)
+					if err != nil {
+						buff.WriteString(fmt.Sprintf("error running inspect cmd: %v", err))
+						return false
+					}
+
+					return proxyPolicymTLS.URL == got.Fleet.ProxyURL
+				}, time.Minute, time.Second, "inspect never showed proxy from policy: %s", buff)
+
+				got, err := f.ExecInspect(ctx)
+				if err != nil {
+					require.NoError(t, err, "error running inspect cmd")
+					return
+				}
+
+				assert.Equal(t, proxyPolicymTLS.URL, got.Fleet.ProxyURL)
+				assert.Equal(t, mtlsPolicy.clientCertPath, got.Fleet.Ssl.Certificate)
+				assert.Equal(t, mtlsPolicy.clientCertKeyPath, got.Fleet.Ssl.Key)
+				assert.Empty(t, got.Fleet.Ssl.KeyPassphrasePath, "policy should have removed key_passphrase_path as key isn't passphrase protected anymore")
+			},
+		},
+		{
+			Name:            "no-proxy-from-cli-and-proxy-from-policy-with-plain-cert-key",
+			URL:             "https://" + defaultFleetHost,
+			EnrollmentToken: enrollmentTokenmTLSProxyResp.APIKey,
+
+			assertInspect: func(t *testing.T, f *atesting.Fixture) {
+				// wait for the agent to apply the policy coming from fleet-server
+				buff := &strings.Builder{}
+				assert.Eventuallyf(t, func() bool {
+					buff.Reset()
+
+					got, err := f.ExecInspect(ctx)
+					if err != nil {
+						buff.WriteString(fmt.Sprintf("error running inspect cmd: %v", err))
+						return false
+					}
+
+					return proxyPolicymTLS.URL == got.Fleet.ProxyURL
+				}, time.Minute, time.Second, "inspect never showed proxy from policy: %s", buff)
+
+				got, err := f.ExecInspect(ctx)
+				if err != nil {
+					require.NoError(t, err, "error running inspect cmd")
+					return
+				}
+
+				assert.Equal(t, proxyPolicymTLS.URL, got.Fleet.ProxyURL)
+				assert.Equal(t, mtlsPolicy.clientCertPath, got.Fleet.Ssl.Certificate)
+				assert.Equal(t, mtlsPolicy.clientCertKeyPath, got.Fleet.Ssl.Key)
+				assert.Empty(t, got.Fleet.Ssl.KeyPassphrasePath, "key_passphrase_path was never set")
+			},
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.Name, func(t *testing.T) {
+			installOpts := atesting.InstallOpts{
+				NonInteractive: true,
+				Force:          true,
+				Privileged:     true,
+				ProxyURL:       tc.ProxyURL,
+				EnrollOpts: atesting.EnrollOpts{
+					URL:             tc.URL,
+					EnrollmentToken: tc.EnrollmentToken,
+
+					CertificateAuthorities: tc.CertificateAuthorities,
+					Certificate:            tc.Certificate,
+					Key:                    tc.Key,
+					KeyPassphrasePath:      tc.KeyPassphrase,
+				},
+			}
+
+			fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+			require.NoError(t, err, "could not create agent fixture")
+
+			out, err := fixture.Install(ctx, &installOpts)
+			require.NoError(t, err, "could not install agent. Output: %s", string(out))
+
+			err = fixture.Client().Connect(ctx)
+			require.NoError(t, err, "could not connect to agent daemon")
+
+			require.Eventually(t,
+				func() bool { return agentAndEndpointAreHealthy(t, ctx, fixture.Client()) },
+				endpointHealthPollingTimeout,
+				time.Minute,
+				"Defend or the agent are not healthy.",
+			)
+
+			tc.assertInspect(t, fixture)
+		})
+	}
+}
+
+func prepareProxies(t *testing.T, fleethostWrong *url.URL, defaultFleetHost string) (
+	certificatePaths, certificatePaths, certificatePaths, *proxytest.Proxy, *proxytest.Proxy, *proxytest.Proxy) {
+
+	mtlsCLI := generateMTLSCerts(t, "mtlsCLI")
+	mtlsPolicy := generateMTLSCerts(t, "mtlsPolicy")
+	oneWayTLSPolicy := generateMTLSCerts(t, "oneWayTLSPolicy")
+
+	proxyCLI := proxytest.New(t,
+		proxytest.WithVerboseLog(),
+		proxytest.WithRequestLog("proxyCLI", t.Logf),
+		proxytest.WithRewrite(fleethostWrong.Host, defaultFleetHost),
+		proxytest.WithMITMCA(mtlsCLI.proxyCAKey, mtlsCLI.proxyCACert),
+		proxytest.WithServerTLSConfig(&tls.Config{
+			Certificates: []tls.Certificate{*mtlsCLI.proxyCert},
+			ClientCAs:    mtlsCLI.clientCACertPool,
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+			MinVersion:   tls.VersionTLS13,
+		}))
+	err := proxyCLI.StartTLS()
+	require.NoError(t, err, "error starting proxyCLI")
+	t.Logf("proxyCLI running on %s", proxyCLI.URL)
+	t.Cleanup(proxyCLI.Close)
+
+	proxyPolicymTLS := proxytest.New(t,
+		proxytest.WithVerboseLog(),
+		proxytest.WithRequestLog("proxyPolicymTLS", t.Logf),
+		proxytest.WithRewrite(fleethostWrong.Host, defaultFleetHost),
+		proxytest.WithMITMCA(mtlsPolicy.proxyCAKey, mtlsPolicy.proxyCACert),
+		proxytest.WithServerTLSConfig(&tls.Config{
+			Certificates: []tls.Certificate{*mtlsPolicy.proxyCert},
+			ClientCAs:    mtlsPolicy.clientCACertPool,
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+			MinVersion:   tls.VersionTLS13,
+		}))
+	err = proxyPolicymTLS.StartTLS()
+	require.NoError(t, err, "error starting proxyPolicymTLS")
+	t.Logf("proxyPolicymTLS running on %s", proxyPolicymTLS.URL)
+	t.Cleanup(proxyPolicymTLS.Close)
+
+	proxyPolicyOneWayTLS := proxytest.New(t,
+		proxytest.WithVerboseLog(),
+		proxytest.WithRequestLog("proxyOneWayTLSPolicy", t.Logf),
+		proxytest.WithRewrite(fleethostWrong.Host, defaultFleetHost),
+		proxytest.WithMITMCA(oneWayTLSPolicy.proxyCAKey, oneWayTLSPolicy.proxyCACert),
+		proxytest.WithServerTLSConfig(&tls.Config{
+			Certificates: []tls.Certificate{*oneWayTLSPolicy.proxyCert},
+			MinVersion:   tls.VersionTLS13,
+		}))
+	err = proxyPolicyOneWayTLS.StartTLS()
+	require.NoError(t, err, "error starting proxyPolicyOneWayTLS")
+	t.Logf("proxyPolicymTLS running on %s", proxyPolicyOneWayTLS.URL)
+	t.Cleanup(proxyPolicyOneWayTLS.Close)
+
+	return mtlsCLI, mtlsPolicy, oneWayTLSPolicy, proxyCLI, proxyPolicymTLS, proxyPolicyOneWayTLS
+}
+
+func generateMTLSCerts(t *testing.T, name string) certificatePaths {
+	// Create a temporary directory to store certificates that will not be
+	// deleted at the end of the test. If the certificates are deleted before
+	// agent uninstall runs, it'll cause the agent uninstall to fail as it loads
+	// all the configs, including the certificates, which would be gone if the
+	// directory is deleted.
+	tmpDir, err := os.MkdirTemp(os.TempDir(), t.Name()+"-"+name)
+	t.Logf("[%s] certificates saved on: %s", name, tmpDir)
+
+	proxyCAKey, proxyCACert, proxyCAPair, err := certutil.NewRSARootCA(
+		certutil.WithCNPrefix("proxy-" + name))
+	require.NoError(t, err, "error creating root CA")
+
+	proxyCert, proxyCertPair, err := certutil.GenerateRSAChildCert(
+		"localhost",
+		[]net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback, net.IPv6zero},
+		proxyCAKey,
+		proxyCACert,
+		certutil.WithCNPrefix("proxy-"+name))
+	require.NoError(t, err, "error creating server certificate")
+
+	clientCAKey, clientCACert, clientCAPair, err := certutil.NewRSARootCA(
+		certutil.WithCNPrefix("client-" + name))
+	require.NoError(t, err, "error creating root CA")
+	clientCACertPool := x509.NewCertPool()
+	clientCACertPool.AddCert(clientCACert)
+
+	clientCert, clientCertPair, err := certutil.GenerateRSAChildCert(
+		"localhost",
+		[]net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback, net.IPv6zero},
+		clientCAKey,
+		clientCACert,
+		certutil.WithCNPrefix("client-"+name))
+	require.NoError(t, err, "error creating server certificate")
+	passphrase := "aReallySecurePassphrase"
+
+	encKey, err := certutil.EncryptKey(clientCert.PrivateKey, passphrase)
+	require.NoError(t, err, "error encrypting certificate key")
+
+	// =========================== save certificates ===========================
+	proxyCACertFile := filepath.Join(tmpDir, "proxyCA.crt")
+	err = os.WriteFile(proxyCACertFile, proxyCAPair.Cert, 0644)
+	require.NoErrorf(t, err, "could not save %q", proxyCACertFile)
+
+	proxyCAKeyFile := filepath.Join(tmpDir, "proxyCA.key")
+	err = os.WriteFile(proxyCAKeyFile, proxyCAPair.Key, 0644)
+	require.NoErrorf(t, err, "could not save %q", proxyCAKeyFile)
+
+	proxyCertFile := filepath.Join(tmpDir, "proxyCert.crt")
+	err = os.WriteFile(proxyCertFile, proxyCertPair.Cert, 0644)
+	require.NoErrorf(t, err, "could not save %q", proxyCertFile)
+
+	proxyKeyFile := filepath.Join(tmpDir, "proxyCert.key")
+	err = os.WriteFile(proxyKeyFile, proxyCertPair.Key, 0644)
+	require.NoErrorf(t, err, "could not save %q", proxyKeyFile)
+
+	clientCACertFile := filepath.Join(tmpDir, "clientCA.crt")
+	err = os.WriteFile(clientCACertFile, clientCAPair.Cert, 0644)
+	require.NoErrorf(t, err, "could not save %q", clientCACertFile)
+
+	clientCAKeyFile := filepath.Join(tmpDir, "clientCA.key")
+	err = os.WriteFile(clientCAKeyFile, clientCAPair.Key, 0644)
+	require.NoErrorf(t, err, "could not save %q", clientCAKeyFile)
+
+	clientCertCertFile := filepath.Join(tmpDir, "clientCert.crt")
+	err = os.WriteFile(clientCertCertFile, clientCertPair.Cert, 0644)
+	require.NoErrorf(t, err, "could not save %q", clientCertCertFile)
+
+	clientCertKeyFile := filepath.Join(tmpDir, "clientCert.key")
+	err = os.WriteFile(clientCertKeyFile, clientCertPair.Key, 0644)
+	require.NoErrorf(t, err, "could not save %q", clientCertKeyFile)
+
+	clientCertKeyEncFile := filepath.Join(tmpDir, "clientCertEnc.key")
+	err = os.WriteFile(clientCertKeyEncFile, encKey, 0644)
+	require.NoErrorf(t, err, "could not save %q", clientCertKeyEncFile)
+
+	clientCertKeyPassFile := filepath.Join(tmpDir, "clientCertKey.pass")
+	err = os.WriteFile(clientCertKeyPassFile, []byte(passphrase), 0644)
+	require.NoErrorf(t, err, "could not save %q", clientCertKeyPassFile)
+
+	return certificatePaths{
+		proxyCAKey:  proxyCAKey,
+		proxyCACert: proxyCACert,
+		proxyCAPath: proxyCACertFile,
+		proxyCert:   proxyCert,
+
+		clientCACertPool:      clientCACertPool,
+		clientCAPath:          clientCACertFile,
+		clientCertPath:        clientCertCertFile,
+		clientCertKeyPath:     clientCertKeyFile,
+		clientCertKeyEncPath:  clientCertKeyEncFile,
+		clientCertKeyPassPath: clientCertKeyPassFile,
+	}
+}
+
+type certificatePaths struct {
+	proxyCAKey  crypto.PrivateKey
+	proxyCACert *x509.Certificate
+	proxyCert   *tls.Certificate
+	proxyCAPath string
+
+	clientCAPath          string
+	clientCACertPool      *x509.CertPool
+	clientCertPath        string
+	clientCertKeyPath     string
+	clientCertKeyEncPath  string
+	clientCertKeyPassPath string
 }
