@@ -92,25 +92,20 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 	return upgradeCmdWithClient(input)
 }
 
-func shouldUpgrade(cmd *cobra.Command, agentInfo info.Agent) (bool, error) {
+func checkUpgradable(force bool, agentInfo info.Agent) error {
 	if agentInfo.IsStandalone() {
-		return true, nil
+		return nil
 	}
 
 	if agentInfo.Unprivileged() {
-		return false, fmt.Errorf("upgrade command needs to be executed as root for fleet managed agents")
-	}
-
-	force, err := cmd.Flags().GetBool(flagForce)
-	if err != nil {
-		return false, fmt.Errorf("failed to retrieve command flag information while trying to upgrade the agent: %w", err)
+		return fmt.Errorf("upgrade command needs to be executed as root for fleet managed agents")
 	}
 
 	if !force {
-		return false, unsupportedUpgrade
+		return unsupportedUpgrade
 	}
 
-	return true, nil
+	return nil
 }
 
 func upgradeCmdWithClient(input *upgradeInput) error {
