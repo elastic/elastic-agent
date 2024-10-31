@@ -65,6 +65,7 @@ Initialise input templates if we are not deploying as managed
 {{- if eq $.Values.agent.fleet.enabled false -}}
 {{/* standalone agent so initialise inputs */}}
 {{- include "elasticagent.kubernetes.init" $ -}}
+{{- include "elasticagent.system.init" $ -}}
 {{- range $customInputName, $customInputVal := $.Values.extraIntegrations -}}
 {{- $customInputPresetName := ($customInputVal).preset -}}
 {{- $presetVal := get $.Values.agent.presets $customInputPresetName -}}
