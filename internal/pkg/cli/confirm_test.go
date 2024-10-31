@@ -12,6 +12,10 @@ func TestConfirm(t *testing.T) {
 		expectedErr    string
 	}{
 		"y":    {true, ""},
+		"y ":   {true, ""},
+		" y":   {true, ""},
+		"y\t":  {true, ""},
+		"\ty":  {true, ""},
 		"yes":  {true, ""},
 		"yeah": {true, ""},
 		"Y":    {true, ""},
@@ -21,6 +25,10 @@ func TestConfirm(t *testing.T) {
 		"Yeah": {true, ""},
 		"Yup":  {false, "error reading user input"},
 		"n":    {false, ""},
+		"n ":   {false, ""},
+		" n":   {false, ""},
+		"n\t":  {false, ""},
+		"\tn":  {false, ""},
 		"no":   {false, ""},
 		"N":    {false, ""},
 		"NO":   {false, ""},
