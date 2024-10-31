@@ -301,6 +301,9 @@ agent:
     repository: docker.elastic.co/beats/elastic-agent
     pullPolicy: IfNotPresent
     tag: "8.17.0-SNAPSHOT"
+  # -- image pull secrets
+  # @section -- 3 - Elastic-Agent Configuration
+  imagePullSecrets: []
   # -- generate kubernetes manifests or [ECK](https://github.com/elastic/cloud-on-k8s) CRDs
   # @section -- 3 - Elastic-Agent Configuration
   engine: k8s # k8s or eck

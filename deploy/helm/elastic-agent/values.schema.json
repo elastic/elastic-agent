@@ -186,7 +186,7 @@
                                 "additionalParsersConfig": {
                                     "type": "array",
                                     "items": {
-                                        "type": "string"
+                                        "type": "object"
                                     }
                                 }
                             },
@@ -267,6 +267,12 @@
                 },
                 "image": {
                     "$ref": "#/definitions/AgentImageConfig"
+                },
+                "imagePullSecrets": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    }
                 },
                 "engine": {
                     "type": "string",

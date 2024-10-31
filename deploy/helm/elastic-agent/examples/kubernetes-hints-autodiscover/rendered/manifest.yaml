@@ -435,6 +435,7 @@ stringData:
         streams:
         - data_stream:
             dataset: kubernetes.container_logs
+            type: logs
           id: kubernetes-container-logs-${kubernetes.pod.name}-${kubernetes.container.id}
           parsers:
           - container:
@@ -1090,7 +1091,7 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: f81171bdf0eed2d3bc8492050be0e6763188e3731e5cfc2b675f6ad8810c6fb7
+        checksum/config: 21fb7e317577410096de8d8e0fb03b32ad2e406b549f75085ae6907d38678e46
 
     spec:
       dnsPolicy: ClusterFirstWithHostNet
