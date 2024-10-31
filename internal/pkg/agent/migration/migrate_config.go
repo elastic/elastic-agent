@@ -42,7 +42,7 @@ func MigrateToEncryptedConfig(ctx context.Context, l *logp.Logger, unencryptedCo
 		return nil
 	}
 
-	l.Info("Initiating migration of %q to %q", unencryptedConfigPath, encryptedConfigPath)
+	l.Info(fmt.Sprintf("Initiating migration of %q to %q", unencryptedConfigPath, encryptedConfigPath))
 	legacyStore, err := storage.NewDiskStore(unencryptedConfigPath)
 	if err != nil {
 		return fmt.Errorf("error instantiating disk store: %w", err)
@@ -65,7 +65,7 @@ func MigrateToEncryptedConfig(ctx context.Context, l *logp.Logger, unencryptedCo
 	if err != nil {
 		return errors.New(err, fmt.Sprintf("error writing encrypted config from file %q to file %q", unencryptedConfigPath, encryptedConfigPath))
 	}
-	l.Info("Migration of %q to %q complete", unencryptedConfigPath, encryptedConfigPath)
+	l.Info(fmt.Sprintf("Migration of %q to %q complete", unencryptedConfigPath, encryptedConfigPath))
 
 	return nil
 }
