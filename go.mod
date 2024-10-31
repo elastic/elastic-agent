@@ -72,12 +72,7 @@ require (
 	golang.org/x/term v0.25.0
 	golang.org/x/text v0.19.0
 	golang.org/x/time v0.6.0
-<<<<<<< HEAD
-	golang.org/x/tools v0.24.0
-=======
 	golang.org/x/tools v0.25.0
-	google.golang.org/api v0.199.0
->>>>>>> 89dca1d1d4 (Add filebeat receiver to otel mode (#5833))
 	google.golang.org/grpc v1.67.1
 	google.golang.org/protobuf v1.35.1
 	gopkg.in/ini.v1 v1.67.0
@@ -136,14 +131,6 @@ require (
 )
 
 require (
-<<<<<<< HEAD
-	cloud.google.com/go/auth v0.8.1 // indirect
-	cloud.google.com/go/auth/oauth2adapt v0.2.3 // indirect
-	cloud.google.com/go/compute/metadata v0.5.2 // indirect
-)
-
-require (
-=======
 	aqwari.net/xml v0.0.0-20210331023308-d9421b293817 // indirect
 	cloud.google.com/go v0.115.1 // indirect
 	cloud.google.com/go/auth v0.9.5 // indirect
@@ -156,7 +143,6 @@ require (
 	code.cloudfoundry.org/go-loggregator v7.4.0+incompatible // indirect
 	code.cloudfoundry.org/gofileutils v0.0.0-20170111115228-4d0c80011a0f // indirect
 	code.cloudfoundry.org/rfc5424 v0.0.0-20180905210152-236a6d29298a // indirect
->>>>>>> 89dca1d1d4 (Add filebeat receiver to otel mode (#5833))
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24 // indirect
 	github.com/Azure/azure-amqp-common-go/v4 v4.2.0 // indirect
 	github.com/Azure/azure-event-hubs-go/v3 v3.6.1 // indirect
@@ -190,12 +176,8 @@ require (
 	github.com/JohnCGriffin/overflow v0.0.0-20211019200055-46fa312c352c // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
-<<<<<<< HEAD
-	github.com/Masterminds/semver/v3 v3.3.0 // indirect
-=======
 	github.com/Masterminds/semver v1.5.0 // indirect
-	github.com/Masterminds/semver/v3 v3.2.1 // indirect
->>>>>>> 89dca1d1d4 (Add filebeat receiver to otel mode (#5833))
+	github.com/Masterminds/semver/v3 v3.3.0 // indirect
 	github.com/Masterminds/sprig/v3 v3.2.3 // indirect
 	github.com/Masterminds/squirrel v1.5.4 // indirect
 	github.com/Microsoft/hcsshim v0.12.5 // indirect
@@ -316,11 +298,8 @@ require (
 	github.com/go-openapi/jsonreference v0.20.4 // indirect
 	github.com/go-openapi/swag v0.22.9 // indirect
 	github.com/go-resty/resty/v2 v2.13.1 // indirect
-<<<<<<< HEAD
-	github.com/go-sql-driver/mysql v1.7.1 // indirect
-=======
 	github.com/go-sourcemap/sourcemap v2.1.2+incompatible // indirect
->>>>>>> 89dca1d1d4 (Add filebeat receiver to otel mode (#5833))
+	github.com/go-sql-driver/mysql v1.7.1 // indirect
 	github.com/go-zookeeper/zk v1.0.3 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/goccy/go-json v0.10.3 // indirect
@@ -342,7 +321,7 @@ require (
 	github.com/google/s2a-go v0.1.8 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
+	github.com/googleapis/enterprise-certificate-proxy v0.3.4 // indirect
 	github.com/googleapis/gax-go/v2 v2.13.0 // indirect
 	github.com/gophercloud/gophercloud v1.14.0 // indirect
 	github.com/gorilla/handlers v1.5.2 // indirect
@@ -584,11 +563,8 @@ require (
 	golang.org/x/oauth2 v0.23.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	gonum.org/v1/gonum v0.15.1 // indirect
-<<<<<<< HEAD
-	google.golang.org/api v0.192.0 // indirect
-=======
+	google.golang.org/api v0.199.0 // indirect
 	google.golang.org/genproto v0.0.0-20240903143218-8af14fe29dc1 // indirect
->>>>>>> 89dca1d1d4 (Add filebeat receiver to otel mode (#5833))
 	google.golang.org/genproto/googleapis/api v0.0.0-20241007155032-5fefd90f89a9 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241007155032-5fefd90f89a9 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
