@@ -114,8 +114,13 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 	version := input.args[0]
 	sourceURI, _ := cmd.Flags().GetString(flagSourceURI)
 
-	su, err := shouldUpgrade(cmd, input.agentInfo)
-	if !su {
+	force, err := cmd.Flags().GetBool(flagForce)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve command flag information while trying to upgrade the agent: %w", err)
+	}
+
+	err := checkUpgradable(force, input.agentInfo)
+	if err != nil {
 		return fmt.Errorf("aborting upgrade: %w", err)
 	}
 
