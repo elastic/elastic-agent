@@ -32,8 +32,8 @@ func MigrateToEncryptedConfig(ctx context.Context, l *logp.Logger, unencryptedCo
 
 	unencStat, unencFileErr := os.Stat(unencryptedConfigPath)
 
-	l.Debugf("checking stat of enc config %q: %+v, err: %v", encryptedConfigPath, encStat, encFileErr)
-	l.Debugf("checking stat of unenc config %q: %+v, err: %v", unencryptedConfigPath, unencStat, unencFileErr)
+	l.Debugf(fmt.Sprintf("checking stat of enc config %q: %+v, err: %v", encryptedConfigPath, encStat, encFileErr.Error()))
+	l.Debugf(fmt.Sprintf("checking stat of unenc config %q: %+v, err: %v", unencryptedConfigPath, unencStat, unencFileErr.Error()))
 
 	isEncryptedConfigEmpty := errors.Is(encFileErr, fs.ErrNotExist) || encStat.Size() == 0
 	isUnencryptedConfigPresent := unencFileErr == nil && unencStat.Size() > 0
@@ -54,7 +54,7 @@ func MigrateToEncryptedConfig(ctx context.Context, l *logp.Logger, unencryptedCo
 	defer func() {
 		err = reader.Close()
 		if err != nil {
-			l.Errorf("Error closing unencrypted store reader for %q: %v", unencryptedConfigPath, err)
+			l.Errorf(fmt.Sprintf("Error closing unencrypted store reader for %q: %v", unencryptedConfigPath, err.Error()))
 		}
 	}()
 	store, err := storage.NewEncryptedDiskStore(ctx, encryptedConfigPath, storageOpts...)
