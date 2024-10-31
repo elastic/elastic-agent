@@ -119,7 +119,7 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 		return fmt.Errorf("failed to retrieve command flag information while trying to upgrade the agent: %w", err)
 	}
 
-	err := checkUpgradable(force, input.agentInfo)
+	err = checkUpgradable(force, input.agentInfo)
 	if err != nil {
 		return fmt.Errorf("aborting upgrade: %w", err)
 	}
