@@ -23,6 +23,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent-libs/testing/certutil"
 )
 
 func TestProxy(t *testing.T) {
@@ -238,6 +240,153 @@ func TestProxy(t *testing.T) {
 		})
 	}
 
+}
+
+func TestHTTPSProxy(t *testing.T) {
+	targetHost := "not-a-server.co"
+	proxy, client, target := prepareMTLSProxyAndTargetServer(t, targetHost)
+	t.Cleanup(func() {
+		proxy.Close()
+		target.Close()
+	})
+
+	tcs := []struct {
+		name   string
+		target string
+		// assertFn should not close the response body
+		assertFn func(*testing.T, *http.Response, error)
+	}{
+		{
+			name:   "successful_request",
+			target: "https://" + targetHost,
+			assertFn: func(t *testing.T, got *http.Response, err error) {
+				if !assert.Equal(t, http.StatusOK, got.StatusCode, "unexpected status code") {
+					body, err := io.ReadAll(got.Body)
+					if err != nil {
+						t.Logf("could not read response body")
+						t.FailNow()
+					}
+					_ = got.Body.Close()
+
+					t.Logf("request body: %s", string(body))
+				}
+
+			},
+		},
+		{
+			name:   "request_failure",
+			target: "https://any.not.target.will.do",
+			assertFn: func(t *testing.T, got *http.Response, err error) {
+				assert.NoError(t, err, "request to an invalid host should not fail, but succeed with a HTTP error")
+				assert.Equal(t, http.StatusBadGateway, got.StatusCode)
+
+				body, err := io.ReadAll(got.Body)
+				require.NoError(t, err, "failed reading response body")
+				assert.Contains(t, string(body), "failed performing request to target")
+			},
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Logf("making request to %q using proxy %q", tc.target, proxy.URL)
+
+			got, err := client.Get(tc.target) //nolint:noctx // it's a test
+			require.NoError(t, err, "request should have succeeded")
+			defer got.Body.Close()
+
+			// assertFn should not close the response body
+			tc.assertFn(t, got, err)
+		})
+	}
+}
+
+func prepareMTLSProxyAndTargetServer(t *testing.T, targetHost string) (*Proxy, http.Client, *httptest.Server) {
+	serverCAKey, serverCACert, _, err := certutil.NewRootCA()
+	require.NoError(t, err, "error creating root CA")
+
+	serverCert, _, err := certutil.GenerateChildCert(
+		"localhost",
+		[]net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback, net.IPv6zero},
+		serverCAKey,
+		serverCACert)
+	require.NoError(t, err, "error creating server certificate")
+	serverCACertPool := x509.NewCertPool()
+	serverCACertPool.AddCert(serverCACert)
+
+	proxyCAKey, proxyCACert, _, err := certutil.NewRootCA()
+	require.NoError(t, err, "error creating root CA")
+
+	proxyCert, _, err := certutil.GenerateChildCert(
+		"localhost",
+		[]net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback, net.IPv6zero},
+		proxyCAKey,
+		proxyCACert)
+	require.NoError(t, err, "error creating server certificate")
+	proxyCACertPool := x509.NewCertPool()
+	proxyCACertPool.AddCert(proxyCACert)
+
+	clientCAKey, clientCACert, _, err := certutil.NewRootCA()
+	require.NoError(t, err, "error creating root CA")
+	clientCACertPool := x509.NewCertPool()
+	clientCACertPool.AddCert(clientCACert)
+
+	clientCert, _, err := certutil.GenerateChildCert(
+		"localhost",
+		[]net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback, net.IPv6zero},
+		clientCAKey,
+		clientCACert)
+	require.NoError(t, err, "error creating server certificate")
+
+	server := httptest.NewUnstartedServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte("It works!"))
+		}))
+	server.TLS = &tls.Config{
+		MinVersion:   tls.VersionTLS13,
+		Certificates: []tls.Certificate{*serverCert},
+	}
+	server.StartTLS()
+	t.Logf("target server running on %s", server.URL)
+
+	proxy := New(t,
+		WithVerboseLog(),
+		WithRequestLog("https", t.Logf),
+		WithRewrite(targetHost+":443", server.URL[8:]),
+		WithMITMCA(proxyCAKey, proxyCACert),
+		WithHTTPClient(&http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					MinVersion: tls.VersionTLS13,
+					RootCAs:    serverCACertPool,
+				},
+			},
+		}),
+		WithServerTLSConfig(&tls.Config{
+			Certificates: []tls.Certificate{*proxyCert},
+			ClientCAs:    clientCACertPool,
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+			MinVersion:   tls.VersionTLS13,
+		}))
+	err = proxy.StartTLS()
+	require.NoError(t, err, "error starting proxy")
+	t.Logf("proxy running on %s", proxy.URL)
+
+	proxyURL, err := url.Parse(proxy.URL)
+	require.NoErrorf(t, err, "failed to parse proxy URL %q", proxy.URL)
+
+	client := http.Client{
+		Transport: &http.Transport{
+			Proxy: http.ProxyURL(proxyURL),
+			TLSClientConfig: &tls.Config{
+				RootCAs:      proxyCACertPool,
+				Certificates: []tls.Certificate{*clientCert},
+				MinVersion:   tls.VersionTLS12,
+			},
+		},
+	}
+
+	return proxy, client, server
 }
 
 func createFakeBackendServer() *httptest.Server {
