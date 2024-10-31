@@ -64,7 +64,7 @@ kubernetes:
     # results in overriding and *disabling all* the respective state streams
     # @section -- 2 - Kubernetes integration
     enabled: true
-    # -- deploy kube-state-metrics service as a sidecar container to the elastic agent of `ksmShared` preset.
+    # -- deploy kube-state-metrics service as a sidecar container to the elastic agent of `ksmSharded` preset.
     # If set to `false`, kube-state-metrics will *not* get deployed and `clusterWide` agent preset will be used for
     # collecting kube-state-metrics.
     # @section -- 2 - Kubernetes integration
@@ -287,16 +287,47 @@ kubernetes:
       # -- system metric stream vars
       # @section -- 2 - Kubernetes integration
       vars: {}
+system:
+  # -- enable System integration.
+  # @section -- 4 - System integration
+  enabled: false
+  # -- name of the output used in System integration. Note that this output needs to be defined in
+  # [outputs](#1-outputs)
+  # @section -- 4 - System integration
+  output: default
+  # -- output namespace
+  # @section -- 4 - System integration
+  namespace: default
+  authLogs:
+    # -- enable auth logs
+    # @section -- 4 - System integration
+    enabled: true
+    # -- override default variables of auth logs stream. Look in the [values.schema.json](values.schema.json) to see the
+    # available variables
+    # @section -- 4 - System integration
+    vars: {}
+  syslog:
+    # -- enable syslog
+    # @section -- 4 - System integration
+    enabled: true
+    # -- override default variables of syslog stream. Look in the [values.schema.json](values.schema.json) to see the
+    # available variables
+    # @section -- 4 - System integration
+    vars: {}
+  metrics:
+    # -- enable metrics
+    # @section -- 4 - System integration
+    enabled: true
 # -- extra [user-defined integrations](https://www.elastic.co/guide/en/fleet/current/elastic-agent-input-configuration.html) to be added to the Elastic Agent
 # An example can be found [here](./examples/nginx-custom-integration/README.md)
-# @section -- 3 - User Extra Integrations
+# @section -- 5 - User Extra Integrations
 extraIntegrations: {}
 agent:
   # -- elastic-agent version
-  # @section -- 3 - Elastic-Agent Configuration
+  # @section -- 6 - Elastic-Agent Configuration
   version: 9.0.0
   # -- image configuration
-  # @section -- 3 - Elastic-Agent Configuration
+  # @section -- 6 - Elastic-Agent Configuration
   image:
     repository: docker.elastic.co/beats/elastic-agent
     pullPolicy: IfNotPresent
@@ -305,40 +336,40 @@ agent:
   # @section -- 3 - Elastic-Agent Configuration
   imagePullSecrets: []
   # -- generate kubernetes manifests or [ECK](https://github.com/elastic/cloud-on-k8s) CRDs
-  # @section -- 3 - Elastic-Agent Configuration
+  # @section -- 6 - Elastic-Agent Configuration
   engine: k8s # k8s or eck
   # -- enable unprivileged mode
-  # @section -- 3 - Elastic-Agent Configuration
+  # @section -- 6 - Elastic-Agent Configuration
   unprivileged: false
   fleet:
     # -- enable elastic-agent managed
-    # @section -- 3.1 - Elastic-Agent Managed Configuration
+    # @section -- 6.1 - Elastic-Agent Managed Configuration
     enabled: false
     # -- Fleet server URL
-    # @section -- 3.1 - Elastic-Agent Managed Configuration
+    # @section -- 6.1 - Elastic-Agent Managed Configuration
     url: ""
     # -- Fleet enrollment token
-    # @section -- 3.1 - Elastic-Agent Managed Configuration
+    # @section -- 6.1 - Elastic-Agent Managed Configuration
     token: ""
     # -- Fleet insecure url
-    # @section -- 3.1 - Elastic-Agent Managed Configuration
+    # @section -- 6.1 - Elastic-Agent Managed Configuration
     insecure: false
     # -- Kibana host to fallback if enrollment token is not supplied
-    # @section -- 3.1 - Elastic-Agent Managed Configuration
+    # @section -- 6.1 - Elastic-Agent Managed Configuration
     kibanaHost: ""
     # -- Kibana username to fallback if enrollment token is not supplied
-    # @section -- 3.1 - Elastic-Agent Managed Configuration
+    # @section -- 6.1 - Elastic-Agent Managed Configuration
     kibanaUser: ""
     # -- Kibana password to fallback if enrollment token is not supplied
-    # @section -- 3.1 - Elastic-Agent Managed Configuration
+    # @section -- 6.1 - Elastic-Agent Managed Configuration
     kibanaPassword: ""
     # -- Agent preset to deploy
-    # @section -- 3.1 - Elastic-Agent Managed Configuration
+    # @section -- 6.1 - Elastic-Agent Managed Configuration
     preset: perNode
   # -- Map of deployment presets for the Elastic Agent. The key of the map is the name of the preset. See more for the presets
   # required by the built-in Kubernetes integration [here](./values.yaml)
   # @notationType -- map[string]{}
-  # @section -- 3 - Elastic-Agent Configuration
+  # @section -- 6 - Elastic-Agent Configuration
   # @default -- `{ "perNode" : {...}, "clusterWide": {...}, "ksmSharded": {...} }`
   presets:
     #  examplePreset:
