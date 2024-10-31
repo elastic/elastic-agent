@@ -20,6 +20,7 @@ Config input for container logs
   - id: kubernetes-container-logs-${kubernetes.pod.name}-${kubernetes.container.id}
     data_stream:
       dataset: kubernetes.container_logs
+      type: logs
     paths:
       - '/var/log/containers/*${kubernetes.container.id}.log'
     prospector.scanner.symlinks: {{ dig "vars" "symlinks" true .Values.kubernetes.containers.logs }}
