@@ -15,7 +15,7 @@ require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20241022170531-d2e6603d82fb
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
 	github.com/elastic/elastic-agent-client/v7 v7.16.0
-	github.com/elastic/elastic-agent-libs v0.15.0
+	github.com/elastic/elastic-agent-libs v0.17.0
 	github.com/elastic/elastic-agent-system-metrics v0.11.3
 	github.com/elastic/elastic-transport-go/v8 v8.6.0
 	github.com/elastic/go-elasticsearch/v8 v8.15.0
@@ -606,5 +606,3 @@ replace (
 	// See https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/12d41f40b0d408b0167633d8095160d3343d46ac/go.mod#L38
 	github.com/openshift/api v3.9.0+incompatible => github.com/openshift/api v0.0.0-20180801171038-322a19404e37
 )
-
-replace github.com/elastic/elastic-agent-libs => github.com/AndersonQ/elastic-agent-libs v0.0.0-20241031142007-6146d7fb60c6
