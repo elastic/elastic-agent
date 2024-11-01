@@ -946,7 +946,7 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 	require.NoError(t, err, "error creating proxy on fleet")
 
 	// add new fleet-server host with mTLS proxy
-	fleetKibanaHostmTLS, err := stack.KibanaClient.NewFleetServerHosts(ctx, kibana.ListFleetServerHostsRequest{
+	fleetKibanaHostmTLS, err := stack.KibanaClient.CreateFleetServerHosts(ctx, kibana.ListFleetServerHostsRequest{
 		ID:        "proxyPolicymTLS" + testUUID,
 		Name:      "proxyPolicymTLS" + testUUID,
 		HostURLs:  []string{fleethostWrong.String()},
@@ -956,7 +956,7 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 	require.NoError(t, err, "error creating fleet host with mTLS proxy")
 
 	// add new fleet-server host with oen way TLS proxy
-	fleetKibanaHostOneWayTLS, err := stack.KibanaClient.NewFleetServerHosts(ctx, kibana.ListFleetServerHostsRequest{
+	fleetKibanaHostOneWayTLS, err := stack.KibanaClient.CreateFleetServerHosts(ctx, kibana.ListFleetServerHostsRequest{
 		ID:        "proxyPolicyOneWayTLS" + testUUID,
 		Name:      "proxyPolicyOneWayTLS" + testUUID,
 		HostURLs:  []string{fleethostWrong.String()},
