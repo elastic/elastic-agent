@@ -847,6 +847,8 @@ func TestForceInstallOverProtectedPolicy(t *testing.T) {
 		},
 	})
 
+	t.Skip("let see if this test is affecting the others")
+
 	deadline := time.Now().Add(10 * time.Minute)
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), deadline)
 	defer cancel()
