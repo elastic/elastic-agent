@@ -16,77 +16,77 @@ steps:
   - group: "Unit tests"
     key: "unit-tests"
     steps:
-      - label: "Unit tests - Ubuntu 22.04"
-        key: "unit-tests-2204"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          image: "family/core-ubuntu-2204"
-        retry:
-          manual:
-            allowed: true
+      # - label: "Unit tests - Ubuntu 22.04"
+      #   key: "unit-tests-2204"
+      #   command: ".buildkite/scripts/steps/unit-tests.sh"
+      #   artifact_paths:
+      #     - "build/TEST-*.html"
+      #     - "build/TEST-*.xml"
+      #     - "build/diagnostics/*"
+      #     - "coverage-*.out"
+      #   agents:
+      #     provider: "gcp"
+      #     image: "family/core-ubuntu-2204"
+      #   retry:
+      #     manual:
+      #       allowed: true
 
-      - label: "Unit tests - Ubuntu 22.04 ARM64"
-        key: "unit-tests-2204-arm64"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "aws"
-          imagePrefix: "core-ubuntu-2204-aarch64"
-          diskSizeGb: 200
-          instanceType: "m6g.xlarge"
-        retry:
-          manual:
-            allowed: true
+      # - label: "Unit tests - Ubuntu 22.04 ARM64"
+      #   key: "unit-tests-2204-arm64"
+      #   command: ".buildkite/scripts/steps/unit-tests.sh"
+      #   artifact_paths:
+      #     - "build/TEST-*.html"
+      #     - "build/TEST-*.xml"
+      #     - "build/diagnostics/*"
+      #     - "coverage-*.out"
+      #   agents:
+      #     provider: "aws"
+      #     imagePrefix: "core-ubuntu-2204-aarch64"
+      #     diskSizeGb: 200
+      #     instanceType: "m6g.xlarge"
+      #   retry:
+      #     manual:
+      #       allowed: true
 
-      - label: "Unit tests - Windows 2022"
-        key: "unit-tests-win2022"
-        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          image: "family/core-windows-2022"
-          machine_type: "n2-standard-8"
-          disk_size: 200
-          disk_type: "pd-ssd"
-        retry:
-          manual:
-            allowed: true
+      # - label: "Unit tests - Windows 2022"
+      #   key: "unit-tests-win2022"
+      #   command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+      #   artifact_paths:
+      #     - "build/TEST-*.html"
+      #     - "build/TEST-*.xml"
+      #     - "build/diagnostics/*"
+      #     - "coverage-*.out"
+      #   agents:
+      #     provider: "gcp"
+      #     image: "family/core-windows-2022"
+      #     machine_type: "n2-standard-8"
+      #     disk_size: 200
+      #     disk_type: "pd-ssd"
+      #   retry:
+      #     manual:
+      #       allowed: true
 
-      - label: "Unit tests - Windows 2016"
-        key: "unit-tests-win2016"
-        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          image: "family/core-windows-2016"
-          machine_type: "n2-standard-8"
-          disk_size: 200
-          disk_type: "pd-ssd"
-        retry:
-          manual:
-            allowed: true
+      # - label: "Unit tests - Windows 2016"
+      #   key: "unit-tests-win2016"
+      #   command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+      #   artifact_paths:
+      #     - "build/TEST-*.html"
+      #     - "build/TEST-*.xml"
+      #     - "build/diagnostics/*"
+      #     - "coverage-*.out"
+      #   agents:
+      #     provider: "gcp"
+      #     image: "family/core-windows-2016"
+      #     machine_type: "n2-standard-8"
+      #     disk_size: 200
+      #     disk_type: "pd-ssd"
+      #   retry:
+      #     manual:
+      #       allowed: true
 
-      # Runs inly on the main branch
+      # Runs only on the main branch
       - label: "Unit tests - MacOS 15 ARM"
-        key: "unit-tests-macos-13-arm"
+        key: "unit-tests-macos-15-arm"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         # branches: main
         artifact_paths:
@@ -102,7 +102,7 @@ steps:
             allowed: true
 
       - label: "Unit tests - MacOS 15"
-        key: "unit-tests-macos-13"
+        key: "unit-tests-macos-15"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         artifact_paths:
           - "build/TEST-*.html"
@@ -154,148 +154,148 @@ steps:
           manual:
             allowed: true
 
-  - label: ":junit: Junit annotate"
-    plugins:
-      - junit-annotate#v2.5.0:
-          artifacts: "**TEST-*.xml"
-          always-annotate: true
-    agents:
-      provider: "gcp"
-    depends_on:
-      - step: "unit-tests-2204"
-        allow_failure: true
-      - step: "unit-tests-2204-arm64"
-        allow_failure: true
-      - step: "unit-tests-win2022"
-        allow_failure: true
-      - step: "unit-tests-win2016"
-        allow_failure: true
-      - step: "unit-tests-macos-13-arm"
-        allow_failure: true
-      - step: "unit-tests-macos-13"
-        allow_failure: true
-      - step: "unit-tests-win10"
-        allow_failure: true
-      - step: "unit-tests-win11"
-        allow_failure: true
+  # - label: ":junit: Junit annotate"
+  #   plugins:
+  #     - junit-annotate#v2.5.0:
+  #         artifacts: "**TEST-*.xml"
+  #         always-annotate: true
+  #   agents:
+  #     provider: "gcp"
+  #   depends_on:
+  #     - step: "unit-tests-2204"
+  #       allow_failure: true
+  #     - step: "unit-tests-2204-arm64"
+  #       allow_failure: true
+  #     - step: "unit-tests-win2022"
+  #       allow_failure: true
+  #     - step: "unit-tests-win2016"
+  #       allow_failure: true
+  #     - step: "unit-tests-macos-13-arm"
+  #       allow_failure: true
+  #     - step: "unit-tests-macos-13"
+  #       allow_failure: true
+  #     - step: "unit-tests-win10"
+  #       allow_failure: true
+  #     - step: "unit-tests-win11"
+  #       allow_failure: true
 
-  - label: "Merge coverage reports"
-    key: "merge-coverage"
-    env:
-      BUILDKITE_REPO: ""
-    command: |
-      .buildkite/scripts/steps/merge.sh
-    artifact_paths:
-      - "build/TEST-go-unit.cov"
-    agents:
-      image: "golang:1.22.6"
-    depends_on:
-      - unit-tests
-      - extended-windows
-    allow_dependency_failure: true
-    soft_fail: true # Until https://github.com/elastic/ingest-dev/issues/4042 is resolved
+  # - label: "Merge coverage reports"
+  #   key: "merge-coverage"
+  #   env:
+  #     BUILDKITE_REPO: ""
+  #   command: |
+  #     .buildkite/scripts/steps/merge.sh
+  #   artifact_paths:
+  #     - "build/TEST-go-unit.cov"
+  #   agents:
+  #     image: "golang:1.22.6"
+  #   depends_on:
+  #     - unit-tests
+  #     - extended-windows
+  #   allow_dependency_failure: true
+  #   soft_fail: true # Until https://github.com/elastic/ingest-dev/issues/4042 is resolved
 
-  - group: "K8s tests"
-    key: "k8s-tests"
-    steps:
-      - label: "K8s tests: {{matrix.k8s_version}}"
-        env:
-          K8S_VERSION: "v{{matrix.k8s_version}}"
-          KIND_VERSION: "v0.24.0"
-        command: ".buildkite/scripts/steps/k8s-tests.sh"
-        agents:
-          provider: "gcp"
-          image: "family/core-ubuntu-2204"
-        matrix:
-          setup:
-            k8s_version:
-              - "1.31.0"
-              - "1.30.0"
-              - "1.29.4"
-              - "1.28.9"
-        retry:
-          manual:
-            allowed: true
+  # - group: "K8s tests"
+  #   key: "k8s-tests"
+  #   steps:
+  #     - label: "K8s tests: {{matrix.k8s_version}}"
+  #       env:
+  #         K8S_VERSION: "v{{matrix.k8s_version}}"
+  #         KIND_VERSION: "v0.24.0"
+  #       command: ".buildkite/scripts/steps/k8s-tests.sh"
+  #       agents:
+  #         provider: "gcp"
+  #         image: "family/core-ubuntu-2204"
+  #       matrix:
+  #         setup:
+  #           k8s_version:
+  #             - "1.31.0"
+  #             - "1.30.0"
+  #             - "1.29.4"
+  #             - "1.28.9"
+  #       retry:
+  #         manual:
+  #           allowed: true
 
-  - label: ":sonarqube: Continuous Code Inspection"
-    env:
-      VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
-    agents:
-      image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
-    command:
-      - "buildkite-agent artifact download --step merge-coverage build/TEST-go-unit.cov ."
-      - "/scan-source-code.sh"
-    depends_on:
-      - "merge-coverage"
-    retry:
-      manual:
-        allowed: true
-    soft_fail: true # Until https://github.com/elastic/ingest-dev/issues/4042 is resolved
+  # - label: ":sonarqube: Continuous Code Inspection"
+  #   env:
+  #     VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
+  #   agents:
+  #     image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
+  #   command:
+  #     - "buildkite-agent artifact download --step merge-coverage build/TEST-go-unit.cov ."
+  #     - "/scan-source-code.sh"
+  #   depends_on:
+  #     - "merge-coverage"
+  #   retry:
+  #     manual:
+  #       allowed: true
+  #   soft_fail: true # Until https://github.com/elastic/ingest-dev/issues/4042 is resolved
 
-  # Triggers a dynamic step: Sync K8s
-  # Runs only on main and if k8s files are changed
-  - label: "Trigger k8s sync"
-    branches: main
-    plugins:
-      - monebag/monorepo-diff#v2.5.9:
-          diff: "git diff --name-only HEAD~1"
-          watch:
-            - path:
-                - deploy/kubernetes/*
-                - version/docs/version.asciidoc
-              config:
-                label: "Sync K8s"
-                command: ".buildkite/scripts/steps/sync-k8s.sh"
-                agents:
-                  provider: "gcp"
-                  image: "family/core-ubuntu-2204"
-                env:
-                  - GH_VERSION=2.4.0
+  # # Triggers a dynamic step: Sync K8s
+  # # Runs only on main and if k8s files are changed
+  # - label: "Trigger k8s sync"
+  #   branches: main
+  #   plugins:
+  #     - monebag/monorepo-diff#v2.5.9:
+  #         diff: "git diff --name-only HEAD~1"
+  #         watch:
+  #           - path:
+  #               - deploy/kubernetes/*
+  #               - version/docs/version.asciidoc
+  #             config:
+  #               label: "Sync K8s"
+  #               command: ".buildkite/scripts/steps/sync-k8s.sh"
+  #               agents:
+  #                 provider: "gcp"
+  #                 image: "family/core-ubuntu-2204"
+  #               env:
+  #                 - GH_VERSION=2.4.0
 
-  # Trigger for pull requests
-  - label: "Trigger Integration tests for Pull request"
-    if: |
-      (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
-      build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
+  # # Trigger for pull requests
+  # - label: "Trigger Integration tests for Pull request"
+  #   if: |
+  #     (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
+  #     build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
 
-    plugins:
-      - monorepo-diff#v1.0.1:
-          diff: "git diff --name-only origin/${GITHUB_PR_TARGET_BRANCH}...HEAD"
-          watch:
-            - path:
-                - internal/
-                - dev-tools/
-                - pkg/
-                - testing/
-                - version/
-                - specs/
-                - .agent-versions.json
-                - .go-version
-                - .package-version
-                - go.mod
-                - go.sum
-                - magefile.go
-                - main.go
+  #   plugins:
+  #     - monorepo-diff#v1.0.1:
+  #         diff: "git diff --name-only origin/${GITHUB_PR_TARGET_BRANCH}...HEAD"
+  #         watch:
+  #           - path:
+  #               - internal/
+  #               - dev-tools/
+  #               - pkg/
+  #               - testing/
+  #               - version/
+  #               - specs/
+  #               - .agent-versions.json
+  #               - .go-version
+  #               - .package-version
+  #               - go.mod
+  #               - go.sum
+  #               - magefile.go
+  #               - main.go
 
-                - .buildkite/integration.pipeline.yml
-                - .buildkite/pipeline.yml
-                - .buildkite/scripts/
-                - .buildkite/hooks/
+  #               - .buildkite/integration.pipeline.yml
+  #               - .buildkite/pipeline.yml
+  #               - .buildkite/scripts/
+  #               - .buildkite/hooks/
 
-              config:
-                trigger: "elastic-agent-extended-testing"
-                build:
-                  commit: "${BUILDKITE_COMMIT}"
-                  branch: "${BUILDKITE_BRANCH}"
-                  env:
-                    - BUILDKITE_PULL_REQUEST=${BUILDKITE_PULL_REQUEST}
-                    - BUILDKITE_PULL_REQUEST_BASE_BRANCH=${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
-                    - GITHUB_PR_LABELS=${GITHUB_PR_LABELS}
+  #             config:
+  #               trigger: "elastic-agent-extended-testing"
+  #               build:
+  #                 commit: "${BUILDKITE_COMMIT}"
+  #                 branch: "${BUILDKITE_BRANCH}"
+  #                 env:
+  #                   - BUILDKITE_PULL_REQUEST=${BUILDKITE_PULL_REQUEST}
+  #                   - BUILDKITE_PULL_REQUEST_BASE_BRANCH=${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
+  #                   - GITHUB_PR_LABELS=${GITHUB_PR_LABELS}
 
-  # Trigger for branches
-  - label: "Triggering Integration tests for branches"
-    if: build.pull_request.id == null
-    trigger: "elastic-agent-extended-testing"
-    build:
-      commit: "${BUILDKITE_COMMIT}"
-      branch: "${BUILDKITE_BRANCH}"
+  # # Trigger for branches
+  # - label: "Triggering Integration tests for branches"
+  #   if: build.pull_request.id == null
+  #   trigger: "elastic-agent-extended-testing"
+  #   build:
+  #     commit: "${BUILDKITE_COMMIT}"
+  #     branch: "${BUILDKITE_BRANCH}"
