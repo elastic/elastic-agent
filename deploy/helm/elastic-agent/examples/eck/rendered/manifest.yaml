@@ -424,6 +424,7 @@ stringData:
         streams:
         - data_stream:
             dataset: kubernetes.container_logs
+            type: logs
           id: kubernetes-container-logs-${kubernetes.pod.name}-${kubernetes.container.id}
           parsers:
           - container:
