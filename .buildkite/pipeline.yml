@@ -85,10 +85,10 @@ steps:
             allowed: true
 
       # Runs inly on the main branch
-      - label: "Unit tests - MacOS 13 ARM"
+      - label: "Unit tests - MacOS 15 ARM"
         key: "unit-tests-macos-13-arm"
         command: ".buildkite/scripts/steps/unit-tests.sh"
-        branches: main
+        # branches: main
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -96,12 +96,12 @@ steps:
           - "coverage-*.out"
         agents:
           provider: orka
-          imagePrefix: generic-13-ventura-arm
+          imagePrefix: generic-base-15-arm
         retry:
           manual:
             allowed: true
 
-      - label: "Unit tests - MacOS 13"
+      - label: "Unit tests - MacOS 15"
         key: "unit-tests-macos-13"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         artifact_paths:
@@ -111,7 +111,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: orka
-          imagePrefix: generic-13-ventura-x64
+          imagePrefix: generic-base-15-x86.img
         retry:
           manual:
             allowed: true
@@ -154,7 +154,6 @@ steps:
           manual:
             allowed: true
 
-
   - label: ":junit: Junit annotate"
     plugins:
       - junit-annotate#v2.5.0:
@@ -179,7 +178,6 @@ steps:
         allow_failure: true
       - step: "unit-tests-win11"
         allow_failure: true
-
 
   - label: "Merge coverage reports"
     key: "merge-coverage"
