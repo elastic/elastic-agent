@@ -108,7 +108,7 @@ func InstallAgentForPolicy(ctx context.Context, t *testing.T, installOpts atesti
 		require.NoError(t, err, "failed installing the agent")
 	}
 
-	t.Logf(">>> Enroll suceeded. Output: %s", output)
+	t.Logf(">>> Enroll succeeded. Output: %s", output)
 
 	timeout := 10 * time.Minute
 	if deadline, ok := ctx.Deadline(); ok {
@@ -128,6 +128,4 @@ func InstallAgentForPolicy(ctx context.Context, t *testing.T, installOpts atesti
 		10*time.Second,
 		"Elastic Agent status is not online",
 	)
-
-	return
 }
