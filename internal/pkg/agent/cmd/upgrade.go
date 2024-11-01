@@ -35,7 +35,7 @@ const (
 	flagForce          = "force"
 )
 
-var unsupportedUpgrade error = errors.New("upgrading fleet managed agents is not supported")
+var unsupportedUpgrade error = errors.New("this agent is Fleet managed and must be upgraded using Fleet")
 
 func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
