@@ -46,11 +46,11 @@ func TestConfirm(t *testing.T) {
 		var outWriter strings.Builder
 		result, err := confirm(inputReader, &outWriter, "prompt", def)
 
-		var prompt string
+		prompt := "prompt "
 		if def {
-			prompt = "prompt [Y/n]:"
+			prompt += "[Y/n]:"
 		} else {
-			prompt = "prompt [y/N]:"
+			prompt += "[y/N]:"
 		}
 
 		require.Equal(t, expectedResult, result)
