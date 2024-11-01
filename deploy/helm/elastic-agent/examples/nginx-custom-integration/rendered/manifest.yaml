@@ -36,9 +36,6 @@ stringData:
         type: elasticsearch
         username: elastic
     secret_references: []
-    providers:
-      kubernetes_leaderelection:
-        enabled: false
     inputs:
       - data_stream:
           namespace: default
@@ -66,6 +63,9 @@ stringData:
           - nginx-stubstatus
         type: nginx/metrics
         use_output: default
+    providers:
+      kubernetes_leaderelection:
+        enabled: false
 ---
 # Source: elastic-agent/templates/agent/cluster-role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -215,7 +215,7 @@ spec:
       labels:
         name: agent-nginx-example
       annotations:
-        checksum/config: 4b3a03273d11151ee0f8bbdc8e235f8b6d2b344e09dedc632ae6f7f9e8e0ef34
+        checksum/config: 627f26ad8791a17274403b380c484441f4b4667f49d72057b17921707be49b0c
     spec:
       automountServiceAccountToken: true
       containers:
