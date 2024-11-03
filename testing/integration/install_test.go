@@ -378,7 +378,6 @@ func TestRepeatedInstallUninstall(t *testing.T) {
 	iterations := 100
 	for i := 0; i < iterations; i++ {
 		t.Run(fmt.Sprintf("%s-%d", t.Name(), i), func(t *testing.T) {
-
 			// Get path to Elastic Agent executable
 			fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 			require.NoError(t, err)
@@ -443,7 +442,7 @@ func TestForceInstallDevelopment(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	// Confirm that the first development isntallation is successful
+	// Confirm that the first development installation is successful
 	require.True(t, devFix.IsInstalled())
 
 	devTopPath := installtest.NamespaceTopPath(devInstOpt.Namespace)
