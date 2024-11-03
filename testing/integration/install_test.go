@@ -408,8 +408,64 @@ func TestRepeatedInstallUninstall(t *testing.T) {
 	}
 }
 
+func TestForceInstallDevelopment(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: Default,
+		Sudo:  true,
+		Local: false,
+	})
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	prdFix, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+	err = prdFix.Prepare(ctx)
+	require.NoError(t, err)
+	prdInstOpt := atesting.InstallOpts{Force: true, Privileged: false}
+	prdOut, err := prdFix.Install(ctx, &prdInstOpt)
+	if err != nil {
+		t.Logf("install output: %s", prdOut)
+		require.NoError(t, err)
+	}
+
+	prdTopPath := installtest.NamespaceTopPath(prdInstOpt.Namespace)
+	require.NoError(t, installtest.CheckSuccess(ctx, prdFix, prdTopPath, &installtest.CheckOpts{Privileged: prdInstOpt.Privileged, Namespace: prdInstOpt.Namespace}))
+
+	devFix, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+	err = devFix.Prepare(ctx)
+	require.NoError(t, err)
+	devInstOpt := atesting.InstallOpts{Force: true, Privileged: false, Develop: true}
+	devOut, err := devFix.Install(ctx, &devInstOpt)
+	if err != nil {
+		t.Logf("install output: %s", devOut)
+		require.NoError(t, err)
+	}
+
+	// Confirm that the first development isntallation is successful
+	require.True(t, devFix.IsInstalled())
+
+	devTopPath := installtest.NamespaceTopPath(devInstOpt.Namespace)
+	require.NoError(t, installtest.CheckSuccess(ctx, devFix, devTopPath, &installtest.CheckOpts{Privileged: devInstOpt.Privileged, Namespace: devInstOpt.Namespace}))
+
+	devFix2, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+	err = devFix2.Prepare(ctx)
+	require.NoError(t, err)
+	devOut2, err := devFix2.Install(ctx, &devInstOpt)
+	if err != nil {
+		t.Logf("install output: %s", devOut2)
+		require.NoError(t, err)
+	}
+
+	// Confirm that the second development installation is successful
+	require.True(t, devFix2.IsInstalled())
+	require.NoError(t, installtest.CheckSuccess(ctx, devFix2, devTopPath, &installtest.CheckOpts{Privileged: devInstOpt.Privileged, Namespace: devInstOpt.Namespace}))
+}
+
 func randStr(length int) string {
-	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 	runes := make([]rune, length)
 	for i := range runes {
@@ -418,3 +474,4 @@ func randStr(length int) string {
 
 	return string(runes)
 }
+
