@@ -474,4 +474,3 @@ func randStr(length int) string {
 
 	return string(runes)
 }
-
