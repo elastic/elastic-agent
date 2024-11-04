@@ -113,7 +113,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: orka
-          imagePrefix: generic-base-15-x86
+          imagePrefix: generic-base-15-x86-2
         retry:
           manual:
             allowed: true
