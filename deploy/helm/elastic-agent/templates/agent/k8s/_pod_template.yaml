@@ -1,4 +1,4 @@
-{{- define "elasticagent.engine.k8s.podTemplateResource" }}
+{{- define "elasticagent.engine.k8s.podTemplate" }}
 {{- $ := index . 0 -}}
 {{- $presetVal := index . 1 -}}
 {{- $agentName := index . 2 }}
