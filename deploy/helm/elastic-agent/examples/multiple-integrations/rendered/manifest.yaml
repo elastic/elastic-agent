@@ -69,12 +69,6 @@ stringData:
         metrics: true
         namespace: default
         use_output: default
-    providers:
-      kubernetes:
-        node: ${NODE_NAME}
-        scope: cluster
-      kubernetes_leaderelection:
-        enabled: true
     inputs:
       - data_stream:
           namespace: default
@@ -120,6 +114,12 @@ stringData:
           - nginx-stubstatus
         type: nginx/metrics
         use_output: default
+    providers:
+      kubernetes:
+        node: ${NODE_NAME}
+        scope: cluster
+      kubernetes_leaderelection:
+        enabled: true
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -152,11 +152,6 @@ stringData:
         metrics: true
         namespace: default
         use_output: default
-    providers:
-      kubernetes:
-        enabled: false
-      kubernetes_leaderelection:
-        enabled: false
     inputs:
       - data_stream:
           namespace: default
@@ -414,6 +409,11 @@ stringData:
           period: 10s
         type: kubernetes/metrics
         use_output: default
+    providers:
+      kubernetes:
+        enabled: false
+      kubernetes_leaderelection:
+        enabled: false
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -446,14 +446,6 @@ stringData:
         metrics: true
         namespace: default
         use_output: default
-    providers:
-      kubernetes:
-        hints:
-          enabled: true
-        node: ${NODE_NAME}
-        scope: node
-      kubernetes_leaderelection:
-        enabled: false
     inputs:
       - data_stream:
           namespace: default
@@ -599,6 +591,14 @@ stringData:
           ssl.verification_mode: none
         type: kubernetes/metrics
         use_output: default
+    providers:
+      kubernetes:
+        hints:
+          enabled: true
+        node: ${NODE_NAME}
+        scope: node
+      kubernetes_leaderelection:
+        enabled: false
 ---
 # Source: elastic-agent/templates/agent/cluster-role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -1117,8 +1117,12 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
+<<<<<<< HEAD
         checksum/config: 21fb7e317577410096de8d8e0fb03b32ad2e406b549f75085ae6907d38678e46
 
+=======
+        checksum/config: c9823ca6e0ab0a28164ee0111de74d3225480f5c5e81057159d3276ad3208f46
+>>>>>>> 9d2c3c9206 ([helm]: forward agent providers configuration for fleet mode (#5912))
     spec:
       dnsPolicy: ClusterFirstWithHostNet
       automountServiceAccountToken: true
@@ -1252,8 +1256,12 @@ spec:
       labels:
         name: agent-clusterwide-example
       annotations:
+<<<<<<< HEAD
         checksum/config: b04d7965af8739293cd90e352c59d1240473f56febd9aded16ba766d77f90b5f
 
+=======
+        checksum/config: 7cd88cef1c964a3660d069d4525c2efc0eed06607e0011c2af83a37648fcaacc
+>>>>>>> 9d2c3c9206 ([helm]: forward agent providers configuration for fleet mode (#5912))
     spec:
       dnsPolicy: ClusterFirstWithHostNet
       automountServiceAccountToken: true
@@ -1323,8 +1331,12 @@ spec:
       labels:
         name: agent-ksmsharded-example
       annotations:
+<<<<<<< HEAD
         checksum/config: 4ec2b2ef4d3c5c103e79e47a45d4b3b4f9f774e85293f9a5b2d56556025f1d2d
 
+=======
+        checksum/config: 58c52f37c9e2582e270e0c3b5c0150252db79a8a1be4e9b287da943a7c9e3bdf
+>>>>>>> 9d2c3c9206 ([helm]: forward agent providers configuration for fleet mode (#5912))
     spec:
       dnsPolicy: ClusterFirstWithHostNet
       automountServiceAccountToken: true
