@@ -146,7 +146,6 @@ func TestResolveControlSocket(t *testing.T) {
 			ResolveControlSocket(tc.runningInstalled)
 
 			require.Equal(t, expecteSocketPath, controlSocketPath)
-
 		})
 
 	}
