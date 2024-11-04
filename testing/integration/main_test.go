@@ -6,6 +6,10 @@ package integration
 
 import (
 	"flag"
+<<<<<<< HEAD
+=======
+	"log"
+>>>>>>> 54d888c71202485db4a9e193bbf3f1a5370d55fe
 	"os"
 	"testing"
 
@@ -25,6 +29,10 @@ func TestMain(m *testing.M) {
 
 	if define.DryRun {
 		// TODO add parsing of requirements and dump them
+<<<<<<< HEAD
+=======
+		log.Print("Dry-run mode specified...")
+>>>>>>> 54d888c71202485db4a9e193bbf3f1a5370d55fe
 	}
 
 	os.Exit(runExitCode)

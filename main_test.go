@@ -2,33 +2,32 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package main
+package integration
 
-// This file is mandatory as otherwise the agent.test binary is not generated correctly.
 import (
 	"flag"
+	"log"
+	"os"
 	"testing"
 
-	"github.com/spf13/cobra"
+	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
-var systemTest *bool
+var flagSet = flag.CommandLine
 
 func init() {
-	testing.Init()
-
-	cmd := &cobra.Command{
-		Use: "elastic-agent [subcommand]",
-	}
-
-	systemTest = flag.Bool("systemTest", false, "Set to true when running system tests")
-	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("systemTest"))
-	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("test.coverprofile"))
+	define.RegisterFlags("integration.", flagSet)
 }
 
-// Test started when the test binary is started. Only calls main.
-func TestSystem(t *testing.T) {
-	if *systemTest {
-		main()
+func TestMain(m *testing.M) {
+	flag.Parse()
+	define.ParseFlags()
+	runExitCode := m.Run()
+
+	if define.DryRun {
+		// TODO add parsing of requirements and dump them
+		log.Print("Dry-run mode specified...")
 	}
+
+	os.Exit(runExitCode)
 }
