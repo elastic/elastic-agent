@@ -25,15 +25,11 @@ func (o *optionalBoolFlag) String() string {
 
 func (o *optionalBoolFlag) Set(s string) error {
 	o.set = true
-	if s == "" || s == "true" {
-		o.value = true
-		return nil
-	}
-	o.value = false
+	o.value = s == "" || s == "true"
 	return nil
 }
 
-func (o *optionalBoolFlag) HasBeenSet() bool {
+func (o *optionalBoolFlag) IsSet() bool {
 	return o.set
 }
 

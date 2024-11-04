@@ -150,7 +150,7 @@ func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Inf
 		return nil
 	}
 
-	if SudoFilter.HasBeenSet() && req.Sudo != SudoFilter.Value() {
+	if SudoFilter.IsSet() && req.Sudo != SudoFilter.Value() {
 		t.Skipf("sudo requirement %t not matching sudo filter %t. Skipping", req.Sudo, SudoFilter.Value())
 	}
 
