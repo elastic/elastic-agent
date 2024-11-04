@@ -95,101 +95,28 @@ func TestHasPrefixWindows(t *testing.T) {
 	}
 }
 
-func TestResolveControlSocketWithInstalledState(t *testing.T) {
+func TestResolveControlSocket(t *testing.T) {
 	testCases := []struct {
-		os               string
-		controlSocket    string
-		topPath          string
-		runningInstalled bool
-		expectedSocket   string
+		os                   string
+		controlSocketSame    bool
+		runningInstalled     bool
+		expectedSocketChange bool
+		expectedSocket       string // in case of a change
 	}{
-		{
-			"darwin",
-			ControlSocketFromPath("darwin", "/top"),
-			"/top",
-			true,
-			ControlSocketFromPath("darwin", "/top"),
-		},
-		{
-			"darwin",
-			ControlSocketFromPath("darwin", "/top"),
-			"/top",
-			false,
-			ControlSocketFromPath("darwin", "/top"),
-		},
-		{
-			"darwin",
-			"/control/socket",
-			"/top",
-			true,
-			"/control/socket",
-		},
-		{
-			"darwin",
-			"/control/socket",
-			"/top",
-			false,
-			"/control/socket",
-		},
+		{"darwin", false, false, false, ""},
+		{"darwin", true, false, false, ""},
+		{"darwin", false, true, false, ""},
+		{"darwin", true, true, false, ""},
 
-		{
-			"linux",
-			ControlSocketFromPath("linux", "/top"),
-			"/top",
-			true,
-			ControlSocketFromPath("linux", "/top"),
-		},
-		{
-			"linux",
-			ControlSocketFromPath("linux", "/top"),
-			"/top",
-			false,
-			ControlSocketFromPath("linux", "/top"),
-		},
-		{
-			"linux",
-			"/control/socket",
-			"/top",
-			true,
-			"/control/socket",
-		},
-		{
-			"linux",
-			"/control/socket",
-			"/top",
-			false,
-			"/control/socket",
-		},
+		{"linux", false, false, false, ""},
+		{"linux", true, false, false, ""},
+		{"linux", false, true, false, ""},
+		{"linux", true, true, false, ""},
 
-		{
-			"windows",
-			ControlSocketFromPath("windows", "/top"),
-			"/top",
-			true,
-			WindowsControlSocketInstalledPath,
-		},
-		{
-			"windows",
-			ControlSocketFromPath("windows", "/top"),
-			"/top",
-			false,
-			ControlSocketFromPath("windows", "/top"),
-		},
-
-		{
-			"windows",
-			"/control/socket",
-			"/top",
-			true,
-			"/control/socket",
-		},
-		{
-			"windows",
-			"/control/socket",
-			"/top",
-			false,
-			"/control/socket",
-		},
+		{"windows", false, false, false, ""},
+		{"windows", true, false, false, ""},
+		{"windows", false, true, false, ""},
+		{"windows", true, true, false, WindowsControlSocketInstalledPath},
 	}
 
 	for i, tc := range testCases {
@@ -204,12 +131,22 @@ func TestResolveControlSocketWithInstalledState(t *testing.T) {
 				controlSocketPath = prevControlSocketPath
 				topPath = prevTopPath
 			}()
-			controlSocketPath = tc.controlSocket
-			topPath = tc.topPath
 
-			ResolveControlSocketWithInstalledState(tc.runningInstalled)
+			topPath = "/top"
+			controlSocketPath = ControlSocketFromPath(tc.os, "/top")
+			if !tc.controlSocketSame {
+				controlSocketPath = "/custom/socket/path"
+			}
 
-			require.Equal(t, tc.expectedSocket, controlSocketPath)
+			expecteSocketPath := controlSocketPath
+			if tc.expectedSocketChange {
+				expecteSocketPath = tc.expectedSocket
+			}
+
+			ResolveControlSocket(tc.runningInstalled)
+
+			require.Equal(t, expecteSocketPath, controlSocketPath)
+
 		})
 
 	}

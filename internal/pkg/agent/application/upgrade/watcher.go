@@ -54,7 +54,7 @@ func NewAgentWatcher(ch chan error, log *logger.Logger, checkInterval time.Durat
 	// when starting watcher from pre 8.8 version of agent control socket is evaluated incorrectly and upgrade fails.
 	// resolving control socket updates it to a proper value before client is initiated
 	// upgrade is only available for installed agent so we can assume
-	paths.ResolveControlSocketWithInstalledState(true)
+	paths.ResolveControlSocket(true)
 
 	c := client.New()
 	ec := &AgentWatcher{

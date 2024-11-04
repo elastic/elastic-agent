@@ -64,12 +64,7 @@ func initialControlSocketPath(topPath string) string {
 // Called during the upgrade process from pre-8.8 versions. In pre-8.8 versions the
 // RunningInstalled will always be false, even when it is an installed version. Once
 // that is fixed from the upgrade process the control socket path needs to be updated.
-func ResolveControlSocket() {
-	ResolveControlSocketWithInstalledState(RunningInstalled())
-}
-
-// ResolveControlSocketWithInstalledState updates the control socket path.
-func ResolveControlSocketWithInstalledState(runningInstalled bool) {
+func ResolveControlSocket(runningInstalled bool) {
 	currentPath := ControlSocket()
 	if currentPath == ControlSocketFromPath(runtime.GOOS, topPath) && runningInstalled {
 		// path is not correct being that it's installed
