@@ -100,23 +100,22 @@ func TestResolveControlSocket(t *testing.T) {
 		os                   string
 		controlSocketSame    bool
 		runningInstalled     bool
-		expectedSocketChange bool
 		expectedSocket       string // in case of a change
 	}{
-		{"darwin", false, false, false, ""},
-		{"darwin", true, false, false, ""},
-		{"darwin", false, true, false, ""},
-		{"darwin", true, true, false, ""},
+		{"darwin", false, false, ""},
+		{"darwin", true, false, ""},
+		{"darwin", false, true, ""},
+		{"darwin", true, true, ""},
 
-		{"linux", false, false, false, ""},
-		{"linux", true, false, false, ""},
-		{"linux", false, true, false, ""},
-		{"linux", true, true, false, ""},
+		{"linux", false, false, ""},
+		{"linux", true, false, ""},
+		{"linux", false, true, ""},
+		{"linux", true, true, ""},
 
-		{"windows", false, false, false, ""},
-		{"windows", true, false, false, ""},
-		{"windows", false, true, false, ""},
-		{"windows", true, true, false, WindowsControlSocketInstalledPath},
+		{"windows", false, false, ""},
+		{"windows", true, false, ""},
+		{"windows", false, true, ""},
+		{"windows", true, true, WindowsControlSocketInstalledPath},
 	}
 
 	for i, tc := range testCases {
@@ -139,7 +138,7 @@ func TestResolveControlSocket(t *testing.T) {
 			}
 
 			expecteSocketPath := controlSocketPath
-			if tc.expectedSocketChange {
+			if tc.expectedSocket != "" {
 				expecteSocketPath = tc.expectedSocket
 			}
 
