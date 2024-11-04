@@ -910,8 +910,6 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
-	t.Skip("let see if this test is affecting the others")
-
 	ctx := context.Background()
 	testUUID := uuid.Must(uuid.NewV4()).String()
 	policyID := "mTLS-defend-" + testUUID
