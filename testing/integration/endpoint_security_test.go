@@ -908,6 +908,8 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
+		// Only supported on Linux
+		OS: []define.OS{{Type: define.Linux}},
 	})
 
 	ctx := context.Background()
