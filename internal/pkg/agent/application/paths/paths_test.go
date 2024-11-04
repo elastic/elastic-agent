@@ -97,10 +97,10 @@ func TestHasPrefixWindows(t *testing.T) {
 
 func TestResolveControlSocket(t *testing.T) {
 	testCases := []struct {
-		os                   string
-		controlSocketSame    bool
-		runningInstalled     bool
-		expectedSocket       string // in case of a change
+		os                        string
+		controlSocketSame         bool
+		runningInstalled          bool
+		controlSocketPathChangeTo string // in case of a change
 	}{
 		{"darwin", false, false, ""},
 		{"darwin", true, false, ""},
@@ -138,8 +138,8 @@ func TestResolveControlSocket(t *testing.T) {
 			}
 
 			expecteSocketPath := controlSocketPath
-			if tc.expectedSocket != "" {
-				expecteSocketPath = tc.expectedSocket
+			if tc.controlSocketPathChangeTo != "" {
+				expecteSocketPath = tc.controlSocketPathChangeTo
 			}
 
 			ResolveControlSocket(tc.runningInstalled)
