@@ -8,28 +8,61 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 )
 
+type optionalBoolFlag struct {
+	set   bool
+	value bool
+}
+
+func (o *optionalBoolFlag) String() string {
+	if !o.set {
+		return "<not set>"
+	}
+	return strconv.FormatBool(o.value)
+}
+
+func (o *optionalBoolFlag) Set(s string) error {
+	o.set = true
+	if s == "" || s == "true" {
+		o.value = true
+		return nil
+	}
+	o.value = false
+	return nil
+}
+
+func (o *optionalBoolFlag) HasBeenSet() bool {
+	return o.set
+}
+
+func (o *optionalBoolFlag) Value() bool {
+	return o.value
+}
+
 var (
-	DryRun    bool
-	Groups    []string
-	Platforms []string
+	DryRun          bool
+	GroupsFilter    []string
+	PlatformsFilter []string
+	SudoFilter      optionalBoolFlag
 
 	groupStringFlag    string
 	platformStringFlag string
 )
 
 func RegisterFlags(prefix string, set *flag.FlagSet) {
-	set.BoolVar(&DryRun, prefix+"dry-run", false, "Forces test in dry-run mode: drops platform/group/sudo requirements")
+	set.BoolVar(&DryRun, prefix+"dry-run", false, "Forces test in dry-run mode: skips the main test and puts a successful placeholder <TestName>/dry-run if the test would have run")
 	set.StringVar(&groupStringFlag, prefix+"groups", "", "test groups, comma-separated")
 	set.StringVar(&platformStringFlag, prefix+"platforms", "", "test platforms, comma-separated")
+	set.Var(&SudoFilter, prefix+"sudo", "Filter tests by sudo requirements")
 }
 
 func ParseFlags() {
-	Groups = splitStringToArray(groupStringFlag)
-	Platforms = splitStringToArray(platformStringFlag)
+	GroupsFilter = splitStringToArray(groupStringFlag)
+	PlatformsFilter = splitStringToArray(platformStringFlag)
 }
 
 func splitStringToArray(stringFlag string) []string {
