@@ -6,8 +6,6 @@ package define
 
 import (
 	"flag"
-	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -69,7 +67,6 @@ func splitStringToArray(stringFlag string) []string {
 	if stringFlag == "" {
 		return nil
 	}
-	fmt.Fprintf(os.Stderr, "Splitting %q...", stringFlag)
 	return strings.Split(stringFlag, ",")
 }
 
