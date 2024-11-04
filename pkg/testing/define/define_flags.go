@@ -84,6 +84,6 @@ func dryRun(t *testing.T, req Requirements) *Info {
 	t.Run("dry-run", func(t *testing.T) {
 		t.Log("Test dry-run successful")
 	})
-	t.Skip(fmt.Sprintf("Skipped because dry-run mode has been specified."))
+	t.Skip("Skipped because dry-run mode has been specified.")
 	return nil
 }
