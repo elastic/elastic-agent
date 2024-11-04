@@ -9,7 +9,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.17.0
+    app.kubernetes.io/version: 9.0.0
     app.kubernetes.io/managed-by: Helm
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
@@ -22,47 +22,13 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.17.0
+    app.kubernetes.io/version: 9.0.0
     app.kubernetes.io/managed-by: Helm
 stringData:
 
   agent.yml: |-
-    id: agent-nginx-example
-    outputs:
-      default:
-        hosts:
-        - http://elasticsearch:9200
-        password: changeme
-        type: elasticsearch
-        username: elastic
-    secret_references: []
-    inputs:
-      - data_stream:
-          namespace: default
-        id: nginx/metrics-nginx-69240207-6fcc-4d19-aee3-dbf716e3bb0f
-        meta:
-          package:
-            name: nginx
-            version: 1.19.1
-        name: nginx-1
-        package_policy_id: 69240207-6fcc-4d19-aee3-dbf716e3bb0f
-        preset: nginx
-        revision: 1
-        streams:
-        - data_stream:
-            dataset: nginx.stubstatus
-            type: metrics
-          hosts:
-          - http://nginx.default.svc.cluster.local:80
-          id: nginx/metrics-nginx.stubstatus-69240207-6fcc-4d19-aee3-dbf716e3bb0f
-          metricsets:
-          - stubstatus
-          period: 10s
-          server_status_path: /nginx_status
-          tags:
-          - nginx-stubstatus
-        type: nginx/metrics
-        use_output: default
+    fleet:
+      enabled: true
     providers:
       kubernetes_leaderelection:
         enabled: false
@@ -76,7 +42,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.17.0
+    app.kubernetes.io/version: 9.0.0
     app.kubernetes.io/managed-by: Helm
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
@@ -183,7 +149,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.17.0
+    app.kubernetes.io/version: 9.0.0
     app.kubernetes.io/managed-by: Helm
 subjects:
   - kind: ServiceAccount
@@ -204,7 +170,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.17.0
+    app.kubernetes.io/version: 9.0.0
     app.kubernetes.io/managed-by: Helm
 spec:
   selector:
@@ -215,49 +181,53 @@ spec:
       labels:
         name: agent-nginx-example
       annotations:
-<<<<<<< HEAD
-        checksum/config: 4b3a03273d11151ee0f8bbdc8e235f8b6d2b344e09dedc632ae6f7f9e8e0ef34
-
-=======
-        checksum/config: 627f26ad8791a17274403b380c484441f4b4667f49d72057b17921707be49b0c
->>>>>>> 9d2c3c9206 ([helm]: forward agent providers configuration for fleet mode (#5912))
+        checksum/config: ce25762427c9b6e207de5327b69be314f9d077db8138b7b241fd40f7b8a80aca
     spec:
-      dnsPolicy: ClusterFirstWithHostNet
       automountServiceAccountToken: true
+      containers:
+      - args:
+        - -c
+        - /etc/elastic-agent/agent.yml
+        - -e
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: STATE_PATH
+          value: /usr/share/elastic-agent/state
+        - name: FLEET_URL
+          value: http://localhost:8220
+        - name: FLEET_ENROLLMENT_TOKEN
+          value: fleetToken
+        - name: FLEET_INSECURE
+          value: "false"
+        - name: FLEET_ENROLL
+          value: "1"
+        image: docker.elastic.co/beats/elastic-agent:9.0.0-SNAPSHOT
+        imagePullPolicy: IfNotPresent
+        name: agent
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /usr/share/elastic-agent/state
+          name: agent-data
+        - mountPath: /etc/elastic-agent/agent.yml
+          name: config
+          readOnly: true
+          subPath: agent.yml
+      dnsPolicy: ClusterFirstWithHostNet
       serviceAccountName: agent-nginx-example
       volumes:
-        - name: agent-data
-          hostPath:
-            
-            path: /etc/elastic-agent/default/agent-nginx-example/state
-            type: DirectoryOrCreate
-        
-        - name: config
-          secret:
-            defaultMode: 0444
-            secretName: agent-nginx-example
-      containers:
-        - name: agent
-          imagePullPolicy: IfNotPresent
-          image: "docker.elastic.co/beats/elastic-agent:8.17.0-SNAPSHOT"
-          args: ["-c", "/etc/elastic-agent/agent.yml", "-e"]
-          securityContext:
-            runAsUser: 0
-          volumeMounts:
-            - name: agent-data
-              mountPath: /usr/share/elastic-agent/state
-            - name: config
-              mountPath: /etc/elastic-agent/agent.yml
-              readOnly: true
-              subPath: agent.yml
-          env:
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: STATE_PATH
-              value: "/usr/share/elastic-agent/state"
+      - hostPath:
+          path: /etc/elastic-agent/default/agent-nginx-example-managed/state
+          type: DirectoryOrCreate
+        name: agent-data
+      - name: config
+        secret:
+          defaultMode: 292
+          secretName: agent-nginx-example
