@@ -300,100 +300,100 @@ spec:
         name: agent-pernode-example
       annotations:
         checksum/config: 39e00ed2a77861d6ce0f1436c373284c3651db4325dbe5d25300677203cfdca7
-
     spec:
-      dnsPolicy: ClusterFirstWithHostNet
       automountServiceAccountToken: true
+      containers:
+      - args:
+        - -c
+        - /etc/elastic-agent/agent.yml
+        - -e
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: STATE_PATH
+          value: /usr/share/elastic-agent/state
+        - name: ELASTIC_NETINFO
+          value: "false"
+        image: docker.elastic.co/beats/elastic-agent:9.0.0-SNAPSHOT
+        imagePullPolicy: IfNotPresent
+        name: agent
+        resources:
+          limits:
+            memory: 1000Mi
+          requests:
+            cpu: 100m
+            memory: 400Mi
+        securityContext:
+          capabilities:
+            add:
+            - DAC_READ_SEARCH
+            - CHOWN
+            - SETPCAP
+            - SYS_PTRACE
+            drop:
+            - ALL
+          privileged: false
+          runAsGroup: 1000
+          runAsUser: 1000
+        volumeMounts:
+        - mountPath: /hostfs/proc
+          name: proc
+          readOnly: true
+        - mountPath: /hostfs/sys/fs/cgroup
+          name: cgroup
+          readOnly: true
+        - mountPath: /var/lib/docker/containers
+          name: varlibdockercontainers
+          readOnly: true
+        - mountPath: /var/log
+          name: varlog
+          readOnly: true
+        - mountPath: /hostfs/etc
+          name: etc-full
+          readOnly: true
+        - mountPath: /hostfs/var/lib
+          name: var-lib
+          readOnly: true
+        - mountPath: /usr/share/elastic-agent/state
+          name: agent-data
+        - mountPath: /etc/elastic-agent/agent.yml
+          name: config
+          readOnly: true
+          subPath: agent.yml
+      dnsPolicy: ClusterFirstWithHostNet
       nodeSelector:
         kubernetes.io/os: linux
       serviceAccountName: agent-pernode-example
       volumes:
-        - hostPath:
-            path: /proc
-          name: proc
-        - hostPath:
-            path: /sys/fs/cgroup
-          name: cgroup
-        - hostPath:
-            path: /var/lib/docker/containers
-          name: varlibdockercontainers
-        - hostPath:
-            path: /var/log
-          name: varlog
-        - hostPath:
-            path: /etc
-          name: etc-full
-        - hostPath:
-            path: /var/lib
-          name: var-lib
-        - name: agent-data
-          hostPath:
-            
-            path: /etc/elastic-agent/default/agent-pernode-example/state
-            type: DirectoryOrCreate
-        
-        - name: config
-          secret:
-            defaultMode: 0444
-            secretName: agent-pernode-example
-      containers:
-        - name: agent
-          imagePullPolicy: IfNotPresent
-          image: "docker.elastic.co/beats/elastic-agent:9.0.0-SNAPSHOT"
-          args: ["-c", "/etc/elastic-agent/agent.yml", "-e"]
-          securityContext:
-            capabilities:
-              add:
-              - DAC_READ_SEARCH
-              - CHOWN
-              - SETPCAP
-              - SYS_PTRACE
-              drop:
-              - ALL
-            privileged: false
-            runAsGroup: 1000
-            runAsUser: 1000
-          resources:
-            limits:
-              memory: 1000Mi
-            requests:
-              cpu: 100m
-              memory: 400Mi
-          volumeMounts:
-            - mountPath: /hostfs/proc
-              name: proc
-              readOnly: true
-            - mountPath: /hostfs/sys/fs/cgroup
-              name: cgroup
-              readOnly: true
-            - mountPath: /var/lib/docker/containers
-              name: varlibdockercontainers
-              readOnly: true
-            - mountPath: /var/log
-              name: varlog
-              readOnly: true
-            - mountPath: /hostfs/etc
-              name: etc-full
-              readOnly: true
-            - mountPath: /hostfs/var/lib
-              name: var-lib
-              readOnly: true
-            - name: agent-data
-              mountPath: /usr/share/elastic-agent/state
-            - name: config
-              mountPath: /etc/elastic-agent/agent.yml
-              readOnly: true
-              subPath: agent.yml
-          env:
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: STATE_PATH
-              value: "/usr/share/elastic-agent/state"
-            - name: ELASTIC_NETINFO
-              value: "false"
+      - hostPath:
+          path: /proc
+        name: proc
+      - hostPath:
+          path: /sys/fs/cgroup
+        name: cgroup
+      - hostPath:
+          path: /var/lib/docker/containers
+        name: varlibdockercontainers
+      - hostPath:
+          path: /var/log
+        name: varlog
+      - hostPath:
+          path: /etc
+        name: etc-full
+      - hostPath:
+          path: /var/lib
+        name: var-lib
+      - hostPath:
+          path: /etc/elastic-agent/default/agent-pernode-example/state
+          type: DirectoryOrCreate
+        name: agent-data
+      - name: config
+        secret:
+          defaultMode: 292
+          secretName: agent-pernode-example
