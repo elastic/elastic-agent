@@ -84,6 +84,8 @@ steps:
       #     manual:
       #       allowed: true
 
+  - group: "MacOS tests"
+    steps:
       # Runs only on the main branch
       - label: "Unit tests - MacOS 15 ARM"
         key: "unit-tests-macos-15-arm"
