@@ -41,7 +41,7 @@ steps:
       - label: "Group: {{matrix}}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it' --build "0192dd5c-9edc-456c-9ba4-8b9078997b6d"
-          .buildkite/scripts/steps/integration_tests_tf_sudo.sh "default"
+          .buildkite/scripts/steps/integration_tests_tf_sudo.sh {{matrix}}
         artifact_paths:
           - build/**
         agents:
