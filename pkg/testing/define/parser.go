@@ -26,7 +26,7 @@ func ValidateDir(dir string) error {
 		for _, file := range pkg.Files {
 			for _, d := range file.Decls {
 				fn, ok := d.(*ast.FuncDecl)
-				if ok && "TestMain" != fn.Name.Name && strings.HasPrefix(fn.Name.Name, "Test") && fn.Recv == nil {
+				if ok && fn.Name.Name != "TestMain" && strings.HasPrefix(fn.Name.Name, "Test") && fn.Recv == nil {
 					if !validateRequireFromFunc(fn) {
 						return fmt.Errorf("test %s first statement must be a function call to define.Require", fn.Name.Name)
 					}
