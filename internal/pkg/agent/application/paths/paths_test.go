@@ -5,10 +5,12 @@
 package paths
 
 import (
+	"fmt"
 	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEqual(t *testing.T) {
@@ -90,5 +92,60 @@ func TestHasPrefixWindows(t *testing.T) {
 				t.Fatalf("got %v, expected %v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestResolveControlSocket(t *testing.T) {
+	testCases := []struct {
+		os                        string
+		controlSocketSame         bool
+		runningInstalled          bool
+		controlSocketPathChangeTo string // in case of a change
+	}{
+		{"darwin", false, false, ""},
+		{"darwin", true, false, ""},
+		{"darwin", false, true, ""},
+		{"darwin", true, true, ""},
+
+		{"linux", false, false, ""},
+		{"linux", true, false, ""},
+		{"linux", false, true, ""},
+		{"linux", true, true, ""},
+
+		{"windows", false, false, ""},
+		{"windows", true, false, ""},
+		{"windows", false, true, ""},
+		{"windows", true, true, WindowsControlSocketInstalledPath},
+	}
+
+	for i, tc := range testCases {
+		if runtime.GOOS != tc.os {
+			continue
+		}
+		t.Run(fmt.Sprintf("test case %d", i), func(t *testing.T) {
+			prevControlSocketPath := controlSocketPath
+			prevTopPath := topPath
+			defer func() {
+				// just to be sure
+				controlSocketPath = prevControlSocketPath
+				topPath = prevTopPath
+			}()
+
+			topPath = "/top"
+			controlSocketPath = ControlSocketFromPath(tc.os, "/top")
+			if !tc.controlSocketSame {
+				controlSocketPath = "/custom/socket/path"
+			}
+
+			expecteSocketPath := controlSocketPath
+			if tc.controlSocketPathChangeTo != "" {
+				expecteSocketPath = tc.controlSocketPathChangeTo
+			}
+
+			ResolveControlSocket(tc.runningInstalled)
+
+			require.Equal(t, expecteSocketPath, controlSocketPath)
+		})
+
 	}
 }
