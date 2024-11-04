@@ -732,7 +732,8 @@ func ensureInstallMarkerPresent() error {
 	// in the `paths.ControlSocket()` in returning the incorrect control socket (only on Windows).
 	// Now that the install marker has been created we need to ensure that `paths.ControlSocket()` will
 	// return the correct result.
-	paths.ResolveControlSocket()
+	// We are being upgraded, we're running as installed, marker was just created.
+	paths.ResolveControlSocket(true)
 
 	return nil
 }
