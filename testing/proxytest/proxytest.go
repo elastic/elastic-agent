@@ -188,7 +188,7 @@ func New(t *testing.T, optns ...Option) *Proxy {
 
 			p.ServeHTTP(w, rrr)
 
-			opts.logFn(fmt.Sprintf("[%s] DONE %d - %s %s %s %s\n",
+			p.log.Info(fmt.Sprintf("[%s] DONE %d - %s %s %s %s\n",
 				requestID, w.statusCode, r.Method, r.URL, r.Proto, r.RemoteAddr))
 		}),
 	)
