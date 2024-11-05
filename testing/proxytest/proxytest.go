@@ -158,6 +158,9 @@ func New(t *testing.T, optns ...Option) *Proxy {
 		t.Fatalf("NewServer failed to create a net.Listener: %v", err)
 	}
 
+<<<<<<< HEAD
+	p := Proxy{opts: opts}
+=======
 	// Create a text handler that writes to standard output
 	lv := slog.LevelInfo
 	if opts.verbose {
@@ -167,13 +170,13 @@ func New(t *testing.T, optns ...Option) *Proxy {
 		opts:   opts,
 		client: opts.client,
 		log: slog.New(slog.NewTextHandler(logfWriter(opts.logFn), &slog.HandlerOptions{
-			AddSource: true,
-			Level:     lv,
+			Level: lv,
 		})),
 	}
 	if opts.capriv != nil && opts.cacert != nil {
 		p.ca = ca{capriv: opts.capriv, cacert: opts.cacert}
 	}
+>>>>>>> a3385439b5 (add integration tests using a proxy with mTLS for control plane with Elastic Defend installed (#5889))
 
 	p.Server = httptest.NewUnstartedServer(
 		http.HandlerFunc(func(ww http.ResponseWriter, r *http.Request) {
@@ -267,6 +270,8 @@ func (p *Proxy) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+<<<<<<< HEAD
+=======
 // processRequest executes the configured request manipulation and perform the
 // request.
 func (p *Proxy) processRequest(r *http.Request) (*http.Response, error) {
@@ -278,6 +283,10 @@ func (p *Proxy) processRequest(r *http.Request) (*http.Response, error) {
 	case p.opts.rewriteHost != nil:
 		r.URL.Host = p.opts.rewriteHost(r.URL.Host)
 	}
+
+	// It should not be required, however if not set, enroll will fail with
+	// "Unknown resource"
+	r.Host = r.URL.Host
 
 	p.log.Debug(fmt.Sprintf("original URL: %s, new URL: %s",
 		origURL, r.URL.String()))
@@ -295,6 +304,7 @@ func (p *Proxy) processRequest(r *http.Request) (*http.Response, error) {
 	return p.client.Do(r)
 }
 
+>>>>>>> a3385439b5 (add integration tests using a proxy with mTLS for control plane with Elastic Defend installed (#5889))
 // ProxiedRequests returns a slice with the "request log" with every request the
 // proxy received.
 func (p *Proxy) ProxiedRequests() []string {
