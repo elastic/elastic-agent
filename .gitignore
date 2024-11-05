@@ -26,6 +26,7 @@ elastic_agent
 fleet.yml
 fleet.enc
 fleet.enc.lock
+env.sh
 
 # Editor swap files
 *.swp
