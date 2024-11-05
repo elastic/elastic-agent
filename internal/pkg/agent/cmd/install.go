@@ -344,7 +344,7 @@ func execUninstall(binaryName string, streams *cli.IOStreams) error {
 	}
 	execPath, err := exec.LookPath(binaryName)
 	if err != nil {
-		return fmt.Errorf("unable to find %s on path: %w", paths.BinaryName, err)
+		return fmt.Errorf("unable to find %s on path: %w", binaryName, err)
 	}
 	uninstall := exec.Command(execPath, args...)
 	uninstall.Stdout = streams.Out
