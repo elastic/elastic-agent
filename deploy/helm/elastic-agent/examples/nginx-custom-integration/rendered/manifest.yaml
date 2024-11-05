@@ -66,6 +66,7 @@ stringData:
     providers:
       kubernetes_leaderelection:
         enabled: false
+        leader_lease: example-nginx
 ---
 # Source: elastic-agent/templates/agent/cluster-role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -215,7 +216,7 @@ spec:
       labels:
         name: agent-nginx-example
       annotations:
-        checksum/config: 627f26ad8791a17274403b380c484441f4b4667f49d72057b17921707be49b0c
+        checksum/config: 99eaac30ab163ab5f4cedbdbf3e6936d34c2b0e2c22dee59947487bab88fcc26
     spec:
       automountServiceAccountToken: true
       containers:
