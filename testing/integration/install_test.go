@@ -452,7 +452,8 @@ func TestForceInstallDevelopment(t *testing.T) {
 	require.NoError(t, err)
 	err = devFix2.Prepare(ctx)
 	require.NoError(t, err)
-	devOut2, err := devFix2.Install(ctx, &devInstOpt)
+	devInstOpt2 := atesting.InstallOpts{Force: true, Privileged: false, Develop: true}
+	devOut2, err := devFix2.Install(ctx, &devInstOpt2)
 	if err != nil {
 		t.Logf("install output: %s", devOut2)
 		require.NoError(t, err)
