@@ -38,6 +38,7 @@ type Proxy struct {
 	// proxiedRequests is a "request log" for every request the proxy receives.
 	proxiedRequests   []string
 	proxiedRequestsMu sync.Mutex
+	requestsWG        *sync.WaitGroup
 
 	opts options
 	log  *slog.Logger
@@ -164,8 +165,9 @@ func New(t *testing.T, optns ...Option) *Proxy {
 		lv = slog.LevelDebug
 	}
 	p := Proxy{
-		opts:   opts,
-		client: opts.client,
+		requestsWG: &sync.WaitGroup{},
+		opts:       opts,
+		client:     opts.client,
 		log: slog.New(slog.NewTextHandler(logfWriter(opts.logFn), &slog.HandlerOptions{
 			Level: lv,
 		})),
@@ -176,6 +178,9 @@ func New(t *testing.T, optns ...Option) *Proxy {
 
 	p.Server = httptest.NewUnstartedServer(
 		http.HandlerFunc(func(ww http.ResponseWriter, r *http.Request) {
+			p.requestsWG.Add(1)
+			defer p.requestsWG.Done()
+
 			w := &proxyResponseWriter{w: ww}
 
 			requestID := uuid.Must(uuid.NewV4()).String()
@@ -187,7 +192,7 @@ func New(t *testing.T, optns ...Option) *Proxy {
 
 			p.ServeHTTP(w, rrr)
 
-			opts.logFn(fmt.Sprintf("[%s] DONE %d - %s %s %s %s\n",
+			p.log.Info(fmt.Sprintf("[%s] DONE %d - %s %s %s %s\n",
 				requestID, w.statusCode, r.Method, r.URL, r.Proto, r.RemoteAddr))
 		}),
 	)
@@ -243,6 +248,12 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p.serveHTTP(w, r)
+}
+
+func (p *Proxy) Close() {
+	p.requestsWG.Wait()
+
+	p.Server.Close()
 }
 
 func (p *Proxy) serveHTTP(w http.ResponseWriter, r *http.Request) {
