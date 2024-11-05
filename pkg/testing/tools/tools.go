@@ -70,8 +70,8 @@ func InstallAgentWithPolicy(ctx context.Context, t *testing.T,
 		agentFixture.SetUninstallToken(uninstallToken)
 	}
 
-	InstallAgentForPolicy(ctx, t, installOpts, agentFixture, kibClient, policy.ID)
-	return policy, nil
+	err = InstallAgentForPolicy(ctx, t, installOpts, agentFixture, kibClient, policy.ID)
+	return policy, err
 }
 
 // InstallAgentForPolicy enrolls the provided agent fixture with Fleet. If
@@ -81,7 +81,7 @@ func InstallAgentWithPolicy(ctx context.Context, t *testing.T,
 // If the context (ctx) has a deadline, it will wait for the agent to become
 // online until the deadline of the context, or if not, a default 5-minute
 // deadline will be applied.
-func InstallAgentForPolicy(ctx context.Context, t *testing.T, installOpts atesting.InstallOpts, agentFixture *atesting.Fixture, kibClient *kibana.Client, policyID string) {
+func InstallAgentForPolicy(ctx context.Context, t *testing.T, installOpts atesting.InstallOpts, agentFixture *atesting.Fixture, kibClient *kibana.Client, policyID string) error {
 	t.Helper()
 
 	// Create enrollment API key
@@ -98,14 +98,17 @@ func InstallAgentForPolicy(ctx context.Context, t *testing.T, installOpts atesti
 
 	if installOpts.URL == "" {
 		fleetServerURL, err := fleettools.DefaultURL(ctx, kibClient)
-		require.NoError(t, err, "failed getting fleet server URL")
+		if err != nil {
+			return fmt.Errorf("failed getting fleet server URL: %w", err)
+		}
+
 		installOpts.URL = fleetServerURL
 	}
 
 	output, err := agentFixture.Install(ctx, &installOpts)
 	if err != nil {
 		t.Log(string(output))
-		require.NoError(t, err, "failed installing the agent")
+		return fmt.Errorf("failed installing the agent: %w", err)
 	}
 
 	t.Logf(">>> Enroll succeeded. Output: %s", output)
@@ -117,7 +120,7 @@ func InstallAgentForPolicy(ctx context.Context, t *testing.T, installOpts atesti
 
 	// Don't check fleet status if --delay-enroll
 	if installOpts.DelayEnroll {
-		return
+		return nil
 	}
 
 	// Wait for Agent to be healthy
@@ -128,4 +131,5 @@ func InstallAgentForPolicy(ctx context.Context, t *testing.T, installOpts atesti
 		10*time.Second,
 		"Elastic Agent status is not online",
 	)
+	return nil
 }

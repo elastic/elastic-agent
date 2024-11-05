@@ -919,7 +919,7 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 	fleetServerURL, err := fleettools.DefaultURL(ctx, stack.KibanaClient)
 	require.NoError(t, err, "failed getting Fleet Server URL")
 
-	defaultFleetHost := fleetServerURL[8:]
+	defaultFleetHost := strings.TrimPrefix(fleetServerURL, "https://")
 	fleethostWrong, err := url.Parse("https://fixme.elastic.co:443")
 	require.NoError(t, err, "failed parsing fleethostWrong")
 
@@ -958,7 +958,7 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 	})
 	require.NoError(t, err, "error creating fleet host with mTLS proxy")
 
-	// add new fleet-server host with oen way TLS proxy
+	// add new fleet-server host with one way TLS proxy
 	fleetKibanaHostOneWayTLS, err := stack.KibanaClient.CreateFleetServerHosts(ctx, kibana.ListFleetServerHostsRequest{
 		ID:        "proxyPolicyOneWayTLS" + testUUID,
 		Name:      "proxyPolicyOneWayTLS" + testUUID,
