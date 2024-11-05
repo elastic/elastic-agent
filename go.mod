@@ -20,7 +20,7 @@ require (
 	github.com/elastic/elastic-transport-go/v8 v8.6.0
 	github.com/elastic/go-elasticsearch/v8 v8.14.0
 	github.com/elastic/go-licenser v0.4.2
-	github.com/elastic/go-sysinfo v1.14.1
+	github.com/elastic/go-sysinfo v1.15.0
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.9.0
@@ -71,7 +71,7 @@ require (
 	golang.org/x/crypto v0.25.0
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
 	golang.org/x/sync v0.7.0
-	golang.org/x/sys v0.22.0
+	golang.org/x/sys v0.25.0
 	golang.org/x/term v0.22.0
 	golang.org/x/text v0.16.0
 	golang.org/x/time v0.5.0
