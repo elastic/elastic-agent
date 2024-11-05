@@ -6,6 +6,7 @@ package define
 
 import (
 	"flag"
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -37,33 +38,34 @@ func (o *optionalBoolFlag) Value() bool {
 	return o.value
 }
 
+type stringArrayFlag struct {
+	values []string
+}
+
+func (s *stringArrayFlag) String() string {
+	return fmt.Sprintf("%s", s.values)
+}
+
+func (s *stringArrayFlag) Set(stringValue string) error {
+	if stringValue == "" {
+		return nil
+	}
+	s.values = strings.Split(stringValue, ",")
+	return nil
+}
+
 var (
 	DryRun          bool
-	GroupsFilter    []string
-	PlatformsFilter []string
+	GroupsFilter    stringArrayFlag
+	PlatformsFilter stringArrayFlag
 	SudoFilter      optionalBoolFlag
-
-	groupStringFlag    string
-	platformStringFlag string
 )
 
 func RegisterFlags(prefix string, set *flag.FlagSet) {
 	set.BoolVar(&DryRun, prefix+"dry-run", false, "Forces test in dry-run mode: skips the main test and puts a successful placeholder <TestName>/dry-run if the test would have run")
-	set.StringVar(&groupStringFlag, prefix+"groups", "", "test groups, comma-separated")
-	set.StringVar(&platformStringFlag, prefix+"platforms", "", "test platforms, comma-separated")
+	set.Var(&GroupsFilter, prefix+"groups", "test groups, comma-separated")
+	set.Var(&PlatformsFilter, prefix+"platforms", "test platforms, comma-separated")
 	set.Var(&SudoFilter, prefix+"sudo", "Filter tests by sudo requirements")
-}
-
-func ParseFlags() {
-	GroupsFilter = splitStringToArray(groupStringFlag)
-	PlatformsFilter = splitStringToArray(platformStringFlag)
-}
-
-func splitStringToArray(stringFlag string) []string {
-	if stringFlag == "" {
-		return nil
-	}
-	return strings.Split(stringFlag, ",")
 }
 
 func dryRun(t *testing.T, req Requirements) *Info {

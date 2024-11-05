@@ -145,8 +145,9 @@ func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Inf
 		panic(fmt.Sprintf("test %s has invalid requirements: %s", t.Name(), err))
 	}
 
-	if len(GroupsFilter) > 0 && !slices.Contains(GroupsFilter, req.Group) {
-		t.Skipf("group %s not found in groups filter %s. Skipping", req.Group, GroupsFilter)
+	filteredGroups := GroupsFilter.values
+	if len(filteredGroups) > 0 && !slices.Contains(filteredGroups, req.Group) {
+		t.Skipf("group %s not found in groups filter %s. Skipping", req.Group, filteredGroups)
 		return nil
 	}
 
