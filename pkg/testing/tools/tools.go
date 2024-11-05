@@ -81,7 +81,11 @@ func InstallAgentWithPolicy(ctx context.Context, t *testing.T,
 // If the context (ctx) has a deadline, it will wait for the agent to become
 // online until the deadline of the context, or if not, a default 5-minute
 // deadline will be applied.
-func InstallAgentForPolicy(ctx context.Context, t *testing.T, installOpts atesting.InstallOpts, agentFixture *atesting.Fixture, kibClient *kibana.Client, policyID string) error {
+func InstallAgentForPolicy(ctx context.Context, t *testing.T,
+	installOpts atesting.InstallOpts,
+	agentFixture *atesting.Fixture,
+	kibClient *kibana.Client,
+	policyID string) error {
 	t.Helper()
 
 	// Create enrollment API key
@@ -92,7 +96,10 @@ func InstallAgentForPolicy(ctx context.Context, t *testing.T, installOpts atesti
 	if installOpts.EnrollmentToken == "" {
 		t.Logf("Creating enrollment API key...")
 		enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(ctx, createEnrollmentAPIKeyReq)
-		require.NoError(t, err, "failed creating enrollment API key")
+		if err != nil {
+			return fmt.Errorf("failed creating enrollment API key: %w", err)
+		}
+
 		installOpts.EnrollmentToken = enrollmentToken.APIKey
 	}
 
