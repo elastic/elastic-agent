@@ -13,29 +13,20 @@ import (
 )
 
 type optionalBoolFlag struct {
-	set   bool
-	value bool
+	value *bool
 }
 
 func (o *optionalBoolFlag) String() string {
-	if !o.set {
-		return "<not set>"
+	if o.value == nil {
+		return "nil"
 	}
-	return strconv.FormatBool(o.value)
+	return strconv.FormatBool(*o.value)
 }
 
 func (o *optionalBoolFlag) Set(s string) error {
-	o.set = true
-	o.value = s == "" || s == "true"
+	bValue := s == "" || s == "true"
+	o.value = &bValue
 	return nil
-}
-
-func (o *optionalBoolFlag) IsSet() bool {
-	return o.set
-}
-
-func (o *optionalBoolFlag) Value() bool {
-	return o.value
 }
 
 type stringArrayFlag struct {
