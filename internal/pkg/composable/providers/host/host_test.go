@@ -6,12 +6,15 @@ package host
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -166,4 +169,17 @@ func returnHostMapping(log *logger.Logger) infoFetcher {
 		host["idx"] = i
 		return host, nil
 	}
+}
+
+func TestTiago(t *testing.T) {
+	osInfo, err := getHostInfo(logp.L())()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	d, err := json.MarshalIndent(osInfo, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(string(d))
 }
