@@ -196,7 +196,7 @@ func TestUpgradeCmd(t *testing.T) {
 
 			// Expect an error due to unprivileged fleet-managed mode
 			assert.Error(t, err)
-			assert.Contains(t, err.Error(), "upgrading fleet managed agents is not supported")
+			assert.Contains(t, err.Error(), "this agent is Fleet managed and must be upgraded using Fleet")
 
 			// Verify counter has not incremented since upgrade should not proceed
 			counter := atomic.LoadInt32(&mock.upgrades)
