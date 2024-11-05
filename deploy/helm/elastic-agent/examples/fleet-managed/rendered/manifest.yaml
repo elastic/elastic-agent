@@ -182,42 +182,52 @@ spec:
         name: agent-nginx-example
       annotations:
         checksum/config: ce25762427c9b6e207de5327b69be314f9d077db8138b7b241fd40f7b8a80aca
-
     spec:
-      dnsPolicy: ClusterFirstWithHostNet
       automountServiceAccountToken: true
+      containers:
+      - args:
+        - -c
+        - /etc/elastic-agent/agent.yml
+        - -e
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: STATE_PATH
+          value: /usr/share/elastic-agent/state
+        - name: FLEET_URL
+          value: http://localhost:8220
+        - name: FLEET_ENROLLMENT_TOKEN
+          value: fleetToken
+        - name: FLEET_INSECURE
+          value: "false"
+        - name: FLEET_ENROLL
+          value: "1"
+        image: docker.elastic.co/beats/elastic-agent:8.16.0-SNAPSHOT
+        imagePullPolicy: IfNotPresent
+        name: agent
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /usr/share/elastic-agent/state
+          name: agent-data
+        - mountPath: /etc/elastic-agent/agent.yml
+          name: config
+          readOnly: true
+          subPath: agent.yml
+      dnsPolicy: ClusterFirstWithHostNet
       serviceAccountName: agent-nginx-example
       volumes:
-        - name: agent-data
-          hostPath:
-            
-            path: /etc/elastic-agent/default/agent-nginx-example-managed/state
-            type: DirectoryOrCreate
-      containers:
-        - name: agent
-          imagePullPolicy: IfNotPresent
-          image: "docker.elastic.co/beats/elastic-agent:8.16.0-SNAPSHOT"
-          securityContext:
-            runAsUser: 0
-          volumeMounts:
-            - name: agent-data
-              mountPath: /usr/share/elastic-agent/state
-          env:
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: STATE_PATH
-              value: "/usr/share/elastic-agent/state"
-            - name: FLEET_URL
-              value: http://localhost:8220
-            - name: FLEET_ENROLLMENT_TOKEN
-              value: fleetToken
-            - name: FLEET_INSECURE
-              value: "false"
-            - name: FLEET_ENROLL
-              value: "1"
+      - hostPath:
+          path: /etc/elastic-agent/default/agent-nginx-example-managed/state
+          type: DirectoryOrCreate
+        name: agent-data
+      - name: config
+        secret:
+          defaultMode: 292
+          secretName: agent-nginx-example
