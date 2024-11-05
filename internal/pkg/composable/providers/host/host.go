@@ -148,6 +148,7 @@ func getHostInfo(log *logger.Logger) func() (map[string]interface{}, error) {
 			"ip":           info.IPs,
 			"mac":          info.MACs,
 			"os_family":    info.OS.Family,
+			"os_platform":  info.OS.Platform,
 			"os_version":   info.OS.Version,
 		}, nil
 	}
