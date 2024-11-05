@@ -3,6 +3,7 @@
 {{- $presetVal := index . 1 -}}
 {{- $agentName := index . 2 }}
   agent.yml: |-
+    {{- if eq $.Values.agent.fleet.enabled false }}
     id: {{ $agentName }}
     {{- with ($presetVal).outputs }}
     outputs:
@@ -15,12 +16,16 @@
     agent:
       {{- . | toYaml | nindent 6}}
     {{- end }}
-    {{- with ($presetVal).providers }}
-    providers:
-      {{- . | toYaml | nindent 6 }}
-    {{- end }}
     inputs:
       {{- with ($presetVal)._inputs -}}
       {{- . | toYaml | nindent 6 }}
       {{- end }}
+    {{- else }}
+    fleet:
+      enabled: true
+    {{- end }}
+    {{- with ($presetVal).providers }}
+    providers:
+      {{- . | toYaml | nindent 6 }}
+    {{- end }}
 {{- end }}
