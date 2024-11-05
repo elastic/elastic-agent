@@ -215,12 +215,8 @@ spec:
       labels:
         name: agent-nginx-example
       annotations:
-<<<<<<< HEAD
-        checksum/config: 4b3a03273d11151ee0f8bbdc8e235f8b6d2b344e09dedc632ae6f7f9e8e0ef34
-
-=======
         checksum/config: 627f26ad8791a17274403b380c484441f4b4667f49d72057b17921707be49b0c
->>>>>>> 9d2c3c9206 ([helm]: forward agent providers configuration for fleet mode (#5912))
+
     spec:
       dnsPolicy: ClusterFirstWithHostNet
       automountServiceAccountToken: true

@@ -1089,12 +1089,8 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-<<<<<<< HEAD
-        checksum/config: 53aa4ccc3e8557125fecf738e70722e2aaa1199ee79a823f684a9d4a296af7b0
-
-=======
         checksum/config: d361521be4fd034ea920a15f80ef519e05c00d801973175e3f165ea714931b52
->>>>>>> 9d2c3c9206 ([helm]: forward agent providers configuration for fleet mode (#5912))
+
     spec:
       dnsPolicy: ClusterFirstWithHostNet
       automountServiceAccountToken: true
@@ -1213,12 +1209,8 @@ spec:
       labels:
         name: agent-clusterwide-example
       annotations:
-<<<<<<< HEAD
-        checksum/config: 73527b0aad319ef33239ef3c862820c5ee5cafb42e2ce164049646791b69ec68
-
-=======
         checksum/config: 14177955837470abb34597058889ea1f1d34ded25b5271b0dbbfb0bc8f3161c9
->>>>>>> 9d2c3c9206 ([helm]: forward agent providers configuration for fleet mode (#5912))
+
     spec:
       dnsPolicy: ClusterFirstWithHostNet
       automountServiceAccountToken: true
@@ -1298,12 +1290,8 @@ spec:
       labels:
         name: agent-ksmsharded-example
       annotations:
-<<<<<<< HEAD
-        checksum/config: 4ec2b2ef4d3c5c103e79e47a45d4b3b4f9f774e85293f9a5b2d56556025f1d2d
-
-=======
         checksum/config: 58c52f37c9e2582e270e0c3b5c0150252db79a8a1be4e9b287da943a7c9e3bdf
->>>>>>> 9d2c3c9206 ([helm]: forward agent providers configuration for fleet mode (#5912))
+
     spec:
       dnsPolicy: ClusterFirstWithHostNet
       automountServiceAccountToken: true
