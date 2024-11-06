@@ -20,8 +20,9 @@ $Env:PATH
 
 & go env
 # TODO: add to the image
+& $Env:PATH += ";C:\Users\Buildkite\.go\go-1.22.8\bin"
 & go install gotest.tools/gotestsum@latest
-& true "C:\Users\Buildkite\.go\go-1.22.8\packages\bin"
+& tree "C:\Users\Buildkite\.go\go-1.22.8\packages\bin"
 & gotestsum --version
 
 # Read package version from .package-version file
