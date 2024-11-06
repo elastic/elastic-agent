@@ -6,8 +6,6 @@ package host
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -171,15 +169,19 @@ func returnHostMapping(log *logger.Logger) infoFetcher {
 	}
 }
 
-func TestTiago(t *testing.T) {
+func TestGetHostInfoReturnsSomeKeys(t *testing.T) {
+	// this is a simple test to ensure the host provicer returns the new keys
+	// needed to add support to Debian 12.
 	osInfo, err := getHostInfo(logp.L())()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	d, err := json.MarshalIndent(osInfo, "", "  ")
-	if err != nil {
-		t.Fatal(err)
+	expectedKeys := []string{"os_family", "os_platform", "os_version"}
+
+	for _, key := range expectedKeys {
+		if _, exist := osInfo[key]; !exist {
+			t.Errorf("expecting key '%s' from host provider.", key)
+		}
 	}
-	fmt.Println(string(d))
 }
