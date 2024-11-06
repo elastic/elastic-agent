@@ -18,7 +18,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/utils"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -35,7 +34,10 @@ const (
 	flagForce          = "force"
 )
 
-var unsupportedUpgrade error = errors.New("this agent is Fleet managed and must be upgraded using Fleet")
+var (
+	unsupportedUpgradeError error = errors.New("this agent is Fleet managed and must be upgraded using Fleet")
+	nonRootExecutionError   error = errors.New("upgrade command needs to be executed as root for fleet managed agents")
+)
 
 func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
@@ -73,36 +75,49 @@ type upgradeInput struct {
 	cmd       *cobra.Command
 	args      []string
 	c         client.Client
-	agentInfo info.Agent
+	agentInfo client.AgentStateInfo
+	isRoot    bool
 }
 
 func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
 	c := client.New()
-	agentInfo, err := info.NewAgentInfoWithLog(cmd.Context(), "error", false)
+	err := c.Connect(cmd.Context())
 	if err != nil {
-		return fmt.Errorf("failed to retrieve agent info while tring to upgrade the agent: %w", err)
+		return errors.New(err, "Failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
 	}
+	defer c.Disconnect()
+	state, err := c.State(cmd.Context())
+	if err != nil {
+		return fmt.Errorf("error while trying to get agent state: %w", err)
+	}
+
+	isRoot, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("error while retrieving user permission: %w", err)
+	}
+
 	input := &upgradeInput{
 		streams,
 		cmd,
 		args,
 		c,
-		agentInfo,
+		state.Info,
+		isRoot,
 	}
 	return upgradeCmdWithClient(input)
 }
 
-func checkUpgradable(force bool, agentInfo info.Agent) error {
-	if agentInfo.IsStandalone() {
+func checkUpgradable(force bool, agentInfo client.AgentStateInfo, isRoot bool) error {
+	if !agentInfo.IsManaged {
 		return nil
 	}
 
-	if agentInfo.Unprivileged() {
-		return fmt.Errorf("upgrade command needs to be executed as root for fleet managed agents")
+	if !isRoot {
+		return nonRootExecutionError
 	}
 
 	if !force {
-		return unsupportedUpgrade
+		return unsupportedUpgradeError
 	}
 
 	return nil
@@ -119,16 +134,10 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 		return fmt.Errorf("failed to retrieve command flag information while trying to upgrade the agent: %w", err)
 	}
 
-	err = checkUpgradable(force, input.agentInfo)
+	err = checkUpgradable(force, input.agentInfo, input.isRoot)
 	if err != nil {
 		return fmt.Errorf("aborting upgrade: %w", err)
 	}
-
-	err = c.Connect(cmd.Context())
-	if err != nil {
-		return errors.New(err, "Failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
-	}
-	defer c.Disconnect()
 
 	isBeingUpgraded, err := upgrade.IsInProgress(c, utils.GetWatcherPIDs)
 	if err != nil {

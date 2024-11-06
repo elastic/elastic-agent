@@ -1,5 +1,3 @@
-// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
 package coordinator
@@ -1304,7 +1302,7 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		configInjector = c.monitorMgr.MonitoringConfig
 	}
 
-	var existingCompState = make(map[string]uint64, len(c.state.Components))
+	existingCompState := make(map[string]uint64, len(c.state.Components))
 	for _, comp := range c.state.Components {
 		existingCompState[comp.Component.ID] = comp.State.Pid
 	}

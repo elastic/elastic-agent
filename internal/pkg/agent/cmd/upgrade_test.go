@@ -20,7 +20,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
-	mockinfo "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/info"
 )
 
 func TestUpgradeCmd(t *testing.T) {
@@ -34,8 +33,6 @@ func TestUpgradeCmd(t *testing.T) {
 
 		upgradeCh := make(chan struct{})
 		mock := &mockServer{upgradeStop: upgradeCh}
-		mockAgentInfo := mockinfo.NewAgent(t)
-		mockAgentInfo.EXPECT().IsStandalone().Return(true)
 		cproto.RegisterElasticAgentControlServer(s, mock)
 		go func() {
 			err := s.Serve(tcpServer)
@@ -45,6 +42,9 @@ func TestUpgradeCmd(t *testing.T) {
 		clientCh := make(chan struct{})
 		// use HTTP prefix for the dialer to use TCP, otherwise it's a unix socket/named pipe
 		c := client.New(client.WithAddress("http://" + tcpServer.Addr().String()))
+		err = c.Connect(context.Background())
+		assert.NoError(t, err)
+
 		args := []string{"--skip-verify", "8.13.0"}
 		streams := cli.NewIOStreams()
 		cmd := newUpgradeCommandWithArgs(args, streams)
@@ -55,7 +55,8 @@ func TestUpgradeCmd(t *testing.T) {
 			cmd,
 			args,
 			c,
-			mockAgentInfo,
+			client.AgentStateInfo{IsManaged: false},
+			false,
 		}
 
 		// the upgrade command will hang until the server shut down
@@ -81,6 +82,7 @@ func TestUpgradeCmd(t *testing.T) {
 		close(upgradeCh)
 		// this makes sure all client assertions are done
 		<-clientCh
+		c.Disconnect()
 	})
 
 	t.Run("fail if fleet managed and unprivileged", func(t *testing.T) {
@@ -95,9 +97,6 @@ func TestUpgradeCmd(t *testing.T) {
 		// Define mock server and agent information
 		upgradeCh := make(chan struct{})
 		mock := &mockServer{upgradeStop: upgradeCh}
-		mockAgentInfo := mockinfo.NewAgent(t)
-		mockAgentInfo.EXPECT().IsStandalone().Return(false) // Simulate fleet-managed agent
-		mockAgentInfo.EXPECT().Unprivileged().Return(true)  // Simulate unprivileged mode
 		cproto.RegisterElasticAgentControlServer(s, mock)
 
 		wg.Add(1)
@@ -119,7 +118,10 @@ func TestUpgradeCmd(t *testing.T) {
 			cmd,
 			args,
 			c,
-			mockAgentInfo,
+			client.AgentStateInfo{
+				IsManaged: true,
+			},
+			false,
 		}
 
 		term := make(chan int)
@@ -160,9 +162,6 @@ func TestUpgradeCmd(t *testing.T) {
 
 		// Define mock server and agent information
 		mock := &mockServer{}
-		mockAgentInfo := mockinfo.NewAgent(t)
-		mockAgentInfo.EXPECT().IsStandalone().Return(false) // Simulate fleet-managed agent
-		mockAgentInfo.EXPECT().Unprivileged().Return(false) // Simulate privileged mode
 		cproto.RegisterElasticAgentControlServer(s, mock)
 
 		wg.Add(1)
@@ -184,7 +183,8 @@ func TestUpgradeCmd(t *testing.T) {
 			cmd,
 			args,
 			c,
-			mockAgentInfo,
+			client.AgentStateInfo{IsManaged: true},
+			true,
 		}
 
 		term := make(chan int)
@@ -226,9 +226,6 @@ func TestUpgradeCmd(t *testing.T) {
 		// Define mock server and agent information
 		upgradeCh := make(chan struct{})
 		mock := &mockServer{upgradeStop: upgradeCh}
-		mockAgentInfo := mockinfo.NewAgent(t)
-		mockAgentInfo.EXPECT().IsStandalone().Return(false) // Simulate fleet-managed agent
-		mockAgentInfo.EXPECT().Unprivileged().Return(false) // Simulate privileged mode
 		cproto.RegisterElasticAgentControlServer(s, mock)
 
 		wg.Add(1)
@@ -240,6 +237,8 @@ func TestUpgradeCmd(t *testing.T) {
 
 		// Create client and command
 		c := client.New(client.WithAddress("http://" + tcpServer.Addr().String()))
+		err = c.Connect(context.Background())
+		assert.NoError(t, err)
 		args := []string{"8.13.0"} // Version argument
 		streams := cli.NewIOStreams()
 		cmd := newUpgradeCommandWithArgs(args, streams)
@@ -254,7 +253,8 @@ func TestUpgradeCmd(t *testing.T) {
 			cmd,
 			args,
 			c,
-			mockAgentInfo,
+			client.AgentStateInfo{IsManaged: true},
+			true,
 		}
 
 		term := make(chan int)
@@ -279,6 +279,7 @@ func TestUpgradeCmd(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-term
+			c.Disconnect()
 			s.Stop()
 		}()
 
