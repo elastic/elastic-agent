@@ -53,5 +53,10 @@ func EnsureUserAndGroup(username string, groupName string, pt *progressbar.Progr
 		}
 		pt.Describe(fmt.Sprintf("Successfully created user %s", username))
 	}
+
+	if err := EnsureRights(username); err != nil {
+		pt.Describe(fmt.Sprintf("Failed to assign rights to user %s", username))
+		return utils.FileOwner{}, fmt.Errorf("failed to set proper rights to user %s: %w", username, err)
+	}
 	return ownership, nil
 }
