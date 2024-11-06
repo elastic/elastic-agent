@@ -12,9 +12,11 @@ metadata:
     {{- with ($presetVal).labels -}}
     {{ toYaml . | nindent 4 }}
     {{- end }}
-  {{- with ($presetVal).clusterRole.annotations -}}
+  {{- $presetValAnnotations := ($presetVal).annotations | default dict }}
+  {{- $clusterRoleAnnotations := ($presetVal).clusterRole.annotations | default dict }}
+  {{- with (merge dict $presetValAnnotations $clusterRoleAnnotations) }}
   annotations:
-    {{ toYaml . | nindent 4 }}
+    {{- toYaml . | nindent 4 }}
   {{- end }}
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group

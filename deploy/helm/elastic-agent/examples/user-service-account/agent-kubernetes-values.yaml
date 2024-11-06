@@ -8,11 +8,20 @@ agent:
       serviceAccount:
         create: false
         name: user-sa-perNode
+      clusterRole:
+        annotations:
+          elastic-agent.k8s.elastic.co/cr: nginx
     clusterWide:
       serviceAccount:
         create: false
         name: user-sa-clusterWide
+      clusterRole:
+        annotations:
+          elastic-agent.k8s.elastic.co/cr: nginx
     ksmSharded:
       serviceAccount:
         create: false
         name: user-sa-ksmSharded
+      clusterRole:
+        annotations:
+          elastic-agent.k8s.elastic.co/cr: nginx

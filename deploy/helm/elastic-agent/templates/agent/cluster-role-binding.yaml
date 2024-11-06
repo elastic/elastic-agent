@@ -12,6 +12,10 @@ metadata:
     {{- with ($presetVal).labels -}}
     {{ toYaml . | nindent 4 }}
     {{- end }}
+  {{- with ($presetVal).annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 subjects:
   - kind: ServiceAccount
     {{-  if eq $presetVal.serviceAccount.create true }}

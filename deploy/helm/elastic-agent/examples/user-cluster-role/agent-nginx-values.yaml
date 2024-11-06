@@ -33,11 +33,15 @@ extraIntegrations:
 agent:
   presets:
     nginx:
+      annotations:
+        elastic-agent.k8s.elastic.co/preset: nginx
       mode: deployment
       securityContext:
         runAsUser: 0
       serviceAccount:
         create: true
+        annotations:
+          elastic-agent.k8s.elastic.co/sa: nginx
       clusterRole:
         create: false
         name: user-cr

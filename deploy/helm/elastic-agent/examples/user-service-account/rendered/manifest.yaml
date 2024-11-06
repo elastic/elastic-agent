@@ -547,6 +547,8 @@ metadata:
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
     app.kubernetes.io/managed-by: Helm
+  annotations:
+    elastic-agent.k8s.elastic.co/cr: nginx
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
     resources:
@@ -670,6 +672,8 @@ metadata:
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
     app.kubernetes.io/managed-by: Helm
+  annotations:
+    elastic-agent.k8s.elastic.co/cr: nginx
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
     resources:
@@ -902,6 +906,8 @@ metadata:
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
     app.kubernetes.io/managed-by: Helm
+  annotations:
+    elastic-agent.k8s.elastic.co/cr: nginx
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
     resources:

@@ -11,6 +11,8 @@ metadata:
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
     app.kubernetes.io/managed-by: Helm
+  annotations:
+    eck.k8s.elastic.co/license: basic
 ---
 # Source: elastic-agent/templates/agent/service-account.yaml
 apiVersion: v1
@@ -24,6 +26,8 @@ metadata:
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
     app.kubernetes.io/managed-by: Helm
+  annotations:
+    eck.k8s.elastic.co/license: basic
 ---
 # Source: elastic-agent/templates/agent/service-account.yaml
 apiVersion: v1
@@ -37,6 +41,8 @@ metadata:
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
     app.kubernetes.io/managed-by: Helm
+  annotations:
+    eck.k8s.elastic.co/license: basic
 ---
 # Source: elastic-agent/templates/agent/eck/secret.yaml
 apiVersion: v1
@@ -571,6 +577,8 @@ metadata:
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
     app.kubernetes.io/managed-by: Helm
+  annotations:
+    eck.k8s.elastic.co/license: basic
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
     resources:
@@ -694,6 +702,8 @@ metadata:
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
     app.kubernetes.io/managed-by: Helm
+  annotations:
+    eck.k8s.elastic.co/license: basic
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
     resources:
@@ -926,6 +936,8 @@ metadata:
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
     app.kubernetes.io/managed-by: Helm
+  annotations:
+    eck.k8s.elastic.co/license: basic
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
     resources:
@@ -1007,6 +1019,8 @@ metadata:
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
     app.kubernetes.io/managed-by: Helm
+  annotations:
+    eck.k8s.elastic.co/license: basic
 subjects:
   - kind: ServiceAccount
     name: agent-clusterwide-example
@@ -1027,6 +1041,8 @@ metadata:
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
     app.kubernetes.io/managed-by: Helm
+  annotations:
+    eck.k8s.elastic.co/license: basic
 subjects:
   - kind: ServiceAccount
     name: agent-ksmsharded-example
@@ -1047,6 +1063,8 @@ metadata:
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
     app.kubernetes.io/managed-by: Helm
+  annotations:
+    eck.k8s.elastic.co/license: basic
 subjects:
   - kind: ServiceAccount
     name: agent-pernode-example
