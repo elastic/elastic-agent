@@ -380,13 +380,11 @@ func stateToProto(state *coordinator.State, agentInfo info.Agent) (*cproto.State
 		if state.UpgradeDetails.Metadata.ScheduledAt != nil &&
 			!state.UpgradeDetails.Metadata.ScheduledAt.IsZero() {
 			upgradeDetails.Metadata.ScheduledAt = state.UpgradeDetails.Metadata.ScheduledAt.Format(control.TimeFormat())
-
 		}
 
 		if state.UpgradeDetails.Metadata.RetryUntil != nil &&
 			!state.UpgradeDetails.Metadata.RetryUntil.IsZero() {
 			upgradeDetails.Metadata.RetryUntil = state.UpgradeDetails.Metadata.RetryUntil.Format(control.TimeFormat())
-
 		}
 	}
 
@@ -399,6 +397,7 @@ func stateToProto(state *coordinator.State, agentInfo info.Agent) (*cproto.State
 			Snapshot:     release.Snapshot(),
 			Pid:          int32(os.Getpid()),
 			Unprivileged: agentInfo.Unprivileged(),
+			IsManaged:    !agentInfo.IsStandalone(),
 		},
 		State:          state.State,
 		Message:        state.Message,

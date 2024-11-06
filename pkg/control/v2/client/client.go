@@ -106,6 +106,7 @@ type AgentStateInfo struct {
 	Snapshot     bool   `json:"snapshot" yaml:"snapshot"`
 	PID          int32  `json:"pid" yaml:"pid"`
 	Unprivileged bool   `json:"unprivileged" yaml:"unprivileged"`
+	IsManaged    bool   `json:"is_managed" yaml:"is_managed`
 }
 
 // AgentState is the current state of the Elastic Agent.
@@ -385,7 +386,6 @@ func (c *client) DiagnosticComponents(ctx context.Context, additionalMetrics []A
 	}
 
 	return results, nil
-
 }
 
 // DiagnosticUnits gathers diagnostics information from specific units (or all if non are provided).
@@ -473,6 +473,7 @@ func toState(res *cproto.StateResponse) (*AgentState, error) {
 			Snapshot:     res.Info.Snapshot,
 			PID:          res.Info.Pid,
 			Unprivileged: res.Info.Unprivileged,
+			IsManaged:    res.Info.IsManaged,
 		},
 		State:          res.State,
 		Message:        res.Message,
