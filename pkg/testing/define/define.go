@@ -21,12 +21,12 @@ import (
 	"github.com/gofrs/uuid/v5"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
-	"github.com/elastic/elastic-agent/pkg/utils"
 	semver "github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/version"
 
@@ -145,13 +145,14 @@ func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Inf
 		panic(fmt.Sprintf("test %s has invalid requirements: %s", t.Name(), err))
 	}
 
-	if len(GroupsFilter) > 0 && !slices.Contains(GroupsFilter, req.Group) {
-		t.Skipf("group %s not found in groups filter %s. Skipping", req.Group, GroupsFilter)
+	filteredGroups := GroupsFilter.values
+	if len(filteredGroups) > 0 && !slices.Contains(filteredGroups, req.Group) {
+		t.Skipf("group %s not found in groups filter %s. Skipping", req.Group, filteredGroups)
 		return nil
 	}
 
-	if SudoFilter.HasBeenSet() && req.Sudo != SudoFilter.Value() {
-		t.Skipf("sudo requirement %t not matching sudo filter %t. Skipping", req.Sudo, SudoFilter.Value())
+	if SudoFilter.value != nil && req.Sudo != *SudoFilter.value {
+		t.Skipf("sudo requirement %t not matching sudo filter %t. Skipping", req.Sudo, *SudoFilter.value)
 	}
 
 	if !req.Local && local {

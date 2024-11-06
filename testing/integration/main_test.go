@@ -21,7 +21,6 @@ func init() {
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	define.ParseFlags()
 	runExitCode := m.Run()
 
 	if define.DryRun {

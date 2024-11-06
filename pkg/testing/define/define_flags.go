@@ -6,53 +6,64 @@ package define
 
 import (
 	"flag"
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
 )
 
 type optionalBoolFlag struct {
-	set   bool
-	value bool
+	value *bool
 }
 
 func (o *optionalBoolFlag) String() string {
-	if !o.set {
-		return "<not set>"
+	if o.value == nil {
+		return "nil"
 	}
-	return strconv.FormatBool(o.value)
+	return strconv.FormatBool(*o.value)
 }
 
 func (o *optionalBoolFlag) Set(s string) error {
-	o.set = true
-	if s == "" || s == "true" {
-		o.value = true
-		return nil
-	}
-	o.value = false
+	bValue := s == "" || s == "true"
+	o.value = &bValue
 	return nil
 }
 
-func (o *optionalBoolFlag) HasBeenSet() bool {
-	return o.set
+type stringArrayFlag struct {
+	values []string
 }
 
-func (o *optionalBoolFlag) Value() bool {
-	return o.value
+func (s *stringArrayFlag) String() string {
+	return fmt.Sprintf("%s", s.values)
+}
+
+func (s *stringArrayFlag) Set(stringValue string) error {
+	if stringValue == "" {
+		return nil
+	}
+	s.values = strings.Split(stringValue, ",")
+	return nil
 }
 
 var (
 	DryRun          bool
+<<<<<<< HEAD
 	GroupsFilter    []string
 	PlatformsFilter []string
 	SudoFilter      optionalBoolFlag
 
 	groupStringFlag    string
 	platformStringFlag string
+=======
+	GroupsFilter    stringArrayFlag
+	PlatformsFilter stringArrayFlag
+	SudoFilter      optionalBoolFlag
+>>>>>>> 79781899da8feaf2fba61fa63e897b11fbb25fdc
 )
 
 func RegisterFlags(prefix string, set *flag.FlagSet) {
 	set.BoolVar(&DryRun, prefix+"dry-run", false, "Forces test in dry-run mode: skips the main test and puts a successful placeholder <TestName>/dry-run if the test would have run")
+<<<<<<< HEAD
 	set.StringVar(&groupStringFlag, prefix+"groups", "", "test groups, comma-separated")
 	set.StringVar(&platformStringFlag, prefix+"platforms", "", "test platforms, comma-separated")
 	set.Var(&SudoFilter, prefix+"sudo", "Filter tests by sudo requirements")
@@ -70,6 +81,13 @@ func splitStringToArray(stringFlag string) []string {
 	return strings.Split(stringFlag, ",")
 }
 
+=======
+	set.Var(&GroupsFilter, prefix+"groups", "test groups, comma-separated")
+	set.Var(&PlatformsFilter, prefix+"platforms", "test platforms, comma-separated")
+	set.Var(&SudoFilter, prefix+"sudo", "Filter tests by sudo requirements")
+}
+
+>>>>>>> 79781899da8feaf2fba61fa63e897b11fbb25fdc
 func dryRun(t *testing.T, req Requirements) *Info {
 	// always validate requirement is valid
 	if err := req.Validate(); err != nil {
