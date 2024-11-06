@@ -6,12 +6,16 @@ package git
 
 import (
 	"context"
+	"regexp"
+	"sort"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var releaseBranchRegexp = regexp.MustCompile(`.*(\d+\.(\d+|x))$`)
 
 func TestGetReleaseBranches(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -23,4 +27,30 @@ func TestGetReleaseBranches(t *testing.T) {
 	for _, b := range branches {
 		assert.Regexp(t, releaseBranchRegexp, b)
 	}
+}
+
+func TestLess(t *testing.T) {
+	branchList := []string{
+		"8.16",
+		"9.1",
+		"8.x",
+		"wrong",
+		"9.0",
+		"9.x",
+		"8.15",
+	}
+
+	expected := []string{
+		"9.x",
+		"9.1",
+		"9.0",
+		"8.x",
+		"8.16",
+		"8.15",
+		"wrong",
+	}
+
+	sort.Slice(branchList, less(branchList))
+
+	require.Equal(t, expected, branchList)
 }
