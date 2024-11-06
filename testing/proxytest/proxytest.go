@@ -178,6 +178,9 @@ func New(t *testing.T, optns ...Option) *Proxy {
 
 	p.Server = httptest.NewUnstartedServer(
 		http.HandlerFunc(func(ww http.ResponseWriter, r *http.Request) {
+			// Sometimes, on CI obviously, the last log happens after the test
+			// finishes. See https://github.com/elastic/elastic-agent/issues/5869.
+			// Therefore, let's add an extra layer to try to avoid that.
 			p.requestsWG.Add(1)
 			defer p.requestsWG.Done()
 
@@ -251,8 +254,9 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Proxy) Close() {
-	// it's necessary as sometimes the request log happens after the test
-	// finishes. See https://github.com/elastic/elastic-agent/issues/5869
+	// Sometimes, on CI obviously, the last log happens after the test
+	// finishes. See https://github.com/elastic/elastic-agent/issues/5869.
+	// So, manually wait all ongoing requests to finish.
 	p.requestsWG.Wait()
 
 	p.Server.Close()
