@@ -106,7 +106,7 @@ type AgentStateInfo struct {
 	Snapshot     bool   `json:"snapshot" yaml:"snapshot"`
 	PID          int32  `json:"pid" yaml:"pid"`
 	Unprivileged bool   `json:"unprivileged" yaml:"unprivileged"`
-	IsManaged    bool   `json:"is_managed" yaml:"is_managed`
+	IsManaged    bool   `json:"is_managed" yaml:"is_managed"`
 }
 
 // AgentState is the current state of the Elastic Agent.
