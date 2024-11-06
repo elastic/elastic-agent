@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc/codes"
@@ -83,7 +84,10 @@ type upgradeInput struct {
 
 func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
 	c := client.New()
-	err := c.Connect(cmd.Context())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	err := c.Connect(ctx)
 	if err != nil {
 		return errors.New(err, "Failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
 	}
