@@ -55,13 +55,8 @@ This section provides a summary of components included in the Elastic Distributi
 | Component | Version |
 |---|---|
 | [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.13.0/processor/elasticinframetricsprocessor/README.md) | v0.13.0 |
-<<<<<<< HEAD
 | [elastictraceprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elastictraceprocessor/v0.2.1/processor/elastictraceprocessor/README.md) | v0.2.1 |
-| [lsmintervalprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/lsmintervalprocessor/v0.2.0/processor/lsmintervalprocessor/README.md) | v0.2.0 |
-=======
-| [elastictraceprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elastictraceprocessor/v0.3.0/processor/elastictraceprocessor/README.md) | v0.3.0 |
 | [lsmintervalprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/lsmintervalprocessor/v0.3.0/processor/lsmintervalprocessor/README.md) | v0.3.0 |
->>>>>>> a1c917a6bd (build(deps): bump github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor from 0.2.0 to 0.3.0 (#5840))
 | [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.112.0/processor/memorylimiterprocessor/README.md) | v0.112.0 |
 | [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.112.0/processor/attributesprocessor/README.md) | v0.112.0 |
 | [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.112.0/processor/filterprocessor/README.md) | v0.112.0 |

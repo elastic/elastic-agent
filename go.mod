@@ -24,13 +24,8 @@ require (
 	github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015
 	github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector v0.2.1
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.13.0
-<<<<<<< HEAD
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.2.1
-	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.2.0
-=======
-	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.3.0
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.3.0
->>>>>>> a1c917a6bd (build(deps): bump github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor from 0.2.0 to 0.3.0 (#5840))
 	github.com/fatih/color v1.17.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-viper/mapstructure/v2 v2.2.1
