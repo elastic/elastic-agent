@@ -18,8 +18,10 @@ Write-Output "~~~ Integration tests: $GROUP_NAME"
 # Check gotestsum version
 $Env:PATH
 
+& go env
 # TODO: add to the image
 & go install gotest.tools/gotestsum@latest
+& true "C:\Users\Buildkite\.go\go-1.22.8\packages\bin"
 & gotestsum --version
 
 # Read package version from .package-version file
