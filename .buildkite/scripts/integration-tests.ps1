@@ -16,10 +16,12 @@ Write-Output "~~~ Running integration tests as $env:USERNAME"
 Write-Output "~~~ Integration tests: $GROUP_NAME"
 
 # Check gotestsum version
+# TODO: add to the image
+go install gotest.tools/gotestsum@latest
 & gotestsum --version
 
 # Read package version from .package-version file
-$PACKAGE_VERSION = Get-Content .package-version -ErrorAction SilentlyContinue
+$PACKAGE_VERSION = Getsd-Content .package-version -ErrorAction SilentlyContinue
 if ($PACKAGE_VERSION) {
     $PACKAGE_VERSION = "${PACKAGE_VERSION}-SNAPSHOT"
 }
