@@ -11,12 +11,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os/exec"
 	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+
+	"github.com/elastic/elastic-agent/pkg/version"
 )
 
 var (
 	ErrNotReleaseBranch = errors.New("this is not a release branch")
+	// glob is not powerful enough to match exactly what we expect, so we have to use the regular expression too
 	releaseBranchRegexp = regexp.MustCompile(`.*(\d+\.(\d+|x))$`)
 )
 
@@ -26,7 +33,7 @@ type outputReader func(io.Reader) error
 // current repository ordered descending by creation date.
 // e.g. 8.13, 8.12, etc.
 func GetReleaseBranches(ctx context.Context) ([]string, error) {
-	c := exec.CommandContext(ctx, "git", "branch", "-r", "--list", "*/[0-9]*.*[0-9x]", "--sort=-creatordate")
+	c := exec.CommandContext(ctx, "git", "for-each-ref", "refs/remotes/origin/[0-9]*.[0-9x]*", "--format=%(refname:short)")
 
 	branchList := []string{}
 	err := runCommand(c, releaseBranchReader(&branchList))
@@ -34,7 +41,34 @@ func GetReleaseBranches(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 
+	sort.Slice(branchList, less(branchList))
+
 	return branchList, nil
+}
+
+// we use this to emulate the maximum possible version value aliased by `.x`
+var maxIntString = strconv.Itoa(math.MaxInt)
+
+// less makes sure we have our release branches in the right order
+func less(branches []string) func(i, j int) bool {
+	return func(i, j int) bool {
+		// we complete the versions, so we can parse semver and compare
+		var (
+			v1 = strings.ReplaceAll(branches[i], "x", maxIntString) + ".0"
+			v2 = strings.ReplaceAll(branches[j], "x", maxIntString) + ".0"
+		)
+
+		parsed1, err1 := version.ParseVersion(v1)
+		parsed2, err2 := version.ParseVersion(v2)
+		if err1 != nil {
+			return false
+		}
+		if err2 != nil {
+			return true
+		}
+		// descending order
+		return !parsed1.Less(*parsed2)
+	}
 }
 
 // GetCurrentReleaseBranch returns the current branch of the repository
@@ -71,7 +105,7 @@ func releaseBranchReader(out *[]string) outputReader {
 		var seen = map[string]struct{}{}
 		scanner := bufio.NewScanner(r)
 		for scanner.Scan() {
-			branch := scanner.Text()
+			branch := strings.TrimPrefix(scanner.Text(), "origin/")
 			branch, err := extractReleaseBranch(branch)
 			if err != nil {
 				continue
