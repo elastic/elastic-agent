@@ -25,6 +25,8 @@ $PACKAGE_VERSION = Getsd-Content .package-version -ErrorAction SilentlyContinue
 if ($PACKAGE_VERSION) {
     $PACKAGE_VERSION = "${PACKAGE_VERSION}-SNAPSHOT"
 }
+echo "~~~ Building test binaries"
+mage build:testBinaries
 
 # Run integration tests with gotestsum
 $env:TEST_BINARY_NAME = "elastic-agent"
