@@ -55,6 +55,8 @@ func TestAPMConfig(t *testing.T) {
 		Group: Default,
 		Stack: &define.Stack{},
 	})
+	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/5890")
+
 	f, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 

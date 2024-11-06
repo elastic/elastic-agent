@@ -29,8 +29,8 @@ mage build:testBinaries
 if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
   echo "~~~ The steps is retried, starting the ESS stack again"
   ess_up $OVERRIDE_STACK_VERSION || echo "Failed to start ESS stack" >&2
-  trap 'ess_down' EXIT  
-else 
+  trap 'ess_down' EXIT
+else
   # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data
   echo "~~~ Receiving ESS stack metadata"
   export ELASTICSEARCH_HOST=$(buildkite-agent meta-data get "es.host")
