@@ -16,8 +16,10 @@ Write-Output "~~~ Running integration tests as $env:USERNAME"
 Write-Output "~~~ Integration tests: $GROUP_NAME"
 
 # Check gotestsum version
+$Env:PATH
+
 # TODO: add to the image
-go install gotest.tools/gotestsum@latest
+& go install gotest.tools/gotestsum@latest
 & gotestsum --version
 
 # Read package version from .package-version file
@@ -25,8 +27,9 @@ $PACKAGE_VERSION = Getsd-Content .package-version -ErrorAction SilentlyContinue
 if ($PACKAGE_VERSION) {
     $PACKAGE_VERSION = "${PACKAGE_VERSION}-SNAPSHOT"
 }
+
 echo "~~~ Building test binaries"
-mage build:testBinaries
+& mage build:testBinaries
 
 # Run integration tests with gotestsum
 $env:TEST_BINARY_NAME = "elastic-agent"
