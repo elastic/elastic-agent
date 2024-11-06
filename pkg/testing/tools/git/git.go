@@ -43,8 +43,6 @@ func GetReleaseBranches(ctx context.Context) ([]string, error) {
 	return branchList, nil
 }
 
-const majorBranchSuffix = ".x"
-
 // we use this to emulate the maximum possible version value aliased by `.x`
 var maxIntString = strconv.Itoa(math.MaxInt)
 
