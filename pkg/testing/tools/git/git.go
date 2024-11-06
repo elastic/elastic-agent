@@ -30,7 +30,7 @@ type outputReader func(io.Reader) error
 // current repository ordered descending by creation date.
 // e.g. 8.13, 8.12, etc.
 func GetReleaseBranches(ctx context.Context) ([]string, error) {
-	c := exec.CommandContext(ctx, "git", "for-each-ref", "refs/heads/[0-9]*.*[0-9x]", "--format=%(refname:short)")
+	c := exec.CommandContext(ctx, "git", "for-each-ref", "refs/remotes/origin/[0-9]*.*[0-9x]", "--format=%(refname:short)")
 
 	branchList := []string{}
 	err := runCommand(c, releaseBranchReader(&branchList))
@@ -102,7 +102,7 @@ func releaseBranchReader(out *[]string) outputReader {
 		var seen = map[string]struct{}{}
 		scanner := bufio.NewScanner(r)
 		for scanner.Scan() {
-			branch := scanner.Text()
+			branch := strings.TrimPrefix(scanner.Text(), "origin/")
 			_, exists := seen[branch]
 			if exists {
 				continue
