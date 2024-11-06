@@ -251,9 +251,11 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Proxy) Close() {
-	p.requestsWG.Wait()
-
 	p.Server.Close()
+
+	// it's necessary as sometimes the request log happens after the test
+	// finishes. See https://github.com/elastic/elastic-agent/issues/5869
+	p.requestsWG.Wait()
 }
 
 func (p *Proxy) serveHTTP(w http.ResponseWriter, r *http.Request) {
