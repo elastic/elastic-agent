@@ -12,6 +12,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -50,6 +51,11 @@ type AgentWatcher struct {
 
 // NewAgentWatcher creates a new agent watcher.
 func NewAgentWatcher(ch chan error, log *logger.Logger, checkInterval time.Duration) *AgentWatcher {
+	// when starting watcher from pre 8.8 version of agent control socket is evaluated incorrectly and upgrade fails.
+	// resolving control socket updates it to a proper value before client is initiated
+	// upgrade is only available for installed agent so we can assume
+	paths.ResolveControlSocket(true)
+
 	c := client.New()
 	ec := &AgentWatcher{
 		notifyChan:    ch,
