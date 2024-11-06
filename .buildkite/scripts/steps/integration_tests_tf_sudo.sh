@@ -7,12 +7,7 @@ source .buildkite/scripts/steps/ess.sh
 
 GROUP_NAME=$1
 if [ -z "$GROUP_NAME" ]; then
-  echo "Error: Specify the group name: sudo-integration-tests.sh [group_name] [tests_to_run]" >&2
-  exit 1
-fi
-TESTS_TO_RUN=$2
-if [ -z "$TESTS_TO_RUN" ]; then
-  echo "Error: Specify the tests to run: sudo-integration-tests.sh [group_name] [tests_to_run]" >&2
+  echo "Error: Specify the group name: sudo-integration-tests.sh [group_name]" >&2
   exit 1
 fi
 
