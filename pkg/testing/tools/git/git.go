@@ -13,6 +13,7 @@ import (
 	"io"
 	"math"
 	"os/exec"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,6 +23,8 @@ import (
 
 var (
 	ErrNotReleaseBranch = errors.New("this is not a release branch")
+	// glob is not powerful enough to match exactly what we expect, so we have to use the regular expression too
+	releaseBranchRegexp = regexp.MustCompile(`.*(\d+\.(\d+|x))$`)
 )
 
 type outputReader func(io.Reader) error
@@ -30,7 +33,7 @@ type outputReader func(io.Reader) error
 // current repository ordered descending by creation date.
 // e.g. 8.13, 8.12, etc.
 func GetReleaseBranches(ctx context.Context) ([]string, error) {
-	c := exec.CommandContext(ctx, "git", "for-each-ref", "refs/remotes/origin/[0-9]*.*[0-9x]", "--format=%(refname:short)")
+	c := exec.CommandContext(ctx, "git", "for-each-ref", "refs/remotes/origin/[0-9]*.[0-9x]*", "--format=%(refname:short)")
 
 	branchList := []string{}
 	err := runCommand(c, releaseBranchReader(&branchList))
@@ -83,7 +86,7 @@ func GetCurrentReleaseBranch(ctx context.Context) (string, error) {
 		return "master", nil
 	}
 
-	return branch, nil
+	return extractReleaseBranch(branch)
 }
 
 func fullOutputReader(out *string) outputReader {
@@ -103,6 +106,10 @@ func releaseBranchReader(out *[]string) outputReader {
 		scanner := bufio.NewScanner(r)
 		for scanner.Scan() {
 			branch := strings.TrimPrefix(scanner.Text(), "origin/")
+			branch, err := extractReleaseBranch(branch)
+			if err != nil {
+				continue
+			}
 			_, exists := seen[branch]
 			if exists {
 				continue
@@ -118,6 +125,18 @@ func releaseBranchReader(out *[]string) outputReader {
 
 		return nil
 	}
+}
+
+func extractReleaseBranch(branch string) (string, error) {
+	if !releaseBranchRegexp.MatchString(branch) {
+		return "", fmt.Errorf("failed to process branch %q: %w", branch, ErrNotReleaseBranch)
+	}
+
+	matches := releaseBranchRegexp.FindStringSubmatch(branch)
+	if len(matches) != 3 {
+		return "", fmt.Errorf("failed to process branch %q: expected 3 matches, got %d", branch, len(matches))
+	}
+	return matches[1], nil
 }
 
 func runCommand(c *exec.Cmd, or outputReader) error {

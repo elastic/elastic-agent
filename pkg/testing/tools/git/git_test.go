@@ -6,7 +6,6 @@ package git
 
 import (
 	"context"
-	"regexp"
 	"sort"
 	"testing"
 	"time"
@@ -14,8 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-var releaseBranchRegexp = regexp.MustCompile(`.*(\d+\.(\d+|x))$`)
 
 func TestGetReleaseBranches(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
