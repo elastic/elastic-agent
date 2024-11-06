@@ -123,21 +123,34 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 | kubernetes.system.metrics.enabled | bool | `true` | enable system metric stream (kubelet) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kubelet#system) |
 | kubernetes.system.metrics.vars | object | `{}` | system metric stream vars |
 
-### 3 - User Extra Integrations
+### 4 - System integration
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| system.enabled | bool | `false` | enable System integration. |
+| system.output | string | `"default"` | name of the output used in System integration. Note that this output needs to be defined in [outputs](#1-outputs) |
+| system.namespace | string | `"default"` | output namespace |
+| system.authLogs.enabled | bool | `true` | enable auth logs |
+| system.authLogs.vars | object | `{}` | override default variables of auth logs stream. Look in the [values.schema.json](values.schema.json) to see the available variables |
+| system.syslog.enabled | bool | `true` | enable syslog |
+| system.syslog.vars | object | `{}` | override default variables of syslog stream. Look in the [values.schema.json](values.schema.json) to see the available variables |
+| system.metrics.enabled | bool | `true` | enable metrics |
+
+### 5 - User Extra Integrations
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | extraIntegrations | object | `{}` | extra [user-defined integrations](https://www.elastic.co/guide/en/fleet/current/elastic-agent-input-configuration.html) to be added to the Elastic Agent An example can be found [here](./examples/nginx-custom-integration/README.md) |
 
-### 3 - Elastic-Agent Configuration
+### 6 - Elastic-Agent Configuration
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | agent.version | string | `"9.0.0"` | elastic-agent version |
 | agent.image | object | `{"pullPolicy":"IfNotPresent","repository":"docker.elastic.co/beats/elastic-agent","tag":"9.0.0-SNAPSHOT"}` | image configuration |
+| agent.imagePullSecrets | list | `[]` | image pull secrets |
 | agent.engine | string | `"k8s"` | generate kubernetes manifests or [ECK](https://github.com/elastic/cloud-on-k8s) CRDs |
 | agent.unprivileged | bool | `false` | enable unprivileged mode |
 | agent.presets | map[string]{} | `{ "perNode" : {...}, "clusterWide": {...}, "ksmSharded": {...} }` | Map of deployment presets for the Elastic Agent. The key of the map is the name of the preset. See more for the presets required by the built-in Kubernetes integration [here](./values.yaml) |
 
-### 3.1 - Elastic-Agent Managed Configuration
+### 6.1 - Elastic-Agent Managed Configuration
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | agent.fleet.enabled | bool | `false` | enable elastic-agent managed |
