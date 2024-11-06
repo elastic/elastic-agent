@@ -35,8 +35,10 @@ const (
 )
 
 var (
-	unsupportedUpgradeError error = errors.New("this agent is Fleet managed and must be upgraded using Fleet")
-	nonRootExecutionError   error = errors.New("upgrade command needs to be executed as root for fleet managed agents")
+	unsupportedUpgradeError   error = errors.New("this agent is Fleet managed and must be upgraded using Fleet")
+	nonRootExecutionError           = errors.New("upgrade command needs to be executed as root for fleet managed agents")
+	skipVeriftNotAllowedError       = errors.New(fmt.Sprintf("\"%s\" flag is not allowed when upgrading a fleet managed agent using the cli", flagSkipVerify))
+	skipVerifyNotRootError          = errors.New(fmt.Sprintf("user needs to be root to use \"%s\" flag when upgrading standalone agents", flagSkipVerify))
 )
 
 func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -107,20 +109,42 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 	return upgradeCmdWithClient(input)
 }
 
-func checkUpgradable(force bool, agentInfo client.AgentStateInfo, isRoot bool) error {
-	if !agentInfo.IsManaged {
+type upgradeCond struct {
+	isManaged  bool
+	force      bool
+	isRoot     bool
+	skipVerify bool
+}
+
+func checkUpgradable(cond upgradeCond) error {
+	checkManaged := func() error {
+		if cond.skipVerify {
+			return skipVeriftNotAllowedError
+		}
+
+		if !cond.isRoot {
+			return nonRootExecutionError
+		}
+
+		if !cond.force {
+			return unsupportedUpgradeError
+		}
+
 		return nil
 	}
 
-	if !isRoot {
-		return nonRootExecutionError
+	checkStandalone := func() error {
+		if cond.skipVerify && !cond.isRoot {
+			return skipVerifyNotRootError
+		}
+		return nil
 	}
 
-	if !force {
-		return unsupportedUpgradeError
+	if cond.isManaged {
+		return checkManaged()
 	}
 
-	return nil
+	return checkStandalone()
 }
 
 func upgradeCmdWithClient(input *upgradeInput) error {
@@ -134,7 +158,17 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 		return fmt.Errorf("failed to retrieve command flag information while trying to upgrade the agent: %w", err)
 	}
 
-	err = checkUpgradable(force, input.agentInfo, input.isRoot)
+	skipVerification, err := cmd.Flags().GetBool(flagSkipVerify)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve %s flag information while upgrading the agent: %w", flagSkipVerify, err)
+	}
+
+	err = checkUpgradable(upgradeCond{
+		isManaged:  input.agentInfo.IsManaged,
+		force:      force,
+		isRoot:     input.isRoot,
+		skipVerify: skipVerification,
+	})
 	if err != nil {
 		return fmt.Errorf("aborting upgrade: %w", err)
 	}
@@ -147,7 +181,6 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 		return errors.New("an upgrade is already in progress; please try again later.")
 	}
 
-	skipVerification, _ := cmd.Flags().GetBool(flagSkipVerify)
 	var pgpChecks []string
 	if !skipVerification {
 		// get local PGP
