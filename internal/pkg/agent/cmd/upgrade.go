@@ -37,7 +37,7 @@ const (
 var (
 	unsupportedUpgradeError   error = errors.New("this agent is Fleet managed and must be upgraded using Fleet")
 	nonRootExecutionError           = errors.New("upgrade command needs to be executed as root for fleet managed agents")
-	skipVeriftNotAllowedError       = errors.New(fmt.Sprintf("\"%s\" flag is not allowed when upgrading a fleet managed agent using the cli", flagSkipVerify))
+	skipVerifyNotAllowedError       = errors.New(fmt.Sprintf("\"%s\" flag is not allowed when upgrading a fleet managed agent using the cli", flagSkipVerify))
 	skipVerifyNotRootError          = errors.New(fmt.Sprintf("user needs to be root to use \"%s\" flag when upgrading standalone agents", flagSkipVerify))
 )
 
@@ -119,7 +119,7 @@ type upgradeCond struct {
 func checkUpgradable(cond upgradeCond) error {
 	checkManaged := func() error {
 		if cond.skipVerify {
-			return skipVeriftNotAllowedError
+			return skipVerifyNotAllowedError
 		}
 
 		if !cond.isRoot {

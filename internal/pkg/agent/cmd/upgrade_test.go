@@ -337,7 +337,7 @@ func TestUpgradeCmd(t *testing.T) {
 			err = upgradeCmdWithClient(commandInput)
 
 			assert.Error(t, err)
-			assert.Contains(t, err.Error(), skipVeriftNotAllowedError.Error())
+			assert.Contains(t, err.Error(), skipVerifyNotAllowedError.Error())
 
 			// Verify counter is incremented
 			counter := atomic.LoadInt32(&mock.upgrades)
