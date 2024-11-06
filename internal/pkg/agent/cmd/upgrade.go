@@ -122,16 +122,16 @@ type upgradeCond struct {
 
 func checkUpgradable(cond upgradeCond) error {
 	checkManaged := func() error {
+		if !cond.force {
+			return unsupportedUpgradeError
+		}
+
 		if cond.skipVerify {
 			return skipVerifyNotAllowedError
 		}
 
 		if !cond.isRoot {
 			return nonRootExecutionError
-		}
-
-		if !cond.force {
-			return unsupportedUpgradeError
 		}
 
 		return nil
