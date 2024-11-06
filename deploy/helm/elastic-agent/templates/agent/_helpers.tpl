@@ -97,6 +97,18 @@ Validate and initialise the defined agent presets
 {{- end -}}
 {{- end -}}
 {{- end -}}
+{{/* by default we disable leader election but we also set the name of the leader lease in case it is explicitly enabled */}}
+{{- if empty ($presetVal).providers -}}
+{{- $_ := set $presetVal "providers" dict -}}
+{{- end -}}
+{{- $presetProviders := get $presetVal "providers" -}}
+{{- if empty ($presetProviders).kubernetes_leaderelection -}}
+{{- $_ := set $presetProviders "kubernetes_leaderelection" dict -}}
+{{- end -}}
+{{- $presetLeaderLeaseName := (printf "%s-%s" $.Release.Name $presetName) | lower  -}}
+{{- $defaultLeaderElection := dict "enabled" false "leader_lease" $presetLeaderLeaseName -}}
+{{- $presetLeaderElection := mergeOverwrite dict $defaultLeaderElection ($presetProviders).kubernetes_leaderelection -}}
+{{- $_ := set $presetProviders "kubernetes_leaderelection" $presetLeaderElection -}}
 {{- end -}}
 {{- end -}}
 
