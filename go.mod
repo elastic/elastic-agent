@@ -14,7 +14,7 @@ require (
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
 	github.com/elastic/elastic-agent-client/v7 v7.16.0
-	github.com/elastic/elastic-agent-libs v0.14.0
+	github.com/elastic/elastic-agent-libs v0.17.0
 	github.com/elastic/elastic-agent-system-metrics v0.11.3
 	github.com/elastic/elastic-transport-go/v8 v8.6.0
 	github.com/elastic/go-elasticsearch/v8 v8.15.0
@@ -22,9 +22,9 @@ require (
 	github.com/elastic/go-sysinfo v1.15.0
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015
-	github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector v0.2.1
+	github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector v0.3.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.13.0
-	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.2.1
+	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.3.0
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.2.0
 	github.com/fatih/color v1.17.0
 	github.com/fsnotify/fsnotify v1.7.0
@@ -334,7 +334,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/experimentalmetricmetadata v0.112.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl v0.112.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.112.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.111.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.112.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.112.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/jaeger v0.112.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheus v0.112.0 // indirect
