@@ -16,16 +16,16 @@ Write-Output "~~~ Running integration tests as $env:USERNAME"
 Write-Output "~~~ Integration tests: $GROUP_NAME"
 
 # Check gotestsum version
-$Env:PATH
-go env
+# $Env:PATH
+# go env
 # TODO: add to the image
-$Env:PATH += ";C:\Users\Buildkite\.go\go-1.22.8\bin"
+# $Env:PATH += ";C:\Users\Buildkite\.go\go-1.22.8\bin"
 go install gotest.tools/gotestsum@latest
-tree "C:\Users\Buildkite\.go\go-1.22.8\packages\bin"
+# tree "C:\Users\Buildkite\.go\go-1.22.8\packages\bin"
 gotestsum --version
 
 # Read package version from .package-version file
-$PACKAGE_VERSION = Getsd-Content .package-version -ErrorAction SilentlyContinue
+$PACKAGE_VERSION = Get-Content .package-version -ErrorAction SilentlyContinue
 if ($PACKAGE_VERSION) {
     $PACKAGE_VERSION = "${PACKAGE_VERSION}-SNAPSHOT"
 }
