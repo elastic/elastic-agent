@@ -170,7 +170,7 @@ func returnHostMapping(log *logger.Logger) infoFetcher {
 }
 
 func TestGetHostInfoReturnsSomeKeys(t *testing.T) {
-	// this is a simple test to ensure the host provicer returns the new keys
+	// this is a simple test to ensure the host provider returns the new keys
 	// needed to add support to Debian 12.
 	osInfo, err := getHostInfo(logp.L())()
 	if err != nil {
