@@ -40,7 +40,7 @@ steps:
     steps:
       - label: "Win2022:{{matrix}}"
         command: |
-          # buildkite-agent artifact download build/distributions/** . --step 'package-it' --build "0192dd5c-9edc-456c-9ba4-8b9078997b6d"
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build "0192dd5c-9edc-456c-9ba4-8b9078997b6d"
           .buildkite/scripts/integration-tests.ps1 {{matrix}}
         artifact_paths:
           - build/**
