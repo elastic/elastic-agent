@@ -85,7 +85,7 @@ func TestUpgradeCmd(t *testing.T) {
 		c.Disconnect()
 	})
 
-	t.Run("fail if fleet managed and unprivileged", func(t *testing.T) {
+	t.Run("fail if fleet managed and unprivileged with --force flag", func(t *testing.T) {
 		var wg sync.WaitGroup
 		// Set up mock TCP server for gRPC connection
 		tcpServer, err := net.Listen("tcp", "127.0.0.1:")
@@ -111,6 +111,10 @@ func TestUpgradeCmd(t *testing.T) {
 		args := []string{"8.13.0"} // Version argument
 		streams := cli.NewIOStreams()
 		cmd := newUpgradeCommandWithArgs(args, streams)
+		err = cmd.Flags().Set(flagForce, "true")
+		if err != nil {
+			log.Fatal(err)
+		}
 		cmd.SetContext(context.Background())
 
 		commandInput := &upgradeInput{
@@ -393,6 +397,9 @@ func TestUpgradeCmd(t *testing.T) {
 			log.Fatal(err)
 		}
 		err = cmd.Flags().Set(flagSkipVerify, "true")
+		if err != nil {
+			log.Fatal(err)
+		}
 		commandInput := &upgradeInput{
 			streams,
 			cmd,
