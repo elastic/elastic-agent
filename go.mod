@@ -265,7 +265,7 @@ require (
 	github.com/elastic/go-elasticsearch/v7 v7.17.10 // indirect
 	github.com/elastic/go-grok v0.3.1 // indirect
 	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
-	github.com/elastic/go-seccomp-bpf v1.4.0 // indirect
+	github.com/elastic/go-seccomp-bpf v1.5.0 // indirect
 	github.com/elastic/go-sfdc v0.0.0-20241010131323-8e176480d727 // indirect
 	github.com/elastic/go-structform v0.0.12 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
