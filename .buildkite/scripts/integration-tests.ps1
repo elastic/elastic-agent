@@ -41,7 +41,7 @@ $env:SNAPSHOT = $true
 
 # Error handling setup for gotestsum execution
 $ErrorActionPreference = 'Continue'
-gotestsum --no-color -f standard-quiet --junitfile "build/${GROUP_NAME}.integration.xml" --jsonfile "build/${GROUP_NAME}.integration.out.json" --% -tags integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args "-integration.groups=$GROUP_NAME" "-integration.sudo=true"
+& gotestsum --no-color -f standard-quiet --junitfile "build/${GROUP_NAME}.integration.xml" --jsonfile "build/${GROUP_NAME}.integration.out.json" -- -tags integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args "-integration.groups=$GROUP_NAME" "-integration.sudo=true"
 $TESTS_EXIT_STATUS = $LASTEXITCODE
 $ErrorActionPreference = 'Stop'
 
