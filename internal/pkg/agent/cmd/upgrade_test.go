@@ -8,18 +8,19 @@ import (
 	"context"
 	"log"
 	"net"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+	clientmocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
 )
 
 func TestUpgradeCmd(t *testing.T) {
@@ -86,32 +87,12 @@ func TestUpgradeCmd(t *testing.T) {
 	})
 
 	t.Run("fail if fleet managed and unprivileged with --force flag", func(t *testing.T) {
-		var wg sync.WaitGroup
-		// Set up mock TCP server for gRPC connection
-		tcpServer, err := net.Listen("tcp", "127.0.0.1:")
-		require.NoError(t, err)
-		defer tcpServer.Close()
+		mockClient := clientmocks.NewClient(t)
 
-		s := grpc.NewServer()
-
-		// Define mock server and agent information
-		upgradeCh := make(chan struct{})
-		mock := &mockServer{upgradeStop: upgradeCh}
-		cproto.RegisterElasticAgentControlServer(s, mock)
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			err := s.Serve(tcpServer)
-			assert.NoError(t, err)
-		}()
-
-		// Create client and command
-		c := client.New(client.WithAddress("http://" + tcpServer.Addr().String()))
 		args := []string{"8.13.0"} // Version argument
 		streams := cli.NewIOStreams()
 		cmd := newUpgradeCommandWithArgs(args, streams)
-		err = cmd.Flags().Set(flagForce, "true")
+		err := cmd.Flags().Set(flagForce, "true")
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -121,62 +102,23 @@ func TestUpgradeCmd(t *testing.T) {
 			streams,
 			cmd,
 			args,
-			c,
+			mockClient,
 			client.AgentStateInfo{
 				IsManaged: true,
 			},
 			false,
 		}
 
-		term := make(chan int)
-		wg.Add(1)
-		// Execute upgrade command and validate shouldUpgrade error
-		go func() {
-			defer wg.Done()
-			err = upgradeCmdWithClient(commandInput)
+		err = upgradeCmdWithClient(commandInput)
 
-			// Expect an error due to unprivileged fleet-managed mode
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), nonRootExecutionError.Error())
-
-			// Verify counter has not incremented since upgrade should not proceed
-			counter := atomic.LoadInt32(&mock.upgrades)
-			assert.Equal(t, int32(0), counter, "server should not have handled any upgrades")
-			close(term)
-		}()
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			<-term
-			s.Stop()
-		}()
-
-		wg.Wait()
+		// Expect an error due to unprivileged fleet-managed mode
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), nonRootExecutionError.Error())
 	})
 
 	t.Run("fail if fleet managed privileged but no force flag", func(t *testing.T) {
-		var wg sync.WaitGroup
-		// Set up mock TCP server for gRPC connection
-		tcpServer, err := net.Listen("tcp", "127.0.0.1:")
-		require.NoError(t, err)
-		defer tcpServer.Close()
+		mockClient := clientmocks.NewClient(t)
 
-		s := grpc.NewServer()
-
-		// Define mock server and agent information
-		mock := &mockServer{}
-		cproto.RegisterElasticAgentControlServer(s, mock)
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			err := s.Serve(tcpServer)
-			assert.NoError(t, err)
-		}()
-
-		// Create client and command
-		c := client.New(client.WithAddress("http://" + tcpServer.Addr().String()))
 		args := []string{"8.13.0"} // Version argument
 		streams := cli.NewIOStreams()
 		cmd := newUpgradeCommandWithArgs(args, streams)
@@ -186,68 +128,28 @@ func TestUpgradeCmd(t *testing.T) {
 			streams,
 			cmd,
 			args,
-			c,
+			mockClient,
 			client.AgentStateInfo{IsManaged: true},
 			true,
 		}
 
-		term := make(chan int)
-		wg.Add(1)
-		// Execute upgrade command and validate shouldUpgrade error
-		go func() {
-			defer wg.Done()
-			err = upgradeCmdWithClient(commandInput)
+		err := upgradeCmdWithClient(commandInput)
 
-			// Expect an error due to unprivileged fleet-managed mode
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), unsupportedUpgradeError.Error())
-
-			// Verify counter has not incremented since upgrade should not proceed
-			counter := atomic.LoadInt32(&mock.upgrades)
-			assert.Equal(t, int32(0), counter, "server should not have handled any upgrades")
-			close(term)
-		}()
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			<-term
-			s.Stop()
-		}()
-
-		wg.Wait()
+		// Expect an error due to unprivileged fleet-managed mode
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), unsupportedUpgradeError.Error())
 	})
 
 	t.Run("proceed with upgrade if fleet managed, privileged, --force is set", func(t *testing.T) {
-		var wg sync.WaitGroup
-		// Set up mock TCP server for gRPC connection
-		tcpServer, err := net.Listen("tcp", "127.0.0.1:")
-		require.NoError(t, err)
-		defer tcpServer.Close()
+		mockClient := clientmocks.NewClient(t)
+		mockClient.EXPECT().State(mock.Anything).Return(&client.AgentState{State: cproto.State_HEALTHY}, nil)
+		mockClient.EXPECT().Upgrade(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("mockVersion", nil)
 
-		s := grpc.NewServer()
-
-		// Define mock server and agent information
-		upgradeCh := make(chan struct{})
-		mock := &mockServer{upgradeStop: upgradeCh}
-		cproto.RegisterElasticAgentControlServer(s, mock)
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			err := s.Serve(tcpServer)
-			assert.NoError(t, err)
-		}()
-
-		// Create client and command
-		c := client.New(client.WithAddress("http://" + tcpServer.Addr().String()))
-		err = c.Connect(context.Background())
-		assert.NoError(t, err)
 		args := []string{"8.13.0"} // Version argument
 		streams := cli.NewIOStreams()
 		cmd := newUpgradeCommandWithArgs(args, streams)
 		cmd.SetContext(context.Background())
-		err = cmd.Flags().Set(flagForce, "true")
+		err := cmd.Flags().Set(flagForce, "true")
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -256,143 +158,55 @@ func TestUpgradeCmd(t *testing.T) {
 			streams,
 			cmd,
 			args,
-			c,
+			mockClient,
 			client.AgentStateInfo{IsManaged: true},
 			true,
 		}
 
-		term := make(chan int)
-		wg.Add(1)
-		// Execute upgrade command and validate that there are no errors
-		go func() {
-			defer wg.Done()
-			err = upgradeCmdWithClient(commandInput)
+		err = upgradeCmdWithClient(commandInput)
 
-			assert.NoError(t, err)
-
-			// Verify counter is incremented
-			counter := atomic.LoadInt32(&mock.upgrades)
-			assert.Equal(t, int32(1), counter, "server should handle exactly one upgrade")
-
-			close(term)
-		}()
-
-		close(upgradeCh)
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			<-term
-			c.Disconnect()
-			s.Stop()
-		}()
-
-		wg.Wait()
+		assert.NoError(t, err)
 	})
 	t.Run("abort upgrade if the agent is fleet managed and skip-verify flag is set", func(t *testing.T) {
-		var wg sync.WaitGroup
-		// Set up mock TCP server for gRPC connection
-		tcpServer, err := net.Listen("tcp", "127.0.0.1:")
-		require.NoError(t, err)
-		defer tcpServer.Close()
+		mockClient := clientmocks.NewClient(t)
 
-		s := grpc.NewServer()
-
-		// Define mock server and agent information
-		upgradeCh := make(chan struct{})
-		mock := &mockServer{upgradeStop: upgradeCh}
-		cproto.RegisterElasticAgentControlServer(s, mock)
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			err := s.Serve(tcpServer)
-			assert.NoError(t, err)
-		}()
-
-		// Create client and command
-		c := client.New(client.WithAddress("http://" + tcpServer.Addr().String()))
-		err = c.Connect(context.Background())
-		assert.NoError(t, err)
 		args := []string{"8.13.0"} // Version argument
 		streams := cli.NewIOStreams()
 
 		cmd := newUpgradeCommandWithArgs(args, streams)
 		cmd.SetContext(context.Background())
-		err = cmd.Flags().Set(flagForce, "true")
+		err := cmd.Flags().Set(flagForce, "true")
 		if err != nil {
 			log.Fatal(err)
 		}
 		err = cmd.Flags().Set(flagSkipVerify, "true")
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		commandInput := &upgradeInput{
 			streams,
 			cmd,
 			args,
-			c,
+			mockClient,
 			client.AgentStateInfo{IsManaged: true},
 			true,
 		}
 
-		term := make(chan int)
-		wg.Add(1)
-		// Execute upgrade command and validate that there are no errors
-		go func() {
-			defer wg.Done()
-			err = upgradeCmdWithClient(commandInput)
+		err = upgradeCmdWithClient(commandInput)
 
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), skipVerifyNotAllowedError.Error())
-
-			// Verify counter is incremented
-			counter := atomic.LoadInt32(&mock.upgrades)
-			assert.Equal(t, int32(0), counter, "server should not handle any upgrades")
-
-			close(term)
-		}()
-
-		close(upgradeCh)
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			<-term
-			c.Disconnect()
-			s.Stop()
-		}()
-
-		wg.Wait()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), skipVerifyNotAllowedError.Error())
 	})
 	t.Run("abort upgrade if the agent is standalone, the user is unprivileged and skip-verify flag is set", func(t *testing.T) {
-		var wg sync.WaitGroup
-		// Set up mock TCP server for gRPC connection
-		tcpServer, err := net.Listen("tcp", "127.0.0.1:")
-		require.NoError(t, err)
-		defer tcpServer.Close()
+		mockClient := clientmocks.NewClient(t)
 
-		s := grpc.NewServer()
-
-		// Define mock server and agent information
-		upgradeCh := make(chan struct{})
-		mock := &mockServer{upgradeStop: upgradeCh}
-		cproto.RegisterElasticAgentControlServer(s, mock)
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			err := s.Serve(tcpServer)
-			assert.NoError(t, err)
-		}()
-
-		// Create client and command
-		c := client.New(client.WithAddress("http://" + tcpServer.Addr().String()))
-		err = c.Connect(context.Background())
-		assert.NoError(t, err)
 		args := []string{"8.13.0"} // Version argument
 		streams := cli.NewIOStreams()
 
 		cmd := newUpgradeCommandWithArgs(args, streams)
 		cmd.SetContext(context.Background())
-		err = cmd.Flags().Set(flagForce, "true")
+		err := cmd.Flags().Set(flagForce, "true")
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -404,111 +218,47 @@ func TestUpgradeCmd(t *testing.T) {
 			streams,
 			cmd,
 			args,
-			c,
+			mockClient,
 			client.AgentStateInfo{IsManaged: false},
 			false,
 		}
 
-		term := make(chan int)
-		wg.Add(1)
-		// Execute upgrade command and validate that there are no errors
-		go func() {
-			defer wg.Done()
-			err = upgradeCmdWithClient(commandInput)
+		err = upgradeCmdWithClient(commandInput)
 
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), skipVerifyNotRootError.Error())
-
-			// Verify counter is incremented
-			counter := atomic.LoadInt32(&mock.upgrades)
-			assert.Equal(t, int32(0), counter, "server should not handle any upgrades")
-
-			close(term)
-		}()
-
-		close(upgradeCh)
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			<-term
-			c.Disconnect()
-			s.Stop()
-		}()
-
-		wg.Wait()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), skipVerifyNotRootError.Error())
 	})
 	t.Run("proceed with upgrade if agent is standalone, user is privileged and skip-verify flag is set", func(t *testing.T) {
-		var wg sync.WaitGroup
-		// Set up mock TCP server for gRPC connection
-		tcpServer, err := net.Listen("tcp", "127.0.0.1:")
-		require.NoError(t, err)
-		defer tcpServer.Close()
+		mockClient := clientmocks.NewClient(t)
+		mockClient.EXPECT().State(mock.Anything).Return(&client.AgentState{State: cproto.State_HEALTHY}, nil)
+		mockClient.EXPECT().Upgrade(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("mockVersion", nil)
 
-		s := grpc.NewServer()
-
-		// Define mock server and agent information
-		upgradeCh := make(chan struct{})
-		mock := &mockServer{upgradeStop: upgradeCh}
-		cproto.RegisterElasticAgentControlServer(s, mock)
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			err := s.Serve(tcpServer)
-			assert.NoError(t, err)
-		}()
-
-		// Create client and command
-		c := client.New(client.WithAddress("http://" + tcpServer.Addr().String()))
-		err = c.Connect(context.Background())
-		assert.NoError(t, err)
 		args := []string{"8.13.0"} // Version argument
 		streams := cli.NewIOStreams()
 
 		cmd := newUpgradeCommandWithArgs(args, streams)
 		cmd.SetContext(context.Background())
-		err = cmd.Flags().Set(flagForce, "true")
+		err := cmd.Flags().Set(flagForce, "true")
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		err = cmd.Flags().Set(flagSkipVerify, "true")
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		commandInput := &upgradeInput{
 			streams,
 			cmd,
 			args,
-			c,
+			mockClient,
 			client.AgentStateInfo{IsManaged: false},
 			true,
 		}
 
-		term := make(chan int)
-		wg.Add(1)
-		// Execute upgrade command and validate that there are no errors
-		go func() {
-			defer wg.Done()
-			err = upgradeCmdWithClient(commandInput)
-
-			assert.NoError(t, err)
-
-			// Verify counter is incremented
-			counter := atomic.LoadInt32(&mock.upgrades)
-			assert.Equal(t, int32(1), counter, "server should handle exactly one upgrade")
-
-			close(term)
-		}()
-
-		close(upgradeCh)
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			<-term
-			c.Disconnect()
-			s.Stop()
-		}()
-
-		wg.Wait()
+		err = upgradeCmdWithClient(commandInput)
+		assert.NoError(t, err)
 	})
 }
 
