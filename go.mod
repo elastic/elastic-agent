@@ -9,7 +9,7 @@ require (
 	github.com/blakesmith/ar v0.0.0-20150311145944-8bd4349a67f2
 	github.com/cavaliergopher/rpm v1.2.0
 	github.com/cenkalti/backoff/v4 v4.3.0
-	github.com/docker/docker v27.2.1+incompatible
+	github.com/docker/docker v27.3.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
@@ -61,13 +61,8 @@ require (
 	go.elastic.co/apm/module/apmgrpc/v2 v2.6.0
 	go.elastic.co/apm/v2 v2.6.0
 	go.elastic.co/ecszap v1.0.2
-<<<<<<< HEAD
 	go.elastic.co/go-licence-detector v0.6.1
-	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.112.0
-=======
-	go.elastic.co/go-licence-detector v0.7.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.113.0
->>>>>>> 1fb4ad230f (build(deps): bump the otel-dependencies group across 1 directory with 97 updates (#5965))
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.28.0
 	golang.org/x/exp v0.0.0-20240904232852-e7e105dedf7e
@@ -152,12 +147,7 @@ require (
 	github.com/BurntSushi/toml v1.4.1-0.20240526193622-a339e1f7089c // indirect
 	github.com/Code-Hex/go-generics-cache v1.5.1 // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
-<<<<<<< HEAD
-	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.24.3 // indirect
-=======
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.25.0 // indirect
-	github.com/JohnCGriffin/overflow v0.0.0-20211019200055-46fa312c352c // indirect
->>>>>>> 1fb4ad230f (build(deps): bump the otel-dependencies group across 1 directory with 97 updates (#5965))
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.3.0 // indirect
@@ -201,20 +191,7 @@ require (
 	github.com/docker/docker-credential-helpers v0.7.0 // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-metrics v0.0.1 // indirect
-<<<<<<< HEAD
-	github.com/ebitengine/purego v0.8.0 // indirect
-=======
-	github.com/dop251/goja v0.0.0-20200831102558-9af81ddcf0e1 // indirect
-	github.com/dop251/goja_nodejs v0.0.0-20171011081505-adff31b136e6 // indirect
-	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/eapache/go-resiliency v1.7.0 // indirect
-	github.com/eapache/go-xerial-snappy v0.0.0-20230731223053-c322873962e3 // indirect
-	github.com/eapache/queue v1.1.0 // indirect
 	github.com/ebitengine/purego v0.8.1 // indirect
-	github.com/eclipse/paho.mqtt.golang v1.3.5 // indirect
-	github.com/elastic/bayeux v1.0.5 // indirect
-	github.com/elastic/go-concert v0.3.0 // indirect
->>>>>>> 1fb4ad230f (build(deps): bump the otel-dependencies group across 1 directory with 97 updates (#5965))
 	github.com/elastic/go-docappender/v2 v2.3.0 // indirect
 	github.com/elastic/go-elasticsearch/v7 v7.17.10 // indirect
 	github.com/elastic/go-grok v0.3.1 // indirect
@@ -273,12 +250,7 @@ require (
 	github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc // indirect
 	github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0 // indirect
-<<<<<<< HEAD
-	github.com/hashicorp/consul/api v1.29.5 // indirect
-=======
-	github.com/h2non/filetype v1.1.1 // indirect
 	github.com/hashicorp/consul/api v1.30.0 // indirect
->>>>>>> 1fb4ad230f (build(deps): bump the otel-dependencies group across 1 directory with 97 updates (#5965))
 	github.com/hashicorp/cronexpr v1.1.2 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
@@ -339,7 +311,6 @@ require (
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/locker v1.0.1 // indirect
 	github.com/moby/spdystream v0.4.0 // indirect
-	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/moby/term v0.5.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
@@ -394,13 +365,7 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.29 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect
-<<<<<<< HEAD
-	github.com/shirou/gopsutil/v4 v4.24.9 // indirect
-=======
-	github.com/shirou/gopsutil/v3 v3.24.5 // indirect
 	github.com/shirou/gopsutil/v4 v4.24.10 // indirect
-	github.com/shoenig/go-m1cpu v0.1.6 // indirect
->>>>>>> 1fb4ad230f (build(deps): bump the otel-dependencies group across 1 directory with 97 updates (#5965))
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/cast v1.6.0 // indirect

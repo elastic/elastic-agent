@@ -56,18 +56,7 @@ This section provides a summary of components included in the Elastic Distributi
 |---|---|
 | [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.13.0/processor/elasticinframetricsprocessor/README.md) | v0.13.0 |
 | [elastictraceprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elastictraceprocessor/v0.3.0/processor/elastictraceprocessor/README.md) | v0.3.0 |
-<<<<<<< HEAD
 | [lsmintervalprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/lsmintervalprocessor/v0.2.0/processor/lsmintervalprocessor/README.md) | v0.2.0 |
-| [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.112.0/processor/memorylimiterprocessor/README.md) | v0.112.0 |
-| [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.112.0/processor/attributesprocessor/README.md) | v0.112.0 |
-| [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.112.0/processor/filterprocessor/README.md) | v0.112.0 |
-| [k8sattributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/k8sattributesprocessor/v0.112.0/processor/k8sattributesprocessor/README.md) | v0.112.0 |
-| [resourcedetectionprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourcedetectionprocessor/v0.112.0/processor/resourcedetectionprocessor/README.md) | v0.112.0 |
-| [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.112.0/processor/resourceprocessor/README.md) | v0.112.0 |
-| [transformprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/transformprocessor/v0.112.0/processor/transformprocessor/README.md) | v0.112.0 |
-| [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.112.0/processor/batchprocessor/README.md) | v0.112.0 |
-=======
-| [lsmintervalprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/lsmintervalprocessor/v0.3.0/processor/lsmintervalprocessor/README.md) | v0.3.0 |
 | [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.113.0/processor/memorylimiterprocessor/README.md) | v0.113.0 |
 | [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.113.0/processor/attributesprocessor/README.md) | v0.113.0 |
 | [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.113.0/processor/filterprocessor/README.md) | v0.113.0 |
@@ -76,7 +65,6 @@ This section provides a summary of components included in the Elastic Distributi
 | [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.113.0/processor/resourceprocessor/README.md) | v0.113.0 |
 | [transformprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/transformprocessor/v0.113.0/processor/transformprocessor/README.md) | v0.113.0 |
 | [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.113.0/processor/batchprocessor/README.md) | v0.113.0 |
->>>>>>> 1fb4ad230f (build(deps): bump the otel-dependencies group across 1 directory with 97 updates (#5965))
 
 ### Extensions
 
@@ -92,56 +80,4 @@ This section provides a summary of components included in the Elastic Distributi
 | Component | Version |
 |---|---|
 | [signaltometricsconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/signaltometricsconnector/v0.3.0/connector/signaltometricsconnector/README.md) | v0.3.0 |
-<<<<<<< HEAD
-| [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.112.0/connector/spanmetricsconnector/README.md) | v0.112.0 |
-=======
 | [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.113.0/connector/spanmetricsconnector/README.md) | v0.113.0 |
-## Persistence in OpenTelemetry Collector
-
-By default, the OpenTelemetry Collector is stateless, which means it doesn't store offsets on disk while reading files. As a result, if you restart the collector, it won't retain the last read offset, potentially leading to data duplication or loss. However, we have configured persistence in the settings provided with the Elastic Agent package. 
-
-To enable persistence for the `filelogreceiver`, we add the `file_storage` extension and activate it for `filelog`. 
-Execute `export STATE_PATH=/path/to/store/otel/offsets` and use the following configuration to enable persistence:
-
-```yaml
-receivers:
-  filelog/platformlogs:
-    include: [ /var/log/system.log ]
-    start_at: beginning
-    storage: file_storage/filelogreceiver
-extensions:
-  file_storage/filelogreceiver:
-    directory: ${env:STATE_PATH}
-    create_directory: true
-exporters:
-  ...
-processors:
-  ...
-service:
-  extensions: [file_storage]
-  pipelines:
-    logs/platformlogs:
-      receivers: [filelog/platformlogs]
-      processors: [...]
-      exporters: [...]
-```
-
-> [!WARNING]  
-Removing the storage key from the filelog section will disable persistence, which will lead to data duplication or loss when the collector restarts.
-
-> [!IMPORTANT]  
-If you remove the `create_directory: true` option, you'll need to manually create a directory to store the data. You can ignore this option if the directory already exists.
-
-### Persistence in standalone Docker mode
-
-By default, when running Elastic Distribution for OpenTelemetry Collector in Docker, checkpoints are stored in `/usr/share/elastic-agent/otel_registry` by default. To ensure data persists across container restarts, you can use the following command:
-
-```bash
-docker run --rm -ti --entrypoint="elastic-agent" --mount type=bind,source=/path/on/host,target=/usr/share/elastic-agent/otel_registry  docker.elastic.co/beats/elastic-agent:9.0.0-SNAPSHOT otel
-```
-
-### Known issues:
--  You face following `failed to build extensions: failed to create extension "file_storage/filelogreceiver": mkdir ...: permission denied` error while running the otel mode
-	- Cause: This issue is likely because the user running the executable lacks sufficient permissions to create the directory.
-	- Resolution: You can either create the directory manually or specify a path with necessary permissions.
->>>>>>> 1fb4ad230f (build(deps): bump the otel-dependencies group across 1 directory with 97 updates (#5965))
