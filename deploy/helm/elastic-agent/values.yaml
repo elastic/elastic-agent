@@ -450,8 +450,6 @@ agent:
           logs: true
           metrics: true
       providers:
-        kubernetes_leaderelection:
-          enabled: false
         kubernetes:
           node: ${NODE_NAME}
           scope: node
@@ -481,7 +479,5 @@ agent:
           logs: true
           metrics: true
       providers:
-        kubernetes_leaderelection:
-          enabled: false
         kubernetes:
           enabled: false
