@@ -36,7 +36,7 @@ const (
 )
 
 var (
-	unsupportedUpgradeError   error = errors.New("this agent is Fleet managed and must be upgraded using Fleet")
+	unsupportedUpgradeError   error = errors.New("this agent is fleet managed and must be upgraded using Fleet")
 	nonRootExecutionError           = errors.New("upgrade command needs to be executed as root for fleet managed agents")
 	skipVerifyNotAllowedError       = errors.New(fmt.Sprintf("\"%s\" flag is not allowed when upgrading a fleet managed agent using the cli", flagSkipVerify))
 	skipVerifyNotRootError          = errors.New(fmt.Sprintf("user needs to be root to use \"%s\" flag when upgrading standalone agents", flagSkipVerify))
