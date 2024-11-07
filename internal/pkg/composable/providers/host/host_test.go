@@ -12,11 +12,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	testlogger "github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/features"
 )
 
@@ -170,11 +170,12 @@ func returnHostMapping(log *logger.Logger) infoFetcher {
 }
 
 func TestGetHostInfoReturnsSomeKeys(t *testing.T) {
+	l, _ := testlogger.New(t.Name())
 	// this is a simple test to ensure the host provider returns the new keys
 	// needed to add support to Debian 12.
-	osInfo, err := getHostInfo(logp.L())()
+	osInfo, err := getHostInfo(l)()
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("could not get host provider variables: %s", err)
 	}
 
 	expectedKeys := []string{"os_family", "os_platform", "os_version"}
