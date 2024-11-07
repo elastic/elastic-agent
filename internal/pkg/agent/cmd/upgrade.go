@@ -89,7 +89,7 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 
 	err := c.Connect(ctx)
 	if err != nil {
-		return errors.New(err, "Failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
+		return errors.New(err, "failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
 	}
 	defer c.Disconnect()
 	state, err := c.State(cmd.Context())
