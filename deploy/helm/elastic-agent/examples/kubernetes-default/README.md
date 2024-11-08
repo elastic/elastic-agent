@@ -36,6 +36,7 @@ helm install elastic-agent ../../ \
      --set 'agent.imagePullSecrets[0].name=regcred' \
      --set outputs.default.type=ESSecretAuthAPI \
      --set outputs.default.secretName=es-api-secret
+```
 
 ## Validate:
 

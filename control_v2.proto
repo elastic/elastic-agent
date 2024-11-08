@@ -169,6 +169,8 @@ message StateAgentInfo {
   int32 pid = 6;
   // True when running as unprivileged.
   bool unprivileged = 7;
+  // True when agent is managed by fleet
+  bool isManaged = 8;
 }
 
 // StateResponse is the current state of Elastic Agent.
