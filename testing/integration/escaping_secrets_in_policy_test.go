@@ -55,11 +55,11 @@ func TestEscapingSecretsInPolicy(t *testing.T) {
 	pkgPolId := uuid.Must(uuid.NewV4()).String()
 
 	templateVars := struct {
-		policyId    string
-		pkgPolicyId string
+		PolicyId    string
+		PkgPolicyId string
 	}{
-		policyId:    policyResp.AgentPolicy.ID,
-		pkgPolicyId: pkgPolId,
+		PolicyId:    policyResp.AgentPolicy.ID,
+		PkgPolicyId: pkgPolId,
 	}
 
 	var tmplBuf bytes.Buffer
