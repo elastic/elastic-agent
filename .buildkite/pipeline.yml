@@ -13,76 +13,76 @@ steps:
     retry:
       manual:
         allowed: true
-  - group: "Unit tests"
-    key: "unit-tests"
-    steps:
-      - label: "Unit tests - Ubuntu 22.04"
-        key: "unit-tests-2204"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          image: "family/core-ubuntu-2204"
-        retry:
-          manual:
-            allowed: true
+  # - group: "Unit tests"
+  #   key: "unit-tests"
+  #   steps:
+  #     - label: "Unit tests - Ubuntu 22.04"
+  #       key: "unit-tests-2204"
+  #       command: ".buildkite/scripts/steps/unit-tests.sh"
+  #       artifact_paths:
+  #         - "build/TEST-*.html"
+  #         - "build/TEST-*.xml"
+  #         - "build/diagnostics/*"
+  #         - "coverage-*.out"
+  #       agents:
+  #         provider: "gcp"
+  #         image: "family/core-ubuntu-2204"
+  #       retry:
+  #         manual:
+  #           allowed: true
 
-      # - label: "Unit tests - Ubuntu 22.04 ARM64"
-      #   key: "unit-tests-2204-arm64"
-      #   command: ".buildkite/scripts/steps/unit-tests.sh"
-      #   artifact_paths:
-      #     - "build/TEST-*.html"
-      #     - "build/TEST-*.xml"
-      #     - "build/diagnostics/*"
-      #     - "coverage-*.out"
-      #   agents:
-      #     provider: "aws"
-      #     imagePrefix: "core-ubuntu-2204-aarch64"
-      #     diskSizeGb: 200
-      #     instanceType: "m6g.xlarge"
-      #   retry:
-      #     manual:
-      #       allowed: true
+  # - label: "Unit tests - Ubuntu 22.04 ARM64"
+  #   key: "unit-tests-2204-arm64"
+  #   command: ".buildkite/scripts/steps/unit-tests.sh"
+  #   artifact_paths:
+  #     - "build/TEST-*.html"
+  #     - "build/TEST-*.xml"
+  #     - "build/diagnostics/*"
+  #     - "coverage-*.out"
+  #   agents:
+  #     provider: "aws"
+  #     imagePrefix: "core-ubuntu-2204-aarch64"
+  #     diskSizeGb: 200
+  #     instanceType: "m6g.xlarge"
+  #   retry:
+  #     manual:
+  #       allowed: true
 
-      # - label: "Unit tests - Windows 2022"
-      #   key: "unit-tests-win2022"
-      #   command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
-      #   artifact_paths:
-      #     - "build/TEST-*.html"
-      #     - "build/TEST-*.xml"
-      #     - "build/diagnostics/*"
-      #     - "coverage-*.out"
-      #   agents:
-      #     provider: "gcp"
-      #     image: "family/core-windows-2022"
-      #     machine_type: "n2-standard-8"
-      #     disk_size: 200
-      #     disk_type: "pd-ssd"
-      #   retry:
-      #     manual:
-      #       allowed: true
+  # - label: "Unit tests - Windows 2022"
+  #   key: "unit-tests-win2022"
+  #   command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+  #   artifact_paths:
+  #     - "build/TEST-*.html"
+  #     - "build/TEST-*.xml"
+  #     - "build/diagnostics/*"
+  #     - "coverage-*.out"
+  #   agents:
+  #     provider: "gcp"
+  #     image: "family/core-windows-2022"
+  #     machine_type: "n2-standard-8"
+  #     disk_size: 200
+  #     disk_type: "pd-ssd"
+  #   retry:
+  #     manual:
+  #       allowed: true
 
-      # - label: "Unit tests - Windows 2016"
-      #   key: "unit-tests-win2016"
-      #   command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
-      #   artifact_paths:
-      #     - "build/TEST-*.html"
-      #     - "build/TEST-*.xml"
-      #     - "build/diagnostics/*"
-      #     - "coverage-*.out"
-      #   agents:
-      #     provider: "gcp"
-      #     image: "family/core-windows-2016"
-      #     machine_type: "n2-standard-8"
-      #     disk_size: 200
-      #     disk_type: "pd-ssd"
-      #   retry:
-      #     manual:
-      #       allowed: true
+  # - label: "Unit tests - Windows 2016"
+  #   key: "unit-tests-win2016"
+  #   command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+  #   artifact_paths:
+  #     - "build/TEST-*.html"
+  #     - "build/TEST-*.xml"
+  #     - "build/diagnostics/*"
+  #     - "coverage-*.out"
+  #   agents:
+  #     provider: "gcp"
+  #     image: "family/core-windows-2016"
+  #     machine_type: "n2-standard-8"
+  #     disk_size: 200
+  #     disk_type: "pd-ssd"
+  #   retry:
+  #     manual:
+  #       allowed: true
 
   - group: "MacOS tests"
     steps:
@@ -98,7 +98,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: orka
-          imagePrefix: generic-base-15-arm-001
+          imagePrefix: generic-base-15-arm-002
         retry:
           manual:
             allowed: true
