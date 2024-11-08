@@ -169,8 +169,7 @@ func New(t *testing.T, optns ...Option) *Proxy {
 		opts:       opts,
 		client:     opts.client,
 		log: slog.New(slog.NewTextHandler(logfWriter(opts.logFn), &slog.HandlerOptions{
-			AddSource: true,
-			Level:     lv,
+			Level: lv,
 		})),
 	}
 	if opts.capriv != nil && opts.cacert != nil {
@@ -295,6 +294,10 @@ func (p *Proxy) processRequest(r *http.Request) (*http.Response, error) {
 	case p.opts.rewriteHost != nil:
 		r.URL.Host = p.opts.rewriteHost(r.URL.Host)
 	}
+
+	// It should not be required, however if not set, enroll will fail with
+	// "Unknown resource"
+	r.Host = r.URL.Host
 
 	p.log.Debug(fmt.Sprintf("original URL: %s, new URL: %s",
 		origURL, r.URL.String()))
