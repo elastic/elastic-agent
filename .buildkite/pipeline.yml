@@ -90,7 +90,6 @@ steps:
     steps:
       - label: "Unit tests - MacOS 15 ARM"
         command: ".buildkite/scripts/steps/unit-tests.sh"
-        branches: main
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -106,6 +105,7 @@ steps:
       # Runs only on the main branch
       - label: "Unit tests - MacOS 13"
         command: ".buildkite/scripts/steps/unit-tests.sh"
+        branches: main
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
