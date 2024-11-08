@@ -24,6 +24,8 @@ go install gotest.tools/gotestsum
 # tree "C:\Users\Buildkite\.go\go-1.22.8\packages\bin"
 gotestsum --version
 
+$PSVersionTable.PSVersion
+
 gotestsum --no-color -f standard-quiet --junitfile "build/${GROUP_NAME}.integration.xml" --jsonfile "build/${GROUP_NAME}.integration.out.json" -- "-tags=integration" "-test.shuffle=on" "-test.timeout=2h0m0s" "github.com/elastic/elastic-agent/testing/integration" -v "-args -integration.groups=$GROUP_NAME -integration.sudo=true"
 
 # # Read package version from .package-version file
