@@ -34,8 +34,8 @@ spec:
   {{- end -}}
   {{- end }}
   deployment:
-    {{- with ($presetVal).replicaCount }}
-    replicas: {{ . }}
+    {{- if hasKey $presetVal "replicaCount" }}
+    replicas: {{ ($presetVal).replicaCount }}
     {{- end }}
     podTemplate:
 {{- toYaml ($podTemplateResource).template | nindent 6 }}
