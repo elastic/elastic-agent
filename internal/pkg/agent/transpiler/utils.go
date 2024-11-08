@@ -26,7 +26,7 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 	nodesMap := map[string]*Dict{}
 	for _, vars := range varsArray {
 		for _, node := range l.Value().([]Node) {
-			dict, ok := node.Clone().(*Dict)
+			dict, ok := node.(*Dict)
 			if !ok {
 				continue
 			}
