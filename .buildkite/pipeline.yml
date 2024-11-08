@@ -103,20 +103,20 @@ steps:
           manual:
             allowed: true
 
-      # - label: "Unit tests - MacOS 15"
-      #   key: "unit-tests-macos-15"
-      #   command: ".buildkite/scripts/steps/unit-tests.sh"
-      #   artifact_paths:
-      #     - "build/TEST-*.html"
-      #     - "build/TEST-*.xml"
-      #     - "build/diagnostics/*"
-      #     - "coverage-*.out"
-      #   agents:
-      #     provider: orka
-      #     imagePrefix: generic-base-15-x86-2
-      #   retry:
-      #     manual:
-      #       allowed: true
+      - label: "Unit tests - MacOS 15"
+        key: "unit-tests-macos-15"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: orka
+          imagePrefix: generic-base-15-x86_64-001
+        retry:
+          manual:
+            allowed: true
 
   # - group: "Desktop Windows tests"
   #   key: "extended-windows"
