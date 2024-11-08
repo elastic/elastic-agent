@@ -1304,7 +1304,7 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		configInjector = c.monitorMgr.MonitoringConfig
 	}
 
-	var existingCompState = make(map[string]uint64, len(c.state.Components))
+	existingCompState := make(map[string]uint64, len(c.state.Components))
 	for _, comp := range c.state.Components {
 		existingCompState[comp.Component.ID] = comp.State.Pid
 	}
