@@ -33,38 +33,18 @@ extraIntegrations:
 agent:
   presets:
     nginx:
+      annotations:
+        elastic-agent.k8s.elastic.co/preset: nginx
       mode: deployment
       securityContext:
         runAsUser: 0
       serviceAccount:
         create: true
+        annotations:
+          elastic-agent.k8s.elastic.co/sa: nginx
       clusterRole:
-        create: true
-        rules:
-          # minimum cluster role ruleset required by agent
-          - apiGroups: [ "" ]
-            resources:
-              - nodes
-              - namespaces
-              - pods
-            verbs:
-              - get
-              - watch
-              - list
-          - apiGroups: [ "apps" ]
-            resources:
-              - replicasets
-            verbs:
-              - get
-              - list
-              - watch
-          - apiGroups: [ "batch" ]
-            resources:
-              - jobs
-            verbs:
-              - get
-              - list
-              - watch
+        create: false
+        name: user-cr
       providers:
         kubernetes_leaderelection:
           enabled: false
