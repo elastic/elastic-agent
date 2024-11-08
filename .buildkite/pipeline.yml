@@ -102,10 +102,10 @@ steps:
           manual:
             allowed: true
 
-      # Runs only on the main branch
+      # Runs only on main and release branches
       - label: "Unit tests - MacOS 13"
         command: ".buildkite/scripts/steps/unit-tests.sh"
-        branches: main
+        branches: "main 8.x 8.16 9.*"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
