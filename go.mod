@@ -1,6 +1,10 @@
 module github.com/elastic/elastic-agent
 
+<<<<<<< HEAD
 go 1.22.4
+=======
+go 1.22.9
+>>>>>>> 92e4906915 (Add go.mod full version support to updatecli (#5979))
 
 require (
 	github.com/Jeffail/gabs/v2 v2.6.0
