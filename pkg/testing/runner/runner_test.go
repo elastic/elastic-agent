@@ -28,7 +28,7 @@ func TestNewRunner_Clean(t *testing.T) {
 		AgentVersion: "8.10.0",
 		StackVersion: "8.10.0-SNAPSHOT",
 		BuildDir:     filepath.Join(tmpdir, "build"),
-		GOVersion:    "1.23.2",
+		GOVersion:    "1.23.3",
 		RepoDir:      filepath.Join(tmpdir, "repo"),
 		StateDir:     stateDir,
 		ExtraEnv:     nil,
