@@ -2,8 +2,9 @@ param (
     [string]$GROUP_NAME
 )
 
-Write-Output "~~~ Receiving ESS stack metadata"
 pwsh
+$PSVersionTable.PSVersion
+Write-Output "~~~ Receiving ESS stack metadata"
 # Retrieve metadata and set environment variables
 $env:ELASTICSEARCH_HOST = & buildkite-agent meta-data get "es.host"
 $env:ELASTICSEARCH_USERNAME = & buildkite-agent meta-data get "es.username"
@@ -51,7 +52,6 @@ $env:SNAPSHOT = $true
 # $encodedCommand = [Convert]::ToBase64String($bytes)
 # pwsh -encodedcommand $encodedCommand
 
-# Use Start-Process to execute the command in PowerShell 5.1
 $ErrorActionPreference = 'Continue'
 # Start-Process -FilePath "gotestsum" -ArgumentList $arguments -NoNewWindow -Wait
 # Start-Process -FilePath "go" -ArgumentList $arguments -NoNewWindow -Wait
