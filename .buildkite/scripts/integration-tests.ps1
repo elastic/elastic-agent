@@ -3,7 +3,7 @@ param (
 )
 
 Write-Output "~~~ Receiving ESS stack metadata"
-
+pwsh
 # Retrieve metadata and set environment variables
 $env:ELASTICSEARCH_HOST = & buildkite-agent meta-data get "es.host"
 $env:ELASTICSEARCH_USERNAME = & buildkite-agent meta-data get "es.username"
