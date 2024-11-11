@@ -36,20 +36,19 @@ $env:SNAPSHOT = $true
 # Error handling setup for gotestsum execution
 
 $arguments = @(
-    "--no-color"
-    "-f", "standard-quiet"
-    "--junitfile", "build/${GROUP_NAME}.integration.xml"
-    "--jsonfile", "build/${GROUP_NAME}.integration.out.json"
-    "--", "-tags=integration"
+    "test"
+    "-tags=integration"
     "-test.shuffle=on"
     "-test.timeout=2h0m0s"
     "github.com/elastic/elastic-agent/testing/integration"
     "-v"
-    "-args", "-integration.groups=$GROUP_NAME", "-integration.sudo=true"
+    "-args", "-integration.groups=default", "-integration.sudo=true"
 )
 
+# Use Start-Process to execute the command in PowerShell 5.1
 $ErrorActionPreference = 'Continue'
-Start-Process -FilePath "gotestsum" -ArgumentList $arguments -NoNewWindow -Wait
+# Start-Process -FilePath "gotestsum" -ArgumentList $arguments -NoNewWindow -Wait
+Start-Process -FilePath "go" -ArgumentList $arguments -NoNewWindow -Wait
 $TESTS_EXIT_STATUS = $LASTEXITCODE
 $ErrorActionPreference = 'Stop'
 
