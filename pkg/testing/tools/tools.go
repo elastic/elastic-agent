@@ -74,9 +74,10 @@ func InstallAgentWithPolicy(ctx context.Context, t *testing.T,
 	return policy, err
 }
 
-// InstallAgentForPolicy enrolls the provided agent fixture in Fleet using the
-// default Fleet Server, waits for the agent to come online, and returns either
-// an error or nil.
+// InstallAgentForPolicy enrolls the provided agent fixture with Fleet. If
+// either the enroll URL or the enrollmentToken is empty, they'll be generated
+// using the default fleet-server. Then if delay enroll isn't set it waits for
+// the agent to come online, otherwise it returns immediately.
 // If the context (ctx) has a deadline, it will wait for the agent to become
 // online until the deadline of the context, or if not, a default 5-minute
 // deadline will be applied.
@@ -92,31 +93,32 @@ func InstallAgentForPolicy(ctx context.Context, t *testing.T,
 		PolicyID: policyID,
 	}
 
-	t.Logf("Creating enrollment API key...")
-	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(ctx, createEnrollmentAPIKeyReq)
-	if err != nil {
-		return fmt.Errorf("unable to create enrollment API key: %w", err)
+	if installOpts.EnrollmentToken == "" {
+		t.Logf("Creating enrollment API key...")
+		enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(ctx, createEnrollmentAPIKeyReq)
+		if err != nil {
+			return fmt.Errorf("failed creating enrollment API key: %w", err)
+		}
+
+		installOpts.EnrollmentToken = enrollmentToken.APIKey
 	}
 
-	// Get default Fleet Server URL
-	fleetServerURL, err := fleettools.DefaultURL(ctx, kibClient)
-	if err != nil {
-		return fmt.Errorf("unable to get default Fleet Server URL: %w", err)
-	}
+	if installOpts.URL == "" {
+		fleetServerURL, err := fleettools.DefaultURL(ctx, kibClient)
+		if err != nil {
+			return fmt.Errorf("failed getting fleet server URL: %w", err)
+		}
 
-	// Enroll agent
-	t.Logf("Unpacking and installing Elastic Agent")
-	installOpts.EnrollOpts = atesting.EnrollOpts{
-		URL:             fleetServerURL,
-		EnrollmentToken: enrollmentToken.APIKey,
+		installOpts.URL = fleetServerURL
 	}
 
 	output, err := agentFixture.Install(ctx, &installOpts)
 	if err != nil {
 		t.Log(string(output))
-		return fmt.Errorf("unable to enroll Elastic Agent: %w", err)
+		return fmt.Errorf("failed installing the agent: %w", err)
 	}
-	t.Logf(">>> Ran Enroll. Output: %s", output)
+
+	t.Logf(">>> Enroll succeeded. Output: %s", output)
 
 	timeout := 10 * time.Minute
 	if deadline, ok := ctx.Deadline(); ok {
@@ -136,6 +138,5 @@ func InstallAgentForPolicy(ctx context.Context, t *testing.T,
 		10*time.Second,
 		"Elastic Agent status is not online",
 	)
-
 	return nil
 }

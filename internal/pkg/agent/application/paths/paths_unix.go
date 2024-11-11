@@ -33,7 +33,7 @@ func initialControlSocketPath(topPath string) string {
 }
 
 // ResolveControlSocket does nothing on non-Windows hosts.
-func ResolveControlSocket() {}
+func ResolveControlSocket(_ bool) {}
 
 // HasPrefix tests if the path starts with the prefix.
 func HasPrefix(path string, prefix string) bool {

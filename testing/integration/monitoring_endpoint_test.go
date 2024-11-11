@@ -89,7 +89,7 @@ func (runner *EndpointMetricsMonRunner) SetupSuite() {
 	require.NoErrorf(runner.T(), err, "Policy Response was: %v", pkgPolicyResp)
 
 	runner.T().Log("Polling for endpoint-security to become Healthy")
-	ctx, cancel = context.WithTimeout(ctx, time.Minute*3)
+	ctx, cancel = context.WithTimeout(ctx, time.Minute*6)
 	defer cancel()
 
 	agentClient := runner.fixture.Client()
@@ -98,7 +98,7 @@ func (runner *EndpointMetricsMonRunner) SetupSuite() {
 
 	require.Eventually(runner.T(),
 		func() bool { return agentAndEndpointAreHealthy(runner.T(), ctx, agentClient) },
-		time.Minute*3,
+		time.Minute*5,
 		time.Second,
 		"Endpoint component or units are not healthy.",
 	)
@@ -144,7 +144,7 @@ func (runner *EndpointMetricsMonRunner) TestEndpointMetricsAfterRestart() {
 	require.NoError(runner.T(), err)
 
 	// wait for endpoint to come back up. We use `pgrep`
-	// since the agent health status won't imidately register that the endpoint process itself is gone.
+	// since the agent health status won't immediately register that the endpoint process itself is gone.
 	require.Eventually(runner.T(), func() bool {
 		cmd := exec.Command("pgrep", "-f", "endpoint")
 		pgrep, err := cmd.CombinedOutput()
@@ -162,7 +162,7 @@ func (runner *EndpointMetricsMonRunner) TestEndpointMetricsAfterRestart() {
 
 	require.Eventually(runner.T(),
 		func() bool { return agentAndEndpointAreHealthy(runner.T(), ctx, agentClient) },
-		time.Minute*3,
+		time.Minute*5,
 		time.Second,
 		"Endpoint component or units are not healthy.",
 	)

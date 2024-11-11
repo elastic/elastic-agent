@@ -69,12 +69,6 @@ stringData:
         metrics: true
         namespace: default
         use_output: default
-    providers:
-      kubernetes:
-        node: ${NODE_NAME}
-        scope: cluster
-      kubernetes_leaderelection:
-        enabled: true
     inputs:
       - data_stream:
           namespace: default
@@ -120,6 +114,13 @@ stringData:
           - nginx-stubstatus
         type: nginx/metrics
         use_output: default
+    providers:
+      kubernetes:
+        node: ${NODE_NAME}
+        scope: cluster
+      kubernetes_leaderelection:
+        enabled: true
+        leader_lease: example-clusterwide
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -152,11 +153,6 @@ stringData:
         metrics: true
         namespace: default
         use_output: default
-    providers:
-      kubernetes:
-        enabled: false
-      kubernetes_leaderelection:
-        enabled: false
     inputs:
       - data_stream:
           namespace: default
@@ -414,6 +410,12 @@ stringData:
           period: 10s
         type: kubernetes/metrics
         use_output: default
+    providers:
+      kubernetes:
+        enabled: false
+      kubernetes_leaderelection:
+        enabled: false
+        leader_lease: example-ksmsharded
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -446,14 +448,6 @@ stringData:
         metrics: true
         namespace: default
         use_output: default
-    providers:
-      kubernetes:
-        hints:
-          enabled: true
-        node: ${NODE_NAME}
-        scope: node
-      kubernetes_leaderelection:
-        enabled: false
     inputs:
       - data_stream:
           namespace: default
@@ -461,6 +455,7 @@ stringData:
         streams:
         - data_stream:
             dataset: kubernetes.container_logs
+            type: logs
           id: kubernetes-container-logs-${kubernetes.pod.name}-${kubernetes.container.id}
           parsers:
           - container:
@@ -598,6 +593,15 @@ stringData:
           ssl.verification_mode: none
         type: kubernetes/metrics
         use_output: default
+    providers:
+      kubernetes:
+        hints:
+          enabled: true
+        node: ${NODE_NAME}
+        scope: node
+      kubernetes_leaderelection:
+        enabled: false
+        leader_lease: example-pernode
 ---
 # Source: elastic-agent/templates/agent/cluster-role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -1116,119 +1120,119 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: f81171bdf0eed2d3bc8492050be0e6763188e3731e5cfc2b675f6ad8810c6fb7
-
+        checksum/config: 0df24cb5f7362916ba8cb10621b123918f22f52a7ce9f0b0514c5983de6d06f3
     spec:
-      dnsPolicy: ClusterFirstWithHostNet
       automountServiceAccountToken: true
+      containers:
+      - args:
+        - -c
+        - /etc/elastic-agent/agent.yml
+        - -e
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: STATE_PATH
+          value: /usr/share/elastic-agent/state
+        - name: ELASTIC_NETINFO
+          value: "false"
+        image: docker.elastic.co/beats/elastic-agent:8.17.0-SNAPSHOT
+        imagePullPolicy: IfNotPresent
+        name: agent
+        resources:
+          limits:
+            memory: 1000Mi
+          requests:
+            cpu: 100m
+            memory: 400Mi
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /hostfs/proc
+          name: proc
+          readOnly: true
+        - mountPath: /hostfs/sys/fs/cgroup
+          name: cgroup
+          readOnly: true
+        - mountPath: /var/lib/docker/containers
+          name: varlibdockercontainers
+          readOnly: true
+        - mountPath: /var/log
+          name: varlog
+          readOnly: true
+        - mountPath: /hostfs/etc
+          name: etc-full
+          readOnly: true
+        - mountPath: /hostfs/var/lib
+          name: var-lib
+          readOnly: true
+        - mountPath: /usr/share/elastic-agent/state/inputs.d
+          name: external-inputs
+        - mountPath: /usr/share/elastic-agent/state
+          name: agent-data
+        - mountPath: /etc/elastic-agent/agent.yml
+          name: config
+          readOnly: true
+          subPath: agent.yml
+      dnsPolicy: ClusterFirstWithHostNet
+      initContainers:
+      - args:
+        - -c
+        - mkdir -p /etc/elastic-agent/inputs.d && mkdir -p /etc/elastic-agent/inputs.d
+          && wget -O - https://github.com/elastic/elastic-agent/archive/v8.17.0.tar.gz
+          | tar xz -C /etc/elastic-agent/inputs.d --strip=5 "elastic-agent-8.17.0/deploy/kubernetes/elastic-agent-standalone/templates.d"
+        command:
+        - sh
+        image: busybox:1.36.1
+        name: k8s-templates-downloader
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          runAsGroup: 1000
+          runAsUser: 1000
+        volumeMounts:
+        - mountPath: /etc/elastic-agent/inputs.d
+          name: external-inputs
       nodeSelector:
         kubernetes.io/os: linux
       serviceAccountName: agent-pernode-example
       volumes:
-        - hostPath:
-            path: /proc
-          name: proc
-        - hostPath:
-            path: /sys/fs/cgroup
-          name: cgroup
-        - hostPath:
-            path: /var/lib/docker/containers
-          name: varlibdockercontainers
-        - hostPath:
-            path: /var/log
-          name: varlog
-        - hostPath:
-            path: /etc
-          name: etc-full
-        - hostPath:
-            path: /var/lib
-          name: var-lib
-        - emptyDir: {}
-          name: external-inputs
-        - name: agent-data
-          hostPath:
-            
-            path: /etc/elastic-agent/default/agent-pernode-example/state
-            type: DirectoryOrCreate
-        
-        - name: config
-          secret:
-            defaultMode: 0444
-            secretName: agent-pernode-example
-      initContainers:
-        - args:
-          - -c
-          - mkdir -p /etc/elastic-agent/inputs.d && mkdir -p /etc/elastic-agent/inputs.d &&
-            wget -O - https://github.com/elastic/elastic-agent/archive/v8.17.0.tar.gz | tar
-            xz -C /etc/elastic-agent/inputs.d --strip=5 "elastic-agent-8.17.0/deploy/kubernetes/elastic-agent-standalone/templates.d"
-          command:
-          - sh
-          image: busybox:1.36.1
-          name: k8s-templates-downloader
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-              - ALL
-            privileged: false
-            runAsGroup: 1000
-            runAsUser: 1000
-          volumeMounts:
-          - mountPath: /etc/elastic-agent/inputs.d
-            name: external-inputs
-      containers:
-        - name: agent
-          imagePullPolicy: IfNotPresent
-          image: "docker.elastic.co/beats/elastic-agent:8.17.0-SNAPSHOT"
-          args: ["-c", "/etc/elastic-agent/agent.yml", "-e"]
-          securityContext:
-            runAsUser: 0
-          resources:
-            limits:
-              memory: 1000Mi
-            requests:
-              cpu: 100m
-              memory: 400Mi
-          volumeMounts:
-            - mountPath: /hostfs/proc
-              name: proc
-              readOnly: true
-            - mountPath: /hostfs/sys/fs/cgroup
-              name: cgroup
-              readOnly: true
-            - mountPath: /var/lib/docker/containers
-              name: varlibdockercontainers
-              readOnly: true
-            - mountPath: /var/log
-              name: varlog
-              readOnly: true
-            - mountPath: /hostfs/etc
-              name: etc-full
-              readOnly: true
-            - mountPath: /hostfs/var/lib
-              name: var-lib
-              readOnly: true
-            - mountPath: /usr/share/elastic-agent/state/inputs.d
-              name: external-inputs
-            - name: agent-data
-              mountPath: /usr/share/elastic-agent/state
-            - name: config
-              mountPath: /etc/elastic-agent/agent.yml
-              readOnly: true
-              subPath: agent.yml
-          env:
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: STATE_PATH
-              value: "/usr/share/elastic-agent/state"
-            - name: ELASTIC_NETINFO
-              value: "false"
+      - hostPath:
+          path: /proc
+        name: proc
+      - hostPath:
+          path: /sys/fs/cgroup
+        name: cgroup
+      - hostPath:
+          path: /var/lib/docker/containers
+        name: varlibdockercontainers
+      - hostPath:
+          path: /var/log
+        name: varlog
+      - hostPath:
+          path: /etc
+        name: etc-full
+      - hostPath:
+          path: /var/lib
+        name: var-lib
+      - emptyDir: {}
+        name: external-inputs
+      - hostPath:
+          path: /etc/elastic-agent/default/agent-pernode-example/state
+          type: DirectoryOrCreate
+        name: agent-data
+      - name: config
+        secret:
+          defaultMode: 292
+          secretName: agent-pernode-example
 ---
 # Source: elastic-agent/templates/agent/k8s/deployment.yaml
 apiVersion: apps/v1
@@ -1251,55 +1255,56 @@ spec:
       labels:
         name: agent-clusterwide-example
       annotations:
-        checksum/config: b04d7965af8739293cd90e352c59d1240473f56febd9aded16ba766d77f90b5f
-
+        checksum/config: 4425148664b320184754e6ab2438144cdda5ec331ba76501a4264ddcab801623
     spec:
-      dnsPolicy: ClusterFirstWithHostNet
       automountServiceAccountToken: true
+      containers:
+      - args:
+        - -c
+        - /etc/elastic-agent/agent.yml
+        - -e
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: STATE_PATH
+          value: /usr/share/elastic-agent/state
+        - name: ELASTIC_NETINFO
+          value: "false"
+        image: docker.elastic.co/beats/elastic-agent:8.17.0-SNAPSHOT
+        imagePullPolicy: IfNotPresent
+        name: agent
+        resources:
+          limits:
+            memory: 800Mi
+          requests:
+            cpu: 100m
+            memory: 400Mi
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /usr/share/elastic-agent/state
+          name: agent-data
+        - mountPath: /etc/elastic-agent/agent.yml
+          name: config
+          readOnly: true
+          subPath: agent.yml
+      dnsPolicy: ClusterFirstWithHostNet
       nodeSelector:
         kubernetes.io/os: linux
       serviceAccountName: agent-clusterwide-example
       volumes:
-        - emptyDir: {}
-          name: agent-data
-        
-        - name: config
-          secret:
-            defaultMode: 0444
-            secretName: agent-clusterwide-example
-      containers:
-        - name: agent
-          imagePullPolicy: IfNotPresent
-          image: "docker.elastic.co/beats/elastic-agent:8.17.0-SNAPSHOT"
-          args: ["-c", "/etc/elastic-agent/agent.yml", "-e"]
-          securityContext:
-            runAsUser: 0
-          resources:
-            limits:
-              memory: 800Mi
-            requests:
-              cpu: 100m
-              memory: 400Mi
-          volumeMounts:
-            - name: agent-data
-              mountPath: /usr/share/elastic-agent/state
-            - name: config
-              mountPath: /etc/elastic-agent/agent.yml
-              readOnly: true
-              subPath: agent.yml
-          env:
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: STATE_PATH
-              value: "/usr/share/elastic-agent/state"
-            - name: ELASTIC_NETINFO
-              value: "false"
+      - emptyDir: {}
+        name: agent-data
+      - name: config
+        secret:
+          defaultMode: 292
+          secretName: agent-clusterwide-example
 ---
 # Source: elastic-agent/templates/agent/k8s/statefulset.yaml
 apiVersion: apps/v1
@@ -1322,93 +1327,94 @@ spec:
       labels:
         name: agent-ksmsharded-example
       annotations:
-        checksum/config: 4ec2b2ef4d3c5c103e79e47a45d4b3b4f9f774e85293f9a5b2d56556025f1d2d
-
+        checksum/config: 3b64edf7317419b11b0aef4cd10cad04037b7bc0b6866da25871b47b41c04490
     spec:
-      dnsPolicy: ClusterFirstWithHostNet
       automountServiceAccountToken: true
+      containers:
+      - args:
+        - --pod=$(POD_NAME)
+        - --pod-namespace=$(POD_NAMESPACE)
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.12.0
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 5
+          timeoutSeconds: 5
+        name: kube-state-metrics
+        ports:
+        - containerPort: 8080
+          name: http-metrics
+        - containerPort: 8081
+          name: telemetry
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8081
+          initialDelaySeconds: 5
+          timeoutSeconds: 5
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+          seccompProfile:
+            type: RuntimeDefault
+      - args:
+        - -c
+        - /etc/elastic-agent/agent.yml
+        - -e
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: STATE_PATH
+          value: /usr/share/elastic-agent/state
+        - name: ELASTIC_NETINFO
+          value: "false"
+        image: docker.elastic.co/beats/elastic-agent:8.17.0-SNAPSHOT
+        imagePullPolicy: IfNotPresent
+        name: agent
+        resources:
+          limits:
+            memory: 800Mi
+          requests:
+            cpu: 100m
+            memory: 400Mi
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /usr/share/elastic-agent/state
+          name: agent-data
+        - mountPath: /etc/elastic-agent/agent.yml
+          name: config
+          readOnly: true
+          subPath: agent.yml
+      dnsPolicy: ClusterFirstWithHostNet
       nodeSelector:
         kubernetes.io/os: linux
       serviceAccountName: agent-ksmsharded-example
       volumes:
-        - emptyDir: {}
-          name: agent-data
-        
-        - name: config
-          secret:
-            defaultMode: 0444
-            secretName: agent-ksmsharded-example
-      containers:
-        - args:
-          - --pod=$(POD_NAME)
-          - --pod-namespace=$(POD_NAMESPACE)
-          env:
-          - name: POD_NAME
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.name
-          - name: POD_NAMESPACE
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.namespace
-          image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.12.0
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8080
-            initialDelaySeconds: 5
-            timeoutSeconds: 5
-          name: kube-state-metrics
-          ports:
-          - containerPort: 8080
-            name: http-metrics
-          - containerPort: 8081
-            name: telemetry
-          readinessProbe:
-            httpGet:
-              path: /
-              port: 8081
-            initialDelaySeconds: 5
-            timeoutSeconds: 5
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-              - ALL
-            readOnlyRootFilesystem: true
-            runAsNonRoot: true
-            runAsUser: 65534
-            seccompProfile:
-              type: RuntimeDefault
-        - name: agent
-          imagePullPolicy: IfNotPresent
-          image: "docker.elastic.co/beats/elastic-agent:8.17.0-SNAPSHOT"
-          args: ["-c", "/etc/elastic-agent/agent.yml", "-e"]
-          securityContext:
-            runAsUser: 0
-          resources:
-            limits:
-              memory: 800Mi
-            requests:
-              cpu: 100m
-              memory: 400Mi
-          volumeMounts:
-            - name: agent-data
-              mountPath: /usr/share/elastic-agent/state
-            - name: config
-              mountPath: /etc/elastic-agent/agent.yml
-              readOnly: true
-              subPath: agent.yml
-          env:
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: STATE_PATH
-              value: "/usr/share/elastic-agent/state"
-            - name: ELASTIC_NETINFO
-              value: "false"
+      - emptyDir: {}
+        name: agent-data
+      - name: config
+        secret:
+          defaultMode: 292
+          secretName: agent-ksmsharded-example

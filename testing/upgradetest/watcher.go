@@ -15,9 +15,10 @@ import (
 )
 
 // FastWatcherCfg is configuration that makes the watcher run faster.
+// we need to set grace period to 100s to be able to detect 5 failures 15 seconds apart and have a little buffer.
 const FastWatcherCfg = `
 agent.upgrade.watcher:
-  grace_period: 1m
+  grace_period: 100s
   error_check.interval: 15s
   crash_check.interval: 15s
 `
