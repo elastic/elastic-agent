@@ -9,7 +9,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.0
+    app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
   annotations:
     elastic-agent.k8s.elastic.co/preset: nginx
@@ -25,7 +25,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.0
+    app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
   annotations:
     elastic-agent.k8s.elastic.co/preset: nginx
@@ -82,7 +82,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.0
+    app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
   annotations:
     elastic-agent.k8s.elastic.co/preset: nginx
@@ -105,7 +105,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.0
+    app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
 spec:
   selector:
@@ -136,7 +136,7 @@ spec:
               fieldPath: metadata.name
         - name: STATE_PATH
           value: /usr/share/elastic-agent/state
-        image: docker.elastic.co/beats/elastic-agent:8.16.0-SNAPSHOT
+        image: docker.elastic.co/beats/elastic-agent:8.16.1-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         securityContext:

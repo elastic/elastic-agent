@@ -9,7 +9,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.0
+    app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
 stringData:
 
@@ -55,6 +55,136 @@ stringData:
         enabled: false
         leader_lease: example-nginx
 ---
+<<<<<<< HEAD
+=======
+# Source: elastic-agent/templates/agent/cluster-role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: agent-nginx-example-default
+  labels:
+    helm.sh/chart: elastic-agent-0.0.1
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 8.16.1
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups: [ "" ] # "" indicates the core API group
+    resources:
+      - nodes
+      - namespaces
+      - events
+      - pods
+      - services
+      - configmaps
+      - persistentvolumes
+      - persistentvolumeclaims
+      - persistentvolumeclaims/status
+      - nodes/metrics
+      - nodes/proxy
+      - nodes/stats
+    verbs:
+      - get
+      - watch
+      - list
+  - apiGroups:
+      - storage.k8s.io
+    resources:
+      - storageclasses
+    verbs:
+      - get
+      - watch
+      - list
+  - nonResourceURLs:
+      - /metrics
+    verbs:
+      - get
+      - watch
+      - list
+  - apiGroups: [ "coordination.k8s.io" ]
+    resources:
+      - leases
+    verbs:
+      - get
+      - create
+      - update
+  - nonResourceURLs:
+      - /healthz
+      - /healthz/*
+      - /livez
+      - /livez/*
+      - /metrics
+      - /metrics/slis
+      - /readyz
+      - /readyz/*
+    verbs:
+      - get
+  - apiGroups: [ "apps" ]
+    resources:
+      - replicasets
+      - deployments
+      - daemonsets
+      - statefulsets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups: [ "batch" ]
+    resources:
+      - jobs
+      - cronjobs
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+    - ""
+    resources:
+    - nodes
+    - namespaces
+    - pods
+    verbs:
+    - get
+    - watch
+    - list
+  - apiGroups:
+    - apps
+    resources:
+    - replicasets
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - batch
+    resources:
+    - jobs
+    verbs:
+    - get
+    - list
+    - watch
+---
+# Source: elastic-agent/templates/agent/cluster-role-binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: agent-nginx-example-default
+  labels:
+    helm.sh/chart: elastic-agent-0.0.1
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 8.16.1
+    app.kubernetes.io/managed-by: Helm
+subjects:
+  - kind: ServiceAccount
+    name: agent-nginx-example
+    namespace: "default"
+roleRef:
+  kind: ClusterRole
+  name: agent-nginx-example-default
+  apiGroup: rbac.authorization.k8s.io
+---
+>>>>>>> 9951d7b3e2 (Update k8s resources)
 # Source: elastic-agent/templates/agent/k8s/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -65,7 +195,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.0
+    app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
 spec:
   selector:
@@ -95,7 +225,7 @@ spec:
               fieldPath: metadata.name
         - name: STATE_PATH
           value: /usr/share/elastic-agent/state
-        image: docker.elastic.co/beats/elastic-agent:8.16.0-SNAPSHOT
+        image: docker.elastic.co/beats/elastic-agent:8.16.1-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         securityContext:
