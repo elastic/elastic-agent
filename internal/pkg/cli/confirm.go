@@ -34,7 +34,7 @@ func confirm(r io.Reader, out io.Writer, prompt string, def bool) (bool, error) 
 		if !reader.Scan() {
 			break
 		}
-		switch strings.ToLower(reader.Text()) {
+		switch strings.ToLower(strings.TrimSpace(reader.Text())) {
 		case "":
 			return def, nil
 		case "y", "yes", "yeah":

@@ -24,9 +24,11 @@ import (
 )
 
 // defaultAgentConfigFile is a name of file used to store agent information
-const agentInfoKey = "agent"
-const defaultLogLevel = "info"
-const maxRetriesloadAgentInfo = 5
+const (
+	agentInfoKey            = "agent"
+	defaultLogLevel         = "info"
+	maxRetriesloadAgentInfo = 5
+)
 
 type persistentAgentInfo struct {
 	ID             string                                 `json:"id" yaml:"id" config:"id"`
