@@ -52,6 +52,7 @@ func TestEscapingSecretsInPolicy(t *testing.T) {
 	policy, err := info.KibanaClient.CreatePolicy(ctx, policyReq)
 
 	pkgPolicyReq := kibana.PackagePolicyRequest{
+		Force:     true,
 		Name:      fmt.Sprintf("log-%s", randId),
 		Namespace: "default",
 		PolicyID:  policy.ID,
