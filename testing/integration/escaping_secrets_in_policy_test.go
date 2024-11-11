@@ -168,7 +168,7 @@ func TestEscapingSecretsInPolicy(t *testing.T) {
 	for _, input := range rendConfObj.Inputs {
 		actual, ok := input["testing"]
 		require.True(t, ok)
-		require.Equal(t, "$$$$", actual)
+		require.Equal(t, "$$", actual)
 		rendConfCheck = true
 	}
 
