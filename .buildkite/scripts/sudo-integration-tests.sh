@@ -4,6 +4,9 @@
 source /opt/buildkite-agent/hooks/pre-command 
 source .buildkite/hooks/pre-command || echo "No pre-command hook found"
 
+# Make sure that all tools are installed
+asdf install
+
 GROUP_NAME=$1
 
 echo "~~~ Running integration tests as $USER"
