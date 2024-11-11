@@ -14,13 +14,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
+
 	"github.com/elastic/elastic-agent-libs/kibana"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
-	"github.com/gofrs/uuid/v5"
-	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
 
 func TestEscapingSecretsInPolicy(t *testing.T) {
