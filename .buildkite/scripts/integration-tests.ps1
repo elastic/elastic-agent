@@ -35,20 +35,27 @@ $env:SNAPSHOT = $true
 
 # Error handling setup for gotestsum execution
 
-$arguments = @(
-    "test"
-    "-tags=integration"
-    "-test.shuffle=on"
-    "-test.timeout=2h0m0s"
-    "github.com/elastic/elastic-agent/testing/integration"
-    "-v"
-    "-args", "-integration.groups=default", "-integration.sudo=true"
-)
+# $arguments = @(
+#     "test"
+#     "-tags=integration"
+#     "-test.shuffle=on"
+#     "-test.timeout=2h0m0s"
+#     "github.com/elastic/elastic-agent/testing/integration"
+#     "-v"
+#     "-args", "-integration.groups=default", "-integration.sudo=true"
+# )
+
+# go test -tags=integration -shuffle=on -timeout=2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args "-integration.groups=$GROUP_NAME -integration.sudo=true"
+
+# $bytes = [System.Text.Encoding]::Unicode.GetBytes($command)
+# $encodedCommand = [Convert]::ToBase64String($bytes)
+# pwsh -encodedcommand $encodedCommand
 
 # Use Start-Process to execute the command in PowerShell 5.1
 $ErrorActionPreference = 'Continue'
 # Start-Process -FilePath "gotestsum" -ArgumentList $arguments -NoNewWindow -Wait
-Start-Process -FilePath "go" -ArgumentList $arguments -NoNewWindow -Wait
+# Start-Process -FilePath "go" -ArgumentList $arguments -NoNewWindow -Wait
+go test -tags=integration -shuffle=on -timeout=2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args "-integration.groups=$GROUP_NAME -integration.sudo=true"
 $TESTS_EXIT_STATUS = $LASTEXITCODE
 $ErrorActionPreference = 'Stop'
 
@@ -64,3 +71,4 @@ if (Test-Path $outputXML) {
 
 # Exit with the test exit status
 exit $TESTS_EXIT_STATUS
+ go test -tags=integration -test.shuffle=on -test.timeout=2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args -integration.groups=default -integration.sudo=true
