@@ -2,10 +2,10 @@ param (
     [string]$GROUP_NAME
 )
 
+Write-Output "~~~ Switching to PowerShell 7"
 pwsh
 $PSVersionTable.PSVersion
 Write-Output "~~~ Receiving ESS stack metadata"
-# Retrieve metadata and set environment variables
 $env:ELASTICSEARCH_HOST = & buildkite-agent meta-data get "es.host"
 $env:ELASTICSEARCH_USERNAME = & buildkite-agent meta-data get "es.username"
 $env:ELASTICSEARCH_PASSWORD = & buildkite-agent meta-data get "es.pwd"
@@ -55,7 +55,9 @@ $env:SNAPSHOT = $true
 $ErrorActionPreference = 'Continue'
 # Start-Process -FilePath "gotestsum" -ArgumentList $arguments -NoNewWindow -Wait
 # Start-Process -FilePath "go" -ArgumentList $arguments -NoNewWindow -Wait
-go test -tags=integration -shuffle=on -timeout=2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args "-integration.groups=$GROUP_NAME -integration.sudo=true"
+
+# go test -tags=integration -shuffle=on -timeout=2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args "-integration.groups=$GROUP_NAME -integration.sudo=true"
+gotestsum --no-color -f standard-quiet --junitfile "build/${GROUP_NAME}.integration.xml" --jsonfile "build/${GROUP_NAME}.integration.out.json" -- -tags=integration -shuffle=on -timeout=2h0m0s "github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=default" "-integration.sudo=true"
 $TESTS_EXIT_STATUS = $LASTEXITCODE
 $ErrorActionPreference = 'Stop'
 
