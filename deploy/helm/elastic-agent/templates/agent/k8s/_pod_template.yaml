@@ -13,12 +13,20 @@ template:
     {{- with ($presetVal).hostPID }}
     hostPID: {{ . }}
     {{- end }}
+    {{- if eq (dig "automountServiceAccountToken" true $presetVal) true }}
     automountServiceAccountToken: true
+    {{- else }}
+    automountServiceAccountToken: false
+    {{- end }}
     {{- with ($presetVal).nodeSelector }}
     nodeSelector:
       {{- . | toYaml | nindent 6 }}
     {{- end }}
+    {{- if eq ($presetVal).serviceAccount.create true }}
     serviceAccountName: {{ $agentName }}
+    {{- else }}
+    serviceAccountName: {{ ($presetVal).serviceAccount.name }}
+    {{- end }}
     {{- with ($presetVal).affinity }}
     affinity:
       {{- . | toYaml | nindent 6 }}

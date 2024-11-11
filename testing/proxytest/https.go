@@ -23,7 +23,6 @@ import (
 
 func (p *Proxy) serveHTTPS(w http.ResponseWriter, r *http.Request) {
 	log := loggerFromReqCtx(r)
-	log.Debug("handling CONNECT")
 
 	clientCon, err := hijack(w)
 	if err != nil {
@@ -35,7 +34,6 @@ func (p *Proxy) serveHTTPS(w http.ResponseWriter, r *http.Request) {
 	// Hijack successful, w is now useless, let's make sure it isn't used by
 	// mistake ;)
 	w = nil //nolint:ineffassign,wastedassign // w is now useless, let's make sure it isn't used by mistake ;)
-	log.Debug("hijacked request")
 
 	// ==================== CONNECT accepted, let the client know
 	_, err = clientCon.Write([]byte("HTTP/1.1 200 Connection established\r\n\r\n"))
@@ -121,8 +119,6 @@ func (p *Proxy) serveHTTPS(w http.ResponseWriter, r *http.Request) {
 
 		_ = resp.Body.Close()
 	}
-
-	log.Debug("EOF reached, finishing HTTPS handler")
 }
 
 func (p *Proxy) newTLSCert(u *url.URL) (*tls.Certificate, error) {
