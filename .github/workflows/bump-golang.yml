@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Updatecli in the runner
-        uses: updatecli/updatecli-action@92a13b95c2cd9f1c6742c965509203c6a5635ed7 # v0.76.1
+        uses: updatecli/updatecli-action@704a64517239e0993c5e3bf6749a063b8f950d9f # v0.76.1
 
       - name: Run Updatecli in Apply mode
         run: updatecli apply --config .ci/updatecli/updatecli-bump-golang.yml --values .ci/updatecli/values.d/scm.yml
