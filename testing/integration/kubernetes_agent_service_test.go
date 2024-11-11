@@ -88,11 +88,6 @@ func TestKubernetesAgentService(t *testing.T) {
 					container.Env[idx].ValueFrom = nil
 				}
 			}
-
-			// has a unique entrypoint and command because its ran in the cloud
-			// adjust the spec to run it correctly
-			container.Command = []string{"elastic-agent"}
-			container.Args = []string{"-c", "/etc/elastic-agent/agent.yml", "-e"}
 		},
 		func(pod *corev1.PodSpec) {
 			for volumeIdx, volume := range pod.Volumes {
@@ -123,7 +118,7 @@ func TestKubernetesAgentService(t *testing.T) {
 
 	ctx := context.Background()
 
-	deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, false, testLogsBasePath, map[string]bool{
+	deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, false, testLogsBasePath, true, map[string]bool{
 		"connectors-py": true,
 	})
 }

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc/codes"
@@ -31,6 +32,14 @@ const (
 	flagPGPBytes       = "pgp"
 	flagPGPBytesPath   = "pgp-path"
 	flagPGPBytesURI    = "pgp-uri"
+	flagForce          = "force"
+)
+
+var (
+	unsupportedUpgradeError   error = errors.New("this agent is fleet managed and must be upgraded using Fleet")
+	nonRootExecutionError           = errors.New("upgrade command needs to be executed as root for fleet managed agents")
+	skipVerifyNotAllowedError       = errors.New(fmt.Sprintf("\"%s\" flag is not allowed when upgrading a fleet managed agent using the cli", flagSkipVerify))
+	skipVerifyNotRootError          = errors.New(fmt.Sprintf("user needs to be root to use \"%s\" flag when upgrading standalone agents", flagSkipVerify))
 )
 
 func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -40,6 +49,7 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 		Long:  "This command upgrades the currently installed Elastic Agent to the specified version.",
 		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
+			c.SetContext(context.Background())
 			if err := upgradeCmd(streams, c, args); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 				os.Exit(1)
@@ -53,24 +63,119 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 	cmd.Flags().String(flagPGPBytes, "", "PGP to use for package verification")
 	cmd.Flags().String(flagPGPBytesURI, "", "Path to a web location containing PGP to use for package verification")
 	cmd.Flags().String(flagPGPBytesPath, "", "Path to a file containing PGP to use for package verification")
+	cmd.Flags().BoolP(flagForce, "", false, "Advanced option to force an upgrade on a fleet managed agent")
+	err := cmd.Flags().MarkHidden(flagForce)
+	if err != nil {
+		fmt.Fprintf(streams.Err, "error while setting upgrade force flag attributes: %s", err.Error())
+		os.Exit(1)
+	}
 
 	return cmd
 }
 
-func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
-	c := client.New()
-	return upgradeCmdWithClient(streams, cmd, args, c)
+type upgradeInput struct {
+	streams   *cli.IOStreams
+	cmd       *cobra.Command
+	args      []string
+	c         client.Client
+	agentInfo client.AgentStateInfo
+	isRoot    bool
 }
 
-func upgradeCmdWithClient(streams *cli.IOStreams, cmd *cobra.Command, args []string, c client.Client) error {
-	version := args[0]
-	sourceURI, _ := cmd.Flags().GetString(flagSourceURI)
+func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
+	c := client.New()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
 
-	err := c.Connect(context.Background())
+	err := c.Connect(ctx)
 	if err != nil {
-		return errors.New(err, "Failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
+		return errors.New(err, "failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
 	}
 	defer c.Disconnect()
+	state, err := c.State(cmd.Context())
+	if err != nil {
+		return fmt.Errorf("error while trying to get agent state: %w", err)
+	}
+
+	isRoot, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("error while retrieving user permission: %w", err)
+	}
+
+	input := &upgradeInput{
+		streams,
+		cmd,
+		args,
+		c,
+		state.Info,
+		isRoot,
+	}
+	return upgradeCmdWithClient(input)
+}
+
+type upgradeCond struct {
+	isManaged  bool
+	force      bool
+	isRoot     bool
+	skipVerify bool
+}
+
+func checkUpgradable(cond upgradeCond) error {
+	checkManaged := func() error {
+		if !cond.force {
+			return unsupportedUpgradeError
+		}
+
+		if cond.skipVerify {
+			return skipVerifyNotAllowedError
+		}
+
+		if !cond.isRoot {
+			return nonRootExecutionError
+		}
+
+		return nil
+	}
+
+	checkStandalone := func() error {
+		if cond.skipVerify && !cond.isRoot {
+			return skipVerifyNotRootError
+		}
+		return nil
+	}
+
+	if cond.isManaged {
+		return checkManaged()
+	}
+
+	return checkStandalone()
+}
+
+func upgradeCmdWithClient(input *upgradeInput) error {
+	cmd := input.cmd
+	c := input.c
+	version := input.args[0]
+	sourceURI, _ := cmd.Flags().GetString(flagSourceURI)
+
+	force, err := cmd.Flags().GetBool(flagForce)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve command flag information while trying to upgrade the agent: %w", err)
+	}
+
+	skipVerification, err := cmd.Flags().GetBool(flagSkipVerify)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve %s flag information while upgrading the agent: %w", flagSkipVerify, err)
+	}
+
+	err = checkUpgradable(upgradeCond{
+		isManaged:  input.agentInfo.IsManaged,
+		force:      force,
+		isRoot:     input.isRoot,
+		skipVerify: skipVerification,
+	})
+	if err != nil {
+		return fmt.Errorf("aborting upgrade: %w", err)
+	}
 
 	isBeingUpgraded, err := upgrade.IsInProgress(c, utils.GetWatcherPIDs)
 	if err != nil {
@@ -80,7 +185,6 @@ func upgradeCmdWithClient(streams *cli.IOStreams, cmd *cobra.Command, args []str
 		return errors.New("an upgrade is already in progress; please try again later.")
 	}
 
-	skipVerification, _ := cmd.Flags().GetBool(flagSkipVerify)
 	var pgpChecks []string
 	if !skipVerification {
 		// get local PGP
@@ -122,6 +226,6 @@ func upgradeCmdWithClient(streams *cli.IOStreams, cmd *cobra.Command, args []str
 			return errors.New(err, "Failed trigger upgrade of daemon")
 		}
 	}
-	fmt.Fprintf(streams.Out, "Upgrade triggered to version %s, Elastic Agent is currently restarting\n", version)
+	fmt.Fprintf(input.streams.Out, "Upgrade triggered to version %s, Elastic Agent is currently restarting\n", version)
 	return nil
 }

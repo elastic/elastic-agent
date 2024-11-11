@@ -47,6 +47,7 @@ type EnrollOpts struct {
 	CertificateAuthorities []string // --certificate-authorities
 	Certificate            string   // --elastic-agent-cert
 	Key                    string   // --elastic-agent-cert-key
+	KeyPassphrasePath      string   // --elastic-agent-cert-key-passphrase
 }
 
 func (e EnrollOpts) toCmdArgs() []string {
@@ -65,10 +66,13 @@ func (e EnrollOpts) toCmdArgs() []string {
 	if e.Certificate != "" {
 		args = append(args, "--elastic-agent-cert="+e.Certificate)
 	}
-
 	if e.Key != "" {
 		args = append(args, "--elastic-agent-cert-key="+e.Key)
 	}
+	if e.KeyPassphrasePath != "" {
+		args = append(args, "--elastic-agent-cert-key-passphrase="+e.KeyPassphrasePath)
+	}
+
 	return args
 }
 
@@ -113,7 +117,7 @@ type InstallOpts struct {
 	FleetBootstrapOpts
 }
 
-func (i *InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
+func (i *InstallOpts) ToCmdArgs() []string {
 	var args []string
 	if i.BasePath != "" {
 		args = append(args, "--base-path", i.BasePath)
@@ -150,7 +154,7 @@ func (i *InstallOpts) toCmdArgs(operatingSystem string) ([]string, error) {
 	args = append(args, i.EnrollOpts.toCmdArgs()...)
 	args = append(args, i.FleetBootstrapOpts.toCmdArgs()...)
 
-	return args, nil
+	return args
 }
 
 // Install installs the prepared Elastic Agent binary and registers a t.Cleanup
@@ -196,11 +200,7 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 	}
 
 	installArgs := []string{"install"}
-	installOptsArgs, err := installOpts.toCmdArgs(f.operatingSystem)
-	if err != nil {
-		return nil, err
-	}
-	installArgs = append(installArgs, installOptsArgs...)
+	installArgs = append(installArgs, installOpts.ToCmdArgs()...)
 	out, err := f.Exec(ctx, installArgs, opts...)
 	if err != nil {
 		f.DumpProcesses("-install")
@@ -238,7 +238,9 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 	f.setClient(c)
 
 	f.t.Cleanup(func() {
-		f.DumpProcesses("-post-uninstall")
+		if f.t.Failed() {
+			f.DumpProcesses("-cleanup")
+		}
 	})
 
 	f.t.Cleanup(func() {

@@ -1,0 +1,50 @@
+kubernetes:
+  enabled: false
+
+extraIntegrations:
+  nginx/metrics:
+    id: nginx/metrics-nginx-69240207-6fcc-4d19-aee3-dbf716e3bb0f
+    preset: nginx
+    name: nginx-1
+    revision: 1
+    type: nginx/metrics
+    use_output: default
+    meta:
+      package:
+        name: nginx
+        version: 1.19.1
+    data_stream:
+      namespace: default
+    package_policy_id: 69240207-6fcc-4d19-aee3-dbf716e3bb0f
+    streams:
+      - id: nginx/metrics-nginx.stubstatus-69240207-6fcc-4d19-aee3-dbf716e3bb0f
+        data_stream:
+          dataset: nginx.stubstatus
+          type: metrics
+        metricsets:
+          - stubstatus
+        hosts:
+          - 'http://nginx.default.svc.cluster.local:80'
+        tags:
+          - nginx-stubstatus
+        period: 10s
+        server_status_path: /nginx_status
+
+agent:
+  presets:
+    nginx:
+      annotations:
+        elastic-agent.k8s.elastic.co/preset: nginx
+      mode: deployment
+      securityContext:
+        runAsUser: 0
+      serviceAccount:
+        create: true
+        annotations:
+          elastic-agent.k8s.elastic.co/sa: nginx
+      clusterRole:
+        create: false
+        name: user-cr
+      providers:
+        kubernetes_leaderelection:
+          enabled: false

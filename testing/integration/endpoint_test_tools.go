@@ -128,6 +128,6 @@ func installElasticDefendPackage(t *testing.T, info *define.Info, policyID strin
 		t.Logf("Error installing fleet package: %v", err)
 		return r, fmt.Errorf("error installing fleet package: %w", err)
 	}
-	t.Logf("Endpoint package Policy Response:\n%+v", pkgResp)
+
 	return pkgResp, err
 }

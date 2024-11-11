@@ -477,8 +477,8 @@ func RunProcess(t *testing.T,
 // when `Run` is called.
 //
 // if shouldWatchState is set to false, communicating state does not happen.
-func (f *Fixture) RunOtelWithClient(ctx context.Context, shouldWatchState bool, enableTestingMode bool, states ...State) error {
-	return f.executeWithClient(ctx, "otel", false, shouldWatchState, enableTestingMode, states...)
+func (f *Fixture) RunOtelWithClient(ctx context.Context, states ...State) error {
+	return f.executeWithClient(ctx, "otel", false, false, false, states...)
 }
 
 func (f *Fixture) executeWithClient(ctx context.Context, command string, disableEncryptedStore bool, shouldWatchState bool, enableTestingMode bool, states ...State) error {
@@ -1376,8 +1376,12 @@ type AgentInspectOutput struct {
 			Threshold         int `yaml:"threshold"`
 		} `yaml:"reporting"`
 		Ssl struct {
-			Renegotiation    string `yaml:"renegotiation"`
-			VerificationMode string `yaml:"verification_mode"`
+			Renegotiation          string   `yaml:"renegotiation"`
+			VerificationMode       string   `yaml:"verification_mode"`
+			Certificate            string   `yaml:"certificate"`
+			CertificateAuthorities []string `yaml:"certificate_authorities"`
+			Key                    string   `yaml:"key"`
+			KeyPassphrasePath      string   `yaml:"key_passphrase_path"`
 		} `yaml:"ssl"`
 		Timeout string `yaml:"timeout"`
 	} `yaml:"fleet"`

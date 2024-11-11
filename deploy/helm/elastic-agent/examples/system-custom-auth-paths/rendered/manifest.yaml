@@ -1,0 +1,400 @@
+---
+# Source: elastic-agent/templates/agent/service-account.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: agent-pernode-example
+  namespace: "default"
+  labels:
+    helm.sh/chart: elastic-agent-0.0.1
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 9.0.0
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: elastic-agent/templates/agent/k8s/secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: agent-pernode-example
+  namespace: "default"
+  labels:
+    helm.sh/chart: elastic-agent-0.0.1
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 9.0.0
+    app.kubernetes.io/managed-by: Helm
+stringData:
+
+  agent.yml: |-
+    id: agent-pernode-example
+    outputs:
+      default:
+        hosts:
+        - http://elasticsearch:9200
+        password: changeme
+        type: elasticsearch
+        username: elastic
+    secret_references: []
+    agent:
+      monitoring:
+        enabled: true
+        logs: true
+        metrics: true
+        namespace: default
+        use_output: default
+    inputs:
+      - data_stream:
+          namespace: default
+        id: system-logs
+        streams:
+        - data_stream:
+            dataset: system.auth
+            type: logs
+          exclude_files:
+          - \.gz$
+          ignore_older: 72h
+          multiline:
+            match: after
+            pattern: ^\s
+          paths:
+          - /var/log/custom_auth.log
+          processors:
+          - add_locale: null
+          tags:
+          - system-auth
+        - data_stream:
+            dataset: system.syslog
+            type: logs
+          exclude_files:
+          - \.gz$
+          ignore_older: 72h
+          multiline:
+            match: after
+            pattern: ^\s
+          paths:
+          - /var/log/custom_syslog.log
+          processors:
+          - add_locale: null
+          tags: null
+        type: logfile
+        use_output: default
+      - data_stream:
+          namespace: default
+        id: system-metrics
+        streams:
+        - cpu.metrics:
+          - percentages
+          - normalized_percentages
+          data_stream:
+            dataset: system.cpu
+            type: metrics
+          metricsets:
+          - cpu
+          period: 10s
+        - data_stream:
+            dataset: system.diskio
+            type: metrics
+          diskio.include_devices: null
+          metricsets:
+          - diskio
+          period: 10s
+        - data_stream:
+            dataset: system.filesystem
+            type: metrics
+          metricsets:
+          - filesystem
+          period: 1m
+          processors:
+          - drop_event.when.regexp:
+              system.filesystem.mount_point: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
+        - data_stream:
+            dataset: system.fsstat
+            type: metrics
+          metricsets:
+          - fsstat
+          period: 1m
+          processors:
+          - drop_event.when.regexp:
+              system.fsstat.mount_point: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
+        - condition: ${host.platform} != 'windows'
+          data_stream:
+            dataset: system.load
+            type: metrics
+          metricsets:
+          - load
+          period: 10s
+        - data_stream:
+            dataset: system.memory
+            type: metrics
+          metricsets:
+          - memory
+          period: 10s
+        - data_stream:
+            dataset: system.network
+            type: metrics
+          metricsets:
+          - network
+          network.interfaces: null
+          period: 10s
+        - data_stream:
+            dataset: system.process
+            type: metrics
+          metricsets:
+          - process
+          period: 10s
+          process.cgroups.enabled: false
+          process.cmdline.cache.enabled: true
+          process.include_cpu_ticks: false
+          process.include_top_n.by_cpu: 5
+          process.include_top_n.by_memory: 5
+          processes:
+          - .*
+        - data_stream:
+            dataset: system.process_summary
+            type: metrics
+          metricsets:
+          - process_summary
+          period: 10s
+        - data_stream:
+            dataset: system.socket_summary
+            type: metrics
+          metricsets:
+          - socket_summary
+          period: 10s
+        - data_stream:
+            dataset: system.uptime
+            type: metrics
+          metricsets:
+          - uptime
+          period: 10s
+        type: system/metrics
+        use_output: default
+    providers:
+      kubernetes:
+        node: ${NODE_NAME}
+        scope: node
+      kubernetes_leaderelection:
+        enabled: false
+        leader_lease: example-pernode
+---
+# Source: elastic-agent/templates/agent/cluster-role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: agent-perNode-example-default
+  labels:
+    helm.sh/chart: elastic-agent-0.0.1
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 9.0.0
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups: [ "" ] # "" indicates the core API group
+    resources:
+      - nodes
+      - namespaces
+      - events
+      - pods
+      - services
+      - configmaps
+      - persistentvolumes
+      - persistentvolumeclaims
+      - persistentvolumeclaims/status
+      - nodes/metrics
+      - nodes/proxy
+      - nodes/stats
+    verbs:
+      - get
+      - watch
+      - list
+  - apiGroups:
+      - storage.k8s.io
+    resources:
+      - storageclasses
+    verbs:
+      - get
+      - watch
+      - list
+  - nonResourceURLs:
+      - /metrics
+    verbs:
+      - get
+      - watch
+      - list
+  - apiGroups: [ "coordination.k8s.io" ]
+    resources:
+      - leases
+    verbs:
+      - get
+      - create
+      - update
+  - nonResourceURLs:
+      - /healthz
+      - /healthz/*
+      - /livez
+      - /livez/*
+      - /metrics
+      - /metrics/slis
+      - /readyz
+      - /readyz/*
+    verbs:
+      - get
+  - apiGroups: [ "apps" ]
+    resources:
+      - replicasets
+      - deployments
+      - daemonsets
+      - statefulsets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups: [ "batch" ]
+    resources:
+      - jobs
+      - cronjobs
+    verbs:
+      - get
+      - list
+      - watch
+---
+# Source: elastic-agent/templates/agent/cluster-role-binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: agent-perNode-example-default
+  labels:
+    helm.sh/chart: elastic-agent-0.0.1
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 9.0.0
+    app.kubernetes.io/managed-by: Helm
+subjects:
+  - kind: ServiceAccount
+    name: agent-pernode-example
+    namespace: "default"
+roleRef:
+  kind: ClusterRole
+  name: agent-perNode-example-default
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: elastic-agent/templates/agent/k8s/daemonset.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: agent-pernode-example
+  namespace: "default"
+  labels:
+    helm.sh/chart: elastic-agent-0.0.1
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 9.0.0
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    matchLabels:
+      name: agent-pernode-example
+  template:
+    metadata:
+      labels:
+        name: agent-pernode-example
+      annotations:
+        checksum/config: 535875b1a8f244fc529158f3467dec1983ca2ef19d365518da249fd46e22d0ef
+    spec:
+      automountServiceAccountToken: true
+      containers:
+      - args:
+        - -c
+        - /etc/elastic-agent/agent.yml
+        - -e
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: STATE_PATH
+          value: /usr/share/elastic-agent/state
+        - name: ELASTIC_NETINFO
+          value: "false"
+        image: docker.elastic.co/beats/elastic-agent:9.0.0-SNAPSHOT
+        imagePullPolicy: IfNotPresent
+        name: agent
+        resources:
+          limits:
+            memory: 1000Mi
+          requests:
+            cpu: 100m
+            memory: 400Mi
+        securityContext:
+          capabilities:
+            add:
+            - DAC_READ_SEARCH
+            - CHOWN
+            - SETPCAP
+            - SYS_PTRACE
+            drop:
+            - ALL
+          privileged: false
+          runAsGroup: 1000
+          runAsUser: 1000
+        volumeMounts:
+        - mountPath: /hostfs/proc
+          name: proc
+          readOnly: true
+        - mountPath: /hostfs/sys/fs/cgroup
+          name: cgroup
+          readOnly: true
+        - mountPath: /var/lib/docker/containers
+          name: varlibdockercontainers
+          readOnly: true
+        - mountPath: /var/log
+          name: varlog
+          readOnly: true
+        - mountPath: /hostfs/etc
+          name: etc-full
+          readOnly: true
+        - mountPath: /hostfs/var/lib
+          name: var-lib
+          readOnly: true
+        - mountPath: /usr/share/elastic-agent/state
+          name: agent-data
+        - mountPath: /etc/elastic-agent/agent.yml
+          name: config
+          readOnly: true
+          subPath: agent.yml
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        kubernetes.io/os: linux
+      serviceAccountName: agent-pernode-example
+      volumes:
+      - hostPath:
+          path: /proc
+        name: proc
+      - hostPath:
+          path: /sys/fs/cgroup
+        name: cgroup
+      - hostPath:
+          path: /var/lib/docker/containers
+        name: varlibdockercontainers
+      - hostPath:
+          path: /var/log
+        name: varlog
+      - hostPath:
+          path: /etc
+        name: etc-full
+      - hostPath:
+          path: /var/lib
+        name: var-lib
+      - hostPath:
+          path: /etc/elastic-agent/default/agent-pernode-example/state
+          type: DirectoryOrCreate
+        name: agent-data
+      - name: config
+        secret:
+          defaultMode: 292
+          secretName: agent-pernode-example
