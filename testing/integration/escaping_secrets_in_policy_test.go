@@ -128,11 +128,13 @@ func TestEscapingSecretsInPolicy(t *testing.T) {
 
 	for _, input := range preConfObj.Inputs {
 		if name, ok := input["name"]; ok && name == pkgPolicyReq.Name {
-			streamArr, ok := input["stream"].([]map[string]interface{})
+			streamArr, ok := input["streams"].([]interface{})
 			require.True(t, ok)
 
 			for _, stream := range streamArr {
-				actual, ok := stream["testing"]
+				sm, ok := stream.(map[string]interface{})
+				require.True(t, ok)
+				actual, ok := sm["testing"]
 				require.True(t, ok)
 				require.Equal(t, "$$$$", actual)
 				preConfCheck = true
@@ -166,6 +168,4 @@ func TestEscapingSecretsInPolicy(t *testing.T) {
 	}
 
 	require.True(t, rendConfCheck)
-
-	require.Equal(t, true, false)
 }
