@@ -99,7 +99,6 @@ func TestEscapingSecretsInPolicy(t *testing.T) {
 				},
 			},
 		},
-		Force: false,
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
