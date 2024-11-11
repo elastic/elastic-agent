@@ -4,7 +4,6 @@ package integration
 
 import (
 	"context"
-	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,10 +19,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-//go:embed custom_log_package.json.tmpl
-var customLogPackagePolicy string
-
-func TestEscapingSecretsInPolicy2(t *testing.T) {
+func TestEscapingSecretsInPolicy(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Default,
 		Stack: &define.Stack{},
@@ -111,18 +107,9 @@ func TestEscapingSecretsInPolicy2(t *testing.T) {
 
 	diagZip, err := fixture.ExecDiagnostics(ctx, "diagnostics", "-p")
 	require.NoError(t, err)
-
 	extractDir := t.TempDir()
-
 	extractZipArchive(t, diagZip, extractDir)
-	fmt.Println("=================================== HERE ====================================")
-	fmt.Printf("%+v\n", pkgPolicyReq)
-	fmt.Println("\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\")
-	entries, _ := os.ReadDir(extractDir)
-	for _, entry := range entries {
-		fmt.Println(entry.Name())
-	}
-	fmt.Println("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+
 	preConfPath := filepath.Join(extractDir, "pre-config.yaml")
 	preStat, err := os.Stat(preConfPath)
 	require.NoErrorf(t, err, "stat file %q failed", preConfPath)
@@ -153,9 +140,7 @@ func TestEscapingSecretsInPolicy2(t *testing.T) {
 		}
 	}
 
-	fmt.Println("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
-	fmt.Printf("%+v\n", preConfObj)
-	fmt.Println("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+	require.True(t, preConfCheck)
 
 	rendConfPath := filepath.Join(extractDir, "components", "log-default", "beat-rendered-config.yml")
 	rendStat, err := os.Stat(rendConfPath)
@@ -171,12 +156,16 @@ func TestEscapingSecretsInPolicy2(t *testing.T) {
 	err = yaml.NewDecoder(rendf).Decode(&rendConfObj)
 	require.NoError(t, err)
 
-	fmt.Println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-	inspOut, err := fixture.ExecInspect(ctx)
-	require.NoError(t, err)
-	ymlbyte, _ := yaml.Marshal(inspOut)
-	fmt.Println(string(ymlbyte))
-	fmt.Println("#############################################################################")
+	rendConfCheck := false
+
+	for _, input := range rendConfObj.Inputs {
+		actual, ok := input["testing"]
+		require.True(t, ok)
+		require.Equal(t, "$$$$", actual)
+		rendConfCheck = true
+	}
+
+	require.True(t, rendConfCheck)
 
 	require.Equal(t, true, false)
 }
