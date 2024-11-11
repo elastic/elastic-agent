@@ -8,6 +8,7 @@ GROUP_NAME=$1
 
 echo "~~~ Running integration tests as $USER"
 echo "~~~ Integration tests: ${GROUP_NAME}"
+go install gotest.tools/gotestsum
 gotestsum --version
 PACKAGE_VERSION="$(cat .package-version)"
 if [[ -n "$PACKAGE_VERSION" ]]; then
