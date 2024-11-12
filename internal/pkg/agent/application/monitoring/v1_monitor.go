@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -48,6 +49,7 @@ const (
 	monitoringKey              = "monitoring"
 	useOutputKey               = "use_output"
 	monitoringMetricsPeriodKey = "metrics_period"
+	failureThresholdKey        = "failure_threshold"
 	monitoringOutput           = "monitoring"
 	defaultMonitoringNamespace = "default"
 	agentName                  = "elastic-agent"
@@ -60,6 +62,10 @@ const (
 	// metricset execution period used for the monitoring metrics inputs
 	// we set this to 60s to reduce the load/data volume on the monitoring cluster
 	defaultMetricsCollectionInterval = 60 * time.Second
+
+	// metricset stream failure threshold before the stream is marked as DEGRADED
+	// to avoid marking the agent degraded for transient errors, we set the default threshold to 2
+	defaultMetricsStreamFailureThreshold = uint(2)
 )
 
 var (
@@ -131,6 +137,7 @@ func (b *BeatsMonitor) MonitoringConfig(
 
 	monitoringOutputName := defaultOutputName
 	metricsCollectionIntervalString := b.config.C.MetricsPeriod
+	failureThreshold := b.config.C.FailureThreshold
 	if agentCfg, found := policy[agentKey]; found {
 		// The agent section is required for feature flags
 		cfg[agentKey] = agentCfg
@@ -149,6 +156,26 @@ func (b *BeatsMonitor) MonitoringConfig(
 					if metricsPeriod, found := monitoringMap[monitoringMetricsPeriodKey]; found {
 						if metricsPeriodStr, ok := metricsPeriod.(string); ok {
 							metricsCollectionIntervalString = metricsPeriodStr
+						}
+					}
+
+					if policyFailureThresholdRaw, found := monitoringMap[failureThresholdKey]; found {
+						switch policyFailureThresholdRaw.(type) {
+						case uint:
+							policyValue := policyFailureThresholdRaw.(uint)
+							failureThreshold = &policyValue
+						case int:
+							policyValue := uint(policyFailureThresholdRaw.(int))
+							failureThreshold = &policyValue
+						case string:
+							policyValue, err := strconv.Atoi(policyFailureThresholdRaw.(string))
+							if err != nil {
+								return nil, fmt.Errorf("failed to convert policy failure threshold string to int: %w", err)
+							}
+							uintPolicyValue := uint(policyValue)
+							failureThreshold = &uintPolicyValue
+						default:
+							return nil, fmt.Errorf("unsupported type for policy failure threshold: %T", policyFailureThresholdRaw)
 						}
 					}
 				}
@@ -173,7 +200,7 @@ func (b *BeatsMonitor) MonitoringConfig(
 	}
 
 	if b.config.C.MonitorMetrics {
-		if err := b.injectMetricsInput(cfg, componentIDToBinary, components, componentIDPidMap, metricsCollectionIntervalString); err != nil {
+		if err := b.injectMetricsInput(cfg, componentIDToBinary, components, componentIDPidMap, metricsCollectionIntervalString, failureThreshold); err != nil {
 			return nil, errors.New(err, "failed to inject monitoring output")
 		}
 	}
@@ -556,15 +583,21 @@ func (b *BeatsMonitor) injectMetricsInput(
 	componentList []component.Component,
 	existingStateServicePids map[string]uint64,
 	metricsCollectionIntervalString string,
+	failureThreshold *uint,
 ) error {
 	if metricsCollectionIntervalString == "" {
 		metricsCollectionIntervalString = defaultMetricsCollectionInterval.String()
 	}
+
+	if failureThreshold == nil {
+		defaultValue := defaultMetricsStreamFailureThreshold
+		failureThreshold = &defaultValue
+	}
 	monitoringNamespace := b.monitoringNamespace()
 	fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
-	beatsStreams := make([]interface{}, 0, len(componentIDToBinary))
-	streams := []interface{}{
-		map[string]interface{}{
+	beatsStreams := make([]map[string]interface{}, 0, len(componentIDToBinary))
+	streams := []map[string]interface{}{
+		{
 			idKey: fmt.Sprintf("%s-agent", monitoringMetricsUnitID),
 			"data_stream": map[string]interface{}{
 				"type":      "metrics",
@@ -864,6 +897,16 @@ func (b *BeatsMonitor) injectMetricsInput(
 			})
 		}
 
+	}
+
+	if failureThreshold != nil {
+		// add failure threshold to all streams and beatStreams
+		for _, s := range streams {
+			s[failureThresholdKey] = *failureThreshold
+		}
+		for _, s := range beatsStreams {
+			s[failureThresholdKey] = *failureThreshold
+		}
 	}
 
 	inputs := []interface{}{
