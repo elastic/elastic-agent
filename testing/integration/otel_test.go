@@ -674,7 +674,7 @@ func TestOtelFBReceiverE2E(t *testing.T) {
 				t.Logf("no data file to import at %s", inputFilePath)
 				return
 			}
-			t.Logf("contents of inport file:\n%s\n", string(contents))
+			t.Logf("contents of import file:\n%s\n", string(contents))
 		}
 	})
 
