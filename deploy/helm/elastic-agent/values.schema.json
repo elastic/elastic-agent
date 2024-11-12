@@ -1058,6 +1058,22 @@
                 "clusterRole": {
                     "$ref": "#/definitions/AgentPresetClusterRole"
                 },
+                "envFrom": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    },
+                    "description": "Environment variables for the deployment.",
+                    "examples": [
+                        [
+                            {
+                                "configMapRef": {
+                                    "name": "my-config"
+                                }
+                            }
+                        ]
+                    ]
+                },
                 "nodeSelector": {
                     "type": "object",
                     "additionalProperties": {
