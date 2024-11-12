@@ -160,19 +160,18 @@ func (b *BeatsMonitor) MonitoringConfig(
 					}
 
 					if policyFailureThresholdRaw, found := monitoringMap[failureThresholdKey]; found {
-						switch policyFailureThresholdRaw.(type) {
+						switch policyValue := policyFailureThresholdRaw.(type) {
 						case uint:
-							policyValue := policyFailureThresholdRaw.(uint)
 							failureThreshold = &policyValue
 						case int:
-							policyValue := uint(policyFailureThresholdRaw.(int))
-							failureThreshold = &policyValue
+							unsignedValue := uint(policyValue)
+							failureThreshold = &unsignedValue
 						case string:
-							policyValue, err := strconv.Atoi(policyFailureThresholdRaw.(string))
+							parsedPolicyValue, err := strconv.Atoi(policyValue)
 							if err != nil {
 								return nil, fmt.Errorf("failed to convert policy failure threshold string to int: %w", err)
 							}
-							uintPolicyValue := uint(policyValue)
+							uintPolicyValue := uint(parsedPolicyValue)
 							failureThreshold = &uintPolicyValue
 						default:
 							return nil, fmt.Errorf("unsupported type for policy failure threshold: %T", policyFailureThresholdRaw)
