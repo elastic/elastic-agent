@@ -1359,27 +1359,6 @@
                     "if": {
                         "properties": {
                             "create": {
-                                "const": false
-                            }
-                        }
-                    },
-                    "then": {
-                        "properties": {
-                            "name": {
-                                "type": "string",
-                                "minLength": 1
-                            }
-                        },
-                        "required": [
-                            "create",
-                            "name"
-                        ]
-                    }
-                },
-                {
-                    "if": {
-                        "properties": {
-                            "create": {
                                 "const": true
                             }
                         }
