@@ -6,6 +6,7 @@ package transpiler
 
 import (
 	"fmt"
+	"hash"
 	"regexp"
 	"strings"
 	"unicode"
@@ -107,6 +108,13 @@ func (v *Vars) Replace(value string) (Node, error) {
 // ID returns the unique ID for the vars.
 func (v *Vars) ID() string {
 	return v.id
+}
+
+func (v *Vars) Hash(h hash.Hash64) error {
+	if _, err := h.Write([]byte(v.id)); err != nil {
+		return err
+	}
+	return v.tree.Hash64With(h)
 }
 
 // Lookup returns the value from the vars.

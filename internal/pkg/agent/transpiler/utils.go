@@ -28,11 +28,16 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 	nodesMap := map[uint64]*Dict{}
 	hasher := xxhash.New()
 	for _, vars := range varsArray {
+		hasher.Reset()
+		_ = vars.Hash(hasher)
 		for _, node := range l.Value().([]Node) {
 			dict, ok := node.(*Dict)
 			if !ok {
 				continue
 			}
+			nodeHasher := hasher // copy to save the vars hash
+			_ = dict.Hash64With(nodeHasher)
+			nodeHash := nodeHasher.Sum64()
 			hadStreams := false
 			if streams := getStreams(dict); streams != nil {
 				hadStreams = true
