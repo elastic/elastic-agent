@@ -172,9 +172,9 @@ spec:
       repository: elastic/elastic-agent
       pipeline_file: ".buildkite/pipeline.elastic-agent-package.yml"
       env:
-        ELASTIC_SLACK_NOTIFICATIONS_ENABLED: "true"
+        ELASTIC_SLACK_NOTIFICATIONS_ENABLED: 'true'
         SLACK_NOTIFICATIONS_CHANNEL: "#ingest-notifications"
-        SLACK_NOTIFICATIONS_ON_SUCCESS: "false"
+        SLACK_NOTIFICATIONS_ON_SUCCESS: 'false'
         SLACK_NOTIFICATIONS_ALL_BRANCHES: "true"
       provider_settings:
         build_pull_request_forks: false
