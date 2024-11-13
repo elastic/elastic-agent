@@ -24,7 +24,7 @@ template:
     {{- end }}
     {{- if eq ($presetVal).serviceAccount.create true }}
     serviceAccountName: {{ $agentName }}
-    {{- else }}
+    {{- else if ($presetVal).serviceAccount.name }}
     serviceAccountName: {{ ($presetVal).serviceAccount.name }}
     {{- end }}
     {{- with ($presetVal).affinity }}
