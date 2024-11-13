@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/spf13/cobra"
 
@@ -44,6 +45,13 @@ unprivileged it will still perform all the same work, including stopping and sta
 	cmd.Flags().BoolP("force", "f", false, "Do not prompt for confirmation")
 	cmd.Flags().DurationP("daemon-timeout", "", 0, "Timeout waiting for Elastic Agent daemon restart after the change is applied (-1 = no wait)")
 
+	// Custom  user specification
+	cmd.Flags().String(flagInstallCustomUser, "", "Custom user used to run Elastic Agent")
+	cmd.Flags().String(flagInstallCustomGroup, "", "Custom group used to access Elastic Agent files")
+	if runtime.GOOS == "windows" {
+		cmd.Flags().String(flagInstallCustomPass, "", "Password for Active directory user used to run Elastic Agent")
+	}
+
 	return cmd
 }
 
@@ -54,6 +62,18 @@ func unprivilegedCmd(streams *cli.IOStreams, cmd *cobra.Command) (err error) {
 	}
 	if !isAdmin {
 		return fmt.Errorf("unable to perform unprivileged command, not executed with %s permissions", utils.PermissionUser)
+	}
+
+	customUser, _ := cmd.Flags().GetString(flagInstallCustomUser)
+	customGroup, _ := cmd.Flags().GetString(flagInstallCustomGroup)
+	customPass := ""
+	if runtime.GOOS == "windows" {
+		customPass, _ = cmd.Flags().GetString(flagInstallCustomPass)
+
+		if (customUser != "" || customPass != "") &&
+			(customUser == "" || customPass == "") {
+			return fmt.Errorf("error installing package: all Active Directory parameters must be provided")
+		}
 	}
 
 	// cannot switch to unprivileged when service components have issues
@@ -77,7 +97,10 @@ func unprivilegedCmd(streams *cli.IOStreams, cmd *cobra.Command) (err error) {
 	}
 
 	pt := install.CreateAndStartNewSpinner(streams.Out, "Converting Elastic Agent to unprivileged...")
-	err = install.SwitchExecutingMode(topPath, pt, install.ElasticUsername, install.ElasticGroupName)
+
+	username, password := install.UnprivilegedUser(customUser, customPass)
+	groupName := install.UnprivilegedGroup(customGroup)
+	err = install.SwitchExecutingMode(topPath, pt, username, groupName, password)
 	if err != nil {
 		// error already adds context
 		return err

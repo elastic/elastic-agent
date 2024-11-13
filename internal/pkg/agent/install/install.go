@@ -40,7 +40,7 @@ const (
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
-func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *progressbar.ProgressBar, streams *cli.IOStreams, adUser, adGroup, adPassword string) (utils.FileOwner, error) {
+func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *progressbar.ProgressBar, streams *cli.IOStreams, customUser, customGroup, userPassword string) (utils.FileOwner, error) {
 	dir, err := findDirectory()
 	if err != nil {
 		return utils.FileOwner{}, errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
@@ -51,9 +51,9 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	groupName := ""
 	password := ""
 	if unprivileged {
-		username, password = unprivilegedUser(adUser, adPassword)
-		groupName = unprivilegedGroup(adGroup)
-		ownership, err = EnsureUserAndGroup(username, groupName, pt)
+		username, password = UnprivilegedUser(customUser, userPassword)
+		groupName = UnprivilegedGroup(customGroup)
+		ownership, err = EnsureUserAndGroup(username, groupName, pt, username == ElasticUsername && password == "") // force create only elastic user
 		if err != nil {
 			// error context already added by EnsureUserAndGroup
 			return utils.FileOwner{}, err
@@ -486,17 +486,22 @@ func CreateInstallMarker(topPath string, ownership utils.FileOwner) error {
 	return fixInstallMarkerPermissions(markerFilePath, ownership)
 }
 
-func unprivilegedUser(adUser, adPassword string) (string, string) {
-	if adUser != "" && adPassword != "" {
-		return adUser, adPassword
+func UnprivilegedUser(username, password string) (string, string) {
+	if username != "" && password != "" {
+		return username, password
+	}
+
+	if username != "" && runtime.GOOS != "windows" {
+		// password only required for windows
+		return username, password
 	}
 
 	return ElasticUsername, ""
 }
 
-func unprivilegedGroup(adGroup string) string {
-	if adGroup != "" {
-		return adGroup
+func UnprivilegedGroup(groupName string) string {
+	if groupName != "" {
+		return groupName
 	}
 
 	return ElasticGroupName

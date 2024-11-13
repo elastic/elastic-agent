@@ -15,7 +15,7 @@ import (
 
 // EnsureUserAndGroup creates the given username and group returning the file ownership information for that
 // user and group.
-func EnsureUserAndGroup(username string, groupName string, pt *progressbar.ProgressBar) (utils.FileOwner, error) {
+func EnsureUserAndGroup(username string, groupName string, pt *progressbar.ProgressBar, forceCreate bool) (utils.FileOwner, error) {
 	var err error
 	var ownership utils.FileOwner
 
@@ -24,7 +24,7 @@ func EnsureUserAndGroup(username string, groupName string, pt *progressbar.Progr
 	if err != nil && !errors.Is(err, ErrGroupNotFound) {
 		return utils.FileOwner{}, fmt.Errorf("failed finding group %s: %w", groupName, err)
 	}
-	if errors.Is(err, ErrGroupNotFound) {
+	if forceCreate && errors.Is(err, ErrGroupNotFound) {
 		pt.Describe(fmt.Sprintf("Creating group %s", groupName))
 		ownership.GID, err = CreateGroup(groupName)
 		if err != nil {
@@ -39,7 +39,7 @@ func EnsureUserAndGroup(username string, groupName string, pt *progressbar.Progr
 	if err != nil && !errors.Is(err, ErrUserNotFound) {
 		return utils.FileOwner{}, fmt.Errorf("failed finding username %s: %w", username, err)
 	}
-	if errors.Is(err, ErrUserNotFound) {
+	if forceCreate && errors.Is(err, ErrUserNotFound) {
 		pt.Describe(fmt.Sprintf("Creating user %s", username))
 		ownership.UID, err = CreateUser(username, ownership.GID)
 		if err != nil {

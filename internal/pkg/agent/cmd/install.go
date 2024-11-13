@@ -30,9 +30,9 @@ const (
 	flagInstallNamespace              = "namespace"
 	flagInstallRunUninstallFromBinary = "run-uninstall-from-binary"
 
-	flagInstallADUser  = "ad-user"
-	flagInstallADGroup = "ad-group"
-	flagInstallADPass  = "ad-password"
+	flagInstallCustomUser  = "user"
+	flagInstallCustomGroup = "group"
+	flagInstallCustomPass  = "password"
 )
 
 func newInstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -67,10 +67,10 @@ would like the Agent to operate.
 	_ = cmd.Flags().MarkHidden(flagInstallDevelopment) // For internal use only.
 
 	// Active directory user specification
+	cmd.Flags().String(flagInstallCustomUser, "", "Custom user used to run Elastic Agent")
+	cmd.Flags().String(flagInstallCustomGroup, "", "Custom group used to access Elastic Agent files")
 	if runtime.GOOS == "windows" {
-		cmd.Flags().String(flagInstallADUser, "", "Active directory user used to run Elastic Agent")
-		cmd.Flags().String(flagInstallADGroup, "", "Active directory group used to access Elastic Agent files")
-		cmd.Flags().String(flagInstallADPass, "", "Password for Active directory user used to run Elastic Agent")
+		cmd.Flags().String(flagInstallCustomPass, "", "Password for Active directory user used to run Elastic Agent")
 	}
 
 	addEnrollFlags(cmd)
@@ -261,16 +261,19 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		progBar.Describe("Successfully uninstalled Elastic Agent")
 	}
 	if status != install.PackageInstall {
-		adUser, _ := cmd.Flags().GetString(flagInstallADUser)
-		adGroup, _ := cmd.Flags().GetString(flagInstallADGroup)
-		adPass, _ := cmd.Flags().GetString(flagInstallADPass)
+		customUser, _ := cmd.Flags().GetString(flagInstallCustomUser)
+		customGroup, _ := cmd.Flags().GetString(flagInstallCustomGroup)
+		customPass := ""
+		if runtime.GOOS == "windows" {
+			customPass, _ = cmd.Flags().GetString(flagInstallCustomPass)
 
-		if (adUser != "" || adPass != "") &&
-			(adUser == "" || adPass == "") {
-			return fmt.Errorf("error installing package: all Active Directory parameters must be provided")
+			if (customUser != "" || customPass != "") &&
+				(customUser == "" || customPass == "") {
+				return fmt.Errorf("error installing package: all Active Directory parameters must be provided")
+			}
 		}
 
-		ownership, err = install.Install(cfgFile, topPath, unprivileged, log, progBar, streams, adUser, adGroup, adPass)
+		ownership, err = install.Install(cfgFile, topPath, unprivileged, log, progBar, streams, customUser, customGroup, customPass)
 		if err != nil {
 			return fmt.Errorf("error installing package: %w", err)
 		}
