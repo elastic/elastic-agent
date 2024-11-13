@@ -42,7 +42,7 @@ locals {
   deployment_version = data.ec_stack.latest.version
 
   ess_region             = coalesce(var.ess_region, "gcp-us-east1")
-  deployment_template_id = coalesce(var.deployment_template_id, "gcp-cpu-optimized-v7")
+  deployment_template_id = coalesce(var.deployment_template_id, "gcp-cpu-optimized")
 }
 
 # If we have defined a stack version, validate that this version exists on that region and return it.
