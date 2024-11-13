@@ -43,12 +43,6 @@ stringData:
         metrics: true
         namespace: default
         use_output: default
-    providers:
-      kubernetes:
-        node: ${NODE_NAME}
-        scope: node
-      kubernetes_leaderelection:
-        enabled: false
     inputs:
       - data_stream:
           namespace: default
@@ -176,6 +170,13 @@ stringData:
           period: 10s
         type: system/metrics
         use_output: default
+    providers:
+      kubernetes:
+        node: ${NODE_NAME}
+        scope: node
+      kubernetes_leaderelection:
+        enabled: false
+        leader_lease: example-pernode
 ---
 # Source: elastic-agent/templates/agent/cluster-role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -299,7 +300,7 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: 39e00ed2a77861d6ce0f1436c373284c3651db4325dbe5d25300677203cfdca7
+        checksum/config: 535875b1a8f244fc529158f3467dec1983ca2ef19d365518da249fd46e22d0ef
     spec:
       automountServiceAccountToken: true
       containers:

@@ -13,12 +13,20 @@ template:
     {{- with ($presetVal).hostPID }}
     hostPID: {{ . }}
     {{- end }}
+    {{- if eq (dig "automountServiceAccountToken" true $presetVal) true }}
     automountServiceAccountToken: true
+    {{- else }}
+    automountServiceAccountToken: false
+    {{- end }}
     {{- with ($presetVal).nodeSelector }}
     nodeSelector:
       {{- . | toYaml | nindent 6 }}
     {{- end }}
+    {{- if eq ($presetVal).serviceAccount.create true }}
     serviceAccountName: {{ $agentName }}
+    {{- else if ($presetVal).serviceAccount.name }}
+    serviceAccountName: {{ ($presetVal).serviceAccount.name }}
+    {{- end }}
     {{- with ($presetVal).affinity }}
     affinity:
       {{- . | toYaml | nindent 6 }}
@@ -55,13 +63,11 @@ template:
           {{- end }}
           type: DirectoryOrCreate
       {{- end }}
-      {{- if eq $.Values.agent.fleet.enabled false }}
       {{/* standalone mode so config is static */}}
       - name: config
         secret:
           defaultMode: 0444
           secretName: {{ $agentName }}
-      {{- end }}
     {{- with $.Values.agent.imagePullSecrets }}
     imagePullSecrets:
       {{- . | toYaml | nindent 8 }}
@@ -83,9 +89,7 @@ template:
         {{- else }}
         image: "{{ $.Values.agent.image.repository }}:{{ $.Values.agent.version }}"
         {{- end }}
-        {{- if eq $.Values.agent.fleet.enabled false }}
         args: ["-c", "/etc/elastic-agent/agent.yml", "-e"]
-        {{- end }}
         {{- with ($presetVal).securityContext }}
         securityContext:
           {{- . | toYaml | nindent 10 }}
@@ -110,12 +114,10 @@ template:
           - name: agent-data
             mountPath: /usr/share/elastic-agent/state
           {{- end }}
-          {{- if eq $.Values.agent.fleet.enabled false }}
           - name: config
             mountPath: /etc/elastic-agent/agent.yml
             readOnly: true
             subPath: agent.yml
-          {{- end }}
         env:
           - name: NODE_NAME
             valueFrom:
@@ -137,4 +139,8 @@ template:
           {{- end }}
           {{- end }}
           {{- end }}
+        {{- with ($presetVal).envFrom }}
+        envFrom:
+          {{- . | toYaml | nindent 10}}
+        {{- end }}
 {{- end }}

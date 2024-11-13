@@ -69,12 +69,6 @@ stringData:
         metrics: true
         namespace: default
         use_output: default
-    providers:
-      kubernetes:
-        node: ${NODE_NAME}
-        scope: cluster
-      kubernetes_leaderelection:
-        enabled: true
     inputs:
       - data_stream:
           namespace: default
@@ -94,6 +88,13 @@ stringData:
           - /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
         type: kubernetes/metrics
         use_output: default
+    providers:
+      kubernetes:
+        node: ${NODE_NAME}
+        scope: cluster
+      kubernetes_leaderelection:
+        enabled: true
+        leader_lease: example-clusterwide
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -126,11 +127,6 @@ stringData:
         metrics: true
         namespace: default
         use_output: default
-    providers:
-      kubernetes:
-        enabled: false
-      kubernetes_leaderelection:
-        enabled: false
     inputs:
       - data_stream:
           namespace: default
@@ -388,6 +384,12 @@ stringData:
           period: 10s
         type: kubernetes/metrics
         use_output: default
+    providers:
+      kubernetes:
+        enabled: false
+      kubernetes_leaderelection:
+        enabled: false
+        leader_lease: example-ksmsharded
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -420,14 +422,6 @@ stringData:
         metrics: true
         namespace: default
         use_output: default
-    providers:
-      kubernetes:
-        hints:
-          enabled: true
-        node: ${NODE_NAME}
-        scope: node
-      kubernetes_leaderelection:
-        enabled: false
     inputs:
       - data_stream:
           namespace: default
@@ -573,6 +567,15 @@ stringData:
           ssl.verification_mode: none
         type: kubernetes/metrics
         use_output: default
+    providers:
+      kubernetes:
+        hints:
+          enabled: true
+        node: ${NODE_NAME}
+        scope: node
+      kubernetes_leaderelection:
+        enabled: false
+        leader_lease: example-pernode
 ---
 # Source: elastic-agent/templates/agent/cluster-role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -1091,7 +1094,7 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: 21fb7e317577410096de8d8e0fb03b32ad2e406b549f75085ae6907d38678e46
+        checksum/config: 0df24cb5f7362916ba8cb10621b123918f22f52a7ce9f0b0514c5983de6d06f3
     spec:
       automountServiceAccountToken: true
       containers:
@@ -1236,7 +1239,7 @@ spec:
       labels:
         name: agent-clusterwide-example
       annotations:
-        checksum/config: 73527b0aad319ef33239ef3c862820c5ee5cafb42e2ce164049646791b69ec68
+        checksum/config: 97e62ed0d731dea2ecadf31b0a7b4160db1b8a253589b7324f3a381af2519591
     spec:
       automountServiceAccountToken: true
       containers:
@@ -1318,7 +1321,7 @@ spec:
       labels:
         name: agent-ksmsharded-example
       annotations:
-        checksum/config: 4ec2b2ef4d3c5c103e79e47a45d4b3b4f9f774e85293f9a5b2d56556025f1d2d
+        checksum/config: 3b64edf7317419b11b0aef4cd10cad04037b7bc0b6866da25871b47b41c04490
     spec:
       automountServiceAccountToken: true
       containers:
