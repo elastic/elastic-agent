@@ -5,6 +5,9 @@ source .buildkite/scripts/common2.sh
 
 source .buildkite/scripts/steps/ess.sh
 
+# Make sure that all tools are installed
+asdf install
+
 GROUP_NAME=$1
 if [ -z "$GROUP_NAME" ]; then
   echo "Error: Specify the group name: sudo-integration-tests.sh [group_name]" >&2
