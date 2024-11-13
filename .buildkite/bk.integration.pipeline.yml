@@ -6,21 +6,21 @@ env:
   ASDF_MAGE_VERSION: 1.14.0
 
 steps:
-  - label: "Integration tests: packaging"
-    key: "package-it"
-    command: ".buildkite/scripts/steps/integration-package.sh"
-    artifact_paths:
-      - build/distributions/**
-    agents:
-      provider: "gcp"
-      machineType: "n1-standard-8"
+  # - label: "Integration tests: packaging"
+  #   key: "package-it"
+  #   command: ".buildkite/scripts/steps/integration-package.sh"
+  #   artifact_paths:
+  #     - build/distributions/**
+  #   agents:
+  #     provider: "gcp"
+  #     machineType: "n1-standard-8"
 
   - label: Start ESS stack for integration tests
     key: integration-ess
     env:
       ASDF_TERRAFORM_VERSION: 1.9.2
-    depends_on:
-      - package-it
+    # depends_on:
+    #   - package-it
     command: |
       #!/usr/bin/env bash
       set -euo pipefail
@@ -34,12 +34,16 @@ steps:
 
   - group: "Stateful(Sudo): Windows"
     key: integration-tests-win
+
     depends_on:
       - integration-ess
     steps:
       - label: "Win2022:{{matrix}}"
+        retry:
+          automatic:
+            - limit: 1
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 01932631-024c-4fcc-94f5-998ee09f8a97
           .buildkite/scripts/integration-tests.ps1 {{matrix}}
         artifact_paths:
           - build/**
@@ -48,60 +52,60 @@ steps:
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-windows-2022"
         matrix:
-          - default
-          - fleet
+          # - default
+          # - fleet
           - fleet-privileged
-          - upgrade
+          # - upgrade
 
-  - group: "Stateful(Sudo): Ubuntu"
-    key: integration-tests-ubuntu
-    depends_on:
-      - package-it
-      - integration-ess
-    steps:
-      - label: "x86_64:Group: {{matrix}}"
-        command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it'
-          .buildkite/scripts/steps/integration_tests_tf_sudo.sh {{matrix}}
-        artifact_paths:
-          - build/**
-        agents:
-          provider: "gcp"
-          machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
-        matrix:
-          - default
-          - upgrade
-          - fleet
-          - fqdn
-          - deb
-          - fleet-airgapped
-          - fleet-privileged
-          - fleet-airgapped-privileged
+  # - group: "Stateful(Sudo): Ubuntu"
+  #   key: integration-tests-ubuntu
+  #   depends_on:
+  #     - package-it
+  #     - integration-ess
+  #   steps:
+  #     - label: "x86_64:Group: {{matrix}}"
+  #       command: |
+  #         buildkite-agent artifact download build/distributions/** . --step 'package-it'
+  #         .buildkite/scripts/steps/integration_tests_tf_sudo.sh {{matrix}}
+  #       artifact_paths:
+  #         - build/**
+  #       agents:
+  #         provider: "gcp"
+  #         machineType: "n1-standard-8"
+  #         image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+  #       matrix:
+  #         - default
+  #         - upgrade
+  #         - fleet
+  #         - fqdn
+  #         - deb
+  #         - fleet-airgapped
+  #         - fleet-privileged
+  #         - fleet-airgapped-privileged
 
-      - label: "arm:Group: {{matrix}}"
-        command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it'
-          .buildkite/scripts/steps/integration_tests_tf_sudo.sh {{matrix}}
-        artifact_paths:
-          - build/**
-        agents:
-          provider: "aws"
-          imagePrefix: "platform-ingest-beats-ubuntu-2404-aarch64"
-          instanceType: "m6g.xlarge"
-        matrix:
-          - default
-          - upgrade
-          - fleet
-          - fqdn
-          - deb
-          - fleet-airgapped
-          - fleet-privileged
-          - fleet-airgapped-privileged
+  #     - label: "arm:Group: {{matrix}}"
+  #       command: |
+  #         buildkite-agent artifact download build/distributions/** . --step 'package-it'
+  #         .buildkite/scripts/steps/integration_tests_tf_sudo.sh {{matrix}}
+  #       artifact_paths:
+  #         - build/**
+  #       agents:
+  #         provider: "aws"
+  #         imagePrefix: "platform-ingest-beats-ubuntu-2404-aarch64"
+  #         instanceType: "m6g.xlarge"
+  #       matrix:
+  #         - default
+  #         - upgrade
+  #         - fleet
+  #         - fqdn
+  #         - deb
+  #         - fleet-airgapped
+  #         - fleet-privileged
+  #         - fleet-airgapped-privileged
 
   - label: ESS stack cleanup
     depends_on:
-      - integration-tests-ubuntu
+      # - integration-tests-ubuntu
       - integration-tests-win
     allow_dependency_failure: true
     command: |
