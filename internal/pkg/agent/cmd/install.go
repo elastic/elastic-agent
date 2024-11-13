@@ -70,7 +70,7 @@ would like the Agent to operate.
 	cmd.Flags().String(flagInstallCustomUser, "", "Custom user used to run Elastic Agent")
 	cmd.Flags().String(flagInstallCustomGroup, "", "Custom group used to access Elastic Agent files")
 	if runtime.GOOS == "windows" {
-		cmd.Flags().String(flagInstallCustomPass, "", "Password for Active directory user used to run Elastic Agent")
+		cmd.Flags().String(flagInstallCustomPass, "", "Password for user used to run Elastic Agent")
 	}
 
 	addEnrollFlags(cmd)
