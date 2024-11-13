@@ -74,7 +74,8 @@ func Test_runDispatcher(t *testing.T) {
 		name                string
 		mockGateway         func(chan []fleetapi.Action) *mockGateway
 		mockDispatcher      func() *mockDispatcher
-		interval            time.Duration
+		flushInterval       time.Duration
+		contextTimeout      time.Duration
 		skipOnWindowsReason string
 	}{{
 		name: "dispatcher not called",
@@ -87,7 +88,8 @@ func Test_runDispatcher(t *testing.T) {
 			dispatcher := &mockDispatcher{}
 			return dispatcher
 		},
-		interval: time.Second,
+		flushInterval:  time.Second,
+		contextTimeout: time.Millisecond * 100,
 	}, {
 		name: "gateway actions passed",
 		mockGateway: func(ch chan []fleetapi.Action) *mockGateway {
@@ -101,7 +103,8 @@ func Test_runDispatcher(t *testing.T) {
 			dispatcher.On("Dispatch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once()
 			return dispatcher
 		},
-		interval: time.Second,
+		flushInterval:  time.Second,
+		contextTimeout: time.Millisecond * 200,
 	}, {
 		name: "no gateway actions, dispatcher is flushed",
 		mockGateway: func(ch chan []fleetapi.Action) *mockGateway {
@@ -115,7 +118,8 @@ func Test_runDispatcher(t *testing.T) {
 			dispatcher.On("Dispatch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe() // allow a second call in case there are timing issues in the CI pipeline
 			return dispatcher
 		},
-		interval: time.Millisecond * 60,
+		flushInterval:  time.Millisecond * 60,
+		contextTimeout: time.Millisecond * 100,
 	}}
 
 	for _, tc := range tests {
@@ -130,9 +134,9 @@ func Test_runDispatcher(t *testing.T) {
 			detailsSetter := func(upgradeDetails *details.Details) {}
 			acker := &mockAcker{}
 
-			ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+			ctx, cancel := context.WithTimeout(context.Background(), tc.contextTimeout)
 			defer cancel()
-			runDispatcher(ctx, dispatcher, gateway, detailsSetter, acker, tc.interval)
+			runDispatcher(ctx, dispatcher, gateway, detailsSetter, acker, tc.flushInterval)
 			assert.Empty(t, ch)
 
 			gateway.AssertExpectations(t)
