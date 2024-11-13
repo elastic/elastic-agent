@@ -40,6 +40,7 @@ import (
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
+	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/pkg/testing/buildkite"
 	tcommon "github.com/elastic/elastic-agent/pkg/testing/common"
@@ -475,7 +476,8 @@ func AssembleDarwinUniversal() error {
 	args := []string{
 		"build/golang-crossbuild/%s-darwin-universal",
 		"build/golang-crossbuild/%s-darwin-arm64",
-		"build/golang-crossbuild/%s-darwin-amd64"}
+		"build/golang-crossbuild/%s-darwin-amd64",
+	}
 
 	for _, arg := range args {
 		lipoArgs = append(lipoArgs, fmt.Sprintf(arg, devtools.BeatName))
@@ -514,7 +516,7 @@ func Package(ctx context.Context) error {
 		dependenciesVersion = beatVersion
 	}
 
-	packageAgent(ctx, platforms, dependenciesVersion, manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(CrossBuild))
+	packageAgent(ctx, platforms, dependenciesVersion, manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(CrossBuild), devtools.SelectedPackageTypes)
 	return nil
 }
 
@@ -855,7 +857,7 @@ func (Devmachine) Create(instanceName string) error {
 	if instanceName == "" {
 		return errors.New(
 			`instanceName is required.
-	Example: 
+	Example:
 	mage devmachine:create "pavel-dev-machine"  `)
 	}
 	return devmachine.Run(instanceName)
@@ -916,7 +918,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 		// produce docker package
 		packageAgent(ctx, []string{
 			"linux/amd64",
-		}, dependenciesVersion, nil, mg.F(devtools.UseElasticAgentDemoPackaging), mg.F(CrossBuild))
+		}, dependenciesVersion, nil, mg.F(devtools.UseElasticAgentDemoPackaging), mg.F(CrossBuild), devtools.SelectedPackageTypes)
 
 		dockerPackagePath := filepath.Join("build", "package", "elastic-agent", "elastic-agent-linux-amd64.docker", "docker-build")
 		if err := os.Chdir(dockerPackagePath); err != nil {
@@ -963,7 +965,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-func packageAgent(ctx context.Context, platforms []string, dependenciesVersion string, manifestResponse *manifest.Build, agentPackaging, agentBinaryTarget mg.Fn) error {
+func packageAgent(ctx context.Context, platforms []string, dependenciesVersion string, manifestResponse *manifest.Build, agentPackaging, agentBinaryTarget mg.Fn, packageTypes []mage.PackageType) error {
 	fmt.Println("--- Package Elastic-Agent")
 
 	platformPackageSuffixes := []string{}
@@ -975,7 +977,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	}
 
 	// download/copy all the necessary dependencies for packaging elastic-agent
-	archivePath, dropPath := collectPackageDependencies(platforms, dependenciesVersion, platformPackageSuffixes)
+	archivePath, dropPath := collectPackageDependencies(platforms, dependenciesVersion, platformPackageSuffixes, packageTypes)
 
 	// cleanup after build
 	defer os.RemoveAll(archivePath)
@@ -1009,8 +1011,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 // NOTE: after the build is done the caller must:
 // - delete archivePath and dropPath contents
 // - unset AGENT_DROP_PATH environment variable
-func collectPackageDependencies(platforms []string, packageVersion string, platformPackageSuffixes []string) (archivePath string, dropPath string) {
-
+func collectPackageDependencies(platforms []string, packageVersion string, platformPackageSuffixes []string, packageTypes []mage.PackageType) (archivePath string, dropPath string) {
 	dropPath, found := os.LookupEnv(agentDropPath)
 
 	// try not to shadow too many variables
@@ -1055,10 +1056,15 @@ func collectPackageDependencies(platforms []string, packageVersion string, platf
 						fmt.Printf("--- Binary %s does not support %s, download skipped\n", spec.BinaryName, platform)
 						continue
 					}
-					targetPath := filepath.Join(archivePath, manifest.PlatformPackages[platform])
-					os.MkdirAll(targetPath, 0755)
-					packageName := spec.GetPackageName(packageVersion, platform)
-					errGroup.Go(downloadBinary(ctx, spec.ProjectName, packageName, spec.BinaryName, platform, packageVersion, targetPath, completedDownloads))
+					for _, pkgType := range packageTypes {
+						if !spec.SupportsPackageType(pkgcommon.PackageType(pkgType)) {
+							continue
+						}
+						targetPath := filepath.Join(archivePath, manifest.PlatformPackages[platform])
+						os.MkdirAll(targetPath, 0755)
+						packageName := spec.GetPackageName(packageVersion, platform)
+						errGroup.Go(downloadBinary(ctx, spec.ProjectName, packageName, spec.BinaryName, platform, packageVersion, targetPath, completedDownloads))
+					}
 				}
 			}
 
@@ -1160,7 +1166,6 @@ func removePythonWheels(matches []string, version string) []string {
 // flattenDependencies will extract all the required packages collected in archivePath and dropPath in flatPath and
 // regenerate checksums
 func flattenDependencies(requiredPackages []string, packageVersion, archivePath, dropPath, flatPath string, manifestResponse *manifest.Build) {
-
 	for _, rp := range requiredPackages {
 		targetPath := filepath.Join(archivePath, rp)
 		versionedFlatPath := filepath.Join(flatPath, rp)
@@ -1239,7 +1244,6 @@ type branchInfo struct {
 // FetchLatestAgentCoreStagingDRA is a mage target that will retrieve the elastic-agent-core DRA artifacts and
 // place them under build/dra/buildID. It accepts one argument that has to be a release branch present in staging DRA
 func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
-
 	branchInfo, err := findLatestBuildForBranch(ctx, baseURLForStagingDRA, branch)
 
 	// Create a dir with the buildID at <root>/build/dra/<buildID>
@@ -1259,7 +1263,7 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 	}
 
 	fmt.Println("Downloaded agent core DRAs:")
-	for k, _ := range artifacts {
+	for k := range artifacts {
 		fmt.Println(k)
 	}
 	return nil
@@ -1267,7 +1271,6 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 
 // PackageUsingDRA packages elastic-agent for distribution using Daily Released Artifacts specified in manifest.
 func PackageUsingDRA(ctx context.Context) error {
-
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
@@ -1295,7 +1298,7 @@ func PackageUsingDRA(ctx context.Context) error {
 		return fmt.Errorf("setting agent commit hash %q: %w", agentCoreProject.CommitHash, err)
 	}
 
-	return packageAgent(ctx, platforms, parsedVersion.VersionWithPrerelease(), manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(useDRAAgentBinaryForPackage, devtools.ManifestURL))
+	return packageAgent(ctx, platforms, parsedVersion.VersionWithPrerelease(), manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(useDRAAgentBinaryForPackage, devtools.ManifestURL), devtools.SelectedPackageTypes)
 }
 
 func downloadManifestAndSetVersion(ctx context.Context, url string) (*manifest.Build, *version.ParsedSemVer, error) {
@@ -1479,7 +1482,6 @@ func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir s
 }
 
 func useDRAAgentBinaryForPackage(ctx context.Context, manifestUrl string) error {
-
 	repositoryRoot, err := findRepositoryRoot()
 	if err != nil {
 		return fmt.Errorf("looking up for repository root: %w", err)
@@ -1874,7 +1876,6 @@ func prepareIronbankBuild() error {
 		}
 		return nil
 	})
-
 	if err != nil {
 		return fmt.Errorf("cannot create templates for the IronBank: %+v", err)
 	}
@@ -2109,8 +2110,10 @@ func (Integration) UpdatePackageVersion(ctx context.Context) error {
 	return nil
 }
 
-var stateDir = ".integration-cache"
-var stateFile = "state.yml"
+var (
+	stateDir  = ".integration-cache"
+	stateFile = "state.yml"
+)
 
 // readFrameworkState reads the state file from the integration test framework
 func readFrameworkState() (runner.State, error) {
@@ -2184,8 +2187,8 @@ func listStacks() (string, error) {
 	for i, stack := range state.Stacks {
 		t := table.NewWriter()
 		t.AppendRows([]table.Row{
-			table.Row{"#", i},
-			table.Row{"Type", stack.Provisioner},
+			{"#", i},
+			{"Type", stack.Provisioner},
 		})
 
 		switch {
@@ -3044,7 +3047,7 @@ func authGCP(ctx context.Context) error {
 	if err := json.Unmarshal(output, &svcList); err != nil {
 		return fmt.Errorf("unable to parse service accounts: %w", err)
 	}
-	var found = false
+	found := false
 	for _, svc := range svcList {
 		if svc.Email == iamAcctName {
 			found = true

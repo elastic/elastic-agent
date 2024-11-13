@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	"gopkg.in/yaml.v3"
@@ -60,16 +61,17 @@ var (
 	componentConfigFilePattern = regexp.MustCompile(`.*beat\.spec\.yml$|.*beat\.yml$|apm-server\.yml$|apm-server\.spec\.yml$|elastic-agent\.yml$`)
 )
 
-// PackageType defines the file format of the package (e.g. zip, rpm, etc).
-type PackageType int
+// Alias for pkgcommon.PackageType. This type is moved to the pkgcommon to
+// resolve circular dependency problems
+type PackageType pkgcommon.PackageType
 
 // List of possible package types.
-const (
-	RPM PackageType = iota + 1
-	Deb
-	Zip
-	TarGz
-	Docker
+var (
+	RPM    PackageType = PackageType(pkgcommon.RPM)
+	Deb                = PackageType(pkgcommon.Deb)
+	Zip                = PackageType(pkgcommon.Zip)
+	TarGz              = PackageType(pkgcommon.TarGz)
+	Docker             = PackageType(pkgcommon.Docker)
 )
 
 // OSPackageArgs define a set of package types to build for an operating
