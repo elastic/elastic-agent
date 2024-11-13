@@ -594,9 +594,11 @@ func (b *BeatsMonitor) injectMetricsInput(
 	}
 	monitoringNamespace := b.monitoringNamespace()
 	fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
-	beatsStreams := make([]map[string]interface{}, 0, len(componentIDToBinary))
-	streams := []map[string]interface{}{
-		{
+	// beatStreams and streams MUST be []interface{} even if in reality they are []map[string]interface{}:
+	// if those are declared as slices of maps the message "proto: invalid type: []map[string]interface{}" will pop up
+	beatsStreams := make([]interface{}, 0, len(componentIDToBinary))
+	streams := []interface{}{
+		map[string]interface{}{
 			idKey: fmt.Sprintf("%s-agent", monitoringMetricsUnitID),
 			"data_stream": map[string]interface{}{
 				"type":      "metrics",
@@ -901,10 +903,19 @@ func (b *BeatsMonitor) injectMetricsInput(
 	if failureThreshold != nil {
 		// add failure threshold to all streams and beatStreams
 		for _, s := range streams {
-			s[failureThresholdKey] = *failureThreshold
+			if streamMap, ok := s.(map[string]interface{}); ok {
+				streamMap[failureThresholdKey] = *failureThreshold
+			} else {
+				return fmt.Errorf("unable to set %s: %d in monitoring stream %q: unexpected type %T", failureThresholdKey, *failureThreshold, s, s)
+			}
+
 		}
 		for _, s := range beatsStreams {
-			s[failureThresholdKey] = *failureThreshold
+			if streamMap, ok := s.(map[string]interface{}); ok {
+				streamMap[failureThresholdKey] = *failureThreshold
+			} else {
+				return fmt.Errorf("unable to set %s: %d in monitoring stream %q: unexpected type %T", failureThresholdKey, *failureThreshold, s, s)
+			}
 		}
 	}
 

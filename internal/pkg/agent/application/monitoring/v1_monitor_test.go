@@ -234,17 +234,20 @@ func TestMonitoringConfigMetricsInterval(t *testing.T) {
 					t.Logf("input %q", inputID)
 					// check the streams created for the input, should be a list of objects
 					if assert.Contains(t, input, "streams", "input %q does not contain any stream", inputID) &&
-						assert.IsTypef(t, []map[string]any{}, input["streams"], "streams for input %q are not a list of maps", inputID) {
+						assert.IsTypef(t, []any{}, input["streams"], "streams for input %q are not a list of objects", inputID) {
 						// loop over streams and access keys
-						for _, stream := range input["streams"].([]map[string]any) {
-							// check period and assert its value
-							streamID := stream["id"]
-							if assert.Containsf(t, stream, "period", "stream %q for input %q does not contain a period", streamID, inputID) &&
-								assert.IsType(t, "", stream["period"], "period for stream %q of input %q is not represented as a string", streamID, inputID) {
-								periodString := stream["period"].(string)
-								duration, err := time.ParseDuration(periodString)
-								if assert.NoErrorf(t, err, "Unparseable period duration %s for stream %q of input %q", periodString, streamID, inputID) {
-									assert.Equalf(t, duration, tc.expectedInterval, "unexpected duration for stream %q of input %q", streamID, inputID)
+						for _, rawStream := range input["streams"].([]any) {
+							if assert.IsTypef(t, map[string]any{}, rawStream, "stream %v for input %q is not a map", rawStream, inputID) {
+								stream := rawStream.(map[string]any)
+								// check period and assert its value
+								streamID := stream["id"]
+								if assert.Containsf(t, stream, "period", "stream %q for input %q does not contain a period", streamID, inputID) &&
+									assert.IsType(t, "", stream["period"], "period for stream %q of input %q is not represented as a string", streamID, inputID) {
+									periodString := stream["period"].(string)
+									duration, err := time.ParseDuration(periodString)
+									if assert.NoErrorf(t, err, "Unparseable period duration %s for stream %q of input %q", periodString, streamID, inputID) {
+										assert.Equalf(t, duration, tc.expectedInterval, "unexpected duration for stream %q of input %q", streamID, inputID)
+									}
 								}
 							}
 						}
@@ -437,15 +440,19 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 					t.Logf("input %q", inputID)
 					// check the streams created for the input, should be a list of objects
 					if assert.Contains(t, input, "streams", "input %q does not contain any stream", inputID) &&
-						assert.IsTypef(t, []map[string]any{}, input["streams"], "streams for input %q are not a list of objects", inputID) {
+						assert.IsTypef(t, []any{}, input["streams"], "streams for input %q are not a list of objects", inputID) {
+
 						// loop over streams and cast to map[string]any to access keys
-						for _, stream := range input["streams"].([]map[string]any) {
-							// check period and assert its value
-							streamID := stream["id"]
-							if assert.Containsf(t, stream, failureThresholdKey, "stream %q for input %q does not contain a failureThreshold", streamID, inputID) &&
-								assert.IsType(t, uint(0), stream[failureThresholdKey], "period for stream %q of input %q is not represented as a string", streamID, inputID) {
-								actualFailureThreshold := stream[failureThresholdKey].(uint)
-								assert.Equalf(t, actualFailureThreshold, tc.expectedThreshold, "unexpected failure threshold for stream %q of input %q", streamID, inputID)
+						for _, rawStream := range input["streams"].([]any) {
+							if assert.IsTypef(t, map[string]any{}, rawStream, "stream %v for input %q is not a map", rawStream, inputID) {
+								stream := rawStream.(map[string]any)
+								// check period and assert its value
+								streamID := stream["id"]
+								if assert.Containsf(t, stream, failureThresholdKey, "stream %q for input %q does not contain a failureThreshold", streamID, inputID) &&
+									assert.IsType(t, uint(0), stream[failureThresholdKey], "period for stream %q of input %q is not represented as a string", streamID, inputID) {
+									actualFailureThreshold := stream[failureThresholdKey].(uint)
+									assert.Equalf(t, actualFailureThreshold, tc.expectedThreshold, "unexpected failure threshold for stream %q of input %q", streamID, inputID)
+								}
 							}
 						}
 					}
@@ -513,9 +520,9 @@ func TestMonitoringConfigComponentFields(t *testing.T) {
 	inputsSlice := monitoringConfig["inputs"].([]any)
 	for _, input := range inputsSlice {
 		inpMap := input.(map[string]any)
-		for _, stream := range inpMap["streams"].([]map[string]any) {
-			streamID := stream["id"].(string)
-			processors := stream["processors"].([]any)
+		for _, rawStream := range inpMap["streams"].([]any) {
+			streamID := rawStream.(map[string]any)["id"].(string)
+			processors := rawStream.(map[string]any)["processors"].([]any)
 			for _, rawProcessor := range processors {
 				processor := rawProcessor.(map[string]any)
 				if _, exists := processor["add_fields"]; !exists {
