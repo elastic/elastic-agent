@@ -76,6 +76,7 @@ stringData:
         scope: cluster
       kubernetes_leaderelection:
         enabled: true
+        leader_lease: example-clusterwide
     inputs:
       - data_stream:
           namespace: default
@@ -127,6 +128,7 @@ stringData:
         enabled: false
       kubernetes_leaderelection:
         enabled: false
+        leader_lease: example-ksmsharded
     inputs:
       - data_stream:
           namespace: default
@@ -417,6 +419,7 @@ stringData:
         scope: node
       kubernetes_leaderelection:
         enabled: false
+        leader_lease: example-pernode
     inputs:
       - data_stream:
           namespace: default
@@ -1094,86 +1097,85 @@ spec:
       namespace: elastic-system
   daemonSet:
     podTemplate:
-
       spec:
-        dnsPolicy: ClusterFirstWithHostNet
         automountServiceAccountToken: true
+        containers:
+        - env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: STATE_PATH
+            value: /usr/share/elastic-agent/state
+          - name: ELASTIC_NETINFO
+            value: "false"
+          image: docker.elastic.co/beats/elastic-agent:8.16.0-SNAPSHOT
+          imagePullPolicy: IfNotPresent
+          name: agent
+          resources:
+            limits:
+              memory: 1000Mi
+            requests:
+              cpu: 100m
+              memory: 400Mi
+          securityContext:
+            capabilities:
+              add:
+              - DAC_READ_SEARCH
+              - CHOWN
+              - SETPCAP
+              - SYS_PTRACE
+              drop:
+              - ALL
+            privileged: false
+            runAsGroup: 1000
+            runAsUser: 1000
+          volumeMounts:
+          - mountPath: /hostfs/proc
+            name: proc
+            readOnly: true
+          - mountPath: /hostfs/sys/fs/cgroup
+            name: cgroup
+            readOnly: true
+          - mountPath: /var/lib/docker/containers
+            name: varlibdockercontainers
+            readOnly: true
+          - mountPath: /var/log
+            name: varlog
+            readOnly: true
+          - mountPath: /hostfs/etc
+            name: etc-full
+            readOnly: true
+          - mountPath: /hostfs/var/lib
+            name: var-lib
+            readOnly: true
+        dnsPolicy: ClusterFirstWithHostNet
         nodeSelector:
           kubernetes.io/os: linux
         serviceAccountName: agent-pernode-example
         volumes:
-          - hostPath:
-              path: /proc
-            name: proc
-          - hostPath:
-              path: /sys/fs/cgroup
-            name: cgroup
-          - hostPath:
-              path: /var/lib/docker/containers
-            name: varlibdockercontainers
-          - hostPath:
-              path: /var/log
-            name: varlog
-          - hostPath:
-              path: /etc
-            name: etc-full
-          - hostPath:
-              path: /var/lib
-            name: var-lib
-        containers:
-          - name: agent
-            imagePullPolicy: IfNotPresent
-            image: "docker.elastic.co/beats/elastic-agent:8.16.0-SNAPSHOT"
-            securityContext:
-              capabilities:
-                add:
-                - DAC_READ_SEARCH
-                - CHOWN
-                - SETPCAP
-                - SYS_PTRACE
-                drop:
-                - ALL
-              privileged: false
-              runAsGroup: 1000
-              runAsUser: 1000
-            resources:
-              limits:
-                memory: 1000Mi
-              requests:
-                cpu: 100m
-                memory: 400Mi
-            volumeMounts:
-              - mountPath: /hostfs/proc
-                name: proc
-                readOnly: true
-              - mountPath: /hostfs/sys/fs/cgroup
-                name: cgroup
-                readOnly: true
-              - mountPath: /var/lib/docker/containers
-                name: varlibdockercontainers
-                readOnly: true
-              - mountPath: /var/log
-                name: varlog
-                readOnly: true
-              - mountPath: /hostfs/etc
-                name: etc-full
-                readOnly: true
-              - mountPath: /hostfs/var/lib
-                name: var-lib
-                readOnly: true
-            env:
-              - name: NODE_NAME
-                valueFrom:
-                  fieldRef:
-                    fieldPath: spec.nodeName
-              - name: POD_NAME
-                valueFrom:
-                  fieldRef:
-                    fieldPath: metadata.name
-              - name: STATE_PATH
-                value: "/usr/share/elastic-agent/state"
-              - name: ELASTIC_NETINFO
-                value: "false"
+        - hostPath:
+            path: /proc
+          name: proc
+        - hostPath:
+            path: /sys/fs/cgroup
+          name: cgroup
+        - hostPath:
+            path: /var/lib/docker/containers
+          name: varlibdockercontainers
+        - hostPath:
+            path: /var/log
+          name: varlog
+        - hostPath:
+            path: /etc
+          name: etc-full
+        - hostPath:
+            path: /var/lib
+          name: var-lib
 ---
 # Source: elastic-agent/templates/agent/eck/deployment.yaml
 apiVersion: agent.k8s.elastic.co/v1alpha1
@@ -1198,52 +1200,51 @@ spec:
       namespace: elastic-system
   deployment:
     podTemplate:
-
       spec:
-        dnsPolicy: ClusterFirstWithHostNet
         automountServiceAccountToken: true
+        containers:
+        - env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: STATE_PATH
+            value: /usr/share/elastic-agent/state
+          - name: ELASTIC_NETINFO
+            value: "false"
+          image: docker.elastic.co/beats/elastic-agent:8.16.0-SNAPSHOT
+          imagePullPolicy: IfNotPresent
+          name: agent
+          resources:
+            limits:
+              memory: 800Mi
+            requests:
+              cpu: 100m
+              memory: 400Mi
+          securityContext:
+            capabilities:
+              add:
+              - CHOWN
+              - SETPCAP
+              - DAC_READ_SEARCH
+              - SYS_PTRACE
+              drop:
+              - ALL
+            privileged: false
+            runAsGroup: 1000
+            runAsUser: 1000
+          volumeMounts: null
+        dnsPolicy: ClusterFirstWithHostNet
         nodeSelector:
           kubernetes.io/os: linux
         serviceAccountName: agent-clusterwide-example
         volumes:
-          - emptyDir: {}
-            name: agent-data
-        containers:
-          - name: agent
-            imagePullPolicy: IfNotPresent
-            image: "docker.elastic.co/beats/elastic-agent:8.16.0-SNAPSHOT"
-            securityContext:
-              capabilities:
-                add:
-                - CHOWN
-                - SETPCAP
-                - DAC_READ_SEARCH
-                - SYS_PTRACE
-                drop:
-                - ALL
-              privileged: false
-              runAsGroup: 1000
-              runAsUser: 1000
-            resources:
-              limits:
-                memory: 800Mi
-              requests:
-                cpu: 100m
-                memory: 400Mi
-            volumeMounts:
-            env:
-              - name: NODE_NAME
-                valueFrom:
-                  fieldRef:
-                    fieldPath: spec.nodeName
-              - name: POD_NAME
-                valueFrom:
-                  fieldRef:
-                    fieldPath: metadata.name
-              - name: STATE_PATH
-                value: "/usr/share/elastic-agent/state"
-              - name: ELASTIC_NETINFO
-                value: "false"
+        - emptyDir: {}
+          name: agent-data
 ---
 # Source: elastic-agent/templates/agent/eck/statefulset.yaml
 apiVersion: agent.k8s.elastic.co/v1alpha1
@@ -1268,90 +1269,89 @@ spec:
       namespace: elastic-system
   statefulSet:
     podTemplate:
-
       spec:
-        dnsPolicy: ClusterFirstWithHostNet
         automountServiceAccountToken: true
+        containers:
+        - args:
+          - --pod=$(POD_NAME)
+          - --pod-namespace=$(POD_NAMESPACE)
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.12.0
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            timeoutSeconds: 5
+          name: kube-state-metrics
+          ports:
+          - containerPort: 8080
+            name: http-metrics
+          - containerPort: 8081
+            name: telemetry
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8081
+            initialDelaySeconds: 5
+            timeoutSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65534
+            seccompProfile:
+              type: RuntimeDefault
+        - env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: STATE_PATH
+            value: /usr/share/elastic-agent/state
+          - name: ELASTIC_NETINFO
+            value: "false"
+          image: docker.elastic.co/beats/elastic-agent:8.16.0-SNAPSHOT
+          imagePullPolicy: IfNotPresent
+          name: agent
+          resources:
+            limits:
+              memory: 800Mi
+            requests:
+              cpu: 100m
+              memory: 400Mi
+          securityContext:
+            capabilities:
+              add:
+              - CHOWN
+              - SETPCAP
+              - DAC_READ_SEARCH
+              - SYS_PTRACE
+              drop:
+              - ALL
+            privileged: false
+            runAsGroup: 1000
+            runAsUser: 1000
+          volumeMounts: null
+        dnsPolicy: ClusterFirstWithHostNet
         nodeSelector:
           kubernetes.io/os: linux
         serviceAccountName: agent-ksmsharded-example
         volumes:
-          - emptyDir: {}
-            name: agent-data
-        containers:
-          - args:
-            - --pod=$(POD_NAME)
-            - --pod-namespace=$(POD_NAMESPACE)
-            env:
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-            image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.12.0
-            livenessProbe:
-              httpGet:
-                path: /healthz
-                port: 8080
-              initialDelaySeconds: 5
-              timeoutSeconds: 5
-            name: kube-state-metrics
-            ports:
-            - containerPort: 8080
-              name: http-metrics
-            - containerPort: 8081
-              name: telemetry
-            readinessProbe:
-              httpGet:
-                path: /
-                port: 8081
-              initialDelaySeconds: 5
-              timeoutSeconds: 5
-            securityContext:
-              allowPrivilegeEscalation: false
-              capabilities:
-                drop:
-                - ALL
-              readOnlyRootFilesystem: true
-              runAsNonRoot: true
-              runAsUser: 65534
-              seccompProfile:
-                type: RuntimeDefault
-          - name: agent
-            imagePullPolicy: IfNotPresent
-            image: "docker.elastic.co/beats/elastic-agent:8.16.0-SNAPSHOT"
-            securityContext:
-              capabilities:
-                add:
-                - CHOWN
-                - SETPCAP
-                - DAC_READ_SEARCH
-                - SYS_PTRACE
-                drop:
-                - ALL
-              privileged: false
-              runAsGroup: 1000
-              runAsUser: 1000
-            resources:
-              limits:
-                memory: 800Mi
-              requests:
-                cpu: 100m
-                memory: 400Mi
-            volumeMounts:
-            env:
-              - name: NODE_NAME
-                valueFrom:
-                  fieldRef:
-                    fieldPath: spec.nodeName
-              - name: POD_NAME
-                valueFrom:
-                  fieldRef:
-                    fieldPath: metadata.name
-              - name: STATE_PATH
-                value: "/usr/share/elastic-agent/state"
-              - name: ELASTIC_NETINFO
-                value: "false"
+        - emptyDir: {}
+          name: agent-data

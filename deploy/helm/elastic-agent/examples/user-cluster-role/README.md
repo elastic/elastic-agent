@@ -1,6 +1,6 @@
-# Example: Nginx Custom Integration
+# Example: Kubernetes Integration with User-created cluster role
 
-In this example we define a `nginx` custom integration alongside a custom agent preset defined in [agent-nginx-values.yaml](agent-nginx-values.yaml). Also, we disable all `kubernetes` related providers and creation of cluster role and service account, as they are not required for this example.
+In this example we define a `nginx` custom integration alongside a custom agent preset defined in [agent-nginx-values.yaml](agent-nginx-values.yaml) including the use of a user-created cluster role. Note that the user is responsible for assigning the correct permissions to the cluster role.
 
 ## Prerequisites:
 1. A k8s secret that contains the connection details to an Elasticsearch cluster such as the URL and the API key ([Kibana - Creating API Keys](https://www.elastic.co/guide/en/kibana/current/api-keys.html)):
@@ -11,6 +11,12 @@ In this example we define a `nginx` custom integration alongside a custom agent 
     ```
 
 2. `nginx` integration assets are installed through Kibana
+
+3. Create a cluster role.
+
+    ```console
+    kubectl create clusterrole user-cr --verb=get,list,watch --resource=pods,namespaces,nodes,replicasets,jobs
+    ```
 
 ## Run:
 1. Install Helm chart

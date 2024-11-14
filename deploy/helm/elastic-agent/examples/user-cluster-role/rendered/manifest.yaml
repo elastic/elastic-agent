@@ -1,4 +1,20 @@
 ---
+# Source: elastic-agent/templates/agent/service-account.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: agent-nginx-example
+  namespace: "default"
+  labels:
+    helm.sh/chart: elastic-agent-0.0.1
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 8.16.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    elastic-agent.k8s.elastic.co/preset: nginx
+    elastic-agent.k8s.elastic.co/sa: nginx
+---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
 kind: Secret
@@ -11,6 +27,8 @@ metadata:
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.16.0
     app.kubernetes.io/managed-by: Helm
+  annotations:
+    elastic-agent.k8s.elastic.co/preset: nginx
 stringData:
 
   agent.yml: |-
@@ -55,6 +73,28 @@ stringData:
         enabled: false
         leader_lease: example-nginx
 ---
+# Source: elastic-agent/templates/agent/cluster-role-binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: agent-nginx-example-default
+  labels:
+    helm.sh/chart: elastic-agent-0.0.1
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 8.16.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    elastic-agent.k8s.elastic.co/preset: nginx
+subjects:
+  - kind: ServiceAccount
+    name: agent-nginx-example
+    namespace: "default"
+roleRef:
+  kind: ClusterRole
+  name: user-cr
+  apiGroup: rbac.authorization.k8s.io
+---
 # Source: elastic-agent/templates/agent/k8s/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -77,8 +117,9 @@ spec:
         name: agent-nginx-example
       annotations:
         checksum/config: 99eaac30ab163ab5f4cedbdbf3e6936d34c2b0e2c22dee59947487bab88fcc26
+        elastic-agent.k8s.elastic.co/preset: nginx
     spec:
-      automountServiceAccountToken: false
+      automountServiceAccountToken: true
       containers:
       - args:
         - -c
@@ -108,6 +149,7 @@ spec:
           readOnly: true
           subPath: agent.yml
       dnsPolicy: ClusterFirstWithHostNet
+      serviceAccountName: agent-nginx-example
       volumes:
       - hostPath:
           path: /etc/elastic-agent/default/agent-nginx-example/state
