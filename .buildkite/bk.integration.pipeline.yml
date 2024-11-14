@@ -40,7 +40,7 @@ steps:
       - label: "Win2022:{{matrix}}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
-          .buildkite/scripts/integration-tests.ps1 {{matrix}}
+          .buildkite/scripts/integration-tests.ps1 {{matrix}} true
         artifact_paths:
           - build/**
         agents:
@@ -53,6 +53,32 @@ steps:
           - fleet-privileged
           - upgrade
 
+  - group: "Stateful(non-sudo):Ubuntu"
+    key: integration-tests-ubuntu
+    depends_on:
+      - package-it
+      - integration-ess
+    steps:
+      - label: "x86_64:Group: {{matrix}}"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          .buildkite/scripts/steps/integration_tests_tf_sudo.sh {{matrix}} false
+        artifact_paths:
+          - build/**
+        agents:
+          provider: "gcp"
+          machineType: "n1-standard-8"
+          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+        matrix:
+          - default
+          - upgrade
+          - fleet
+          - fqdn
+          - deb
+          - fleet-airgapped
+          - fleet-privileged
+          - fleet-airgapped-privileged
+
   - group: "Stateful(Sudo): Ubuntu"
     key: integration-tests-ubuntu
     depends_on:
@@ -62,7 +88,7 @@ steps:
       - label: "x86_64:Group: {{matrix}}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
-          .buildkite/scripts/steps/integration_tests_tf_sudo.sh {{matrix}}
+          .buildkite/scripts/steps/integration_tests_tf_sudo.sh {{matrix}} true
         artifact_paths:
           - build/**
         agents:
@@ -82,7 +108,7 @@ steps:
       - label: "arm:Group: {{matrix}}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
-          .buildkite/scripts/steps/integration_tests_tf_sudo.sh {{matrix}}
+          .buildkite/scripts/steps/integration_tests_tf_sudo.sh {{matrix}} true
         artifact_paths:
           - build/**
         agents:

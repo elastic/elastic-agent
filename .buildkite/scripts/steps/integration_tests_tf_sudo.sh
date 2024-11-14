@@ -34,8 +34,8 @@ mage build:testBinaries
 # BUILDKITE_RETRY_COUNT > 0 for the retries
 if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
   echo "~~~ The steps is retried, starting the ESS stack again"
+  trap 'ess_down' EXIT
   ess_up $OVERRIDE_STACK_VERSION || echo "Failed to start ESS stack" >&2
-  trap 'ess_down' EXIT  
 else 
   # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data
   echo "~~~ Receiving ESS stack metadata"
