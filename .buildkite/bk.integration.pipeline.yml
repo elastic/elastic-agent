@@ -39,11 +39,8 @@ steps:
       - integration-ess
     steps:
       - label: "Win2022:{{matrix}}"
-        retry:
-          automatic:
-            - limit: 1
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 01932631-024c-4fcc-94f5-998ee09f8a97
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/integration-tests.ps1 {{matrix}}
         artifact_paths:
           - build/**
