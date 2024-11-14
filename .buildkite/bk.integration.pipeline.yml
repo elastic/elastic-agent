@@ -34,7 +34,6 @@ steps:
 
   - group: "Stateful(Sudo): Windows"
     key: integration-tests-win
-
     depends_on:
       - integration-ess
     steps:
