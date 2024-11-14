@@ -201,10 +201,12 @@ func testMonitoringLogsAreShipped(
 			"Failed to connect to backoff(elasticsearch(http://127.0.0.1:9200)): Get \"http://127.0.0.1:9200\": dial tcp 127.0.0.1:9200: connect: connection refused", // Deb test
 			"Failed to download artifact",
 			"Failed to initialize artifact",
-			"Global configuration artifact is not available",                                 // Endpoint: failed to load user artifact due to connectivity issues
-			"add_cloud_metadata: received error failed fetching EC2 Identity Document",       // okay for the cloud metadata to not work
-			"add_cloud_metadata: received error failed requesting openstack metadata",        // okay for the cloud metadata to not work
-			"add_cloud_metadata: received error failed with http status code 404",            // okay for the cloud metadata to not work
+			"Global configuration artifact is not available", // Endpoint: failed to load user artifact due to connectivity issues
+			"add_cloud_metadata: received error for provider aws: failed fetching EC2 Identity Document",      // okay for the cloud metadata to not work
+			"add_cloud_metadata: received error for provider openstack: failed requesting openstack metadata", // okay for the cloud metadata to not work
+			"add_cloud_metadata: received error for provider hetzner: failed with http status code 404",
+			"add_cloud_metadata: received error for provider digitalocean: failed with http status code 404",
+			"add_cloud_metadata: received error for provider azure: failed with http status code 404",
 			"elastic-agent-client error: rpc error: code = Canceled desc = context canceled", // can happen on restart
 			"failed to invoke rollback watcher: failed to start Upgrade Watcher",             // on debian this happens probably need to fix.
 			"falling back to IMDSv1: operation error ec2imds: getToken",                      // okay for the cloud metadata to not work
@@ -416,7 +418,6 @@ func ensureDocumentsInES(
 	dsType, dsDataset, dsNamespace string,
 	numEvents int,
 ) func() bool {
-
 	f := func() bool {
 		t.Helper()
 
@@ -430,7 +431,6 @@ func ensureDocumentsInES(
 		}
 
 		return false
-
 	}
 
 	return f
