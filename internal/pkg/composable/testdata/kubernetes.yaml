@@ -1,0 +1,25 @@
+annotations: {}
+labels:
+  app: nginx
+  pod-template-hash: d556c846c
+namespace: default
+namespace_labels:
+  kubernetes_io/metadata_name: default
+namespace_uid: 65506782-932a-4ed7-874f-4b729b648b05
+node:
+  hostname: kind
+  labels:
+    beta_kubernetes_io/arch: amd64
+    beta_kubernetes_io/os: linux
+    kubernetes_io/arch: amd64
+    kubernetes_io/hostname: kind
+    kubernetes_io/os: linux
+  name: kind
+  uid: 5a917c19-0789-419b-9b6d-7cf858e942e3
+pod:
+  ip: 10.244.2.64
+  name: nginx-d556c846c-sk9qt
+  uid: 02ad1222-6edc-403a-8775-ec2b164a77bf
+replicaset:
+  name: nginx-d556c846c
+scope: node
