@@ -23,10 +23,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	"gopkg.in/yaml.v3"
+
+	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
 )
 
 const (
