@@ -24,13 +24,22 @@ import (
 func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opts *CheckOpts) error {
 	if !opts.Privileged {
 		// Check that the elastic-agent user/group exist.
-		uid, err := install.FindUID(install.ElasticUsername)
-		if err != nil {
-			return fmt.Errorf("failed to find %s user: %w", install.ElasticUsername, err)
+		username := install.ElasticUsername
+		if opts.Username != "" {
+			username = opts.Username
 		}
-		gid, err := install.FindGID(install.ElasticGroupName)
+		uid, err := install.FindUID(username)
 		if err != nil {
-			return fmt.Errorf("failed to find %s group: %w", install.ElasticGroupName, err)
+			return fmt.Errorf("failed to find %s user: %w", username, err)
+		}
+
+		group := install.ElasticGroupName
+		if opts.Username != "" {
+			group = opts.Group
+		}
+		gid, err := install.FindGID(group)
+		if err != nil {
+			return fmt.Errorf("failed to find %s group: %w", group, err)
 		}
 
 		// Ensure entire installation tree has the correct permissions.
@@ -58,10 +67,10 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opt
 			return fmt.Errorf("failed to convert info.Sys() into *syscall.Stat_t")
 		}
 		if fs.Uid != uint32(uid) {
-			return fmt.Errorf("%s not owned by %s user", socketPath, install.ElasticUsername)
+			return fmt.Errorf("%s not owned by %s user", socketPath, username)
 		}
 		if fs.Gid != uint32(gid) {
-			return fmt.Errorf("%s not owned by %s group", socketPath, install.ElasticGroupName)
+			return fmt.Errorf("%s not owned by %s group", socketPath, group)
 		}
 
 		// Executing `elastic-agent status` as the `elastic-agent-user` user should work.
@@ -73,7 +82,7 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opt
 		var output []byte
 		err = waitForNoError(ctx, func(_ context.Context) error {
 			// #nosec G204 -- user cannot inject any parameters to this command
-			cmd := exec.Command("sudo", "-u", install.ElasticUsername, shellWrapperName, "status")
+			cmd := exec.Command("sudo", "-u", username, shellWrapperName, "status")
 			output, err = cmd.CombinedOutput()
 			if err != nil {
 				return fmt.Errorf("elastic-agent status failed: %w (output: %s)", err, output)

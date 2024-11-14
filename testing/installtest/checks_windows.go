@@ -53,31 +53,41 @@ func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, opt
 		return fmt.Errorf("failed to get allowed SID's for %s: %w", topPath, err)
 	}
 	if !opts.Privileged {
+		username := install.ElasticUsername
+		if opts.Username != "" {
+			username = opts.Username
+		}
+
 		// Check that the elastic-agent user/group exist.
-		uid, err := install.FindUID(install.ElasticUsername)
+		uid, err := install.FindUID(username)
 		if err != nil {
-			return fmt.Errorf("failed to find %s user: %w", install.ElasticUsername, err)
+			return fmt.Errorf("failed to find %s user: %w", username, err)
 		}
 		uidSID, err := windows.StringToSid(uid)
 		if err != nil {
 			return fmt.Errorf("failed to convert string to windows.SID %s: %w", uid, err)
 		}
-		gid, err := install.FindGID(install.ElasticGroupName)
+
+		group := install.ElasticGroupName
+		if opts.Username != "" {
+			group = opts.Group
+		}
+		gid, err := install.FindGID(group)
 		if err != nil {
-			return fmt.Errorf("failed to find %s group: %w", install.ElasticGroupName, err)
+			return fmt.Errorf("failed to find %s group: %w", group, err)
 		}
 		gidSID, err := windows.StringToSid(gid)
 		if err != nil {
 			return fmt.Errorf("failed to convert string to windows.SID %s: %w", uid, err)
 		}
 		if !owner.Equals(uidSID) {
-			return fmt.Errorf("%s not owned by %s user", topPath, install.ElasticUsername)
+			return fmt.Errorf("%s not owned by %s user", topPath, username)
 		}
 		if !hasSID(sids, uidSID) {
-			return fmt.Errorf("path %s should have ACE for %s user", topPath, install.ElasticUsername)
+			return fmt.Errorf("path %s should have ACE for %s user", topPath, username)
 		}
 		if !hasSID(sids, gidSID) {
-			return fmt.Errorf("path %s should have ACE for %s group", topPath, install.ElasticGroupName)
+			return fmt.Errorf("path %s should have ACE for %s group", topPath, group)
 		}
 		// administrators should have access as well
 		if !hasWellKnownSID(sids, windows.WinBuiltinAdministratorsSid) {

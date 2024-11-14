@@ -45,6 +45,9 @@ func TestDarwinSudo(t *testing.T) {
 			{
 				Type: define.Darwin,
 			},
+			{
+				Type: define.Linux,
+			},
 		},
 		Sudo: true,
 	})

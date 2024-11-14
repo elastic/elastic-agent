@@ -14,15 +14,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/installtest"
+	"github.com/schollz/progressbar/v3"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestSwitchUnprivilegedWithoutBasePath(t *testing.T) {
+
 	define.Require(t, define.Requirements{
 		Group: Default,
 		// We require sudo for this test to run
@@ -32,6 +35,13 @@ func TestSwitchUnprivilegedWithoutBasePath(t *testing.T) {
 		// It's not safe to run this test locally as it
 		// installs Elastic Agent.
 		Local: false,
+		OS: []define.OS{
+			{
+				Type: define.Darwin,
+			}, {
+				Type: define.Linux,
+			},
+		},
 	})
 
 	// Get path to Elastic Agent executable
@@ -44,7 +54,42 @@ func TestSwitchUnprivilegedWithoutBasePath(t *testing.T) {
 	// Prepare the Elastic Agent so the binary is extracted and ready to use.
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
+	testSwitchUnprivilegedWithoutBasePathCustomUser(ctx, t, fixture, "", "")
+}
 
+func TestSwitchUnprivilegedWithoutBasePathCustomUser(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: Default,
+		// We require sudo for this test to run
+		// `elastic-agent install`.
+		Sudo: true,
+
+		// It's not safe to run this test locally as it
+		// installs Elastic Agent.
+		Local: false,
+		OS: []define.OS{
+			{
+				Type: define.Darwin,
+			}, {
+				Type: define.Linux,
+			},
+		},
+	})
+
+	// Get path to Elastic Agent executable
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	// Prepare the Elastic Agent so the binary is extracted and ready to use.
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	testSwitchUnprivilegedWithoutBasePathCustomUser(ctx, t, fixture, "tester", "testing")
+}
+
+func testSwitchUnprivilegedWithoutBasePathCustomUser(ctx context.Context, t *testing.T, fixture *atesting.Fixture, customUsername, customGroup string) {
 	// Run `elastic-agent install`.  We use `--force` to prevent interactive
 	// execution.
 	opts := &atesting.InstallOpts{Force: true, Privileged: true}
@@ -54,18 +99,39 @@ func TestSwitchUnprivilegedWithoutBasePath(t *testing.T) {
 		require.NoError(t, err)
 	}
 
+	// setup user
+	if customUsername != "" {
+		pt := progressbar.NewOptions(-1)
+		_, err = install.EnsureUserAndGroup(customUsername, customGroup, pt, true)
+		require.NoError(t, err)
+	}
+
 	// Check that Agent was installed in default base path in privileged mode
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Privileged: true}))
 
 	// Switch to unprivileged mode
-	out, err = fixture.Exec(ctx, []string{"unprivileged", "-f"})
+	args := []string{"unprivileged", "-f"}
+	if customUsername != "" {
+		args = append(args, "--user", customUsername)
+	}
+
+	if customGroup != "" {
+		args = append(args, "--group", customGroup)
+	}
+
+	out, err = fixture.Exec(ctx, args)
 	if err != nil {
 		t.Logf("unprivileged output: %s", out)
 		require.NoError(t, err)
 	}
 
 	// Check that Agent is running in default base path in unprivileged mode
-	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Privileged: false}))
+	checks := &installtest.CheckOpts{
+		Privileged: false,
+		Username:   customUsername,
+		Group:      customGroup,
+	}
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, checks))
 }
 
 func TestSwitchUnprivilegedWithBasePath(t *testing.T) {

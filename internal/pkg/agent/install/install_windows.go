@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"golang.org/x/sys/windows"
@@ -62,6 +63,12 @@ func withServiceOptions(username string, groupName string, password string) ([]s
 	}
 
 	if password != "" {
+		if isFullDomainName, err := isWindowsDomainUsername(username); err != nil {
+			return nil, fmt.Errorf("failed to parse username: %w", err)
+		} else if !isFullDomainName {
+			return nil, fmt.Errorf("username is not in proper format 'domain\\username'")
+		}
+
 		// existing user
 		return []serviceOpt{withUserGroup(username, groupName), withPassword(password)}, nil
 	}
@@ -113,4 +120,18 @@ func serviceConfigure(ownership utils.FileOwner) error {
 		return fmt.Errorf("failed to set DACL for service(%s): %w", paths.ServiceName(), err)
 	}
 	return nil
+}
+
+func isWindowsDomainUsername(username string) (bool, error) {
+	if !strings.Contains(username, `\`) {
+		// fail fast
+		return false, nil
+	}
+
+	match, err := regexp.MatchString(`^.*(\\)(.*)$`, username)
+	if err != nil {
+		return false, err
+	}
+
+	return match, nil
 }
