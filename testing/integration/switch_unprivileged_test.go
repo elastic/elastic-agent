@@ -14,12 +14,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/schollz/progressbar/v3"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/installtest"
-	"github.com/schollz/progressbar/v3"
 
 	"github.com/stretchr/testify/require"
 )
