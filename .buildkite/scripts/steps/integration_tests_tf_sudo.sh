@@ -9,8 +9,14 @@ source .buildkite/scripts/steps/ess.sh
 asdf install
 
 GROUP_NAME=$1
+TEST_SUDO=$2
 if [ -z "$GROUP_NAME" ]; then
-  echo "Error: Specify the group name: sudo-integration-tests.sh [group_name]" >&2
+  echo "Error: Specify the group name: integration_tests_tf.sh [group_name]" >&2
+  exit 1
+fi
+
+if [ -z "$TEST_SUDO" ]; then
+  echo "Error: Specify the test sudo: integration_tests_tf.sh [group_name] [test_sudo]" >&2
   exit 1
 fi
 
@@ -43,4 +49,10 @@ fi
 
 # Run integration tests
 echo "~~~ Running integration tests"
-sudo -E .buildkite/scripts/sudo-integration-tests.sh $@
+
+if [ "$TEST_SUDO" == "true" ]; then
+  sudo -E .buildkite/scripts/sudo-integration-tests.sh $@
+else
+  .buildkite/scripts/sudo-integration-tests.sh $@
+fi
+
