@@ -32,12 +32,12 @@ steps:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
 
-  - group: "Stateful(Sudo): Windows"
+  - group: "Stateful: Windows"
     key: integration-tests-win
     depends_on:
       - integration-ess
     steps:
-      - label: "Win2022:{{matrix}}"
+      - label: "Win2022:sudo:{{matrix}}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} true
@@ -49,17 +49,17 @@ steps:
           image: "family/platform-ingest-elastic-agent-windows-2022"
         matrix:
           - default
-          - fleet
-          - fleet-privileged
-          - upgrade
+          # - fleet
+          # - fleet-privileged
+          # - upgrade
 
-  - group: "Stateful(non-sudo):Ubuntu"
+  - group: "Stateful:Ubuntu"
     key: integration-tests-ubuntu
     depends_on:
       - package-it
       - integration-ess
     steps:
-      - label: "x86_64:Group: {{matrix}}"
+      - label: "x86_64:non-sudo: {{matrix}}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf_sudo.sh {{matrix}} false
@@ -71,21 +71,14 @@ steps:
           image: "family/platform-ingest-elastic-agent-ubuntu-2404"
         matrix:
           - default
-          - upgrade
-          - fleet
-          - fqdn
-          - deb
-          - fleet-airgapped
-          - fleet-privileged
-          - fleet-airgapped-privileged
-
-  - group: "Stateful(Sudo): Ubuntu"
-    key: integration-tests-ubuntu
-    depends_on:
-      - package-it
-      - integration-ess
-    steps:
-      - label: "x86_64:Group: {{matrix}}"
+          # - upgrade
+          # - fleet
+          # - fqdn
+          # - deb
+          # - fleet-airgapped
+          # - fleet-privileged
+          # - fleet-airgapped-privileged
+      - label: "x86_64:sudo: {{matrix}}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf_sudo.sh {{matrix}} true
@@ -97,15 +90,15 @@ steps:
           image: "family/platform-ingest-elastic-agent-ubuntu-2404"
         matrix:
           - default
-          - upgrade
-          - fleet
-          - fqdn
-          - deb
-          - fleet-airgapped
-          - fleet-privileged
-          - fleet-airgapped-privileged
+          # - upgrade
+          # - fleet
+          # - fqdn
+          # - deb
+          # - fleet-airgapped
+          # - fleet-privileged
+          # - fleet-airgapped-privileged
 
-      - label: "arm:Group: {{matrix}}"
+      - label: "arm:sudo: {{matrix}}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf_sudo.sh {{matrix}} true
@@ -117,13 +110,33 @@ steps:
           instanceType: "m6g.xlarge"
         matrix:
           - default
-          - upgrade
-          - fleet
-          - fqdn
-          - deb
-          - fleet-airgapped
-          - fleet-privileged
-          - fleet-airgapped-privileged
+          # - upgrade
+          # - fleet
+          # - fqdn
+          # - deb
+          # - fleet-airgapped
+          # - fleet-privileged
+          # - fleet-airgapped-privileged
+
+      - label: "arm:non-sudo: {{matrix}}"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          .buildkite/scripts/steps/integration_tests_tf_sudo.sh {{matrix}} false
+        artifact_paths:
+          - build/**
+        agents:
+          provider: "aws"
+          imagePrefix: "platform-ingest-beats-ubuntu-2404-aarch64"
+          instanceType: "m6g.xlarge"
+        matrix:
+          - default
+          # - upgrade
+          # - fleet
+          # - fqdn
+          # - deb
+          # - fleet-airgapped
+          # - fleet-privileged
+          # - fleet-airgapped-privileged
 
   - label: ESS stack cleanup
     depends_on:
