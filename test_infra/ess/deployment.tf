@@ -79,6 +79,13 @@ resource "ec_deployment" "integration-testing" {
     }
   }
 
+  apm = {
+    topology = {
+      size       = "1g"
+      zone_count = 1
+    }
+  }
+
   tags = {
     "provisioner"  = "elastic-agent-integration-tests"
     "creator"      = var.creator

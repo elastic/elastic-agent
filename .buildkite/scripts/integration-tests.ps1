@@ -1,5 +1,5 @@
 param (
-    [string]$GROUP_NAME
+    [string]$GROUP_NAME,
     [string]$TEST_SUDO
 )
 
