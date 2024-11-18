@@ -56,7 +56,6 @@ steps:
   - group: "Stateful(Sudo): Ubuntu"
     key: integration-tests-ubuntu
     depends_on:
-      - package-it
       - integration-ess
     steps:
       - label: "x86_64:Group: {{matrix}}"
@@ -71,6 +70,8 @@ steps:
           image: "family/platform-ingest-elastic-agent-ubuntu-2404"
         matrix:
           - default
+          - container
+          - fleet-upgrade-to-pr-build
           - upgrade
           - fleet
           - fqdn
@@ -91,6 +92,8 @@ steps:
           instanceType: "m6g.xlarge"
         matrix:
           - default
+          - container
+          - fleet-upgrade-to-pr-build
           - upgrade
           - fleet
           - fqdn
