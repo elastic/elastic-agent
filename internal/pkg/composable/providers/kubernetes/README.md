@@ -76,7 +76,7 @@ The updated complete inputs block will be then forwarded to agent to spawn/updat
 
 ### Hints based autodiscover
 
-Standalone elastic agent supports autodiscover based on hints collected from the [Kubernetes Provider](https://www.elastic.co/guide/en/fleet/current/kubernetes-provider.html). The hints mechanism looks for hints in kubernetes pod annotations that have the prefix `co.elastic.hints`. As soon as the container starts, elastic agent checks it for hints and launches the proper configuration for the container. Hints tell elastic agent how to monitor the container by using the proper integration.
+Standalone elastic agent supports autodiscover based on hints collected from the [Kubernetes Provider](https://www.elastic.co/guide/en/fleet/current/kubernetes-provider.html). The hints mechanism looks for hints in kubernetes pod annotations that have the prefix `co.elastic.hints`. As soon as the Pod is ready, elastic agent checks it for hints and launches the proper configuration for the container. Hints tell elastic agent how to monitor the container by using the proper integration.
 The full list of supported hints can be found [here](https://www.elastic.co/guide/en/fleet/current/hints-annotations-autodiscovery.html#_required_hints).
 
 Example:
