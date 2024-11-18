@@ -204,6 +204,9 @@ func (m *OTelManager) Watch() <-chan *status.AggregateStatus {
 func (m *OTelManager) startCollector(cfg *confmap.Conf, errCh chan error) (context.CancelFunc, *agentprovider.Provider, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	ap := agentprovider.NewProvider(cfg)
+
+	// NewForceExtensionConverterFactory is used to ensure that the agent_status extension is always enabled.
+	// It is required for the Elastic Agent to extract the status out of the OTel collector.
 	settings := otel.NewSettings(
 		release.Version(), []string{ap.URI()},
 		otel.WithConfigProviderFactory(ap.NewFactory()),

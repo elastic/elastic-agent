@@ -36,7 +36,7 @@ type State struct {
 	Components []runtime.ComponentComponentState `yaml:"components"`
 	LogLevel   logp.Level                        `yaml:"log_level"`
 
-	OTelStatus *status.AggregateStatus
+	Collector *status.AggregateStatus
 
 	UpgradeDetails *details.Details `yaml:"upgrade_details,omitempty"`
 }
@@ -195,9 +195,9 @@ func (c *Coordinator) generateReportableState() (s State) {
 	s.UpgradeDetails = c.state.UpgradeDetails
 	s.Components = make([]runtime.ComponentComponentState, len(c.state.Components))
 	copy(s.Components, c.state.Components)
-	if c.state.OTelStatus != nil {
+	if c.state.Collector != nil {
 		// copy the contents
-		s.OTelStatus = copyOTelStatus(c.state.OTelStatus)
+		s.Collector = copyOTelStatus(c.state.Collector)
 	}
 
 	// Ordering of state aggregation:
@@ -230,10 +230,10 @@ func (c *Coordinator) generateReportableState() (s State) {
 	} else if c.varsMgrErr != nil {
 		s.State = agentclient.Failed
 		s.Message = fmt.Sprintf("Vars manager: %s", c.varsMgrErr.Error())
-	} else if hasState(s.Components, client.UnitStateFailed) || otelhelpers.HasStatus(s.OTelStatus, componentstatus.StatusFatalError) || otelhelpers.HasStatus(s.OTelStatus, componentstatus.StatusPermanentError) {
+	} else if hasState(s.Components, client.UnitStateFailed) || otelhelpers.HasStatus(s.Collector, componentstatus.StatusFatalError) || otelhelpers.HasStatus(s.Collector, componentstatus.StatusPermanentError) {
 		s.State = agentclient.Degraded
 		s.Message = "1 or more components/units in a failed state"
-	} else if hasState(s.Components, client.UnitStateDegraded) || otelhelpers.HasStatus(s.OTelStatus, componentstatus.StatusRecoverableError) {
+	} else if hasState(s.Components, client.UnitStateDegraded) || otelhelpers.HasStatus(s.Collector, componentstatus.StatusRecoverableError) {
 		s.State = agentclient.Degraded
 		s.Message = "1 or more components/units in a degraded state"
 	} else {

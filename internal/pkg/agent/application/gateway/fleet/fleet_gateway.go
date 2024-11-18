@@ -235,7 +235,7 @@ func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 	return nil, ctx.Err()
 }
 
-func (f *FleetGateway) convertToCheckinComponents(components []runtime.ComponentComponentState, otelStatus *status.AggregateStatus) []fleetapi.CheckinComponent {
+func (f *FleetGateway) convertToCheckinComponents(components []runtime.ComponentComponentState, collector *status.AggregateStatus) []fleetapi.CheckinComponent {
 	if components == nil {
 		return nil
 	}
@@ -254,8 +254,8 @@ func (f *FleetGateway) convertToCheckinComponents(components []runtime.Component
 	}
 
 	size := len(components)
-	if otelStatus != nil {
-		size += len(otelStatus.ComponentStatusMap)
+	if collector != nil {
+		size += len(collector.ComponentStatusMap)
 	}
 	checkinComponents := make([]fleetapi.CheckinComponent, 0, size)
 
@@ -289,8 +289,8 @@ func (f *FleetGateway) convertToCheckinComponents(components []runtime.Component
 
 	// OTel status is placed as a component for each top-level component in OTel
 	// and each subcomponent is a unit.
-	if otelStatus != nil {
-		for id, item := range otelStatus.ComponentStatusMap {
+	if collector != nil {
+		for id, item := range collector.ComponentStatusMap {
 			state, msg := otelhelpers.StateWithMessage(item)
 
 			checkinComponent := fleetapi.CheckinComponent{
@@ -336,7 +336,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	state := f.stateFetcher()
 
 	// convert components into checkin components structure
-	components := f.convertToCheckinComponents(state.Components, state.OTelStatus)
+	components := f.convertToCheckinComponents(state.Components, state.Collector)
 
 	f.log.Debugf("correcting agent loglevel from %s to %s using coordinator state", ecsMeta.Elastic.Agent.LogLevel, state.LogLevel.String())
 	// Fix loglevel with the current log level used by coordinator

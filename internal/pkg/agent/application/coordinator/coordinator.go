@@ -1157,8 +1157,8 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 			c.processVars(ctx, vars)
 		}
 
-	case otelStatus := <-c.managerChans.otelManagerUpdate:
-		c.state.OTelStatus = otelStatus
+	case collector := <-c.managerChans.otelManagerUpdate:
+		c.state.Collector = collector
 		c.stateNeedsRefresh = true
 
 	case ll := <-c.logLevelCh:

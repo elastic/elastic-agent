@@ -11,6 +11,7 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 )
 
+// forceExtension is a Converter that forces that an extension is enabled in the OTel configuration.
 type forceExtension struct {
 	name string
 }

@@ -360,7 +360,7 @@ func TestProcessHTTPHandler(t *testing.T) {
 			coord: mockCoordinator{
 				isUp: true,
 				state: coordinator.State{
-					OTelStatus: &status.AggregateStatus{
+					Collector: &status.AggregateStatus{
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 						ComponentStatusMap: map[string]*status.AggregateStatus{
 							"test-component": &status.AggregateStatus{
@@ -382,7 +382,7 @@ func TestProcessHTTPHandler(t *testing.T) {
 			coord: mockCoordinator{
 				isUp: true,
 				state: coordinator.State{
-					OTelStatus: &status.AggregateStatus{
+					Collector: &status.AggregateStatus{
 						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
 						ComponentStatusMap: map[string]*status.AggregateStatus{
 							"test-component": &status.AggregateStatus{

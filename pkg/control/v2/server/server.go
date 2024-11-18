@@ -408,11 +408,11 @@ func stateToProto(state *coordinator.State, agentInfo info.Agent) (*cproto.State
 		FleetMessage:   state.FleetMessage,
 		Components:     components,
 		UpgradeDetails: upgradeDetails,
-		Collector:      otelStatusToProto(state.OTelStatus),
+		Collector:      collectorToProto(state.Collector),
 	}, nil
 }
 
-func otelStatusToProto(s *status.AggregateStatus) *cproto.CollectorComponent {
+func collectorToProto(s *status.AggregateStatus) *cproto.CollectorComponent {
 	if s == nil {
 		return nil
 	}
@@ -426,7 +426,7 @@ func otelStatusToProto(s *status.AggregateStatus) *cproto.CollectorComponent {
 	if len(s.ComponentStatusMap) > 0 {
 		r.ComponentStatusMap = make(map[string]*cproto.CollectorComponent, len(s.ComponentStatusMap))
 		for id, nested := range s.ComponentStatusMap {
-			r.ComponentStatusMap[id] = otelStatusToProto(nested)
+			r.ComponentStatusMap[id] = collectorToProto(nested)
 		}
 	}
 	return r

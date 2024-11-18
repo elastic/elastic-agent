@@ -125,7 +125,7 @@ func TestStateMapping(t *testing.T) {
 						},
 					},
 				},
-				OTelStatus: &status.AggregateStatus{
+				Collector: &status.AggregateStatus{
 					Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					ComponentStatusMap: map[string]*status.AggregateStatus{
 						"some-pipeline": &status.AggregateStatus{
