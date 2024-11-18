@@ -20,8 +20,10 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	aTesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
@@ -108,6 +110,83 @@ service:
       exporters:
         - debug
         - otlp/elastic`
+
+func TestOtelHybridFileProcessing(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: Default,
+		Local: true,
+		OS: []define.OS{
+			// input path missing on windows
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+	})
+
+	t.Cleanup(func() {
+		_ = os.Remove(fileProcessingFilename)
+	})
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx, fakeComponent)
+	require.NoError(t, err)
+
+	var fixtureWg sync.WaitGroup
+	fixtureWg.Add(1)
+	go func() {
+		defer fixtureWg.Done()
+		err = fixture.Run(ctx, aTesting.State{
+			Configure: string(fileProcessingConfig),
+			Reached: func(state *client.AgentState) bool {
+				// keep running (context cancel will stop it)
+				return false
+			},
+		})
+	}()
+
+	var content []byte
+	watchLines := linesTrackMap([]string{
+		`"stringValue":"syslog"`,     // syslog is being processed
+		`"stringValue":"system.log"`, // system.log is being processed
+	})
+
+	require.Eventually(t,
+		func() bool {
+			// verify file exists
+			content, err = os.ReadFile(fileProcessingFilename)
+			if err != nil || len(content) == 0 {
+				return false
+			}
+
+			for k, alreadyFound := range watchLines {
+				if alreadyFound {
+					continue
+				}
+				if bytes.Contains(content, []byte(k)) {
+					watchLines[k] = true
+				}
+			}
+
+			return mapAtLeastOneTrue(watchLines)
+		},
+		3*time.Minute, 500*time.Millisecond,
+		fmt.Sprintf("there should be exported logs by now"))
+
+	statusCtx, statusCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer statusCancel()
+	output, err := fixture.ExecStatus(statusCtx)
+	require.NoError(t, err, "status command failed")
+
+	cancel()
+	fixtureWg.Wait()
+	require.True(t, err == nil || err == context.Canceled || err == context.DeadlineExceeded, "Retrieved unexpected error: %s", err.Error())
+
+	assert.NotNil(t, output.Collector)
+	assert.Equal(t, 2, output.Collector.Status, "collector status should have been StatusOK")
+}
 
 func TestOtelFileProcessing(t *testing.T) {
 	define.Require(t, define.Requirements{

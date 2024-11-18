@@ -8,6 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+	"go.opentelemetry.io/collector/component/componentstatus"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -122,6 +125,19 @@ func TestStateMapping(t *testing.T) {
 						},
 					},
 				},
+				OTelStatus: &status.AggregateStatus{
+					Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					ComponentStatusMap: map[string]*status.AggregateStatus{
+						"some-pipeline": &status.AggregateStatus{
+							Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							ComponentStatusMap: map[string]*status.AggregateStatus{
+								"receiver": &status.AggregateStatus{
+									Event: componentstatus.NewEvent(componentstatus.StatusOK),
+								},
+							},
+						},
+					},
+				},
 			}
 
 			if tc.upgradeDetails != nil {
@@ -163,6 +179,19 @@ func TestStateMapping(t *testing.T) {
 					},
 				}
 				assert.Equal(t, expectedCompState, stateResponse.Components[0])
+			}
+			if assert.NotNil(t, stateResponse.Collector) {
+				assert.Equal(t, cproto.CollectorComponentStatus_StatusOK, stateResponse.Collector.Status)
+				if assert.Contains(t, stateResponse.Collector.ComponentStatusMap, "some-pipeline") {
+					observed := stateResponse.Collector.ComponentStatusMap["some-pipeline"]
+					assert.Equal(t, cproto.CollectorComponentStatus_StatusOK, observed.Status)
+					assert.NotEmpty(t, observed.Timestamp)
+					if assert.Contains(t, observed.ComponentStatusMap, "receiver") {
+						observedReceiver := observed.ComponentStatusMap["receiver"]
+						assert.Equal(t, cproto.CollectorComponentStatus_StatusOK, observedReceiver.Status)
+						assert.NotEmpty(t, observedReceiver.Timestamp)
+					}
+				}
 			}
 
 			if tc.upgradeDetails != nil {

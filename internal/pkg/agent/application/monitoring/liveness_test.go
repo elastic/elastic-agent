@@ -12,6 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+	"go.opentelemetry.io/collector/component/componentstatus"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -343,6 +346,50 @@ func TestProcessHTTPHandler(t *testing.T) {
 								InputSpec: &component.InputRuntimeSpec{
 									BinaryName: "testbeat",
 								},
+							},
+						},
+					},
+				},
+			},
+			expectedCode: 500,
+			liveness:     true,
+			failon:       "degraded",
+		},
+		{
+			name: "healthy-liveness-off-otel",
+			coord: mockCoordinator{
+				isUp: true,
+				state: coordinator.State{
+					OTelStatus: &status.AggregateStatus{
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							"test-component": &status.AggregateStatus{
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							"test-component2": &status.AggregateStatus{
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+						},
+					},
+				},
+			},
+			expectedCode: 200,
+			liveness:     false,
+			failon:       "degraded",
+		},
+		{
+			name: "degraded-and-healthy-otel",
+			coord: mockCoordinator{
+				isUp: true,
+				state: coordinator.State{
+					OTelStatus: &status.AggregateStatus{
+						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							"test-component": &status.AggregateStatus{
+								Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+							},
+							"test-component2": &status.AggregateStatus{
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
 						},
 					},

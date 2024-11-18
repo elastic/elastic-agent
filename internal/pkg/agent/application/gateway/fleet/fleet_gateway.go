@@ -8,6 +8,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -18,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/otelhelpers"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -232,7 +235,7 @@ func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 	return nil, ctx.Err()
 }
 
-func (f *FleetGateway) convertToCheckinComponents(components []runtime.ComponentComponentState) []fleetapi.CheckinComponent {
+func (f *FleetGateway) convertToCheckinComponents(components []runtime.ComponentComponentState, otelStatus *status.AggregateStatus) []fleetapi.CheckinComponent {
 	if components == nil {
 		return nil
 	}
@@ -250,7 +253,11 @@ func (f *FleetGateway) convertToCheckinComponents(components []runtime.Component
 		return ""
 	}
 
-	checkinComponents := make([]fleetapi.CheckinComponent, 0, len(components))
+	size := len(components)
+	if otelStatus != nil {
+		size += len(otelStatus.ComponentStatusMap)
+	}
+	checkinComponents := make([]fleetapi.CheckinComponent, 0, size)
 
 	for _, item := range components {
 		component := item.Component
@@ -280,6 +287,36 @@ func (f *FleetGateway) convertToCheckinComponents(components []runtime.Component
 		checkinComponents = append(checkinComponents, checkinComponent)
 	}
 
+	// OTel status is placed as a component for each top-level component in OTel
+	// and each subcomponent is a unit.
+	if otelStatus != nil {
+		for id, item := range otelStatus.ComponentStatusMap {
+			state, msg := otelhelpers.StateWithMessage(item)
+
+			checkinComponent := fleetapi.CheckinComponent{
+				ID:      id,
+				Type:    "otel",
+				Status:  stateString(state),
+				Message: msg,
+			}
+
+			if len(item.ComponentStatusMap) > 0 {
+				units := make([]fleetapi.CheckinUnit, 0, len(item.ComponentStatusMap))
+				for unitId, unitItem := range item.ComponentStatusMap {
+					unitState, unitMsg := otelhelpers.StateWithMessage(unitItem)
+					units = append(units, fleetapi.CheckinUnit{
+						ID:      unitId,
+						Status:  stateString(unitState),
+						Message: unitMsg,
+					})
+				}
+				checkinComponent.Units = units
+			}
+
+			checkinComponents = append(checkinComponents, checkinComponent)
+		}
+	}
+
 	return checkinComponents
 }
 
@@ -299,7 +336,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	state := f.stateFetcher()
 
 	// convert components into checkin components structure
-	components := f.convertToCheckinComponents(state.Components)
+	components := f.convertToCheckinComponents(state.Components, state.OTelStatus)
 
 	f.log.Debugf("correcting agent loglevel from %s to %s using coordinator state", ecsMeta.Elastic.Agent.LogLevel, state.LogLevel.String())
 	// Fix loglevel with the current log level used by coordinator
