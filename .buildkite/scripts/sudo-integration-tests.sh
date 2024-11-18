@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 
+# Fixes source asdf.sh, otherwise it relies on unexisting /root/.asdf directory
+export HOME=/opt/buildkite-agent
+
 # The script is used to run integration tests with sudo
-source /opt/buildkite-agent/hooks/pre-command 
+source /opt/buildkite-agent/hooks/pre-command
 source .buildkite/hooks/pre-command || echo "No pre-command hook found"
 
 # Make sure that all tools are installed
