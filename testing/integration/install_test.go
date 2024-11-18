@@ -408,6 +408,81 @@ func TestRepeatedInstallUninstall(t *testing.T) {
 	}
 }
 
+// TestRepeatedInstallUninstallFleet will install then uninstall the agent
+// repeatedly with it enrolled into Fleet.  This test exists because of a number
+// of race conditions that have occurred in the uninstall process when enrolled
+// into Fleet. Current testing shows each iteration takes around 16 seconds.
+func TestRepeatedInstallUninstallFleet(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Default,
+		Stack: &define.Stack{}, // needs a fleet-server.
+		// We require sudo for this test to run
+		// `elastic-agent install` (even though it will
+		// be installed as non-root).
+		Sudo: true,
+
+		// It's not safe to run this test locally as it
+		// installs Elastic Agent.
+		Local: false,
+	})
+
+	prepareCtx, prepareCancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	defer prepareCancel()
+
+	policyResp, enrollmentTokenResp := createPolicyAndEnrollmentToken(prepareCtx, t, info.KibanaClient, createBasicPolicy())
+	t.Logf("Created policy %+v", policyResp.AgentPolicy)
+
+	t.Log("Getting default Fleet Server URL...")
+	fleetServerURL, err := fleettools.DefaultURL(prepareCtx, info.KibanaClient)
+	require.NoError(t, err, "failed getting Fleet Server URL")
+
+	// Get path to Elastic Agent executable
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	// Prepare the Elastic Agent so the binary is extracted and ready to use.
+	err = fixture.Prepare(prepareCtx)
+	require.NoError(t, err)
+
+	maxRunTime := 2 * time.Minute
+	iterations := 100
+	for i := 0; i < iterations; i++ {
+		successful := t.Run(fmt.Sprintf("%s-%d", t.Name(), i), func(t *testing.T) {
+			ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(maxRunTime))
+			defer cancel()
+
+			// Run `elastic-agent install`.  We use `--force` to prevent interactive
+			// execution.
+			opts := &atesting.InstallOpts{
+				Force: true,
+				EnrollOpts: atesting.EnrollOpts{
+					URL:             fleetServerURL,
+					EnrollmentToken: enrollmentTokenResp.APIKey,
+				},
+			}
+			out, err := fixture.Install(ctx, opts)
+			if err != nil {
+				t.Logf("install output: %s", out)
+				require.NoErrorf(t, err, "install failed: %s", err)
+			}
+
+			// Check that Agent was installed in successfully
+			require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+
+			// Perform uninstall.
+			out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+			if err != nil {
+				t.Logf("uninstall output: %s", out)
+				require.NoErrorf(t, err, "uninstall failed: %s", err)
+			}
+		})
+		if !successful {
+			// quit now, another test run will continue to fail now
+			return
+		}
+	}
+}
+
 func randStr(length int) string {
 	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 

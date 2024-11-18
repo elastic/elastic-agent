@@ -621,6 +621,7 @@ func (f *Fixture) uninstallNoPkgManager(ctx context.Context, uninstallOpts *Unin
 		return out, fmt.Errorf("error running uninstall command: %w", err)
 	}
 	f.installed = false
+	f.workDir = f.extractDir
 
 	// Check that Elastic Agent files are actually removed
 	basePath := f.installOpts.BasePath

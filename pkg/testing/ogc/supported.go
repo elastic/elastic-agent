@@ -121,7 +121,7 @@ var ogcSupported = []LayoutOS{
 			Version: "2022",
 		},
 		Provider:     Google,
-		InstanceSize: "e2-standard-4", // 4 amd64 cpus, 16 GB RAM
+		InstanceSize: "e2-highcpu-16", // 16 amd64 cpus, 16 GB RAM
 		RunsOn:       "windows-2022",
 		Username:     "windows",
 		RemotePath:   "C:\\Users\\windows\\agent",
