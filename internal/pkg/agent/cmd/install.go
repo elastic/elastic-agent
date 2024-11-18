@@ -266,11 +266,6 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		customPass := ""
 		if runtime.GOOS == "windows" {
 			customPass, _ = cmd.Flags().GetString(flagInstallCustomPass)
-
-			if (customUser != "" || customPass != "") &&
-				(customUser == "" || customPass == "") {
-				return fmt.Errorf("error installing package: all Active Directory parameters must be provided")
-			}
 		}
 
 		ownership, err = install.Install(cfgFile, topPath, unprivileged, log, progBar, streams, customUser, customGroup, customPass)

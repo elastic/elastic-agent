@@ -69,11 +69,6 @@ func unprivilegedCmd(streams *cli.IOStreams, cmd *cobra.Command) (err error) {
 	customPass := ""
 	if runtime.GOOS == "windows" {
 		customPass, _ = cmd.Flags().GetString(flagInstallCustomPass)
-
-		if (customUser != "" || customPass != "") &&
-			(customUser == "" || customPass == "") {
-			return fmt.Errorf("error installing package: all Active Directory parameters must be provided")
-		}
 	}
 
 	// cannot switch to unprivileged when service components have issues
