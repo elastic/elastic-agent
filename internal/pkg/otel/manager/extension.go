@@ -129,6 +129,9 @@ func (as *AgentStatusExtension) ComponentStatusChanged(
 func (as *AgentStatusExtension) eventLoop(ctx context.Context) {
 	// prevent aggregate statuses from flapping between StatusStarting and StatusOK
 	// as components are started individually by the service.
+	//
+	// follows the same pattern that is being used by the healthcheckv2extension
+	// https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/extension/healthcheckv2extension/extension.go#L168
 	var eventQueue []*evtPair
 
 LOOP:
