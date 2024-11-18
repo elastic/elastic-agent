@@ -72,9 +72,11 @@ resource "ec_deployment" "integration-testing" {
     zone_count = 1
     config = {
       user_settings_json = <<EOF
-"xpack.fleet.enableExperimental": ["agentTamperProtectionEnabled"],
-"xpack.fleet.internal.registry.kibanaVersionCheckEnabled": false,
-"server.restrictInternalApis": false
+      {
+        "xpack.fleet.enableExperimental": ["agentTamperProtectionEnabled"],
+        "xpack.fleet.internal.registry.kibanaVersionCheckEnabled": false,
+        "server.restrictInternalApis": false
+      }
 EOF
     }
   }
