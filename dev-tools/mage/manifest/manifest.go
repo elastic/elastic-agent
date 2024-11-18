@@ -98,18 +98,6 @@ var PlatformPackages = map[string]string{
 // The project names are those used in the "projects" list in the unified release manifest.
 // See the sample manifests in the testdata directory.
 var ExpectedBinaries = []BinarySpec{
-<<<<<<< HEAD
-	{BinaryName: "agentbeat", ProjectName: "beats", Platforms: AllPlatforms},
-	{BinaryName: "apm-server", ProjectName: "apm-server", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}}},
-	{BinaryName: "cloudbeat", ProjectName: "cloudbeat", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
-	{BinaryName: "cloud-defend", ProjectName: "cloud-defend", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
-	{BinaryName: "connectors", ProjectName: "connectors", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PythonWheel: true},
-	{BinaryName: "endpoint-security", ProjectName: "endpoint-dev", Platforms: AllPlatforms},
-	{BinaryName: "fleet-server", ProjectName: "fleet-server", Platforms: AllPlatforms},
-	{BinaryName: "pf-elastic-collector", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
-	{BinaryName: "pf-elastic-symbolizer", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
-	{BinaryName: "pf-host-agent", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
-=======
 	{BinaryName: "agentbeat", ProjectName: "beats", Platforms: AllPlatforms, PackageTypes: pkgcommon.AllPackageTypes},
 	{BinaryName: "apm-server", ProjectName: "apm-server", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}}, PackageTypes: pkgcommon.AllPackageTypes},
 	{BinaryName: "cloudbeat", ProjectName: "cloudbeat", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PackageTypes: pkgcommon.AllPackageTypes},
@@ -119,7 +107,6 @@ var ExpectedBinaries = []BinarySpec{
 	{BinaryName: "pf-elastic-collector", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PackageTypes: pkgcommon.AllPackageTypes},
 	{BinaryName: "pf-elastic-symbolizer", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PackageTypes: pkgcommon.AllPackageTypes},
 	{BinaryName: "pf-host-agent", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PackageTypes: pkgcommon.AllPackageTypes},
->>>>>>> 9c7552fde1 (Remove endpoint security from linux containers (#6016))
 }
 
 type BinarySpec struct {
