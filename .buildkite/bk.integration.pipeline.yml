@@ -89,7 +89,7 @@ steps:
         agents:
           provider: "aws"
           imagePrefix: "platform-ingest-beats-ubuntu-2404-aarch64"
-          instanceType: "m6g.xlarge"
+          instanceType: "m6g.2xlarge"
         matrix:
           - default
           - container
