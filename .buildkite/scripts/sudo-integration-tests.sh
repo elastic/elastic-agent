@@ -16,6 +16,7 @@ fi
 
 if [ "$TEST_SUDO" == "true" ]; then
   echo "Re-initializing ASDF. The user is changed to root..."  
+  export HOME=/opt/buildkite-agent
   source /opt/buildkite-agent/hooks/pre-command 
   source .buildkite/hooks/pre-command || echo "No pre-command hook found"
 fi
