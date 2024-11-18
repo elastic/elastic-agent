@@ -88,7 +88,7 @@ steps:
   - group: "macOS tests"
     key: "macos-unit-tests"
     steps:
-      - label: "Unit tests - MacOS 15 ARM"
+      - label: "Unit tests - macOS 15 ARM"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         artifact_paths:
           - "build/TEST-*.html"
@@ -103,7 +103,7 @@ steps:
             allowed: true
 
       # Runs only on main and release branches
-      - label: "Unit tests - MacOS 13"
+      - label: "Unit tests - macOS 13"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         branches: "main 8.* 9.*"
         artifact_paths:
