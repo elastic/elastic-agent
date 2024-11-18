@@ -1,17 +1,4 @@
 ---
-# Source: elastic-agent/templates/agent/service-account.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: agent-nginx-example
-  namespace: "default"
-  labels:
-    helm.sh/chart: elastic-agent-0.0.1
-    app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.17.0
-    app.kubernetes.io/managed-by: Helm
----
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
 kind: Secret
@@ -68,133 +55,6 @@ stringData:
         enabled: false
         leader_lease: example-nginx
 ---
-# Source: elastic-agent/templates/agent/cluster-role.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: agent-nginx-example-default
-  labels:
-    helm.sh/chart: elastic-agent-0.0.1
-    app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.17.0
-    app.kubernetes.io/managed-by: Helm
-rules:
-  - apiGroups: [ "" ] # "" indicates the core API group
-    resources:
-      - nodes
-      - namespaces
-      - events
-      - pods
-      - services
-      - configmaps
-      - persistentvolumes
-      - persistentvolumeclaims
-      - persistentvolumeclaims/status
-      - nodes/metrics
-      - nodes/proxy
-      - nodes/stats
-    verbs:
-      - get
-      - watch
-      - list
-  - apiGroups:
-      - storage.k8s.io
-    resources:
-      - storageclasses
-    verbs:
-      - get
-      - watch
-      - list
-  - nonResourceURLs:
-      - /metrics
-    verbs:
-      - get
-      - watch
-      - list
-  - apiGroups: [ "coordination.k8s.io" ]
-    resources:
-      - leases
-    verbs:
-      - get
-      - create
-      - update
-  - nonResourceURLs:
-      - /healthz
-      - /healthz/*
-      - /livez
-      - /livez/*
-      - /metrics
-      - /metrics/slis
-      - /readyz
-      - /readyz/*
-    verbs:
-      - get
-  - apiGroups: [ "apps" ]
-    resources:
-      - replicasets
-      - deployments
-      - daemonsets
-      - statefulsets
-    verbs:
-      - get
-      - list
-      - watch
-  - apiGroups: [ "batch" ]
-    resources:
-      - jobs
-      - cronjobs
-    verbs:
-      - get
-      - list
-      - watch
-  - apiGroups:
-    - ""
-    resources:
-    - nodes
-    - namespaces
-    - pods
-    verbs:
-    - get
-    - watch
-    - list
-  - apiGroups:
-    - apps
-    resources:
-    - replicasets
-    verbs:
-    - get
-    - list
-    - watch
-  - apiGroups:
-    - batch
-    resources:
-    - jobs
-    verbs:
-    - get
-    - list
-    - watch
----
-# Source: elastic-agent/templates/agent/cluster-role-binding.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: agent-nginx-example-default
-  labels:
-    helm.sh/chart: elastic-agent-0.0.1
-    app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.17.0
-    app.kubernetes.io/managed-by: Helm
-subjects:
-  - kind: ServiceAccount
-    name: agent-nginx-example
-    namespace: "default"
-roleRef:
-  kind: ClusterRole
-  name: agent-nginx-example-default
-  apiGroup: rbac.authorization.k8s.io
----
 # Source: elastic-agent/templates/agent/k8s/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -218,7 +78,7 @@ spec:
       annotations:
         checksum/config: 99eaac30ab163ab5f4cedbdbf3e6936d34c2b0e2c22dee59947487bab88fcc26
     spec:
-      automountServiceAccountToken: true
+      automountServiceAccountToken: false
       containers:
       - args:
         - -c
@@ -248,7 +108,6 @@ spec:
           readOnly: true
           subPath: agent.yml
       dnsPolicy: ClusterFirstWithHostNet
-      serviceAccountName: agent-nginx-example
       volumes:
       - hostPath:
           path: /etc/elastic-agent/default/agent-nginx-example/state

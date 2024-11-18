@@ -135,7 +135,6 @@ func (c *Coordinator) refreshState() {
 // Coordinator state and sets stateNeedsRefresh.
 // Must be called on the main Coordinator goroutine.
 func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState) {
-
 	// check for any component updates to the known PID, so we can update the component monitoring
 	found := false
 	for i, other := range c.state.Components {
@@ -168,7 +167,6 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 	}
 
 	c.stateNeedsRefresh = true
-
 }
 
 // generateReportableState aggregates the internal state of the Coordinator
