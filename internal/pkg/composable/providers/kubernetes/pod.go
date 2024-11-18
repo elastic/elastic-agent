@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
@@ -224,7 +226,9 @@ func (p *pod) Stop() {
 }
 
 func (p *pod) emitRunning(pod *kubernetes.Pod) {
-
+	if pod.Status.Phase == v1.PodPending || pod.Status.Phase == v1.PodUnknown {
+		return
+	}
 	namespaceAnnotations := kubernetes.PodNamespaceAnnotations(pod, p.namespaceWatcher)
 
 	data := generatePodData(pod, p.metagen, namespaceAnnotations)
