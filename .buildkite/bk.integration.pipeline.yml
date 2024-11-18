@@ -165,6 +165,7 @@ steps:
     depends_on:
       - integration-tests-ubuntu
       - integration-tests-win
+      - integration-tests-rhel8
     allow_dependency_failure: true
     command: |
       buildkite-agent artifact download "test_infra/ess/**" . --step "integration-ess"
