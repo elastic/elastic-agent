@@ -58,7 +58,7 @@ steps:
       - label: "Win2022:non-sudo:{{matrix}}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 01932f40-918b-46fc-94f7-d4a3219201ef
-          .buildkite/scripts/integration-tests.ps1 {{matrix}} true
+          .buildkite/scripts/integration-tests.ps1 {{matrix}} false
         artifact_paths:
           - build/**
         agents:
