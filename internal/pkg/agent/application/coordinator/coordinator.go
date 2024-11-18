@@ -13,6 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.opentelemetry.io/collector/component/componentstatus"
+
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 
 	"go.elastic.co/apm/v2"
@@ -920,6 +922,12 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 					ID    string                 `yaml:"id"`
 					State runtime.ComponentState `yaml:"state"`
 				}
+				type StateCollectorStatus struct {
+					Status     componentstatus.Status           `yaml:"status"`
+					Err        string                           `yaml:"error,omitempty"`
+					Timestamp  string                           `yaml:"timestamp"`
+					Components map[string]*StateCollectorStatus `yaml:"components,omitempty"`
+				}
 				type StateHookOutput struct {
 					State          agentclient.State      `yaml:"state"`
 					Message        string                 `yaml:"message"`
@@ -927,7 +935,27 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 					FleetMessage   string                 `yaml:"fleet_message"`
 					LogLevel       logp.Level             `yaml:"log_level"`
 					Components     []StateComponentOutput `yaml:"components"`
+					Collector      *StateCollectorStatus  `yaml:"collector,omitempty"`
 					UpgradeDetails *details.Details       `yaml:"upgrade_details,omitempty"`
+				}
+
+				var toCollectorStatus func(status *status.AggregateStatus) *StateCollectorStatus
+				toCollectorStatus = func(status *status.AggregateStatus) *StateCollectorStatus {
+					s := &StateCollectorStatus{
+						Status:    status.Status(),
+						Timestamp: status.Timestamp().Format(time.RFC3339Nano),
+					}
+					statusErr := status.Err()
+					if statusErr != nil {
+						s.Err = statusErr.Error()
+					}
+					if len(status.ComponentStatusMap) > 0 {
+						s.Components = make(map[string]*StateCollectorStatus, len(status.ComponentStatusMap))
+						for k, v := range status.ComponentStatusMap {
+							s.Components[k] = toCollectorStatus(v)
+						}
+					}
+					return s
 				}
 
 				s := c.State()
@@ -939,6 +967,10 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 						State: s.Components[i].State,
 					}
 				}
+				var collectorStatus *StateCollectorStatus
+				if s.Collector != nil {
+					collectorStatus = toCollectorStatus(s.Collector)
+				}
 				output := StateHookOutput{
 					State:          s.State,
 					Message:        s.Message,
@@ -946,6 +978,7 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 					FleetMessage:   s.FleetMessage,
 					LogLevel:       s.LogLevel,
 					Components:     compStates,
+					Collector:      collectorStatus,
 					UpgradeDetails: s.UpgradeDetails,
 				}
 				o, err := yaml.Marshal(output)
