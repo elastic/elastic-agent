@@ -1,0 +1,5 @@
+xpack.fleet:
+  enableExperimental:
+    - agentTamperProtectionEnabled
+  internal.registry.kibanaVersionCheckEnabled: false
+server.restrictInternalApis: false
