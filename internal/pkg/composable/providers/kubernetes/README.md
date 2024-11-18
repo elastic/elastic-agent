@@ -67,7 +67,7 @@ What makes this input block dynamic are the variables under hosts block and the 
 
 The Kubernetes provider watches for Kubernetes resources and generates mappings from them (similar to events in beats provider). The mappings include those variables([list of variables](https://www.elastic.co/guide/en/fleet/current/kubernetes-provider.html#_provider_for_pod_resources)) for each k8s resource with unique value for each one of them.
 
-Agent composable controller which controls all the providers receives these mappings and tries to match them with the input blogs of the configurations.
+Agent composable controller which controls all the providers receives these mappings and tries to match them with the input blocks of the configurations.
 
 This means that for every mapping that the condition matches (`kubernetes.pod.labels.app == redis`), a new input will be created in which the condition will be removed(not needed anymore) and the `kubernetes.pod.ip` variable will be substituted from the value in the same mapping.
 
