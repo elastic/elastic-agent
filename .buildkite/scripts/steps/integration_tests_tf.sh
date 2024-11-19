@@ -51,8 +51,8 @@ fi
 echo "~~~ Running integration tests"
 
 if [ "$TEST_SUDO" == "true" ]; then
-  sudo -E .buildkite/scripts/sudo-integration-tests.sh $@
+  sudo -E .buildkite/scripts/buildkite-integration-tests.sh $@
 else
-  .buildkite/scripts/sudo-integration-tests.sh $@
+  .buildkite/scripts/buildkite-integration-tests.sh $@
 fi
 
