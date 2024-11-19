@@ -293,6 +293,15 @@ func TestInstallUninstallAudit(t *testing.T) {
 		Stack: &define.Stack{}, // needs a fleet-server.
 		Sudo:  true,
 		Local: false,
+		// Skip Windows as it has been disabled because of https://github.com/elastic/elastic-agent/issues/5952
+		OS: []define.OS{
+			{
+				Type: define.Linux,
+			},
+			{
+				Type: define.Darwin,
+			},
+		},
 	})
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
