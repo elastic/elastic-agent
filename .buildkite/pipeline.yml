@@ -50,7 +50,9 @@ steps:
 
       - label: "Unit tests - Windows 2022"
         key: "unit-tests-win2022"
-        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+        command: |
+          .\\.buildkite\\scripts\\install-go.ps1
+          .\\.buildkite\\scripts\\steps\\unit-tests.ps1
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -68,7 +70,9 @@ steps:
 
       - label: "Unit tests - Windows 2016"
         key: "unit-tests-win2016"
-        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+        command: |
+          .\\.buildkite\\scripts\\install-go.ps1
+          .\\.buildkite\\scripts\\steps\\unit-tests.ps1
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -121,7 +125,9 @@ steps:
     steps:
       - label: "Unit tests - Windows 10"
         key: "unit-tests-win10"
-        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+        command: |
+          .\\.buildkite\\scripts\\install-go.ps1
+          .\\.buildkite\\scripts\\steps\\unit-tests.ps1
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -138,7 +144,9 @@ steps:
             allowed: true
       - label: "Unit tests - Windows 11"
         key: "unit-tests-win11"
-        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+        command: |
+          .\\.buildkite\\scripts\\install-go.ps1
+          .\\.buildkite\\scripts\\steps\\unit-tests.ps1
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -153,7 +161,6 @@ steps:
         retry:
           manual:
             allowed: true
-
 
   - label: ":junit: Junit annotate"
     plugins:
@@ -179,7 +186,6 @@ steps:
         allow_failure: true
       - step: "unit-tests-win11"
         allow_failure: true
-
 
   - label: "Merge coverage reports"
     key: "merge-coverage"

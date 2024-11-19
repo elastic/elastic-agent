@@ -1058,6 +1058,22 @@
                 "clusterRole": {
                     "$ref": "#/definitions/AgentPresetClusterRole"
                 },
+                "envFrom": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    },
+                    "description": "Environment variables for the deployment.",
+                    "examples": [
+                        [
+                            {
+                                "configMapRef": {
+                                    "name": "my-config"
+                                }
+                            }
+                        ]
+                    ]
+                },
                 "nodeSelector": {
                     "type": "object",
                     "additionalProperties": {
@@ -1297,27 +1313,6 @@
                     "if": {
                         "properties": {
                             "create": {
-                                "const": false
-                            }
-                        }
-                    },
-                    "then": {
-                        "properties": {
-                            "name": {
-                                "type": "string",
-                                "minLength": 1
-                            }
-                        },
-                        "required": [
-                            "create",
-                            "name"
-                        ]
-                    }
-                },
-                {
-                    "if": {
-                        "properties": {
-                            "create": {
                                 "const": true
                             }
                         }
@@ -1328,10 +1323,7 @@
                                 "type": "string",
                                 "maxLength": 0
                             }
-                        },
-                        "required": [
-                            "create"
-                        ]
+                        }
                     }
                 }
             ]
@@ -1363,27 +1355,6 @@
                 "create"
             ],
             "allOf": [
-                {
-                    "if": {
-                        "properties": {
-                            "create": {
-                                "const": false
-                            }
-                        }
-                    },
-                    "then": {
-                        "properties": {
-                            "name": {
-                                "type": "string",
-                                "minLength": 1
-                            }
-                        },
-                        "required": [
-                            "create",
-                            "name"
-                        ]
-                    }
-                },
                 {
                     "if": {
                         "properties": {
