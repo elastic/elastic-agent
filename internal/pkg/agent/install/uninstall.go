@@ -59,6 +59,43 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 		return fmt.Errorf("uninstall must be run from outside the installed path '%s'", topPath)
 	}
 
+	// check if the agent was installed using --unprivileged by checking the file vault for the agent secret (needed on darwin to correctly load the vault)
+	unprivileged, err := checkForUnprivilegedVault(ctx)
+	if err != nil {
+		return fmt.Errorf("error checking for unprivileged vault: %w", err)
+	}
+
+	// will only notify fleet of the uninstall command if it can gather config and agentinfo, and is not a stand-alone install
+	localFleet := false
+	notifyFleet := false
+	var ai *info.AgentInfo
+	c, err := operations.LoadFullAgentConfig(ctx, log, cfgFile, false, unprivileged)
+	if err != nil {
+		pt.Describe(fmt.Sprintf("unable to read agent config to determine if notifying Fleet is needed: %v", err))
+	}
+	cfg, err := configuration.NewFromConfig(c)
+	if err != nil {
+		pt.Describe(fmt.Sprintf("notify Fleet: unable to transform *config.Config to *configuration.Configuration: %v", err))
+	}
+
+	if cfg != nil && !configuration.IsStandalone(cfg.Fleet) {
+		ai, err = info.NewAgentInfo(ctx, false)
+		if err != nil {
+			pt.Describe(fmt.Sprintf("unable to read agent info, Fleet will not be notified of uninstall: %v", err))
+		} else {
+			notifyFleet = true
+		}
+		if cfg.Fleet != nil && cfg.Fleet.Server != nil {
+			localFleet = true
+		}
+	}
+
+	// Skip on Windows because of https://github.com/elastic/elastic-agent/issues/5952
+	// Once the root-cause is identified then this can be re-enabled on Windows.
+	// Notify fleet-server while it is still running if it's running locally
+	if notifyFleet && localFleet && runtime.GOOS != "windows" {
+		notifyFleetAuditUninstall(ctx, log, pt, cfg, ai) //nolint:errcheck // ignore the error as we can't act on it
+	}
 	// ensure service is stopped
 	status, err := EnsureStoppedService(topPath, pt)
 	if err != nil {
@@ -69,12 +106,6 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	// kill any running watcher
 	if err := killWatcher(pt); err != nil {
 		return fmt.Errorf("failed trying to kill any running watcher: %w", err)
-	}
-
-	// check if the agent was installed using --unprivileged by checking the file vault for the agent secret (needed on darwin to correctly load the vault)
-	unprivileged, err := checkForUnprivilegedVault(ctx)
-	if err != nil {
-		return fmt.Errorf("error checking for unprivileged vault: %w", err)
 	}
 
 	// Uninstall components first
@@ -111,27 +142,6 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 		}
 	}
 
-	// will only notify fleet of the uninstall command if it can gather config and agentinfo, and is not a stand-alone install
-	notifyFleet := false
-	var ai *info.AgentInfo
-	c, err := operations.LoadFullAgentConfig(ctx, log, cfgFile, false, unprivileged)
-	if err != nil {
-		pt.Describe(fmt.Sprintf("unable to read agent config to determine if notifying Fleet is needed: %v", err))
-	}
-	cfg, err := configuration.NewFromConfig(c)
-	if err != nil {
-		pt.Describe(fmt.Sprintf("notify Fleet: unable to transform *config.Config to *configuration.Configuration: %v", err))
-	}
-
-	if cfg != nil && !configuration.IsStandalone(cfg.Fleet) {
-		ai, err = info.NewAgentInfo(ctx, false)
-		if err != nil {
-			pt.Describe(fmt.Sprintf("unable to read agent info, Fleet will not be notified of uninstall: %v", err))
-		} else {
-			notifyFleet = true
-		}
-	}
-
 	// remove existing directory
 	pt.Describe("Removing install directory")
 	err = RemovePath(topPath)
@@ -146,7 +156,7 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 
 	// Skip on Windows because of https://github.com/elastic/elastic-agent/issues/5952
 	// Once the root-cause is identified then this can be re-enabled on Windows.
-	if notifyFleet && runtime.GOOS != "windows" {
+	if notifyFleet && !localFleet && runtime.GOOS != "windows" {
 		notifyFleetAuditUninstall(ctx, log, pt, cfg, ai) //nolint:errcheck // ignore the error as we can't act on it
 	}
 

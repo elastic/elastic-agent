@@ -338,6 +338,13 @@ func TestInstallUninstallAudit(t *testing.T) {
 		return waitForAgentAndFleetHealthy(ctx, t, fixture)
 	}, time.Minute, time.Second, "agent never became healthy or connected to Fleet")
 
+	t.Run("run uninstall", testUninstallAuditUnenroll(ctx, fixture, info))
+}
+
+func testUninstallAuditUnenroll(ctx context.Context, fixture *atesting.Fixture, info *define.Info) func(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skip Windows as it has been disabled because of https://github.com/elastic/elastic-agent/issues/5952")
+	}
 	agentID, err := getAgentID(ctx, fixture)
 	require.NoError(t, err, "error getting the agent inspect output")
 	require.NotEmpty(t, agentID, "agent ID empty")
