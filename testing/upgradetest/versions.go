@@ -62,11 +62,12 @@ type SnapshotFetcher interface {
 // `SnapshotBranches` is a list of active release branches used for finding latest snapshots on them.
 // A branch might have no snapshot, in this case it's getting silently skipped.
 type VersionRequirements struct {
-	UpgradeToVersion string
-	CurrentMajors    int
-	PreviousMajors   int
-	PreviousMinors   int
-	SnapshotBranches []string
+	UpgradeToVersion    string
+	CurrentMajors       int
+	PreviousMajors      int
+	PreviousMinors      int
+	IndependentReleases int
+	SnapshotBranches    []string
 }
 
 var AgentVersionsFilename string
@@ -189,6 +190,7 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 	currentMajorsToFind := reqs.CurrentMajors
 	previousMajorsToFind := reqs.PreviousMajors
 	previousMinorsToFind := reqs.PreviousMinors
+	recentIndependentReleasesToFind := reqs.IndependentReleases
 	recentSnapshotsToFind := len(reqs.SnapshotBranches)
 
 	for _, version := range sortedParsedVersions {
@@ -200,6 +202,10 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 		case recentSnapshotsToFind > 0 && version.IsSnapshot():
 			upgradableVersions = append(upgradableVersions, version.String())
 			recentSnapshotsToFind--
+
+		case recentIndependentReleasesToFind > 0 && version.IsIndependentRelease():
+			upgradableVersions = append(upgradableVersions, version.String())
+			recentIndependentReleasesToFind--
 
 		// for the rest of the checks we capture only released versions
 		case version.Prerelease() != "" || version.BuildMetadata() != "":

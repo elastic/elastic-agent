@@ -296,6 +296,49 @@ func TestIsSnapshot(t *testing.T) {
 
 }
 
+func TestIsIndependentRelease(t *testing.T) {
+	testcases := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "Simple version",
+			input:    "8.8.0",
+			expected: false,
+		},
+		{
+			name:     "Simple snapshot",
+			input:    "8.8.0-SNAPSHOT",
+			expected: false,
+		},
+		{
+			name:     "Independent release",
+			input:    "8.8.0+build20241224081012",
+			expected: true,
+		},
+		{
+			name:     "Independent release no time",
+			input:    "8.8.0+build20241224",
+			expected: false,
+		},
+		{
+			name:     "Independent release and more",
+			input:    "8.8.0+build20241224081012.meta.5",
+			expected: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			psv, err := ParseVersion(tc.input)
+			require.NoError(t, err)
+			require.NotNil(t, psv)
+			assert.Equal(t, tc.expected, psv.IsIndependentRelease())
+		})
+	}
+}
+
 func TestExtractSnapshotFromVersionString(t *testing.T) {
 	testcases := []struct {
 		name          string
