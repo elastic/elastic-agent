@@ -1,9 +1,5 @@
 {{- if gt (len $.Values.agent.presets) 0}}
-{{- if $.Release.IsInstall }}
-🙌 Release "{{ .Release.Name }}" is installed at "{{ $.Release.Namespace }}" namespace
-{{- else if $.Release.IsUpgrade }}
-🚀 Release "{{ .Release.Name }}" at "{{ $.Release.Namespace }}" namespace upgraded
-{{- end }}
+Release "{{ .Release.Name }}" is installed at "{{ $.Release.Namespace }}" namespace
 {{ if gt (len $.Values.agent.presets) 1 }}
 Installed agents:
 {{- else }}
