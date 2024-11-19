@@ -8,7 +8,7 @@ https://www.elastic.co/guide/en/fleet/current/kubernetes-provider.html
 
 Kubernetes provider can be configured both in **standalone** and **fleet managed** elastic agent.
 
-a. In  **standalone** elastic agent, user needs to edit the [elastic-agent-standalone-kubernetes.yaml](https://github.com/elastic/elastic-agent/blob/f994f5bfdf68db27902a4175c3b655b4d611cf7c/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L28)
+a. In  **standalone** elastic agent, the kubernetes provider is configured inside the [elastic-agent-standalone-kubernetes.yaml](https://github.com/elastic/elastic-agent/blob/f994f5bfdf68db27902a4175c3b655b4d611cf7c/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L28). User can update the parameters based on their needs.
 b. In **fleet managed** elastic agent, kubernetes provider is enabled by default with default values. User needs to follow the steps described in the [documentation](https://www.elastic.co/guide/en/fleet/current/advanced-kubernetes-managed-by-fleet.html) to configure it.
 
 Condition based autodiscover is supported both in **fleet managed** elastic agent and in **standalone** elastic agent(see [doc](https://www.elastic.co/guide/en/fleet/current/conditions-based-autodiscover.html)).
@@ -19,9 +19,6 @@ Hints based autodiscover is only supported in **standalone** elastic agent(see [
 
 ### Conditions based autodiscover
 
-  
-
-Example:
 
 As an example we will use the redis module.
 
@@ -67,7 +64,7 @@ What makes this input block dynamic are the variables under hosts block and the 
 
 The Kubernetes provider watches for Kubernetes resources and generates mappings from them (similar to events in beats provider). The mappings include those variables([list of variables](https://www.elastic.co/guide/en/fleet/current/kubernetes-provider.html#_provider_for_pod_resources)) for each k8s resource with unique value for each one of them.
 
-Agent composable controller which controls all the providers receives these mappings and tries to match them with the input blocks of the configurations.
+Agent [composable controller](https://github.com/elastic/elastic-agent/blob/f994f5bfdf68db27902a4175c3b655b4d611cf7c/internal/pkg/composable/controller.go#L117) which controls all the providers [receives](https://github.com/elastic/elastic-agent/blob/f994f5bfdf68db27902a4175c3b655b4d611cf7c/internal/pkg/composable/controller.go#L371) these mappings and tries to match them with the input blocks of the configurations.
 
 This means that for every mapping that the condition matches (`kubernetes.pod.labels.app == redis`), a new input will be created in which the condition will be removed(not needed anymore) and the `kubernetes.pod.ip` variable will be substituted from the value in the same mapping.
 
@@ -95,8 +92,12 @@ metadata:
 ```
 
 In order to enable hints based autodiscover, user needs to uncomment the following lines in the [Elastic Agent Standalone manifest](https://github.com/elastic/elastic-agent/blob/main/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml)
-1. Add the [init container]((https://github.com/elastic/elastic-agent/blob/c01636e7383a9b2af9a588e0fcf1a4cae7d0d65c/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L697-L709)) that downloads the templates of various packages.
-2. Add the [volumeMount](https://github.com/elastic/elastic-agent/blob/c01636e7383a9b2af9a588e0fcf1a4cae7d0d65c/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L783-L785) and [volume](https://github.com/elastic/elastic-agent/blob/c01636e7383a9b2af9a588e0fcf1a4cae7d0d65c/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L824-L826).
+1. [Enable hints](https://github.com/elastic/elastic-agent/blob/4e983446837ff551a9f058fdc575a193d9afcbab/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L32) feature in kubernetes provider configuration.
+2. Add the [init container]((https://github.com/elastic/elastic-agent/blob/c01636e7383a9b2af9a588e0fcf1a4cae7d0d65c/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L697-L709)) that downloads the templates of various packages.
+3. Add the [volumeMount](https://github.com/elastic/elastic-agent/blob/c01636e7383a9b2af9a588e0fcf1a4cae7d0d65c/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L783-L785) and [volume](https://github.com/elastic/elastic-agent/blob/c01636e7383a9b2af9a588e0fcf1a4cae7d0d65c/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L824-L826).
+
+**Note:** If hints are enabled, the [`default_container_logs`](https://github.com/elastic/elastic-agent/blob/4e983446837ff551a9f058fdc575a193d9afcbab/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L33C8-L33C42) option is set to `True` by default. This means that logs from all discovered pods will be collected automatically, without requiring any annotations. To disable this behavior, set the option to `False`. This will stop the automatic log collection from all discovered pods. In this case, you must explicitly annotate your pods with the annotation `co.elastic.hints/package: "container_logs"` to collect their logs.
+
 
 The init container will start before the elastic agent pod and will donwload all the templates of packages [supported](https://github.com/elastic/elastic-agent/tree/main/deploy/kubernetes/elastic-agent-standalone/templates.d). 
 Elastic agent will then collect from the pods running(through the watchers mechanism) all the hints annotations and will try to match them with the correct package.
