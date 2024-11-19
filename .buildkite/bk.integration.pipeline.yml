@@ -33,15 +33,16 @@ steps:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
 
-  - group: "Stateful(Sudo): Windows"
+  - group: "Stateful: Windows"
     key: integration-tests-win
     depends_on:
       - integration-ess
+      - package-it
     steps:
-      - label: "Win2022:{{matrix}}"
+      - label: "Win2022:sudo:{{matrix}}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
-          .buildkite/scripts/integration-tests.ps1 {{matrix}}
+          .buildkite/scripts/integration-tests.ps1 {{matrix}} true
         artifact_paths:
           - build/**
         agents:
@@ -54,16 +55,42 @@ steps:
           - fleet-privileged
           - upgrade
 
-  - group: "Stateful IT (Sudo): Ubuntu"
+      - label: "Win2022:non-sudo:{{matrix}}"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          .buildkite/scripts/integration-tests.ps1 {{matrix}} false
+        artifact_paths:
+          - build/**
+        agents:
+          provider: "gcp"
+          machineType: "n1-standard-8"
+          image: "family/platform-ingest-elastic-agent-windows-2022"
+        matrix:
+          - default
+
+  - group: "Stateful:Ubuntu"
     key: integration-tests-ubuntu
     depends_on:
       - package-it
       - integration-ess
     steps:
-      - label: "x86_64:Group: {{matrix}}"
+      - label: "x86_64:non-sudo: {{matrix}}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
-          .buildkite/scripts/steps/integration_tests_tf_sudo.sh {{matrix}}
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
+        artifact_paths:
+          - build/**
+        agents:
+          provider: "gcp"
+          machineType: "n1-standard-8"
+          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+        matrix:
+          - default
+
+      - label: "x86_64:sudo: {{matrix}}"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
         agents:
@@ -82,10 +109,10 @@ steps:
           - fleet-privileged
           - fleet-airgapped-privileged
 
-      - label: "arm:Group: {{matrix}}"
+      - label: "arm:sudo: {{matrix}}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
-          .buildkite/scripts/steps/integration_tests_tf_sudo.sh {{matrix}}
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
         agents:
@@ -94,6 +121,8 @@ steps:
           instanceType: "m6g.2xlarge"
         matrix:
           - default
+          - container
+          - fleet-upgrade-to-pr-build
           - upgrade
           - fleet
           - fqdn
@@ -101,6 +130,36 @@ steps:
           - fleet-airgapped
           - fleet-privileged
           - fleet-airgapped-privileged
+
+      - label: "arm:non-sudo: {{matrix}}"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
+        artifact_paths:
+          - build/**
+        agents:
+          provider: "aws"
+          imagePrefix: "platform-ingest-beats-ubuntu-2404-aarch64"
+          instanceType: "m6g.xlarge"
+        matrix:
+          - default
+
+  - group: "Stateful(Sudo):RHEL8"
+    key: integration-tests-rhel8
+    depends_on:
+      - package-it
+      - integration-ess
+    steps:
+    - label: "x86_64:sudo:rpm"
+      command: |
+        buildkite-agent artifact download build/distributions/** . --step 'package-it'
+        .buildkite/scripts/steps/integration_tests_tf.sh rpm true
+      artifact_paths:
+         - build/**
+      agents:
+        provider: "gcp"
+        machineType: "n1-standard-8"
+        image: "family/platform-ingest-elastic-agent-rhel-8"
 
   - label: ESS stack cleanup
     depends_on:
