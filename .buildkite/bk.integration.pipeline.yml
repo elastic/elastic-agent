@@ -53,6 +53,38 @@ steps:
           - fleet-privileged
           - upgrade
 
+      - label: "Win11:{{matrix}}"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          .buildkite/scripts/integration-tests.ps1 {{matrix}}
+        artifact_paths:
+          - build/**
+        agents:
+          provider: "gcp"
+          machineType: "n1-standard-8"
+          image: "family/platform-ingest-elastic-agent-windows-11"
+        matrix:
+          - default
+          - fleet
+          - fleet-privileged
+          - upgrade
+
+      - label: "Win10:{{matrix}}"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          .buildkite/scripts/integration-tests.ps1 {{matrix}}
+        artifact_paths:
+          - build/**
+        agents:
+          provider: "gcp"
+          machineType: "n1-standard-8"
+          image: "family/platform-ingest-elastic-agent-windows-10"
+        matrix:
+          - default
+          - fleet
+          - fleet-privileged
+          - upgrade
+
   - group: "Stateful(Sudo): Ubuntu"
     key: integration-tests-ubuntu
     depends_on:
