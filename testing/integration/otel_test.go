@@ -31,39 +31,6 @@ import (
 	"github.com/elastic/go-elasticsearch/v8"
 )
 
-const fileProcessingFilename = `/tmp/testfileprocessing.json`
-
-var fileProcessingConfig = []byte(`receivers:
-  filelog:
-    include: [ "/var/log/system.log", "/var/log/syslog"  ]
-    start_at: beginning
-
-exporters:
-  file:
-    path: ` + fileProcessingFilename + `
-service:
-  pipelines:
-    logs:
-      receivers: [filelog]
-      exporters:
-        - file`)
-
-var fileInvalidOtelConfig = []byte(`receivers:
-  filelog:
-    include: [ "/var/log/system.log", "/var/log/syslog"  ]
-    start_at: beginning
-
-exporters:
-  file:
-    path: ` + fileProcessingFilename + `
-service:
-  pipelines:
-    logs:
-      receivers: [filelog]
-      processors: [nonexistingprocessor]
-      exporters:
-        - file`)
-
 const apmProcessingContent = `2023-06-19 05:20:50 ERROR This is a test error message
 2023-06-20 12:50:00 DEBUG This is a test debug message 2
 2023-06-20 12:51:00 DEBUG This is a test debug message 3
@@ -199,17 +166,86 @@ func TestOtelFileProcessing(t *testing.T) {
 		},
 	})
 
-	t.Cleanup(func() {
-		_ = os.Remove(fileProcessingFilename)
-	})
-
 	// replace default elastic-agent.yml with otel config
 	// otel mode should be detected automatically
-	tempDir := t.TempDir()
-	cfgFilePath := filepath.Join(tempDir, "otel.yml")
-	require.NoError(t, os.WriteFile(cfgFilePath, []byte(fileProcessingConfig), 0o600))
+	tmpDir := t.TempDir()
+	// create input file
+	numEvents := 50
+	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
+	require.NoError(t, err, "failed to create temp file to hold data to ingest")
+	inputFilePath := inputFile.Name()
+	for i := 0; i < numEvents; i++ {
+		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
+		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+	}
+	err = inputFile.Close()
+	require.NoError(t, err, "failed to close data temp file")
+	t.Cleanup(func() {
+		if t.Failed() {
+			contents, err := os.ReadFile(inputFilePath)
+			if err != nil {
+				t.Logf("no data file to import at %s", inputFilePath)
+				return
+			}
+			t.Logf("contents of import file:\n%s\n", string(contents))
+		}
+	})
+	// create output filename
+	outputFilePath := filepath.Join(tmpDir, "output.txt")
+	t.Cleanup(func() {
+		if t.Failed() {
+			contents, err := os.ReadFile(outputFilePath)
+			if err != nil {
+				t.Logf("no output data at %s", inputFilePath)
+				return
+			}
+			t.Logf("contents of output file:\n%s\n", string(contents))
+		}
+	})
+	// create the otel config with input and output
+	type otelConfigOptions struct {
+		InputPath  string
+		OutputPath string
+	}
+	otelConfigTemplate := `receivers:
+  filelog:
+    include:
+      - {{.InputPath}}
+    start_at: beginning
 
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", cfgFilePath}))
+exporters:
+  file:
+    path: {{.OutputPath}}
+service:
+  pipelines:
+    logs:
+      receivers:
+        - filelog
+      exporters:
+        - file
+`
+	otelConfigPath := filepath.Join(tmpDir, "otel.yml")
+	var otelConfigBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("otelConfig").Parse(otelConfigTemplate)).Execute(&otelConfigBuffer,
+			otelConfigOptions{
+				InputPath:  inputFilePath,
+				OutputPath: outputFilePath,
+			}))
+	require.NoError(t, os.WriteFile(otelConfigPath, otelConfigBuffer.Bytes(), 0o600))
+	t.Cleanup(func() {
+		if t.Failed() {
+			contents, err := os.ReadFile(otelConfigPath)
+			if err != nil {
+				t.Logf("No otel configuration file at %s", otelConfigPath)
+				return
+			}
+			t.Logf("Contents of otel config file:\n%s\n", string(contents))
+		}
+	})
+	// now we can actually run the test
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", otelConfigPath}))
 	require.NoError(t, err)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
@@ -227,42 +263,43 @@ func TestOtelFileProcessing(t *testing.T) {
 		err = fixture.RunOtelWithClient(ctx)
 	}()
 
+	validateCommandIsWorking(t, ctx, fixture, tmpDir)
+
 	var content []byte
-	watchLines := linesTrackMap([]string{
-		`"stringValue":"syslog"`,     // syslog is being processed
-		`"stringValue":"system.log"`, // system.log is being processed
-	})
-
-	validateCommandIsWorking(t, ctx, fixture, tempDir)
-
 	require.Eventually(t,
 		func() bool {
 			// verify file exists
-			content, err = os.ReadFile(fileProcessingFilename)
+			content, err = os.ReadFile(outputFilePath)
 			if err != nil || len(content) == 0 {
 				return false
 			}
 
-			for k, alreadyFound := range watchLines {
-				if alreadyFound {
-					continue
-				}
-				if bytes.Contains(content, []byte(k)) {
-					watchLines[k] = true
-				}
-			}
-
-			return mapAtLeastOneTrue(watchLines)
+			found := bytes.Count(content, []byte(filepath.Base(inputFilePath)))
+			return found == numEvents
 		},
 		3*time.Minute, 500*time.Millisecond,
 		fmt.Sprintf("there should be exported logs by now"))
-
 	cancel()
 	fixtureWg.Wait()
 	require.True(t, err == nil || err == context.Canceled || err == context.DeadlineExceeded, "Retrieved unexpected error: %s", err.Error())
 }
 
 func validateCommandIsWorking(t *testing.T, ctx context.Context, fixture *aTesting.Fixture, tempDir string) {
+	fileProcessingConfig := []byte(`receivers:
+  filelog:
+    include: [ "/var/log/system.log", "/var/log/syslog"  ]
+    start_at: beginning
+
+exporters:
+  file:
+    path: /tmp/testfileprocessing.json
+service:
+  pipelines:
+    logs:
+      receivers: [filelog]
+      exporters:
+        - file
+`)
 	cfgFilePath := filepath.Join(tempDir, "otel-valid.yml")
 	require.NoError(t, os.WriteFile(cfgFilePath, []byte(fileProcessingConfig), 0o600))
 
@@ -280,6 +317,22 @@ func validateCommandIsWorking(t *testing.T, ctx context.Context, fixture *aTesti
 
 	// check `elastic-agent otel validate` command works for invalid otel config
 	cfgFilePath = filepath.Join(tempDir, "otel-invalid.yml")
+	fileInvalidOtelConfig := []byte(`receivers:
+  filelog:
+    include: [ "/var/log/system.log", "/var/log/syslog"  ]
+    start_at: beginning
+
+exporters:
+  file:
+    path: /tmp/testfileprocessing.json
+service:
+  pipelines:
+    logs:
+      receivers: [filelog]
+      processors: [nonexistingprocessor]
+      exporters:
+        - file
+`)
 	require.NoError(t, os.WriteFile(cfgFilePath, []byte(fileInvalidOtelConfig), 0o600))
 
 	out, err = fixture.Exec(ctx, []string{"otel", "validate", "--config", cfgFilePath})
