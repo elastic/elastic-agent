@@ -9,6 +9,7 @@ https://www.elastic.co/guide/en/fleet/current/kubernetes-provider.html
 Kubernetes provider can be configured both in **standalone** and **fleet managed** elastic agent.
 
 a. In  **standalone** elastic agent, the kubernetes provider is configured inside the [elastic-agent-standalone-kubernetes.yaml](https://github.com/elastic/elastic-agent/blob/f994f5bfdf68db27902a4175c3b655b4d611cf7c/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L28). User can update the parameters based on their needs.
+
 b. In **fleet managed** elastic agent, kubernetes provider is enabled by default with default values. User needs to follow the steps described in the [documentation](https://www.elastic.co/guide/en/fleet/current/advanced-kubernetes-managed-by-fleet.html) to configure it.
 
 Condition based autodiscover is supported both in **fleet managed** elastic agent and in **standalone** elastic agent(see [doc](https://www.elastic.co/guide/en/fleet/current/conditions-based-autodiscover.html)).
