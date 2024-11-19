@@ -138,7 +138,7 @@ func (r *artifactResult) Fetch(ctx context.Context, l Logger, dir string) error 
 
 func findURI(ctx context.Context, doer httpDoer, version *semver.ParsedSemVer) (string, error) {
 	// if we know the exact build ID, we can build the URI right away
-	if version.BuildMetadata() != "" {
+	if version.BuildMetadata() != "" && !version.IsIndependentRelease() {
 		return fmt.Sprintf("https://snapshots.elastic.co/%s-%s/downloads/beats/elastic-agent/", version.CoreVersion(), version.BuildMetadata()), nil
 	}
 
