@@ -78,83 +78,6 @@ service:
         - debug
         - otlp/elastic`
 
-func TestOtelHybridFileProcessing(t *testing.T) {
-	define.Require(t, define.Requirements{
-		Group: Default,
-		Local: true,
-		OS: []define.OS{
-			// input path missing on windows
-			{Type: define.Linux},
-			{Type: define.Darwin},
-		},
-	})
-
-	t.Cleanup(func() {
-		_ = os.Remove(fileProcessingFilename)
-	})
-
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-	require.NoError(t, err)
-
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
-	defer cancel()
-	err = fixture.Prepare(ctx, fakeComponent)
-	require.NoError(t, err)
-
-	var fixtureWg sync.WaitGroup
-	fixtureWg.Add(1)
-	go func() {
-		defer fixtureWg.Done()
-		err = fixture.Run(ctx, aTesting.State{
-			Configure: string(fileProcessingConfig),
-			Reached: func(state *client.AgentState) bool {
-				// keep running (context cancel will stop it)
-				return false
-			},
-		})
-	}()
-
-	var content []byte
-	watchLines := linesTrackMap([]string{
-		`"stringValue":"syslog"`,     // syslog is being processed
-		`"stringValue":"system.log"`, // system.log is being processed
-	})
-
-	require.Eventually(t,
-		func() bool {
-			// verify file exists
-			content, err = os.ReadFile(fileProcessingFilename)
-			if err != nil || len(content) == 0 {
-				return false
-			}
-
-			for k, alreadyFound := range watchLines {
-				if alreadyFound {
-					continue
-				}
-				if bytes.Contains(content, []byte(k)) {
-					watchLines[k] = true
-				}
-			}
-
-			return mapAtLeastOneTrue(watchLines)
-		},
-		3*time.Minute, 500*time.Millisecond,
-		fmt.Sprintf("there should be exported logs by now"))
-
-	statusCtx, statusCancel := context.WithTimeout(ctx, 5*time.Second)
-	defer statusCancel()
-	output, err := fixture.ExecStatus(statusCtx)
-	require.NoError(t, err, "status command failed")
-
-	cancel()
-	fixtureWg.Wait()
-	require.True(t, err == nil || err == context.Canceled || err == context.DeadlineExceeded, "Retrieved unexpected error: %s", err.Error())
-
-	assert.NotNil(t, output.Collector)
-	assert.Equal(t, 2, output.Collector.Status, "collector status should have been StatusOK")
-}
-
 func TestOtelFileProcessing(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: Default,
@@ -282,6 +205,131 @@ service:
 	cancel()
 	fixtureWg.Wait()
 	require.True(t, err == nil || err == context.Canceled || err == context.DeadlineExceeded, "Retrieved unexpected error: %s", err.Error())
+}
+
+func TestOtelHybridFileProcessing(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: Default,
+		Local: true,
+		OS: []define.OS{
+			// input path missing on windows
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+	})
+
+	// otel mode should be detected automatically
+	tmpDir := t.TempDir()
+	// create input file
+	numEvents := 50
+	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
+	require.NoError(t, err, "failed to create temp file to hold data to ingest")
+	inputFilePath := inputFile.Name()
+	for i := 0; i < numEvents; i++ {
+		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
+		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+	}
+	err = inputFile.Close()
+	require.NoError(t, err, "failed to close data temp file")
+	t.Cleanup(func() {
+		if t.Failed() {
+			contents, err := os.ReadFile(inputFilePath)
+			if err != nil {
+				t.Logf("no data file to import at %s", inputFilePath)
+				return
+			}
+			t.Logf("contents of import file:\n%s\n", string(contents))
+		}
+	})
+	// create output filename
+	outputFilePath := filepath.Join(tmpDir, "output.txt")
+	t.Cleanup(func() {
+		if t.Failed() {
+			contents, err := os.ReadFile(outputFilePath)
+			if err != nil {
+				t.Logf("no output data at %s", inputFilePath)
+				return
+			}
+			t.Logf("contents of output file:\n%s\n", string(contents))
+		}
+	})
+	// create the otel config with input and output
+	type otelConfigOptions struct {
+		InputPath  string
+		OutputPath string
+	}
+	otelConfigTemplate := `receivers:
+  filelog:
+    include:
+      - {{.InputPath}}
+    start_at: beginning
+
+exporters:
+  file:
+    path: {{.OutputPath}}
+service:
+  pipelines:
+    logs:
+      receivers:
+        - filelog
+      exporters:
+        - file
+`
+	var otelConfigBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("otelConfig").Parse(otelConfigTemplate)).Execute(&otelConfigBuffer,
+			otelConfigOptions{
+				InputPath:  inputFilePath,
+				OutputPath: outputFilePath,
+			}))
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx, fakeComponent)
+	require.NoError(t, err)
+
+	var fixtureWg sync.WaitGroup
+	fixtureWg.Add(1)
+	go func() {
+		defer fixtureWg.Done()
+		err = fixture.Run(ctx, aTesting.State{
+			Configure: otelConfigBuffer.String(),
+			Reached: func(state *client.AgentState) bool {
+				// keep running (context cancel will stop it)
+				return false
+			},
+		})
+	}()
+
+	var content []byte
+	require.Eventually(t,
+		func() bool {
+			// verify file exists
+			content, err = os.ReadFile(outputFilePath)
+			if err != nil || len(content) == 0 {
+				return false
+			}
+
+			found := bytes.Count(content, []byte(filepath.Base(inputFilePath)))
+			return found == numEvents
+		},
+		3*time.Minute, 500*time.Millisecond,
+		fmt.Sprintf("there should be exported logs by now"))
+
+	statusCtx, statusCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer statusCancel()
+	output, err := fixture.ExecStatus(statusCtx)
+	require.NoError(t, err, "status command failed")
+
+	cancel()
+	fixtureWg.Wait()
+	require.True(t, err == nil || err == context.Canceled || err == context.DeadlineExceeded, "Retrieved unexpected error: %s", err.Error())
+
+	assert.NotNil(t, output.Collector)
+	assert.Equal(t, 2, output.Collector.Status, "collector status should have been StatusOK")
 }
 
 func validateCommandIsWorking(t *testing.T, ctx context.Context, fixture *aTesting.Fixture, tempDir string) {
