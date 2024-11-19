@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
 
+# Fixes source asdf.sh, otherwise it relies on unexisting /root/.asdf directory
+export HOME=/opt/buildkite-agent
+
 # The script is used to run integration tests with sudo
-source /opt/buildkite-agent/hooks/pre-command 
+source /opt/buildkite-agent/hooks/pre-command
 source .buildkite/hooks/pre-command || echo "No pre-command hook found"
+
+# Make sure that all tools are installed
+asdf install
 
 GROUP_NAME=$1
 
 echo "~~~ Running integration tests as $USER"
 echo "~~~ Integration tests: ${GROUP_NAME}"
+go install gotest.tools/gotestsum
 gotestsum --version
 PACKAGE_VERSION="$(cat .package-version)"
 if [[ -n "$PACKAGE_VERSION" ]]; then
