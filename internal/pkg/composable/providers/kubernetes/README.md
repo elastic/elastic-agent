@@ -12,7 +12,7 @@ a. In  **standalone** elastic agent, the kubernetes provider is configured insid
 
 b. In **fleet managed** elastic agent, kubernetes provider is enabled by default with default values. User needs to follow the steps described in the [documentation](https://www.elastic.co/guide/en/fleet/current/advanced-kubernetes-managed-by-fleet.html) to configure it.
 
-Condition based autodiscover is supported both in **fleet managed** elastic agent and in **standalone** elastic agent(see [doc](https://www.elastic.co/guide/en/fleet/current/conditions-based-autodiscover.html)).
+Condition based autodiscover is supported both in **fleet managed** elastic agent and in **standalone** elastic agent (see [doc](https://www.elastic.co/guide/en/fleet/current/conditions-based-autodiscover.html)).
 
 Hints based autodiscover is only supported in **standalone** elastic agent(see [doc](https://www.elastic.co/guide/en/fleet/current/hints-annotations-autodiscovery.html)).
 
