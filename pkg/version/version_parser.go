@@ -20,7 +20,7 @@ const preReleaseSeparator = "-"
 const metadataSeparator = "+"
 const prereleaseTokenSeparator = "."
 const snapshotPrereleaseToken = "SNAPSHOT"
-const isIndependentReleaseFormat = `^build\d{12}`
+const IsIndependentReleaseFormat = `^build\d{12}`
 
 var semVerFmtRegEx *regexp.Regexp
 var numericPrereleaseTokenRegEx *regexp.Regexp
@@ -131,7 +131,7 @@ func (psv ParsedSemVer) IsSnapshot() bool {
 }
 
 func (psv ParsedSemVer) IsIndependentRelease() bool {
-	matched, err := regexp.MatchString(isIndependentReleaseFormat, psv.buildMetadata)
+	matched, err := regexp.MatchString(IsIndependentReleaseFormat, psv.buildMetadata)
 	return err == nil && matched
 }
 
