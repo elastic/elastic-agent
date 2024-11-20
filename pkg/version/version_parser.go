@@ -42,13 +42,12 @@ func init() {
 var ErrNoMatch = errors.New("version string does not match expected format")
 
 type ParsedSemVer struct {
-	original             string
-	major                int
-	minor                int
-	patch                int
-	prerelease           string
-	buildMetadata        string
-	isIndependentRelease bool
+	original      string
+	major         int
+	minor         int
+	patch         int
+	prerelease    string
+	buildMetadata string
 }
 
 func (psv ParsedSemVer) Original() string {
@@ -132,7 +131,8 @@ func (psv ParsedSemVer) IsSnapshot() bool {
 }
 
 func (psv ParsedSemVer) IsIndependentRelease() bool {
-	return psv.isIndependentRelease
+	matched, err := regexp.MatchString(isIndependentReleaseFormat, psv.buildMetadata)
+	return err == nil && matched
 }
 
 func (psv ParsedSemVer) Less(other ParsedSemVer) bool {
@@ -258,19 +258,13 @@ func ParseVersion(version string) (*ParsedSemVer, error) {
 		return nil, fmt.Errorf("parsing patch version: %w", err)
 	}
 
-	var isIndependentRelease bool
-	if matched, err := regexp.MatchString(isIndependentReleaseFormat, matches[namedGroups["buildmetadata"]]); err == nil && matched {
-		isIndependentRelease = true
-	}
-
 	return &ParsedSemVer{
-		original:             version,
-		major:                major,
-		minor:                minor,
-		patch:                patch,
-		prerelease:           matches[namedGroups["prerelease"]],
-		buildMetadata:        matches[namedGroups["buildmetadata"]],
-		isIndependentRelease: isIndependentRelease,
+		original:      version,
+		major:         major,
+		minor:         minor,
+		patch:         patch,
+		prerelease:    matches[namedGroups["prerelease"]],
+		buildMetadata: matches[namedGroups["buildmetadata"]],
 	}, nil
 }
 
