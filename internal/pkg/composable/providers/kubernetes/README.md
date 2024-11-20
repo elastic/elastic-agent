@@ -101,6 +101,6 @@ In order to enable hints based autodiscover, user needs to uncomment the followi
 
 
 The init container will start before the elastic agent pod and will donwload all the templates of packages [supported](https://github.com/elastic/elastic-agent/tree/main/deploy/kubernetes/elastic-agent-standalone/templates.d). 
-Elastic agent will then collect from the pods running(through the watchers mechanism) all the hints annotations and will try to match them with the correct package.
+Elastic agent will then collect from the pods running (through the watchers mechanism) all the hints annotations and will try to match them with the correct package.
 In the redis example, it will use the [redis template](https://github.com/elastic/elastic-agent/blob/main/deploy/kubernetes/elastic-agent-standalone/templates.d/redis.yml) and substitute the template variables with the values specified in the annotations. Default values will be used for variables not provided.
 A new input will be then created for redis and redis-specific data will start being collected.
