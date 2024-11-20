@@ -43,12 +43,21 @@ require (
 	github.com/kardianos/service v1.2.1-0.20210728001519-a323c3813bc7
 	github.com/magefile/mage v1.15.0
 	github.com/oklog/ulid/v2 v2.1.0
+<<<<<<< HEAD
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.117.0
+=======
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.113.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.113.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.113.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.113.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.113.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.113.0
+>>>>>>> b07566b96 (Add support for running EDOT inside of running Elastic Agent (#5767))
 	github.com/otiai10/copy v1.14.0
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/rednafi/link-patrol v0.0.0-20240826150821-057643e74d4d
@@ -65,7 +74,12 @@ require (
 	go.elastic.co/apm/v2 v2.6.2
 	go.elastic.co/ecszap v1.0.2
 	go.elastic.co/go-licence-detector v0.7.0
+<<<<<<< HEAD
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.117.0
+=======
+	go.opentelemetry.io/collector/component/componentstatus v0.113.0
+	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.113.0
+>>>>>>> b07566b96 (Add support for running EDOT inside of running Elastic Agent (#5767))
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.32.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
@@ -94,6 +108,7 @@ require (
 
 require (
 	github.com/distribution/reference v0.6.0 // indirect
+<<<<<<< HEAD
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.117.0
@@ -130,6 +145,44 @@ require (
 	go.opentelemetry.io/collector/processor/batchprocessor v0.117.0
 	go.opentelemetry.io/collector/receiver v0.117.0
 	go.opentelemetry.io/collector/receiver/otlpreceiver v0.117.0
+=======
+	github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.113.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.113.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.113.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.113.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.113.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.113.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.113.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor v0.113.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.113.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.113.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.113.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.113.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver v0.113.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver v0.113.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.113.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver v0.113.0
+	go.opentelemetry.io/collector/component v0.113.0
+	go.opentelemetry.io/collector/confmap v1.19.0
+	go.opentelemetry.io/collector/confmap/provider/envprovider v1.19.0
+	go.opentelemetry.io/collector/confmap/provider/fileprovider v1.19.0
+	go.opentelemetry.io/collector/confmap/provider/httpprovider v1.19.0
+	go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.19.0
+	go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.19.0
+	go.opentelemetry.io/collector/connector v0.113.0
+	go.opentelemetry.io/collector/exporter v0.113.0
+	go.opentelemetry.io/collector/exporter/debugexporter v0.113.0
+	go.opentelemetry.io/collector/exporter/otlpexporter v0.113.0
+	go.opentelemetry.io/collector/exporter/otlphttpexporter v0.113.0
+	go.opentelemetry.io/collector/extension v0.113.0
+	go.opentelemetry.io/collector/extension/memorylimiterextension v0.113.0
+	go.opentelemetry.io/collector/featuregate v1.19.0
+	go.opentelemetry.io/collector/otelcol v0.113.0
+	go.opentelemetry.io/collector/processor v0.113.0
+	go.opentelemetry.io/collector/processor/batchprocessor v0.113.0
+	go.opentelemetry.io/collector/receiver v0.113.0
+	go.opentelemetry.io/collector/receiver/otlpreceiver v0.113.0
+>>>>>>> b07566b96 (Add support for running EDOT inside of running Elastic Agent (#5767))
 )
 
 require (
@@ -499,6 +552,7 @@ require (
 	go.elastic.co/fastjson v1.4.0 // indirect
 	go.etcd.io/bbolt v1.3.11 // indirect
 	go.opencensus.io v0.24.0 // indirect
+<<<<<<< HEAD
 	go.opentelemetry.io/collector v0.117.0 // indirect
 	go.opentelemetry.io/collector/client v1.23.0 // indirect
 	go.opentelemetry.io/collector/component/componentstatus v0.117.0 // indirect
@@ -544,6 +598,48 @@ require (
 	go.opentelemetry.io/collector/scraper/scraperhelper v0.117.0 // indirect
 	go.opentelemetry.io/collector/semconv v0.117.0 // indirect
 	go.opentelemetry.io/collector/service v0.117.0 // indirect
+=======
+	go.opentelemetry.io/collector v0.113.0 // indirect
+	go.opentelemetry.io/collector/client v1.19.0 // indirect
+	go.opentelemetry.io/collector/config/configauth v0.113.0 // indirect
+	go.opentelemetry.io/collector/config/configcompression v1.19.0 // indirect
+	go.opentelemetry.io/collector/config/configgrpc v0.113.0 // indirect
+	go.opentelemetry.io/collector/config/confighttp v0.113.0 // indirect
+	go.opentelemetry.io/collector/config/confignet v1.19.0 // indirect
+	go.opentelemetry.io/collector/config/configopaque v1.19.0 // indirect
+	go.opentelemetry.io/collector/config/configretry v1.19.0 // indirect
+	go.opentelemetry.io/collector/config/configtelemetry v0.113.0 // indirect
+	go.opentelemetry.io/collector/config/configtls v1.19.0 // indirect
+	go.opentelemetry.io/collector/config/internal v0.113.0 // indirect
+	go.opentelemetry.io/collector/connector/connectorprofiles v0.113.0 // indirect
+	go.opentelemetry.io/collector/connector/connectortest v0.113.0 // indirect
+	go.opentelemetry.io/collector/consumer v0.113.0 // indirect
+	go.opentelemetry.io/collector/consumer/consumererror v0.113.0 // indirect
+	go.opentelemetry.io/collector/consumer/consumererror/consumererrorprofiles v0.113.0 // indirect
+	go.opentelemetry.io/collector/consumer/consumerprofiles v0.113.0 // indirect
+	go.opentelemetry.io/collector/consumer/consumertest v0.113.0 // indirect
+	go.opentelemetry.io/collector/exporter/exporterhelper/exporterhelperprofiles v0.113.0 // indirect
+	go.opentelemetry.io/collector/exporter/exporterprofiles v0.113.0 // indirect
+	go.opentelemetry.io/collector/exporter/exportertest v0.113.0 // indirect
+	go.opentelemetry.io/collector/extension/auth v0.113.0 // indirect
+	go.opentelemetry.io/collector/extension/experimental/storage v0.113.0 // indirect
+	go.opentelemetry.io/collector/extension/extensioncapabilities v0.113.0 // indirect
+	go.opentelemetry.io/collector/filter v0.113.0 // indirect
+	go.opentelemetry.io/collector/internal/fanoutconsumer v0.113.0 // indirect
+	go.opentelemetry.io/collector/internal/memorylimiter v0.113.0 // indirect
+	go.opentelemetry.io/collector/internal/sharedcomponent v0.113.0 // indirect
+	go.opentelemetry.io/collector/pdata v1.19.0 // indirect
+	go.opentelemetry.io/collector/pdata/pprofile v0.113.0 // indirect
+	go.opentelemetry.io/collector/pdata/testdata v0.113.0 // indirect
+	go.opentelemetry.io/collector/pipeline v0.113.0 // indirect
+	go.opentelemetry.io/collector/pipeline/pipelineprofiles v0.113.0 // indirect
+	go.opentelemetry.io/collector/processor/processorprofiles v0.113.0 // indirect
+	go.opentelemetry.io/collector/processor/processortest v0.113.0 // indirect
+	go.opentelemetry.io/collector/receiver/receiverprofiles v0.113.0 // indirect
+	go.opentelemetry.io/collector/receiver/receivertest v0.113.0 // indirect
+	go.opentelemetry.io/collector/semconv v0.113.0 // indirect
+	go.opentelemetry.io/collector/service v0.113.0 // indirect
+>>>>>>> b07566b96 (Add support for running EDOT inside of running Elastic Agent (#5767))
 	go.opentelemetry.io/contrib/bridges/otelzap v0.6.0 // indirect
 	go.opentelemetry.io/contrib/config v0.10.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.57.0 // indirect

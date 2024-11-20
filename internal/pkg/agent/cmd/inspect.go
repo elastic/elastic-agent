@@ -389,7 +389,7 @@ func getMonitoringFn(ctx context.Context, cfg map[string]interface{}) (component
 	}
 
 	agentCfg := configuration.DefaultConfiguration()
-	if err := config.Unpack(agentCfg); err != nil {
+	if err := config.UnpackTo(agentCfg); err != nil {
 		return nil, err
 	}
 

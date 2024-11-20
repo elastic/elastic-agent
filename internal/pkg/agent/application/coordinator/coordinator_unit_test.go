@@ -13,10 +13,13 @@ package coordinator
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+	"go.opentelemetry.io/collector/component/componentstatus"
+	"go.opentelemetry.io/collector/confmap"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -152,6 +155,94 @@ func TestCoordinatorReportsUnhealthyComponents(t *testing.T) {
 	// Coordinator recovers
 	unhealthyComponent.State.State = client.UnitStateStarting
 	runtimeChan <- unhealthyComponent
+	coord.runLoopIteration(ctx)
+	select {
+	case state := <-stateChan:
+		assert.Equal(t, agentclient.Healthy, state.State, "Starting component state should cause healthy Coordinator state")
+		assert.Equal(t, "Running", state.Message, "Healthy coordinator should return to baseline state message")
+	default:
+		assert.Fail(t, "Coordinator's state didn't change")
+	}
+}
+
+func TestCoordinatorReportsUnhealthyOTelComponents(t *testing.T) {
+	// Set a one-second timeout -- nothing here should block, but if it
+	// does let's report a failure instead of timing out the test runner.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	// Channels have buffer length 1 so we don't have to run on multiple
+	// goroutines.
+	stateChan := make(chan State, 1)
+	otelChan := make(chan *status.AggregateStatus, 1)
+	coord := &Coordinator{
+		state: State{
+			CoordinatorState:   agentclient.Healthy,
+			CoordinatorMessage: "Running",
+		},
+		stateBroadcaster: &broadcaster.Broadcaster[State]{
+			InputChan: stateChan,
+		},
+		managerChans: managerChans{
+			otelManagerUpdate: otelChan,
+		},
+		componentPIDTicker: time.NewTicker(time.Second * 30),
+	}
+
+	unhealthyOTel := &status.AggregateStatus{
+		Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+		ComponentStatusMap: map[string]*status.AggregateStatus{
+			"test-component-1": {
+				Event: componentstatus.NewRecoverableErrorEvent(errors.New("test message")),
+			},
+		},
+	}
+
+	// Send the otel component state to the Coordinator channel and let it run for an
+	// iteration to update
+	otelChan <- unhealthyOTel
+	coord.runLoopIteration(ctx)
+	select {
+	case state := <-stateChan:
+		assert.Equal(t, agentclient.Degraded, state.State, "Degraded component state should cause degraded Coordinator state")
+		assert.Equal(t, "1 or more components/units in a degraded state", state.Message, "state message should reflect degraded component")
+	default:
+		assert.Fail(t, "Coordinator's state didn't change")
+	}
+
+	// Try again, escalating the component's state to Failed.
+	// The state message should change slightly, but the overall Coordinator
+	// state should still just be Degraded -- components / units can't cause
+	// a Failed state, only errors in the managers can do that.
+	unhealthyOTel = &status.AggregateStatus{
+		Event: componentstatus.NewEvent(componentstatus.StatusFatalError),
+		ComponentStatusMap: map[string]*status.AggregateStatus{
+			"test-component-1": {
+				Event: componentstatus.NewFatalErrorEvent(errors.New("test message")),
+			},
+		},
+	}
+	otelChan <- unhealthyOTel
+	coord.runLoopIteration(ctx)
+	select {
+	case state := <-stateChan:
+		assert.Equal(t, agentclient.Degraded, state.State, "Failed component state should cause degraded Coordinator state")
+		assert.Equal(t, "1 or more components/units in a failed state", state.Message, "state message should reflect failed component")
+	default:
+		assert.Fail(t, "Coordinator's state didn't change")
+	}
+
+	// Reset component state to UnitStateStarting and verify the
+	// Coordinator recovers
+	unhealthyOTel = &status.AggregateStatus{
+		Event: componentstatus.NewEvent(componentstatus.StatusStarting),
+		ComponentStatusMap: map[string]*status.AggregateStatus{
+			"test-component-1": {
+				Event: componentstatus.NewEvent(componentstatus.StatusStarting),
+			},
+		},
+	}
+	otelChan <- unhealthyOTel
 	coord.runLoopIteration(ctx)
 	select {
 	case state := <-stateChan:
@@ -686,7 +777,7 @@ inputs:
 	assert.True(t, monitoringServer.isRunning)
 }
 
-func TestCoordinatorPolicyChangeUpdatesRuntimeManager(t *testing.T) {
+func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManager(t *testing.T) {
 	// Send a test policy to the Coordinator as a Config Manager update,
 	// verify it generates the right component model and sends it to the
 	// runtime manager, then send an empty policy and verify it calls
@@ -710,6 +801,15 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeManager(t *testing.T) {
 			return nil
 		},
 	}
+	var otelUpdated bool         // Set by otel manager callback
+	var otelConfig *confmap.Conf // Set by otel manager callback
+	otelManager := &fakeOTelManager{
+		updateCallback: func(cfg *confmap.Conf) error {
+			otelUpdated = true
+			otelConfig = cfg
+			return nil
+		},
+	}
 
 	coord := &Coordinator{
 		logger:           logger,
@@ -719,11 +819,12 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeManager(t *testing.T) {
 			configManagerUpdate: configChan,
 		},
 		runtimeMgr:         runtimeManager,
+		otelMgr:            otelManager,
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
 
-	// Create a policy with one input and one output
+	// Create a policy with one input and one output (no otel configuration)
 	cfg := config.MustNewConfigFrom(`
 outputs:
   default:
@@ -746,6 +847,8 @@ inputs:
 	// manually (sorry).
 	assert.True(t, updated, "Runtime manager should be updated after a policy change")
 	require.Equal(t, 1, len(components), "Test policy should generate one component")
+	assert.True(t, otelUpdated, "OTel manager should be updated after a policy change")
+	require.Nil(t, otelConfig, "OTel manager should not have any config")
 
 	component := components[0]
 	assert.Equal(t, "filestream-default", component.ID)
@@ -765,16 +868,57 @@ inputs:
 	assert.Equal(t, client.UnitTypeOutput, units[1].Type)
 	assert.Equal(t, "elasticsearch", units[1].Config.Type)
 
-	// Send a new empty config update and make sure the runtime manager
-	// receives that as well.
+	// Send a new config update that includes otel configuration
 	updated = false
 	components = nil
+	otelUpdated = false
+	otelConfig = nil
+	cfg = config.MustNewConfigFrom(`
+outputs:
+  default:
+    type: elasticsearch
+inputs:
+  - id: test-input
+    type: filestream
+    use_output: default
+receivers:
+  otlp:
+processors:
+  batch:
+exporters:
+  otlp:
+service:
+  pipelines:
+    traces:
+      receivers:
+        - otlp
+      exporters:
+        - otlp
+`)
+	cfgChange = &configChange{cfg: cfg}
+	configChan <- cfgChange
+	coord.runLoopIteration(ctx)
+
+	// Validate that the runtime manager and otel manager got the updated configuration
+	assert.True(t, updated, "Runtime manager should be updated after a policy change")
+	require.Equal(t, 1, len(components), "Test policy should generate one component")
+	assert.True(t, otelUpdated, "OTel manager should be updated after a policy change")
+	require.NotNil(t, otelConfig, "OTel manager should have a config")
+
+	// Send a new empty config update and make sure the runtime manager
+	// and otel manager receives that as well.
+	updated = false
+	components = nil
+	otelUpdated = false
+	otelConfig = nil
 	cfgChange = &configChange{cfg: config.MustNewConfigFrom(nil)}
 	configChan <- cfgChange
 	coord.runLoopIteration(ctx)
 	assert.True(t, cfgChange.acked, "empty policy should be acknowledged")
 	assert.True(t, updated, "empty policy should cause runtime manager update")
 	assert.Empty(t, components, "empty policy should produce empty component model")
+	assert.True(t, otelUpdated, "empty policy should cause otel manager update")
+	assert.Nil(t, otelConfig, "empty policy should cause otel manager to get nil config")
 }
 
 func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
@@ -791,7 +935,7 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 	// Create a mocked runtime manager that always reports an error
 	runtimeManager := &fakeRuntimeManager{
 		updateCallback: func(comp []component.Component) error {
-			return fmt.Errorf(errorStr)
+			return errors.New(errorStr)
 		},
 		errChan: updateErrChan,
 	}
@@ -829,6 +973,67 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 	coord.runLoopIteration(ctx)
 	require.Error(t, coord.runtimeUpdateErr, "Runtime update failure should be saved in runtimeUpdateErr")
 	assert.Equal(t, errorStr, coord.runtimeUpdateErr.Error(), "runtimeUpdateErr should match the error reported by the runtime manager")
+
+	// Make sure the error appears in the Coordinator state.
+	state := coord.State()
+	assert.Equal(t, agentclient.Failed, state.State, "Failed policy update should cause failed Coordinator")
+	assert.Contains(t, state.Message, errorStr, "Failed policy update should be reported in Coordinator state message")
+}
+
+func TestCoordinatorReportsOTelManagerUpdateFailure(t *testing.T) {
+	// Set a one-second timeout -- nothing here should block, but if it
+	// does let's report a failure instead of timing out the test runner.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	logger := logp.NewLogger("testing")
+
+	configChan := make(chan ConfigChange, 1)
+	updateErrChan := make(chan error, 1)
+
+	// Create a mocked otel manager that always reports an error
+	const errorStr = "update failed for testing reasons"
+	runtimeManager := &fakeRuntimeManager{}
+	otelManager := &fakeOTelManager{
+		updateCallback: func(retrieved *confmap.Conf) error {
+			return errors.New(errorStr)
+		},
+		errChan: updateErrChan,
+	}
+
+	coord := &Coordinator{
+		logger:           logger,
+		agentInfo:        &info.AgentInfo{},
+		stateBroadcaster: broadcaster.New(State{}, 0, 0),
+		managerChans: managerChans{
+			configManagerUpdate: configChan,
+			// Give coordinator the same error channel we set on the otel
+			// manager, so it receives the update result.
+			otelManagerError: updateErrChan,
+		},
+		runtimeMgr:         runtimeManager,
+		otelMgr:            otelManager,
+		vars:               emptyVars(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
+	}
+
+	// Send an empty policy which should forward an empty component model to
+	// the otel manager (which we have set up to report an error).
+	cfg := config.MustNewConfigFrom(nil)
+	configChange := &configChange{cfg: cfg}
+	configChan <- configChange
+	coord.runLoopIteration(ctx)
+
+	// Make sure the config change was acknowledged to the config manager
+	// (the failure is not reported here since it happens asynchronously; it
+	// will appear in the coordinator state afterwards.)
+	assert.True(t, configChange.acked, "Config change should be acknowledged to the config manager")
+	assert.NoError(t, configChange.err, "Config change with async error should succeed")
+
+	// Now do another run loop iteration to let the update error propagate,
+	// and make sure it is reported correctly.
+	coord.runLoopIteration(ctx)
+	require.Error(t, coord.otelErr, "OTel update failure should be saved in otelErr")
+	assert.Equal(t, errorStr, coord.otelErr.Error(), "otelErr should match the error reported by the otel manager")
 
 	// Make sure the error appears in the Coordinator state.
 	state := coord.State()

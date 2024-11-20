@@ -55,7 +55,7 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 
 	var providersCfg Config
 	if c != nil {
-		err := c.Unpack(&providersCfg)
+		err := c.UnpackTo(&providersCfg)
 		if err != nil {
 			return nil, errors.New(err, "failed to unpack providers config", errors.TypeConfig)
 		}
