@@ -1,0 +1,316 @@
+// begin next relnotes
+
+[[release-notes-next]]
+==  next
+
+Review important information about the  next release.
+
+[discrete]
+[[security-updates-next]]
+=== Security updates
+
+
+Elastic-agent::
+
+* Upgraded Otel-Collector-Contrib Packages. {Elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4572[#https://github.com/elastic/elastic-agent/pull/4572] 
+elastic-agent::
+
+* Upgrade To Go 1.22.5. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5065[#https://github.com/elastic/elastic-agent/pull/5065] 
+* Add Wolfi Docker Image To Packaging, The Cloud Image Is Now Based On Wolfi.  
+* Upgrade To Go 1.22.8. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5731[#https://github.com/elastic/elastic-agent/pull/5731] 
+
+[discrete]
+[[breaking-changes-next]]
+=== Breaking changes
+
+Breaking changes can prevent your application from optimal operation and
+performance. Before you upgrade, review the breaking changes, then mitigate the
+impact to your application.
+
+// TODO: add details and impact
+
+elastic-agent::
+
+[discrete]
+[[breaking-https://github.com/elastic/elastic-agent/pull/5481]]
+.Remove Cloud-Defend From Agent Package. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5481[#https://github.com/elastic/elastic-agent/pull/5481] 
+[%collapsible]
+====
+
+====
+[discrete]
+[[breaking-]]
+.Remove Default Credentials When Running Elastic Agent In Container Mode.  
+[%collapsible]
+====
+ELASTICSEARCH_USERNAME and ELASTICSEARCH_PASSWORD now need to be explicitly set when running the agent in container mode
+====
+[discrete]
+[[breaking-]]
+.Crossbuild-Debian11.  
+[%collapsible]
+====
+We&#39;re dropping support for Debian 10, so no need to crossbuild using the outdated image anymore. This also updates the statically linked glibc from 2.19 to 2.31.
+====
+
+
+
+
+
+[discrete]
+[[new-features-next]]
+=== New features
+
+The next release adds the following new and notable features.
+
+
+
+
+* Improve Upgrade Watcher To No Longer Need Root Access. {-pull}https://github.com/elastic/elastic-agent/pull/3622[#https://github.com/elastic/elastic-agent/pull/3622] 
+* Move Control Socket Path To The Installation Directory. {-pull}https://github.com/elastic/elastic-agent/pull/3909[#https://github.com/elastic/elastic-agent/pull/3909] {-issue}https://github.com/elastic/elastic-agent/issues/3840[#https://github.com/elastic/elastic-agent/issues/3840]
+* Add Mtls Flags To Install/Enroll. {-pull}https://github.com/elastic/elastic-agent/pull/4007[#https://github.com/elastic/elastic-agent/pull/4007] 
++
+Add mTLS flags to the install/enroll commands to allow fleet-server to
+use client certs when connecting to Elasticsearch, and to allow
+elastic-agent to use client certs when connecting to fleet-server.
+Fleet-server will use the CAs passed in `--certificate-authorities` to
+validate any client certs. Agent client certs do not influence auth in
+fleet-server, an enrollment token, or API key is still required.
+
+* Add Support For Filebeat Websocket Input Type. {-pull}https://github.com/elastic/elastic-agent/pull/4242[#https://github.com/elastic/elastic-agent/pull/4242] 
+* Agent/Beats Grpc Comms Over Domain Socket/Named Pipe. {-pull}https://github.com/elastic/elastic-agent/pull/4249[#https://github.com/elastic/elastic-agent/pull/4249] {-issue}https://github.com/elastic/elastic-agent/issues/4248[#https://github.com/elastic/elastic-agent/issues/4248]
+* Add Postrm Script To Deb And Rpm Packages. {-pull}https://github.com/elastic/elastic-agent/pull/4334[#https://github.com/elastic/elastic-agent/pull/4334] 
+* Enable --Unprivileged On Mac Os, Allowing Elastic-Agent To Run As An Unprivileged User. {-pull}https://github.com/elastic/elastic-agent/pull/4362[#https://github.com/elastic/elastic-agent/pull/4362] 
+* Add Unprivileged And Privileged Switch Commands. {-pull}https://github.com/elastic/elastic-agent/pull/4621[#https://github.com/elastic/elastic-agent/pull/4621] {-issue}https://github.com/elastic/ingest-dev/issues/2790[#https://github.com/elastic/ingest-dev/issues/2790]
++
+Adds ability to switch between privileged and unprivileged mode using the privileged and unprivileged
+subcommands respectively.
+
+* Add Monitoring Of Endpoint Usage Metrics. {-pull}https://github.com/elastic/elastic-agent/pull/4789[#https://github.com/elastic/elastic-agent/pull/4789] {-issue}https://github.com/elastic/elastic-agent/issues/4083[#https://github.com/elastic/elastic-agent/issues/4083]
+* Add-K8sattributesprocessor.  
+* Call Fleet-Server Audit/Unenroll Endpoint On Uninstall. {-pull}https://github.com/elastic/elastic-agent/pull/5302[#https://github.com/elastic/elastic-agent/pull/5302] {-issue}https://github.com/elastic/elastic-agent/issues/484[#https://github.com/elastic/elastic-agent/issues/484]
++
+Uninstalling a fleet-managed elastic-agent instance will now do a
+best-effort attempt to notify fleet-server of the agent removal so the
+agent should not appear as offline.
+
+* Remove Experimental Support For Shippers. {-pull}https://github.com/elastic/elastic-agent/pull/5308[#https://github.com/elastic/elastic-agent/pull/5308] 
+* Add Cloudbeat Gcp Asset Inventory Input Spec.  
+* Add Support For Passphrase Protected Mtls Client Certificate Key During Install/Enroll.  
++
+Adds `--elastic-agent-cert-key-passphrase` command line flag for the `install`
+and `enroll` commands. The new flag accepts a absolute path for a file containing
+a passphrase to be used to decrypt the mTLS client certificate key.
+
+* Elastic Defend Accepts Passphrase Protected Client Certificate Key For Mtls.  {-issue}https://github.com/elastic/elastic-agent/issues/5490[#https://github.com/elastic/elastic-agent/issues/5490]
+* Skip Notify Fleet On Windows Uninstall. {-pull}https://github.com/elastic/elastic-agent/pull/6065[#https://github.com/elastic/elastic-agent/pull/6065] {-issue}https://github.com/elastic/elastic-agent/issues/5952[#https://github.com/elastic/elastic-agent/issues/5952]
+Coordinator::
+
+* Fleet-Config-Change-Logging. {Coordinator-pull}https://github.com/elastic/elastic-agent/pull/4050[#https://github.com/elastic/elastic-agent/pull/4050] 
+agent::
+
+* Add The Full Version Number To The Installation Directory Name. {agent-pull}https://github.com/elastic/elastic-agent/pull/4193[#https://github.com/elastic/elastic-agent/pull/4193] 
+all::
+
+* Add Performance Presets To The Elasticsearch Output Configuration. {all-pull}https://github.com/elastic/beats/pull/37259[#https://github.com/elastic/beats/pull/37259] {all-issue}https://github.com/elastic/elastic-agent/issues/3797[#https://github.com/elastic/elastic-agent/issues/3797]
++
+Add a &#34;preset&#34; field to Elasticsearch output configurations that applies a set of configuration overrides based on a desired performance priority. Valid values are &#34;balanced&#34;, &#34;throughput&#34;, &#34;scale&#34;, &#34;latency&#34; and &#34;custom&#34;. The default if unspecified is &#34;custom&#34;.
+cloudbeat::
+
+* Add Cloudbeat Asset Inventory Aws.  
+* Add Cloudbeat Azure Asset Inventory Input Spec.  
+elastic-agent::
+
+* Support Flattened Data_stream.* Fields In Input Configuration. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3465[#https://github.com/elastic/elastic-agent/pull/3465] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/3191[#https://github.com/elastic/elastic-agent/issues/3191]
++
+An input configuration supports flattened fields, however the &#39;data_stream&#39; field was not being correctly decoded when flattened. This commit fixes this issue.
+* Hints Autodiscovery For Elastic Agent - Add Default Host For Each Container In A Pod. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3575[#https://github.com/elastic/elastic-agent/pull/3575] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/1453[#https://github.com/elastic/elastic-agent/issues/1453]
+* Send Upgrade Details To Fleet. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3528[#https://github.com/elastic/elastic-agent/pull/3528] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/3119[#https://github.com/elastic/elastic-agent/issues/3119]
+* Add Cache For Secrets When Using Kubernetes Secret Provider. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3822[#https://github.com/elastic/elastic-agent/pull/3822] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/3594[#https://github.com/elastic/elastic-agent/issues/3594]
+* Add Metadata For Retryable Upgrade Steps To Upgrade Details. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3845[#https://github.com/elastic/elastic-agent/pull/3845] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/3818[#https://github.com/elastic/elastic-agent/issues/3818]
+* Upgrade Elastic-Agent-Libs To V0.7.3. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4000[#https://github.com/elastic/elastic-agent/pull/4000] 
++
+Upgrades golang.org/x/crypto from 0.14.0 to 0.17.0.
+* Fix Creation Of Directories When Unpacking Tar.gz Packages. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4100[#https://github.com/elastic/elastic-agent/pull/4100] 
+* Make More Selective The Pod Autodiscovery Upon Node And Namespace Update Events. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4226[#https://github.com/elastic/elastic-agent/pull/4226] {elastic-agent-issue}https://github.com/elastic/beats/issues/37338[#https://github.com/elastic/beats/issues/37338]
++
+Update the PodUpdater fucntion with additonal checks before actually triggering Pod watcher restarts
+* Kubernetes Secrets Provider Has Been Improved To Update A Kubernetes Secret  When The Secret Value Changes. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4371[#https://github.com/elastic/elastic-agent/pull/4371] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/4168[#https://github.com/elastic/elastic-agent/issues/4168]
+* Ucfg-Parser-Fix. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4436[#https://github.com/elastic/elastic-agent/pull/4436] 
++
+Fix config unpacking when config strings contain list-like passages
+* Introduce Isolate Units For Input Spec. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4476[#https://github.com/elastic/elastic-agent/pull/4476] {elastic-agent-issue}https://github.com/elastic/security-team/issues/8669[#https://github.com/elastic/security-team/issues/8669]
++
+Introduce a new flag in the spec that will allow to disable grouping of same input type inputs into a single component.
+If that flag is being activated the inputs won&#39;t be grouped and we will create a separate component for each input that will run units for that particular input.
+
+* Log Raw Events To A Separate Log File. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4549[#https://github.com/elastic/elastic-agent/pull/4549] 
++
+Log entries from Elastic-Agent inputs containing event data are now
+directed to a different file under the &#39;events&#39; folder in the logs
+directory. This file is not sent to the monitoring output, however
+it can be retrieved by collecting a diagnostics.
+
+* Makes The `Filterprocessor` Available To Users Running Elastic Agent In `Otel` Mode. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4708[#https://github.com/elastic/elastic-agent/pull/4708] 
+* Makes The `Elasticsearchexporter` Available To Users Running Elastic Agent In `Otel` Mode. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4707[#https://github.com/elastic/elastic-agent/pull/4707] 
+* Update Kubernetes Manifests To Adopt Official Recommended Labels. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4722[#https://github.com/elastic/elastic-agent/pull/4722] 
++
+Update kubernetes manifests to adopt the official recommended labels. This will require a `kubectl replace` to apply as selector labels are an immutable field.
+* Makes The `Resourcedetection` Processor Available To Users Running Elastic Agent In `Otel` Mode.  
+* Add Otelcol Shortuct To Elastic-Agent Otel. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4816[#https://github.com/elastic/elastic-agent/pull/4816] 
+* Add Unprivileged Mode Support (Beta).  
++
+Add new --unprivileged installation option. This option installs the Elastic Agent as a non-root or non-Administrator
+user that has limited permissions on the host.
+
+* Extend Agent Container Initialisation To Chown Paths And Raise Capabilities For Non-Root. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4925[#https://github.com/elastic/elastic-agent/pull/4925] 
+* Allow Configuring `Agent.monitoring.metrics_period`. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4961[#https://github.com/elastic/elastic-agent/pull/4961] 
+* Makes The `Elasticinframetrics` Processor Available To Users Running Elastic Agent In `Otel` Mode.  
+* Event Logger Output Now Can Be Set Via Fleet Overrides Or Environment Variable For Container Command. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4932[#https://github.com/elastic/elastic-agent/pull/4932] 
+* Increase Elastic Agent Memory Requests And Limits When Deployed In Kubernetes. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5614[#https://github.com/elastic/elastic-agent/pull/5614] 
+* Kustomize Template To Enables Hints Based Autodiscovery By Default When Deploying Standalone Elastic-Agent Into A Kubernetes Cluster. Remove Root Privileges Of Init Container. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5643[#https://github.com/elastic/elastic-agent/pull/5643] 
+* Add Os_family, Os_platform And Os_version To Host Provider. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5941[#https://github.com/elastic/elastic-agent/pull/5941] {elastic-agent-issue}https://github.com/elastic/integrations/issues/10797[#https://github.com/elastic/integrations/issues/10797]
+elastic-agent,otel::
+
+* Enable Persistence In The Configuration Provided With Our Otel Collector Distribution.  
+install::
+
+* Change-Install-Marker-Creation. {install-pull}https://github.com/elastic/elastic-agent/pull/4172[#https://github.com/elastic/elastic-agent/pull/4172] {install-issue}https://github.com/elastic/elastic-agent/issues/4051[#https://github.com/elastic/elastic-agent/issues/4051]
++
+Create the .installed marker earlier on in the install process, allowing the use of `elastic-agent uninstall` to cleanup if the install fails.
+monitoring::
+
+* Add A Configurable /Liveness Endpoint. {monitoring-pull}https://github.com/elastic/elastic-agent/pull/4499[#https://github.com/elastic/elastic-agent/pull/4499] 
++
+Adds a liveness endpoint suitable for use as a k8s liveness probe.
+spec::
+
+* Add Etw Input Mapping To The Filebeat Spec. {spec-pull}https://github.com/elastic/elastic-agent/pull/4037[#https://github.com/elastic/elastic-agent/pull/4037] 
+
+
+[discrete]
+[[enhancements-next]]
+=== Enhancements
+
+
+
+
+* Hints Autodiscovery For Elastic Agent - Define Configuration Through Annotations For Specific Containers Inside A Pod. {-pull}https://github.com/elastic/elastic-agent/pull/3416[#https://github.com/elastic/elastic-agent/pull/3416] 
+* Add Mtls Env Var Settings For Containers. {-pull}https://github.com/elastic/elastic-agent/pull/4261[#https://github.com/elastic/elastic-agent/pull/4261] 
+* Add Cpu Profile Collection To The Fleet Diagnostics Action Handler. {-pull}4394[#4394] {-issue}3491[#3491]
+* Reduce The Overall Download And On-Disk Size Of The Elastic Agent. {-pull}https://github.com/elastic/elastic-agent/pull/4516[#https://github.com/elastic/elastic-agent/pull/4516] {-issue}https://github.com/elastic/elastic-agent/issues/3364[#https://github.com/elastic/elastic-agent/issues/3364]
+* Fleet Server Component Now Uses Policy Output Configuration To Communicate With Elasticsearch. {-pull}https://github.com/elastic/elastic-agent/pull/4643[#https://github.com/elastic/elastic-agent/pull/4643] {-issue}https://github.com/elastic/elastic-agent/issue/2784[#https://github.com/elastic/elastic-agent/issue/2784]
+* Add Agent-Info.yaml To Diagnostics Bundle. {-pull}https://github.com/elastic/elastic-agent/pull/4725[#https://github.com/elastic/elastic-agent/pull/4725] {-issue}https://github.com/elastic/elastic-agent/issues/4439[#https://github.com/elastic/elastic-agent/issues/4439]
+* Add Diagnostics Skip-Conn Flag. {-pull}https://github.com/elastic/elastic-agent/pull/4946[#https://github.com/elastic/elastic-agent/pull/4946] 
+* Inject Proxy_url Into Endpoint Elasticsearch Output And Fleet Config. {-pull}https://github.com/elastic/elastic-agent/pull/5044[#https://github.com/elastic/elastic-agent/pull/5044] {-issue}https://github.com/elastic/elastic-agent/issues/2602[#https://github.com/elastic/elastic-agent/issues/2602]
+* Inspect Command Will Redact Secret_paths In Policy.  
+* Diagnostics Files Will Redact Secret_paths. {-pull}https://github.com/elastic/elastic-agent/pull/5745[#https://github.com/elastic/elastic-agent/pull/5745] 
+agent::
+
+* Remove Duplicated Tags When Specified During The Agent Enrollment. {agent-pull}https://github.com/elastic/elastic-agent/pull/3740[#https://github.com/elastic/elastic-agent/pull/3740] {agent-issue}https://github.com/elastic/elastic-agent/issues/858[#https://github.com/elastic/elastic-agent/issues/858]
+config::
+
+* Add Error Descriptors To Inspect Command, Config Methods. {config-pull}https://github.com/elastic/elastic-agent/pull/4074[#https://github.com/elastic/elastic-agent/pull/4074] 
+diagnostics::
+
+* Use Shorter Timeouts For Diagnostic Requests Unless Cpu Diagnostics Are Requested. {diagnostics-pull}https://github.com/elastic/elastic-agent/pull/3794[#https://github.com/elastic/elastic-agent/pull/3794] {diagnostics-issue}https://github.com/elastic/elastic-agent/issues/3197[#https://github.com/elastic/elastic-agent/issues/3197]
+elastic-agent::
+
+* Reduces Time Taken To Install And Upgrade Elastic Agent On Systems Running Ssds. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3212[#https://github.com/elastic/elastic-agent/pull/3212] 
+* Start/Stop Monitoring Server Based On Monitoring Config. {elastic-agent-pull}3492[#3492] {elastic-agent-issue}2735[#2735]
+* Include Upgrade Details In Output Of `Elastic-Agent Status`. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3615[#https://github.com/elastic/elastic-agent/pull/3615] 
+* Include Upgrade Details In Diagnostics Bundle. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3624[#https://github.com/elastic/elastic-agent/pull/3624] 
+* Add Agent.providers.initial_default Configuration Flag To Disable Providers By Default. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4166[#https://github.com/elastic/elastic-agent/pull/4166] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/4145[#https://github.com/elastic/elastic-agent/issues/4145]
+* Introduce Log Message For Not Supported Annotations For Hints Based Autodiscover. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4360[#https://github.com/elastic/elastic-agent/pull/4360] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/3064[#https://github.com/elastic/elastic-agent/issues/3064]
+* Make Enroll Command More Stable By Handling Temporary Server Errors. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4523[#https://github.com/elastic/elastic-agent/pull/4523] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/4513[#https://github.com/elastic/elastic-agent/issues/4513]
+* Removed Cloud-Defend From .Tar.gz Archives, Now It Only Appears In Docker Images. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4584[#https://github.com/elastic/elastic-agent/pull/4584] 
+* Handle The Starting Of Namespace And Node Watchers For Metadata Enrichment According To `Add_resource_metadata` And Hints Configuration. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4618[#https://github.com/elastic/elastic-agent/pull/4618] 
+* Reduce Agent Logs By Default By Dropping &#34;Non-Zero Metrics...&#34; Logs Before Es Ingestion. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4633[#https://github.com/elastic/elastic-agent/pull/4633] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/4252[#https://github.com/elastic/elastic-agent/issues/4252]
+* Use More Stable Snapshot Api For Upgrades To Snapshot Versions. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4693[#https://github.com/elastic/elastic-agent/pull/4693] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/4458[#https://github.com/elastic/elastic-agent/issues/4458]
+* Set Log Level From Fleet Policy. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3090[#https://github.com/elastic/elastic-agent/pull/3090] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/2851[#https://github.com/elastic/elastic-agent/issues/2851]
+* Kustomize Templates Using Default Manifests For K8s Onboarding.  
+* Load Certificate Authorities From Fleet Policy. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4770[#https://github.com/elastic/elastic-agent/pull/4770] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/2247[#https://github.com/elastic/elastic-agent/issues/2247]
+* Load Fleet.ssl.certificate And Fleet.ssl.key From Agent Policy. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4770[#https://github.com/elastic/elastic-agent/pull/4770] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/2248[#https://github.com/elastic/elastic-agent/issues/2248]
+* Capture Early Errors On Windows In Application Eventlog. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4846[#https://github.com/elastic/elastic-agent/pull/4846] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/4627[#https://github.com/elastic/elastic-agent/issues/4627]
+* Add Benchmark Input. {elastic-agent-pull}https://github.com/elastic/beats/pull/39789[#https://github.com/elastic/beats/pull/39789] 
+* Add Ability To Escape Variables In Policy. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5035[#https://github.com/elastic/elastic-agent/pull/5035] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/2177[#https://github.com/elastic/elastic-agent/issues/2177]
+* Reduce Docker Image Size By Performing More Steps In The Builder Image.  
+* Include The Correct Elastic License 2.0 File In Build Artifacts And Packages. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5464[#https://github.com/elastic/elastic-agent/pull/5464] 
+* Support Elasticsearch_api_key Environment Variable When Running In Container Mode.  
+* Add Pprof Extension To Otel Dependencies. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5556[#https://github.com/elastic/elastic-agent/pull/5556] 
+* Update Ubuntu Base Image From 20.04 To 24.04.  
+* Only Watch Metadata For Replicasets In K8s Provider.  
+* Add Filebeat Otel Receiver. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5833[#https://github.com/elastic/elastic-agent/pull/5833] 
+* Update Otel Components To V0.112.0/V1.18.0.  
+* Detect And Fail-Early Cli Upgrades If Agent Is Fleet-Managed. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5864[#https://github.com/elastic/elastic-agent/pull/5864] 
+* Emit Pod Data Only For Running Pods In The Kubernetes Provider.  
+* Removed Endpoint Security From Linux Containers. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6016[#https://github.com/elastic/elastic-agent/pull/6016] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/5495[#https://github.com/elastic/elastic-agent/issues/5495]
+elastic-endpoint::
+
+* Endpoint Should Be Allowed To Run On Windows Server 2012 / 2012 R2. {elastic-endpoint-pull}https://github.com/elastic/elastic-agent/pull/5429[#https://github.com/elastic/elastic-agent/pull/5429] 
+monitoring::
+
+* Add Monitoring Beats To Usage Metrics Reporting. {monitoring-pull}https://github.com/elastic/elastic-agent/pull/4326[#https://github.com/elastic/elastic-agent/pull/4326] {monitoring-issue}https://github.com/elastic/elastic-agent/issues/4082[#https://github.com/elastic/elastic-agent/issues/4082]
+
+
+
+
+[discrete]
+[[bug-fixes-next]]
+=== Bug fixes
+
+
+
+
+* Only Try To Download Upgrade Locally When File:// Prefix Is Used For Source Uri. {-pull}https://github.com/elastic/elastic-agent/pull/3682[#https://github.com/elastic/elastic-agent/pull/3682] 
+* Fix Component Control Protocol To Allow Checkin To Be Chunked Across Multiple Messages. {-pull}https://github.com/elastic/elastic-agent/pull/3884[#https://github.com/elastic/elastic-agent/pull/3884] {-issue}https://github.com/elastic/elastic-agent/issues/2460[#https://github.com/elastic/elastic-agent/issues/2460]
+* Fixes An Issue Where The Elastic Agent Did Not Utilize The Download Settings When Downloading The Artifact Signature File. {-pull}https://github.com/elastic/elastic-agent/pull/4270[#https://github.com/elastic/elastic-agent/pull/4270] {-issue}https://github.com/elastic/elastic-agent/issues/4237[#https://github.com/elastic/elastic-agent/issues/4237]
+* Fix The Elastic Agent State Store. {-pull}https://github.com/elastic/elastic-agent/pull/4441[#https://github.com/elastic/elastic-agent/pull/4441] {-issue}https://github.com/elastic/elastic-agent/issues/3912[#https://github.com/elastic/elastic-agent/issues/3912]
+* Make Delayed Enrollment Try Indefinitely. {-pull}https://github.com/elastic/elastic-agent/pull/4727[#https://github.com/elastic/elastic-agent/pull/4727] {-issue}https://github.com/elastic/elastic-agent/issues/4716[#https://github.com/elastic/elastic-agent/issues/4716]
+* Fix Delay Enrollment To Work In Unprivileged Mode On Windows. {-pull}https://github.com/elastic/elastic-agent/pull/4779[#https://github.com/elastic/elastic-agent/pull/4779] {-issue}https://github.com/elastic/elastic-agent/issues/4678[#https://github.com/elastic/elastic-agent/issues/4678]
+* Allow Elastic Agent Container To Work With A Read-Only Filesystem. {-pull}https://github.com/elastic/elastic-agent/pull/4995[#https://github.com/elastic/elastic-agent/pull/4995] 
+* Fix Indefinite Memory And Cpu Consumption When Waiting Fleet To Be Ready. {-pull}https://github.com/elastic/elastic-agent/pull/5034[#https://github.com/elastic/elastic-agent/pull/5034] {-issue}https://github.com/elastic/elastic-agent/issues/5033[#https://github.com/elastic/elastic-agent/issues/5033]
+* Fix Issue With Windows Install When User Has No Home Directory. {-pull}https://github.com/elastic/elastic-agent/pull/5118[#https://github.com/elastic/elastic-agent/pull/5118] {-issue}https://github.com/elastic/elastic-agent/issues/5019[#https://github.com/elastic/elastic-agent/issues/5019]
+* Fix Loss Of State.enc On Upgrade With Debian Packaging. {-pull}https://github.com/elastic/elastic-agent/pull/5260[#https://github.com/elastic/elastic-agent/pull/5260] {-issue}https://github.com/elastic/elastic-agent/issues/5101[#https://github.com/elastic/elastic-agent/issues/5101]
+* Check Windows Permissions For False-Positive Return. {-pull}https://github.com/elastic/elastic-agent/pull/5317[#https://github.com/elastic/elastic-agent/pull/5317] {-issue}https://github.com/elastic/elastic-agent/issues/4496[#https://github.com/elastic/elastic-agent/issues/4496]
+Dispatcher::
+
+* When A Scheduled Upgrade Expires, Set The Upgrade State To Failed. {Dispatcher-pull}https://github.com/elastic/elastic-agent/pull/3902[#https://github.com/elastic/elastic-agent/pull/3902] {Dispatcher-issue}https://github.com/elastic/elastic-agent/issues/3817[#https://github.com/elastic/elastic-agent/issues/3817]
+agent::
+
+* Preserve Build Metadata In Upgrade Version Strings. {agent-pull}https://github.com/elastic/elastic-agent/pull/3824[#https://github.com/elastic/elastic-agent/pull/3824] 
+* On Windows Prevent Uninstall From Within Installed Directory. {agent-pull}https://github.com/elastic/elastic-agent/pull/4108[#https://github.com/elastic/elastic-agent/pull/4108] 
+elastic-agent::
+
+* Surface Errors During Agent&#39;s Enroll Process, Failing If Any Happens. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3815/[#https://github.com/elastic/elastic-agent/pull/3815/] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/3664[#https://github.com/elastic/elastic-agent/issues/3664]
+* Elastic-Agent-Autodiscover To V0.6.6. Fix Default Metadata Config. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/3938[#https://github.com/elastic/elastic-agent/pull/3938] 
+* Set Timeout Of 1 Minute For Fqdn Lookups. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4147[#https://github.com/elastic/elastic-agent/pull/4147] 
+* On Windows Make Sure The Service Is Stopped Before Uninstalling. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4224[#https://github.com/elastic/elastic-agent/pull/4224] 
+* Increase Timeout For File Removal During Uninstall. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4310[#https://github.com/elastic/elastic-agent/pull/4310] 
+* Reduce False Positives In Logging An Api Switch Request From Fleet Server. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4481[#https://github.com/elastic/elastic-agent/pull/4481] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/4477[#https://github.com/elastic/elastic-agent/issues/4477]
+* Fix Failing Upgrade Command When Grpc Server Interrupts Connection. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4519[#https://github.com/elastic/elastic-agent/pull/4519] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/3890[#https://github.com/elastic/elastic-agent/issues/3890]
+* Fix Issue Where Kubernetes_leaderelection Provider Would Not Try To Reacquire The Lease Once Lost. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4542[#https://github.com/elastic/elastic-agent/pull/4542] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/4543[#https://github.com/elastic/elastic-agent/issues/4543]
+* Always Select The More Recent Watcher During Agent Upgrade/Downgrade. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4491[#https://github.com/elastic/elastic-agent/pull/4491] 
+* Removed Beat State Metricset From Monitoring Metrics. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4579[#https://github.com/elastic/elastic-agent/pull/4579] 
+* Stop Creating A Zombie Process On Each Restart. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4834[#https://github.com/elastic/elastic-agent/pull/4834] 
+* Fix Possible Crash In Reading Component Logs. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4910[#https://github.com/elastic/elastic-agent/pull/4910] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/4907[#https://github.com/elastic/elastic-agent/issues/4907]
+* Ensure Socket Can Be Created Even When State_path Is Too Long For Container Command. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/4909[#https://github.com/elastic/elastic-agent/pull/4909] 
+* Increase Removal Timeout When Uninstall.  
+* Fix Namespace Filter On Watchers Started By Pod And Service Eventer On Kubernetes Provider.  
+* Use Setcap On A Correct Agentbeat Binary.  
+* Use Monotonic Clock For Component Check-In. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5284[#https://github.com/elastic/elastic-agent/pull/5284] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/5277[#https://github.com/elastic/elastic-agent/issues/5277]
+* Add Health_check Extension To Otel.yml File Bundled With Elastic Agent Package. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5369[#https://github.com/elastic/elastic-agent/pull/5369] 
+* Set Default Log Level On Policy Change, When Policy Does Not Have A Log Level. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5452[#https://github.com/elastic/elastic-agent/pull/5452] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/5451[#https://github.com/elastic/elastic-agent/issues/5451]
+* Add Pprof Endpoints To The Monitoring Server If Enabled.  
+* Stop Elastic-Agent Inspect From Printing Output Twice. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5692[#https://github.com/elastic/elastic-agent/pull/5692] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/4471[#https://github.com/elastic/elastic-agent/issues/4471]
+* This Pr Assumes Installed Agent On Upgrade In Order To Initialize Control Path Properly. {elastic-agent-pull}https://github.com/owner/repo/5879[#https://github.com/owner/repo/5879] {elastic-agent-issue}https://github.com/owner/repo/5872[#https://github.com/owner/repo/5872]
+* Allows Users To Enter Spaces Around Yes/No Inputs In Cli Confirmation Prompts. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5909[#https://github.com/elastic/elastic-agent/pull/5909] 
+* Prevent Installing Elastic Defend On Non Native Architecture.  
+progress tracker::
+
+* Use Third-Party Library For Tracking Progress In Install/Uninstall. {progress tracker-pull}https://github.com/elastic/elastic-agent/pull/3623[#https://github.com/elastic/elastic-agent/pull/3623] {progress tracker-issue}https://github.com/elastic/elastic-agent/issues/3607[#https://github.com/elastic/elastic-agent/issues/3607]
+state-store::
+
+* Fix The Elastic Agent Crashing When Self Unenrolling Due To Too Many Authentication Failures Against Fleet Server.  {state-store-issue}https://github.com/elastic/elastic-agent/issues/5434[#https://github.com/elastic/elastic-agent/issues/5434]
+
+// end next relnotes

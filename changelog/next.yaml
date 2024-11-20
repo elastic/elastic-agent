@@ -1,0 +1,1698 @@
+version: next
+entries:
+    - kind: unknown
+      summary: Elastic-Agent container runs on Azure Container Instances
+      description: ""
+      component: elastic-agent
+      pr:
+        - "3576"
+      issue:
+        - "82"
+      timestamp: 1689328899
+      file:
+        name: 1689328899-Elastic-Agent-container-runs-on-Azure-Container-Instances-.yaml
+        checksum: 2a9a0fe58912e50ffaf7ce97931244ba45e12a76
+    - kind: enhancement
+      summary: Reduces time taken to install and upgrade Elastic Agent on systems running SSDs
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3212
+      issue: []
+      timestamp: 1693592658
+      file:
+        name: 1693592658-concurrent-install.yaml
+        checksum: 90d9935c6fe2816f56eecd19394794814cebbd2f
+    - kind: enhancement
+      summary: Hints Autodiscovery for Elastic Agent - Define configuration through annotations for specific containers inside a pod
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3416
+      issue: []
+      timestamp: 1694692246
+      file:
+        name: 1694692246-hintspercontainer.yaml
+        checksum: 62a792cbcf26af3a37f5d67129692ae1994b768d
+    - kind: feature
+      summary: Support flattened data_stream.* fields in input configuration
+      description: An input configuration supports flattened fields, however the 'data_stream' field was not being correctly decoded when flattened. This commit fixes this issue.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3465
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3191
+      timestamp: 1695389490
+      file:
+        name: 1695389490-Support-flattened-data_stream.-fields.yaml
+        checksum: 11dd12c290c58f7f518c488f8765cbdc1fa3daac
+    - kind: enhancement
+      summary: Start/stop monitoring server based on monitoring config
+      description: ""
+      component: elastic-agent
+      pr:
+        - "3492"
+      issue:
+        - "2735"
+      timestamp: 1696249276
+      file:
+        name: 1696249276-Start-stop-monitoring-server-based-on-monitoring-config.yaml
+        checksum: d8126ffe93879d19502ebd7a6663b1fa2de6bd02
+    - kind: feature
+      summary: Hints Autodiscovery for Elastic Agent - Add default host for each container in a pod
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3575
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/1453
+      timestamp: 1696935756
+      file:
+        name: 1696935756-add-default-host.yaml
+        checksum: dfac45fd395d50c6635a412e59e44d5f4a56267a
+    - kind: enhancement
+      summary: Include upgrade details in output of `elastic-agent status`.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3615
+      issue: []
+      timestamp: 1697508156
+      file:
+        name: 1697508156-upgrade-details-in-status.yaml
+        checksum: 3c400f83ace4770b2e4458758a4b838381bc0c7a
+    - kind: feature
+      summary: Improve upgrade watcher to no longer need root access
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3622
+      issue: []
+      timestamp: 1697554456
+      file:
+        name: 1697554456-Improve-upgrade-watcher-to-no-longer-need-root-access.yaml
+        checksum: 785c7ad1a312ebb17d54f91b3d106de276deb596
+    - kind: bug-fix
+      summary: Use third-party library for tracking progress in install/uninstall
+      description: ""
+      component: progress tracker
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3623
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3607
+      timestamp: 1697565877
+      file:
+        name: 1697565877-progress-race-fixes.yaml
+        checksum: 4bee6ae0a2704f43357c29fdf808d77aa9d3066c
+    - kind: enhancement
+      summary: Include upgrade details in diagnostics bundle.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3624
+      issue: []
+      timestamp: 1697588586
+      file:
+        name: 1697588586-upgrade-details-in-diagnostics.yaml
+        checksum: 00ca33862a0553048d15e6244320e89b8dfb33aa
+    - kind: enhancement
+      summary: Remove duplicated tags when specified during the Agent enrollment.
+      description: ""
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3740
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/858
+      timestamp: 1697662209
+      file:
+        name: 1697662209-duplicate-tags.yaml
+        checksum: 3c50c851f371fc1dff93b4a118f2309014432d9d
+    - kind: bug-fix
+      summary: Only try to download upgrade locally when file:// prefix is used for source URI
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3682
+      issue: []
+      timestamp: 1698851635
+      file:
+        name: 1698851635-Only-try-to-download-upgrade-locally-when-file---prefix-is-used-for-source-URI.yaml
+        checksum: 912439278b5c880444413879fdcaf47fedbe68a8
+    - kind: feature
+      summary: Send upgrade details to Fleet
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3528
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3119
+      timestamp: 1699016628
+      file:
+        name: 1699016628-send-upgrade-details-to-fleet.yaml
+        checksum: 2383fc3cbfb49b0037e09836fd0c54d4e36dad2d
+    - kind: enhancement
+      summary: Use shorter timeouts for diagnostic requests unless CPU diagnostics are requested
+      description: Use different timeout values for diagnostics requests, depending on if CPU diagnostics are requested
+      component: diagnostics
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3794
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3197
+      timestamp: 1700520158
+      file:
+        name: 1700520158-dynamic-timeout-for-diags.yaml
+        checksum: bf0cb77b593c2623e9d6dcd598af7ac8b4f5ef7b
+    - kind: bug-fix
+      summary: Surface errors during Agent's enroll process, failing if any happens.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3815/
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3664
+      timestamp: 1700851577
+      file:
+        name: 1700851577-Surface-errors-during-Agent_s-enroll-process-failing-if-any-happens.yaml
+        checksum: fd712689b592e859275d1febe77f7b2849352f4f
+    - kind: feature
+      summary: add cache for secrets when using kubernetes secret provider
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3822
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3594
+      timestamp: 1701091034
+      file:
+        name: 1701091034-add-cache-for-secrets.yaml
+        checksum: 27ab6bd1aa9502b9e94f874a30a5750b82568e78
+    - kind: feature
+      summary: Add metadata for retryable upgrade steps to upgrade details
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3845
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3818
+      timestamp: 1701293846
+      file:
+        name: 1701293846-upgrade-details-downloading.yaml
+        checksum: af0a759294ef3cb9d4661e2443e24117dabc0ac0
+    - kind: bug-fix
+      summary: Preserve build metadata in upgrade version strings
+      description: ""
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3824
+      issue: []
+      timestamp: 1701445320
+      file:
+        name: 1701445320-preserve-build-metadata-in-upgrade-version-strings.yaml
+        checksum: 6d1406f3af000d8e7cf767b784743e4f5c21c1c0
+    - kind: feature
+      summary: Add performance presets to the Elasticsearch output configuration.
+      description: Add a "preset" field to Elasticsearch output configurations that applies a set of configuration overrides based on a desired performance priority. Valid values are "balanced", "throughput", "scale", "latency" and "custom". The default if unspecified is "custom".
+      component: all
+      pr:
+        - https://github.com/elastic/beats/pull/37259
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3797
+      timestamp: 1701882851
+      file:
+        name: 1701882851-performance-presets.yaml
+        checksum: 84809717c0296421e74201a50421b88084a39f78
+    - kind: bug-fix
+      summary: Fix component control protocol to allow checkin to be chunked across multiple messages
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3884
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2460
+      timestamp: 1701975889
+      file:
+        name: 1701975889-Fix-component-control-protocol-to-allow-checkin-to-be-chunked-across-multiple-messages.yaml
+        checksum: c1ee581da8390454f3bc9473630deebd409af41e
+    - kind: bug-fix
+      summary: When a scheduled upgrade expires, set the upgrade state to failed
+      description: ""
+      component: Dispatcher
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3902
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3817
+      timestamp: 1702463797
+      file:
+        name: 1702463797-When-a-scheduled-upgrade-expires,-set-the-upgrade-state-to-failed.yaml
+        checksum: cc79b52134ed2a394175b3e818a36c5ce11c037f
+    - kind: feature
+      summary: Move control socket path to the installation directory
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3909
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3840
+      timestamp: 1702501610
+      file:
+        name: 1702501610-Adjust-control-socket-path-into-the-installation-directory.yaml
+        checksum: 26f1e6cce95c9bb736e4e4c0547a67fb753d39e9
+    - kind: bug-fix
+      summary: Elastic-agent-autodiscover to v0.6.6. Fix default metadata config
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3938
+      issue: []
+      timestamp: 1703157372
+      file:
+        name: 1703157372-a-changeset-filename.yaml
+        checksum: 97cd96f7e6a3a7e2d59dce1cad772dc28f3a5546
+    - kind: feature
+      summary: Upgrade elastic-agent-libs to v0.7.3.
+      description: Upgrades golang.org/x/crypto from 0.14.0 to 0.17.0.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4000
+      issue: []
+      timestamp: 1704382549
+      file:
+        name: 1704382549-Upgrade-elastic-agent-libs-to-v0.7.3.yaml
+        checksum: b539f90de555dec68ba14cb5eb2ce9a71a22d9be
+    - kind: feature
+      summary: Add mTLS flags to install/enroll
+      description: |
+        Add mTLS flags to the install/enroll commands to allow fleet-server to
+        use client certs when connecting to Elasticsearch, and to allow
+        elastic-agent to use client certs when connecting to fleet-server.
+        Fleet-server will use the CAs passed in `--certificate-authorities` to
+        validate any client certs. Agent client certs do not influence auth in
+        fleet-server, an enrollment token, or API key is still required.
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4007
+      issue: []
+      timestamp: 1704397113
+      file:
+        name: 1704397113-Add-mTLS-flags-to-install-enroll.yaml
+        checksum: 70d883de5dbf0eb100475f3624c9bc75b79bcce4
+    - kind: feature
+      summary: fleet-config-change-logging
+      description: ""
+      component: Coordinator
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4050
+      issue: []
+      timestamp: 1704824761
+      file:
+        name: 1704824761-fleet-config-change-logging.yaml
+        checksum: b4bbfb229817780c09ca10f4a084b5cad0e51231
+    - kind: enhancement
+      summary: add error descriptors to inspect command, config methods
+      description: ""
+      component: config
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4074
+      issue: []
+      timestamp: 1704994055
+      file:
+        name: 1704994055-add-error-statements.yaml
+        checksum: ea274c6badeb499445962c0f2a1f2437d3ae2271
+    - kind: feature
+      summary: fix creation of directories when unpacking tar.gz packages
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4100
+      issue: []
+      timestamp: 1705605734
+      file:
+        name: 1705605734-fix-creation-of-directories-when-unpacking-tar.gz-packages.yaml
+        checksum: 176ba691bad8755ceffdaf9f4c0180ad0806a22b
+    - kind: bug-fix
+      summary: On Windows prevent uninstall from within installed directory
+      description: On Windows, prevent uninstall from within installed directory to prevent a sharing violation.  Also for install and uninstall, print debug logs to stderr if command fails.
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4108
+      issue: []
+      timestamp: 1706123313
+      file:
+        name: 1706123313-on-Windows-prevent-uninstall-from-within-installed-directory.yaml
+        checksum: 55f66c7d3477de0c7c4fc77f8f5162863151fb26
+    - kind: bug-fix
+      summary: Set timeout of 1 minute for FQDN lookups
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4147
+      issue: []
+      timestamp: 1706213166
+      file:
+        name: 1706213166-fqdn-ctx.yaml
+        checksum: 3a606e93e2c9c13255581c17b34063ecc6d2c910
+    - kind: feature
+      summary: Add the full version number to the installation directory name
+      description: ""
+      component: agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4193
+      issue: []
+      timestamp: 1706703918
+      file:
+        name: 1706703918-Add-the-full-version-number-to-the-installation-directory-name.yaml
+        checksum: cd1cfd9a6a49668e22bf1c12b8a37f69947924b6
+    - kind: enhancement
+      summary: Add agent.providers.initial_default configuration flag to disable providers by default
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4166
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4145
+      timestamp: 1707070032
+      file:
+        name: 1707070032-providers-default-disable.yaml
+        checksum: 9f90951034e10f7d3e4c792f844af6942395fdce
+    - kind: feature
+      summary: Make more selective the Pod autodiscovery upon node and namespace update events
+      description: Update the PodUpdater fucntion with additonal checks before actually triggering Pod watcher restarts
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4226
+      issue:
+        - https://github.com/elastic/beats/issues/37338
+      timestamp: 1707405322
+      file:
+        name: 1707405322-newpodupdater.yaml
+        checksum: 00a391fc76df30f342ae426bfbfddd10f9a9a833
+    - kind: feature
+      summary: Add ETW input mapping to the Filebeat spec.
+      description: ""
+      component: spec
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4037
+      issue: []
+      timestamp: 1707481157
+      file:
+        name: 1707481157-etw-filebeat-spec.yaml
+        checksum: 56f9a7fc00b2970e1ee16891a60dc8b0142c7c88
+    - kind: feature
+      summary: Add support for Filebeat WebSocket input type.
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4242
+      issue: []
+      timestamp: 1707754331
+      file:
+        name: 1707754331-websocket-filebeat-spec.yaml
+        checksum: ea1fddf2415c8937cb19ae01ee7f83755188ba26
+    - kind: feature
+      summary: Agent/beats grpc comms over domain socket/named pipe
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4249
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4248
+      timestamp: 1707781046
+      file:
+        name: 1707781046-Agent-beats-grpc-comms-over-domain-socket-named-pipe.yaml
+        checksum: 8f0aa111de8e00fd16de7a7ad893e9f01d5e74bf
+    - kind: bug-fix
+      summary: On Windows make sure the service is stopped before uninstalling.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4224
+      issue: []
+      timestamp: 1707857612
+      file:
+        name: 1707857612-windows_stop_before_uninstall.yaml
+        checksum: dbb8d046269b149033b402c1026f80fe97995577
+    - kind: enhancement
+      summary: Add mTLS env var settings for containers
+      description: |
+        Add env var bindings so fleet-server/elastic-agents started in container mode
+        can specify mTLS variables.
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4261
+      issue: []
+      timestamp: 1707935415
+      file:
+        name: 1707935415-Add-mTLS-env-var-settings-for-containers.yaml
+        checksum: fb77ec6bec159313458fdbaa04650818f6383611
+    - kind: feature
+      summary: change-install-marker-creation
+      description: Create the .installed marker earlier on in the install process, allowing the use of `elastic-agent uninstall` to cleanup if the install fails.
+      component: install
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4172
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4051
+      timestamp: 1707951532
+      file:
+        name: 1707951532-change-install-marker-creation.yaml
+        checksum: 4fc941b22314b3464c1173d3b2ed5423c5cf36b8
+    - kind: bug-fix
+      summary: Fixes an issue where the Elastic Agent did not utilize the download settings when downloading the artifact signature file.
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4270
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4237
+      timestamp: 1707999059
+      file:
+        name: 1707999059-Fixes-an-issue-where-the-Elastic-Agent-did-not-utilize-the-download-settings-when-downloading-the-artifact-signature-file..yaml
+        checksum: 6990bf516da756462ce20136e2b44b4dfa46504b
+    - kind: bug-fix
+      summary: Increase timeout for file removal during uninstall
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4310
+      issue: []
+      timestamp: 1708594284
+      file:
+        name: 1708594284-Increase-timeout-for-file-removal-during-uninstall.yaml
+        checksum: 1976af78c398b7535ded2ddafc28e7eebd3db6dd
+    - kind: enhancement
+      summary: add monitoring beats to usage metrics reporting
+      description: ""
+      component: monitoring
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4326
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4082
+      timestamp: 1708628530
+      file:
+        name: 1708628530-add-monitoring-beats-to-metrics.yaml
+        checksum: 30341c16c13bc95e02b248fb03e2c0f4910619ee
+    - kind: feature
+      summary: add postrm script to deb and rpm packages
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4334
+      issue: []
+      timestamp: 1708732907
+      file:
+        name: 1708732907-add-postrm-script-to-deb-and-rpm-packages.yaml
+        checksum: 274e5a3d09e6894c55a32837a25f2fbfab2b72b2
+    - kind: enhancement
+      summary: Introduce log message for not supported annotations for Hints based autodiscover
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4360
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3064
+      timestamp: 1709656001
+      file:
+        name: 1709656001-logshints.yaml
+        checksum: c245ec9283c399224160e873c9dec11b157cbd90
+    - kind: feature
+      summary: Kubernetes secrets provider has been improved to update a kubernetes secret  when the secret value changes.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4371
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4168
+      timestamp: 1709824109
+      file:
+        name: 1709824109-k8s-secret-provider-trigger-signal.yaml
+        checksum: 95f072f0d8c282cede34e5468d120c584cf1854b
+    - kind: enhancement
+      summary: Add CPU profile collection to the Fleet diagnostics action handler
+      description: |
+        Add the optional CPU profile collection to the diagnostic action handler.
+        CPU profiles will be collected if the REQUEST_DIAGNOSTICS action has the
+        optional additional_metrics parameter list contains "CPU".
+      component: ""
+      pr:
+        - "4394"
+      issue:
+        - "3491"
+      timestamp: 1710153529
+      file:
+        name: 1710153529-Add-CPU-profile-collection-to-diagnostics-action-handler.yaml
+        checksum: 13598c1216e0a3bbff5bc18849e30b8c0529f85e
+    - kind: feature
+      summary: Enable --unprivileged on Mac OS, allowing elastic-agent to run as an unprivileged user
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4362
+      issue: []
+      timestamp: 1710179479
+      file:
+        name: 1710179479-Enable---unprivileged-on-Mac-OS.yaml
+        checksum: 3dca77aabe3abc853db8a4a7c890b996c561e790
+    - kind: feature
+      summary: ucfg-parser-fix
+      description: Fix config unpacking when config strings contain list-like passages
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4436
+      issue: []
+      timestamp: 1710868294
+      file:
+        name: 1710868294-ucfg-parser-fix.yaml
+        checksum: 62d38d05a6ac2eb0ca234c3c1127ede9d3d258c9
+    - kind: feature
+      summary: Introduce isolate units for input spec.
+      description: |
+        Introduce a new flag in the spec that will allow to disable grouping of same input type inputs into a single component.
+        If that flag is being activated the inputs won't be grouped and we will create a separate component for each input that will run units for that particular input.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4476
+      issue:
+        - https://github.com/elastic/security-team/issues/8669
+      timestamp: 1711355973
+      file:
+        name: 1711355973-Introduce-non-grouping-for-input-spec.yaml
+        checksum: 141b3347be2b24d2f418464ff62c4d03174bdce9
+    - kind: bug-fix
+      summary: Reduce false positives in logging an API switch request from Fleet server
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4481
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4477
+      timestamp: 1711474205
+      file:
+        name: 1711474205-Reduce-false-positives-in-logging-an-API-switch-request-from-Fleet-server.yaml
+        checksum: 950729a01b62b2e66955db61bff4affe777b3061
+    - kind: feature
+      summary: Add a configurable /liveness endpoint.
+      description: Adds a liveness endpoint suitable for use as a k8s liveness probe.
+      component: monitoring
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4499
+      issue: []
+      timestamp: 1711653910
+      file:
+        name: 1711653910-add-liveness-endpoint.yaml
+        checksum: da25702b24676938157a2efc1b44ab0a9c9631c1
+    - kind: bug-fix
+      summary: Fix the Elastic Agent state store
+      description: |
+        This change fixes issues when loading data from the Agent's internal state store.
+        Which include the error `error parsing version ""` the Agent would present after
+        trying to execute a scheduled upgrade after a restart.
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4441
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3912
+      timestamp: 1712067343
+      file:
+        name: 1712067343-fix-state-store.yaml
+        checksum: 1ef2d064fe31f5f22b3b5820b186ef3ba22f47dc
+    - kind: security
+      summary: Upgrade to Go 1.22.5.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5065
+      issue: []
+      timestamp: 1712176768
+      file:
+        name: 1712176768-Upgrade-to-Go-1.22.5.yaml
+        checksum: 282e800f2fc4eb001f883e231afa70fbf040263b
+    - kind: bug-fix
+      summary: Fix failing upgrade command when gRPC server interrupts connection
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4519
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3890
+      timestamp: 1712305270
+      file:
+        name: 1712305270-fix-upgrade-cmd-fail-when-disconnected.yaml
+        checksum: f260a359f1e79ae34e08a657e44a6b6ba5ab199f
+    - kind: enhancement
+      summary: Make enroll command more stable by handling temporary server errors
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4523
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4513
+      timestamp: 1712324173
+      file:
+        name: 1712324173-improve-enroll-stability.yaml
+        checksum: eadaf6159c4be8d668074223ac6bc1f66d1fcd17
+    - kind: bug-fix
+      summary: Fix issue where kubernetes_leaderelection provider would not try to reacquire the lease once lost
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4542
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4543
+      timestamp: 1712583231
+      file:
+        name: 1712583231-leader-election-issue.yaml
+        checksum: c5ecc3ff31c39947d2aeb1719350e4f2223421cf
+    - kind: bug-fix
+      summary: Always select the more recent watcher during agent upgrade/downgrade
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4491
+      issue: []
+      timestamp: 1712737337
+      file:
+        name: 1712737337-always-launch-more-recent-watcher.yaml
+        checksum: 3e8edd72c73f18e63b75d071dbc02a5cd4bac91d
+    - kind: feature
+      summary: Log raw events to a separate log file
+      description: |
+        Log entries from Elastic-Agent inputs containing event data are now
+        directed to a different file under the 'events' folder in the logs
+        directory. This file is not sent to the monitoring output, however
+        it can be retrieved by collecting a diagnostics.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4549
+      issue: []
+      timestamp: 1712935205
+      file:
+        name: 1712935205-Log-raw-events-to-a-separate-log-file.yaml
+        checksum: ebc53fcce5789c459ae52f9c64b4bcb52b344bb5
+    - kind: enhancement
+      summary: Reduce the overall download and on-disk size of the Elastic Agent
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4516
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3364
+      timestamp: 1712949156
+      file:
+        name: 1712949156-Switch-to-agentbeat.yaml
+        checksum: 85fd41f6809951e6fc08a8108ec0e0903b3cf9ba
+    - kind: security
+      summary: Upgraded otel-collector-contrib packages
+      description: ""
+      component: Elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4572
+      issue: []
+      timestamp: 1713157536
+      file:
+        name: 1713157536-upgrade-otel-collector-contrib-package.yaml
+        checksum: b64d66dcc038ef7121fbe4ba8fb8a71dad0bbc76
+    - kind: bug-fix
+      summary: Removed beat state metricset from monitoring metrics
+      description: Removing beat state metricsets reduces the document count of indices metrics-elastic_agent.*-* by 50%, saving around 13% disk space
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4579
+      issue: []
+      timestamp: 1713257367
+      file:
+        name: 1713257367-Remove-beat-state-metricset-from-elastic-agent-monitoring.yaml
+        checksum: 179c5ef72c7a40ec4cde8b2d791101f68487abd5
+    - kind: enhancement
+      summary: Removed cloud-defend from .tar.gz archives, now it only appears in docker images
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4584
+      issue: []
+      timestamp: 1713289288
+      file:
+        name: 1713289288-Removed-cloud-defend-from-.tar.gz-archives.yaml
+        checksum: 5df28c91e04ae1463df1e1e6d88f3bfca37551fa
+    - kind: enhancement
+      summary: Handle the starting of namespace and node watchers for metadata enrichment according to `add_resource_metadata` and hints configuration.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4618
+      issue: []
+      timestamp: 1713946896
+      file:
+        name: 1713946896-remove-mandatory-ns-node-permissions.yaml
+        checksum: f50fe7bffec84eeb2cd1a45906e8296e7073c97f
+    - kind: enhancement
+      summary: Fleet Server component now uses policy output configuration to communicate with Elasticsearch
+      description: |
+        Alter how elatic-agent passes the fleet-server output component so that the policy's output is used.
+        In cases where fleet-server encounters an error when trying to use the policy's output it will use
+        the configuration specified during enrollment as a fallback. In cases where it uses the fallback
+        the policy's output is periodically retested and used if it's successful.
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4643
+      issue:
+        - https://github.com/elastic/elastic-agent/issue/2784
+      timestamp: 1714505172
+      file:
+        name: 1714505172-Send-fleet-server-component-output-under-bootstrap-key.yaml
+        checksum: 3fb41a5d07e2a983af8fcfca14c51963ce0dbe6b
+    - kind: enhancement
+      summary: Reduce agent logs by default by dropping "Non-zero metrics..." logs before ES ingestion
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4633
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4252
+      timestamp: 1714717717
+      file:
+        name: 1714717717-Reduce-agent-logs-by-default.yaml
+        checksum: 4465aaec9e51c126b951ce6a1b6935cabc33a961
+    - kind: enhancement
+      summary: Use more stable snapshot API for upgrades to snapshot versions
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4693
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4458
+      timestamp: 1715158488
+      file:
+        name: 1715158488-use-snapshot-api.yaml
+        checksum: 37b37ddc8a9f8adc4a2400bd1167b39ed9f74d9e
+    - kind: feature
+      summary: Makes the `filterprocessor` available to users running Elastic Agent in `otel` mode.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4708
+      issue: []
+      timestamp: 1715178093
+      file:
+        name: 1715178093-otel-mode-add-filter-processor.yaml
+        checksum: 757042246e20236db59806c7d4dc5a7f35e0e122
+    - kind: feature
+      summary: Makes the `elasticsearchexporter` available to users running Elastic Agent in `otel` mode.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4707
+      issue: []
+      timestamp: 1715178161
+      file:
+        name: 1715178161-otel-mode-add-elasticsearch-exporter.yaml
+        checksum: 774e71fcb51d1810ecce1cea75e29414c547c96d
+    - kind: enhancement
+      summary: Set log level from fleet policy
+      description: |
+        Enables setting agent logging level in policy. Setting a valid log level (same values allowed for setting log level on the specific agent) in fleet policy under `agent.logging.level` key will cause the agent to change its logging level, unless an override is set for the specific elastic-agent using a `settings` action.
+        The order of priority of log level for a fleet managed agent is:
+        1. log level set specifically to the agent via settings action, if any
+        2. log level specified in fleet policy, if any
+        3. default hard-coded log level for elastic-agent
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/3090
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2851
+      timestamp: 1715257644
+      file:
+        name: 1715257644-Set-log-level-from-fleet-policy.yaml
+        checksum: 949f50ac46ef06a470b0a6b910cb47f7175e0b44
+    - kind: enhancement
+      summary: Add agent-info.yaml to diagnostics bundle
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4725
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4439
+      timestamp: 1715259944
+      file:
+        name: 1715259944-Add-agent-info.yaml-to-diagnostics-bundle.yaml
+        checksum: 7294bf9fccf4e5d0dd691a5a1888932b2afc0338
+    - kind: feature
+      summary: Add unprivileged and privileged switch commands
+      description: |
+        Adds ability to switch between privileged and unprivileged mode using the privileged and unprivileged
+        subcommands respectively.
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4621
+      issue:
+        - https://github.com/elastic/ingest-dev/issues/2790
+      timestamp: 1715266075
+      file:
+        name: 1715266075-Add-unprivileged-and-privileged-switch-commands.yaml
+        checksum: c5432e31ad31fd383f6e2c25abe24b79f223ce6e
+    - kind: bug-fix
+      summary: Make delayed enrollment try indefinitely
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4727
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4716
+      timestamp: 1715266989
+      file:
+        name: 1715266989-Make-delayed-enrollment-try-indefinitely.yaml
+        checksum: 5b549d913d91a5abdb2344dd2b53f7060d321f4a
+    - kind: feature
+      summary: Update kubernetes manifests to adopt official recommended labels
+      description: Update kubernetes manifests to adopt the official recommended labels. This will require a `kubectl replace` to apply as selector labels are an immutable field.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4722
+      issue: []
+      timestamp: 1715551124
+      file:
+        name: 1715551124-Update-kubernetes-manifests-to-adopt-official-recommended-labels.yaml
+        checksum: a59019c927600bef3a39c3d6383cf77aaa4c9cc8
+    - kind: enhancement
+      summary: kustomize templates using default manifests for k8s onboarding
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1715773969
+      file:
+        name: 1715773969-kustomize-onboarding.yaml
+        checksum: c738e537b650ea08acf0bf16120a16cf54dccc95
+    - kind: bug-fix
+      summary: Fix delay enrollment to work in unprivileged mode on Windows
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4779
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4678
+      timestamp: 1716227441
+      file:
+        name: 1716227441-Fix-delay-enrollment-to-work-in-unprivileged-mode-on-Windows.yaml
+        checksum: 4ad34fa40e3c62d01d7ac266939c9ebb38b3846d
+    - kind: feature
+      summary: Add monitoring of endpoint usage metrics
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4789
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4083
+      timestamp: 1716320508
+      file:
+        name: 1716320508-add-endpoint-monitoring.yaml
+        checksum: 2097a41406e86a674bf43fccf8bb7529163df6cd
+    - kind: enhancement
+      summary: Load Certificate Authorities from Fleet policy
+      description: |
+        Loads Certificate Authorities (CA) from Fleet policy's key `fleet.ssl.certificate_authorities` and pass it to elastic-agent HTTP client used for connecting to Fleet server. The CAs will be used to validate server or proxy certificates presented when connecting to `HTTPs` endpoints.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4770
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2247
+      timestamp: 1716490302
+      file:
+        name: 1716490302-Load-fleet.ssl.certificate_authorities-from-agent-policy.yaml
+        checksum: e5071d95ce6a6fda47bc56d04391a6405a79d166
+    - kind: enhancement
+      summary: Load fleet.ssl.certificate and fleet.ssl.key from agent policy
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4770
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2248
+      timestamp: 1716490372
+      file:
+        name: 1716490372-Load-fleet.ssl.certificate-and-fleet.ssl.key-from-agent-policy.yaml
+        checksum: 8500042c908380bae28ca508344c1e814e5bb957
+    - kind: feature
+      summary: Makes the `resourcedetection` processor available to users running Elastic Agent in `otel` mode.
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1716543099
+      file:
+        name: 1716543099-add-otel-resource-detection-processor.yaml
+        checksum: c921e5dbb8477b74a853afc5ebfc9f423023d7bb
+    - kind: feature
+      summary: Add cloudbeat asset inventory aws
+      description: ""
+      component: cloudbeat
+      pr: []
+      issue: []
+      timestamp: 1716543533
+      file:
+        name: 1716543533-add-cloudbeat-asset-inventory-aws.yaml
+        checksum: 3e26481924d58015f2978828c829097db1da8772
+    - kind: feature
+      summary: Add otelcol shortuct to elastic-agent otel
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4816
+      issue: []
+      timestamp: 1717077736
+      file:
+        name: 1717077736-otelcol-shortcut.yaml
+        checksum: 037cbd2904390cfcbabb36561e1ae20feb2f4c02
+    - kind: bug-fix
+      summary: Stop creating a zombie process on each restart.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4834
+      issue: []
+      timestamp: 1717185708
+      file:
+        name: 1717185708-Stop-creating-a-zombie-process-on-each-restart.yaml
+        checksum: e5bc550ac77a588dafafe39d09885a4974cda460
+    - kind: enhancement
+      summary: Capture early errors on Windows in Application eventlog.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4846
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4627
+      timestamp: 1717516439
+      file:
+        name: 1717516439-Capture-early-errors-on-Windows.yaml
+        checksum: 48c43eeb9bb2e3f7af1c4be00a91d2c7cf872b76
+    - kind: enhancement
+      summary: Add benchmark input
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/beats/pull/39789
+      issue: []
+      timestamp: 1717523676
+      file:
+        name: 1717523676-Add-benchmark-input.yaml
+        checksum: e3e84c880ac08128b0e7346a791a8619e6ecfe68
+    - kind: feature
+      summary: add-k8sattributesprocessor
+      description: ""
+      component: ""
+      pr: []
+      issue: []
+      timestamp: 1717939159
+      file:
+        name: 1717939159-add-k8sattributesprocessor.yaml
+        checksum: bb3813f4de8c2738ed08bb5cff0a34f4951daee2
+    - kind: bug-fix
+      summary: Fix possible crash in reading component logs
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4910
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4907
+      timestamp: 1718138001
+      file:
+        name: 1718138001-Fix-possible-crash-in-reading-component-logs.yaml
+        checksum: de163d465751c0260f59b98f8cd119c7d249b7e1
+    - kind: feature
+      summary: Add unprivileged mode support (beta)
+      description: |
+        Add new --unprivileged installation option. This option installs the Elastic Agent as a non-root or non-Administrator
+        user that has limited permissions on the host.
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1718200496
+      file:
+        name: 1718200496-Add-unprivileged-mode-support.yaml
+        checksum: 9f4c10314c9a43e826aec5907bc44ff40d12a2ce
+    - kind: bug-fix
+      summary: Ensure socket can be created even when STATE_PATH is too long for container command
+      description: |
+        When running the Elastic-Agent container command and `STATE_PATH` is
+        set to a value that is too long the Unix socket cannot be created,
+        so the Elastic-Agent will use the default state path instead.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4909
+      issue: []
+      timestamp: 1718226176
+      file:
+        name: 1718226176-Ensure.yaml
+        checksum: 70b5a479bddcf5edf2d61a5a521d5b3646d1b2c6
+    - kind: bug-fix
+      summary: Increase removal timeout when uninstall
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1718268915
+      file:
+        name: 1718268915-increase-remove-timeout.yaml
+        checksum: e86e7d090e9b9192ee098ee234c7622f0e94ece9
+    - kind: feature
+      summary: extend agent container initialisation to chown paths and raise capabilities for non-root
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4925
+      issue: []
+      timestamp: 1718273218
+      file:
+        name: 1718273218-container-init-capabilities.yaml
+        checksum: fc9ac0b65e535b0f0a398975d829eabd314a4706
+    - kind: enhancement
+      summary: Add diagnostics skip-conn flag
+      description: Add --skip-conn flag to elastic-agent diagnostics subcommand to skip collecting connection request diagnostics.
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4946
+      issue: []
+      timestamp: 1718660806
+      file:
+        name: 1718660806-Add-diagnostics-skip-conn-flag.yaml
+        checksum: 8af202b7b65f30b94a29e4cc7fca24a599db944d
+    - kind: feature
+      summary: Allow configuring `agent.monitoring.metrics_period`.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4961
+      issue: []
+      timestamp: 1718818524
+      file:
+        name: 1718818524-support-monitoring-metrics-interval.yaml
+        checksum: 5728b0ae94e5b95a97d85472283333856acd50e2
+    - kind: unknown
+      summary: Use installed agent to uninstall itself when install -f is used.
+      description: |
+        When using "elastic-agent install -f", the agent will exec "elastic-agent uninstall -f"
+        using the agent found in the system's path. This ensures all path references are correctly
+        loaded and tamper protection errors will cause the install attempt to fail.
+      component: ""
+      pr: []
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4506
+      timestamp: 1718833116
+      file:
+        name: 1718833116-Check-for-tamper-protection-when-uninstalling.yaml
+        checksum: 6e059958ee8636d679cd848215691e7f3aeaa30c
+    - kind: feature
+      summary: Makes the `elasticinframetrics` processor available to users running Elastic Agent in `otel` mode.
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1718863753
+      file:
+        name: 1718863753-otel-add-elastic-infra-metrics-processor.yaml
+        checksum: e067e9ffd7b1b778cba8ca59bdaa41640a43f0da
+    - kind: bug-fix
+      summary: Fix namespace filter on watchers started by pod and service eventer on kubernetes provider
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1718953844
+      file:
+        name: 1718953844-fix-namespace-filter-on-watchers.yaml
+        checksum: 71035beefc9bd41368f898890492137c26d227b4
+    - kind: bug-fix
+      summary: Allow Elastic Agent container to work with a read-only filesystem
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4995
+      issue: []
+      timestamp: 1719266012
+      file:
+        name: 1719266012-Don't-fail-when-unable-to-write-container-paths.yaml
+        checksum: 1e7b2c28c24b6b62f2023a0aaacdc2df746df7d4
+    - kind: feature
+      summary: Event logger output now can be set via Fleet overrides or environment variable for container command.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/4932
+      issue: []
+      timestamp: 1719345278
+      file:
+        name: 1719345278-container.yaml
+        checksum: 6ba206a8382050214fd05f0aae9ddad6ce732df0
+    - kind: other
+      summary: Upgrade NodeJS to LTS 18.20.3
+      description: ""
+      component: heartbeat
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5010
+      issue: []
+      timestamp: 1719483857
+      file:
+        name: 1719483857-Upgrade-NodeJS-to-LTS-18.20.3.yaml
+        checksum: b7171724a3163ddc6e95013b2bd41dc08022112b
+    - kind: bug-fix
+      summary: Fix indefinite memory and CPU consumption when waiting fleet to be ready
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5034
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/5033
+      timestamp: 1719934992
+      file:
+        name: 1719934992-Fix-indefinite-memory-and-CPU-consumption-when-waiting-fleet-to-be-ready.yaml
+        checksum: 89f05e7ab9d46dbc7aee4e7d10b0b1a8716442cf
+    - kind: enhancement
+      summary: Add ability to escape variables in policy
+      description: |
+        Adds the ability to escape variables with prefix of '$' allow variables such as `$${...}` to be escaped and
+        included in the computed policy as `${...}`.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5035
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2177
+      timestamp: 1719935188
+      file:
+        name: 1719935188-Add-ability-to-escape-variables-in-policy.yaml
+        checksum: ce6a144c7d2a8899a65af26e483388a61ebd0522
+    - kind: enhancement
+      summary: Inject proxy_url into endpoint elasticsearch output and fleet config
+      description: |
+        Inject a proxy_url value into endpoint's elasticsearch output and endpoint and APM's fleet configuration if there are no existing keys as part of the policy, but the agent default proxy servers are set by enviroment variables.
+        The 1st host in the output list is used to determine if the HTTPS_PROXY or HTTP_PROXY value is used, if it can't be determined this way the HTTPS_PROXY is used over HTTP_PROXY.
+        Injection will be skipped if the policy sets proxy_disable to true, the proxy_url key is set with an empty value, or the proxy from the env var is empty.
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5044
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2602
+      timestamp: 1720034703
+      file:
+        name: 1720034703-Inject-proxy_url-into-endpoint-elasticsearch-output.yaml
+        checksum: 2f3450ea9e4f979086dc22aaae01d7994560c033
+    - kind: bug-fix
+      summary: Use setcap on a correct agentbeat binary
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1720195309
+      file:
+        name: 1720195309-add-agentbeat-capabilities.yaml
+        checksum: 161a19f5c9520d645f1d32c8e7b6353fd011440c
+    - kind: security
+      summary: Add Wolfi docker image to packaging, the cloud image is now based on Wolfi
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1720208209
+      file:
+        name: 1720208209-add-docker-wolfi.yaml
+        checksum: 7f987ed006db5931da3d6d777abedfcc6855f0d9
+    - kind: enhancement
+      summary: Reduce Docker image size by performing more steps in the builder image
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1720209553
+      file:
+        name: 1720209553-reduce-docker-size.yaml
+        checksum: f373949a58f9bd28347b3924111f4b64a3fca39f
+    - kind: bug-fix
+      summary: Fix issue with Windows install when user has no home directory
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5118
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/5019
+      timestamp: 1720713910
+      file:
+        name: 1720713910-Fix-issue-with-Windows-install-when-user-has-no-home-directory.yaml
+        checksum: 16624dccb7dc0721398021d091c4da38fb2c0da2
+    - kind: unknown
+      summary: Fix FQDN being lower-cased for `host.hostname`
+      description: ""
+      component: host metadata
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5191
+      issue:
+        - https://github.com/elastic/beats/issues/39993
+      timestamp: 1721910073
+      file:
+        name: 1721910073-Fix-FQDN-being-lower-cased-for-.yaml
+        checksum: 3663c5c4f942af5f29a83f8ddaf5a3b26c482a99
+    - kind: bug-fix
+      summary: Fix loss of state.enc on upgrade with debian packaging
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5260
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/5101
+      timestamp: 1722954476
+      file:
+        name: 1722954476-Fix-loss-of-state.enc-on-upgrade-with-debian-packaging.yaml
+        checksum: c4b9f01b0cf5d508d70b02959e86018ecdaa60b6
+    - kind: bug-fix
+      summary: use monotonic clock for component check-in
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5284
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/5277
+      timestamp: 1723477450
+      file:
+        name: 1723477450-use-monotonic-clock-for-check-in.yaml
+        checksum: 3a3ba56b2983114d8c54998e3fec8d356ccabe75
+    - kind: feature
+      summary: Call fleet-server audit/unenroll endpoint on uninstall
+      description: |
+        Uninstalling a fleet-managed elastic-agent instance will now do a
+        best-effort attempt to notify fleet-server of the agent removal so the
+        agent should not appear as offline.
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5302
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/484
+      timestamp: 1723675050
+      file:
+        name: 1723675050-Call-fleet-server-audit-unenroll-endpoint-on-uninstall.yaml
+        checksum: 417bc97a82409efb285d80ae67ffc6e0f598ad54
+    - kind: feature
+      summary: Remove experimental support for shippers
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5308
+      issue: []
+      timestamp: 1723818607
+      file:
+        name: 1723818607-Remove-experimental-support-for-shippers.yaml
+        checksum: 7fdd729ded3f29d0a23d18e374da32076088c334
+    - kind: bug-fix
+      summary: Check windows permissions for false-positive return
+      description: |
+        Check the errors returned when handling the ACL on windows systems to stop emmitting an error that states "The operation completed successfully".
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5317
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4496
+      timestamp: 1724103107
+      file:
+        name: 1724103107-Check-windows-permissions-for-false-positive-return.yaml
+        checksum: 14514fa498fc348d5ffd179b938f08707618a048
+    - kind: feature
+      summary: Add cloudbeat Azure asset inventory input spec
+      description: ""
+      component: cloudbeat
+      pr: []
+      issue: []
+      timestamp: 1724156595
+      file:
+        name: 1724156595-add-cloudbeat-azure-asset-inventory.yaml
+        checksum: eea1aab2b2996416de5f58173f72e67d43e12e75
+    - kind: bug-fix
+      summary: Add health_check extension to otel.yml file bundled with Elastic Agent package
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5369
+      issue: []
+      timestamp: 1724804905
+      file:
+        name: 1724804905-otel-health-check.yaml
+        checksum: 0570bb202fc59ef0dbef713c5143f830c9d98eaf
+    - kind: feature
+      summary: Add cloudbeat GCP asset inventory input spec
+      description: ""
+      component: ""
+      pr: []
+      issue: []
+      timestamp: 1725444403
+      file:
+        name: 1725444403-add-cloudbeat-gcp-asset-inventory.yaml
+        checksum: 31d7cce0a0ebd9aefe00fc6589655a3ac9e792aa
+    - kind: enhancement
+      summary: Endpoint should be allowed to run on Windows Server 2012 / 2012 R2
+      description: ""
+      component: elastic-endpoint
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5429
+      issue: []
+      timestamp: 1725483799
+      file:
+        name: 1725483799-Endpoint-should-be-allowed-to-run-on-Windows-Server-2012.yaml
+        checksum: bc2ddfa236c6f6d14a6884dc322a90465686e7b3
+    - kind: bug-fix
+      summary: Fix the Elastic Agent crashing when self unenrolling due to too many authentication failures against Fleet Server
+      description: ""
+      component: state-store
+      pr: []
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/5434
+      timestamp: 1725523126
+      file:
+        name: 1725523126-fix-state-store-SetAction-panic.yaml
+        checksum: 5bfc290ceed049b237ac70e33f052d88c7543a25
+    - kind: bug-fix
+      summary: Set default log level on policy change, when policy does not have a log level
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5452
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/5451
+      timestamp: 1725620525
+      file:
+        name: 1725620525-fix-default-log-level-policy-change.yaml
+        checksum: 361b2f849bf0e1425908c21e9b241e76c8c66806
+    - kind: enhancement
+      summary: Include the correct Elastic License 2.0 file in build artifacts and packages.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5464
+      issue: []
+      timestamp: 1725655844
+      file:
+        name: 1725655844-Include-correct-ELv2-license-file-in-elastic-agent-packages.yaml
+        checksum: 23772624a3bcda5fe97d6b02469ca58a33478358
+    - kind: breaking-change
+      summary: Remove cloud-defend from agent package
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5481
+      issue: []
+      timestamp: 1725913991
+      file:
+        name: 1725913991-remove-cloud-defend.yaml
+        checksum: 5bc3b5e31f850ce19da3ff2bdd0f6710a15efb06
+    - kind: feature
+      summary: Add support for passphrase protected mTLS client certificate key during install/enroll
+      description: |
+        Adds `--elastic-agent-cert-key-passphrase` command line flag for the `install`
+        and `enroll` commands. The new flag accepts a absolute path for a file containing
+        a passphrase to be used to decrypt the mTLS client certificate key.
+      component: ""
+      pr: []
+      issue: []
+      timestamp: 1726040648
+      file:
+        name: 1726040648-Add-support-for-passphrase-protected-mTLS-client-certificate-key.yaml
+        checksum: fbe402b12dd7df200be2b77182dbb8a70cbe3ebe
+    - kind: breaking-change
+      summary: Remove default credentials when running Elastic Agent in container mode
+      description: ELASTICSEARCH_USERNAME and ELASTICSEARCH_PASSWORD now need to be explicitly set when running the agent in container mode
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1726144746
+      file:
+        name: 1726144746-container-default-credentials.yaml
+        checksum: 787ea64973b0a62effa8d92fc308bf95ad084d9d
+    - kind: enhancement
+      summary: Support ELASTICSEARCH_API_KEY environment variable when running in container mode
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1726145045
+      file:
+        name: 1726145045-container-api-key.yaml
+        checksum: 80738c5524291194c91c457bdfb5baf80a339522
+    - kind: other
+      summary: change deprecated maintainer label in Dockerfile to org.opencontainers.image.authors
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5527
+      issue: []
+      timestamp: 1726238750
+      file:
+        name: 1726238750-change-deprecated-maintainer-label-in-Dockerfile-to-org.opencontainers.image.authors.yaml
+        checksum: 92b1f0d5e1bd075ffa853209b9157f99dd10e342
+    - kind: feature
+      summary: Enable persistence in the configuration provided with our OTel Collector distribution.
+      description: ""
+      component: elastic-agent,otel
+      pr: []
+      issue: []
+      timestamp: 1726572104
+      file:
+        name: 1726572104-enable-persistence-by-default.yaml
+        checksum: 9f79bc53034a5d6e7c00f14dbb90682bb2331328
+    - kind: feature
+      summary: Elastic Defend accepts passphrase protected client certificate key for mTLS
+      description: ""
+      component: ""
+      pr: []
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/5490
+      timestamp: 1726735182
+      file:
+        name: 1726735182-Elastic-Defend-accepts-passphrase-protected-client-certificate-key-for-mTLS.yaml
+        checksum: 87a540851e254b6a480facbc2064aff85e4ebcf3
+    - kind: enhancement
+      summary: Add pprof extension to OTel dependencies
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5556
+      issue: []
+      timestamp: 1726739016
+      file:
+        name: 1726739016-otel-pprof-extension.yaml
+        checksum: f1f6146aa76b4f443a6299ebac2c13d2739829cf
+    - kind: bug-fix
+      summary: Add pprof endpoints to the monitoring server if enabled
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1726740792
+      file:
+        name: 1726740792-pprof-endpoint.yaml
+        checksum: 85b84d9b5de136990c035e2dfd25a2a6e8b75740
+    - kind: feature
+      summary: Increase Elastic Agent memory requests and limits when deployed in Kubernetes.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5614
+      issue: []
+      timestamp: 1727271745
+      file:
+        name: 1727271745-resource-limits-kubernetes.yaml
+        checksum: 87c4ff8553bfa5a8e1252e0d6ece2130ffbcc074
+    - kind: enhancement
+      summary: inspect command will redact secret_paths in policy
+      description: |
+        The elastic-agent inspect command will now redact any secret values when displaying output.
+        The keys that are redacted are expected to be defined in the "secret_paths" attribute.
+      component: ""
+      pr: []
+      issue: []
+      timestamp: 1727453779
+      file:
+        name: 1727453779-inspect-command-will-redact-secret_paths-in-policy.yaml
+        checksum: 2bce71ccf6115ce9805646716d248798e66fe563
+    - kind: enhancement
+      summary: Update Ubuntu base image from 20.04 to 24.04
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1727778754
+      file:
+        name: 1727778754-update-base-ubuntu-from-20.04-to-24.04.yaml
+        checksum: 55cb7d970881e2ae6393d98c668a8e5ebd578d59
+    - kind: feature
+      summary: Kustomize template to enables hints based autodiscovery by default when deploying standalone elastic-agent into a Kubernetes cluster. Remove root privileges of init container.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5643
+      issue: []
+      timestamp: 1727790202
+      file:
+        name: 1727790202-kustomize-templates-with-hints.yaml
+        checksum: edf53c46a28ee93ada54709ce83ce1b05d1a74d2
+    - kind: bug-fix
+      summary: Stop elastic-agent inspect from printing output twice
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5692
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4471
+      timestamp: 1727994385
+      file:
+        name: 1727994385-Stop-elastic-agent-inspect-from-printing-output-twice.yaml
+        checksum: 433114aa145e1134c92e50ce494caaaffa79860f
+    - kind: enhancement
+      summary: Only watch metadata for ReplicaSets in K8s provider
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1728039144
+      file:
+        name: 1728039144-k8s-replicaset-onlymeta.yaml
+        checksum: 780c81f3cf58beeb0eefda8de9c5aaaff3fcc901
+    - kind: security
+      summary: Upgrade to Go 1.22.8.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5731
+      issue: []
+      timestamp: 1728332120
+      file:
+        name: 1728332120-Upgrade-to-Go-1.22.8..yaml
+        checksum: 959431da51ad449f61effe2d131c8ab87139e731
+    - kind: enhancement
+      summary: Diagnostics files will redact secret_paths
+      description: |
+        The elastic-agent will use redact secret paths in files written in diagnostics bundles.
+        Secret paths are expected to be specified as a top-level attribute in yaml data being written.
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5745
+      issue: []
+      timestamp: 1728425752
+      file:
+        name: 1728425752-Diagnostics-files-will-redact-secret_paths.yaml
+        checksum: 60a7dab5656134148b0542b5da57e3050e6da103
+    - kind: enhancement
+      summary: Add filebeat otel receiver
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5833
+      issue: []
+      timestamp: 1729630977
+      file:
+        name: 1729630977-Add-filebeat-otel-receiver.yaml
+        checksum: 0e5e55864891cc5896a90a015decd87e8f463556
+    - kind: enhancement
+      summary: Update OTel components to v0.112.0/v1.18.0
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1729694636
+      file:
+        name: 1729694636-main.yaml
+        checksum: fb5249d469dbf31298382a45191e0122174b9488
+    - kind: breaking-change
+      summary: crossbuild-debian11
+      description: We're dropping support for Debian 10, so no need to crossbuild using the outdated image anymore. This also updates the statically linked glibc from 2.19 to 2.31.
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1729750939
+      file:
+        name: 1729750939-crossbuild-debian11.yaml
+        checksum: 4972f2ef7a2315f39713345eb471a00a0573eff8
+    - kind: enhancement
+      summary: Detect and fail-early cli upgrades if agent is fleet-managed
+      description: This change brings restrictions on the upgrade cli command. If an agent is fleet-managed and is running in unprivileged mode, users won't be able to upgrade the agent using the cli. If an agent is fleet-managed and is running privileged, users will only be able to upgrade the agent using the cli if they provide --force flag.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5864
+      issue: []
+      timestamp: 1729971565
+      file:
+        name: 1729971565-detect-fail-early-fleet-managed-cli-upgrade.yaml
+        checksum: 9e787dd2741fe58524f9736d969f35a0b1dcbecb
+    - kind: bug-fix
+      summary: This PR assumes installed agent on upgrade in order to initialize control path properly.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/owner/repo/5879
+      issue:
+        - https://github.com/owner/repo/5872
+      timestamp: 1730284359
+      file:
+        name: 1730284359-assume-installed-agent-on-upgrade.yaml
+        checksum: 227d39799bd411a4805b5d32008b6631ff914c67
+    - kind: bug-fix
+      summary: Allows users to enter spaces around yes/no inputs in CLI confirmation prompts.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5909
+      issue: []
+      timestamp: 1730418510
+      file:
+        name: 1730418510-confirm-test.yaml
+        checksum: cd0f621aef96b686dd3c9ed900ec0975d88c7618
+    - kind: feature
+      summary: Add os_family, os_platform and os_version to host provider
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5941
+      issue:
+        - https://github.com/elastic/integrations/issues/10797
+      timestamp: 1730986549
+      file:
+        name: 1730986549-Add-os_family,-os_platform-and-os_version-to-host-provider.yaml
+        checksum: f2dabf4cc393c6a4bd1c6e30d8fdd6f8ba71fc19
+    - kind: enhancement
+      summary: Emit Pod data only for running Pods in the Kubernetes provider
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1731500837
+      file:
+        name: 1731500837-pod-status-updates.yaml
+        checksum: bc5b90d209d9687495e3cec9429cf85ed3fccb8a
+    - kind: enhancement
+      summary: removed endpoint security from linux containers
+      description: Removed elastic endpoint security from linux containers as it has a dependency on systemd.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6016
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/5495
+      timestamp: 1731517501
+      file:
+        name: 1731517501-removed-endpoint-security-from-linux-containers.yaml
+        checksum: 73ce73dcbe55f9a094386af3ce0db5d13327d63e
+    - kind: feature
+      summary: Skip notify Fleet on Windows uninstall
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6065
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/5952
+      timestamp: 1731951823
+      file:
+        name: 1731951823-Skip-notify-Fleet-on-Windows-uninstall.yaml
+        checksum: 2d63aea1682edf364355ee8e09abb1a9434c7c4c
+    - kind: bug-fix
+      summary: Prevent installing Elastic Defend on non native architecture
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1732110636
+      file:
+        name: 1732110636-elastic-defend-cannot-run-in-emulation.yaml
+        checksum: cc811ca8793718da37ee77b8dfdcc38bf28ed8eb
