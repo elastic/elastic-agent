@@ -14,6 +14,8 @@ inputs:
       - UPGRADE
     runtime:
       preventions:
+        - condition: ${runtime.arch} != ${runtime.native_arch}
+          message: "Elastic Defend cannot run in emulation"
         - condition: ${runtime.arch} == 'arm64' and ${runtime.family} == 'redhat' and ${runtime.major} == 7
           message: "Elastic Defend doesn't support RHEL7 on arm64"
         - condition: ${user.root} == false
