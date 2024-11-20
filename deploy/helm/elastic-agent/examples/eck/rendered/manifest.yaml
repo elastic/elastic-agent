@@ -10,7 +10,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
 ---
@@ -25,7 +24,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
 ---
@@ -40,7 +38,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
 ---
@@ -55,7 +52,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
 stringData:
@@ -108,7 +104,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
 stringData:
@@ -398,7 +393,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
 stringData:
@@ -576,7 +570,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
 rules:
@@ -701,7 +694,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
 rules:
@@ -935,7 +927,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
 rules:
@@ -1018,7 +1009,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
 subjects:
@@ -1040,7 +1030,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
 subjects:
@@ -1062,7 +1051,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
 subjects:
@@ -1085,7 +1073,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
 spec:
@@ -1188,7 +1175,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
 spec:
@@ -1257,7 +1243,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
   annotations:
     eck.k8s.elastic.co/license: basic
 spec:

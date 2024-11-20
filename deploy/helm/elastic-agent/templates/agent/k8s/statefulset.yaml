@@ -17,6 +17,9 @@ spec:
   selector:
     matchLabels:
       name: {{ $agentName }}
+  {{- if hasKey $presetVal "replicaCount" }}
+  replicas: {{ ($presetVal).replicaCount }}
+  {{- end }}
   template:
     metadata:
       labels:

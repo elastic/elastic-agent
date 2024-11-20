@@ -1,0 +1,157 @@
+---
+# Source: elastic-agent/templates/agent/service-account.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: agent-nginx-example
+  namespace: "default"
+  labels:
+    helm.sh/chart: elastic-agent-0.0.1
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 9.0.0
+  annotations:
+    elastic-agent.k8s.elastic.co/preset: nginx
+    elastic-agent.k8s.elastic.co/sa: nginx
+---
+# Source: elastic-agent/templates/agent/k8s/secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: agent-nginx-example
+  namespace: "default"
+  labels:
+    helm.sh/chart: elastic-agent-0.0.1
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 9.0.0
+  annotations:
+    elastic-agent.k8s.elastic.co/preset: nginx
+stringData:
+
+  agent.yml: |-
+    id: agent-nginx-example
+    outputs:
+      default:
+        hosts:
+        - http://elasticsearch:9200
+        password: changeme
+        type: elasticsearch
+        username: elastic
+    secret_references: []
+    inputs:
+      - data_stream:
+          namespace: default
+        id: nginx/metrics-nginx-69240207-6fcc-4d19-aee3-dbf716e3bb0f
+        meta:
+          package:
+            name: nginx
+            version: 1.19.1
+        name: nginx-1
+        package_policy_id: 69240207-6fcc-4d19-aee3-dbf716e3bb0f
+        preset: nginx
+        revision: 1
+        streams:
+        - data_stream:
+            dataset: nginx.stubstatus
+            type: metrics
+          hosts:
+          - http://nginx.default.svc.cluster.local:80
+          id: nginx/metrics-nginx.stubstatus-69240207-6fcc-4d19-aee3-dbf716e3bb0f
+          metricsets:
+          - stubstatus
+          period: 10s
+          server_status_path: /nginx_status
+          tags:
+          - nginx-stubstatus
+        type: nginx/metrics
+        use_output: default
+    providers:
+      kubernetes_leaderelection:
+        enabled: false
+        leader_lease: example-nginx
+---
+# Source: elastic-agent/templates/agent/cluster-role-binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: agent-nginx-example-default
+  labels:
+    helm.sh/chart: elastic-agent-0.0.1
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 9.0.0
+  annotations:
+    elastic-agent.k8s.elastic.co/preset: nginx
+subjects:
+  - kind: ServiceAccount
+    name: agent-nginx-example
+    namespace: "default"
+roleRef:
+  kind: ClusterRole
+  name: user-cr
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: elastic-agent/templates/agent/k8s/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-nginx-example
+  namespace: "default"
+  labels:
+    helm.sh/chart: elastic-agent-0.0.1
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 9.0.0
+spec:
+  selector:
+    matchLabels:
+      name: agent-nginx-example
+  template:
+    metadata:
+      labels:
+        name: agent-nginx-example
+      annotations:
+        checksum/config: 99eaac30ab163ab5f4cedbdbf3e6936d34c2b0e2c22dee59947487bab88fcc26
+        elastic-agent.k8s.elastic.co/preset: nginx
+    spec:
+      automountServiceAccountToken: true
+      containers:
+      - args:
+        - -c
+        - /etc/elastic-agent/agent.yml
+        - -e
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: STATE_PATH
+          value: /usr/share/elastic-agent/state
+        image: docker.elastic.co/beats/elastic-agent:9.0.0-SNAPSHOT
+        imagePullPolicy: IfNotPresent
+        name: agent
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /usr/share/elastic-agent/state
+          name: agent-data
+        - mountPath: /etc/elastic-agent/agent.yml
+          name: config
+          readOnly: true
+          subPath: agent.yml
+      dnsPolicy: ClusterFirstWithHostNet
+      serviceAccountName: agent-nginx-example
+      volumes:
+      - hostPath:
+          path: /etc/elastic-agent/default/agent-nginx-example/state
+          type: DirectoryOrCreate
+        name: agent-data
+      - name: config
+        secret:
+          defaultMode: 292
+          secretName: agent-nginx-example
