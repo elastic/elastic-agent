@@ -22,6 +22,13 @@ import (
 	"github.com/elastic/elastic-agent/version"
 )
 
+const (
+	// Conforming to https://learn.microsoft.com/en-us/troubleshoot/windows-server/active-directory/naming-conventions-for-computer-domain-site-ou#domain-names
+	// domain names can contain all alphanumeric characters except for the extended characters that appear in the Disallowed characters list. Names can contain a period, but names can't start with a period.
+	// Disallowed characters: [, ~ : @ # $ % ^ ' . ( ) { } _ {whitespace} \ / ]
+	activeDirectoryUsername = `^[A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*\\[A-Za-z0-9.-]{1,104}$`
+)
+
 // postInstall performs post installation for Windows systems.
 func postInstall(topPath string) error {
 	// delete the top-level elastic-agent.exe
@@ -128,7 +135,7 @@ func isWindowsDomainUsername(username string) (bool, error) {
 		return false, nil
 	}
 
-	match, err := regexp.MatchString(`^.*(\\)(.*)$`, username)
+	match, err := regexp.MatchString(activeDirectoryUsername, username)
 	if err != nil {
 		return false, err
 	}
