@@ -9,10 +9,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/features"
-	"github.com/elastic/elastic-agent/pkg/limits"
-	"github.com/elastic/elastic-agent/version"
-
 	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -28,10 +24,14 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/elastic-agent/pkg/limits"
+	"github.com/elastic/elastic-agent/version"
 )
 
 // New creates a new Agent and bootstrap the required subsystem.
@@ -176,13 +176,13 @@ func New(
 		}
 	}
 
-	// no need for vars in otel mode
 	varsManager, err := composable.New(log, rawConfig, composableManaged)
 	if err != nil {
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
-	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, compModifiers...)
+	otelManager := otelmanager.NewOTelManager(log.Named("otel_manager"))
+	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelManager, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created

@@ -172,7 +172,7 @@ func Parse(policy any) (*Flags, error) {
 	}
 
 	parsedFlags := cfg{}
-	if err := c.Unpack(&parsedFlags); err != nil {
+	if err := c.UnpackTo(&parsedFlags); err != nil {
 		return nil, fmt.Errorf("could not umpack features config: %w", err)
 	}
 
