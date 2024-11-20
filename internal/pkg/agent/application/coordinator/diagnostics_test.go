@@ -100,6 +100,7 @@ agent:
     metrics_period: ""
     namespace: ""
     pprof: null
+    failure_threshold: null
     traces: true
     apm:
       hosts:

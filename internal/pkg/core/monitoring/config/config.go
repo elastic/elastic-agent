@@ -21,17 +21,18 @@ const (
 
 // MonitoringConfig describes a configuration of a monitoring
 type MonitoringConfig struct {
-	Enabled        bool                  `yaml:"enabled" config:"enabled"`
-	MonitorLogs    bool                  `yaml:"logs" config:"logs"`
-	MonitorMetrics bool                  `yaml:"metrics" config:"metrics"`
-	MetricsPeriod  string                `yaml:"metrics_period" config:"metrics_period"`
-	LogMetrics     bool                  `yaml:"-" config:"-"`
-	HTTP           *MonitoringHTTPConfig `yaml:"http" config:"http"`
-	Namespace      string                `yaml:"namespace" config:"namespace"`
-	Pprof          *PprofConfig          `yaml:"pprof" config:"pprof"`
-	MonitorTraces  bool                  `yaml:"traces" config:"traces"`
-	APM            APMConfig             `yaml:"apm,omitempty" config:"apm,omitempty" json:"apm,omitempty"`
-	Diagnostics    Diagnostics           `yaml:"diagnostics,omitempty" json:"diagnostics,omitempty"`
+	Enabled          bool                  `yaml:"enabled" config:"enabled"`
+	MonitorLogs      bool                  `yaml:"logs" config:"logs"`
+	MonitorMetrics   bool                  `yaml:"metrics" config:"metrics"`
+	MetricsPeriod    string                `yaml:"metrics_period" config:"metrics_period"`
+	FailureThreshold *uint                 `yaml:"failure_threshold" config:"failure_threshold"`
+	LogMetrics       bool                  `yaml:"-" config:"-"`
+	HTTP             *MonitoringHTTPConfig `yaml:"http" config:"http"`
+	Namespace        string                `yaml:"namespace" config:"namespace"`
+	Pprof            *PprofConfig          `yaml:"pprof" config:"pprof"`
+	MonitorTraces    bool                  `yaml:"traces" config:"traces"`
+	APM              APMConfig             `yaml:"apm,omitempty" config:"apm,omitempty" json:"apm,omitempty"`
+	Diagnostics      Diagnostics           `yaml:"diagnostics,omitempty" json:"diagnostics,omitempty"`
 }
 
 // MonitoringHTTPConfig is a config defining HTTP endpoint published by agent

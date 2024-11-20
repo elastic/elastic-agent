@@ -235,7 +235,7 @@ func TestMonitoringConfigMetricsInterval(t *testing.T) {
 					// check the streams created for the input, should be a list of objects
 					if assert.Contains(t, input, "streams", "input %q does not contain any stream", inputID) &&
 						assert.IsTypef(t, []any{}, input["streams"], "streams for input %q are not a list of objects", inputID) {
-						// loop over streams and cast to map[string]any to access keys
+						// loop over streams and access keys
 						for _, rawStream := range input["streams"].([]any) {
 							if assert.IsTypef(t, map[string]any{}, rawStream, "stream %v for input %q is not a map", rawStream, inputID) {
 								stream := rawStream.(map[string]any)
@@ -248,6 +248,210 @@ func TestMonitoringConfigMetricsInterval(t *testing.T) {
 									if assert.NoErrorf(t, err, "Unparseable period duration %s for stream %q of input %q", periodString, streamID, inputID) {
 										assert.Equalf(t, duration, tc.expectedInterval, "unexpected duration for stream %q of input %q", streamID, inputID)
 									}
+								}
+							}
+						}
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
+
+	agentInfo, err := info.NewAgentInfo(context.Background(), false)
+	require.NoError(t, err, "Error creating agent info")
+
+	sampleFiveErrorsStreamThreshold := uint(5)
+	sampleTenErrorsStreamThreshold := uint(10)
+
+	tcs := []struct {
+		name              string
+		monitoringCfg     *monitoringConfig
+		policy            map[string]any
+		expectedThreshold uint
+	}{
+		{
+			name: "default failure threshold",
+			monitoringCfg: &monitoringConfig{
+				C: &monitoringcfg.MonitoringConfig{
+					Enabled:        true,
+					MonitorMetrics: true,
+					HTTP: &monitoringcfg.MonitoringHTTPConfig{
+						Enabled: false,
+					},
+				},
+			},
+			policy: map[string]any{
+				"agent": map[string]any{
+					"monitoring": map[string]any{
+						"metrics": true,
+						"http": map[string]any{
+							"enabled": false,
+						},
+					},
+				},
+				"outputs": map[string]any{
+					"default": map[string]any{},
+				},
+			},
+			expectedThreshold: defaultMetricsStreamFailureThreshold,
+		},
+		{
+			name: "agent config failure threshold",
+			monitoringCfg: &monitoringConfig{
+				C: &monitoringcfg.MonitoringConfig{
+					Enabled:        true,
+					MonitorMetrics: true,
+					HTTP: &monitoringcfg.MonitoringHTTPConfig{
+						Enabled: false,
+					},
+					FailureThreshold: &sampleFiveErrorsStreamThreshold,
+				},
+			},
+			policy: map[string]any{
+				"agent": map[string]any{
+					"monitoring": map[string]any{
+						"metrics": true,
+						"http": map[string]any{
+							"enabled": false,
+						},
+					},
+				},
+				"outputs": map[string]any{
+					"default": map[string]any{},
+				},
+			},
+			expectedThreshold: sampleFiveErrorsStreamThreshold,
+		},
+		{
+			name: "policy failure threshold uint",
+			monitoringCfg: &monitoringConfig{
+				C: &monitoringcfg.MonitoringConfig{
+					Enabled:        true,
+					MonitorMetrics: true,
+					HTTP: &monitoringcfg.MonitoringHTTPConfig{
+						Enabled: false,
+					},
+					FailureThreshold: &sampleFiveErrorsStreamThreshold,
+				},
+			},
+			policy: map[string]any{
+				"agent": map[string]any{
+					"monitoring": map[string]any{
+						"metrics": true,
+						"http": map[string]any{
+							"enabled": false,
+						},
+						failureThresholdKey: sampleTenErrorsStreamThreshold,
+					},
+				},
+				"outputs": map[string]any{
+					"default": map[string]any{},
+				},
+			},
+			expectedThreshold: sampleTenErrorsStreamThreshold,
+		},
+		{
+			name: "policy failure threshold int",
+			monitoringCfg: &monitoringConfig{
+				C: &monitoringcfg.MonitoringConfig{
+					Enabled:        true,
+					MonitorMetrics: true,
+					HTTP: &monitoringcfg.MonitoringHTTPConfig{
+						Enabled: false,
+					},
+					FailureThreshold: &sampleFiveErrorsStreamThreshold,
+				},
+			},
+			policy: map[string]any{
+				"agent": map[string]any{
+					"monitoring": map[string]any{
+						"metrics": true,
+						"http": map[string]any{
+							"enabled": false,
+						},
+						failureThresholdKey: 10,
+					},
+				},
+				"outputs": map[string]any{
+					"default": map[string]any{},
+				},
+			},
+			expectedThreshold: sampleTenErrorsStreamThreshold,
+		},
+		{
+			name: "policy failure threshold string",
+			monitoringCfg: &monitoringConfig{
+				C: &monitoringcfg.MonitoringConfig{
+					Enabled:        true,
+					MonitorMetrics: true,
+					HTTP: &monitoringcfg.MonitoringHTTPConfig{
+						Enabled: false,
+					},
+					FailureThreshold: &sampleFiveErrorsStreamThreshold,
+				},
+			},
+			policy: map[string]any{
+				"agent": map[string]any{
+					"monitoring": map[string]any{
+						"metrics": true,
+						"http": map[string]any{
+							"enabled": false,
+						},
+						failureThresholdKey: "10",
+					},
+				},
+				"outputs": map[string]any{
+					"default": map[string]any{},
+				},
+			},
+			expectedThreshold: sampleTenErrorsStreamThreshold,
+		},
+	}
+
+	for _, tc := range tcs {
+
+		t.Run(tc.name, func(t *testing.T) {
+			b := &BeatsMonitor{
+				enabled:         true,
+				config:          tc.monitoringCfg,
+				operatingSystem: runtime.GOOS,
+				agentInfo:       agentInfo,
+			}
+			got, err := b.MonitoringConfig(tc.policy, nil, map[string]string{"foobeat": "filebeat"}, map[string]uint64{}) // put a componentID/binary mapping to have something in the beats monitoring input
+			assert.NoError(t, err)
+
+			rawInputs, ok := got["inputs"]
+			require.True(t, ok, "monitoring config contains no input")
+			inputs, ok := rawInputs.([]any)
+			require.True(t, ok, "monitoring inputs are not a list")
+			marshaledInputs, err := yaml.Marshal(inputs)
+			if assert.NoError(t, err, "error marshaling monitoring inputs") {
+				t.Logf("marshaled monitoring inputs:\n%s\n", marshaledInputs)
+			}
+
+			// loop over the created inputs
+			for _, i := range inputs {
+				input, ok := i.(map[string]any)
+				if assert.Truef(t, ok, "input is not represented as a map: %v", i) {
+					inputID := input["id"]
+					t.Logf("input %q", inputID)
+					// check the streams created for the input, should be a list of objects
+					if assert.Contains(t, input, "streams", "input %q does not contain any stream", inputID) &&
+						assert.IsTypef(t, []any{}, input["streams"], "streams for input %q are not a list of objects", inputID) {
+
+						// loop over streams and cast to map[string]any to access keys
+						for _, rawStream := range input["streams"].([]any) {
+							if assert.IsTypef(t, map[string]any{}, rawStream, "stream %v for input %q is not a map", rawStream, inputID) {
+								stream := rawStream.(map[string]any)
+								// check period and assert its value
+								streamID := stream["id"]
+								if assert.Containsf(t, stream, failureThresholdKey, "stream %q for input %q does not contain a failureThreshold", streamID, inputID) &&
+									assert.IsType(t, uint(0), stream[failureThresholdKey], "period for stream %q of input %q is not represented as a string", streamID, inputID) {
+									actualFailureThreshold := stream[failureThresholdKey].(uint)
+									assert.Equalf(t, actualFailureThreshold, tc.expectedThreshold, "unexpected failure threshold for stream %q of input %q", streamID, inputID)
 								}
 							}
 						}

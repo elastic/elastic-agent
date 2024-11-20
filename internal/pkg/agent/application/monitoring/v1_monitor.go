@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -48,6 +49,7 @@ const (
 	monitoringKey              = "monitoring"
 	useOutputKey               = "use_output"
 	monitoringMetricsPeriodKey = "metrics_period"
+	failureThresholdKey        = "failure_threshold"
 	monitoringOutput           = "monitoring"
 	defaultMonitoringNamespace = "default"
 	agentName                  = "elastic-agent"
@@ -60,6 +62,10 @@ const (
 	// metricset execution period used for the monitoring metrics inputs
 	// we set this to 60s to reduce the load/data volume on the monitoring cluster
 	defaultMetricsCollectionInterval = 60 * time.Second
+
+	// metricset stream failure threshold before the stream is marked as DEGRADED
+	// to avoid marking the agent degraded for transient errors, we set the default threshold to 2
+	defaultMetricsStreamFailureThreshold = uint(2)
 )
 
 var (
@@ -131,6 +137,7 @@ func (b *BeatsMonitor) MonitoringConfig(
 
 	monitoringOutputName := defaultOutputName
 	metricsCollectionIntervalString := b.config.C.MetricsPeriod
+	failureThreshold := b.config.C.FailureThreshold
 	if agentCfg, found := policy[agentKey]; found {
 		// The agent section is required for feature flags
 		cfg[agentKey] = agentCfg
@@ -149,6 +156,25 @@ func (b *BeatsMonitor) MonitoringConfig(
 					if metricsPeriod, found := monitoringMap[monitoringMetricsPeriodKey]; found {
 						if metricsPeriodStr, ok := metricsPeriod.(string); ok {
 							metricsCollectionIntervalString = metricsPeriodStr
+						}
+					}
+
+					if policyFailureThresholdRaw, found := monitoringMap[failureThresholdKey]; found {
+						switch policyValue := policyFailureThresholdRaw.(type) {
+						case uint:
+							failureThreshold = &policyValue
+						case int:
+							unsignedValue := uint(policyValue)
+							failureThreshold = &unsignedValue
+						case string:
+							parsedPolicyValue, err := strconv.Atoi(policyValue)
+							if err != nil {
+								return nil, fmt.Errorf("failed to convert policy failure threshold string to int: %w", err)
+							}
+							uintPolicyValue := uint(parsedPolicyValue)
+							failureThreshold = &uintPolicyValue
+						default:
+							return nil, fmt.Errorf("unsupported type for policy failure threshold: %T", policyFailureThresholdRaw)
 						}
 					}
 				}
@@ -173,7 +199,7 @@ func (b *BeatsMonitor) MonitoringConfig(
 	}
 
 	if b.config.C.MonitorMetrics {
-		if err := b.injectMetricsInput(cfg, componentIDToBinary, components, componentIDPidMap, metricsCollectionIntervalString); err != nil {
+		if err := b.injectMetricsInput(cfg, componentIDToBinary, components, componentIDPidMap, metricsCollectionIntervalString, failureThreshold); err != nil {
 			return nil, errors.New(err, "failed to inject monitoring output")
 		}
 	}
@@ -556,12 +582,20 @@ func (b *BeatsMonitor) injectMetricsInput(
 	componentList []component.Component,
 	existingStateServicePids map[string]uint64,
 	metricsCollectionIntervalString string,
+	failureThreshold *uint,
 ) error {
 	if metricsCollectionIntervalString == "" {
 		metricsCollectionIntervalString = defaultMetricsCollectionInterval.String()
 	}
+
+	if failureThreshold == nil {
+		defaultValue := defaultMetricsStreamFailureThreshold
+		failureThreshold = &defaultValue
+	}
 	monitoringNamespace := b.monitoringNamespace()
 	fixedAgentName := strings.ReplaceAll(agentName, "-", "_")
+	// beatStreams and streams MUST be []interface{} even if in reality they are []map[string]interface{}:
+	// if those are declared as slices of maps the message "proto: invalid type: []map[string]interface{}" will pop up
 	beatsStreams := make([]interface{}, 0, len(componentIDToBinary))
 	streams := []interface{}{
 		map[string]interface{}{
@@ -866,6 +900,7 @@ func (b *BeatsMonitor) injectMetricsInput(
 
 	}
 
+<<<<<<< HEAD
 	shipperHTTPStreams := []interface{}{}
 	// the shipper is listed in componentList, but not componentIDToBinary
 	// iterate over the full component list, adding a monitoring output for every shipper binary.
@@ -906,6 +941,24 @@ func (b *BeatsMonitor) injectMetricsInput(
 					"period":     metricsCollectionIntervalString,
 					"processors": createProcessorsForJSONInput(name, comp.ID, monitoringNamespace, b.agentInfo),
 				})
+=======
+	if failureThreshold != nil {
+		// add failure threshold to all streams and beatStreams
+		for _, s := range streams {
+			if streamMap, ok := s.(map[string]interface{}); ok {
+				streamMap[failureThresholdKey] = *failureThreshold
+			} else {
+				return fmt.Errorf("unable to set %s: %d in monitoring stream %q: unexpected type %T", failureThresholdKey, *failureThreshold, s, s)
+			}
+
+		}
+		for _, s := range beatsStreams {
+			if streamMap, ok := s.(map[string]interface{}); ok {
+				streamMap[failureThresholdKey] = *failureThreshold
+			} else {
+				return fmt.Errorf("unable to set %s: %d in monitoring stream %q: unexpected type %T", failureThresholdKey, *failureThreshold, s, s)
+			}
+>>>>>>> 2a4650974e (Add failureThreshold to elastic-agent self-monitoring config (#5999))
 		}
 	}
 
