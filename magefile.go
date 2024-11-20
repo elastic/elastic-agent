@@ -3446,6 +3446,12 @@ func (Helm) RenderExamples() error {
 			maps.Copy(helmValues, data)
 		}
 
+		lintAction := action.NewLint()
+		lintResult := lintAction.Run([]string{helmChartPath}, helmValues)
+		if len(lintResult.Errors) > 0 {
+			return fmt.Errorf("failed to lint helm chart for example %s: %w", exampleFullPath, errors.Join(lintResult.Errors...))
+		}
+
 		installAction := action.NewInstall(actionConfig)
 		installAction.Namespace = "default"
 		installAction.ReleaseName = "example"
