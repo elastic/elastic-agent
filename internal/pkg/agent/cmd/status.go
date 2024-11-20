@@ -96,6 +96,13 @@ func formatStatus(state client.State, message string) string {
 	return fmt.Sprintf("status: (%s) %s", state, message)
 }
 
+func formatComponentStatus(component *client.CollectorComponent) string {
+	if component.Error != "" {
+		return fmt.Sprintf("status: %s [%s]", component.Status, component.Error)
+	}
+	return fmt.Sprintf("status: %s", component.Status)
+}
+
 func listComponentState(l list.Writer, components []client.ComponentState, all bool) {
 	for _, c := range components {
 		// see if any unit is not Healthy because component
@@ -134,6 +141,27 @@ func listComponentState(l list.Writer, components []client.ComponentState, all b
 	}
 }
 
+func listCollectorState(l list.Writer, id string, component *client.CollectorComponent) {
+	if component == nil {
+		return
+	}
+	l.AppendItem(id)
+	l.Indent()
+	l.AppendItem(formatComponentStatus(component))
+	if len(component.ComponentStatusMap) > 0 {
+		// list in order
+		keys := make([]string, 0, len(component.ComponentStatusMap))
+		for k := range component.ComponentStatusMap {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			listCollectorState(l, k, component.ComponentStatusMap[k])
+		}
+	}
+	l.UnIndent()
+}
+
 func listAgentState(l list.Writer, state *client.AgentState, all bool) {
 	l.AppendItem("elastic-agent")
 	l.Indent()
@@ -148,6 +176,21 @@ func listAgentState(l list.Writer, state *client.AgentState, all bool) {
 	}
 	l.UnIndent()
 	listComponentState(l, state.Components, all)
+	if state.Collector != nil {
+		l.Indent()
+		if len(state.Collector.ComponentStatusMap) > 0 {
+			// list in order
+			keys := make([]string, 0, len(state.Collector.ComponentStatusMap))
+			for k := range state.Collector.ComponentStatusMap {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			for _, k := range keys {
+				listCollectorState(l, k, state.Collector.ComponentStatusMap[k])
+			}
+		}
+		l.UnIndent()
+	}
 
 	// Upgrade details
 	listUpgradeDetails(l, state.UpgradeDetails)
