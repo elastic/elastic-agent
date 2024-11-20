@@ -70,6 +70,13 @@ resource "ec_deployment" "integration-testing" {
   kibana = {
     size       = "1g"
     zone_count = 1
+    config = {
+      user_settings_json = jsonencode({
+        "xpack.fleet.enableExperimental"                          = ["agentTamperProtectionEnabled"]
+        "xpack.fleet.internal.registry.kibanaVersionCheckEnabled" = false
+        "server.restrictInternalApis"                             = false
+      })
+    }
   }
 
   integrations_server = {
