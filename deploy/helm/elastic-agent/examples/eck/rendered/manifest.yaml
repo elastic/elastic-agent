@@ -9,8 +9,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 5cd2518b4e ([helm] remove unsupported Release fields for publishing the chart as an EKS addon (#6079))
   annotations:
     eck.k8s.elastic.co/license: basic
 ---
@@ -24,8 +28,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 5cd2518b4e ([helm] remove unsupported Release fields for publishing the chart as an EKS addon (#6079))
   annotations:
     eck.k8s.elastic.co/license: basic
 ---
@@ -39,8 +47,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 5cd2518b4e ([helm] remove unsupported Release fields for publishing the chart as an EKS addon (#6079))
   annotations:
     eck.k8s.elastic.co/license: basic
 ---
@@ -54,8 +66,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 5cd2518b4e ([helm] remove unsupported Release fields for publishing the chart as an EKS addon (#6079))
   annotations:
     eck.k8s.elastic.co/license: basic
 stringData:
@@ -107,8 +123,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 5cd2518b4e ([helm] remove unsupported Release fields for publishing the chart as an EKS addon (#6079))
   annotations:
     eck.k8s.elastic.co/license: basic
 stringData:
@@ -397,8 +417,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 5cd2518b4e ([helm] remove unsupported Release fields for publishing the chart as an EKS addon (#6079))
   annotations:
     eck.k8s.elastic.co/license: basic
 stringData:
@@ -575,8 +599,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 5cd2518b4e ([helm] remove unsupported Release fields for publishing the chart as an EKS addon (#6079))
   annotations:
     eck.k8s.elastic.co/license: basic
 rules:
@@ -700,8 +728,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 5cd2518b4e ([helm] remove unsupported Release fields for publishing the chart as an EKS addon (#6079))
   annotations:
     eck.k8s.elastic.co/license: basic
 rules:
@@ -934,8 +966,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 5cd2518b4e ([helm] remove unsupported Release fields for publishing the chart as an EKS addon (#6079))
   annotations:
     eck.k8s.elastic.co/license: basic
 rules:
@@ -1017,8 +1053,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 5cd2518b4e ([helm] remove unsupported Release fields for publishing the chart as an EKS addon (#6079))
   annotations:
     eck.k8s.elastic.co/license: basic
 subjects:
@@ -1039,8 +1079,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 5cd2518b4e ([helm] remove unsupported Release fields for publishing the chart as an EKS addon (#6079))
   annotations:
     eck.k8s.elastic.co/license: basic
 subjects:
@@ -1061,8 +1105,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 5cd2518b4e ([helm] remove unsupported Release fields for publishing the chart as an EKS addon (#6079))
   annotations:
     eck.k8s.elastic.co/license: basic
 subjects:
@@ -1084,8 +1132,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 5cd2518b4e ([helm] remove unsupported Release fields for publishing the chart as an EKS addon (#6079))
   annotations:
     eck.k8s.elastic.co/license: basic
 spec:
@@ -1187,8 +1239,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 5cd2518b4e ([helm] remove unsupported Release fields for publishing the chart as an EKS addon (#6079))
   annotations:
     eck.k8s.elastic.co/license: basic
 spec:
@@ -1256,8 +1312,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 5cd2518b4e ([helm] remove unsupported Release fields for publishing the chart as an EKS addon (#6079))
   annotations:
     eck.k8s.elastic.co/license: basic
 spec:

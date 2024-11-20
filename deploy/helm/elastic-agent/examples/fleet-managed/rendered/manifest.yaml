@@ -9,8 +9,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 5cd2518b4e ([helm] remove unsupported Release fields for publishing the chart as an EKS addon (#6079))
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -22,8 +26,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 5cd2518b4e ([helm] remove unsupported Release fields for publishing the chart as an EKS addon (#6079))
 stringData:
 
   agent.yml: |-
@@ -43,8 +51,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 5cd2518b4e ([helm] remove unsupported Release fields for publishing the chart as an EKS addon (#6079))
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
     resources:
@@ -150,8 +162,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 5cd2518b4e ([helm] remove unsupported Release fields for publishing the chart as an EKS addon (#6079))
 subjects:
   - kind: ServiceAccount
     name: agent-nginx-example
@@ -171,8 +187,12 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.16.1
     app.kubernetes.io/managed-by: Helm
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 5cd2518b4e ([helm] remove unsupported Release fields for publishing the chart as an EKS addon (#6079))
 spec:
   selector:
     matchLabels:
