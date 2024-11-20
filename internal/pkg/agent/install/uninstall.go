@@ -90,17 +90,18 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 		}
 	}
 
-	// Skip on Windows because of https://github.com/elastic/elastic-agent/issues/5952
-	// Once the root-cause is identified then this can be re-enabled on Windows.
-	// Notify fleet-server while it is still running if it's running locally
-	if notifyFleet && localFleet && runtime.GOOS != "windows" {
-		notifyFleetAuditUninstall(ctx, log, pt, cfg, ai) //nolint:errcheck // ignore the error as we can't act on it
-	}
 	// ensure service is stopped
 	status, err := EnsureStoppedService(topPath, pt)
 	if err != nil {
 		// context for the error already provided in the EnsureStoppedService function
 		return err
+	}
+
+	// Skip on Windows because of https://github.com/elastic/elastic-agent/issues/5952
+	// Once the root-cause is identified then this can be re-enabled on Windows.
+	// Notify fleet-server while it is still running if it's running locally
+	if notifyFleet && localFleet && runtime.GOOS != "windows" {
+		notifyFleetAuditUninstall(ctx, log, pt, cfg, ai) //nolint:errcheck // ignore the error as we can't act on it
 	}
 
 	// kill any running watcher

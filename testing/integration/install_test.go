@@ -351,8 +351,8 @@ func testUninstallAuditUnenroll(ctx context.Context, fixture *atesting.Fixture, 
 		require.NotEmpty(t, agentID, "agent ID empty")
 
 		out, err := fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+		t.Logf("uninstall output: %s", out)
 		if err != nil {
-			t.Logf("uninstall output: %s", out)
 			require.NoError(t, err)
 		}
 
@@ -371,7 +371,7 @@ func testUninstallAuditUnenroll(ctx context.Context, fixture *atesting.Fixture, 
 		}
 		err = json.Unmarshal(p, &res)
 		require.NoError(t, err)
-		require.Equalf(t, "uninstall", res.Source.AuditUnenrolledReason, "Agent doc: %s\nUninstall output: %s", p, out)
+		require.Equal(t, "uninstall", res.Source.AuditUnenrolledReason)
 	}
 }
 
