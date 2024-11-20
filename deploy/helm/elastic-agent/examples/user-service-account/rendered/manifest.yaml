@@ -10,7 +10,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.17.0
-    app.kubernetes.io/managed-by: Helm
 stringData:
 
   agent.yml: |-
@@ -68,7 +67,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.17.0
-    app.kubernetes.io/managed-by: Helm
 stringData:
 
   agent.yml: |-
@@ -363,7 +361,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.17.0
-    app.kubernetes.io/managed-by: Helm
 stringData:
 
   agent.yml: |-
@@ -546,7 +543,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.17.0
-    app.kubernetes.io/managed-by: Helm
   annotations:
     elastic-agent.k8s.elastic.co/cr: nginx
 rules:
@@ -671,7 +667,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.17.0
-    app.kubernetes.io/managed-by: Helm
   annotations:
     elastic-agent.k8s.elastic.co/cr: nginx
 rules:
@@ -905,7 +900,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.17.0
-    app.kubernetes.io/managed-by: Helm
   annotations:
     elastic-agent.k8s.elastic.co/cr: nginx
 rules:
@@ -988,7 +982,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.17.0
-    app.kubernetes.io/managed-by: Helm
 subjects:
   - kind: ServiceAccount
     name: user-sa-clusterWide
@@ -1008,7 +1001,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.17.0
-    app.kubernetes.io/managed-by: Helm
 subjects:
   - kind: ServiceAccount
     name: user-sa-ksmSharded
@@ -1028,7 +1020,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.17.0
-    app.kubernetes.io/managed-by: Helm
 subjects:
   - kind: ServiceAccount
     name: user-sa-perNode
@@ -1049,7 +1040,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.17.0
-    app.kubernetes.io/managed-by: Helm
 spec:
   selector:
     matchLabels:
@@ -1169,7 +1159,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.17.0
-    app.kubernetes.io/managed-by: Helm
 spec:
   selector:
     matchLabels:
@@ -1251,7 +1240,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.17.0
-    app.kubernetes.io/managed-by: Helm
 spec:
   selector:
     matchLabels:
