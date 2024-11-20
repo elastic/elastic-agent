@@ -16,7 +16,7 @@ summary: Added support for pre-existing Active Directory user for unprivileged m
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-description: User can specify custom pre-existing user for running unprivileged mode. This user will be gived permissions to log on as a service.
+description: User can specify custom pre-existing user for running unprivileged mode. This user will be given permissions to log on as a service.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component:
