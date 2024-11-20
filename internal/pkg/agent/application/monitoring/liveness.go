@@ -9,7 +9,11 @@ import (
 	"net/http"
 	"time"
 
+	"go.opentelemetry.io/collector/component/componentstatus"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+
+	"github.com/elastic/elastic-agent/internal/pkg/otel/otelhelpers"
 )
 
 const formValueKey = "failon"
@@ -76,6 +80,11 @@ func livenessHandler(coord CoordinatorState) func(http.ResponseWriter, *http.Req
 		unhealthyComponent := false
 		for _, comp := range state.Components {
 			if (failConfig.Failed && comp.State.State == client.UnitStateFailed) || (failConfig.Degraded && comp.State.State == client.UnitStateDegraded) {
+				unhealthyComponent = true
+			}
+		}
+		if state.Collector != nil {
+			if (failConfig.Failed && (otelhelpers.HasStatus(state.Collector, componentstatus.StatusFatalError) || otelhelpers.HasStatus(state.Collector, componentstatus.StatusPermanentError))) || (failConfig.Degraded && otelhelpers.HasStatus(state.Collector, componentstatus.StatusRecoverableError)) {
 				unhealthyComponent = true
 			}
 		}
