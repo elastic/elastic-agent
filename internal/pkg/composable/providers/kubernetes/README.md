@@ -63,7 +63,7 @@ What makes this input block dynamic are the variables under hosts block and the 
 
 #### High level description
 
-The Kubernetes provider watches for Kubernetes resources and generates mappings from them (similar to events in beats provider). The mappings include those variables([list of variables](https://www.elastic.co/guide/en/fleet/current/kubernetes-provider.html#_provider_for_pod_resources)) for each k8s resource with unique value for each one of them.
+The Kubernetes provider watches for Kubernetes resources and generates mappings from them (similar to events in beats provider). The mappings include those variables ([list of variables](https://www.elastic.co/guide/en/fleet/current/kubernetes-provider.html#_provider_for_pod_resources)) for each k8s resource with unique value for each one of them.
 
 Agent [composable controller](https://github.com/elastic/elastic-agent/blob/f994f5bfdf68db27902a4175c3b655b4d611cf7c/internal/pkg/composable/controller.go#L117) which controls all the providers [receives](https://github.com/elastic/elastic-agent/blob/f994f5bfdf68db27902a4175c3b655b4d611cf7c/internal/pkg/composable/controller.go#L371) these mappings and tries to match them with the input blocks of the configurations.
 
