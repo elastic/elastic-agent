@@ -2036,12 +2036,11 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 	// branches = append([]string{"master"}, branches...)
 
 	reqs := upgradetest.VersionRequirements{
-		UpgradeToVersion:    bversion.Agent,
-		CurrentMajors:       1,
-		PreviousMinors:      2,
-		PreviousMajors:      1,
-		SnapshotBranches:    branches,
-		IndependentReleases: 1,
+		UpgradeToVersion: bversion.Agent,
+		CurrentMajors:    1,
+		PreviousMinors:   2,
+		PreviousMajors:   1,
+		SnapshotBranches: branches,
 	}
 	b, _ := json.MarshalIndent(reqs, "", "  ")
 	fmt.Println(string(b))

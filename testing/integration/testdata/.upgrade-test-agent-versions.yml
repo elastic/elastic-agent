@@ -7,5 +7,4 @@
 testVersions:
   - 8.16.0
   - 8.15.4
-  - 8.15.3+build202411051926
   - 7.17.26-SNAPSHOT
