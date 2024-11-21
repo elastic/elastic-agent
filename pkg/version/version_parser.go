@@ -160,8 +160,9 @@ func (psv ParsedSemVer) Less(other ParsedSemVer) bool {
 		return psv.patch < other.patch
 	}
 
-	if (psv.IsIndependentRelease() || other.IsIndependentRelease()) && psv.compareIndependentBuild(other) {
-		return true
+	if psv.IsIndependentRelease() || other.IsIndependentRelease() {
+		// one of them is independent release let's compare those
+		return psv.compareIndependentBuild(other)
 	}
 
 	// compare prerelease strings as major.minor.patch are equal
