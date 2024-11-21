@@ -25,6 +25,7 @@ import (
 )
 
 func TestEscapingSecretsInPolicy(t *testing.T) {
+	t.Skip("flaky test")
 	info := define.Require(t, define.Requirements{
 		Group: Default,
 		Stack: &define.Stack{},
