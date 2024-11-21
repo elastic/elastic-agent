@@ -30,7 +30,7 @@ func TestEscapingSecretsInPolicy(t *testing.T) {
 		Stack: &define.Stack{},
 		Sudo:  true,
 	})
-	t.Skip("flaky test")
+	t.Skip("flaky test: https://github.com/elastic/elastic-agent/issues/6107")
 	ctx := context.Background()
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
