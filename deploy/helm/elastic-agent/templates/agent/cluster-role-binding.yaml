@@ -1,8 +1,9 @@
 {{- include "elasticagent.init" $ -}}
 {{- range $presetName, $presetVal := $.Values.agent.presets -}}
-{{- if or (eq $presetVal.clusterRole.create true) (eq $presetVal.serviceAccount.create true) -}}
+{{- if or ($presetVal).clusterRole.create ($presetVal).clusterRole.name  -}}
+{{- if or ($presetVal).serviceAccount.create ($presetVal).serviceAccount.name -}}
 {{/* cluster role binding is not namespace bound so let's try to give it a unique enough name */}}
-{{- $clusterRoleName := printf "agent-%s-%s-%s" $presetName $.Release.Name $.Release.Namespace -}}
+{{- $clusterRoleName := printf "agent-%s-%s-%s" $presetName $.Release.Name $.Release.Namespace }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -33,5 +34,6 @@ roleRef:
   {{- end }}
   apiGroup: rbac.authorization.k8s.io
 ---
+{{- end }}
 {{- end }}
 {{- end }}

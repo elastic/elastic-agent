@@ -10,7 +10,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.17.0
-    app.kubernetes.io/managed-by: Helm
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -23,7 +22,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.17.0
-    app.kubernetes.io/managed-by: Helm
 stringData:
 
   agent.yml: |-
@@ -188,7 +186,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.17.0
-    app.kubernetes.io/managed-by: Helm
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
     resources:
@@ -269,7 +266,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.17.0
-    app.kubernetes.io/managed-by: Helm
 subjects:
   - kind: ServiceAccount
     name: agent-pernode-example
@@ -290,7 +286,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.17.0
-    app.kubernetes.io/managed-by: Helm
 spec:
   selector:
     matchLabels:
