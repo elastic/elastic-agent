@@ -19,13 +19,13 @@ patches:
         spec:
           initContainers:
             - name: k8s-templates-downloader
-              image: docker.elastic.co/beats/elastic-agent:8.17.0
+              image: docker.elastic.co/beats/elastic-agent:8.18.0
               command: ['bash']
               args:
                 - -c
                 - >-
                   mkdir -p /etc/elastic-agent/inputs.d &&
-                  curl -sL https://github.com/elastic/elastic-agent/archive/8.17.tar.gz | tar xz -C /etc/elastic-agent/inputs.d --strip=5 "elastic-agent-8.17/deploy/kubernetes/elastic-agent-standalone/templates.d"
+                  curl -sL https://github.com/elastic/elastic-agent/archive/8.18.tar.gz | tar xz -C /etc/elastic-agent/inputs.d --strip=5 "elastic-agent-8.18/deploy/kubernetes/elastic-agent-standalone/templates.d"
               volumeMounts:
                 - mountPath: /etc/elastic-agent/inputs.d
                   name: external-inputs
