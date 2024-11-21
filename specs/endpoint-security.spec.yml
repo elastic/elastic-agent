@@ -59,6 +59,8 @@ inputs:
     proxied_actions: *proxied_actions
     runtime:
       preventions:
+        - condition: ${runtime.arch} != ${runtime.native_arch}
+          message: "Elastic Defend cannot run on an emulated architecture"
         - condition: ${user.root} == false
           message: "Elastic Defend requires Elastic Agent be running as root"
         - condition: ${install.in_default} == false
