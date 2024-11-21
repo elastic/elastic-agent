@@ -135,6 +135,15 @@ func (psv ParsedSemVer) IsIndependentRelease() bool {
 	return err == nil && matched
 }
 
+func (psv ParsedSemVer) IndependentBuildID() string {
+	r := regexp.MustCompile(IsIndependentReleaseFormat)
+	if matches := r.FindAllString(psv.buildMetadata, -1); len(matches) > 0 {
+		return matches[0]
+	}
+
+	return ""
+}
+
 func (psv ParsedSemVer) Less(other ParsedSemVer) bool {
 	// compare major version
 	if psv.major != other.major {
@@ -151,8 +160,30 @@ func (psv ParsedSemVer) Less(other ParsedSemVer) bool {
 		return psv.patch < other.patch
 	}
 
+	if (psv.IsIndependentRelease() || other.IsIndependentRelease()) && psv.compareIndependentBuild(other) {
+		return true
+	}
+
 	// compare prerelease strings as major.minor.patch are equal
 	return psv.comparePrerelease(other)
+}
+
+func (psv ParsedSemVer) compareIndependentBuild(other ParsedSemVer) bool {
+	// spare regex parsing
+	psvIsIndependent := psv.IsIndependentRelease()
+	otherIsIndependent := other.IsIndependentRelease()
+
+	if !psvIsIndependent && !otherIsIndependent {
+		return false
+	}
+
+	if psvIsIndependent != otherIsIndependent {
+		// independent release is always newer
+		return !psvIsIndependent
+	}
+
+	// compare build IDs
+	return psv.IndependentBuildID() < other.IndependentBuildID()
 }
 
 // comparePrerelease compares the prerelease part of 2 ParsedSemVer objects
