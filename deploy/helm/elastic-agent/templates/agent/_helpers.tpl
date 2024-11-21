@@ -203,7 +203,6 @@ Common labels
 {{- define "elasticagent.labels" -}}
 helm.sh/chart: {{ include "elasticagent.chart" . }}
 {{ include "elasticagent.selectorLabels" . }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
