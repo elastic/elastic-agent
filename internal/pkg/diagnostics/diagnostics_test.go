@@ -164,7 +164,33 @@ inputs:
 outputs:
     default:
         api_key: <REDACTED>
-        redactOtherKey: secretOutputValue
+        redactOtherKey: <REDACTED>
+        type: elasticsearch
+`,
+	}, {
+		name: "uppercase fields are redacted",
+		input: []byte(`id: test-policy
+inputs:
+  - type: test_input
+outputs:
+  default:
+    type: elasticsearch
+    api_key: secretKey
+    Certificate: secretCert
+    PassPhrase: secretPassphrase
+    PASSWORD: secretPassword
+    tOkEn: secretToken
+`),
+		expect: `id: test-policy
+inputs:
+    - type: test_input
+outputs:
+    default:
+        Certificate: <REDACTED>
+        PASSWORD: <REDACTED>
+        PassPhrase: <REDACTED>
+        api_key: <REDACTED>
+        tOkEn: <REDACTED>
         type: elasticsearch
 `,
 	}, {
