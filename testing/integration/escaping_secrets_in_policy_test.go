@@ -25,12 +25,12 @@ import (
 )
 
 func TestEscapingSecretsInPolicy(t *testing.T) {
-	t.Skip("flaky test")
 	info := define.Require(t, define.Requirements{
 		Group: Default,
 		Stack: &define.Stack{},
 		Sudo:  true,
 	})
+	t.Skip("flaky test")
 	ctx := context.Background()
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
