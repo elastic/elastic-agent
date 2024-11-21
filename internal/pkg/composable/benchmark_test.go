@@ -5,11 +5,12 @@
 package composable
 
 import (
-	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -64,8 +65,10 @@ func BenchmarkGenerateVars100Pods(b *testing.B) {
 			}
 			c.dynamicProviders[providerName] = providerState
 		} else {
+			providerAst, err := transpiler.NewAST(providerData[providerName])
+			require.NoError(b, err)
 			providerState := &contextProviderState{
-				mapping: providerData[providerName],
+				mapping: providerAst,
 			}
 			c.contextProviders[providerName] = providerState
 		}

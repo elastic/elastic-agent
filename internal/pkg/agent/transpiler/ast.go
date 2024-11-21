@@ -825,6 +825,9 @@ func (a *AST) HashStr() string {
 
 // Equal check if two AST are equals by using the computed hash.
 func (a *AST) Equal(other *AST) bool {
+	if a.root == nil || other.root == nil {
+		return a.root == other.root
+	}
 	return bytes.Equal(a.Hash(), other.Hash())
 }
 

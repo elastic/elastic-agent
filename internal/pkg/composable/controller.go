@@ -79,10 +79,12 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 		if err != nil {
 			return nil, errors.New(err, fmt.Sprintf("failed to build provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
 		}
+		emptyMapping, _ := transpiler.NewAST(nil)
 		contextProviders[name] = &contextProviderState{
 			// Safe for Context to be nil here because it will be filled in
 			// by (*controller).Run before the provider is started.
 			provider: provider,
+			mapping:  emptyMapping,
 		}
 	}
 
@@ -275,18 +277,16 @@ func (c *controller) Close() {
 func (c *controller) generateVars(fetchContextProviders mapstr.M) []*transpiler.Vars {
 	// build the vars list of mappings
 	vars := make([]*transpiler.Vars, 1)
-	mapping := map[string]interface{}{}
+	mapping, _ := transpiler.NewAST(map[string]any{})
 	for name, state := range c.contextProviders {
-		mapping[name] = state.Current()
+		_ = mapping.Insert(state.Current(), name)
 	}
-	// this is ensured not to error, by how the mappings states are verified
-	mappingAst, _ := transpiler.NewAST(mapping)
-	vars[0] = transpiler.NewVarsFromAst("", mappingAst, fetchContextProviders)
+	vars[0] = transpiler.NewVarsFromAst("", mapping, fetchContextProviders)
 
 	// add to the vars list for each dynamic providers mappings
 	for name, state := range c.dynamicProviders {
 		for _, mappings := range state.Mappings() {
-			local := mappingAst.ShallowClone()
+			local := mapping.ShallowClone()
 			_ = local.Insert(mappings.mapping, name)
 			id := fmt.Sprintf("%s-%s", name, mappings.id)
 			v := transpiler.NewVarsWithProcessorsFromAst(id, local, name, mappings.processors, fetchContextProviders)
@@ -301,7 +301,7 @@ type contextProviderState struct {
 
 	provider corecomp.ContextProvider
 	lock     sync.RWMutex
-	mapping  map[string]interface{}
+	mapping  *transpiler.AST
 	signal   chan bool
 }
 
@@ -323,12 +323,7 @@ func (c *contextProviderState) Signal() {
 // Set sets the current mapping.
 func (c *contextProviderState) Set(mapping map[string]interface{}) error {
 	var err error
-	mapping, err = cloneMap(mapping)
-	if err != nil {
-		return err
-	}
-	// ensure creating vars will not error
-	_, err = transpiler.NewVars("", mapping, nil)
+	ast, err := transpiler.NewAST(mapping)
 	if err != nil {
 		return err
 	}
@@ -336,17 +331,17 @@ func (c *contextProviderState) Set(mapping map[string]interface{}) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if reflect.DeepEqual(c.mapping, mapping) {
+	if c.mapping != nil && c.mapping.Equal(ast) {
 		// same mapping; no need to update and signal
 		return nil
 	}
-	c.mapping = mapping
+	c.mapping = ast
 	c.Signal()
 	return nil
 }
 
 // Current returns the current mapping.
-func (c *contextProviderState) Current() map[string]interface{} {
+func (c *contextProviderState) Current() *transpiler.AST {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	return c.mapping
@@ -449,22 +444,6 @@ func (c *dynamicProviderState) Mappings() []dynamicProviderMapping {
 		}
 	}
 	return mappings
-}
-
-func cloneMap(source map[string]interface{}) (map[string]interface{}, error) {
-	if source == nil {
-		return nil, nil
-	}
-	bytes, err := json.Marshal(source)
-	if err != nil {
-		return nil, fmt.Errorf("failed to clone: %w", err)
-	}
-	var dest map[string]interface{}
-	err = json.Unmarshal(bytes, &dest)
-	if err != nil {
-		return nil, fmt.Errorf("failed to clone: %w", err)
-	}
-	return dest, nil
 }
 
 func cloneMapArray(source []map[string]interface{}) ([]map[string]interface{}, error) {
