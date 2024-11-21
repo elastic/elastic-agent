@@ -44,7 +44,7 @@ func (c *dynamicProvider) Run(comm composable.DynamicProviderComm) error {
 func DynamicProviderBuilder(_ *logger.Logger, c *config.Config, _ bool) (composable.DynamicProvider, error) {
 	p := &dynamicProvider{}
 	if c != nil {
-		err := c.Unpack(p)
+		err := c.UnpackTo(p)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unpack vars: %w", err)
 		}

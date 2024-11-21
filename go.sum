@@ -1153,6 +1153,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.113.0 
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.113.0/go.mod h1:X25Nhlw6xhuNSd/C0FeEwmD4PGmcXDl7pa2jR0UREkU=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.114.0 h1:Xr3Hvm9cxOSQX94tLX1yX63uvuvtglJICrOz9YcxiuI=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.114.0/go.mod h1:cgIgmEg66RhVtAv4JkIhHdy70kn2EtVhrH8CtyvhfuI=
+github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.114.0 h1:00yFkUPHw/weDMMQ/XFDU1RF7Z6lZ8i2oUD5P2cXPaI=
+github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.114.0/go.mod h1:5JwSzQWnz0K4iO6/q9++0rdSoFhZFB3R/rmGHVd7iWc=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/jaeger v0.114.0 h1:WymtAsFHYen4GTTTXvVqZCoMz6vPADYUf4xIP0Gvm+E=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/jaeger v0.114.0/go.mod h1:FcTNci+LpU5x5FkHM0Su3k6/ESDHWQsL30AFISzaIyk=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheus v0.114.0 h1:eJxap/u8Q5wYnBcJTrTS1Tq6wq31SOlIr+FMJX5ZoC8=
