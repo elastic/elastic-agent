@@ -838,6 +838,74 @@ func TestHash(t *testing.T) {
 	}
 }
 
+func TestShallowClone(t *testing.T) {
+	tests := map[string]struct {
+		input *AST
+	}{
+		"dict": {
+			input: &AST{
+				root: &Dict{
+					value: []Node{
+						&Key{name: "integer", value: &IntVal{value: 1}},
+						&Key{name: "float", value: &FloatVal{value: 1.1234}},
+						&Key{name: "bool1", value: &BoolVal{value: true}},
+					},
+				},
+			},
+		},
+		"list": {
+			input: &AST{
+				root: &List{
+					value: []Node{
+						&IntVal{value: 1},
+						&FloatVal{value: 1.1234},
+						&BoolVal{value: true},
+					},
+				},
+			},
+		},
+		"key": {
+			input: &AST{
+				root: &Key{name: "integer", value: &IntVal{value: 1}},
+			},
+		},
+		"str": {
+			input: &AST{
+				root: &StrVal{value: "value"},
+			},
+		},
+		"bool": {
+			input: &AST{
+				root: &BoolVal{value: true},
+			},
+		},
+		"integer": {
+			input: &AST{
+				root: &IntVal{value: 1},
+			},
+		},
+		"float": {
+			input: &AST{
+				root: &FloatVal{value: 1.1234},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			cloned := test.input.ShallowClone()
+			assert.Equal(t, test.input, cloned)
+			err := test.input.Insert(&AST{root: &BoolVal{value: true}}, "key")
+			if err == nil {
+				assert.NotEqual(t, test.input, cloned)
+			} else if list, ok := test.input.root.(*List); ok {
+				list.value = append(list.value, &IntVal{value: 7})
+				assert.NotEqual(t, test.input, cloned)
+			}
+		})
+	}
+}
+
 func mustMakeVars(mapping map[string]interface{}) *Vars {
 	v, err := NewVars("", mapping, nil)
 	if err != nil {

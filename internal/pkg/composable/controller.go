@@ -291,6 +291,34 @@ func (c *controller) Close() {
 	}
 }
 
+<<<<<<< HEAD
+=======
+func (c *controller) generateVars(fetchContextProviders mapstr.M) []*transpiler.Vars {
+	// build the vars list of mappings
+	vars := make([]*transpiler.Vars, 1)
+	mapping := map[string]interface{}{}
+	for name, state := range c.contextProviders {
+		mapping[name] = state.Current()
+	}
+	// this is ensured not to error, by how the mappings states are verified
+	mappingAst, _ := transpiler.NewAST(mapping)
+	vars[0] = transpiler.NewVarsFromAst("", mappingAst, fetchContextProviders)
+
+	// add to the vars list for each dynamic providers mappings
+	for name, state := range c.dynamicProviders {
+		for _, mappings := range state.Mappings() {
+			local := mappingAst.ShallowClone()
+			dynamicAst, _ := transpiler.NewAST(mappings.mapping)
+			_ = local.Insert(dynamicAst, name)
+			id := fmt.Sprintf("%s-%s", name, mappings.id)
+			v := transpiler.NewVarsWithProcessorsFromAst(id, local, name, mappings.processors, fetchContextProviders)
+			vars = append(vars, v)
+		}
+	}
+	return vars
+}
+
+>>>>>>> db6fbe2429 (Don't deepcopy AST when generating vars (#6058))
 type contextProviderState struct {
 	context.Context
 
