@@ -55,7 +55,7 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 
 	var providersCfg Config
 	if c != nil {
-		err := c.Unpack(&providersCfg)
+		err := c.UnpackTo(&providersCfg)
 		if err != nil {
 			return nil, errors.New(err, "failed to unpack providers config", errors.TypeConfig)
 		}
@@ -280,16 +280,17 @@ func (c *controller) generateVars(fetchContextProviders mapstr.M) []*transpiler.
 		mapping[name] = state.Current()
 	}
 	// this is ensured not to error, by how the mappings states are verified
-	vars[0], _ = transpiler.NewVars("", mapping, fetchContextProviders)
+	mappingAst, _ := transpiler.NewAST(mapping)
+	vars[0] = transpiler.NewVarsFromAst("", mappingAst, fetchContextProviders)
 
 	// add to the vars list for each dynamic providers mappings
 	for name, state := range c.dynamicProviders {
 		for _, mappings := range state.Mappings() {
-			local, _ := cloneMap(mapping) // will not fail; already been successfully cloned once
-			local[name] = mappings.mapping
+			local := mappingAst.ShallowClone()
+			dynamicAst, _ := transpiler.NewAST(mappings.mapping)
+			_ = local.Insert(dynamicAst, name)
 			id := fmt.Sprintf("%s-%s", name, mappings.id)
-			// this is ensured not to error, by how the mappings states are verified
-			v, _ := transpiler.NewVarsWithProcessors(id, local, name, mappings.processors, fetchContextProviders)
+			v := transpiler.NewVarsWithProcessorsFromAst(id, local, name, mappings.processors, fetchContextProviders)
 			vars = append(vars, v)
 		}
 	}
