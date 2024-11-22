@@ -1149,8 +1149,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.114.0
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.114.0/go.mod h1:5qsGcjFV3WFI6J2onAlkR7Xd/8VtwJcECaDRZfW4Tb4=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/resourcetotelemetry v0.114.0 h1:PwUMZ6fHMEUV5i9hUly+z3UujDTTdxQtWzL0rWc/lgA=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/resourcetotelemetry v0.114.0/go.mod h1:YEHL6w4vvB9b0/lNwGjz8DyWXTF/7Xw0Hkgc3mGWwa8=
-github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.113.0 h1:Qy0MqQQKmW9wrfduM794WKg4qjTobIdj5HDHW5FZ/P8=
-github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.113.0/go.mod h1:X25Nhlw6xhuNSd/C0FeEwmD4PGmcXDl7pa2jR0UREkU=
+github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.114.0 h1:mtSN/07RGQPi1/zHVSZg4G0qRtOoJpPew5jsQWv9uS0=
+github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.114.0/go.mod h1:C9Zgh/N3j4NR2D+1FGAA1YizhFW9OS51DwLUFJTdXN4=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.114.0 h1:Xr3Hvm9cxOSQX94tLX1yX63uvuvtglJICrOz9YcxiuI=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.114.0/go.mod h1:cgIgmEg66RhVtAv4JkIhHdy70kn2EtVhrH8CtyvhfuI=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.114.0 h1:00yFkUPHw/weDMMQ/XFDU1RF7Z6lZ8i2oUD5P2cXPaI=
