@@ -9,7 +9,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.1
+    app.kubernetes.io/version: 8.16.2
 stringData:
 
   agent.yml: |-
@@ -64,7 +64,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.1
+    app.kubernetes.io/version: 8.16.2
 spec:
   selector:
     matchLabels:
@@ -93,7 +93,7 @@ spec:
               fieldPath: metadata.name
         - name: STATE_PATH
           value: /usr/share/elastic-agent/state
-        image: docker.elastic.co/beats/elastic-agent:8.16.1-SNAPSHOT
+        image: docker.elastic.co/beats/elastic-agent:8.16.2-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         securityContext:

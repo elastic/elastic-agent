@@ -325,13 +325,13 @@ extraIntegrations: {}
 agent:
   # -- elastic-agent version
   # @section -- 6 - Elastic-Agent Configuration
-  version: 8.16.1
+  version: 8.16.2
   # -- image configuration
   # @section -- 6 - Elastic-Agent Configuration
   image:
     repository: docker.elastic.co/beats/elastic-agent
     pullPolicy: IfNotPresent
-    tag: "8.16.1-SNAPSHOT"
+    tag: "8.16.2-SNAPSHOT"
   # -- image pull secrets
   # @section -- 3 - Elastic-Agent Configuration
   imagePullSecrets: []
