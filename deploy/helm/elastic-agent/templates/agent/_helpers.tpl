@@ -203,7 +203,6 @@ Common labels
 {{- define "elasticagent.labels" -}}
 helm.sh/chart: {{ include "elasticagent.chart" . }}
 {{ include "elasticagent.selectorLabels" . }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
@@ -284,10 +283,12 @@ app.kubernetes.io/version: {{ .Values.agent.version}}
 {{- $ := index . 0 -}}
 {{- $preset := index . 1 -}}
 {{- $templateName := index . 2 -}}
-{{- $presetRules := dig "rules" (list) $preset -}}
+{{- if eq ($preset).clusterRole.create true -}}
+{{- $presetClusterRoleRules := dig "rules" (list) ($preset).clusterRole -}}
 {{- $rulesToAdd := get (include $templateName $ | fromYaml) "rules" -}}
-{{- $presetRules = uniq (concat $presetRules $rulesToAdd) -}}
-{{- $_ := set $preset "rules" $presetRules -}}
+{{- $presetClusterRoleRules = uniq (concat $presetClusterRoleRules $rulesToAdd) -}}
+{{- $_ := set ($preset).clusterRole "rules" $presetClusterRoleRules -}}
+{{- end -}}
 {{- end -}}
 
 {{- define "elasticagent.preset.mutate.annotations" -}}

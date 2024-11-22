@@ -19,6 +19,7 @@ import (
 	"github.com/magefile/mage/mg"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
 	"github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -78,8 +79,10 @@ var backoffSchedule = []time.Duration{
 	10 * time.Second,
 }
 
-var errorInvalidManifestURL = errors.New("invalid ManifestURL provided")
-var errorNotAllowedManifestURL = errors.New("the provided ManifestURL is not allowed URL")
+var (
+	errorInvalidManifestURL    = errors.New("invalid ManifestURL provided")
+	errorNotAllowedManifestURL = errors.New("the provided ManifestURL is not allowed URL")
+)
 
 var AllowedManifestHosts = []string{"snapshots.elastic.co", "staging.elastic.co"}
 
@@ -95,28 +98,37 @@ var PlatformPackages = map[string]string{
 // The project names are those used in the "projects" list in the unified release manifest.
 // See the sample manifests in the testdata directory.
 var ExpectedBinaries = []BinarySpec{
-	{BinaryName: "agentbeat", ProjectName: "beats", Platforms: AllPlatforms},
-	{BinaryName: "apm-server", ProjectName: "apm-server", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}}},
-	{BinaryName: "cloudbeat", ProjectName: "cloudbeat", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
-	{BinaryName: "cloud-defend", ProjectName: "cloud-defend", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
-	{BinaryName: "connectors", ProjectName: "connectors", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PythonWheel: true},
-	{BinaryName: "endpoint-security", ProjectName: "endpoint-dev", Platforms: AllPlatforms},
-	{BinaryName: "fleet-server", ProjectName: "fleet-server", Platforms: AllPlatforms},
-	{BinaryName: "pf-elastic-collector", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
-	{BinaryName: "pf-elastic-symbolizer", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
-	{BinaryName: "pf-host-agent", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}},
+	{BinaryName: "agentbeat", ProjectName: "beats", Platforms: AllPlatforms, PackageTypes: pkgcommon.AllPackageTypes},
+	{BinaryName: "apm-server", ProjectName: "apm-server", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}}, PackageTypes: pkgcommon.AllPackageTypes},
+	{BinaryName: "cloudbeat", ProjectName: "cloudbeat", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PackageTypes: pkgcommon.AllPackageTypes},
+	{BinaryName: "connectors", ProjectName: "connectors", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PythonWheel: true, PackageTypes: pkgcommon.AllPackageTypes},
+	{BinaryName: "endpoint-security", ProjectName: "endpoint-dev", Platforms: AllPlatforms, PackageTypes: []pkgcommon.PackageType{pkgcommon.RPM, pkgcommon.Deb, pkgcommon.Zip, pkgcommon.TarGz}},
+	{BinaryName: "fleet-server", ProjectName: "fleet-server", Platforms: AllPlatforms, PackageTypes: pkgcommon.AllPackageTypes},
+	{BinaryName: "pf-elastic-collector", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PackageTypes: pkgcommon.AllPackageTypes},
+	{BinaryName: "pf-elastic-symbolizer", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PackageTypes: pkgcommon.AllPackageTypes},
+	{BinaryName: "pf-host-agent", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PackageTypes: pkgcommon.AllPackageTypes},
 }
 
 type BinarySpec struct {
-	BinaryName  string
-	ProjectName string
-	Platforms   []Platform
-	PythonWheel bool
+	BinaryName   string
+	ProjectName  string
+	Platforms    []Platform
+	PythonWheel  bool
+	PackageTypes []pkgcommon.PackageType
 }
 
 func (proj BinarySpec) SupportsPlatform(platform string) bool {
 	for _, p := range proj.Platforms {
 		if p.Platform() == platform {
+			return true
+		}
+	}
+	return false
+}
+
+func (proj BinarySpec) SupportsPackageType(pkgType pkgcommon.PackageType) bool {
+	for _, p := range proj.PackageTypes {
+		if p == pkgType {
 			return true
 		}
 	}
@@ -154,7 +166,7 @@ func DownloadManifest(ctx context.Context, manifest string) (Build, error) {
 	if urlError != nil {
 		return Build{}, errorInvalidManifestURL
 	}
-	var valid = false
+	valid := false
 	for _, manifestHost := range AllowedManifestHosts {
 		if manifestHost == manifestUrl.Host {
 			valid = true
@@ -316,7 +328,7 @@ func DownloadPackage(ctx context.Context, downloadUrl string, target string) err
 	if errorUrl != nil {
 		return errorInvalidManifestURL
 	}
-	var valid = false
+	valid := false
 	for _, manifestHost := range AllowedManifestHosts {
 		if manifestHost == parsedURL.Host {
 			valid = true

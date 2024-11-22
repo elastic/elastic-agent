@@ -38,6 +38,7 @@ type Proxy struct {
 	// proxiedRequests is a "request log" for every request the proxy receives.
 	proxiedRequests   []string
 	proxiedRequestsMu sync.Mutex
+	requestsWG        *sync.WaitGroup
 
 	opts options
 	log  *slog.Logger
@@ -164,11 +165,11 @@ func New(t *testing.T, optns ...Option) *Proxy {
 		lv = slog.LevelDebug
 	}
 	p := Proxy{
-		opts:   opts,
-		client: opts.client,
+		requestsWG: &sync.WaitGroup{},
+		opts:       opts,
+		client:     opts.client,
 		log: slog.New(slog.NewTextHandler(logfWriter(opts.logFn), &slog.HandlerOptions{
-			AddSource: true,
-			Level:     lv,
+			Level: lv,
 		})),
 	}
 	if opts.capriv != nil && opts.cacert != nil {
@@ -177,6 +178,12 @@ func New(t *testing.T, optns ...Option) *Proxy {
 
 	p.Server = httptest.NewUnstartedServer(
 		http.HandlerFunc(func(ww http.ResponseWriter, r *http.Request) {
+			// Sometimes, on CI obviously, the last log happens after the test
+			// finishes. See https://github.com/elastic/elastic-agent/issues/5869.
+			// Therefore, let's add an extra layer to try to avoid that.
+			p.requestsWG.Add(1)
+			defer p.requestsWG.Done()
+
 			w := &proxyResponseWriter{w: ww}
 
 			requestID := uuid.Must(uuid.NewV4()).String()
@@ -246,6 +253,15 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	p.serveHTTP(w, r)
 }
 
+func (p *Proxy) Close() {
+	// Sometimes, on CI obviously, the last log happens after the test
+	// finishes. See https://github.com/elastic/elastic-agent/issues/5869.
+	// So, manually wait all ongoing requests to finish.
+	p.requestsWG.Wait()
+
+	p.Server.Close()
+}
+
 func (p *Proxy) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	resp, err := p.processRequest(r)
 	if err != nil {
@@ -278,6 +294,10 @@ func (p *Proxy) processRequest(r *http.Request) (*http.Response, error) {
 	case p.opts.rewriteHost != nil:
 		r.URL.Host = p.opts.rewriteHost(r.URL.Host)
 	}
+
+	// It should not be required, however if not set, enroll will fail with
+	// "Unknown resource"
+	r.Host = r.URL.Host
 
 	p.log.Debug(fmt.Sprintf("original URL: %s, new URL: %s",
 		origURL, r.URL.String()))
