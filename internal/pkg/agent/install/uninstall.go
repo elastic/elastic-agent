@@ -95,7 +95,7 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	// Once the root-cause is identified then this can be re-enabled on Windows.
 	// Notify fleet-server while it is still running if it's running locally
 	if notifyFleet && localFleet && runtime.GOOS != "windows" {
-		if cfg.Fleet.Client.Transport != nil {
+		if cfg.Fleet.Client.Transport.TLS != nil {
 			cfg.Fleet.Client.Transport.TLS.VerificationMode = tlscommon.VerifyCertificate
 		}
 		cfg.Fleet.Client.Hosts = []string{cfg.Fleet.Client.Host}
