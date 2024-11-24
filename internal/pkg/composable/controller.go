@@ -55,7 +55,7 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 
 	var providersCfg Config
 	if c != nil {
-		err := c.Unpack(&providersCfg)
+		err := c.UnpackTo(&providersCfg)
 		if err != nil {
 			return nil, errors.New(err, "failed to unpack providers config", errors.TypeConfig)
 		}
@@ -212,26 +212,7 @@ func (c *controller) Run(ctx context.Context) error {
 
 		c.logger.Debugf("Computing new variable state for composable inputs")
 
-		// build the vars list of mappings
-		vars := make([]*transpiler.Vars, 1)
-		mapping := map[string]interface{}{}
-		for name, state := range c.contextProviders {
-			mapping[name] = state.Current()
-		}
-		// this is ensured not to error, by how the mappings states are verified
-		vars[0], _ = transpiler.NewVars("", mapping, fetchContextProviders)
-
-		// add to the vars list for each dynamic providers mappings
-		for name, state := range c.dynamicProviders {
-			for _, mappings := range state.Mappings() {
-				local, _ := cloneMap(mapping) // will not fail; already been successfully cloned once
-				local[name] = mappings.mapping
-				id := fmt.Sprintf("%s-%s", name, mappings.id)
-				// this is ensured not to error, by how the mappings states are verified
-				v, _ := transpiler.NewVarsWithProcessors(id, local, name, mappings.processors, fetchContextProviders)
-				vars = append(vars, v)
-			}
-		}
+		vars := c.generateVars(fetchContextProviders)
 
 	UPDATEVARS:
 		for {
@@ -289,6 +270,31 @@ func (c *controller) Close() {
 			c.logger.Errorf("unable to close dynamic provider %q: %s", name, err.Error())
 		}
 	}
+}
+
+func (c *controller) generateVars(fetchContextProviders mapstr.M) []*transpiler.Vars {
+	// build the vars list of mappings
+	vars := make([]*transpiler.Vars, 1)
+	mapping := map[string]interface{}{}
+	for name, state := range c.contextProviders {
+		mapping[name] = state.Current()
+	}
+	// this is ensured not to error, by how the mappings states are verified
+	mappingAst, _ := transpiler.NewAST(mapping)
+	vars[0] = transpiler.NewVarsFromAst("", mappingAst, fetchContextProviders)
+
+	// add to the vars list for each dynamic providers mappings
+	for name, state := range c.dynamicProviders {
+		for _, mappings := range state.Mappings() {
+			local := mappingAst.ShallowClone()
+			dynamicAst, _ := transpiler.NewAST(mappings.mapping)
+			_ = local.Insert(dynamicAst, name)
+			id := fmt.Sprintf("%s-%s", name, mappings.id)
+			v := transpiler.NewVarsWithProcessorsFromAst(id, local, name, mappings.processors, fetchContextProviders)
+			vars = append(vars, v)
+		}
+	}
+	return vars
 }
 
 type contextProviderState struct {

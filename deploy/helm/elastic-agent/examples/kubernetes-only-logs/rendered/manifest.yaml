@@ -10,7 +10,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -23,7 +22,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
 stringData:
 
   agent.yml: |-
@@ -104,6 +102,7 @@ stringData:
         scope: node
       kubernetes_leaderelection:
         enabled: false
+        leader_lease: example-pernode
 ---
 # Source: elastic-agent/templates/agent/cluster-role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -115,7 +114,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
     resources:
@@ -196,7 +194,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
 subjects:
   - kind: ServiceAccount
     name: agent-pernode-example
@@ -217,7 +214,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
 spec:
   selector:
     matchLabels:
@@ -227,7 +223,7 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: 10cb3f4c3996f9ccaee8461e274a694fbbb03df6437e46d293cc515296b00cc0
+        checksum/config: 0840dcdf026f64cefb7aa69f420bc923d7e2d7d6e9a239e107fd2684e309d8ae
     spec:
       automountServiceAccountToken: true
       containers:

@@ -2,8 +2,6 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build !windows
-
 package otel
 
 import (
@@ -62,75 +60,80 @@ import (
 	"github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector"
 )
 
-func components() (otelcol.Factories, error) {
-	var err error
-	factories := otelcol.Factories{}
+func components(extensionFactories ...extension.Factory) func() (otelcol.Factories, error) {
+	return func() (otelcol.Factories, error) {
 
-	// Receivers
-	factories.Receivers, err = receiver.MakeFactoryMap(
-		otlpreceiver.NewFactory(),
-		filelogreceiver.NewFactory(),
-		kubeletstatsreceiver.NewFactory(),
-		k8sclusterreceiver.NewFactory(),
-		hostmetricsreceiver.NewFactory(),
-		httpcheckreceiver.NewFactory(),
-		k8sobjectsreceiver.NewFactory(),
-		prometheusreceiver.NewFactory(),
-		jaegerreceiver.NewFactory(),
-		zipkinreceiver.NewFactory(),
-		fbreceiver.NewFactory(),
-	)
-	if err != nil {
-		return otelcol.Factories{}, err
+		var err error
+		factories := otelcol.Factories{}
+
+		// Receivers
+		factories.Receivers, err = receiver.MakeFactoryMap(
+			otlpreceiver.NewFactory(),
+			filelogreceiver.NewFactory(),
+			kubeletstatsreceiver.NewFactory(),
+			k8sclusterreceiver.NewFactory(),
+			hostmetricsreceiver.NewFactory(),
+			httpcheckreceiver.NewFactory(),
+			k8sobjectsreceiver.NewFactory(),
+			prometheusreceiver.NewFactory(),
+			jaegerreceiver.NewFactory(),
+			zipkinreceiver.NewFactory(),
+			fbreceiver.NewFactory(),
+		)
+		if err != nil {
+			return otelcol.Factories{}, err
+		}
+
+		// Processors
+		factories.Processors, err = processor.MakeFactoryMap(
+			batchprocessor.NewFactory(),
+			resourceprocessor.NewFactory(),
+			attributesprocessor.NewFactory(),
+			transformprocessor.NewFactory(),
+			filterprocessor.NewFactory(),
+			k8sattributesprocessor.NewFactory(),
+			elasticinframetricsprocessor.NewFactory(),
+			resourcedetectionprocessor.NewFactory(),
+			memorylimiterprocessor.NewFactory(),
+			lsmintervalprocessor.NewFactory(),
+			elastictraceprocessor.NewFactory(),
+		)
+		if err != nil {
+			return otelcol.Factories{}, err
+		}
+
+		// Exporters
+		factories.Exporters, err = exporter.MakeFactoryMap(
+			otlpexporter.NewFactory(),
+			debugexporter.NewFactory(),
+			fileexporter.NewFactory(),
+			elasticsearchexporter.NewFactory(),
+			otlphttpexporter.NewFactory(),
+		)
+		if err != nil {
+			return otelcol.Factories{}, err
+		}
+
+		factories.Connectors, err = connector.MakeFactoryMap(
+			spanmetricsconnector.NewFactory(),
+			signaltometricsconnector.NewFactory(),
+		)
+		if err != nil {
+			return otelcol.Factories{}, err
+		}
+
+		extensions := []extension.Factory{
+			memorylimiterextension.NewFactory(),
+			filestorage.NewFactory(),
+			healthcheckextension.NewFactory(),
+			pprofextension.NewFactory(),
+		}
+		extensions = append(extensions, extensionFactories...)
+		factories.Extensions, err = extension.MakeFactoryMap(extensions...)
+		if err != nil {
+			return otelcol.Factories{}, err
+		}
+
+		return factories, err
 	}
-
-	// Processors
-	factories.Processors, err = processor.MakeFactoryMap(
-		batchprocessor.NewFactory(),
-		resourceprocessor.NewFactory(),
-		attributesprocessor.NewFactory(),
-		transformprocessor.NewFactory(),
-		filterprocessor.NewFactory(),
-		k8sattributesprocessor.NewFactory(),
-		elasticinframetricsprocessor.NewFactory(),
-		resourcedetectionprocessor.NewFactory(),
-		memorylimiterprocessor.NewFactory(),
-		lsmintervalprocessor.NewFactory(),
-		elastictraceprocessor.NewFactory(),
-	)
-	if err != nil {
-		return otelcol.Factories{}, err
-	}
-
-	// Exporters
-	factories.Exporters, err = exporter.MakeFactoryMap(
-		otlpexporter.NewFactory(),
-		debugexporter.NewFactory(),
-		fileexporter.NewFactory(),
-		elasticsearchexporter.NewFactory(),
-		otlphttpexporter.NewFactory(),
-	)
-	if err != nil {
-		return otelcol.Factories{}, err
-	}
-
-	factories.Connectors, err = connector.MakeFactoryMap(
-		spanmetricsconnector.NewFactory(),
-		signaltometricsconnector.NewFactory(),
-	)
-	if err != nil {
-		return otelcol.Factories{}, err
-	}
-
-	factories.Extensions, err = extension.MakeFactoryMap(
-		memorylimiterextension.NewFactory(),
-		filestorage.NewFactory(),
-		healthcheckextension.NewFactory(),
-		pprofextension.NewFactory(),
-	)
-	if err != nil {
-		return otelcol.Factories{}, err
-	}
-
-	return factories, err
 }

@@ -144,7 +144,7 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	}
 	pt.Describe("Removed install directory")
 
-	if notifyFleet && !skipFleetAudit {
+	if notifyFleet && runtime.GOOS != "windows" && !skipFleetAudit {
 		notifyFleetAuditUninstall(ctx, log, pt, cfg, ai) //nolint:errcheck // ignore the error as we can't act on it
 	}
 

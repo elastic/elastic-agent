@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -176,7 +177,7 @@ func TestGenerateContainerPodData(t *testing.T) {
 	logger := getLogger()
 	var cfg Config
 	c := config.New()
-	_ = c.Unpack(&cfg)
+	_ = c.UnpackTo(&cfg)
 	generateContainerData(
 		&comm,
 		pod,
@@ -306,7 +307,7 @@ func TestEphemeralContainers(t *testing.T) {
 	logger := getLogger()
 	var cfg Config
 	c := config.New()
-	_ = c.Unpack(&cfg)
+	_ = c.UnpackTo(&cfg)
 	generateContainerData(
 		&comm,
 		pod,
@@ -513,6 +514,63 @@ func TestPodEventer_Namespace_Node_Watcher(t *testing.T) {
 				assert.NotEqualf(t, nil, nodeWatcher, "Node "+test.msg)
 			}
 		})
+	}
+}
+
+func TestPodEventer_OnlyRunningPods(t *testing.T) {
+	client := k8sfake.NewSimpleClientset()
+
+	log, err := logger.New("service-eventer-test", true)
+	assert.NoError(t, err)
+
+	providerDataChan := make(chan providerData, 1)
+
+	comm := MockDynamicComm{
+		context.TODO(),
+		providerDataChan,
+	}
+
+	var cfg Config
+	cfg.InitDefaults()
+
+	eventer, err := NewPodEventer(&comm, &cfg, log, client, "cluster", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pod := &kubernetes.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testpod",
+			UID:       types.UID(uid),
+			Namespace: "testns",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		Spec: kubernetes.PodSpec{
+			NodeName: "testnode",
+		},
+		Status: kubernetes.PodStatus{
+			PodIP: "127.0.0.5",
+			Phase: v1.PodPending,
+		},
+	}
+
+	eventer.OnUpdate(pod)
+	select {
+	case <-providerDataChan:
+		assert.Fail(t, "should not receive update for Pending Pod")
+	default:
+	}
+
+	// set status to Running, we should get an update now
+	pod.Status.Phase = v1.PodRunning
+	eventer.OnUpdate(pod)
+	select {
+	case <-providerDataChan:
+	case <-time.After(time.Second * 5):
+		assert.Fail(t, "should receive update for Pending Pod")
 	}
 }
 

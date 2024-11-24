@@ -34,33 +34,13 @@ agent:
   presets:
     nginx:
       mode: deployment
+      automountServiceAccountToken: false # disables all kubernetes providers
       securityContext:
         runAsUser: 0
-      rules:
-        # minimum cluster role ruleset required by agent
-        - apiGroups: [ "" ]
-          resources:
-            - nodes
-            - namespaces
-            - pods
-          verbs:
-            - get
-            - watch
-            - list
-        - apiGroups: [ "apps" ]
-          resources:
-            - replicasets
-          verbs:
-            - get
-            - list
-            - watch
-        - apiGroups: [ "batch" ]
-          resources:
-            - jobs
-          verbs:
-            - get
-            - list
-            - watch
+      serviceAccount:
+        create: false # disable creation of service account
+      clusterRole:
+        create: false # disable creation of cluster role account
       providers:
         kubernetes_leaderelection:
-          enabled: false
+          enabled: false # disable leader election
