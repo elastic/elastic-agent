@@ -240,7 +240,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 				return err
 			}
 		} else {
-			err := install.Uninstall(cmd.Context(), cfgFile, topPath, "", log, progBar)
+			err := install.Uninstall(cmd.Context(), cfgFile, topPath, "", log, progBar, false)
 			if err != nil {
 				progBar.Describe("Uninstall from binary failed")
 				return err
@@ -257,7 +257,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		defer func() {
 			if err != nil {
 				progBar.Describe("Uninstalling")
-				innerErr := install.Uninstall(cmd.Context(), cfgFile, topPath, "", log, progBar)
+				innerErr := install.Uninstall(cmd.Context(), cfgFile, topPath, "", log, progBar, false)
 				if innerErr != nil {
 					progBar.Describe("Failed to Uninstall")
 				} else {
