@@ -72,6 +72,8 @@ steps:
           image: "family/platform-ingest-elastic-agent-ubuntu-2404"
         matrix:
           - default
+          - container
+          - fleet-upgrade-to-pr-build
           - upgrade
           - fleet
           - fqdn
