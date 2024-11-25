@@ -60,6 +60,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.113.0/processor/memorylimiterprocessor/README.md) | v0.113.0 |
 | [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.113.0/processor/attributesprocessor/README.md) | v0.113.0 |
 | [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.113.0/processor/filterprocessor/README.md) | v0.113.0 |
+| [geoipprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/geoipprocessor/v0.113.0/processor/geoipprocessor/README.md) | v0.113.0 |
 | [k8sattributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/k8sattributesprocessor/v0.113.0/processor/k8sattributesprocessor/README.md) | v0.113.0 |
 | [resourcedetectionprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourcedetectionprocessor/v0.113.0/processor/resourcedetectionprocessor/README.md) | v0.113.0 |
 | [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.113.0/processor/resourceprocessor/README.md) | v0.113.0 |
