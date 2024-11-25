@@ -210,6 +210,7 @@ func testMonitoringLogsAreShipped(
 			"add_cloud_metadata: received error for provider digitalocean: failed with http status code 404",
 			"add_cloud_metadata: received error for provider azure: failed with http status code 404",
 			"add_cloud_metadata: received error for provider openstack: failed with http status code 404",
+			"add_cloud_metadata: received error for provider gcp: failed with http status code 404",
 			"elastic-agent-client error: rpc error: code = Canceled desc = context canceled", // can happen on restart
 			"failed to invoke rollback watcher: failed to start Upgrade Watcher",             // on debian this happens probably need to fix.
 			"falling back to IMDSv1: operation error ec2imds: getToken",                      // okay for the cloud metadata to not work
