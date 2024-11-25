@@ -351,6 +351,41 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	fromInstall, _ := cmd.Flags().GetBool(fromInstallArg)
 
+	hasRoot, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("checking if running with root/Administrator privileges: %w", err)
+	}
+	if hasRoot {
+
+		binPath, err := os.Executable()
+		if err != nil {
+			return fmt.Errorf("failed to get binpath: %w", err)
+		}
+
+		owner, err := getFileOwner(binPath)
+		if err != nil {
+			return fmt.Errorf("failed to get file owner: %w", err)
+		}
+
+		curUser, err := getCurrentUser()
+		if err != nil {
+			return fmt.Errorf("failed to get current user: %w", err)
+		}
+
+		isOwner, err := isFileOwner(curUser, owner)
+		if err != nil {
+			return fmt.Errorf("error while checking if current user is the file owner: %w", err)
+		}
+
+		if !isOwner {
+			execFunc, err := execWithFileOwnerFunc(owner, binPath)
+			if err != nil {
+				return fmt.Errorf("error getting exec func: %w", err)
+			}
+			return execFunc()
+		}
+	}
+
 	pathConfigFile := paths.ConfigFile()
 	rawConfig, err := config.LoadFile(pathConfigFile)
 	if err != nil {
@@ -525,7 +560,6 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		pathConfigFile,
 		store,
 	)
-
 	if err != nil {
 		return err
 	}
