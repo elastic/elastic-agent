@@ -30,7 +30,7 @@ func isFileOwner(curUser string, fileOwner string) (bool, error) {
 	return curUser == fileOwner, nil
 }
 
-func isEnrollable() (bool, error) {
+func isEnroll() (bool, error) {
 	binPath, err := os.Executable()
 	if err != nil {
 		return false, fmt.Errorf("failed to get binpath: %w", err)

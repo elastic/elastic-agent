@@ -357,8 +357,8 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	if err != nil {
 		return fmt.Errorf("checking if running with root/Administrator privileges: %w", err)
 	}
-	if hasRoot {
-		isEnroll, err := isEnrollable()
+	if hasRoot && !fromInstall {
+		isEnroll, err := isEnroll()
 		if err != nil {
 			return fmt.Errorf("ran into an error while figuring out if user is allowed to execute the enroll command")
 		}

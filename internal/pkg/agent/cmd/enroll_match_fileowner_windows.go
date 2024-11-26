@@ -2,7 +2,83 @@
 
 package cmd
 
-// no-op for windows for now
-func isEnrollable() (bool, error) {
-	return true, nil
+import (
+	"fmt"
+	"os"
+
+	"golang.org/x/sys/windows"
+)
+
+func getFileOwner(filePath string) (string, error) {
+	// Get security information of the file
+	sd, err := windows.GetNamedSecurityInfo(
+		filePath,
+		windows.SE_FILE_OBJECT,
+		windows.OWNER_SECURITY_INFORMATION,
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to get security info: %w", err)
+	}
+	owner, _, err := sd.Owner()
+	if err != nil {
+		return "", fmt.Errorf("failed to get security descriptor owner: %w", err)
+	}
+
+	return owner.String(), nil
+}
+
+// Helper to get the current user's SID
+func getCurrentUser() (string, error) {
+	// Get the token for the current process
+	var token windows.Token
+	err := windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_QUERY, &token)
+	if err != nil {
+		return "", fmt.Errorf("failed to open process token: %w", err)
+	}
+	defer token.Close()
+
+	// Get the token use
+	tokenUser, err := token.GetTokenUser()
+	if err != nil {
+		return "", fmt.Errorf("failed to get token user: %w", err)
+	}
+
+	return tokenUser.User.Sid.String(), nil
+}
+
+func isFileOwner(curUser string, fileOwner string) (bool, error) {
+	var cSid *windows.SID
+	err := windows.ConvertStringSidToSid(windows.StringToUTF16Ptr(curUser), &cSid)
+	if err != nil {
+		return false, fmt.Errorf("failed to convert SID string to SID: %w", err)
+	}
+
+	var fSid *windows.SID
+	err = windows.ConvertStringSidToSid(windows.StringToUTF16Ptr(fileOwner), &fSid)
+	if err != nil {
+		return false, fmt.Errorf("failed to convert SID string to SID: %w", err)
+	}
+
+	isEqual := fSid.Equals(cSid)
+
+	return isEqual, nil
+}
+
+func isEnroll() (bool, error) {
+	user, err := getCurrentUser()
+	if err != nil {
+		return false, fmt.Errorf("ran into an error while retrieving current user: %w", err)
+	}
+
+	binPath, err := os.Executable()
+	if err != nil {
+		return false, fmt.Errorf("ran into an error while getting executable path: %w", err)
+	}
+
+	fileOwner, err := getFileOwner(binPath)
+	if err != nil {
+		return false, fmt.Errorf("ran into an error while getting file owner: %w", err)
+	}
+
+	return isFileOwner(user, fileOwner)
 }
