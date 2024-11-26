@@ -11,7 +11,7 @@
 kind: enhancement
 
 # Change summary; a 80ish characters long description of the change.
-summary: Adds actionable error message for linux and mac when a root user tries to enroll an unprivileged agent that has been unenrolled via the fleet ui
+summary: Elastic agent returns an actionable error message when a root user tries to enroll an unprivileged agent that has been unenrolled via the fleet ui
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
