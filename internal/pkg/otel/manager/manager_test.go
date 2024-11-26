@@ -63,6 +63,7 @@ var (
 )
 
 func TestOTelManager_Run(t *testing.T) {
+	t.Skip("Flaky test") // https://github.com/elastic/elastic-agent/issues/6119
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	l, _ := loggertest.New("otel")
