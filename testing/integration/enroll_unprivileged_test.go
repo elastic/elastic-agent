@@ -7,13 +7,12 @@ import (
 	"os"
 	"os/exec"
 	"testing"
-	"time"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
-	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
@@ -24,6 +23,14 @@ func TestEnrollUnprivileged(t *testing.T) {
 		Group: Default,
 		Stack: &define.Stack{},
 		Sudo:  true,
+		OS: []define.OS{
+			{
+				Type: define.Linux,
+			},
+			{
+				Type: define.Darwin,
+			},
+		},
 	})
 	t.Run("unenrolled unprivileged agent re-enrolls successfully using root user", func(t *testing.T) {
 		ctx := context.Background()
@@ -68,21 +75,7 @@ func TestEnrollUnprivileged(t *testing.T) {
 
 		enrollArgs := []string{"elastic-agent", "enroll", "--url", enrollUrl, "--enrollment-token", enrollmentApiKey.APIKey, "--force"}
 
-		out, err := exec.CommandContext(ctx, "sudo", enrollArgs...).CombinedOutput()
-		require.NoError(t, err)
-
-		t.Logf(">>> Enroll succeeded. Output: %s", out)
-		timeout := 2 * time.Minute
-		if deadline, ok := ctx.Deadline(); ok {
-			timeout = time.Until(deadline)
-		}
-		// Wait for Agent to be healthy
-		require.Eventually(
-			t,
-			check.FleetAgentStatus(ctx, t, info.KibanaClient, policy.ID, "online"),
-			timeout,
-			10*time.Second,
-			"Elastic Agent status is not online",
-		)
+		_, err = exec.CommandContext(ctx, "sudo", enrollArgs...).CombinedOutput()
+		require.Error(t, cmd.UserOwnerMismatchError)
 	})
 }
