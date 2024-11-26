@@ -6,12 +6,14 @@ ARG ELASTIC_AGENT_GID=1000
 # beats stuff
 ARG BEAT_NAME="elastic-agent"
 ARG BEAT_HOME="/usr/share/${BEAT_NAME}"
+ARG HOST_BEAT_HOME="beat"
 ARG BEAT_VENDOR
 ARG BEAT_VERSION
 ARG BEAT_URL
 ARG BEAT_DESCRIPTION
 ARG BEAT_ROOT_IMPORT_PATH
-ARG BEAT_VCS_COMMIT
+ARG BEAT_COMMIT
+ARG BEAT_COMMIT_SHORT
 ARG BEAT_LICENSE
 
 #docker image stuff
@@ -66,39 +68,43 @@ RUN set -e ; \
   mv "${TINI_BIN}" /usr/bin/tini ; \
   chmod +x /usr/bin/tini
 
+
 ## Wolfi
 FROM ${WOLFI_BASE_IMAGE}:${WOLFI_BASE_VERSION} AS elastic_agent_base_wolfi
 RUN apk update && \
     apk add --no-cache shadow libcap-utils
+
+
 # Elastic Agent images
 FROM elastic_agent_base_${BASE_IMAGE_FAMILY} AS elastic_agent_image
 
-#COPY beat ${BEAT_HOME}
+COPY ${HOST_BEAT_HOME} ${BEAT_HOME}
 
 LABEL \
-  org.label-schema.build-date="{{ date }}" \
+  org.label-schema.build-date="${BUILD_TIMESTAMP}" \
   org.label-schema.schema-version="1.0" \
-  org.label-schema.vendor="{{ .BeatVendor }}" \
-  org.label-schema.license="{{ .License }}" \
-  org.label-schema.name="{{ .BeatName }}" \
-  org.label-schema.version="{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}" \
-  org.label-schema.url="{{ .BeatURL }}" \
-  org.label-schema.vcs-url="{{ $repoInfo.RootImportPath }}" \
-  org.label-schema.vcs-ref="{{ commit }}" \
-  io.k8s.description="{{ .BeatDescription }}" \
-  io.k8s.display-name="{{ .BeatName | title }} image" \
-  org.opencontainers.image.created="{{ date }}" \
-  org.opencontainers.image.licenses="{{ .License }}" \
-  org.opencontainers.image.title="{{ .BeatName | title }}" \
-  org.opencontainers.image.vendor="{{ .BeatVendor }}" \
+  org.label-schema.vendor="${BEAT_VENDOR}" \
+  org.label-schema.license="${BEAT_LICENSE}" \
+  org.label-schema.name="${BEAT_NAME}" \
+  org.label-schema.version="${BEAT_VERSION}" \
+  org.label-schema.url="${BEAT_URL}" \
+  org.label-schema.vcs-url="${BEAT_ROOT_IMPORT_PATH}" \
+  org.label-schema.vcs-ref="${BEAT_VCS_REF}" \
+  io.k8s.description="${BEAT_DESCRIPTION}" \
+  io.k8s.display-name="${BEAT_NAME} image" \
+  org.opencontainers.image.created="${BUILD_TIMESTAMP}" \
+  org.opencontainers.image.licenses="${BEAT_LICENSE}" \
+  org.opencontainers.image.title="${BEAT_NAME}" \
+  org.opencontainers.image.vendor="${BEAT_VENDOR}" \
   org.opencontainers.image.authors="infra@elastic.co" \
-  name="{{ .BeatName }}" \
-  vendor="{{ .BeatVendor }}" \
-  version="{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}" \
+  name="${BEAT_NAME}" \
+  vendor="${BEAT_VENDOR}" \
+  version="${BEAT_VENDOR}" \
   release="1" \
-  url="{{ .BeatURL }}" \
-  summary="{{ .BeatName }}" \
-  license="{{ .License }}" \
-  description="{{ .BeatDescription }}"
+  url="${BEAT_URL}" \
+  summary="${BEAT_NAME}" \
+  license="${BEAT_LICENSE}" \
+  description="${BEAT_DESCRIPTION}"
 
+#TODO remove once it's done
 RUN ls -lah /usr/bin/tini
