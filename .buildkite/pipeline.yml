@@ -13,6 +13,7 @@ steps:
     retry:
       manual:
         allowed: true
+
   - group: "Unit tests"
     key: "unit-tests"
     steps:
@@ -88,11 +89,11 @@ steps:
           manual:
             allowed: true
 
-      # Runs inly on the main branch
-      - label: "Unit tests - MacOS 13 ARM"
-        key: "unit-tests-macos-13-arm"
+  - group: "macOS tests"
+    key: "macos-unit-tests"
+    steps:
+      - label: "Unit tests - macOS 15 ARM"
         command: ".buildkite/scripts/steps/unit-tests.sh"
-        branches: main
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -100,14 +101,15 @@ steps:
           - "coverage-*.out"
         agents:
           provider: orka
-          imagePrefix: generic-13-ventura-arm
+          imagePrefix: generic-base-15-arm-002
         retry:
           manual:
             allowed: true
 
-      - label: "Unit tests - MacOS 13"
-        key: "unit-tests-macos-13"
+      # Runs only on main and release branches
+      - label: "Unit tests - macOS 13"
         command: ".buildkite/scripts/steps/unit-tests.sh"
+        branches: "main 8.* 9.*"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -178,9 +180,7 @@ steps:
         allow_failure: true
       - step: "unit-tests-win2016"
         allow_failure: true
-      - step: "unit-tests-macos-13-arm"
-        allow_failure: true
-      - step: "unit-tests-macos-13"
+      - step: "macos-unit-tests"
         allow_failure: true
       - step: "unit-tests-win10"
         allow_failure: true
