@@ -343,6 +343,8 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	return args
 }
 
+var UserOwnerMismatchError = errors.New("the command is executed as root but the program files are not owned by the root user. execute the command as the user that owns the program files")
+
 func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	err := validateEnrollFlags(cmd)
 	if err != nil {
@@ -356,33 +358,12 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		return fmt.Errorf("checking if running with root/Administrator privileges: %w", err)
 	}
 	if hasRoot {
-
-		binPath, err := os.Executable()
+		isEnroll, err := isEnrollable()
 		if err != nil {
-			return fmt.Errorf("failed to get binpath: %w", err)
+			return fmt.Errorf("ran into an error while figuring out if user is allowed to execute the enroll command")
 		}
-
-		owner, err := getFileOwner(binPath)
-		if err != nil {
-			return fmt.Errorf("failed to get file owner: %w", err)
-		}
-
-		curUser, err := getCurrentUser()
-		if err != nil {
-			return fmt.Errorf("failed to get current user: %w", err)
-		}
-
-		isOwner, err := isFileOwner(curUser, owner)
-		if err != nil {
-			return fmt.Errorf("error while checking if current user is the file owner: %w", err)
-		}
-
-		if !isOwner {
-			execFunc, err := execWithFileOwnerFunc(owner, binPath)
-			if err != nil {
-				return fmt.Errorf("error getting exec func: %w", err)
-			}
-			return execFunc()
+		if !isEnroll {
+			return UserOwnerMismatchError
 		}
 	}
 
