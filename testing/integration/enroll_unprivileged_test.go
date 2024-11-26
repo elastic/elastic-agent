@@ -23,14 +23,6 @@ func TestEnrollUnprivileged(t *testing.T) {
 		Group: Default,
 		Stack: &define.Stack{},
 		Sudo:  true,
-		OS: []define.OS{
-			{
-				Type: define.Linux,
-			},
-			{
-				Type: define.Darwin,
-			},
-		},
 	})
 	t.Run("unenrolled unprivileged agent re-enrolls successfully using root user", func(t *testing.T) {
 		ctx := context.Background()
