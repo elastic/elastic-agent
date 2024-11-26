@@ -82,6 +82,7 @@ resource "ec_deployment" "integration-testing" {
   }
 
   integrations_server = {
+    instance_configuration_id = "gcp.integrationsserver.n2.68x32x45"
     topology = {
       size       = "1g"
       zone_count = 1
