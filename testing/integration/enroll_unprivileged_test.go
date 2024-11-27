@@ -10,6 +10,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"runtime"
 	"testing"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -71,7 +72,12 @@ func TestEnrollUnprivileged(t *testing.T) {
 
 		enrollArgs := []string{"elastic-agent", "enroll", "--url", enrollUrl, "--enrollment-token", enrollmentApiKey.APIKey, "--force"}
 
-		_, err = exec.CommandContext(ctx, "sudo", enrollArgs...).CombinedOutput()
-		require.Error(t, cmd.UserOwnerMismatchError)
+		if runtime.GOOS != "windows" {
+			_, err = exec.CommandContext(ctx, "sudo", enrollArgs...).CombinedOutput()
+			require.Error(t, cmd.UserOwnerMismatchError)
+		} else {
+			_, err = exec.CommandContext(ctx, "elastic-agent", enrollArgs[1:]...).CombinedOutput()
+			require.Error(t, cmd.UserOwnerMismatchError)
+		}
 	})
 }
