@@ -268,3 +268,4 @@ https://github.com/elastic/elastic-agent/pull/1108 and on
 https://github.com/elastic/elastic-agent/issues/1107). However until
 we have the mage automation sorted out, it has been removed to avoid
 confusion.
+foo
