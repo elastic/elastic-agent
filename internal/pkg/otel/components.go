@@ -25,6 +25,7 @@ import (
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
 
 	fbreceiver "github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
+	mbreceiver "github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
 
 	// Processors:
 	attributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor" // for modifying signal attributes
@@ -62,7 +63,6 @@ import (
 
 func components(extensionFactories ...extension.Factory) func() (otelcol.Factories, error) {
 	return func() (otelcol.Factories, error) {
-
 		var err error
 		factories := otelcol.Factories{}
 
@@ -79,6 +79,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			jaegerreceiver.NewFactory(),
 			zipkinreceiver.NewFactory(),
 			fbreceiver.NewFactory(),
+			mbreceiver.NewFactory(),
 		)
 		if err != nil {
 			return otelcol.Factories{}, err
