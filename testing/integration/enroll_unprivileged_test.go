@@ -13,14 +13,15 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/gofrs/uuid/v5"
+	"github.com/stretchr/testify/require"
+
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
-	"github.com/gofrs/uuid/v5"
-	"github.com/stretchr/testify/require"
 )
 
 func TestEnrollUnprivileged(t *testing.T) {
