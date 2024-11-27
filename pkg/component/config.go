@@ -45,7 +45,7 @@ func (c ComponentLimits) AsProto() *proto.ComponentLimits {
 	}
 
 	return &proto.ComponentLimits{
-		GoMaxProcs: uint64(c.GoMaxProcs),
+		GoMaxProcs: uint64(c.GoMaxProcs), //nolint:gosec // will never be negative
 		Source:     source,
 	}
 }
@@ -119,8 +119,8 @@ func deDotDataStream(ds *proto.DataStream, source *structpb.Struct) (*proto.Data
 	}
 
 	// Create a temporary struct to unpack the configuration.
-	// Unpack correctly handles any flattened fields like
-	// data_stream.type. So all we need to do is to call Unpack,
+	// UnpackTo correctly handles any flattened fields like
+	// data_stream.type. So all we need to do is to call UnpackTo,
 	// ensure the DataStream does not have a different value,
 	// them merge them both.
 	tmp := struct {

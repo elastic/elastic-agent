@@ -13,6 +13,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+	"go.opentelemetry.io/collector/component/componentstatus"
+
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v1/proto"
 	v1server "github.com/elastic/elastic-agent/pkg/control/v1/server"
@@ -395,7 +398,7 @@ func stateToProto(state *coordinator.State, agentInfo info.Agent) (*cproto.State
 			Commit:       release.Commit(),
 			BuildTime:    release.BuildTime().Format(control.TimeFormat()),
 			Snapshot:     release.Snapshot(),
-			Pid:          int32(os.Getpid()),
+			Pid:          int32(os.Getpid()), //nolint:gosec // not going to have a pid greater than 32bit integer
 			Unprivileged: agentInfo.Unprivileged(),
 			IsManaged:    !agentInfo.IsStandalone(),
 		},
@@ -405,5 +408,48 @@ func stateToProto(state *coordinator.State, agentInfo info.Agent) (*cproto.State
 		FleetMessage:   state.FleetMessage,
 		Components:     components,
 		UpgradeDetails: upgradeDetails,
+		Collector:      collectorToProto(state.Collector),
 	}, nil
+}
+
+func collectorToProto(s *status.AggregateStatus) *cproto.CollectorComponent {
+	if s == nil {
+		return nil
+	}
+	r := &cproto.CollectorComponent{
+		Status:    otelComponentStatusToProto(s.Status()),
+		Timestamp: s.Timestamp().Format(time.RFC3339Nano),
+	}
+	if s.Err() != nil {
+		r.Error = s.Err().Error()
+	}
+	if len(s.ComponentStatusMap) > 0 {
+		r.ComponentStatusMap = make(map[string]*cproto.CollectorComponent, len(s.ComponentStatusMap))
+		for id, nested := range s.ComponentStatusMap {
+			r.ComponentStatusMap[id] = collectorToProto(nested)
+		}
+	}
+	return r
+}
+
+func otelComponentStatusToProto(s componentstatus.Status) cproto.CollectorComponentStatus {
+	switch s {
+	case componentstatus.StatusNone:
+		return cproto.CollectorComponentStatus_StatusNone
+	case componentstatus.StatusStarting:
+		return cproto.CollectorComponentStatus_StatusStarting
+	case componentstatus.StatusOK:
+		return cproto.CollectorComponentStatus_StatusOK
+	case componentstatus.StatusRecoverableError:
+		return cproto.CollectorComponentStatus_StatusRecoverableError
+	case componentstatus.StatusPermanentError:
+		return cproto.CollectorComponentStatus_StatusPermanentError
+	case componentstatus.StatusFatalError:
+		return cproto.CollectorComponentStatus_StatusFatalError
+	case componentstatus.StatusStopping:
+		return cproto.CollectorComponentStatus_StatusStopping
+	case componentstatus.StatusStopped:
+		return cproto.CollectorComponentStatus_StatusStopped
+	}
+	return cproto.CollectorComponentStatus_StatusNone
 }
