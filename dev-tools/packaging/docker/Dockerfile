@@ -3,10 +3,14 @@ ARG ELASTIC_AGENT_USER="elastic-agent"
 ARG ELASTIC_AGENT_UID=1000
 ARG ELASTIC_AGENT_GID=1000
 
+# Capabilities
+ARG LINUX_CAPABILITIES
+
 # beats stuff
 ARG BEAT_NAME="elastic-agent"
-ARG BEAT_HOME="/usr/share/${BEAT_NAME}"
-ARG HOST_BEAT_HOME="beat"
+ARG BEAT_BINARY="elastic-agent"
+ARG BEAT_HOME="/usr/share/${BEAT_NAME}/"
+ARG HOST_BEAT_HOME="beat/"
 ARG BEAT_VENDOR
 ARG BEAT_VERSION
 ARG BEAT_URL
@@ -76,9 +80,93 @@ RUN apk update && \
 
 
 # Elastic Agent images
-FROM elastic_agent_base_${BASE_IMAGE_FAMILY} AS elastic_agent_image
+
+FROM elastic_agent_base_${BASE_IMAGE_FAMILY} AS elastic_agent_files
+
+# arguments redeclared here because https://docs.docker.com/reference/dockerfile/#understand-how-arg-and-from-interact
+ARG HOST_BEAT_HOME
+ARG BEAT_HOME
+ARG BEAT_COMMIT_SHORT
+ARG BEAT_BINARY
+
+ARG ELASTIC_AGENT_UID
+ARG ELASTIC_AGENT_GID
+ARG LINUX_CAPABILITIES
+
 
 COPY ${HOST_BEAT_HOME} ${BEAT_HOME}
+
+#RUN true && \
+    # ECE needs to create config here under non-1000 user
+RUN chmod 0777 ${BEAT_HOME}
+RUN mkdir -p ${BEAT_HOME}/data ${BEAT_HOME}/data/elastic-agent-${BEAT_COMMIT_SHORT}/logs
+RUN find ${BEAT_HOME} -type d -exec chmod 0755 {} \;
+RUN find ${BEAT_HOME} -type f -exec chmod 0644 {} \;
+RUN find ${BEAT_HOME}/data -type d -exec chmod 0777 {} \;
+RUN find ${BEAT_HOME}/data -type f -exec chmod 0666 {} \;
+RUN rm ${BEAT_HOME}/${BEAT_BINARY}
+RUN ln -s ${BEAT_HOME}/data/elastic-agent-${BEAT_COMMIT_SHORT}/elastic-agent ${BEAT_HOME}/${BEAT_BINARY}
+RUN chmod 0755 ${BEAT_HOME}/data/elastic-agent-*/elastic-agent
+RUN chmod 0755 ${BEAT_HOME}/data/elastic-agent-*/components/*beat
+RUN (chmod 0755 ${BEAT_HOME}/data/elastic-agent-*/components/osquery* || true)
+RUN (chmod 0755 ${BEAT_HOME}/data/elastic-agent-*/components/apm-server || true)
+RUN (chmod 0755 ${BEAT_HOME}/data/elastic-agent-*/components/endpoint-security || true)
+RUN (chmod 0755 ${BEAT_HOME}/data/elastic-agent-*/components/fleet-server || true)
+RUN (chmod 0755 ${BEAT_HOME}/data/elastic-agent-*/components/pf-elastic-collector || true)
+RUN (chmod 0755 ${BEAT_HOME}/data/elastic-agent-*/components/pf-elastic-symbolizer || true)
+RUN (chmod 0755 ${BEAT_HOME}/data/elastic-agent-*/components/pf-host-agent || true)
+RUN find ${BEAT_HOME}/data/elastic-agent-${BEAT_COMMIT_SHORT}/components -name "*.yml*" -type f -exec chmod 0644 {} \;
+#{{- range $i, $modulesd := .ModulesDirs }}
+#    chmod 0775 {{ $beatHome}}/{{ $modulesd }} && \
+#{{- end }}
+#
+#{{- if eq .Variant "cloud" }}
+#    mkdir -p /opt/agentbeat /opt/filebeat /opt/metricbeat && \
+#    cp -f ${BEAT_HOME}/data/cloud_downloads/filebeat.sh /opt/filebeat/filebeat && \
+#    chmod +x /opt/filebeat/filebeat && \
+#    cp -f ${BEAT_HOME}/data/cloud_downloads/metricbeat.sh /opt/metricbeat/metricbeat && \
+#    chmod +x /opt/metricbeat/metricbeat && \
+#    tar xf ${BEAT_HOME}/data/cloud_downloads/agentbeat-*.tar.gz -C /opt/agentbeat --strip-components=1 && \
+#    rm -rf ${BEAT_HOME}/data/cloud_downloads && \
+#{{- end }}
+#    true
+
+# Change ownership to the files
+RUN chown -R ${ELASTIC_AGENT_UID}:${ELASTIC_AGENT_GID} ${BEAT_HOME}
+
+# Keep this after any chown command, chown resets any applied capabilities
+RUN setcap =p ${BEAT_HOME}/data/elastic-agent-${BEAT_COMMIT_SHORT}/elastic-agent && \
+# Since the beat is stored at the other end of a symlink we must follow the symlink first
+# For security reasons setcap does not support symlinks. This is smart in the general case
+# but in our specific case since we're building a trusted image from trusted binaries this is
+# fine. Thus, we use readlink to follow the link and setcap on the actual binary
+  ( [! -z "${LINUX_CAPABILITIES}" ] && setcap ${LINUX_CAPABILITIES}  $(readlink -f ${BEAT_BINARY})) || true
+
+
+
+FROM elastic_agent_base_${BASE_IMAGE_FAMILY} AS elastic_agent_image
+
+# beats stuff (redeclared here because https://docs.docker.com/reference/dockerfile/#understand-how-arg-and-from-interact )
+ARG BEAT_NAME
+ARG BEAT_BINARY
+ARG BEAT_HOME
+ARG HOST_BEAT_HOME
+ARG BEAT_VENDOR
+ARG BEAT_VERSION
+ARG BEAT_URL
+ARG BEAT_DESCRIPTION
+ARG BEAT_ROOT_IMPORT_PATH
+ARG BEAT_COMMIT
+ARG BEAT_COMMIT_SHORT
+ARG BEAT_LICENSE
+
+
+# COPY docker-entrypoint /usr/local/bin/docker-entrypoint
+
+
+COPY --from=elastic_agent_files ${BEAT_HOME} ${BEAT_HOME}
+
+
 
 LABEL \
   org.label-schema.build-date="${BUILD_TIMESTAMP}" \
