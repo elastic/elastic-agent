@@ -1,5 +1,6 @@
 # User/group args
 ARG ELASTIC_AGENT_USER="elastic-agent"
+ARG ELASTIC_AGENT_GROUP="elastic-agent"
 ARG ELASTIC_AGENT_UID=1000
 ARG ELASTIC_AGENT_GID=1000
 
@@ -23,6 +24,7 @@ ARG BEAT_LICENSE
 #docker image stuff
 ARG BASE_IMAGE_FAMILY="ubuntu"
 ARG BUILD_TIMESTAMP
+ARG DOCKER_VARIANT="basic"
 
 # Base images args
 
@@ -39,15 +41,22 @@ ARG WOLFI_BASE_VERSION="latest"
 ## Ubuntu
 FROM ubuntu:${UBUNTU_BASE_VERSION} AS elastic_agent_base_ubuntu
 
+ARG ELASTIC_AGENT_USER
+ARG ELASTIC_AGENT_GROUP
+ARG ELASTIC_AGENT_UID
+ARG ELASTIC_AGENT_GID
+
 ENV BEAT_SETUID_AS=elastic-agent
 # Delete the existing "ubuntu" user to prevent conflict with the user that is added later.
 # See https://bugs.launchpad.net/cloud-images/+bug/2005129/comments/2.
 RUN touch /var/mail/ubuntu && \
-      chown ubuntu /var/mail/ubuntu && \
-      userdel -r ubuntu && \
-      apt-get update -y && \
-      DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends --yes ca-certificates curl gawk xz-utils && \
-      apt-get clean all
+    chown ubuntu /var/mail/ubuntu && \
+    userdel -r ubuntu && \
+    apt-get update -y && \
+    DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends --yes ca-certificates curl gawk xz-utils && \
+    apt-get clean all && \
+    groupadd --gid ${ELASTIC_AGENT_GID} ${ELASTIC_AGENT_GROUP} && \
+    useradd -M --uid ${ELASTIC_AGENT_UID} --gid ${ELASTIC_AGENT_GID} --groups 0 ${ELASTIC_AGENT_USER}
 
 # Add an init process, check the checksum to make sure it's a match
 RUN set -e ; \
@@ -75,13 +84,24 @@ RUN set -e ; \
 
 ## Wolfi
 FROM ${WOLFI_BASE_IMAGE}:${WOLFI_BASE_VERSION} AS elastic_agent_base_wolfi
+ARG ELASTIC_AGENT_USER
+ARG ELASTIC_AGENT_GROUP
+ARG ELASTIC_AGENT_UID
+ARG ELASTIC_AGENT_GID
+
+RUN addgroup -g ${ELASTIC_AGENT_GID} ${ELASTIC_AGENT_GROUP} && \
+    adduser -H -D -u ${ELASTIC_AGENT_UID} -G ${ELASTIC_AGENT_GROUP} ${ELASTIC_AGENT_USER}
+
+FROM elastic_agent_base_wolfi AS elastic_agent_base_wolfi_buildtools
 RUN apk update && \
     apk add --no-cache shadow libcap-utils
 
+FROM elastic_agent_base_ubuntu AS elastic_agent_base_ubuntu_buildtools
 
-# Elastic Agent images
+RUN apt-get update -y  && apt-get install --no-install-recommends --yes libcap2-bin && apt-get clean all
 
-FROM elastic_agent_base_${BASE_IMAGE_FAMILY} AS elastic_agent_files
+# Elastic Agent files stage (collects files and fixes permissions
+FROM elastic_agent_base_${BASE_IMAGE_FAMILY}_buildtools AS elastic_agent_files
 
 # arguments redeclared here because https://docs.docker.com/reference/dockerfile/#understand-how-arg-and-from-interact
 ARG HOST_BEAT_HOME
@@ -92,7 +112,9 @@ ARG BEAT_BINARY
 ARG ELASTIC_AGENT_UID
 ARG ELASTIC_AGENT_GID
 ARG LINUX_CAPABILITIES
+ARG BASE_IMAGE_FAMILY
 
+ARG DOCKER_VARIANT
 
 COPY ${HOST_BEAT_HOME} ${BEAT_HOME}
 
@@ -120,14 +142,18 @@ RUN find ${BEAT_HOME}/data/elastic-agent-${BEAT_COMMIT_SHORT}/components -name "
 #    chmod 0775 {{ $beatHome}}/{{ $modulesd }} && \
 #{{- end }}
 #
-#{{- if eq .Variant "cloud" }}
-#    mkdir -p /opt/agentbeat /opt/filebeat /opt/metricbeat && \
-#    cp -f ${BEAT_HOME}/data/cloud_downloads/filebeat.sh /opt/filebeat/filebeat && \
-#    chmod +x /opt/filebeat/filebeat && \
-#    cp -f ${BEAT_HOME}/data/cloud_downloads/metricbeat.sh /opt/metricbeat/metricbeat && \
-#    chmod +x /opt/metricbeat/metricbeat && \
-#    tar xf ${BEAT_HOME}/data/cloud_downloads/agentbeat-*.tar.gz -C /opt/agentbeat --strip-components=1 && \
-#    rm -rf ${BEAT_HOME}/data/cloud_downloads && \
+# Extra files for specific variant builds
+
+# Extra files for "cloud" variant
+RUN [ "${DOCKER_VARIANT}" != "cloud" ] || ( \
+    mkdir -p /opt/agentbeat /opt/filebeat /opt/metricbeat && \
+    cp -f ${BEAT_HOME}/data/cloud_downloads/filebeat.sh /opt/filebeat/filebeat && \
+    chmod +x /opt/filebeat/filebeat && \
+    cp -f ${BEAT_HOME}/data/cloud_downloads/metricbeat.sh /opt/metricbeat/metricbeat && \
+    chmod +x /opt/metricbeat/metricbeat && \
+    tar xf ${BEAT_HOME}/data/cloud_downloads/agentbeat-*.tar.gz -C /opt/agentbeat --strip-components=1 && \
+    rm -rf ${BEAT_HOME}/data/cloud_downloads \
+    )
 #{{- end }}
 #    true
 
@@ -136,14 +162,10 @@ RUN chown -R ${ELASTIC_AGENT_UID}:${ELASTIC_AGENT_GID} ${BEAT_HOME}
 
 # Keep this after any chown command, chown resets any applied capabilities
 RUN setcap =p ${BEAT_HOME}/data/elastic-agent-${BEAT_COMMIT_SHORT}/elastic-agent && \
-# Since the beat is stored at the other end of a symlink we must follow the symlink first
-# For security reasons setcap does not support symlinks. This is smart in the general case
-# but in our specific case since we're building a trusted image from trusted binaries this is
-# fine. Thus, we use readlink to follow the link and setcap on the actual binary
-  ( [! -z "${LINUX_CAPABILITIES}" ] && setcap ${LINUX_CAPABILITIES}  $(readlink -f ${BEAT_BINARY})) || true
+  ([ -z "${LINUX_CAPABILITIES}" ] || setcap ${LINUX_CAPABILITIES}  $(readlink -f ${BEAT_BINARY}))
 
 
-
+# Elastic-agent images
 FROM elastic_agent_base_${BASE_IMAGE_FAMILY} AS elastic_agent_image
 
 # beats stuff (redeclared here because https://docs.docker.com/reference/dockerfile/#understand-how-arg-and-from-interact )

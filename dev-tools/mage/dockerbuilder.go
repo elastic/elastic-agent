@@ -298,14 +298,25 @@ func (b *dockerBuilder) dockerSave(tag string) error {
 func (b *dockerBuilder) generateBuildArgs() []string {
 
 	buildArgFromTemplatesMapping := map[string]string{
-		"BEAT_COMMIT":       "{{commit}}",
-		"BEAT_COMMIT_SHORT": "{{commit_short}}",
+		"BEAT_COMMIT":        "{{commit}}",
+		"BEAT_COMMIT_SHORT":  "{{commit_short}}",
+		"DOCKER_VARIANT":     "{{.Variant}}",
+		"ELASTIC_AGENT_USER": "{{.user}}",
+		"BEAT_VENDOR":        "{{.BeatVendor}}",
+		"BEAT_VERSION":       "{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}",
 	}
 
 	buildArgs := make([]string, 0, len(buildArgFromTemplatesMapping))
 
 	baseTemplate := template.New("build-args").Funcs(FuncMap)
-	data := b.toMap()
+
+	baseData := map[string]interface{}{
+		"ExposePorts": b.exposePorts(),
+		"ModulesDirs": b.modulesDirs(),
+		"Variant":     b.DockerVariant.String(),
+	}
+	// this is copy-pasted from prepareBuild() to ensure that the data to render templates is the same
+	data := EnvMap(append([]map[string]interface{}{b.evalContext, b.toMap()}, baseData)...)
 	for buildArg, tmplDef := range buildArgFromTemplatesMapping {
 
 		parsedArgTmpl, err := baseTemplate.Parse(tmplDef)
