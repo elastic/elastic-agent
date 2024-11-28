@@ -17,12 +17,6 @@ if [[ -n "$STACK_VERSION" ]]; then
     STACK_VERSION=${STACK_VERSION}"-SNAPSHOT"
 fi
 
-# TODO: move to common.sh when it's refactored
-# BK analytics
-echo "--- Prepare BK test analytics token :vault:"
-BUILDKITE_ANALYTICS_TOKEN=$(vault kv get -field token kv/ci-shared/platform-ingest/buildkite_analytics_token)
-export BUILDKITE_ANALYTICS_TOKEN
-
 # Run integration tests
 set +e
 AGENT_STACK_VERSION="${STACK_VERSION}" TEST_INTEG_CLEAN_ON_EXIT=true  STACK_PROVISIONER="$STACK_PROVISIONER" SNAPSHOT=true mage $MAGE_TARGET $MAGE_SUBTARGET
