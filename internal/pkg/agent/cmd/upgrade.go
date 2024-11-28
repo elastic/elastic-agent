@@ -87,10 +87,6 @@ type upgradeInput struct {
 }
 
 func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
-	topPath := paths.Top()
-	fmt.Printf("============================= HERE'S THE TOP PATH: %s ===============================\n", topPath)
-	fmt.Printf("============================= HERE'S THE CONFIG PATH: %s ================================\n", paths.Config())
-
 	c := client.New()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
