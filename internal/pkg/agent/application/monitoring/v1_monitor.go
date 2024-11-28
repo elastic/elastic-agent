@@ -64,8 +64,8 @@ const (
 	defaultMetricsCollectionInterval = 60 * time.Second
 
 	// metricset stream failure threshold before the stream is marked as DEGRADED
-	// to avoid marking the agent degraded for transient errors, we set the default threshold to 2
-	defaultMetricsStreamFailureThreshold = uint(2)
+	// to avoid marking the agent degraded for transient errors, we set the default threshold to 5
+	defaultMetricsStreamFailureThreshold = uint(5)
 )
 
 var (
