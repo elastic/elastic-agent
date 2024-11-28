@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -325,6 +326,77 @@ func mustNewStruct(t *testing.T, v map[string]interface{}) *structpb.Struct {
 	str, err := structpb.NewStruct(v)
 	require.NoError(t, err)
 	return str
+}
+
+func TestCoordinator_VarsMgr_Observe(t *testing.T) {
+	coordCh := make(chan error)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	coord, cfgMgr, varsMgr := createCoordinator(t, ctx)
+	stateChan := coord.StateSubscribe(ctx, 32)
+	go func() {
+		err := coord.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			// allowed error
+			err = nil
+		}
+		coordCh <- err
+	}()
+
+	// wait for it to be in starting state
+	waitForState(t, stateChan, func(state State) bool {
+		return state.State == agentclient.Starting &&
+			state.Message == "Waiting for initial configuration and composable variables"
+	}, 3*time.Second)
+
+	// set vars state should stay same (until config)
+	varsMgr.Vars(ctx, []*transpiler.Vars{{}})
+
+	// State changes happen asynchronously in the Coordinator goroutine, so
+	// wait a little bit to make sure no changes are reported; if the Vars
+	// call does trigger a change, it should happen relatively quickly.
+	select {
+	case <-stateChan:
+		assert.Fail(t, "Vars call shouldn't cause a state change")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	// set configuration that has variables present
+	cfg, err := config.NewConfigFrom(map[string]interface{}{
+		"inputs": []interface{}{
+			map[string]interface{}{
+				"type": "filestream",
+				"paths": []interface{}{
+					"${env.filestream_path|env.log_path|'/var/log/syslog'}",
+				},
+			},
+			map[string]interface{}{
+				"type":      "windows",
+				"condition": "${host.platform} == 'windows'",
+			},
+		},
+	})
+	require.NoError(t, err)
+	cfgMgr.Config(ctx, cfg)
+
+	// healthy signals that the configuration has been computed
+	waitForState(t, stateChan, func(state State) bool {
+		return state.State == agentclient.Healthy && state.Message == "Running"
+	}, 3*time.Second)
+
+	// get the set observed vars from the fake vars manager
+	varsMgr.observedMx.Lock()
+	observed := varsMgr.observed
+	varsMgr.observedMx.Unlock()
+
+	// stop the coordinator
+	cancel()
+	err = <-coordCh
+	require.NoError(t, err)
+
+	// verify that the observed vars are the expected vars
+	assert.Equal(t, []string{"env.filestream_path", "env.log_path", "host.platform"}, observed)
 }
 
 func TestCoordinator_State_Starting(t *testing.T) {
@@ -1072,6 +1144,9 @@ func (l *configChange) Fail(err error) {
 type fakeVarsManager struct {
 	varsCh chan []*transpiler.Vars
 	errCh  chan error
+
+	observedMx sync.RWMutex
+	observed   []string
 }
 
 func newFakeVarsManager() *fakeVarsManager {
@@ -1099,6 +1174,12 @@ func (f *fakeVarsManager) ReportError(ctx context.Context, err error) {
 
 func (f *fakeVarsManager) Watch() <-chan []*transpiler.Vars {
 	return f.varsCh
+}
+
+func (f *fakeVarsManager) Observe(observed []string) {
+	f.observedMx.Lock()
+	defer f.observedMx.Unlock()
+	f.observed = observed
 }
 
 func (f *fakeVarsManager) Vars(ctx context.Context, vars []*transpiler.Vars) {

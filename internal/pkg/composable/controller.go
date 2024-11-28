@@ -35,18 +35,23 @@ type Controller interface {
 	// Watch returns the channel to watch for variable changes.
 	Watch() <-chan []*transpiler.Vars
 
-	// Close closes the controller, allowing for any resource
-	// cleanup and such.
-	Close()
+	// Observe instructs the variables to observe.
+	Observe([]string)
 }
 
 // controller manages the state of the providers current context.
 type controller struct {
-	logger           *logger.Logger
-	ch               chan []*transpiler.Vars
-	errCh            chan error
-	contextProviders map[string]*contextProviderState
-	dynamicProviders map[string]*dynamicProviderState
+	logger     *logger.Logger
+	ch         chan []*transpiler.Vars
+	observedCh chan map[string]bool
+	errCh      chan error
+
+	managed          bool
+	contextProviders map[string]contextProvider
+	dynamicProviders map[string]dynamicProvider
+
+	contextProviderStates map[string]*contextProviderState
+	dynamicProviderStates map[string]*dynamicProviderState
 }
 
 // New creates a new controller.
@@ -68,55 +73,49 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 	}
 
 	// build all the context providers
-	contextProviders := map[string]*contextProviderState{}
+	contextProviders := map[string]contextProvider{}
 	for name, builder := range Providers.contextProviders {
 		pCfg, ok := providersCfg.Providers[name]
 		if (ok && !pCfg.Enabled()) || (!ok && !providersInitialDefault) {
 			// explicitly disabled; skipping
 			continue
 		}
-		provider, err := builder(l, pCfg, managed)
-		if err != nil {
-			return nil, errors.New(err, fmt.Sprintf("failed to build provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
-		}
-		emptyMapping, _ := transpiler.NewAST(nil)
-		contextProviders[name] = &contextProviderState{
-			// Safe for Context to be nil here because it will be filled in
-			// by (*controller).Run before the provider is started.
-			provider: provider,
-			mapping:  emptyMapping,
+		contextProviders[name] = contextProvider{
+			builder: builder,
+			cfg:     pCfg,
 		}
 	}
 
 	// build all the dynamic providers
-	dynamicProviders := map[string]*dynamicProviderState{}
+	dynamicProviders := map[string]dynamicProvider{}
 	for name, builder := range Providers.dynamicProviders {
 		pCfg, ok := providersCfg.Providers[name]
 		if (ok && !pCfg.Enabled()) || (!ok && !providersInitialDefault) {
 			// explicitly disabled; skipping
 			continue
 		}
-		provider, err := builder(l.Named(strings.Join([]string{"providers", name}, ".")), pCfg, managed)
-		if err != nil {
-			return nil, errors.New(err, fmt.Sprintf("failed to build provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
-		}
-		dynamicProviders[name] = &dynamicProviderState{
-			provider: provider,
-			mappings: map[string]dynamicProviderMapping{},
+		dynamicProviders[name] = dynamicProvider{
+			builder: builder,
+			cfg:     pCfg,
 		}
 	}
 
 	return &controller{
-		logger:           l,
-		ch:               make(chan []*transpiler.Vars, 1),
-		errCh:            make(chan error),
-		contextProviders: contextProviders,
-		dynamicProviders: dynamicProviders,
+		logger:                l,
+		ch:                    make(chan []*transpiler.Vars, 1),
+		observedCh:            make(chan map[string]bool, 1),
+		errCh:                 make(chan error),
+		managed:               managed,
+		contextProviders:      contextProviders,
+		dynamicProviders:      dynamicProviders,
+		contextProviderStates: make(map[string]*contextProviderState),
+		dynamicProviderStates: make(map[string]*dynamicProviderState),
 	}, nil
 }
 
 // Run runs the controller.
 func (c *controller) Run(ctx context.Context) error {
+	var wg sync.WaitGroup
 	c.logger.Debugf("Starting controller for composable inputs")
 	defer c.logger.Debugf("Stopped controller for composable inputs")
 
@@ -126,47 +125,13 @@ func (c *controller) Run(ctx context.Context) error {
 
 	fetchContextProviders := mapstr.M{}
 
-	var wg sync.WaitGroup
-	wg.Add(len(c.contextProviders) + len(c.dynamicProviders))
-
-	// run all the enabled context providers
-	for name, state := range c.contextProviders {
-		state.Context = localCtx
-		state.signal = stateChangedChan
-		go func(name string, state *contextProviderState) {
-			defer wg.Done()
-			err := state.provider.Run(ctx, state)
-			if err != nil && !errors.Is(err, context.Canceled) {
-				err = errors.New(err, fmt.Sprintf("failed to run provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
-				c.logger.Errorf("%s", err)
-			}
-		}(name, state)
-		if p, ok := state.provider.(corecomp.FetchContextProvider); ok {
-			_, _ = fetchContextProviders.Put(name, p)
-		}
-	}
-
-	// run all the enabled dynamic providers
-	for name, state := range c.dynamicProviders {
-		state.Context = localCtx
-		state.signal = stateChangedChan
-		go func(name string, state *dynamicProviderState) {
-			defer wg.Done()
-			err := state.provider.Run(state)
-			if err != nil && !errors.Is(err, context.Canceled) {
-				err = errors.New(err, fmt.Sprintf("failed to run provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
-				c.logger.Errorf("%s", err)
-			}
-		}(name, state)
-	}
-
 	c.logger.Debugf("Started controller for composable inputs")
 
 	t := time.NewTimer(100 * time.Millisecond)
-	cleanupFn := func() {
+	defer func() {
 		c.logger.Debugf("Stopping controller for composable inputs")
 		t.Stop()
-		cancel()
+		cancel() // this cancel will stop all running providers
 
 		// wait for all providers to stop (but its possible they still send notifications over notify
 		// channel, and we cannot block them sending)
@@ -184,6 +149,13 @@ func (c *controller) Run(ctx context.Context) error {
 
 		close(c.ch)
 		wg.Wait()
+	}()
+
+	// send initial vars state
+	err := c.sendVars(ctx, fetchContextProviders)
+	if err != nil {
+		// only error is context cancel, no need to add error message context
+		return err
 	}
 
 	// performs debounce of notifies; accumulates them into 100 millisecond chunks
@@ -192,8 +164,13 @@ func (c *controller) Run(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
-				cleanupFn()
 				return ctx.Err()
+			case observed := <-c.observedCh:
+				c.handleObserved(localCtx, &wg, stateChangedChan, fetchContextProviders, observed)
+				t.Reset(100 * time.Millisecond)
+				c.logger.Debugf("Observed state changed for composable inputs; debounce started")
+				drainChan(stateChangedChan)
+				break DEBOUNCE
 			case <-stateChangedChan:
 				t.Reset(100 * time.Millisecond)
 				c.logger.Debugf("Variable state changed for composable inputs; debounce started")
@@ -205,32 +182,38 @@ func (c *controller) Run(ctx context.Context) error {
 		// notification received, wait for batch
 		select {
 		case <-ctx.Done():
-			cleanupFn()
 			return ctx.Err()
 		case <-t.C:
 			drainChan(stateChangedChan)
 			// batching done, gather results
 		}
 
-		c.logger.Debugf("Computing new variable state for composable inputs")
+		// send the vars to the watcher
+		err = c.sendVars(ctx, fetchContextProviders)
+		if err != nil {
+			// only error is context cancel, no need to add error message context
+			return err
+		}
+	}
+}
 
-		vars := c.generateVars(fetchContextProviders)
-
-	UPDATEVARS:
-		for {
+func (c *controller) sendVars(ctx context.Context, fetchContextProviders mapstr.M) error {
+	c.logger.Debugf("Computing new variable state for composable inputs")
+	vars := c.generateVars(fetchContextProviders)
+	for {
+		select {
+		case c.ch <- vars:
+			return nil
+		case <-ctx.Done():
+			// coordinator is handling cancellation it won't drain the channel
+			return ctx.Err()
+		default:
+			// c.ch is size of 1, nothing is reading and there's already a signal
 			select {
-			case c.ch <- vars:
-				break UPDATEVARS
-			case <-ctx.Done():
-				// coordinator is handling cancellation it won't drain the channel
+			case <-c.ch:
+				// Vars not pushed, cleaning channel
 			default:
-				// c.ch is size of 1, nothing is reading and there's already a signal
-				select {
-				case <-c.ch:
-					// Vars not pushed, cleaning channel
-				default:
-					// already read
-				}
+				// already read
 			}
 		}
 	}
@@ -246,45 +229,185 @@ func (c *controller) Watch() <-chan []*transpiler.Vars {
 	return c.ch
 }
 
-// Close closes the controller, allowing for any resource
-// cleanup and such.
-func (c *controller) Close() {
-	// Attempt to close all closeable context providers.
-	for name, state := range c.contextProviders {
-		cp, ok := state.provider.(corecomp.CloseableProvider)
-		if !ok {
+// Observe sends the observed variables from the AST to the controller.
+//
+// Based on this information it will determine which providers should even be running.
+func (c *controller) Observe(vars []string) {
+	// only need the top-level variables to determine which providers to run
+	//
+	// future: possible that all vars could be organized and then passed to each provider to
+	// inform the provider on which variables it needs to provide values for.
+	topLevel := make(map[string]bool)
+	for _, v := range vars {
+		vs := strings.SplitN(v, ".", 2)
+		topLevel[vs[0]] = true
+	}
+	// drain the channel first, if the previous vars had not been used yet the new list should be used instead
+	drainChan(c.observedCh)
+	c.observedCh <- topLevel
+}
+
+func (c *controller) handleObserved(ctx context.Context, wg *sync.WaitGroup, stateChangedChan chan bool, fetchContextProviders mapstr.M, observed map[string]bool) {
+	// get the list of already running, so we can determine a list that needs to be stopped
+	runningCtx := make(map[string]*contextProviderState, len(c.contextProviderStates))
+	runningDyn := make(map[string]*dynamicProviderState, len(c.dynamicProviderStates))
+	for name, state := range c.contextProviderStates {
+		runningCtx[name] = state
+	}
+	for name, state := range c.dynamicProviderStates {
+		runningDyn[name] = state
+	}
+
+	// loop through the top-level observed variables and start the providers that are current off
+	for name, enabled := range observed {
+		if !enabled {
+			// should always be true, but just in-case
+			continue
+		}
+		_, ok := runningCtx[name]
+		if ok {
+			// already running
+			delete(runningCtx, name)
+			continue
+		}
+		_, ok = runningDyn[name]
+		if ok {
+			// already running
+			delete(runningDyn, name)
 			continue
 		}
 
-		if err := cp.Close(); err != nil {
-			c.logger.Errorf("unable to close context provider %q: %s", name, err.Error())
+		contextInfo, ok := c.contextProviders[name]
+		if ok {
+			state := c.startContextProvider(ctx, wg, stateChangedChan, name, contextInfo)
+			if state != nil {
+				c.contextProviderStates[name] = state
+				if p, ok := state.provider.(corecomp.FetchContextProvider); ok {
+					_, _ = fetchContextProviders.Put(name, p)
+				}
+			}
 		}
+		dynamicInfo, ok := c.dynamicProviders[name]
+		if ok {
+			state := c.startDynamicProvider(ctx, wg, stateChangedChan, name, dynamicInfo)
+			if state != nil {
+				c.dynamicProviderStates[name] = state
+			}
+		}
+		c.logger.Warnf("provider %q referenced in policy but no provider exists or was explicitly disabled", name)
 	}
 
-	// Attempt to close all closeable dynamic providers.
-	for name, state := range c.dynamicProviders {
-		cp, ok := state.provider.(corecomp.CloseableProvider)
-		if !ok {
-			continue
-		}
-
-		if err := cp.Close(); err != nil {
-			c.logger.Errorf("unable to close dynamic provider %q: %s", name, err.Error())
-		}
+	// running remaining need to be stopped
+	for name, state := range runningCtx {
+		state.logger.Infof("Stopping provider %q", name)
+		state.canceller()
+		delete(c.contextProviderStates, name)
 	}
+	for name, state := range runningDyn {
+		state.logger.Infof("Stopping dynamic provider %q", name)
+		state.canceller()
+		delete(c.dynamicProviderStates, name)
+	}
+}
+
+func (c *controller) startContextProvider(ctx context.Context, wg *sync.WaitGroup, stateChangedChan chan bool, name string, info contextProvider) *contextProviderState {
+	l := c.logger.Named(strings.Join([]string{"providers", name}, "."))
+	l.Infof("Starting context provider %q", name)
+
+	provider, err := info.builder(l, info.cfg, c.managed)
+	if err != nil {
+		l.Errorf("failed to build provider '%s': %s", name, err)
+		return nil
+	}
+
+	wg.Add(1)
+	ctx, cancel := context.WithCancel(ctx)
+	emptyMapping, _ := transpiler.NewAST(nil)
+	state := &contextProviderState{
+		Context:   ctx,
+		provider:  provider,
+		mapping:   emptyMapping,
+		signal:    stateChangedChan,
+		logger:    l,
+		canceller: cancel,
+	}
+	go func() {
+		defer wg.Done()
+		for {
+			err := state.provider.Run(ctx, state)
+			if errors.Is(err, context.Canceled) {
+				// valid exit
+				closeProvider(l, name, provider)
+				return
+			}
+			// all other exits are bad, even a nil error
+			l.Errorf("provider %q failed to run (will restart in 5s): %s", name, err)
+			closeProvider(l, name, provider)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(5 * time.Second):
+				// wait 5 seconds then start it again
+			}
+		}
+	}()
+	return state
+}
+
+func (c *controller) startDynamicProvider(ctx context.Context, wg *sync.WaitGroup, stateChangedChan chan bool, name string, info dynamicProvider) *dynamicProviderState {
+	l := c.logger.Named(strings.Join([]string{"providers", name}, "."))
+	l.Infof("Starting dynamic provider %q", name)
+
+	provider, err := info.builder(l, info.cfg, c.managed)
+	if err != nil {
+		l.Errorf("failed to build provider '%s': %s", name, err)
+		return nil
+	}
+
+	wg.Add(1)
+	ctx, cancel := context.WithCancel(ctx)
+	state := &dynamicProviderState{
+		Context:   ctx,
+		provider:  provider,
+		mappings:  map[string]dynamicProviderMapping{},
+		signal:    stateChangedChan,
+		logger:    l,
+		canceller: cancel,
+	}
+	go func() {
+		defer wg.Done()
+		for {
+			err := state.provider.Run(state)
+			if errors.Is(err, context.Canceled) {
+				// valid exit
+				closeProvider(l, name, provider)
+				return
+			}
+			// all other exits are bad, even a nil error
+			l.Errorf("provider %q failed to run (will restart in 5s): %s", name, err)
+			closeProvider(l, name, provider)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(5 * time.Second):
+				// wait 5 seconds then start it again
+			}
+		}
+	}()
+	return state
 }
 
 func (c *controller) generateVars(fetchContextProviders mapstr.M) []*transpiler.Vars {
 	// build the vars list of mappings
 	vars := make([]*transpiler.Vars, 1)
 	mapping, _ := transpiler.NewAST(map[string]any{})
-	for name, state := range c.contextProviders {
+	for name, state := range c.contextProviderStates {
 		_ = mapping.Insert(state.Current(), name)
 	}
 	vars[0] = transpiler.NewVarsFromAst("", mapping, fetchContextProviders)
 
 	// add to the vars list for each dynamic providers mappings
-	for name, state := range c.dynamicProviders {
+	for name, state := range c.dynamicProviderStates {
 		for _, mappings := range state.Mappings() {
 			local := mapping.ShallowClone()
 			_ = local.Insert(mappings.mapping, name)
@@ -296,6 +419,27 @@ func (c *controller) generateVars(fetchContextProviders mapstr.M) []*transpiler.
 	return vars
 }
 
+func closeProvider(l *logger.Logger, name string, provider interface{}) {
+	cp, ok := provider.(corecomp.CloseableProvider)
+	if !ok {
+		// doesn't implement Close
+		return
+	}
+	if err := cp.Close(); err != nil {
+		l.Errorf("unable to close context provider %q: %s", name, err)
+	}
+}
+
+type contextProvider struct {
+	builder ContextProviderBuilder
+	cfg     *config.Config
+}
+
+type dynamicProvider struct {
+	builder DynamicProviderBuilder
+	cfg     *config.Config
+}
+
 type contextProviderState struct {
 	context.Context
 
@@ -303,6 +447,9 @@ type contextProviderState struct {
 	lock     sync.RWMutex
 	mapping  *transpiler.AST
 	signal   chan bool
+
+	logger    *logger.Logger
+	canceller context.CancelFunc
 }
 
 // Signal signals that something has changed in the provider.
@@ -361,6 +508,9 @@ type dynamicProviderState struct {
 	lock     sync.Mutex
 	mappings map[string]dynamicProviderMapping
 	signal   chan bool
+
+	logger    *logger.Logger
+	canceller context.CancelFunc
 }
 
 // AddOrUpdate adds or updates the current mapping for the dynamic provider.
@@ -471,7 +621,7 @@ func addToSet(set []int, i int) []int {
 	return append(set, i)
 }
 
-func drainChan(ch chan bool) {
+func drainChan[T any](ch chan T) {
 	for {
 		select {
 		case <-ch:

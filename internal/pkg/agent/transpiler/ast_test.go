@@ -920,6 +920,105 @@ func TestShallowClone(t *testing.T) {
 	}
 }
 
+func TestVars(t *testing.T) {
+	tests := map[string]struct {
+		input  map[string]interface{}
+		result []string
+	}{
+		"empty": {
+			input:  map[string]interface{}{},
+			result: nil,
+		},
+		"badbracket": {
+			input: map[string]interface{}{
+				"badbracket": "${missing.end",
+			},
+			result: nil,
+		},
+		"allconstant": {
+			input: map[string]interface{}{
+				"constant": "${'constant'}",
+			},
+			result: nil,
+		},
+		"escaped": {
+			input: map[string]interface{}{
+				"constant": "$${var1}",
+			},
+			result: nil,
+		},
+		"nested": {
+			input: map[string]interface{}{
+				"novars": map[string]interface{}{
+					"list1": []interface{}{
+						map[string]interface{}{
+							"int":   1,
+							"float": 1.1234,
+							"bool":  true,
+							"str":   "value1",
+						},
+					},
+					"list2": []interface{}{
+						map[string]interface{}{
+							"int":   2,
+							"float": 2.3456,
+							"bool":  false,
+							"str":   "value2",
+						},
+					},
+				},
+				"vars1": map[string]interface{}{
+					"list1": []interface{}{
+						map[string]interface{}{
+							"int":   1,
+							"float": 1.1234,
+							"bool":  true,
+							"str":   "${var1|var2|'constant'}",
+						},
+					},
+					"list2": []interface{}{
+						map[string]interface{}{
+							"int":   2,
+							"float": 2.3456,
+							"bool":  false,
+							"str":   "${var3|var1|'constant'}",
+						},
+					},
+				},
+				"vars2": map[string]interface{}{
+					"list1": []interface{}{
+						map[string]interface{}{
+							"int":   1,
+							"float": 1.1234,
+							"bool":  true,
+							"str":   "${var5|var6|'constant'}",
+						},
+					},
+					"list2": []interface{}{
+						map[string]interface{}{
+							"int":   2,
+							"float": 2.3456,
+							"bool":  false,
+							"str":   "${var1}",
+						},
+					},
+				},
+			},
+			result: []string{"var1", "var2", "var3", "var1", "var5", "var6", "var1"},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			ast, err := NewAST(test.input)
+			require.NoError(t, err)
+			var vars []string
+			vars = ast.root.Vars(vars)
+			assert.Equal(t, test.result, vars)
+		})
+	}
+}
+
 func mustMakeVars(mapping map[string]interface{}) *Vars {
 	v, err := NewVars("", mapping, nil)
 	if err != nil {
