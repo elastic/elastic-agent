@@ -1154,6 +1154,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.113.0 
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.113.0/go.mod h1:X25Nhlw6xhuNSd/C0FeEwmD4PGmcXDl7pa2jR0UREkU=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.113.0 h1:G8w+wg4nnqBqe297fBWnjJ5Tg2OYDVEMsdWA9/3ozxQ=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.113.0/go.mod h1:m3hDVsXPQzQfeji3+hn7NYJPHDRlHhQRNd5T7N5wZqc=
+github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.113.0 h1:3cHaq0xbqzoEBxcHDl8h0YpUZ1W3St7UG5YQ8f9qCxw=
+github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.113.0/go.mod h1:aJlolKULr8dNC4PlPkqpnBYGHrbanp4+cODG/8V/GW8=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/jaeger v0.113.0 h1:mFYOvag34kGXceVj29k0ZpBUyjEX7VZq+KctUSfNiG0=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/jaeger v0.113.0/go.mod h1:54P38b2i1CgHvZLxD3EAzVccqreamGEz2U4pqy9DuHw=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheus v0.113.0 h1:vKtNSM3VQBTJx1ecf+I1iqn4kj7fKif1SpBLQ+numf8=
@@ -1520,8 +1522,6 @@ go.opentelemetry.io/collector/config/internal v0.113.0 h1:9RAzH8v7ItFT1npHpvP0Sv
 go.opentelemetry.io/collector/config/internal v0.113.0/go.mod h1:yC7E4h1Uj0SubxcFImh6OvBHFTjMh99+A5PuyIgDWqc=
 go.opentelemetry.io/collector/confmap v1.19.0 h1:TQ0lZpAKqgsE0EKk+u4JA+uBbPYeFRmWP3GH43w40CY=
 go.opentelemetry.io/collector/confmap v1.19.0/go.mod h1:GgNu1ElPGmLn9govqIfjaopvdspw4PJ9KeDtWC4E2Q4=
-go.opentelemetry.io/collector/confmap/converter/expandconverter v0.113.0 h1:DBjWXlVzdwVbs1ZOH+k1vmoBt3TLx8NvRK8ZK3nKdmo=
-go.opentelemetry.io/collector/confmap/converter/expandconverter v0.113.0/go.mod h1:/YDWibNLalyfd0BR0V5ixiParsNCvVKkA58f3bcu/AA=
 go.opentelemetry.io/collector/confmap/provider/envprovider v1.19.0 h1:f8O/I5pVRN86Gx5mHekNx92S6fGdOS4VcooRJKWe6Bs=
 go.opentelemetry.io/collector/confmap/provider/envprovider v1.19.0/go.mod h1:AiaW5YW1LD0/WlZuc8eZuZPBH6PA9QqsiAYRX1iC6T0=
 go.opentelemetry.io/collector/confmap/provider/fileprovider v1.19.0 h1:TYwyk4ea3U+5MYcEjrzZAaonBcLlabQu8CZeB7ekAYY=
