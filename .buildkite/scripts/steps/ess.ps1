@@ -1,9 +1,11 @@
+. "$PWD\.buildkite\scripts\retry.ps1"
+
 function ess_up {
   param (
       [string]$StackVersion,
       [string]$EssRegion = "gcp-us-west2"
   )
-
+  
   Write-Output "~~~ Starting ESS Stack"
   
   $Workspace = & git rev-parse --show-toplevel
@@ -80,32 +82,6 @@ function get_git_user_email {
   } else {
       return $email
   }
-}
-
-function Retry-Command {
-  param (
-      [scriptblock]$ScriptBlock,
-      [int]$MaxRetries = 3,
-      [int]$DelaySeconds = 5
-  )
-
-  $lastError = $null
-
-  for ($attempt = 1; $attempt -le $MaxRetries; $attempt++) {
-      try {          
-        $result = & $ScriptBlock        
-        return $result
-      }
-      catch {          
-          $lastError = $_
-          Write-Warning "Attempt $attempt failed: $($_.Exception.Message)"
-          Write-Warning "Retrying in $DelaySeconds seconds..."
-          Start-Sleep -Seconds $DelaySeconds
-      }
-  }
-
-  Write-Error "All $MaxRetries attempts failed. Original error: $($lastError.Exception.Message)"
-  throw $lastError.Exception
 }
 
 function Get-Ess-Stack {

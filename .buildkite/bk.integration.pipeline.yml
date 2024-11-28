@@ -53,7 +53,7 @@ steps:
           - test-collector#v1.10.1:
               files: "build/TEST-*.xml"
               format: "junit"
-              branches: "main"
+              # branches: "main"
               debug: true
         matrix:
           - default
@@ -102,7 +102,7 @@ steps:
           - test-collector#v1.10.1:
               files: "build/TEST-*.xml"
               format: "junit"
-              branches: "main"
+              # branches: "main"
               debug: true
         matrix:
           - default
