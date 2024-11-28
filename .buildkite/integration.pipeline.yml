@@ -66,6 +66,7 @@ steps:
     env:
       TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-f"
     command: |
+      source .buildkite/scripts/set-bk-analytics-token.sh
       buildkite-agent artifact download build/distributions/** . --step 'package-it'
       .buildkite/scripts/steps/integration_tests.sh stateful
     artifact_paths:

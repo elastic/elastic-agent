@@ -40,6 +40,7 @@ steps:
     steps:
       - label: "Win2022:sudo:{{matrix}}"
         command: |
+          .buildkite/scripts/set-bk-analytics-token.ps1
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} true
         artifact_paths:
@@ -62,6 +63,7 @@ steps:
 
       - label: "Win2022:non-sudo:{{matrix}}"
         command: |
+          .buildkite/scripts/set-bk-analytics-token.ps1
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} false
         artifact_paths:
@@ -87,6 +89,7 @@ steps:
     steps:
       - label: "x86_64:non-sudo: {{matrix}}"
         command: |
+          source .buildkite/scripts/set-bk-analytics-token.sh
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
@@ -106,6 +109,7 @@ steps:
 
       - label: "x86_64:sudo: {{matrix}}"
         command: |
+          source .buildkite/scripts/set-bk-analytics-token.sh
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
@@ -134,6 +138,7 @@ steps:
 
       - label: "arm:sudo: {{matrix}}"
         command: |
+          source .buildkite/scripts/set-bk-analytics-token.sh
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
@@ -162,6 +167,7 @@ steps:
 
       - label: "arm:non-sudo: {{matrix}}"
         command: |
+          source .buildkite/scripts/set-bk-analytics-token.sh
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
@@ -187,6 +193,7 @@ steps:
     steps:
       - label: "x86_64:sudo:rpm"
         command: |
+          source .buildkite/scripts/set-bk-analytics-token.sh
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf.sh rpm true
         artifact_paths:
