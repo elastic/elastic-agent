@@ -63,7 +63,6 @@ if [[ "$BUILDKITE_STEP_KEY" == *"integration-tests"* ]]; then
   echo "--- Prepare BK test analytics token :vault:"
   BUILDKITE_ANALYTICS_TOKEN=$(vault kv get -field token kv/ci-shared/platform-ingest/buildkite_analytics_token)
   export BUILDKITE_ANALYTICS_TOKEN
-
 fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-binary-dra" ]]; then
