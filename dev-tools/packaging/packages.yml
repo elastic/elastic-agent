@@ -52,6 +52,10 @@ shared:
         content: >
           {{ commit }}
         mode: 0644
+      /etc/{{.BeatName}}/upgrades.disabled:
+        mode: 0444
+        content: >
+          ""
       /usr/share/{{.BeatName}}/bin/{{.BeatName}}-god:
         source: build/golang-crossbuild/god-{{.GOOS}}-{{.Platform.Arch}}
         mode: 0755
@@ -274,6 +278,10 @@ shared:
         content: >
           {{ commit }}
         mode: 0644
+      '.state/upgrades.disabled':
+        content: >
+          ""
+        mode: 0444
 
   # cloud build to beats-ci repository
   - &agent_docker_cloud_spec

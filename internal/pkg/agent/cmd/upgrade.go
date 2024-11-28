@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/utils"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -26,13 +28,14 @@ import (
 )
 
 const (
-	flagSourceURI      = "source-uri"
-	flagSkipVerify     = "skip-verify"
-	flagSkipDefaultPgp = "skip-default-pgp"
-	flagPGPBytes       = "pgp"
-	flagPGPBytesPath   = "pgp-path"
-	flagPGPBytesURI    = "pgp-uri"
-	flagForce          = "force"
+	flagSourceURI       = "source-uri"
+	flagSkipVerify      = "skip-verify"
+	flagSkipDefaultPgp  = "skip-default-pgp"
+	flagPGPBytes        = "pgp"
+	flagPGPBytesPath    = "pgp-path"
+	flagPGPBytesURI     = "pgp-uri"
+	flagForce           = "force"
+	upgradeDisabledFile = "upgrades.disabled"
 )
 
 var (
@@ -40,6 +43,7 @@ var (
 	nonRootExecutionError           = errors.New("upgrade command needs to be executed as root for fleet managed agents")
 	skipVerifyNotAllowedError       = errors.New(fmt.Sprintf("\"%s\" flag is not allowed when upgrading a fleet managed agent using the cli", flagSkipVerify))
 	skipVerifyNotRootError          = errors.New(fmt.Sprintf("user needs to be root to use \"%s\" flag when upgrading standalone agents", flagSkipVerify))
+	upgradeDisabledError            = errors.New("cannot upgrade agent running in docker or deployed via DEB or RPM")
 )
 
 func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -83,6 +87,10 @@ type upgradeInput struct {
 }
 
 func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
+	topPath := paths.Top()
+	fmt.Printf("============================= HERE'S THE TOP PATH: %s ===============================\n", topPath)
+	fmt.Printf("============================= HERE'S THE CONFIG PATH: %s ================================\n", paths.Config())
+
 	c := client.New()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -114,10 +122,11 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 }
 
 type upgradeCond struct {
-	isManaged  bool
-	force      bool
-	isRoot     bool
-	skipVerify bool
+	isUpgradeDisabled bool
+	isManaged         bool
+	force             bool
+	isRoot            bool
+	skipVerify        bool
 }
 
 func checkUpgradable(cond upgradeCond) error {
@@ -143,7 +152,9 @@ func checkUpgradable(cond upgradeCond) error {
 		}
 		return nil
 	}
-
+	if cond.isUpgradeDisabled {
+		return upgradeDisabledError
+	}
 	if cond.isManaged {
 		return checkManaged()
 	}
@@ -167,11 +178,24 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 		return fmt.Errorf("failed to retrieve %s flag information while upgrading the agent: %w", flagSkipVerify, err)
 	}
 
+	var isUpgradeDisabled bool
+	_, err = os.Stat(filepath.Join(paths.Config(), upgradeDisabledFile))
+	if err == nil {
+		isUpgradeDisabled = true
+	} else {
+		if os.IsNotExist(err) {
+			isUpgradeDisabled = false
+		} else {
+			return fmt.Errorf("failed reading file: %w", err)
+		}
+	}
+
 	err = checkUpgradable(upgradeCond{
-		isManaged:  input.agentInfo.IsManaged,
-		force:      force,
-		isRoot:     input.isRoot,
-		skipVerify: skipVerification,
+		isManaged:         input.agentInfo.IsManaged,
+		force:             force,
+		isRoot:            input.isRoot,
+		skipVerify:        skipVerification,
+		isUpgradeDisabled: isUpgradeDisabled,
 	})
 	if err != nil {
 		return fmt.Errorf("aborting upgrade: %w", err)
