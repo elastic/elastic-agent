@@ -8,6 +8,7 @@ import (
 	"context"
 	"log"
 	"net"
+	"os"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -58,6 +59,7 @@ func TestUpgradeCmd(t *testing.T) {
 			c,
 			client.AgentStateInfo{IsManaged: false},
 			false,
+			"",
 		}
 
 		// the upgrade command will hang until the server shut down
@@ -107,6 +109,7 @@ func TestUpgradeCmd(t *testing.T) {
 				IsManaged: true,
 			},
 			false,
+			"",
 		}
 
 		err = upgradeCmdWithClient(commandInput)
@@ -131,6 +134,7 @@ func TestUpgradeCmd(t *testing.T) {
 			mockClient,
 			client.AgentStateInfo{IsManaged: true},
 			true,
+			"",
 		}
 
 		err := upgradeCmdWithClient(commandInput)
@@ -161,6 +165,7 @@ func TestUpgradeCmd(t *testing.T) {
 			mockClient,
 			client.AgentStateInfo{IsManaged: true},
 			true,
+			"",
 		}
 
 		err = upgradeCmdWithClient(commandInput)
@@ -191,6 +196,7 @@ func TestUpgradeCmd(t *testing.T) {
 			mockClient,
 			client.AgentStateInfo{IsManaged: true},
 			true,
+			"",
 		}
 
 		err = upgradeCmdWithClient(commandInput)
@@ -221,6 +227,7 @@ func TestUpgradeCmd(t *testing.T) {
 			mockClient,
 			client.AgentStateInfo{IsManaged: false},
 			false,
+			"",
 		}
 
 		err = upgradeCmdWithClient(commandInput)
@@ -255,10 +262,61 @@ func TestUpgradeCmd(t *testing.T) {
 			mockClient,
 			client.AgentStateInfo{IsManaged: false},
 			true,
+			"",
 		}
 
 		err = upgradeCmdWithClient(commandInput)
 		assert.NoError(t, err)
+	})
+	t.Run("prevent upgrade if there is \"upgrades.disabled\" file in the config directory", func(t *testing.T) {
+		mockClient := clientmocks.NewClient(t)
+
+		// Here we are creating the upgrade disabled file in the current directory.
+		// We have to set the configPath in the input struct to "" for this test to
+		// work
+		file, err := os.Create(upgradeDisabledFile)
+		if err != nil {
+			t.Fatalf("error creating test file: %s", err.Error())
+		}
+		err = file.Close()
+		if err != nil {
+			t.Fatalf("error closing the test file: %s", err.Error())
+		}
+
+		defer func(t *testing.T) {
+			err := os.Remove(upgradeDisabledFile)
+			if err != nil {
+				t.Fatalf("error removing the test file: %s", err.Error())
+			}
+		}(t)
+
+		args := []string{"8.13.0"} // Version argument
+		streams := cli.NewIOStreams()
+
+		cmd := newUpgradeCommandWithArgs(args, streams)
+		cmd.SetContext(context.Background())
+		err = cmd.Flags().Set(flagForce, "true")
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = cmd.Flags().Set(flagSkipVerify, "true")
+		if err != nil {
+			log.Fatal(err)
+		}
+		commandInput := &upgradeInput{
+			streams,
+			cmd,
+			args,
+			mockClient,
+			client.AgentStateInfo{IsManaged: false},
+			false,
+			"",
+		}
+
+		err = upgradeCmdWithClient(commandInput)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), upgradeDisabledError.Error())
 	})
 }
 
