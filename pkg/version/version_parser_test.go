@@ -5,6 +5,7 @@
 package version
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -339,6 +340,29 @@ func TestIsIndependentRelease(t *testing.T) {
 	}
 }
 
+func TestIndependenBuild(t *testing.T) {
+	testCases := []struct {
+		Version         string
+		ExpectedBuildID string
+	}{
+		{"8.10.9", ""},
+		{"8.10.9-SNAPSHOT", ""},
+		{"1.2.3-er.1+abcdef", ""},
+		{"8.10.9+build20241224", ""},
+		{"8.10.9+build202412240810", "build202412240810"},
+		{"8.10.9+build202412240810.meta.5", "build202412240810"},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("#%d %s", i, tc.Version), func(t *testing.T) {
+			pv, err := ParseVersion(tc.Version)
+			assert.NoError(t, err)
+
+			assert.Equal(t, tc.ExpectedBuildID, pv.IndependentBuildID())
+		})
+	}
+}
+
 func TestExtractSnapshotFromVersionString(t *testing.T) {
 	testcases := []struct {
 		name          string
@@ -518,6 +542,32 @@ func TestLess(t *testing.T) {
 			leftVersion:  "1.0.0-rc.1",
 			rightVersion: "1.0.0",
 			less:         true,
+		},
+
+		// independent section
+		{
+			name:         "independent release is always more than regular",
+			leftVersion:  "8.9.0+build202405061022",
+			rightVersion: "8.9.0",
+			less:         false,
+		},
+		{
+			name:         "prerelease is less than independent release",
+			leftVersion:  "8.9.0-SNAPSHOT",
+			rightVersion: "8.9.0+build202405061022",
+			less:         true,
+		},
+		{
+			name:         "older release is less",
+			leftVersion:  "8.9.0+build202305061022",
+			rightVersion: "8.9.0+build202405061022",
+			less:         true,
+		},
+		{
+			name:         "older release is less - reversed",
+			leftVersion:  "8.9.0+build202405061022",
+			rightVersion: "8.9.0+build202305061022",
+			less:         false,
 		},
 	}
 
