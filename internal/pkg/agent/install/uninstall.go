@@ -20,7 +20,6 @@ import (
 	"github.com/schollz/progressbar/v3"
 
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
@@ -95,9 +94,6 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	// Once the root-cause is identified then this can be re-enabled on Windows.
 	// Notify fleet-server while it is still running if it's running locally
 	if notifyFleet && localFleet && runtime.GOOS != "windows" {
-		if cfg.Fleet.Client.Transport.TLS != nil {
-			cfg.Fleet.Client.Transport.TLS.VerificationMode = tlscommon.VerifyCertificate
-		}
 		cfg.Fleet.Client.Hosts = []string{cfg.Fleet.Client.Host}
 		notifyFleetAuditUninstall(ctx, log, pt, cfg, ai) //nolint:errcheck // ignore the error as we can't act on it
 	}
