@@ -24,9 +24,11 @@ import (
 )
 
 // defaultAgentConfigFile is a name of file used to store agent information
-const agentInfoKey = "agent"
-const defaultLogLevel = "info"
-const maxRetriesloadAgentInfo = 5
+const (
+	agentInfoKey            = "agent"
+	defaultLogLevel         = "info"
+	maxRetriesloadAgentInfo = 5
+)
 
 type persistentAgentInfo struct {
 	ID             string                                 `json:"id" yaml:"id" config:"id"`
@@ -125,7 +127,7 @@ func getInfoFromStore(s ioStore, logLevel string) (*persistentAgentInfo, bool, e
 		LogLevel:       logLevel,
 		MonitoringHTTP: monitoringConfig.DefaultConfig().HTTP,
 	}
-	if err := cc.Unpack(&pid); err != nil {
+	if err := cc.UnpackTo(&pid); err != nil {
 		return nil, false, errors.New(err, "failed to unpack stored config to map")
 	}
 
@@ -150,7 +152,7 @@ func updateAgentInfo(s ioStore, agentInfo *persistentAgentInfo) error {
 	}
 
 	configMap := make(map[string]interface{})
-	if err := cfg.Unpack(&configMap); err != nil {
+	if err := cfg.UnpackTo(&configMap); err != nil {
 		return errors.New(err, "failed to unpack stored config to map")
 	}
 
@@ -158,7 +160,7 @@ func updateAgentInfo(s ioStore, agentInfo *persistentAgentInfo) error {
 	if agentInfoSubMap, found := configMap[agentInfoKey]; found {
 		if cc, err := config.NewConfigFrom(agentInfoSubMap); err == nil {
 			pid := &persistentAgentInfo{}
-			err := cc.Unpack(&pid)
+			err := cc.UnpackTo(&pid)
 			if err == nil && pid.ID != agentInfo.ID {
 				// if our id is different (we just generated it)
 				// keep the one present in the file

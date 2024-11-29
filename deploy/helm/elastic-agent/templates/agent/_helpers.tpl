@@ -65,6 +65,7 @@ Initialise input templates if we are not deploying as managed
 {{- if eq $.Values.agent.fleet.enabled false -}}
 {{/* standalone agent so initialise inputs */}}
 {{- include "elasticagent.kubernetes.init" $ -}}
+{{- include "elasticagent.system.init" $ -}}
 {{- range $customInputName, $customInputVal := $.Values.extraIntegrations -}}
 {{- $customInputPresetName := ($customInputVal).preset -}}
 {{- $presetVal := get $.Values.agent.presets $customInputPresetName -}}
@@ -96,6 +97,18 @@ Validate and initialise the defined agent presets
 {{- end -}}
 {{- end -}}
 {{- end -}}
+{{/* by default we disable leader election but we also set the name of the leader lease in case it is explicitly enabled */}}
+{{- if empty ($presetVal).providers -}}
+{{- $_ := set $presetVal "providers" dict -}}
+{{- end -}}
+{{- $presetProviders := get $presetVal "providers" -}}
+{{- if empty ($presetProviders).kubernetes_leaderelection -}}
+{{- $_ := set $presetProviders "kubernetes_leaderelection" dict -}}
+{{- end -}}
+{{- $presetLeaderLeaseName := (printf "%s-%s" $.Release.Name $presetName) | lower  -}}
+{{- $defaultLeaderElection := dict "enabled" false "leader_lease" $presetLeaderLeaseName -}}
+{{- $presetLeaderElection := mergeOverwrite dict $defaultLeaderElection ($presetProviders).kubernetes_leaderelection -}}
+{{- $_ := set $presetProviders "kubernetes_leaderelection" $presetLeaderElection -}}
 {{- end -}}
 {{- end -}}
 
@@ -190,7 +203,6 @@ Common labels
 {{- define "elasticagent.labels" -}}
 helm.sh/chart: {{ include "elasticagent.chart" . }}
 {{ include "elasticagent.selectorLabels" . }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
@@ -271,10 +283,12 @@ app.kubernetes.io/version: {{ .Values.agent.version}}
 {{- $ := index . 0 -}}
 {{- $preset := index . 1 -}}
 {{- $templateName := index . 2 -}}
-{{- $presetRules := dig "rules" (list) $preset -}}
+{{- if eq ($preset).clusterRole.create true -}}
+{{- $presetClusterRoleRules := dig "rules" (list) ($preset).clusterRole -}}
 {{- $rulesToAdd := get (include $templateName $ | fromYaml) "rules" -}}
-{{- $presetRules = uniq (concat $presetRules $rulesToAdd) -}}
-{{- $_ := set $preset "rules" $presetRules -}}
+{{- $presetClusterRoleRules = uniq (concat $presetClusterRoleRules $rulesToAdd) -}}
+{{- $_ := set ($preset).clusterRole "rules" $presetClusterRoleRules -}}
+{{- end -}}
 {{- end -}}
 
 {{- define "elasticagent.preset.mutate.annotations" -}}

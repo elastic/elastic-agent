@@ -144,7 +144,9 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	}
 	pt.Describe("Removed install directory")
 
-	if notifyFleet {
+	// Skip on Windows because of https://github.com/elastic/elastic-agent/issues/5952
+	// Once the root-cause is identified then this can be re-enabled on Windows.
+	if notifyFleet && runtime.GOOS != "windows" {
 		notifyFleetAuditUninstall(ctx, log, pt, cfg, ai) //nolint:errcheck // ignore the error as we can't act on it
 	}
 

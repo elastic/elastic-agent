@@ -1,9 +1,5 @@
 {{- if gt (len $.Values.agent.presets) 0}}
-{{- if $.Release.IsInstall }}
-🙌 Release "{{ .Release.Name }}" is installed at "{{ $.Release.Namespace }}" namespace
-{{- else if $.Release.IsUpgrade }}
-🚀 Release "{{ .Release.Name }}" at "{{ $.Release.Namespace }}" namespace upgraded
-{{- end }}
+Release "{{ .Release.Name }}" is installed at "{{ $.Release.Namespace }}" namespace
 {{ if gt (len $.Values.agent.presets) 1 }}
 Installed agents:
 {{- else }}
@@ -21,6 +17,9 @@ Installed agent:
 Installed integrations:
 {{- if eq $.Values.kubernetes.enabled true }}
   - kubernetes [built-in chart integration]
+{{- end }}
+{{- if eq $.Values.system.enabled true }}
+  - system [built-in chart integration]
 {{- end }}
 {{- range $customInputName, $customInputVal := $.Values.extraIntegrations }}
   - {{$customInputName}} [user-defined integration]

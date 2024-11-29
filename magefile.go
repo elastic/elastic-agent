@@ -40,6 +40,7 @@ import (
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
+	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/pkg/testing/buildkite"
 	tcommon "github.com/elastic/elastic-agent/pkg/testing/common"
@@ -533,7 +534,7 @@ func Package(ctx context.Context) error {
 		dependenciesVersion = beatVersion
 	}
 
-	packageAgent(ctx, platforms, dependenciesVersion, manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(CrossBuild))
+	packageAgent(ctx, platforms, dependenciesVersion, manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(CrossBuild), devtools.SelectedPackageTypes)
 	return nil
 }
 
@@ -874,7 +875,7 @@ func (Devmachine) Create(instanceName string) error {
 	if instanceName == "" {
 		return errors.New(
 			`instanceName is required.
-	Example: 
+	Example:
 	mage devmachine:create "pavel-dev-machine"  `)
 	}
 	return devmachine.Run(instanceName)
@@ -935,7 +936,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 		// produce docker package
 		packageAgent(ctx, []string{
 			"linux/amd64",
-		}, dependenciesVersion, nil, mg.F(devtools.UseElasticAgentDemoPackaging), mg.F(CrossBuild))
+		}, dependenciesVersion, nil, mg.F(devtools.UseElasticAgentDemoPackaging), mg.F(CrossBuild), devtools.SelectedPackageTypes)
 
 		dockerPackagePath := filepath.Join("build", "package", "elastic-agent", "elastic-agent-linux-amd64.docker", "docker-build")
 		if err := os.Chdir(dockerPackagePath); err != nil {
@@ -982,7 +983,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-func packageAgent(ctx context.Context, platforms []string, dependenciesVersion string, manifestResponse *manifest.Build, agentPackaging, agentBinaryTarget mg.Fn) error {
+func packageAgent(ctx context.Context, platforms []string, dependenciesVersion string, manifestResponse *manifest.Build, agentPackaging, agentBinaryTarget mg.Fn, packageTypes []mage.PackageType) error {
 	fmt.Println("--- Package Elastic-Agent")
 
 	platformPackageSuffixes := []string{}
@@ -994,7 +995,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	}
 
 	// download/copy all the necessary dependencies for packaging elastic-agent
-	archivePath, dropPath := collectPackageDependencies(platforms, dependenciesVersion, platformPackageSuffixes)
+	archivePath, dropPath := collectPackageDependencies(platforms, dependenciesVersion, platformPackageSuffixes, packageTypes)
 
 	// cleanup after build
 	defer os.RemoveAll(archivePath)
@@ -1028,7 +1029,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 // NOTE: after the build is done the caller must:
 // - delete archivePath and dropPath contents
 // - unset AGENT_DROP_PATH environment variable
-func collectPackageDependencies(platforms []string, packageVersion string, platformPackageSuffixes []string) (archivePath string, dropPath string) {
+func collectPackageDependencies(platforms []string, packageVersion string, platformPackageSuffixes []string, packageTypes []mage.PackageType) (archivePath string, dropPath string) {
 	dropPath, found := os.LookupEnv(agentDropPath)
 
 	// try not to shadow too many variables
@@ -1073,10 +1074,15 @@ func collectPackageDependencies(platforms []string, packageVersion string, platf
 						fmt.Printf("--- Binary %s does not support %s, download skipped\n", spec.BinaryName, platform)
 						continue
 					}
-					targetPath := filepath.Join(archivePath, manifest.PlatformPackages[platform])
-					os.MkdirAll(targetPath, 0755)
-					packageName := spec.GetPackageName(packageVersion, platform)
-					errGroup.Go(downloadBinary(ctx, spec.ProjectName, packageName, spec.BinaryName, platform, packageVersion, targetPath, completedDownloads))
+					for _, pkgType := range packageTypes {
+						if !spec.SupportsPackageType(pkgcommon.PackageType(pkgType)) {
+							continue
+						}
+						targetPath := filepath.Join(archivePath, manifest.PlatformPackages[platform])
+						os.MkdirAll(targetPath, 0755)
+						packageName := spec.GetPackageName(packageVersion, platform)
+						errGroup.Go(downloadBinary(ctx, spec.ProjectName, packageName, spec.BinaryName, platform, packageVersion, targetPath, completedDownloads))
+					}
 				}
 			}
 
@@ -1310,7 +1316,7 @@ func PackageUsingDRA(ctx context.Context) error {
 		return fmt.Errorf("setting agent commit hash %q: %w", agentCoreProject.CommitHash, err)
 	}
 
-	return packageAgent(ctx, platforms, parsedVersion.VersionWithPrerelease(), manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(useDRAAgentBinaryForPackage, devtools.ManifestURL))
+	return packageAgent(ctx, platforms, parsedVersion.VersionWithPrerelease(), manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(useDRAAgentBinaryForPackage, devtools.ManifestURL), devtools.SelectedPackageTypes)
 }
 
 func downloadManifestAndSetVersion(ctx context.Context, url string) (*manifest.Build, *version.ParsedSemVer, error) {
@@ -3456,6 +3462,12 @@ func (Helm) RenderExamples() error {
 				return fmt.Errorf("failed to load helm values file: %w", err)
 			}
 			maps.Copy(helmValues, data)
+		}
+
+		lintAction := action.NewLint()
+		lintResult := lintAction.Run([]string{helmChartPath}, helmValues)
+		if len(lintResult.Errors) > 0 {
+			return fmt.Errorf("failed to lint helm chart for example %s: %w", exampleFullPath, errors.Join(lintResult.Errors...))
 		}
 
 		installAction := action.NewInstall(actionConfig)

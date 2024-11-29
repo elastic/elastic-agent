@@ -128,7 +128,7 @@ func Parse(policy any) (*LimitsConfig, error) {
 	}
 
 	parsedConfig := rootConfig{}
-	if err := c.Unpack(&parsedConfig); err != nil {
+	if err := c.UnpackTo(&parsedConfig); err != nil {
 		return nil, fmt.Errorf("could not unpack limits config: %w", err)
 	}
 

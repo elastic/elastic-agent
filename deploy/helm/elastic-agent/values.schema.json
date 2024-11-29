@@ -18,6 +18,71 @@
                 }
             ]
         },
+        "system": {
+            "type": "object",
+            "description": "Configuration for system integration.",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Enable system integration."
+                },
+                "output": {
+                    "type": "string",
+                    "description": "Name of the output used in system integration. Must be defined in outputs."
+                },
+                "namespace": {
+                    "type": "string",
+                    "description": "output namespace.",
+                    "default": "default"
+                },
+                "authLogs": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable system auth logs stream."
+                        },
+                        "vars": {
+                            "$ref": "#/definitions/SystemLogsStreamVars"
+                        }
+                    },
+                    "required": [
+                        "enabled"
+                    ]
+                },
+                "syslog": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable system syslog stream."
+                        },
+                        "vars": {
+                            "$ref": "#/definitions/SystemLogsStreamVars"
+                        }
+                    },
+                    "required": [
+                        "enabled"
+                    ]
+                },
+                "metrics": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Enable system metrics stream."
+                        }
+                    },
+                    "required": [
+                        "enabled"
+                    ]
+                }
+            },
+            "required": [
+                "enabled",
+                "output"
+            ]
+        },
         "kubernetes": {
             "type": "object",
             "description": "Configuration for Kubernetes integration.",
@@ -186,7 +251,7 @@
                                 "additionalParsersConfig": {
                                     "type": "array",
                                     "items": {
-                                        "type": "string"
+                                        "type": "object"
                                     }
                                 }
                             },
@@ -267,6 +332,12 @@
                 },
                 "image": {
                     "$ref": "#/definitions/AgentImageConfig"
+                },
+                "imagePullSecrets": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    }
                 },
                 "engine": {
                     "type": "string",
@@ -528,7 +599,8 @@
                             "password"
                         ]
                     }
-                },{
+                },
+                {
                     "if": {
                         "properties": {
                             "type": {
@@ -931,6 +1003,14 @@
                         ]
                     ]
                 },
+                "automountServiceAccountToken": {
+                    "type": "boolean",
+                    "description": "Automount service account token for the deployment.",
+                    "examples": [
+                        true
+                    ],
+                    "default": true
+                },
                 "hostNetwork": {
                     "type": "boolean",
                     "description": "Enable host networking for the deployment.",
@@ -972,26 +1052,24 @@
                         }
                     ]
                 },
-                "rules": {
+                "serviceAccount": {
+                    "$ref": "#/definitions/AgentPresetServiceAccount"
+                },
+                "clusterRole": {
+                    "$ref": "#/definitions/AgentPresetClusterRole"
+                },
+                "envFrom": {
                     "type": "array",
                     "items": {
                         "type": "object"
                     },
-                    "description": "Rules for the deployment.",
+                    "description": "Environment variables for the deployment.",
                     "examples": [
                         [
                             {
-                                "apiGroups": [
-                                    ""
-                                ],
-                                "resources": [
-                                    "pods"
-                                ],
-                                "verbs": [
-                                    "get",
-                                    "watch",
-                                    "list"
-                                ]
+                                "configMapRef": {
+                                    "name": "my-config"
+                                }
                             }
                         ]
                     ]
@@ -1175,8 +1253,167 @@
                 }
             },
             "required": [
-                "mode"
+                "mode",
+                "serviceAccount",
+                "clusterRole"
             ]
+        },
+        "AgentPresetClusterRole": {
+            "type": "object",
+            "properties": {
+                "create": {
+                    "type": "boolean",
+                    "description": "Create the cluster role.",
+                    "default": true
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Name of the cluster role to use if create is set to false."
+                },
+                "annotations": {
+                    "type": "object",
+                    "description": "Annotations for the cluster role if create is set to true."
+                },
+                "rules": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    },
+                    "description": "Rules for the cluster role to create if create is set to true.",
+                    "examples": [
+                        [
+                            {
+                                "apiGroups": [
+                                    ""
+                                ],
+                                "resources": [
+                                    "pods"
+                                ],
+                                "verbs": [
+                                    "get",
+                                    "watch",
+                                    "list"
+                                ]
+                            }
+                        ]
+                    ]
+                }
+            },
+            "examples": [
+                {
+                    "create": true,
+                    "name": ""
+                }
+            ],
+            "required": [
+                "create"
+            ],
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "create": {
+                                "const": true
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        "AgentPresetServiceAccount": {
+            "type": "object",
+            "properties": {
+                "create": {
+                    "type": "boolean",
+                    "description": "Create the service account.",
+                    "default": true
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Name of the service account to use if create is set to false."
+                },
+                "annotations": {
+                    "type": "object",
+                    "description": "Annotations for the service account if create is set to true."
+                }
+            },
+            "examples": [
+                {
+                    "create": true,
+                    "name": ""
+                }
+            ],
+            "required": [
+                "create"
+            ],
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "create": {
+                                "const": true
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        },
+                        "required": [
+                            "create"
+                        ]
+                    }
+                }
+            ]
+        },
+        "SystemLogsStreamVars": {
+            "type": "object",
+            "description": "System integration log stream variables.",
+            "properties": {
+                "paths": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Paths to scan for logs."
+                },
+                "exclude_files": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Files to exclude from logs."
+                },
+                "processors": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    },
+                    "description": "Processors for the system auth logs stream."
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Tags for the logs stream."
+                },
+                "ignore_older": {
+                    "type": "string",
+                    "description": "If this option is specified, events that are older than the specified amount of time are ignored. Valid time units are \"ns\", \"us\" (or \"µs\"), \"ms\", \"s\", \"m\", \"h\"."
+                }
+            }
         }
     }
 }

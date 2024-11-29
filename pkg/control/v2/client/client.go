@@ -26,6 +26,9 @@ type UnitType = cproto.UnitType
 // State is the state codes
 type State = cproto.State
 
+// CollectorComponentStatus is the status of a collector component
+type CollectorComponentStatus = cproto.CollectorComponentStatus
+
 // AdditionalMetrics is the type for additional diagnostic requests
 type AdditionalMetrics = cproto.AdditionalDiagnosticRequest
 
@@ -55,6 +58,25 @@ const (
 	Upgrading State = cproto.State_UPGRADING
 	// Rollback is when it is upgrading is rolling back.
 	Rollback State = cproto.State_ROLLBACK
+)
+
+const (
+	// CollectorComponentStatusNone is when the collector component doesn't report a status.
+	CollectorComponentStatusNone CollectorComponentStatus = cproto.CollectorComponentStatus_StatusNone
+	// CollectorComponentStatusStarting is when the collector component is starting.
+	CollectorComponentStatusStarting CollectorComponentStatus = cproto.CollectorComponentStatus_StatusStarting
+	// CollectorComponentStatusOK is when the collector component is in good health.
+	CollectorComponentStatusOK CollectorComponentStatus = cproto.CollectorComponentStatus_StatusOK
+	// CollectorComponentStatusRecoverableError is when the collector component had an error but can recover.
+	CollectorComponentStatusRecoverableError CollectorComponentStatus = cproto.CollectorComponentStatus_StatusRecoverableError
+	// CollectorComponentStatusPermanentError is when the collector component had a permanent error.
+	CollectorComponentStatusPermanentError CollectorComponentStatus = cproto.CollectorComponentStatus_StatusPermanentError
+	// CollectorComponentStatusFatalError is when the collector component had a fatal error.
+	CollectorComponentStatusFatalError CollectorComponentStatus = cproto.CollectorComponentStatus_StatusFatalError
+	// CollectorComponentStatusStopping is when the collector component is stopping.
+	CollectorComponentStatusStopping CollectorComponentStatus = cproto.CollectorComponentStatus_StatusStopping
+	// CollectorComponentStatusStopped is when the collector component is stopped.
+	CollectorComponentStatusStopped CollectorComponentStatus = cproto.CollectorComponentStatus_StatusStopped
 )
 
 const (
@@ -97,6 +119,14 @@ type ComponentState struct {
 	VersionInfo ComponentVersionInfo `json:"version_info" yaml:"version_info"`
 }
 
+// CollectorComponent is a state of a collector component managed by the Elastic Agent.
+type CollectorComponent struct {
+	Status             CollectorComponentStatus       `json:"status" yaml:"status"`
+	Error              string                         `json:"error,omitempty" yaml:"error,omitempty"`
+	Timestamp          time.Time                      `json:"timestamp,omitempty" yaml:"timestamp,omitempty"`
+	ComponentStatusMap map[string]*CollectorComponent `json:"components,omitempty" yaml:"components,omitempty"`
+}
+
 // AgentStateInfo is the overall information about the Elastic Agent.
 type AgentStateInfo struct {
 	ID           string `json:"id" yaml:"id"`
@@ -106,6 +136,7 @@ type AgentStateInfo struct {
 	Snapshot     bool   `json:"snapshot" yaml:"snapshot"`
 	PID          int32  `json:"pid" yaml:"pid"`
 	Unprivileged bool   `json:"unprivileged" yaml:"unprivileged"`
+	IsManaged    bool   `json:"is_managed" yaml:"is_managed"`
 }
 
 // AgentState is the current state of the Elastic Agent.
@@ -117,6 +148,7 @@ type AgentState struct {
 	FleetState     State                  `yaml:"fleet_state"`
 	FleetMessage   string                 `yaml:"fleet_message"`
 	UpgradeDetails *cproto.UpgradeDetails `json:"upgrade_details,omitempty" yaml:"upgrade_details,omitempty"`
+	Collector      *CollectorComponent    `json:"collector,omitempty" yaml:"collector,omitempty"`
 }
 
 // DiagnosticFileResult is a diagnostic file result.
@@ -385,7 +417,6 @@ func (c *client) DiagnosticComponents(ctx context.Context, additionalMetrics []A
 	}
 
 	return results, nil
-
 }
 
 // DiagnosticUnits gathers diagnostics information from specific units (or all if non are provided).
@@ -473,6 +504,7 @@ func toState(res *cproto.StateResponse) (*AgentState, error) {
 			Snapshot:     res.Info.Snapshot,
 			PID:          res.Info.Pid,
 			Unprivileged: res.Info.Unprivileged,
+			IsManaged:    res.Info.IsManaged,
 		},
 		State:          res.State,
 		Message:        res.Message,
@@ -515,5 +547,39 @@ func toState(res *cproto.StateResponse) (*AgentState, error) {
 		}
 		s.Components = append(s.Components, cs)
 	}
+	if res.Collector != nil {
+		cs, err := collectorToState(res.Collector)
+		if err != nil {
+			return nil, err
+		}
+		s.Collector = cs
+	}
 	return s, nil
+}
+
+func collectorToState(res *cproto.CollectorComponent) (*CollectorComponent, error) {
+	var t time.Time
+	var err error
+	if res.Timestamp != "" {
+		t, err = time.Parse(time.RFC3339Nano, res.Timestamp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	cc := &CollectorComponent{
+		Status:    res.Status,
+		Error:     res.Error,
+		Timestamp: t,
+	}
+	if res.ComponentStatusMap != nil {
+		cc.ComponentStatusMap = make(map[string]*CollectorComponent, len(res.ComponentStatusMap))
+		for id, compStatus := range res.ComponentStatusMap {
+			cs, err := collectorToState(compStatus)
+			if err != nil {
+				return nil, err
+			}
+			cc.ComponentStatusMap[id] = cs
+		}
+	}
+	return cc, nil
 }
