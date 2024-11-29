@@ -1019,6 +1019,58 @@ func TestVars(t *testing.T) {
 	}
 }
 
+func TestLookup(t *testing.T) {
+	tests := map[string]struct {
+		ast      *AST
+		selector Selector
+		node     Node
+		ok       bool
+	}{
+		"nil": {
+			ast:      nil,
+			selector: "",
+			node:     nil,
+			ok:       false,
+		},
+		"noroot": {
+			ast:      &AST{},
+			selector: "",
+			node:     nil,
+			ok:       false,
+		},
+		"notfound": {
+			ast: &AST{
+				root: NewDict([]Node{NewKey("entry", NewDict([]Node{
+					NewKey("var1", NewStrVal("value1")),
+					NewKey("var2", NewStrVal("value2")),
+				}))}),
+			},
+			selector: "entry.var3",
+			node:     nil,
+			ok:       false,
+		},
+		"found": {
+			ast: &AST{
+				root: NewDict([]Node{NewKey("entry", NewDict([]Node{
+					NewKey("var1", NewStrVal("value1")),
+					NewKey("var2", NewStrVal("value2")),
+				}))}),
+			},
+			selector: "entry.var2",
+			node:     NewKey("var2", NewStrVal("value2")),
+			ok:       true,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			node, ok := Lookup(test.ast, test.selector)
+			if assert.Equal(t, test.ok, ok) {
+				assert.Equal(t, test.node, node)
+			}
+		})
+	}
+}
+
 func mustMakeVars(mapping map[string]interface{}) *Vars {
 	v, err := NewVars("", mapping, nil)
 	if err != nil {

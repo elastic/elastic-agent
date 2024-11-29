@@ -58,7 +58,8 @@ type Node interface {
 	// Hash compute a sha256 hash of the current node and recursively call any children.
 	Hash() []byte
 
-	// Vars return a list of referenced vars.
+	// Vars adds to the array with the variables identified in the node. Returns the array in-case
+	// the capacity of the array had to be changed.
 	Vars([]string) []string
 
 	// Apply apply the current vars, returning the new value for the node.
@@ -502,35 +503,11 @@ func (s *StrVal) Hash() []byte {
 
 // Vars returns a list of all variables referenced in the string.
 func (s *StrVal) Vars(vars []string) []string {
-	value := s.value
-	matchIdxs := varsRegex.FindAllSubmatchIndex([]byte(value), -1)
-	if !validBrackets(value, matchIdxs) {
-		// brackets are not valid; unable to pull vars (computing the policy will fail)
-		return vars
-	}
-	for _, r := range matchIdxs {
-		for i := 0; i < len(r); i += 4 {
-			if value[r[i]+1] == '$' {
-				// match on an escaped var, this is not a real variable
-				continue
-			}
-			// match on a non-escaped var
-			extractedVars, err := extractVars(value[r[i+2]:r[i+3]])
-			if err != nil {
-				// variable parsing failed (computing the policy will fail)
-				return vars
-			}
-			for _, val := range extractedVars {
-				switch val.(type) {
-				case *constString:
-					// not a variable
-				case *varString:
-					// found variable add it to the array
-					vars = append(vars, val.Value())
-				}
-			}
-		}
-	}
+	// errors are ignored (if there is an error determine the vars it will also error computing the policy)
+	_, _ = replaceVars(s.value, func(variable string) (Node, Processors, bool) {
+		vars = append(vars, variable)
+		return nil, nil, false
+	}, false)
 	return vars
 }
 

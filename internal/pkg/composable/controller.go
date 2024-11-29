@@ -47,9 +47,9 @@ type controller struct {
 	errCh           chan error
 	restartInterval time.Duration
 
-	managed          bool
-	contextProviders map[string]contextProvider
-	dynamicProviders map[string]dynamicProvider
+	managed                 bool
+	contextProviderBuilders map[string]contextProvider
+	dynamicProviderBuilders map[string]dynamicProvider
 
 	contextProviderStates map[string]*contextProviderState
 	dynamicProviderStates map[string]*dynamicProviderState
@@ -107,16 +107,16 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 	}
 
 	return &controller{
-		logger:                l,
-		ch:                    make(chan []*transpiler.Vars, 1),
-		observedCh:            make(chan map[string]bool, 1),
-		errCh:                 make(chan error),
-		managed:               managed,
-		restartInterval:       restartInterval,
-		contextProviders:      contextProviders,
-		dynamicProviders:      dynamicProviders,
-		contextProviderStates: make(map[string]*contextProviderState),
-		dynamicProviderStates: make(map[string]*dynamicProviderState),
+		logger:                  l,
+		ch:                      make(chan []*transpiler.Vars, 1),
+		observedCh:              make(chan map[string]bool, 1),
+		errCh:                   make(chan error),
+		managed:                 managed,
+		restartInterval:         restartInterval,
+		contextProviderBuilders: contextProviders,
+		dynamicProviderBuilders: dynamicProviders,
+		contextProviderStates:   make(map[string]*contextProviderState),
+		dynamicProviderStates:   make(map[string]*dynamicProviderState),
 	}, nil
 }
 
@@ -129,8 +129,6 @@ func (c *controller) Run(ctx context.Context) error {
 	stateChangedChan := make(chan bool, 1) // sized so we can store 1 notification or proceed
 	localCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-
-	fetchContextProviders := mapstr.M{}
 
 	c.logger.Debugf("Started controller for composable inputs")
 
@@ -158,12 +156,36 @@ func (c *controller) Run(ctx context.Context) error {
 		wg.Wait()
 	}()
 
+	// synchronize the fetch providers through a channel
+	var fetchProvidersLock sync.RWMutex
+	var fetchProviders mapstr.M
+	fetchCh := make(chan fetchProvider)
+	go func() {
+		for {
+			select {
+			case <-localCtx.Done():
+				return
+			case msg := <-fetchCh:
+				fetchProvidersLock.Lock()
+				if msg.fetchProvider == nil {
+					_ = fetchProviders.Delete(msg.name)
+				} else {
+					_, _ = fetchProviders.Put(msg.name, msg.fetchProvider)
+				}
+				fetchProvidersLock.Unlock()
+			}
+		}
+	}()
+
 	// send initial vars state
-	err := c.sendVars(ctx, fetchContextProviders)
+	fetchProvidersLock.RLock()
+	err := c.sendVars(ctx, fetchProviders)
 	if err != nil {
+		fetchProvidersLock.RUnlock()
 		// only error is context cancel, no need to add error message context
 		return err
 	}
+	fetchProvidersLock.RUnlock()
 
 	// performs debounce of notifies; accumulates them into 100 millisecond chunks
 	for {
@@ -173,11 +195,13 @@ func (c *controller) Run(ctx context.Context) error {
 			case <-ctx.Done():
 				return ctx.Err()
 			case observed := <-c.observedCh:
-				c.handleObserved(localCtx, &wg, stateChangedChan, fetchContextProviders, observed)
-				t.Reset(100 * time.Millisecond)
-				c.logger.Debugf("Observed state changed for composable inputs; debounce started")
-				drainChan(stateChangedChan)
-				break DEBOUNCE
+				changed := c.handleObserved(localCtx, &wg, fetchCh, stateChangedChan, observed)
+				if changed {
+					t.Reset(100 * time.Millisecond)
+					c.logger.Debugf("Observed state changed for composable inputs; debounce started")
+					drainChan(stateChangedChan)
+					break DEBOUNCE
+				}
 			case <-stateChangedChan:
 				t.Reset(100 * time.Millisecond)
 				c.logger.Debugf("Variable state changed for composable inputs; debounce started")
@@ -196,11 +220,14 @@ func (c *controller) Run(ctx context.Context) error {
 		}
 
 		// send the vars to the watcher
-		err = c.sendVars(ctx, fetchContextProviders)
+		fetchProvidersLock.RLock()
+		err := c.sendVars(ctx, fetchProviders)
 		if err != nil {
+			fetchProvidersLock.RUnlock()
 			// only error is context cancel, no need to add error message context
 			return err
 		}
+		fetchProvidersLock.RUnlock()
 	}
 }
 
@@ -254,7 +281,9 @@ func (c *controller) Observe(vars []string) {
 	c.observedCh <- topLevel
 }
 
-func (c *controller) handleObserved(ctx context.Context, wg *sync.WaitGroup, stateChangedChan chan bool, fetchContextProviders mapstr.M, observed map[string]bool) {
+func (c *controller) handleObserved(ctx context.Context, wg *sync.WaitGroup, fetchCh chan fetchProvider, stateChangedChan chan bool, observed map[string]bool) bool {
+	changed := false
+
 	// get the list of already running, so we can determine a list that needs to be stopped
 	runningCtx := make(map[string]*contextProviderState, len(c.contextProviderStates))
 	runningDyn := make(map[string]*dynamicProviderState, len(c.dynamicProviderStates))
@@ -284,20 +313,20 @@ func (c *controller) handleObserved(ctx context.Context, wg *sync.WaitGroup, sta
 			continue
 		}
 
-		contextInfo, ok := c.contextProviders[name]
+		contextInfo, ok := c.contextProviderBuilders[name]
 		if ok {
-			state := c.startContextProvider(ctx, wg, stateChangedChan, name, contextInfo)
+			state := c.startContextProvider(ctx, wg, fetchCh, stateChangedChan, name, contextInfo)
 			if state != nil {
+				changed = true
 				c.contextProviderStates[name] = state
-				if p, ok := state.provider.(corecomp.FetchContextProvider); ok {
-					_, _ = fetchContextProviders.Put(name, p)
-				}
+
 			}
 		}
-		dynamicInfo, ok := c.dynamicProviders[name]
+		dynamicInfo, ok := c.dynamicProviderBuilders[name]
 		if ok {
 			state := c.startDynamicProvider(ctx, wg, stateChangedChan, name, dynamicInfo)
 			if state != nil {
+				changed = true
 				c.dynamicProviderStates[name] = state
 			}
 		}
@@ -306,18 +335,22 @@ func (c *controller) handleObserved(ctx context.Context, wg *sync.WaitGroup, sta
 
 	// running remaining need to be stopped
 	for name, state := range runningCtx {
+		changed = true
 		state.logger.Infof("Stopping provider %q", name)
 		state.canceller()
 		delete(c.contextProviderStates, name)
 	}
 	for name, state := range runningDyn {
+		changed = true
 		state.logger.Infof("Stopping dynamic provider %q", name)
 		state.canceller()
 		delete(c.dynamicProviderStates, name)
 	}
+
+	return changed
 }
 
-func (c *controller) startContextProvider(ctx context.Context, wg *sync.WaitGroup, stateChangedChan chan bool, name string, info contextProvider) *contextProviderState {
+func (c *controller) startContextProvider(ctx context.Context, wg *sync.WaitGroup, fetchCh chan fetchProvider, stateChangedChan chan bool, name string, info contextProvider) *contextProviderState {
 	wg.Add(1)
 	l := c.logger.Named(strings.Join([]string{"providers", name}, "."))
 
@@ -344,17 +377,30 @@ func (c *controller) startContextProvider(ctx context.Context, wg *sync.WaitGrou
 				case <-time.After(c.restartInterval):
 					// wait restart interval and then try again
 				}
+				continue
 			}
 
-			state.provider = provider
+			fp, fpok := provider.(corecomp.FetchContextProvider)
+			if fpok {
+				sendFetchProvider(ctx, fetchCh, name, fp)
+			}
+
 			err = provider.Run(ctx, state)
 			closeProvider(l, name, provider)
 			if errors.Is(err, context.Canceled) {
 				// valid exit
+				if fpok {
+					// turn off fetch provider
+					sendFetchProvider(ctx, fetchCh, name, nil)
+				}
 				return
 			}
 			// all other exits are bad, even a nil error
 			l.Errorf("provider %q failed to run (will retry in %s): %s", name, c.restartInterval.String(), err)
+			if fpok {
+				// turn off fetch provider
+				sendFetchProvider(ctx, fetchCh, name, nil)
+			}
 			select {
 			case <-ctx.Done():
 				return
@@ -364,6 +410,13 @@ func (c *controller) startContextProvider(ctx context.Context, wg *sync.WaitGrou
 		}
 	}()
 	return state
+}
+
+func sendFetchProvider(ctx context.Context, fetchCh chan fetchProvider, name string, fp corecomp.FetchContextProvider) {
+	select {
+	case <-ctx.Done():
+	case fetchCh <- fetchProvider{name: name, fetchProvider: fp}:
+	}
 }
 
 func (c *controller) startDynamicProvider(ctx context.Context, wg *sync.WaitGroup, stateChangedChan chan bool, name string, info dynamicProvider) *dynamicProviderState {
@@ -392,9 +445,10 @@ func (c *controller) startDynamicProvider(ctx context.Context, wg *sync.WaitGrou
 				case <-time.After(c.restartInterval):
 					// wait restart interval and then try again
 				}
+				continue
 			}
 
-			err = state.provider.Run(state)
+			err = provider.Run(state)
 			closeProvider(l, name, provider)
 			if errors.Is(err, context.Canceled) {
 				return
@@ -455,13 +509,17 @@ type dynamicProvider struct {
 	cfg     *config.Config
 }
 
+type fetchProvider struct {
+	name          string
+	fetchProvider corecomp.FetchContextProvider
+}
+
 type contextProviderState struct {
 	context.Context
 
-	provider corecomp.ContextProvider
-	lock     sync.RWMutex
-	mapping  *transpiler.AST
-	signal   chan bool
+	lock    sync.RWMutex
+	mapping *transpiler.AST
+	signal  chan bool
 
 	logger    *logger.Logger
 	canceller context.CancelFunc
@@ -519,7 +577,6 @@ type dynamicProviderMapping struct {
 type dynamicProviderState struct {
 	context.Context
 
-	provider DynamicProvider
 	lock     sync.Mutex
 	mappings map[string]dynamicProviderMapping
 	signal   chan bool
