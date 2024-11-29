@@ -90,11 +90,13 @@ ARG ELASTIC_AGENT_UID
 ARG ELASTIC_AGENT_GID
 
 RUN addgroup -g ${ELASTIC_AGENT_GID} ${ELASTIC_AGENT_GROUP} && \
-    adduser -H -D -u ${ELASTIC_AGENT_UID} -G ${ELASTIC_AGENT_GROUP} ${ELASTIC_AGENT_USER}
+    adduser -H -D -u ${ELASTIC_AGENT_UID} -G ${ELASTIC_AGENT_GROUP} ${ELASTIC_AGENT_USER} && \
+    apk update && \
+    apk add --no-cache ca-certificates curl gawk shadow bash
 
 FROM elastic_agent_base_wolfi AS elastic_agent_base_wolfi_buildtools
 RUN apk update && \
-    apk add --no-cache shadow libcap-utils
+    apk add --no-cache libcap-utils
 
 FROM elastic_agent_base_ubuntu AS elastic_agent_base_ubuntu_buildtools
 
@@ -154,8 +156,6 @@ RUN [ "${DOCKER_VARIANT}" != "cloud" ] || ( \
     tar xf ${BEAT_HOME}/data/cloud_downloads/agentbeat-*.tar.gz -C /opt/agentbeat --strip-components=1 && \
     rm -rf ${BEAT_HOME}/data/cloud_downloads \
     )
-#{{- end }}
-#    true
 
 # Change ownership to the files
 RUN chown -R ${ELASTIC_AGENT_UID}:${ELASTIC_AGENT_GID} ${BEAT_HOME}
@@ -181,14 +181,32 @@ ARG BEAT_ROOT_IMPORT_PATH
 ARG BEAT_COMMIT
 ARG BEAT_COMMIT_SHORT
 ARG BEAT_LICENSE
-
-
-# COPY docker-entrypoint /usr/local/bin/docker-entrypoint
-
+ARG BUILD_TIMESTAMP
+ARG ELASTIC_AGENT_USER
 
 COPY --from=elastic_agent_files ${BEAT_HOME} ${BEAT_HOME}
+RUN mkdir /licenses && \
+    cp /usr/share/elastic-agent/LICENSE.txt /licenses && \
+    cp /usr/share/elastic-agent/NOTICE.txt /licenses
+
+COPY --from=dockerbuild --chmod=0755 docker-entrypoint.elastic-agent /usr/local/bin/docker-entrypoint
 
 
+
+USER ${ELASTIC_AGENT_USER}
+
+
+ENV ELASTIC_CONTAINER="true"
+ENV PATH=/usr/share/elastic-agent:$PATH
+ENV GODEBUG="madvdontneed=1"
+
+# When running under Docker, we must ensure libbeat monitoring pulls cgroup
+# metrics from /sys/fs/cgroup/<subsystem>/, ignoring any paths found in
+# /proc/self/cgroup.
+ENV LIBBEAT_MONITORING_CGROUPS_HIERARCHY_OVERRIDE=/
+
+WORKDIR ${BEAT_HOME}
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint"]
 
 LABEL \
   org.label-schema.build-date="${BUILD_TIMESTAMP}" \
@@ -199,7 +217,7 @@ LABEL \
   org.label-schema.version="${BEAT_VERSION}" \
   org.label-schema.url="${BEAT_URL}" \
   org.label-schema.vcs-url="${BEAT_ROOT_IMPORT_PATH}" \
-  org.label-schema.vcs-ref="${BEAT_VCS_REF}" \
+  org.label-schema.vcs-ref="${BEAT_COMMIT}" \
   io.k8s.description="${BEAT_DESCRIPTION}" \
   io.k8s.display-name="${BEAT_NAME} image" \
   org.opencontainers.image.created="${BUILD_TIMESTAMP}" \
@@ -216,5 +234,4 @@ LABEL \
   license="${BEAT_LICENSE}" \
   description="${BEAT_DESCRIPTION}"
 
-#TODO remove once it's done
-RUN ls -lah /usr/bin/tini
+

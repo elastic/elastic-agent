@@ -208,6 +208,7 @@ func (b *dockerBuilder) dockerBuild() (string, error) {
 		)
 
 		cmdArgs = append(cmdArgs,
+			"--build-context", "dockerbuild="+filepath.Join(elasticBeatsDir, "dev-tools/packaging/docker/"),
 			"-f", filepath.Join(elasticBeatsDir, "dev-tools/packaging/docker/Dockerfile"),
 			"-t", tag,
 			b.buildDir,
@@ -298,12 +299,18 @@ func (b *dockerBuilder) dockerSave(tag string) error {
 func (b *dockerBuilder) generateBuildArgs() []string {
 
 	buildArgFromTemplatesMapping := map[string]string{
-		"BEAT_COMMIT":        "{{commit}}",
-		"BEAT_COMMIT_SHORT":  "{{commit_short}}",
-		"DOCKER_VARIANT":     "{{.Variant}}",
-		"ELASTIC_AGENT_USER": "{{.user}}",
-		"BEAT_VENDOR":        "{{.BeatVendor}}",
-		"BEAT_VERSION":       "{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}",
+		"BEAT_COMMIT":           "{{ commit }}",
+		"BEAT_COMMIT_SHORT":     "{{ commit_short }}",
+		"BEAT_DESCRIPTION":      "{{ .BeatDescription }}",
+		"BEAT_LICENSE":          "{{ .License }}",
+		"BEAT_ROOT_IMPORT_PATH": "{{ .BeatURL }}",
+		"BEAT_URL":              "{{ .BeatURL }}",
+		"BEAT_VCS_REF":          "{{ (repo).RootImportPath }}",
+		"BEAT_VENDOR":           "{{ .BeatVendor }}",
+		"BEAT_VERSION":          "{{ beat_version }}{{ if .Snapshot }}-SNAPSHOT{{ end }}",
+		"BUILD_TIMESTAMP":       "{{ date }}",
+		"DOCKER_VARIANT":        "{{ .Variant }}",
+		"ELASTIC_AGENT_USER":    "{{ .user }}",
 	}
 
 	buildArgs := make([]string, 0, len(buildArgFromTemplatesMapping))
