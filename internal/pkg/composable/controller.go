@@ -41,10 +41,11 @@ type Controller interface {
 
 // controller manages the state of the providers current context.
 type controller struct {
-	logger     *logger.Logger
-	ch         chan []*transpiler.Vars
-	observedCh chan map[string]bool
-	errCh      chan error
+	logger          *logger.Logger
+	ch              chan []*transpiler.Vars
+	observedCh      chan map[string]bool
+	errCh           chan error
+	restartInterval time.Duration
 
 	managed          bool
 	contextProviders map[string]contextProvider
@@ -70,6 +71,11 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 	providersInitialDefault := true
 	if providersCfg.ProvidersInitialDefault != nil {
 		providersInitialDefault = *providersCfg.ProvidersInitialDefault
+	}
+
+	restartInterval := 5 * time.Second
+	if providersCfg.ProvidersRestartInterval != nil {
+		restartInterval = *providersCfg.ProvidersRestartInterval
 	}
 
 	// build all the context providers
@@ -106,6 +112,7 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 		observedCh:            make(chan map[string]bool, 1),
 		errCh:                 make(chan error),
 		managed:               managed,
+		restartInterval:       restartInterval,
 		contextProviders:      contextProviders,
 		dynamicProviders:      dynamicProviders,
 		contextProviderStates: make(map[string]*contextProviderState),
@@ -311,21 +318,13 @@ func (c *controller) handleObserved(ctx context.Context, wg *sync.WaitGroup, sta
 }
 
 func (c *controller) startContextProvider(ctx context.Context, wg *sync.WaitGroup, stateChangedChan chan bool, name string, info contextProvider) *contextProviderState {
-	l := c.logger.Named(strings.Join([]string{"providers", name}, "."))
-	l.Infof("Starting context provider %q", name)
-
-	provider, err := info.builder(l, info.cfg, c.managed)
-	if err != nil {
-		l.Errorf("failed to build provider '%s': %s", name, err)
-		return nil
-	}
-
 	wg.Add(1)
+	l := c.logger.Named(strings.Join([]string{"providers", name}, "."))
+
 	ctx, cancel := context.WithCancel(ctx)
 	emptyMapping, _ := transpiler.NewAST(nil)
 	state := &contextProviderState{
 		Context:   ctx,
-		provider:  provider,
 		mapping:   emptyMapping,
 		signal:    stateChangedChan,
 		logger:    l,
@@ -334,20 +333,33 @@ func (c *controller) startContextProvider(ctx context.Context, wg *sync.WaitGrou
 	go func() {
 		defer wg.Done()
 		for {
-			err := state.provider.Run(ctx, state)
+			l.Infof("Starting context provider %q", name)
+
+			provider, err := info.builder(l, info.cfg, c.managed)
+			if err != nil {
+				l.Errorf("provider %q failed to build (will retry in %s): %s", name, c.restartInterval.String(), err)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(c.restartInterval):
+					// wait restart interval and then try again
+				}
+			}
+
+			state.provider = provider
+			err = provider.Run(ctx, state)
+			closeProvider(l, name, provider)
 			if errors.Is(err, context.Canceled) {
 				// valid exit
-				closeProvider(l, name, provider)
 				return
 			}
 			// all other exits are bad, even a nil error
-			l.Errorf("provider %q failed to run (will restart in 5s): %s", name, err)
-			closeProvider(l, name, provider)
+			l.Errorf("provider %q failed to run (will retry in %s): %s", name, c.restartInterval.String(), err)
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(5 * time.Second):
-				// wait 5 seconds then start it again
+			case <-time.After(c.restartInterval):
+				// wait restart interval and then try again
 			}
 		}
 	}()
@@ -355,20 +367,12 @@ func (c *controller) startContextProvider(ctx context.Context, wg *sync.WaitGrou
 }
 
 func (c *controller) startDynamicProvider(ctx context.Context, wg *sync.WaitGroup, stateChangedChan chan bool, name string, info dynamicProvider) *dynamicProviderState {
-	l := c.logger.Named(strings.Join([]string{"providers", name}, "."))
-	l.Infof("Starting dynamic provider %q", name)
-
-	provider, err := info.builder(l, info.cfg, c.managed)
-	if err != nil {
-		l.Errorf("failed to build provider '%s': %s", name, err)
-		return nil
-	}
-
 	wg.Add(1)
+	l := c.logger.Named(strings.Join([]string{"providers", name}, "."))
+
 	ctx, cancel := context.WithCancel(ctx)
 	state := &dynamicProviderState{
 		Context:   ctx,
-		provider:  provider,
 		mappings:  map[string]dynamicProviderMapping{},
 		signal:    stateChangedChan,
 		logger:    l,
@@ -377,20 +381,31 @@ func (c *controller) startDynamicProvider(ctx context.Context, wg *sync.WaitGrou
 	go func() {
 		defer wg.Done()
 		for {
-			err := state.provider.Run(state)
+			l.Infof("Starting dynamic provider %q", name)
+
+			provider, err := info.builder(l, info.cfg, c.managed)
+			if err != nil {
+				l.Errorf("provider %q failed to build (will retry in %s): %s", name, c.restartInterval.String(), err)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(c.restartInterval):
+					// wait restart interval and then try again
+				}
+			}
+
+			err = state.provider.Run(state)
+			closeProvider(l, name, provider)
 			if errors.Is(err, context.Canceled) {
-				// valid exit
-				closeProvider(l, name, provider)
 				return
 			}
 			// all other exits are bad, even a nil error
-			l.Errorf("provider %q failed to run (will restart in 5s): %s", name, err)
-			closeProvider(l, name, provider)
+			l.Errorf("provider %q failed to run (will restart in %s): %s", name, c.restartInterval.String(), err)
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(5 * time.Second):
-				// wait 5 seconds then start it again
+			case <-time.After(c.restartInterval):
+				// wait restart interval and then try again
 			}
 		}
 	}()
