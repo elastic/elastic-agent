@@ -94,7 +94,6 @@ const (
 	agentCoreProjectName = "elastic-agent-core"
 
 	helmChartPath = "./deploy/helm/elastic-agent"
-
 	sha512FileExt = ".sha512"
 )
 
@@ -113,6 +112,25 @@ var (
 	goIntegTestTimeout = 2 * time.Hour
 	// goProvisionAndTestTimeout is the timeout used for both provisioning and running tests.
 	goProvisionAndTestTimeout = goIntegTestTimeout + 30*time.Minute
+
+	helmChartsValues = []struct {
+		path        string
+		versionKeys []string
+		tagKeys     []string
+	}{
+		// elastic-agent Helm Chart
+		{
+			"./deploy/helm/elastic-agent",
+			[]string{"agent", "version"},
+			[]string{"agent", "image", "tag"},
+		},
+		// edot-collector values file for kube-stack Helm Chart
+		{
+			"./deploy/helm/edot-collector/kube-stack",
+			[]string{"defaultCRConfig", "image", "tag"},
+			nil,
+		},
+	}
 )
 
 func init() {
@@ -475,7 +493,8 @@ func AssembleDarwinUniversal() error {
 	args := []string{
 		"build/golang-crossbuild/%s-darwin-universal",
 		"build/golang-crossbuild/%s-darwin-arm64",
-		"build/golang-crossbuild/%s-darwin-amd64"}
+		"build/golang-crossbuild/%s-darwin-amd64",
+	}
 
 	for _, arg := range args {
 		lipoArgs = append(lipoArgs, fmt.Sprintf(arg, devtools.BeatName))
@@ -1010,7 +1029,6 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 // - delete archivePath and dropPath contents
 // - unset AGENT_DROP_PATH environment variable
 func collectPackageDependencies(platforms []string, packageVersion string, platformPackageSuffixes []string) (archivePath string, dropPath string) {
-
 	dropPath, found := os.LookupEnv(agentDropPath)
 
 	// try not to shadow too many variables
@@ -1160,7 +1178,6 @@ func removePythonWheels(matches []string, version string) []string {
 // flattenDependencies will extract all the required packages collected in archivePath and dropPath in flatPath and
 // regenerate checksums
 func flattenDependencies(requiredPackages []string, packageVersion, archivePath, dropPath, flatPath string, manifestResponse *manifest.Build) {
-
 	for _, rp := range requiredPackages {
 		targetPath := filepath.Join(archivePath, rp)
 		versionedFlatPath := filepath.Join(flatPath, rp)
@@ -1239,7 +1256,6 @@ type branchInfo struct {
 // FetchLatestAgentCoreStagingDRA is a mage target that will retrieve the elastic-agent-core DRA artifacts and
 // place them under build/dra/buildID. It accepts one argument that has to be a release branch present in staging DRA
 func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
-
 	branchInfo, err := findLatestBuildForBranch(ctx, baseURLForStagingDRA, branch)
 
 	// Create a dir with the buildID at <root>/build/dra/<buildID>
@@ -1259,7 +1275,7 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 	}
 
 	fmt.Println("Downloaded agent core DRAs:")
-	for k, _ := range artifacts {
+	for k := range artifacts {
 		fmt.Println(k)
 	}
 	return nil
@@ -1267,7 +1283,6 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 
 // PackageUsingDRA packages elastic-agent for distribution using Daily Released Artifacts specified in manifest.
 func PackageUsingDRA(ctx context.Context) error {
-
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
@@ -1479,7 +1494,6 @@ func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir s
 }
 
 func useDRAAgentBinaryForPackage(ctx context.Context, manifestUrl string) error {
-
 	repositoryRoot, err := findRepositoryRoot()
 	if err != nil {
 		return fmt.Errorf("looking up for repository root: %w", err)
@@ -1874,7 +1888,6 @@ func prepareIronbankBuild() error {
 		}
 		return nil
 	})
-
 	if err != nil {
 		return fmt.Errorf("cannot create templates for the IronBank: %+v", err)
 	}
@@ -2109,8 +2122,10 @@ func (Integration) UpdatePackageVersion(ctx context.Context) error {
 	return nil
 }
 
-var stateDir = ".integration-cache"
-var stateFile = "state.yml"
+var (
+	stateDir  = ".integration-cache"
+	stateFile = "state.yml"
+)
 
 // readFrameworkState reads the state file from the integration test framework
 func readFrameworkState() (runner.State, error) {
@@ -2184,8 +2199,8 @@ func listStacks() (string, error) {
 	for i, stack := range state.Stacks {
 		t := table.NewWriter()
 		t.AppendRows([]table.Row{
-			table.Row{"#", i},
-			table.Row{"Type", stack.Provisioner},
+			{"#", i},
+			{"Type", stack.Provisioner},
 		})
 
 		switch {
@@ -3044,7 +3059,7 @@ func authGCP(ctx context.Context) error {
 	if err := json.Unmarshal(output, &svcList); err != nil {
 		return fmt.Errorf("unable to parse service accounts: %w", err)
 	}
-	var found = false
+	found := false
 	for _, svc := range svcList {
 		if svc.Email == iamAcctName {
 			found = true
@@ -3476,63 +3491,65 @@ func (Helm) RenderExamples() error {
 }
 
 func (Helm) UpdateAgentVersion() error {
-	valuesFile := filepath.Join(helmChartPath, "values.yaml")
+	for _, chart := range helmChartsValues {
+		valuesFile := filepath.Join(chart.path, "values.yaml")
 
-	data, err := os.ReadFile(valuesFile)
-	if err != nil {
-		return fmt.Errorf("failed to read file: %w", err)
-	}
-
-	isTagged, err := devtools.TagContainsCommit()
-	if err != nil {
-		return fmt.Errorf("failed to check if tag contains commit: %w", err)
-	}
-
-	if !isTagged {
-		isTagged = os.Getenv(snapshotEnv) != ""
-	}
-
-	agentVersion := getVersion()
-
-	// Parse YAML into a Node structure because
-	// it maintains comments
-	var rootNode yaml.Node
-	err = yaml.Unmarshal(data, &rootNode)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal YAML: %w", err)
-	}
-
-	if rootNode.Kind != yaml.DocumentNode {
-		return fmt.Errorf("root node is not a document node")
-	} else if len(rootNode.Content) == 0 {
-		return fmt.Errorf("root node has no content")
-	}
-
-	if err := updateYamlNodes(rootNode.Content[0], agentVersion, "agent", "version"); err != nil {
-		return fmt.Errorf("failed to update agent version: %w", err)
-	}
-
-	if !isTagged {
-		if err := updateYamlNodes(rootNode.Content[0], fmt.Sprintf("%s-SNAPSHOT", agentVersion), "agent", "image", "tag"); err != nil {
-			return fmt.Errorf("failed to update agent image tag: %w", err)
+		data, err := os.ReadFile(valuesFile)
+		if err != nil {
+			return fmt.Errorf("failed to read file: %w", err)
 		}
-	}
 
-	// Truncate values file
-	file, err := os.Create(valuesFile)
-	if err != nil {
-		return fmt.Errorf("failed to open file for writing: %w", err)
-	}
-	defer file.Close()
+		isTagged, err := devtools.TagContainsCommit()
+		if err != nil {
+			return fmt.Errorf("failed to check if tag contains commit: %w", err)
+		}
 
-	// Create a YAML encoder with 2-space indentation
-	encoder := yaml.NewEncoder(file)
-	encoder.SetIndent(2)
+		if !isTagged {
+			isTagged = os.Getenv(snapshotEnv) != ""
+		}
 
-	// Encode the updated YAML node back to the file
-	err = encoder.Encode(&rootNode)
-	if err != nil {
-		return fmt.Errorf("failed to encode updated YAML: %w", err)
+		agentVersion := getVersion()
+
+		// Parse YAML into a Node structure because
+		// it maintains comments
+		var rootNode yaml.Node
+		err = yaml.Unmarshal(data, &rootNode)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal YAML: %w", err)
+		}
+
+		if rootNode.Kind != yaml.DocumentNode {
+			return fmt.Errorf("root node is not a document node")
+		} else if len(rootNode.Content) == 0 {
+			return fmt.Errorf("root node has no content")
+		}
+
+		if err := updateYamlNodes(rootNode.Content[0], agentVersion, chart.versionKeys...); err != nil {
+			return fmt.Errorf("failed to update agent version: %w", err)
+		}
+
+		if !isTagged && len(chart.tagKeys) > 0 {
+			if err := updateYamlNodes(rootNode.Content[0], fmt.Sprintf("%s-SNAPSHOT", agentVersion), chart.tagKeys...); err != nil {
+				return fmt.Errorf("failed to update agent image tag: %w", err)
+			}
+		}
+
+		// Truncate values file
+		file, err := os.Create(valuesFile)
+		if err != nil {
+			return fmt.Errorf("failed to open file for writing: %w", err)
+		}
+		defer file.Close()
+
+		// Create a YAML encoder with 2-space indentation
+		encoder := yaml.NewEncoder(file)
+		encoder.SetIndent(2)
+
+		// Encode the updated YAML node back to the file
+		err = encoder.Encode(&rootNode)
+		if err != nil {
+			return fmt.Errorf("failed to encode updated YAML: %w", err)
+		}
 	}
 
 	return nil
