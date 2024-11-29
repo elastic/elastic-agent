@@ -22,6 +22,10 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+const (
+	defaultRetryInterval = 30 * time.Second
+)
+
 // Controller manages the state of the providers current context.
 type Controller interface {
 	// Run runs the controller.
@@ -73,7 +77,7 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 		providersInitialDefault = *providersCfg.ProvidersInitialDefault
 	}
 
-	restartInterval := 5 * time.Second
+	restartInterval := defaultRetryInterval
 	if providersCfg.ProvidersRestartInterval != nil {
 		restartInterval = *providersCfg.ProvidersRestartInterval
 	}
