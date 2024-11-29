@@ -137,13 +137,13 @@ func (r *artifactResult) Fetch(ctx context.Context, l Logger, dir string) error 
 }
 
 func findURI(ctx context.Context, doer httpDoer, version *semver.ParsedSemVer) (string, error) {
-	// if we know the exact build ID, we can build the URI right away
-	if version.BuildMetadata() != "" {
-		return fmt.Sprintf("https://snapshots.elastic.co/%s-%s/downloads/beats/elastic-agent/", version.CoreVersion(), version.BuildMetadata()), nil
-	}
-
 	// if it's the latest snapshot of a version, we can find a build ID and build the URI in the same manner
 	if version.IsSnapshot() {
+		// if we know the exact build ID, we can build the URI right away
+		if version.BuildMetadata() != "" {
+			return fmt.Sprintf("https://snapshots.elastic.co/%s-%s/downloads/beats/elastic-agent/", version.CoreVersion(), version.BuildMetadata()), nil
+		}
+
 		buildID, err := findLatestSnapshot(ctx, doer, version.CoreVersion())
 		if err != nil {
 			return "", fmt.Errorf("failed to find snapshot information for version %q: %w", version, err)

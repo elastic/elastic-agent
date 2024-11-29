@@ -5,9 +5,14 @@
 # upgrade integration tests.
 
 testVersions:
+<<<<<<< HEAD
   - 8.17.0-SNAPSHOT
   - 8.16.0-SNAPSHOT
   - 8.15.3
   - 8.14.3
+=======
+  - 8.16.0
+  - 8.15.4
+>>>>>>> a4bf7d07bf (Add 1 independent release into upgrade matrix (#6075))
   - 7.17.26-SNAPSHOT
   - 7.17.25
