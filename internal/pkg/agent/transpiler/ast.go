@@ -52,6 +52,9 @@ type Node interface {
 	//Close clones the current node.
 	Clone() Node
 
+	// ShallowClone makes a shallow clone of the node.
+	ShallowClone() Node
+
 	// Hash compute a sha256 hash of the current node and recursively call any children.
 	Hash() []byte
 
@@ -132,6 +135,19 @@ func (d *Dict) Clone() Node {
 			continue
 		}
 		nodes = append(nodes, i.Clone())
+
+	}
+	return &Dict{value: nodes}
+}
+
+// ShallowClone makes a shallow clone of the node.
+func (d *Dict) ShallowClone() Node {
+	nodes := make([]Node, 0, len(d.value))
+	for _, i := range d.value {
+		if i == nil {
+			continue
+		}
+		nodes = append(nodes, i)
 
 	}
 	return &Dict{value: nodes}
@@ -244,6 +260,11 @@ func (k *Key) Clone() Node {
 	}
 
 	return &Key{name: k.name, value: nil}
+}
+
+// ShallowClone makes a shallow clone of the node.
+func (k *Key) ShallowClone() Node {
+	return &Key{name: k.name, value: k.value}
 }
 
 // Hash compute a sha256 hash of the current node and recursively call any children.
@@ -364,6 +385,18 @@ func (l *List) Clone() Node {
 	return &List{value: nodes}
 }
 
+// ShallowClone makes a shallow clone of the node.
+func (l *List) ShallowClone() Node {
+	nodes := make([]Node, 0, len(l.value))
+	for _, i := range l.value {
+		if i == nil {
+			continue
+		}
+		nodes = append(nodes, i)
+	}
+	return &List{value: nodes}
+}
+
 // Apply applies the vars to all nodes in the list.
 func (l *List) Apply(vars *Vars) (Node, error) {
 	nodes := make([]Node, 0, len(l.value))
@@ -429,6 +462,11 @@ func (s *StrVal) Clone() Node {
 	return &k
 }
 
+// ShallowClone makes a shallow clone of the node.
+func (s *StrVal) ShallowClone() Node {
+	return s.Clone()
+}
+
 // Hash we return the byte slice of the string.
 func (s *StrVal) Hash() []byte {
 	return []byte(s.value)
@@ -480,6 +518,11 @@ func (s *IntVal) Clone() Node {
 	return &k
 }
 
+// ShallowClone makes a shallow clone of the node.
+func (s *IntVal) ShallowClone() Node {
+	return s.Clone()
+}
+
 // Apply does nothing.
 func (s *IntVal) Apply(_ *Vars) (Node, error) {
 	return s, nil
@@ -529,6 +572,11 @@ func (s *UIntVal) Value() interface{} {
 func (s *UIntVal) Clone() Node {
 	k := *s
 	return &k
+}
+
+// ShallowClone makes a shallow clone of the node.
+func (s *UIntVal) ShallowClone() Node {
+	return s.Clone()
 }
 
 // Hash we convert the value into a string and return the byte slice.
@@ -583,6 +631,11 @@ func (s *FloatVal) Clone() Node {
 	return &k
 }
 
+// ShallowClone makes a shallow clone of the node.
+func (s *FloatVal) ShallowClone() Node {
+	return s.Clone()
+}
+
 // Hash return a string representation of the value, we try to return the minimal precision we can.
 func (s *FloatVal) Hash() []byte {
 	return []byte(strconv.FormatFloat(s.value, 'f', -1, 64))
@@ -635,6 +688,11 @@ func (s *BoolVal) Value() interface{} {
 func (s *BoolVal) Clone() Node {
 	k := *s
 	return &k
+}
+
+// ShallowClone makes a shallow clone of the node.
+func (s *BoolVal) ShallowClone() Node {
+	return s.Clone()
 }
 
 // Hash returns a single byte to represent the boolean value.
@@ -750,6 +808,11 @@ func (a *AST) Clone() *AST {
 	return &AST{root: a.root.Clone()}
 }
 
+// ShallowClone makes a shallow clone of the node.
+func (a *AST) ShallowClone() *AST {
+	return &AST{root: a.root.ShallowClone()}
+}
+
 // Hash calculates a hash from all the included nodes in the tree.
 func (a *AST) Hash() []byte {
 	return a.root.Hash()
@@ -762,6 +825,9 @@ func (a *AST) HashStr() string {
 
 // Equal check if two AST are equals by using the computed hash.
 func (a *AST) Equal(other *AST) bool {
+	if a.root == nil || other.root == nil {
+		return a.root == other.root
+	}
 	return bytes.Equal(a.Hash(), other.Hash())
 }
 
@@ -927,6 +993,12 @@ func Lookup(a *AST, selector Selector) (Node, bool) {
 	}
 
 	return current, true
+}
+
+// Insert inserts an AST into an existing AST, will return and error if the target position cannot
+// accept a new node.
+func (a *AST) Insert(b *AST, to Selector) error {
+	return Insert(a, b.root, to)
 }
 
 // Insert inserts a node into an existing AST, will return and error if the target position cannot
