@@ -57,7 +57,11 @@ if [[ "$BUILDKITE_STEP_KEY" == *"integration-tests"* ]]; then
   # ESS credentials
   export API_KEY_TOKEN=$(vault kv get -field apiKey ${CI_ESS_PATH})
   echo ${API_KEY_TOKEN} > ./apiKey
-  export TEST_INTEG_AUTH_ESS_APIKEY_FILE=$(realpath ./apiKey)  
+  export TEST_INTEG_AUTH_ESS_APIKEY_FILE=$(realpath ./apiKey)
+fi
+
+if [[ "$BUILDKITE_GROUP_KEY" == *"integration-tests"* ]]; then
+  source .buildkite/scripts/set-bk-analytics-token.sh
 fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-binary-dra" ]]; then

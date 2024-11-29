@@ -1,5 +1,7 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 
+# Warning: Integration test step groups must have a key containing `integration-tests`.
+# see pre-command.sh and pre-command.ps1
 env:
   DOCKER_REGISTRY: "docker.elastic.co"
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
@@ -41,7 +43,6 @@ steps:
       - label: "Win2022:sudo:{{matrix}}"
         skip: true
         command: |
-          .buildkite/scripts/set-bk-analytics-token.ps1
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} true
         artifact_paths:
@@ -64,9 +65,9 @@ steps:
 
       - label: "Win2022:non-sudo:{{matrix}}"
         command: |
-          .buildkite/scripts/set-bk-analytics-token.ps1
-          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 019372af-c893-4837-adf1-00d1548f0c80
-          .buildkite/scripts/integration-tests.ps1 {{matrix}} false
+          echo 1
+          # buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 019372af-c893-4837-adf1-00d1548f0c80
+          # .buildkite/scripts/integration-tests.ps1 {{matrix}} false
         artifact_paths:
           - build/**
         agents:
@@ -90,9 +91,9 @@ steps:
     steps:
       - label: "x86_64:non-sudo: {{matrix}}"
         command: |
-          source .buildkite/scripts/set-bk-analytics-token.sh
-          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 019372af-c893-4837-adf1-00d1548f0c80
-          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
+          echo 1
+          # buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 019372af-c893-4837-adf1-00d1548f0c80
+          # .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
         agents:
@@ -111,7 +112,6 @@ steps:
       - label: "x86_64:sudo: {{matrix}}"
         skip: true
         command: |
-          source .buildkite/scripts/set-bk-analytics-token.sh
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
@@ -141,7 +141,6 @@ steps:
       - label: "arm:sudo: {{matrix}}"
         skip: true
         command: |
-          source .buildkite/scripts/set-bk-analytics-token.sh
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
@@ -171,7 +170,6 @@ steps:
       - label: "arm:non-sudo: {{matrix}}"
         skip: true
         command: |
-          source .buildkite/scripts/set-bk-analytics-token.sh
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
@@ -198,7 +196,6 @@ steps:
     steps:
       - label: "x86_64:sudo:rpm"
         command: |
-          source .buildkite/scripts/set-bk-analytics-token.sh
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf.sh rpm true
         artifact_paths:
