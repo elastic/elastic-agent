@@ -99,6 +99,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.113.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.113.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.113.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/geoipprocessor v0.113.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.113.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor v0.113.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.113.0
@@ -438,6 +439,8 @@ require (
 	github.com/openshift/api v3.9.0+incompatible // indirect
 	github.com/openshift/client-go v0.0.0-20210521082421-73d9475a9142 // indirect
 	github.com/openzipkin/zipkin-go v0.4.3 // indirect
+	github.com/oschwald/geoip2-golang v1.11.0 // indirect
+	github.com/oschwald/maxminddb-golang v1.13.0 // indirect
 	github.com/ovh/go-ovh v1.6.0 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
