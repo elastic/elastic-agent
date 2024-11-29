@@ -84,6 +84,7 @@ RUN set -e ; \
 
 ## Wolfi
 FROM ${WOLFI_BASE_IMAGE}:${WOLFI_BASE_VERSION} AS elastic_agent_base_wolfi
+ARG DOCKER_VARIANT
 ARG ELASTIC_AGENT_USER
 ARG ELASTIC_AGENT_GROUP
 ARG ELASTIC_AGENT_UID
@@ -93,6 +94,12 @@ RUN addgroup -g ${ELASTIC_AGENT_GID} ${ELASTIC_AGENT_GROUP} && \
     adduser -H -D -u ${ELASTIC_AGENT_UID} -G ${ELASTIC_AGENT_GROUP} ${ELASTIC_AGENT_USER} && \
     apk update && \
     apk add --no-cache ca-certificates curl gawk shadow bash
+
+# Extra set of dependencies for docker complete variant
+RUN [ "${DOCKER_VARIANT}" != "complete" ] || ( apk update && \
+            apk add --no-interactive --no-progress --no-cache nodejs-18=18.20.4-r0 npm=10.8.3-r0 glib dbus-glib libatk-1.0 \
+            libatk-bridge-2.0 cups-libs libxcomposite libxdamage libxrandr libxkbcommon pango alsa-lib \
+            font-opensans fontconfig gtk icu-data-full libnss mesa font-noto-cjk font-noto-emoji )
 
 FROM elastic_agent_base_wolfi AS elastic_agent_base_wolfi_buildtools
 RUN apk update && \
@@ -120,8 +127,6 @@ ARG DOCKER_VARIANT
 
 COPY ${HOST_BEAT_HOME} ${BEAT_HOME}
 
-#RUN true && \
-    # ECE needs to create config here under non-1000 user
 RUN chmod 0777 ${BEAT_HOME}
 RUN mkdir -p ${BEAT_HOME}/data ${BEAT_HOME}/data/elastic-agent-${BEAT_COMMIT_SHORT}/logs
 RUN find ${BEAT_HOME} -type d -exec chmod 0755 {} \;
@@ -140,6 +145,8 @@ RUN (chmod 0755 ${BEAT_HOME}/data/elastic-agent-*/components/pf-elastic-collecto
 RUN (chmod 0755 ${BEAT_HOME}/data/elastic-agent-*/components/pf-elastic-symbolizer || true)
 RUN (chmod 0755 ${BEAT_HOME}/data/elastic-agent-*/components/pf-host-agent || true)
 RUN find ${BEAT_HOME}/data/elastic-agent-${BEAT_COMMIT_SHORT}/components -name "*.yml*" -type f -exec chmod 0644 {} \;
+
+# TODO (Not sure if used)
 #{{- range $i, $modulesd := .ModulesDirs }}
 #    chmod 0775 {{ $beatHome}}/{{ $modulesd }} && \
 #{{- end }}
@@ -166,7 +173,7 @@ RUN setcap =p ${BEAT_HOME}/data/elastic-agent-${BEAT_COMMIT_SHORT}/elastic-agent
 
 
 # Elastic-agent images
-FROM elastic_agent_base_${BASE_IMAGE_FAMILY} AS elastic_agent_image
+FROM elastic_agent_base_${BASE_IMAGE_FAMILY} AS image_basic
 
 # beats stuff (redeclared here because https://docs.docker.com/reference/dockerfile/#understand-how-arg-and-from-interact )
 ARG BEAT_NAME
@@ -190,6 +197,8 @@ RUN mkdir /licenses && \
     cp /usr/share/elastic-agent/NOTICE.txt /licenses
 
 COPY --from=dockerbuild --chmod=0755 docker-entrypoint.elastic-agent /usr/local/bin/docker-entrypoint
+
+
 
 
 
@@ -235,3 +244,85 @@ LABEL \
   description="${BEAT_DESCRIPTION}"
 
 
+FROM image_basic AS image_cloud
+
+COPY --from=elastic_agent_files /opt /opt
+
+# Generate folder for a stub command that will be overwritten at runtime
+RUN mkdir /app && \
+    chown {{ .user }}:{{ .user }} /app
+
+FROM image_basic AS image_service
+
+ARG BEAT_HOME
+
+# TODO moving connectors.zip should probably be done in the elastic_agent_files stage
+# and the extra python package should be done in the base image
+RUN apk add --no-cache git make python-3.11 py3.11-pip && \
+    unzip ${BEAT_HOME}/data/service/connectors-*.zip -d ${BEAT_HOME}/data/service && \
+    mv ${BEAT_HOME}/data/service/elasticsearch_connectors-* /usr/share/connectors && \
+    PYTHON=python3.11 make -C /usr/share/connectors clean install install-agent && \
+    chmod 0755 ${BEAT_HOME}/data/elastic-agent-*/components/connectors
+
+FROM image_basic AS image_complete
+
+ARG BEAT_HOME
+ARG ELASTIC_AGENT_GROUP
+ARG ELASTIC_AGENT_USER
+
+
+USER root
+ENV NODE_PATH=${BEAT_HOME}/.node
+RUN echo \
+    $NODE_PATH \
+    ${BEAT_HOME}/.config \
+    ${BEAT_HOME}/.synthetics \
+    ${BEAT_HOME}/.npm \
+    ${BEAT_HOME}/.cache \
+    | xargs -IDIR sh -c 'mkdir -p DIR && chmod 0775 DIR'
+
+# Setup synthetics env vars
+ENV ELASTIC_SYNTHETICS_CAPABLE=true
+ENV ELASTIC_AGENT_COMPLETE=true
+ENV TZ=UTC
+ENV NODE_VERSION=18.20.4
+ENV PATH="$NODE_PATH/node/bin:$PATH"
+# Install the latest version of @elastic/synthetics forcefully ignoring the previously
+# cached node_modules, heartbeat then calls the global executable to run test suites
+# Setup node
+RUN cd ${BEAT_HOME}/.node \
+  && NODE_DOWNLOAD_URL="" \
+  && case "$(arch)" in \
+        arm64) \
+           NODE_DOWNLOAD_URL=https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz \
+           ;; \
+       x86_64) \
+           NODE_DOWNLOAD_URL=https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz \
+           ;; \
+       aarch64) \
+           NODE_DOWNLOAD_URL=https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-arm64.tar.xz \
+           ;; \
+       *) \
+           echo >&2 ; echo >&2 "Unsupported architecture \$(arch)" ; echo >&2 ; exit 1 ; \
+           ;; \
+     esac \
+  && mkdir -p node \
+  && curl ${NODE_DOWNLOAD_URL} | tar -xJ --strip 1 -C node \
+  && chmod ugo+rwX -R $NODE_PATH \
+# Install synthetics as a regular user, installing npm deps as root odesn't work
+   # fix .node .npm and .synthetics
+   && chown -R ${ELASTIC_AGENT_USER}:${ELASTIC_AGENT_GROUP} $NODE_PATH
+USER {{ .user }}
+# If this fails dump the NPM logs
+RUN (npm i -g --loglevel verbose --production --engine-strict @elastic/synthetics@stack_release || sh -c 'tail -n +1 /root/.npm/_logs/* && exit 1') && \
+    chmod ugo+rwX -R $NODE_PATH
+USER root
+
+# Install the deps as needed by the exact version of playwright elastic synthetics uses
+# We don't use npx playwright install-deps because that could pull a newer version
+# Install additional fonts as well
+RUN apt-get update -y && \
+    $NODE_PATH/node/lib/node_modules/@elastic/synthetics/node_modules/.bin/playwright install-deps chromium && \
+    DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends --yes \
+    fonts-noto \
+    fonts-noto-cjk
