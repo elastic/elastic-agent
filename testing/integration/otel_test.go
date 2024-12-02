@@ -83,7 +83,7 @@ func TestOtelFileProcessing(t *testing.T) {
 		Group: Default,
 		Local: true,
 		OS: []define.OS{
-			// input path missing on windows
+			{Type: define.Windows},
 			{Type: define.Linux},
 			{Type: define.Darwin},
 		},
@@ -428,7 +428,7 @@ func TestOtelLogsIngestion(t *testing.T) {
 		Group: Default,
 		Local: true,
 		OS: []define.OS{
-			// input path missing on windows
+			{Type: define.Windows},
 			{Type: define.Linux},
 			{Type: define.Darwin},
 		},
@@ -725,7 +725,7 @@ func TestFileBeatReceiver(t *testing.T) {
 		Group: Default,
 		Local: true,
 		OS: []define.OS{
-			// {Type: define.Windows}, we don't support otel on Windows yet
+			{Type: define.Windows},
 			{Type: define.Linux},
 			{Type: define.Darwin},
 		},
@@ -830,7 +830,7 @@ func TestOtelFBReceiverE2E(t *testing.T) {
 		Group: Default,
 		Local: true,
 		OS: []define.OS{
-			// {Type: define.Windows}, we don't support otel on Windows yet
+			{Type: define.Windows},
 			{Type: define.Linux},
 			{Type: define.Darwin},
 		},
