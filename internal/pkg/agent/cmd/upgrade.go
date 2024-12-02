@@ -39,11 +39,11 @@ const (
 )
 
 var (
-	unsupportedUpgradeError   error = errors.New("this agent is fleet managed and must be upgraded using Fleet")
-	nonRootExecutionError           = errors.New("upgrade command needs to be executed as root for fleet managed agents")
-	skipVerifyNotAllowedError       = errors.New(fmt.Sprintf("\"%s\" flag is not allowed when upgrading a fleet managed agent using the cli", flagSkipVerify))
-	skipVerifyNotRootError          = errors.New(fmt.Sprintf("user needs to be root to use \"%s\" flag when upgrading standalone agents", flagSkipVerify))
-	upgradeDisabledError            = errors.New("cannot upgrade agent running in docker or deployed via DEB or RPM")
+	UnsupportedUpgradeError   error = errors.New("this agent is fleet managed and must be upgraded using Fleet")
+	NonRootExecutionError           = errors.New("upgrade command needs to be executed as root for fleet managed agents")
+	SkipVerifyNotAllowedError       = errors.New(fmt.Sprintf("\"%s\" flag is not allowed when upgrading a fleet managed agent using the cli", flagSkipVerify))
+	SkipVerifyNotRootError          = errors.New(fmt.Sprintf("user needs to be root to use \"%s\" flag when upgrading standalone agents", flagSkipVerify))
+	UpgradeDisabledError            = errors.New("cannot upgrade agent running in docker or deployed via DEB or RPM")
 )
 
 func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -130,15 +130,15 @@ type upgradeCond struct {
 func checkUpgradable(cond upgradeCond) error {
 	checkManaged := func() error {
 		if !cond.force {
-			return unsupportedUpgradeError
+			return UnsupportedUpgradeError
 		}
 
 		if cond.skipVerify {
-			return skipVerifyNotAllowedError
+			return SkipVerifyNotAllowedError
 		}
 
 		if !cond.isRoot {
-			return nonRootExecutionError
+			return NonRootExecutionError
 		}
 
 		return nil
@@ -146,12 +146,12 @@ func checkUpgradable(cond upgradeCond) error {
 
 	checkStandalone := func() error {
 		if cond.skipVerify && !cond.isRoot {
-			return skipVerifyNotRootError
+			return SkipVerifyNotRootError
 		}
 		return nil
 	}
 	if cond.isUpgradeDisabled {
-		return upgradeDisabledError
+		return UpgradeDisabledError
 	}
 	if cond.isManaged {
 		return checkManaged()
