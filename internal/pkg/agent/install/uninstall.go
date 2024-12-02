@@ -69,26 +69,32 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	localFleet := false
 	notifyFleet := false
 	var ai *info.AgentInfo
-	c, err := operations.LoadFullAgentConfig(ctx, log, cfgFile, false, unprivileged)
-	if err != nil {
-		pt.Describe(fmt.Sprintf("unable to read agent config to determine if notifying Fleet is needed: %v", err))
-	}
-	cfg, err := configuration.NewFromConfig(c)
-	if err != nil {
-		pt.Describe(fmt.Sprintf("notify Fleet: unable to transform *config.Config to *configuration.Configuration: %v", err))
-	}
-
-	if cfg != nil && !configuration.IsStandalone(cfg.Fleet) {
-		ai, err = info.NewAgentInfo(ctx, false)
+	var cfg *configuration.Configuration
+	func() { // check if we need to notify in a func to allow us to return early if a (non-fatal) error is encountered.
+		c, err := operations.LoadFullAgentConfig(ctx, log, cfgFile, false, unprivileged)
 		if err != nil {
-			pt.Describe(fmt.Sprintf("unable to read agent info, Fleet will not be notified of uninstall: %v", err))
-		} else {
-			notifyFleet = true
+			pt.Describe(fmt.Sprintf("unable to read agent config to determine if notifying Fleet is needed: %v", err))
+			return
 		}
-		if cfg.Fleet != nil && cfg.Fleet.Server != nil {
-			localFleet = true
+		cfg, err = configuration.NewFromConfig(c)
+		if err != nil {
+			pt.Describe(fmt.Sprintf("notify Fleet: unable to transform *config.Config to *configuration.Configuration: %v", err))
+			return
 		}
-	}
+
+		if cfg != nil && !configuration.IsStandalone(cfg.Fleet) {
+			ai, err = info.NewAgentInfo(ctx, false)
+			if err != nil {
+				pt.Describe(fmt.Sprintf("unable to read agent info, Fleet will not be notified of uninstall: %v", err))
+				return
+			} else {
+				notifyFleet = true
+			}
+			if cfg.Fleet != nil && cfg.Fleet.Server != nil {
+				localFleet = true
+			}
+		}
+	}()
 
 	// Skip on Windows because of https://github.com/elastic/elastic-agent/issues/5952
 	// Once the root-cause is identified then this can be re-enabled on Windows.
