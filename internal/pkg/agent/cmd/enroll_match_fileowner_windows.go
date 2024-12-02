@@ -68,7 +68,7 @@ func isFileOwner(curUser string, fileOwner string) (bool, error) {
 	return isEqual, nil
 }
 
-func isOwner() (bool, error) {
+func isOwnerExec() (bool, error) {
 	user, err := getCurrentUser()
 	if err != nil {
 		return false, fmt.Errorf("ran into an error while retrieving current user: %w", err)
