@@ -263,7 +263,7 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)
 	require.NoError(t, err, "Error creating agent info")
 
-	sampleFiveErrorsStreamThreshold := uint(5)
+	sampleSevenErrorsStreamThreshold := uint(7)
 	sampleTenErrorsStreamThreshold := uint(10)
 
 	tcs := []struct {
@@ -307,7 +307,7 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 					HTTP: &monitoringcfg.MonitoringHTTPConfig{
 						Enabled: false,
 					},
-					FailureThreshold: &sampleFiveErrorsStreamThreshold,
+					FailureThreshold: &sampleSevenErrorsStreamThreshold,
 				},
 			},
 			policy: map[string]any{
@@ -323,7 +323,7 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 					"default": map[string]any{},
 				},
 			},
-			expectedThreshold: sampleFiveErrorsStreamThreshold,
+			expectedThreshold: sampleSevenErrorsStreamThreshold,
 		},
 		{
 			name: "policy failure threshold uint",
@@ -334,7 +334,7 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 					HTTP: &monitoringcfg.MonitoringHTTPConfig{
 						Enabled: false,
 					},
-					FailureThreshold: &sampleFiveErrorsStreamThreshold,
+					FailureThreshold: &sampleSevenErrorsStreamThreshold,
 				},
 			},
 			policy: map[string]any{
@@ -362,7 +362,7 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 					HTTP: &monitoringcfg.MonitoringHTTPConfig{
 						Enabled: false,
 					},
-					FailureThreshold: &sampleFiveErrorsStreamThreshold,
+					FailureThreshold: &sampleSevenErrorsStreamThreshold,
 				},
 			},
 			policy: map[string]any{
@@ -390,7 +390,7 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 					HTTP: &monitoringcfg.MonitoringHTTPConfig{
 						Enabled: false,
 					},
-					FailureThreshold: &sampleFiveErrorsStreamThreshold,
+					FailureThreshold: &sampleSevenErrorsStreamThreshold,
 				},
 			},
 			policy: map[string]any{
