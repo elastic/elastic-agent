@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/elastic/elastic-agent-libs/mapstr"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -848,6 +850,41 @@ func TestHash(t *testing.T) {
 
 		t.Run("test base64 string", func(t *testing.T) {
 			assert.Equal(t, test.match, test.c1.HashStr() == test.c2.HashStr())
+		})
+	}
+}
+
+func TestApplyDoesNotMutate(t *testing.T) {
+	tests := map[string]struct {
+		input Node
+	}{
+		"dict": {
+			&Dict{
+				value: []Node{
+					&Key{name: "str", value: &StrVal{value: "${var}"}},
+				},
+			},
+		},
+		"list": {
+			&List{
+				value: []Node{
+					&StrVal{value: "${var}"},
+				},
+			},
+		},
+		"key": {
+			&Key{name: "str", value: &StrVal{value: "${var}"}},
+		},
+		"str": {&StrVal{value: "${var}"}},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			vars, err := NewVars("", map[string]any{"var": "value"}, mapstr.M{})
+			require.NoError(t, err)
+			applied, err := test.input.Apply(vars)
+			require.NoError(t, err)
+			assert.NotEqual(t, test.input, applied)
 		})
 	}
 }

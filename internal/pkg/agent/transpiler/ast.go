@@ -62,7 +62,7 @@ type Node interface {
 	// the capacity of the array had to be changed.
 	Vars([]string) []string
 
-	// Apply apply the current vars, returning the new value for the node.
+	// Apply apply the current vars, returning the new value for the node. This does not modify the original Node.
 	Apply(*Vars) (Node, error)
 
 	// Processors returns any attached processors, because of variable substitution.
@@ -176,7 +176,7 @@ func (d *Dict) Vars(vars []string) []string {
 	return vars
 }
 
-// Apply applies the vars to all the nodes in the dictionary.
+// Apply applies the vars to all the nodes in the dictionary. This does not modify the original dictionary.
 func (d *Dict) Apply(vars *Vars) (Node, error) {
 	nodes := make([]Node, 0, len(d.value))
 	for _, v := range d.value {
@@ -299,7 +299,7 @@ func (k *Key) Vars(vars []string) []string {
 	return k.value.Vars(vars)
 }
 
-// Apply applies the vars to the value.
+// Apply applies the vars to the value. This does not modify the original node.
 func (k *Key) Apply(vars *Vars) (Node, error) {
 	if k.value == nil {
 		return k, nil
@@ -427,7 +427,7 @@ func (l *List) Vars(vars []string) []string {
 	return vars
 }
 
-// Apply applies the vars to all nodes in the list.
+// Apply applies the vars to all nodes in the list. This does not modify the original list.
 func (l *List) Apply(vars *Vars) (Node, error) {
 	nodes := make([]Node, 0, len(l.value))
 	for _, v := range l.value {
@@ -512,7 +512,7 @@ func (s *StrVal) Vars(vars []string) []string {
 	return vars
 }
 
-// Apply applies the vars to the string value.
+// Apply applies the vars to the string value. This does not modify the original string.
 func (s *StrVal) Apply(vars *Vars) (Node, error) {
 	return vars.Replace(s.value)
 }
