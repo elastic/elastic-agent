@@ -26,6 +26,7 @@ func TestIsWindowsUsername(t *testing.T) {
 		{`domai:n\user`, false},
 		{`dom.ain\user`, true},
 		{`dom.ain\.user`, true},
+		{`domain\usér`, false},
 	}
 
 	for _, tc := range testCases {

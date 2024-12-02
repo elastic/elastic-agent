@@ -73,14 +73,14 @@ func withServiceOptions(username string, groupName string, password string) ([]s
 		if isFullDomainName, err := isWindowsDomainUsername(username); err != nil {
 			return nil, fmt.Errorf("failed to parse username: %w", err)
 		} else if !isFullDomainName {
-			return nil, fmt.Errorf("username is not in proper format 'domain\\username'")
+			return nil, fmt.Errorf(`username is not in proper format 'domain\\username', contains illegal character: ,~:@#$%%^'.(){}_\/ or a whitespace`)
 		}
 
 		// existing user
 		return []serviceOpt{withUserGroup(username, groupName), withPassword(password)}, nil
 	}
 
-	// service requires a password to launch as the user
+	// service requires a password to launch as the use
 	// this sets it to a random password that is only known by the service
 	password, err := RandomPassword()
 	if err != nil {
