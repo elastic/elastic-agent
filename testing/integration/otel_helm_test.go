@@ -85,12 +85,14 @@ func TestOtelKubeStackHelm(t *testing.T) {
 
 	testCases := []struct {
 		name                       string
+		helmReleaseName            string
 		valuesFile                 string
 		atLeastValidatedPodsNumber int
 	}{
 		{
-			name:       "helm standalone agent default kubernetes privileged",
-			valuesFile: "../../deploy/helm/edot-collector/kube-stack/values.yaml",
+			name:            "helm standalone agent default kubernetes privileged",
+			helmReleaseName: "kube-stack-otel",
+			valuesFile:      "../../deploy/helm/edot-collector/kube-stack/values.yaml",
 			// - perNode Daemonset (at least 1 agent pod)
 			// - clusterWide Deployment  (1 agent pod)
 			// - operator Deployment  (1 agent pod)
@@ -146,7 +148,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				uninstallAction := action.NewUninstall(actionConfig)
 				uninstallAction.Wait = true
 
-				_, err = uninstallAction.Run("helm-agent")
+				_, err = uninstallAction.Run(tc.helmReleaseName)
 				if err != nil {
 					require.NoError(t, err, "failed to uninstall helm chart")
 				}
@@ -156,7 +158,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 			installAction.Namespace = testNamespace
 			installAction.CreateNamespace = true
 			installAction.UseReleaseName = true
-			installAction.ReleaseName = "kube-stack-otel"
+			installAction.ReleaseName = tc.helmReleaseName
 			installAction.Timeout = 2 * time.Minute
 			installAction.Wait = true
 			installAction.WaitForJobs = true
@@ -170,7 +172,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 			checkedAgentContainers := 0
 
 			for _, pod := range podList.Items {
-				if !strings.HasPrefix(pod.GetName(), "kube-stack-otel") {
+				if !strings.HasPrefix(pod.GetName(), tc.helmReleaseName) {
 					continue
 				}
 
