@@ -63,6 +63,11 @@ require (
 	go.elastic.co/apm/v2 v2.6.0
 	go.elastic.co/ecszap v1.0.2
 	go.elastic.co/go-licence-detector v0.7.0
+	go.opentelemetry.io/collector/confmap/provider/envprovider v1.20.0
+	go.opentelemetry.io/collector/confmap/provider/fileprovider v1.20.0
+	go.opentelemetry.io/collector/confmap/provider/httpprovider v1.20.0
+	go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.20.0
+	go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.20.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.114.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.29.0
@@ -107,7 +112,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver v0.114.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.114.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver v0.114.0
-	go.opentelemetry.io/collector/component v0.114.0 // indirect
+	go.opentelemetry.io/collector/component v0.114.0
 	go.opentelemetry.io/collector/confmap v1.20.0
 	go.opentelemetry.io/collector/connector v0.114.0
 	go.opentelemetry.io/collector/exporter v0.114.0
