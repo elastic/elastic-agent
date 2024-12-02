@@ -165,22 +165,25 @@ func TestOtelKubeStackHelm(t *testing.T) {
 			_, err = installAction.Run(helmChart, helmValues)
 			require.NoError(t, err, "failed to install helm chart")
 
-			podList := &corev1.PodList{}
-			err = client.Resources(testNamespace).List(ctx, podList)
-			require.NoError(t, err, fmt.Sprintf("failed to list pods in namespace %s", testNamespace))
+			// Pods are created by the OpenTelemetry Operator, it
+			// takes some time for the OpenTelemetry Operator to be
+			// ready
+			require.Eventually(t, func() bool {
+				podList := &corev1.PodList{}
+				err = client.Resources(testNamespace).List(ctx, podList)
+				require.NoError(t, err, fmt.Sprintf("failed to list pods in namespace %s", testNamespace))
 
-			checkedAgentContainers := 0
+				checkedAgentContainers := 0
 
-			for _, pod := range podList.Items {
-				if !strings.HasPrefix(pod.GetName(), tc.helmReleaseName) {
-					continue
+				for _, pod := range podList.Items {
+					if !strings.HasPrefix(pod.GetName(), tc.helmReleaseName) {
+						continue
+					}
+
+					checkedAgentContainers++
 				}
-
-				checkedAgentContainers++
-			}
-
-			require.GreaterOrEqual(t, checkedAgentContainers, tc.atLeastValidatedPodsNumber,
-				fmt.Sprintf("at least %d agent containers should be checked", tc.atLeastValidatedPodsNumber))
+				return checkedAgentContainers >= tc.atLeastValidatedPodsNumber
+			}, 2*time.Minute, 10*time.Second, fmt.Sprintf("at least %d agent containers should be checked", tc.atLeastValidatedPodsNumber))
 		})
 	}
 }
