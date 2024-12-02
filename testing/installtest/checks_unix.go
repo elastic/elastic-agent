@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -42,8 +43,22 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opt
 			return fmt.Errorf("failed to find %s group: %w", group, err)
 		}
 
+		var uid32 uint32
+		if uid > math.MaxUint32 {
+			return fmt.Errorf("provided UID %d does is higher than %d", uid, math.MaxInt32)
+		}
+		//nolint:gosec // G115 false positive on conversion
+		uid32 = uint32(uid)
+
+		var gid32 uint32
+		if gid > math.MaxUint32 {
+			return fmt.Errorf("provided GID %d does is higher than %d", gid, math.MaxInt32)
+		}
+		//nolint:gosec // G115 false positive on conversion
+		gid32 = uint32(gid)
+
 		// Ensure entire installation tree has the correct permissions.
-		err = validateFileTree(topPath, uint32(uid), uint32(gid))
+		err = validateFileTree(topPath, uid32, gid32)
 		if err != nil {
 			// context already added
 			return err
@@ -66,10 +81,10 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opt
 		if !ok {
 			return fmt.Errorf("failed to convert info.Sys() into *syscall.Stat_t")
 		}
-		if fs.Uid != uint32(uid) {
+		if fs.Uid != uid32 {
 			return fmt.Errorf("%s not owned by %s user", socketPath, username)
 		}
-		if fs.Gid != uint32(gid) {
+		if fs.Gid != gid32 {
 			return fmt.Errorf("%s not owned by %s group", socketPath, group)
 		}
 
