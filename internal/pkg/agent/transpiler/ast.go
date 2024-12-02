@@ -151,7 +151,8 @@ func (d *Dict) ShallowClone() Node {
 		if i == nil {
 			continue
 		}
-		nodes = append(nodes, i)
+		// Dict nodes are key-value pairs, and we do want to make a copy of the key here
+		nodes = append(nodes, i.ShallowClone())
 
 	}
 	return &Dict{value: nodes}

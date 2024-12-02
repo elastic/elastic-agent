@@ -909,7 +909,7 @@ func TestShallowClone(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			cloned := test.input.ShallowClone()
 			assert.Equal(t, test.input, cloned)
-			err := test.input.Insert(&AST{root: &BoolVal{value: true}}, "key")
+			err := test.input.Insert(&AST{root: &Key{name: "integer", value: &IntVal{value: 7}}}, "integer")
 			if err == nil {
 				assert.NotEqual(t, test.input, cloned)
 			} else if list, ok := test.input.root.(*List); ok {
