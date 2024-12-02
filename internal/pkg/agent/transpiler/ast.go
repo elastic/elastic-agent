@@ -58,6 +58,10 @@ type Node interface {
 	// Hash compute a sha256 hash of the current node and recursively call any children.
 	Hash() []byte
 
+	// Vars adds to the array with the variables identified in the node. Returns the array in-case
+	// the capacity of the array had to be changed.
+	Vars([]string) []string
+
 	// Apply apply the current vars, returning the new value for the node.
 	Apply(*Vars) (Node, error)
 
@@ -160,6 +164,15 @@ func (d *Dict) Hash() []byte {
 		h.Write(v.Hash())
 	}
 	return h.Sum(nil)
+}
+
+// Vars returns a list of all variables referenced in the dictionary.
+func (d *Dict) Vars(vars []string) []string {
+	for _, v := range d.value {
+		k := v.(*Key)
+		vars = k.Vars(vars)
+	}
+	return vars
 }
 
 // Apply applies the vars to all the nodes in the dictionary.
@@ -275,6 +288,14 @@ func (k *Key) Hash() []byte {
 		h.Write(k.value.Hash())
 	}
 	return h.Sum(nil)
+}
+
+// Vars returns a list of all variables referenced in the value.
+func (k *Key) Vars(vars []string) []string {
+	if k.value == nil {
+		return vars
+	}
+	return k.value.Vars(vars)
 }
 
 // Apply applies the vars to the value.
@@ -397,6 +418,14 @@ func (l *List) ShallowClone() Node {
 	return &List{value: nodes}
 }
 
+// Vars returns a list of all variables referenced in the list.
+func (l *List) Vars(vars []string) []string {
+	for _, v := range l.value {
+		vars = v.Vars(vars)
+	}
+	return vars
+}
+
 // Apply applies the vars to all nodes in the list.
 func (l *List) Apply(vars *Vars) (Node, error) {
 	nodes := make([]Node, 0, len(l.value))
@@ -472,6 +501,16 @@ func (s *StrVal) Hash() []byte {
 	return []byte(s.value)
 }
 
+// Vars returns a list of all variables referenced in the string.
+func (s *StrVal) Vars(vars []string) []string {
+	// errors are ignored (if there is an error determine the vars it will also error computing the policy)
+	_, _ = replaceVars(s.value, func(variable string) (Node, Processors, bool) {
+		vars = append(vars, variable)
+		return nil, nil, false
+	}, false)
+	return vars
+}
+
 // Apply applies the vars to the string value.
 func (s *StrVal) Apply(vars *Vars) (Node, error) {
 	return vars.Replace(s.value)
@@ -521,6 +560,11 @@ func (s *IntVal) Clone() Node {
 // ShallowClone makes a shallow clone of the node.
 func (s *IntVal) ShallowClone() Node {
 	return s.Clone()
+}
+
+// Vars does nothing. Cannot have variable in an IntVal.
+func (s *IntVal) Vars(vars []string) []string {
+	return vars
 }
 
 // Apply does nothing.
@@ -584,6 +628,11 @@ func (s *UIntVal) Hash() []byte {
 	return []byte(s.String())
 }
 
+// Vars does nothing. Cannot have variable in an UIntVal.
+func (s *UIntVal) Vars(vars []string) []string {
+	return vars
+}
+
 // Apply does nothing.
 func (s *UIntVal) Apply(_ *Vars) (Node, error) {
 	return s, nil
@@ -639,6 +688,11 @@ func (s *FloatVal) ShallowClone() Node {
 // Hash return a string representation of the value, we try to return the minimal precision we can.
 func (s *FloatVal) Hash() []byte {
 	return []byte(strconv.FormatFloat(s.value, 'f', -1, 64))
+}
+
+// Vars does nothing. Cannot have variable in an FloatVal.
+func (s *FloatVal) Vars(vars []string) []string {
+	return vars
 }
 
 // Apply does nothing.
@@ -701,6 +755,11 @@ func (s *BoolVal) Hash() []byte {
 		return trueVal
 	}
 	return falseVal
+}
+
+// Vars does nothing. Cannot have variable in an BoolVal.
+func (s *BoolVal) Vars(vars []string) []string {
+	return vars
 }
 
 // Apply does nothing.
@@ -825,6 +884,9 @@ func (a *AST) HashStr() string {
 
 // Equal check if two AST are equals by using the computed hash.
 func (a *AST) Equal(other *AST) bool {
+	if a.root == nil || other.root == nil {
+		return a.root == other.root
+	}
 	return bytes.Equal(a.Hash(), other.Hash())
 }
 
@@ -979,6 +1041,11 @@ func attachProcessors(node Node, processors Processors) Node {
 
 // Lookup accept an AST and a selector and return the matching Node at that position.
 func Lookup(a *AST, selector Selector) (Node, bool) {
+	// Be defensive and ensure that the ast is usable.
+	if a == nil || a.root == nil {
+		return nil, false
+	}
+
 	// Run through the graph and find matching nodes.
 	current := a.root
 	for _, part := range splitPath(selector) {

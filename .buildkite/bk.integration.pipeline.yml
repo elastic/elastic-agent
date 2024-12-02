@@ -48,6 +48,12 @@ steps:
           provider: "gcp"
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-windows-2022"
+        plugins:
+          - test-collector#v1.10.1:
+              files: "build/TEST-*.xml"
+              format: "junit"
+              branches: "main"
+              debug: true
         matrix:
           - default
           - fleet
@@ -64,6 +70,12 @@ steps:
           provider: "gcp"
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-windows-2022"
+        plugins:
+          - test-collector#v1.10.1:
+              files: "build/TEST-*.xml"
+              format: "junit"
+              branches: "main"
+              debug: true
         matrix:
           - default
 
@@ -83,6 +95,12 @@ steps:
           provider: "gcp"
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+        plugins:
+          - test-collector#v1.10.1:
+              files: "build/TEST-*.xml"
+              format: "junit"
+              branches: "main"
+              debug: true
         matrix:
           - default
 
@@ -96,6 +114,12 @@ steps:
           provider: "gcp"
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+        plugins:
+          - test-collector#v1.10.1:
+              files: "build/TEST-*.xml"
+              format: "junit"
+              branches: "main"
+              debug: true
         matrix:
           - default
           - container
@@ -118,6 +142,12 @@ steps:
           provider: "aws"
           imagePrefix: "platform-ingest-beats-ubuntu-2404-aarch64"
           instanceType: "m6g.2xlarge"
+        plugins:
+          - test-collector#v1.10.1:
+              files: "build/TEST-*.xml"
+              format: "junit"
+              branches: "main"
+              debug: true
         matrix:
           - default
           - container
@@ -140,6 +170,12 @@ steps:
           provider: "aws"
           imagePrefix: "platform-ingest-beats-ubuntu-2404-aarch64"
           instanceType: "m6g.xlarge"
+        plugins:
+          - test-collector#v1.10.1:
+              files: "build/TEST-*.xml"
+              format: "junit"
+              branches: "main"
+              debug: true
         matrix:
           - default
 
@@ -159,6 +195,12 @@ steps:
           provider: "gcp"
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-rhel-8"
+        plugins:
+          - test-collector#v1.10.1:
+              files: "build/TEST-*.xml"
+              format: "junit"
+              branches: "main"
+              debug: true
 
   - label: ESS stack cleanup
     depends_on:
