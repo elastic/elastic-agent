@@ -13,12 +13,12 @@ import (
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
-	"go.opentelemetry.io/collector/confmap/converter/expandconverter"
 	"go.opentelemetry.io/collector/confmap/provider/envprovider"
 	"go.opentelemetry.io/collector/confmap/provider/fileprovider"
 	"go.opentelemetry.io/collector/confmap/provider/httpprovider"
 	"go.opentelemetry.io/collector/confmap/provider/httpsprovider"
 	"go.opentelemetry.io/collector/confmap/provider/yamlprovider"
+
 	"go.opentelemetry.io/collector/otelcol"
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -64,9 +64,6 @@ func newSettings(version string, configPaths []string) (*otelcol.CollectorSettin
 				yamlprovider.NewFactory(),
 				httpprovider.NewFactory(),
 				httpsprovider.NewFactory(),
-			},
-			ConverterFactories: []confmap.ConverterFactory{
-				expandconverter.NewFactory(),
 			},
 		},
 	}
