@@ -250,7 +250,7 @@ COPY --from=elastic_agent_files /opt /opt
 
 # Generate folder for a stub command that will be overwritten at runtime
 RUN mkdir /app && \
-    chown {{ .user }}:{{ .user }} /app
+    chown ${ELASTIC_AGENT_USER}:${ELASTIC_AGENT_GROUP} /app
 
 FROM image_basic AS image_service
 
@@ -312,7 +312,7 @@ RUN cd ${BEAT_HOME}/.node \
 # Install synthetics as a regular user, installing npm deps as root odesn't work
    # fix .node .npm and .synthetics
    && chown -R ${ELASTIC_AGENT_USER}:${ELASTIC_AGENT_GROUP} $NODE_PATH
-USER {{ .user }}
+USER ${ELASTIC_AGENT_USER}
 # If this fails dump the NPM logs
 RUN (npm i -g --loglevel verbose --production --engine-strict @elastic/synthetics@stack_release || sh -c 'tail -n +1 /root/.npm/_logs/* && exit 1') && \
     chmod ugo+rwX -R $NODE_PATH

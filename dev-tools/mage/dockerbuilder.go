@@ -209,6 +209,8 @@ func (b *dockerBuilder) dockerBuild() (string, error) {
 
 		cmdArgs = append(cmdArgs,
 			"--build-context", "dockerbuild="+filepath.Join(elasticBeatsDir, "dev-tools/packaging/docker/"),
+			// TODO this should come from the spec
+			"--target", "image_basic",
 			"-f", filepath.Join(elasticBeatsDir, "dev-tools/packaging/docker/Dockerfile"),
 			"-t", tag,
 			b.buildDir,
