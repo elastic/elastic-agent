@@ -75,10 +75,12 @@ func TestEnrollUnprivileged(t *testing.T) {
 
 		if runtime.GOOS != "windows" {
 			_, err = exec.CommandContext(ctx, "sudo", enrollArgs...).CombinedOutput()
-			require.Error(t, cmd.UserOwnerMismatchError)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), cmd.UserOwnerMismatchError.Error())
 		} else {
 			_, err = exec.CommandContext(ctx, "elastic-agent", enrollArgs[1:]...).CombinedOutput()
-			require.Error(t, cmd.UserOwnerMismatchError)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), cmd.UserOwnerMismatchError.Error())
 		}
 	})
 }
