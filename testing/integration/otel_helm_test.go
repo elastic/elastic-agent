@@ -123,6 +123,14 @@ func TestOtelKubeStackHelm(t *testing.T) {
 			options := values.Options{
 				ValueFiles: []string{tc.valuesFile},
 				Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", agentImageTag)},
+
+				// override secrets reference with env variables
+				JSONValues: []string{
+					fmt.Sprintf(`collectors.cluster.env[1]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, esHost),
+					fmt.Sprintf(`collectors.cluster.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, esAPIKey),
+					fmt.Sprintf(`collectors.daemon.env[2]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, esHost),
+					fmt.Sprintf(`collectors.daemon.env[3]={"name":"ELASTIC_API_KEY","value":"%s"}`, esAPIKey),
+				},
 			}
 			providers := getter.All(settings)
 			helmValues, err = options.MergeValues(providers)
@@ -148,7 +156,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 			installAction.Namespace = testNamespace
 			installAction.CreateNamespace = true
 			installAction.UseReleaseName = true
-			installAction.ReleaseName = "helm-agent"
+			installAction.ReleaseName = "kube-stack-otel"
 			installAction.Timeout = 2 * time.Minute
 			installAction.Wait = true
 			installAction.WaitForJobs = true
@@ -162,7 +170,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 			checkedAgentContainers := 0
 
 			for _, pod := range podList.Items {
-				if !strings.HasPrefix(pod.GetName(), "kube-stack-") {
+				if !strings.HasPrefix(pod.GetName(), "kube-stack-otel") {
 					continue
 				}
 
