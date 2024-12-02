@@ -29,7 +29,7 @@ metadata:
 spec:
   type: buildkite-pipeline
   owner: group:ingest-fp
-  system: buildkite
+  system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
     kind: Pipeline
@@ -81,7 +81,7 @@ metadata:
 spec:
   type: buildkite-pipeline
   owner: group:ingest-fp
-  system: buildkite
+  system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
     kind: Pipeline
@@ -122,7 +122,7 @@ metadata:
 spec:
   type: buildkite-pipeline
   owner: group:ingest-fp
-  system: buildkite
+  system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
     kind: Pipeline
@@ -161,7 +161,7 @@ metadata:
 spec:
   type: buildkite-pipeline
   owner: group:ingest-fp
-  system: buildkite
+  system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
     kind: Pipeline
@@ -208,7 +208,7 @@ metadata:
 spec:
   type: buildkite-pipeline
   owner: group:ingest-fp
-  system: buildkite
+  system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
     kind: Pipeline
@@ -253,7 +253,7 @@ metadata:
 spec:
   type: buildkite-pipeline
   owner: group:ingest-fp
-  system: buildkite
+  system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
     kind: Pipeline
@@ -295,7 +295,7 @@ metadata:
 spec:
   type: buildkite-pipeline
   owner: group:ingest-fp
-  system: buildkite
+  system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
     kind: Pipeline
