@@ -5,6 +5,7 @@ package integration
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -38,6 +39,15 @@ func TestRestrictUpgradeDeb(t *testing.T) {
 
 		_, err = fixture.Install(ctx, &installOpts)
 		require.NoError(t, err)
+
+		require.Eventuallyf(t, func() bool {
+			err = fixture.IsHealthy(ctx)
+			return err == nil
+		}, 5*time.Minute, time.Second,
+			"Elastic-Agent did not report healthy. Agent status error: \"%v\"",
+			err,
+		)
+
 		out, err := fixture.Exec(ctx, []string{"upgrade", "1.0.0"})
 		require.Error(t, err)
 		require.Contains(t, string(out), cmd.UpgradeDisabledError.Error())
