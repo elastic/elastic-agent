@@ -34,10 +34,9 @@ func TestRestrictUpgradeDeb(t *testing.T) {
 			NonInteractive: true,
 			Privileged:     true,
 			Force:          true,
-			DelayEnroll:    true,
 		}
 
-		_, err = fixture.Install(ctx, &installOpts)
+		_, err = fixture.InstallWithoutEnroll(ctx, &installOpts)
 		require.NoError(t, err)
 
 		require.Eventuallyf(t, func() bool {
