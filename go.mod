@@ -12,7 +12,7 @@ require (
 	github.com/docker/docker v27.3.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20241126231543-1bd39c5cf55e
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20241202144630-0eb63c16f21a
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.0
 	github.com/elastic/elastic-agent-libs v0.17.2
@@ -184,7 +184,6 @@ require (
 	github.com/Microsoft/hcsshim v0.12.5 // indirect
 	github.com/PaesslerAG/gval v1.2.2 // indirect
 	github.com/PaesslerAG/jsonpath v0.1.1 // indirect
-	github.com/Shopify/sarama v1.37.2 // indirect
 	github.com/Showmax/go-fqdn v1.0.0 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/aerospike/aerospike-client-go/v7 v7.7.1 // indirect
@@ -278,6 +277,7 @@ require (
 	github.com/elastic/mito v1.16.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.13.0 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
+	github.com/elastic/sarama v1.19.1-0.20241120141909-c7eabfcee7e5 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/envoyproxy/go-control-plane v0.13.0 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.1.0 // indirect
@@ -450,7 +450,6 @@ require (
 	github.com/openzipkin/zipkin-go v0.4.3 // indirect
 	github.com/ovh/go-ovh v1.6.0 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
-	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pkg/errors v0.9.1 // indirect
