@@ -362,7 +362,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		if err != nil {
 			return fmt.Errorf("ran into an error while figuring out if user is allowed to execute the enroll command")
 		}
-		if !isOwner {
+		if !oe {
 			return UserOwnerMismatchError
 		}
 	}

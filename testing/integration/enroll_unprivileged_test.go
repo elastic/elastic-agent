@@ -74,13 +74,13 @@ func TestEnrollUnprivileged(t *testing.T) {
 		enrollArgs := []string{"elastic-agent", "enroll", "--url", enrollUrl, "--enrollment-token", enrollmentApiKey.APIKey, "--force"}
 
 		if runtime.GOOS != "windows" {
-			_, err = exec.CommandContext(ctx, "sudo", enrollArgs...).CombinedOutput()
+			out, err := exec.CommandContext(ctx, "sudo", enrollArgs...).CombinedOutput()
 			require.Error(t, err)
-			require.Contains(t, err.Error(), cmd.UserOwnerMismatchError.Error())
+			require.Contains(t, string(out), cmd.UserOwnerMismatchError.Error())
 		} else {
-			_, err = exec.CommandContext(ctx, "elastic-agent", enrollArgs[1:]...).CombinedOutput()
+			out, err := exec.CommandContext(ctx, "elastic-agent", enrollArgs[1:]...).CombinedOutput()
 			require.Error(t, err)
-			require.Contains(t, err.Error(), cmd.UserOwnerMismatchError.Error())
+			require.Contains(t, string(out), cmd.UserOwnerMismatchError.Error())
 		}
 	})
 }
