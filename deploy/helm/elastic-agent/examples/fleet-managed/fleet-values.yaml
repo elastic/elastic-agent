@@ -1,0 +1,43 @@
+agent:
+  fleet:
+    enabled: true
+    url: http://localhost:8220
+    token: fleetToken
+    preset: nginx
+  presets:
+    nginx:
+      mode: deployment
+      securityContext:
+        runAsUser: 0
+      serviceAccount:
+        create: true
+      clusterRole:
+        create: true
+        rules:
+          # minimum cluster role ruleset required by agent
+          - apiGroups: [ "" ]
+            resources:
+              - nodes
+              - namespaces
+              - pods
+            verbs:
+              - get
+              - watch
+              - list
+          - apiGroups: [ "apps" ]
+            resources:
+              - replicasets
+            verbs:
+              - get
+              - list
+              - watch
+          - apiGroups: [ "batch" ]
+            resources:
+              - jobs
+            verbs:
+              - get
+              - list
+              - watch
+      providers:
+        kubernetes_leaderelection:
+          enabled: false

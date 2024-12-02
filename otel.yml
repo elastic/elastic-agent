@@ -2,6 +2,7 @@ receivers:
   filelog:
     include: [ /var/log/system.log ]
     start_at: beginning
+    storage: file_storage/filelogreceiver
 
 processors:
   resource:
@@ -24,9 +25,12 @@ extensions:
   health_check:
     endpoint: "localhost:13133"
     path: "/health/status"
+  file_storage/filelogreceiver:
+    create_directory: true
+    directory: ${env:STATE_PATH}
 
 service:
-  extensions: [health_check, memory_limiter]
+  extensions: [health_check, memory_limiter, file_storage/filelogreceiver]
   pipelines:
     logs:
       receivers: [filelog]

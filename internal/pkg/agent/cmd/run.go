@@ -129,18 +129,6 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 		service.WaitExecutionDone()
 	}()
 
-	if err := handleUpgrade(); err != nil {
-		return fmt.Errorf("error checking for and handling upgrade: %w", err)
-	}
-
-	locker := filelock.NewAppLocker(paths.Data(), paths.AgentLockFileName)
-	if err := locker.TryLock(); err != nil {
-		return err
-	}
-	defer func() {
-		_ = locker.Unlock()
-	}()
-
 	service.BeforeRun()
 	defer service.Cleanup()
 
@@ -153,6 +141,18 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 
 	defer cancel()
 	go service.ProcessWindowsControlEvents(stopBeat)
+
+	if err := handleUpgrade(); err != nil {
+		return fmt.Errorf("error checking for and handling upgrade: %w", err)
+	}
+
+	locker := filelock.NewAppLocker(paths.Data(), paths.AgentLockFileName)
+	if err := locker.TryLock(); err != nil {
+		return err
+	}
+	defer func() {
+		_ = locker.Unlock()
+	}()
 
 	return runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, modifiers...)
 }
@@ -732,7 +732,8 @@ func ensureInstallMarkerPresent() error {
 	// in the `paths.ControlSocket()` in returning the incorrect control socket (only on Windows).
 	// Now that the install marker has been created we need to ensure that `paths.ControlSocket()` will
 	// return the correct result.
-	paths.ResolveControlSocket()
+	// We are being upgraded, we're running as installed, marker was just created.
+	paths.ResolveControlSocket(true)
 
 	return nil
 }

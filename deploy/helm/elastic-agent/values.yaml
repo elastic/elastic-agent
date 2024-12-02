@@ -325,13 +325,13 @@ extraIntegrations: {}
 agent:
   # -- elastic-agent version
   # @section -- 6 - Elastic-Agent Configuration
-  version: 8.17.0
+  version: 8.18.0
   # -- image configuration
   # @section -- 6 - Elastic-Agent Configuration
   image:
     repository: docker.elastic.co/beats/elastic-agent
     pullPolicy: IfNotPresent
-    tag: "8.17.0-SNAPSHOT"
+    tag: "8.18.0-SNAPSHOT"
   # -- image pull secrets
   # @section -- 6 - Elastic-Agent Configuration
   imagePullSecrets: []
@@ -385,7 +385,6 @@ agent:
     #    extraContainers: []
     #    resources: {}
     #    securityContext: {}
-    #    rules: []
     #    nodeSelector: {}
     #    tolerations: []
     #    topologySpreadConstraints: []
@@ -400,6 +399,10 @@ agent:
     # clusterWide preset is required by the built-in kubernetes integration
     clusterWide:
       mode: deployment
+      serviceAccount:
+        create: true
+      clusterRole:
+        create: true
       resources:
         limits:
           memory: 800Mi
@@ -431,6 +434,10 @@ agent:
     perNode:
       ## required by the built-in kubernetes integration
       mode: daemonset
+      serviceAccount:
+        create: true
+      clusterRole:
+        create: true
       resources:
         limits:
           memory: 1000Mi
@@ -450,14 +457,16 @@ agent:
           logs: true
           metrics: true
       providers:
-        kubernetes_leaderelection:
-          enabled: false
         kubernetes:
           node: ${NODE_NAME}
           scope: node
     ksmSharded:
       ## required by the built-in kubernetes integration
       mode: statefulset
+      serviceAccount:
+        create: true
+      clusterRole:
+        create: true
       resources:
         limits:
           memory: 800Mi
@@ -481,7 +490,5 @@ agent:
           logs: true
           metrics: true
       providers:
-        kubernetes_leaderelection:
-          enabled: false
         kubernetes:
           enabled: false

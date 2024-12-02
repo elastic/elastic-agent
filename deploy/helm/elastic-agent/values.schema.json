@@ -1003,6 +1003,14 @@
                         ]
                     ]
                 },
+                "automountServiceAccountToken": {
+                    "type": "boolean",
+                    "description": "Automount service account token for the deployment.",
+                    "examples": [
+                        true
+                    ],
+                    "default": true
+                },
                 "hostNetwork": {
                     "type": "boolean",
                     "description": "Enable host networking for the deployment.",
@@ -1044,26 +1052,24 @@
                         }
                     ]
                 },
-                "rules": {
+                "serviceAccount": {
+                    "$ref": "#/definitions/AgentPresetServiceAccount"
+                },
+                "clusterRole": {
+                    "$ref": "#/definitions/AgentPresetClusterRole"
+                },
+                "envFrom": {
                     "type": "array",
                     "items": {
                         "type": "object"
                     },
-                    "description": "Rules for the deployment.",
+                    "description": "Environment variables for the deployment.",
                     "examples": [
                         [
                             {
-                                "apiGroups": [
-                                    ""
-                                ],
-                                "resources": [
-                                    "pods"
-                                ],
-                                "verbs": [
-                                    "get",
-                                    "watch",
-                                    "list"
-                                ]
+                                "configMapRef": {
+                                    "name": "my-config"
+                                }
                             }
                         ]
                     ]
@@ -1247,7 +1253,128 @@
                 }
             },
             "required": [
-                "mode"
+                "mode",
+                "serviceAccount",
+                "clusterRole"
+            ]
+        },
+        "AgentPresetClusterRole": {
+            "type": "object",
+            "properties": {
+                "create": {
+                    "type": "boolean",
+                    "description": "Create the cluster role.",
+                    "default": true
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Name of the cluster role to use if create is set to false."
+                },
+                "annotations": {
+                    "type": "object",
+                    "description": "Annotations for the cluster role if create is set to true."
+                },
+                "rules": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    },
+                    "description": "Rules for the cluster role to create if create is set to true.",
+                    "examples": [
+                        [
+                            {
+                                "apiGroups": [
+                                    ""
+                                ],
+                                "resources": [
+                                    "pods"
+                                ],
+                                "verbs": [
+                                    "get",
+                                    "watch",
+                                    "list"
+                                ]
+                            }
+                        ]
+                    ]
+                }
+            },
+            "examples": [
+                {
+                    "create": true,
+                    "name": ""
+                }
+            ],
+            "required": [
+                "create"
+            ],
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "create": {
+                                "const": true
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        "AgentPresetServiceAccount": {
+            "type": "object",
+            "properties": {
+                "create": {
+                    "type": "boolean",
+                    "description": "Create the service account.",
+                    "default": true
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Name of the service account to use if create is set to false."
+                },
+                "annotations": {
+                    "type": "object",
+                    "description": "Annotations for the service account if create is set to true."
+                }
+            },
+            "examples": [
+                {
+                    "create": true,
+                    "name": ""
+                }
+            ],
+            "required": [
+                "create"
+            ],
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "create": {
+                                "const": true
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        },
+                        "required": [
+                            "create"
+                        ]
+                    }
+                }
             ]
         },
         "SystemLogsStreamVars": {

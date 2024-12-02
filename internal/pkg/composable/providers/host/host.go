@@ -109,7 +109,7 @@ func ContextProviderBuilder(log *logger.Logger, c *config.Config, _ bool) (corec
 		fetcher: getHostInfo(log),
 	}
 	if c != nil {
-		err := c.Unpack(p)
+		err := c.UnpackTo(p)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unpack config: %w", err)
 		}
@@ -147,6 +147,9 @@ func getHostInfo(log *logger.Logger) func() (map[string]interface{}, error) {
 			"architecture": info.Architecture,
 			"ip":           info.IPs,
 			"mac":          info.MACs,
+			"os_family":    info.OS.Family,
+			"os_platform":  info.OS.Platform,
+			"os_version":   info.OS.Version,
 		}, nil
 	}
 }

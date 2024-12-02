@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -20,12 +21,12 @@ import (
 	"github.com/gofrs/uuid/v5"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
-	"github.com/elastic/elastic-agent/pkg/utils"
 	semver "github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/version"
 
@@ -143,6 +144,17 @@ func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Inf
 	if err := req.Validate(); err != nil {
 		panic(fmt.Sprintf("test %s has invalid requirements: %s", t.Name(), err))
 	}
+
+	filteredGroups := GroupsFilter.values
+	if len(filteredGroups) > 0 && !slices.Contains(filteredGroups, req.Group) {
+		t.Skipf("group %s not found in groups filter %s. Skipping", req.Group, filteredGroups)
+		return nil
+	}
+
+	if SudoFilter.value != nil && req.Sudo != *SudoFilter.value {
+		t.Skipf("sudo requirement %t not matching sudo filter %t. Skipping", req.Sudo, *SudoFilter.value)
+	}
+
 	if !req.Local && local {
 		t.Skip("running local only tests and this test doesn't support local")
 		return nil
@@ -173,6 +185,11 @@ func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Inf
 		t.Skipf("platform: %s, architecture: %s, version: %s, and distro: %s combination is not supported by test.  required: %v", runtime.GOOS, runtime.GOARCH, osInfo.Version, osInfo.Platform, req.OS)
 		return nil
 	}
+
+	if DryRun {
+		return dryRun(t, req)
+	}
+
 	namespace, err := getNamespace(t, local)
 	if err != nil {
 		panic(err)

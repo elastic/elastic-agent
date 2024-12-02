@@ -2,6 +2,7 @@
 {{- range $presetName, $presetVal := $.Values.agent.presets -}}
 {{- if and (eq ($presetVal).mode "daemonset") (eq $.Values.agent.engine "eck") -}}
 {{- $agentName := include "elasticagent.preset.fullname" (list $ $presetName)  -}}
+{{- $podTemplateResource := include "elasticagent.engine.eck.podTemplate" (list $ $presetVal $agentName) | fromYaml }}
 apiVersion: agent.k8s.elastic.co/v1alpha1
 kind: Agent
 metadata:
@@ -34,7 +35,7 @@ spec:
   {{- end }}
   daemonSet:
     podTemplate:
-{{ include "elasticagent.engine.eck.podTemplate" (list $ $presetVal $agentName) }}
+{{- toYaml ($podTemplateResource).template | nindent 6 }}
 ---
 {{- end -}}
 {{- end }}
