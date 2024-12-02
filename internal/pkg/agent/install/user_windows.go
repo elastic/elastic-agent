@@ -182,12 +182,13 @@ func AddUserToGroup(username string, groupName string) error {
 	entries[0] = LOCALGROUP_MEMBERS_INFO_0{
 		Lgrmi0_sid: userSid,
 	}
+
 	ret, _, _ := procNetLocalGroupAddMembers.Call(
 		uintptr(0),
 		uintptr(unsafe.Pointer(groupNamePtr)),
 		uintptr(uint32(0)),
 		uintptr(unsafe.Pointer(&entries[0])),
-		uintptr(uint32(len(entries))),
+		uintptr(uint32(len(entries))), //nolint:gosec // G115 max 1
 	)
 	if ret != 0 {
 		return fmt.Errorf("call to NetLocalGroupAddMembers failed: status=%d", ret)
