@@ -5,11 +5,12 @@
 package composable
 
 import (
-	"maps"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -54,7 +55,8 @@ func BenchmarkGenerateVars100Pods(b *testing.B) {
 				mappings: make(map[string]dynamicProviderMapping),
 			}
 			for i := 0; i < podCount; i++ {
-				podData := maps.Clone(providerMapping)
+				podData, err := transpiler.NewAST(providerMapping)
+				require.NoError(b, err)
 				podUID := uuid.NewUUID()
 				podMapping := dynamicProviderMapping{
 					mapping: podData,
@@ -63,8 +65,10 @@ func BenchmarkGenerateVars100Pods(b *testing.B) {
 			}
 			c.dynamicProviders[providerName] = providerState
 		} else {
+			providerAst, err := transpiler.NewAST(providerData[providerName])
+			require.NoError(b, err)
 			providerState := &contextProviderState{
-				mapping: providerData[providerName],
+				mapping: providerAst,
 			}
 			c.contextProviders[providerName] = providerState
 		}
