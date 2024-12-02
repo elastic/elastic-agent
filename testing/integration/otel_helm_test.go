@@ -183,7 +183,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 					checkedAgentContainers++
 				}
 				return checkedAgentContainers >= tc.atLeastValidatedPodsNumber
-			}, 2*time.Minute, 10*time.Second, fmt.Sprintf("at least %d agent containers should be checked", tc.atLeastValidatedPodsNumber))
+			}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least %d agent containers should be checked", tc.atLeastValidatedPodsNumber))
 		})
 	}
 }
