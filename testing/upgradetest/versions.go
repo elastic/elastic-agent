@@ -190,7 +190,6 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 	previousMajorsToFind := reqs.PreviousMajors
 	previousMinorsToFind := reqs.PreviousMinors
 	recentSnapshotsToFind := len(reqs.SnapshotBranches)
-
 	for _, version := range sortedParsedVersions {
 		switch {
 		// we skip version above the target
@@ -202,7 +201,7 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 			recentSnapshotsToFind--
 
 		// for the rest of the checks we capture only released versions
-		case version.Prerelease() != "" || version.BuildMetadata() != "":
+		case version.Prerelease() != "" || (version.BuildMetadata() != "" && !version.IsIndependentRelease()):
 			continue
 
 		// previous minors
