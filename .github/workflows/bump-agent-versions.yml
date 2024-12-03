@@ -44,7 +44,7 @@ jobs:
         run: ./.github/workflows/bump-agent-versions.sh
 
       - if: ${{ failure()  }}
-        uses: slackapi/slack-github-action@e598089eaef53883a2d9b325e044899548518a03 # v2.0.0
+        uses: slackapi/slack-github-action@c4c0dd436db32691ce5e61fa36c2aaf563b977ad # v2.0.0
         with:
           channel-id: '#ingest-notifications'
           payload: |
@@ -66,7 +66,7 @@ jobs:
 
         # if a PR was created as a result of this job, we notify on the Slack channel
       - if: ${{ startsWith(steps.update.outputs.pr, 'https') }}
-        uses: slackapi/slack-github-action@e598089eaef53883a2d9b325e044899548518a03 # v2.0.0
+        uses: slackapi/slack-github-action@c4c0dd436db32691ce5e61fa36c2aaf563b977ad # v2.0.0
         with:
           channel-id: '#ingest-notifications'
           payload: |
