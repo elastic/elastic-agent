@@ -52,10 +52,6 @@ shared:
         content: >
           {{ commit }}
         mode: 0644
-      /etc/{{.BeatName}}/upgrades.disabled:
-        mode: 0444
-        content: >
-          ""
       /usr/share/{{.BeatName}}/bin/{{.BeatName}}-god:
         source: build/golang-crossbuild/god-{{.GOOS}}-{{.Platform.Arch}}
         mode: 0755
