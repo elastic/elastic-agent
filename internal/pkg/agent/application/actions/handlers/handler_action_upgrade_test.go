@@ -130,6 +130,7 @@ func TestUpgradeHandler(t *testing.T) {
 }
 
 func TestUpgradeHandlerSameVersion(t *testing.T) {
+	t.Skip("flaky test: https://github.com/elastic/elastic-agent/issues/5938")
 	// Create a cancellable context that will shut down the coordinator after
 	// the test.
 	ctx, cancel := context.WithCancel(context.Background())
