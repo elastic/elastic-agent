@@ -14,7 +14,7 @@ require (
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20241111113032-56dca4bbda40
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
-	github.com/elastic/elastic-agent-client/v7 v7.16.0
+	github.com/elastic/elastic-agent-client/v7 v7.17.0
 	github.com/elastic/elastic-agent-libs v0.17.2
 	github.com/elastic/elastic-agent-system-metrics v0.11.4
 	github.com/elastic/elastic-transport-go/v8 v8.6.0
@@ -272,7 +272,7 @@ require (
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/lunes v0.1.0 // indirect
-	github.com/elastic/mito v1.15.0 // indirect
+	github.com/elastic/mito v1.16.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.13.0 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect

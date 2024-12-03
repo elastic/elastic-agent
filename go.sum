@@ -438,8 +438,8 @@ github.com/elastic/beats/v7 v7.0.0-alpha2.0.20241111113032-56dca4bbda40 h1:pYJl9
 github.com/elastic/beats/v7 v7.0.0-alpha2.0.20241111113032-56dca4bbda40/go.mod h1:nLRYK65xJlgXs2GYjmalQRSdoGxNgx3z/OC2QO1Un5g=
 github.com/elastic/elastic-agent-autodiscover v0.9.0 h1:+iWIKh0u3e8I+CJa3FfWe9h0JojNasPgYIA47gpuuns=
 github.com/elastic/elastic-agent-autodiscover v0.9.0/go.mod h1:5iUxLHhVdaGSWYTveSwfJEY4RqPXTG13LPiFoxcpFd4=
-github.com/elastic/elastic-agent-client/v7 v7.16.0 h1:yKGq2+CxAuW8Kh0EoNl202tqAyQKfBcPRawVKs2Jve0=
-github.com/elastic/elastic-agent-client/v7 v7.16.0/go.mod h1:6h+f9QdIr3GO2ODC0Y8+aEXRwzbA5W4eV4dd/67z7nI=
+github.com/elastic/elastic-agent-client/v7 v7.17.0 h1:TPLrEHF4kJ3RkmQzZPffrniY4WeW4vriHZbOAzM1hFo=
+github.com/elastic/elastic-agent-client/v7 v7.17.0/go.mod h1:6h+f9QdIr3GO2ODC0Y8+aEXRwzbA5W4eV4dd/67z7nI=
 github.com/elastic/elastic-agent-libs v0.17.2 h1:Wk2mzdyjC7TZNgXcIfht5r6nHbXP4uLEFNxAhIhhkLA=
 github.com/elastic/elastic-agent-libs v0.17.2/go.mod h1:5CR02awPrBr+tfmjBBK+JI+dMmHNQjpVY24J0wjbC7M=
 github.com/elastic/elastic-agent-system-metrics v0.11.4 h1:Z/8CML5RKvGpi6/QUFok1K3EriBAv2kUAXnsk8hCifk=
@@ -478,8 +478,8 @@ github.com/elastic/gosigar v0.14.3 h1:xwkKwPia+hSfg9GqrCUKYdId102m9qTJIIr7egmK/u
 github.com/elastic/gosigar v0.14.3/go.mod h1:iXRIGg2tLnu7LBdpqzyQfGDEidKCfWcCMS0WKyPWoMs=
 github.com/elastic/lunes v0.1.0 h1:amRtLPjwkWtzDF/RKzcEPMvSsSseLDLW+bnhfNSLRe4=
 github.com/elastic/lunes v0.1.0/go.mod h1:xGphYIt3XdZRtyWosHQTErsQTd4OP1p9wsbVoHelrd4=
-github.com/elastic/mito v1.15.0 h1:MicOxLSVkgU2Aonbh3i+++66Wl5wvD8y9gALK8PQDYs=
-github.com/elastic/mito v1.15.0/go.mod h1:J+wCf4HccW2YoSFmZMGu+d06gN+WmnIlj5ehBqine74=
+github.com/elastic/mito v1.16.0 h1:7UYy1OpJ8rlr4nzy/HDYQHuHjUIDMCofk5ICalYC2LA=
+github.com/elastic/mito v1.16.0/go.mod h1:J+wCf4HccW2YoSFmZMGu+d06gN+WmnIlj5ehBqine74=
 github.com/elastic/mock-es v0.0.0-20241101195702-0a41fa3d30d9 h1:wXto1Zck/WqoXIoxEI8+nqoSSohPGp5dWV5zLskldYU=
 github.com/elastic/mock-es v0.0.0-20241101195702-0a41fa3d30d9/go.mod h1:cXqWcLnmu5y4QveTb2hjk7rgzkHMuZsqeXtbJpNAcu0=
 github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector v0.3.0 h1:5bEQRB73ZYYdZ1cRntygO8uAPajWLZCs1FOqWfq8JYg=
