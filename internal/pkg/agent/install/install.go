@@ -487,12 +487,7 @@ func CreateInstallMarker(topPath string, ownership utils.FileOwner) error {
 }
 
 func UnprivilegedUser(username, password string) (string, string) {
-	if username != "" && password != "" {
-		return username, password
-	}
-
-	if username != "" && runtime.GOOS != "windows" {
-		// password only required for windows
+	if username != "" {
 		return username, password
 	}
 
