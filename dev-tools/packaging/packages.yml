@@ -84,6 +84,10 @@ shared:
         mode: 0644
         content: >
           {{ manifest }}
+      /var/lib/{{.BeatName}}/upgrades.disabled:
+        mode: 0444
+        content: >
+          ""
 
   - &linux_otel_files
     'otelcol':
@@ -278,7 +282,7 @@ shared:
         content: >
           {{ commit }}
         mode: 0644
-      '.state/upgrades.disabled':
+      "state/data/upgrades.disabled":
         content: >
           ""
         mode: 0444
