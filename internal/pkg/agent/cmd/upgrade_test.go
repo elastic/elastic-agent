@@ -272,7 +272,7 @@ func TestUpgradeCmd(t *testing.T) {
 		mockClient := clientmocks.NewClient(t)
 
 		// Here we are creating the upgrade disabled file in the current directory.
-		// We have to set the configPath in the input struct to "" for this test to
+		// We have to set the topPath in the input struct to "" for this test to
 		// work
 		file, err := os.Create(upgradeDisabledFile)
 		if err != nil {

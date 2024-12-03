@@ -78,13 +78,13 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 }
 
 type upgradeInput struct {
-	streams    *cli.IOStreams
-	cmd        *cobra.Command
-	args       []string
-	c          client.Client
-	agentInfo  client.AgentStateInfo
-	isRoot     bool
-	configPath string
+	streams   *cli.IOStreams
+	cmd       *cobra.Command
+	args      []string
+	c         client.Client
+	agentInfo client.AgentStateInfo
+	isRoot    bool
+	topPath   string
 }
 
 func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
@@ -108,13 +108,13 @@ func upgradeCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error
 	}
 
 	input := &upgradeInput{
-		streams:    streams,
-		cmd:        cmd,
-		args:       args,
-		c:          c,
-		agentInfo:  state.Info,
-		isRoot:     isRoot,
-		configPath: paths.Config(),
+		streams:   streams,
+		cmd:       cmd,
+		args:      args,
+		c:         c,
+		agentInfo: state.Info,
+		isRoot:    isRoot,
+		topPath:   paths.Top(),
 	}
 	return upgradeCmdWithClient(input)
 }
@@ -177,7 +177,7 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 	}
 
 	var isUpgradeDisabled bool
-	_, err = os.Stat(filepath.Join(input.configPath, upgradeDisabledFile))
+	_, err = os.Stat(filepath.Join(input.topPath, upgradeDisabledFile))
 	if err == nil {
 		isUpgradeDisabled = true
 	} else {
