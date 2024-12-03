@@ -512,9 +512,6 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 		return nil, fmt.Errorf("failed to prepare: %w", err)
 	}
 
-	fmt.Println("===================== SOURCE PACKAGE ======================")
-	fmt.Println(f.srcPackage)
-	fmt.Println("===========================================================")
 	// sudo rpm -iv elastic-agent rpm
 	out, err := exec.CommandContext(ctx, "sudo", "rpm", "-i", "-v", f.srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
 	if err != nil {
@@ -542,9 +539,6 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 
 	// start elastic-agent
 	out, err = exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
-	fmt.Println("========================= OUTPUT =======================")
-	fmt.Println(out)
-	fmt.Println("========================================================")
 	if err != nil {
 		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
 	}
