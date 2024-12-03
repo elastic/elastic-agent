@@ -172,6 +172,9 @@ type ConfigManager interface {
 type VarsManager interface {
 	Runner
 
+	// Observe instructs the variables to observe.
+	Observe([]string)
+
 	// Watch returns the chanel to watch for variable changes.
 	Watch() <-chan []*transpiler.Vars
 }
@@ -1235,6 +1238,9 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 		return err
 	}
 
+	// pass the observed vars from the AST to the varsMgr
+	c.observeASTVars()
+
 	// Disabled for 8.8.0 release in order to limit the surface
 	// https://github.com/elastic/security-team/issues/6501
 
@@ -1311,6 +1317,30 @@ func (c *Coordinator) generateAST(cfg *config.Config) (err error) {
 
 	c.ast = rawAst
 	return nil
+}
+
+// observeASTVars identifies the variables that are referenced in the computed AST and passed to
+// the varsMgr so it knows what providers are being referenced. If a providers is not being
+// referenced then the provider does not need to be running.
+func (c *Coordinator) observeASTVars() {
+	if c.varsMgr == nil {
+		// No varsMgr (only happens in testing)
+		return
+	}
+	if c.ast == nil {
+		// No AST; no vars
+		c.varsMgr.Observe(nil)
+		return
+	}
+	inputs, ok := transpiler.Lookup(c.ast, "inputs")
+	if !ok {
+		// No inputs; no vars
+		c.varsMgr.Observe(nil)
+		return
+	}
+	var vars []string
+	vars = inputs.Vars(vars)
+	c.varsMgr.Observe(vars)
 }
 
 // processVars updates the transpiler vars in the Coordinator.

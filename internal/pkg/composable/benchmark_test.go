@@ -28,9 +28,9 @@ func BenchmarkGenerateVars100Pods(b *testing.B) {
 	log, err := logger.New("", false)
 	require.NoError(b, err)
 	c := controller{
-		contextProviders: make(map[string]*contextProviderState),
-		dynamicProviders: make(map[string]*dynamicProviderState),
-		logger:           log,
+		contextProviderStates: make(map[string]*contextProviderState),
+		dynamicProviderStates: make(map[string]*dynamicProviderState),
+		logger:                log,
 	}
 	podCount := 100
 
@@ -63,14 +63,14 @@ func BenchmarkGenerateVars100Pods(b *testing.B) {
 				}
 				providerState.mappings[string(podUID)] = podMapping
 			}
-			c.dynamicProviders[providerName] = providerState
+			c.dynamicProviderStates[providerName] = providerState
 		} else {
 			providerAst, err := transpiler.NewAST(providerData[providerName])
 			require.NoError(b, err)
 			providerState := &contextProviderState{
 				mapping: providerAst,
 			}
-			c.contextProviders[providerName] = providerState
+			c.contextProviderStates[providerName] = providerState
 		}
 	}
 
