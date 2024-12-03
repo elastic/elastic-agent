@@ -15,7 +15,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
 	"io"
 	"os"
 	"path/filepath"
@@ -32,7 +31,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -47,6 +45,7 @@ import (
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd"
 	aclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -194,7 +193,6 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 							RunAsUser:  tc.runUser,
 							RunAsGroup: tc.runGroup,
 						}
-
 					}
 					// set Elasticsearch host and API key
 					for idx, env := range container.Env {
@@ -227,7 +225,6 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 			deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, tc.runK8SInnerTests, testLogsBasePath, true, nil)
 		})
 	}
-
 }
 
 func TestKubernetesAgentOtel(t *testing.T) {
@@ -273,7 +270,6 @@ func TestKubernetesAgentOtel(t *testing.T) {
 		envAdd           []corev1.EnvVar
 		runK8SInnerTests bool
 	}{
-
 		{
 			"run agent in otel mode",
 			[]corev1.EnvVar{
@@ -595,11 +591,222 @@ func TestKubernetesAgentHelm(t *testing.T) {
 	}
 }
 
+func TestRestrictCliUpgrade(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack: &define.Stack{},
+		Local: false,
+		Sudo:  false,
+		OS: []define.OS{
+			{Type: define.Kubernetes, DockerVariant: "basic"},
+			{Type: define.Kubernetes, DockerVariant: "wolfi"},
+			{Type: define.Kubernetes, DockerVariant: "ubi"},
+			{Type: define.Kubernetes, DockerVariant: "complete"},
+			{Type: define.Kubernetes, DockerVariant: "complete-wolfi"},
+		},
+		Group: define.Kubernetes,
+	})
+
+	agentImage := os.Getenv("AGENT_IMAGE")
+	require.NotEmpty(t, agentImage, "AGENT_IMAGE must be set")
+
+	agentImageParts := strings.SplitN(agentImage, ":", 2)
+	require.Len(t, agentImageParts, 2, "AGENT_IMAGE must be in the form '<repository>:<version>'")
+	agentImageRepo := agentImageParts[0]
+	agentImageTag := agentImageParts[1]
+
+	client, err := info.KubeClient()
+	require.NoError(t, err)
+	require.NotNil(t, client)
+
+	testLogsBasePath := os.Getenv("K8S_TESTS_POD_LOGS_BASE")
+	require.NotEmpty(t, testLogsBasePath, "K8S_TESTS_POD_LOGS_BASE must be set")
+
+	err = os.MkdirAll(filepath.Join(testLogsBasePath, t.Name()), 0755)
+	require.NoError(t, err, "failed to create test logs directory")
+
+	namespace := info.Namespace
+
+	esHost := os.Getenv("ELASTICSEARCH_HOST")
+	require.NotEmpty(t, esHost, "ELASTICSEARCH_HOST must be set")
+
+	esAPIKey, err := generateESAPIKey(info.ESClient, namespace)
+	require.NoError(t, err, "failed to generate ES API key")
+	require.NotEmpty(t, esAPIKey, "failed to generate ES API key")
+
+	require.NoError(t, err, "failed to create fleet enroll params")
+
+	testCases := []struct {
+		name                       string
+		values                     map[string]any
+		atLeastValidatedPodsNumber int
+		runK8SInnerTests           bool
+	}{
+		{
+			name: "helm standalone agent default kubernetes privileged",
+			values: map[string]any{
+				"kubernetes": map[string]any{
+					"enabled": true,
+				},
+				"agent": map[string]any{
+					"unprivileged": false,
+					"image": map[string]any{
+						"repository": agentImageRepo,
+						"tag":        agentImageTag,
+						"pullPolicy": "Never",
+					},
+				},
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type":    "ESPlainAuthAPI",
+						"url":     esHost,
+						"api_key": esAPIKey,
+					},
+				},
+			},
+			runK8SInnerTests: true,
+			// - perNode Daemonset (at least 1 agent pod)
+			// - clusterWide Deployment  (1 agent pod)
+			// - ksmSharded Statefulset  (1 agent pod)
+			atLeastValidatedPodsNumber: 3,
+		},
+		{
+			name: "helm standalone agent default kubernetes unprivileged",
+			values: map[string]any{
+				"kubernetes": map[string]any{
+					"enabled": true,
+				},
+				"agent": map[string]any{
+					"unprivileged": true,
+					"image": map[string]any{
+						"repository": agentImageRepo,
+						"tag":        agentImageTag,
+						"pullPolicy": "Never",
+					},
+				},
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type":    "ESPlainAuthAPI",
+						"url":     esHost,
+						"api_key": esAPIKey,
+					},
+				},
+			},
+			runK8SInnerTests: true,
+			// - perNode Daemonset (at least 1 agent pod)
+			// - clusterWide Deployment  (1 agent pod)
+			// - ksmSharded Statefulset  (1 agent pod)
+			atLeastValidatedPodsNumber: 3,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			hasher := sha256.New()
+			hasher.Write([]byte(tc.name))
+			testNamespace := strings.ToLower(base64.URLEncoding.EncodeToString(hasher.Sum(nil)))
+			testNamespace = noSpecialCharsRegexp.ReplaceAllString(testNamespace, "")
+
+			settings := cli.New()
+			settings.SetNamespace(testNamespace)
+			actionConfig := &action.Configuration{}
+
+			helmChart, err := loader.Load(agentK8SHelm)
+			require.NoError(t, err, "failed to load helm chart")
+
+			err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "",
+				func(format string, v ...interface{}) {})
+			require.NoError(t, err, "failed to init helm action config")
+
+			helmValues := tc.values
+
+			t.Cleanup(func() {
+				if t.Failed() {
+					dumpLogs(t, ctx, client, testNamespace, testLogsBasePath)
+				}
+
+				uninstallAction := action.NewUninstall(actionConfig)
+				uninstallAction.Wait = true
+
+				_, err = uninstallAction.Run("helm-agent")
+				if err != nil {
+					require.NoError(t, err, "failed to uninstall helm chart")
+				}
+			})
+
+			installAction := action.NewInstall(actionConfig)
+			installAction.Namespace = testNamespace
+			installAction.CreateNamespace = true
+			installAction.UseReleaseName = true
+			installAction.ReleaseName = "helm-agent"
+			installAction.Timeout = 2 * time.Minute
+			installAction.Wait = true
+			installAction.WaitForJobs = true
+			_, err = installAction.Run(helmChart, helmValues)
+			require.NoError(t, err, "failed to install helm chart")
+
+			podList := &corev1.PodList{}
+			err = client.Resources(testNamespace).List(ctx, podList)
+			require.NoError(t, err, fmt.Sprintf("failed to list pods in namespace %s", testNamespace))
+
+			checkedAgentContainers := 0
+
+			for _, pod := range podList.Items {
+				if !strings.HasPrefix(pod.GetName(), "agent-") {
+					continue
+				}
+
+				command := []string{"elastic-agent", "status"}
+				var stdout, stderr bytes.Buffer
+				var agentHealthyErr error
+				// we will wait maximum 120 seconds for the agent to report healthy
+				for i := 0; i < 120; i++ {
+					stdout.Reset()
+					stderr.Reset()
+					agentHealthyErr = client.Resources().ExecInPod(ctx, testNamespace, pod.Name, "agent", command, &stdout, &stderr)
+					if agentHealthyErr == nil {
+						break
+					}
+					time.Sleep(time.Second * 1)
+				}
+
+				statusString := stdout.String()
+				if agentHealthyErr != nil {
+					t.Errorf("elastic-agent never reported healthy: %v", agentHealthyErr)
+					t.Logf("stdout: %s\n", statusString)
+					t.Logf("stderr: %s\n", stderr.String())
+					t.FailNow()
+					return
+				}
+
+				stdout.Reset()
+				stderr.Reset()
+
+				if tc.runK8SInnerTests {
+					err := client.Resources().ExecInPod(ctx, testNamespace, pod.Name, "agent",
+						[]string{"/usr/share/elastic-agent", "upgrade"}, &stdout, &stderr)
+					t.Log(stdout.String())
+					if err != nil {
+						t.Log(stderr.String())
+					}
+					require.Error(t, err)
+					require.Contains(t, err.Error(), cmd.UpgradeDisabledError.Error())
+				}
+
+				checkedAgentContainers++
+			}
+
+			require.GreaterOrEqual(t, checkedAgentContainers, tc.atLeastValidatedPodsNumber,
+				fmt.Sprintf("at least %d agent containers should be checked", tc.atLeastValidatedPodsNumber))
+		})
+	}
+}
+
 // deployK8SAgent is a helper function to deploy the elastic-agent in k8s and invoke the inner k8s tests if
 // runK8SInnerTests is true
 func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, objects []k8s.Object, namespace string,
-	runInnerK8STests bool, testLogsBasePath string, checkStatus bool, componentPresence map[string]bool) {
-
+	runInnerK8STests bool, testLogsBasePath string, checkStatus bool, componentPresence map[string]bool,
+) {
 	objects = append([]k8s.Object{&corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: namespace,
@@ -732,7 +939,6 @@ func getComponentState(status atesting.AgentStatusOutput, componentName string) 
 
 // dumpLogs dumps the logs of all pods in the given namespace to the given target directory
 func dumpLogs(t *testing.T, ctx context.Context, client klient.Client, namespace string, targetDir string) {
-
 	podList := &corev1.PodList{}
 
 	clientSet, err := kubernetes.NewForConfig(client.RESTConfig())
