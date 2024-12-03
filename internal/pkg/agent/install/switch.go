@@ -19,7 +19,7 @@ import (
 //
 // When username and groupName are blank then it switched back to root/Administrator and when a username/groupName is
 // provided then it switched to running with that username and groupName.
-func SwitchExecutingMode(topPath string, pt *progressbar.ProgressBar, username string, groupName string) error {
+func SwitchExecutingMode(topPath string, pt *progressbar.ProgressBar, username string, groupName string, password string) error {
 	// ensure service is stopped
 	status, err := EnsureStoppedService(topPath, pt)
 	if err != nil {
@@ -38,7 +38,7 @@ func SwitchExecutingMode(topPath string, pt *progressbar.ProgressBar, username s
 	// ensure user/group are created
 	var ownership utils.FileOwner
 	if username != "" && groupName != "" {
-		ownership, err = EnsureUserAndGroup(username, groupName, pt)
+		ownership, err = EnsureUserAndGroup(username, groupName, pt, username == ElasticUsername)
 		if err != nil {
 			// context for the error already provided in the EnsureUserAndGroup function
 			return err
@@ -78,7 +78,7 @@ func SwitchExecutingMode(topPath string, pt *progressbar.ProgressBar, username s
 
 	// re-install service
 	pt.Describe("Installing service")
-	err = InstallService(topPath, ownership, username, groupName)
+	err = InstallService(topPath, ownership, username, groupName, password)
 	if err != nil {
 		pt.Describe("Failed to install service")
 		// error context already added by InstallService
