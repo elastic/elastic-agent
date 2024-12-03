@@ -1,3 +1,5 @@
+# For installation and configuration options, refer to the [installation instructions](https://github.com/elastic/opentelemetry/blob/main/docs/kubernetes/operator/README.md)
+
 # For advanced configuration options, refer to the [official OpenTelemetry Helm chart](https://github.com/open-telemetry/opentelemetry-helm-charts/blob/main/charts/opentelemetry-kube-stack/values.yaml)
 
 opentelemetry-operator:
