@@ -73,7 +73,7 @@ func withServiceOptions(username string, groupName string, password string) ([]s
 		if isFullDomainName, err := isWindowsDomainUsername(username); err != nil {
 			return nil, fmt.Errorf("failed to parse username: %w", err)
 		} else if !isFullDomainName {
-			return nil, fmt.Errorf(`username is not in proper format 'domain\\username', contains illegal character: ,~:@#$%%^'.(){}_\/ or a whitespace`)
+			return nil, fmt.Errorf(`username is not in proper format 'domain\username', contains illegal character: ,~:@#$%%^'.(){}_\/ or a whitespace`)
 		}
 
 		// existing user
