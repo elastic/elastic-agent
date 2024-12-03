@@ -36,7 +36,7 @@ Unless -f is used this command will ask confirmation before performing removal.
 
 	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current and do not prompt for confirmation")
 	cmd.Flags().String("uninstall-token", "", "Uninstall token required for protected agent uninstall")
-	cmd.Flags().Bool("skip-fleet-audit", false, "Skip the auditing the uninstall from fleet")
+	cmd.Flags().Bool("skip-fleet-audit", false, "Skip fleet unenroll/audit")
 	return cmd
 }
 
