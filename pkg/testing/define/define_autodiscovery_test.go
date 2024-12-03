@@ -23,10 +23,9 @@ func Test_discoverTest(t *testing.T) {
 		tests []inputTest
 	}
 	tests := []struct {
-		name            string
-		args            args
-		discoveredTests map[TestPlatform]TestsByPlatform
-		discoveredYAML  string
+		name           string
+		args           args
+		discoveredYAML string
 	}{
 		{
 			name: "Default test",
@@ -40,241 +39,191 @@ func Test_discoverTest(t *testing.T) {
 					},
 				},
 			},
-			discoveredTests: map[TestPlatform]TestsByPlatform{
-				TestPlatform{OS: "darwin", Arch: "amd64"}: {
-					Platform: TestPlatform{OS: "darwin", Arch: "amd64"},
-					OperatingSystems: map[TestOS]TestByOS{
-						TestOS{Name: "", Version: ""}: {
-							OperatingSystem: TestOS{Name: "", Version: ""},
-							Groups: map[string]TestGroup{
-								"foo": {
-									Name: "foo",
-									Tests: map[string]TestMetadata{
-										"Test_all_default_platforms": {
-											Name:  "Test_all_default_platforms",
-											Local: false,
-											Sudo:  false,
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				TestPlatform{OS: "darwin", Arch: "arm64"}: {
-					Platform: TestPlatform{OS: "darwin", Arch: "arm64"},
-					OperatingSystems: map[TestOS]TestByOS{
-						TestOS{Name: "", Version: ""}: {
-							OperatingSystem: TestOS{Name: "", Version: ""},
-							Groups: map[string]TestGroup{
-								"foo": {
-									Name: "foo",
-									Tests: map[string]TestMetadata{
-										"Test_all_default_platforms": {
-											Name:  "Test_all_default_platforms",
-											Local: false,
-											Sudo:  false,
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				TestPlatform{OS: "linux", Arch: "amd64"}: {
-					Platform: TestPlatform{OS: "linux", Arch: "amd64"},
-					OperatingSystems: map[TestOS]TestByOS{
-						TestOS{Name: "", Version: ""}: {
-							OperatingSystem: TestOS{Name: "", Version: ""},
-							Groups: map[string]TestGroup{
-								"foo": {
-									Name: "foo",
-									Tests: map[string]TestMetadata{
-										"Test_all_default_platforms": {
-											Name:  "Test_all_default_platforms",
-											Local: false,
-											Sudo:  false,
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				TestPlatform{OS: "linux", Arch: "arm64"}: {
-					Platform: TestPlatform{OS: "linux", Arch: "arm64"},
-					OperatingSystems: map[TestOS]TestByOS{
-						TestOS{Name: "", Version: ""}: {
-							OperatingSystem: TestOS{Name: "", Version: ""},
-							Groups: map[string]TestGroup{
-								"foo": {
-									Name: "foo",
-									Tests: map[string]TestMetadata{
-										"Test_all_default_platforms": {
-											Name:  "Test_all_default_platforms",
-											Local: false,
-											Sudo:  false,
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				TestPlatform{OS: "windows", Arch: "amd64"}: {
-					Platform: TestPlatform{OS: "windows", Arch: "amd64"},
-					OperatingSystems: map[TestOS]TestByOS{
-						TestOS{Name: "", Version: ""}: {
-							OperatingSystem: TestOS{Name: "", Version: ""},
-							Groups: map[string]TestGroup{
-								"foo": {
-									Name: "foo",
-									Tests: map[string]TestMetadata{
-										"Test_all_default_platforms": {
-											Name:  "Test_all_default_platforms",
-											Local: false,
-											Sudo:  false,
-										},
-									},
-								},
-							},
+			discoveredYAML: `
+darwin/amd64:
+    platform:
+        os: darwin
+        arch: amd64
+    os:
+        "":
+            groups:
+                foo:
+                    group_name: foo
+                    tests:
+                        Test_all_default_platforms:
+                            test_name: Test_all_default_platforms
+                            local: false
+                            sudo: false
+darwin/arm64:
+    platform:
+        os: darwin
+        arch: arm64
+    os:
+        "":
+            groups:
+                foo:
+                    group_name: foo
+                    tests:
+                        Test_all_default_platforms:
+                            test_name: Test_all_default_platforms
+                            local: false
+                            sudo: false
+linux/amd64:
+    platform:
+        os: linux
+        arch: amd64
+    os:
+        "":
+            groups:
+                foo:
+                    group_name: foo
+                    tests:
+                        Test_all_default_platforms:
+                            test_name: Test_all_default_platforms
+                            local: false
+                            sudo: false
+linux/arm64:
+    platform:
+        os: linux
+        arch: arm64
+    os:
+        "":
+            groups:
+                foo:
+                    group_name: foo
+                    tests:
+                        Test_all_default_platforms:
+                            test_name: Test_all_default_platforms
+                            local: false
+                            sudo: false
+windows/amd64:
+    platform:
+        os: windows
+        arch: amd64
+    os:
+        "":
+            groups:
+                foo:
+                    group_name: foo
+                    tests:
+                        Test_all_default_platforms:
+                            test_name: Test_all_default_platforms
+                            local: false
+                            sudo: false
+`,
+		},
+
+		{
+			name: "Only windows test",
+			args: args{
+				tests: []inputTest{
+					{
+						n: &NamedThing{name: "Test_only_windows"},
+						reqs: &Requirements{
+							Group: "foo",
+							OS:    []OS{{Type: Windows}},
 						},
 					},
 				},
 			},
-			//discoveredYAML: `foo: bar`,
 		},
-
-		//	[]TestOS{
-		//
-		//		TestPlatform{OS: "darwin", Arch: "arm64"}:  {{Name: "", Version: ""}},
-		//		TestPlatform{OS: "linux", Arch: "amd64"}:   {{Name: "", Version: ""}},
-		//		TestPlatform{OS: "linux", Arch: "arm64"}:   {{Name: "", Version: ""}},
-		//		TestPlatform{OS: "windows", Arch: "amd64"}: {{Name: "", Version: ""}},
-		//	},
-		//},
-		//{
-		//	name: "Only windows test",
-		//	args: args{
-		//		tests: []inputTest{
-		//			{
-		//				n: &NamedThing{name: "Test_only_windows"},
-		//				reqs: &Requirements{
-		//					Group: "foo",
-		//					OS:    []OS{{Type: Windows}},
-		//				},
-		//			},
-		//		},
-		//	},
-		//	discoveredTests: map[TestPlatform][]TestOS{
-		//		TestPlatform{OS: "windows", Arch: ""}: {{Name: "windows", Version: ""}},
-		//	},
-		//},
-		//{
-		//	name: "Specific windows version test",
-		//	args: args{
-		//		tests: []inputTest{
-		//			{
-		//				n: &NamedThing{name: "Test_only_windows"},
-		//				reqs: &Requirements{
-		//					Group: "foo",
-		//					OS:    []OS{{Type: Windows, Version: "Windows Server 2019"}},
-		//				},
-		//			},
-		//		},
-		//	},
-		//	discoveredTests: map[TestPlatform][]TestOS{
-		//		TestPlatform{OS: "windows", Arch: ""}: {{Name: "windows", Version: "Windows Server 2019"}},
-		//	},
-		//},
-		//{
-		//	name: "Generic linux test",
-		//	args: args{
-		//		tests: []inputTest{
-		//			{
-		//				n: &NamedThing{name: "Test_only_linux"},
-		//				reqs: &Requirements{
-		//					Group: "foo",
-		//					OS:    []OS{{Type: Linux}},
-		//				},
-		//			},
-		//		},
-		//	},
-		//
-		//	discoveredTests: map[TestPlatform][]TestOS{
-		//		TestPlatform{OS: "linux", Arch: ""}: {{Name: "", Version: ""}},
-		//	},
-		//},
-		//{
-		//	name: "Specific linux distro test",
-		//	args: args{
-		//		tests: []inputTest{
-		//			{
-		//				n: &NamedThing{name: "Test_only_linux"},
-		//				reqs: &Requirements{
-		//					Group: "foo",
-		//					OS:    []OS{{Type: Linux, Distro: "Ubuntu"}},
-		//				},
-		//			},
-		//		},
-		//	},
-		//	discoveredTests: map[TestPlatform][]TestOS{
-		//		TestPlatform{OS: "linux", Arch: ""}: {{Name: "Ubuntu", Version: ""}},
-		//	},
-		//},
-		//{
-		//	name: "Specific linux distro and version test",
-		//	args: args{
-		//		tests: []inputTest{
-		//			{
-		//				n: &NamedThing{name: "Test_only_linux"},
-		//				reqs: &Requirements{
-		//					Group: "foo",
-		//					OS:    []OS{{Type: Linux, Distro: "Ubuntu", Version: "24.04"}},
-		//				},
-		//			},
-		//		},
-		//	},
-		//	discoveredTests: map[TestPlatform][]TestOS{
-		//		TestPlatform{OS: "linux", Arch: ""}: {{Name: "Ubuntu", Version: "24.04"}},
-		//	},
-		//},
-		//{
-		//	name: "Mix multiple tests",
-		//	args: args{
-		//		tests: []inputTest{
-		//			{
-		//				n: &NamedThing{name: "Test_only_linux"},
-		//				reqs: &Requirements{
-		//					Group: "foo",
-		//					OS:    []OS{{Type: Linux, Distro: "Ubuntu", Version: "24.04"}},
-		//				},
-		//			},
-		//			{
-		//				n: &NamedThing{name: "Test_only_windows"},
-		//				reqs: &Requirements{
-		//					Group: "foo",
-		//					OS:    []OS{{Type: Windows, Version: "Windows Server 2019"}},
-		//				},
-		//			},
-		//			{
-		//				n: &NamedThing{name: "Test_all_default_platforms"},
-		//				reqs: &Requirements{
-		//					Group: "foo",
-		//				},
-		//			},
-		//		},
-		//	},
-		//	discoveredTests: map[TestPlatform][]TestOS{
-		//		TestPlatform{OS: "darwin", Arch: "amd64"}:  {{Name: "", Version: ""}},
-		//		TestPlatform{OS: "darwin", Arch: "arm64"}:  {{Name: "", Version: ""}},
-		//		TestPlatform{OS: "linux", Arch: ""}:        {{Name: "Ubuntu", Version: "24.04"}},
-		//		TestPlatform{OS: "linux", Arch: "amd64"}:   {{Name: "", Version: ""}},
-		//		TestPlatform{OS: "linux", Arch: "arm64"}:   {{Name: "", Version: ""}},
-		//		TestPlatform{OS: "windows", Arch: ""}:      {{Name: "windows", Version: "Windows Server 2019"}},
-		//		TestPlatform{OS: "windows", Arch: "amd64"}: {{Name: "", Version: ""}},
-		//	},
-		//},
+		{
+			name: "Specific windows version test",
+			args: args{
+				tests: []inputTest{
+					{
+						n: &NamedThing{name: "Test_only_windows"},
+						reqs: &Requirements{
+							Group: "foo",
+							OS:    []OS{{Type: Windows, Version: "Windows Server 2019"}},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Generic linux test",
+			args: args{
+				tests: []inputTest{
+					{
+						n: &NamedThing{name: "Test_only_linux"},
+						reqs: &Requirements{
+							Group: "foo",
+							OS:    []OS{{Type: Linux}},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Specific linux distro test",
+			args: args{
+				tests: []inputTest{
+					{
+						n: &NamedThing{name: "Test_only_linux"},
+						reqs: &Requirements{
+							Group: "foo",
+							OS:    []OS{{Type: Linux, Distro: "Ubuntu"}},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Specific linux distro and version test",
+			args: args{
+				tests: []inputTest{
+					{
+						n: &NamedThing{name: "Test_only_linux"},
+						reqs: &Requirements{
+							Group: "foo",
+							OS:    []OS{{Type: Linux, Distro: "Ubuntu", Version: "24.04"}},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Mix multiple tests with different groups",
+			args: args{
+				tests: []inputTest{
+					{
+						n: &NamedThing{name: "Test_only_linux"},
+						reqs: &Requirements{
+							Group: "foo",
+							OS:    []OS{{Type: Linux, Distro: "Ubuntu", Version: "24.04"}},
+						},
+					},
+					{
+						n: &NamedThing{name: "Test_only_linux2"},
+						reqs: &Requirements{
+							Group: "bar",
+							OS:    []OS{{Type: Linux, Distro: "Ubuntu", Version: "24.04"}},
+						},
+					},
+					{
+						n: &NamedThing{name: "Test_only_windows"},
+						reqs: &Requirements{
+							Group: "foo",
+							OS:    []OS{{Type: Windows, Version: "Windows Server 2019"}},
+						},
+					},
+					{
+						n: &NamedThing{name: "Test_all_default_platforms"},
+						reqs: &Requirements{
+							Group: "foo",
+						},
+					},
+					{
+						n: &NamedThing{name: "Test_all_default_platforms_sudo"},
+						reqs: &Requirements{
+							Group: "bar",
+							Sudo:  true,
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		// reset map between testcases
@@ -283,10 +232,10 @@ func Test_discoverTest(t *testing.T) {
 			for _, ttarg := range tt.args.tests {
 				discoverTest(ttarg.n, ttarg.reqs)
 			}
-			assert.Equal(t, tt.discoveredTests, testAutodiscovery)
+			actualTestYaml, err := DumpAutodiscoveryYAML()
+			t.Logf("Got autodiscovery YAML:\n%s\n", actualTestYaml)
+			assert.NoError(t, err)
 			if tt.discoveredYAML != "" {
-				actualTestYaml, err := DumpAutodiscoveryYAML()
-				assert.NoError(t, err)
 				assert.YAMLEq(t, tt.discoveredYAML, string(actualTestYaml))
 			}
 		})

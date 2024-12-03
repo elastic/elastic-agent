@@ -2,78 +2,12 @@ package define
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 
 	"gopkg.in/yaml.v3"
 )
 
-type TestPlatform struct {
-	OS   string
-	Arch string
-}
-
-func (tp *TestPlatform) String() string {
-	return fmt.Sprintf("%s/%s", tp.OS, tp.Arch)
-}
-
-func (tp *TestPlatform) Parse(s string) error {
-	var ok bool
-	tp.OS, tp.Arch, ok = strings.Cut(s, "/")
-	if !ok {
-		return fmt.Errorf("separator not found in platform string %q", s)
-	}
-	return nil
-}
-
-func (tp *TestPlatform) MarshalYAML() (interface{}, error) {
-	return tp.String(), nil
-}
-
-type TestMetadata struct {
-	Name  string `json:"-" yaml:"-"`
-	Local bool   `json:"local" yaml:"local"`
-	Sudo  bool   `json:"sudo" yaml:"sudo"`
-}
-
-type TestOS struct {
-	Name    string `json:"name" yaml:"name"`
-	Version string `json:"version" yaml:"version"`
-}
-
-type TestGroup struct {
-	Name  string                  `json:"-" yaml:"-"`
-	Tests map[string]TestMetadata `json:"tests" yaml:"tests"`
-}
-
-func NewTestGroup(groupName string) TestGroup {
-	return TestGroup{
-		Name:  groupName,
-		Tests: map[string]TestMetadata{},
-	}
-}
-
-type TestByOS struct {
-	OperatingSystem TestOS               `json:"-" yaml:"-"`
-	Groups          map[string]TestGroup `json:"groups" yaml:"groups"`
-}
-
-func NewTestByOS(tos TestOS) TestByOS {
-	return TestByOS{
-		OperatingSystem: tos,
-		Groups:          map[string]TestGroup{},
-	}
-}
-
-type TestsByPlatform struct {
-	Platform         TestPlatform        `json:"-" yaml:"-"`
-	OperatingSystems map[TestOS]TestByOS `json:"os" yaml:"os"`
-}
-
-func NewTestsByPlatform(platform TestPlatform) TestsByPlatform {
-	return TestsByPlatform{Platform: platform, OperatingSystems: map[TestOS]TestByOS{}}
-}
-
+// Default platforms. Overridable using InitAutodiscovery()
 var defaultPlatforms = []TestPlatform{
 	{OS: Windows, Arch: AMD64},
 
@@ -87,13 +21,91 @@ var defaultPlatforms = []TestPlatform{
 	{OS: Linux, Arch: ARM64},
 }
 
+// k8s default platforms
 // TODO this should be used for k8s tests ?
 var k8sPlatforms = []TestPlatform{
 	{OS: Kubernetes, Arch: AMD64},
 	{OS: Kubernetes, Arch: ARM64},
 }
 
-var testAutodiscovery = map[TestPlatform]TestsByPlatform{}
+var defaultTestOS = TestOS{
+	Name:    "",
+	Version: "",
+}
+
+var defaultTestPlatform = TestPlatform{
+	OS:   "",
+	Arch: "",
+}
+
+// YAML/JSON output structs
+type OutputRunner struct {
+	OSFamily string        `json:"os_family" yaml:"os_family" `
+	Arch     string        `json:"arch,omitempty"`
+	OS       string        `json:"os,omitempty"`
+	Version  string        `json:"version,omitempty"`
+	Groups   []OutputGroup `json:"groups,omitempty"`
+}
+
+type OutputGroup struct {
+	Name  string
+	Tests []OutputTest
+}
+
+type OutputTest struct {
+	Name     string
+	Metadata TestMetadata
+}
+
+// structs to aggregate test information
+type TestPlatform struct {
+	OS   string `json:"os" yaml:"os"`
+	Arch string `json:"arch" yaml:"arch"`
+}
+
+type TestMetadata struct {
+	Local bool `json:"local" yaml:"local"`
+	Sudo  bool `json:"sudo" yaml:"sudo"`
+}
+
+type TestOS struct {
+	Name    string `json:"name" yaml:"name"`
+	Version string `json:"version" yaml:"version"`
+}
+type TestGroup struct {
+	Tests map[string]TestMetadata
+}
+
+func NewTestGroup() TestGroup {
+	return TestGroup{
+		Tests: map[string]TestMetadata{},
+	}
+}
+
+type TestByOS struct {
+	Groups map[string]TestGroup
+}
+
+func NewTestByOS() TestByOS {
+	return TestByOS{
+		Groups: map[string]TestGroup{},
+	}
+}
+
+type TestsByPlatform struct {
+	OperatingSystems map[TestOS]TestByOS `json:"os" yaml:"os"`
+}
+
+func NewTestsByPlatform() TestsByPlatform {
+	return TestsByPlatform{OperatingSystems: map[TestOS]TestByOS{}}
+}
+
+type DiscoveredTests struct {
+	Discovered map[TestPlatform]TestsByPlatform
+}
+
+// test autodiscovery aggregator
+var testAutodiscovery *DiscoveredTests
 var testAutodiscoveryMx sync.Mutex
 
 type Named interface {
@@ -103,7 +115,9 @@ type Named interface {
 func InitAutodiscovery(initDefaultPlatforms []TestPlatform) {
 	testAutodiscoveryMx.Lock()
 	defer testAutodiscoveryMx.Unlock()
-	testAutodiscovery = map[TestPlatform]TestsByPlatform{}
+	testAutodiscovery = &DiscoveredTests{
+		Discovered: map[TestPlatform]TestsByPlatform{},
+	}
 
 	if initDefaultPlatforms != nil {
 		defaultPlatforms = initDefaultPlatforms
@@ -113,20 +127,65 @@ func InitAutodiscovery(initDefaultPlatforms []TestPlatform) {
 func DumpAutodiscoveryYAML() ([]byte, error) {
 	testAutodiscoveryMx.Lock()
 	defer testAutodiscoveryMx.Unlock()
-	return yaml.Marshal(testAutodiscovery)
+	err := testAutodiscovery.normalizeDiscoveredTests()
+	if err != nil {
+		return nil, fmt.Errorf("normalizing discovered tests: %w", err)
+	}
+
+	runners := mapToRunners(testAutodiscovery)
+
+	return yaml.Marshal(runners)
+}
+
+func mapToRunners(autodiscovery *DiscoveredTests) []OutputRunner {
+
+	var mapped []OutputRunner
+
+	for pltf, testsByOS := range autodiscovery.Discovered {
+		for testOS, testsByOS := range testsByOS.OperatingSystems {
+			or := OutputRunner{
+				OSFamily: pltf.OS,
+				Arch:     pltf.Arch,
+				OS:       testOS.Name,
+				Version:  testOS.Version,
+				Groups:   make([]OutputGroup, 0, len(testsByOS.Groups)),
+			}
+
+			for groupName, groupTests := range testsByOS.Groups {
+				or.Groups = append(or.Groups, mapGroup(groupName, groupTests))
+			}
+			mapped = append(mapped, or)
+		}
+	}
+
+	return mapped
+}
+
+func mapGroup(name string, group TestGroup) OutputGroup {
+	og := OutputGroup{Name: name, Tests: make([]OutputTest, 0, len(group.Tests))}
+	for testName, testMetadata := range group.Tests {
+		og.Tests = append(og.Tests, OutputTest{
+			Name:     testName,
+			Metadata: testMetadata,
+		})
+	}
+
+	return og
 }
 
 func discoverTest(test Named, reqs *Requirements) {
 	testAutodiscoveryMx.Lock()
 	defer testAutodiscoveryMx.Unlock()
 	for _, p := range getPlatforms(reqs.OS) {
-		mappedOSesForPlatform := ensureMapping(testAutodiscovery, p, NewTestsByPlatform)
+		if testAutodiscovery == nil {
+			panic("testAutodiscovery is nil. Check that InitAutodiscovery() has been called properly")
+		}
+		mappedOSesForPlatform := ensureMapping(testAutodiscovery.Discovered, p, NewTestsByPlatform)
 		osForPlatform := getOSForPlatform(reqs.OS, p)
 		for _, o := range osForPlatform {
 			testsByOS := ensureMapping(mappedOSesForPlatform.OperatingSystems, o, NewTestByOS)
 			testGroup := ensureMapping(testsByOS.Groups, reqs.Group, NewTestGroup)
 			testGroup.Tests[test.Name()] = TestMetadata{
-				Name:  test.Name(),
 				Local: reqs.Local,
 				Sudo:  reqs.Sudo,
 			}
@@ -134,11 +193,11 @@ func discoverTest(test Named, reqs *Requirements) {
 	}
 }
 
-func ensureMapping[K comparable, V any](mappings map[K]V, k K, newValueCreateFunc func(K) V) V {
+func ensureMapping[K comparable, V any](mappings map[K]V, k K, newValueCreateFunc func() V) V {
 	if existingValue, ok := mappings[k]; ok {
 		return existingValue
 	}
-	newValue := newValueCreateFunc(k)
+	newValue := newValueCreateFunc()
 	mappings[k] = newValue
 	return newValue
 }
@@ -159,10 +218,7 @@ func getOSForPlatform(os []OS, p TestPlatform) []TestOS {
 
 	// no other OS has matched, return the default OS
 	return []TestOS{
-		{
-			Name:    "",
-			Version: "",
-		},
+		defaultTestOS,
 	}
 
 }
@@ -184,7 +240,7 @@ func getTestOS(o OS) TestOS {
 
 func getPlatforms(os []OS) []TestPlatform {
 	if len(os) == 0 {
-		return defaultPlatforms
+		return []TestPlatform{defaultTestPlatform}
 	}
 
 	platforms := make([]TestPlatform, 0, len(os))
@@ -198,27 +254,48 @@ func getPlatforms(os []OS) []TestPlatform {
 	return platforms
 }
 
-// TODO
-func normalizePlatforms(platforms []TestPlatform) ([]TestPlatform, error) {
-	// check if there's just an os type without arch and normalize
-	normalized := make([]TestPlatform, 0, len(platforms))
-	for _, p := range platforms {
-		if p.OS != "" && p.Arch != "" {
-			// normal case, append and go to the next platform
-			normalized = append(normalized, p)
+// Normalization functions
+func (dt *DiscoveredTests) normalizeDiscoveredTests() error {
+
+	normalized := map[TestPlatform]TestsByPlatform{}
+	for pltf, oses := range dt.Discovered {
+
+		if pltf.OS == "" && pltf.Arch != "" {
+			return fmt.Errorf("platform not supported: %v", pltf)
+		}
+
+		if pltf.OS != "" && pltf.Arch != "" {
+			existingOSes := ensureMapping(normalized, pltf, NewTestsByPlatform) // normal case, append to normalized and go to the next platform
+			existingOSes.mergeOSes(oses)
 			continue
 		}
 
-		if p.OS == "" {
-			return normalized, fmt.Errorf("platforms without OS type are not supported: %v", p)
-		}
-
-		// Arch is not specified: fill in the supported archs for the OS type
-		for _, dp := range defaultPlatforms {
-			if p.OS == dp.OS {
-				normalized = append(normalized, dp)
+		// Arch and/or OS is not specified: fill in the supported archs for the OS type (potentially for all OSes)
+		for i, dp := range defaultPlatforms {
+			if pltf.OS == "" || pltf.OS == dp.OS {
+				existingOSes := ensureMapping(normalized, defaultPlatforms[i], NewTestsByPlatform)
+				existingOSes.mergeOSes(oses)
 			}
 		}
 	}
-	return normalized, nil
+
+	dt.Discovered = normalized
+
+	return nil
+}
+
+func (tbp *TestsByPlatform) mergeOSes(from TestsByPlatform) {
+	for testOS, testsByOS := range from.OperatingSystems {
+		// iterate over all the OS definitions, ensuring that the entry exists in the destination map
+		existingTestsByOS := ensureMapping(tbp.OperatingSystems, testOS, NewTestByOS)
+		// iterate over source groups for this OS and merge
+		for grp, tests := range testsByOS.Groups {
+			// iterate over all the OS definitions, ensuring that the entry exists in the destination map
+			existingGroup := ensureMapping(existingTestsByOS.Groups, grp, NewTestGroup)
+			// add all the tests
+			for testName, testMeta := range tests.Tests {
+				existingGroup.Tests[testName] = testMeta
+			}
+		}
+	}
 }
