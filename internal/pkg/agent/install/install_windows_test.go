@@ -56,13 +56,24 @@ func TestWithServiceOption(t *testing.T) {
 		t.Run(
 			fmt.Sprintf("test case #%d: %s:%s:%s", i, tc.name, tc.groupName, tc.password),
 			func(t *testing.T) {
-				serviceOpts, err := withServiceOptions(tc.name, tc.groupName, tc.password)
+				opts, err := withServiceOptions(tc.name, tc.groupName, tc.password)
 
 				if tc.expectedError != "" {
 					assert.True(t, strings.Contains(err.Error(), tc.expectedError))
 				}
 
-				assert.Equal(t, tc.expectedServiceOpts, serviceOpts)
+				assert.Equal(t, len(tc.expectedServiceOpts), len(opts))
+				expected := serviceOpts{}
+				actual := serviceOpts{}
+				for _, opt := range tc.expectedServiceOpts {
+					opt(&expected)
+				}
+
+				for _, opt := range opts {
+					opt(&actual)
+				}
+
+				assert.EqualExportedValues(t, expected, actual)
 			})
 	}
 }
