@@ -59,5 +59,8 @@ $ kubectl create namespace opentelemetry-operator-system
 ```
 $ helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
 $ helm repo update
-$ helm upgrade --install --namespace opentelemetry-operator-system opentelemetry-kube-stack open-telemetry/opentelemetry-kube-stack --values ./values.yaml --version 0.3.0
+$ helm upgrade --install --namespace opentelemetry-operator-system opentelemetry-kube-stack open-telemetry/opentelemetry-kube-stack --values ./values.yaml --version 0.3.3
+
+> [!NOTE]
+> Refer to the [compatibility matrix](https://github.com/elastic/opentelemetry/blob/main/docs/kubernetes/operator/README.md#compatibility-matrix) for a complete list of available manifests and associated helm chart versions.
 ```
