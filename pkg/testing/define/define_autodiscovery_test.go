@@ -17,7 +17,7 @@ func (n *NamedThing) Name() string {
 func Test_discoverTest(t *testing.T) {
 	type inputTest struct {
 		n    Named
-		reqs *Requirements
+		reqs Requirements
 	}
 	type args struct {
 		tests []inputTest
@@ -33,83 +33,68 @@ func Test_discoverTest(t *testing.T) {
 				tests: []inputTest{
 					{
 						n: &NamedThing{name: "Test_all_default_platforms"},
-						reqs: &Requirements{
+						reqs: Requirements{
 							Group: "foo",
 						},
 					},
 				},
 			},
 			discoveredYAML: `
-darwin/amd64:
-    platform:
-        os: darwin
-        arch: amd64
-    os:
-        "":
-            groups:
-                foo:
-                    group_name: foo
-                    tests:
-                        Test_all_default_platforms:
-                            test_name: Test_all_default_platforms
-                            local: false
-                            sudo: false
-darwin/arm64:
-    platform:
-        os: darwin
-        arch: arm64
-    os:
-        "":
-            groups:
-                foo:
-                    group_name: foo
-                    tests:
-                        Test_all_default_platforms:
-                            test_name: Test_all_default_platforms
-                            local: false
-                            sudo: false
-linux/amd64:
-    platform:
-        os: linux
-        arch: amd64
-    os:
-        "":
-            groups:
-                foo:
-                    group_name: foo
-                    tests:
-                        Test_all_default_platforms:
-                            test_name: Test_all_default_platforms
-                            local: false
-                            sudo: false
-linux/arm64:
-    platform:
-        os: linux
-        arch: arm64
-    os:
-        "":
-            groups:
-                foo:
-                    group_name: foo
-                    tests:
-                        Test_all_default_platforms:
-                            test_name: Test_all_default_platforms
-                            local: false
-                            sudo: false
-windows/amd64:
-    platform:
-        os: windows
-        arch: amd64
-    os:
-        "":
-            groups:
-                foo:
-                    group_name: foo
-                    tests:
-                        Test_all_default_platforms:
-                            test_name: Test_all_default_platforms
-                            local: false
-                            sudo: false
+        - os_family: linux
+          arch: arm64
+          os: ""
+          version: ""
+          groups:
+            - name: foo
+              tests:
+                - name: Test_all_default_platforms
+                  metadata:
+                    local: false
+                    sudo: false
+        - os_family: windows
+          arch: amd64
+          os: ""
+          version: ""
+          groups:
+            - name: foo
+              tests:
+                - name: Test_all_default_platforms
+                  metadata:
+                    local: false
+                    sudo: false
+        - os_family: darwin
+          arch: amd64
+          os: ""
+          version: ""
+          groups:
+            - name: foo
+              tests:
+                - name: Test_all_default_platforms
+                  metadata:
+                    local: false
+                    sudo: false
+        - os_family: darwin
+          arch: arm64
+          os: ""
+          version: ""
+          groups:
+            - name: foo
+              tests:
+                - name: Test_all_default_platforms
+                  metadata:
+                    local: false
+                    sudo: false
+        - os_family: linux
+          arch: amd64
+          os: ""
+          version: ""
+          groups:
+            - name: foo
+              tests:
+                - name: Test_all_default_platforms
+                  metadata:
+                    local: false
+                    sudo: false
 `,
 		},
 
@@ -119,7 +104,7 @@ windows/amd64:
 				tests: []inputTest{
 					{
 						n: &NamedThing{name: "Test_only_windows"},
-						reqs: &Requirements{
+						reqs: Requirements{
 							Group: "foo",
 							OS:    []OS{{Type: Windows}},
 						},
@@ -133,7 +118,7 @@ windows/amd64:
 				tests: []inputTest{
 					{
 						n: &NamedThing{name: "Test_only_windows"},
-						reqs: &Requirements{
+						reqs: Requirements{
 							Group: "foo",
 							OS:    []OS{{Type: Windows, Version: "Windows Server 2019"}},
 						},
@@ -147,7 +132,7 @@ windows/amd64:
 				tests: []inputTest{
 					{
 						n: &NamedThing{name: "Test_only_linux"},
-						reqs: &Requirements{
+						reqs: Requirements{
 							Group: "foo",
 							OS:    []OS{{Type: Linux}},
 						},
@@ -161,7 +146,7 @@ windows/amd64:
 				tests: []inputTest{
 					{
 						n: &NamedThing{name: "Test_only_linux"},
-						reqs: &Requirements{
+						reqs: Requirements{
 							Group: "foo",
 							OS:    []OS{{Type: Linux, Distro: "Ubuntu"}},
 						},
@@ -175,7 +160,7 @@ windows/amd64:
 				tests: []inputTest{
 					{
 						n: &NamedThing{name: "Test_only_linux"},
-						reqs: &Requirements{
+						reqs: Requirements{
 							Group: "foo",
 							OS:    []OS{{Type: Linux, Distro: "Ubuntu", Version: "24.04"}},
 						},
@@ -189,34 +174,34 @@ windows/amd64:
 				tests: []inputTest{
 					{
 						n: &NamedThing{name: "Test_only_linux"},
-						reqs: &Requirements{
+						reqs: Requirements{
 							Group: "foo",
 							OS:    []OS{{Type: Linux, Distro: "Ubuntu", Version: "24.04"}},
 						},
 					},
 					{
 						n: &NamedThing{name: "Test_only_linux2"},
-						reqs: &Requirements{
+						reqs: Requirements{
 							Group: "bar",
 							OS:    []OS{{Type: Linux, Distro: "Ubuntu", Version: "24.04"}},
 						},
 					},
 					{
 						n: &NamedThing{name: "Test_only_windows"},
-						reqs: &Requirements{
+						reqs: Requirements{
 							Group: "foo",
 							OS:    []OS{{Type: Windows, Version: "Windows Server 2019"}},
 						},
 					},
 					{
 						n: &NamedThing{name: "Test_all_default_platforms"},
-						reqs: &Requirements{
+						reqs: Requirements{
 							Group: "foo",
 						},
 					},
 					{
 						n: &NamedThing{name: "Test_all_default_platforms_sudo"},
-						reqs: &Requirements{
+						reqs: Requirements{
 							Group: "bar",
 							Sudo:  true,
 						},

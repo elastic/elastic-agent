@@ -173,7 +173,7 @@ func mapGroup(name string, group TestGroup) OutputGroup {
 	return og
 }
 
-func discoverTest(test Named, reqs *Requirements) {
+func discoverTest(test Named, reqs Requirements) {
 	testAutodiscoveryMx.Lock()
 	defer testAutodiscoveryMx.Unlock()
 	for _, p := range getPlatforms(reqs.OS) {
