@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/spf13/cobra"
 
@@ -28,6 +29,10 @@ const (
 	flagInstallDevelopment            = "develop"
 	flagInstallNamespace              = "namespace"
 	flagInstallRunUninstallFromBinary = "run-uninstall-from-binary"
+
+	flagInstallCustomUser  = "user"
+	flagInstallCustomGroup = "group"
+	flagInstallCustomPass  = "password"
 )
 
 func newInstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -60,6 +65,13 @@ would like the Agent to operate.
 
 	cmd.Flags().Bool(flagInstallDevelopment, false, "Install into a standardized development namespace, may enable development specific options. Allows multiple Elastic Agents to be installed at once. (experimental)")
 	_ = cmd.Flags().MarkHidden(flagInstallDevelopment) // For internal use only.
+
+	// Active directory user specification
+	cmd.Flags().String(flagInstallCustomUser, "", "Custom user used to run Elastic Agent")
+	cmd.Flags().String(flagInstallCustomGroup, "", "Custom group used to access Elastic Agent files")
+	if runtime.GOOS == "windows" {
+		cmd.Flags().String(flagInstallCustomPass, "", "Password for user used to run Elastic Agent")
+	}
 
 	addEnrollFlags(cmd)
 
@@ -249,7 +261,14 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		progBar.Describe("Successfully uninstalled Elastic Agent")
 	}
 	if status != install.PackageInstall {
-		ownership, err = install.Install(cfgFile, topPath, unprivileged, log, progBar, streams)
+		customUser, _ := cmd.Flags().GetString(flagInstallCustomUser)
+		customGroup, _ := cmd.Flags().GetString(flagInstallCustomGroup)
+		customPass := ""
+		if runtime.GOOS == "windows" {
+			customPass, _ = cmd.Flags().GetString(flagInstallCustomPass)
+		}
+
+		ownership, err = install.Install(cfgFile, topPath, unprivileged, log, progBar, streams, customUser, customGroup, customPass)
 		if err != nil {
 			return fmt.Errorf("error installing package: %w", err)
 		}
