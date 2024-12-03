@@ -496,7 +496,7 @@ func UnprivilegedUser(username, password string) (string, string) {
 		return username, password
 	}
 
-	return ElasticUsername, ""
+	return ElasticUsername, password
 }
 
 func UnprivilegedGroup(groupName string) string {
