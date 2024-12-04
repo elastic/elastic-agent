@@ -175,6 +175,14 @@ func (i *InstallOpts) ToCmdArgs() []string {
 //   - the combined output of Install command stdout and stderr
 //   - an error if any.
 func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
+	return f.installFunc(ctx, installOpts, true, opts...)
+}
+
+func (f *Fixture) InstallWithoutEnroll(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
+	return f.installFunc(ctx, installOpts, false, opts...)
+}
+
+func (f *Fixture) installFunc(ctx context.Context, installOpts *InstallOpts, shouldEnroll bool, opts ...process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture install function", f.t.Name())
 
 	// check for running agents before installing, but only if not installed into a namespace whose point is allowing two agents at once.
@@ -184,11 +192,11 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 
 	switch f.packageFormat {
 	case "targz", "zip":
-		return f.installNoPkgManager(ctx, installOpts, opts)
+		return f.installNoPkgManager(ctx, installOpts, shouldEnroll, opts)
 	case "deb":
-		return f.installDeb(ctx, installOpts, opts)
+		return f.installDeb(ctx, installOpts, shouldEnroll, opts)
 	case "rpm":
-		return f.installRpm(ctx, installOpts, opts)
+		return f.installRpm(ctx, installOpts, shouldEnroll, opts)
 	default:
 		return nil, fmt.Errorf("package format %s isn't supported yet", f.packageFormat)
 	}
@@ -202,14 +210,25 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 // It returns:
 //   - the combined output of Install command stdout and stderr
 //   - an error if any.
-func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallOpts, opts []process.CmdOption) ([]byte, error) {
+func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallOpts, shouldEnroll bool, opts []process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture installNoPkgManager function", f.t.Name())
 	if installOpts == nil {
 		// default options when not provided
 		installOpts = &InstallOpts{}
 	}
 
+	// Removes install params to prevent enrollment
+	removeEnrollParams := func(installOpts *InstallOpts) {
+		installOpts.URL = ""
+		installOpts.EnrollmentToken = ""
+		installOpts.ESHost = ""
+	}
+
 	installArgs := []string{"install"}
+	if !shouldEnroll {
+		removeEnrollParams(installOpts)
+	}
+
 	installArgs = append(installArgs, installOpts.ToCmdArgs()...)
 	out, err := f.Exec(ctx, installArgs, opts...)
 	if err != nil {
@@ -410,7 +429,7 @@ func getProcesses(t *gotesting.T, regex string) []runningProcess {
 // It returns:
 //   - the combined output of Install command stdout and stderr
 //   - an error if any.
-func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts []process.CmdOption) ([]byte, error) {
+func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, shouldEnroll bool, opts []process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture installDeb function", f.t.Name())
 	// Prepare so that the f.srcPackage string is populated
 	err := f.EnsurePrepared(ctx)
@@ -456,6 +475,10 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts
 		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
 	}
 
+	if !shouldEnroll {
+		return nil, nil
+	}
+
 	// apt install doesn't enroll, so need to do that
 	enrollArgs := []string{"elastic-agent", "enroll"}
 	if installOpts.Force {
@@ -491,7 +514,7 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts
 // It returns:
 //   - the combined output of Install command stdout and stderr
 //   - an error if any.
-func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, opts []process.CmdOption) ([]byte, error) {
+func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shouldEnroll bool, opts []process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture installRpm function", f.t.Name())
 	// Prepare so that the f.srcPackage string is populated
 	err := f.EnsurePrepared(ctx)
@@ -528,6 +551,10 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, opts
 	out, err = exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
 	if err != nil {
 		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
+	}
+
+	if !shouldEnroll {
+		return nil, nil
 	}
 
 	// rpm install doesn't enroll, so need to do that
