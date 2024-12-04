@@ -177,3 +177,5 @@ func dsclExec(args ...string) error {
 	}
 	return nil
 }
+
+func EnsureRights(_ string) error { return nil }

@@ -54,59 +54,14 @@ func NewVarsWithProcessorsFromAst(id string, tree *AST, processorKey string, pro
 
 // Replace returns a new value based on variable replacement.
 func (v *Vars) Replace(value string) (Node, error) {
-	var processors Processors
-	matchIdxs := varsRegex.FindAllSubmatchIndex([]byte(value), -1)
-	if !validBrackets(value, matchIdxs) {
-		return nil, fmt.Errorf("starting ${ is missing ending }")
-	}
-	result := ""
-	lastIndex := 0
-	for _, r := range matchIdxs {
-		for i := 0; i < len(r); i += 4 {
-			if value[r[i]+1] == '$' {
-				// match on an escaped var, append the raw string with the '$' prefix removed
-				result += value[lastIndex:r[0]] + value[r[i]+1:r[i+1]]
-				lastIndex = r[1]
-				continue
-			}
-			// match on a non-escaped var
-			vars, err := extractVars(value[r[i+2]:r[i+3]])
-			if err != nil {
-				return nil, fmt.Errorf(`error parsing variable "%s": %w`, value[r[i]:r[i+1]], err)
-			}
-			set := false
-			for _, val := range vars {
-				switch val.(type) {
-				case *constString:
-					result += value[lastIndex:r[0]] + val.Value()
-					set = true
-				case *varString:
-					node, ok := v.lookupNode(val.Value())
-					if ok {
-						node := nodeToValue(node)
-						if v.processorsKey != "" && varPrefixMatched(val.Value(), v.processorsKey) {
-							processors = v.processors
-						}
-						if r[i] == 0 && r[i+1] == len(value) {
-							// possible for complete replacement of object, because the variable
-							// is not inside of a string
-							return attachProcessors(node, processors), nil
-						}
-						result += value[lastIndex:r[0]] + node.String()
-						set = true
-					}
-				}
-				if set {
-					break
-				}
-			}
-			if !set {
-				return NewStrVal(""), ErrNoMatch
-			}
-			lastIndex = r[1]
+	return replaceVars(value, func(variable string) (Node, Processors, bool) {
+		var processors Processors
+		node, ok := v.lookupNode(variable)
+		if ok && v.processorsKey != "" && varPrefixMatched(variable, v.processorsKey) {
+			processors = v.processors
 		}
-	}
-	return NewStrValWithProcessors(result+value[lastIndex:], processors), nil
+		return node, processors, ok
+	}, true)
 }
 
 // ID returns the unique ID for the vars.
@@ -146,6 +101,62 @@ func (v *Vars) lookupNode(name string) (Node, bool) {
 	}
 	// lookup in the AST tree
 	return Lookup(v.tree, name)
+}
+
+func replaceVars(value string, replacer func(variable string) (Node, Processors, bool), reqMatch bool) (Node, error) {
+	var processors Processors
+	matchIdxs := varsRegex.FindAllSubmatchIndex([]byte(value), -1)
+	if !validBrackets(value, matchIdxs) {
+		return nil, fmt.Errorf("starting ${ is missing ending }")
+	}
+	result := ""
+	lastIndex := 0
+	for _, r := range matchIdxs {
+		for i := 0; i < len(r); i += 4 {
+			if value[r[i]+1] == '$' {
+				// match on an escaped var, append the raw string with the '$' prefix removed
+				result += value[lastIndex:r[0]] + value[r[i]+1:r[i+1]]
+				lastIndex = r[1]
+				continue
+			}
+			// match on a non-escaped var
+			vars, err := extractVars(value[r[i+2]:r[i+3]])
+			if err != nil {
+				return nil, fmt.Errorf(`error parsing variable "%s": %w`, value[r[i]:r[i+1]], err)
+			}
+			set := false
+			for _, val := range vars {
+				switch val.(type) {
+				case *constString:
+					result += value[lastIndex:r[0]] + val.Value()
+					set = true
+				case *varString:
+					node, nodeProcessors, ok := replacer(val.Value())
+					if ok {
+						node := nodeToValue(node)
+						if nodeProcessors != nil {
+							processors = nodeProcessors
+						}
+						if r[i] == 0 && r[i+1] == len(value) {
+							// possible for complete replacement of object, because the variable
+							// is not inside of a string
+							return attachProcessors(node, processors), nil
+						}
+						result += value[lastIndex:r[0]] + node.String()
+						set = true
+					}
+				}
+				if set {
+					break
+				}
+			}
+			if !set && reqMatch {
+				return NewStrVal(""), ErrNoMatch
+			}
+			lastIndex = r[1]
+		}
+	}
+	return NewStrValWithProcessors(result+value[lastIndex:], processors), nil
 }
 
 // nodeToValue ensures that the node is an actual value.
