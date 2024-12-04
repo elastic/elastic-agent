@@ -40,7 +40,7 @@ const (
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
-func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *progressbar.ProgressBar, streams *cli.IOStreams) (utils.FileOwner, error) {
+func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *progressbar.ProgressBar, streams *cli.IOStreams, customUser, customGroup, userPassword string) (utils.FileOwner, error) {
 	dir, err := findDirectory()
 	if err != nil {
 		return utils.FileOwner{}, errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
@@ -49,13 +49,15 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	var ownership utils.FileOwner
 	username := ""
 	groupName := ""
+	password := ""
 	if unprivileged {
-		username = ElasticUsername
-		groupName = ElasticGroupName
-		ownership, err = EnsureUserAndGroup(username, groupName, pt)
+		username, password = UnprivilegedUser(customUser, userPassword)
+		groupName = UnprivilegedGroup(customGroup)
+		ownership, err = EnsureUserAndGroup(username, groupName, pt, username == ElasticUsername && password == "") // force create only elastic user
 		if err != nil {
 			// error context already added by EnsureUserAndGroup
 			return utils.FileOwner{}, err
+
 		}
 	}
 
@@ -147,7 +149,7 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 
 	// install service
 	pt.Describe("Installing service")
-	err = InstallService(topPath, ownership, username, groupName)
+	err = InstallService(topPath, ownership, username, groupName, password)
 	if err != nil {
 		pt.Describe("Failed to install service")
 		// error context already added by InstallService
@@ -371,11 +373,12 @@ func StatusService(topPath string) (service.Status, error) {
 }
 
 // InstallService installs the service.
-func InstallService(topPath string, ownership utils.FileOwner, username string, groupName string) error {
-	opts, err := withServiceOptions(username, groupName)
+func InstallService(topPath string, ownership utils.FileOwner, username string, groupName string, password string) error {
+	opts, err := withServiceOptions(username, groupName, password)
 	if err != nil {
 		return fmt.Errorf("error getting service installation options: %w", err)
 	}
+
 	svc, err := newService(topPath, opts...)
 	if err != nil {
 		return fmt.Errorf("error creating new service handler for install: %w", err)
@@ -481,4 +484,20 @@ func CreateInstallMarker(topPath string, ownership utils.FileOwner) error {
 	}
 	_ = handle.Close()
 	return fixInstallMarkerPermissions(markerFilePath, ownership)
+}
+
+func UnprivilegedUser(username, password string) (string, string) {
+	if username != "" {
+		return username, password
+	}
+
+	return ElasticUsername, password
+}
+
+func UnprivilegedGroup(groupName string) string {
+	if groupName != "" {
+		return groupName
+	}
+
+	return ElasticGroupName
 }
