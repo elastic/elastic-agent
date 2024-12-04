@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/stretchr/testify/require"
@@ -49,6 +49,6 @@ func TestRestrictUpgradeRPM(t *testing.T) {
 
 		out, err := fixture.Exec(ctx, []string{"upgrade", "1.0.0"})
 		require.Error(t, err)
-		require.Contains(t, string(out), cmd.UpgradeDisabledError.Error())
+		require.Contains(t, string(out), coordinator.ErrNotUpgradable.Error())
 	})
 }
