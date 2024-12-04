@@ -14,4 +14,5 @@ echo "--- Detected groups"
 echo ${GROUPS_YAML}
 echo "--- Generating dynamic pipeline"
 DYN_PIPELINE="${PWD}/build/dyn.pipeline.yml"
-GROUPS_YAML=${GROUPS_YAML} yq '.steps.[].steps.[].matrix=env(GROUPS_YAML)' .buildkite/bk.integration.pipeline.yml > "${DYN_PIPELINE}"
+# The 'has("steps")' filter is needed to avoid creating empty arrays in 'label' items
+GROUPS_YAML=${GROUPS_YAML} yq '((.steps.[]|has("steps")).steps.[]|has("matrix")).matrix=env(GROUPS_YAML)' .buildkite/bk.integration.pipeline.yml > "${DYN_PIPELINE}"
