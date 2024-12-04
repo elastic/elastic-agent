@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 type NamedThing struct {
@@ -221,7 +223,14 @@ func Test_discoverTest(t *testing.T) {
 			t.Logf("Got autodiscovery YAML:\n%s\n", actualTestYaml)
 			assert.NoError(t, err)
 			if tt.discoveredYAML != "" {
-				assert.YAMLEq(t, tt.discoveredYAML, string(actualTestYaml))
+				expected := []OutputRunner{}
+				err = yaml.Unmarshal([]byte(tt.discoveredYAML), &expected)
+				require.NoError(t, err, "Error unmarshalling expected YAML")
+				actual := []OutputRunner{}
+				err = yaml.Unmarshal(actualTestYaml, &actual)
+				require.NoError(t, err, "Error unmarshalling actual YAML")
+				assert.ElementsMatch(t, expected, actual, "Generated runners do not match expected ones")
+
 			}
 		})
 	}
