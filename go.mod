@@ -272,7 +272,7 @@ require (
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/lunes v0.1.0 // indirect
-	github.com/elastic/mito v1.15.0 // indirect
+	github.com/elastic/mito v1.16.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.13.0 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
