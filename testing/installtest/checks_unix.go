@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,17 +25,38 @@ import (
 func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opts *CheckOpts) error {
 	if !opts.Privileged {
 		// Check that the elastic-agent user/group exist.
-		uid, err := install.FindUID(install.ElasticUsername)
-		if err != nil {
-			return fmt.Errorf("failed to find %s user: %w", install.ElasticUsername, err)
+		username := install.ElasticUsername
+		if opts.Username != "" {
+			username = opts.Username
 		}
-		gid, err := install.FindGID(install.ElasticGroupName)
+		uid, err := install.FindUID(username)
 		if err != nil {
-			return fmt.Errorf("failed to find %s group: %w", install.ElasticGroupName, err)
+			return fmt.Errorf("failed to find %s user: %w", username, err)
 		}
 
+		group := install.ElasticGroupName
+		if opts.Username != "" {
+			group = opts.Group
+		}
+		gid, err := install.FindGID(group)
+		if err != nil {
+			return fmt.Errorf("failed to find %s group: %w", group, err)
+		}
+
+		var uid32 uint32
+		if uid > math.MaxUint32 {
+			return fmt.Errorf("provided UID %d does is higher than %d", uid, math.MaxInt32)
+		}
+		uid32 = uint32(uid)
+
+		var gid32 uint32
+		if gid > math.MaxUint32 {
+			return fmt.Errorf("provided GID %d does is higher than %d", gid, math.MaxInt32)
+		}
+		gid32 = uint32(gid)
+
 		// Ensure entire installation tree has the correct permissions.
-		err = validateFileTree(topPath, uint32(uid), uint32(gid))
+		err = validateFileTree(topPath, uid32, gid32)
 		if err != nil {
 			// context already added
 			return err
@@ -57,11 +79,11 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opt
 		if !ok {
 			return fmt.Errorf("failed to convert info.Sys() into *syscall.Stat_t")
 		}
-		if fs.Uid != uint32(uid) {
-			return fmt.Errorf("%s not owned by %s user", socketPath, install.ElasticUsername)
+		if fs.Uid != uid32 {
+			return fmt.Errorf("%s not owned by %s user", socketPath, username)
 		}
-		if fs.Gid != uint32(gid) {
-			return fmt.Errorf("%s not owned by %s group", socketPath, install.ElasticGroupName)
+		if fs.Gid != gid32 {
+			return fmt.Errorf("%s not owned by %s group", socketPath, group)
 		}
 
 		// Executing `elastic-agent status` as the `elastic-agent-user` user should work.
@@ -73,7 +95,7 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opt
 		var output []byte
 		err = waitForNoError(ctx, func(_ context.Context) error {
 			// #nosec G204 -- user cannot inject any parameters to this command
-			cmd := exec.Command("sudo", "-u", install.ElasticUsername, shellWrapperName, "status")
+			cmd := exec.Command("sudo", "-u", username, shellWrapperName, "status")
 			output, err = cmd.CombinedOutput()
 			if err != nil {
 				return fmt.Errorf("elastic-agent status failed: %w (output: %s)", err, output)

@@ -5,6 +5,7 @@
 package install
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -62,6 +63,50 @@ func TestHasAllSSDs(t *testing.T) {
 			actual := hasAllSSDs(test.block)
 			require.Equal(t, test.expected, actual)
 		})
+	}
+}
+
+func TestUnprivilegedUser(t *testing.T) {
+	testCases := []struct {
+		username         string
+		password         string
+		expectedUsername string
+		expectedPassword string
+	}{
+		{"", "", ElasticUsername, ""},
+		{"", "pass", ElasticUsername, "pass"},
+		{"user", "", "user", ""},
+		{"user", "pass", "user", "pass"},
+	}
+	for i, tc := range testCases {
+		t.Run(
+			fmt.Sprintf("test case #%d: %s:%s", i, tc.username, tc.password),
+			func(t *testing.T) {
+				username, password := UnprivilegedUser(tc.username, tc.password)
+				assert.Equal(t, tc.expectedUsername, username)
+				assert.Equal(t, password, tc.expectedPassword)
+			},
+		)
+	}
+}
+
+func TestUnprivilegedGroup(t *testing.T) {
+	testCases := []struct {
+		groupName         string
+		expectedGroupName string
+	}{
+		{"", ElasticGroupName},
+		{"custom", "custom"},
+	}
+
+	for i, tc := range testCases {
+		t.Run(
+			fmt.Sprintf("test case #%d: %s", i, tc.groupName),
+			func(t *testing.T) {
+				groupname := UnprivilegedGroup(tc.groupName)
+				assert.Equal(t, tc.expectedGroupName, groupname)
+			},
+		)
 	}
 }
 
