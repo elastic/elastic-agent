@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
+
 package define
 
 import (
@@ -19,13 +23,6 @@ var defaultPlatforms = []TestPlatform{
 	{OS: Darwin, Arch: ARM64},
 	{OS: Linux, Arch: AMD64},
 	{OS: Linux, Arch: ARM64},
-}
-
-// k8s default platforms
-// TODO this should be used for k8s tests ?
-var k8sPlatforms = []TestPlatform{
-	{OS: Kubernetes, Arch: AMD64},
-	{OS: Kubernetes, Arch: ARM64},
 }
 
 var defaultTestOS = TestOS{
