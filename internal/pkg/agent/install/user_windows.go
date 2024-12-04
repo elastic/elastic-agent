@@ -188,7 +188,7 @@ func AddUserToGroup(username string, groupName string) error {
 		uintptr(unsafe.Pointer(groupNamePtr)),
 		uintptr(uint32(0)),
 		uintptr(unsafe.Pointer(&entries[0])),
-		uintptr(uint32(len(entries))), //nolint:gosec // G115 max 1
+		uintptr(uint32(len(entries))),
 	)
 	if ret != 0 {
 		return fmt.Errorf("call to NetLocalGroupAddMembers failed: status=%d", ret)

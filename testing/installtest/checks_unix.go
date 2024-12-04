@@ -47,14 +47,12 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opt
 		if uid > math.MaxUint32 {
 			return fmt.Errorf("provided UID %d does is higher than %d", uid, math.MaxInt32)
 		}
-		//nolint:gosec // G115 false positive on conversion
 		uid32 = uint32(uid)
 
 		var gid32 uint32
 		if gid > math.MaxUint32 {
 			return fmt.Errorf("provided GID %d does is higher than %d", gid, math.MaxInt32)
 		}
-		//nolint:gosec // G115 false positive on conversion
 		gid32 = uint32(gid)
 
 		// Ensure entire installation tree has the correct permissions.
