@@ -260,50 +260,60 @@ steps:
                 env:
                   - GH_VERSION=2.4.0
 
+# Try to dynamically trigger integration tests
+  - label: "Dynamic groups IT"
+    command: |
+      .buildkite/scripts/gen-it-steps.sh
+    artifact_paths:
+      - "build/discovered_tests.yaml"
+      - "build/dyn.pipeline.yml"
+    agents:
+      image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
+      useCustomGlobalHooks: true
   # Trigger for pull requests
-  - label: "Trigger Integration tests for Pull request"
-    if: |
-      (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
-      build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
-
-    plugins:
-      - monorepo-diff#v1.0.1:
-          diff: "git diff --name-only origin/${GITHUB_PR_TARGET_BRANCH}...HEAD"
-          watch:
-            - path:
-                - internal/
-                - dev-tools/
-                - pkg/
-                - testing/
-                - version/
-                - specs/
-                - .agent-versions.json
-                - .go-version
-                - .package-version
-                - go.mod
-                - go.sum
-                - magefile.go
-                - main.go
-
-                - .buildkite/integration.pipeline.yml
-                - .buildkite/pipeline.yml
-                - .buildkite/scripts/
-                - .buildkite/hooks/
-
-              config:
-                trigger: "elastic-agent-extended-testing"
-                build:
-                  commit: "${BUILDKITE_COMMIT}"
-                  branch: "${BUILDKITE_BRANCH}"
-                  env:
-                    - BUILDKITE_PULL_REQUEST=${BUILDKITE_PULL_REQUEST}
-                    - BUILDKITE_PULL_REQUEST_BASE_BRANCH=${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
-                    - GITHUB_PR_LABELS=${GITHUB_PR_LABELS}
+#  - label: "Trigger Integration tests for Pull request"
+#    if: |
+#      (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
+#      build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
+#
+#    plugins:
+#      - monorepo-diff#v1.0.1:
+#          diff: "git diff --name-only origin/${GITHUB_PR_TARGET_BRANCH}...HEAD"
+#          watch:
+#            - path:
+#                - internal/
+#                - dev-tools/
+#                - pkg/
+#                - testing/
+#                - version/
+#                - specs/
+#                - .agent-versions.json
+#                - .go-version
+#                - .package-version
+#                - go.mod
+#                - go.sum
+#                - magefile.go
+#                - main.go
+#
+#                - .buildkite/integration.pipeline.yml
+#                - .buildkite/pipeline.yml
+#                - .buildkite/scripts/
+#                - .buildkite/hooks/
+#
+#              config:
+#                trigger: "elastic-agent-extended-testing"
+#                build:
+#                  commit: "${BUILDKITE_COMMIT}"
+#                  branch: "${BUILDKITE_BRANCH}"
+#                  env:
+#                    - BUILDKITE_PULL_REQUEST=${BUILDKITE_PULL_REQUEST}
+#                    - BUILDKITE_PULL_REQUEST_BASE_BRANCH=${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
+#                    - GITHUB_PR_LABELS=${GITHUB_PR_LABELS}
 
   # Trigger for branches
-  - label: "Triggering Integration tests for branches"
-    if: build.pull_request.id == null
-    trigger: "elastic-agent-extended-testing"
-    build:
-      commit: "${BUILDKITE_COMMIT}"
-      branch: "${BUILDKITE_BRANCH}"
+#  - label: "Triggering Integration tests for branches"
+#    if: build.pull_request.id == null
+#    trigger: "elastic-agent-extended-testing"
+#    build:
+#      commit: "${BUILDKITE_COMMIT}"
+#      branch: "${BUILDKITE_BRANCH}"

@@ -41,7 +41,7 @@ func TestMain(m *testing.M) {
 			log.Printf("Error writing autodiscovery data in %q: %s", define.AutoDiscoveryOutput, err)
 			os.Exit(1)
 		}
-
+		log.Println("dumped autodiscovery YAML in:", define.AutoDiscoveryOutput)
 	}
 
 	os.Exit(runExitCode)
