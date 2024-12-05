@@ -71,14 +71,14 @@ func TestEnrollUnprivileged(t *testing.T) {
 		enrollUrl, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 		require.NoError(t, err)
 
-		enrollArgs := []string{"elastic-agent", "enroll", "--url", enrollUrl, "--enrollment-token", enrollmentApiKey.APIKey, "--force"}
+		enrollArgs := []string{"enroll", "--url", enrollUrl, "--enrollment-token", enrollmentApiKey.APIKey, "--force"}
 
 		if runtime.GOOS != "windows" {
-			out, err := exec.CommandContext(ctx, "sudo", enrollArgs...).CombinedOutput()
+			out, err := exec.CommandContext(ctx, "elastic-agent", enrollArgs...).CombinedOutput()
 			require.Error(t, err)
 			require.Contains(t, string(out), cmd.UserOwnerMismatchError.Error())
 		} else {
-			out, err := exec.CommandContext(ctx, "elastic-agent", enrollArgs[1:]...).CombinedOutput()
+			out, err := exec.CommandContext(ctx, "C:\\Program Files\\Elastic\\Agent\\elastic-agent.exe", enrollArgs...).CombinedOutput()
 			require.Error(t, err)
 			require.Contains(t, string(out), cmd.UserOwnerMismatchError.Error())
 		}
