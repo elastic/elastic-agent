@@ -55,7 +55,7 @@ require (
 	github.com/schollz/progressbar/v3 v3.13.1
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/tsg/go-daemon v0.0.0-20200207173439-e704b93fd89b
 	github.com/winlabs/gowin32 v0.0.0-20240930213947-f504d7e14639
 	go.elastic.co/apm/module/apmgorilla/v2 v2.6.0
@@ -76,15 +76,15 @@ require (
 	golang.org/x/tools v0.25.0
 	google.golang.org/api v0.199.0
 	google.golang.org/grpc v1.67.1
-	google.golang.org/protobuf v1.35.1
+	google.golang.org/protobuf v1.35.2
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/gotestsum v1.9.0
 	helm.sh/helm/v3 v3.15.4
-	k8s.io/api v0.31.2
-	k8s.io/apimachinery v0.31.2
-	k8s.io/client-go v0.31.2
+	k8s.io/api v0.31.3
+	k8s.io/apimachinery v0.31.3
+	k8s.io/client-go v0.31.3
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.70
 	sigs.k8s.io/e2e-framework v0.4.0
 	sigs.k8s.io/kustomize/api v0.13.5-0.20230601165947-6ce0bf390ce3
@@ -471,7 +471,7 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.30 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect
-	github.com/shirou/gopsutil/v4 v4.24.10 // indirect
+	github.com/shirou/gopsutil/v4 v4.24.11 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/cast v1.6.0 // indirect
@@ -507,7 +507,7 @@ require (
 	go.etcd.io/bbolt v1.3.11 // indirect
 	go.mongodb.org/mongo-driver v1.14.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	go.opentelemetry.io/collector v0.114.0 // indirect
+	go.opentelemetry.io/collector v0.115.0 // indirect
 	go.opentelemetry.io/collector/client v1.21.0 // indirect
 	go.opentelemetry.io/collector/component/componenttest v0.115.0 // indirect
 	go.opentelemetry.io/collector/config/configauth v0.115.0 // indirect
@@ -522,7 +522,7 @@ require (
 	go.opentelemetry.io/collector/config/internal v0.115.0 // indirect
 	go.opentelemetry.io/collector/connector/connectorprofiles v0.115.0 // indirect
 	go.opentelemetry.io/collector/connector/connectortest v0.115.0 // indirect
-	go.opentelemetry.io/collector/consumer v0.115.0 // indirect
+	go.opentelemetry.io/collector/consumer v1.21.0 // indirect
 	go.opentelemetry.io/collector/consumer/consumererror v0.115.0 // indirect
 	go.opentelemetry.io/collector/consumer/consumererror/consumererrorprofiles v0.115.0 // indirect
 	go.opentelemetry.io/collector/consumer/consumerprofiles v0.115.0 // indirect
@@ -548,6 +548,7 @@ require (
 	go.opentelemetry.io/collector/processor/processortest v0.115.0 // indirect
 	go.opentelemetry.io/collector/receiver/receiverprofiles v0.115.0 // indirect
 	go.opentelemetry.io/collector/receiver/receivertest v0.115.0 // indirect
+	go.opentelemetry.io/collector/scraper v0.115.0 // indirect
 	go.opentelemetry.io/collector/semconv v0.115.0 // indirect
 	go.opentelemetry.io/collector/service v0.115.0 // indirect
 	go.opentelemetry.io/contrib/bridges/otelzap v0.6.0 // indirect
@@ -589,12 +590,12 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	howett.net/plist v1.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.30.3 // indirect
-	k8s.io/apiserver v0.31.2 // indirect
+	k8s.io/apiserver v0.31.3 // indirect
 	k8s.io/cli-runtime v0.30.3 // indirect
-	k8s.io/component-base v0.31.2 // indirect
+	k8s.io/component-base v0.31.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
 	k8s.io/kubectl v0.30.3 // indirect
-	k8s.io/kubelet v0.31.2 // indirect
+	k8s.io/kubelet v0.31.3 // indirect
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8 // indirect
 	kernel.org/pub/linux/libs/security/libcap/psx v1.2.70 // indirect
 	oras.land/oras-go v1.2.5 // indirect
