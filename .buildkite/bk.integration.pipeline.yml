@@ -133,6 +133,8 @@ steps:
           - fleet-airgapped-privileged
 
       - label: "arm:sudo: {{matrix}}"
+        # https://github.com/elastic/ingest-dev/issues/4610
+        skip: true
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
@@ -161,6 +163,8 @@ steps:
           - fleet-airgapped-privileged
 
       - label: "arm:non-sudo: {{matrix}}"
+        # https://github.com/elastic/ingest-dev/issues/4610
+        skip: true
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
