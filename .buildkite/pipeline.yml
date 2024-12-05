@@ -263,7 +263,8 @@ steps:
 # Try to dynamically trigger integration tests
   - label: "Dynamic groups IT"
     command: |
-      .buildkite/scripts/gen-it-steps.sh
+      .buildkite/scripts/gen-it-steps.sh build/dyn.pipeline.yml
+      cat build/dyn.pipeline.yml | yq -P . | buildkite-agent pipeline upload
     artifact_paths:
       - "build/discovered_tests.yaml"
       - "build/dyn.pipeline.yml"
