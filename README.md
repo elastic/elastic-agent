@@ -1,7 +1,6 @@
 # Elastic Agent
 
 [![Build status](https://badge.buildkite.com/1d35bb40427cc6833979645b61ea214fc4b686a2ffe3a68bdf.svg)](https://buildkite.com/elastic/elastic-agent)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=elastic_elastic-agent&metric=coverage)](https://sonarcloud.io/summary/new_code?id=elastic_elastic-agent)
 
 ## Architecture and Internals
 
