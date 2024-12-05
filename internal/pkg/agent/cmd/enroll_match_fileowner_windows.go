@@ -10,8 +10,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"golang.org/x/sys/windows"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 )
 
 var UserOwnerMismatchError = errors.New("the command is executed as root but the program files are not owned by the root user.")
