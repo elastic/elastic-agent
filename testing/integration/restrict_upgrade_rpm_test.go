@@ -20,7 +20,7 @@ import (
 
 func TestRestrictUpgradeRPM(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: RPM,
+		Group: Default,
 		Stack: &define.Stack{},
 		Sudo:  true,
 		OS: []define.OS{
