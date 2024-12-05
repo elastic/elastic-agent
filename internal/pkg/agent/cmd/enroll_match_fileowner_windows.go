@@ -10,8 +10,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"golang.org/x/sys/windows"
 )
+
+var UserOwnerMismatchError = errors.New("the command is executed as root but the program files are not owned by the root user.")
 
 func getFileOwner(filePath string) (string, error) {
 	// Get security information of the file
