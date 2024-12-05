@@ -1114,6 +1114,8 @@ github.com/onsi/gomega v1.4.3/go.mod h1:ex+gbHU/CVuBBDIJjb2X0qEXbFg53c61hWP/1Cpa
 github.com/onsi/gomega v1.7.0/go.mod h1:ex+gbHU/CVuBBDIJjb2X0qEXbFg53c61hWP/1CpauHY=
 github.com/onsi/gomega v1.34.1 h1:EUMJIKUjM8sKjYbtxQI9A4z2o+rruxnzNvpknOXie6k=
 github.com/onsi/gomega v1.34.1/go.mod h1:kU1QgUvBDLXBJq618Xvm2LUX6rSAfRaFRTcdOeDLwwY=
+github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.115.0 h1:yBOpacgNInabTLtqH8rgdU0ajDOVgsZDfov9NY/SUoc=
+github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.115.0/go.mod h1:u8zFCiorLO8eWq/IdDl/SQyr3apaVsQi8dMJXbPbOBg=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.115.0 h1:sO4fPw0NRUibgBVvQVTqPBCBRFh0I+ODIr3HAwcWezI=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.115.0/go.mod h1:HqzCXJ4rxXzWNYaUtCqJzXyTsCGEKSa/d+tHcyeRDY0=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.115.0 h1:swHLAWBDJrxOL7BX3UBe0hhDVWNw1MSh1KOAv9/TWi8=
