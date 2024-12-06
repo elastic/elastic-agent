@@ -343,12 +343,6 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	return args
 }
 
-type (
-	getFileOwnerFunc   func(string) (string, error)
-	getCurrentUserFunc func() (string, error)
-	isFileOwnerFunc    func(string, string) (bool, error)
-)
-
 func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	err := validateEnrollFlags(cmd)
 	if err != nil {
