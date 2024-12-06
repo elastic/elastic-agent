@@ -343,6 +343,12 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	return args
 }
 
+type (
+	getFileOwnerFunc   func(string) (string, error)
+	getCurrentUserFunc func() (string, error)
+	isFileOwnerFunc    func(string, string) (bool, error)
+)
+
 func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	err := validateEnrollFlags(cmd)
 	if err != nil {
@@ -356,7 +362,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		return fmt.Errorf("checking if running with root/Administrator privileges: %w", err)
 	}
 	if hasRoot && !fromInstall {
-		oe, err := isOwnerExec()
+		oe, err := isOwnerExec(getFileOwner, getCurrentUser, isFileOwner)
 		if err != nil {
 			return fmt.Errorf("ran into an error while figuring out if user is allowed to execute the enroll command")
 		}
