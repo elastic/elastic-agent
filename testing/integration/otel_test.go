@@ -1104,8 +1104,8 @@ service:
 func TestFBOtelRestartE2E(t *testing.T) {
 	// This test ensures that filebeatreceiver is able to deliver logs even
 	// in advent of a collector restart.
-	// It starts a filebeat receiver and then restarts it a couple times.
 	// The input is a file that is being appended to n times during the test.
+	// It starts a filebeat receiver and then restarts it a couple times.
 	// At the end it asserts that the number of logs in ES is equal to the number of
 	// lines in the input file.
 	info := define.Require(t, define.Requirements{
@@ -1119,7 +1119,6 @@ func TestFBOtelRestartE2E(t *testing.T) {
 		Stack: &define.Stack{},
 	})
 	tmpDir := t.TempDir()
-	numEvents := 50
 
 	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
 	require.NoError(t, err, "failed to create temp file to hold data to ingest")
@@ -1132,7 +1131,6 @@ func TestFBOtelRestartE2E(t *testing.T) {
 		ESEndpoint string
 		ESApiKey   string
 		Index      string
-		MinItems   int
 	}
 	esEndpoint, err := getESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
@@ -1166,7 +1164,6 @@ exporters:
     batcher:
       enabled: true
       flush_timeout: 1s
-      min_size_items: {{.MinItems}}
     mapping:
       mode: bodymap
 service:
@@ -1187,7 +1184,6 @@ service:
 				ESEndpoint: esEndpoint,
 				ESApiKey:   esApiKey.Encoded,
 				Index:      index,
-				MinItems:   numEvents,
 			}))
 	require.NoError(t, os.WriteFile(otelConfigPath, otelConfigBuffer.Bytes(), 0o600))
 	t.Cleanup(func() {
@@ -1210,16 +1206,21 @@ service:
 	require.NoError(t, err)
 
 	// Write logs to input file
-	var ingestDone atomic.Bool
+	var inputLinesCounter atomic.Int64
+	var stopInputWriter atomic.Bool
 	go func() {
-		for i := 0; i < numEvents; i++ {
+		for i := 0; ; i++ {
+			if stopInputWriter.Load() {
+				break
+			}
+
 			_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
 			require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+			inputLinesCounter.Add(1)
 			time.Sleep(100 * time.Millisecond)
 		}
 		err = inputFile.Close()
 		require.NoError(t, err, "failed to close input file")
-		ingestDone.Store(true)
 	}()
 
 	t.Cleanup(func() {
@@ -1233,21 +1234,25 @@ service:
 		}
 	})
 
+	var restartCount atomic.Int64
 	var fixtureWg sync.WaitGroup
 	fixtureWg.Add(1)
 	go func() {
 		defer fixtureWg.Done()
 
 		for {
-			if ingestDone.Load() {
-				break
-			}
-
 			// restart the collector every couple seconds while new data is being written
+			prevCount := inputLinesCounter.Load()
 			fCtx, cancel := context.WithDeadline(ctx, time.Now().Add(2*time.Second))
 			err = fixture.RunOtelWithClient(fCtx)
-			require.True(t, errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled), "unexpected error: %v", err)
 			cancel()
+			require.True(t, errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled), "unexpected error: %v", err)
+			require.True(t, inputLinesCounter.Load() > prevCount, "expected input lines to increase")
+			restartCount.Add(1)
+
+			if stopInputWriter.Load() {
+				break
+			}
 		}
 
 		// start the collector again for the remaining of the test
@@ -1256,15 +1261,15 @@ service:
 		err = fixture.RunOtelWithClient(fCtx)
 	}()
 
+	time.Sleep(5 * time.Second)
+	stopInputWriter.Store(true)
+
+	require.True(t, restartCount.Load() > 0, "expected the collector to restart at least once")
+
 	// Make sure all the logs are ingested
 	actualHits := &struct{ Hits int }{}
 	require.Eventually(t,
 		func() bool {
-			if !ingestDone.Load() {
-				t.Log("Waiting for input file to be fully written")
-				return false
-			}
-
 			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer findCancel()
 
@@ -1274,10 +1279,10 @@ service:
 			require.NoError(t, err)
 
 			actualHits.Hits = docs.Hits.Total.Value
-			return actualHits.Hits == numEvents
+			return actualHits.Hits == int(inputLinesCounter.Load())
 		},
 		2*time.Minute, 1*time.Second,
-		"Expected %d logs, got %v", numEvents, actualHits)
+		"Expected %d logs, got %v", int(inputLinesCounter.Load()), actualHits)
 
 	cancel()
 	fixtureWg.Wait()
