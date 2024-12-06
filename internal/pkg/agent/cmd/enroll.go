@@ -362,7 +362,11 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		return fmt.Errorf("checking if running with root/Administrator privileges: %w", err)
 	}
 	if hasRoot && !fromInstall {
-		oe, err := isOwnerExec(getFileOwner, getCurrentUser, isFileOwner)
+		binPath, err := os.Executable()
+		if err != nil {
+			return fmt.Errorf("error while getting executabel path: %w", err)
+		}
+		oe, err := isOwnerExec(binPath)
 		if err != nil {
 			return fmt.Errorf("ran into an error while figuring out if user is allowed to execute the enroll command")
 		}
