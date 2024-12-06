@@ -105,7 +105,6 @@ func CreateUser(name string, _ string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to generate random password: %w", err)
 	}
-
 	info := USER_INFO_1{
 		Usri1_priv:  USER_PRIV_USER,
 		Usri1_flags: USER_UF_SCRIPT | USER_UF_NORMAL_ACCOUNT | USER_UF_DONT_EXPIRE_PASSWD,
