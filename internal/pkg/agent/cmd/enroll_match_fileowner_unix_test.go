@@ -29,3 +29,12 @@ func TestGetFileOwnerUnix(t *testing.T) {
 
 	require.Equal(t, fo, strconv.Itoa(cu))
 }
+
+func TestIsFileOwnerUnix(t *testing.T) {
+	cu := os.Geteuid()
+
+	isOwner, err := isFileOwner(strconv.Itoa(cu), strconv.Itoa(cu))
+	require.NoError(t, err)
+
+	require.True(t, isOwner)
+}
