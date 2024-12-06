@@ -1,0 +1,36 @@
+//go:build windows
+
+package cmd
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/windows"
+)
+
+func TestGetFileOwnerWindows(t *testing.T) {
+	var token windows.Token
+	err := windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_QUERY, &token)
+	require.NoError(t, err)
+	defer token.Close()
+
+	tokenUser, err := token.GetTokenUser()
+	require.NoError(t, err)
+
+	path := t.TempDir()
+	fp := filepath.Join(path, "testfile")
+	_, err = os.Create(fp)
+	require.NoError(t, err)
+
+	fo, err := getFileOwner(fp)
+	require.NoError(t, err)
+
+	var foSid *windows.SID
+	err = windows.ConvertStringSidToSid(windows.StringToUTF16Ptr(fo), &foSid)
+	require.NoError(t, err)
+
+	require.True(t, foSid.Equals(tokenUser.User.Sid))
+}
