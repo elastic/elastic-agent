@@ -22,8 +22,9 @@ func TestGetFileOwnerWindows(t *testing.T) {
 
 	path := t.TempDir()
 	fp := filepath.Join(path, "testfile")
-	_, err = os.Create(fp)
+	fi, err := os.Create(fp)
 	require.NoError(t, err)
+	defer fi.Close()
 
 	fo, err := getFileOwner(fp)
 	require.NoError(t, err)
