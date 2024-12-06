@@ -38,3 +38,16 @@ func TestIsFileOwnerUnix(t *testing.T) {
 
 	require.True(t, isOwner)
 }
+
+func TestIsOwnerExecUnix(t *testing.T) {
+	path := t.TempDir()
+	fp := filepath.Join(path, "testfile")
+	fi, err := os.Create(fp)
+	require.NoError(t, err)
+	defer fi.Close()
+
+	isOwner, err := isOwnerExec(fp)
+	require.NoError(t, err)
+
+	require.True(t, isOwner)
+}
