@@ -57,7 +57,7 @@ func TestIsFileOwnerWindows(t *testing.T) {
 	require.True(t, eq, fmt.Sprintf("expected \"true\" received \"%v\"", eq))
 }
 
-func TestisOwnerExecWindows(t *testing.T) {
+func TestIsOwnerExecWindows(t *testing.T) {
 	path := t.TempDir()
 	fp := filepath.Join(path, "testfile")
 	fi, err := os.Create(fp)
