@@ -11,7 +11,7 @@
 kind: feature
 
 # Change summary; a 80ish characters long description of the change.
-summary: add routing connector to EDOT collector
+summary: Add OpenTelemetry Routing connector to EDOT Collector
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
