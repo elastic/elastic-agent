@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -49,5 +50,5 @@ func TestIsFileOwnerWindows(t *testing.T) {
 
 	eq, err := isFileOwner(tStr, tStr)
 	require.NoError(t, err)
-	require.True(t, eq)
+	require.True(t, eq, fmt.Sprintf("expected \"true\" received \"%v\"", eq))
 }
