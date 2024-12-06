@@ -31,6 +31,17 @@ func TestGetFileOwnerWindows(t *testing.T) {
 	require.NoError(t, err)
 	defer fi.Close()
 
+	err = windows.SetNamedSecurityInfo(
+		fp,
+		windows.SE_FILE_OBJECT,
+		windows.OWNER_SECURITY_INFORMATION,
+		tokenUser.User.Sid,
+		nil,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+
 	fo, err := getFileOwner(fp)
 	require.NoError(t, err)
 
