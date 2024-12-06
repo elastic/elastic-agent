@@ -8,7 +8,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"golang.org/x/sys/windows"
 
@@ -72,20 +71,15 @@ func isFileOwner(curUser string, fileOwner string) (bool, error) {
 	return isEqual, nil
 }
 
-func isOwnerExec(getFileOwner getFileOwnerFunc, getCurrentUser getCurrentUserFunc, isFileOwner isFileOwnerFunc) (bool, error) {
+func isOwnerExec(filePath string) (bool, error) {
+	fileOwner, err := getFileOwner(filePath)
+	if err != nil {
+		return false, fmt.Errorf("ran into an error while getting file owner: %w", err)
+	}
+
 	user, err := getCurrentUser()
 	if err != nil {
 		return false, fmt.Errorf("ran into an error while retrieving current user: %w", err)
-	}
-
-	binPath, err := os.Executable()
-	if err != nil {
-		return false, fmt.Errorf("ran into an error while getting executable path: %w", err)
-	}
-
-	fileOwner, err := getFileOwner(binPath)
-	if err != nil {
-		return false, fmt.Errorf("ran into an error while getting file owner: %w", err)
 	}
 
 	return isFileOwner(user, fileOwner)

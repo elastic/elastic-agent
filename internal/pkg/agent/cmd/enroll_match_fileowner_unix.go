@@ -38,13 +38,8 @@ func isFileOwner(curUser string, fileOwner string) (bool, error) {
 	return curUser == fileOwner, nil
 }
 
-func isOwnerExec(getFileOwner getFileOwnerFunc, getCurrentUser getCurrentUserFunc, isFileOwner isFileOwnerFunc) (bool, error) {
-	binPath, err := os.Executable()
-	if err != nil {
-		return false, fmt.Errorf("failed to get binpath: %w", err)
-	}
-
-	owner, err := getFileOwner(binPath)
+func isOwnerExec(filePath string) (bool, error) {
+	owner, err := getFileOwner(filePath)
 	if err != nil {
 		return false, fmt.Errorf("failed to get file owner: %w", err)
 	}

@@ -35,3 +35,19 @@ func TestGetFileOwnerWindows(t *testing.T) {
 
 	require.True(t, foSid.Equals(tokenUser.User.Sid))
 }
+
+func TestIsFileOwnerWindows(t *testing.T) {
+	var token windows.Token
+	err := windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_QUERY, &token)
+	require.NoError(t, err)
+	defer token.Close()
+
+	tokenUser, err := token.GetTokenUser()
+	require.NoError(t, err)
+
+	tStr := tokenUser.User.Sid.String()
+
+	eq, err := isFileOwner(tStr, tStr)
+	require.NoError(t, err)
+	require.True(t, eq)
+}
