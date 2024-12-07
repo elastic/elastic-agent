@@ -95,7 +95,6 @@ const (
 	agentCoreProjectName = "elastic-agent-core"
 
 	helmChartPath = "./deploy/helm/elastic-agent"
-
 	sha512FileExt = ".sha512"
 )
 
@@ -114,6 +113,25 @@ var (
 	goIntegTestTimeout = 2 * time.Hour
 	// goProvisionAndTestTimeout is the timeout used for both provisioning and running tests.
 	goProvisionAndTestTimeout = goIntegTestTimeout + 30*time.Minute
+
+	helmChartsValues = []struct {
+		path        string
+		versionKeys []string
+		tagKeys     []string
+	}{
+		// elastic-agent Helm Chart
+		{
+			"./deploy/helm/elastic-agent",
+			[]string{"agent", "version"},
+			[]string{"agent", "image", "tag"},
+		},
+		// edot-collector values file for kube-stack Helm Chart
+		{
+			"./deploy/helm/edot-collector/kube-stack",
+			[]string{"defaultCRConfig", "image", "tag"},
+			nil,
+		},
+	}
 )
 
 func init() {
@@ -3485,63 +3503,65 @@ func (Helm) RenderExamples() error {
 }
 
 func (Helm) UpdateAgentVersion() error {
-	valuesFile := filepath.Join(helmChartPath, "values.yaml")
+	for _, chart := range helmChartsValues {
+		valuesFile := filepath.Join(chart.path, "values.yaml")
 
-	data, err := os.ReadFile(valuesFile)
-	if err != nil {
-		return fmt.Errorf("failed to read file: %w", err)
-	}
-
-	isTagged, err := devtools.TagContainsCommit()
-	if err != nil {
-		return fmt.Errorf("failed to check if tag contains commit: %w", err)
-	}
-
-	if !isTagged {
-		isTagged = os.Getenv(snapshotEnv) != ""
-	}
-
-	agentVersion := getVersion()
-
-	// Parse YAML into a Node structure because
-	// it maintains comments
-	var rootNode yaml.Node
-	err = yaml.Unmarshal(data, &rootNode)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal YAML: %w", err)
-	}
-
-	if rootNode.Kind != yaml.DocumentNode {
-		return fmt.Errorf("root node is not a document node")
-	} else if len(rootNode.Content) == 0 {
-		return fmt.Errorf("root node has no content")
-	}
-
-	if err := updateYamlNodes(rootNode.Content[0], agentVersion, "agent", "version"); err != nil {
-		return fmt.Errorf("failed to update agent version: %w", err)
-	}
-
-	if !isTagged {
-		if err := updateYamlNodes(rootNode.Content[0], fmt.Sprintf("%s-SNAPSHOT", agentVersion), "agent", "image", "tag"); err != nil {
-			return fmt.Errorf("failed to update agent image tag: %w", err)
+		data, err := os.ReadFile(valuesFile)
+		if err != nil {
+			return fmt.Errorf("failed to read file: %w", err)
 		}
-	}
 
-	// Truncate values file
-	file, err := os.Create(valuesFile)
-	if err != nil {
-		return fmt.Errorf("failed to open file for writing: %w", err)
-	}
-	defer file.Close()
+		isTagged, err := devtools.TagContainsCommit()
+		if err != nil {
+			return fmt.Errorf("failed to check if tag contains commit: %w", err)
+		}
 
-	// Create a YAML encoder with 2-space indentation
-	encoder := yaml.NewEncoder(file)
-	encoder.SetIndent(2)
+		if !isTagged {
+			isTagged = os.Getenv(snapshotEnv) != ""
+		}
 
-	// Encode the updated YAML node back to the file
-	err = encoder.Encode(&rootNode)
-	if err != nil {
-		return fmt.Errorf("failed to encode updated YAML: %w", err)
+		agentVersion := getVersion()
+
+		// Parse YAML into a Node structure because
+		// it maintains comments
+		var rootNode yaml.Node
+		err = yaml.Unmarshal(data, &rootNode)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal YAML: %w", err)
+		}
+
+		if rootNode.Kind != yaml.DocumentNode {
+			return fmt.Errorf("root node is not a document node")
+		} else if len(rootNode.Content) == 0 {
+			return fmt.Errorf("root node has no content")
+		}
+
+		if err := updateYamlNodes(rootNode.Content[0], agentVersion, chart.versionKeys...); err != nil {
+			return fmt.Errorf("failed to update agent version: %w", err)
+		}
+
+		if !isTagged && len(chart.tagKeys) > 0 {
+			if err := updateYamlNodes(rootNode.Content[0], fmt.Sprintf("%s-SNAPSHOT", agentVersion), chart.tagKeys...); err != nil {
+				return fmt.Errorf("failed to update agent image tag: %w", err)
+			}
+		}
+
+		// Truncate values file
+		file, err := os.Create(valuesFile)
+		if err != nil {
+			return fmt.Errorf("failed to open file for writing: %w", err)
+		}
+		defer file.Close()
+
+		// Create a YAML encoder with 2-space indentation
+		encoder := yaml.NewEncoder(file)
+		encoder.SetIndent(2)
+
+		// Encode the updated YAML node back to the file
+		err = encoder.Encode(&rootNode)
+		if err != nil {
+			return fmt.Errorf("failed to encode updated YAML: %w", err)
+		}
 	}
 
 	return nil
