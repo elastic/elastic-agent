@@ -47,8 +47,6 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 		Local: false,
 	})
 
-	t.Skip("Skip until the first 8.16.0-SNAPSHOT is available")
-
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
@@ -165,4 +163,6 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 		require.Error(t, err, "uninstall should have failed")
 		require.Containsf(t, string(out), "uninstall must be run from outside the installed path", "expected error string not found in: %s err: %s", out, err)
 	}
+
+	t.Run("Test audit/unenroll", testUninstallAuditUnenroll(ctx, fixture, info))
 }

@@ -392,32 +392,41 @@ func TestInstallUninstallAudit(t *testing.T) {
 		return waitForAgentAndFleetHealthy(ctx, t, fixture)
 	}, time.Minute, time.Second, "agent never became healthy or connected to Fleet")
 
-	agentID, err := getAgentID(ctx, fixture)
-	require.NoError(t, err, "error getting the agent inspect output")
-	require.NotEmpty(t, agentID, "agent ID empty")
+	t.Run("run uninstall", testUninstallAuditUnenroll(ctx, fixture, info))
+}
 
-	out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
-	if err != nil {
-		t.Logf("uninstall output: %s", out)
+func testUninstallAuditUnenroll(ctx context.Context, fixture *atesting.Fixture, info *define.Info) func(t *testing.T) {
+	return func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("Skip Windows as it has been disabled because of https://github.com/elastic/elastic-agent/issues/5952")
+		}
+		agentID, err := getAgentID(ctx, fixture)
+		require.NoError(t, err, "error getting the agent inspect output")
+		require.NotEmpty(t, agentID, "agent ID empty")
+
+		out, err := fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+		if err != nil {
+			t.Logf("uninstall output: %s", out)
+			require.NoError(t, err)
+		}
+
+		// TODO: replace direct query to ES index with API call to Fleet
+		// Blocked on https://github.com/elastic/kibana/issues/194884
+		response, err := info.ESClient.Get(".fleet-agents", agentID, info.ESClient.Get.WithContext(ctx))
 		require.NoError(t, err)
+		defer response.Body.Close()
+		p, err := io.ReadAll(response.Body)
+		require.NoError(t, err)
+		require.Equalf(t, http.StatusOK, response.StatusCode, "ES status code expected 200, body: %s", p)
+		var res struct {
+			Source struct {
+				AuditUnenrolledReason string `json:"audit_unenrolled_reason"`
+			} `json:"_source"`
+		}
+		err = json.Unmarshal(p, &res)
+		require.NoError(t, err)
+		require.Equalf(t, "uninstall", res.Source.AuditUnenrolledReason, "uninstall output: %s", out)
 	}
-
-	// TODO: replace direct query to ES index with API call to Fleet
-	// Blocked on https://github.com/elastic/kibana/issues/194884
-	response, err := info.ESClient.Get(".fleet-agents", agentID, info.ESClient.Get.WithContext(ctx))
-	require.NoError(t, err)
-	defer response.Body.Close()
-	p, err := io.ReadAll(response.Body)
-	require.NoError(t, err)
-	require.Equalf(t, http.StatusOK, response.StatusCode, "ES status code expected 200, body: %s", p)
-	var res struct {
-		Source struct {
-			AuditUnenrolledReason string `json:"audit_unenrolled_reason"`
-		} `json:"_source"`
-	}
-	err = json.Unmarshal(p, &res)
-	require.NoError(t, err)
-	require.Equal(t, "uninstall", res.Source.AuditUnenrolledReason)
 }
 
 // TestRepeatedInstallUninstall will install then uninstall the agent
