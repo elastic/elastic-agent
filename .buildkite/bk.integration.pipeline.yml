@@ -6,21 +6,10 @@ env:
   ASDF_MAGE_VERSION: 1.14.0
 
 steps:
-  - label: "Integration tests: packaging"
-    key: "package-it"
-    command: ".buildkite/scripts/steps/integration-package.sh"
-    artifact_paths:
-      - build/distributions/**
-    agents:
-      provider: "gcp"
-      machineType: "n1-standard-8"
-
   - label: Start ESS stack for integration tests
     key: integration-ess
     env:
       ASDF_TERRAFORM_VERSION: 1.9.2
-    depends_on:
-      - package-it
     command: |
       #!/usr/bin/env bash
       set -euo pipefail
@@ -36,11 +25,10 @@ steps:
     key: integration-tests-win
     depends_on:
       - integration-ess
-      - package-it
     steps:
       - label: "Win2022:sudo:{{matrix}}"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
           .buildkite/scripts/integration-tests.ps1 {{matrix}} true
         artifact_paths:
           - build/**
@@ -56,7 +44,7 @@ steps:
 
       - label: "Win2022:non-sudo:{{matrix}}"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
           .buildkite/scripts/integration-tests.ps1 {{matrix}} false
         artifact_paths:
           - build/**
@@ -71,11 +59,10 @@ steps:
     key: integration-tests-ubuntu
     depends_on:
       - integration-ess
-      - package-it
     steps:
       - label: "x86_64:non-sudo: {{matrix}}"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
@@ -88,7 +75,7 @@ steps:
 
       - label: "x86_64:sudo: {{matrix}}"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
@@ -109,10 +96,9 @@ steps:
           - fleet-airgapped-privileged
 
       - label: "arm:sudo: {{matrix}}"
-        # https://github.com/elastic/ingest-dev/issues/4610
         skip: true
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
@@ -133,10 +119,9 @@ steps:
           - fleet-airgapped-privileged
 
       - label: "arm:non-sudo: {{matrix}}"
-        # https://github.com/elastic/ingest-dev/issues/4610
         skip: true
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
@@ -150,12 +135,11 @@ steps:
   - group: "Stateful(Sudo):RHEL8"
     key: integration-tests-rhel8
     depends_on:
-      - package-it
       - integration-ess
     steps:
       - label: "x86_64:sudo:rpm"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
           .buildkite/scripts/steps/integration_tests_tf.sh rpm true
         artifact_paths:
           - build/**
