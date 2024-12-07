@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/magefile/mage/sh"
@@ -135,6 +136,11 @@ func (b *dockerBuilder) prepareBuild() error {
 		return err
 	}
 
+	if isNewDockerBuildProcess() {
+		// if it is a new docker build process, no need to render the Dockerfile template
+		return nil
+	}
+
 	return b.expandDockerfile(templatesDir, data)
 }
 
@@ -185,7 +191,48 @@ func (b *dockerBuilder) dockerBuild() (string, error) {
 	if repository := b.ExtraVars["repository"]; repository != "" {
 		tag = fmt.Sprintf("%s/%s", repository, tag)
 	}
-	return tag, sh.Run("docker", "build", "-t", tag, b.buildDir)
+
+	if isNewDockerBuildProcess() {
+		// use the new buildx command line
+		elasticBeatsDir, err := ElasticBeatsDir()
+		if err != nil {
+			return "", fmt.Errorf("error detecting elasticBeatsDir: %w", err)
+		}
+		cmdArgs := []string{
+			"buildx",
+			"build",
+		}
+
+		cmdArgs = append(cmdArgs,
+			b.generateBuildArgs()...,
+		)
+
+		cmdArgs = append(cmdArgs,
+			"--build-context", "dockerbuild="+filepath.Join(elasticBeatsDir, "dev-tools/packaging/docker/"),
+			// TODO this should come from the spec
+			"--target", "image_basic",
+			"-f", filepath.Join(elasticBeatsDir, "dev-tools/packaging/docker/Dockerfile"),
+			"-t", tag,
+			b.buildDir,
+		)
+
+		cmdSB := new(bytes.Buffer)
+		cmdSB.WriteString("docker ")
+		for _, cmdArg := range cmdArgs {
+			cmdSB.WriteString(cmdArg)
+			cmdSB.WriteString(" ")
+		}
+		os.WriteFile(filepath.Join(filepath.Dir(b.buildDir), "docker_build_cmd.txt"), cmdSB.Bytes(), 0644)
+
+		return tag, sh.Run("docker", cmdArgs...)
+	} else {
+		return tag, sh.Run("docker", "build", "-t", tag, b.buildDir)
+	}
+}
+
+func isNewDockerBuildProcess() bool {
+	_, ok := os.LookupEnv("USE_DOCKER_BUILDX")
+	return ok
 }
 
 func (b *dockerBuilder) dockerSave(tag string) error {
@@ -249,4 +296,52 @@ func (b *dockerBuilder) dockerSave(tag string) error {
 		return fmt.Errorf("failed to create .sha512 file: %w", err)
 	}
 	return nil
+}
+
+func (b *dockerBuilder) generateBuildArgs() []string {
+
+	buildArgFromTemplatesMapping := map[string]string{
+		"BEAT_COMMIT":           "{{ commit }}",
+		"BEAT_COMMIT_SHORT":     "{{ commit_short }}",
+		"BEAT_DESCRIPTION":      "{{ .BeatDescription }}",
+		"BEAT_LICENSE":          "{{ .License }}",
+		"BEAT_ROOT_IMPORT_PATH": "{{ .BeatURL }}",
+		"BEAT_URL":              "{{ .BeatURL }}",
+		"BEAT_VCS_REF":          "{{ (repo).RootImportPath }}",
+		"BEAT_VENDOR":           "{{ .BeatVendor }}",
+		"BEAT_VERSION":          "{{ beat_version }}{{ if .Snapshot }}-SNAPSHOT{{ end }}",
+		"BUILD_TIMESTAMP":       "{{ date }}",
+		"DOCKER_VARIANT":        "{{ .Variant }}",
+		"ELASTIC_AGENT_USER":    "{{ .user }}",
+	}
+
+	buildArgs := make([]string, 0, len(buildArgFromTemplatesMapping))
+
+	baseTemplate := template.New("build-args").Funcs(FuncMap)
+
+	baseData := map[string]interface{}{
+		"ExposePorts": b.exposePorts(),
+		"ModulesDirs": b.modulesDirs(),
+		"Variant":     b.DockerVariant.String(),
+	}
+	// this is copy-pasted from prepareBuild() to ensure that the data to render templates is the same
+	data := EnvMap(append([]map[string]interface{}{b.evalContext, b.toMap()}, baseData)...)
+	for buildArg, tmplDef := range buildArgFromTemplatesMapping {
+
+		parsedArgTmpl, err := baseTemplate.Parse(tmplDef)
+		if err != nil {
+			// FIXME handle more gracefully
+			panic(fmt.Errorf("failed to parse template '%s' for build arg %s: %w", tmplDef, buildArg, err))
+		}
+		sb := new(strings.Builder)
+		sb.WriteString(buildArg)
+		sb.WriteString("=")
+		err = parsedArgTmpl.Execute(sb, data)
+		if err != nil {
+			// FIXME handle more gracefully
+			panic(fmt.Errorf("failed to execute template '%s' for build arg %s with data %v: %w", tmplDef, buildArg, data, err))
+		}
+		buildArgs = append(buildArgs, "--build-arg", sb.String())
+	}
+	return buildArgs
 }

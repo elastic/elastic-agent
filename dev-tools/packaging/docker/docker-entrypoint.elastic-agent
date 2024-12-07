@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Update umask to retain group write permissions on runtime directories: $root/tmp/default, $root/logs/default and $root/run/default
+umask 0007
+
+set -eo pipefail
+
+# For information on the possible environment variables that can be passed into the container. Run the following
+# command for information on the options that are available.
+#
+# `./elastic-agent container --help`
+#
+
+if [[ "$ELASTIC_AGENT_OTEL" == "true" ]]
+then
+exec elastic-agent otel "$@"
+else
+exec elastic-agent container "$@"
+fi
