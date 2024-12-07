@@ -1063,8 +1063,8 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 				require.NoErrorf(t, err, "error running inspect cmd")
 
 				assert.Equal(t, proxyCLI.URL, got.Fleet.ProxyURL)
-				assert.Equal(t, mtlsCLI.clientCertPath, got.Fleet.Ssl.Certificate)
-				assert.Equal(t, mtlsCLI.clientCertKeyPath, got.Fleet.Ssl.Key)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.Certificate)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.Key)
 				assert.Empty(t, got.Fleet.Ssl.KeyPassphrasePath, "policy should have removed key_passphrase_path as key isn't passphrase protected anymore")
 			},
 		},
@@ -1083,9 +1083,9 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 				require.NoErrorf(t, err, "error running inspect cmd")
 
 				assert.Equal(t, proxyCLI.URL, got.Fleet.ProxyURL)
-				assert.Equal(t, mtlsCLI.clientCertPath, got.Fleet.Ssl.Certificate)
-				assert.Equal(t, mtlsCLI.clientCertKeyEncPath, got.Fleet.Ssl.Key)
-				assert.Equal(t, mtlsCLI.clientCertKeyPassPath, got.Fleet.Ssl.KeyPassphrasePath)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.Certificate)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.Key)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.KeyPassphrasePath)
 			},
 		},
 		{
@@ -1155,8 +1155,8 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 					return
 				}
 				assert.Equal(t, proxyPolicymTLS.URL, got.Fleet.ProxyURL)
-				assert.Equal(t, mtlsPolicy.clientCertPath, got.Fleet.Ssl.Certificate)
-				assert.Equal(t, mtlsPolicy.clientCertKeyPath, got.Fleet.Ssl.Key)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.Certificate)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.Key)
 				assert.Empty(t, got.Fleet.Ssl.KeyPassphrasePath, "policy should have removed key_passphrase_path as key isn't passphrase protected anymore")
 			},
 		},
@@ -1193,8 +1193,8 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 				}
 
 				assert.Equal(t, proxyPolicymTLS.URL, got.Fleet.ProxyURL)
-				assert.Equal(t, mtlsPolicy.clientCertPath, got.Fleet.Ssl.Certificate)
-				assert.Equal(t, mtlsPolicy.clientCertKeyPath, got.Fleet.Ssl.Key)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.Certificate)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.Key)
 				assert.Empty(t, got.Fleet.Ssl.KeyPassphrasePath, "policy should have removed key_passphrase_path as key isn't passphrase protected anymore")
 			},
 		},
@@ -1225,8 +1225,8 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 				}
 
 				assert.Equal(t, proxyPolicymTLS.URL, got.Fleet.ProxyURL)
-				assert.Equal(t, mtlsPolicy.clientCertPath, got.Fleet.Ssl.Certificate)
-				assert.Equal(t, mtlsPolicy.clientCertKeyPath, got.Fleet.Ssl.Key)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.Certificate)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.Key)
 				assert.Empty(t, got.Fleet.Ssl.KeyPassphrasePath, "key_passphrase_path was never set")
 			},
 		},
