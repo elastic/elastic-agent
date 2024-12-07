@@ -72,6 +72,26 @@ func TestIsOwnerExecWindows(t *testing.T) {
 	path := t.TempDir()
 	fp := filepath.Join(path, "testfile")
 	fi, err := os.Create(fp)
+
+	var token windows.Token
+	err = windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_QUERY, &token)
+	require.NoError(t, err)
+	defer token.Close()
+
+	tokenUser, err := token.GetTokenUser()
+	require.NoError(t, err)
+
+	err = windows.SetNamedSecurityInfo(
+		fp,
+		windows.SE_FILE_OBJECT,
+		windows.OWNER_SECURITY_INFORMATION,
+		tokenUser.User.Sid,
+		nil,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+
 	require.NoError(t, err)
 	defer fi.Close()
 
