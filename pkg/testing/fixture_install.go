@@ -112,6 +112,8 @@ type InstallOpts struct {
 	Namespace      string // --namespace, not supported for DEB and RPM.
 
 	Privileged bool // inverse of --unprivileged (as false is the default)
+	Username   string
+	Group      string
 
 	EnrollOpts
 	FleetBootstrapOpts
@@ -149,6 +151,14 @@ func (i *InstallOpts) ToCmdArgs() []string {
 			// If --namespace was used it will override the development namespace.
 			i.Namespace = paths.DevelopmentNamespace
 		}
+	}
+
+	if i.Username != "" {
+		args = append(args, "--user", i.Username)
+	}
+
+	if i.Group != "" {
+		args = append(args, "--group", i.Group)
 	}
 
 	args = append(args, i.EnrollOpts.toCmdArgs()...)

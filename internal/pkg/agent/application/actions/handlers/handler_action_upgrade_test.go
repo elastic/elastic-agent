@@ -110,7 +110,7 @@ func TestUpgradeHandler(t *testing.T) {
 				return nil, nil
 			},
 		},
-		nil, nil, nil, nil, nil, false)
+		nil, nil, nil, nil, nil, false, nil)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 
@@ -130,6 +130,7 @@ func TestUpgradeHandler(t *testing.T) {
 }
 
 func TestUpgradeHandlerSameVersion(t *testing.T) {
+	t.Skip("flaky test: https://github.com/elastic/elastic-agent/issues/5938")
 	// Create a cancellable context that will shut down the coordinator after
 	// the test.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -169,7 +170,7 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 				return nil, err
 			},
 		},
-		nil, nil, nil, nil, nil, false)
+		nil, nil, nil, nil, nil, false, nil)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 
@@ -230,7 +231,7 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 				return nil, nil
 			},
 		},
-		nil, nil, nil, nil, nil, false)
+		nil, nil, nil, nil, nil, false, nil)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 

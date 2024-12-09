@@ -812,7 +812,7 @@ func (f *Fixture) IsHealthy(ctx context.Context, opts ...process.CmdOption) erro
 
 	if status.State != int(cproto.State_HEALTHY) {
 		return fmt.Errorf("agent isn't healthy, current status: %s",
-			client.State(status.State))
+			client.State(status.State)) //nolint:gosec // value will never be over 32-bit
 	}
 
 	return nil
@@ -1289,6 +1289,13 @@ func createTempDir(t *testing.T) string {
 	return tempDir
 }
 
+type AgentStatusCollectorOutput struct {
+	Status             int                                    `json:"status"`
+	Error              string                                 `json:"error"`
+	Timestamp          string                                 `json:"timestamp"`
+	ComponentStatusMap map[string]*AgentStatusCollectorOutput `json:"components"`
+}
+
 type AgentStatusOutput struct {
 	Info struct {
 		ID           string `json:"id"`
@@ -1324,9 +1331,10 @@ type AgentStatusOutput struct {
 			} `json:"meta"`
 		} `json:"version_info,omitempty"`
 	} `json:"components"`
-	FleetState     int              `json:"FleetState"`
-	FleetMessage   string           `json:"FleetMessage"`
-	UpgradeDetails *details.Details `json:"upgrade_details"`
+	Collector      *AgentStatusCollectorOutput `json:"collector"`
+	FleetState     int                         `json:"FleetState"`
+	FleetMessage   string                      `json:"FleetMessage"`
+	UpgradeDetails *details.Details            `json:"upgrade_details"`
 }
 
 func (aso *AgentStatusOutput) IsZero() bool {

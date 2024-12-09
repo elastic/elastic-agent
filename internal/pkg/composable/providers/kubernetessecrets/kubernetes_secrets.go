@@ -50,7 +50,7 @@ func ContextProviderBuilder(logger *logger.Logger, c *config.Config, _ bool) (co
 	if c == nil {
 		c = config.New()
 	}
-	err := c.Unpack(&cfg)
+	err := c.UnpackTo(&cfg)
 	if err != nil {
 		return nil, errors.New(err, "failed to unpack configuration")
 	}

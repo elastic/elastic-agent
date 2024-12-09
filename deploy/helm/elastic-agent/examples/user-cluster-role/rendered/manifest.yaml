@@ -10,7 +10,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
   annotations:
     elastic-agent.k8s.elastic.co/preset: nginx
     elastic-agent.k8s.elastic.co/sa: nginx
@@ -26,7 +25,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
   annotations:
     elastic-agent.k8s.elastic.co/preset: nginx
 stringData:
@@ -83,7 +81,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
   annotations:
     elastic-agent.k8s.elastic.co/preset: nginx
 subjects:
@@ -106,7 +103,6 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.0.0
-    app.kubernetes.io/managed-by: Helm
 spec:
   selector:
     matchLabels:
