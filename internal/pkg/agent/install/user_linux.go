@@ -92,3 +92,5 @@ func getentGetID(database string, key string) (int, error) {
 	}
 	return val, nil
 }
+
+func EnsureRights(_ string) error { return nil }
