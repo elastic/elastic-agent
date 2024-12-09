@@ -477,7 +477,7 @@ func TestRepeatedInstallUninstall(t *testing.T) {
 // into Fleet. Current testing shows each iteration takes around 16 seconds.
 func TestRepeatedInstallUninstallFleet(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Default,
+		Group: Fleet,
 		Stack: &define.Stack{}, // needs a fleet-server.
 		// We require sudo for this test to run
 		// `elastic-agent install` (even though it will
