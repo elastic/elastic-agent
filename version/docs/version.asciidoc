@@ -3,7 +3,11 @@
 // FIXME: once elastic.co docs have been switched over to use `main`, remove
 // the `doc-site-branch` line below as well as any references to it in the code.
 :doc-site-branch: master
+<<<<<<< HEAD
 :go-version: 1.22.9
+=======
+:go-version: 1.22.10
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 :release-state: unreleased
 :python: 3.7
 :docker: 1.12

@@ -93,8 +93,12 @@ else
 		--label release_note:skip \
 		--label backport:skip \
 		--base main \
+<<<<<<< HEAD
 		--head $(ELASTIC_AGENT_BRANCH) \
 		--reviewer elastic/obs-cloudnative-monitoring
+=======
+		--head $(ELASTIC_AGENT_BRANCH)
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 endif
 
 else

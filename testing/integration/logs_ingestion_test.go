@@ -38,7 +38,10 @@ import (
 	"github.com/elastic/elastic-agent/testing/installtest"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 
+<<<<<<< HEAD
 	"github.com/rcrowley/go-metrics"
+=======
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -121,7 +124,10 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 }
 
 func startMockES(t *testing.T) string {
+<<<<<<< HEAD
 	registry := metrics.NewRegistry()
+=======
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 	uid := uuid.Must(uuid.NewV4())
 	clusterUUID := uuid.Must(uuid.NewV4()).String()
 
@@ -129,7 +135,11 @@ func startMockES(t *testing.T) string {
 	mux.Handle("/", mockes.NewAPIHandler(
 		uid,
 		clusterUUID,
+<<<<<<< HEAD
 		registry,
+=======
+		nil,
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 		time.Now().Add(time.Hour), 0, 0, 0, 100, 0))
 
 	s := httptest.NewServer(mux)

@@ -11,7 +11,11 @@
 kind: feature
 
 # Change summary; a 80ish characters long description of the change.
+<<<<<<< HEAD
 summary: add routing connector to EDOT collector
+=======
+summary: Add OpenTelemetry Routing connector to EDOT Collector
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.

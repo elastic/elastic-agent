@@ -129,7 +129,12 @@ func getAgentVersions() (*AgentVersions, error) {
 	return &versionFile, nil
 }
 
+<<<<<<< HEAD
 // FetchUpgradableVersions returns the versions list from the agent version file.
+=======
+// GetUpgradableVersions returns the versions list from the agent version file. The list
+// is sorted in descending order (newer versions first).
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 func GetUpgradableVersions() ([]*version.ParsedSemVer, error) {
 	parsedVersions := make([]*version.ParsedSemVer, 0, len(agentVersions.TestVersions))
 	for _, v := range agentVersions.TestVersions {
@@ -143,7 +148,12 @@ func GetUpgradableVersions() ([]*version.ParsedSemVer, error) {
 	return parsedVersions, nil
 }
 
+<<<<<<< HEAD
 // FetchUpgradableVersions returns a list of versions that meet the specified requirements.
+=======
+// FetchUpgradableVersions returns a list of versions that meet the specified requirements, sorted
+// in descending order (newer versions first).
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 //
 // Every version on the resulting list will meet the given requirements (by OR condition).
 // However, it's not guaranteed that the list contains the amount of versions per requirement.
@@ -239,6 +249,21 @@ func PreviousMinor() (*version.ParsedSemVer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse the current version %s: %w", define.Version(), err)
 	}
+<<<<<<< HEAD
+=======
+
+	// Special case: if we are in the first release of a new major (so vX.0.0), we should
+	// return the latest release from the previous major.
+	if current.Minor() == 0 && current.Patch() == 0 {
+		// Since the current version is the first release of a new major (vX.0.0), there
+		// will be no minor versions in the versions list from the same major (vX). The list
+		// will only contain minors from the previous major (vX-1). Further, since the
+		// version list is sorted in descending order (newer versions first), we can return the
+		// first item from the list as it will be the newest minor of the previous major.
+		return versions[0], nil
+	}
+
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 	for _, v := range versions {
 		if v.Prerelease() != "" || v.BuildMetadata() != "" {
 			continue

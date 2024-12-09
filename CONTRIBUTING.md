@@ -44,6 +44,11 @@ Keep these in mind as both authors and reviewers of PRs:
   - The PR must contain related changes and leave out unrelated changes (e.g. refactorings, etc. that could be their own PR instead).
   - If the PR could be broken up into two or more PRs either "vertically" (by separating concerns logically) or horizontally (by sharding the PR into a series of PRs --- usually works well with mass refactoring or cleanup type PRs), it should. A set of such related PRs can be tracked and given context in a meta issue.
 
+<<<<<<< HEAD
+=======
+* The PR changeset should be rather small: 500 lines of code (excluding generated code or other changes that normally should not require close review by a human) is the soft limit that should be used to judge if a PR is "too big".
+
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 * I must strive to please the reviewer(s). In other words, bias towards taking the reviewers suggestions rather than getting into a protracted argument. This helps move the PR forward. A convenient "escape hatch" to use might be to file a new issue for a follow up discussion/PR. If you find yourself getting into a drawn out argument, ask yourself: is this a good use of our time?
 
 ## As a reviewer of a PR:

@@ -4357,6 +4357,7 @@
       },
       "dependencies": []
     },
+<<<<<<< HEAD
     "cloud-defend": {
       "branch": "main",
       "commit_hash": "27215867e613177b0ca57d0357c421c646fac0b5",
@@ -4387,6 +4388,8 @@
       },
       "dependencies": []
     },
+=======
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
     "beats": {
       "branch": "main",
       "commit_hash": "d4d2ddce3230f21f01a19afdb836626f7b0af4b5",

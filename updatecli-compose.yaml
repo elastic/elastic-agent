@@ -6,9 +6,17 @@ policies:
     values:
       - .ci/updatecli/values.d/scm.yml
       - .ci/updatecli/values.d/ironbank.yml
+<<<<<<< HEAD
 
   - name: Update Updatecli policies
     policy: ghcr.io/updatecli/policies/autodiscovery/updatecli:0.4.0@sha256:254367f5b1454fd6032b88b314450cd3b6d5e8d5b6c953eb242a6464105eb869
     values:
       - .ci/updatecli/values.d/scm.yml
       - .ci/updatecli/values.d/updatecli-compose.yml
+=======
+  - name: Update Updatecli policies
+    policy: ghcr.io/updatecli/policies/autodiscovery/updatecli:0.8.0@sha256:99e9e61b501575c2c176c39f2275998d198b590a3f6b1fe829f7315f8d457e7f
+    values:
+      - .ci/updatecli/values.d/scm.yml
+      - .ci/updatecli/values.d/updatecli-compose.yml
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))

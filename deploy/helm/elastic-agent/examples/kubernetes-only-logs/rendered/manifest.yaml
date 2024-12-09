@@ -9,7 +9,11 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.18.0
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -21,7 +25,11 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.18.0
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 stringData:
 
   agent.yml: |-
@@ -113,7 +121,11 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.18.0
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
     resources:
@@ -193,7 +205,11 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.18.0
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 subjects:
   - kind: ServiceAccount
     name: agent-pernode-example
@@ -213,7 +229,11 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
+<<<<<<< HEAD
     app.kubernetes.io/version: 8.18.0
+=======
+    app.kubernetes.io/version: 9.0.0
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 spec:
   selector:
     matchLabels:
@@ -244,7 +264,11 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
+<<<<<<< HEAD
         image: docker.elastic.co/beats/elastic-agent:8.18.0-SNAPSHOT
+=======
+        image: docker.elastic.co/beats/elastic-agent:9.0.0-SNAPSHOT
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
         imagePullPolicy: IfNotPresent
         name: agent
         resources:

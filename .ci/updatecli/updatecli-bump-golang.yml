@@ -57,6 +57,7 @@ sources:
         kind: regex
         pattern: go1\.{{ source "minor" }}\.(\d*)$
 
+<<<<<<< HEAD
   gomod:
     dependson:
       - latestGoVersion
@@ -69,6 +70,8 @@ sources:
     spec:
       command: echo {{ source "latestGoVersion" }}
 
+=======
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 conditions:
   dockerTag:
     name: Is docker image golang:{{ source "latestGoVersion" }} published
@@ -124,6 +127,7 @@ targets:
         - Dockerfile
         - Dockerfile.skaffold
       matchpattern: 'ARG GO_VERSION=\d+.\d+.\d+'
+<<<<<<< HEAD
   update-gomod-minor-version:
     name: "Update go.mod minor version"
     sourceid: gomod
@@ -135,10 +139,20 @@ targets:
       matchpattern: 'go \d+.\d+'
   update-gomod-toolchain-version:
     name: "Update go.mod toolchain version"
+=======
+  update-gomod-full-version:
+    name: "Update go.mod version"
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
     sourceid: latestGoVersion
     scmid: githubConfig
     kind: file
     spec:
+<<<<<<< HEAD
       content: 'toolchain go{{ source "latestGoVersion" }}'
       file: go.mod
       matchpattern: 'toolchain go\d+.\d+.\d+'
+=======
+      content: 'go {{ source "latestGoVersion" }}'
+      file: go.mod
+      matchpattern: 'go \d+.\d+.\d+'
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))

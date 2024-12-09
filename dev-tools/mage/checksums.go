@@ -144,6 +144,7 @@ func ChecksumsWithManifest(requiredPackage string, versionedFlatPath string, ver
 						log.Printf(">>>>>>> Calculated directory to copy: [%s]", dirToCopy)
 					}
 
+<<<<<<< HEAD
 					// cloud-defend path exception
 					// When untarred, cloud defend untars to:
 					//    cloud-defend-8.14.0-arm64
@@ -164,6 +165,8 @@ func ChecksumsWithManifest(requiredPackage string, versionedFlatPath string, ver
 						}
 					}
 
+=======
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 					// Set copy options
 					options := copy.Options{
 						OnSymlink: func(_ string) copy.SymlinkAction {
@@ -263,6 +266,7 @@ func getComponentVersion(componentName string, requiredPackage string, component
 
 	return componentVersion
 }
+<<<<<<< HEAD
 
 // This is a helper function for the cloud-defend package.
 // When it is untarred, it does not have the same dirname as the package name.
@@ -278,3 +282,5 @@ func fixCloudDefendDirPath(dirPath string, componentVersion string, expectedArch
 
 	return fixedDirPath
 }
+=======
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))

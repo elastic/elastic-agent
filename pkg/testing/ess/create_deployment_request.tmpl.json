@@ -83,7 +83,13 @@
           "kibana": {
             "version": "{{ .request.Version }}",
             "user_settings_json": {
+<<<<<<< HEAD
               "xpack.fleet.enableExperimental": ["agentTamperProtectionEnabled"]
+=======
+              "xpack.fleet.enableExperimental": ["agentTamperProtectionEnabled"],
+              "xpack.fleet.internal.registry.kibanaVersionCheckEnabled": false,
+              "server.restrictInternalApis": false
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
             }
           }
         },
@@ -99,4 +105,8 @@
     "system_owned": false,
     "tags": {{ json .request.Tags }}
   }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))

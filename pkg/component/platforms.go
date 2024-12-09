@@ -9,6 +9,11 @@ import (
 	goruntime "runtime"
 	"strings"
 
+<<<<<<< HEAD
+=======
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install/pkgmgr"
+
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 	"github.com/elastic/go-sysinfo"
 
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -114,7 +119,12 @@ type PlatformDetail struct {
 	Major      int
 	Minor      int
 
+<<<<<<< HEAD
 	User UserDetail
+=======
+	IsInstalledViaExternalPkgMgr bool
+	User                         UserDetail
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 }
 
 // PlatformModifier can modify the platform details before the runtime specifications are loaded.
@@ -155,6 +165,10 @@ func LoadPlatformDetail(modifiers ...PlatformModifier) (PlatformDetail, error) {
 		User: UserDetail{
 			Root: hasRoot,
 		},
+<<<<<<< HEAD
+=======
+		IsInstalledViaExternalPkgMgr: pkgmgr.InstalledViaExternalPkgMgr(),
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 	}
 	for _, modifier := range modifiers {
 		detail = modifier(detail)

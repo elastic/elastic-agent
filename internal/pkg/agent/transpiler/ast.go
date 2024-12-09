@@ -5,7 +5,10 @@
 package transpiler
 
 import (
+<<<<<<< HEAD
 	"bytes"
+=======
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
@@ -14,6 +17,11 @@ import (
 	"strconv"
 	"strings"
 
+<<<<<<< HEAD
+=======
+	"github.com/cespare/xxhash/v2"
+
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
 )
 
@@ -58,6 +66,12 @@ type Node interface {
 	// Hash compute a sha256 hash of the current node and recursively call any children.
 	Hash() []byte
 
+<<<<<<< HEAD
+=======
+	// Hash64With recursively computes the given hash for the Node and its children
+	Hash64With(h *xxhash.Digest) error
+
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 	// Vars adds to the array with the variables identified in the node. Returns the array in-case
 	// the capacity of the array had to be changed.
 	Vars([]string) []string
@@ -167,6 +181,19 @@ func (d *Dict) Hash() []byte {
 	return h.Sum(nil)
 }
 
+<<<<<<< HEAD
+=======
+// Hash64With recursively computes the given hash for the Node and its children
+func (d *Dict) Hash64With(h *xxhash.Digest) error {
+	for _, v := range d.value {
+		if err := v.Hash64With(h); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 // Vars returns a list of all variables referenced in the dictionary.
 func (d *Dict) Vars(vars []string) []string {
 	for _, v := range d.value {
@@ -291,6 +318,20 @@ func (k *Key) Hash() []byte {
 	return h.Sum(nil)
 }
 
+<<<<<<< HEAD
+=======
+// Hash64With recursively computes the given hash for the Node and its children
+func (k *Key) Hash64With(h *xxhash.Digest) error {
+	if _, err := h.WriteString(k.name); err != nil {
+		return err
+	}
+	if k.value != nil {
+		return k.value.Hash64With(h)
+	}
+	return nil
+}
+
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 // Vars returns a list of all variables referenced in the value.
 func (k *Key) Vars(vars []string) []string {
 	if k.value == nil {
@@ -374,6 +415,19 @@ func (l *List) Hash() []byte {
 	return h.Sum(nil)
 }
 
+<<<<<<< HEAD
+=======
+// Hash64With recursively computes the given hash for the Node and its children
+func (l *List) Hash64With(h *xxhash.Digest) error {
+	for _, v := range l.value {
+		if err := v.Hash64With(h); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 // Find takes an index and return the values at that index.
 func (l *List) Find(idx string) (Node, bool) {
 	i, err := strconv.Atoi(idx)
@@ -502,6 +556,15 @@ func (s *StrVal) Hash() []byte {
 	return []byte(s.value)
 }
 
+<<<<<<< HEAD
+=======
+// Hash64With recursively computes the given hash for the Node and its children
+func (s *StrVal) Hash64With(h *xxhash.Digest) error {
+	_, err := h.WriteString(s.value)
+	return err
+}
+
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 // Vars returns a list of all variables referenced in the string.
 func (s *StrVal) Vars(vars []string) []string {
 	// errors are ignored (if there is an error determine the vars it will also error computing the policy)
@@ -578,6 +641,15 @@ func (s *IntVal) Hash() []byte {
 	return []byte(s.String())
 }
 
+<<<<<<< HEAD
+=======
+// Hash64With recursively computes the given hash for the Node and its children
+func (s *IntVal) Hash64With(h *xxhash.Digest) error {
+	_, err := h.WriteString(s.String())
+	return err
+}
+
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 // Processors returns any linked processors that are now connected because of Apply.
 func (s *IntVal) Processors() Processors {
 	return s.processors
@@ -629,6 +701,15 @@ func (s *UIntVal) Hash() []byte {
 	return []byte(s.String())
 }
 
+<<<<<<< HEAD
+=======
+// Hash64With recursively computes the given hash for the Node and its children
+func (s *UIntVal) Hash64With(h *xxhash.Digest) error {
+	_, err := h.WriteString(s.String())
+	return err
+}
+
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 // Vars does nothing. Cannot have variable in an UIntVal.
 func (s *UIntVal) Vars(vars []string) []string {
 	return vars
@@ -688,7 +769,22 @@ func (s *FloatVal) ShallowClone() Node {
 
 // Hash return a string representation of the value, we try to return the minimal precision we can.
 func (s *FloatVal) Hash() []byte {
+<<<<<<< HEAD
 	return []byte(strconv.FormatFloat(s.value, 'f', -1, 64))
+=======
+	return []byte(s.hashString())
+}
+
+// Hash64With recursively computes the given hash for the Node and its children
+func (s *FloatVal) Hash64With(h *xxhash.Digest) error {
+	_, err := h.WriteString(s.hashString())
+	return err
+}
+
+// hashString returns a string representation of s suitable for hashing.
+func (s *FloatVal) hashString() string {
+	return strconv.FormatFloat(s.value, 'f', -1, 64)
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 }
 
 // Vars does nothing. Cannot have variable in an FloatVal.
@@ -758,6 +854,21 @@ func (s *BoolVal) Hash() []byte {
 	return falseVal
 }
 
+<<<<<<< HEAD
+=======
+// Hash64With recursively computes the given hash for the Node and its children
+func (s *BoolVal) Hash64With(h *xxhash.Digest) error {
+	var encodedBool []byte
+	if s.value {
+		encodedBool = trueVal
+	} else {
+		encodedBool = falseVal
+	}
+	_, err := h.Write(encodedBool)
+	return err
+}
+
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 // Vars does nothing. Cannot have variable in an BoolVal.
 func (s *BoolVal) Vars(vars []string) []string {
 	return vars
@@ -878,6 +989,14 @@ func (a *AST) Hash() []byte {
 	return a.root.Hash()
 }
 
+<<<<<<< HEAD
+=======
+// Hash64With recursively computes the given hash for the Node and its children
+func (a *AST) Hash64With(h *xxhash.Digest) error {
+	return a.root.Hash64With(h)
+}
+
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 // HashStr return the calculated hash as a base64 url encoded string.
 func (a *AST) HashStr() string {
 	return base64.URLEncoding.EncodeToString(a.root.Hash())
@@ -888,7 +1007,17 @@ func (a *AST) Equal(other *AST) bool {
 	if a.root == nil || other.root == nil {
 		return a.root == other.root
 	}
+<<<<<<< HEAD
 	return bytes.Equal(a.Hash(), other.Hash())
+=======
+	hasher := xxhash.New()
+	_ = a.Hash64With(hasher)
+	thisHash := hasher.Sum64()
+	hasher.Reset()
+	_ = other.Hash64With(hasher)
+	otherHash := hasher.Sum64()
+	return thisHash == otherHash
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 }
 
 // Lookup looks for a value from the AST.

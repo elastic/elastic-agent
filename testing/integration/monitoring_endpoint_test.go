@@ -89,7 +89,11 @@ func (runner *EndpointMetricsMonRunner) SetupSuite() {
 	require.NoErrorf(runner.T(), err, "Policy Response was: %v", pkgPolicyResp)
 
 	runner.T().Log("Polling for endpoint-security to become Healthy")
+<<<<<<< HEAD
 	ctx, cancel = context.WithTimeout(ctx, time.Minute*6)
+=======
+	ctx, cancel = context.WithTimeout(ctx, time.Minute*3)
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 	defer cancel()
 
 	agentClient := runner.fixture.Client()
@@ -98,7 +102,11 @@ func (runner *EndpointMetricsMonRunner) SetupSuite() {
 
 	require.Eventually(runner.T(),
 		func() bool { return agentAndEndpointAreHealthy(runner.T(), ctx, agentClient) },
+<<<<<<< HEAD
 		time.Minute*5,
+=======
+		time.Minute*3,
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 		time.Second,
 		"Endpoint component or units are not healthy.",
 	)
@@ -144,7 +152,11 @@ func (runner *EndpointMetricsMonRunner) TestEndpointMetricsAfterRestart() {
 	require.NoError(runner.T(), err)
 
 	// wait for endpoint to come back up. We use `pgrep`
+<<<<<<< HEAD
 	// since the agent health status won't immediately register that the endpoint process itself is gone.
+=======
+	// since the agent health status won't imidately register that the endpoint process itself is gone.
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 	require.Eventually(runner.T(), func() bool {
 		cmd := exec.Command("pgrep", "-f", "endpoint")
 		pgrep, err := cmd.CombinedOutput()
@@ -162,7 +174,11 @@ func (runner *EndpointMetricsMonRunner) TestEndpointMetricsAfterRestart() {
 
 	require.Eventually(runner.T(),
 		func() bool { return agentAndEndpointAreHealthy(runner.T(), ctx, agentClient) },
+<<<<<<< HEAD
 		time.Minute*5,
+=======
+		time.Minute*3,
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 		time.Second,
 		"Endpoint component or units are not healthy.",
 	)

@@ -325,15 +325,25 @@ extraIntegrations: {}
 agent:
   # -- elastic-agent version
   # @section -- 6 - Elastic-Agent Configuration
+<<<<<<< HEAD
   version: 8.18.0
+=======
+  version: 9.0.0
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
   # -- image configuration
   # @section -- 6 - Elastic-Agent Configuration
   image:
     repository: docker.elastic.co/beats/elastic-agent
     pullPolicy: IfNotPresent
+<<<<<<< HEAD
     tag: "8.18.0-SNAPSHOT"
   # -- image pull secrets
   # @section -- 6 - Elastic-Agent Configuration
+=======
+    tag: "9.0.0-SNAPSHOT"
+  # -- image pull secrets
+  # @section -- 3 - Elastic-Agent Configuration
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
   imagePullSecrets: []
   # -- generate kubernetes manifests or [ECK](https://github.com/elastic/cloud-on-k8s) CRDs
   # @section -- 6 - Elastic-Agent Configuration

@@ -7,6 +7,11 @@ package transpiler
 import (
 	"errors"
 	"fmt"
+<<<<<<< HEAD
+=======
+
+	"github.com/cespare/xxhash/v2"
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 )
 
 const (
@@ -23,7 +28,12 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 		return nil, fmt.Errorf("inputs must be an array")
 	}
 	var nodes []varIDMap
+<<<<<<< HEAD
 	nodesMap := map[string]*Dict{}
+=======
+	nodesMap := map[uint64]*Dict{}
+	hasher := xxhash.New()
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 	for _, vars := range varsArray {
 		for _, node := range l.Value().([]Node) {
 			dict, ok := node.(*Dict)
@@ -56,7 +66,13 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 					continue
 				}
 			}
+<<<<<<< HEAD
 			hash := string(dict.Hash())
+=======
+			hasher.Reset()
+			_ = dict.Hash64With(hasher)
+			hash := hasher.Sum64()
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 			_, exists := nodesMap[hash]
 			if !exists {
 				nodesMap[hash] = dict

@@ -5,7 +5,10 @@
 package mage
 
 import (
+<<<<<<< HEAD
 	"bytes"
+=======
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 	"context"
 	"errors"
 	"fmt"
@@ -341,6 +344,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		}
 	}
 
+<<<<<<< HEAD
 	// Generate an XML code coverage report.
 	var codecovReport string
 	if params.CoverageProfileFile != "" {
@@ -377,6 +381,8 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		fmt.Println(">> go run gocover-cobertura:", params.CoverageProfileFile, "Created")
 	}
 
+=======
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 	// Return an error indicating that testing failed.
 	if goTestErr != nil {
 		fmt.Println(">> go test:", params.LogName, "Test Failed")

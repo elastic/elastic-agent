@@ -120,7 +120,11 @@ linters-settings:
 
   gosimple:
     # Select the Go version to target. The default is '1.13'.
+<<<<<<< HEAD
     go: "1.22.9"
+=======
+    go: "1.22.10"
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 
   nolintlint:
     # Enable to ensure that nolint directives are all used. Default is true.
@@ -136,17 +140,29 @@ linters-settings:
 
   staticcheck:
     # Select the Go version to target. The default is '1.13'.
+<<<<<<< HEAD
     go: "1.22.9"
+=======
+    go: "1.22.10"
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
     checks: ["all"]
 
   stylecheck:
     # Select the Go version to target. The default is '1.13'.
+<<<<<<< HEAD
     go: "1.22.9"
+=======
+    go: "1.22.10"
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
     checks: ["all"]
 
   unused:
     # Select the Go version to target. The default is '1.13'.
+<<<<<<< HEAD
     go: "1.22.9"
+=======
+    go: "1.22.10"
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 
   gosec:
     excludes:
