@@ -29,8 +29,8 @@ import (
 )
 
 var (
-	kubeStackChartURL     = "https://github.com/open-telemetry/opentelemetry-helm-charts/releases/download/opentelemetry-kube-stack-0.3.2/opentelemetry-kube-stack-0.3.2.tgz"
-	kubeStackChartVersion = "0.3.2"
+        kubeStackChartVersion = "0.3.2"
+	kubeStackChartURL     = "https://github.com/open-telemetry/opentelemetry-helm-charts/releases/download/opentelemetry-kube-stack-" + kubeStackChartVersion + "/opentelemetry-kube-stack-" + kubeStackChartVersion + ".tgz"
 )
 
 func TestOtelKubeStackHelm(t *testing.T) {
