@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/elastic/elastic-agent-libs/mapstr"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -852,6 +854,41 @@ func TestHash(t *testing.T) {
 	}
 }
 
+func TestApplyDoesNotMutate(t *testing.T) {
+	tests := map[string]struct {
+		input Node
+	}{
+		"dict": {
+			&Dict{
+				value: []Node{
+					&Key{name: "str", value: &StrVal{value: "${var}"}},
+				},
+			},
+		},
+		"list": {
+			&List{
+				value: []Node{
+					&StrVal{value: "${var}"},
+				},
+			},
+		},
+		"key": {
+			&Key{name: "str", value: &StrVal{value: "${var}"}},
+		},
+		"str": {&StrVal{value: "${var}"}},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			vars, err := NewVars("", map[string]any{"var": "value"}, mapstr.M{})
+			require.NoError(t, err)
+			applied, err := test.input.Apply(vars)
+			require.NoError(t, err)
+			assert.NotEqual(t, test.input, applied)
+		})
+	}
+}
+
 func TestShallowClone(t *testing.T) {
 	tests := map[string]struct {
 		input *AST
@@ -909,7 +946,7 @@ func TestShallowClone(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			cloned := test.input.ShallowClone()
 			assert.Equal(t, test.input, cloned)
-			err := test.input.Insert(&AST{root: &BoolVal{value: true}}, "key")
+			err := test.input.Insert(&AST{root: &Key{name: "integer", value: &IntVal{value: 7}}}, "integer")
 			if err == nil {
 				assert.NotEqual(t, test.input, cloned)
 			} else if list, ok := test.input.root.(*List); ok {

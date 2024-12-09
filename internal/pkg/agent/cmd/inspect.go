@@ -236,7 +236,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 }
 
 func printMapStringConfig(mapStr map[string]interface{}, streams *cli.IOStreams) error {
-	data, err := yaml.Marshal(diagnostics.RedactSecretPaths(mapStr, streams.Err))
+	data, err := yaml.Marshal(diagnostics.Redact(mapStr, streams.Err))
 	if err != nil {
 		return errors.New(err, "could not marshal to YAML")
 	}
