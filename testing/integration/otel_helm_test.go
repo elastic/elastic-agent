@@ -29,7 +29,7 @@ import (
 )
 
 var (
-        kubeStackChartVersion = "0.3.2"
+	kubeStackChartVersion = "0.3.2"
 	kubeStackChartURL     = "https://github.com/open-telemetry/opentelemetry-helm-charts/releases/download/opentelemetry-kube-stack-" + kubeStackChartVersion + "/opentelemetry-kube-stack-" + kubeStackChartVersion + ".tgz"
 )
 
@@ -74,8 +74,8 @@ func TestOtelKubeStackHelm(t *testing.T) {
 	require.NotEmpty(t, esAPIKey, "failed to generate ES API key")
 
 	chartOptions := &action.ChartPathOptions{
-		RepoURL: "https://github.com/open-telemetry/opentelemetry-helm-charts/releases/download/opentelemetry-kube-stack-0.3.2/opentelemetry-kube-stack-0.3.2.tgz",
-		Version: "0.3.0",
+		RepoURL: kubeStackChartURL,
+		Version: kubeStackChartVersion,
 	}
 
 	chartLocation, err := action.NewPull().LocateChart(chartOptions.RepoURL, cli.New())
