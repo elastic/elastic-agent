@@ -80,6 +80,7 @@ This section provides a summary of components included in the Elastic Distributi
 | Component | Version |
 |---|---|
 | [signaltometricsconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/signaltometricsconnector/v0.3.0/connector/signaltometricsconnector/README.md) | v0.3.0 |
+| [routingconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/routingconnector/v0.114.0/connector/routingconnector/README.md) | v0.114.0 |
 | [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.114.0/connector/spanmetricsconnector/README.md) | v0.114.0 |
 ## Persistence in OpenTelemetry Collector
 
