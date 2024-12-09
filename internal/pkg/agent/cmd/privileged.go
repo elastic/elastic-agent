@@ -69,7 +69,7 @@ func privilegedCmd(streams *cli.IOStreams, cmd *cobra.Command) (err error) {
 	}
 
 	pt := install.CreateAndStartNewSpinner(streams.Out, "Converting Elastic Agent to privileged...")
-	err = install.SwitchExecutingMode(topPath, pt, "", "")
+	err = install.SwitchExecutingMode(topPath, pt, "", "", "")
 	if err != nil {
 		// error already adds context
 		return err

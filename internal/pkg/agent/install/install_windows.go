@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"golang.org/x/sys/windows"
@@ -19,6 +20,13 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
+)
+
+const (
+	// Conforming to https://learn.microsoft.com/en-us/troubleshoot/windows-server/active-directory/naming-conventions-for-computer-domain-site-ou#domain-names
+	// domain names can contain all alphanumeric characters except for the extended characters that appear in the Disallowed characters list. Names can contain a period, but names can't start with a period.
+	// Disallowed characters: [, ~ : @ # $ % ^ ' . ( ) { } _ {whitespace} \ / ]
+	activeDirectoryUsername = `^[A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*\\[A-Za-z0-9.-]{1,104}$`
 )
 
 // postInstall performs post installation for Windows systems.
@@ -55,13 +63,24 @@ func fixInstallMarkerPermissions(markerFilePath string, ownership utils.FileOwne
 }
 
 // withServiceOptions just sets the user/group for the service.
-func withServiceOptions(username string, groupName string) ([]serviceOpt, error) {
+func withServiceOptions(username string, groupName string, password string) ([]serviceOpt, error) {
 	if username == "" {
 		// not installed with --unprivileged; nothing to do
 		return []serviceOpt{}, nil
 	}
 
-	// service requires a password to launch as the user
+	if password != "" {
+		if isFullDomainName, err := isWindowsDomainUsername(username); err != nil {
+			return nil, fmt.Errorf("failed to parse username: %w", err)
+		} else if !isFullDomainName {
+			return nil, fmt.Errorf(`username is not in proper format 'domain\username', contains illegal character: ,~:@#$%%^'.(){}_\/ or a whitespace`)
+		}
+
+		// existing user
+		return []serviceOpt{withUserGroup(username, groupName), withPassword(password)}, nil
+	}
+
+	// service requires a password to launch as the use
 	// this sets it to a random password that is only known by the service
 	password, err := RandomPassword()
 	if err != nil {
@@ -108,4 +127,18 @@ func serviceConfigure(ownership utils.FileOwner) error {
 		return fmt.Errorf("failed to set DACL for service(%s): %w", paths.ServiceName(), err)
 	}
 	return nil
+}
+
+func isWindowsDomainUsername(username string) (bool, error) {
+	if !strings.Contains(username, `\`) {
+		// fail fast
+		return false, nil
+	}
+
+	match, err := regexp.MatchString(activeDirectoryUsername, username)
+	if err != nil {
+		return false, err
+	}
+
+	return match, nil
 }
