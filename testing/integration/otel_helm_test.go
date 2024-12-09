@@ -176,11 +176,9 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				checkedAgentContainers := 0
 
 				for _, pod := range podList.Items {
-					if !strings.HasPrefix(pod.GetName(), tc.helmReleaseName) {
-						continue
+					if strings.HasPrefix(pod.GetName(), tc.helmReleaseName) && pod.Status.Phase == corev1.PodRunning {
+						checkedAgentContainers++
 					}
-
-					checkedAgentContainers++
 				}
 				return checkedAgentContainers >= tc.atLeastValidatedPodsNumber
 			}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least %d agent containers should be checked", tc.atLeastValidatedPodsNumber))
