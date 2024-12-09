@@ -93,9 +93,12 @@ func TestOtelKubeStackHelm(t *testing.T) {
 			name:            "helm standalone agent default kubernetes privileged",
 			helmReleaseName: "kube-stack-otel",
 			valuesFile:      "../../deploy/helm/edot-collector/kube-stack/values.yaml",
-			// - perNode Daemonset (at least 1 agent pod)
-			// - clusterWide Deployment  (1 agent pod)
-			// - operator Deployment  (1 agent pod)
+			// - A Daemonset to collect K8s node's metrics and logs
+			// (1 EDOT collector pod per node)
+			// - A Cluster wide Deployment to collect K8s metrics and
+			// events (1 EDOT collector pod per cluster)
+			// - An OpenTelemetry Operator Deployment (1 pod per
+			// cluster)
 			atLeastValidatedPodsNumber: 3,
 		},
 	}
