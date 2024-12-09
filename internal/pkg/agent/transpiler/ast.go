@@ -55,7 +55,15 @@ type Node interface {
 	// Hash compute a sha256 hash of the current node and recursively call any children.
 	Hash() []byte
 
+<<<<<<< HEAD
 	// Apply apply the current vars, returning the new value for the node.
+=======
+	// Vars adds to the array with the variables identified in the node. Returns the array in-case
+	// the capacity of the array had to be changed.
+	Vars([]string) []string
+
+	// Apply apply the current vars, returning the new value for the node. This does not modify the original Node.
+>>>>>>> 398f3229b8 (Avoid unnecessary copies during config generation (#6184))
 	Apply(*Vars) (Node, error)
 
 	// Processors returns any attached processors, because of variable substitution.
@@ -137,6 +145,23 @@ func (d *Dict) Clone() Node {
 	return &Dict{value: nodes}
 }
 
+<<<<<<< HEAD
+=======
+// ShallowClone makes a shallow clone of the node.
+func (d *Dict) ShallowClone() Node {
+	nodes := make([]Node, 0, len(d.value))
+	for _, i := range d.value {
+		if i == nil {
+			continue
+		}
+		// Dict nodes are key-value pairs, and we do want to make a copy of the key here
+		nodes = append(nodes, i.ShallowClone())
+
+	}
+	return &Dict{value: nodes}
+}
+
+>>>>>>> 398f3229b8 (Avoid unnecessary copies during config generation (#6184))
 // Hash compute a sha256 hash of the current node and recursively call any children.
 func (d *Dict) Hash() []byte {
 	h := sha256.New()
@@ -146,7 +171,20 @@ func (d *Dict) Hash() []byte {
 	return h.Sum(nil)
 }
 
+<<<<<<< HEAD
 // Apply applies the vars to all the nodes in the dictionary.
+=======
+// Vars returns a list of all variables referenced in the dictionary.
+func (d *Dict) Vars(vars []string) []string {
+	for _, v := range d.value {
+		k := v.(*Key)
+		vars = k.Vars(vars)
+	}
+	return vars
+}
+
+// Apply applies the vars to all the nodes in the dictionary. This does not modify the original dictionary.
+>>>>>>> 398f3229b8 (Avoid unnecessary copies during config generation (#6184))
 func (d *Dict) Apply(vars *Vars) (Node, error) {
 	nodes := make([]Node, 0, len(d.value))
 	for _, v := range d.value {
@@ -256,7 +294,19 @@ func (k *Key) Hash() []byte {
 	return h.Sum(nil)
 }
 
+<<<<<<< HEAD
 // Apply applies the vars to the value.
+=======
+// Vars returns a list of all variables referenced in the value.
+func (k *Key) Vars(vars []string) []string {
+	if k.value == nil {
+		return vars
+	}
+	return k.value.Vars(vars)
+}
+
+// Apply applies the vars to the value. This does not modify the original node.
+>>>>>>> 398f3229b8 (Avoid unnecessary copies during config generation (#6184))
 func (k *Key) Apply(vars *Vars) (Node, error) {
 	if k.value == nil {
 		return k, nil
@@ -364,7 +414,31 @@ func (l *List) Clone() Node {
 	return &List{value: nodes}
 }
 
+<<<<<<< HEAD
 // Apply applies the vars to all nodes in the list.
+=======
+// ShallowClone makes a shallow clone of the node.
+func (l *List) ShallowClone() Node {
+	nodes := make([]Node, 0, len(l.value))
+	for _, i := range l.value {
+		if i == nil {
+			continue
+		}
+		nodes = append(nodes, i)
+	}
+	return &List{value: nodes}
+}
+
+// Vars returns a list of all variables referenced in the list.
+func (l *List) Vars(vars []string) []string {
+	for _, v := range l.value {
+		vars = v.Vars(vars)
+	}
+	return vars
+}
+
+// Apply applies the vars to all nodes in the list. This does not modify the original list.
+>>>>>>> 398f3229b8 (Avoid unnecessary copies during config generation (#6184))
 func (l *List) Apply(vars *Vars) (Node, error) {
 	nodes := make([]Node, 0, len(l.value))
 	for _, v := range l.value {
@@ -434,7 +508,21 @@ func (s *StrVal) Hash() []byte {
 	return []byte(s.value)
 }
 
+<<<<<<< HEAD
 // Apply applies the vars to the string value.
+=======
+// Vars returns a list of all variables referenced in the string.
+func (s *StrVal) Vars(vars []string) []string {
+	// errors are ignored (if there is an error determine the vars it will also error computing the policy)
+	_, _ = replaceVars(s.value, func(variable string) (Node, Processors, bool) {
+		vars = append(vars, variable)
+		return nil, nil, false
+	}, false)
+	return vars
+}
+
+// Apply applies the vars to the string value. This does not modify the original string.
+>>>>>>> 398f3229b8 (Avoid unnecessary copies during config generation (#6184))
 func (s *StrVal) Apply(vars *Vars) (Node, error) {
 	return vars.Replace(s.value)
 }
