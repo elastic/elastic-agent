@@ -96,6 +96,7 @@ func TestRpmLogIngestFleetManaged(t *testing.T) {
 	t.Run("Normal logs with flattened data_stream are shipped", func(t *testing.T) {
 		testFlattenedDatastreamFleetPolicy(t, ctx, info, policy)
 	})
+	require.True(t, false, "forcing failure")
 }
 
 func TestRpmFleetUpgrade(t *testing.T) {
@@ -191,4 +192,5 @@ func TestRpmFleetUpgrade(t *testing.T) {
 		t.Logf("Got Agent version %s != %s", newVersion, noSnapshotVersion)
 		return false
 	}, 5*time.Minute, time.Second)
+	require.True(t, false, "forcing failure")
 }

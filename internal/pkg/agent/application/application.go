@@ -48,7 +48,6 @@ func New(
 	disableMonitoring bool,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
-
 	err := version.InitVersionError()
 	if err != nil {
 		// non-fatal error, log a warning and move on
@@ -122,7 +121,7 @@ func New(
 
 	var configMgr coordinator.ConfigManager
 	var managed *managedConfigManager
-	var compModifiers = []coordinator.ComponentsModifier{InjectAPMConfig}
+	compModifiers := []coordinator.ComponentsModifier{InjectAPMConfig}
 	var composableManaged bool
 	var isManaged bool
 
@@ -209,6 +208,12 @@ func New(
 
 func mergeFleetConfig(ctx context.Context, rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {
 	path := paths.AgentConfigFile()
+
+	fmt.Println("============================== AGENT CONFIG FILE mergeFleetConfig ===================================")
+	fmt.Println("Agent config file: ", path)
+	fmt.Println("Config pathld ", paths.Config())
+	fmt.Println("=====================================================================================================")
+
 	store, err := storage.NewEncryptedDiskStore(ctx, path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error instantiating encrypted disk store: %w", err)
