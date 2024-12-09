@@ -155,6 +155,11 @@ func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Inf
 		t.Skipf("sudo requirement %t not matching sudo filter %t. Skipping", req.Sudo, *SudoFilter.value)
 	}
 
+	// record autodiscover after filtering by group and sudo and before validating against the actual environment
+	if AutoDiscover {
+		discoverTest(t, req)
+	}
+
 	if !req.Local && local {
 		t.Skip("running local only tests and this test doesn't support local")
 		return nil
