@@ -63,7 +63,17 @@ if [[ "$BUILDKITE_STEP_KEY" == *"integration-tests"* ]]; then
   echo "--- Prepare BK test analytics token :vault:"
   BUILDKITE_ANALYTICS_TOKEN=$(vault kv get -field token kv/ci-shared/platform-ingest/buildkite_analytics_token)
   export BUILDKITE_ANALYTICS_TOKEN
+<<<<<<< HEAD
 
+=======
+fi
+
+if [[ "$BUILDKITE_STEP_KEY" == *"aggregate-reports"* ]]; then
+  # BK analytics
+  echo "--- Prepare BK test analytics token :vault:"
+  BUILDKITE_ANALYTICS_TOKEN=$(vault kv get -field token kv/ci-shared/platform-ingest/buildkite_analytics_token)
+  export BUILDKITE_ANALYTICS_TOKEN
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 fi
 
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-binary-dra" ]]; then

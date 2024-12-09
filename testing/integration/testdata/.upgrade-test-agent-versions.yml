@@ -5,7 +5,15 @@
 # upgrade integration tests.
 
 testVersions:
+<<<<<<< HEAD
   - 8.16.1
   - 8.15.5
   - 7.17.26-SNAPSHOT
   - 7.17.25
+=======
+  - 8.17.0-SNAPSHOT
+  - 8.16.1-SNAPSHOT
+  - 8.16.0
+  - 8.15.4
+  - 7.17.26-SNAPSHOT
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))

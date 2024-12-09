@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 ARG GO_VERSION=1.22.9
+=======
+ARG GO_VERSION=1.22.10
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 FROM circleci/golang:${GO_VERSION}
 
 

@@ -5,7 +5,12 @@
 set -euo pipefail
 set -x # for debugging
 
+<<<<<<< HEAD
 MERGED_COV_FILE="TEST-go-unit.cov"
+=======
+mkdir -p build
+MERGED_COV_FILE="build/TEST-go-unit.cov"
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 
 go install github.com/wadey/gocovmerge@latest
 

@@ -35,6 +35,11 @@ func GetAgentByPolicyIDAndHostnameFromList(ctx context.Context, client *kibana.C
 		agentHostname := item.LocalMetadata.Host.Hostname
 		agentPolicyID := item.PolicyID
 
+<<<<<<< HEAD
+=======
+		agentHostnames = append(agentHostnames, agentHostname)
+
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 		if strings.EqualFold(agentHostname, hostname) && agentPolicyID == policyID {
 			hostnameAgents = append(hostnameAgents, &listAgentsResp.Items[i])
 		}

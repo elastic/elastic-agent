@@ -5,8 +5,14 @@ outputs:
   default:
     type: elasticsearch
     hosts: '${ELASTICSEARCH_HOSTS:http://elasticsearch:9200}'
+<<<<<<< HEAD
     username: '${ELASTICSEARCH_USERNAME:elastic}'
     password: '${ELASTICSEARCH_PASSWORD:changeme}'
+=======
+    username: '${ELASTICSEARCH_USERNAME:}'
+    password: '${ELASTICSEARCH_PASSWORD:}'
+    api_key: '${ELASTICSEARCH_API_KEY:}'
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
     preset: balanced
 
 inputs:

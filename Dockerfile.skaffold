@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 ARG GO_VERSION=1.22.9
+=======
+ARG GO_VERSION=1.22.10
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 ARG crossbuild_image="docker.elastic.co/beats-dev/golang-crossbuild"
 ARG AGENT_VERSION=8.9.0-SNAPSHOT
 ARG AGENT_IMAGE="docker.elastic.co/beats/elastic-agent"

@@ -31,7 +31,10 @@ RUN true && \
     chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/*beat && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/osquery* || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/apm-server || true) && \
+<<<<<<< HEAD
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/cloud-defend || true) && \
+=======
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/endpoint-security || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/fleet-server || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-elastic-collector || true) && \

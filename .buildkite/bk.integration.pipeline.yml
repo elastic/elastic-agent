@@ -4,7 +4,10 @@ env:
   DOCKER_REGISTRY: "docker.elastic.co"
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   ASDF_MAGE_VERSION: 1.14.0
+<<<<<<< HEAD
   ASDF_GOLANG_VERSION: 1.22.6
+=======
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 
 steps:
   - label: "Integration tests: packaging"
@@ -45,6 +48,10 @@ steps:
           .buildkite/scripts/integration-tests.ps1 {{matrix}} true
         artifact_paths:
           - build/**
+<<<<<<< HEAD
+=======
+          - build/diagnostics/**
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
@@ -61,6 +68,10 @@ steps:
           .buildkite/scripts/integration-tests.ps1 {{matrix}} false
         artifact_paths:
           - build/**
+<<<<<<< HEAD
+=======
+          - build/diagnostics/**
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
@@ -71,8 +82,13 @@ steps:
   - group: "Stateful:Ubuntu"
     key: integration-tests-ubuntu
     depends_on:
+<<<<<<< HEAD
       - package-it
       - integration-ess
+=======
+      - integration-ess
+      - package-it
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
     steps:
       - label: "x86_64:non-sudo: {{matrix}}"
         command: |
@@ -80,6 +96,10 @@ steps:
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
+<<<<<<< HEAD
+=======
+          - build/diagnostics/**
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
@@ -93,6 +113,10 @@ steps:
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
+<<<<<<< HEAD
+=======
+          - build/diagnostics/**
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
@@ -110,11 +134,20 @@ steps:
           - fleet-airgapped-privileged
 
       - label: "arm:sudo: {{matrix}}"
+<<<<<<< HEAD
+=======
+        # https://github.com/elastic/ingest-dev/issues/4610
+        skip: true
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
+<<<<<<< HEAD
+=======
+          - build/diagnostics/**
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
         agents:
           provider: "aws"
           imagePrefix: "platform-ingest-beats-ubuntu-2404-aarch64"
@@ -132,11 +165,20 @@ steps:
           - fleet-airgapped-privileged
 
       - label: "arm:non-sudo: {{matrix}}"
+<<<<<<< HEAD
+=======
+        # https://github.com/elastic/ingest-dev/issues/4610
+        skip: true
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
+<<<<<<< HEAD
+=======
+          - build/diagnostics/**
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
         agents:
           provider: "aws"
           imagePrefix: "platform-ingest-beats-ubuntu-2404-aarch64"
@@ -150,6 +192,7 @@ steps:
       - package-it
       - integration-ess
     steps:
+<<<<<<< HEAD
     - label: "x86_64:sudo:rpm"
       command: |
         buildkite-agent artifact download build/distributions/** . --step 'package-it'
@@ -160,6 +203,19 @@ steps:
         provider: "gcp"
         machineType: "n1-standard-8"
         image: "family/platform-ingest-elastic-agent-rhel-8"
+=======
+      - label: "x86_64:sudo:rpm"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          .buildkite/scripts/steps/integration_tests_tf.sh rpm true
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        agents:
+          provider: "gcp"
+          machineType: "n1-standard-8"
+          image: "family/platform-ingest-elastic-agent-rhel-8"
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 
   - label: ESS stack cleanup
     depends_on:
@@ -174,3 +230,29 @@ steps:
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
+<<<<<<< HEAD
+=======
+
+  - label: Aggregate test reports
+    # Warning: The key has a hook in pre-command
+    key: aggregate-reports
+    depends_on:
+      - integration-tests-ubuntu
+      - integration-tests-win
+      - integration-tests-rhel8
+    allow_dependency_failure: true
+    command: |
+      buildkite-agent artifact download "build/*.xml" .
+      buildkite-agent artifact download "build\*.xml" .
+    agents:
+      image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
+      useCustomGlobalHooks: true
+    soft_fail:
+      - exit_status: "*"
+    plugins:
+      - test-collector#v1.10.1:
+          files: "build/*.xml"
+          format: "junit"
+          branches: "main"
+          debug: true
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))

@@ -906,10 +906,14 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 
 // addFileToTar adds a file (or directory) to a tar archive.
 func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
+<<<<<<< HEAD
 	excludedFiles := []string{
 		"cloud-defend",
 		"cloud-defend.spec.yml",
 	}
+=======
+	excludedFiles := []string{}
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 
 	return filepath.WalkDir(pkgFile.Source, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {

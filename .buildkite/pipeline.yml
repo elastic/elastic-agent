@@ -167,7 +167,11 @@ steps:
   - label: ":junit: Junit annotate"
     plugins:
       - junit-annotate#v2.5.0:
+<<<<<<< HEAD
           artifacts: "build/*.xml"
+=======
+          artifacts: "**TEST-*.xml"
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
           always-annotate: true
     agents:
       provider: "gcp"
@@ -194,7 +198,11 @@ steps:
     command: |
       .buildkite/scripts/steps/merge.sh
     artifact_paths:
+<<<<<<< HEAD
       - "TEST-go-unit.cov"
+=======
+      - "build/TEST-go-unit.cov"
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
     agents:
       image: "golang:1.22.6"
     depends_on:
@@ -231,7 +239,11 @@ steps:
     agents:
       image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
     command:
+<<<<<<< HEAD
       - "buildkite-agent artifact download --step merge-coverage TEST-go-unit.cov ."
+=======
+      - "buildkite-agent artifact download --step merge-coverage build/TEST-go-unit.cov ."
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
       - "/scan-source-code.sh"
     depends_on:
       - "merge-coverage"

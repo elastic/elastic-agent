@@ -35,6 +35,10 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/otiai10/copy"
 
+<<<<<<< HEAD
+=======
+	devmachine "github.com/elastic/elastic-agent/dev-tools/devmachine"
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
@@ -158,6 +162,12 @@ type Integration mg.Namespace
 // Otel namespace contains Open Telemetry related tasks.
 type Otel mg.Namespace
 
+<<<<<<< HEAD
+=======
+// Devmachine namespace contains tasks related to remote development machines.
+type Devmachine mg.Namespace
+
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
 	err := sh.RunV("go", "mod", "tidy", "-v")
@@ -846,6 +856,22 @@ func (Cloud) Push() error {
 	return nil
 }
 
+<<<<<<< HEAD
+=======
+// Creates a new devmachine that will be auto-deleted in 6 hours.
+// Example: MACHINE_IMAGE="family/platform-ingest-elastic-agent-ubuntu-2204" ZONE="us-central1-a" mage devmachine:create "pavel-dev-machine"
+// ZONE defaults to 'us-central1-a', MACHINE_IMAGE defaults to 'family/platform-ingest-elastic-agent-ubuntu-2204'
+func (Devmachine) Create(instanceName string) error {
+	if instanceName == "" {
+		return errors.New(
+			`instanceName is required.
+	Example:
+	mage devmachine:create "pavel-dev-machine"  `)
+	}
+	return devmachine.Run(instanceName)
+}
+
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 func Clean() {
 	mg.Deps(devtools.Clean, Build.Clean)
 }

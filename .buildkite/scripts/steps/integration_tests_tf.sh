@@ -47,6 +47,15 @@ else
   export KIBANA_PASSWORD=$(buildkite-agent meta-data get "kibana.pwd")
 fi
 
+<<<<<<< HEAD
+=======
+# TODO: move to common.sh when it's refactored
+# BK analytics
+echo "--- Prepare BK test analytics token :vault:"
+BUILDKITE_ANALYTICS_TOKEN=$(vault kv get -field token kv/ci-shared/platform-ingest/buildkite_analytics_token)
+export BUILDKITE_ANALYTICS_TOKEN
+
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
 # Run integration tests
 echo "~~~ Running integration tests"
 

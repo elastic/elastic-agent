@@ -64,6 +64,7 @@ spec:
                   fieldPath: metadata.name
           securityContext:
             runAsUser: 0
+<<<<<<< HEAD
             # The following capabilities are needed for 'Defend for containers' integration (cloud-defend)
             # If you are using this integration, please uncomment these lines before applying.
             #capabilities:
@@ -71,6 +72,8 @@ spec:
             #    - BPF # (since Linux 5.8) allows loading of BPF programs, create most map types, load BTF, iterate programs and maps.
             #    - PERFMON # (since Linux 5.8) allows attaching of BPF programs used for performance metrics and observability operations.
             #    - SYS_RESOURCE # Allow use of special resources or raising of resource limits. Used by 'Defend for Containers' to modify 'rlimit_memlock'
+=======
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
           resources:
             limits:
               memory: 1400Mi
@@ -130,6 +133,7 @@ spec:
           hostPath:
             path: /etc/machine-id
             type: File
+<<<<<<< HEAD
         # Needed for 'Defend for containers' integration (cloud-defend)
         # If you are not using this integration, then these volumes and the corresponding
         # mounts can be removed.
@@ -137,3 +141,5 @@ spec:
           hostPath:
             path: /sys/kernel/debug
 
+=======
+>>>>>>> 950e1d74ba (build(deps): bump github.com/elastic/elastic-agent-libs from 0.17.3 to 0.17.4 (#6237))
