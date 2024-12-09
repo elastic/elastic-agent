@@ -20,7 +20,6 @@ import (
 	"github.com/schollz/progressbar/v3"
 
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -48,6 +47,13 @@ var (
 	fleetAuditWaitMax  = time.Second * 10
 )
 
+// agentInfo is a custom type that implements the fleetapi.AgentInfo interface
+type agentInfo string
+
+func (a *agentInfo) AgentID() string {
+	return string(*a)
+}
+
 // Uninstall uninstalls persistently Elastic Agent on the system.
 func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
 	cwd, err := os.Getwd()
@@ -68,9 +74,10 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	// will only notify fleet of the uninstall command if it can gather config and agentinfo, and is not a stand-alone install
 	localFleet := false
 	notifyFleet := false
-	var ai *info.AgentInfo
+	var agentID agentInfo
 	var cfg *configuration.Configuration
 	func() { // check if we need to notify in a func to allow us to return early if a (non-fatal) error is encountered.
+		// read local config
 		c, err := operations.LoadFullAgentConfig(ctx, log, cfgFile, false, unprivileged)
 		if err != nil {
 			pt.Describe("notify Fleet failed: unable to read config")
@@ -83,13 +90,8 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 		}
 
 		if cfg != nil && !configuration.IsStandalone(cfg.Fleet) {
-			ai, err = info.NewAgentInfo(ctx, false)
-			if err != nil {
-				pt.Describe("notify Fleet failed: unable to read agent info")
-				return
-			} else {
-				notifyFleet = true
-			}
+			agentID = agentInfo(cfg.Settings.ID)
+			notifyFleet = true
 			if cfg.Fleet != nil && cfg.Fleet.Server != nil {
 				localFleet = true
 			}
@@ -101,7 +103,7 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	// Notify fleet-server while it is still running if it's running locally
 	if notifyFleet && localFleet && runtime.GOOS != "windows" {
 		cfg.Fleet.Client.Hosts = []string{cfg.Fleet.Client.Host}
-		notifyFleetAuditUninstall(ctx, log, pt, cfg, ai) //nolint:errcheck // ignore the error as we can't act on it
+		notifyFleetAuditUninstall(ctx, log, pt, cfg, &agentID) //nolint:errcheck // ignore the error as we can't act on it
 	}
 
 	// ensure service is stopped
@@ -165,7 +167,7 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	// Skip on Windows because of https://github.com/elastic/elastic-agent/issues/5952
 	// Once the root-cause is identified then this can be re-enabled on Windows.
 	if notifyFleet && !localFleet && runtime.GOOS != "windows" {
-		notifyFleetAuditUninstall(ctx, log, pt, cfg, ai) //nolint:errcheck // ignore the error as we can't act on it
+		notifyFleetAuditUninstall(ctx, log, pt, cfg, &agentID) //nolint:errcheck // ignore the error as we can't act on it
 	}
 
 	return nil
@@ -174,7 +176,7 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 // notifyFleetAuditUninstall will attempt to notify fleet-server of the agent's uninstall.
 //
 // There are retries for the attempt after a 10s wait, but it is a best-effort approach.
-func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai *info.AgentInfo) error {
+func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai fleetapi.AgentInfo) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	pt.Describe("Attempting to notify Fleet of uninstall")
