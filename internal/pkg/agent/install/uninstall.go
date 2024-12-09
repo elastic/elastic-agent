@@ -73,19 +73,19 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	func() { // check if we need to notify in a func to allow us to return early if a (non-fatal) error is encountered.
 		c, err := operations.LoadFullAgentConfig(ctx, log, cfgFile, false, unprivileged)
 		if err != nil {
-			pt.Describe(fmt.Sprintf("unable to read agent config to determine if notifying Fleet is needed: %v", err))
+			pt.Describe("notify Fleet failed: unable to read config")
 			return
 		}
 		cfg, err = configuration.NewFromConfig(c)
 		if err != nil {
-			pt.Describe(fmt.Sprintf("notify Fleet: unable to transform *config.Config to *configuration.Configuration: %v", err))
+			pt.Describe("notify Fleet failed: error transforming config")
 			return
 		}
 
 		if cfg != nil && !configuration.IsStandalone(cfg.Fleet) {
 			ai, err = info.NewAgentInfo(ctx, false)
 			if err != nil {
-				pt.Describe(fmt.Sprintf("unable to read agent info, Fleet will not be notified of uninstall: %v", err))
+				pt.Describe("notify Fleet failed: unable to read agent info")
 				return
 			} else {
 				notifyFleet = true
