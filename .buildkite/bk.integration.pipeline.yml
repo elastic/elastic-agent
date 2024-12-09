@@ -177,3 +177,26 @@ steps:
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
+
+  - label: Aggregate test reports
+    # Warning: The key has a hook in pre-command
+    key: aggregate-reports
+    depends_on:
+      - integration-tests-ubuntu
+      - integration-tests-win
+      - integration-tests-rhel8
+    allow_dependency_failure: true
+    command: |
+      buildkite-agent artifact download "build/*.xml" .
+      buildkite-agent artifact download "build\*.xml" .
+    agents:
+      image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
+      useCustomGlobalHooks: true
+    soft_fail:
+      - exit_status: "*"
+    plugins:
+      - test-collector#v1.10.1:
+          files: "build/*.xml"
+          format: "junit"
+          branches: "main"
+          debug: true
