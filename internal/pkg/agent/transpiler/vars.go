@@ -33,6 +33,11 @@ func NewVars(id string, mapping map[string]interface{}, fetchContextProviders ma
 	return NewVarsWithProcessors(id, mapping, "", nil, fetchContextProviders)
 }
 
+// NewVarsFromAst returns a new instance of vars. It takes the mapping as an *AST.
+func NewVarsFromAst(id string, tree *AST, fetchContextProviders mapstr.M) *Vars {
+	return &Vars{id, tree, "", nil, fetchContextProviders}
+}
+
 // NewVarsWithProcessors returns a new instance of vars with attachment of processors.
 func NewVarsWithProcessors(id string, mapping map[string]interface{}, processorKey string, processors Processors, fetchContextProviders mapstr.M) (*Vars, error) {
 	tree, err := NewAST(mapping)
@@ -40,6 +45,11 @@ func NewVarsWithProcessors(id string, mapping map[string]interface{}, processorK
 		return nil, err
 	}
 	return &Vars{id, tree, processorKey, processors, fetchContextProviders}, nil
+}
+
+// NewVarsWithProcessorsFromAst returns a new instance of vars with attachment of processors. It takes the mapping as an *AST.
+func NewVarsWithProcessorsFromAst(id string, tree *AST, processorKey string, processors Processors, fetchContextProviders mapstr.M) *Vars {
+	return &Vars{id, tree, processorKey, processors, fetchContextProviders}
 }
 
 // Replace returns a new value based on variable replacement.
