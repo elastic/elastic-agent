@@ -263,7 +263,7 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)
 	require.NoError(t, err, "Error creating agent info")
 
-	sampleFiveErrorsStreamThreshold := uint(5)
+	sampleSevenErrorsStreamThreshold := uint(7)
 	sampleTenErrorsStreamThreshold := uint(10)
 
 	tcs := []struct {
@@ -307,7 +307,7 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 					HTTP: &monitoringcfg.MonitoringHTTPConfig{
 						Enabled: false,
 					},
-					FailureThreshold: &sampleFiveErrorsStreamThreshold,
+					FailureThreshold: &sampleSevenErrorsStreamThreshold,
 				},
 			},
 			policy: map[string]any{
@@ -323,7 +323,7 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 					"default": map[string]any{},
 				},
 			},
-			expectedThreshold: sampleFiveErrorsStreamThreshold,
+			expectedThreshold: sampleSevenErrorsStreamThreshold,
 		},
 		{
 			name: "policy failure threshold uint",
@@ -334,7 +334,7 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 					HTTP: &monitoringcfg.MonitoringHTTPConfig{
 						Enabled: false,
 					},
-					FailureThreshold: &sampleFiveErrorsStreamThreshold,
+					FailureThreshold: &sampleSevenErrorsStreamThreshold,
 				},
 			},
 			policy: map[string]any{
@@ -362,7 +362,7 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 					HTTP: &monitoringcfg.MonitoringHTTPConfig{
 						Enabled: false,
 					},
-					FailureThreshold: &sampleFiveErrorsStreamThreshold,
+					FailureThreshold: &sampleSevenErrorsStreamThreshold,
 				},
 			},
 			policy: map[string]any{
@@ -390,7 +390,7 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 					HTTP: &monitoringcfg.MonitoringHTTPConfig{
 						Enabled: false,
 					},
-					FailureThreshold: &sampleFiveErrorsStreamThreshold,
+					FailureThreshold: &sampleSevenErrorsStreamThreshold,
 				},
 			},
 			policy: map[string]any{
@@ -401,6 +401,34 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 							"enabled": false,
 						},
 						failureThresholdKey: "10",
+					},
+				},
+				"outputs": map[string]any{
+					"default": map[string]any{},
+				},
+			},
+			expectedThreshold: sampleTenErrorsStreamThreshold,
+		},
+		{
+			name: "policy failure threshold float64",
+			monitoringCfg: &monitoringConfig{
+				C: &monitoringcfg.MonitoringConfig{
+					Enabled:        true,
+					MonitorMetrics: true,
+					HTTP: &monitoringcfg.MonitoringHTTPConfig{
+						Enabled: false,
+					},
+					FailureThreshold: &sampleSevenErrorsStreamThreshold,
+				},
+			},
+			policy: map[string]any{
+				"agent": map[string]any{
+					"monitoring": map[string]any{
+						"metrics": true,
+						"http": map[string]any{
+							"enabled": false,
+						},
+						failureThresholdKey: float64(10),
 					},
 				},
 				"outputs": map[string]any{
@@ -458,6 +486,146 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 					}
 				}
 			}
+		})
+	}
+}
+
+func TestErrorMonitoringConfigMetricsFailureThreshold(t *testing.T) {
+
+	agentInfo, err := info.NewAgentInfo(context.Background(), false)
+	require.NoError(t, err, "Error creating agent info")
+
+	tcs := []struct {
+		name          string
+		monitoringCfg *monitoringConfig
+		policy        map[string]any
+		assertError   assert.ErrorAssertionFunc
+	}{
+		{
+			name: "invalid policy failure threshold float64",
+			monitoringCfg: &monitoringConfig{
+				C: &monitoringcfg.MonitoringConfig{
+					Enabled:        true,
+					MonitorMetrics: true,
+					HTTP: &monitoringcfg.MonitoringHTTPConfig{
+						Enabled: false,
+					},
+					FailureThreshold: nil,
+				},
+			},
+			policy: map[string]any{
+				"agent": map[string]any{
+					"monitoring": map[string]any{
+						"metrics": true,
+						"http": map[string]any{
+							"enabled": false,
+						},
+						failureThresholdKey: float64(-1),
+					},
+				},
+				"outputs": map[string]any{
+					"default": map[string]any{},
+				},
+			},
+			assertError: assert.Error,
+		},
+		{
+			name: "invalid policy failure threshold string",
+			monitoringCfg: &monitoringConfig{
+				C: &monitoringcfg.MonitoringConfig{
+					Enabled:        true,
+					MonitorMetrics: true,
+					HTTP: &monitoringcfg.MonitoringHTTPConfig{
+						Enabled: false,
+					},
+					FailureThreshold: nil,
+				},
+			},
+			policy: map[string]any{
+				"agent": map[string]any{
+					"monitoring": map[string]any{
+						"metrics": true,
+						"http": map[string]any{
+							"enabled": false,
+						},
+						failureThresholdKey: "foobar",
+					},
+				},
+				"outputs": map[string]any{
+					"default": map[string]any{},
+				},
+			},
+			assertError: assert.Error,
+		},
+		{
+			name: "invalid policy failure threshold negative number as string",
+			monitoringCfg: &monitoringConfig{
+				C: &monitoringcfg.MonitoringConfig{
+					Enabled:        true,
+					MonitorMetrics: true,
+					HTTP: &monitoringcfg.MonitoringHTTPConfig{
+						Enabled: false,
+					},
+					FailureThreshold: nil,
+				},
+			},
+			policy: map[string]any{
+				"agent": map[string]any{
+					"monitoring": map[string]any{
+						"metrics": true,
+						"http": map[string]any{
+							"enabled": false,
+						},
+						failureThresholdKey: "-12",
+					},
+				},
+				"outputs": map[string]any{
+					"default": map[string]any{},
+				},
+			},
+			assertError: assert.Error,
+		},
+		{
+			name: "invalid policy failure threshold negative int",
+			monitoringCfg: &monitoringConfig{
+				C: &monitoringcfg.MonitoringConfig{
+					Enabled:        true,
+					MonitorMetrics: true,
+					HTTP: &monitoringcfg.MonitoringHTTPConfig{
+						Enabled: false,
+					},
+					FailureThreshold: nil,
+				},
+			},
+			policy: map[string]any{
+				"agent": map[string]any{
+					"monitoring": map[string]any{
+						"metrics": true,
+						"http": map[string]any{
+							"enabled": false,
+						},
+						failureThresholdKey: -12,
+					},
+				},
+				"outputs": map[string]any{
+					"default": map[string]any{},
+				},
+			},
+			assertError: assert.Error,
+		},
+	}
+
+	for _, tc := range tcs {
+
+		t.Run(tc.name, func(t *testing.T) {
+			b := &BeatsMonitor{
+				enabled:         true,
+				config:          tc.monitoringCfg,
+				operatingSystem: runtime.GOOS,
+				agentInfo:       agentInfo,
+			}
+			_, err := b.MonitoringConfig(tc.policy, nil, map[string]string{"foobeat": "filebeat"}, map[string]uint64{}) // put a componentID/binary mapping to have something in the beats monitoring input
+			tc.assertError(t, err)
 		})
 	}
 }

@@ -129,18 +129,6 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 		service.WaitExecutionDone()
 	}()
 
-	if err := handleUpgrade(); err != nil {
-		return fmt.Errorf("error checking for and handling upgrade: %w", err)
-	}
-
-	locker := filelock.NewAppLocker(paths.Data(), paths.AgentLockFileName)
-	if err := locker.TryLock(); err != nil {
-		return err
-	}
-	defer func() {
-		_ = locker.Unlock()
-	}()
-
 	service.BeforeRun()
 	defer service.Cleanup()
 
@@ -153,6 +141,18 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 
 	defer cancel()
 	go service.ProcessWindowsControlEvents(stopBeat)
+
+	if err := handleUpgrade(); err != nil {
+		return fmt.Errorf("error checking for and handling upgrade: %w", err)
+	}
+
+	locker := filelock.NewAppLocker(paths.Data(), paths.AgentLockFileName)
+	if err := locker.TryLock(); err != nil {
+		return err
+	}
+	defer func() {
+		_ = locker.Unlock()
+	}()
 
 	return runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, modifiers...)
 }
@@ -284,15 +284,10 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 		l.Info("APM instrumentation disabled")
 	}
 
-	coord, configMgr, composable, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, fleetInitTimeout, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
+	coord, configMgr, _, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, fleetInitTimeout, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
 	if err != nil {
 		return logReturn(l, err)
 	}
-	defer func() {
-		if composable != nil {
-			composable.Close()
-		}
-	}()
 
 	monitoringServer, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {

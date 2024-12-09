@@ -44,6 +44,7 @@ steps:
           .buildkite/scripts/integration-tests.ps1 {{matrix}} true
         artifact_paths:
           - build/**
+          - build/diagnostics/**
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
@@ -60,6 +61,7 @@ steps:
           .buildkite/scripts/integration-tests.ps1 {{matrix}} false
         artifact_paths:
           - build/**
+          - build/diagnostics/**
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
@@ -79,6 +81,7 @@ steps:
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
+          - build/diagnostics/**
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
@@ -92,6 +95,7 @@ steps:
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
+          - build/diagnostics/**
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
@@ -109,11 +113,14 @@ steps:
           - fleet-airgapped-privileged
 
       - label: "arm:sudo: {{matrix}}"
+        # https://github.com/elastic/ingest-dev/issues/4610
+        skip: true
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
+          - build/diagnostics/**
         agents:
           provider: "aws"
           imagePrefix: "platform-ingest-beats-ubuntu-2404-aarch64"
@@ -131,11 +138,14 @@ steps:
           - fleet-airgapped-privileged
 
       - label: "arm:non-sudo: {{matrix}}"
+        # https://github.com/elastic/ingest-dev/issues/4610
+        skip: true
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
+          - build/diagnostics/**
         agents:
           provider: "aws"
           imagePrefix: "platform-ingest-beats-ubuntu-2404-aarch64"
@@ -155,6 +165,7 @@ steps:
           .buildkite/scripts/steps/integration_tests_tf.sh rpm true
         artifact_paths:
           - build/**
+          - build/diagnostics/**
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
