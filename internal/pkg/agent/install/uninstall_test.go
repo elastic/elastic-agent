@@ -236,8 +236,8 @@ func (m *MockNotifyFleetAuditUninstall) Call(ctx context.Context, log *logp.Logg
 	m.Called = true
 }
 func TestSkipFleetAuditUnenroll(t *testing.T) {
-	log, _ := logp.NewInMemory("test", zap.NewDevelopmentEncoderConfig())
-	pt := progressbar.NewOptions(-1, progressbar.OptionSetWriter(io.Discard))
+	log := &logp.Logger{}
+	pt := &progressbar.ProgressBar{}
 	ai := &info.AgentInfo{}
 	cfg := &configuration.Configuration{}
 
