@@ -86,6 +86,10 @@ func getElasticCoServer(t *testing.T) (*httptest.Server, []byte) {
 		case ".sha512":
 			resp = []byte(fmt.Sprintf("%x %s", hash, packageName))
 		case ".asc":
+			fmt.Println("============ HERE ASC ============")
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte{})
+			return
 			resp = sig
 		case ".tar.gz", ".zip", ".deb", ".rpm":
 			packageName += ext
