@@ -8,11 +8,7 @@ package integration
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/base64"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -46,32 +42,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 		Group: define.Kubernetes,
 	})
 
-	agentImage := os.Getenv("AGENT_IMAGE")
-	require.NotEmpty(t, agentImage, "AGENT_IMAGE must be set")
-
-	agentImageParts := strings.SplitN(agentImage, ":", 2)
-	require.Len(t, agentImageParts, 2, "AGENT_IMAGE must be in the form '<repository>:<version>'")
-	agentImageRepo := agentImageParts[0]
-	agentImageTag := agentImageParts[1]
-
-	client, err := info.KubeClient()
-	require.NoError(t, err)
-	require.NotNil(t, client)
-
-	testLogsBasePath := os.Getenv("K8S_TESTS_POD_LOGS_BASE")
-	require.NotEmpty(t, testLogsBasePath, "K8S_TESTS_POD_LOGS_BASE must be set")
-
-	err = os.MkdirAll(filepath.Join(testLogsBasePath, t.Name()), 0o755)
-	require.NoError(t, err, "failed to create test logs directory")
-
-	namespace := info.Namespace
-
-	esHost := os.Getenv("ELASTICSEARCH_HOST")
-	require.NotEmpty(t, esHost, "ELASTICSEARCH_HOST must be set")
-
-	esAPIKey, err := generateESAPIKey(info.ESClient, namespace)
-	require.NoError(t, err, "failed to generate ES API key")
-	require.NotEmpty(t, esAPIKey, "failed to generate ES API key")
+	kCtx := k8sGetContext(t, info)
 
 	chartOptions := &action.ChartPathOptions{
 		RepoURL: kubeStackChartURL,
@@ -106,10 +77,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			hasher := sha256.New()
-			hasher.Write([]byte(tc.name))
-			testNamespace := strings.ToLower(base64.URLEncoding.EncodeToString(hasher.Sum(nil)))
-			testNamespace = noSpecialCharsRegexp.ReplaceAllString(testNamespace, "")
+			testNamespace := kCtx.getNamespace(t)
 
 			settings := cli.New()
 			settings.SetNamespace(testNamespace)
@@ -127,14 +95,14 @@ func TestOtelKubeStackHelm(t *testing.T) {
 
 			options := values.Options{
 				ValueFiles: []string{tc.valuesFile},
-				Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", agentImageTag)},
+				Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
 
 				// override secrets reference with env variables
 				JSONValues: []string{
-					fmt.Sprintf(`collectors.cluster.env[1]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, esHost),
-					fmt.Sprintf(`collectors.cluster.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, esAPIKey),
-					fmt.Sprintf(`collectors.daemon.env[2]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, esHost),
-					fmt.Sprintf(`collectors.daemon.env[3]={"name":"ELASTIC_API_KEY","value":"%s"}`, esAPIKey),
+					fmt.Sprintf(`collectors.cluster.env[1]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, kCtx.esHost),
+					fmt.Sprintf(`collectors.cluster.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, kCtx.esAPIKey),
+					fmt.Sprintf(`collectors.daemon.env[2]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, kCtx.esHost),
+					fmt.Sprintf(`collectors.daemon.env[3]={"name":"ELASTIC_API_KEY","value":"%s"}`, kCtx.esAPIKey),
 				},
 			}
 			providers := getter.All(settings)
@@ -145,7 +113,9 @@ func TestOtelKubeStackHelm(t *testing.T) {
 
 			t.Cleanup(func() {
 				if t.Failed() {
-					dumpLogs(t, ctx, client, testNamespace, testLogsBasePath)
+					if err := k8sDumpAllPodLogs(ctx, kCtx.client, testNamespace, testNamespace, kCtx.logsBasePath); err != nil {
+						t.Logf("failed to dump logs: %s", err)
+					}
 				}
 
 				uninstallAction := action.NewUninstall(actionConfig)
@@ -173,7 +143,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 			// ready
 			require.Eventually(t, func() bool {
 				podList := &corev1.PodList{}
-				err = client.Resources(testNamespace).List(ctx, podList)
+				err = kCtx.client.Resources(testNamespace).List(ctx, podList)
 				require.NoError(t, err, fmt.Sprintf("failed to list pods in namespace %s", testNamespace))
 
 				checkedAgentContainers := 0
