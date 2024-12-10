@@ -14,18 +14,16 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"reflect"
 	"runtime/pprof"
 	"strings"
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
-	"github.com/elastic/go-ucfg"
 
 	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/redact"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/version"
@@ -333,7 +331,7 @@ func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResu
 			// Best effort, output a warning but still include the file
 			fmt.Fprintf(errOut, "[WARNING] Could not redact %s due to unmarshalling error: %s\n", fullFilePath, err)
 		} else {
-			unmarshalled = Redact(unmarshalled, errOut)
+			unmarshalled = redact.RedactSecrets(unmarshalled, errOut)
 			redacted, err := yaml.Marshal(unmarshalled)
 			if err != nil {
 				// Best effort, output a warning but still include the file
@@ -346,59 +344,6 @@ func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResu
 
 	_, err := resultWriter.Write(*out)
 	return err
-}
-
-// redactMap sensitive values from the underlying map
-// the whole generic function here is out of paranoia. Although extremely unlikely,
-// we have no way of guaranteeing we'll get a "normal" map[string]interface{},
-// since the diagnostic interface is a bit of a free-for-all
-func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}) map[K]interface{} {
-	if inputMap == nil {
-		return nil
-	}
-	for rootKey, rootValue := range inputMap {
-		if rootValue != nil {
-			switch cast := rootValue.(type) {
-			case map[string]interface{}:
-				rootValue = redactMap(errOut, cast)
-			case map[interface{}]interface{}:
-				rootValue = redactMap(errOut, cast)
-			case map[int]interface{}:
-				rootValue = redactMap(errOut, cast)
-			case string:
-				if keyString, ok := any(rootKey).(string); ok {
-					if redactKey(keyString) {
-						rootValue = REDACTED
-					}
-				}
-			default:
-				// in cases where we got some weird kind of map we couldn't parse, print a warning
-				if reflect.TypeOf(rootValue).Kind() == reflect.Map {
-					fmt.Fprintf(errOut, "[WARNING]: file may be partly redacted, could not cast value %v of type %T", rootKey, rootValue)
-				}
-
-			}
-		}
-
-		inputMap[rootKey] = rootValue
-
-	}
-	return inputMap
-}
-
-func redactKey(k string) bool {
-	// "routekey" shouldn't be redacted.
-	// Add any other exceptions here.
-	if k == "routekey" {
-		return false
-	}
-
-	k = strings.ToLower(k)
-	return strings.Contains(k, "certificate") ||
-		strings.Contains(k, "passphrase") ||
-		strings.Contains(k, "password") ||
-		strings.Contains(k, "token") ||
-		strings.Contains(k, "key")
 }
 
 func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool) error {
@@ -573,44 +518,4 @@ func saveLogs(name string, logPath string, zw *zip.Writer) error {
 	}
 
 	return nil
-}
-
-// Redact redacts sensitive values from the passed mapStr.
-func Redact(mapStr map[string]any, errOut io.Writer) map[string]any {
-	return redactMap(errOut, RedactSecretPaths(mapStr, errOut))
-}
-
-// RedactSecretPaths will check the passed mapStr input for a secret_paths attribute.
-// If found it will replace the value for every key in the paths list with <REDACTED> and return the resulting map.
-// Any issues or errors will be written to the errOut writer.
-func RedactSecretPaths(mapStr map[string]any, errOut io.Writer) map[string]any {
-	v, ok := mapStr["secret_paths"]
-	if !ok {
-		return mapStr
-	}
-	arr, ok := v.([]interface{})
-	if !ok {
-		fmt.Fprintln(errOut, "No output redaction: secret_paths attribute is not a list.")
-		return mapStr
-	}
-	cfg := ucfg.MustNewFrom(mapStr)
-	for _, v := range arr {
-		key, ok := v.(string)
-		if !ok {
-			fmt.Fprintf(errOut, "No output redaction for %q: expected type string, is type %T.\n", v, v)
-			continue
-		}
-
-		if ok, _ := cfg.Has(key, -1, ucfg.PathSep(".")); ok {
-			err := cfg.SetString(key, -1, REDACTED, ucfg.PathSep("."))
-			if err != nil {
-				fmt.Fprintf(errOut, "No output redaction for %q: %v.\n", key, err)
-			}
-		}
-	}
-	result, err := config.MustNewConfigFrom(cfg).ToMapStr()
-	if err != nil {
-		return mapStr
-	}
-	return result
 }
