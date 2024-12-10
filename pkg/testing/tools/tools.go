@@ -42,7 +42,8 @@ func InstallAgentWithPolicy(ctx context.Context, t *testing.T,
 	installOpts atesting.InstallOpts,
 	agentFixture *atesting.Fixture,
 	kibClient *kibana.Client,
-	createPolicyReq kibana.AgentPolicy) (kibana.PolicyResponse, error) {
+	createPolicyReq kibana.AgentPolicy,
+) (kibana.PolicyResponse, error) {
 	t.Helper()
 
 	// Create policy
@@ -85,21 +86,41 @@ func InstallAgentForPolicy(ctx context.Context, t *testing.T,
 	installOpts atesting.InstallOpts,
 	agentFixture *atesting.Fixture,
 	kibClient *kibana.Client,
-	policyID string) error {
-	t.Helper()
+	policyID string,
+) error {
+	enrollmentToken, err := CreateEnrollmentToken(t, ctx, kibClient, policyID)
+	if err != nil {
+		return fmt.Errorf("failed to create enrollment token while preparing to install agent for policy: %w", err)
+	}
+	return InstallAgentForPolicyWithToken(ctx, t, installOpts, agentFixture, kibClient, policyID, enrollmentToken)
+}
 
+func CreateEnrollmentToken(t *testing.T, ctx context.Context, kibClient *kibana.Client, policyID string) (kibana.CreateEnrollmentAPIKeyResponse, error) {
 	// Create enrollment API key
 	createEnrollmentAPIKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
 		PolicyID: policyID,
 	}
 
+	t.Logf("Creating enrollment API key...")
+	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(ctx, createEnrollmentAPIKeyReq)
+	if err != nil {
+		return kibana.CreateEnrollmentAPIKeyResponse{}, fmt.Errorf("failed creating enrollment API key: %w", err)
+	}
+
+	return enrollmentToken, nil
+}
+
+func InstallAgentForPolicyWithToken(ctx context.Context, t *testing.T,
+	installOpts atesting.InstallOpts,
+	agentFixture *atesting.Fixture,
+	kibClient *kibana.Client,
+	policyID string,
+	enrollmentToken kibana.CreateEnrollmentAPIKeyResponse,
+) error {
+	t.Helper()
+
 	if installOpts.EnrollmentToken == "" {
 		t.Logf("Creating enrollment API key...")
-		enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(ctx, createEnrollmentAPIKeyReq)
-		if err != nil {
-			return fmt.Errorf("failed creating enrollment API key: %w", err)
-		}
-
 		installOpts.EnrollmentToken = enrollmentToken.APIKey
 	}
 
@@ -138,5 +159,6 @@ func InstallAgentForPolicy(ctx context.Context, t *testing.T,
 		10*time.Second,
 		"Elastic Agent status is not online",
 	)
+
 	return nil
 }
