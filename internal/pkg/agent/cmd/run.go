@@ -202,6 +202,10 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 		return logReturn(l, errors.New(err, "failed to perform delayed enrollment"))
 	}
 	pathConfigFile := paths.AgentConfigFile()
+	fmt.Println("====================== AGENT CONFIG FILE runElasticAgent ==================")
+	fmt.Println("Agent config file: ", pathConfigFile)
+	fmt.Println("Config file: ", paths.Config())
+	fmt.Println("===========================================")
 
 	// agent ID needs to stay empty in bootstrap mode
 	createAgentID := true
@@ -454,6 +458,12 @@ func getOverwrites(ctx context.Context, rawConfig *config.Config) error {
 		return nil
 	}
 	path := paths.AgentConfigFile()
+
+	fmt.Println("======================== AGENT CONFIG FILE getOverwrites =======================")
+	fmt.Println("Agent config file: ", path)
+	fmt.Println("Config file: ", paths.Config())
+	fmt.Println("================================================================================")
+
 	store, err := storage.NewEncryptedDiskStore(ctx, path)
 	if err != nil {
 		return fmt.Errorf("error instantiating encrypted disk store: %w", err)
@@ -534,7 +544,12 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	// SkipDaemonRestart to true avoids running that code.
 	options.SkipDaemonRestart = true
 	pathConfigFile := paths.ConfigFile()
+	configPath := paths.AgentConfigFile()
 	encStore, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile())
+	fmt.Println("================== AGENT CONFIG FILE tryDelayEnroll =================")
+	fmt.Println("Agent Config File: ", configPath)
+	fmt.Println("Config File: ", pathConfigFile)
+	fmt.Println("=====================================================================")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create encrypted disk store: %w", err)
 	}

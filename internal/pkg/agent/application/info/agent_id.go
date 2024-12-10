@@ -55,6 +55,12 @@ func updateLogLevel(ctx context.Context, level string) error {
 	}
 
 	agentConfigFile := paths.AgentConfigFile()
+
+	fmt.Println("========================== AGENT CONFIG FILE updateLogLevel ==========================")
+	fmt.Println("Agent config file: ", agentConfigFile)
+	fmt.Println("Config file: ", paths.Config())
+	fmt.Println("======================================================================================")
+
 	diskStore, err := storage.NewEncryptedDiskStore(ctx, agentConfigFile)
 	if err != nil {
 		return fmt.Errorf("error instantiating encrypted disk store: %w", err)
@@ -77,6 +83,10 @@ func generateAgentID() (string, error) {
 // as well as a bool indicating if agent is running in standalone mode.
 func getInfoFromStore(s ioStore, logLevel string) (*persistentAgentInfo, bool, error) {
 	agentConfigFile := paths.AgentConfigFile()
+	fmt.Println("====================== AGENT CONFIG FILE getInfoFromStore ====================")
+	fmt.Println("Agent config file: ", agentConfigFile)
+	fmt.Println("Config file: ", paths.Config())
+	fmt.Println("===========================================================")
 	reader, err := s.Load()
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to load from ioStore: %w", err)
@@ -97,6 +107,10 @@ func getInfoFromStore(s ioStore, logLevel string) (*persistentAgentInfo, bool, e
 			"failed to unpack stored config to map",
 			errors.TypeFilesystem)
 	}
+
+	fmt.Println("======================= CONFIG MAP =========================")
+	fmt.Println(configMap)
+	fmt.Println("============================================================")
 
 	// check fleet config. This behavior emulates configuration.IsStandalone
 	fleetmode, fleetExists := configMap["fleet"]
@@ -136,6 +150,10 @@ func getInfoFromStore(s ioStore, logLevel string) (*persistentAgentInfo, bool, e
 
 func updateAgentInfo(s ioStore, agentInfo *persistentAgentInfo) error {
 	agentConfigFile := paths.AgentConfigFile()
+	fmt.Println("=================== AGENT CONFIG FILE updateAgentInfo ======================")
+	fmt.Println("Agent config file: ", agentConfigFile)
+	fmt.Println("Config path: ", paths.Config())
+	fmt.Println("============================================================================")
 	reader, err := s.Load()
 	if err != nil {
 		return errors.New(err, "failed loading from store",
@@ -222,6 +240,10 @@ func loadAgentInfo(ctx context.Context, forceUpdate bool, logLevel string, creat
 	defer idLock.Unlock()
 
 	agentConfigFile := paths.AgentConfigFile()
+	fmt.Println("========================== AGENT CONFIG FILE loadAgentInfo =========================")
+	fmt.Println("Agent config file: ", agentConfigFile)
+	fmt.Println("Config file: ", paths.Config())
+	fmt.Println("====================================================================================")
 	diskStore, err := storage.NewEncryptedDiskStore(ctx, agentConfigFile)
 	if err != nil {
 		return nil, false, fmt.Errorf("error instantiating encrypted disk store: %w", err)
