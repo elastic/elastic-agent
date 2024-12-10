@@ -1057,22 +1057,10 @@ func collectPackageDependencies(platforms []string, packageVersion string, platf
 						fmt.Printf("--- Binary %s does not support %s, download skipped\n", spec.BinaryName, platform)
 						continue
 					}
-<<<<<<< HEAD
 					targetPath := filepath.Join(archivePath, manifest.PlatformPackages[platform])
 					os.MkdirAll(targetPath, 0755)
 					packageName := spec.GetPackageName(packageVersion, platform)
 					errGroup.Go(downloadBinary(ctx, spec.ProjectName, packageName, spec.BinaryName, platform, packageVersion, targetPath, completedDownloads))
-=======
-					for _, pkgType := range packageTypes {
-						if !spec.SupportsPackageType(pkgcommon.PackageType(pkgType)) {
-							continue
-						}
-						targetPath := filepath.Join(archivePath, manifest.PlatformPackages[platform])
-						os.MkdirAll(targetPath, 0o755)
-						packageName := spec.GetPackageName(packageVersion, platform)
-						errGroup.Go(downloadBinary(ctx, spec.ProjectName, packageName, spec.BinaryName, platform, packageVersion, targetPath, completedDownloads))
-					}
->>>>>>> 69c2f92c19 (docs: add EDOT colletor kube-stack Helm values (#5822))
 				}
 			}
 
