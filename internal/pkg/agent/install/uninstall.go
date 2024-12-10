@@ -111,6 +111,8 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 		}
 	}
 
+	// will only notify fleet of the uninstall command if it can gather config and agentinfo, and is not a stand-alone install
+	notifyFleet := false
 	var ai *info.AgentInfo
 	c, err := operations.LoadFullAgentConfig(ctx, log, cfgFile, false, unprivileged)
 	if err != nil {
@@ -125,7 +127,8 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 		ai, err = info.NewAgentInfo(ctx, false)
 		if err != nil {
 			pt.Describe(fmt.Sprintf("unable to read agent info, Fleet will not be notified of uninstall: %v", err))
-			skipFleetAudit = true
+		} else {
+			notifyFleet = true
 		}
 	}
 
@@ -141,15 +144,14 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	}
 	pt.Describe("Removed install directory")
 
-	notifyFleetIfNeeded(ctx, log, pt, cfg, ai, skipFleetAudit, notifyFleetAuditUninstall)
+	notifyFleetIfNeeded(ctx, log, pt, cfg, ai, notifyFleet, skipFleetAudit, notifyFleetAuditUninstall)
 	return nil
 }
 
-func notifyFleetIfNeeded(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai *info.AgentInfo, skipFleetAudit bool, notifyFleetAuditUninstall NotifyFleetAuditUninstall) {
-	// will only notify fleet of the uninstall command if it can gather config and agentinfo, and is not a stand-alone install
+func notifyFleetIfNeeded(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai *info.AgentInfo, notifyFleet, skipFleetAudit bool, notifyFleetAuditUninstall NotifyFleetAuditUninstall) {
 	// Skip on Windows because of https://github.com/elastic/elastic-agent/issues/5952
 	// Once the root-cause is identified then this can be re-enabled on Windows.
-	if ai != nil && cfg != nil && !skipFleetAudit && runtime.GOOS != "windows" {
+	if notifyFleet && runtime.GOOS != "windows" && !skipFleetAudit {
 		notifyFleetAuditUninstall(ctx, log, pt, cfg, ai) //nolint:errcheck // ignore the error as we can't act on it)
 	}
 }

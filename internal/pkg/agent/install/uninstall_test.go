@@ -242,6 +242,6 @@ func TestSkipFleetAuditUnenroll(t *testing.T) {
 	cfg := &configuration.Configuration{}
 
 	mockNotify := &MockNotifyFleetAuditUninstall{}
-	notifyFleetIfNeeded(context.Background(), log, pt, cfg, ai, true, notifyFleetAuditUninstall)
+	notifyFleetIfNeeded(context.Background(), log, pt, cfg, ai, true, true, notifyFleetAuditUninstall)
 	assert.False(t, mockNotify.Called, "NotifyFleetAuditUninstall should not be called when skipFleetAudit is true")
 }
