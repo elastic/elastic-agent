@@ -1131,6 +1131,18 @@ func TestCondition(t *testing.T) {
 	condition, err := eql.New(input.value.Value().(string))
 	require.NoError(t, err)
 	assert.Equal(t, condition, input.condition)
+
+	// create a dict with the key
+	dict := NewDict([]Node{input})
+	ast := &AST{root: NewKey("key", dict)}
+	// the cached condition remains
+	assert.Equal(t, condition, input.condition)
+
+	// replace the key with a new one, without a cached condition
+	input2 := NewKey("condition", NewStrVal("${other.data} == 'info'"))
+	err = Insert(ast, input2, "")
+	require.NoError(t, err)
+	assert.Nil(t, input2.condition)
 }
 
 func mustMakeVars(mapping map[string]interface{}) *Vars {
