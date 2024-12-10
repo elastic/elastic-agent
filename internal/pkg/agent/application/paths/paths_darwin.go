@@ -10,6 +10,10 @@ const (
 	// BinaryName is the name of the installed binary.
 	BinaryName = "elastic-agent"
 
+	// DevelopmentBinaryName is the name of the installed binary when --develop
+	// flag is used
+	DevelopmentBinaryName = "elastic-development-agent"
+
 	// DefaultBasePath is the base path used by the install command
 	// for installing Elastic Agent's files.
 	DefaultBasePath = "/Library"
