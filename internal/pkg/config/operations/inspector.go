@@ -19,10 +19,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-var (
-	// ErrNoFleetConfig is returned when no configuration was retrieved from fleet just yet.
-	ErrNoFleetConfig = fmt.Errorf("no fleet config retrieved yet")
-)
+// ErrNoFleetConfig is returned when no configuration was retrieved from fleet just yet.
+var ErrNoFleetConfig = fmt.Errorf("no fleet config retrieved yet")
 
 // LoadFullAgentConfig load agent config based on provided paths and defined capabilities.
 // In case fleet is used, config from policy action is returned.
@@ -82,6 +80,10 @@ func loadConfig(ctx context.Context, configPath string, unprivileged bool) (*con
 	}
 
 	path := paths.AgentConfigFile()
+	fmt.Println("======================== AGENT CONFIG FILE loadConfig =========================")
+	fmt.Println("Agent config file: ", path)
+	fmt.Println("Config path: ", paths.Config())
+	fmt.Println("===============================================================================")
 
 	store, err := storage.NewEncryptedDiskStore(ctx, path, storage.WithUnprivileged(unprivileged))
 	if err != nil {
