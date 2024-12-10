@@ -111,8 +111,6 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 		}
 	}
 
-	// will only notify fleet of the uninstall command if it can gather config and agentinfo, and is not a stand-alone install
-	notifyFleet := false
 	var ai *info.AgentInfo
 	c, err := operations.LoadFullAgentConfig(ctx, log, cfgFile, false, unprivileged)
 	if err != nil {
@@ -127,8 +125,7 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 		ai, err = info.NewAgentInfo(ctx, false)
 		if err != nil {
 			pt.Describe(fmt.Sprintf("unable to read agent info, Fleet will not be notified of uninstall: %v", err))
-		} else {
-			notifyFleet = true
+			skipFleetAudit = true
 		}
 	}
 
@@ -144,14 +141,20 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	}
 	pt.Describe("Removed install directory")
 
-	// Skip on Windows because of https://github.com/elastic/elastic-agent/issues/5952
-	// Once the root-cause is identified then this can be re-enabled on Windows.
-	if notifyFleet && runtime.GOOS != "windows" && !skipFleetAudit {
-		notifyFleetAuditUninstall(ctx, log, pt, cfg, ai) //nolint:errcheck // ignore the error as we can't act on it
-	}
-
+	notifyFleetIfNeeded(ctx, log, pt, cfg, ai, skipFleetAudit, notifyFleetAuditUninstall)
 	return nil
 }
+
+func notifyFleetIfNeeded(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai *info.AgentInfo, skipFleetAudit bool, notifyFleetAuditUninstall NotifyFleetAuditUninstall) {
+	// will only notify fleet of the uninstall command if it can gather config and agentinfo, and is not a stand-alone install
+	// Skip on Windows because of https://github.com/elastic/elastic-agent/issues/5952
+	// Once the root-cause is identified then this can be re-enabled on Windows.
+	if ai != nil && cfg != nil && !skipFleetAudit && runtime.GOOS != "windows" {
+		notifyFleetAuditUninstall(ctx, log, pt, cfg, ai) //nolint:errcheck // ignore the error as we can't act on it)
+	}
+}
+
+type NotifyFleetAuditUninstall func(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai *info.AgentInfo) error
 
 // notifyFleetAuditUninstall will attempt to notify fleet-server of the agent's uninstall.
 //
