@@ -15,7 +15,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
 	"io"
 	"os"
 	"path/filepath"
@@ -37,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	cliResource "k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/e2e-framework/klient"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
@@ -46,6 +46,7 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
+	helmKube "helm.sh/helm/v3/pkg/kube"
 
 	aclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -76,27 +77,7 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 		Group: define.Kubernetes,
 	})
 
-	agentImage := os.Getenv("AGENT_IMAGE")
-	require.NotEmpty(t, agentImage, "AGENT_IMAGE must be set")
-
-	client, err := info.KubeClient()
-	require.NoError(t, err)
-	require.NotNil(t, client)
-
-	testLogsBasePath := os.Getenv("K8S_TESTS_POD_LOGS_BASE")
-	require.NotEmpty(t, testLogsBasePath, "K8S_TESTS_POD_LOGS_BASE must be set")
-
-	err = os.MkdirAll(filepath.Join(testLogsBasePath, t.Name()), 0755)
-	require.NoError(t, err, "failed to create test logs directory")
-
-	namespace := info.Namespace
-
-	esHost := os.Getenv("ELASTICSEARCH_HOST")
-	require.NotEmpty(t, esHost, "ELASTICSEARCH_HOST must be set")
-
-	esAPIKey, err := generateESAPIKey(info.ESClient, namespace)
-	require.NoError(t, err, "failed to generate ES API key")
-	require.NotEmpty(t, esAPIKey, "failed to generate ES API key")
+	kCtx := k8sGetContext(t, info)
 
 	renderedManifest, err := renderKustomize(agentK8SKustomize)
 	require.NoError(t, err, "failed to render kustomize")
@@ -164,18 +145,25 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 				t.Skip(tc.skipReason)
 			}
 
-			hasher := sha256.New()
-			hasher.Write([]byte(tc.name))
-			testNamespace := strings.ToLower(base64.URLEncoding.EncodeToString(hasher.Sum(nil)))
-			testNamespace = noSpecialCharsRegexp.ReplaceAllString(testNamespace, "")
+			ctx := context.Background()
 
-			k8sObjects, err := yamlToK8SObjects(bufio.NewReader(bytes.NewReader(renderedManifest)))
+			testNamespace := kCtx.getNamespace(t)
+
+			k8sObjects, err := k8sYAMLToObjects(bufio.NewReader(bytes.NewReader(renderedManifest)))
 			require.NoError(t, err, "failed to convert yaml to k8s objects")
 
-			adjustK8SAgentManifests(k8sObjects, testNamespace, "elastic-agent-standalone",
+			// add the testNamespace in the beginning of k8sObjects to be created first
+			k8sObjects = append([]k8s.Object{&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}}, k8sObjects...)
+
+			t.Cleanup(func() {
+				err = k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, k8sObjects...)
+				require.NoError(t, err, "failed to delete k8s namespace")
+			})
+
+			k8sKustomizeAdjustObjects(k8sObjects, testNamespace, "elastic-agent-standalone",
 				func(container *corev1.Container) {
 					// set agent image
-					container.Image = agentImage
+					container.Image = kCtx.agentImage
 					// set ImagePullPolicy to "Never" to avoid pulling the image
 					// as the image is already loaded by the kubernetes provisioner
 					container.ImagePullPolicy = "Never"
@@ -194,16 +182,15 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 							RunAsUser:  tc.runUser,
 							RunAsGroup: tc.runGroup,
 						}
-
 					}
 					// set Elasticsearch host and API key
 					for idx, env := range container.Env {
 						if env.Name == "ES_HOST" {
-							container.Env[idx].Value = esHost
+							container.Env[idx].Value = kCtx.esHost
 							container.Env[idx].ValueFrom = nil
 						}
 						if env.Name == "API_KEY" {
-							container.Env[idx].Value = esAPIKey
+							container.Env[idx].Value = kCtx.esAPIKey
 							container.Env[idx].ValueFrom = nil
 						}
 					}
@@ -222,12 +209,10 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 					}
 				})
 
-			ctx := context.Background()
-
-			deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, tc.runK8SInnerTests, testLogsBasePath, true, nil)
+			k8sKustomizeDeployAgent(t, ctx, kCtx.client, k8sObjects, testNamespace, tc.runK8SInnerTests,
+				kCtx.logsBasePath, true, nil)
 		})
 	}
-
 }
 
 func TestKubernetesAgentOtel(t *testing.T) {
@@ -243,27 +228,7 @@ func TestKubernetesAgentOtel(t *testing.T) {
 		Group: define.Kubernetes,
 	})
 
-	agentImage := os.Getenv("AGENT_IMAGE")
-	require.NotEmpty(t, agentImage, "AGENT_IMAGE must be set")
-
-	client, err := info.KubeClient()
-	require.NoError(t, err)
-	require.NotNil(t, client)
-
-	testLogsBasePath := os.Getenv("K8S_TESTS_POD_LOGS_BASE")
-	require.NotEmpty(t, testLogsBasePath, "K8S_TESTS_POD_LOGS_BASE must be set")
-
-	err = os.MkdirAll(filepath.Join(testLogsBasePath, t.Name()), 0755)
-	require.NoError(t, err, "failed to create test logs directory")
-
-	namespace := info.Namespace
-
-	esHost := os.Getenv("ELASTICSEARCH_HOST")
-	require.NotEmpty(t, esHost, "ELASTICSEARCH_HOST must be set")
-
-	esAPIKey, err := generateESAPIKey(info.ESClient, namespace)
-	require.NoError(t, err, "failed to generate ES API key")
-	require.NotEmpty(t, esAPIKey, "failed to generate ES API key")
+	kCtx := k8sGetContext(t, info)
 
 	renderedManifest, err := renderKustomize(agentK8SKustomize)
 	require.NoError(t, err, "failed to render kustomize")
@@ -273,7 +238,6 @@ func TestKubernetesAgentOtel(t *testing.T) {
 		envAdd           []corev1.EnvVar
 		runK8SInnerTests bool
 	}{
-
 		{
 			"run agent in otel mode",
 			[]corev1.EnvVar{
@@ -286,18 +250,24 @@ func TestKubernetesAgentOtel(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			hasher := sha256.New()
-			hasher.Write([]byte(tc.name))
-			testNamespace := strings.ToLower(base64.URLEncoding.EncodeToString(hasher.Sum(nil)))
-			testNamespace = noSpecialCharsRegexp.ReplaceAllString(testNamespace, "")
+			ctx := context.Background()
+			testNamespace := kCtx.getNamespace(t)
 
-			k8sObjects, err := yamlToK8SObjects(bufio.NewReader(bytes.NewReader(renderedManifest)))
+			k8sObjects, err := k8sYAMLToObjects(bufio.NewReader(bytes.NewReader(renderedManifest)))
 			require.NoError(t, err, "failed to convert yaml to k8s objects")
 
-			adjustK8SAgentManifests(k8sObjects, testNamespace, "elastic-agent-standalone",
+			// add the testNamespace in the k8sObjects
+			k8sObjects = append([]k8s.Object{&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}}, k8sObjects...)
+
+			t.Cleanup(func() {
+				err = k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, k8sObjects...)
+				require.NoError(t, err, "failed to delete k8s namespace")
+			})
+
+			k8sKustomizeAdjustObjects(k8sObjects, testNamespace, "elastic-agent-standalone",
 				func(container *corev1.Container) {
 					// set agent image
-					container.Image = agentImage
+					container.Image = kCtx.agentImage
 					// set ImagePullPolicy to "Never" to avoid pulling the image
 					// as the image is already loaded by the kubernetes provisioner
 					container.ImagePullPolicy = "Never"
@@ -305,11 +275,11 @@ func TestKubernetesAgentOtel(t *testing.T) {
 					// set Elasticsearch host and API key
 					for idx, env := range container.Env {
 						if env.Name == "ES_HOST" {
-							container.Env[idx].Value = esHost
+							container.Env[idx].Value = kCtx.esHost
 							container.Env[idx].ValueFrom = nil
 						}
 						if env.Name == "API_KEY" {
-							container.Env[idx].Value = esAPIKey
+							container.Env[idx].Value = kCtx.esAPIKey
 							container.Env[idx].ValueFrom = nil
 						}
 					}
@@ -335,9 +305,8 @@ func TestKubernetesAgentOtel(t *testing.T) {
 					}
 				})
 
-			ctx := context.Background()
-
-			deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, tc.runK8SInnerTests, testLogsBasePath, false, nil)
+			k8sKustomizeDeployAgent(t, ctx, kCtx.client, k8sObjects, testNamespace,
+				false, kCtx.logsBasePath, false, nil)
 		})
 	}
 }
@@ -355,41 +324,22 @@ func TestKubernetesAgentHelm(t *testing.T) {
 		Group: define.Kubernetes,
 	})
 
-	agentImage := os.Getenv("AGENT_IMAGE")
-	require.NotEmpty(t, agentImage, "AGENT_IMAGE must be set")
+	ctx := context.Background()
+	kCtx := k8sGetContext(t, info)
 
-	agentImageParts := strings.SplitN(agentImage, ":", 2)
-	require.Len(t, agentImageParts, 2, "AGENT_IMAGE must be in the form '<repository>:<version>'")
-	agentImageRepo := agentImageParts[0]
-	agentImageTag := agentImageParts[1]
-
-	client, err := info.KubeClient()
+	nodeList := corev1.NodeList{}
+	err := kCtx.client.Resources().List(ctx, &nodeList)
 	require.NoError(t, err)
-	require.NotNil(t, client)
 
-	testLogsBasePath := os.Getenv("K8S_TESTS_POD_LOGS_BASE")
-	require.NotEmpty(t, testLogsBasePath, "K8S_TESTS_POD_LOGS_BASE must be set")
-
-	err = os.MkdirAll(filepath.Join(testLogsBasePath, t.Name()), 0755)
-	require.NoError(t, err, "failed to create test logs directory")
-
-	namespace := info.Namespace
-
-	esHost := os.Getenv("ELASTICSEARCH_HOST")
-	require.NotEmpty(t, esHost, "ELASTICSEARCH_HOST must be set")
-
-	esAPIKey, err := generateESAPIKey(info.ESClient, namespace)
-	require.NoError(t, err, "failed to generate ES API key")
-	require.NotEmpty(t, esAPIKey, "failed to generate ES API key")
-
-	enrollParams, err := fleettools.NewEnrollParams(context.Background(), info.KibanaClient)
-	require.NoError(t, err, "failed to create fleet enroll params")
+	totalK8SNodes := len(nodeList.Items)
+	require.NotZero(t, totalK8SNodes, "No Kubernetes nodes found")
 
 	testCases := []struct {
-		name                       string
-		values                     map[string]any
-		atLeastValidatedPodsNumber int
-		runK8SInnerTests           bool
+		name                   string
+		values                 map[string]any
+		atLeastAgentPods       int
+		runK8SInnerTests       bool
+		agentPodLabelSelectors []string
 	}{
 		{
 			name: "helm standalone agent default kubernetes privileged",
@@ -400,24 +350,30 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				"agent": map[string]any{
 					"unprivileged": false,
 					"image": map[string]any{
-						"repository": agentImageRepo,
-						"tag":        agentImageTag,
+						"repository": kCtx.agentImageRepo,
+						"tag":        kCtx.agentImageTag,
 						"pullPolicy": "Never",
 					},
 				},
 				"outputs": map[string]any{
 					"default": map[string]any{
 						"type":    "ESPlainAuthAPI",
-						"url":     esHost,
-						"api_key": esAPIKey,
+						"url":     kCtx.esHost,
+						"api_key": kCtx.esAPIKey,
 					},
 				},
 			},
 			runK8SInnerTests: true,
-			// - perNode Daemonset (at least 1 agent pod)
+			// - perNode Daemonset (totalK8SNodes pods)
 			// - clusterWide Deployment  (1 agent pod)
 			// - ksmSharded Statefulset  (1 agent pod)
-			atLeastValidatedPodsNumber: 3,
+			atLeastAgentPods: totalK8SNodes + 1 + 1,
+			agentPodLabelSelectors: []string{
+				// name=agent-{preset}-{release}
+				"name=agent-pernode-helm-agent",
+				"name=agent-clusterwide-helm-agent",
+				"name=agent-ksmsharded-helm-agent",
+			},
 		},
 		{
 			name: "helm standalone agent default kubernetes unprivileged",
@@ -428,24 +384,30 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				"agent": map[string]any{
 					"unprivileged": true,
 					"image": map[string]any{
-						"repository": agentImageRepo,
-						"tag":        agentImageTag,
+						"repository": kCtx.agentImageRepo,
+						"tag":        kCtx.agentImageTag,
 						"pullPolicy": "Never",
 					},
 				},
 				"outputs": map[string]any{
 					"default": map[string]any{
 						"type":    "ESPlainAuthAPI",
-						"url":     esHost,
-						"api_key": esAPIKey,
+						"url":     kCtx.esHost,
+						"api_key": kCtx.esAPIKey,
 					},
 				},
 			},
 			runK8SInnerTests: true,
-			// - perNode Daemonset (at least 1 agent pod)
+			// - perNode Daemonset (totalK8SNodes pods)
 			// - clusterWide Deployment  (1 agent pod)
 			// - ksmSharded Statefulset  (1 agent pod)
-			atLeastValidatedPodsNumber: 3,
+			atLeastAgentPods: totalK8SNodes + 1 + 1,
+			agentPodLabelSelectors: []string{
+				// name=agent-{preset}-{release}
+				"name=agent-pernode-helm-agent",
+				"name=agent-clusterwide-helm-agent",
+				"name=agent-ksmsharded-helm-agent",
+			},
 		},
 		{
 			name: "helm managed agent default kubernetes privileged",
@@ -453,21 +415,25 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				"agent": map[string]any{
 					"unprivileged": false,
 					"image": map[string]any{
-						"repository": agentImageRepo,
-						"tag":        agentImageTag,
+						"repository": kCtx.agentImageRepo,
+						"tag":        kCtx.agentImageTag,
 						"pullPolicy": "Never",
 					},
 					"fleet": map[string]any{
 						"enabled": true,
-						"url":     enrollParams.FleetURL,
-						"token":   enrollParams.EnrollmentToken,
+						"url":     kCtx.enrollParams.FleetURL,
+						"token":   kCtx.enrollParams.EnrollmentToken,
 						"preset":  "perNode",
 					},
 				},
 			},
 			runK8SInnerTests: true,
-			// - perNode Daemonset (at least 1 agent pod)
-			atLeastValidatedPodsNumber: 1,
+			// - perNode Daemonset (totalK8SNodes pods)
+			atLeastAgentPods: totalK8SNodes,
+			agentPodLabelSelectors: []string{
+				// name=agent-{preset}-{release}
+				"name=agent-pernode-helm-agent",
+			},
 		},
 		{
 			name: "helm managed agent default kubernetes unprivileged",
@@ -475,31 +441,32 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				"agent": map[string]any{
 					"unprivileged": true,
 					"image": map[string]any{
-						"repository": agentImageRepo,
-						"tag":        agentImageTag,
+						"repository": kCtx.agentImageRepo,
+						"tag":        kCtx.agentImageTag,
 						"pullPolicy": "Never",
 					},
 					"fleet": map[string]any{
 						"enabled": true,
-						"url":     enrollParams.FleetURL,
-						"token":   enrollParams.EnrollmentToken,
+						"url":     kCtx.enrollParams.FleetURL,
+						"token":   kCtx.enrollParams.EnrollmentToken,
 						"preset":  "perNode",
 					},
 				},
 			},
 			runK8SInnerTests: true,
-			// - perNode Daemonset (at least 1 agent pod)
-			atLeastValidatedPodsNumber: 1,
+			// - perNode Daemonset (totalK8SNodes pods)
+			atLeastAgentPods: totalK8SNodes,
+			agentPodLabelSelectors: []string{
+				// name=agent-{preset}-{release}
+				"name=agent-pernode-helm-agent",
+			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			hasher := sha256.New()
-			hasher.Write([]byte(tc.name))
-			testNamespace := strings.ToLower(base64.URLEncoding.EncodeToString(hasher.Sum(nil)))
-			testNamespace = noSpecialCharsRegexp.ReplaceAllString(testNamespace, "")
+			testNamespace := kCtx.getNamespace(t)
 
 			settings := cli.New()
 			settings.SetNamespace(testNamespace)
@@ -514,17 +481,25 @@ func TestKubernetesAgentHelm(t *testing.T) {
 
 			helmValues := tc.values
 
+			k8sNamespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}
+
 			t.Cleanup(func() {
 				if t.Failed() {
-					dumpLogs(t, ctx, client, testNamespace, testLogsBasePath)
+					if err := k8sDumpAllPodLogs(ctx, kCtx.client, testNamespace, testNamespace, kCtx.logsBasePath); err != nil {
+						t.Logf("failed to dump logs: %s", err)
+					}
 				}
 
 				uninstallAction := action.NewUninstall(actionConfig)
 				uninstallAction.Wait = true
-
 				_, err = uninstallAction.Run("helm-agent")
 				if err != nil {
-					require.NoError(t, err, "failed to uninstall helm chart")
+					t.Logf("failed to uninstall helm chart: %s", err)
+				}
+
+				err = k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, k8sNamespace)
+				if err != nil {
+					t.Logf("failed to delete k8s namespace: %s", err)
 				}
 			})
 
@@ -539,189 +514,155 @@ func TestKubernetesAgentHelm(t *testing.T) {
 			_, err = installAction.Run(helmChart, helmValues)
 			require.NoError(t, err, "failed to install helm chart")
 
-			podList := &corev1.PodList{}
-			err = client.Resources(testNamespace).List(ctx, podList)
-			require.NoError(t, err, fmt.Sprintf("failed to list pods in namespace %s", testNamespace))
+			healthyAgentPods := 0
+			for _, podSelector := range tc.agentPodLabelSelectors {
+				pods := &corev1.PodList{}
+				err = kCtx.client.Resources(testNamespace).List(ctx, pods, func(opt *metav1.ListOptions) {
+					opt.LabelSelector = podSelector
+				})
+				require.NoError(t, err, "failed to list pods with selector ", podSelector)
 
-			checkedAgentContainers := 0
+				for _, pod := range pods.Items {
+					var stdout, stderr bytes.Buffer
+					err = k8sCheckAgentStatus(ctx, kCtx.client, &stdout, &stderr, testNamespace, pod.Name, "agent", map[string]bool{})
+					if err != nil {
+						t.Errorf("failed to check agent status: %v", err)
+						t.Logf("stdout: %s\n", stdout.String())
+						t.Logf("stderr: %s\n", stderr.String())
+						t.FailNow()
+					}
+					healthyAgentPods++
 
-			for _, pod := range podList.Items {
-				if !strings.HasPrefix(pod.GetName(), "agent-") {
-					continue
-				}
+					if !tc.runK8SInnerTests {
+						continue
+					}
 
-				command := []string{"elastic-agent", "status"}
-				var stdout, stderr bytes.Buffer
-				var agentHealthyErr error
-				// we will wait maximum 120 seconds for the agent to report healthy
-				for i := 0; i < 120; i++ {
 					stdout.Reset()
 					stderr.Reset()
-					agentHealthyErr = client.Resources().ExecInPod(ctx, testNamespace, pod.Name, "agent", command, &stdout, &stderr)
-					if agentHealthyErr == nil {
-						break
-					}
-					time.Sleep(time.Second * 1)
-				}
-
-				statusString := stdout.String()
-				if agentHealthyErr != nil {
-					t.Errorf("elastic-agent never reported healthy: %v", agentHealthyErr)
-					t.Logf("stdout: %s\n", statusString)
-					t.Logf("stderr: %s\n", stderr.String())
-					t.FailNow()
-					return
-				}
-
-				stdout.Reset()
-				stderr.Reset()
-
-				if tc.runK8SInnerTests {
-					err := client.Resources().ExecInPod(ctx, testNamespace, pod.Name, "agent",
+					err := kCtx.client.Resources().ExecInPod(ctx, testNamespace, pod.Name, "agent",
 						[]string{"/usr/share/elastic-agent/k8s-inner-tests", "-test.v"}, &stdout, &stderr)
+					t.Logf("%s k8s-inner-tests output:", pod.Name)
 					t.Log(stdout.String())
 					if err != nil {
 						t.Log(stderr.String())
 					}
 					require.NoError(t, err, "error at k8s inner tests execution")
 				}
-
-				checkedAgentContainers++
 			}
 
-			require.GreaterOrEqual(t, checkedAgentContainers, tc.atLeastValidatedPodsNumber,
-				fmt.Sprintf("at least %d agent containers should be checked", tc.atLeastValidatedPodsNumber))
+			require.GreaterOrEqual(t, healthyAgentPods, tc.atLeastAgentPods,
+				fmt.Sprintf("at least %d agent containers should be checked", tc.atLeastAgentPods))
 		})
 	}
 }
 
-// deployK8SAgent is a helper function to deploy the elastic-agent in k8s and invoke the inner k8s tests if
-// runK8SInnerTests is true
-func deployK8SAgent(t *testing.T, ctx context.Context, client klient.Client, objects []k8s.Object, namespace string,
-	runInnerK8STests bool, testLogsBasePath string, checkStatus bool, componentPresence map[string]bool) {
-
-	objects = append([]k8s.Object{&corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: namespace,
-		},
-	}}, objects...)
+func k8sKustomizeDeployAgent(t *testing.T, ctx context.Context, client klient.Client, objects []k8s.Object,
+	namespace string, runK8SInnerTests bool, testlogsBasePath string, checkStatus bool, componentPresence map[string]bool,
+) {
+	err := k8sCreateObjects(ctx, client, k8sCreateOpts{namespace: namespace, wait: true}, objects...)
+	require.NoError(t, err, "failed to create k8s objects")
 
 	t.Cleanup(func() {
 		if t.Failed() {
-			dumpLogs(t, ctx, client, namespace, testLogsBasePath)
+			if err := k8sDumpAllPodLogs(ctx, client, namespace, namespace, testlogsBasePath); err != nil {
+				t.Logf("failed to dump logs: %s", err)
+			}
 		}
-
-		// need to delete all k8s objects and wait for it as elastic-agent
-		// in k8s creates cluster-wide roles and having multiple of them at
-		// the same time isn't allowed
-		deleteK8SObjects(t, ctx, client, objects, true)
 	})
 
-	// Create the objects
-	for _, obj := range objects {
-		obj.SetNamespace(namespace)
-		err := client.Resources(namespace).Create(ctx, obj)
-		require.NoError(t, err, fmt.Sprintf("failed to create object %s", obj.GetName()))
-	}
+	pods := &corev1.PodList{}
+	podsLabelSelector := fmt.Sprintf("app=elastic-agent-standalone")
+	err = client.Resources(namespace).List(ctx, pods, func(opt *metav1.ListOptions) {
+		opt.LabelSelector = podsLabelSelector
+	})
+	require.NoError(t, err, "failed to list pods with selector ", podsLabelSelector)
+	require.NotEmpty(t, pods.Items, "no pods found with selector ", podsLabelSelector)
 
-	var agentPodName string
-	// Wait for pods to be ready
-	require.Eventually(t, func() bool {
-		podList := &corev1.PodList{}
-		err := client.Resources(namespace).List(ctx, podList)
-		require.NoError(t, err, fmt.Sprintf("failed to list pods in namespace %s", namespace))
+	for _, pod := range pods.Items {
+		var stdout, stderr bytes.Buffer
 
-		for _, pod := range podList.Items {
-			if agentPodName == "" && strings.HasPrefix(pod.GetName(), "elastic-agent-standalone") {
-				agentPodName = pod.Name
-			}
-
-			for _, containerStatus := range pod.Status.ContainerStatuses {
-				if containerStatus.RestartCount > 0 {
-					return false
-				}
-			}
-
-			for _, cond := range pod.Status.Conditions {
-				if cond.Type != corev1.PodReady {
-					continue
-				}
-
-				if cond.Status != corev1.ConditionTrue {
-					return false
-				}
+		if checkStatus {
+			err = k8sCheckAgentStatus(ctx, client, &stdout, &stderr, namespace, pod.Name, "elastic-agent-standalone", componentPresence)
+			if err != nil {
+				t.Errorf("failed to check agent status: %v", err)
+				t.Logf("stdout: %s\n", stdout.String())
+				t.Logf("stderr: %s\n", stderr.String())
+				t.FailNow()
 			}
 		}
 
-		return true
-	}, time.Second*100, time.Second*1, fmt.Sprintf("pods in namespace %s never became ready", namespace))
-
-	require.NotEmpty(t, agentPodName, "agent pod name is empty")
-
-	if !checkStatus {
-		// not checking status
-		return
-	}
-
-	command := []string{"elastic-agent", "status", "--output=json"}
-	var status atesting.AgentStatusOutput
-	var stdout, stderr bytes.Buffer
-	var agentHealthyErr error
-	// we will wait maximum 120 seconds for the agent to report healthy
-	for i := 0; i < 120; i++ {
-		status = atesting.AgentStatusOutput{} // clear status output
 		stdout.Reset()
 		stderr.Reset()
-		agentHealthyErr = client.Resources().ExecInPod(ctx, namespace, agentPodName, "elastic-agent-standalone", command, &stdout, &stderr)
-		if agentHealthyErr == nil {
-			if uerr := json.Unmarshal(stdout.Bytes(), &status); uerr == nil {
-				if status.State == int(aclient.Healthy) {
-					// agent is healthy innner tests should now pass
-					if runInnerK8STests {
-						err := client.Resources().ExecInPod(ctx, namespace, agentPodName, "elastic-agent-standalone",
-							[]string{"/usr/share/elastic-agent/k8s-inner-tests", "-test.v"}, &stdout, &stderr)
-						t.Log(stdout.String())
-						if err != nil {
-							t.Log(stderr.String())
-						}
-						require.NoError(t, err, "error at k8s inner tests execution")
-					}
 
-					// validate that the components defined are also healthy if they should exist
-					componentsCorrect := true
-					for component, shouldBePresent := range componentPresence {
-						compState, ok := getComponentState(status, component)
-						if shouldBePresent {
-							if !ok {
-								// doesn't exist
-								componentsCorrect = false
-							} else if compState != int(aclient.Healthy) {
-								// not healthy
-								componentsCorrect = false
-							}
-						} else if ok {
-							// should not be present
-							// break instantly and fail (as it existing should never happen)
-							break
-						}
-					}
-					if componentsCorrect {
-						// agent health and components are correct
-						return
-					}
-				}
+		if runK8SInnerTests {
+			err := client.Resources().ExecInPod(ctx, namespace, pod.Name, "elastic-agent-standalone",
+				[]string{"/usr/share/elastic-agent/k8s-inner-tests", "-test.v"}, &stdout, &stderr)
+			t.Logf("%s k8s-inner-tests output:", pod.Name)
+			t.Log(stdout.String())
+			if err != nil {
+				t.Log(stderr.String())
 			}
+			require.NoError(t, err, "error at k8s inner tests execution")
 		}
-		time.Sleep(time.Second * 1)
 	}
-
-	t.Errorf("elastic-agent never reported healthy: %+v", status)
-	t.Logf("stdout: %s\n", stdout.String())
-	t.Logf("stderr: %s\n", stderr.String())
-	t.FailNow()
 }
 
-func getComponentState(status atesting.AgentStatusOutput, componentName string) (int, bool) {
+// k8sCheckAgentStatus checks that the agent reports healthy.
+func k8sCheckAgentStatus(ctx context.Context, client klient.Client, stdout *bytes.Buffer, stderr *bytes.Buffer,
+	namespace string, agentPodName string, containerName string, componentPresence map[string]bool,
+) error {
+	command := []string{"elastic-agent", "status", "--output=json"}
+
+	checkStatus := func() error {
+		status := atesting.AgentStatusOutput{} // clear status output
+		stdout.Reset()
+		stderr.Reset()
+		if err := client.Resources().ExecInPod(ctx, namespace, agentPodName, containerName, command, stdout, stderr); err != nil {
+			return err
+		}
+
+		if err := json.Unmarshal(stdout.Bytes(), &status); err != nil {
+			return err
+		}
+
+		var err error
+		// validate that the components defined are also healthy if they should exist
+		for component, shouldBePresent := range componentPresence {
+			compState, ok := getAgentComponentState(status, component)
+			if shouldBePresent {
+				if !ok {
+					// doesn't exist
+					err = errors.Join(err, fmt.Errorf("required component %s not found", component))
+				} else if compState != int(aclient.Healthy) {
+					// not healthy
+					err = errors.Join(err, fmt.Errorf("required component %s is not healthy", component))
+				}
+			} else if ok {
+				// should not be present
+				err = errors.Join(err, fmt.Errorf("component %s should not be present", component))
+			}
+		}
+		return err
+	}
+
+	// we will wait maximum 120 seconds for the agent to report healthy
+	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 120*time.Second)
+	defer timeoutCancel()
+	for {
+		err := checkStatus()
+		if err == nil {
+			return nil
+		}
+		if timeoutCtx.Err() != nil {
+			// timeout waiting for agent to become healthy
+			return errors.Join(err, errors.New("timeout waiting for agent to become healthy"))
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+// getAgentComponentState returns the component state for the given component name and a bool indicating if it exists.
+func getAgentComponentState(status atesting.AgentStatusOutput, componentName string) (int, bool) {
 	for _, comp := range status.Components {
 		if comp.Name == componentName {
 			return comp.State, true
@@ -730,25 +671,22 @@ func getComponentState(status atesting.AgentStatusOutput, componentName string) 
 	return -1, false
 }
 
-// dumpLogs dumps the logs of all pods in the given namespace to the given target directory
-func dumpLogs(t *testing.T, ctx context.Context, client klient.Client, namespace string, targetDir string) {
-
+// k8sDumpAllPodLogs dumps the logs of all pods in the given namespace to the given target directory
+func k8sDumpAllPodLogs(ctx context.Context, client klient.Client, testName string, namespace string, targetDir string) error {
 	podList := &corev1.PodList{}
 
 	clientSet, err := kubernetes.NewForConfig(client.RESTConfig())
 	if err != nil {
-		t.Logf("Error creating clientset: %v\n", err)
-		return
+		return fmt.Errorf("error creating clientset: %w", err)
 	}
 
 	err = client.Resources(namespace).List(ctx, podList)
 	if err != nil {
-		t.Logf("Error listing pods: %v\n", err)
-		return
+		return fmt.Errorf("error listing pods: %w", err)
 	}
 
+	var errs error
 	for _, pod := range podList.Items {
-
 		previous := false
 		for _, containerStatus := range pod.Status.ContainerStatuses {
 			if containerStatus.RestartCount > 0 {
@@ -758,10 +696,10 @@ func dumpLogs(t *testing.T, ctx context.Context, client klient.Client, namespace
 		}
 
 		for _, container := range pod.Spec.Containers {
-			logFilePath := filepath.Join(targetDir, fmt.Sprintf("%s-%s-%s.log", t.Name(), pod.Name, container.Name))
+			logFilePath := filepath.Join(targetDir, fmt.Sprintf("%s-%s-%s.log", testName, pod.Name, container.Name))
 			logFile, err := os.Create(logFilePath)
 			if err != nil {
-				t.Logf("Error creating log file: %v\n", err)
+				errs = errors.Join(fmt.Errorf("error creating log file: %w", err), errs)
 				continue
 			}
 
@@ -771,24 +709,24 @@ func dumpLogs(t *testing.T, ctx context.Context, client klient.Client, namespace
 			})
 			podLogsStream, err := req.Stream(context.TODO())
 			if err != nil {
-				t.Logf("Error getting container %s of pod %s logs: %v\n", container.Name, pod.Name, err)
+				errs = errors.Join(fmt.Errorf("error getting container %s of pod %s logs: %w", container.Name, pod.Name, err), errs)
 				continue
 			}
 
 			_, err = io.Copy(logFile, podLogsStream)
 			if err != nil {
-				t.Logf("Error writing container %s of pod %s logs: %v\n", container.Name, pod.Name, err)
-			} else {
-				t.Logf("Wrote container %s of pod %s logs to %s\n", container.Name, pod.Name, logFilePath)
+				errs = errors.Join(fmt.Errorf("error writing container %s of pod %s logs: %w", container.Name, pod.Name, err), errs)
 			}
 
 			_ = podLogsStream.Close()
 		}
 	}
+
+	return errs
 }
 
-// adjustK8SAgentManifests adjusts the namespace of given k8s objects and calls the given callbacks for the containers and the pod
-func adjustK8SAgentManifests(objects []k8s.Object, namespace string, containerName string, cbContainer func(container *corev1.Container), cbPod func(pod *corev1.PodSpec)) {
+// k8sKustomizeAdjustObjects adjusts the namespace of given k8s objects and calls the given callbacks for the containers and the pod
+func k8sKustomizeAdjustObjects(objects []k8s.Object, namespace string, containerName string, cbContainer func(container *corev1.Container), cbPod func(pod *corev1.PodSpec)) {
 	// Update the agent image and image pull policy as it is already loaded in kind cluster
 	for _, obj := range objects {
 		obj.SetNamespace(namespace)
@@ -806,22 +744,12 @@ func adjustK8SAgentManifests(objects []k8s.Object, namespace string, containerNa
 			podSpec = &objWithType.Spec.Template.Spec
 		case *batchv1.CronJob:
 			podSpec = &objWithType.Spec.JobTemplate.Spec.Template.Spec
-		case *rbacv1.ClusterRoleBinding:
-			for idx, subject := range objWithType.Subjects {
-				if strings.HasPrefix(subject.Name, "elastic-agent") {
-					objWithType.Subjects[idx].Namespace = namespace
-				}
-			}
-			continue
-		case *rbacv1.RoleBinding:
-			for idx, subject := range objWithType.Subjects {
-				if strings.HasPrefix(subject.Name, "elastic-agent") {
-					objWithType.Subjects[idx].Namespace = namespace
-				}
-			}
-			continue
 		default:
 			continue
+		}
+
+		if cbPod != nil {
+			cbPod(podSpec)
 		}
 
 		for idx, container := range podSpec.Containers {
@@ -831,32 +759,28 @@ func adjustK8SAgentManifests(objects []k8s.Object, namespace string, containerNa
 			if cbContainer != nil {
 				cbContainer(&podSpec.Containers[idx])
 			}
-
-			if cbPod != nil {
-				cbPod(podSpec)
-			}
 		}
-
 	}
 }
 
-// yamlToK8SObjects converts yaml to k8s objects
-func yamlToK8SObjects(reader *bufio.Reader) ([]k8s.Object, error) {
+// k8sYAMLToObjects converts the given YAML reader to a list of k8s objects
+func k8sYAMLToObjects(reader *bufio.Reader) ([]k8s.Object, error) {
+	// if we need to encode/decode more k8s object types in our tests, add them here
+	k8sScheme := runtime.NewScheme()
+	k8sScheme.AddKnownTypes(rbacv1.SchemeGroupVersion, &rbacv1.ClusterRoleBinding{}, &rbacv1.ClusterRoleBindingList{})
+	k8sScheme.AddKnownTypes(rbacv1.SchemeGroupVersion, &rbacv1.ClusterRole{}, &rbacv1.ClusterRoleList{})
+	k8sScheme.AddKnownTypes(rbacv1.SchemeGroupVersion, &rbacv1.RoleBinding{}, &rbacv1.RoleBindingList{})
+	k8sScheme.AddKnownTypes(rbacv1.SchemeGroupVersion, &rbacv1.Role{}, &rbacv1.RoleList{})
+	k8sScheme.AddKnownTypes(corev1.SchemeGroupVersion, &corev1.ServiceAccount{}, &corev1.ServiceAccountList{})
+	k8sScheme.AddKnownTypes(corev1.SchemeGroupVersion, &corev1.Pod{}, &corev1.PodList{})
+	k8sScheme.AddKnownTypes(corev1.SchemeGroupVersion, &corev1.Service{}, &corev1.ServiceList{})
+	k8sScheme.AddKnownTypes(appsv1.SchemeGroupVersion, &appsv1.DaemonSet{})
+	k8sScheme.AddKnownTypes(appsv1.SchemeGroupVersion, &appsv1.StatefulSet{})
+	k8sScheme.AddKnownTypes(appsv1.SchemeGroupVersion, &appsv1.Deployment{})
+	k8sScheme.AddKnownTypes(corev1.SchemeGroupVersion, &corev1.Secret{}, &corev1.ConfigMap{})
+
 	var objects []k8s.Object
-
-	scheme := runtime.NewScheme()
-	scheme.AddKnownTypes(rbacv1.SchemeGroupVersion, &rbacv1.ClusterRoleBinding{}, &rbacv1.ClusterRoleBindingList{})
-	scheme.AddKnownTypes(rbacv1.SchemeGroupVersion, &rbacv1.ClusterRole{}, &rbacv1.ClusterRoleList{})
-	scheme.AddKnownTypes(rbacv1.SchemeGroupVersion, &rbacv1.RoleBinding{}, &rbacv1.RoleBindingList{})
-	scheme.AddKnownTypes(rbacv1.SchemeGroupVersion, &rbacv1.Role{}, &rbacv1.RoleList{})
-	scheme.AddKnownTypes(corev1.SchemeGroupVersion, &corev1.ServiceAccount{}, &corev1.ServiceAccountList{})
-	scheme.AddKnownTypes(corev1.SchemeGroupVersion, &corev1.Service{}, &corev1.ServiceList{})
-	scheme.AddKnownTypes(appsv1.SchemeGroupVersion, &appsv1.DaemonSet{})
-	scheme.AddKnownTypes(appsv1.SchemeGroupVersion, &appsv1.StatefulSet{})
-	scheme.AddKnownTypes(appsv1.SchemeGroupVersion, &appsv1.Deployment{})
-	scheme.AddKnownTypes(corev1.SchemeGroupVersion, &corev1.Secret{}, &corev1.ConfigMap{})
-	decoder := serializer.NewCodecFactory(scheme).UniversalDeserializer()
-
+	decoder := serializer.NewCodecFactory(k8sScheme).UniversalDeserializer()
 	yamlReader := yaml.NewYAMLReader(reader)
 	for {
 		yamlBytes, err := yamlReader.Read()
@@ -937,43 +861,260 @@ func generateESAPIKey(esClient *elasticsearch.Client, keyName string) (string, e
 	return fmt.Sprintf("%s:%s", keyID, keyToken), nil
 }
 
-// deleteK8SObjects deletes the given k8s objects and waits for them to be deleted if wait is true.
-func deleteK8SObjects(t *testing.T, ctx context.Context, client klient.Client, objects []k8s.Object, wait bool) {
+// k8sDeleteOpts contains options for deleting k8s objects
+type k8sDeleteOpts struct {
+	// wait for the objects to be deleted
+	wait bool
+	// timeout for waiting for the objects to be deleted
+	waitTimeout time.Duration
+}
+
+// k8sDeleteObjects deletes the given k8s objects and waits for them to be deleted if wait is true.
+func k8sDeleteObjects(ctx context.Context, client klient.Client, opts k8sDeleteOpts, objects ...k8s.Object) error {
+	if len(objects) == 0 {
+		return nil
+	}
+
+	// Delete the objects
 	for _, obj := range objects {
-		_ = client.Resources().Delete(ctx, obj)
+		_ = client.Resources(obj.GetNamespace()).Delete(ctx, obj)
 	}
 
-	if !wait {
-		return
+	if !opts.wait {
+		// no need to wait
+		return nil
 	}
 
-	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Second)
+	if opts.waitTimeout == 0 {
+		// default to 20 seconds
+		opts.waitTimeout = 20 * time.Second
+	}
+
+	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, opts.waitTimeout)
 	defer timeoutCancel()
-
 	for _, obj := range objects {
-		if timeoutCtx.Err() != nil {
-			break
-		}
-
-		for i := 0; i < 10; i++ {
+		for {
 			if timeoutCtx.Err() != nil {
-				break
+				return errors.New("timeout waiting for k8s objects to be deleted")
 			}
 
 			err := client.Resources().Get(timeoutCtx, obj.GetName(), obj.GetNamespace(), obj)
 			if err != nil {
+				// object has been deleted
 				break
 			}
-			time.Sleep(500 * time.Millisecond)
+
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 
-	if timeoutCtx.Err() != nil {
-		t.Log("Timeout waiting for k8s objects to be deleted")
-	}
+	return nil
 }
 
+// int64Ptr returns a pointer to the given int64
 func int64Ptr(val int64) *int64 {
 	valPtr := val
 	return &valPtr
+}
+
+// k8sCreateOpts contains options for k8sCreateObjects
+type k8sCreateOpts struct {
+	// namespace is the namespace to create the objects in
+	namespace string
+	// wait specifies whether to wait for the objects to be ready
+	wait bool
+	// waitTimeout is the timeout for waiting for the objects to be ready if wait is true
+	waitTimeout time.Duration
+}
+
+// k8sCreateObjects creates k8s objects and waits for them to be ready if specified in opts.
+// Note that if opts.namespace is not empty, all objects will be created and updated to reference
+// the given namespace.
+func k8sCreateObjects(ctx context.Context, client klient.Client, opts k8sCreateOpts, objects ...k8s.Object) error {
+	// Create the objects
+	for _, obj := range objects {
+		if opts.namespace != "" {
+			// update the namespace
+			obj.SetNamespace(opts.namespace)
+
+			// special case for ClusterRoleBinding and RoleBinding
+			// update the subjects to reference the given namespace
+			switch objWithType := obj.(type) {
+			case *rbacv1.ClusterRoleBinding:
+				for idx := range objWithType.Subjects {
+					objWithType.Subjects[idx].Namespace = opts.namespace
+				}
+				continue
+			case *rbacv1.RoleBinding:
+				for idx := range objWithType.Subjects {
+					objWithType.Subjects[idx].Namespace = opts.namespace
+				}
+				continue
+			}
+		}
+		if err := client.Resources().Create(ctx, obj); err != nil {
+			return fmt.Errorf("failed to create object %s: %w", obj.GetName(), err)
+		}
+	}
+
+	if !opts.wait {
+		// no need to wait
+		return nil
+	}
+
+	if opts.waitTimeout == 0 {
+		// default to 120 seconds
+		opts.waitTimeout = 120 * time.Second
+	}
+
+	return k8sWaitForReady(ctx, client, opts.waitTimeout, objects...)
+}
+
+// k8sWaitForReady waits for the given k8s objects to be ready
+func k8sWaitForReady(ctx context.Context, client klient.Client, waitDuration time.Duration, objects ...k8s.Object) error {
+	// use ready checker from helm kube
+	clientSet, err := kubernetes.NewForConfig(client.RESTConfig())
+	if err != nil {
+		return fmt.Errorf("error creating clientset: %w", err)
+	}
+	readyChecker := helmKube.NewReadyChecker(clientSet, func(s string, i ...interface{}) {})
+
+	ctxTimeout, cancel := context.WithTimeout(ctx, waitDuration)
+	defer cancel()
+
+	waitFn := func(ri *cliResource.Info) error {
+		// here we wait for the k8s object (e.g. deployment, daemonset, pod) to be ready
+		for {
+			ready, readyErr := readyChecker.IsReady(ctxTimeout, ri)
+			if ready {
+				// k8s object is ready
+				return nil
+			}
+			// k8s object is not ready yet
+			readyErr = errors.Join(fmt.Errorf("k8s object %s is not ready", ri.Name), readyErr)
+
+			if ctxTimeout.Err() != nil {
+				// timeout
+				return errors.Join(fmt.Errorf("timeout waiting for k8s object %s to be ready", ri.Name), readyErr)
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+
+	for _, o := range objects {
+		// convert k8s.Object to resource.Info for ready checker
+		runtimeObj, ok := o.(runtime.Object)
+		if !ok {
+			return fmt.Errorf("unable to convert k8s.Object %s to runtime.Object", o.GetName())
+		}
+
+		if err := waitFn(&cliResource.Info{
+			Object:    runtimeObj,
+			Name:      o.GetName(),
+			Namespace: o.GetNamespace(),
+		}); err != nil {
+			return err
+		}
+		// extract pod label selector for all k8s objects that have underlying pods
+		oPodsLabelSelector, err := helmKube.SelectorsForObject(runtimeObj)
+		if err != nil {
+			// k8s object does not have pods
+			continue
+		}
+
+		podList, err := clientSet.CoreV1().Pods(o.GetNamespace()).List(ctx, metav1.ListOptions{
+			LabelSelector: oPodsLabelSelector.String(),
+		})
+		if err != nil {
+			return fmt.Errorf("error listing pods: %w", err)
+		}
+
+		// here we wait for the all pods to be ready
+		for _, pod := range podList.Items {
+			if err := waitFn(&cliResource.Info{
+				Object:    &pod,
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+			}); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// k8sContext contains all the information needed to run a k8s test
+type k8sContext struct {
+	client    klient.Client
+	clientSet *kubernetes.Clientset
+	// logsBasePath is the path that will be used to store the pod logs in a case a test fails
+	logsBasePath string
+	// agentImage is the full image of elastic-agent to use in the test
+	agentImage string
+	// agentImageRepo is the repository of elastic-agent image to use in the test
+	agentImageRepo string
+	// agentImageTag is the tag of elastic-agent image to use in the test
+	agentImageTag string
+	// esHost is the host of the elasticsearch to use in the test
+	esHost string
+	// esAPIKey is the API key of the elasticsearch to use in the test
+	esAPIKey string
+	// enrollParams contains the information needed to enroll an agent with Fleet in the test
+	enrollParams *fleettools.EnrollParams
+}
+
+// getNamespace returns a unique namespace for the current test
+func (k8sContext) getNamespace(t *testing.T) string {
+	hasher := sha256.New()
+	hasher.Write([]byte(t.Name()))
+	testNamespace := strings.ToLower(base64.URLEncoding.EncodeToString(hasher.Sum(nil)))
+	return noSpecialCharsRegexp.ReplaceAllString(testNamespace, "")
+}
+
+// k8sGetContext performs all the necessary checks to get a k8sContext for the current test
+func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
+	agentImage := os.Getenv("AGENT_IMAGE")
+	require.NotEmpty(t, agentImage, "AGENT_IMAGE must be set")
+
+	agentImageParts := strings.SplitN(agentImage, ":", 2)
+	require.Len(t, agentImageParts, 2, "AGENT_IMAGE must be in the form '<repository>:<version>'")
+	agentImageRepo := agentImageParts[0]
+	agentImageTag := agentImageParts[1]
+
+	client, err := info.KubeClient()
+	require.NoError(t, err)
+	require.NotNil(t, client)
+
+	clientSet, err := kubernetes.NewForConfig(client.RESTConfig())
+	require.NoError(t, err)
+	require.NotNil(t, clientSet)
+
+	testLogsBasePath := os.Getenv("K8S_TESTS_POD_LOGS_BASE")
+	require.NotEmpty(t, testLogsBasePath, "K8S_TESTS_POD_LOGS_BASE must be set")
+
+	err = os.MkdirAll(filepath.Join(testLogsBasePath, t.Name()), 0o755)
+	require.NoError(t, err, "failed to create test logs directory")
+
+	esHost := os.Getenv("ELASTICSEARCH_HOST")
+	require.NotEmpty(t, esHost, "ELASTICSEARCH_HOST must be set")
+
+	esAPIKey, err := generateESAPIKey(info.ESClient, info.Namespace)
+	require.NoError(t, err, "failed to generate ES API key")
+	require.NotEmpty(t, esAPIKey, "failed to generate ES API key")
+
+	enrollParams, err := fleettools.NewEnrollParams(context.Background(), info.KibanaClient)
+	require.NoError(t, err, "failed to create fleet enroll params")
+
+	return k8sContext{
+		client:         client,
+		clientSet:      clientSet,
+		agentImage:     agentImage,
+		agentImageRepo: agentImageRepo,
+		agentImageTag:  agentImageTag,
+		logsBasePath:   testLogsBasePath,
+		esHost:         esHost,
+		esAPIKey:       esAPIKey,
+		enrollParams:   enrollParams,
+	}
 }
