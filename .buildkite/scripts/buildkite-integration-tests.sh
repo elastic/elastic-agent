@@ -15,7 +15,12 @@ fi
 
 if [ "$TEST_SUDO" == "true" ]; then
   echo "Re-initializing ASDF. The user is changed to root..."
+<<<<<<< HEAD
   export HOME=/opt/buildkite-agent
+=======
+  export ASDF_DATA_DIR="/opt/buildkite-agent/.asdf"
+  export PATH="$ASDF_DATA_DIR/bin:$ASDF_DATA_DIR/shims:$PATH"
+>>>>>>> 0a74d21900 (changed sudo-integration-tests.sh (#6078))
   source /opt/buildkite-agent/hooks/pre-command
   source .buildkite/hooks/pre-command || echo "No pre-command hook found"
 fi
