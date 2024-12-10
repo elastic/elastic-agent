@@ -361,9 +361,6 @@ func TestInstallUninstallAudit(t *testing.T) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-	require.NoError(t, err)
-
 	policyResp, enrollmentTokenResp := createPolicyAndEnrollmentToken(ctx, t, info.KibanaClient, createBasicPolicy())
 	t.Logf("Created policy %+v", policyResp.AgentPolicy)
 
@@ -371,28 +368,63 @@ func TestInstallUninstallAudit(t *testing.T) {
 	fleetServerURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 	require.NoError(t, err, "failed getting Fleet Server URL")
 
-	err = fixture.Prepare(ctx)
-	require.NoError(t, err)
-	// Run `elastic-agent install`.  We use `--force` to prevent interactive
-	// execution.
-	opts := &atesting.InstallOpts{
-		Force: true,
-		EnrollOpts: atesting.EnrollOpts{
-			URL:             fleetServerURL,
-			EnrollmentToken: enrollmentTokenResp.APIKey,
-		},
-	}
-	out, err := fixture.Install(ctx, opts)
-	if err != nil {
-		t.Logf("install output: %s", out)
+	t.Run("privileged", func(t *testing.T) {
+		fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 		require.NoError(t, err)
-	}
 
-	require.Eventuallyf(t, func() bool {
-		return waitForAgentAndFleetHealthy(ctx, t, fixture)
-	}, time.Minute, time.Second, "agent never became healthy or connected to Fleet")
+		err = fixture.Prepare(ctx)
+		require.NoError(t, err)
+		// Run `elastic-agent install`.  We use `--force` to prevent interactive
+		// execution.
+		opts := &atesting.InstallOpts{
+			Force:      true,
+			Privileged: true,
+			EnrollOpts: atesting.EnrollOpts{
+				URL:             fleetServerURL,
+				EnrollmentToken: enrollmentTokenResp.APIKey,
+			},
+		}
+		out, err := fixture.Install(ctx, opts)
+		if err != nil {
+			t.Logf("install output: %s", out)
+			require.NoError(t, err)
+		}
 
-	t.Run("run uninstall", testUninstallAuditUnenroll(ctx, fixture, info))
+		require.Eventuallyf(t, func() bool {
+			return waitForAgentAndFleetHealthy(ctx, t, fixture)
+		}, time.Minute, time.Second, "agent never became healthy or connected to Fleet")
+
+		t.Run("run uninstall", testUninstallAuditUnenroll(ctx, fixture, info))
+	})
+
+	t.Run("unprivileged", func(t *testing.T) {
+		fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+		require.NoError(t, err)
+
+		err = fixture.Prepare(ctx)
+		require.NoError(t, err)
+		// Run `elastic-agent install`.  We use `--force` to prevent interactive
+		// execution.
+		opts := &atesting.InstallOpts{
+			Force:      true,
+			Privileged: false,
+			EnrollOpts: atesting.EnrollOpts{
+				URL:             fleetServerURL,
+				EnrollmentToken: enrollmentTokenResp.APIKey,
+			},
+		}
+		out, err := fixture.Install(ctx, opts)
+		if err != nil {
+			t.Logf("install output: %s", out)
+			require.NoError(t, err)
+		}
+
+		require.Eventuallyf(t, func() bool {
+			return waitForAgentAndFleetHealthy(ctx, t, fixture)
+		}, time.Minute, time.Second, "agent never became healthy or connected to Fleet")
+
+		t.Run("run uninstall", testUninstallAuditUnenroll(ctx, fixture, info))
+	})
 }
 
 func testUninstallAuditUnenroll(ctx context.Context, fixture *atesting.Fixture, info *define.Info) func(t *testing.T) {
