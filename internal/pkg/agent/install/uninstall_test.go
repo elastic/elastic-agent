@@ -22,7 +22,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -178,7 +177,7 @@ func TestNotifyFleetAuditUnenroll(t *testing.T) {
 
 	log, _ := logp.NewInMemory("test", zap.NewDevelopmentEncoderConfig())
 	pt := progressbar.NewOptions(-1, progressbar.OptionSetWriter(io.Discard))
-	ai := &info.AgentInfo{}
+	var agentID agentInfo = "testID"
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -194,7 +193,7 @@ func TestNotifyFleetAuditUnenroll(t *testing.T) {
 					},
 				},
 			}
-			err := notifyFleetAuditUninstall(context.Background(), log, pt, cfg, ai)
+			err := notifyFleetAuditUninstall(context.Background(), log, pt, cfg, &agentID)
 			if tc.err == nil {
 				assert.NoError(t, err)
 			} else {
@@ -222,7 +221,7 @@ func TestNotifyFleetAuditUnenroll(t *testing.T) {
 				},
 			},
 		}
-		err := notifyFleetAuditUninstall(context.Background(), log, pt, cfg, ai)
+		err := notifyFleetAuditUninstall(context.Background(), log, pt, cfg, &agentID)
 		assert.EqualError(t, err, "notify Fleet: failed")
 
 	})
