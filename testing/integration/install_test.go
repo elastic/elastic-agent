@@ -27,6 +27,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/installtest"
@@ -531,6 +532,9 @@ func TestRepeatedInstallUninstallFleet(t *testing.T) {
 
 			// Check that Agent was installed in successfully
 			require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+
+			// Check connected to Fleet.
+			check.ConnectedToFleet(ctx, t, fixture, 5*time.Minute)
 
 			// Perform uninstall.
 			out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
