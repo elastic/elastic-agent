@@ -179,6 +179,19 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		u.log.Errorw("Unable to clean downloads before update", "error.message", err, "downloads.path", paths.Downloads())
 	}
 
+	currentVersion := agentVersion{
+		version:  release.Version(),
+		snapshot: release.Snapshot(),
+		hash:     release.Commit(),
+	}
+
+	// check version before download
+	same, newVersion := isSameVersion(u.log, currentVersion, packageMetadata{}, version)
+	if same {
+		u.log.Warn("Upgrade action skipped: upgrade did not occur because its the same version")
+		return nil, nil
+	}
+
 	det.SetState(details.StateDownloading)
 
 	sourceURI = u.sourceURI(sourceURI)
@@ -206,15 +219,11 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, fmt.Errorf("reading metadata for elastic agent version %s package %q: %w", version, archivePath, err)
 	}
 
-	currentVersion := agentVersion{
-		version:  release.Version(),
-		snapshot: release.Snapshot(),
-		hash:     release.Commit(),
-	}
-
-	same, newVersion := isSameVersion(u.log, currentVersion, metadata, version)
+	// Recheck version here in case of a snapshot->snapshot upgrade on the same version.
+	same, newVersion = isSameVersion(u.log, currentVersion, metadata, version)
 	if same {
-		return nil, fmt.Errorf("agent version is already %s", currentVersion)
+		u.log.Warn("Upgrade action skipped: upgrade did not occur because its the same version")
+		return nil, nil
 	}
 
 	u.log.Infow("Unpacking agent package", "version", newVersion)
