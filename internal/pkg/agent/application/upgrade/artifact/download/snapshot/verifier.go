@@ -30,7 +30,6 @@ func (v *Verifier) Name() string {
 // NewVerifier creates a downloader which first checks local directory
 // and then fallbacks to remote if configured.
 func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte, versionOverride *agtversion.ParsedSemVer) (download.Verifier, error) {
-
 	client, err := config.HTTPTransportSettings.Client(httpcommon.WithAPMHTTPInstrumentation())
 	if err != nil {
 		return nil, err
@@ -54,9 +53,9 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte, versio
 }
 
 // Verify checks the package from configured source.
-func (v *Verifier) Verify(a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
+func (v *Verifier) Verify(ctx context.Context, a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
 	strippedVersion := agtversion.NewParsedSemVer(version.Major(), version.Minor(), version.Patch(), version.Prerelease(), "")
-	return v.verifier.Verify(a, *strippedVersion, skipDefaultPgp, pgpBytes...)
+	return v.verifier.Verify(ctx, a, *strippedVersion, skipDefaultPgp, pgpBytes...)
 }
 
 func (v *Verifier) Reload(c *artifact.Config) error {
