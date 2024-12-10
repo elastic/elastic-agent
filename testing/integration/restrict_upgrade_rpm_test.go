@@ -55,6 +55,5 @@ func TestRestrictUpgradeRPM(t *testing.T) {
 		out, err := fixture.Exec(ctx, []string{"upgrade", "1.0.0"})
 		require.Error(t, err)
 		require.Contains(t, string(out), coordinator.ErrNotUpgradable.Error())
-		require.True(t, false, "forcing failure")
 	})
 }
