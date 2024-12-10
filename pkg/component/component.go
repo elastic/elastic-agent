@@ -5,6 +5,7 @@
 package component
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -13,11 +14,13 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/go-viper/mapstructure/v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
+	"github.com/elastic/elastic-agent/internal/pkg/redact"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/limits"
 )
@@ -171,6 +174,14 @@ func (c Component) MarshalYAML() (interface{}, error) {
 		c.ErrMsg = c.Err.Error()
 	}
 	return c, nil
+}
+
+func (c *Component) MarshalJSON() ([]byte, error) {
+	var componentMap map[string]interface{}
+	mapstructure.Decode(c, &componentMap)
+	errWriter := strings.Builder{}
+	redacted := redact.RedactSecrets(componentMap, &errWriter)
+	return json.Marshal(redacted)
 }
 
 // Type returns the type of the component.
