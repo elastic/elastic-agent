@@ -186,7 +186,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	// check version before download
-	same, newVersion := isSameVersion(u.log, currentVersion, packageMetadata{}, version)
+	same, _ := isSameVersion(u.log, currentVersion, packageMetadata{}, version)
 	if same {
 		u.log.Warn("Upgrade action skipped: upgrade did not occur because its the same version")
 		return nil, nil
@@ -220,7 +220,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	// Recheck version here in case of a snapshot->snapshot upgrade on the same version.
-	same, newVersion = isSameVersion(u.log, currentVersion, metadata, version)
+	same, newVersion := isSameVersion(u.log, currentVersion, metadata, version)
 	if same {
 		u.log.Warn("Upgrade action skipped: upgrade did not occur because its the same version")
 		return nil, nil
