@@ -44,7 +44,7 @@ func TestDownload(t *testing.T) {
 	log, _ := logger.New("", false)
 	timeout := 30 * time.Second
 	testCases := getTestCases()
-	server, _ := getElasticCoServer(t)
+	server, _, _ := getElasticCoServer(t)
 	elasticClient := getElasticCoClient(server)
 
 	config := &artifact.Config{
@@ -359,7 +359,6 @@ type downloadHttpResponse struct {
 }
 
 func TestDownloadVersion(t *testing.T) {
-
 	type fields struct {
 		config *artifact.Config
 	}
@@ -485,7 +484,6 @@ func TestDownloadVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			targetDirPath := t.TempDir()
 
 			handleDownload := func(rw http.ResponseWriter, req *http.Request) {
@@ -527,5 +525,4 @@ func TestDownloadVersion(t *testing.T) {
 			assert.Equalf(t, filepath.Join(targetDirPath, tt.want), got, "Download(%v, %v)", tt.args.a, tt.args.version)
 		})
 	}
-
 }

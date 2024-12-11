@@ -1,5 +1,3 @@
-// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
 package download
@@ -317,6 +315,8 @@ func CheckValidDownloadUri(rawURI string) error {
 }
 
 func fetchPgpFromURI(uri string, client HTTPClient) ([]byte, error) {
+	fmt.Println("================= FETCH PGP FROM URI =======================")
+	fmt.Println(uri)
 	if err := CheckValidDownloadUri(uri); err != nil {
 		return nil, err
 	}
