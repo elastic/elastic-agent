@@ -110,10 +110,6 @@ func runTests(t *testing.T, testCases []testCase, td *testDials, config *artifac
 				t.Fatal(err)
 			}
 
-			testVerifier.client.Transport = &timeoutRoundTripper{
-				next: testVerifier.client.Transport,
-			}
-
 			err = testVerifier.Verify(cancelCtx, beatSpec, *version, false)
 			require.NoError(t, err)
 		})
@@ -132,11 +128,3 @@ func getRandomTestCases() []testCase {
 	}
 }
 
-type timeoutRoundTripper struct {
-	timedout bool
-	next     http.RoundTripper
-}
-
-func (tr *timeoutRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	return tr.next.RoundTrip(req)
-}
