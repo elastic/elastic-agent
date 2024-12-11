@@ -57,13 +57,13 @@ func isFileOwner(curUser string, fileOwner string) (bool, error) {
 	var cSid *windows.SID
 	err := windows.ConvertStringSidToSid(windows.StringToUTF16Ptr(curUser), &cSid)
 	if err != nil {
-		return false, fmt.Errorf("failed to convert SID string to SID: %w", err)
+		return false, fmt.Errorf("failed to convert user SID string to SID: %w", err)
 	}
 
 	var fSid *windows.SID
 	err = windows.ConvertStringSidToSid(windows.StringToUTF16Ptr(fileOwner), &fSid)
 	if err != nil {
-		return false, fmt.Errorf("failed to convert SID string to SID: %w", err)
+		return false, fmt.Errorf("failed to convert file SID string to SID: %w", err)
 	}
 
 	isEqual := fSid.Equals(cSid)
