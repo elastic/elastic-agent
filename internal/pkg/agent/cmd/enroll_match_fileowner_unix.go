@@ -55,9 +55,5 @@ func isOwnerExec(filePath string) (bool, error) {
 		return false, fmt.Errorf("error while checking if current user is the file owner: %w", err)
 	}
 
-	if !isOwner {
-		return false, nil
-	}
-
-	return true, nil
+	return isOwner, nil
 }
