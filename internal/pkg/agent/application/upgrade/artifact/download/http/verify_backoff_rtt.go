@@ -45,6 +45,9 @@ func (btr *BackoffRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 		}
 
 		if resp.StatusCode >= 400 {
+			if err := resp.Body.Close(); err != nil {
+				btr.logger.Errorf("error closing the response body: %w", err)
+			}
 			return errors.New(fmt.Sprintf("received response status: %d", resp.StatusCode))
 		}
 
