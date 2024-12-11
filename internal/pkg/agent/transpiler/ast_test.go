@@ -9,6 +9,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/elastic/elastic-agent-libs/mapstr"
+
+	"github.com/elastic/elastic-agent/internal/pkg/eql"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -852,6 +856,41 @@ func TestHash(t *testing.T) {
 	}
 }
 
+func TestApplyDoesNotMutate(t *testing.T) {
+	tests := map[string]struct {
+		input Node
+	}{
+		"dict": {
+			&Dict{
+				value: []Node{
+					&Key{name: "str", value: &StrVal{value: "${var}"}},
+				},
+			},
+		},
+		"list": {
+			&List{
+				value: []Node{
+					&StrVal{value: "${var}"},
+				},
+			},
+		},
+		"key": {
+			&Key{name: "str", value: &StrVal{value: "${var}"}},
+		},
+		"str": {&StrVal{value: "${var}"}},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			vars, err := NewVars("", map[string]any{"var": "value"}, mapstr.M{})
+			require.NoError(t, err)
+			applied, err := test.input.Apply(vars)
+			require.NoError(t, err)
+			assert.NotEqual(t, test.input, applied)
+		})
+	}
+}
+
 func TestShallowClone(t *testing.T) {
 	tests := map[string]struct {
 		input *AST
@@ -909,7 +948,7 @@ func TestShallowClone(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			cloned := test.input.ShallowClone()
 			assert.Equal(t, test.input, cloned)
-			err := test.input.Insert(&AST{root: &BoolVal{value: true}}, "key")
+			err := test.input.Insert(&AST{root: &Key{name: "integer", value: &IntVal{value: 7}}}, "integer")
 			if err == nil {
 				assert.NotEqual(t, test.input, cloned)
 			} else if list, ok := test.input.root.(*List); ok {
@@ -1069,6 +1108,41 @@ func TestLookup(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCondition(t *testing.T) {
+	vars := mustMakeVars(map[string]interface{}{
+		"other": map[string]interface{}{
+			"data": "info",
+		}})
+
+	input := NewKey("condition", NewStrVal("${other.data} == 'info'"))
+	expected := NewKey("condition", NewBoolVal(true))
+
+	// the condition string hasn't been parsed yet
+	assert.Nil(t, input.condition)
+
+	output, err := input.Apply(vars)
+	require.NoError(t, err)
+	assert.Equal(t, expected, output)
+
+	// check if the condition was parsed and cached
+	assert.NotNil(t, input.condition)
+	condition, err := eql.New(input.value.Value().(string))
+	require.NoError(t, err)
+	assert.Equal(t, condition, input.condition)
+
+	// create a dict with the key
+	dict := NewDict([]Node{input})
+	ast := &AST{root: NewKey("key", dict)}
+	// the cached condition remains
+	assert.Equal(t, condition, input.condition)
+
+	// replace the key with a new one, without a cached condition
+	input2 := NewKey("condition", NewStrVal("${other.data} == 'info'"))
+	err = Insert(ast, input2, "")
+	require.NoError(t, err)
+	assert.Nil(t, input2.condition)
 }
 
 func mustMakeVars(mapping map[string]interface{}) *Vars {
