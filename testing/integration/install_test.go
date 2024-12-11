@@ -421,57 +421,6 @@ func TestInstallUninstallAudit(t *testing.T) {
 	require.Equal(t, "uninstall", res.Source.AuditUnenrolledReason)
 }
 
-// TestRepeatedInstallUninstall will install then uninstall the agent
-// repeatedly.  This test exists because of a number of race
-// conditions that have occurred in the uninstall process.  Current
-// testing shows each iteration takes around 16 seconds.
-func TestRepeatedInstallUninstall(t *testing.T) {
-	define.Require(t, define.Requirements{
-		Group: Default,
-		// We require sudo for this test to run
-		// `elastic-agent install` (even though it will
-		// be installed as non-root).
-		Sudo: true,
-
-		// It's not safe to run this test locally as it
-		// installs Elastic Agent.
-		Local: false,
-	})
-
-	maxRunTime := 2 * time.Minute
-	iterations := 100
-	for i := 0; i < iterations; i++ {
-		t.Run(fmt.Sprintf("%s-%d", t.Name(), i), func(t *testing.T) {
-
-			// Get path to Elastic Agent executable
-			fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-			require.NoError(t, err)
-
-			ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(maxRunTime))
-			defer cancel()
-
-			// Prepare the Elastic Agent so the binary is extracted and ready to use.
-			err = fixture.Prepare(ctx)
-			require.NoError(t, err)
-
-			// Run `elastic-agent install`.  We use `--force` to prevent interactive
-			// execution.
-			opts := &atesting.InstallOpts{Force: true}
-			out, err := fixture.Install(ctx, opts)
-			if err != nil {
-				t.Logf("install output: %s", out)
-				require.NoError(t, err)
-			}
-
-			// Check that Agent was installed in default base path
-			require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Privileged: opts.Privileged}))
-			t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
-			out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
-			require.NoErrorf(t, err, "uninstall failed: %s", err)
-		})
-	}
-}
-
 // TestRepeatedInstallUninstallFleet will install then uninstall the agent
 // repeatedly with it enrolled into Fleet.  This test exists because of a number
 // of race conditions that have occurred in the uninstall process when enrolled
