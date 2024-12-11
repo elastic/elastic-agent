@@ -16,7 +16,7 @@ require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20241202144630-0eb63c16f21a
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.0
-	github.com/elastic/elastic-agent-libs v0.17.3
+	github.com/elastic/elastic-agent-libs v0.17.4
 	github.com/elastic/elastic-agent-system-metrics v0.11.4
 	github.com/elastic/elastic-transport-go/v8 v8.6.0
 	github.com/elastic/go-elasticsearch/v8 v8.16.0
@@ -86,6 +86,7 @@ require (
 	helm.sh/helm/v3 v3.15.4
 	k8s.io/api v0.31.3
 	k8s.io/apimachinery v0.31.3
+	k8s.io/cli-runtime v0.30.3
 	k8s.io/client-go v0.31.3
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.70
 	sigs.k8s.io/e2e-framework v0.4.0
@@ -592,7 +593,6 @@ require (
 	howett.net/plist v1.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.30.3 // indirect
 	k8s.io/apiserver v0.31.3 // indirect
-	k8s.io/cli-runtime v0.30.3 // indirect
 	k8s.io/component-base v0.31.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
 	k8s.io/kubectl v0.30.3 // indirect
