@@ -38,12 +38,9 @@ func TestKubernetesAgentService(t *testing.T) {
 	ctx := context.Background()
 	kCtx := k8sGetContext(t, info)
 
-	nodeList := corev1.NodeList{}
-	err = kCtx.client.Resources().List(ctx, &nodeList)
-	require.NoError(t, err)
-
-	totalK8SNodes := len(nodeList.Items)
-	require.NotZero(t, totalK8SNodes, "No Kubernetes nodes found")
+	schedulableNodeCount, err := k8sSchedulableNodeCount(ctx, kCtx)
+	require.NoError(t, err, "error at getting schedulable node count")
+	require.NotZero(t, schedulableNodeCount, "no schedulable Kubernetes nodes found")
 
 	testSteps := []k8sTestStep{
 		k8sStepCreateNamespace(),
@@ -59,7 +56,7 @@ func TestKubernetesAgentService(t *testing.T) {
 				}
 			}
 		}),
-		k8sStepCheckAgentStatus("app=elastic-agent-standalone", totalK8SNodes, "elastic-agent-standalone", map[string]bool{
+		k8sStepCheckAgentStatus("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone", map[string]bool{
 			"connectors-py": true,
 		}),
 	}

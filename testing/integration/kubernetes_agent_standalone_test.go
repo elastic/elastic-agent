@@ -80,12 +80,9 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 	ctx := context.Background()
 	kCtx := k8sGetContext(t, info)
 
-	nodeList := corev1.NodeList{}
-	err := kCtx.client.Resources().List(ctx, &nodeList)
-	require.NoError(t, err)
-
-	totalK8SNodes := len(nodeList.Items)
-	require.NotZero(t, totalK8SNodes, "No Kubernetes nodes found")
+	schedulableNodeCount, err := k8sSchedulableNodeCount(ctx, kCtx)
+	require.NoError(t, err, "error at getting schedulable node count")
+	require.NotZero(t, schedulableNodeCount, "no schedulable Kubernetes nodes found")
 
 	testCases := []struct {
 		name       string
@@ -99,7 +96,7 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 				k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{
 					agentContainerMemoryLimit: "800Mi",
 				}, nil),
-				k8sStepCheckAgentStatus("app=elastic-agent-standalone", totalK8SNodes, "elastic-agent-standalone", nil),
+				k8sStepCheckAgentStatus("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone", nil),
 			},
 		},
 		{
@@ -112,7 +109,7 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 					agentContainerCapabilitiesDrop: []corev1.Capability{"ALL"},
 					agentContainerMemoryLimit:      "800Mi",
 				}, nil),
-				k8sStepCheckAgentStatus("app=elastic-agent-standalone", totalK8SNodes, "elastic-agent-standalone", nil),
+				k8sStepCheckAgentStatus("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone", nil),
 			},
 		},
 		{
@@ -125,8 +122,8 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 					agentContainerCapabilitiesDrop: []corev1.Capability{"ALL"},
 					agentContainerMemoryLimit:      "800Mi",
 				}, nil),
-				k8sStepCheckAgentStatus("app=elastic-agent-standalone", totalK8SNodes, "elastic-agent-standalone", nil),
-				k8sStepRunInnerTests("app=elastic-agent-standalone", totalK8SNodes, "elastic-agent-standalone"),
+				k8sStepCheckAgentStatus("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone", nil),
+				k8sStepRunInnerTests("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone"),
 			},
 		},
 		{
@@ -140,8 +137,8 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 					agentContainerCapabilitiesDrop: []corev1.Capability{"ALL"},
 					agentContainerMemoryLimit:      "800Mi",
 				}, nil),
-				k8sStepCheckAgentStatus("app=elastic-agent-standalone", totalK8SNodes, "elastic-agent-standalone", nil),
-				k8sStepRunInnerTests("app=elastic-agent-standalone", totalK8SNodes, "elastic-agent-standalone"),
+				k8sStepCheckAgentStatus("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone", nil),
+				k8sStepRunInnerTests("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone"),
 			},
 		},
 		{
@@ -155,8 +152,8 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 					agentContainerCapabilitiesDrop: []corev1.Capability{"ALL"},
 					agentContainerMemoryLimit:      "800Mi",
 				}, nil),
-				k8sStepCheckAgentStatus("app=elastic-agent-standalone", totalK8SNodes, "elastic-agent-standalone", nil),
-				k8sStepRunInnerTests("app=elastic-agent-standalone", totalK8SNodes, "elastic-agent-standalone"),
+				k8sStepCheckAgentStatus("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone", nil),
+				k8sStepRunInnerTests("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone"),
 			},
 		},
 	}
@@ -197,8 +194,9 @@ func TestKubernetesAgentOtel(t *testing.T) {
 	err := kCtx.client.Resources().List(ctx, &nodeList)
 	require.NoError(t, err)
 
-	totalK8SNodes := len(nodeList.Items)
-	require.NotZero(t, totalK8SNodes, "No Kubernetes nodes found")
+	schedulableNodeCount, err := k8sSchedulableNodeCount(ctx, kCtx)
+	require.NoError(t, err, "error at getting schedulable node count")
+	require.NotZero(t, schedulableNodeCount, "no schedulable Kubernetes nodes found")
 
 	testCases := []struct {
 		name       string
@@ -254,8 +252,9 @@ func TestKubernetesAgentHelm(t *testing.T) {
 	err := kCtx.client.Resources().List(ctx, &nodeList)
 	require.NoError(t, err)
 
-	totalK8SNodes := len(nodeList.Items)
-	require.NotZero(t, totalK8SNodes, "No Kubernetes nodes found")
+	schedulableNodeCount, err := k8sSchedulableNodeCount(ctx, kCtx)
+	require.NoError(t, err, "error at getting schedulable node count")
+	require.NotZero(t, schedulableNodeCount, "no schedulable Kubernetes nodes found")
 
 	testCases := []struct {
 		name       string
@@ -286,10 +285,10 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						},
 					},
 				}),
-				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", totalK8SNodes, "agent", nil),
+				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
 				k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
 				k8sStepCheckAgentStatus("name=agent-ksmsharded-helm-agent", 1, "agent", nil),
-				k8sStepRunInnerTests("name=agent-pernode-helm-agent", totalK8SNodes, "agent"),
+				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
 				k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
 				k8sStepRunInnerTests("name=agent-ksmsharded-helm-agent", 1, "agent"),
 			},
@@ -318,10 +317,10 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						},
 					},
 				}),
-				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", totalK8SNodes, "agent", nil),
+				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
 				k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
 				k8sStepCheckAgentStatus("name=agent-ksmsharded-helm-agent", 1, "agent", nil),
-				k8sStepRunInnerTests("name=agent-pernode-helm-agent", totalK8SNodes, "agent"),
+				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
 				k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
 				k8sStepRunInnerTests("name=agent-ksmsharded-helm-agent", 1, "agent"),
 			},
@@ -346,8 +345,8 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						},
 					},
 				}),
-				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", totalK8SNodes, "agent", nil),
-				k8sStepRunInnerTests("name=agent-pernode-helm-agent", totalK8SNodes, "agent"),
+				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
 			},
 		},
 		{
@@ -370,8 +369,8 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						},
 					},
 				}),
-				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", totalK8SNodes, "agent", nil),
-				k8sStepRunInnerTests("name=agent-pernode-helm-agent", totalK8SNodes, "agent"),
+				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
 			},
 		},
 	}
@@ -855,6 +854,38 @@ func (k8sContext) getNamespace(t *testing.T) string {
 	hasher.Write([]byte(t.Name()))
 	testNamespace := strings.ToLower(base64.URLEncoding.EncodeToString(hasher.Sum(nil)))
 	return noSpecialCharsRegexp.ReplaceAllString(testNamespace, "")
+}
+
+func k8sSchedulableNodeCount(ctx context.Context, kCtx k8sContext) (int, error) {
+	nodeList := corev1.NodeList{}
+	err := kCtx.client.Resources().List(ctx, &nodeList)
+	if err != nil {
+		return 0, err
+	}
+
+	totalSchedulableNodes := 0
+
+	for _, node := range nodeList.Items {
+		if node.Spec.Unschedulable {
+			continue
+		}
+
+		hasNoScheduleTaint := false
+		for _, taint := range node.Spec.Taints {
+			if taint.Effect == corev1.TaintEffectNoSchedule {
+				hasNoScheduleTaint = true
+				break
+			}
+		}
+
+		if hasNoScheduleTaint {
+			continue
+		}
+
+		totalSchedulableNodes++
+	}
+
+	return totalSchedulableNodes, err
 }
 
 // k8sGetContext performs all the necessary checks to get a k8sContext for the current test
