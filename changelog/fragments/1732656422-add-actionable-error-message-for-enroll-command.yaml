@@ -11,7 +11,7 @@
 kind: enhancement
 
 # Change summary; a 80ish characters long description of the change.
-summary: Elastic agent returns an actionable error message when a root user tries to enroll an unprivileged agent that has been unenrolled via the fleet ui
+summary: Elastic agent returns an actionable error message when a the use trying to execute the enroll command is not the same as the onwer of the elastic-agent program files
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
@@ -28,4 +28,4 @@ component: elastic-agent
 pr: https://github.com/elastic/elastic-agent/pull/6144
 # Issue URL; optional; the GitHub issue related to this changeset (either closes or is part of).
 # If not present is automatically filled by the tooling with the issue linked to the PR number.
-#issue: https://github.com/owner/repo/1234
+issue: https://github.com/elastic/elastic-agent/issues/4889
