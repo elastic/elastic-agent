@@ -1147,6 +1147,9 @@ func TestFBOtelRestartE2E(t *testing.T) {
           enabled: true
           paths:
             - {{.InputPath}}
+          parsers:
+            - ndjson:
+                document_id: "id"
     output:
       otelconsumer:
     logging:
@@ -1214,7 +1217,7 @@ service:
 				break
 			}
 
-			_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
+			_, err = inputFile.Write([]byte(fmt.Sprintf(`{"id": "%d", "text: "line %d"}\n`, i, i)))
 			require.NoErrorf(t, err, "failed to write line %d to temp file", i)
 			inputLinesCounter.Add(1)
 			time.Sleep(100 * time.Millisecond)
