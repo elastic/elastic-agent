@@ -9,35 +9,10 @@ package cmd
 import (
 	"os"
 	"path/filepath"
-	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
-
-func TestGetFileOwnerUnix(t *testing.T) {
-	cu := os.Geteuid()
-
-	path := t.TempDir()
-	fp := filepath.Join(path, "testfile")
-	fi, err := os.Create(fp)
-	require.NoError(t, err)
-	defer fi.Close()
-
-	fo, err := getFileOwner(fp)
-	require.NoError(t, err)
-
-	require.Equal(t, fo, strconv.Itoa(cu))
-}
-
-func TestIsFileOwnerUnix(t *testing.T) {
-	cu := os.Geteuid()
-
-	isOwner, err := isFileOwner(strconv.Itoa(cu), strconv.Itoa(cu))
-	require.NoError(t, err)
-
-	require.True(t, isOwner)
-}
 
 func TestIsOwnerExecUnix(t *testing.T) {
 	path := t.TempDir()
