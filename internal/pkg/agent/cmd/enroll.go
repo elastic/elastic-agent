@@ -360,11 +360,11 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		if err != nil {
 			return fmt.Errorf("error while getting executable path: %w", err)
 		}
-		oe, err := isOwnerExec(binPath)
+		isOwner, err := isOwnerExec(binPath)
 		if err != nil {
-			return fmt.Errorf("ran into an error while figuring out if user is allowed to execute the enroll command")
+			return fmt.Errorf("ran into an error while figuring out if user is allowed to execute the enroll command: %w", err)
 		}
-		if !oe {
+		if !isOwner {
 			return UserOwnerMismatchError
 		}
 	}
