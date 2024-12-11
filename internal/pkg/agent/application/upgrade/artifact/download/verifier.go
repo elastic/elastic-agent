@@ -315,8 +315,6 @@ func CheckValidDownloadUri(rawURI string) error {
 }
 
 func fetchPgpFromURI(uri string, client HTTPClient) ([]byte, error) {
-	fmt.Println("================= FETCH PGP FROM URI =======================")
-	fmt.Println(uri)
 	if err := CheckValidDownloadUri(uri); err != nil {
 		return nil, err
 	}
