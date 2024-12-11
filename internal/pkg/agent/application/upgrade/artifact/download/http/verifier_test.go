@@ -81,12 +81,12 @@ func runTests(t *testing.T, testCases []testCase, td *testDials, config *artifac
 	for _, tc := range testCases {
 		testName := fmt.Sprintf("%s-binary-%s", tc.system, tc.arch)
 		t.Run(testName, func(t *testing.T) {
-      td.withExtResCode(".asc", 500, 2)
-      defer td.reset()
+			td.withExtResCode(".asc", 500, 2)
+			defer td.reset()
 
-      cancelDeadline := time.Now().Add(config.Timeout)
-      cancelCtx, cancel := context.WithDeadline(context.Background(), cancelDeadline)
-      defer cancel()
+			cancelDeadline := time.Now().Add(config.Timeout)
+			cancelCtx, cancel := context.WithDeadline(context.Background(), cancelDeadline)
+			defer cancel()
 
 			config.OperatingSystem = tc.system
 			config.Architecture = tc.arch
@@ -110,11 +110,11 @@ func runTests(t *testing.T, testCases []testCase, td *testDials, config *artifac
 				t.Fatal(err)
 			}
 
-      testVerifier.client.Transport = &timeoutRoundTripper{
-        next: testVerifier.client.Transport,
-      }
+			testVerifier.client.Transport = &timeoutRoundTripper{
+				next: testVerifier.client.Transport,
+			}
 
-      err = testVerifier.Verify(cancelCtx, beatSpec, *version, false)
+			err = testVerifier.Verify(cancelCtx, beatSpec, *version, false)
 			require.NoError(t, err)
 		})
 	}
@@ -133,10 +133,10 @@ func getRandomTestCases() []testCase {
 }
 
 type timeoutRoundTripper struct {
-  timedout bool
-  next http.RoundTripper
+	timedout bool
+	next     http.RoundTripper
 }
 
-func (tr *timeoutRoundTripper) RoundTrip(req *http.Request)(*http.Response, error) {
-  return tr.next.RoundTrip(req)
+func (tr *timeoutRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return tr.next.RoundTrip(req)
 }
