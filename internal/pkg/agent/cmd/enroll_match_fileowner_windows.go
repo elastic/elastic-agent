@@ -71,6 +71,7 @@ func isFileOwner(curUser string, fileOwner string) (bool, error) {
 	return isEqual, nil
 }
 
+// Checks if the provided file is owned by the user that initiated the process
 func isOwnerExec(filePath string) (bool, error) {
 	fileOwner, err := getFileOwner(filePath)
 	if err != nil {

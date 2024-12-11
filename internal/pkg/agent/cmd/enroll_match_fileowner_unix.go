@@ -27,7 +27,7 @@ func getFileOwner(filePath string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("failed to get system specific file info: %w", err)
 	}
-	return strconv.Itoa(stat.Uid), nil
+	return strconv.Itoa(int(stat.Uid)), nil
 }
 
 func getCurrentUser() (string, error) {
@@ -38,6 +38,7 @@ func isFileOwner(curUser string, fileOwner string) (bool, error) {
 	return curUser == fileOwner, nil
 }
 
+// Checks if the provided file is owned by the user that initiated the process
 func isOwnerExec(filePath string) (bool, error) {
 	owner, err := getFileOwner(filePath)
 	if err != nil {
