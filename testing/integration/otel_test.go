@@ -1159,6 +1159,9 @@ func TestFBOtelRestartE2E(t *testing.T) {
     path.home: {{.HomeDir}}
     queue.mem.flush.timeout: 0s
 exporters:
+  debug:
+    use_internal_logger: false
+    verbosity: detailed
   elasticsearch/log:
     endpoints:
       - {{.ESEndpoint}}
@@ -1176,6 +1179,7 @@ service:
         - filebeatreceiver
       exporters:
         - elasticsearch/log
+        - debug
 `
 	otelConfigPath := filepath.Join(tmpDir, "otel.yml")
 	var otelConfigBuffer bytes.Buffer
@@ -1205,7 +1209,7 @@ service:
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
 	defer cancel()
-	err = fixture.Prepare(ctx, fakeComponent)
+	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
 
 	// Write logs to input file
