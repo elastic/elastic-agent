@@ -733,6 +733,23 @@ func TestIsSameVersion(t *testing.T) {
 				newVersion: agentVersion123SNAPSHOTghijkl,
 			},
 		},
+		{
+			name: "same version and snapshot, no hash (SNAPSHOT upgrade before download)",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: nil,
+				},
+				version: "1.2.3-SNAPSHOT",
+			},
+			want: want{
+				same: false,
+				newVersion: agentVersion{
+					version:  "1.2.3",
+					snapshot: true,
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

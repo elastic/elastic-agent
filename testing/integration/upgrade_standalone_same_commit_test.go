@@ -74,7 +74,7 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 			upgradetest.WithUnprivileged(unprivilegedAvailable),
 			upgradetest.WithDisableHashCheck(true),
 		)
-		assert.ErrorContainsf(t, err, fmt.Sprintf("agent version is already %s", currentVersion), "upgrade should fail indicating we are already at the same version")
+		assert.ErrorContains(t, err, "failed to find watcher:")
 	})
 
 	t.Run(fmt.Sprintf("Upgrade on a repackaged version of agent %s (%s)", currentVersion, unPrivilegedString), func(t *testing.T) {
