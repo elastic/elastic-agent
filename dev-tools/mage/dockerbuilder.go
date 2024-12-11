@@ -7,6 +7,7 @@ package mage
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +15,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -23,20 +27,35 @@ import (
 type dockerBuilder struct {
 	PackageSpec
 
-	imageName string
-	buildDir  string
-	beatDir   string
+	imageName       string
+	buildDir        string
+	beatDir         string
+	buildxPlatforms []string
 }
 
 func newDockerBuilder(spec PackageSpec) (*dockerBuilder, error) {
+	var buildxPlatforms []string
 	buildDir := filepath.Join(spec.packageDir, "docker-build")
 	beatDir := filepath.Join(buildDir, "beat")
 
+	err := isBuildxEnabled()
+	if err == nil {
+		fmt.Println("Docker buildx is available, cross-platform builds are possible")
+		buildxPlatforms, err = getBuildxPlatforms()
+		if err != nil {
+			return nil, err
+		}
+		fmt.Println("Available buildx platforms:", buildxPlatforms)
+	} else {
+		fmt.Println("Docker buildx is not available")
+	}
+
 	return &dockerBuilder{
-		PackageSpec: spec,
-		imageName:   spec.ImageName(),
-		buildDir:    buildDir,
-		beatDir:     beatDir,
+		PackageSpec:     spec,
+		imageName:       spec.ImageName(),
+		buildDir:        buildDir,
+		beatDir:         beatDir,
+		buildxPlatforms: buildxPlatforms,
 	}, nil
 }
 
@@ -185,6 +204,21 @@ func (b *dockerBuilder) dockerBuild() (string, error) {
 	if repository := b.ExtraVars["repository"]; repository != "" {
 		tag = fmt.Sprintf("%s/%s", repository, tag)
 	}
+
+	platform := fmt.Sprintf("%s/%s", "linux", b.Arch)
+
+	if runtime.GOARCH != b.Arch { // we need a cross-platform build, check if buildx supports the requested platform
+		if b.buildxPlatforms == nil {
+			return "", fmt.Errorf("cross-platform docker build requested, but buildx is not available")
+		}
+		if !slices.Contains(b.buildxPlatforms, platform) {
+			return "", fmt.Errorf("requested buildx platform %s not available", platform)
+		}
+		// if building cross-platform, add the arch name to the tag
+		tag = fmt.Sprintf("%s-%s", tag, b.Arch)
+		return tag, sh.Run("docker", "buildx", "build", "-t", tag, "--platform", platform, "--load", b.buildDir)
+	}
+
 	return tag, sh.Run("docker", "build", "-t", tag, b.buildDir)
 }
 
@@ -249,4 +283,46 @@ func (b *dockerBuilder) dockerSave(tag string) error {
 		return fmt.Errorf("failed to create .sha512 file: %w", err)
 	}
 	return nil
+}
+
+func isBuildxEnabled() error {
+	return sh.Run("docker", "buildx", "version")
+}
+
+func getBuildxPlatforms() ([]string, error) {
+	// first get the current builder
+	output, err := sh.Output("docker", "buildx", "inspect")
+	if err != nil {
+		return nil, err
+	}
+	regex := regexp.MustCompile(`^Name:\s*(?P<name>[^\n]+)\n`)
+	matches := regex.FindStringSubmatch(output)
+	if matches == nil || len(matches) < 2 {
+		return nil, fmt.Errorf("failed to parse buildx inspect output, couldn't get builder name: %s", output)
+	}
+	builderName := matches[1]
+
+	// then get the supported platforms from the json formatted list
+	lsOutput, err := sh.Output("docker", "buildx", "ls", "--format", "json")
+	if err != nil {
+		return nil, err
+	}
+	var builder struct {
+		Name  string
+		Nodes []struct {
+			Platforms []string
+		}
+	}
+	builderJsonStrings := strings.Split(lsOutput, "\n")
+
+	for _, builderJsonString := range builderJsonStrings {
+		if err := json.Unmarshal([]byte(builderJsonString), &builder); err != nil {
+			return nil, err
+		}
+		if builder.Name == builderName {
+			return builder.Nodes[0].Platforms, nil
+		}
+	}
+
+	return []string{}, fmt.Errorf("failed to find builder %s in output", builderName)
 }
