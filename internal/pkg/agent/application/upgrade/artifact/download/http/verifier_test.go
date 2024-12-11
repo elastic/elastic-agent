@@ -9,8 +9,9 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net/http"
-	// "net/http/httptest"
-	// "net/url"
+
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"testing"
 	"time"
@@ -21,7 +22,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	// "github.com/elastic/elastic-agent/testing/proxytest"
+	"github.com/elastic/elastic-agent/testing/proxytest"
 )
 
 func TestVerify(t *testing.T) {
@@ -30,7 +31,7 @@ func TestVerify(t *testing.T) {
 	log, _ := logger.New("", false)
 	timeout := 30 * time.Second
 	testCases := getRandomTestCases()[0:1]
-	server, pub := getElasticCoServer(t)
+	server, pub, td := getElasticCoServer(t)
 
 	config := &artifact.Config{
 		SourceURI:       server.URL + "/downloads",
@@ -41,45 +42,48 @@ func TestVerify(t *testing.T) {
 	}
 
 	t.Run("without proxy", func(t *testing.T) {
-		runTests(t, testCases, config, log, pub)
+		runTests(t, testCases, td, config, log, pub)
 	})
 
-	// t.Run("with proxy", func(t *testing.T) {
-	// 	brokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	// 		w.WriteHeader(http.StatusTeapot)
-	// 		t.Log("[brokenServer] wrong server, is the proxy working?")
-	// 		_, _ = w.Write([]byte(`wrong server, is the proxy working?`))
-	// 	}))
-	// 	serverURL, err := url.Parse(server.URL)
-	// 	require.NoError(t, err, "could not parse server URL \"%s\"",
-	// 		server.URL)
-	//
-	// 	proxy := proxytest.New(t,
-	// 		proxytest.WithRewriteFn(func(u *url.URL) {
-	// 			u.Host = serverURL.Host
-	// 		}),
-	// 		proxytest.WithRequestLog("proxy", func(_ string, _ ...any) {}))
-	// 	err = proxy.Start()
-	// 	require.NoError(t, err, "error starting proxytest")
-	// 	defer proxy.Close()
-	// 	proxyURL, err := url.Parse(proxy.LocalhostURL)
-	// 	require.NoError(t, err, "could not parse server URL \"%s\"",
-	// 		server.URL)
-	//
-	// 	config := *config
-	// 	config.SourceURI = brokenServer.URL + "/downloads"
-	// 	config.Proxy = httpcommon.HTTPClientProxySettings{
-	// 		URL: (*httpcommon.ProxyURI)(proxyURL),
-	// 	}
-	//
-	// 	runTests(t, testCases, &config, log, pub)
-	// })
+	t.Run("with proxy", func(t *testing.T) {
+		brokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusTeapot)
+			t.Log("[brokenServer] wrong server, is the proxy working?")
+			_, _ = w.Write([]byte(`wrong server, is the proxy working?`))
+		}))
+		serverURL, err := url.Parse(server.URL)
+		require.NoError(t, err, "could not parse server URL \"%s\"",
+			server.URL)
+
+		proxy := proxytest.New(t,
+			proxytest.WithRewriteFn(func(u *url.URL) {
+				u.Host = serverURL.Host
+			}),
+			proxytest.WithRequestLog("proxy", func(_ string, _ ...any) {}))
+		err = proxy.Start()
+		require.NoError(t, err, "error starting proxytest")
+		defer proxy.Close()
+		proxyURL, err := url.Parse(proxy.LocalhostURL)
+		require.NoError(t, err, "could not parse server URL \"%s\"",
+			server.URL)
+
+		config := *config
+		config.SourceURI = brokenServer.URL + "/downloads"
+		config.Proxy = httpcommon.HTTPClientProxySettings{
+			URL: (*httpcommon.ProxyURI)(proxyURL),
+		}
+
+		runTests(t, testCases, td, &config, log, pub)
+	})
 }
 
-func runTests(t *testing.T, testCases []testCase, config *artifact.Config, log *logger.Logger, pub []byte) {
+func runTests(t *testing.T, testCases []testCase, td *testDials, config *artifact.Config, log *logger.Logger, pub []byte) {
 	for _, tc := range testCases {
 		testName := fmt.Sprintf("%s-binary-%s", tc.system, tc.arch)
 		t.Run(testName, func(t *testing.T) {
+      td.withExtResCode(".asc", 500, 2)
+      defer td.reset()
+
       cancelDeadline := time.Now().Add(config.Timeout)
       cancelCtx, cancel := context.WithDeadline(context.Background(), cancelDeadline)
       defer cancel()
@@ -110,7 +114,7 @@ func runTests(t *testing.T, testCases []testCase, config *artifact.Config, log *
         next: testVerifier.client.Transport,
       }
 
-			err = testVerifier.Verify(cancelCtx, beatSpec, *version, false)
+      err = testVerifier.Verify(cancelCtx, beatSpec, *version, false)
 			require.NoError(t, err)
 		})
 	}
@@ -134,7 +138,5 @@ type timeoutRoundTripper struct {
 }
 
 func (tr *timeoutRoundTripper) RoundTrip(req *http.Request)(*http.Response, error) {
-  fmt.Println("TEST ROUNDTRIPPER")
-  fmt.Println(req.URL)
   return tr.next.RoundTrip(req)
 }
