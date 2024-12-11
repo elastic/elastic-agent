@@ -373,6 +373,94 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
 			},
 		},
+		{
+			name: "helm standalone agent unprivileged kubernetes hints",
+			steps: []k8sTestStep{
+				k8sStepCreateNamespace(),
+				k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
+					"agent": map[string]any{
+						// NOTE: Setting the version to something released is mandatory as when we enable hints
+						// we have an init container that downloads a released agent archive and extracts
+						// the templates from there. If and when we embed the templates directly in the
+						// agent image, we can remove this.
+						"version":      "8.16.0",
+						"unprivileged": true,
+						"image": map[string]any{
+							"repository": kCtx.agentImageRepo,
+							"tag":        kCtx.agentImageTag,
+							"pullPolicy": "Never",
+						},
+					},
+					"kubernetes": map[string]any{
+						"enabled": true,
+						"hints": map[string]any{
+							"enabled": true,
+						},
+					},
+					"outputs": map[string]any{
+						"default": map[string]any{
+							"type":    "ESPlainAuthAPI",
+							"url":     kCtx.esHost,
+							"api_key": kCtx.esAPIKey,
+						},
+					},
+				}),
+				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+				k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
+				k8sStepCheckAgentStatus("name=agent-ksmsharded-helm-agent", 1, "agent", nil),
+				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+				k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
+				k8sStepRunInnerTests("name=agent-ksmsharded-helm-agent", 1, "agent"),
+				k8sStepHintsRedisCreate(),
+				k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", true),
+				k8sStepHintsRedisDelete(),
+				k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", false),
+			},
+		},
+		{
+			name: "helm standalone agent unprivileged kubernetes hints pre-deployed",
+			steps: []k8sTestStep{
+				k8sStepCreateNamespace(),
+				k8sStepHintsRedisCreate(),
+				k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
+					"agent": map[string]any{
+						// NOTE: Setting the version to something released is mandatory as when we enable hints
+						// we have an init container that downloads a released agent archive and extracts
+						// the templates from there. If and when we embed the templates directly in the
+						// agent image, we can remove this.
+						"version":      "8.16.0",
+						"unprivileged": true,
+						"image": map[string]any{
+							"repository": kCtx.agentImageRepo,
+							"tag":        kCtx.agentImageTag,
+							"pullPolicy": "Never",
+						},
+					},
+					"kubernetes": map[string]any{
+						"enabled": true,
+						"hints": map[string]any{
+							"enabled": true,
+						},
+					},
+					"outputs": map[string]any{
+						"default": map[string]any{
+							"type":    "ESPlainAuthAPI",
+							"url":     kCtx.esHost,
+							"api_key": kCtx.esAPIKey,
+						},
+					},
+				}),
+				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+				k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
+				k8sStepCheckAgentStatus("name=agent-ksmsharded-helm-agent", 1, "agent", nil),
+				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+				k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
+				k8sStepRunInnerTests("name=agent-ksmsharded-helm-agent", 1, "agent"),
+				k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", true),
+				k8sStepHintsRedisDelete(),
+				k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", false),
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1162,5 +1250,66 @@ func k8sStepHelmDeploy(chartPath string, releaseName string, values map[string]a
 		installAction.WaitForJobs = true
 		_, err = installAction.Run(helmChart, values)
 		require.NoError(t, err, "failed to install helm chart")
+	}
+}
+
+func k8sStepHintsRedisCreate() k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		r, err := os.Open("testdata/k8s.hints.redis.yaml")
+		require.NoError(t, err, "failed to open redis k8s test data")
+
+		redisObjs, err := k8sYAMLToObjects(bufio.NewReader(r))
+		require.NoError(t, err, "failed to convert redis yaml to k8s objects")
+
+		t.Cleanup(func() {
+			err = k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, redisObjs...)
+			require.NoError(t, err, "failed to delete redis k8s objects")
+		})
+
+		err = k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true, waitTimeout: 120 * time.Second, namespace: namespace}, redisObjs...)
+		require.NoError(t, err, "failed to create redis k8s objects")
+	}
+}
+
+func k8sStepHintsRedisCheckAgentStatus(agentPodLabelSelector string, hintDeployed bool) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		redisPod := &corev1.Pod{}
+		err := kCtx.client.Resources(namespace).Get(ctx, "redis", namespace, redisPod)
+		if hintDeployed {
+			require.NoError(t, err, "failed to get redis pod")
+		}
+
+		perNodePodList := &corev1.PodList{}
+		err = kCtx.client.Resources(namespace).List(ctx, perNodePodList, func(opt *metav1.ListOptions) {
+			opt.LabelSelector = agentPodLabelSelector
+		})
+		require.NoError(t, err, "failed to list pods with selector ", perNodePodList)
+		require.NotEmpty(t, perNodePodList.Items, "no pods found with selector ", perNodePodList)
+
+		for _, pod := range perNodePodList.Items {
+			shouldExist := hintDeployed && redisPod.Spec.NodeName == pod.Spec.NodeName
+
+			var stdout, stderr bytes.Buffer
+			err = k8sCheckAgentStatus(ctx, kCtx.client, &stdout, &stderr, namespace, pod.Name, "agent", map[string]bool{
+				"redis/metrics": shouldExist,
+			})
+			if err != nil {
+				t.Errorf("failed to check agent status %s: %v", pod.Name, err)
+				t.Logf("stdout: %s\n", stdout.String())
+				t.Logf("stderr: %s\n", stderr.String())
+				t.FailNow()
+			}
+		}
+	}
+}
+
+func k8sStepHintsRedisDelete() k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		redisPod := &corev1.Pod{}
+		err := kCtx.client.Resources(namespace).Get(ctx, "redis", namespace, redisPod)
+		require.NoError(t, err, "failed to get redis pod")
+
+		err = k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, redisPod)
+		require.NoError(t, err, "failed to delete redis k8s objects")
 	}
 }
