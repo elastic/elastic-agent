@@ -83,5 +83,10 @@ func isOwnerExec(filePath string) (bool, error) {
 		return false, fmt.Errorf("ran into an error while retrieving current user: %w", err)
 	}
 
-	return isFileOwner(user, fileOwner)
+	isOwner, err := isFileOwner(user, fileOwner)
+	if err != nil {
+		return false, fmt.Errorf("error while checking if current user is the file owner: %w", err)
+	}
+
+	return isOwner, nil
 }
