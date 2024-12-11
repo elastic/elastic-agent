@@ -27,7 +27,7 @@ func getFileOwner(filePath string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("failed to get system specific file info: %w", err)
 	}
-	return strconv.FormatInt(int64(stat.Uid), 10), nil
+	return strconv.Itoa(stat.Uid), nil
 }
 
 func getCurrentUser() (string, error) {
