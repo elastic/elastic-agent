@@ -227,3 +227,21 @@ func TestNotifyFleetAuditUnenroll(t *testing.T) {
 
 	})
 }
+
+type MockNotifyFleetAuditUninstall struct {
+	Called bool
+}
+
+func (m *MockNotifyFleetAuditUninstall) Call(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai *info.AgentInfo) {
+	m.Called = true
+}
+func TestSkipFleetAuditUnenroll(t *testing.T) {
+	log := &logp.Logger{}
+	pt := &progressbar.ProgressBar{}
+	ai := &info.AgentInfo{}
+	cfg := &configuration.Configuration{}
+
+	mockNotify := &MockNotifyFleetAuditUninstall{}
+	notifyFleetIfNeeded(context.Background(), log, pt, cfg, ai, true, true, notifyFleetAuditUninstall)
+	assert.False(t, mockNotify.Called, "NotifyFleetAuditUninstall should not be called when skipFleetAudit is true")
+}
