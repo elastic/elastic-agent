@@ -97,6 +97,7 @@ steps:
           - fleet-airgapped-privileged
 
       - label: "arm:sudo: {{matrix}}"
+        # https://github.com/elastic/ingest-dev/issues/4610
         skip: true
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
@@ -120,6 +121,7 @@ steps:
           - fleet-airgapped-privileged
 
       - label: "arm:non-sudo: {{matrix}}"
+        # https://github.com/elastic/ingest-dev/issues/4610
         skip: true
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
