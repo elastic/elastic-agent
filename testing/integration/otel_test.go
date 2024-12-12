@@ -1201,6 +1201,8 @@ service:
 				return
 			}
 			t.Logf("Contents of otel config file:\n%s\n", string(contents))
+			// TODO(mauri870): remove this line before merging
+			os.WriteFile("/tmp/otel.yml", contents, 0o600)
 		}
 	})
 	// Now we can actually create the fixture and run it
@@ -1221,7 +1223,7 @@ service:
 				break
 			}
 
-			_, err = inputFile.Write([]byte(fmt.Sprintf(`{"id": "%d", "text: "line %d"}\n`, i, i)))
+			_, err = inputFile.Write([]byte(fmt.Sprintf(`{"id": "%d", "text": "line %d"}\n`, i, i)))
 			require.NoErrorf(t, err, "failed to write line %d to temp file", i)
 			inputLinesCounter.Add(1)
 			time.Sleep(100 * time.Millisecond)
