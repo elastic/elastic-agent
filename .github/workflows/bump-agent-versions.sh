@@ -9,7 +9,7 @@ then
     echo "The version files didn't change, skipping..."
 else
 		# because this script is running on the matrix, we need to fetch the current branch on every run
-		current_rf=$(git rev-parse --abbrev-ref HEAD)
+		current_ref=$(git rev-parse --abbrev-ref HEAD)
     echo "The version file(s) changed"
     git diff -p
     open=$(gh pr list --repo "$GITHUB_REPOSITORY" --label="update-versions" --limit 1 --state open --base "$current_ref")
