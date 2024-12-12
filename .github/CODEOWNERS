@@ -12,4 +12,13 @@
 /.buildkite @elastic/ingest-eng-prod
 /.ci @elastic/ingest-eng-prod
 /.github @elastic/ingest-eng-prod
+<<<<<<< HEAD
 /catalog-info.yaml @elastic/ingest-eng-prod
+=======
+/.github/CODEOWNERS @elastic/ingest-tech-lead
+/deploy/helm @elastic/elastic-agent-control-plane
+/deploy/kubernetes @elastic/elastic-agent-control-plane
+/dev-tools/kubernetes @elastic/elastic-agent-control-plane
+/internal/pkg/agent/application/configuration_embed_changed_test.go @elastic/cloudbeat
+/internal/pkg/composable/providers/kubernetes @elastic/elastic-agent-control-plane
+>>>>>>> 8c744f8f2b (Update CODEOWNERS according to k8s ownership transfer plan (#6188))
