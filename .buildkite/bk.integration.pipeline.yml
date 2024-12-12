@@ -59,10 +59,6 @@ steps:
   - group: "Stateful:Ubuntu"
     key: integration-tests-ubuntu
     depends_on:
-<<<<<<< HEAD
-      - package-it
-=======
->>>>>>> a2d5f752ee (Run BK integration tests on PRs and release branches (#6148))
       - integration-ess
     steps:
       - label: "x86_64:non-sudo: {{matrix}}"
@@ -101,10 +97,7 @@ steps:
           - fleet-airgapped-privileged
 
       - label: "arm:sudo: {{matrix}}"
-<<<<<<< HEAD
-=======
         skip: true
->>>>>>> a2d5f752ee (Run BK integration tests on PRs and release branches (#6148))
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
@@ -127,10 +120,7 @@ steps:
           - fleet-airgapped-privileged
 
       - label: "arm:non-sudo: {{matrix}}"
-<<<<<<< HEAD
-=======
         skip: true
->>>>>>> a2d5f752ee (Run BK integration tests on PRs and release branches (#6148))
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
@@ -148,18 +138,6 @@ steps:
     depends_on:
       - integration-ess
     steps:
-<<<<<<< HEAD
-    - label: "x86_64:sudo:rpm"
-      command: |
-        buildkite-agent artifact download build/distributions/** . --step 'package-it'
-        .buildkite/scripts/steps/integration_tests_tf.sh rpm true
-      artifact_paths:
-         - build/**
-      agents:
-        provider: "gcp"
-        machineType: "n1-standard-8"
-        image: "family/platform-ingest-elastic-agent-rhel-8"
-=======
       - label: "x86_64:sudo:rpm"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
@@ -171,7 +149,6 @@ steps:
           provider: "gcp"
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-rhel-8"
->>>>>>> a2d5f752ee (Run BK integration tests on PRs and release branches (#6148))
 
   - label: ESS stack cleanup
     depends_on:
