@@ -38,8 +38,18 @@ func (btr *BackoffRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 
 	var resp *http.Response
 	var err error
+	// opFunc is a wrapper used by the backoff function. Backoff will keep trying
+	// to send a request until the request succeeds or the context expires.
+	//
+	// When the request encounters an error, opFunc returns an error to trigger a
+	// retry.
+	//
+	// When the request succeeds, opFunc returns nil and the response is sent up the call stack
+	//
+	// The response body is closed for failed requests (status >= 400). It is the
+	// callers responsibility to close the response body for successful requests
 	opFunc := func() error {
-		resp, err = btr.next.RoundTrip(req)
+		resp, err = btr.next.RoundTrip(req) //nolint:bodyclose
 		if err != nil {
 			return err
 		}
