@@ -10,16 +10,15 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/e2e-framework/klient/k8s"
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
@@ -36,43 +35,28 @@ func TestKubernetesAgentService(t *testing.T) {
 		Group: define.Kubernetes,
 	})
 
-	agentImage := os.Getenv("AGENT_IMAGE")
-	require.NotEmpty(t, agentImage, "AGENT_IMAGE must be set")
-
-	client, err := info.KubeClient()
-	require.NoError(t, err)
-	require.NotNil(t, client)
-
-	testLogsBasePath := os.Getenv("K8S_TESTS_POD_LOGS_BASE")
-	require.NotEmpty(t, testLogsBasePath, "K8S_TESTS_POD_LOGS_BASE must be set")
-
-	err = os.MkdirAll(filepath.Join(testLogsBasePath, t.Name()), 0755)
-	require.NoError(t, err, "failed to create test logs directory")
-
-	namespace := info.Namespace
-
-	esHost := os.Getenv("ELASTICSEARCH_HOST")
-	require.NotEmpty(t, esHost, "ELASTICSEARCH_HOST must be set")
-
-	esAPIKey, err := generateESAPIKey(info.ESClient, namespace)
-	require.NoError(t, err, "failed to generate ES API key")
-	require.NotEmpty(t, esAPIKey, "failed to generate ES API key")
+	ctx := context.Background()
+	kCtx := k8sGetContext(t, info)
+	testNamespace := kCtx.getNamespace(t)
 
 	renderedManifest, err := renderKustomize(agentK8SKustomize)
 	require.NoError(t, err, "failed to render kustomize")
 
-	hasher := sha256.New()
-	hasher.Write([]byte(t.Name()))
-	testNamespace := strings.ToLower(base64.URLEncoding.EncodeToString(hasher.Sum(nil)))
-	testNamespace = noSpecialCharsRegexp.ReplaceAllString(testNamespace, "")
-
-	k8sObjects, err := yamlToK8SObjects(bufio.NewReader(bytes.NewReader(renderedManifest)))
+	k8sObjects, err := k8sYAMLToObjects(bufio.NewReader(bytes.NewReader(renderedManifest)))
 	require.NoError(t, err, "failed to convert yaml to k8s objects")
 
-	adjustK8SAgentManifests(k8sObjects, testNamespace, "elastic-agent-standalone",
+	// add the testNamespace in the k8sObjects
+	k8sObjects = append([]k8s.Object{&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}}, k8sObjects...)
+
+	t.Cleanup(func() {
+		err = k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, k8sObjects...)
+		require.NoError(t, err, "failed to delete k8s namespace")
+	})
+
+	k8sKustomizeAdjustObjects(k8sObjects, testNamespace, "elastic-agent-standalone",
 		func(container *corev1.Container) {
 			// set agent image
-			container.Image = agentImage
+			container.Image = kCtx.agentImage
 			// set ImagePullPolicy to "Never" to avoid pulling the image
 			// as the image is already loaded by the kubernetes provisioner
 			container.ImagePullPolicy = "Never"
@@ -80,11 +64,11 @@ func TestKubernetesAgentService(t *testing.T) {
 			// set Elasticsearch host and API key
 			for idx, env := range container.Env {
 				if env.Name == "ES_HOST" {
-					container.Env[idx].Value = esHost
+					container.Env[idx].Value = kCtx.esHost
 					container.Env[idx].ValueFrom = nil
 				}
 				if env.Name == "API_KEY" {
-					container.Env[idx].Value = esAPIKey
+					container.Env[idx].Value = kCtx.esAPIKey
 					container.Env[idx].ValueFrom = nil
 				}
 			}
@@ -116,9 +100,8 @@ func TestKubernetesAgentService(t *testing.T) {
 		}
 	}
 
-	ctx := context.Background()
-
-	deployK8SAgent(t, ctx, client, k8sObjects, testNamespace, false, testLogsBasePath, true, map[string]bool{
-		"connectors-py": true,
-	})
+	k8sKustomizeDeployAgent(t, ctx, kCtx.client, k8sObjects, testNamespace, false, kCtx.logsBasePath,
+		true, map[string]bool{
+			"connectors-py": true,
+		})
 }
