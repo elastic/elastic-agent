@@ -9,8 +9,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.1
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 8.16.2
 stringData:
 
   agent.yml: |-
@@ -67,8 +66,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.1
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 8.16.2
 stringData:
 
   agent.yml: |-
@@ -362,8 +360,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.1
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 8.16.2
 stringData:
 
   agent.yml: |-
@@ -545,8 +542,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.1
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 8.16.2
   annotations:
     elastic-agent.k8s.elastic.co/cr: nginx
 rules:
@@ -670,8 +666,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.1
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 8.16.2
   annotations:
     elastic-agent.k8s.elastic.co/cr: nginx
 rules:
@@ -904,8 +899,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.1
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 8.16.2
   annotations:
     elastic-agent.k8s.elastic.co/cr: nginx
 rules:
@@ -987,8 +981,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.1
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 8.16.2
 subjects:
   - kind: ServiceAccount
     name: user-sa-clusterWide
@@ -1007,8 +1000,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.1
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 8.16.2
 subjects:
   - kind: ServiceAccount
     name: user-sa-ksmSharded
@@ -1027,8 +1019,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.1
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 8.16.2
 subjects:
   - kind: ServiceAccount
     name: user-sa-perNode
@@ -1048,8 +1039,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.1
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 8.16.2
 spec:
   selector:
     matchLabels:
@@ -1080,7 +1070,7 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
-        image: docker.elastic.co/beats/elastic-agent:8.16.1-SNAPSHOT
+        image: docker.elastic.co/beats/elastic-agent:8.16.2-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
@@ -1168,8 +1158,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.1
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 8.16.2
 spec:
   selector:
     matchLabels:
@@ -1200,7 +1189,7 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
-        image: docker.elastic.co/beats/elastic-agent:8.16.1-SNAPSHOT
+        image: docker.elastic.co/beats/elastic-agent:8.16.2-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
@@ -1250,8 +1239,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.1
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 8.16.2
 spec:
   selector:
     matchLabels:
@@ -1323,7 +1311,7 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
-        image: docker.elastic.co/beats/elastic-agent:8.16.1-SNAPSHOT
+        image: docker.elastic.co/beats/elastic-agent:8.16.2-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:

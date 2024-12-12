@@ -233,8 +233,10 @@ func TestProxy(t *testing.T) {
 func TestHTTPSProxy(t *testing.T) {
 	targetHost := "not-a-server.co"
 	proxy, client, target := prepareMTLSProxyAndTargetServer(t, targetHost)
-	defer proxy.Close()
-	defer target.Close()
+	t.Cleanup(func() {
+		proxy.Close()
+		target.Close()
+	})
 
 	tcs := []struct {
 		name   string

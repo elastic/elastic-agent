@@ -9,8 +9,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.1
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 8.16.2
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -22,8 +21,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.1
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 8.16.2
 stringData:
 
   agent.yml: |-
@@ -115,8 +113,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.1
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 8.16.2
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
     resources:
@@ -196,8 +193,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.1
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 8.16.2
 subjects:
   - kind: ServiceAccount
     name: agent-pernode-example
@@ -217,8 +213,7 @@ metadata:
     helm.sh/chart: elastic-agent-0.0.1
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.1
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 8.16.2
 spec:
   selector:
     matchLabels:
@@ -249,7 +244,7 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
-        image: docker.elastic.co/beats/elastic-agent:8.16.1-SNAPSHOT
+        image: docker.elastic.co/beats/elastic-agent:8.16.2-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
