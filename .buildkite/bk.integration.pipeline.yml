@@ -97,10 +97,7 @@ steps:
           - fleet-airgapped-privileged
 
       - label: "arm:sudo: {{matrix}}"
-<<<<<<< HEAD
-=======
         # https://github.com/elastic/ingest-dev/issues/4610
->>>>>>> 6eb9290c35 (Skip new ARM tests: https://github.com/elastic/ingest-dev/issues/4610 (#6173))
         skip: true
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
@@ -124,10 +121,7 @@ steps:
           - fleet-airgapped-privileged
 
       - label: "arm:non-sudo: {{matrix}}"
-<<<<<<< HEAD
-=======
         # https://github.com/elastic/ingest-dev/issues/4610
->>>>>>> 6eb9290c35 (Skip new ARM tests: https://github.com/elastic/ingest-dev/issues/4610 (#6173))
         skip: true
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
