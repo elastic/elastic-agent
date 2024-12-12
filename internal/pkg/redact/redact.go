@@ -21,13 +21,13 @@ const (
 
 // Redact redacts sensitive values from the passed mapStr.
 func RedactSecrets(mapStr map[string]any, errOut io.Writer) map[string]any {
-	return redactMap(errOut, redactSecretPaths(mapStr, errOut))
+	return RedactPossibleSecrets(RedactSecretPaths(mapStr, errOut), errOut)
 }
 
 // RedactSecretPaths will check the passed mapStr input for a secret_paths attribute.
 // If found it will replace the value for every key in the paths list with <REDACTED> and return the resulting map.
 // Any issues or errors will be written to the errOut writer.
-func redactSecretPaths(mapStr map[string]any, errOut io.Writer) map[string]any {
+func RedactSecretPaths(mapStr map[string]any, errOut io.Writer) map[string]any {
 	v, ok := mapStr["secret_paths"]
 	if !ok {
 		return mapStr
@@ -59,52 +59,74 @@ func redactSecretPaths(mapStr map[string]any, errOut io.Writer) map[string]any {
 	return result
 }
 
+func RedactPossibleSecrets(mapStr map[string]any, errOut io.Writer) map[string]any {
+	return redactMap(mapStr, errOut)
+}
+
 // redactMap redacts sensitive values from the inputMap
-func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}) map[K]interface{} {
+func redactMap[K comparable](inputMap map[K]interface{}, errOut io.Writer) map[K]interface{} {
 	if inputMap == nil {
 		return nil
 	}
-	for rootKey, rootValue := range inputMap {
-		if rootValue != nil {
-			switch cast := rootValue.(type) {
-			case map[string]interface{}:
-				rootValue = redactMap(errOut, cast)
-			case map[interface{}]interface{}:
-				rootValue = redactMap(errOut, cast)
-			case map[int]interface{}:
-				rootValue = redactMap(errOut, cast)
+	for key, value := range inputMap {
+		if value != nil {
+			switch value.(type) {
 			case string:
-				if keyString, ok := any(rootKey).(string); ok {
-					if redactKey(keyString) {
-						rootValue = REDACTED
+				if keyString, ok := any(key).(string); ok {
+					if shouldRedact(keyString) {
+						value = REDACTED
 					}
 				}
 			default:
-				// in cases where we got some weird kind of map we couldn't parse, print a warning
-				if reflect.TypeOf(rootValue).Kind() == reflect.Map {
-					fmt.Fprintf(errOut, "[WARNING]: file may be partly redacted, could not cast value %v of type %T", rootKey, rootValue)
-				}
-
+				redactAny(key, value, errOut)
 			}
 		}
 
-		inputMap[rootKey] = rootValue
-
+		inputMap[key] = value
 	}
 	return inputMap
 }
 
-func redactKey(k string) bool {
+func redactAny(key, value any, errOut io.Writer) {
+	if value == nil {
+		return
+	}
+	switch inputType := value.(type) {
+	case map[string]interface{}:
+		value = redactMap(inputType, errOut)
+	case map[interface{}]interface{}:
+		value = redactMap(inputType, errOut)
+	case map[int]interface{}:
+		value = redactMap(inputType, errOut)
+	case []any:
+		value = redactSlice(key, inputType, errOut)
+	default:
+		// in cases where we got some weird kind of map we couldn't parse, print a warning
+		if reflect.TypeOf(value).Kind() == reflect.Map {
+			fmt.Fprintf(errOut, "[WARNING]: file may be partially redacted, could not cast value %v of type %T", key, value)
+		}
+
+	}
+}
+
+func redactSlice(key any, inputSlice []any, errOut io.Writer) []any {
+	for i := range inputSlice {
+		redactAny(fmt.Sprintf("%v[%d]", key, i), inputSlice[i], errOut)
+	}
+	return inputSlice
+}
+
+func shouldRedact(key string) bool {
 	// "routekey" shouldn't be redacted.
 	// Add any other exceptions here.
-	if k == "routekey" {
+	if key == "routekey" {
 		return false
 	}
 
-	k = strings.ToLower(k)
-	return strings.Contains(k, "certificate") ||
-		strings.Contains(k, "passphrase") ||
-		strings.Contains(k, "password") ||
-		strings.Contains(k, "token") ||
-		strings.Contains(k, "key")
+	key = strings.ToLower(key)
+	return strings.Contains(key, "certificate") ||
+		strings.Contains(key, "passphrase") ||
+		strings.Contains(key, "password") ||
+		strings.Contains(key, "token") ||
+		strings.Contains(key, "key")
 }
