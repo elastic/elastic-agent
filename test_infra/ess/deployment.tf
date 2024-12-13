@@ -42,7 +42,7 @@ locals {
   deployment_version = data.ec_stack.latest.version
 
   ess_region             = coalesce(var.ess_region, "gcp-us-east1")
-  deployment_template_id = coalesce(var.deployment_template_id, "gcp-cpu-optimized")
+  deployment_template_id = coalesce(var.deployment_template_id, "gcp-storage-optimized")
 }
 
 # If we have defined a stack version, validate that this version exists on that region and return it.
@@ -59,17 +59,19 @@ resource "ec_deployment" "integration-testing" {
   version                = local.deployment_version
 
   elasticsearch = {
-    autoscale = false
+    autoscale                 = false
+    instance_configuration_id = "gcp.es.datahot.n2.68x10x45"
 
     hot = {
       autoscaling = {}
-      size        = "4g"
+      size        = "8g"
       zone_count  = 1
     }
   }
   kibana = {
-    size       = "1g"
-    zone_count = 1
+    size                      = "1g"
+    zone_count                = 1
+    instance_configuration_id = "gcp.kibana.n2.68x32x45"
     config = {
       user_settings_json = jsonencode({
         "xpack.fleet.enableExperimental"                          = ["agentTamperProtectionEnabled"]
@@ -80,6 +82,7 @@ resource "ec_deployment" "integration-testing" {
   }
 
   integrations_server = {
+    instance_configuration_id = "gcp.integrationsserver.n2.68x32x45"
     topology = {
       size       = "1g"
       zone_count = 1
