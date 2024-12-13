@@ -13,6 +13,7 @@ steps:
     retry:
       manual:
         allowed: true
+
   - group: "Unit tests"
     key: "unit-tests"
     steps:
@@ -50,7 +51,9 @@ steps:
 
       - label: "Unit tests - Windows 2022"
         key: "unit-tests-win2022"
-        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+        command: |
+          .\\.buildkite\\scripts\\install-go.ps1
+          .\\.buildkite\\scripts\\steps\\unit-tests.ps1
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -68,7 +71,9 @@ steps:
 
       - label: "Unit tests - Windows 2016"
         key: "unit-tests-win2016"
-        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+        command: |
+          .\\.buildkite\\scripts\\install-go.ps1
+          .\\.buildkite\\scripts\\steps\\unit-tests.ps1
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -84,11 +89,11 @@ steps:
           manual:
             allowed: true
 
-      # Runs inly on the main branch
-      - label: "Unit tests - MacOS 13 ARM"
-        key: "unit-tests-macos-13-arm"
+  - group: "macOS tests"
+    key: "macos-unit-tests"
+    steps:
+      - label: "Unit tests - macOS 15 ARM"
         command: ".buildkite/scripts/steps/unit-tests.sh"
-        branches: main
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -96,14 +101,15 @@ steps:
           - "coverage-*.out"
         agents:
           provider: orka
-          imagePrefix: generic-13-ventura-arm
+          imagePrefix: generic-base-15-arm-002
         retry:
           manual:
             allowed: true
 
-      - label: "Unit tests - MacOS 13"
-        key: "unit-tests-macos-13"
+      # Runs only on main and release branches
+      - label: "Unit tests - macOS 13"
         command: ".buildkite/scripts/steps/unit-tests.sh"
+        branches: "main 8.* 9.*"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -121,7 +127,9 @@ steps:
     steps:
       - label: "Unit tests - Windows 10"
         key: "unit-tests-win10"
-        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+        command: |
+          .\\.buildkite\\scripts\\install-go.ps1
+          .\\.buildkite\\scripts\\steps\\unit-tests.ps1
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -138,7 +146,9 @@ steps:
             allowed: true
       - label: "Unit tests - Windows 11"
         key: "unit-tests-win11"
-        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+        command: |
+          .\\.buildkite\\scripts\\install-go.ps1
+          .\\.buildkite\\scripts\\steps\\unit-tests.ps1
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -154,11 +164,10 @@ steps:
           manual:
             allowed: true
 
-
   - label: ":junit: Junit annotate"
     plugins:
       - junit-annotate#v2.5.0:
-          artifacts: "build/*.xml"
+          artifacts: "**TEST-*.xml"
           always-annotate: true
     agents:
       provider: "gcp"
@@ -171,15 +180,12 @@ steps:
         allow_failure: true
       - step: "unit-tests-win2016"
         allow_failure: true
-      - step: "unit-tests-macos-13-arm"
-        allow_failure: true
-      - step: "unit-tests-macos-13"
+      - step: "macos-unit-tests"
         allow_failure: true
       - step: "unit-tests-win10"
         allow_failure: true
       - step: "unit-tests-win11"
         allow_failure: true
-
 
   - label: "Merge coverage reports"
     key: "merge-coverage"
@@ -188,7 +194,7 @@ steps:
     command: |
       .buildkite/scripts/steps/merge.sh
     artifact_paths:
-      - "TEST-go-unit.cov"
+      - "build/TEST-go-unit.cov"
     agents:
       image: "golang:1.22.6"
     depends_on:
@@ -225,7 +231,7 @@ steps:
     agents:
       image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
     command:
-      - "buildkite-agent artifact download --step merge-coverage TEST-go-unit.cov ."
+      - "buildkite-agent artifact download --step merge-coverage build/TEST-go-unit.cov ."
       - "/scan-source-code.sh"
     depends_on:
       - "merge-coverage"
@@ -255,7 +261,7 @@ steps:
                   - GH_VERSION=2.4.0
 
   # Trigger for pull requests
-  - label: "Trigger Integration tests for Pull request"
+  - label: "Trigger Extended tests for Pull request"
     if: |
       (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
       build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
@@ -295,7 +301,7 @@ steps:
                     - GITHUB_PR_LABELS=${GITHUB_PR_LABELS}
 
   # Trigger for branches
-  - label: "Triggering Integration tests for branches"
+  - label: "Triggering Extended tests for branches"
     if: build.pull_request.id == null
     trigger: "elastic-agent-extended-testing"
     build:

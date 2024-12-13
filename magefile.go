@@ -35,6 +35,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/otiai10/copy"
 
+	devmachine "github.com/elastic/elastic-agent/dev-tools/devmachine"
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
@@ -176,6 +177,9 @@ type Integration mg.Namespace
 
 // Otel namespace contains Open Telemetry related tasks.
 type Otel mg.Namespace
+
+// Devmachine namespace contains tasks related to remote development machines.
+type Devmachine mg.Namespace
 
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
@@ -863,6 +867,19 @@ func (Cloud) Push() error {
 	fmt.Printf(">> Docker image pushed to remote registry successfully: %s\n", targetCloudImageName)
 
 	return nil
+}
+
+// Creates a new devmachine that will be auto-deleted in 6 hours.
+// Example: MACHINE_IMAGE="family/platform-ingest-elastic-agent-ubuntu-2204" ZONE="us-central1-a" mage devmachine:create "pavel-dev-machine"
+// ZONE defaults to 'us-central1-a', MACHINE_IMAGE defaults to 'family/platform-ingest-elastic-agent-ubuntu-2204'
+func (Devmachine) Create(instanceName string) error {
+	if instanceName == "" {
+		return errors.New(
+			`instanceName is required.
+	Example:
+	mage devmachine:create "pavel-dev-machine"  `)
+	}
+	return devmachine.Run(instanceName)
 }
 
 func Clean() {
