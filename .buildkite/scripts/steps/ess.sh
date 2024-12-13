@@ -2,23 +2,19 @@
 set -euo pipefail
 
 function ess_up() {
-  echo "~~~ Staring ESS Stack"  
+  echo "~~~ Staring ESS Stack"
   local WORKSPACE=$(git rev-parse --show-toplevel)
   local TF_DIR="${WORKSPACE}/test_infra/ess/"
   local STACK_VERSION=$1
   local ESS_REGION=${2:-"gcp-us-west2"}
-    
+
   if [ -z "$STACK_VERSION" ]; then
     echo "Error: Specify stack version: ess_up [stack_version]" >&2
     return 1
   fi
 
-<<<<<<< HEAD
   export EC_API_KEY=$(retry -t 5 -- vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
-=======
-  export EC_API_KEY=$(retry 5 vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
->>>>>>> 7aa8bb222f (Ess terraform + run integration tests on BK agents (#5113))
-  
+
   if [[ -z "${EC_API_KEY}" ]]; then
     echo "Error: Failed to get EC API key from vault" >&2
     exit 1
@@ -27,8 +23,8 @@ function ess_up() {
   BUILDKITE_BUILD_CREATOR="${BUILDKITE_BUILD_CREATOR:-"$(get_git_user_email)"}"
   BUILDKITE_BUILD_NUMBER="${BUILDKITE_BUILD_NUMBER:-"0"}"
   BUILDKITE_PIPELINE_SLUG="${BUILDKITE_PIPELINE_SLUG:-"elastic-agent-integration-tests"}"
-  
-  pushd "${TF_DIR}"    
+
+  pushd "${TF_DIR}"
   terraform init
   terraform apply \
     -auto-approve \
@@ -48,17 +44,13 @@ function ess_up() {
 }
 
 function ess_down() {
-  echo "~~~ Tearing down the ESS Stack"  
+  echo "~~~ Tearing down the ESS Stack"
   local WORKSPACE=$(git rev-parse --show-toplevel)
   local TF_DIR="${WORKSPACE}/test_infra/ess/"
   if [ -z "${EC_API_KEY:-}" ]; then
-<<<<<<< HEAD
-    export EC_API_KEY=$(retry -t 5 -- vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)    
-=======
-    export EC_API_KEY=$(retry 5 vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)    
->>>>>>> 7aa8bb222f (Ess terraform + run integration tests on BK agents (#5113))
+    export EC_API_KEY=$(retry -t 5 -- vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
   fi
-  
+
   pushd "${TF_DIR}"
   terraform init
   terraform destroy -auto-approve
@@ -67,15 +59,15 @@ function ess_down() {
 
 function get_git_user_email() {
   if ! git rev-parse --is-inside-work-tree &>/dev/null; then
-    echo "unknown"  
+    echo "unknown"
     return
   fi
 
   local email
   email=$(git config --get user.email)
-  
+
   if [ -z "$email" ]; then
-    echo "unknown"  
+    echo "unknown"
   else
     echo "$email"
   fi
