@@ -47,7 +47,7 @@ steps:
           - build/**
         agents:
           provider: "gcp"
-          imageProject: elastic-images-qa
+#          imageProject: elastic-images-qa
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-ubuntu-2204"
 
@@ -60,7 +60,7 @@ steps:
           - build/**
         agents:
           provider: "gcp"
-          imageProject: elastic-images-qa
+#          imageProject: elastic-images-qa
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-ubuntu-2204"
 
@@ -74,7 +74,7 @@ steps:
           - build/**
         agents:
           provider: "gcp"
-          imageProject: elastic-images-qa
+#          imageProject: elastic-images-qa
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-ubuntu-2204"
 
@@ -88,7 +88,7 @@ steps:
           - build/**
         agents:
           provider: "gcp"
-          imageProject: elastic-images-qa
+#          imageProject: elastic-images-qa
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-ubuntu-2204"
 
@@ -102,7 +102,7 @@ steps:
           - build/**
         agents:
           provider: "gcp"
-          imageProject: elastic-images-qa
+#          imageProject: elastic-images-qa
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-ubuntu-2204"
 
@@ -116,7 +116,7 @@ steps:
           - build/**
         agents:
           provider: "gcp"
-          imageProject: elastic-images-qa
+#          imageProject: elastic-images-qa
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-ubuntu-2204"
 
@@ -130,7 +130,7 @@ steps:
           - build/**
         agents:
           provider: "gcp"
-          imageProject: elastic-images-qa
+#          imageProject: elastic-images-qa
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-ubuntu-2204"
 
@@ -144,7 +144,7 @@ steps:
           - build/**
         agents:
           provider: "gcp"
-          imageProject: elastic-images-qa
+#          imageProject: elastic-images-qa
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-ubuntu-2204"
 
