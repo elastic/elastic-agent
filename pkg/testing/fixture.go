@@ -53,6 +53,7 @@ type Fixture struct {
 
 	srcPackage string
 	workDir    string
+	extractDir string
 
 	installed   bool
 	installOpts *InstallOpts
@@ -198,7 +199,7 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	if err != nil {
 		return err
 	}
-	if f.workDir != "" {
+	if f.extractDir != "" {
 		// already prepared
 		return fmt.Errorf("already been prepared")
 	}
@@ -212,16 +213,17 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	if err != nil {
 		return err
 	}
-	workDir := createTempDir(f.t)
-	finalDir := filepath.Join(workDir, name)
-	err = ExtractArtifact(f.t, src, workDir)
+	extractDir := createTempDir(f.t)
+	finalDir := filepath.Join(extractDir, name)
+	err = ExtractArtifact(f.t, src, extractDir)
 	if err != nil {
-		return fmt.Errorf("extracting artifact %q in %q: %w", src, workDir, err)
+		return fmt.Errorf("extracting artifact %q in %q: %w", src, extractDir, err)
 	}
 	err = f.prepareComponents(finalDir, components...)
 	if err != nil {
 		return err
 	}
+	f.extractDir = finalDir
 	f.workDir = finalDir
 	return nil
 }
@@ -823,7 +825,7 @@ func (f *Fixture) IsInstalled() bool {
 
 // EnsurePrepared ensures that the fixture has been prepared.
 func (f *Fixture) EnsurePrepared(ctx context.Context) error {
-	if f.workDir == "" {
+	if f.extractDir == "" {
 		return f.Prepare(ctx)
 	}
 	return nil
