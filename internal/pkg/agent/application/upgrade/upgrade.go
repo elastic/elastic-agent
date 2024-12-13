@@ -55,6 +55,7 @@ var agentArtifact = artifact.Artifact{
 }
 
 var ErrWatcherNotStarted = errors.New("watcher did not start in time")
+var ErrUpgradeSameVersion = errors.New("upgrade did not occur because it is the same version")
 
 // Upgrader performs an upgrade
 type Upgrader struct {
@@ -162,6 +163,19 @@ func (av agentVersion) String() string {
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 
+	currentVersion := agentVersion{
+		version:  release.Version(),
+		snapshot: release.Snapshot(),
+		hash:     release.Commit(),
+	}
+
+	// check version before download
+	same, _ := isSameVersion(u.log, currentVersion, packageMetadata{}, version)
+	if same {
+		u.log.Warnf("Upgrade action skipped: %v", ErrUpgradeSameVersion)
+		return nil, ErrUpgradeSameVersion
+	}
+
 	// Inform the Upgrade Marker Watcher that we've started upgrading. Note that this
 	// is only possible to do in-memory since, today, the  process that's initiating
 	// the upgrade is the same as the Agent process in which the Upgrade Marker Watcher is
@@ -177,19 +191,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	err = cleanNonMatchingVersionsFromDownloads(u.log, u.agentInfo.Version())
 	if err != nil {
 		u.log.Errorw("Unable to clean downloads before update", "error.message", err, "downloads.path", paths.Downloads())
-	}
-
-	currentVersion := agentVersion{
-		version:  release.Version(),
-		snapshot: release.Snapshot(),
-		hash:     release.Commit(),
-	}
-
-	// check version before download
-	same, _ := isSameVersion(u.log, currentVersion, packageMetadata{}, version)
-	if same {
-		u.log.Warn("Upgrade action skipped: upgrade did not occur because its the same version")
-		return nil, nil
 	}
 
 	det.SetState(details.StateDownloading)
@@ -222,8 +223,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	// Recheck version here in case of a snapshot->snapshot upgrade on the same version.
 	same, newVersion := isSameVersion(u.log, currentVersion, metadata, version)
 	if same {
-		u.log.Warn("Upgrade action skipped: upgrade did not occur because its the same version")
-		return nil, nil
+		u.log.Warnf("Upgrade action skipped: %v", ErrUpgradeSameVersion)
+		return nil, ErrUpgradeSameVersion
 	}
 
 	u.log.Infow("Unpacking agent package", "version", newVersion)
