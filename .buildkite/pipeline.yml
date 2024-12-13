@@ -51,9 +51,7 @@ steps:
 
       - label: "Unit tests - Windows 2022"
         key: "unit-tests-win2022"
-        command: |
-          .\\.buildkite\\scripts\\install-go.ps1
-          .\\.buildkite\\scripts\\steps\\unit-tests.ps1
+        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -71,9 +69,7 @@ steps:
 
       - label: "Unit tests - Windows 2016"
         key: "unit-tests-win2016"
-        command: |
-          .\\.buildkite\\scripts\\install-go.ps1
-          .\\.buildkite\\scripts\\steps\\unit-tests.ps1
+        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -89,10 +85,9 @@ steps:
           manual:
             allowed: true
 
-  - group: "macOS tests"
-    key: "macos-unit-tests"
-    steps:
-      - label: "Unit tests - macOS 15 ARM"
+      # Runs inly on the main branch
+      - label: "Unit tests - MacOS 13 ARM"
+        key: "unit-tests-macos-13-arm"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         artifact_paths:
           - "build/TEST-*.html"
@@ -101,15 +96,14 @@ steps:
           - "coverage-*.out"
         agents:
           provider: orka
-          imagePrefix: generic-base-15-arm-002
+          imagePrefix: generic-13-ventura-arm
         retry:
           manual:
             allowed: true
 
-      # Runs only on main and release branches
-      - label: "Unit tests - macOS 13"
+      - label: "Unit tests - MacOS 13"
+        key: "unit-tests-macos-13"
         command: ".buildkite/scripts/steps/unit-tests.sh"
-        branches: "main 8.* 9.*"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -127,9 +121,7 @@ steps:
     steps:
       - label: "Unit tests - Windows 10"
         key: "unit-tests-win10"
-        command: |
-          .\\.buildkite\\scripts\\install-go.ps1
-          .\\.buildkite\\scripts\\steps\\unit-tests.ps1
+        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -146,9 +138,7 @@ steps:
             allowed: true
       - label: "Unit tests - Windows 11"
         key: "unit-tests-win11"
-        command: |
-          .\\.buildkite\\scripts\\install-go.ps1
-          .\\.buildkite\\scripts\\steps\\unit-tests.ps1
+        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -164,10 +154,11 @@ steps:
           manual:
             allowed: true
 
+
   - label: ":junit: Junit annotate"
     plugins:
       - junit-annotate#v2.5.0:
-          artifacts: "**TEST-*.xml"
+          artifacts: "build/*.xml"
           always-annotate: true
     agents:
       provider: "gcp"
@@ -180,12 +171,15 @@ steps:
         allow_failure: true
       - step: "unit-tests-win2016"
         allow_failure: true
-      - step: "macos-unit-tests"
+      - step: "unit-tests-macos-13-arm"
+        allow_failure: true
+      - step: "unit-tests-macos-13"
         allow_failure: true
       - step: "unit-tests-win10"
         allow_failure: true
       - step: "unit-tests-win11"
         allow_failure: true
+
 
   - label: "Merge coverage reports"
     key: "merge-coverage"
@@ -194,7 +188,7 @@ steps:
     command: |
       .buildkite/scripts/steps/merge.sh
     artifact_paths:
-      - "build/TEST-go-unit.cov"
+      - "TEST-go-unit.cov"
     agents:
       image: "golang:1.22.6"
     depends_on:
@@ -231,7 +225,7 @@ steps:
     agents:
       image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
     command:
-      - "buildkite-agent artifact download --step merge-coverage build/TEST-go-unit.cov ."
+      - "buildkite-agent artifact download --step merge-coverage TEST-go-unit.cov ."
       - "/scan-source-code.sh"
     depends_on:
       - "merge-coverage"
