@@ -865,6 +865,19 @@ func (Cloud) Push() error {
 	return nil
 }
 
+func Clean() {
+	mg.Deps(devtools.Clean, Build.Clean)
+}
+
+func dockerCommitHash() string {
+	commit, err := devtools.CommitHash()
+	if err == nil && len(commit) > commitLen {
+		return commit[:commitLen]
+	}
+
+	return ""
+}
+
 func getVersion() string {
 	version, found := os.LookupEnv("BEAT_VERSION")
 	if !found {
