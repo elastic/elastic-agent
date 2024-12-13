@@ -580,7 +580,6 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 			det.SetState(details.StateCompleted)
 			return err
 		}
-		c.ClearOverrideState()
 		det.Fail(err)
 		return err
 	}
