@@ -9,8 +9,6 @@ package integration
 import (
 	"context"
 	"os"
-	"os/exec"
-	"runtime"
 	"testing"
 
 	"github.com/gofrs/uuid/v5"
@@ -73,14 +71,8 @@ func TestEnrollUnprivileged(t *testing.T) {
 
 		enrollArgs := []string{"enroll", "--url", enrollUrl, "--enrollment-token", enrollmentApiKey.APIKey, "--force"}
 
-		if runtime.GOOS != "windows" {
-			out, err := exec.CommandContext(ctx, "elastic-agent", enrollArgs...).CombinedOutput()
-			require.Error(t, err)
-			require.Contains(t, string(out), cmd.UserOwnerMismatchError.Error())
-		} else {
-			out, err := exec.CommandContext(ctx, "C:\\Program Files\\Elastic\\Agent\\elastic-agent.exe", enrollArgs...).CombinedOutput()
-			require.Error(t, err)
-			require.Contains(t, string(out), cmd.UserOwnerMismatchError.Error())
-		}
+		out, err := fixture.Exec(ctx, enrollArgs)
+		require.Error(t, err)
+		require.Contains(t, string(out), cmd.UserOwnerMismatchError.Error())
 	})
 }
