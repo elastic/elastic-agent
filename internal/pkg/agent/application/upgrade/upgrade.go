@@ -223,7 +223,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	// Recheck version here in case of a snapshot->snapshot upgrade on the same version.
 	same, newVersion := isSameVersion(u.log, currentVersion, metadata, version)
 	if same {
-		u.log.Warnf("Upgrade action skipped: %v", ErrUpgradeSameVersion)
+		u.log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
 		return nil, ErrUpgradeSameVersion
 	}
 
