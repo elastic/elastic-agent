@@ -172,7 +172,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	// check version before download
 	same, _ := isSameVersion(u.log, currentVersion, packageMetadata{}, version)
 	if same {
-		u.log.Warnf("Upgrade action skipped: %v", ErrUpgradeSameVersion)
+		u.log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
 		return nil, ErrUpgradeSameVersion
 	}
 
