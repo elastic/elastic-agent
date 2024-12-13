@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+
 GROUP_NAME=$1
 TEST_SUDO=$2
 
@@ -15,7 +16,8 @@ fi
 
 if [ "$TEST_SUDO" == "true" ]; then
   echo "Re-initializing ASDF. The user is changed to root..."
-  export HOME=/opt/buildkite-agent
+  export ASDF_DATA_DIR="/opt/buildkite-agent/.asdf"
+  export PATH="$ASDF_DATA_DIR/bin:$ASDF_DATA_DIR/shims:$PATH"
   source /opt/buildkite-agent/hooks/pre-command
   source .buildkite/hooks/pre-command || echo "No pre-command hook found"
 fi
@@ -34,13 +36,18 @@ if [[ -n "$PACKAGE_VERSION" ]]; then
     PACKAGE_VERSION=${PACKAGE_VERSION}"-SNAPSHOT"
 fi
 
+os_data=$(uname -spr | tr ' ' '_')
+root_suffix=""
+if [ "$TEST_SUDO" == "true" ]; then
+  root_suffix="_sudo"
+fi
+fully_qualified_group_name="${GROUP_NAME}${root_suffix}_${os_data}"
+outputXML="build/${fully_qualified_group_name}.integration.xml"
+outputJSON="build/${fully_qualified_group_name}.integration.out.json"
 set +e
-TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${PACKAGE_VERSION}" SNAPSHOT=true gotestsum --no-color -f standard-quiet --junitfile "build/${GROUP_NAME}.integration.xml" --jsonfile "build/${GROUP_NAME}.integration.out.json" -- -tags integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args -integration.groups="${GROUP_NAME}" -integration.sudo="${TEST_SUDO}"
+TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${PACKAGE_VERSION}" SNAPSHOT=true gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args -integration.groups="${GROUP_NAME}" -integration.sudo="${TEST_SUDO}"
 TESTS_EXIT_STATUS=$?
 set -e
-
-# HTML report
-outputXML="build/${GROUP_NAME}.integration.xml"
 
 if [ -f "$outputXML" ]; then
   go install github.com/alexec/junit2html@latest

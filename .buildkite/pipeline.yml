@@ -167,7 +167,7 @@ steps:
   - label: ":junit: Junit annotate"
     plugins:
       - junit-annotate#v2.5.0:
-          artifacts: "build/*.xml"
+          artifacts: "**TEST-*.xml"
           always-annotate: true
     agents:
       provider: "gcp"
@@ -194,7 +194,7 @@ steps:
     command: |
       .buildkite/scripts/steps/merge.sh
     artifact_paths:
-      - "TEST-go-unit.cov"
+      - "build/TEST-go-unit.cov"
     agents:
       image: "golang:1.22.6"
     depends_on:
@@ -231,7 +231,7 @@ steps:
     agents:
       image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
     command:
-      - "buildkite-agent artifact download --step merge-coverage TEST-go-unit.cov ."
+      - "buildkite-agent artifact download --step merge-coverage build/TEST-go-unit.cov ."
       - "/scan-source-code.sh"
     depends_on:
       - "merge-coverage"
@@ -261,7 +261,7 @@ steps:
                   - GH_VERSION=2.4.0
 
   # Trigger for pull requests
-  - label: "Trigger Integration tests for Pull request"
+  - label: "Trigger Extended tests for Pull request"
     if: |
       (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
       build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
@@ -301,7 +301,7 @@ steps:
                     - GITHUB_PR_LABELS=${GITHUB_PR_LABELS}
 
   # Trigger for branches
-  - label: "Triggering Integration tests for branches"
+  - label: "Triggering Extended tests for branches"
     if: build.pull_request.id == null
     trigger: "elastic-agent-extended-testing"
     build:
