@@ -61,11 +61,14 @@ func (btr *BackoffRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 	attempt := 1
 	opFunc := func() error {
 		if resettableBody != nil {
-			resettableBody.Seek(0, io.SeekStart)
+			_, err = resettableBody.Seek(0, io.SeekStart)
+			if err != nil {
+				btr.logger.Errorf("error while resetting request body: %w", err)
+			}
 		}
 
 		attempt++
-		resp, err = btr.next.RoundTrip(req) //nolint:bodyclose
+		resp, err = btr.next.RoundTrip(req) //nolint:bodyclose // the response body is closed when status code >= 400 or it is closed by the caller
 		if err != nil {
 			btr.logger.Errorf("attempt %d: error round-trip: %w", err)
 			return err

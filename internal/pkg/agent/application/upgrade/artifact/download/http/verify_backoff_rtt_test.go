@@ -20,7 +20,8 @@ func TestVerifyBackoffRoundtripper(t *testing.T) {
 				rw.WriteHeader(http.StatusInternalServerError)
 				failedResCounter--
 			}
-			rw.Write([]byte("hello"))
+			_, err := rw.Write([]byte("hello"))
+			require.NoError(t, err)
 		}
 		server := httptest.NewServer(http.HandlerFunc(handler))
 		client := http.Client{
@@ -28,7 +29,7 @@ func TestVerifyBackoffRoundtripper(t *testing.T) {
 			Timeout:   10 * time.Second,
 		}
 
-		res, err := client.Get(server.URL)
+		res, err := client.Get(server.URL) //nolint:noctx // test code
 		require.NoError(t, err)
 		defer res.Body.Close()
 
@@ -52,7 +53,8 @@ func TestVerifyBackoffRoundtripper(t *testing.T) {
 			require.NoError(t, err)
 			defer req.Body.Close()
 
-			rw.Write(body)
+			_, err = rw.Write(body)
+			require.NoError(t, err)
 		}
 		server := httptest.NewServer(http.HandlerFunc(handler))
 		client := http.Client{
@@ -62,7 +64,7 @@ func TestVerifyBackoffRoundtripper(t *testing.T) {
 
 		reqReader := bytes.NewReader([]byte("hello"))
 
-		resp, err := client.Post(server.URL, "text/html", reqReader)
+		resp, err := client.Post(server.URL, "text/html", reqReader) //nolint:noctx // test code
 		require.NoError(t, err)
 		defer resp.Body.Close()
 
