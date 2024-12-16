@@ -4,4 +4,4 @@ description: Elastic-Agent Helm Chart
 kubeVersion: ">= 1.27.0-0"
 type: application
 appVersion: 9.0.0
-version: 9.0.0-SNAPSHOT
+version: 9.0.0-beta
