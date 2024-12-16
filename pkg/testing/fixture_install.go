@@ -187,6 +187,7 @@ func (f *Fixture) installFunc(ctx context.Context, installOpts *InstallOpts, sho
 
 	// check for running agents before installing, but only if not installed into a namespace whose point is allowing two agents at once.
 	if installOpts != nil && !installOpts.Develop && installOpts.Namespace == "" {
+		fmt.Println("TESTING IF ANY OTHER AGENTS ARE RUNNING ", getElasticAgentProcesses(f.t))
 		assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at beginning of Install()")
 	}
 
@@ -553,6 +554,7 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
 	}
 
+	fmt.Println("SHOULD ENROLL ", shouldEnroll)
 	if !shouldEnroll {
 		return nil, nil
 	}
