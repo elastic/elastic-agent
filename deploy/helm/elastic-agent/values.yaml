@@ -333,7 +333,7 @@ agent:
     pullPolicy: IfNotPresent
     tag: "9.0.0-SNAPSHOT"
   # -- image pull secrets
-  # @section -- 3 - Elastic-Agent Configuration
+  # @section -- 6 - Elastic-Agent Configuration
   imagePullSecrets: []
   # -- generate kubernetes manifests or [ECK](https://github.com/elastic/cloud-on-k8s) CRDs
   # @section -- 6 - Elastic-Agent Configuration

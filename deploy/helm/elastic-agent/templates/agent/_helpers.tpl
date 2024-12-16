@@ -30,8 +30,8 @@ Entrypoint for chart initialisation
 {{- if not (hasKey $.Values.agent "initialised") -}}
 {{/* init order matters */}}
 {{- include (printf "elasticagent.engine.%s.init" $.Values.agent.engine) $ -}}
-{{- include "elasticagent.init.fleet" $ -}}
 {{- include "elasticagent.init.inputs" $ -}}
+{{- include "elasticagent.init.fleet" $ -}}
 {{- include "elasticagent.init.presets" $ -}}
 {{- $_ := set $.Values.agent "initialised" dict -}}
 {{- end -}}
@@ -62,10 +62,12 @@ Initialise input templates if we are not deploying as managed
 */}}
 {{- define "elasticagent.init.inputs" -}}
 {{- $ := . -}}
-{{- if eq $.Values.agent.fleet.enabled false -}}
-{{/* standalone agent so initialise inputs */}}
+{{/* initialise inputs of the built-in integrations, even if fleet is enabled,
+ as they change the k8s configuration of presets e.g. necessary volume mounts, etc. */}}
 {{- include "elasticagent.kubernetes.init" $ -}}
 {{- include "elasticagent.system.init" $ -}}
+{{/* initialise inputs the custom integrations only if fleet is disabled */}}
+{{- if eq $.Values.agent.fleet.enabled false -}}
 {{- range $customInputName, $customInputVal := $.Values.extraIntegrations -}}
 {{- $customInputPresetName := ($customInputVal).preset -}}
 {{- $presetVal := get $.Values.agent.presets $customInputPresetName -}}
