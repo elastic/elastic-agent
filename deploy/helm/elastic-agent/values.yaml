@@ -47,7 +47,7 @@ kubernetes:
   # -- enable Kubernetes integration.
   # @section -- 2 - Kubernetes integration
   # @sectionDescriptionTemplate -- Kubernetes
-  enabled: false
+  enabled: true
   # -- name of the output used in kubernetes integration. Note that this output needs to be defined in
   # [outputs](#1-outputs)
   # @section -- 2 - Kubernetes integration
