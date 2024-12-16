@@ -3491,6 +3491,8 @@ func (Helm) RenderExamples() error {
 func (Helm) UpdateAgentVersion() error {
 	agentVersion := bversion.GetParsedAgentPackageVersion().CoreVersion()
 	agentSnapshotVersion := agentVersion + "-SNAPSHOT"
+	// until the Helm chart reaches GA this remains with -beta suffix
+	agentChartVersion := agentVersion + "-beta"
 
 	for yamlFile, keyVals := range map[string][]struct {
 		key   string
@@ -3506,9 +3508,7 @@ func (Helm) UpdateAgentVersion() error {
 		// Chart.yaml for elastic-agent Helm Chart
 		filepath.Join(helmChartPath, "Chart.yaml"): {
 			{"appVersion", agentVersion},
-			// always use the SNAPSHOT version for the chart that resides
-			// in the git repo
-			{"version", agentSnapshotVersion},
+			{"version", agentChartVersion},
 		},
 		// edot-collector values file for kube-stack Helm Chart
 		filepath.Join(helmOtelChartPath, "values.yaml"): {
