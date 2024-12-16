@@ -3489,7 +3489,7 @@ func (Helm) RenderExamples() error {
 
 // UpdateAgentVersion updates the agent version in the Elastic-Agent and EDOT-Collector Helm charts.
 func (Helm) UpdateAgentVersion() error {
-	agentVersion := getVersion()
+	agentVersion := bversion.GetParsedAgentPackageVersion().CoreVersion()
 	agentSnapshotVersion := agentVersion + "-SNAPSHOT"
 
 	for yamlFile, keyVals := range map[string][]struct {
