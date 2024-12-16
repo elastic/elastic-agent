@@ -32,7 +32,7 @@ stringData:
         node: ${NODE_NAME}
         scope: node
       kubernetes_leaderelection:
-        enabled: false
+        enabled: true
         leader_lease: example-pernode
 ---
 # Source: elastic-agent/templates/agent/cluster-role.yaml
@@ -154,7 +154,7 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: af3259ba23f68d99ef807759ff88472468ae32fe402c062fa164b19041d533c9
+        checksum/config: cd7c5c4f03cc8377d18ee22cf236428090959fc194ee647bd97a39b79f38c807
     spec:
       automountServiceAccountToken: true
       containers:
