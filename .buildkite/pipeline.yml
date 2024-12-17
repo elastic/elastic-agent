@@ -158,7 +158,7 @@ steps:
   - label: ":junit: Junit annotate"
     plugins:
       - junit-annotate#v2.5.0:
-          artifacts: "build/*.xml"
+          artifacts: "**TEST-*.xml"
           always-annotate: true
     agents:
       provider: "gcp"
