@@ -163,19 +163,6 @@ func (av agentVersion) String() string {
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 
-	currentVersion := agentVersion{
-		version:  release.Version(),
-		snapshot: release.Snapshot(),
-		hash:     release.Commit(),
-	}
-
-	// check version before download
-	same, _ := isSameVersion(u.log, currentVersion, packageMetadata{}, version)
-	if same {
-		u.log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
-		return nil, ErrUpgradeSameVersion
-	}
-
 	// Inform the Upgrade Marker Watcher that we've started upgrading. Note that this
 	// is only possible to do in-memory since, today, the  process that's initiating
 	// the upgrade is the same as the Agent process in which the Upgrade Marker Watcher is
@@ -220,7 +207,12 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, fmt.Errorf("reading metadata for elastic agent version %s package %q: %w", version, archivePath, err)
 	}
 
-	// Recheck version here in case of a snapshot->snapshot upgrade on the same version.
+	currentVersion := agentVersion{
+		version:  release.Version(),
+		snapshot: release.Snapshot(),
+		hash:     release.Commit(),
+	}
+
 	same, newVersion := isSameVersion(u.log, currentVersion, metadata, version)
 	if same {
 		u.log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
