@@ -429,7 +429,11 @@ func TestRepeatedInstallUninstallFleet(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: InstallUninstall,
 		Stack: &define.Stack{}, // needs a fleet-server.
-		Sudo:  true,
+		// We require sudo for this test to run
+		// `elastic-agent install` (even though it will
+		// be installed as non-root).
+		Sudo: true,
+
 		// It's not safe to run this test locally as it
 		// installs Elastic Agent.
 		Local: false,
