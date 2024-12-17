@@ -6,7 +6,7 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
+    helm.sh/chart: elastic-agent-8.16.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.16.2
@@ -20,7 +20,7 @@ metadata:
   name: agent-ksmsharded-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
+    helm.sh/chart: elastic-agent-8.16.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.16.2
@@ -34,7 +34,7 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
+    helm.sh/chart: elastic-agent-8.16.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.16.2
@@ -48,7 +48,7 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
+    helm.sh/chart: elastic-agent-8.16.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.16.2
@@ -100,7 +100,7 @@ metadata:
   name: agent-ksmsharded-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
+    helm.sh/chart: elastic-agent-8.16.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.16.2
@@ -389,7 +389,7 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
+    helm.sh/chart: elastic-agent-8.16.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.16.2
@@ -566,7 +566,7 @@ kind: ClusterRole
 metadata:
   name: agent-clusterWide-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
+    helm.sh/chart: elastic-agent-8.16.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.16.2
@@ -690,7 +690,7 @@ kind: ClusterRole
 metadata:
   name: agent-ksmSharded-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
+    helm.sh/chart: elastic-agent-8.16.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.16.2
@@ -923,7 +923,7 @@ kind: ClusterRole
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
+    helm.sh/chart: elastic-agent-8.16.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.16.2
@@ -1005,7 +1005,7 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-clusterWide-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
+    helm.sh/chart: elastic-agent-8.16.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.16.2
@@ -1026,7 +1026,7 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-ksmSharded-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
+    helm.sh/chart: elastic-agent-8.16.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.16.2
@@ -1047,7 +1047,7 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
+    helm.sh/chart: elastic-agent-8.16.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.16.2
@@ -1069,7 +1069,7 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
+    helm.sh/chart: elastic-agent-8.16.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.16.2
@@ -1171,7 +1171,7 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
+    helm.sh/chart: elastic-agent-8.16.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.16.2
@@ -1239,7 +1239,7 @@ metadata:
   name: agent-ksmsharded-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
+    helm.sh/chart: elastic-agent-8.16.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.16.2
