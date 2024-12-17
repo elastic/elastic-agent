@@ -69,7 +69,7 @@ var protectionTests = []struct {
 // test automatically.
 func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: FleetEndpointSecurity,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -96,7 +96,7 @@ func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 // but at this point endpoint is already uninstalled.
 func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: FleetEndpointSecurity,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -124,7 +124,7 @@ func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 // but at this point endpoint should be already uninstalled.
 func TestInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: FleetEndpointSecurity,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -399,7 +399,7 @@ type agentPolicyUpdateRequest struct {
 // path other than default
 func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: FleetEndpointSecurity,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -470,7 +470,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 // Tests that install of Elastic Defend fails if Agent is installed unprivileged.
 func TestEndpointSecurityUnprivileged(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: FleetEndpointSecurity,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -550,7 +550,7 @@ func TestEndpointSecurityUnprivileged(t *testing.T) {
 // Tests that trying to switch from privileged to unprivileged with Elastic Defend fails.
 func TestEndpointSecurityCannotSwitchToUnprivileged(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: FleetEndpointSecurity,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -620,7 +620,7 @@ func TestEndpointSecurityCannotSwitchToUnprivileged(t *testing.T) {
 // TestEndpointLogsAreCollectedInDiagnostics tests that diagnostics archive contain endpoint logs
 func TestEndpointLogsAreCollectedInDiagnostics(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: FleetEndpointSecurity,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -838,7 +838,7 @@ func agentIsHealthyNoEndpoint(t *testing.T, ctx context.Context, agentClient cli
 // when an installed agent is running a policy with tamper protection enabled fails.
 func TestForceInstallOverProtectedPolicy(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: FleetEndpointSecurity,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -904,7 +904,7 @@ func TestForceInstallOverProtectedPolicy(t *testing.T) {
 
 func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 	stack := define.Require(t, define.Requirements{
-		Group: FleetInstallDefend,
+		Group: FleetEndpointSecurity,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation

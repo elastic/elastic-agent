@@ -35,6 +35,9 @@ const (
 	// Upgrade group of tests. Used for testing upgrades.
 	Upgrade = "upgrade"
 
+	// StandaloneUpgrade group of tests. Used for TestStandaloneUpgrade.
+	StandaloneUpgrade = "standalone-upgrade"
+
 	// Deb group of tests. Used for testing .deb packages install & upgrades
 	Deb = "deb"
 
@@ -44,6 +47,6 @@ const (
 	// InstallUninstall group of tests. Used for testing repeated install & uninstall scenarios
 	InstallUninstall = "install-uninstall"
 
-	// FleetInstallDefend group of tests. Used for the long running TestInstallDefendWithMTLSandEncCertKey test.
-	FleetInstallDefend = "fleet-install-defend"
+	// FleetInstall group of tests. Used for the long running fleet-related "TestInstall..." tests.
+	FleetEndpointSecurity = "fleet-endpoint-security"
 )
