@@ -427,13 +427,9 @@ func TestInstallUninstallAudit(t *testing.T) {
 // into Fleet. Current testing shows each iteration takes around 16 seconds.
 func TestRepeatedInstallUninstallFleet(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: InstallUninstall,
 		Stack: &define.Stack{}, // needs a fleet-server.
-		// We require sudo for this test to run
-		// `elastic-agent install` (even though it will
-		// be installed as non-root).
-		Sudo: true,
-
+		Sudo:  true,
 		// It's not safe to run this test locally as it
 		// installs Elastic Agent.
 		Local: false,
@@ -458,9 +454,13 @@ func TestRepeatedInstallUninstallFleet(t *testing.T) {
 	require.NoError(t, err)
 
 	maxRunTime := 2 * time.Minute
-	iterations := 100
-	for i := 0; i < iterations; i++ {
-		successful := t.Run(fmt.Sprintf("%s-%d", t.Name(), i), func(t *testing.T) {
+	for i := 0; i < iterations(); i++ {
+		t.Run(fmt.Sprintf("%s-%d", t.Name(), i), func(t *testing.T) {
+
+			// Get path to Elastic Agent executable
+			fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+			require.NoError(t, err)
+
 			ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(maxRunTime))
 			defer cancel()
 
@@ -497,6 +497,13 @@ func TestRepeatedInstallUninstallFleet(t *testing.T) {
 			return
 		}
 	}
+}
+
+func iterations() int {
+	if os.Getenv("BUILDKITE_PULL_REQUEST") != "" {
+		return 50
+	}
+	return 100
 }
 
 func randStr(length int) string {

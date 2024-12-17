@@ -42,6 +42,7 @@ steps:
           - fleet
           - fleet-privileged
           - upgrade
+          - install-uninstall
 
       - label: "Win2022:non-sudo:{{matrix}}"
         command: |
@@ -89,6 +90,7 @@ steps:
           image: "family/platform-ingest-elastic-agent-ubuntu-2404"
         matrix:
           - default
+          - install-uninstall
           - container
           - fleet-upgrade-to-pr-build
           - upgrade
@@ -106,13 +108,14 @@ steps:
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
-          - build/diagnostics/**
+          - build/diagnosticss/**
         agents:
           provider: "aws"
           imagePrefix: "platform-ingest-beats-ubuntu-2404-aarch64"
           instanceType: "m6g.2xlarge"
         matrix:
           - default
+          - install-uninstall
           - container
           - fleet-upgrade-to-pr-build
           - upgrade
