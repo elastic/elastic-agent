@@ -44,6 +44,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+| [loadbalancingexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/loadbalancingexporter/v0.115.0/exporter/loadbalancingexporter/README.md) | v0.115.0 |
 | [elasticsearchexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/elasticsearchexporter/v0.115.0/exporter/elasticsearchexporter/README.md) | v0.115.0 |
 | [fileexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/fileexporter/v0.115.0/exporter/fileexporter/README.md) | v0.115.0 |
 | [debugexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/debugexporter/v0.115.0/exporter/debugexporter/README.md) | v0.115.0 |
