@@ -43,4 +43,7 @@ const (
 
 	// InstallUninstall group of tests. Used for testing repeated install & uninstall scenarios
 	InstallUninstall = "install-uninstall"
+
+	// FleetInstallDefend group of tests. Used for the long running TestInstallDefendWithMTLSandEncCertKey test.
+	FleetInstallDefend = "fleet-install-defend"
 )

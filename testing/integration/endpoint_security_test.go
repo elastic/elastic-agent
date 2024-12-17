@@ -904,7 +904,7 @@ func TestForceInstallOverProtectedPolicy(t *testing.T) {
 
 func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 	stack := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: FleetInstallDefend,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
