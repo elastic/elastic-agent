@@ -108,7 +108,7 @@ steps:
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
-          - build/diagnosticss/**
+          - build/diagnostics/**
         agents:
           provider: "aws"
           imagePrefix: "platform-ingest-beats-ubuntu-2404-aarch64"
