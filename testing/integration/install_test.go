@@ -455,12 +455,7 @@ func TestRepeatedInstallUninstallFleet(t *testing.T) {
 
 	maxRunTime := 2 * time.Minute
 	for i := 0; i < iterations(); i++ {
-		t.Run(fmt.Sprintf("%s-%d", t.Name(), i), func(t *testing.T) {
-
-			// Get path to Elastic Agent executable
-			fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-			require.NoError(t, err)
-
+		successful := t.Run(fmt.Sprintf("%s-%d", t.Name(), i), func(t *testing.T) {
 			ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(maxRunTime))
 			defer cancel()
 
