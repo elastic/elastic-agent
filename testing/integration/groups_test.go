@@ -40,4 +40,7 @@ const (
 
 	// RPM group of tests. Used for testing .rpm packages install & upgrades
 	RPM = "rpm"
+
+	// InstallUninstall group of tests. Used for testing repeated install & uninstall scenarios
+	InstallUninstall = "install-uninstall"
 )
