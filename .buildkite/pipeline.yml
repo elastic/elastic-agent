@@ -166,7 +166,7 @@ steps:
   - label: ":junit: Junit annotate"
     plugins:
       - junit-annotate#v2.5.0:
-          artifacts: "build/*.xml"
+          artifacts: "**TEST-*.xml"
           always-annotate: true
     agents:
       provider: "gcp"
@@ -196,7 +196,7 @@ steps:
     command: |
       .buildkite/scripts/steps/merge.sh
     artifact_paths:
-      - "TEST-go-unit.cov"
+      - "build/TEST-go-unit.cov"
     agents:
       image: "golang:1.22.6"
     depends_on:
