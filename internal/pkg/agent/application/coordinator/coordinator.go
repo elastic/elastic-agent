@@ -1406,6 +1406,7 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 	}
 
 	c.logger.Info("Updating running component model")
+	c.logger.With("components", model.Components).Debug("Updating running component model")
 	c.runtimeMgr.Update(model)
 	return nil
 }
