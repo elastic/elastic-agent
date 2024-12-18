@@ -22,11 +22,11 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 )
@@ -178,7 +178,7 @@ func TestNotifyFleetAuditUnenroll(t *testing.T) {
 
 	log, _ := logp.NewInMemory("test", zap.NewDevelopmentEncoderConfig())
 	pt := progressbar.NewOptions(-1, progressbar.OptionSetWriter(io.Discard))
-	ai := &info.AgentInfo{}
+	var agentID agentInfo = "testID"
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -194,7 +194,7 @@ func TestNotifyFleetAuditUnenroll(t *testing.T) {
 					},
 				},
 			}
-			err := notifyFleetAuditUninstall(context.Background(), log, pt, cfg, ai)
+			err := notifyFleetAuditUninstall(context.Background(), log, pt, cfg, &agentID)
 			if tc.err == nil {
 				assert.NoError(t, err)
 			} else {
@@ -222,7 +222,7 @@ func TestNotifyFleetAuditUnenroll(t *testing.T) {
 				},
 			},
 		}
-		err := notifyFleetAuditUninstall(context.Background(), log, pt, cfg, ai)
+		err := notifyFleetAuditUninstall(context.Background(), log, pt, cfg, &agentID)
 		assert.EqualError(t, err, "notify Fleet: failed")
 
 	})
@@ -232,16 +232,17 @@ type MockNotifyFleetAuditUninstall struct {
 	Called bool
 }
 
-func (m *MockNotifyFleetAuditUninstall) Call(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai *info.AgentInfo) {
+func (m *MockNotifyFleetAuditUninstall) Call(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai fleetapi.AgentInfo) {
 	m.Called = true
 }
+
 func TestSkipFleetAuditUnenroll(t *testing.T) {
 	log := &logp.Logger{}
 	pt := &progressbar.ProgressBar{}
-	ai := &info.AgentInfo{}
 	cfg := &configuration.Configuration{}
+	var agentID agentInfo = "testID"
 
 	mockNotify := &MockNotifyFleetAuditUninstall{}
-	notifyFleetIfNeeded(context.Background(), log, pt, cfg, ai, true, true, notifyFleetAuditUninstall)
+	notifyFleetIfNeeded(context.Background(), log, pt, cfg, agentID, true, false, true, notifyFleetAuditUninstall)
 	assert.False(t, mockNotify.Called, "NotifyFleetAuditUninstall should not be called when skipFleetAudit is true")
 }
