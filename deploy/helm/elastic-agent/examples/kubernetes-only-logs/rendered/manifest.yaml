@@ -6,7 +6,7 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-8.16.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.16.2
@@ -18,7 +18,7 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-8.16.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.16.2
@@ -110,7 +110,7 @@ kind: ClusterRole
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-8.16.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.16.2
@@ -190,7 +190,7 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-8.16.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.16.2
@@ -210,7 +210,7 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-8.16.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 8.16.2
