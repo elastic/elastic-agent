@@ -438,6 +438,7 @@ agent:
         create: true
       clusterRole:
         create: true
+      hostNetwork: true
       resources:
         limits:
           memory: 1000Mi
