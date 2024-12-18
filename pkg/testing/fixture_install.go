@@ -530,30 +530,7 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 	}
 
 	f.t.Cleanup(func() {
-		if f.t.Failed() {
-			f.DumpProcesses("-cleanup")
-		}
-	})
-
-	f.t.Cleanup(func() {
-		assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agents left after running RPM tests")
-	})
-
-	f.t.Cleanup(func() {
 		f.t.Logf("[test %s] Inside fixture installRpm cleanup function", f.t.Name())
-
-		// diagnostics is collected when either the environment variable
-		// AGENT_COLLECT_DIAG=true or the test is marked failed
-		collect := collectDiagFlag()
-		failed := f.t.Failed()
-		if collect || failed {
-			if collect {
-				f.t.Logf("collecting diagnostics; AGENT_COLLECT_DIAG=true")
-			} else if failed {
-				f.t.Logf("collecting diagnostics; test failed")
-			}
-			f.collectDiagnostics()
-		}
 
 		uninstallCtx, uninstallCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer uninstallCancel()
@@ -570,6 +547,13 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 			f.t.Logf("failed to 'sudo rpm -e elastic-agent': %s, output: %s", err, string(out))
 			f.t.FailNow()
 		}
+
+		f.t.Logf("removing installed agent files")
+		out, err = exec.CommandContext(uninstallCtx, "sudo", "rm", "-rf", "/var/lib/elastic-agent", "/var/log/elastic-agent", "/etc/elastic-agent").CombinedOutput()
+		if err != nil {
+			f.t.Logf("failed to 'sudo rm -rf /var/lib/elastic-agent /var/log/elastic-agent/ /etc/elastic-agent'")
+			f.t.FailNow()
+		}
 	})
 
 	// start elastic-agent
@@ -578,7 +562,6 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
 	}
 
-	fmt.Println("SHOULD ENROLL ", shouldEnroll)
 	if !shouldEnroll {
 		return nil, nil
 	}
