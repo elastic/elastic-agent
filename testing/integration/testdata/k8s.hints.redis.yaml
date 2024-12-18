@@ -3,7 +3,7 @@ kind: Pod
 metadata:
   name: redis
   annotations:
-    co.elastic.hints/package: redis
+    co.elastic.hints/package: redis # don't remove this as integration tests depend on it
     co.elastic.hints/data_streams: info
     co.elastic.hints/host: '${kubernetes.pod.ip}:6379'
     co.elastic.hints/info.period: 5s

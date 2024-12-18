@@ -1288,6 +1288,12 @@ func k8sStepHintsRedisCheckAgentStatus(agentPodLabelSelector string, hintDeploye
 		require.NoError(t, err, "failed to list redis pods with selector ", redisPodSelector)
 		if hintDeployed {
 			require.NotEmpty(t, redisPodList.Items, "no redis pods found with selector ", redisPodSelector)
+			// check that redis pods have the correct annotations
+			for _, redisPod := range redisPodList.Items {
+				hintPackage, ok := redisPod.ObjectMeta.Annotations["co.elastic.hints/package"]
+				require.True(t, ok, "missing hints annotation")
+				require.Equal(t, "redis", hintPackage, "hints annotation package wrong value")
+			}
 		} else {
 			require.Empty(t, redisPodList.Items, "redis pods should not exist ", redisPodSelector)
 		}
