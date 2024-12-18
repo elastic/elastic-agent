@@ -116,7 +116,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 		}
 	}
 
-	if err := verifier.Verify(agentArtifact, *parsedVersion, skipDefaultPgp, pgpBytes...); err != nil {
+	if err := verifier.Verify(ctx, agentArtifact, *parsedVersion, skipDefaultPgp, pgpBytes...); err != nil {
 		return "", errors.New(err, "failed verification of agent binary")
 	}
 	return path, nil
