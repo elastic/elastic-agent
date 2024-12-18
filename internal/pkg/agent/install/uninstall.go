@@ -99,7 +99,7 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	}()
 
 	// Notify fleet-server while it is still running if it's running locally
-	if notifyFleet && localFleet {
+	if notifyFleet && localFleet && runtime.GOOS != "windows" {
 		// host is set in the agent/cmd/enroll_cmd.go by createFleetServerBootstrapConfig
 		// hosts is set in agent/application/actions/handlers/handler_action_policy_change.go by updateFleetConfig
 		// agents running the fleet-server integration should communicate over the internal API (defaults to localhost:8221)
@@ -166,15 +166,10 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	}
 	pt.Describe("Removed install directory")
 
-<<<<<<< HEAD
 	// Skip on Windows because of https://github.com/elastic/elastic-agent/issues/5952
 	// Once the root-cause is identified then this can be re-enabled on Windows.
-	if notifyFleet && runtime.GOOS != "windows" {
-		notifyFleetAuditUninstall(ctx, log, pt, cfg, ai) //nolint:errcheck // ignore the error as we can't act on it
-=======
-	if notifyFleet && !localFleet {
+	if notifyFleet && !localFleet && runtime.GOOS != "windows" {
 		notifyFleetAuditUninstall(ctx, log, pt, cfg, &agentID) //nolint:errcheck // ignore the error as we can't act on it
->>>>>>> f321d8a72 (Fix audit/unenroll calls when agent runs fleet-server (#6085))
 	}
 
 	return nil
