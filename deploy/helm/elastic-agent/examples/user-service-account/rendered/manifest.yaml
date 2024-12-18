@@ -6,10 +6,10 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-8.16.3-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.2
+    app.kubernetes.io/version: 8.16.3
 stringData:
 
   agent.yml: |-
@@ -63,10 +63,10 @@ metadata:
   name: agent-ksmsharded-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-8.16.3-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.2
+    app.kubernetes.io/version: 8.16.3
 stringData:
 
   agent.yml: |-
@@ -357,10 +357,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-8.16.3-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.2
+    app.kubernetes.io/version: 8.16.3
 stringData:
 
   agent.yml: |-
@@ -539,10 +539,10 @@ kind: ClusterRole
 metadata:
   name: agent-clusterWide-example-default
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-8.16.3-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.2
+    app.kubernetes.io/version: 8.16.3
   annotations:
     elastic-agent.k8s.elastic.co/cr: nginx
 rules:
@@ -663,10 +663,10 @@ kind: ClusterRole
 metadata:
   name: agent-ksmSharded-example-default
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-8.16.3-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.2
+    app.kubernetes.io/version: 8.16.3
   annotations:
     elastic-agent.k8s.elastic.co/cr: nginx
 rules:
@@ -896,10 +896,10 @@ kind: ClusterRole
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-8.16.3-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.2
+    app.kubernetes.io/version: 8.16.3
   annotations:
     elastic-agent.k8s.elastic.co/cr: nginx
 rules:
@@ -978,10 +978,10 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-clusterWide-example-default
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-8.16.3-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.2
+    app.kubernetes.io/version: 8.16.3
 subjects:
   - kind: ServiceAccount
     name: user-sa-clusterWide
@@ -997,10 +997,10 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-ksmSharded-example-default
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-8.16.3-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.2
+    app.kubernetes.io/version: 8.16.3
 subjects:
   - kind: ServiceAccount
     name: user-sa-ksmSharded
@@ -1016,10 +1016,10 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-8.16.3-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.2
+    app.kubernetes.io/version: 8.16.3
 subjects:
   - kind: ServiceAccount
     name: user-sa-perNode
@@ -1036,10 +1036,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-8.16.3-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.2
+    app.kubernetes.io/version: 8.16.3
 spec:
   selector:
     matchLabels:
@@ -1070,7 +1070,7 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
-        image: docker.elastic.co/beats/elastic-agent:8.16.2-SNAPSHOT
+        image: docker.elastic.co/beats/elastic-agent:8.16.3-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
@@ -1155,10 +1155,10 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-8.16.3-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.2
+    app.kubernetes.io/version: 8.16.3
 spec:
   selector:
     matchLabels:
@@ -1189,7 +1189,7 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
-        image: docker.elastic.co/beats/elastic-agent:8.16.2-SNAPSHOT
+        image: docker.elastic.co/beats/elastic-agent:8.16.3-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
@@ -1236,10 +1236,10 @@ metadata:
   name: agent-ksmsharded-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-8.16.3-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.2
+    app.kubernetes.io/version: 8.16.3
 spec:
   selector:
     matchLabels:
@@ -1311,7 +1311,7 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
-        image: docker.elastic.co/beats/elastic-agent:8.16.2-SNAPSHOT
+        image: docker.elastic.co/beats/elastic-agent:8.16.3-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
