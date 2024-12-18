@@ -986,6 +986,35 @@ specs:
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
+    #### Cloud specific docker images ####
+    - os: linux
+      arch: amd64
+      types: [docker]
+      spec:
+        <<: *agent_docker_spec
+        # The cloud image is always based on Ubuntu
+        <<: *docker_ubuntu_spec
+        <<: *docker_builder_spec
+        <<: *agent_docker_cloud_spec
+        <<: *elastic_license_for_binaries
+        files:
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+    - os: linux
+      arch: arm64
+      types: [docker]
+      spec:
+        <<: *agent_docker_spec
+        # The cloud image is always based on Ubuntu
+        <<: *docker_ubuntu_arm_spec
+        <<: *docker_builder_arm_spec
+        <<: *agent_docker_cloud_spec
+        <<: *elastic_license_for_binaries
+        files:
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     #### ubi-based ####
     - os: linux
       arch: amd64
@@ -1011,34 +1040,8 @@ specs:
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     #### wolfi-based ####
-    #### Cloud specific docker images ####
-    - os: linux
-      arch: amd64
-      types: [docker]
-      spec:
-        <<: *agent_docker_spec
-        # The cloud image is always based on Wolfi
-        <<: *docker_wolfi_spec
-        <<: *docker_builder_spec
-        <<: *agent_docker_cloud_spec
-        <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
-    - os: linux
-      arch: arm64
-      types: [docker]
-      spec:
-        <<: *agent_docker_spec
-        # The cloud image is always based on Wolfi
-        <<: *docker_wolfi_arm_spec
-        <<: *docker_builder_arm_spec
-        <<: *agent_docker_cloud_spec
-        <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
     #### Service specific docker images ####
     - os: linux
       arch: amd64
