@@ -1273,21 +1273,37 @@ func k8sStepHintsRedisCreate() k8sTestStep {
 
 func k8sStepHintsRedisCheckAgentStatus(agentPodLabelSelector string, hintDeployed bool) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		redisPod := &corev1.Pod{}
-		err := kCtx.client.Resources(namespace).Get(ctx, "redis", namespace, redisPod)
-		if hintDeployed {
-			require.NoError(t, err, "failed to get redis pod")
-		}
-
-		perNodePodList := &corev1.PodList{}
-		err = kCtx.client.Resources(namespace).List(ctx, perNodePodList, func(opt *metav1.ListOptions) {
+		agentPodList := &corev1.PodList{}
+		err := kCtx.client.Resources(namespace).List(ctx, agentPodList, func(opt *metav1.ListOptions) {
 			opt.LabelSelector = agentPodLabelSelector
 		})
-		require.NoError(t, err, "failed to list pods with selector ", perNodePodList)
-		require.NotEmpty(t, perNodePodList.Items, "no pods found with selector ", perNodePodList)
+		require.NoError(t, err, "failed to list agent pods with selector ", agentPodLabelSelector)
+		require.NotEmpty(t, agentPodList.Items, "no agent pods found with selector ", agentPodLabelSelector)
 
-		for _, pod := range perNodePodList.Items {
-			shouldExist := hintDeployed && redisPod.Spec.NodeName == pod.Spec.NodeName
+		redisPodSelector := "app.kubernetes.io/name=redis"
+		redisPodList := &corev1.PodList{}
+		err = kCtx.client.Resources(namespace).List(ctx, redisPodList, func(opt *metav1.ListOptions) {
+			opt.LabelSelector = redisPodSelector
+		})
+		require.NoError(t, err, "failed to list redis pods with selector ", redisPodSelector)
+		if hintDeployed {
+			require.NotEmpty(t, redisPodList.Items, "no redis pods found with selector ", redisPodSelector)
+		} else {
+			require.Empty(t, redisPodList.Items, "redis pods should not exist ", redisPodSelector)
+		}
+
+		for _, pod := range agentPodList.Items {
+			shouldExist := hintDeployed
+			if shouldExist {
+				redisPodOnSameNode := false
+				for _, redisPod := range redisPodList.Items {
+					redisPodOnSameNode = redisPod.Spec.NodeName == pod.Spec.NodeName
+					if redisPodOnSameNode {
+						break
+					}
+				}
+				shouldExist = shouldExist && redisPodOnSameNode
+			}
 
 			var stdout, stderr bytes.Buffer
 			err = k8sCheckAgentStatus(ctx, kCtx.client, &stdout, &stderr, namespace, pod.Name, "agent", map[string]bool{
