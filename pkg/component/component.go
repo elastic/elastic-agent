@@ -5,6 +5,7 @@
 package component
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -171,6 +172,39 @@ func (c Component) MarshalYAML() (interface{}, error) {
 		c.ErrMsg = c.Err.Error()
 	}
 	return c, nil
+}
+
+func (c *Component) MarshalJSON() ([]byte, error) {
+	marshalableComponent := struct {
+		ID         string `json:"ID"`
+		InputType  string `json:"InputType"`
+		OutputType string `json:"OutputType"`
+		ErrMsg     string `json:"ErrMsg,omitempty"`
+		Units      []struct {
+			ID     string `json:"ID"`
+			ErrMsg string `json:"ErrMsg,omitempty"`
+		} `json:"Units"`
+	}{
+		ID:         c.ID,
+		InputType:  c.InputType,
+		OutputType: c.OutputType,
+	}
+	if c.Err != nil {
+		marshalableComponent.ErrMsg = c.Err.Error()
+	}
+	for i := range c.Units {
+		marshalableComponent.Units = append(marshalableComponent.Units, struct {
+			ID     string `json:"ID"`
+			ErrMsg string `json:"ErrMsg,omitempty"`
+		}{
+			ID: c.Units[i].ID,
+		})
+		if c.Units[i].Err != nil {
+			marshalableComponent.Units[i].ErrMsg = c.Units[i].Err.Error()
+		}
+	}
+
+	return json.Marshal(marshalableComponent)
 }
 
 // Type returns the type of the component.
