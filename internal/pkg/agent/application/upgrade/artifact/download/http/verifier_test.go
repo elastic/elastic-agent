@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net/http"
+
 	"net/http/httptest"
 	"net/url"
 	"os"
@@ -30,7 +31,7 @@ func TestVerify(t *testing.T) {
 	log, _ := logger.New("", false)
 	timeout := 30 * time.Second
 	testCases := getRandomTestCases()[0:1]
-	server, pub := getElasticCoServer(t)
+	server, pub, td := getElasticCoServer(t)
 
 	config := &artifact.Config{
 		SourceURI:       server.URL + "/downloads",
@@ -41,7 +42,7 @@ func TestVerify(t *testing.T) {
 	}
 
 	t.Run("without proxy", func(t *testing.T) {
-		runTests(t, testCases, config, log, pub)
+		runTests(t, testCases, td, config, log, pub)
 	})
 
 	t.Run("with proxy", func(t *testing.T) {
@@ -72,14 +73,21 @@ func TestVerify(t *testing.T) {
 			URL: (*httpcommon.ProxyURI)(proxyURL),
 		}
 
-		runTests(t, testCases, &config, log, pub)
+		runTests(t, testCases, td, &config, log, pub)
 	})
 }
 
-func runTests(t *testing.T, testCases []testCase, config *artifact.Config, log *logger.Logger, pub []byte) {
+func runTests(t *testing.T, testCases []testCase, td *testDials, config *artifact.Config, log *logger.Logger, pub []byte) {
 	for _, tc := range testCases {
 		testName := fmt.Sprintf("%s-binary-%s", tc.system, tc.arch)
 		t.Run(testName, func(t *testing.T) {
+			td.withExtResCode(".asc", 500, 2)
+			defer td.reset()
+
+			cancelDeadline := time.Now().Add(config.Timeout)
+			cancelCtx, cancel := context.WithDeadline(context.Background(), cancelDeadline)
+			defer cancel()
+
 			config.OperatingSystem = tc.system
 			config.Architecture = tc.arch
 
@@ -88,7 +96,7 @@ func runTests(t *testing.T, testCases []testCase, config *artifact.Config, log *
 			downloader, err := NewDownloader(log, config, upgradeDetails)
 			require.NoError(t, err, "could not create new downloader")
 
-			pkgPath, err := downloader.Download(context.Background(), beatSpec, version)
+			pkgPath, err := downloader.Download(cancelCtx, beatSpec, version)
 			require.NoErrorf(t, err, "failed downloading %s v%s",
 				beatSpec.Artifact, version)
 
@@ -102,7 +110,7 @@ func runTests(t *testing.T, testCases []testCase, config *artifact.Config, log *
 				t.Fatal(err)
 			}
 
-			err = testVerifier.Verify(beatSpec, *version, false)
+			err = testVerifier.Verify(cancelCtx, beatSpec, *version, false)
 			require.NoError(t, err)
 		})
 	}
