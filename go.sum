@@ -1623,10 +1623,10 @@ go.opentelemetry.io/collector/pdata/pprofile v0.115.0 h1:NI89hy13vNDw7EOnQf7Jtit
 go.opentelemetry.io/collector/pdata/pprofile v0.115.0/go.mod h1:jGzdNfO0XTtfLjXCL/uCC1livg1LlfR+ix2WE/z3RpQ=
 go.opentelemetry.io/collector/pdata/testdata v0.115.0 h1:Rblz+AKXdo3fG626jS+KSd0OSA4uMXcTQfpwed6P8LI=
 go.opentelemetry.io/collector/pdata/testdata v0.115.0/go.mod h1:inNnRt6S2Nn260EfCBEcjesjlKOSsr0jPwkPqpBkt4s=
-go.opentelemetry.io/collector/pipeline v0.115.0 h1:bmACBqb0e8U9ag+vGGHUP7kCfAO7HHROdtzIEg8ulus=
-go.opentelemetry.io/collector/pipeline v0.115.0/go.mod h1:qE3DmoB05AW0C3lmPvdxZqd/H4po84NPzd5MrqgtL74=
-go.opentelemetry.io/collector/pipeline/pipelineprofiles v0.115.0 h1:3l9ruCAOrssTUDnyChKNzHWOdTtfThnYaoPZ1/+5sD0=
-go.opentelemetry.io/collector/pipeline/pipelineprofiles v0.115.0/go.mod h1:2Myg+law/5lcezo9PhhZ0wjCaLYdGK24s1jDWbSW9VY=
+go.opentelemetry.io/collector/pipeline v0.116.0 h1:o8eKEuWEszmRpfShy7ElBoQ3Jo6kCi9ucm3yRgdNb9s=
+go.opentelemetry.io/collector/pipeline v0.116.0/go.mod h1:qE3DmoB05AW0C3lmPvdxZqd/H4po84NPzd5MrqgtL74=
+go.opentelemetry.io/collector/pipeline/pipelineprofiles v0.116.0 h1:vRdnwIU40bYtxntVOmxg4Bhrh9QVKtx5wwlxK21rc1s=
+go.opentelemetry.io/collector/pipeline/pipelineprofiles v0.116.0/go.mod h1:KxDMUOfbVy8lzZ85CZEG3gCJEYMyWiBKdN+HWUwQWTM=
 go.opentelemetry.io/collector/processor v0.115.0 h1:+fveHGRe24PZPv/F5taahGuZ9HdNW44hgNWEJhIUdyc=
 go.opentelemetry.io/collector/processor v0.115.0/go.mod h1:/oLHBlLsm7tFb7zOIrA5C0j14yBtjXKAgxJJ2Bktyk4=
 go.opentelemetry.io/collector/processor/batchprocessor v0.115.0 h1:dgw1jcE/YVFTs41b3Y7SerU3BBSyMEE93AYV+BAxR8E=
