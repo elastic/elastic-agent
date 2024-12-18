@@ -74,7 +74,7 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 			upgradetest.WithUnprivileged(unprivilegedAvailable),
 			upgradetest.WithDisableHashCheck(true),
 		)
-		assert.ErrorContains(t, err, "upgrade did not occur because it is the same version")
+		assert.NoError(t, err)
 	})
 
 	t.Run(fmt.Sprintf("Upgrade on a repackaged version of agent %s (%s)", currentVersion, unPrivilegedString), func(t *testing.T) {

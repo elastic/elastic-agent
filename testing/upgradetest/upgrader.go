@@ -332,18 +332,22 @@ func PerformUpgrade(
 
 	upgradeOutput, err := startFixture.Exec(ctx, upgradeCmdArgs)
 	if err != nil {
-		logger.Logf("Upgrade err: %v, output: %s", err, upgradeOutput)
 		// Sometimes the gRPC server shuts down before replying to the command which is expected
 		// we can determine this state by the EOF error coming from the server.
 		// If the server is just unavailable/not running, we should not succeed.
 		// Starting with version 8.13.2, this is handled by the upgrade command itself.
 		outputString := string(upgradeOutput)
-		if strings.Contains(outputString, "upgrade did not occur because it is the same version") {
-			return fmt.Errorf("upgrade did not occur because it is the same version")
-		}
 		isConnectionInterrupted := strings.Contains(outputString, "Unavailable") && strings.Contains(outputString, "EOF")
 		if !isConnectionInterrupted {
 			return fmt.Errorf("failed to start agent upgrade to version %q: %w\n%s", endVersionInfo.Binary.Version, err, upgradeOutput)
+		}
+	}
+
+	// check status
+	if status := getStatus(ctx, startFixture); status != nil {
+		if status.State == 2 && status.UpgradeDetails == nil {
+			logger.Logf("Agent status indicates no upgrade is in progress.")
+			return nil
 		}
 	}
 
@@ -656,4 +660,24 @@ func windowsBaseTemp() (string, error) {
 		return "", fmt.Errorf("failed to chmod %s: %w", baseTmp, err)
 	}
 	return baseTmp, nil
+}
+
+// getStatus will attempt to get the agent status with retries if enounters an error
+func getStatus(ctx context.Context, fixture *atesting.Fixture) *atesting.AgentStatusOutput {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+	defer cancel()
+	ticker := time.NewTicker(time.Second * 5)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			status, err := fixture.ExecStatus(ctx)
+			if err != nil {
+				continue
+			}
+			return &status
+		}
+	}
 }
