@@ -341,6 +341,7 @@ func (f *Fixture) RunBeat(ctx context.Context) error {
 		process.WithContext(ctx),
 		process.WithArgs(args),
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
+
 	if err != nil {
 		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
 	}
@@ -395,8 +396,7 @@ func RunProcess(t *testing.T,
 	lp Logger,
 	ctx context.Context, runLength time.Duration,
 	logOutput, allowErrs bool,
-	processPath string, args ...string,
-) error {
+	processPath string, args ...string) error {
 	if _, deadlineSet := ctx.Deadline(); !deadlineSet {
 		t.Fatal("Context passed to RunProcess() has no deadline set.")
 	}
@@ -414,6 +414,7 @@ func RunProcess(t *testing.T,
 		process.WithContext(ctx),
 		process.WithArgs(args),
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
+
 	if err != nil {
 		return fmt.Errorf("failed to spawn %q: %w", processPath, err)
 	}
@@ -543,6 +544,7 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 		process.WithContext(ctx),
 		process.WithArgs(args),
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
+
 	if err != nil {
 		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
 	}
