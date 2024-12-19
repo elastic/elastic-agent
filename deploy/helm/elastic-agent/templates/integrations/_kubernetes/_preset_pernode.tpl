@@ -3,7 +3,6 @@
 {{- include "elasticagent.preset.mutate.volumes" (list $ $.Values.agent.presets.perNode "elasticagent.kubernetes.pernode.preset.volumes") -}}
 {{- include "elasticagent.preset.mutate.outputs.byname" (list $ $.Values.agent.presets.perNode $.Values.kubernetes.output)}}
 {{- if eq $.Values.kubernetes.hints.enabled true -}}
-{{- include "elasticagent.preset.mutate.initcontainers" (list $ $.Values.agent.presets.perNode "elasticagent.kubernetes.pernode.preset.initcontainers") -}}
 {{- include "elasticagent.preset.mutate.providers.kubernetes.hints" (list $ $.Values.agent.presets.perNode "elasticagent.kubernetes.pernode.preset.providers.kubernetes.hints") -}}
 {{- end -}}
 {{- if or (eq $.Values.kubernetes.scheduler.enabled true) (eq $.Values.kubernetes.controller_manager.enabled true) -}}
@@ -37,10 +36,6 @@ extraVolumeMounts:
 - name: var-lib
   mountPath: /hostfs/var/lib
   readOnly: true
-{{- if eq $.Values.kubernetes.hints.enabled true }}
-- name: external-inputs
-  mountPath: /usr/share/elastic-agent/state/inputs.d
-{{- end }}
 {{- end -}}
 
 {{- define "elasticagent.kubernetes.pernode.preset.volumes" -}}
@@ -63,34 +58,6 @@ extraVolumes:
 - name: var-lib
   hostPath:
     path: /var/lib
-{{- if eq $.Values.kubernetes.hints.enabled true }}
-- name: external-inputs
-  emptyDir: {}
-{{- end }}
-{{- end -}}
-
-{{- define "elasticagent.kubernetes.pernode.preset.initcontainers" -}}
-initContainers:
-- name: k8s-templates-downloader
-  image: busybox:1.36.1
-  securityContext:
-    allowPrivilegeEscalation: false
-    privileged: false
-    runAsUser: 1000
-    runAsGroup: 1000
-    capabilities:
-      drop:
-        - ALL
-  command: [ 'sh' ]
-  args:
-    - -c
-    - >-
-      mkdir -p /etc/elastic-agent/inputs.d &&
-      mkdir -p /etc/elastic-agent/inputs.d &&
-      wget -O - https://github.com/elastic/elastic-agent/archive/v{{$.Values.agent.version}}.tar.gz | tar xz -C /etc/elastic-agent/inputs.d --strip=5 "elastic-agent-{{$.Values.agent.version}}/deploy/kubernetes/elastic-agent-standalone/templates.d"
-  volumeMounts:
-    - name: external-inputs
-      mountPath: /etc/elastic-agent/inputs.d
 {{- end -}}
 
 {{- define "elasticagent.kubernetes.pernode.preset.providers.kubernetes.hints" -}}
