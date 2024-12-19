@@ -1,4 +1,24 @@
 inputs:
+    - name: tcp-pfsense
+      id: tcp-pfsense-${kubernetes.hints.container_id}
+      type: tcp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.pfsense.log.enabled} == true and ${kubernetes.hints.pfsense.enabled} == true
+          data_stream:
+            dataset: pfsense.log
+            type: logs
+          host: localhost:9001
+          processors:
+            - add_locale: null
+            - add_fields:
+                fields:
+                    tz_offset: local
+                target: _tmp
+          tags:
+            - pfsense
+            - forwarded
+      data_stream.namespace: default
     - name: filestream-pfsense
       id: filestream-pfsense-${kubernetes.hints.container_id}
       type: filestream
@@ -37,26 +57,6 @@ inputs:
                 fields:
                     internal_networks:
                         - private
-                    tz_offset: local
-                target: _tmp
-          tags:
-            - pfsense
-            - forwarded
-      data_stream.namespace: default
-    - name: tcp-pfsense
-      id: tcp-pfsense-${kubernetes.hints.container_id}
-      type: tcp
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.pfsense.log.enabled} == true and ${kubernetes.hints.pfsense.enabled} == true
-          data_stream:
-            dataset: pfsense.log
-            type: logs
-          host: localhost:9001
-          processors:
-            - add_locale: null
-            - add_fields:
-                fields:
                     tz_offset: local
                 target: _tmp
           tags:

@@ -1,64 +1,4 @@
 inputs:
-    - name: filestream-logstash
-      id: filestream-logstash-${kubernetes.hints.container_id}
-      type: filestream
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.logstash.log.enabled} == true or ${kubernetes.hints.logstash.enabled} == true
-          data_stream:
-            dataset: logstash.log
-            type: logs
-          exclude_files:
-            - .gz$
-          file_identity:
-            fingerprint: null
-          multiline:
-            match: after
-            negate: true
-            pattern: ^((\[[0-9]{4}-[0-9]{2}-[0-9]{2}[^\]]+\])|({.+}))
-          parsers:
-            - container:
-                format: auto
-                stream: ${kubernetes.hints.logstash.log.stream|'all'}
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          processors:
-            - add_locale.when.not.regexp.message: ^{
-            - add_fields:
-                fields:
-                    ecs.version: 1.10.0
-                target: ""
-          prospector:
-            scanner:
-                fingerprint:
-                    enabled: true
-                symlinks: true
-        - condition: ${kubernetes.hints.logstash.slowlog.enabled} == true or ${kubernetes.hints.logstash.enabled} == true
-          data_stream:
-            dataset: logstash.slowlog
-            type: logs
-          exclude_files:
-            - .gz$
-          file_identity:
-            fingerprint: null
-          parsers:
-            - container:
-                format: auto
-                stream: ${kubernetes.hints.logstash.slowlog.stream|'all'}
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          processors:
-            - add_locale.when.not.regexp.message: ^{
-            - add_fields:
-                fields:
-                    ecs.version: 1.10.0
-                target: ""
-          prospector:
-            scanner:
-                fingerprint:
-                    enabled: true
-                symlinks: true
-      data_stream.namespace: default
     - name: logstash/metrics-logstash
       id: logstash/metrics-logstash-${kubernetes.hints.container_id}
       type: logstash/metrics
@@ -380,4 +320,64 @@ inputs:
           redact:
             fields: null
           resource.url: http://localhost:9600/_node
+      data_stream.namespace: default
+    - name: filestream-logstash
+      id: filestream-logstash-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.logstash.log.enabled} == true or ${kubernetes.hints.logstash.enabled} == true
+          data_stream:
+            dataset: logstash.log
+            type: logs
+          exclude_files:
+            - .gz$
+          file_identity:
+            fingerprint: null
+          multiline:
+            match: after
+            negate: true
+            pattern: ^((\[[0-9]{4}-[0-9]{2}-[0-9]{2}[^\]]+\])|({.+}))
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.logstash.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors:
+            - add_locale.when.not.regexp.message: ^{
+            - add_fields:
+                fields:
+                    ecs.version: 1.10.0
+                target: ""
+          prospector:
+            scanner:
+                fingerprint:
+                    enabled: true
+                symlinks: true
+        - condition: ${kubernetes.hints.logstash.slowlog.enabled} == true or ${kubernetes.hints.logstash.enabled} == true
+          data_stream:
+            dataset: logstash.slowlog
+            type: logs
+          exclude_files:
+            - .gz$
+          file_identity:
+            fingerprint: null
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.logstash.slowlog.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors:
+            - add_locale.when.not.regexp.message: ^{
+            - add_fields:
+                fields:
+                    ecs.version: 1.10.0
+                target: ""
+          prospector:
+            scanner:
+                fingerprint:
+                    enabled: true
+                symlinks: true
       data_stream.namespace: default

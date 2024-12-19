@@ -59,9 +59,9 @@ inputs:
             - remote_write
           port: 9201
           rate_counters: true
-          ssl.certificate: null
+          ssl.certificate: /etc/pki/server/cert.pem
           ssl.enabled: null
-          ssl.key: /etc/pki/server/cert.key
+          ssl.key: null
           types_patterns.exclude: null
           types_patterns.include: null
           use_types: true
