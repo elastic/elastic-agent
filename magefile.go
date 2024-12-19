@@ -84,6 +84,7 @@ const (
 	externalArtifacts = "EXTERNAL"
 	platformsEnv      = "PLATFORMS"
 	packagesEnv       = "PACKAGES"
+	dockerVariants    = "DOCKER_VARIANTS"
 	configFile        = "elastic-agent.yml"
 	agentDropPath     = "AGENT_DROP_PATH"
 	checksumFilename  = "checksum.yml"
@@ -782,9 +783,13 @@ func (Cloud) Image(ctx context.Context) {
 	dev := os.Getenv(devEnv)
 	defer os.Setenv(devEnv, dev)
 
+	variant := os.Getenv(dockerVariants)
+	defer os.Setenv(dockerVariants, variant)
+
 	os.Setenv(platformsEnv, "linux/amd64")
 	os.Setenv(packagesEnv, "docker")
 	os.Setenv(devEnv, "true")
+	os.Setenv(dockerVariants, "cloud")
 
 	if s, err := strconv.ParseBool(snapshot); err == nil && !s {
 		// only disable SNAPSHOT build when explicitely defined
