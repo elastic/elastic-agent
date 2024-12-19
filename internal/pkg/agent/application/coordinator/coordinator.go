@@ -575,6 +575,12 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 	if err != nil {
 		c.ClearOverrideState()
+		if errors.Is(err, upgrade.ErrUpgradeSameVersion) {
+			c.logger.Info("Same ver upgrade detected.")
+			// Set upgrade state to completed so update no longer shows in-progress.
+			det.SetState(details.StateCompleted)
+			return nil
+		}
 		det.Fail(err)
 		return err
 	}
