@@ -15,7 +15,7 @@ import (
 
 func TestIO(t *testing.T) {
 	t.Run("encode and decode with the right password", func(t *testing.T) {
-		passwd := []byte("hello")
+		passwd := bytes.Repeat([]byte("hello"), 10)
 		msg := []byte("bonjour la famille")
 		dest := new(bytes.Buffer)
 
@@ -40,7 +40,7 @@ func TestIO(t *testing.T) {
 	})
 
 	t.Run("Large single write", func(t *testing.T) {
-		passwd := []byte("hello")
+		passwd := bytes.Repeat([]byte("hello"), 10)
 		msg, err := randomBytes(1327)
 
 		require.NoError(t, err)
@@ -67,7 +67,7 @@ func TestIO(t *testing.T) {
 	})
 
 	t.Run("try to decode with the wrong password", func(t *testing.T) {
-		passwd := []byte("hello")
+		passwd := bytes.Repeat([]byte("hello"), 10)
 		msg := []byte("bonjour la famille")
 		dest := new(bytes.Buffer)
 
@@ -90,7 +90,7 @@ func TestIO(t *testing.T) {
 	})
 
 	t.Run("Make sure that buffered IO works with the encoder", func(t *testing.T) {
-		passwd := []byte("hello")
+		passwd := bytes.Repeat([]byte("hello"), 10)
 		msg, err := randomBytes(2048)
 		require.NoError(t, err)
 		dest := new(bytes.Buffer)
@@ -121,7 +121,7 @@ func TestIO(t *testing.T) {
 	})
 
 	t.Run("Make sure that buffered IO works with the decoder", func(t *testing.T) {
-		passwd := []byte("hello")
+		passwd := bytes.Repeat([]byte("hello"), 10)
 		msg, err := randomBytes(2048)
 		require.NoError(t, err)
 		dest := new(bytes.Buffer)
@@ -163,7 +163,7 @@ func TestIO(t *testing.T) {
 	})
 
 	t.Run("works with multiple writes", func(t *testing.T) {
-		passwd := []byte("hello")
+		passwd := bytes.Repeat([]byte("hello"), 10)
 
 		expected := []byte("hello world bonjour la famille")
 
