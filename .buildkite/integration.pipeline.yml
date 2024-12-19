@@ -5,77 +5,21 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
 
   # Packaging
-  SNAPSHOT: true
-  EXTERNAL: true
-  DEV: true
+  SNAPSHOT: "true"
+  EXTERNAL: "true"
 
 steps:
   - label: "Integration tests: packaging"
     key: "package-it"
+    env:
+      PACKAGES: "tar.gz"
+      PLATFORMS: "linux/arm64"
     command: ".buildkite/scripts/steps/integration-package.sh"
     artifact_paths:
       - build/distributions/**
     agents:
       provider: "gcp"
       machineType: "n1-standard-8"
-#  - group: "Integration tests: packaging"
-#    key: "package-it"
-#    steps:
-#      - label: "Packaging: Ubuntu x86_64"
-#        key: "packaging-ubuntu-x86-64"
-#        env:
-#          PACKAGES: "tar.gz"
-#          PLATFORMS: "linux/amd64"
-#        command: ".buildkite/scripts/steps/integration-package.sh"
-#        artifact_paths:
-#        - build/distributions/**
-#        agents:
-#          provider: "gcp"
-#          machineType: "n1-standard-8"
-#
-#      - label: "Packaging: Ubuntu arm64"
-#        key: "packaging-ubuntu-arm64"
-#        env:
-#          PACKAGES: "tar.gz"
-#          PLATFORMS: "linux/amd64,linux/arm64"
-#        command: ".buildkite/scripts/steps/integration-package.sh"
-#        artifact_paths:
-#          - build/distributions/**
-#        agents:
-#          provider: "gcp"
-#          machineType: "n1-standard-8"
-#
-#      - label: "Packaging: Windows"
-#        key: "packaging-windows"
-#        env:
-#          PACKAGES: "zip"
-#          PLATFORMS: "windows/amd64"
-#        command: ".buildkite/scripts/steps/integration-package.sh"
-#        artifact_paths:
-#          - build/distributions/**
-#        agents:
-#          provider: "gcp"
-#          machineType: "n1-standard-8"
-#
-#      - label: "Packaging: Containers {{matrix.ext}} {{matrix.arch}}"
-#        key: "packaging-containers"
-#        env:
-#          PACKAGES: "{{matrix.ext}}"
-#          PLATFORMS: "{{matrix.arch}}"
-#        command: ".buildkite/scripts/steps/integration-package.sh"
-#        artifact_paths:
-#          - build/distributions/**
-#        agents:
-#          provider: "gcp"
-#          machineType: "n1-standard-8"
-#        matrix:
-#          setup:
-#            arch:
-#              - linux/amd64
-#              - linux/arm64
-#            ext:
-#              - rpm
-#              - deb
 
 #  - label: "Serverless integration test"
 #    key: "serverless-integration-tests"
