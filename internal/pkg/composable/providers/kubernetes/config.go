@@ -5,12 +5,17 @@
 package kubernetes
 
 import (
+	"errors"
 	"time"
 
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
+
+const hintsInputsPathPattern = "/usr/share/elastic-agent/hints.inputs.d/*.yml"
 
 // Config for kubernetes provider
 type Config struct {
@@ -55,6 +60,22 @@ type Hints struct {
 // Enabled config section for resources' config blocks
 type Enabled struct {
 	Enabled bool `config:"enabled"`
+}
+
+func GetHintsInputConfigPath(log *logger.Logger, agentCfg map[string]interface{}) string {
+	hintsVal, err := utils.GetNestedMap(agentCfg, "providers", "kubernetes", "hints", "enabled")
+	if err != nil {
+		if errors.Is(err, utils.ErrKeyNotFound) {
+			return ""
+		}
+		log.Errorf("error at reading providers.kubernetes.hints.enabled from config: %v", err)
+		return ""
+	}
+	hintsEnabled, ok := hintsVal.(bool)
+	if !ok || !hintsEnabled {
+		return ""
+	}
+	return hintsInputsPathPattern
 }
 
 // InitDefaults initializes the default values for the config.

@@ -7,6 +7,7 @@ package config
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"go.opentelemetry.io/collector/confmap"
 
@@ -102,9 +103,11 @@ func getInput(c *Config) ([]*ucfg.Config, error) {
 	return tmpConfig.Inputs, nil
 }
 
+// isFileUnderInputsFolder checks if the given f path matches the Loader inputsFolder or
+// if the parent directory of it has the suffix inputs.d
 func (l *Loader) isFileUnderInputsFolder(f string) bool {
 	if matches, err := filepath.Match(l.inputsFolder, f); !matches || err != nil {
-		return false
+		return strings.HasSuffix(filepath.Dir(f), "inputs.d")
 	}
 	return true
 }
