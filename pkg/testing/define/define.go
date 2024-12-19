@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -143,8 +144,6 @@ func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Inf
 	if err := req.Validate(); err != nil {
 		panic(fmt.Sprintf("test %s has invalid requirements: %s", t.Name(), err))
 	}
-<<<<<<< HEAD
-=======
 
 	filteredGroups := GroupsFilter.values
 	if len(filteredGroups) > 0 && !slices.Contains(filteredGroups, req.Group) {
@@ -161,7 +160,6 @@ func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Inf
 		discoverTest(t, req)
 	}
 
->>>>>>> a7597b01d (Integration tests autodiscovery (#6199))
 	if !req.Local && local {
 		t.Skip("running local only tests and this test doesn't support local")
 		return nil
