@@ -21,11 +21,27 @@ func init() {
 
 func TestMain(m *testing.M) {
 	flag.Parse()
+
+	if define.AutoDiscover {
+		define.InitAutodiscovery(nil)
+	}
+
 	runExitCode := m.Run()
 
-	if define.DryRun {
-		// TODO add parsing of requirements and dump them
-		log.Print("Dry-run mode specified...")
+	if define.AutoDiscover {
+
+		discoveredTests, err := define.DumpAutodiscoveryYAML()
+		if err != nil {
+			log.Println("Error dumping autodiscovery YAML:", err)
+			os.Exit(1)
+		}
+
+		err = os.WriteFile(define.AutoDiscoveryOutput, discoveredTests, 0644)
+		if err != nil {
+			log.Printf("Error writing autodiscovery data in %q: %s", define.AutoDiscoveryOutput, err)
+			os.Exit(1)
+		}
+
 	}
 
 	os.Exit(runExitCode)
