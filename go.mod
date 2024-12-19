@@ -16,7 +16,7 @@ require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20241202144630-0eb63c16f21a
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.0
-	github.com/elastic/elastic-agent-libs v0.17.4
+	github.com/elastic/elastic-agent-libs v0.17.5
 	github.com/elastic/elastic-agent-system-metrics v0.11.4
 	github.com/elastic/elastic-transport-go/v8 v8.6.0
 	github.com/elastic/go-elasticsearch/v8 v8.17.0
@@ -68,12 +68,12 @@ require (
 	go.opentelemetry.io/collector/component/componentstatus v0.115.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.115.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/crypto v0.29.0
-	golang.org/x/exp v0.0.0-20240904232852-e7e105dedf7e
-	golang.org/x/sync v0.9.0
-	golang.org/x/sys v0.27.0
-	golang.org/x/term v0.26.0
-	golang.org/x/text v0.20.0
+	golang.org/x/crypto v0.31.0
+	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
+	golang.org/x/sync v0.10.0
+	golang.org/x/sys v0.28.0
+	golang.org/x/term v0.27.0
+	golang.org/x/text v0.21.0
 	golang.org/x/time v0.6.0
 	golang.org/x/tools v0.25.0
 	google.golang.org/grpc v1.67.1
