@@ -10,6 +10,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -20,6 +22,8 @@ inputs:
             - /usr/local/var/spool/zeek/capture_loss.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -30,6 +34,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -40,6 +46,8 @@ inputs:
             - /usr/local/var/spool/zeek/conn.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -50,6 +58,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -60,6 +70,8 @@ inputs:
             - /usr/local/var/spool/zeek/dce_rpc.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -70,6 +82,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -80,6 +94,8 @@ inputs:
             - /usr/local/var/spool/zeek/dhcp.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -90,6 +106,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -100,6 +118,8 @@ inputs:
             - /usr/local/var/spool/zeek/dnp3.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - zeek-dnp3
@@ -109,6 +129,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -119,6 +141,8 @@ inputs:
             - /usr/local/var/spool/zeek/dns.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -129,6 +153,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -139,6 +165,8 @@ inputs:
             - /usr/local/var/spool/zeek/dpd.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - zeek-dpd
@@ -148,6 +176,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -158,6 +188,8 @@ inputs:
             - /usr/local/var/spool/zeek/files.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - zeek-files
@@ -167,6 +199,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -177,6 +211,8 @@ inputs:
             - /usr/local/var/spool/zeek/ftp.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -187,6 +223,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -197,6 +235,8 @@ inputs:
             - /usr/local/var/spool/zeek/http.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -207,6 +247,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -217,6 +259,8 @@ inputs:
             - /usr/local/var/spool/zeek/intel.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -227,6 +271,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -237,6 +283,8 @@ inputs:
             - /usr/local/var/spool/zeek/irc.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -247,6 +295,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -257,6 +307,8 @@ inputs:
             - /usr/local/var/spool/zeek/kerberos.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -267,6 +319,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -277,6 +331,8 @@ inputs:
             - /usr/local/var/spool/zeek/known_certs.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -287,6 +343,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -297,6 +355,8 @@ inputs:
             - /usr/local/var/spool/zeek/known_hosts.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -307,6 +367,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -317,6 +379,8 @@ inputs:
             - /usr/local/var/spool/zeek/known_services.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -327,6 +391,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -337,6 +403,8 @@ inputs:
             - /usr/local/var/spool/zeek/modbus.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -347,6 +415,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -357,6 +427,8 @@ inputs:
             - /usr/local/var/spool/zeek/mysql.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -367,6 +439,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -377,6 +451,8 @@ inputs:
             - /usr/local/var/spool/zeek/notice.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -387,6 +463,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -397,6 +475,8 @@ inputs:
             - /usr/local/var/spool/zeek/ntlm.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -407,6 +487,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -417,6 +499,8 @@ inputs:
             - /usr/local/var/spool/zeek/ntp.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -427,6 +511,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -437,6 +523,8 @@ inputs:
             - /usr/local/var/spool/zeek/ocsp.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -447,6 +535,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -457,6 +547,8 @@ inputs:
             - /usr/local/var/spool/zeek/pe.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -467,6 +559,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -477,6 +571,8 @@ inputs:
             - /usr/local/var/spool/zeek/radius.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -487,6 +583,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -497,6 +595,8 @@ inputs:
             - /usr/local/var/spool/zeek/rdp.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -507,6 +607,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -517,6 +619,8 @@ inputs:
             - /usr/local/var/spool/zeek/rfb.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -527,6 +631,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -537,6 +643,8 @@ inputs:
             - /usr/local/var/spool/zeek/signature.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -547,6 +655,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -557,6 +667,8 @@ inputs:
             - /usr/local/var/spool/zeek/sip.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -567,6 +679,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -577,6 +691,8 @@ inputs:
             - /usr/local/var/spool/zeek/smb_cmd.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -587,6 +703,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -597,6 +715,8 @@ inputs:
             - /usr/local/var/spool/zeek/smb_files.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -607,6 +727,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -617,6 +739,8 @@ inputs:
             - /usr/local/var/spool/zeek/smb_mapping.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -627,6 +751,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -637,6 +763,8 @@ inputs:
             - /usr/local/var/spool/zeek/smtp.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -647,6 +775,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -657,6 +787,8 @@ inputs:
             - /usr/local/var/spool/zeek/snmp.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -667,6 +799,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -677,6 +811,8 @@ inputs:
             - /usr/local/var/spool/zeek/socks.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -687,6 +823,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -697,6 +835,8 @@ inputs:
             - /usr/local/var/spool/zeek/software.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -707,6 +847,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -717,6 +859,8 @@ inputs:
             - /usr/local/var/spool/zeek/ssh.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -727,6 +871,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -737,6 +883,8 @@ inputs:
             - /usr/local/var/spool/zeek/ssl.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -747,6 +895,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -757,6 +907,8 @@ inputs:
             - /usr/local/var/spool/zeek/stats.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -767,6 +919,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -777,6 +931,8 @@ inputs:
             - /usr/local/var/spool/zeek/syslog.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -787,6 +943,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -797,6 +955,8 @@ inputs:
             - /usr/local/var/spool/zeek/traceroute.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -807,6 +967,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -817,6 +979,8 @@ inputs:
             - /usr/local/var/spool/zeek/tunnel.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -827,6 +991,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -837,6 +1003,8 @@ inputs:
             - /usr/local/var/spool/zeek/weird.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -847,6 +1015,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -857,6 +1027,8 @@ inputs:
             - /usr/local/var/spool/zeek/x509.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
