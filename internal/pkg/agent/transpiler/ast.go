@@ -5,7 +5,6 @@
 package transpiler
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
@@ -13,6 +12,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/cespare/xxhash/v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
 )
@@ -58,11 +59,14 @@ type Node interface {
 	// Hash compute a sha256 hash of the current node and recursively call any children.
 	Hash() []byte
 
+	// Hash64With recursively computes the given hash for the Node and its children
+	Hash64With(h *xxhash.Digest) error
+
 	// Vars adds to the array with the variables identified in the node. Returns the array in-case
 	// the capacity of the array had to be changed.
 	Vars([]string) []string
 
-	// Apply apply the current vars, returning the new value for the node.
+	// Apply apply the current vars, returning the new value for the node. This does not modify the original Node.
 	Apply(*Vars) (Node, error)
 
 	// Processors returns any attached processors, because of variable substitution.
@@ -151,7 +155,8 @@ func (d *Dict) ShallowClone() Node {
 		if i == nil {
 			continue
 		}
-		nodes = append(nodes, i)
+		// Dict nodes are key-value pairs, and we do want to make a copy of the key here
+		nodes = append(nodes, i.ShallowClone())
 
 	}
 	return &Dict{value: nodes}
@@ -166,6 +171,16 @@ func (d *Dict) Hash() []byte {
 	return h.Sum(nil)
 }
 
+// Hash64With recursively computes the given hash for the Node and its children
+func (d *Dict) Hash64With(h *xxhash.Digest) error {
+	for _, v := range d.value {
+		if err := v.Hash64With(h); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Vars returns a list of all variables referenced in the dictionary.
 func (d *Dict) Vars(vars []string) []string {
 	for _, v := range d.value {
@@ -175,7 +190,7 @@ func (d *Dict) Vars(vars []string) []string {
 	return vars
 }
 
-// Apply applies the vars to all the nodes in the dictionary.
+// Apply applies the vars to all the nodes in the dictionary. This does not modify the original dictionary.
 func (d *Dict) Apply(vars *Vars) (Node, error) {
 	nodes := make([]Node, 0, len(d.value))
 	for _, v := range d.value {
@@ -223,13 +238,14 @@ func (d *Dict) sort() {
 
 // Key represents a Key / value pair in the dictionary.
 type Key struct {
-	name  string
-	value Node
+	name      string
+	value     Node
+	condition *eql.Expression
 }
 
 // NewKey creates a new key with provided name node pair.
 func NewKey(name string, val Node) *Key {
-	return &Key{name, val}
+	return &Key{name: name, value: val}
 }
 
 func (k *Key) String() string {
@@ -290,6 +306,17 @@ func (k *Key) Hash() []byte {
 	return h.Sum(nil)
 }
 
+// Hash64With recursively computes the given hash for the Node and its children
+func (k *Key) Hash64With(h *xxhash.Digest) error {
+	if _, err := h.WriteString(k.name); err != nil {
+		return err
+	}
+	if k.value != nil {
+		return k.value.Hash64With(h)
+	}
+	return nil
+}
+
 // Vars returns a list of all variables referenced in the value.
 func (k *Key) Vars(vars []string) []string {
 	if k.value == nil {
@@ -298,7 +325,7 @@ func (k *Key) Vars(vars []string) []string {
 	return k.value.Vars(vars)
 }
 
-// Apply applies the vars to the value.
+// Apply applies the vars to the value. This does not modify the original node.
 func (k *Key) Apply(vars *Vars) (Node, error) {
 	if k.value == nil {
 		return k, nil
@@ -308,11 +335,18 @@ func (k *Key) Apply(vars *Vars) (Node, error) {
 		case *BoolVal:
 			return k, nil
 		case *StrVal:
-			cond, err := eql.Eval(v.value, vars, true)
+			var err error
+			if k.condition == nil {
+				k.condition, err = eql.New(v.value)
+				if err != nil {
+					return nil, fmt.Errorf(`invalid condition "%s": %w`, v.value, err)
+				}
+			}
+			cond, err := k.condition.Eval(vars, true)
 			if err != nil {
 				return nil, fmt.Errorf(`condition "%s" evaluation failed: %w`, v.value, err)
 			}
-			return &Key{k.name, NewBoolVal(cond)}, nil
+			return &Key{name: k.name, value: NewBoolVal(cond)}, nil
 		}
 		return nil, fmt.Errorf("condition key's value must be a string; received %T", k.value)
 	}
@@ -323,7 +357,7 @@ func (k *Key) Apply(vars *Vars) (Node, error) {
 	if v == nil {
 		return nil, nil
 	}
-	return &Key{k.name, v}, nil
+	return &Key{name: k.name, value: v}, nil
 }
 
 // Processors returns any attached processors, because of variable substitution.
@@ -371,6 +405,16 @@ func (l *List) Hash() []byte {
 	}
 
 	return h.Sum(nil)
+}
+
+// Hash64With recursively computes the given hash for the Node and its children
+func (l *List) Hash64With(h *xxhash.Digest) error {
+	for _, v := range l.value {
+		if err := v.Hash64With(h); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Find takes an index and return the values at that index.
@@ -426,7 +470,7 @@ func (l *List) Vars(vars []string) []string {
 	return vars
 }
 
-// Apply applies the vars to all nodes in the list.
+// Apply applies the vars to all nodes in the list. This does not modify the original list.
 func (l *List) Apply(vars *Vars) (Node, error) {
 	nodes := make([]Node, 0, len(l.value))
 	for _, v := range l.value {
@@ -501,6 +545,12 @@ func (s *StrVal) Hash() []byte {
 	return []byte(s.value)
 }
 
+// Hash64With recursively computes the given hash for the Node and its children
+func (s *StrVal) Hash64With(h *xxhash.Digest) error {
+	_, err := h.WriteString(s.value)
+	return err
+}
+
 // Vars returns a list of all variables referenced in the string.
 func (s *StrVal) Vars(vars []string) []string {
 	// errors are ignored (if there is an error determine the vars it will also error computing the policy)
@@ -511,7 +561,7 @@ func (s *StrVal) Vars(vars []string) []string {
 	return vars
 }
 
-// Apply applies the vars to the string value.
+// Apply applies the vars to the string value. This does not modify the original string.
 func (s *StrVal) Apply(vars *Vars) (Node, error) {
 	return vars.Replace(s.value)
 }
@@ -577,6 +627,12 @@ func (s *IntVal) Hash() []byte {
 	return []byte(s.String())
 }
 
+// Hash64With recursively computes the given hash for the Node and its children
+func (s *IntVal) Hash64With(h *xxhash.Digest) error {
+	_, err := h.WriteString(s.String())
+	return err
+}
+
 // Processors returns any linked processors that are now connected because of Apply.
 func (s *IntVal) Processors() Processors {
 	return s.processors
@@ -626,6 +682,12 @@ func (s *UIntVal) ShallowClone() Node {
 // Hash we convert the value into a string and return the byte slice.
 func (s *UIntVal) Hash() []byte {
 	return []byte(s.String())
+}
+
+// Hash64With recursively computes the given hash for the Node and its children
+func (s *UIntVal) Hash64With(h *xxhash.Digest) error {
+	_, err := h.WriteString(s.String())
+	return err
 }
 
 // Vars does nothing. Cannot have variable in an UIntVal.
@@ -687,7 +749,18 @@ func (s *FloatVal) ShallowClone() Node {
 
 // Hash return a string representation of the value, we try to return the minimal precision we can.
 func (s *FloatVal) Hash() []byte {
-	return []byte(strconv.FormatFloat(s.value, 'f', -1, 64))
+	return []byte(s.hashString())
+}
+
+// Hash64With recursively computes the given hash for the Node and its children
+func (s *FloatVal) Hash64With(h *xxhash.Digest) error {
+	_, err := h.WriteString(s.hashString())
+	return err
+}
+
+// hashString returns a string representation of s suitable for hashing.
+func (s *FloatVal) hashString() string {
+	return strconv.FormatFloat(s.value, 'f', -1, 64)
 }
 
 // Vars does nothing. Cannot have variable in an FloatVal.
@@ -755,6 +828,18 @@ func (s *BoolVal) Hash() []byte {
 		return trueVal
 	}
 	return falseVal
+}
+
+// Hash64With recursively computes the given hash for the Node and its children
+func (s *BoolVal) Hash64With(h *xxhash.Digest) error {
+	var encodedBool []byte
+	if s.value {
+		encodedBool = trueVal
+	} else {
+		encodedBool = falseVal
+	}
+	_, err := h.Write(encodedBool)
+	return err
 }
 
 // Vars does nothing. Cannot have variable in an BoolVal.
@@ -877,6 +962,11 @@ func (a *AST) Hash() []byte {
 	return a.root.Hash()
 }
 
+// Hash64With recursively computes the given hash for the Node and its children
+func (a *AST) Hash64With(h *xxhash.Digest) error {
+	return a.root.Hash64With(h)
+}
+
 // HashStr return the calculated hash as a base64 url encoded string.
 func (a *AST) HashStr() string {
 	return base64.URLEncoding.EncodeToString(a.root.Hash())
@@ -887,7 +977,13 @@ func (a *AST) Equal(other *AST) bool {
 	if a.root == nil || other.root == nil {
 		return a.root == other.root
 	}
-	return bytes.Equal(a.Hash(), other.Hash())
+	hasher := xxhash.New()
+	_ = a.Hash64With(hasher)
+	thisHash := hasher.Sum64()
+	hasher.Reset()
+	_ = other.Hash64With(hasher)
+	otherHash := hasher.Sum64()
+	return thisHash == otherHash
 }
 
 // Lookup looks for a value from the AST.
