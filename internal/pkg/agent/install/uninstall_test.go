@@ -242,7 +242,29 @@ func TestSkipFleetAuditUnenroll(t *testing.T) {
 	cfg := &configuration.Configuration{}
 	var agentID agentInfo = "testID"
 
-	mockNotify := &MockNotifyFleetAuditUninstall{}
-	notifyFleetIfNeeded(context.Background(), log, pt, cfg, agentID, true, false, true, notifyFleetAuditUninstall)
-	assert.False(t, mockNotify.Called, "NotifyFleetAuditUninstall should not be called when skipFleetAudit is true")
+	testCases := []struct {
+		notifyFleet    bool
+		localFleet     bool
+		skipFleetAudit bool
+	}{
+		{true, true, true},
+		{true, true, false},
+		{true, false, true},
+		{false, true, true},
+		{false, true, false},
+		{false, false, true},
+		{false, false, false},
+	}
+
+	for i, tc := range testCases {
+		t.Run(
+			fmt.Sprintf("test case #%d: %t:%t:%t", i, tc.notifyFleet, tc.localFleet, tc.skipFleetAudit),
+			func(t *testing.T) {
+				mockNotify := &MockNotifyFleetAuditUninstall{}
+				notifyFleetIfNeeded(context.Background(), log, pt, cfg, agentID, tc.notifyFleet, tc.localFleet, tc.skipFleetAudit, notifyFleetAuditUninstall)
+				assert.False(t, mockNotify.Called, "NotifyFleetAuditUninstall should not be invoked when notifyFleet: %t - localFleet: %t - skipFleetAudit: %t", tc.notifyFleet, tc.localFleet, tc.skipFleetAudit)
+			},
+		)
+	}
+
 }
