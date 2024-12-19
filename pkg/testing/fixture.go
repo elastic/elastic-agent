@@ -1029,7 +1029,7 @@ func (f *Fixture) DumpProcesses(suffix string) {
 	}
 
 	f.t.Logf("Dumping running processes in %s", filePath)
-	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0777)
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
 		f.t.Logf("failed to dump process; failed to create output file %s root: %s", filePath, err)
 		return
