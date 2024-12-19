@@ -10,6 +10,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -18,6 +20,8 @@ inputs:
             - /var/log/containers/*${kubernetes.hints.container_id}.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
@@ -31,8 +35,7 @@ inputs:
           data_stream:
             dataset: traefik.health
             type: metrics
-          hosts:
-            - ${kubernetes.hints.traefik.health.host|kubernetes.hints.traefik.host|'localhost:8080'}
+          hosts: null
           metricsets:
             - health
           period: ${kubernetes.hints.traefik.health.period|kubernetes.hints.traefik.period|'10s'}
