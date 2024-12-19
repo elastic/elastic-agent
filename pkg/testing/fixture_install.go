@@ -550,6 +550,7 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 		f.t.Logf("removing installed agent files")
 		out, err = exec.CommandContext(uninstallCtx, "sudo", "rm", "-rf", "/var/lib/elastic-agent", "/var/log/elastic-agent", "/etc/elastic-agent").CombinedOutput()
 		if err != nil {
+			f.t.Log(string(out))
 			f.t.Logf("failed to 'sudo rm -rf /var/lib/elastic-agent /var/log/elastic-agent/ /etc/elastic-agent'")
 			f.t.FailNow()
 		}
