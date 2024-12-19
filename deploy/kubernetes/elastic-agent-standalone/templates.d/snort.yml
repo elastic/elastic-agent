@@ -10,6 +10,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -26,6 +28,8 @@ inputs:
                 target: _tmp
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded
