@@ -461,6 +461,94 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				"name=agent-pernode-helm-agent",
 			},
 		},
+		{
+			name: "helm standalone agent unprivileged kubernetes hints",
+			steps: []k8sTestStep{
+				k8sStepCreateNamespace(),
+				k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
+					"agent": map[string]any{
+						// NOTE: Setting the version to something released is mandatory as when we enable hints
+						// we have an init container that downloads a released agent archive and extracts
+						// the templates from there. If and when we embed the templates directly in the
+						// agent image, we can remove this.
+						"version":      "8.16.0",
+						"unprivileged": true,
+						"image": map[string]any{
+							"repository": kCtx.agentImageRepo,
+							"tag":        kCtx.agentImageTag,
+							"pullPolicy": "Never",
+						},
+					},
+					"kubernetes": map[string]any{
+						"enabled": true,
+						"hints": map[string]any{
+							"enabled": true,
+						},
+					},
+					"outputs": map[string]any{
+						"default": map[string]any{
+							"type":    "ESPlainAuthAPI",
+							"url":     kCtx.esHost,
+							"api_key": kCtx.esAPIKey,
+						},
+					},
+				}),
+				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+				k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
+				k8sStepCheckAgentStatus("name=agent-ksmsharded-helm-agent", 1, "agent", nil),
+				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+				k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
+				k8sStepRunInnerTests("name=agent-ksmsharded-helm-agent", 1, "agent"),
+				k8sStepHintsRedisCreate(),
+				k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", true),
+				k8sStepHintsRedisDelete(),
+				k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", false),
+			},
+		},
+		{
+			name: "helm standalone agent unprivileged kubernetes hints pre-deployed",
+			steps: []k8sTestStep{
+				k8sStepCreateNamespace(),
+				k8sStepHintsRedisCreate(),
+				k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
+					"agent": map[string]any{
+						// NOTE: Setting the version to something released is mandatory as when we enable hints
+						// we have an init container that downloads a released agent archive and extracts
+						// the templates from there. If and when we embed the templates directly in the
+						// agent image, we can remove this.
+						"version":      "8.16.0",
+						"unprivileged": true,
+						"image": map[string]any{
+							"repository": kCtx.agentImageRepo,
+							"tag":        kCtx.agentImageTag,
+							"pullPolicy": "Never",
+						},
+					},
+					"kubernetes": map[string]any{
+						"enabled": true,
+						"hints": map[string]any{
+							"enabled": true,
+						},
+					},
+					"outputs": map[string]any{
+						"default": map[string]any{
+							"type":    "ESPlainAuthAPI",
+							"url":     kCtx.esHost,
+							"api_key": kCtx.esAPIKey,
+						},
+					},
+				}),
+				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+				k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
+				k8sStepCheckAgentStatus("name=agent-ksmsharded-helm-agent", 1, "agent", nil),
+				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+				k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
+				k8sStepRunInnerTests("name=agent-ksmsharded-helm-agent", 1, "agent"),
+				k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", true),
+				k8sStepHintsRedisDelete(),
+				k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", false),
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1118,3 +1206,319 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 		enrollParams:   enrollParams,
 	}
 }
+<<<<<<< HEAD
+=======
+
+// k8sTestStep is a function that performs a single step in a k8s integration test
+type k8sTestStep func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string)
+
+// k8sStepCreateNamespace creates a namespace for the current test and adds a test cleanup that
+// deletes it
+func k8sStepCreateNamespace() k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		k8sNamespace := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespace,
+			},
+		}
+
+		t.Cleanup(func() {
+			err := k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, k8sNamespace)
+			if err != nil {
+				t.Logf("failed to delete namespace: %v", err)
+			}
+		})
+
+		err := k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true}, k8sNamespace)
+		require.NoError(t, err, "failed to create namespace")
+	}
+}
+
+// k8sKustomizeOverrides is futile attempt to make kustomize somewhat flexible and
+// contains certain handpicked overrides to apply to the k8s objects created from
+// kustomize rendering
+type k8sKustomizeOverrides struct {
+	agentContainerRunUser          *int64
+	agentContainerRunGroup         *int64
+	agentContainerCapabilitiesDrop []corev1.Capability
+	agentContainerCapabilitiesAdd  []corev1.Capability
+	agentContainerExtraEnv         []corev1.EnvVar
+	agentContainerArgs             []string
+	agentContainerMemoryLimit      string
+}
+
+// k8sStepDeployKustomize renders a kustomize manifest and deploys it. Also, it tries to
+// adjust the k8s objects created from the rendering to match the needs of the current test with k8sKustomizeOverrides.
+// However, this is not that as flexible as we would like it to be. As a last resort somebody can use forEachObject callback
+// to further adjust the k8s objects
+func k8sStepDeployKustomize(kustomizePath string, containerName string, overrides k8sKustomizeOverrides, forEachObject func(object k8s.Object)) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		renderedManifest, err := k8sRenderKustomize(kustomizePath)
+		require.NoError(t, err, "failed to render kustomize")
+
+		objects, err := k8sYAMLToObjects(bufio.NewReader(bytes.NewReader(renderedManifest)))
+		require.NoError(t, err, "failed to parse rendered kustomize")
+
+		if forEachObject != nil {
+			for _, object := range objects {
+				forEachObject(object)
+			}
+		}
+
+		k8sKustomizeAdjustObjects(objects, namespace, containerName,
+			func(container *corev1.Container) {
+				// set agent image
+				container.Image = kCtx.agentImage
+				// set ImagePullPolicy to "Never" to avoid pulling the image
+				// as the image is already loaded by the kubernetes provisioner
+				container.ImagePullPolicy = "Never"
+
+				if overrides.agentContainerMemoryLimit != "" {
+					container.Resources.Limits = corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse(overrides.agentContainerMemoryLimit),
+					}
+				}
+
+				// if security context overrides are set then set security context
+				if overrides.agentContainerCapabilitiesDrop != nil || overrides.agentContainerCapabilitiesAdd != nil ||
+					overrides.agentContainerRunUser != nil || overrides.agentContainerRunGroup != nil {
+					// set security context
+					container.SecurityContext = &corev1.SecurityContext{
+						Capabilities: &corev1.Capabilities{
+							Drop: overrides.agentContainerCapabilitiesDrop,
+							Add:  overrides.agentContainerCapabilitiesAdd,
+						},
+						RunAsUser:  overrides.agentContainerRunUser,
+						RunAsGroup: overrides.agentContainerRunGroup,
+					}
+				}
+
+				// set Elasticsearch host and API key
+				for idx, env := range container.Env {
+					if env.Name == "ES_HOST" {
+						container.Env[idx].Value = kCtx.esHost
+						container.Env[idx].ValueFrom = nil
+					}
+					if env.Name == "API_KEY" {
+						container.Env[idx].Value = kCtx.esAPIKey
+						container.Env[idx].ValueFrom = nil
+					}
+				}
+
+				if len(overrides.agentContainerExtraEnv) > 0 {
+					container.Env = append(container.Env, overrides.agentContainerExtraEnv...)
+				}
+
+				if overrides.agentContainerArgs != nil {
+					// drop arguments overriding default config
+					container.Args = []string{}
+				}
+			},
+			func(pod *corev1.PodSpec) {
+				for volumeIdx, volume := range pod.Volumes {
+					// need to update the volume path of the state directory
+					// to match the test namespace
+					if volume.Name == "elastic-agent-state" {
+						hostPathType := corev1.HostPathDirectoryOrCreate
+						pod.Volumes[volumeIdx].VolumeSource.HostPath = &corev1.HostPathVolumeSource{
+							Type: &hostPathType,
+							Path: fmt.Sprintf("/var/lib/elastic-agent-standalone/%s/state", namespace),
+						}
+					}
+				}
+			})
+
+		t.Cleanup(func() {
+			if t.Failed() {
+				if err := k8sDumpAllPodLogs(ctx, kCtx.client, namespace, namespace, kCtx.logsBasePath); err != nil {
+					t.Logf("failed to dump logs: %v", err)
+				}
+			}
+
+			err := k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, objects...)
+			if err != nil {
+				t.Logf("failed to delete objects: %v", err)
+			}
+		})
+
+		err = k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true}, objects...)
+		require.NoError(t, err, "failed to create objects")
+	}
+}
+
+// k8sStepCheckAgentStatus checks the status of the agent inside the pods returned by the selector
+func k8sStepCheckAgentStatus(agentPodLabelSelector string, expectedPodNumber int, containerName string, componentPresence map[string]bool) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		perNodePodList := &corev1.PodList{}
+		err := kCtx.client.Resources(namespace).List(ctx, perNodePodList, func(opt *metav1.ListOptions) {
+			opt.LabelSelector = agentPodLabelSelector
+		})
+		require.NoError(t, err, "failed to list pods with selector ", perNodePodList)
+		require.NotEmpty(t, perNodePodList.Items, "no pods found with selector ", perNodePodList)
+		require.Equal(t, expectedPodNumber, len(perNodePodList.Items), "unexpected number of pods found with selector ", perNodePodList)
+
+		for _, pod := range perNodePodList.Items {
+			var stdout, stderr bytes.Buffer
+			err = k8sCheckAgentStatus(ctx, kCtx.client, &stdout, &stderr, namespace, pod.Name, containerName, componentPresence)
+			if err != nil {
+				t.Errorf("failed to check agent status %s: %v", pod.Name, err)
+				t.Logf("stdout: %s\n", stdout.String())
+				t.Logf("stderr: %s\n", stderr.String())
+				t.FailNow()
+			}
+		}
+	}
+}
+
+// k8sStepRunInnerTests invokes the k8s inner tests inside the pods returned by the selector. Note that this
+// step requires the agent image to be built with the testing framework as there is the point where the binary
+// for the inner tests is copied
+func k8sStepRunInnerTests(agentPodLabelSelector string, expectedPodNumber int, containerName string) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		perNodePodList := &corev1.PodList{}
+		err := kCtx.client.Resources(namespace).List(ctx, perNodePodList, func(opt *metav1.ListOptions) {
+			opt.LabelSelector = agentPodLabelSelector
+		})
+		require.NoError(t, err, "failed to list pods with selector ", perNodePodList)
+		require.NotEmpty(t, perNodePodList.Items, "no pods found with selector ", perNodePodList)
+		require.Equal(t, expectedPodNumber, len(perNodePodList.Items), "unexpected number of pods found with selector ", perNodePodList)
+
+		for _, pod := range perNodePodList.Items {
+			var stdout, stderr bytes.Buffer
+			err = kCtx.client.Resources().ExecInPod(ctx, namespace, pod.Name, containerName,
+				[]string{"/usr/share/elastic-agent/k8s-inner-tests", "-test.v"}, &stdout, &stderr)
+			t.Logf("%s k8s-inner-tests output:", pod.Name)
+			t.Log(stdout.String())
+			if err != nil {
+				t.Log(stderr.String())
+			}
+			require.NoError(t, err, "error at k8s inner tests execution")
+		}
+	}
+}
+
+// k8sStepHelmDeploy deploys a helm chart with the given values and the release name
+func k8sStepHelmDeploy(chartPath string, releaseName string, values map[string]any) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		settings := cli.New()
+		settings.SetNamespace(namespace)
+		actionConfig := &action.Configuration{}
+
+		helmChart, err := loader.Load(chartPath)
+		require.NoError(t, err, "failed to load helm chart")
+
+		err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "",
+			func(format string, v ...interface{}) {})
+		require.NoError(t, err, "failed to init helm action config")
+
+		t.Cleanup(func() {
+			if t.Failed() {
+				if err := k8sDumpAllPodLogs(ctx, kCtx.client, namespace, namespace, kCtx.logsBasePath); err != nil {
+					t.Logf("failed to dump logs: %v", err)
+				}
+			}
+
+			uninstallAction := action.NewUninstall(actionConfig)
+			uninstallAction.Wait = true
+			_, err = uninstallAction.Run(releaseName)
+			if err != nil {
+				t.Logf("failed to uninstall helm chart: %v", err)
+			}
+		})
+
+		installAction := action.NewInstall(actionConfig)
+		installAction.Namespace = namespace
+		installAction.CreateNamespace = true
+		installAction.UseReleaseName = true
+		installAction.ReleaseName = releaseName
+		installAction.Timeout = 2 * time.Minute
+		installAction.Wait = true
+		installAction.WaitForJobs = true
+		_, err = installAction.Run(helmChart, values)
+		require.NoError(t, err, "failed to install helm chart")
+	}
+}
+
+func k8sStepHintsRedisCreate() k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		r, err := os.Open("testdata/k8s.hints.redis.yaml")
+		require.NoError(t, err, "failed to open redis k8s test data")
+
+		redisObjs, err := k8sYAMLToObjects(bufio.NewReader(r))
+		require.NoError(t, err, "failed to convert redis yaml to k8s objects")
+
+		t.Cleanup(func() {
+			err = k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, redisObjs...)
+			require.NoError(t, err, "failed to delete redis k8s objects")
+		})
+
+		err = k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true, waitTimeout: 120 * time.Second, namespace: namespace}, redisObjs...)
+		require.NoError(t, err, "failed to create redis k8s objects")
+	}
+}
+
+func k8sStepHintsRedisCheckAgentStatus(agentPodLabelSelector string, hintDeployed bool) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		agentPodList := &corev1.PodList{}
+		err := kCtx.client.Resources(namespace).List(ctx, agentPodList, func(opt *metav1.ListOptions) {
+			opt.LabelSelector = agentPodLabelSelector
+		})
+		require.NoError(t, err, "failed to list agent pods with selector ", agentPodLabelSelector)
+		require.NotEmpty(t, agentPodList.Items, "no agent pods found with selector ", agentPodLabelSelector)
+
+		redisPodSelector := "app.kubernetes.io/name=redis"
+		redisPodList := &corev1.PodList{}
+		err = kCtx.client.Resources(namespace).List(ctx, redisPodList, func(opt *metav1.ListOptions) {
+			opt.LabelSelector = redisPodSelector
+		})
+		require.NoError(t, err, "failed to list redis pods with selector ", redisPodSelector)
+		if hintDeployed {
+			require.NotEmpty(t, redisPodList.Items, "no redis pods found with selector ", redisPodSelector)
+			// check that redis pods have the correct annotations
+			for _, redisPod := range redisPodList.Items {
+				hintPackage, ok := redisPod.ObjectMeta.Annotations["co.elastic.hints/package"]
+				require.True(t, ok, "missing hints annotation")
+				require.Equal(t, "redis", hintPackage, "hints annotation package wrong value")
+			}
+		} else {
+			require.Empty(t, redisPodList.Items, "redis pods should not exist ", redisPodSelector)
+		}
+
+		for _, pod := range agentPodList.Items {
+			shouldExist := hintDeployed
+			if shouldExist {
+				redisPodOnSameNode := false
+				for _, redisPod := range redisPodList.Items {
+					redisPodOnSameNode = redisPod.Spec.NodeName == pod.Spec.NodeName
+					if redisPodOnSameNode {
+						break
+					}
+				}
+				shouldExist = shouldExist && redisPodOnSameNode
+			}
+
+			var stdout, stderr bytes.Buffer
+			err = k8sCheckAgentStatus(ctx, kCtx.client, &stdout, &stderr, namespace, pod.Name, "agent", map[string]bool{
+				"redis/metrics": shouldExist,
+			})
+			if err != nil {
+				t.Errorf("failed to check agent status %s: %v", pod.Name, err)
+				t.Logf("stdout: %s\n", stdout.String())
+				t.Logf("stderr: %s\n", stderr.String())
+				t.FailNow()
+			}
+		}
+	}
+}
+
+func k8sStepHintsRedisDelete() k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		redisPod := &corev1.Pod{}
+		err := kCtx.client.Resources(namespace).Get(ctx, "redis", namespace, redisPod)
+		require.NoError(t, err, "failed to get redis pod")
+
+		err = k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, redisPod)
+		require.NoError(t, err, "failed to delete redis k8s objects")
+	}
+}
+>>>>>>> c7c5ba413 ([k8s] add kubernetes hints integration tests (#6360))
