@@ -1030,7 +1030,7 @@ func TestIsSameReleaseVersion(t *testing.T) {
 		target: "1.2.4",
 		expect: false,
 	}, {
-		name: "target version is same with pre-release",
+		name: "target version has same major.minor.patch, different pre-release",
 		current: agentVersion{
 			version: "1.2.3",
 		},
@@ -1050,10 +1050,18 @@ func TestIsSameReleaseVersion(t *testing.T) {
 		},
 		target: "1.2.3",
 		expect: true,
+	}, {
+		name: "target version is invalid",
+		current: agentVersion{
+			version: "1.2.3",
+		},
+		target: "a.b.c",
+		expect: false,
 	}}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.expect, isSameReleaseVersion(tc.current, tc.target))
+			log, _ := loggertest.New(tc.name)
+			assert.Equal(t, tc.expect, isSameReleaseVersion(log, tc.current, tc.target))
 		})
 	}
 }

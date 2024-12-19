@@ -169,7 +169,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		hash:     release.Commit(),
 	}
 
-	if isSameReleaseVersion(currentVersion, version) {
+	if isSameReleaseVersion(u.log, currentVersion, version) {
 		u.log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
 		return nil, ErrUpgradeSameVersion
 	}
@@ -634,13 +634,17 @@ func IsInProgress(c client.Client, watcherPIDsFetcher func() ([]int, error)) (bo
 	return state.State == cproto.State_UPGRADING, nil
 }
 
-// isSameReleaseVersion will if upgradeVersion and currentVersion are equal using only release numbers.
+// isSameReleaseVersion will return true if upgradeVersion and currentVersion are equal using only release numbers and SNAPSHOT prerelease qualifiers.
 // They are not equal if either are a SNAPSHOT, or if the semver numbers (including prerelease and build identifiers) differ.
-func isSameReleaseVersion(current agentVersion, upgradeVersion string) bool {
+func isSameReleaseVersion(log *logger.Logger, current agentVersion, upgradeVersion string) bool {
 	if current.snapshot {
 		return false
 	}
-	target, _ := agtversion.ParseVersion(upgradeVersion)
+	target, err := agtversion.ParseVersion(upgradeVersion)
+	if err != nil {
+		log.Warnw("Unable too parse version for released version comparison", upgradeVersion, err)
+		return false
+	}
 	targetVersion, targetSnapshot := target.ExtractSnapshotFromVersionString()
 	if targetSnapshot {
 		return false

@@ -74,6 +74,9 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 			upgradetest.WithUnprivileged(unprivilegedAvailable),
 			upgradetest.WithDisableHashCheck(true),
 		)
+		// PerformUpgrade will exit after calling `elastic-agent upgrade ...` if a subsequent call to
+		// `elastic-agent status` returns the running state with no upgrade details. This indicates that
+		// the agent did a nop upgrade.
 		assert.NoError(t, err)
 	})
 
