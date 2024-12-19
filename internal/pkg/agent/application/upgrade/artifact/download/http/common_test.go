@@ -55,7 +55,28 @@ func getTestCases() []testCase {
 	}
 }
 
-func getElasticCoServer(t *testing.T) (*httptest.Server, []byte) {
+type extResCode map[string]struct {
+	resCode int
+	count   int
+}
+
+type testDials struct {
+	extResCode
+}
+
+func (td *testDials) withExtResCode(k string, statusCode int, count int) {
+	td.extResCode[k] = struct {
+		resCode int
+		count   int
+	}{statusCode, count}
+}
+
+func (td *testDials) reset() {
+	*td = testDials{extResCode: make(extResCode)}
+}
+
+func getElasticCoServer(t *testing.T) (*httptest.Server, []byte, *testDials) {
+	td := testDials{extResCode: make(extResCode)}
 	correctValues := map[string]struct{}{
 		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "i386.deb"):             {},
 		fmt.Sprintf("%s-%s-%s", beatSpec.Cmd, version, "amd64.deb"):            {},
@@ -81,7 +102,6 @@ func getElasticCoServer(t *testing.T) (*httptest.Server, []byte) {
 			ext = ".tar.gz"
 		}
 		packageName = strings.TrimSuffix(packageName, ext)
-
 		switch ext {
 		case ".sha512":
 			resp = []byte(fmt.Sprintf("%x %s", hash, packageName))
@@ -103,11 +123,17 @@ func getElasticCoServer(t *testing.T) (*httptest.Server, []byte) {
 			return
 		}
 
+		if v, ok := td.extResCode[ext]; ok && v.count != 0 {
+			w.WriteHeader(v.resCode)
+			v.count--
+			td.extResCode[ext] = v
+		}
+
 		_, err := w.Write(resp)
 		assert.NoErrorf(t, err, "mock elastic.co server: failes writing response")
 	})
 
-	return httptest.NewServer(handler), pub
+	return httptest.NewServer(handler), pub, &td
 }
 
 func getElasticCoClient(server *httptest.Server) http.Client {
