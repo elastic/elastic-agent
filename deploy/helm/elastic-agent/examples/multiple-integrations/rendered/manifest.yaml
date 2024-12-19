@@ -1158,8 +1158,6 @@ spec:
         - mountPath: /hostfs/var/lib
           name: var-lib
           readOnly: true
-        - mountPath: /usr/share/elastic-agent/state/inputs.d
-          name: external-inputs
         - mountPath: /usr/share/elastic-agent/state
           name: agent-data
         - mountPath: /etc/elastic-agent/agent.yml
@@ -1167,6 +1165,7 @@ spec:
           readOnly: true
           subPath: agent.yml
       dnsPolicy: ClusterFirstWithHostNet
+<<<<<<< HEAD
       initContainers:
       - args:
         - -c
@@ -1188,6 +1187,8 @@ spec:
         volumeMounts:
         - mountPath: /etc/elastic-agent/inputs.d
           name: external-inputs
+=======
+>>>>>>> a631362d5 ([k8s] embed hints inputs in agent container image (#6381))
       nodeSelector:
         kubernetes.io/os: linux
       serviceAccountName: agent-pernode-example
@@ -1210,8 +1211,6 @@ spec:
       - hostPath:
           path: /var/lib
         name: var-lib
-      - emptyDir: {}
-        name: external-inputs
       - hostPath:
           path: /etc/elastic-agent/default/agent-pernode-example/state
           type: DirectoryOrCreate

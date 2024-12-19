@@ -23,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
+	"github.com/elastic/elastic-agent/internal/pkg/composable/providers/kubernetes"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -135,7 +136,12 @@ func New(
 		log.Info("Parsed configuration and determined agent is managed locally")
 
 		loader := config.NewLoader(log, paths.ExternalInputs())
-		discover := config.Discoverer(pathConfigFile, cfg.Settings.Path, paths.ExternalInputs())
+		rawCfgMap, err := rawConfig.ToMapStr()
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to transform agent configuration into a map: %w", err)
+		}
+		discover := config.Discoverer(pathConfigFile, cfg.Settings.Path, paths.ExternalInputs(),
+			kubernetes.GetHintsInputConfigPath(log, rawCfgMap))
 		if !cfg.Settings.Reload.Enabled {
 			log.Debug("Reloading of configuration is off")
 			configMgr = newOnce(log, discover, loader)

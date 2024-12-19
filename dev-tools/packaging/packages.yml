@@ -274,6 +274,9 @@ shared:
         content: >
           {{ commit }}
         mode: 0644
+      'hints.inputs.d':
+        source: '{{ repo.RootDir }}/deploy/kubernetes/elastic-agent-standalone/templates.d'
+        mode: 0755
 
   # cloud build to beats-ci repository
   - &agent_docker_cloud_spec
