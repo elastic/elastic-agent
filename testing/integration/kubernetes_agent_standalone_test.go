@@ -48,6 +48,7 @@ import (
 	"helm.sh/helm/v3/pkg/cli"
 	helmKube "helm.sh/helm/v3/pkg/kube"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	aclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -288,6 +289,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
 				k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
 				k8sStepCheckAgentStatus("name=agent-ksmsharded-helm-agent", 1, "agent", nil),
+				k8sStepCheckRestrictUpgrade("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
 				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
 				k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
 				k8sStepRunInnerTests("name=agent-ksmsharded-helm-agent", 1, "agent"),
@@ -320,6 +322,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
 				k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
 				k8sStepCheckAgentStatus("name=agent-ksmsharded-helm-agent", 1, "agent", nil),
+				k8sStepCheckRestrictUpgrade("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
 				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
 				k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
 				k8sStepRunInnerTests("name=agent-ksmsharded-helm-agent", 1, "agent"),
@@ -1333,5 +1336,25 @@ func k8sStepHintsRedisDelete() k8sTestStep {
 
 		err = k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, redisPod)
 		require.NoError(t, err, "failed to delete redis k8s objects")
+	}
+}
+
+func k8sStepCheckRestrictUpgrade(agentPodLabelSelector string, expectedPodNumber int, containerName string) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		perNodePodList := &corev1.PodList{}
+		err := kCtx.client.Resources(namespace).List(ctx, perNodePodList, func(opt *metav1.ListOptions) {
+			opt.LabelSelector = agentPodLabelSelector
+		})
+		require.NoError(t, err, "failed to list pods with selector ", perNodePodList)
+		require.NotEmpty(t, perNodePodList.Items, "no pods found with selector ", perNodePodList)
+		require.Equal(t, expectedPodNumber, len(perNodePodList.Items), "unexpected number of pods found with selector ", perNodePodList)
+		for _, pod := range perNodePodList.Items {
+			var stdout, stderr bytes.Buffer
+
+			command := []string{"elastic-agent", "upgrade", "1.0.0"}
+			err := kCtx.client.Resources().ExecInPod(ctx, namespace, pod.Name, containerName, command, &stdout, &stderr)
+			require.Error(t, err)
+			require.Contains(t, stderr.String(), coordinator.ErrNotUpgradable.Error())
+		}
 	}
 }
