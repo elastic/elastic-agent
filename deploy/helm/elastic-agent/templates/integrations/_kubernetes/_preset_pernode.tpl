@@ -2,7 +2,7 @@
 {{- include "elasticagent.preset.mutate.volumemounts" (list $ $.Values.agent.presets.perNode "elasticagent.kubernetes.pernode.preset.volumemounts") -}}
 {{- include "elasticagent.preset.mutate.volumes" (list $ $.Values.agent.presets.perNode "elasticagent.kubernetes.pernode.preset.volumes") -}}
 {{- include "elasticagent.preset.mutate.outputs.byname" (list $ $.Values.agent.presets.perNode $.Values.kubernetes.output)}}
-{{- if eq $.Values.kubernetes.hints.enabled true -}}
+{{- if and (eq $.Values.kubernetes.hints.enabled true) (eq $.Values.agent.fleet.enabled false) -}}
 {{- include "elasticagent.preset.mutate.providers.kubernetes.hints" (list $ $.Values.agent.presets.perNode "elasticagent.kubernetes.pernode.preset.providers.kubernetes.hints") -}}
 {{- end -}}
 {{- if or (eq $.Values.kubernetes.scheduler.enabled true) (eq $.Values.kubernetes.controller_manager.enabled true) -}}
