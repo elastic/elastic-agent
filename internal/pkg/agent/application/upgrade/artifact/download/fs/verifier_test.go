@@ -29,12 +29,11 @@ import (
 
 var testVersion = agtversion.NewParsedSemVer(7, 5, 1, "", "")
 
-var (
-	agentSpec = artifact.Artifact{
-		Name:     "Elastic Agent",
-		Cmd:      "elastic-agent",
-		Artifact: "beat/elastic-agent"}
-)
+var agentSpec = artifact.Artifact{
+	Name:     "Elastic Agent",
+	Cmd:      "elastic-agent",
+	Artifact: "beat/elastic-agent",
+}
 
 func TestFetchVerify(t *testing.T) {
 	// See docs/pgp-sign-verify-artifact.md for how to generate a key, export
@@ -47,7 +46,8 @@ func TestFetchVerify(t *testing.T) {
 	targetPath := filepath.Join("testdata", "download")
 	ctx := context.Background()
 	a := artifact.Artifact{
-		Name: "elastic-agent", Cmd: "elastic-agent", Artifact: "beats/elastic-agent"}
+		Name: "elastic-agent", Cmd: "elastic-agent", Artifact: "beats/elastic-agent",
+	}
 	version := agtversion.NewParsedSemVer(8, 0, 0, "", "")
 
 	filename := "elastic-agent-8.0.0-darwin-x86_64.tar.gz"
@@ -80,7 +80,7 @@ func TestFetchVerify(t *testing.T) {
 	// first download verify should fail:
 	// download skipped, as invalid package is prepared upfront
 	// verify fails and cleans download
-	err = verifier.Verify(a, *version, false)
+	err = verifier.Verify(ctx, a, *version, false)
 	var checksumErr *download.ChecksumMismatchError
 	require.ErrorAs(t, err, &checksumErr)
 
@@ -109,7 +109,7 @@ func TestFetchVerify(t *testing.T) {
 	_, err = os.Stat(ascTargetFilePath)
 	require.NoError(t, err)
 
-	err = verifier.Verify(a, *version, false)
+	err = verifier.Verify(ctx, a, *version, false)
 	require.NoError(t, err)
 
 	// Bad GPG public key.
@@ -126,7 +126,7 @@ func TestFetchVerify(t *testing.T) {
 
 	// Missing .asc file.
 	{
-		err = verifier.Verify(a, *version, false)
+		err = verifier.Verify(ctx, a, *version, false)
 		require.Error(t, err)
 
 		// Don't delete these files when GPG validation failure.
@@ -139,7 +139,7 @@ func TestFetchVerify(t *testing.T) {
 		err = os.WriteFile(targetFilePath+".asc", []byte("bad sig"), 0o600)
 		require.NoError(t, err)
 
-		err = verifier.Verify(a, *version, false)
+		err = verifier.Verify(ctx, a, *version, false)
 		var invalidSigErr *download.InvalidSignatureError
 		assert.ErrorAs(t, err, &invalidSigErr)
 
@@ -157,7 +157,8 @@ func prepareFetchVerifyTests(
 	targetDir,
 	filename,
 	targetFilePath,
-	hashTargetFilePath string) error {
+	hashTargetFilePath string,
+) error {
 	sourceFilePath := filepath.Join(dropPath, filename)
 	hashSourceFilePath := filepath.Join(dropPath, filename+".sha512")
 
@@ -202,6 +203,7 @@ func TestVerify(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.Name, func(t *testing.T) {
+			ctx := context.Background()
 			log, obs := loggertest.New("TestVerify")
 			targetDir := t.TempDir()
 
@@ -220,7 +222,7 @@ func TestVerify(t *testing.T) {
 			pgpKey := prepareTestCase(t, agentSpec, testVersion, config)
 
 			testClient := NewDownloader(config)
-			artifactPath, err := testClient.Download(context.Background(), agentSpec, testVersion)
+			artifactPath, err := testClient.Download(ctx, agentSpec, testVersion)
 			require.NoError(t, err, "fs.Downloader could not download artifacts")
 			_, err = testClient.DownloadAsc(context.Background(), agentSpec, *testVersion)
 			require.NoError(t, err, "fs.Downloader could not download artifacts .asc file")
@@ -231,7 +233,7 @@ func TestVerify(t *testing.T) {
 			testVerifier, err := NewVerifier(log, config, pgpKey)
 			require.NoError(t, err)
 
-			err = testVerifier.Verify(agentSpec, *testVersion, false, tc.RemotePGPUris...)
+			err = testVerifier.Verify(ctx, agentSpec, *testVersion, false, tc.RemotePGPUris...)
 			require.NoError(t, err)
 
 			// log message informing remote PGP was skipped
@@ -246,7 +248,6 @@ func TestVerify(t *testing.T) {
 // It creates the necessary key to sing the artifact and returns the public key
 // to verify the signature.
 func prepareTestCase(t *testing.T, a artifact.Artifact, version *agtversion.ParsedSemVer, cfg *artifact.Config) []byte {
-
 	filename, err := artifact.GetArtifactName(a, *version, cfg.OperatingSystem, cfg.Architecture)
 	require.NoErrorf(t, err, "could not get artifact name")
 
