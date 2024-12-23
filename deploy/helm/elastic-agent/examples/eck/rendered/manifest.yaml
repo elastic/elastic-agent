@@ -1141,6 +1141,7 @@ spec:
             name: var-lib
             readOnly: true
         dnsPolicy: ClusterFirstWithHostNet
+        hostNetwork: true
         nodeSelector:
           kubernetes.io/os: linux
         serviceAccountName: agent-pernode-example

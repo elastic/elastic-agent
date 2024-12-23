@@ -31,38 +31,5 @@ agent:
     enabled: true
     url: $FLEET_URL # replace with Fleet URL
     token: $FLEET_TOKEN # replace with Fleet Enrollment token
-    preset: nginx
-  presets:
-    nginx:
-      mode: deployment
-      securityContext:
-        runAsUser: 0
-      rules:
-        # minimum cluster role ruleset required by agent
-        - apiGroups: [ "" ]
-          resources:
-            - nodes
-            - namespaces
-            - pods
-          verbs:
-            - get
-            - watch
-            - list
-        - apiGroups: [ "apps" ]
-          resources:
-            - replicasets
-          verbs:
-            - get
-            - list
-            - watch
-        - apiGroups: [ "batch" ]
-          resources:
-            - jobs
-          verbs:
-            - get
-            - list
-            - watch
-      providers:
-        kubernetes_leaderelection:
-          enabled: false
+    preset: perNode
 ```
