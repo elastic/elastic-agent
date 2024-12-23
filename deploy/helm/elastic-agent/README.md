@@ -62,7 +62,7 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| kubernetes.enabled | bool | `false` | enable Kubernetes integration. |
+| kubernetes.enabled | bool | `true` | enable Kubernetes integration. |
 | kubernetes.output | string | `"default"` | name of the output used in kubernetes integration. Note that this output needs to be defined in [outputs](#1-outputs) |
 | kubernetes.namespace | string | `"default"` | kubernetes namespace |
 | kubernetes.hints.enabled | bool | `false` | enable [elastic-agent autodiscovery](https://www.elastic.co/guide/en/fleet/current/elastic-agent-kubernetes-autodiscovery.html) feature |
