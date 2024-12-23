@@ -23,7 +23,7 @@ const ackPath = "/api/fleet/agents/%s/acks"
 type AckEvent struct {
 	EventType string          `json:"type"`              //  'STATE' | 'ERROR' | 'ACTION_RESULT' | 'ACTION'
 	SubType   string          `json:"subtype"`           // 'RUNNING','STARTING','IN_PROGRESS','CONFIG','FAILED','STOPPING','STOPPED','DATA_DUMP','ACKNOWLEDGED','UNKNOWN';
-	Timestamp string          `json:"timestamp"`         // : '2019-01-05T14:32:03.36764-05:00',
+	Timestamp string          `json:"timestamp"`         // : '2019-01-05T14:32:03.36764-05:00'
 	ActionID  string          `json:"action_id"`         // : '48cebde1-c906-4893-b89f-595d943b72a2',
 	AgentID   string          `json:"agent_id"`          // : 'agent1',
 	Message   string          `json:"message,omitempty"` // : 'hello2',
@@ -84,11 +84,11 @@ func (e *AckResponse) Validate() error {
 // AckCmd is a fleet API command.
 type AckCmd struct {
 	client client.Sender
-	info   agentInfo
+	info   AgentInfo
 }
 
 // NewAckCmd creates a new api command.
-func NewAckCmd(info agentInfo, client client.Sender) *AckCmd {
+func NewAckCmd(info AgentInfo, client client.Sender) *AckCmd {
 	return &AckCmd{
 		client: client,
 		info:   info,
