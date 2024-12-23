@@ -17,7 +17,6 @@
 {{- include "elasticagent.kubernetes.config.state.statefulsets.init" $ -}}
 {{- include "elasticagent.kubernetes.config.state.storageclasses.init" $ -}}
 {{- include "elasticagent.kubernetes.config.kube_controller.init" $ -}}
-{{- include "elasticagent.kubernetes.config.hints.init" $ -}}
 {{- include "elasticagent.kubernetes.config.audit_logs.init" $ -}}
 {{- include "elasticagent.kubernetes.config.container_logs.init" $ -}}
 {{- include "elasticagent.kubernetes.config.kubelet.containers.init" $ -}}
