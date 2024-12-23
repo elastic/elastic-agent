@@ -13,9 +13,14 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/go-ucfg"
 	"github.com/elastic/go-ucfg/cfgutil"
 )
+
+func init() {
+	tlscommon.SetInsecureDefaults()
+}
 
 // options hold the specified options
 type options struct {
