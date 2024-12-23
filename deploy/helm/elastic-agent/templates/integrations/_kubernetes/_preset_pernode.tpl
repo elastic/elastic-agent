@@ -2,8 +2,12 @@
 {{- include "elasticagent.preset.mutate.volumemounts" (list $ $.Values.agent.presets.perNode "elasticagent.kubernetes.pernode.preset.volumemounts") -}}
 {{- include "elasticagent.preset.mutate.volumes" (list $ $.Values.agent.presets.perNode "elasticagent.kubernetes.pernode.preset.volumes") -}}
 {{- include "elasticagent.preset.mutate.outputs.byname" (list $ $.Values.agent.presets.perNode $.Values.kubernetes.output)}}
+<<<<<<< HEAD
 {{- if eq $.Values.kubernetes.hints.enabled true -}}
 {{- include "elasticagent.preset.mutate.initcontainers" (list $ $.Values.agent.presets.perNode "elasticagent.kubernetes.pernode.preset.initcontainers") -}}
+=======
+{{- if and (eq $.Values.kubernetes.hints.enabled true) (eq $.Values.agent.fleet.enabled false) -}}
+>>>>>>> 0d94ead04 ([helm] fleet mode fixes (#6345))
 {{- include "elasticagent.preset.mutate.providers.kubernetes.hints" (list $ $.Values.agent.presets.perNode "elasticagent.kubernetes.pernode.preset.providers.kubernetes.hints") -}}
 {{- end -}}
 {{- if or (eq $.Values.kubernetes.scheduler.enabled true) (eq $.Values.kubernetes.controller_manager.enabled true) -}}

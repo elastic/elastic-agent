@@ -1167,6 +1167,7 @@ spec:
           readOnly: true
           subPath: agent.yml
       dnsPolicy: ClusterFirstWithHostNet
+<<<<<<< HEAD
       initContainers:
       - args:
         - -c
@@ -1188,6 +1189,9 @@ spec:
         volumeMounts:
         - mountPath: /etc/elastic-agent/inputs.d
           name: external-inputs
+=======
+      hostNetwork: true
+>>>>>>> 0d94ead04 ([helm] fleet mode fixes (#6345))
       nodeSelector:
         kubernetes.io/os: linux
       serviceAccountName: agent-pernode-example
