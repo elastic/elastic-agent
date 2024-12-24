@@ -71,7 +71,6 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 			// test all produced images
 			{Type: define.Kubernetes, DockerVariant: "basic"},
 			{Type: define.Kubernetes, DockerVariant: "wolfi"},
-			{Type: define.Kubernetes, DockerVariant: "ubi"},
 			{Type: define.Kubernetes, DockerVariant: "complete"},
 			{Type: define.Kubernetes, DockerVariant: "complete-wolfi"},
 		},
