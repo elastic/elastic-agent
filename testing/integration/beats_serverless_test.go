@@ -49,6 +49,8 @@ type BeatRunner struct {
 }
 
 func TestBeatsServerless(t *testing.T) {
+	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/6431")
+
 	info := define.Require(t, define.Requirements{
 		Group: Default,
 		OS: []define.OS{
