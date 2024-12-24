@@ -58,6 +58,7 @@ func TestBeatsServerless(t *testing.T) {
 		Local: false,
 		Sudo:  true,
 	})
+	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/6431")
 
 	suite.Run(t, &BeatRunner{requirementsInfo: info})
 }
