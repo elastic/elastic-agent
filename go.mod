@@ -76,12 +76,7 @@ require (
 	golang.org/x/text v0.21.0
 	golang.org/x/time v0.6.0
 	golang.org/x/tools v0.25.0
-<<<<<<< HEAD
-	google.golang.org/grpc v1.68.1
-=======
-	google.golang.org/api v0.199.0
 	google.golang.org/grpc v1.69.2
->>>>>>> 183b431cd (build(deps): bump github.com/elastic/opentelemetry-lib from 0.13.0 to 0.14.0 (#6430))
 	google.golang.org/protobuf v1.35.2
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
