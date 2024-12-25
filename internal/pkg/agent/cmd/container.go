@@ -51,11 +51,9 @@ const (
 	logsPathPerms = 0775
 )
 
-var (
-	// Used to strip the appended ({uuid}) from the name of an enrollment token. This makes much easier for
-	// a container to reference a token by name, without having to know what the generated UUID is for that name.
-	tokenNameStrip = regexp.MustCompile(`\s\([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\)$`)
-)
+// Used to strip the appended ({uuid}) from the name of an enrollment token. This makes much easier for
+// a container to reference a token by name, without having to know what the generated UUID is for that name.
+var tokenNameStrip = regexp.MustCompile(`\s\([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\)$`)
 
 func newContainerCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := cobra.Command{
@@ -547,7 +545,7 @@ func kibanaFetchToken(cfg setupConfig, client *kibana.Client, policy *kibanaPoli
 	if err != nil {
 		return "", err
 	}
-	key, err := findKey(keys.List, policy, tokenName)
+	key, err := findKey(keys.Items, policy, tokenName)
 	if err != nil {
 		return "", err
 	}
@@ -951,7 +949,7 @@ type kibanaAPIKey struct {
 }
 
 type kibanaAPIKeys struct {
-	List []kibanaAPIKey `json:"list"`
+	Items []kibanaAPIKey `json:"items"`
 }
 
 type kibanaAPIKeyDetail struct {
