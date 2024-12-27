@@ -291,6 +291,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 			return err
 		}
 	}
+
 	if cfg.Fleet.Enroll {
 		var policy *kibanaPolicy
 		token := cfg.Fleet.EnrollmentToken
