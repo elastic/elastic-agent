@@ -28,6 +28,7 @@ Add a checklist of things that are required to be reviewed in order to have the 
 List here all the items you have verified BEFORE sending this PR. Please DO NOT remove any item, striking through those that do not apply. (Just in case, strikethrough uses two tildes. ~~Scratch this.~~)
 -->
 
+- [ ] I have read and understood the [pull request guidelines](https://github.com/elastic/elastic-agent/blob/main/CONTRIBUTING.md#pull-request-guidelines) of this project.
 - [ ] My code follows the style guidelines of this project
 - [ ] I have commented my code, particularly in hard-to-understand areas
 - [ ] I have made corresponding changes to the documentation
