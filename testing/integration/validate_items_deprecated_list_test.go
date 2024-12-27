@@ -27,6 +27,7 @@ type newBody struct {
 }
 
 // TODO: Remove test after list deprecation is complete
+// Added by https://github.com/elastic/elastic-agent/pull/6437
 func TestItemsMatchDeprecatedList(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Default,
