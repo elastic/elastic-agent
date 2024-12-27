@@ -356,10 +356,10 @@ collectors:
         debug:
         debug/vvv:
           verbosity: detailed
-         # [Elasticsearch exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/README.md)
+          # [Elasticsearch exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/README.md)
         elasticsearch/otel:
           endpoints: # List of Elasticsearch endpoints.
-          - ${env:ELASTIC_ENDPOINT}
+            - ${env:ELASTIC_ENDPOINT}
           api_key: ${env:ELASTIC_API_KEY} # API key for Elasticsearch authentication.
           logs_dynamic_index:
             enabled: true
@@ -370,7 +370,7 @@ collectors:
             mode: otel
         elasticsearch/ecs:
           endpoints:
-          - ${env:ELASTIC_ENDPOINT}
+            - ${env:ELASTIC_ENDPOINT}
           api_key: ${env:ELASTIC_API_KEY}
           mapping:
             mode: ecs
@@ -401,7 +401,7 @@ collectors:
           traces:
             receivers: [otlp]
             processors: [batch, elastictrace]
-            exporters: [debug,  signaltometrics, elasticsearch/otel]
+            exporters: [debug, signaltometrics, elasticsearch/otel]
           metrics/aggregated-otel-metrics:
             receivers:
               - signaltometrics
@@ -411,7 +411,6 @@ collectors:
             exporters:
               - debug
               - elasticsearch/otel
-
   #  Cluster is a K8s deployment EDOT collector focused on gathering telemetry
   #  at the cluster level (Kubernetes Events and cluster metrics).
   cluster:
@@ -878,7 +877,7 @@ collectors:
         pipelines:
           logs/node:
             receivers:
-             -  filelog
+              - filelog
             processors:
               - batch
               - k8sattributes
@@ -932,7 +931,6 @@ collectors:
               - resource/hostname
             exporters:
               - otlp/gateway
-
 # For more details on OpenTelemetry's zero-code instrumentation, see:
 # https://opentelemetry.io/docs/concepts/instrumentation/zero-code/
 instrumentation:
