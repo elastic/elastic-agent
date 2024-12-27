@@ -25,7 +25,7 @@ import (
 )
 
 var (
-	kubeStackChartVersion = "0.3.2"
+	kubeStackChartVersion = "0.3.9"
 	kubeStackChartURL     = "https://github.com/open-telemetry/opentelemetry-helm-charts/releases/download/opentelemetry-kube-stack-" + kubeStackChartVersion + "/opentelemetry-kube-stack-" + kubeStackChartVersion + ".tgz"
 )
 
@@ -68,9 +68,11 @@ func TestOtelKubeStackHelm(t *testing.T) {
 			// (1 EDOT collector pod per node)
 			// - A Cluster wide Deployment to collect K8s metrics and
 			// events (1 EDOT collector pod per cluster)
+			// - Two Gateway pods to collect, aggregate and forward
+			// telemetry.
 			// - An OpenTelemetry Operator Deployment (1 pod per
 			// cluster)
-			atLeastValidatedPodsNumber: 3,
+			atLeastValidatedPodsNumber: 5,
 		},
 	}
 
