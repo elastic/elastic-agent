@@ -1147,6 +1147,7 @@ spec:
           readOnly: true
           subPath: agent.yml
       dnsPolicy: ClusterFirstWithHostNet
+      hostNetwork: true
       nodeSelector:
         kubernetes.io/os: linux
       serviceAccountName: agent-pernode-example
