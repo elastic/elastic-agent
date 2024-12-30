@@ -12,6 +12,7 @@ import (
 const (
 	undefined     = "undefined"
 	basic         = "basic"
+	ubi           = "ubi"
 	wolfi         = "wolfi"
 	complete      = "complete"
 	completeWolfi = "complete-wolfi"
@@ -26,6 +27,7 @@ type DockerVariant int
 const (
 	Undefined = iota
 	Basic
+	UBI
 	Wolfi
 	WolfiComplete
 	Complete
@@ -40,6 +42,8 @@ func (typ DockerVariant) String() string {
 		return undefined
 	case Basic:
 		return basic
+	case UBI:
+		return ubi
 	case Wolfi:
 		return wolfi
 	case WolfiComplete:
@@ -67,6 +71,8 @@ func (typ *DockerVariant) UnmarshalText(text []byte) error {
 		*typ = Undefined
 	case basic:
 		*typ = Basic
+	case ubi:
+		*typ = UBI
 	case wolfi:
 		*typ = Wolfi
 	case completeWolfi:
