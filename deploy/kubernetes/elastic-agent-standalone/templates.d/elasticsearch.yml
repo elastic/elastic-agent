@@ -10,6 +10,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -43,6 +45,8 @@ inputs:
                 ignore_missing: true
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
         - condition: ${kubernetes.hints.elasticsearch.deprecation.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
           data_stream:
@@ -52,6 +56,8 @@ inputs:
             - .gz$
             - _slowlog.log$
             - _access.log$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -60,6 +66,8 @@ inputs:
             - /var/log/containers/*${kubernetes.hints.container_id}.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
         - condition: ${kubernetes.hints.elasticsearch.gc.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
           data_stream:
@@ -72,6 +80,8 @@ inputs:
             - '^CommandLine flags: '
             - '^Memory: '
             - ^{
+          file_identity:
+            fingerprint: null
           multiline:
             match: after
             negate: true
@@ -89,6 +99,8 @@ inputs:
                 target: ""
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
         - condition: ${kubernetes.hints.elasticsearch.server.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
           data_stream:
@@ -99,6 +111,8 @@ inputs:
             - _slowlog.log$
             - _access.log$
             - _deprecation.log$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -107,6 +121,8 @@ inputs:
             - /var/log/containers/*${kubernetes.hints.container_id}.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
         - condition: ${kubernetes.hints.elasticsearch.slowlog.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
           data_stream:
@@ -114,6 +130,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -122,6 +140,8 @@ inputs:
             - /var/log/containers/*${kubernetes.hints.container_id}.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
       data_stream.namespace: default
     - name: elasticsearch/metrics-elasticsearch

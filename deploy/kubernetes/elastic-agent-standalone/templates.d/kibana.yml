@@ -10,6 +10,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -18,6 +20,8 @@ inputs:
             - /var/log/containers/*${kubernetes.hints.container_id}.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
         - condition: ${kubernetes.hints.kibana.log.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
           data_stream:
@@ -25,6 +29,8 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
           parsers:
             - container:
                 format: auto
@@ -33,6 +39,8 @@ inputs:
             - /var/log/containers/*${kubernetes.hints.container_id}.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
       data_stream.namespace: default
     - name: http/metrics-kibana
@@ -61,6 +69,27 @@ inputs:
                       to: kibana.background_task_utilization
                 ignore_missing: true
           username: ${kubernetes.hints.kibana.background_task_utilization.username|kubernetes.hints.kibana.username|''}
+        - condition: ${kubernetes.hints.kibana.task_manager_metrics.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
+          data_stream:
+            dataset: kibana.task_manager_metrics
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.kibana.task_manager_metrics.host|kubernetes.hints.kibana.host|'http://localhost:5601'}
+          method: GET
+          metricsets:
+            - json
+          namespace: task_manager_metrics
+          password: ${kubernetes.hints.kibana.task_manager_metrics.password|kubernetes.hints.kibana.password|''}
+          path: /api/task_manager/metrics
+          period: ${kubernetes.hints.kibana.task_manager_metrics.period|kubernetes.hints.kibana.period|'10s'}
+          processors:
+            - rename:
+                fail_on_error: false
+                fields:
+                    - from: http.task_manager_metrics
+                      to: kibana.task_manager_metrics
+                ignore_missing: true
+          username: ${kubernetes.hints.kibana.task_manager_metrics.username|kubernetes.hints.kibana.username|''}
       data_stream.namespace: default
     - name: kibana/metrics-kibana
       id: kibana/metrics-kibana-${kubernetes.hints.container_id}
