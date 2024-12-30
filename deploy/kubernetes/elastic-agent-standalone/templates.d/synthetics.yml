@@ -1,4 +1,32 @@
 inputs:
+    - name: synthetics/http-synthetics
+      id: synthetics/http-synthetics-${kubernetes.hints.container_id}
+      type: synthetics/http
+      use_output: default
+      streams:
+        - __ui: null
+          check.request.method: null
+          condition: ${kubernetes.hints.synthetics.http.enabled} == true and ${kubernetes.hints.synthetics.enabled} == true
+          data_stream:
+            dataset: http
+            type: synthetics
+          enabled: true
+          ipv4: true
+          ipv6: true
+          max_attempts: 2
+          max_redirects: null
+          name: null
+          password: ${kubernetes.hints.synthetics.http.password|kubernetes.hints.synthetics.password|''}
+          response.include_body: null
+          response.include_headers: null
+          run_from.geo.name: Fleet managed
+          run_from.id: fleet_managed
+          schedule: '@every 3m'
+          timeout: ${kubernetes.hints.synthetics.http.timeout|kubernetes.hints.synthetics.timeout|''}
+          type: http
+          urls: null
+          username: ${kubernetes.hints.synthetics.http.username|kubernetes.hints.synthetics.username|''}
+      data_stream.namespace: default
     - name: synthetics/tcp-synthetics
       id: synthetics/tcp-synthetics-${kubernetes.hints.container_id}
       type: synthetics/tcp
@@ -13,12 +41,8 @@ inputs:
           hosts: ${kubernetes.hints.synthetics.tcp.host|kubernetes.hints.synthetics.host|''}
           ipv4: true
           ipv6: true
+          max_attempts: 2
           name: null
-          processors:
-            - add_fields:
-                fields:
-                    monitor.fleet_managed: true
-                target: ""
           proxy_use_local_resolver: false
           run_from.geo.name: Fleet managed
           run_from.id: fleet_managed
@@ -40,12 +64,8 @@ inputs:
           hosts: ${kubernetes.hints.synthetics.icmp.host|kubernetes.hints.synthetics.host|''}
           ipv4: true
           ipv6: true
+          max_attempts: 2
           name: null
-          processors:
-            - add_fields:
-                fields:
-                    monitor.fleet_managed: true
-                target: ""
           run_from.geo.name: Fleet managed
           run_from.id: fleet_managed
           schedule: '@every 3m'
@@ -64,12 +84,8 @@ inputs:
             dataset: browser
             type: synthetics
           enabled: true
+          max_attempts: 2
           name: null
-          processors:
-            - add_fields:
-                fields:
-                    monitor.fleet_managed: true
-                target: ""
           run_from.geo.name: Fleet managed
           run_from.id: fleet_managed
           schedule: '@every 3m'
@@ -116,36 +132,4 @@ inputs:
             scanner:
                 symlinks: true
           tags: []
-      data_stream.namespace: default
-    - name: synthetics/http-synthetics
-      id: synthetics/http-synthetics-${kubernetes.hints.container_id}
-      type: synthetics/http
-      use_output: default
-      streams:
-        - __ui: null
-          check.request.method: null
-          condition: ${kubernetes.hints.synthetics.http.enabled} == true and ${kubernetes.hints.synthetics.enabled} == true
-          data_stream:
-            dataset: http
-            type: synthetics
-          enabled: true
-          ipv4: true
-          ipv6: true
-          max_redirects: null
-          name: null
-          password: ${kubernetes.hints.synthetics.http.password|kubernetes.hints.synthetics.password|''}
-          processors:
-            - add_fields:
-                fields:
-                    monitor.fleet_managed: true
-                target: ""
-          response.include_body: null
-          response.include_headers: null
-          run_from.geo.name: Fleet managed
-          run_from.id: fleet_managed
-          schedule: '@every 3m'
-          timeout: ${kubernetes.hints.synthetics.http.timeout|kubernetes.hints.synthetics.timeout|''}
-          type: http
-          urls: null
-          username: ${kubernetes.hints.synthetics.http.username|kubernetes.hints.synthetics.username|''}
       data_stream.namespace: default
