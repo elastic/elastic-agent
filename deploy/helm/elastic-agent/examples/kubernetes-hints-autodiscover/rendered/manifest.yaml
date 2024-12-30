@@ -1151,6 +1151,7 @@ spec:
           readOnly: true
           subPath: agent.yml
       dnsPolicy: ClusterFirstWithHostNet
+      hostNetwork: true
       initContainers:
       - args:
         - -c
