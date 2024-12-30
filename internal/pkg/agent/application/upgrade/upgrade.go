@@ -169,6 +169,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		hash:     release.Commit(),
 	}
 
+	// Compare versions and exit before downloading anything if the upgrade
+	// is for the same release version that is currently running
 	if isSameReleaseVersion(u.log, currentVersion, version) {
 		u.log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
 		return nil, ErrUpgradeSameVersion
@@ -218,6 +220,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, fmt.Errorf("reading metadata for elastic agent version %s package %q: %w", version, archivePath, err)
 	}
 
+	// Compare the downloaded version (including git hash) to see if we need to upgrade
+	// versions are the same if the numbers and hash match which may occur in a SNAPSHOT -> SNAPSHOT upgrage
 	same, newVersion := isSameVersion(u.log, currentVersion, metadata, version)
 	if same {
 		u.log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
