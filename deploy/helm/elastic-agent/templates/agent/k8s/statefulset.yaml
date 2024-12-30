@@ -2,7 +2,7 @@
 {{- range $presetName, $presetVal := $.Values.agent.presets -}}
 {{- if and (eq ($presetVal).mode "statefulset") (eq $.Values.agent.engine "k8s") -}}
 {{- $agentName := include "elasticagent.preset.fullname" (list $ $presetName)  -}}
-{{- $podTemplateResource := include "elasticagent.engine.k8s.podTemplate" (list $ $presetVal $agentName) | fromYaml  -}}
+{{- $podTemplateResource := include "elasticagent.engine.k8s.podTemplate" (list $ $presetVal $agentName) | fromYaml }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
