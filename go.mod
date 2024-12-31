@@ -17,7 +17,11 @@ require (
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.0
 	github.com/elastic/elastic-agent-libs v0.17.5
+<<<<<<< HEAD
 	github.com/elastic/elastic-agent-system-metrics v0.11.4
+=======
+	github.com/elastic/elastic-agent-system-metrics v0.11.7
+>>>>>>> 4484c6275 (build(deps): bump github.com/elastic/elastic-agent-system-metrics from 0.11.5 to 0.11.7 (#6450))
 	github.com/elastic/elastic-transport-go/v8 v8.6.0
 	github.com/elastic/go-elasticsearch/v8 v8.17.0
 	github.com/elastic/go-licenser v0.4.2
