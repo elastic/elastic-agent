@@ -25,7 +25,7 @@ import (
 )
 
 var (
-	kubeStackChartVersion = "0.3.2"
+	kubeStackChartVersion = "0.3.9"
 	kubeStackChartURL     = "https://github.com/open-telemetry/opentelemetry-helm-charts/releases/download/opentelemetry-kube-stack-" + kubeStackChartVersion + "/opentelemetry-kube-stack-" + kubeStackChartVersion + ".tgz"
 )
 
@@ -68,9 +68,11 @@ func TestOtelKubeStackHelm(t *testing.T) {
 			// (1 EDOT collector pod per node)
 			// - A Cluster wide Deployment to collect K8s metrics and
 			// events (1 EDOT collector pod per cluster)
+			// - Two Gateway pods to collect, aggregate and forward
+			// telemetry.
 			// - An OpenTelemetry Operator Deployment (1 pod per
 			// cluster)
-			atLeastValidatedPodsNumber: 3,
+			atLeastValidatedPodsNumber: 5,
 		},
 	}
 
@@ -99,10 +101,8 @@ func TestOtelKubeStackHelm(t *testing.T) {
 
 				// override secrets reference with env variables
 				JSONValues: []string{
-					fmt.Sprintf(`collectors.cluster.env[1]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, kCtx.esHost),
-					fmt.Sprintf(`collectors.cluster.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, kCtx.esAPIKey),
-					fmt.Sprintf(`collectors.daemon.env[2]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, kCtx.esHost),
-					fmt.Sprintf(`collectors.daemon.env[3]={"name":"ELASTIC_API_KEY","value":"%s"}`, kCtx.esAPIKey),
+					fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, kCtx.esHost),
+					fmt.Sprintf(`collectors.gateway.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, kCtx.esAPIKey),
 				},
 			}
 			providers := getter.All(settings)
