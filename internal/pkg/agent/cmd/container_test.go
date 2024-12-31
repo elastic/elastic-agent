@@ -5,11 +5,17 @@
 package cmd
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
 
@@ -172,4 +178,66 @@ func TestBuildEnrollArgs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestKibanaFetchToken(t *testing.T) {
+	t.Run("should fetch details from items in the api response", func(t *testing.T) {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/api/fleet/enrollment_api_keys/", func(w http.ResponseWriter, r *http.Request) {
+			basePath := "/api/fleet/enrollment_api_keys/"
+
+			apiKey := kibanaAPIKey{
+				ID:       "id",
+				PolicyID: "policyID",
+				Name:     "tokenName",
+				APIKey:   "apiKey",
+			}
+
+			trimmed := strings.TrimPrefix(r.URL.String(), basePath)
+			if trimmed == "" {
+				apiKeys := kibanaAPIKeys{
+					Items: []kibanaAPIKey{
+						apiKey,
+					},
+				}
+				b, err := json.Marshal(apiKeys)
+				require.NoError(t, err)
+
+				_, err = w.Write(b)
+				require.NoError(t, err)
+
+				return
+			}
+
+			keyDetail := kibanaAPIKeyDetail{
+				Item: apiKey,
+			}
+			b, err := json.Marshal(keyDetail)
+			require.NoError(t, err)
+
+			_, err = w.Write(b)
+			require.NoError(t, err)
+		})
+
+		policy := kibanaPolicy{
+			ID: "policyID",
+		}
+
+		server := httptest.NewServer(mux)
+		defer server.Close()
+
+		client := &kibana.Client{
+			Connection: kibana.Connection{
+				URL:          server.URL,
+				Username:     "",
+				Password:     "",
+				APIKey:       "",
+				ServiceToken: "",
+				HTTP:         &http.Client{},
+			},
+		}
+		ak, err := kibanaFetchToken(setupConfig{Kibana: kibanaConfig{RetryMaxCount: 1}}, client, &policy, cli.NewIOStreams(), "tokenName")
+		require.NoError(t, err)
+		require.Equal(t, "apiKey", ak)
+	})
 }
