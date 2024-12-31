@@ -5,6 +5,7 @@
 package composed
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -24,7 +25,7 @@ func (d *ErrorVerifier) Name() string {
 	return "error"
 }
 
-func (d *ErrorVerifier) Verify(artifact.Artifact, agtversion.ParsedSemVer, bool, ...string) error {
+func (d *ErrorVerifier) Verify(context.Context, artifact.Artifact, agtversion.ParsedSemVer, bool, ...string) error {
 	d.called = true
 	return errors.New("failing")
 }
@@ -39,7 +40,7 @@ func (d *FailVerifier) Name() string {
 	return "fail"
 }
 
-func (d *FailVerifier) Verify(artifact.Artifact, agtversion.ParsedSemVer, bool, ...string) error {
+func (d *FailVerifier) Verify(context.Context, artifact.Artifact, agtversion.ParsedSemVer, bool, ...string) error {
 	d.called = true
 	return &download.InvalidSignatureError{File: "", Err: errors.New("invalid signature")}
 }
@@ -54,7 +55,7 @@ func (d *SuccVerifier) Name() string {
 	return "succ"
 }
 
-func (d *SuccVerifier) Verify(artifact.Artifact, agtversion.ParsedSemVer, bool, ...string) error {
+func (d *SuccVerifier) Verify(context.Context, artifact.Artifact, agtversion.ParsedSemVer, bool, ...string) error {
 	d.called = true
 	return nil
 }
@@ -90,7 +91,7 @@ func TestVerifier(t *testing.T) {
 	testVersion := agtversion.NewParsedSemVer(1, 2, 3, "", "")
 	for _, tc := range testCases {
 		d := NewVerifier(log, tc.verifiers[0], tc.verifiers[1], tc.verifiers[2])
-		err := d.Verify(artifact.Artifact{Name: "a", Cmd: "a", Artifact: "a/a"}, *testVersion, false)
+		err := d.Verify(context.Background(), artifact.Artifact{Name: "a", Cmd: "a", Artifact: "a/a"}, *testVersion, false)
 
 		assert.Equal(t, tc.expectedResult, err == nil)
 
