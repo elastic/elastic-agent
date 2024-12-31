@@ -202,7 +202,10 @@ func TestKibanaFetchToken(t *testing.T) {
 				}
 				b, err := json.Marshal(apiKeys)
 				require.NoError(t, err)
-				w.Write(b)
+
+				_, err = w.Write(b)
+				require.NoError(t, err)
+
 				return
 			}
 
@@ -211,7 +214,9 @@ func TestKibanaFetchToken(t *testing.T) {
 			}
 			b, err := json.Marshal(keyDetail)
 			require.NoError(t, err)
-			w.Write(b)
+
+			_, err = w.Write(b)
+			require.NoError(t, err)
 		})
 
 		policy := kibanaPolicy{
