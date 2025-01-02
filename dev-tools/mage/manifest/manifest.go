@@ -101,6 +101,7 @@ var ExpectedBinaries = []BinarySpec{
 	{BinaryName: "agentbeat", ProjectName: "beats", Platforms: AllPlatforms, PackageTypes: pkgcommon.AllPackageTypes},
 	{BinaryName: "apm-server", ProjectName: "apm-server", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}}, PackageTypes: pkgcommon.AllPackageTypes},
 	{BinaryName: "cloudbeat", ProjectName: "cloudbeat", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PackageTypes: pkgcommon.AllPackageTypes},
+	{BinaryName: "cloud-defend", ProjectName: "cloud-defend", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PackageTypes: []pkgcommon.PackageType{pkgcommon.Docker}},
 	{BinaryName: "connectors", ProjectName: "connectors", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PythonWheel: true, PackageTypes: pkgcommon.AllPackageTypes},
 	{BinaryName: "endpoint-security", ProjectName: "endpoint-dev", Platforms: AllPlatforms, PackageTypes: []pkgcommon.PackageType{pkgcommon.RPM, pkgcommon.Deb, pkgcommon.Zip, pkgcommon.TarGz}},
 	{BinaryName: "fleet-server", ProjectName: "fleet-server", Platforms: AllPlatforms, PackageTypes: pkgcommon.AllPackageTypes},
