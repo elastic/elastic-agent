@@ -1,0 +1,62 @@
+outputs:
+  default:
+    type: ESSecretAuthAPI
+    secretName: es-api-secret
+
+extraIntegrations:
+  netflow:
+    id: netflow-netflow-60a9d5b2-c611-4749-90bf-5e2443936c1d
+    name: netflow-1
+    preset: netflow
+    revision: 1
+    type: netflow
+    use_output: default
+    meta:
+      package:
+        name: netflow
+        version: 2.19.1
+    data_stream:
+      namespace: default
+    package_policy_id: 60a9d5b2-c611-4749-90bf-5e2443936c1d
+    streams:
+      - id: netflow-netflow.log-60a9d5b2-c611-4749-90bf-5e2443936c1d
+        data_stream:
+          dataset: netflow.log
+          type: logs
+        protocols:
+          - v1
+          - v5
+          - v6
+          - v7
+          - v8
+          - v9
+          - ipfix
+        host: '0.0.0.0:2055'
+        max_message_size: 10KiB
+        expiration_timeout: 30m
+        queue_size: 8192
+        detect_sequence_reset: true
+        tags:
+          - netflow
+          - forwarded
+        publisher_pipeline.disable_host: true
+
+kubernetes:
+  enabled: false
+
+agent:
+  unprivileged: true
+  presets:
+    netflow:
+      automountServiceAccountToken: false
+      mode: deployment
+      service:
+        type: ClusterIP
+      ports:
+        - containerPort: 2055
+          servicePort: 2055
+          protocol: UDP
+      serviceAccount:
+        create: false
+      clusterRole:
+        create: false
