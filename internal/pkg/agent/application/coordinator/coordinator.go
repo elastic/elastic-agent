@@ -576,7 +576,6 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	if err != nil {
 		c.ClearOverrideState()
 		if errors.Is(err, upgrade.ErrUpgradeSameVersion) {
-			c.logger.Info("Same ver upgrade detected.")
 			// Set upgrade state to completed so update no longer shows in-progress.
 			det.SetState(details.StateCompleted)
 			return nil
