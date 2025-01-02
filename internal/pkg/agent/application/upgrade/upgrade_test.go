@@ -733,6 +733,23 @@ func TestIsSameVersion(t *testing.T) {
 				newVersion: agentVersion123SNAPSHOTghijkl,
 			},
 		},
+		{
+			name: "same version and snapshot, no hash (SNAPSHOT upgrade before download)",
+			args: args{
+				current: agentVersion123SNAPSHOTabcdef,
+				metadata: packageMetadata{
+					manifest: nil,
+				},
+				version: "1.2.3-SNAPSHOT",
+			},
+			want: want{
+				same: false,
+				newVersion: agentVersion{
+					version:  "1.2.3",
+					snapshot: true,
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -980,6 +997,71 @@ func Test_selectWatcherExecutable(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equalf(t, paths.BinaryPath(filepath.Join(fakeTopDir, tt.want), agentName), selectWatcherExecutable(fakeTopDir, tt.args.previous, tt.args.current), "selectWatcherExecutable(%v, %v)", tt.args.previous, tt.args.current)
+		})
+	}
+}
+
+func TestIsSameReleaseVersion(t *testing.T) {
+	tests := []struct {
+		name    string
+		current agentVersion
+		target  string
+		expect  bool
+	}{{
+		name: "current version is snapshot",
+		current: agentVersion{
+			version:  "1.2.3",
+			snapshot: true,
+		},
+		target: "1.2.3",
+		expect: false,
+	}, {
+		name: "target version is snapshot",
+		current: agentVersion{
+			version: "1.2.3",
+		},
+		target: "1.2.3-SNAPSHOT",
+		expect: false,
+	}, {
+		name: "target version is different version",
+		current: agentVersion{
+			version: "1.2.3",
+		},
+		target: "1.2.4",
+		expect: false,
+	}, {
+		name: "target version has same major.minor.patch, different pre-release",
+		current: agentVersion{
+			version: "1.2.3",
+		},
+		target: "1.2.3-custom.info",
+		expect: false,
+	}, {
+		name: "target version is same with build",
+		current: agentVersion{
+			version: "1.2.3",
+		},
+		target: "1.2.3+buildID",
+		expect: false,
+	}, {
+		name: "target version is same",
+		current: agentVersion{
+			version: "1.2.3",
+		},
+		target: "1.2.3",
+		expect: true,
+	}, {
+		name: "target version is invalid",
+		current: agentVersion{
+			version: "1.2.3",
+		},
+		target: "a.b.c",
+		expect: false,
+	}}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			log, _ := loggertest.New(tc.name)
+			assert.Equal(t, tc.expect, isSameReleaseVersion(log, tc.current, tc.target))
 		})
 	}
 }
