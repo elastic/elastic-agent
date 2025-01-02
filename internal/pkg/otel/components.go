@@ -67,7 +67,6 @@ func components() (otelcol.Factories, error) {
 	var err error
 	factories := otelcol.Factories{}
 
-<<<<<<< HEAD
 	// Receivers
 	factories.Receivers, err = receiver.MakeFactoryMap(
 		otlpreceiver.NewFactory(),
@@ -84,80 +83,6 @@ func components() (otelcol.Factories, error) {
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
-=======
-		// Receivers
-		factories.Receivers, err = receiver.MakeFactoryMap(
-			otlpreceiver.NewFactory(),
-			filelogreceiver.NewFactory(),
-			kubeletstatsreceiver.NewFactory(),
-			k8sclusterreceiver.NewFactory(),
-			hostmetricsreceiver.NewFactory(),
-			httpcheckreceiver.NewFactory(),
-			k8sobjectsreceiver.NewFactory(),
-			prometheusreceiver.NewFactory(),
-			jaegerreceiver.NewFactory(),
-			zipkinreceiver.NewFactory(),
-			fbreceiver.NewFactory(),
-			mbreceiver.NewFactory(),
-		)
-		if err != nil {
-			return otelcol.Factories{}, err
-		}
-
-		// Processors
-		factories.Processors, err = processor.MakeFactoryMap(
-			batchprocessor.NewFactory(),
-			resourceprocessor.NewFactory(),
-			attributesprocessor.NewFactory(),
-			transformprocessor.NewFactory(),
-			filterprocessor.NewFactory(),
-			k8sattributesprocessor.NewFactory(),
-			elasticinframetricsprocessor.NewFactory(),
-			resourcedetectionprocessor.NewFactory(),
-			memorylimiterprocessor.NewFactory(),
-			lsmintervalprocessor.NewFactory(),
-			elastictraceprocessor.NewFactory(),
-		)
-		if err != nil {
-			return otelcol.Factories{}, err
-		}
-
-		// Exporters
-		factories.Exporters, err = exporter.MakeFactoryMap(
-			otlpexporter.NewFactory(),
-			debugexporter.NewFactory(),
-			fileexporter.NewFactory(),
-			elasticsearchexporter.NewFactory(),
-			loadbalancingexporter.NewFactory(),
-			otlphttpexporter.NewFactory(),
-		)
-		if err != nil {
-			return otelcol.Factories{}, err
-		}
-
-		factories.Connectors, err = connector.MakeFactoryMap(
-			routingconnector.NewFactory(),
-			spanmetricsconnector.NewFactory(),
-			signaltometricsconnector.NewFactory(),
-		)
-		if err != nil {
-			return otelcol.Factories{}, err
-		}
-
-		extensions := []extension.Factory{
-			memorylimiterextension.NewFactory(),
-			filestorage.NewFactory(),
-			healthcheckextension.NewFactory(),
-			pprofextension.NewFactory(),
-		}
-		extensions = append(extensions, extensionFactories...)
-		factories.Extensions, err = extension.MakeFactoryMap(extensions...)
-		if err != nil {
-			return otelcol.Factories{}, err
-		}
-
-		return factories, err
->>>>>>> dbfd4471a ([otel] add loadbalancing exporter component (#6315))
 	}
 
 	// Processors
@@ -184,6 +109,7 @@ func components() (otelcol.Factories, error) {
 		debugexporter.NewFactory(),
 		fileexporter.NewFactory(),
 		elasticsearchexporter.NewFactory(),
+		loadbalancingexporter.NewFactory(),
 		otlphttpexporter.NewFactory(),
 	)
 	if err != nil {
