@@ -58,10 +58,10 @@ func (e *AuditUnenrollRequest) Validate() error {
 
 type AuditUnenrollCmd struct {
 	client client.Sender
-	info   agentInfo
+	info   AgentInfo
 }
 
-func NewAuditUnenrollCmd(info agentInfo, client client.Sender) *AuditUnenrollCmd {
+func NewAuditUnenrollCmd(info AgentInfo, client client.Sender) *AuditUnenrollCmd {
 	return &AuditUnenrollCmd{
 		client: client,
 		info:   info,

@@ -82,6 +82,7 @@ const (
 	externalArtifacts = "EXTERNAL"
 	platformsEnv      = "PLATFORMS"
 	packagesEnv       = "PACKAGES"
+	dockerVariants    = "DOCKER_VARIANTS"
 	configFile        = "elastic-agent.yml"
 	agentDropPath     = "AGENT_DROP_PATH"
 	checksumFilename  = "checksum.yml"
@@ -92,9 +93,9 @@ const (
 	baseURLForStagingDRA = "https://staging.elastic.co/"
 	agentCoreProjectName = "elastic-agent-core"
 
-	helmChartPath = "./deploy/helm/elastic-agent"
-
-	sha512FileExt = ".sha512"
+	helmChartPath     = "./deploy/helm/elastic-agent"
+	helmOtelChartPath = "./deploy/helm/edot-collector/kube-stack"
+	sha512FileExt     = ".sha512"
 )
 
 var (
@@ -392,7 +393,7 @@ func (Build) TestBinaries() error {
 		if err != nil {
 			return err
 		}
-		err = os.Chmod(outputName, 0755)
+		err = os.Chmod(outputName, 0o755)
 		if err != nil {
 			return err
 		}
@@ -625,7 +626,7 @@ func GoInstall(link string) error {
 // Mkdir returns a function that create a directory.
 func Mkdir(dir string) func() error {
 	return func() error {
-		if err := os.MkdirAll(dir, 0700); err != nil {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return fmt.Errorf("failed to create directory: %v, error: %+v", dir, err)
 		}
 		return nil
@@ -776,9 +777,13 @@ func (Cloud) Image(ctx context.Context) {
 	dev := os.Getenv(devEnv)
 	defer os.Setenv(devEnv, dev)
 
+	variant := os.Getenv(dockerVariants)
+	defer os.Setenv(dockerVariants, variant)
+
 	os.Setenv(platformsEnv, "linux/amd64")
 	os.Setenv(packagesEnv, "docker")
 	os.Setenv(devEnv, "true")
+	os.Setenv(dockerVariants, "cloud")
 
 	if s, err := strconv.ParseBool(snapshot); err == nil && !s {
 		// only disable SNAPSHOT build when explicitely defined
@@ -792,6 +797,7 @@ func (Cloud) Image(ctx context.Context) {
 	devtools.DevBuild = true
 	devtools.Platforms = devtools.Platforms.Filter("linux/amd64")
 	devtools.SelectedPackageTypes = []devtools.PackageType{devtools.Docker}
+	devtools.SelectedDockerVariants = []devtools.DockerVariant{devtools.Cloud}
 
 	if _, hasExternal := os.LookupEnv(externalArtifacts); !hasExternal {
 		devtools.ExternalBuild = true
@@ -970,7 +976,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	if mg.Verbose() {
 		log.Printf("--- creating flat dir in .elastic-agent_flat")
 	}
-	os.MkdirAll(flatPath, 0755)
+	os.MkdirAll(flatPath, 0o755)
 	defer os.RemoveAll(flatPath)
 
 	// extract all dependencies from their archives into flat dir
@@ -1088,7 +1094,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, platf
 					}
 
 					targetPath := filepath.Join(archivePath, rp)
-					os.MkdirAll(targetPath, 0755)
+					os.MkdirAll(targetPath, 0o755)
 					for _, f := range files {
 						// safety check; if the user has an older version of the beats repo,
 						// for example right after a release where you've `git pulled` from on repo and not the other,
@@ -1148,9 +1154,9 @@ func flattenDependencies(requiredPackages []string, packageVersion, archivePath,
 		targetPath := filepath.Join(archivePath, rp)
 		versionedFlatPath := filepath.Join(flatPath, rp)
 		versionedDropPath := filepath.Join(dropPath, rp)
-		os.MkdirAll(targetPath, 0755)
-		os.MkdirAll(versionedFlatPath, 0755)
-		os.MkdirAll(versionedDropPath, 0755)
+		os.MkdirAll(targetPath, 0o755)
+		os.MkdirAll(versionedFlatPath, 0o755)
+		os.MkdirAll(versionedDropPath, 0o755)
 
 		// untar all
 		matches, err := filepath.Glob(filepath.Join(targetPath, "*tar.gz"))
@@ -1566,13 +1572,13 @@ func appendComponentChecksums(versionedDropPath string, checksums map[string]str
 		return err
 	}
 
-	return os.WriteFile(filepath.Join(versionedDropPath, checksumFilename), content, 0644)
+	return os.WriteFile(filepath.Join(versionedDropPath, checksumFilename), content, 0o644)
 }
 
 // movePackagesToArchive Create archive folder and move any pre-existing artifacts into it.
 func movePackagesToArchive(dropPath string, platformPackageSuffixes []string, packageVersion string) string {
 	archivePath := filepath.Join(dropPath, "archives")
-	os.MkdirAll(archivePath, 0755)
+	os.MkdirAll(archivePath, 0o755)
 
 	// move archives to archive path
 	matches, err := filepath.Glob(filepath.Join(dropPath, "*tar.gz*"))
@@ -1611,7 +1617,7 @@ func movePackagesToArchive(dropPath string, platformPackageSuffixes []string, pa
 
 			targetPath := filepath.Join(archivePath, packageSuffix, filepath.Base(f))
 			targetDir := filepath.Dir(targetPath)
-			if err := os.MkdirAll(targetDir, 0750); err != nil {
+			if err := os.MkdirAll(targetDir, 0o750); err != nil {
 				fmt.Printf("warning: failed to create directory %s: %s", targetDir, err)
 			}
 
@@ -1795,7 +1801,7 @@ func saveIronbank() error {
 
 	distributionsDir := "build/distributions"
 	if _, err := os.Stat(distributionsDir); os.IsNotExist(err) {
-		err := os.MkdirAll(distributionsDir, 0750)
+		err := os.MkdirAll(distributionsDir, 0o750)
 		if err != nil {
 			return fmt.Errorf("cannot create folder for docker artifacts: %+v", err)
 		}
@@ -2036,7 +2042,7 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 	versionFileData := upgradetest.AgentVersions{
 		TestVersions: versions,
 	}
-	file, err := os.OpenFile(upgradetest.AgentVersionsFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(upgradetest.AgentVersionsFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
 		return fmt.Errorf("failed to open %s for write: %w", upgradetest.AgentVersionsFilename, err)
 	}
@@ -2077,7 +2083,7 @@ func (Integration) UpdatePackageVersion(ctx context.Context) error {
 		return fmt.Errorf("expected a single version, got %v", versions)
 	}
 	packageVersion := versions[0].CoreVersion()
-	file, err := os.OpenFile(packageVersionFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(packageVersionFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
 		return fmt.Errorf("failed to open %s for write: %w", packageVersionFilename, err)
 	}
@@ -2649,15 +2655,15 @@ func integRunnerOnce(ctx context.Context, matrix bool, singleTest string) (int, 
 	_ = os.Remove("build/TEST-go-integration.out")
 	_ = os.Remove("build/TEST-go-integration.out.json")
 	_ = os.Remove("build/TEST-go-integration.xml")
-	err = writeFile("build/TEST-go-integration.out", results.Output, 0644)
+	err = writeFile("build/TEST-go-integration.out", results.Output, 0o644)
 	if err != nil {
 		return 0, fmt.Errorf("error writing test out file: %w", err)
 	}
-	err = writeFile("build/TEST-go-integration.out.json", results.JSONOutput, 0644)
+	err = writeFile("build/TEST-go-integration.out.json", results.JSONOutput, 0o644)
 	if err != nil {
 		return 0, fmt.Errorf("error writing test out json file: %w", err)
 	}
-	err = writeFile("build/TEST-go-integration.xml", results.XMLOutput, 0644)
+	err = writeFile("build/TEST-go-integration.xml", results.XMLOutput, 0o644)
 	if err != nil {
 		return 0, fmt.Errorf("error writing test out xml file: %w", err)
 	}
@@ -2823,7 +2829,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	}
 
 	diagDir := filepath.Join("build", "diagnostics")
-	_ = os.MkdirAll(diagDir, 0755)
+	_ = os.MkdirAll(diagDir, 0o755)
 
 	cfg := tcommon.Config{
 		AgentVersion:   agentVersion,
@@ -3109,11 +3115,11 @@ func authESS(ctx context.Context) error {
 	}
 	_, err = os.Stat(essAPIKeyFile)
 	if os.IsNotExist(err) {
-		if err := os.MkdirAll(filepath.Dir(essAPIKeyFile), 0700); err != nil {
+		if err := os.MkdirAll(filepath.Dir(essAPIKeyFile), 0o700); err != nil {
 			return fmt.Errorf("unable to create ESS config directory: %w", err)
 		}
 
-		if err := os.WriteFile(essAPIKeyFile, nil, 0600); err != nil {
+		if err := os.WriteFile(essAPIKeyFile, nil, 0o600); err != nil {
 			return fmt.Errorf("unable to initialize ESS API key file: %w", err)
 		}
 	} else if err != nil {
@@ -3153,7 +3159,7 @@ func authESS(ctx context.Context) error {
 	}
 
 	// Write API key to file for future use
-	if err := os.WriteFile(essAPIKeyFile, []byte(essAPIKey), 0600); err != nil {
+	if err := os.WriteFile(essAPIKeyFile, []byte(essAPIKey), 0o600); err != nil {
 		return fmt.Errorf("unable to persist ESS API key for future use: %w", err)
 	}
 
@@ -3225,7 +3231,7 @@ func (Otel) Readme() error {
 	}
 
 	// resolve template
-	out, err := os.OpenFile(readmeOut, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	out, err := os.OpenFile(readmeOut, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
 		return fmt.Errorf("failed to open file %s: %w", readmeOut, err)
 	}
@@ -3384,6 +3390,9 @@ type otelDependencies struct {
 
 type Helm mg.Namespace
 
+// RenderExamples runs the equivalent of `helm template` and `helm lint`
+// for the examples of the Elastic Helm chart which are located at
+// `deploy/helm/elastic-agent/examples` directory.
 func (Helm) RenderExamples() error {
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
@@ -3464,24 +3473,69 @@ func (Helm) RenderExamples() error {
 	return nil
 }
 
+// UpdateAgentVersion updates the agent version in the Elastic-Agent and EDOT-Collector Helm charts.
 func (Helm) UpdateAgentVersion() error {
-	valuesFile := filepath.Join(helmChartPath, "values.yaml")
+	agentVersion := bversion.GetParsedAgentPackageVersion().CoreVersion()
+	agentSnapshotVersion := agentVersion + "-SNAPSHOT"
+	// until the Helm chart reaches GA this remains with -beta suffix
+	agentChartVersion := agentVersion + "-beta"
 
-	data, err := os.ReadFile(valuesFile)
+	for yamlFile, keyVals := range map[string][]struct {
+		key   string
+		value string
+	}{
+		// values file for elastic-agent Helm Chart
+		filepath.Join(helmChartPath, "values.yaml"): {
+			{"agent.version", agentVersion},
+			// always use the SNAPSHOT version for image tag
+			// for the chart that resides in the git repo
+			{"agent.image.tag", agentSnapshotVersion},
+		},
+		// Chart.yaml for elastic-agent Helm Chart
+		filepath.Join(helmChartPath, "Chart.yaml"): {
+			{"appVersion", agentVersion},
+			{"version", agentChartVersion},
+		},
+		// edot-collector values file for kube-stack Helm Chart
+		filepath.Join(helmOtelChartPath, "values.yaml"): {
+			{"defaultCRConfig.image.tag", agentVersion},
+		},
+	} {
+		if err := updateYamlFile(yamlFile, keyVals...); err != nil {
+			return fmt.Errorf("failed to update agent version: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// Lint lints the Elastic-Agent Helm chart.
+func (Helm) Lint() error {
+	settings := cli.New() // Helm CLI settings
+	actionConfig := &action.Configuration{}
+
+	err := actionConfig.Init(settings.RESTClientGetter(), "default", "",
+		func(format string, v ...interface{}) {})
+	if err != nil {
+		return fmt.Errorf("failed to init helm action config: %w", err)
+	}
+
+	lintAction := action.NewLint()
+	lintResult := lintAction.Run([]string{helmChartPath}, nil)
+	if len(lintResult.Errors) > 0 {
+		return fmt.Errorf("failed to lint helm chart: %w", errors.Join(lintResult.Errors...))
+	}
+	return nil
+}
+
+func updateYamlFile(path string, keyVal ...struct {
+	key   string
+	value string
+}) error {
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
 	}
-
-	isTagged, err := devtools.TagContainsCommit()
-	if err != nil {
-		return fmt.Errorf("failed to check if tag contains commit: %w", err)
-	}
-
-	if !isTagged {
-		isTagged = os.Getenv(snapshotEnv) != ""
-	}
-
-	agentVersion := getVersion()
 
 	// Parse YAML into a Node structure because
 	// it maintains comments
@@ -3497,18 +3551,14 @@ func (Helm) UpdateAgentVersion() error {
 		return fmt.Errorf("root node has no content")
 	}
 
-	if err := updateYamlNodes(rootNode.Content[0], agentVersion, "agent", "version"); err != nil {
-		return fmt.Errorf("failed to update agent version: %w", err)
-	}
-
-	if !isTagged {
-		if err := updateYamlNodes(rootNode.Content[0], fmt.Sprintf("%s-SNAPSHOT", agentVersion), "agent", "image", "tag"); err != nil {
-			return fmt.Errorf("failed to update agent image tag: %w", err)
+	for _, kv := range keyVal {
+		if err := updateYamlNodes(rootNode.Content[0], kv.value, strings.Split(kv.key, ".")...); err != nil {
+			return fmt.Errorf("failed to update agent version: %w", err)
 		}
 	}
 
 	// Truncate values file
-	file, err := os.Create(valuesFile)
+	file, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("failed to open file for writing: %w", err)
 	}
@@ -3522,25 +3572,6 @@ func (Helm) UpdateAgentVersion() error {
 	err = encoder.Encode(&rootNode)
 	if err != nil {
 		return fmt.Errorf("failed to encode updated YAML: %w", err)
-	}
-
-	return nil
-}
-
-func (Helm) Lint() error {
-	settings := cli.New() // Helm CLI settings
-	actionConfig := &action.Configuration{}
-
-	err := actionConfig.Init(settings.RESTClientGetter(), "default", "",
-		func(format string, v ...interface{}) {})
-	if err != nil {
-		return fmt.Errorf("failed to init helm action config: %w", err)
-	}
-
-	lintAction := action.NewLint()
-	lintResult := lintAction.Run([]string{helmChartPath}, nil)
-	if len(lintResult.Errors) > 0 {
-		return fmt.Errorf("failed to lint helm chart: %w", errors.Join(lintResult.Errors...))
 	}
 	return nil
 }

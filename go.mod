@@ -65,12 +65,12 @@ require (
 	go.elastic.co/go-licence-detector v0.6.1
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.112.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/crypto v0.28.0
-	golang.org/x/exp v0.0.0-20240904232852-e7e105dedf7e
-	golang.org/x/sync v0.8.0
-	golang.org/x/sys v0.26.0
-	golang.org/x/term v0.25.0
-	golang.org/x/text v0.19.0
+	golang.org/x/crypto v0.31.0
+	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
+	golang.org/x/sync v0.10.0
+	golang.org/x/sys v0.28.0
+	golang.org/x/term v0.27.0
+	golang.org/x/text v0.21.0
 	golang.org/x/time v0.6.0
 	golang.org/x/tools v0.24.0
 	google.golang.org/grpc v1.67.1
@@ -80,9 +80,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/gotestsum v1.9.0
 	helm.sh/helm/v3 v3.15.4
-	k8s.io/api v0.31.1
-	k8s.io/apimachinery v0.31.1
-	k8s.io/client-go v0.31.1
+	k8s.io/api v0.31.3
+	k8s.io/apimachinery v0.31.3
+	k8s.io/cli-runtime v0.30.3
+	k8s.io/client-go v0.31.3
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.70
 	sigs.k8s.io/e2e-framework v0.4.0
 	sigs.k8s.io/kustomize/api v0.13.5-0.20230601165947-6ce0bf390ce3
@@ -454,8 +455,8 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/mod v0.21.0 // indirect
-	golang.org/x/net v0.30.0 // indirect
-	golang.org/x/oauth2 v0.23.0 // indirect
+	golang.org/x/net v0.33.0 // indirect
+	golang.org/x/oauth2 v0.24.0 // indirect
 	gonum.org/v1/gonum v0.15.1 // indirect
 	google.golang.org/api v0.192.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241007155032-5fefd90f89a9 // indirect
@@ -465,9 +466,8 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	howett.net/plist v1.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.30.3 // indirect
-	k8s.io/apiserver v0.31.1 // indirect
-	k8s.io/cli-runtime v0.30.3 // indirect
-	k8s.io/component-base v0.31.1 // indirect
+	k8s.io/apiserver v0.31.3 // indirect
+	k8s.io/component-base v0.31.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
 	k8s.io/kubectl v0.30.3 // indirect
 	k8s.io/kubelet v0.31.1 // indirect
