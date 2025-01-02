@@ -29,6 +29,7 @@ Unless -f is used this command will ask confirmation before performing removal.
 		Run: func(c *cobra.Command, _ []string) {
 			if err := uninstallCmd(streams, c); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				logExternal(fmt.Sprintf("%s uninstall failed: %s", paths.BinaryName, err))
 				os.Exit(1)
 			}
 		},
@@ -36,6 +37,7 @@ Unless -f is used this command will ask confirmation before performing removal.
 
 	cmd.Flags().BoolP("force", "f", false, "Force overwrite the current and do not prompt for confirmation")
 	cmd.Flags().String("uninstall-token", "", "Uninstall token required for protected agent uninstall")
+	cmd.Flags().Bool("skip-fleet-audit", false, "Skip fleet audit/unenroll")
 
 	return cmd
 }
@@ -60,6 +62,7 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	force, _ := cmd.Flags().GetBool("force")
 	uninstallToken, _ := cmd.Flags().GetString("uninstall-token")
+	skipFleetAudit, _ := cmd.Flags().GetBool("skip-fleet-audit")
 	if status == install.Broken {
 		if !force {
 			fmt.Fprintf(streams.Out, "Elastic Agent is installed but currently broken: %s\n", reason)
@@ -94,7 +97,7 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		fmt.Fprint(os.Stderr, logBuff.String())
 	}()
 
-	err = install.Uninstall(cmd.Context(), paths.ConfigFile(), paths.Top(), uninstallToken, log, progBar)
+	err = install.Uninstall(cmd.Context(), paths.ConfigFile(), paths.Top(), uninstallToken, log, progBar, skipFleetAudit)
 	if err != nil {
 		progBar.Describe("Failed to uninstall agent")
 		return fmt.Errorf("error uninstalling agent: %w", err)

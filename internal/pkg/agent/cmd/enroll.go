@@ -42,6 +42,7 @@ func newEnrollCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command
 		Run: func(c *cobra.Command, args []string) {
 			if err := enroll(streams, c); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				logExternal(fmt.Sprintf("%s enroll failed: %s", paths.BinaryName, err))
 				os.Exit(1)
 			}
 		},
