@@ -228,7 +228,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 	if mg.Verbose() {
 		gotestsumArgs = append(gotestsumArgs, "-f", "standard-verbose")
 	} else {
-		gotestsumArgs = append(gotestsumArgs, "-f", "standard-quiet")
+		gotestsumArgs = append(gotestsumArgs, "-f", "standard-verbose")
 	}
 	if params.JUnitReportFile != "" {
 		CreateDir(params.JUnitReportFile)
@@ -258,6 +258,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 			"-coverprofile="+params.CoverageProfileFile,
 		)
 	}
+	testArgs = append(testArgs, "-v")
 
 	// Pass the go test extra flags BEFORE the RunExpr.
 	// TL;DR: This is needed to make sure that a -test.run flag specified in the GOTEST_FLAGS environment variable does
