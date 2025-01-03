@@ -3417,12 +3417,7 @@ func (Helm) RenderExamples() error {
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
-	helmChart, err := loader.Load(helmChartPath)
-	if err != nil {
-		return fmt.Errorf("failed to load helm chart: %w", err)
-	}
-
-	err = actionConfig.Init(settings.RESTClientGetter(), "default", "",
+	err := actionConfig.Init(settings.RESTClientGetter(), "default", "",
 		func(format string, v ...interface{}) {})
 	if err != nil {
 		return fmt.Errorf("failed to init helm action config: %w", err)
@@ -3437,6 +3432,11 @@ func (Helm) RenderExamples() error {
 	for _, d := range dirEntries {
 		if !d.IsDir() {
 			continue
+		}
+
+		helmChart, err := loader.Load(helmChartPath)
+		if err != nil {
+			return fmt.Errorf("failed to load helm chart: %w", err)
 		}
 
 		exampleFullPath := filepath.Join(examplesPath, d.Name())
