@@ -17,7 +17,8 @@ crds:
 defaultCRConfig:
   image:
     repository: "docker.elastic.co/beats/elastic-agent"
-    tag: "9.0.0"
+    tag: "8.18.0-SNAPSHOT"
+    pullPolicy: "Always"
   targetAllocator:
     enabled: false # Enable/disable the Operator's Target allocator.
     # Refer to: https://github.com/open-telemetry/opentelemetry-operator/tree/main/cmd/otel-allocator
@@ -36,11 +37,11 @@ collectors:
     resources:
       limits:
         cpu: 1500m
-        memory: 1500Mi
+        memory: 2500Mi
       requests:
         cpu: 100m
         memory: 500Mi
-    suffix: gateway
+    suffix: gateway-lb
     replicas: 2
     enabled: true
     env:
@@ -425,7 +426,7 @@ collectors:
           # [Elasticsearch exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/README.md)
         otlp/gateway:
           # !!! Elastic APM https endpoint WITHOUT the "https://" prefix
-          endpoint: "http://opentelemetry-kube-stack-gateway-collector:4317"
+          endpoint: "http://opentelemetry-kube-stack-lb-gateway-lb-collector:4317"
           compression: none
           tls:
             insecure: true
@@ -576,8 +577,8 @@ collectors:
     presets:
       logsCollection:
         enabled: true # Enable/disable the collection of node's logs.
-        storeCheckpoints: true # Store checkpoints for log collection, allowing for resumption from the last processed log.
-    hostNetwork: true # Use the host's network namespace. This allows the daemon to access the network interfaces of the host directly.
+        storeCheckpoints: false # Store checkpoints for log collection, allowing for resumption from the last processed log.
+    # hostNetwork: true # Use the host's network namespace. This allows the daemon to access the network interfaces of the host directly.
     securityContext: # Run the daemon as the root user and group for proper metrics collection.
       runAsUser: 0
       runAsGroup: 0
@@ -587,9 +588,17 @@ collectors:
         # [Debug exporter](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/debugexporter/README.md)
         debug:
           verbosity: basic
+        loadbalancing/gateway:
+          protocol:
+            otlp:
+              tls:
+                insecure: true
+          resolver:
+            k8s:
+              service: opentelemetry-kube-stack-lb-gateway-lb-collector-headless
         otlp/gateway:
           # !!! Elastic APM https endpoint WITHOUT the "https://" prefix
-          endpoint: "http://opentelemetry-kube-stack-gateway-collector:4317"
+          endpoint: "http://opentelemetry-kube-stack-lb-gateway-lb-collector:4317"
           compression: none
           tls:
             insecure: true
@@ -914,7 +923,7 @@ collectors:
               - batch
               - resource/hostname
             exporters:
-              - otlp/gateway
+              - loadbalancing/gateway
           logs/apm:
             receivers:
               - otlp
@@ -922,7 +931,7 @@ collectors:
               - batch
               - resource/hostname
             exporters:
-              - otlp/gateway
+              - loadbalancing/gateway
           traces/apm:
             receivers:
               - otlp
@@ -930,14 +939,14 @@ collectors:
               - batch
               - resource/hostname
             exporters:
-              - otlp/gateway
+              - loadbalancing/gateway
 # For more details on OpenTelemetry's zero-code instrumentation, see:
 # https://opentelemetry.io/docs/concepts/instrumentation/zero-code/
 instrumentation:
   name: elastic-instrumentation
   enabled: true # Enable/disable auto-instrumentation.
   exporter:
-    endpoint: http://opentelemetry-kube-stack-daemon-collector.opentelemetry-operator-system.svc.cluster.local:4318 # The daemonset OpenTelemetry Collector endpoint where telemetry data will be exported.
+    endpoint: http://opentelemetry-kube-stack-lb-daemon-collector.opentelemetry-operator-system-lb.svc.cluster.local:4318 # The daemonset OpenTelemetry Collector endpoint where telemetry data will be exported.
   propagators:
     - tracecontext # W3C TraceContext propagator for distributed tracing.
     - baggage # Baggage propagator to include baggage information in trace context.
