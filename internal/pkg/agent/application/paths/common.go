@@ -84,7 +84,6 @@ func init() {
 	fs.StringVar(&configFilePath, "config", DefaultConfigName, "Configuration file, relative to path.config")
 	fs.StringVar(&configFilePath, "c", DefaultConfigName, "Configuration file, relative to path.config")
 	fs.StringVar(&logsPath, "path.logs", logsPath, "Logs path contains Agent log output")
-	fs.StringVar(&installPath, "path.install", installPath, "DEPRECATED, setting this flag has no effect since v8.6.0")
 	fs.StringVar(&controlSocketPath, "path.socket", controlSocketPath, "Control protocol socket path for the Agent")
 
 	// enable user to download update artifacts to alternative place
@@ -158,7 +157,6 @@ func SetConfig(path string) {
 
 // ConfigFile returns the path to the configuration file.
 func ConfigFile() string {
-
 	return configFileWithDefaultOverride(DefaultConfigName)
 }
 
