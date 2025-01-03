@@ -1,0 +1,48 @@
+{{- range $presetName, $presetVal := $.Values.agent.presets -}}
+{{- $presetService := dig "service" dict $presetVal -}}
+{{- $ports := dig "ports" list $presetVal -}}
+{{- if and $presetService $ports -}}
+{{- $agentName := include "elasticagent.preset.fullname" (list $ $presetName)  -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $agentName }}
+  namespace: {{ $.Release.Namespace | quote }}
+  labels:
+    {{- include "elasticagent.labels" $ | nindent 4 }}
+    {{- with ($presetVal).labels -}}
+    {{ toYaml . | nindent 4 }}
+    {{- end }}
+  {{- $presetValAnnotations := ($presetVal).annotations | default dict }}
+  {{- $presetServiceAnnotations := $presetService.annotations | default dict }}
+  {{- with merge dict $presetValAnnotations $presetServiceAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ $presetService.type }}
+  selector:
+    name: {{ $agentName }}
+  ports:
+  {{- range $idx, $port := $ports }}
+    - port: {{ $port.servicePort | default $port.containerPort }}
+      targetPort: {{ $port.containerPort }}
+      {{- with $port.protocol | default "TCP" }}
+      protocol: {{ . }}
+      {{- end }}
+      {{- with $port.name }}
+      name: {{ . }}
+      {{- end }}
+      {{- with $port.appProtocol }}
+      appProtocol: {{ . }}
+      {{- end }}
+      {{- with $port.nodePort }}
+      nodePort: {{ . }}
+      {{- end }}
+  {{- end }}
+  {{- with omit $presetService "type" "ports" "selector" }}
+  {{- toYaml | nindent 2 }}
+  {{- end }}
+---
+{{- end }}
+{{- end }}

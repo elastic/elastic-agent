@@ -45,7 +45,8 @@ import (
 	// Exporters:
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter"
 	fileexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter" // for e2e tests
-	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter"                           // for dev
+	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter"
+	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter" // for dev
 	"go.opentelemetry.io/collector/exporter/otlpexporter"
 	otlphttpexporter "go.opentelemetry.io/collector/exporter/otlphttpexporter"
 
@@ -110,6 +111,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			debugexporter.NewFactory(),
 			fileexporter.NewFactory(),
 			elasticsearchexporter.NewFactory(),
+			loadbalancingexporter.NewFactory(),
 			otlphttpexporter.NewFactory(),
 		)
 		if err != nil {
