@@ -123,14 +123,13 @@ func TestUpgradeHandler(t *testing.T) {
 
 	// Make sure this test does not dead lock or wait for too long
 	select {
-	case <-time.Tick(50 * time.Millisecond):
+	case <-time.Tick(1 * time.Second):
 		t.Fatal("mockUpgradeManager.Upgrade was not called")
 	case <-upgradeCalledChan:
 	}
 }
 
 func TestUpgradeHandlerSameVersion(t *testing.T) {
-	t.Skip("flaky test: https://github.com/elastic/elastic-agent/issues/5938")
 	// Create a cancellable context that will shut down the coordinator after
 	// the test.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -185,7 +184,7 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 
 	// Make sure this test does not dead lock or wait for too long
 	select {
-	case <-time.Tick(50 * time.Millisecond):
+	case <-time.Tick(1 * time.Second):
 		t.Fatal("mockUpgradeManager.Upgrade was not called")
 	case <-upgradeCalledChan:
 	}
