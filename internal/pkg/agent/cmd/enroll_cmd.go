@@ -524,6 +524,8 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 	}
 
 	c.log.Infof("1st enrollment attempt failed, retrying enrolling to URL: %s with exponential backoff (init %s, max %s)", c.client.URI(), enrollBackoffInit, enrollBackoffMax)
+	c.log.Warn(err.Error())
+
 	signal := make(chan struct{})
 	defer close(signal)
 	backExp := backoff.NewExpBackoff(signal, enrollBackoffInit, enrollBackoffMax)
