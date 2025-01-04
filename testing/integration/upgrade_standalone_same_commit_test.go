@@ -74,7 +74,10 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 			upgradetest.WithUnprivileged(unprivilegedAvailable),
 			upgradetest.WithDisableHashCheck(true),
 		)
-		assert.ErrorContainsf(t, err, fmt.Sprintf("agent version is already %s", currentVersion), "upgrade should fail indicating we are already at the same version")
+		// PerformUpgrade will exit after calling `elastic-agent upgrade ...` if a subsequent call to
+		// `elastic-agent status` returns the running state with no upgrade details. This indicates that
+		// the agent did a nop upgrade.
+		assert.NoError(t, err)
 	})
 
 	t.Run(fmt.Sprintf("Upgrade on a repackaged version of agent %s (%s)", currentVersion, unPrivilegedString), func(t *testing.T) {

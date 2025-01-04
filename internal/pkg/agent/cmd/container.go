@@ -417,9 +417,6 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 	if paths.Downloads() != "" {
 		args = append(args, "--path.downloads", paths.Downloads())
 	}
-	if paths.Install() != "" {
-		args = append(args, "--path.install", paths.Install())
-	}
 	if !paths.IsVersionHome() {
 		args = append(args, "--path.home.unversioned")
 	}
