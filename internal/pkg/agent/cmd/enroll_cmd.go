@@ -543,7 +543,6 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 			retry = true
 		case err != nil:
 			c.log.Warnf("Enrollment failed: %s", err.Error())
-			retry = false
 		}
 		if !retry {
 			break
