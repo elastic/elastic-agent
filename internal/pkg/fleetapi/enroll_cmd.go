@@ -24,10 +24,10 @@ import (
 type EnrollType string
 
 // ErrTooManyRequests is received when the remote server is overloaded.
-var ErrTooManyRequests = errors.New("too many requests received (429)")
+var ErrTooManyRequests = errors.New("Received status 429(TooManyRequest)")
 
 // ErrConnRefused is returned when the connection to the server is refused.
-var ErrConnRefused = errors.New("connection refused")
+var ErrConnRefused = errors.New("Connection refused")
 
 // ErrTemporaryServerError is returned when the request caused a temporary server error
 var ErrTemporaryServerError = errors.New("temporary server error, please retry later")
