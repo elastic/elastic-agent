@@ -551,6 +551,8 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 		err = c.enroll(ctx, persistentConfig)
 		if err != nil {
 			c.log.Warnf("Enrollment attempt failed: %s", err.Error())
+		} else {
+			break
 		}
 	}
 
