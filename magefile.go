@@ -84,6 +84,7 @@ const (
 	externalArtifacts = "EXTERNAL"
 	platformsEnv      = "PLATFORMS"
 	packagesEnv       = "PACKAGES"
+	dockerVariants    = "DOCKER_VARIANTS"
 	configFile        = "elastic-agent.yml"
 	agentDropPath     = "AGENT_DROP_PATH"
 	checksumFilename  = "checksum.yml"
@@ -782,9 +783,13 @@ func (Cloud) Image(ctx context.Context) {
 	dev := os.Getenv(devEnv)
 	defer os.Setenv(devEnv, dev)
 
+	variant := os.Getenv(dockerVariants)
+	defer os.Setenv(dockerVariants, variant)
+
 	os.Setenv(platformsEnv, "linux/amd64")
 	os.Setenv(packagesEnv, "docker")
 	os.Setenv(devEnv, "true")
+	os.Setenv(dockerVariants, "cloud")
 
 	if s, err := strconv.ParseBool(snapshot); err == nil && !s {
 		// only disable SNAPSHOT build when explicitely defined
@@ -798,6 +803,7 @@ func (Cloud) Image(ctx context.Context) {
 	devtools.DevBuild = true
 	devtools.Platforms = devtools.Platforms.Filter("linux/amd64")
 	devtools.SelectedPackageTypes = []devtools.PackageType{devtools.Docker}
+	devtools.SelectedDockerVariants = []devtools.DockerVariant{devtools.Cloud}
 
 	if _, hasExternal := os.LookupEnv(externalArtifacts); !hasExternal {
 		devtools.ExternalBuild = true
@@ -3411,12 +3417,7 @@ func (Helm) RenderExamples() error {
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
-	helmChart, err := loader.Load(helmChartPath)
-	if err != nil {
-		return fmt.Errorf("failed to load helm chart: %w", err)
-	}
-
-	err = actionConfig.Init(settings.RESTClientGetter(), "default", "",
+	err := actionConfig.Init(settings.RESTClientGetter(), "default", "",
 		func(format string, v ...interface{}) {})
 	if err != nil {
 		return fmt.Errorf("failed to init helm action config: %w", err)
@@ -3431,6 +3432,11 @@ func (Helm) RenderExamples() error {
 	for _, d := range dirEntries {
 		if !d.IsDir() {
 			continue
+		}
+
+		helmChart, err := loader.Load(helmChartPath)
+		if err != nil {
+			return fmt.Errorf("failed to load helm chart: %w", err)
 		}
 
 		exampleFullPath := filepath.Join(examplesPath, d.Name())
