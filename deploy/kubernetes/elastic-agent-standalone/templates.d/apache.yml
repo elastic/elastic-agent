@@ -103,6 +103,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.apache.access.enabled} == true or ${kubernetes.hints.apache.enabled} == true
+          id: filestream-apache-access-${kubernetes.hints.container_id}
           data_stream:
             dataset: apache.access
             type: logs
@@ -124,6 +125,7 @@ inputs:
           tags:
             - apache-access
         - condition: ${kubernetes.hints.apache.error.enabled} == true or ${kubernetes.hints.apache.enabled} == true
+          id: filestream-apache-error-${kubernetes.hints.container_id}
           data_stream:
             dataset: apache.error
             type: logs

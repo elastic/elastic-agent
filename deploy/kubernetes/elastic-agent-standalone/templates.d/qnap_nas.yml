@@ -45,6 +45,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.qnap_nas.container_logs.enabled} == true
+          id: filestream-qnap_nas-logs-${kubernetes.hints.container_id}
           data_stream:
             dataset: qnap_nas.container_logs
             type: logs

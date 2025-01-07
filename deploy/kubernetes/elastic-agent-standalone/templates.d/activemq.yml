@@ -5,6 +5,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.activemq.audit.enabled} == true or ${kubernetes.hints.activemq.enabled} == true
+          id: filestream-activemq-audit-${kubernetes.hints.container_id}
           data_stream:
             dataset: activemq.audit
             type: logs
@@ -27,6 +28,7 @@ inputs:
             - forwarded
             - activemq-audit
         - condition: ${kubernetes.hints.activemq.log.enabled} == true or ${kubernetes.hints.activemq.enabled} == true
+          id: filestream-activemq-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: activemq.log
             type: logs
