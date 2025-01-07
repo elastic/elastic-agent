@@ -20,10 +20,12 @@ import (
 // 8.10  - default is disabled
 // 8.11+ - default is enabled
 const defaultTamperProtection = true
+const defaultBeatsAsOtelReceivers = false
 
 var (
 	current = Flags{
-		tamperProtection: defaultTamperProtection,
+		tamperProtection:     defaultTamperProtection,
+		beatsAsOtelReceivers: defaultBeatsAsOtelReceivers,
 	}
 )
 
@@ -37,6 +39,8 @@ type Flags struct {
 	fqdnCallbacks map[string]BoolValueOnChangeCallback
 
 	tamperProtection bool
+
+	beatsAsOtelReceivers bool
 }
 
 type cfg struct {
@@ -48,6 +52,9 @@ type cfg struct {
 			TamperProtection *struct {
 				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
 			} `json:"tamper_protection,omitempty" yaml:"tamper_protection,omitempty" config:"tamper_protection,omitempty"`
+			BeatsAsOtelReceivers *struct {
+				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
+			} `json:"beats_as_otel_receivers,omitempty" yaml:"beats_as_otel_receivers,omitempty" config:"beats_as_otel_receivers,omitempty"`
 		} `json:"features" yaml:"features" config:"features"`
 	} `json:"agent" yaml:"agent" config:"agent"`
 }
@@ -64,6 +71,13 @@ func (f *Flags) TamperProtection() bool {
 	defer f.mu.RUnlock()
 
 	return f.tamperProtection
+}
+
+func (f *Flags) BeatsAsOtelReceivers() bool {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	return f.beatsAsOtelReceivers
 }
 
 func (f *Flags) AsProto() *proto.Features {
@@ -119,6 +133,14 @@ func (f *Flags) setTamperProtection(newValue bool) {
 	defer f.mu.Unlock()
 
 	f.tamperProtection = newValue
+}
+
+// setBeatsAsOtelReceivers sets the value of the BeatsAsOtelReceivers flag in Flags.
+func (f *Flags) setBeatsAsOtelReceivers(newValue bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.beatsAsOtelReceivers = newValue
 }
 
 // setSource sets the source from he given cfg.
@@ -186,6 +208,12 @@ func Parse(policy any) (*Flags, error) {
 		flags.setTamperProtection(defaultTamperProtection)
 	}
 
+	if parsedFlags.Agent.Features.BeatsAsOtelReceivers != nil {
+		flags.setBeatsAsOtelReceivers(parsedFlags.Agent.Features.BeatsAsOtelReceivers.Enabled)
+	} else {
+		flags.setBeatsAsOtelReceivers(defaultBeatsAsOtelReceivers)
+	}
+
 	if err := flags.setSource(parsedFlags); err != nil {
 		return nil, fmt.Errorf("error creating feature flags source: %w", err)
 	}
@@ -208,6 +236,7 @@ func Apply(c *config.Config) error {
 
 	current.setFQDN(parsed.FQDN())
 	current.setTamperProtection(parsed.TamperProtection())
+	current.setBeatsAsOtelReceivers(parsed.BeatsAsOtelReceivers())
 	return err
 }
 
@@ -219,4 +248,8 @@ func FQDN() bool {
 // TamperProtection reports if tamper protection feature is enabled
 func TamperProtection() bool {
 	return current.TamperProtection()
+}
+
+func BeatsAsOtelReceivers() bool {
+	return current.BeatsAsOtelReceivers()
 }

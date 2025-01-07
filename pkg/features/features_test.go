@@ -116,3 +116,73 @@ func TestFQDNCallbacks(t *testing.T) {
 	RemoveFQDNOnChangeCallback("cb2")
 	require.Len(t, current.fqdnCallbacks, 0)
 }
+
+func TestBeatsAsOtelReceiversFlag(t *testing.T) {
+	tcs := []struct {
+		name string
+		yaml string
+		want bool
+	}{
+		{
+			name: "flag missing",
+			yaml: `
+agent:
+  features:`,
+			want: false,
+		},
+		{
+			name: "flag empty",
+			yaml: `
+agent:
+  features:
+    beats_as_otel_receivers:`,
+			want: false,
+		},
+		{
+			name: "flag not specified",
+			yaml: `
+agent:
+  features:
+    beats_as_otel_receivers: {}`,
+			want: false,
+		},
+		{
+			name: "flag disabled",
+			yaml: `
+agent:
+  features:
+    beats_as_otel_receivers:
+      enabled: false`,
+			want: false,
+		},
+		{
+			name: "flag enabled",
+			yaml: `
+agent:
+  features:
+    beats_as_otel_receivers:
+      enabled: true`,
+			want: true,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+
+			c, err := config.NewConfigFrom(tc.yaml)
+			if err != nil {
+				t.Fatalf("could not parse config YAML: %v", err)
+			}
+
+			err = Apply(c)
+			if err != nil {
+				t.Fatalf("Apply failed: %v", err)
+			}
+
+			got := BeatsAsOtelReceivers()
+			if got != tc.want {
+				t.Errorf("want: %t, got %t", tc.want, got)
+			}
+		})
+	}
+}
