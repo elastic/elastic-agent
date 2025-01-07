@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/confmap/provider/envprovider"
+
 	"go.opentelemetry.io/collector/confmap/provider/fileprovider"
 	"go.opentelemetry.io/collector/confmap/provider/httpprovider"
 	"go.opentelemetry.io/collector/confmap/provider/httpsprovider"
@@ -20,6 +21,7 @@ import (
 
 	"go.opentelemetry.io/collector/otelcol"
 
+	"github.com/elastic/elastic-agent/internal/pkg/otel/configprovider"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
@@ -83,12 +85,13 @@ func NewSettings(version string, configPaths []string, opts ...SettingOpt) *otel
 	}
 
 	providerFactories := []confmap.ProviderFactory{
-		fileprovider.NewFactory(),
-		envprovider.NewFactory(),
-		yamlprovider.NewFactory(),
-		httpprovider.NewFactory(),
-		httpsprovider.NewFactory(),
+		configprovider.NewFactory(fileprovider.NewFactory),
+		configprovider.NewFactory(envprovider.NewFactory),
+		configprovider.NewFactory(yamlprovider.NewFactory),
+		configprovider.NewFactory(httpprovider.NewFactory),
+		configprovider.NewFactory(httpsprovider.NewFactory),
 	}
+
 	providerFactories = append(providerFactories, o.resolverConfigProviders...)
 	var converterFactories []confmap.ConverterFactory
 	converterFactories = append(converterFactories, o.resolverConverterFactories...)

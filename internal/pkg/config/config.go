@@ -17,6 +17,8 @@ import (
 	"github.com/elastic/go-ucfg/cfgutil"
 )
 
+var OTelConfKeys []string = []string{"connectors", "receivers", "processors", "exporters", "extensions", "service"}
+
 // options hold the specified options
 type options struct {
 	otelKeys []string
@@ -51,7 +53,7 @@ var DefaultOptions = []interface{}{
 	ucfg.VarExp,
 	VarSkipKeys("inputs"),
 	ucfg.IgnoreCommas,
-	OTelKeys("connectors", "receivers", "processors", "exporters", "extensions", "service"),
+	OTelKeys(OTelConfKeys...),
 }
 
 // Config custom type that can provide both an Agent configuration alongside of an optional OTel configuration.
