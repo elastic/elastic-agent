@@ -17,7 +17,7 @@ crds:
 defaultCRConfig:
   image:
     repository: "docker.elastic.co/beats/elastic-agent"
-    tag: "8.18.0-SNAPSHOT"
+    tag: "9.0.0"
   targetAllocator:
     enabled: false # Enable/disable the Operator's Target allocator.
     # Refer to: https://github.com/open-telemetry/opentelemetry-operator/tree/main/cmd/otel-allocator
@@ -576,8 +576,8 @@ collectors:
     presets:
       logsCollection:
         enabled: true # Enable/disable the collection of node's logs.
-        storeCheckpoints: true # Store checkpoints for log collection, allowing for resumption from the last processed log.
-    hostNetwork: true # Use the host's network namespace. This allows the daemon to access the network interfaces of the host directly.
+        storeCheckpoints: false # Store checkpoints for log collection, allowing for resumption from the last processed log.
+    # hostNetwork: true # Use the host's network namespace. This allows the daemon to access the network interfaces of the host directly.
     securityContext: # Run the daemon as the root user and group for proper metrics collection.
       runAsUser: 0
       runAsGroup: 0
@@ -587,6 +587,16 @@ collectors:
         # [Debug exporter](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/debugexporter/README.md)
         debug:
           verbosity: basic
+        # [Loadbalancing exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/loadbalancingexporter)
+        loadbalancing/gateway:
+          routing_key: service
+          protocol:
+            otlp:
+              tls:
+                insecure: true
+          resolver:
+            k8s:
+              service: opentelemetry-kube-stack-gateway-collector-headless
         otlp/gateway:
           # !!! Elastic APM https endpoint WITHOUT the "https://" prefix
           endpoint: "http://opentelemetry-kube-stack-gateway-collector:4317"
@@ -914,7 +924,7 @@ collectors:
               - batch
               - resource/hostname
             exporters:
-              - otlp/gateway
+              - loadbalancing/gateway
           logs/apm:
             receivers:
               - otlp
@@ -922,7 +932,7 @@ collectors:
               - batch
               - resource/hostname
             exporters:
-              - otlp/gateway
+              - loadbalancing/gateway
           traces/apm:
             receivers:
               - otlp
@@ -930,7 +940,7 @@ collectors:
               - batch
               - resource/hostname
             exporters:
-              - otlp/gateway
+              - loadbalancing/gateway
 # For more details on OpenTelemetry's zero-code instrumentation, see:
 # https://opentelemetry.io/docs/concepts/instrumentation/zero-code/
 instrumentation:
