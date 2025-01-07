@@ -5,6 +5,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.haproxy.log.enabled} == true or ${kubernetes.hints.haproxy.enabled} == true
+          id: filestream-haproxy-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: haproxy.log
             type: logs

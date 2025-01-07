@@ -5,6 +5,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.fireeye.nx.enabled} == true or ${kubernetes.hints.fireeye.enabled} == true
+          id: filestream-fireeye-nx-${kubernetes.hints.container_id}
           data_stream:
             dataset: fireeye.nx
             type: logs

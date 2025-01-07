@@ -5,6 +5,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.hashicorp_vault.audit.enabled} == true or ${kubernetes.hints.hashicorp_vault.enabled} == true
+          id: filestream-hashicorp_vault-audit-${kubernetes.hints.container_id}
           data_stream:
             dataset: hashicorp_vault.audit
             type: logs
@@ -26,6 +27,7 @@ inputs:
           tags:
             - hashicorp-vault-audit
         - condition: ${kubernetes.hints.hashicorp_vault.log.enabled} == true or ${kubernetes.hints.hashicorp_vault.enabled} == true
+          id: filestream-hashicorp_vault-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: hashicorp_vault.log
             type: logs

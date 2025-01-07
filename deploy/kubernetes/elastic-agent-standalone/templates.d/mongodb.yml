@@ -5,6 +5,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.mongodb.log.enabled} == true or ${kubernetes.hints.mongodb.enabled} == true
+          id: filestream-mongodb-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: mongodb.log
             type: logs

@@ -564,6 +564,7 @@ stringData:
     providers:
       kubernetes:
         hints:
+          default_container_logs: false
           enabled: true
         node: ${NODE_NAME}
         scope: node
@@ -1081,7 +1082,7 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: 0df24cb5f7362916ba8cb10621b123918f22f52a7ce9f0b0514c5983de6d06f3
+        checksum/config: daca0d998edb3afa587d96e69b0833f6919ca6ba72f58f3a1f83b22d7e5ffaf6
     spec:
       automountServiceAccountToken: true
       containers:

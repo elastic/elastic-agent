@@ -78,6 +78,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.panw.panos.enabled} == true or ${kubernetes.hints.panw.enabled} == true
+          id: filestream-panw-panos-${kubernetes.hints.container_id}
           data_stream:
             dataset: panw.panos
             type: logs

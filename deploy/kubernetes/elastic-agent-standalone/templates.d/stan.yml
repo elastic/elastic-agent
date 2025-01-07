@@ -5,6 +5,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.stan.log.enabled} == true or ${kubernetes.hints.stan.enabled} == true
+          id: filestream-stan-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: stan.log
             type: logs

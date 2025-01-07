@@ -5531,6 +5531,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.tomcat.log.enabled} == true and ${kubernetes.hints.tomcat.enabled} == true
+          id: filestream-tomcat-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: tomcat.log
             type: logs
