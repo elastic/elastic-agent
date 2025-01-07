@@ -65,6 +65,11 @@ providers:
   kubernetes:
     hints:
       enabled: true
+{{- if (eq $.Values.kubernetes.containers.logs.enabled false) }}
+      default_container_logs: true
+{{- else }}
+      default_container_logs: false
+{{- end }}
 {{- end -}}
 
 {{- define "elasticagent.kubernetes.pernode.preset.tolerations" -}}

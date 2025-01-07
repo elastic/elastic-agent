@@ -21,6 +21,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.iptables.log.enabled} == true and ${kubernetes.hints.iptables.enabled} == true
+          id: filestream-iptables-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: iptables.log
             type: logs
