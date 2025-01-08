@@ -32,6 +32,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.netflow.container_logs.enabled} == true
+          id: filestream-netflow-logs-${kubernetes.hints.container_id}
           data_stream:
             dataset: netflow.container_logs
             type: logs

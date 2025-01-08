@@ -38,6 +38,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.zookeeper.container_logs.enabled} == true
+          id: filestream-zookeeper-logs-${kubernetes.hints.container_id}
           data_stream:
             dataset: zookeeper.container_logs
             type: logs

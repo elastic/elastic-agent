@@ -117,6 +117,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.synthetics.container_logs.enabled} == true
+          id: filestream-synthetics-logs-${kubernetes.hints.container_id}
           data_stream:
             dataset: synthetics.container_logs
             type: logs
