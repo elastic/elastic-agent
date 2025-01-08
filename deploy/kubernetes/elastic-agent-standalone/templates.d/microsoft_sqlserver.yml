@@ -18,6 +18,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.microsoft_sqlserver.log.enabled} == true or ${kubernetes.hints.microsoft_sqlserver.enabled} == true
+          id: filestream-microsoft_sqlserver-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: microsoft_sqlserver.log
             type: logs

@@ -5,6 +5,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.kibana.audit.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
+          id: filestream-kibana-audit-${kubernetes.hints.container_id}
           data_stream:
             dataset: kibana.audit
             type: logs
@@ -24,6 +25,7 @@ inputs:
                     enabled: true
                 symlinks: true
         - condition: ${kubernetes.hints.kibana.log.enabled} == true or ${kubernetes.hints.kibana.enabled} == true
+          id: filestream-kibana-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: kibana.log
             type: logs

@@ -5,6 +5,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.snort.log.enabled} == true or ${kubernetes.hints.snort.enabled} == true
+          id: filestream-snort-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: snort.log
             type: logs

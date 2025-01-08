@@ -39,6 +39,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.cyberarkpas.audit.enabled} == true and ${kubernetes.hints.cyberarkpas.enabled} == true
+          id: filestream-cyberarkpas-audit-${kubernetes.hints.container_id}
           data_stream:
             dataset: cyberarkpas.audit
             type: logs
