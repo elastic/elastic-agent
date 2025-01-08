@@ -353,9 +353,7 @@ collectors:
                 - set(attributes["data_stream.dataset"], Concat([attributes["metricset.name"], "60m"], "."))
                 - set(attributes["processor.event"], "metric")
       exporters:
-        debug:
-        debug/vvv:
-          verbosity: detailed
+        debug: {}
           # [Elasticsearch exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/README.md)
         elasticsearch/otel:
           endpoints: # List of Elasticsearch endpoints.
@@ -770,7 +768,7 @@ collectors:
           start_at: end
           exclude:
             # exlude collector logs
-            - /var/log/pods/opentelemetry-operator-system_opentelemetry-kube-stack*/*/*.log
+            - /var/log/pods/*opentelemetry-kube-stack*/*/*.log
           include:
             - /var/log/pods/*/*/*.log
           include_file_name: false
