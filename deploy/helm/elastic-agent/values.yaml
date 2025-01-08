@@ -493,3 +493,7 @@ agent:
       providers:
         kubernetes:
           enabled: false
+kube-state-metrics:
+  enabled: true
+  fullnameOverride: "kube-state-metrics"
+  replicas: 1

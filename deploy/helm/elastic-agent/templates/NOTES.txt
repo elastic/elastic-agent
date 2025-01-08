@@ -13,6 +13,10 @@ Installed agent:
 {{- end }}
 {{- end }}
 
+{{ if eq (index $.Values "kube-state-metrics" "enabled") true -}}
+Installed kube-state-metrics at "{{ $.Release.Namespace }}" namespace.
+{{- end }}
+
 {{ if eq $.Values.agent.fleet.enabled false -}}
 Installed integrations:
 {{- if eq $.Values.kubernetes.enabled true }}
