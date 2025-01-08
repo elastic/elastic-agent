@@ -503,6 +503,12 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 	if token != "" {
 		args = append(args, "--enrollment-token", token)
 	}
+	if cfg.Fleet.ID != "" {
+		args = append(args, "--id", cfg.Fleet.ID)
+	}
+	if cfg.Fleet.ReplaceToken != "" {
+		args = append(args, "--replace-token", cfg.Fleet.ReplaceToken)
+	}
 	if cfg.Fleet.DaemonTimeout != 0 {
 		args = append(args, "--daemon-timeout")
 		args = append(args, cfg.Fleet.DaemonTimeout.String())
