@@ -20,7 +20,7 @@ In this example we install the built-in `kubernetes` integration with the defaul
 
    1. The username to connect to Kibana is `elastic`
    2. To find the password to connect to Kibana, run `kubectl get secrets/elasticsearch-sample-es-elastic-user -n elastic-system -o json | jq -r '.data.elastic' | base64 -d`
-   3. Don't forget to forward the port of Kibana to your local machine by running `kubectl port-forward deployments/kibana-sample-kb -n elastic-system 12000:5601`
+   3. Don't forget to forward the port of Kibana to your local machine with this command `kubectl port-forward deployments/kibana-sample-kb -n elastic-system 12000:5601`
    4. Open https://localhost:12000 in your browser
    5. Install kubernetes integration through Kibana
 

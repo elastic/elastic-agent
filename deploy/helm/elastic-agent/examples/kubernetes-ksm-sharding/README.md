@@ -1,6 +1,6 @@
 # Example: Kubernetes Integration with default chart values
 
-In this example we install the built-in `kubernetes` integration with the default built-in values.
+In this example we install the built-in `kubernetes` integration with the default built-in values. We also change the `kube-state-metrics` to run with the `autosharding` feature enabled and include elastic-agent as a sidecar container. Such a type of setup is recommended for big k8s clusters, featuring a lot of k8s object, where scaling of kube-state-metrics extraction is required.
 
 ## Prerequisites:
 1. A k8s secret that contains the connection details to an Elasticsearch cluster such as the URL and the API key ([Kibana - Creating API Keys](https://www.elastic.co/guide/en/kibana/current/api-keys.html)):
@@ -17,9 +17,7 @@ In this example we install the built-in `kubernetes` integration with the defaul
 #### Public image registry:
 ```console
 helm install elastic-agent ../../ \
-     -f ./agent-kubernetes-values.yaml \
-     --set outputs.default.type=ESSecretAuthAPI \
-     --set outputs.default.secretName=es-api-secret
+     -f ./agent-kubernetes-values.yaml
 ```
 
 
@@ -33,16 +31,10 @@ Install elastic-agent
 ```console
 helm install elastic-agent ../../ \
      -f ./agent-kubernetes-values.yaml \
-     --set 'agent.imagePullSecrets[0].name=regcred' \
-     --set outputs.default.type=ESSecretAuthAPI \
-     --set outputs.default.secretName=es-api-secret
+     --set 'agent.imagePullSecrets[0].name=regcred'
 ```
 
 ## Validate:
 
-1. `kube-state metrics` is installed with this command `kubectl get deployments -n kube-system kube-state-metrics`.
+1. `kube-state metrics` is installed by this command `kubectl get sts -n kube-system kube-state-metrics`.
 2. The Kibana `kubernetes`-related dashboards should start showing up the respective info.
-
-## Note:
-
-1. If you want to disable kube-state-metrics installation with the elastic-agent Helm chart, you can set `kube-state-metrics.enabled=false` in the Helm chart. The helm chart will use the value of `kubernetes.state.host` to configure the elastic-agent input.
