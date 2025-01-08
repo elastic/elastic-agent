@@ -195,7 +195,7 @@ collectors:
     presets:
       logsCollection:
         enabled: true # Enable/disable the collection of node's logs.
-        storeCheckpoints: false # Store checkpoints for log collection, allowing for resumption from the last processed log.
+        storeCheckpoints: true # Store checkpoints for log collection, allowing for resumption from the last processed log.
     # hostNetwork: true # Use the host's network namespace. This allows the daemon to access the network interfaces of the host directly.
     securityContext: # Run the daemon as the root user and group for proper metrics collection.
       runAsUser: 0
