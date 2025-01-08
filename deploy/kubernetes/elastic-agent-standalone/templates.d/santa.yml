@@ -5,6 +5,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.santa.log.enabled} == true or ${kubernetes.hints.santa.enabled} == true
+          id: filestream-santa-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: santa.log
             type: logs

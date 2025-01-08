@@ -5,6 +5,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.crowdstrike.falcon.enabled} == true or ${kubernetes.hints.crowdstrike.enabled} == true
+          id: filestream-crowdstrike-falcon-${kubernetes.hints.container_id}
           data_stream:
             dataset: crowdstrike.falcon
             type: logs
@@ -32,6 +33,7 @@ inputs:
             - forwarded
             - crowdstrike-falcon
         - condition: ${kubernetes.hints.crowdstrike.fdr.enabled} == true or ${kubernetes.hints.crowdstrike.enabled} == true
+          id: filestream-crowdstrike-fdr-${kubernetes.hints.container_id}
           data_stream:
             dataset: crowdstrike.fdr
             type: logs

@@ -5,6 +5,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.checkpoint.firewall.enabled} == true or ${kubernetes.hints.checkpoint.enabled} == true
+          id: filestream-checkpoint-firewall-${kubernetes.hints.container_id}
           data_stream:
             dataset: checkpoint.firewall
             type: logs

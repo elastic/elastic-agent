@@ -26,6 +26,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.cef.log.enabled} == true or ${kubernetes.hints.cef.enabled} == true
+          id: filestream-cef-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: cef.log
             type: logs

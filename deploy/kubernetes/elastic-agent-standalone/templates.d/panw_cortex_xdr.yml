@@ -74,6 +74,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.panw_cortex_xdr.container_logs.enabled} == true
+          id: filestream-panw_cortex_xdr-logs-${kubernetes.hints.container_id}
           data_stream:
             dataset: panw_cortex_xdr.container_logs
             type: logs

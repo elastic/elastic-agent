@@ -17,6 +17,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.tcp.container_logs.enabled} == true
+          id: filestream-tcp-${kubernetes.hints.container_id}
           data_stream:
             dataset: tcp.container_logs
             type: logs

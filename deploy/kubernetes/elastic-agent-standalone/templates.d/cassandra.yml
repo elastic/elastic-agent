@@ -5,6 +5,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.cassandra.log.enabled} == true or ${kubernetes.hints.cassandra.enabled} == true
+          id: filestream-cassandra-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: cassandra.log
             type: logs
