@@ -6,10 +6,10 @@ metadata:
   name: agent-nginx-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-8.17.1-beta
+    helm.sh/chart: elastic-agent-8.17.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.17.1
+    app.kubernetes.io/version: 8.17.2
 stringData:
 
   agent.yml: |-
@@ -61,10 +61,10 @@ metadata:
   name: agent-nginx-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-8.17.1-beta
+    helm.sh/chart: elastic-agent-8.17.2-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.17.1
+    app.kubernetes.io/version: 8.17.2
 spec:
   selector:
     matchLabels:
@@ -93,7 +93,7 @@ spec:
               fieldPath: metadata.name
         - name: STATE_PATH
           value: /usr/share/elastic-agent/state
-        image: docker.elastic.co/beats/elastic-agent:8.17.1-SNAPSHOT
+        image: docker.elastic.co/beats/elastic-agent:8.17.2-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         securityContext:
