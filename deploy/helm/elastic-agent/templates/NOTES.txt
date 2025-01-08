@@ -15,6 +15,11 @@ Installed agent:
 
 {{ if eq (index $.Values "kube-state-metrics" "enabled") true -}}
 Installed kube-state-metrics at "{{ $.Release.Namespace }}" namespace.
+{{- if eq $.Values.kubernetes.enabled true -}}
+{{- if eq $.Values.kubernetes.state.agentAsSidecar.enabled true }}
+  - elastic-agent runs as a sidecar container
+{{- end }}
+{{- end }}
 {{- end }}
 
 {{ if eq $.Values.agent.fleet.enabled false -}}
