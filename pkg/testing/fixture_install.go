@@ -469,12 +469,6 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, shou
 		}
 	})
 
-	// start elastic-agent
-	out, err = exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
-	if err != nil {
-		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
-	}
-
 	if !shouldEnroll {
 		return nil, nil
 	}
@@ -502,6 +496,12 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, shou
 	out, err = exec.CommandContext(ctx, "sudo", enrollArgs...).CombinedOutput()
 	if err != nil {
 		return out, fmt.Errorf("elastic-agent enroll failed: %w, output: %s args: %v", err, string(out), enrollArgs)
+	}
+
+	// start elastic-agent
+	out, err = exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
+	if err != nil {
+		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
 	}
 
 	return nil, nil
@@ -556,12 +556,6 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 		}
 	})
 
-	// start elastic-agent
-	out, err = exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
-	if err != nil {
-		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
-	}
-
 	if !shouldEnroll {
 		return nil, nil
 	}
@@ -590,6 +584,12 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 	out, err = exec.CommandContext(ctx, "sudo", enrollArgs...).CombinedOutput()
 	if err != nil {
 		return out, fmt.Errorf("elastic-agent enroll failed: %w, output: %s args: %v", err, string(out), enrollArgs)
+	}
+
+	// start elastic-agent
+	out, err = exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
+	if err != nil {
+		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
 	}
 
 	return nil, nil

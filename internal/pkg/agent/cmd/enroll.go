@@ -15,6 +15,8 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install/pkgmgr"
+
 	"github.com/spf13/cobra"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
@@ -476,6 +478,12 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 	if runtime.GOOS == "darwin" {
 		fixPermissions = nil
+	}
+
+	// If agent was installed via a deb or rpm package, we want to avoid restarting because it may not be running yet.
+	// In this case, the user is expected to (re)start agent via systemd instead.
+	if pkgmgr.InstalledViaExternalPkgMgr() {
+		skipDaemonReload = true
 	}
 
 	options := enrollCmdOption{

@@ -97,6 +97,75 @@ func TestDebLogIngestFleetManaged(t *testing.T) {
 	})
 }
 
+func TestDebEnroll(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Deb,
+		Stack: &define.Stack{},
+		OS: []define.OS{
+			{
+				Type:   define.Linux,
+				Distro: "ubuntu",
+			},
+		},
+		Local: false,
+		Sudo:  true,
+	})
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("deb"))
+	require.NoError(t, err)
+
+	// 1. Create a policy in Fleet without any
+	// To ensure there are no conflicts with previous test runs against
+	// the same ESS stack, we add the current time at the end of the policy
+	// name. This policy does not contain any integration.
+	t.Log("Creating a test policy")
+	createPolicyReq := kibana.AgentPolicy{
+		Name:        fmt.Sprintf("test-policy-enroll-%s", uuid.Must(uuid.NewV4()).String()),
+		Namespace:   info.Namespace,
+		Description: "test policy for agent enrollment",
+		AgentFeatures: []map[string]interface{}{
+			{
+				"name":    "test_enroll",
+				"enabled": true,
+			},
+		},
+	}
+
+	policy, err := info.KibanaClient.CreatePolicy(ctx, createPolicyReq)
+	require.NoError(t, err)
+
+	enrollmentToken, err := tools.CreateEnrollmentToken(t, ctx, info.KibanaClient, policy.ID)
+	require.NoError(t, err)
+
+	fleetServerURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
+	require.NoError(t, err)
+
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+	}
+
+	// 2. Install agent without enrolling
+	t.Log("Installing agent from deb package")
+	out, err := agentFixture.InstallWithoutEnroll(ctx, &installOpts)
+	require.NoError(t, err, "failed to install agent, got error: %s", string(out))
+
+	// 3. Enroll the agent, should succeed without the agent having been started
+	t.Log("Enrolling agent")
+	enrollArgs := []string{"elastic-agent", "enroll", "--url", fleetServerURL, "--enrollment-token", enrollmentToken.APIKey, "--force"}
+	out, err = exec.CommandContext(ctx, "sudo", enrollArgs...).CombinedOutput()
+	require.NoError(t, err, "failed to enroll agent, got error: %s", string(out))
+
+	// 4. Start the agent, it should connect to fleet correctly
+	t.Log("Starting agent")
+	out, err = exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
+	require.NoError(t, err, "failed to start elastic-agent, got error: %s", string(out))
+	check.ConnectedToFleet(ctx, t, agentFixture, 5*time.Minute)
+}
+
 func TestDebFleetUpgrade(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Deb,
@@ -154,7 +223,6 @@ func TestDebFleetUpgrade(t *testing.T) {
 		NonInteractive: true,
 		Force:          true,
 	}
-
 	// 2. Install the Elastic-Agent with the policy that
 	// was just created.
 	policy, err := tools.InstallAgentWithPolicy(
