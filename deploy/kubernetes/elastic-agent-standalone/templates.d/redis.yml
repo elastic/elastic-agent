@@ -66,6 +66,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.redis.log.enabled} == true or ${kubernetes.hints.redis.enabled} == true
+          id: filestream-redis-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: redis.log
             type: logs

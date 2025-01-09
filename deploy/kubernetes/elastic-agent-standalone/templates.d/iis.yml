@@ -32,6 +32,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.iis.access.enabled} == true or ${kubernetes.hints.iis.enabled} == true
+          id: filestream-iis-access-${kubernetes.hints.container_id}
           data_stream:
             dataset: iis.access
             type: logs
@@ -56,6 +57,7 @@ inputs:
           tags:
             - iis-access
         - condition: ${kubernetes.hints.iis.error.enabled} == true or ${kubernetes.hints.iis.enabled} == true
+          id: filestream-iis-error-${kubernetes.hints.container_id}
           data_stream:
             dataset: iis.error
             type: logs

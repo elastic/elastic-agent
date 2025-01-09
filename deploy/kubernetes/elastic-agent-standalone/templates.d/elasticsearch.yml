@@ -5,6 +5,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.elasticsearch.audit.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
+          id: filestream-elasticsearch-audit-${kubernetes.hints.container_id}
           data_stream:
             dataset: elasticsearch.audit
             type: logs
@@ -49,6 +50,7 @@ inputs:
                     enabled: true
                 symlinks: true
         - condition: ${kubernetes.hints.elasticsearch.deprecation.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
+          id: filestream-elasticsearch-deprecation-${kubernetes.hints.container_id}
           data_stream:
             dataset: elasticsearch.deprecation
             type: logs
@@ -70,6 +72,7 @@ inputs:
                     enabled: true
                 symlinks: true
         - condition: ${kubernetes.hints.elasticsearch.gc.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
+          id: filestream-elasticsearch-gc-${kubernetes.hints.container_id}
           data_stream:
             dataset: elasticsearch.gc
             type: logs
@@ -103,6 +106,7 @@ inputs:
                     enabled: true
                 symlinks: true
         - condition: ${kubernetes.hints.elasticsearch.server.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
+          id: filestream-elasticsearch-server-${kubernetes.hints.container_id}
           data_stream:
             dataset: elasticsearch.server
             type: logs
@@ -125,6 +129,7 @@ inputs:
                     enabled: true
                 symlinks: true
         - condition: ${kubernetes.hints.elasticsearch.slowlog.enabled} == true or ${kubernetes.hints.elasticsearch.enabled} == true
+          id: filestream-elasticsearch-slowlog-${kubernetes.hints.container_id}
           data_stream:
             dataset: elasticsearch.slowlog
             type: logs

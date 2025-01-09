@@ -5,6 +5,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.pfsense.container_logs.enabled} == true
+          id: filestream-pfsense-logs-${kubernetes.hints.container_id}
           data_stream:
             dataset: pfsense.container_logs
             type: logs

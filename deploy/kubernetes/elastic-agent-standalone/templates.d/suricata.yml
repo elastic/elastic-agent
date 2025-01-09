@@ -5,6 +5,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.suricata.eve.enabled} == true or ${kubernetes.hints.suricata.enabled} == true
+          id: filestream-suricata-eve-${kubernetes.hints.container_id}
           data_stream:
             dataset: suricata.eve
             type: logs

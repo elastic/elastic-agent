@@ -5,6 +5,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.nats.log.enabled} == true or ${kubernetes.hints.nats.enabled} == true
+          id: filestream-nats-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: nats.log
             type: logs
