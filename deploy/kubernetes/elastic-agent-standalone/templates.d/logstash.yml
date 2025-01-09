@@ -5,6 +5,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.logstash.log.enabled} == true or ${kubernetes.hints.logstash.enabled} == true
+          id: filestream-logstash-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: logstash.log
             type: logs
@@ -34,6 +35,7 @@ inputs:
                     enabled: true
                 symlinks: true
         - condition: ${kubernetes.hints.logstash.slowlog.enabled} == true or ${kubernetes.hints.logstash.enabled} == true
+          id: filestream-logstash-slowlog-${kubernetes.hints.container_id}
           data_stream:
             dataset: logstash.slowlog
             type: logs

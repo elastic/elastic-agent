@@ -5,6 +5,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.zeek.capture_loss.enabled} == true or ${kubernetes.hints.zeek.enabled} == true
+          id: filestream-zeek-loss-${kubernetes.hints.container_id}
           data_stream:
             dataset: zeek.capture_loss
             type: logs

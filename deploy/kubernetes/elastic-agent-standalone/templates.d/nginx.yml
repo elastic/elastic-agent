@@ -5,6 +5,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.nginx.access.enabled} == true or ${kubernetes.hints.nginx.enabled} == true
+          id: filestream-nginx-access-${kubernetes.hints.container_id}
           data_stream:
             dataset: nginx.access
             type: logs
@@ -29,6 +30,7 @@ inputs:
           tags:
             - nginx-access
         - condition: ${kubernetes.hints.nginx.error.enabled} == true or ${kubernetes.hints.nginx.enabled} == true
+          id: filestream-nginx-error-${kubernetes.hints.container_id}
           data_stream:
             dataset: nginx.error
             type: logs

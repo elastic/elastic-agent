@@ -72,6 +72,7 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.prometheus.container_logs.enabled} == true
+          id: filestream-prometheus-logs-${kubernetes.hints.container_id}
           data_stream:
             dataset: prometheus.container_logs
             type: logs
