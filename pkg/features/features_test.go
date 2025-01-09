@@ -186,3 +186,73 @@ agent:
 		})
 	}
 }
+
+func TestMonitoringWithOtelFlag(t *testing.T) {
+	tcs := []struct {
+		name string
+		yaml string
+		want bool
+	}{
+		{
+			name: "flag missing",
+			yaml: `
+agent:
+  features:`,
+			want: false,
+		},
+		{
+			name: "flag empty",
+			yaml: `
+agent:
+  features:
+    monitoring_with_otel:`,
+			want: false,
+		},
+		{
+			name: "flag not specified",
+			yaml: `
+agent:
+  features:
+    monitoring_with_otel: {}`,
+			want: false,
+		},
+		{
+			name: "flag disabled",
+			yaml: `
+agent:
+  features:
+    monitoring_with_otel:
+      enabled: false`,
+			want: false,
+		},
+		{
+			name: "flag enabled",
+			yaml: `
+agent:
+  features:
+    monitoring_with_otel:
+      enabled: true`,
+			want: true,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+
+			c, err := config.NewConfigFrom(tc.yaml)
+			if err != nil {
+				t.Fatalf("could not parse config YAML: %v", err)
+			}
+
+			err = Apply(c)
+			if err != nil {
+				t.Fatalf("Apply failed: %v", err)
+			}
+
+			got := MonitoringWithOtel()
+			if got != tc.want {
+				t.Errorf("want: %t, got %t", tc.want, got)
+			}
+		})
+	}
+}

@@ -21,11 +21,13 @@ import (
 // 8.11+ - default is enabled
 const defaultTamperProtection = true
 const defaultBeatsAsOtelReceivers = false
+const defaultMonitoringWithOtel = false
 
 var (
 	current = Flags{
 		tamperProtection:     defaultTamperProtection,
 		beatsAsOtelReceivers: defaultBeatsAsOtelReceivers,
+		monitoringWithOtel:   defaultMonitoringWithOtel,
 	}
 )
 
@@ -40,7 +42,11 @@ type Flags struct {
 
 	tamperProtection bool
 
+	// beatsAsOtelReceivers indicates if the Agent run Beats as OpenTelemetry receivers like filebeatreceiver etc.
 	beatsAsOtelReceivers bool
+
+	// monitoringWithOtel indicates if the Agent should use OpenTelemetry components for self-monitoring instead of Beats.
+	monitoringWithOtel bool
 }
 
 type cfg struct {
@@ -55,6 +61,9 @@ type cfg struct {
 			BeatsAsOtelReceivers *struct {
 				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
 			} `json:"beats_as_otel_receivers,omitempty" yaml:"beats_as_otel_receivers,omitempty" config:"beats_as_otel_receivers,omitempty"`
+			MonitoringWithOtel *struct {
+				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
+			} `json:"monitoring_with_otel,omitempty" yaml:"monitoring_with_otel,omitempty" config:"monitoring_with_otel,omitempty"`
 		} `json:"features" yaml:"features" config:"features"`
 	} `json:"agent" yaml:"agent" config:"agent"`
 }
@@ -78,6 +87,13 @@ func (f *Flags) BeatsAsOtelReceivers() bool {
 	defer f.mu.RUnlock()
 
 	return f.beatsAsOtelReceivers
+}
+
+func (f *Flags) MonitoringWithOtel() bool {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	return f.monitoringWithOtel
 }
 
 func (f *Flags) AsProto() *proto.Features {
@@ -141,6 +157,13 @@ func (f *Flags) setBeatsAsOtelReceivers(newValue bool) {
 	defer f.mu.Unlock()
 
 	f.beatsAsOtelReceivers = newValue
+}
+
+func (f *Flags) setMonitoringWithOtel(newValue bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.monitoringWithOtel = newValue
 }
 
 // setSource sets the source from he given cfg.
@@ -214,6 +237,12 @@ func Parse(policy any) (*Flags, error) {
 		flags.setBeatsAsOtelReceivers(defaultBeatsAsOtelReceivers)
 	}
 
+	if parsedFlags.Agent.Features.MonitoringWithOtel != nil {
+		flags.setMonitoringWithOtel(parsedFlags.Agent.Features.MonitoringWithOtel.Enabled)
+	} else {
+		flags.setMonitoringWithOtel(defaultMonitoringWithOtel)
+	}
+
 	if err := flags.setSource(parsedFlags); err != nil {
 		return nil, fmt.Errorf("error creating feature flags source: %w", err)
 	}
@@ -237,6 +266,7 @@ func Apply(c *config.Config) error {
 	current.setFQDN(parsed.FQDN())
 	current.setTamperProtection(parsed.TamperProtection())
 	current.setBeatsAsOtelReceivers(parsed.BeatsAsOtelReceivers())
+	current.setMonitoringWithOtel(parsed.MonitoringWithOtel())
 	return err
 }
 
@@ -252,4 +282,8 @@ func TamperProtection() bool {
 
 func BeatsAsOtelReceivers() bool {
 	return current.BeatsAsOtelReceivers()
+}
+
+func MonitoringWithOtel() bool {
+	return current.MonitoringWithOtel()
 }
