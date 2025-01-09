@@ -525,7 +525,6 @@ require (
 	go.opentelemetry.io/collector/config/configretry v1.23.0 // indirect
 	go.opentelemetry.io/collector/config/configtelemetry v0.117.0 // indirect
 	go.opentelemetry.io/collector/config/configtls v1.23.0 // indirect
-	go.opentelemetry.io/collector/config/internal v0.117.0 // indirect
 	go.opentelemetry.io/collector/connector/connectortest v0.117.0 // indirect
 	go.opentelemetry.io/collector/connector/xconnector v0.117.0 // indirect
 	go.opentelemetry.io/collector/consumer v1.23.0 // indirect
