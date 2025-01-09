@@ -595,13 +595,13 @@ collectors:
     config:
       connectors:
         routing:
-          default_pipelines: [metrics/otlp]
+          default_pipelines: [metrics/otel]
           error_mode: ignore
           match_once: true
           table:
             - context: metric
               statement: route() where instrumentation_scope.name == "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver"
-              pipelines: [metrics/infra/ecs, metrics/infra/otel]
+              pipelines: [metrics/infra/ecs, metrics/otel]
             - context: metric
               statement: route() where IsMatch(instrumentation_scope.name, "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal/scraper/*")
               pipelines: [metrics/infra/ecs]
@@ -914,11 +914,7 @@ collectors:
               - attributes/dataset
               - batch
             exporters: [debug, elasticsearch/ecs]
-          metrics/infra/otel:
-            receivers: [routing]
-            processors: [batch]
-            exporters: [debug, elasticsearch/otel]
-          metrics/otlp:
+          metrics/otel:
             receivers: [routing]
             processors: [batch]
             exporters: [debug, signaltometrics, elasticsearch/otel]
