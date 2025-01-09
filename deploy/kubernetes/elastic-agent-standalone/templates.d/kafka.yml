@@ -5,7 +5,6 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.kafka.log.enabled} == true or ${kubernetes.hints.kafka.enabled} == true
-          id: filestream-kafka-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: kafka.log
             type: logs
@@ -13,6 +12,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-kafka-kafka-log-${kubernetes.hints.container_id}
           multiline:
             match: after
             negate: true

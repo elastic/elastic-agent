@@ -1,4 +1,34 @@
 inputs:
+    - name: filestream-redis
+      id: filestream-redis-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.redis.log.enabled} == true or ${kubernetes.hints.redis.enabled} == true
+          data_stream:
+            dataset: redis.log
+            type: logs
+          exclude_files:
+            - .gz$
+          exclude_lines:
+            - ^\s+[\-`('.|_]
+          file_identity:
+            fingerprint: null
+          id: filestream-redis-redis-log-${kubernetes.hints.container_id}
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.redis.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                fingerprint:
+                    enabled: true
+                symlinks: true
+          tags:
+            - redis-log
+      data_stream.namespace: default
     - name: redis-redis
       id: redis-redis-${kubernetes.hints.container_id}
       type: redis
@@ -59,34 +89,4 @@ inputs:
           network: tcp
           password: ${kubernetes.hints.redis.keyspace.password|kubernetes.hints.redis.password|''}
           period: ${kubernetes.hints.redis.keyspace.period|kubernetes.hints.redis.period|'10s'}
-      data_stream.namespace: default
-    - name: filestream-redis
-      id: filestream-redis-${kubernetes.hints.container_id}
-      type: filestream
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.redis.log.enabled} == true or ${kubernetes.hints.redis.enabled} == true
-          id: filestream-redis-log-${kubernetes.hints.container_id}
-          data_stream:
-            dataset: redis.log
-            type: logs
-          exclude_files:
-            - .gz$
-          exclude_lines:
-            - ^\s+[\-`('.|_]
-          file_identity:
-            fingerprint: null
-          parsers:
-            - container:
-                format: auto
-                stream: ${kubernetes.hints.redis.log.stream|'all'}
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          prospector:
-            scanner:
-                fingerprint:
-                    enabled: true
-                symlinks: true
-          tags:
-            - redis-log
       data_stream.namespace: default

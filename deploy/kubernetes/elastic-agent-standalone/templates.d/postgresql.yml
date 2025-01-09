@@ -5,7 +5,6 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.postgresql.log.enabled} == true or ${kubernetes.hints.postgresql.enabled} == true
-          id: filestream-postgresql-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: postgresql.log
             type: logs
@@ -13,6 +12,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-postgresql-postgresql-log-${kubernetes.hints.container_id}
           multiline:
             match: after
             negate: true

@@ -5,7 +5,6 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.modsecurity.auditlog.enabled} == true or ${kubernetes.hints.modsecurity.enabled} == true
-          id: filestream-modsecurity-auditlog-${kubernetes.hints.container_id}
           data_stream:
             dataset: modsecurity.auditlog
             type: logs
@@ -17,6 +16,7 @@ inputs:
           fields_under_root: true
           file_identity:
             fingerprint: null
+          id: filestream-modsecurity-modsecurity-auditlog-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto

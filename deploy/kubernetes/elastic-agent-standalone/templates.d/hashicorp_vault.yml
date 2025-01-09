@@ -5,7 +5,6 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.hashicorp_vault.audit.enabled} == true or ${kubernetes.hints.hashicorp_vault.enabled} == true
-          id: filestream-hashicorp_vault-audit-${kubernetes.hints.container_id}
           data_stream:
             dataset: hashicorp_vault.audit
             type: logs
@@ -13,6 +12,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-hashicorp_vault-hashicorp_vault-audit-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -27,7 +27,6 @@ inputs:
           tags:
             - hashicorp-vault-audit
         - condition: ${kubernetes.hints.hashicorp_vault.log.enabled} == true or ${kubernetes.hints.hashicorp_vault.enabled} == true
-          id: filestream-hashicorp_vault-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: hashicorp_vault.log
             type: logs
@@ -35,6 +34,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-hashicorp_vault-hashicorp_vault-log-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -48,21 +48,6 @@ inputs:
                 symlinks: true
           tags:
             - hashicorp-vault-log
-      data_stream.namespace: default
-    - name: tcp-hashicorp_vault
-      id: tcp-hashicorp_vault-${kubernetes.hints.container_id}
-      type: tcp
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.hashicorp_vault.audit.enabled} == true and ${kubernetes.hints.hashicorp_vault.enabled} == true
-          data_stream:
-            dataset: hashicorp_vault.audit
-            type: logs
-          host: localhost:9007
-          max_message_size: 1 MiB
-          tags:
-            - hashicorp-vault-audit
-            - forwarded
       data_stream.namespace: default
     - name: prometheus/metrics-hashicorp_vault
       id: prometheus/metrics-hashicorp_vault-${kubernetes.hints.container_id}
@@ -83,4 +68,19 @@ inputs:
             format: prometheus
           rate_counters: true
           use_types: true
+      data_stream.namespace: default
+    - name: tcp-hashicorp_vault
+      id: tcp-hashicorp_vault-${kubernetes.hints.container_id}
+      type: tcp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.hashicorp_vault.audit.enabled} == true and ${kubernetes.hints.hashicorp_vault.enabled} == true
+          data_stream:
+            dataset: hashicorp_vault.audit
+            type: logs
+          host: localhost:9007
+          max_message_size: 1 MiB
+          tags:
+            - hashicorp-vault-audit
+            - forwarded
       data_stream.namespace: default
