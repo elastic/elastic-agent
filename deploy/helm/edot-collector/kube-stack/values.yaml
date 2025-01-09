@@ -208,7 +208,6 @@ collectors:
           verbosity: basic
         # [Loadbalancing exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/loadbalancingexporter)
         loadbalancing/gateway:
-          routing_key: service
           protocol:
             otlp:
               tls:
