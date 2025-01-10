@@ -880,7 +880,7 @@ collectors:
                 - set(attributes["processor.event"], "metric")
       exporters:
         debug: {}
-          # [Elasticsearch exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/README.md)
+        # [Elasticsearch exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/README.md)
         elasticsearch/otel:
           endpoints: # List of Elasticsearch endpoints.
             - ${env:ELASTIC_ENDPOINT}
@@ -931,7 +931,6 @@ collectors:
             exporters:
               - debug
               - elasticsearch/otel
-
 # For more details on OpenTelemetry's zero-code instrumentation, see:
 # https://opentelemetry.io/docs/concepts/instrumentation/zero-code/
 instrumentation:
