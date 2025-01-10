@@ -190,7 +190,7 @@ func TestCopyFiles(t *testing.T) {
 
 			// not interested in speed benchmarks, use an arbitrary copyConcurrency value
 			copyConcurrency := 4
-			err := copyFiles(copyConcurrency, tc.mappings, tmpSrc, tmpDst)
+			err := copyFiles(copyConcurrency, tc.mappings, tmpSrc, tmpDst, nil)
 			assert.NoError(t, err)
 
 			for _, ef := range tc.expectedFiles {
