@@ -5,7 +5,6 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.nginx_ingress_controller.access.enabled} == true or ${kubernetes.hints.nginx_ingress_controller.enabled} == true
-          id: filestream-nginx_ingress_controller-access-${kubernetes.hints.container_id}
           data_stream:
             dataset: nginx_ingress_controller.access
             type: logs
@@ -23,7 +22,6 @@ inputs:
           tags:
             - nginx-ingress-controller-access
         - condition: ${kubernetes.hints.nginx_ingress_controller.error.enabled} == true or ${kubernetes.hints.nginx_ingress_controller.enabled} == true
-          id: filestream-nginx_ingress_controller-error-${kubernetes.hints.container_id}
           data_stream:
             dataset: nginx_ingress_controller.error
             type: logs

@@ -5,7 +5,6 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.mysql_enterprise.audit.enabled} == true or ${kubernetes.hints.mysql_enterprise.enabled} == true
-          id: filestream-mysql_enterprise-audit-${kubernetes.hints.container_id}
           data_stream:
             dataset: mysql_enterprise.audit
             type: logs

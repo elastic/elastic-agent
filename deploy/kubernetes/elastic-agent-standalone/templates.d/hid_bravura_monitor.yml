@@ -5,7 +5,6 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.hid_bravura_monitor.log.enabled} == true or ${kubernetes.hints.hid_bravura_monitor.enabled} == true
-          id: filestream-hid_bravura_monitor-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: hid_bravura_monitor.log
             type: logs
