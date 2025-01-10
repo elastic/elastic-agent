@@ -9,17 +9,16 @@ package integration
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
@@ -55,24 +54,36 @@ func TestOtelKubeStackHelm(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name                       string
-		helmReleaseName            string
-		valuesFile                 string
-		atLeastValidatedPodsNumber int
+		name  string
+		steps []k8sTestStep
 	}{
 		{
-			name:            "helm standalone agent default kubernetes privileged",
-			helmReleaseName: "kube-stack-otel",
-			valuesFile:      "../../deploy/helm/edot-collector/kube-stack/values.yaml",
-			// - A Daemonset to collect K8s node's metrics and logs
-			// (1 EDOT collector pod per node)
-			// - A Cluster wide Deployment to collect K8s metrics and
-			// events (1 EDOT collector pod per cluster)
-			// - Two Gateway pods to collect, aggregate and forward
-			// telemetry.
-			// - An OpenTelemetry Operator Deployment (1 pod per
-			// cluster)
-			atLeastValidatedPodsNumber: 5,
+			name: "helm kube-stack operator standalone agent kubernetes privileged",
+			steps: []k8sTestStep{
+				k8sStepCreateNamespace(),
+				k8sStepHelmDeployWithValues(chartLocation, "kube-stack-otel",
+					values.Options{
+						ValueFiles: []string{"../../deploy/helm/edot-collector/kube-stack/values.yaml"},
+						Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
+
+						// override secrets reference with env variables
+						JSONValues: []string{
+							fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, kCtx.esHost),
+							fmt.Sprintf(`collectors.gateway.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, kCtx.esAPIKey),
+						},
+					},
+				),
+				// - An OpenTelemetry Operator Deployment (1 pod per
+				// cluster)
+				k8sStepCheckRunningPods("app.kubernetes.io/name=opentelemetry-operator", 1, "manager"),
+				// - A Daemonset to collect K8s node's metrics and logs
+				// (1 EDOT collector pod per node)
+				// - A Cluster wide Deployment to collect K8s metrics and
+				// events (1 EDOT collector pod per cluster)
+				// - Two Gateway pods to collect, aggregate and forward
+				// telemetry.
+				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 4, "otc-container"),
+			},
 		},
 	}
 
@@ -81,80 +92,46 @@ func TestOtelKubeStackHelm(t *testing.T) {
 			ctx := context.Background()
 			testNamespace := kCtx.getNamespace(t)
 
-			settings := cli.New()
-			settings.SetNamespace(testNamespace)
-			actionConfig := &action.Configuration{}
-
-			helmChart, err := loader.Load(chartLocation)
-			require.NoError(t, err, "failed to load helm chart")
-
-			err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "",
-				func(format string, v ...interface{}) {})
-			require.NoError(t, err, "failed to init helm action config")
-
-			// Initialize a map to hold the parsed data
-			helmValues := make(map[string]any)
-
-			options := values.Options{
-				ValueFiles: []string{tc.valuesFile},
-				Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
-
-				// override secrets reference with env variables
-				JSONValues: []string{
-					fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, kCtx.esHost),
-					fmt.Sprintf(`collectors.gateway.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, kCtx.esAPIKey),
-				},
+			for _, step := range tc.steps {
+				step(t, ctx, kCtx, testNamespace)
 			}
-			providers := getter.All(settings)
-			helmValues, err = options.MergeValues(providers)
-			if err != nil {
-				require.NoError(t, err, "failed to helm values")
-			}
-
-			t.Cleanup(func() {
-				if t.Failed() {
-					if err := k8sDumpAllPodLogs(ctx, kCtx.client, testNamespace, testNamespace, kCtx.logsBasePath); err != nil {
-						t.Logf("failed to dump logs: %s", err)
-					}
-				}
-
-				uninstallAction := action.NewUninstall(actionConfig)
-				uninstallAction.Wait = true
-
-				_, err = uninstallAction.Run(tc.helmReleaseName)
-				if err != nil {
-					require.NoError(t, err, "failed to uninstall helm chart")
-				}
-			})
-
-			installAction := action.NewInstall(actionConfig)
-			installAction.Namespace = testNamespace
-			installAction.CreateNamespace = true
-			installAction.UseReleaseName = true
-			installAction.ReleaseName = tc.helmReleaseName
-			installAction.Timeout = 2 * time.Minute
-			installAction.Wait = true
-			installAction.WaitForJobs = true
-			_, err = installAction.Run(helmChart, helmValues)
-			require.NoError(t, err, "failed to install helm chart")
-
-			// Pods are created by the OpenTelemetry Operator, it
-			// takes some time for the OpenTelemetry Operator to be
-			// ready
-			require.Eventually(t, func() bool {
-				podList := &corev1.PodList{}
-				err = kCtx.client.Resources(testNamespace).List(ctx, podList)
-				require.NoError(t, err, fmt.Sprintf("failed to list pods in namespace %s", testNamespace))
-
-				checkedAgentContainers := 0
-
-				for _, pod := range podList.Items {
-					if strings.HasPrefix(pod.GetName(), tc.helmReleaseName) && pod.Status.Phase == corev1.PodRunning {
-						checkedAgentContainers++
-					}
-				}
-				return checkedAgentContainers >= tc.atLeastValidatedPodsNumber
-			}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least %d agent containers should be checked", tc.atLeastValidatedPodsNumber))
 		})
+	}
+}
+
+func k8sStepHelmDeployWithValues(chartPath string, releaseName string, values values.Options) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		// Initialize a map to hold the parsed data
+		helmValues := make(map[string]any)
+
+		settings := cli.New()
+		settings.SetNamespace(namespace)
+		providers := getter.All(settings)
+		helmValues, err := values.MergeValues(providers)
+		if err != nil {
+			require.NoError(t, err, "failed to helm values")
+		}
+
+		k8sStepHelmDeploy(chartPath, releaseName, helmValues)
+	}
+}
+
+// k8sStepCheckRunningPods checks the status of the agent inside the pods returned by the selector
+func k8sStepCheckRunningPods(podLabelSelector string, expectedPodNumber int, containerName string) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		require.Eventually(t, func() bool {
+			perNodePodList := &corev1.PodList{}
+			err := kCtx.client.Resources(namespace).List(ctx, perNodePodList, func(opt *metav1.ListOptions) {
+				opt.LabelSelector = podLabelSelector
+			})
+			require.NoError(t, err, "failed to list pods with selector ", perNodePodList)
+			require.NotEmpty(t, perNodePodList.Items, "no pods found with selector ", perNodePodList)
+			require.Equal(t, expectedPodNumber, len(perNodePodList.Items), "unexpected number of pods found with selector ", perNodePodList)
+
+			for _, pod := range perNodePodList.Items {
+				require.True(t, pod.Status.Phase == corev1.PodRunning, "unexpected pod status phase")
+			}
+			return true
+		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least %d agent containers should be checked", expectedPodNumber))
 	}
 }
