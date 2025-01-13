@@ -12,6 +12,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-mongodb-mongodb-log-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -42,7 +43,7 @@ inputs:
           password: ${kubernetes.hints.mongodb.collstats.password|kubernetes.hints.mongodb.password|''}
           period: ${kubernetes.hints.mongodb.collstats.period|kubernetes.hints.mongodb.period|'10s'}
           ssl.certificate: null
-          ssl.enabled: false
+          ssl.enabled: null
           ssl.key: null
           ssl.verification_mode: null
           username: ${kubernetes.hints.mongodb.collstats.username|kubernetes.hints.mongodb.username|''}
@@ -57,7 +58,7 @@ inputs:
           password: ${kubernetes.hints.mongodb.dbstats.password|kubernetes.hints.mongodb.password|''}
           period: ${kubernetes.hints.mongodb.dbstats.period|kubernetes.hints.mongodb.period|'10s'}
           ssl.certificate: null
-          ssl.enabled: false
+          ssl.enabled: null
           ssl.key: null
           ssl.verification_mode: null
           username: ${kubernetes.hints.mongodb.dbstats.username|kubernetes.hints.mongodb.username|''}
@@ -72,7 +73,7 @@ inputs:
           password: ${kubernetes.hints.mongodb.metrics.password|kubernetes.hints.mongodb.password|''}
           period: ${kubernetes.hints.mongodb.metrics.period|kubernetes.hints.mongodb.period|'10s'}
           ssl.certificate: null
-          ssl.enabled: false
+          ssl.enabled: null
           ssl.key: null
           ssl.verification_mode: null
           username: ${kubernetes.hints.mongodb.metrics.username|kubernetes.hints.mongodb.username|''}
@@ -87,7 +88,7 @@ inputs:
           password: ${kubernetes.hints.mongodb.replstatus.password|kubernetes.hints.mongodb.password|''}
           period: ${kubernetes.hints.mongodb.replstatus.period|kubernetes.hints.mongodb.period|'10s'}
           ssl.certificate: null
-          ssl.enabled: null
+          ssl.enabled: false
           ssl.key: null
           ssl.verification_mode: null
           username: ${kubernetes.hints.mongodb.replstatus.username|kubernetes.hints.mongodb.username|''}

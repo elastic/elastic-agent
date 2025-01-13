@@ -12,6 +12,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-capture_loss-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -36,6 +37,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-connection-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -60,6 +62,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-dce_rpc-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -84,6 +87,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-dhcp-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -108,6 +112,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-dnp3-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -131,6 +136,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-dns-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -155,6 +161,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-dpd-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -178,6 +185,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-files-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -201,6 +209,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-ftp-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -225,6 +234,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-http-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -249,6 +259,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-intel-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -273,6 +284,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-irc-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -297,6 +309,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-kerberos-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -321,6 +334,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-known_certs-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -345,6 +359,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-known_hosts-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -369,6 +384,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-known_services-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -393,6 +409,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-modbus-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -417,6 +434,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-mysql-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -441,6 +459,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-notice-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -465,6 +484,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-ntlm-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -489,6 +509,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-ntp-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -513,6 +534,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-ocsp-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -537,6 +559,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-pe-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -561,6 +584,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-radius-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -585,6 +609,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-rdp-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -609,6 +634,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-rfb-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -633,6 +659,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-signature-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -657,6 +684,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-sip-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -681,6 +709,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-smb_cmd-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -705,6 +734,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-smb_files-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -729,6 +759,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-smb_mapping-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -753,6 +784,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-smtp-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -777,6 +809,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-snmp-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -801,6 +834,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-socks-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -825,6 +859,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-software-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -849,6 +884,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-ssh-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -873,6 +909,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-ssl-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -897,6 +934,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-stats-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -921,6 +959,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-syslog-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -945,6 +984,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-traceroute-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -969,6 +1009,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-tunnel-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -993,6 +1034,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-weird-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -1017,6 +1059,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-zeek-zeek-x509-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
