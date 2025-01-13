@@ -212,8 +212,10 @@ type Coordinator struct {
 	configMgr  ConfigManager
 	varsMgr    VarsManager
 
-	otelMgr OTelManager
-	otelCfg *confmap.Conf
+	otelMgr          OTelManager
+	otelCfg          *confmap.Conf
+	otelDerivedCfg   map[string]any
+	otelComponentCfg *confmap.Conf
 
 	caps      capabilities.Capabilities
 	modifiers []ComponentsModifier
@@ -1155,7 +1157,7 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 		// if we hit the ticker and we've got a new PID,
 		// reload the component model
 		if c.componentPidRequiresUpdate.Swap(false) {
-			err := c.refreshComponentModel(ctx)
+			err := c.refreshComponents(ctx)
 			if err != nil {
 				err = fmt.Errorf("error refreshing component model for PID update: %w", err)
 				c.setConfigManagerError(err)
@@ -1222,10 +1224,6 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 
 // Always called on the main Coordinator goroutine.
 func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (err error) {
-	if c.otelMgr != nil {
-		c.otelCfg = cfg.OTel
-		c.otelMgr.Update(cfg.OTel)
-	}
 	return c.processConfigAgent(ctx, cfg)
 }
 
@@ -1252,7 +1250,7 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 	// c.setProtection(protectionConfig)
 
 	if c.vars != nil {
-		return c.refreshComponentModel(ctx)
+		return c.refreshComponents(ctx)
 	}
 	return nil
 }
@@ -1352,7 +1350,7 @@ func (c *Coordinator) observeASTVars() {
 // Called on the main Coordinator goroutine.
 func (c *Coordinator) processVars(ctx context.Context, vars []*transpiler.Vars) {
 	c.vars = vars
-	err := c.refreshComponentModel(ctx)
+	err := c.refreshComponents(ctx)
 	if err != nil {
 		c.logger.Errorf("updating Coordinator variables: %s", err.Error())
 	}
@@ -1361,7 +1359,7 @@ func (c *Coordinator) processVars(ctx context.Context, vars []*transpiler.Vars) 
 // Called on the main Coordinator goroutine.
 func (c *Coordinator) processLogLevel(ctx context.Context, ll logp.Level) {
 	c.setLogLevel(ll)
-	err := c.refreshComponentModel(ctx)
+	err := c.refreshComponents(ctx)
 	if err != nil {
 		c.logger.Errorf("updating log level: %s", err.Error())
 	}
@@ -1370,20 +1368,103 @@ func (c *Coordinator) processLogLevel(ctx context.Context, ll logp.Level) {
 // Regenerate the component model based on the current vars and AST, then
 // forward the result to the runtime manager.
 // Always called on the main Coordinator goroutine.
-func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
+func (c *Coordinator) refreshComponents(ctx context.Context) (err error) {
 	if c.ast == nil || c.vars == nil {
 		// Nothing to process yet
 		return nil
 	}
 
-	span, ctx := apm.StartSpan(ctx, "refreshComponentModel", "app.internal")
+	span, ctx := apm.StartSpan(ctx, "refreshComponents", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
 		span.End()
 	}()
 
+	// generate the final config from the policy and vars
+	cfg, err := c.generateFinalConfig()
+	if err != nil {
+		return err
+	}
+
+	// refresh both the component model and the otel components
+	// TODO: split the configuration into non-Otel and Otel components
+	//err = c.refreshComponentModel(ctx)
+	//if err != nil {
+	//	return err
+	//}
+	err = c.refreshOtelComponents(cfg)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Coordinator) generateFinalConfig() (cfg map[string]any, err error) {
+	defer func() {
+		// Update componentGenErr with the results.
+		c.setComponentGenError(err)
+	}()
+
+	ast := c.ast.ShallowClone()
+	inputs, ok := transpiler.Lookup(ast, "inputs")
+	if ok {
+		renderedInputs, err := transpiler.RenderInputs(inputs, c.vars)
+		if err != nil {
+			return cfg, fmt.Errorf("rendering inputs failed: %w", err)
+		}
+		err = transpiler.Insert(ast, renderedInputs, "inputs")
+		if err != nil {
+			return cfg, fmt.Errorf("inserting rendered inputs failed: %w", err)
+		}
+	}
+
+	cfg, err = ast.Map()
+	if err != nil {
+		return cfg, fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
+	}
+	return
+}
+
+// Regenerate the otel component configuration based on the current vars and AST, then
+// send this configuration to the otel manager.
+// Always called on the main Coordinator goroutine.
+func (c *Coordinator) refreshOtelComponents(cfg map[string]any) (err error) {
+	err = c.generateOtelComponentConfig(cfg)
+	if err != nil {
+		return fmt.Errorf("generating otel component config: %w", err)
+	}
+
+	c.logger.Info("Updating otel components")
+	c.logger.With("components", c.otelComponentCfg).Debug("Updating running otel components")
+
+	// create a final otel config by cloning the hybrid part
+	var otelCfgMap map[string]any
+	if c.otelCfg != nil {
+		otelCfgMap = c.otelCfg.ToStringMap()
+	} else {
+		otelCfgMap = make(map[string]any)
+	}
+
+	otelCfg := confmap.NewFromStringMap(otelCfgMap)
+	err = otelCfg.Merge(c.otelComponentCfg) // TODO: ensure there's no conflicts
+	if err != nil {
+		return fmt.Errorf("merging otel component config: %w", err)
+	}
+	c.otelMgr.Update(otelCfg)
+	return nil
+}
+
+// Regenerate the component model based on the provided config and
+// forward the result to the runtime manager.
+// Always called on the main Coordinator goroutine.
+func (c *Coordinator) refreshComponentModel(cfg map[string]any) (err error) {
+	if c.ast == nil || c.vars == nil {
+		// Nothing to process yet
+		return nil
+	}
+
 	// regenerate the component model
-	err = c.generateComponentModel()
+	err = c.generateComponentModel(cfg)
 	if err != nil {
 		return fmt.Errorf("generating component model: %w", err)
 	}
@@ -1407,36 +1488,20 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 	c.logger.Info("Updating running component model")
 	c.logger.With("components", model.Components).Debug("Updating running component model")
 	c.runtimeMgr.Update(model)
+
 	return nil
 }
 
 // generateComponentModel regenerates the configuration tree and
-// components from the current AST and vars and returns the result.
+// components from the current AST and vars and updates the coordinator attribute.
 // Called from both the main Coordinator goroutine and from external
 // goroutines via diagnostics hooks.
-func (c *Coordinator) generateComponentModel() (err error) {
+func (c *Coordinator) generateComponentModel(cfg map[string]any) (err error) {
 	defer func() {
 		// Update componentGenErr with the results.
 		c.setComponentGenError(err)
 	}()
 
-	ast := c.ast.ShallowClone()
-	inputs, ok := transpiler.Lookup(ast, "inputs")
-	if ok {
-		renderedInputs, err := transpiler.RenderInputs(inputs, c.vars)
-		if err != nil {
-			return fmt.Errorf("rendering inputs failed: %w", err)
-		}
-		err = transpiler.Insert(ast, renderedInputs, "inputs")
-		if err != nil {
-			return fmt.Errorf("inserting rendered inputs failed: %w", err)
-		}
-	}
-
-	cfg, err := ast.Map()
-	if err != nil {
-		return fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
-	}
 	var configInjector component.GenerateMonitoringCfgFn
 	if c.monitorMgr != nil && c.monitorMgr.Enabled() {
 		configInjector = c.monitorMgr.MonitoringConfig
@@ -1476,6 +1541,25 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	c.componentModel = comps
 
 	c.checkAndLogUpdate(lastComponentModel)
+
+	return nil
+}
+
+func (c *Coordinator) generateOtelComponentConfig(cfg map[string]any) (err error) {
+	defer func() {
+		// Update componentGenErr with the results.
+		c.setComponentGenError(err)
+	}()
+
+	newOtelComponentCfg, err := getOtelConfig(cfg, c.agentInfo)
+
+	if err != nil {
+		return fmt.Errorf("getting new otel component config: %w", err)
+	}
+	c.logger.With("components", *newOtelComponentCfg).Debug("Generated new otel component config")
+
+	c.otelComponentCfg = newOtelComponentCfg
+	// c.checkAndLogUpdate(lastComponentModel)
 
 	return nil
 }
