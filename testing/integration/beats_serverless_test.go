@@ -176,7 +176,7 @@ auditbeat.modules:
 		additionalCfg = packetbeatCfg
 	}
 
-	tmpl_map := map[string]string{"es_host": fixedESHost, "key_user": apiResp.Id, "key_pass": apiResp.APIKey, "kb_host": fixedKibanaHost, "test_id": testUuid.String(), "beat_cfg": additionalCfg}
+	tmpl_map := map[string]string{"es_host": fixedESHost, "key_user": apiResp.ID, "key_pass": apiResp.APIKey, "kb_host": fixedKibanaHost, "test_id": testUuid.String(), "beat_cfg": additionalCfg}
 	parsedCfg := bytes.Buffer{}
 	err = tmpl.Execute(&parsedCfg, tmpl_map)
 	require.NoError(runner.T(), err)
