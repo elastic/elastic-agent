@@ -206,18 +206,9 @@ collectors:
         # [Debug exporter](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/debugexporter/README.md)
         debug:
           verbosity: basic
-        # [Loadbalancing exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/loadbalancingexporter)
-        loadbalancing/gateway:
-          protocol:
-            otlp:
-              tls:
-                insecure: true
-          resolver:
-            k8s:
-              service: opentelemetry-kube-stack-gateway-collector-headless
         otlp/gateway:
           # !!! Elastic APM https endpoint WITHOUT the "https://" prefix
-          endpoint: "http://opentelemetry-kube-stack-gateway-collector:4317"
+          endpoint: "http://opentelemetry-kube-stack-gateway-collector-headless:4317"
           compression: none
           tls:
             insecure: true
@@ -542,7 +533,7 @@ collectors:
               - batch
               - resource/hostname
             exporters:
-              - loadbalancing/gateway
+              - otlp/gateway
           logs/apm:
             receivers:
               - otlp
@@ -550,7 +541,7 @@ collectors:
               - batch
               - resource/hostname
             exporters:
-              - loadbalancing/gateway
+              - otlp/gateway
           traces/apm:
             receivers:
               - otlp
@@ -558,7 +549,7 @@ collectors:
               - batch
               - resource/hostname
             exporters:
-              - loadbalancing/gateway
+              - otlp/gateway
   #  Gateway is a K8s deployment EDOT collector focused on processing and
   #  forwarding telemetry to an Elasticsearch endpoint.
   gateway:

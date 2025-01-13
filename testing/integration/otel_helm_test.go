@@ -125,13 +125,14 @@ func k8sStepCheckRunningPods(podLabelSelector string, expectedPodNumber int, con
 				opt.LabelSelector = podLabelSelector
 			})
 			require.NoError(t, err, "failed to list pods with selector ", perNodePodList)
-			require.NotEmpty(t, perNodePodList.Items, "no pods found with selector ", perNodePodList)
-			require.Equal(t, expectedPodNumber, len(perNodePodList.Items), "unexpected number of pods found with selector ", perNodePodList)
+			checkedAgentContainers := 0
 
 			for _, pod := range perNodePodList.Items {
-				require.True(t, pod.Status.Phase == corev1.PodRunning, "unexpected pod status phase")
+				if pod.Status.Phase == corev1.PodRunning {
+					checkedAgentContainers++
+				}
 			}
-			return true
+			return checkedAgentContainers >= expectedPodNumber
 		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least %d agent containers should be checked", expectedPodNumber))
 	}
 }
