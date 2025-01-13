@@ -5,7 +5,6 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.traefik.access.enabled} == true or ${kubernetes.hints.traefik.enabled} == true
-          id: filestream-traefik-access-${kubernetes.hints.container_id}
           data_stream:
             dataset: traefik.access
             type: logs
@@ -13,6 +12,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-traefik-traefik-access-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
