@@ -573,7 +573,7 @@ func TestOtelAPMIngestion(t *testing.T) {
 		"run",
 		"-e",
 		"-E", "output.elasticsearch.hosts=['" + esHost + "']",
-		"-E", "output.elasticsearch.api_key=" + fmt.Sprintf("%s:%s", esApiKey.Id, esApiKey.APIKey),
+		"-E", "output.elasticsearch.api_key=" + fmt.Sprintf("%s:%s", esApiKey.ID, esApiKey.APIKey),
 		"-E", "apm-server.host=127.0.0.1:8200",
 		"-E", "apm-server.ssl.enabled=false",
 	}
