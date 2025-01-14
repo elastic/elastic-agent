@@ -1,0 +1,47 @@
+filebeat.inputs:
+  - type: filestream
+    id: filestream-filebeat
+    enabled: true
+    paths:
+      - /tmp/filebeat.log
+output.elasticsearch:
+  hosts:
+    - https://esendpoint
+  api_key: api-key
+  index: filebeat-index
+
+receivers:
+  filebeatreceiver:
+    filebeat:
+      inputs:
+        - type: filestream
+          id: filestream-fbreceiver
+          enabled: true
+          paths:
+            - /tmp/fbreceiver.log
+    output:
+      otelconsumer:
+    logging:
+      level: info
+      selectors:
+        - "*"
+    path.home: /tmp
+    queue.mem.flush.timeout: 0s
+exporters:
+  elasticsearch/log:
+    endpoints:
+      - https://esendpoint
+    api_key: api-key
+    logs_index: fbreceiver-index
+    batcher:
+      enabled: true
+      flush_timeout: 1s
+    mapping:
+      mode: bodymap
+service:
+  pipelines:
+    logs:
+      receivers:
+        - filebeatreceiver
+      exporters:
+        - elasticsearch/log
