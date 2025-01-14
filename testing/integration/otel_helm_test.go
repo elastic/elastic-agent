@@ -112,7 +112,7 @@ func k8sStepHelmDeployWithValues(chartPath string, releaseName string, values va
 			require.NoError(t, err, "failed to helm values")
 		}
 
-		k8sStepHelmDeploy(chartPath, releaseName, helmValues)
+		k8sStepHelmDeploy(chartPath, releaseName, helmValues)(t, ctx, kCtx, namespace)
 	}
 }
 
