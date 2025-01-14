@@ -128,8 +128,18 @@ func k8sStepCheckRunningPods(podLabelSelector string, expectedPodNumber int, con
 			checkedAgentContainers := 0
 
 			for _, pod := range perNodePodList.Items {
-				if pod.Status.Phase == corev1.PodRunning {
-					checkedAgentContainers++
+				if pod.Status.Phase != corev1.PodRunning {
+					continue
+				}
+
+				for _, container := range pod.Status.ContainerStatuses {
+					if container.Name != containerName {
+						continue
+					}
+
+					if container.RestartCount == 0 && container.State.Running != nil {
+						checkedAgentContainers++
+					}
 				}
 			}
 			return checkedAgentContainers >= expectedPodNumber
