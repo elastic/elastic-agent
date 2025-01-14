@@ -1,6 +1,6 @@
 # Example: Kubernetes Integration with default chart values
 
-In this example we install the built-in `kubernetes` integration with the default built-in values. We also change the `kube-state-metrics` to run with the `autosharding` feature enabled and include elastic-agent as a sidecar container. Such a type of setup is recommended for big k8s clusters, featuring a lot of k8s object, where scaling of kube-state-metrics extraction is required.
+In this example we install the built-in `kubernetes` integration with the default built-in values. We also change the `kube-state-metrics` to run with the `autosharding` feature enabled and include elastic-agent as a sidecar container. Such a type of setup is recommended for big k8s clusters, featuring a lot of k8s resources, where scaling of kube-state-metrics extraction is required.
 
 ## Prerequisites:
 1. A k8s secret that contains the connection details to an Elasticsearch cluster such as the URL and the API key ([Kibana - Creating API Keys](https://www.elastic.co/guide/en/kibana/current/api-keys.html)):

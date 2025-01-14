@@ -1,6 +1,6 @@
 # Example: Managed by Fleet Elastic Agent
 
-In this example we will perform two Helm chart installations, one installing elastic-agent as a Daemonset and the other installing kube-state-metrics with the `autosharding` feature enabled and elastic-agent as a sidecar container. All the agents are managed by [Fleet](https://www.elastic.co/guide/en/fleet/current/manage-agents-in-fleet.html). Such a type of setup is recommended for big k8s clusters, featuring a lot of k8s object, where scaling of kube-state-metrics extraction is required.
+In this example we will perform two Helm chart installations, one installing elastic-agent as a Daemonset and the other installing kube-state-metrics with the `autosharding` feature enabled and elastic-agent as a sidecar container. All the agents are managed by [Fleet](https://www.elastic.co/guide/en/fleet/current/manage-agents-in-fleet.html). Such a type of setup is recommended for big k8s clusters, featuring a lot of k8s resources, where scaling of kube-state-metrics extraction is required.
 
 ## Run:
 
