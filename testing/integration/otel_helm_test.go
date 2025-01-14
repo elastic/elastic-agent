@@ -61,7 +61,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 			name: "helm kube-stack operator standalone agent kubernetes privileged",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepHelmDeployWithValues(chartLocation, "kube-stack-otel",
+				k8sStepHelmDeployWithValueOptions(chartLocation, "kube-stack-otel",
 					values.Options{
 						ValueFiles: []string{"../../deploy/helm/edot-collector/kube-stack/values.yaml"},
 						Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
@@ -99,7 +99,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 	}
 }
 
-func k8sStepHelmDeployWithValues(chartPath string, releaseName string, values values.Options) k8sTestStep {
+func k8sStepHelmDeployWithValueOptions(chartPath string, releaseName string, values values.Options) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
 		// Initialize a map to hold the parsed data
 		helmValues := make(map[string]any)
