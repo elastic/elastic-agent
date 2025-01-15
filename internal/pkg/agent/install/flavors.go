@@ -10,8 +10,10 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"gopkg.in/yaml.v3"
 )
 
@@ -22,6 +24,8 @@ const (
 	DefaultFlavor  = FlavorBasic
 	flavorFileName = ".flavor"
 )
+
+type SkipFn func(relPath string) bool
 
 var ErrUnknownFlavor = fmt.Errorf("unknown flavor")
 
@@ -45,6 +49,35 @@ var flavors map[string][]string = map[string][]string{
 	},
 }
 
+func SpecsInFlavor(flavor string) ([]string, error) {
+	ff, found := flavors[flavor]
+	if !found {
+		return nil, ErrUnknownFlavor
+	}
+
+	specs := []string{}
+	for _, f := range ff {
+		specs = append(specs, fmt.Sprintf("%s.spec.yml", f))
+	}
+
+	return specs, nil
+}
+
+func SpecInFlavor(specFilename string, flavor string) (bool, error) {
+	ff, found := flavors[flavor]
+	if !found {
+		return false, ErrUnknownFlavor
+	}
+
+	for _, f := range ff {
+		if strings.HasSuffix(specFilename, fmt.Sprintf("%s.spec.yml", f)) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 // MarkFlavor persists flavor used with agent.
 // This mark is used during upgrades in order to upgrade to proper set.
 func MarkFlavor(topPath string, flavor string) error {
@@ -57,41 +90,46 @@ func MarkFlavor(topPath string, flavor string) error {
 }
 
 // Flavor reads flavor from mark file.
-// Returns defaultFlavor in case file does not exists.
 // In case file exists and contains invalid flavor ErrUnknownFlavor is returned
-func Flavor(topPath string, defaultFlavor string) (string, error) {
+func Flavor(topPath string, defaultFlavor string, log *logger.Logger) (string, error) {
 	filename := filepath.Join(topPath, flavorFileName)
 	content, err := os.ReadFile(filename)
 	if err != nil {
-		if os.IsNotExist(err) {
-			// file does not exist, flavor was not marked probably due to earlier version
-			// fallback to default if defined
-			if defaultFlavor != "" {
-				return defaultFlavor, nil
-			}
+		// file does not exist, flavor was not marked probably due to earlier version
+		// fallback to default if defined
+		if defaultFlavor != "" && os.IsNotExist(err) {
+			return defaultFlavor, nil
 		}
 
+		// failed reading flavor, do not break behavior and apply none as widest
+		log.Warnf("failed detecting flavor: %v", err)
 		return "", nil
 	}
 
-	_, found := flavors[string(content)]
+	detectedFlavor := string(content)
+	_, found := flavors[detectedFlavor]
 	if !found {
+		log.Warnf("unknown flavor detected: %v", detectedFlavor)
 		return "", ErrUnknownFlavor
 	}
 
-	return string(content), nil
+	return detectedFlavor, nil
 }
 
 func ApplyFlavor(versionedHome string, flavor string) error {
-	skipFn, err := SkipComponentsPathFn(flavor, versionedHome)
+	skipFn, err := SkipComponentsPathFn(versionedHome, flavor)
 	if err != nil {
 		return err
 	}
 
+	return ApplyFlavorWithSkip(versionedHome, flavor, skipFn)
+}
+
+func ApplyFlavorWithSkip(versionedHome string, flavor string, skipFn SkipFn) error {
 	componentsDir := filepath.Join(versionedHome, "components")
 	filesToRemove := []string{}
 
-	err = filepath.Walk(componentsDir, func(path string, info fs.FileInfo, err error) error {
+	err := filepath.Walk(componentsDir, func(path string, info fs.FileInfo, err error) error {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil
 		}
@@ -99,7 +137,7 @@ func ApplyFlavor(versionedHome string, flavor string) error {
 			return fmt.Errorf("walk on %q failed: %w", componentsDir, err)
 		}
 
-		if skipFn(path) {
+		if skipFn != nil && skipFn(path) {
 			// remove as file is not needed
 			filesToRemove = append(filesToRemove, path)
 		}
@@ -120,12 +158,16 @@ func ApplyFlavor(versionedHome string, flavor string) error {
 	return err
 }
 
-func SkipComponentsPathFn(flavor string, versionedHome string) (func(relPath string) bool, error) {
-	allowedSubpaths, err := allowedSubpathsForFlavor(flavor, versionedHome)
+func SkipComponentsPathFn(versionedHome, flavor string) (SkipFn, error) {
+	allowedSubpaths, err := allowedSubpathsForFlavor(versionedHome, flavor)
 	if err != nil {
 		return nil, err
 	}
 
+	return SkipComponentsPathWithSubpathsFn(allowedSubpaths)
+}
+
+func SkipComponentsPathWithSubpathsFn(allowedSubpaths []string) (SkipFn, error) {
 	return func(relPath string) bool {
 		return skipComponentsPath(relPath, allowedSubpaths)
 	}, nil
@@ -166,7 +208,7 @@ func skipComponentsPath(relPath string, allowedSubpaths []string) bool {
 
 // allowedSubpathsForFlavor returns allowed /components/* subpath for specific flavors
 // includes components, spec files, config files and other files specified in spec
-func allowedSubpathsForFlavor(flavor string, versionedHome string) ([]string, error) {
+func allowedSubpathsForFlavor(versionedHome, flavor string) ([]string, error) {
 	components, err := componentsForFlavor(flavor)
 	fmt.Println("got components for flavor", flavor, components)
 	if err != nil {
@@ -192,30 +234,7 @@ func allowedSubpathsForFlavor(flavor string, versionedHome string) ([]string, er
 }
 
 func subpathsForComponent(component, sourceComponentsDir string) ([]string, error) {
-	// TODO: read spec file
-	// TODO: replace / with os.PathSeparator
-
 	specFilename := fmt.Sprintf("%s.spec.yml", component)
-	additionalFiles, err := loadPathsFromSpec(sourceComponentsDir, specFilename)
-	if err != nil {
-		return nil, err
-	}
-
-	return append(additionalFiles,
-		component,
-		specFilename,
-		fmt.Sprintf("%s.yml", component)), nil
-}
-
-func loadPathsFromSpec(sourceComponentsDir, specFilename string) ([]string, error) {
-	if sourceComponentsDir == "" {
-		return nil, nil
-	}
-
-	def := struct {
-		Files []string `yaml:"component_files"`
-	}{}
-
 	content, err := os.ReadFile(filepath.Join(sourceComponentsDir, specFilename))
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -224,11 +243,34 @@ func loadPathsFromSpec(sourceComponentsDir, specFilename string) ([]string, erro
 		return nil, err
 	}
 
+	return ParseComponentFiles(content, specFilename, true)
+}
+
+func ParseComponentFiles(content []byte, filename string, includeDefaults bool) ([]string, error) {
+	def := struct {
+		Files []string `yaml:"component_files"`
+	}{}
+
 	if err := yaml.Unmarshal(content, &def); err != nil {
 		return nil, err
 	}
 
-	return def.Files, nil
+	var files []string
+	files = append(files, def.Files...)
+
+	if includeDefaults {
+		component := strings.TrimSuffix(filepath.Base(filename), ".spec.yml")
+		binaryName := component
+		if runtime.GOOS == "windows" {
+			binaryName += ".exe"
+		}
+		files = append(files,
+			binaryName,
+			fmt.Sprintf("%s.spec.yml", component),
+			fmt.Sprintf("%s.yml", component))
+	}
+
+	return files, nil
 }
 
 // componentsForFlavor returns a list of components for selected flavor.

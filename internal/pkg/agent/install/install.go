@@ -75,7 +75,7 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 
 	pt.Describe("Copying install files")
 	copyConcurrency := calculateCopyConcurrency(streams)
-	skipFn, err := SkipComponentsPathFn(flavor, paths.VersionedHome(dir))
+	skipFn, err := SkipComponentsPathFn(paths.VersionedHome(dir), flavor)
 	if err != nil {
 		return utils.FileOwner{}, err
 	}
