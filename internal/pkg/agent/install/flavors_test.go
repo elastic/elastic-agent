@@ -585,3 +585,66 @@ func TestFlavor(t *testing.T) {
         })
     }
 }
+
+func TestSpecsForFlavor(t *testing.T) {
+    tests := []struct {
+        name          string
+        flavor        string
+        wantSpecs    []string
+        wantError     bool
+        errorContains string
+    }{
+        {
+            name:   "basic flavor",
+            flavor: FlavorBasic,
+            wantSpecs: []string{
+                "agentbeat.spec.yml",
+                "osqueryd.spec.yml",
+                "endpoint-security.spec.yml",
+                "pf-host-agent.spec.yml",
+            },
+        },
+        {
+            name:   "servers flavor",
+            flavor: FlavorServers,
+            wantSpecs: []string{
+                "agentbeat.spec.yml",
+                "osqueryd.spec.yml",
+                "endpoint-security.spec.yml",
+                "pf-host-agent.spec.yml",
+                "cloudbeat.spec.yml",
+                "apm-server.spec.yml",
+                "fleet-server.spec.yml",
+                "pf-elastic-symbolizer.spec.yml",
+                "pf-elastic-collector.spec.yml",
+            },
+        },
+        {
+            name:          "empty flavor",
+            flavor:        "",
+            wantError:     true,
+            errorContains: ErrUnknownFlavor.Error(),
+        },
+        {
+            name:          "unknown flavor",
+            flavor:        "unknown",
+            wantError:     true,
+            errorContains: ErrUnknownFlavor.Error(),
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            specs, err := SpecsForFlavor(tt.flavor)
+
+            if tt.wantError {
+                require.Error(t, err)
+                assert.Contains(t, err.Error(), tt.errorContains)
+                return
+            }
+
+            require.NoError(t, err)
+            assert.ElementsMatch(t, tt.wantSpecs, specs)
+        })
+    }
+} 
