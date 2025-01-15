@@ -255,3 +255,64 @@ func TestAllowedSubpathsForFlavor(t *testing.T) {
         })
     }
 }
+
+func TestSkipComponentsPathWithSubpathsFn(t *testing.T) {
+    tests := []struct {
+        name           string
+        allowedPaths   []string
+        testPaths      map[string]bool // path -> should skip
+    }{
+        {
+            name: "empty allowed paths skips nothing",
+            allowedPaths: nil,
+            testPaths: map[string]bool{
+                filepath.Join("data", "components", "test.txt"): false,
+                filepath.Join("data", "components", "dir", "file"): false,
+            },
+        },
+        {
+            name: "exact matches",
+            allowedPaths: []string{
+                "agentbeat.exe",
+                "agentbeat.yml",
+            },
+            testPaths: map[string]bool{
+                filepath.Join("data", "components", "agentbeat.exe"): false,
+                filepath.Join("data", "components", "agentbeat.yml"): false,
+                filepath.Join("data", "components", "other.exe"): true,
+            },
+        },
+        {
+            name: "directory wildcards",
+            allowedPaths: []string{
+                filepath.Join("modules", "*"),
+            },
+            testPaths: map[string]bool{
+                filepath.Join("data", "components", "modules", "mod1"): false,
+                filepath.Join("data", "components", "modules", "mod2", "file"): false,
+                filepath.Join("data", "components", "other", "logs"): true,
+            },
+        },
+        {
+            name: "non-component paths",
+            allowedPaths: []string{"test.txt"},
+            testPaths: map[string]bool{
+                "test.txt": false,
+                filepath.Join("other", "file.txt"): false,
+            },
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            skipFn, err := SkipComponentsPathWithSubpathsFn(tt.allowedPaths)
+            require.NoError(t, err)
+
+            for path, wantSkip := range tt.testPaths {
+                got := skipFn(path)
+                assert.Equal(t, wantSkip, got,
+                    "Path %s: wanted skip=%v, got skip=%v", path, wantSkip, got)
+            }
+        })
+    }
+}
