@@ -157,3 +157,101 @@ func TestSubpathsForComponent(t *testing.T) {
         })
     }
 }
+
+func TestAllowedSubpathsForFlavor(t *testing.T) {
+	binarySuffix := ""
+	if runtime.GOOS == "windows" {
+		binarySuffix = ".exe"
+	}
+	versionedHome := t.TempDir()
+    tests := []struct {
+        name           string
+        flavor         string
+        specFiles      map[string]string
+        wantError      bool
+        errorContains  string
+        wantSubpaths   []string
+    }{
+        {
+            name:   "basic flavor with specs",
+            flavor: FlavorBasic,
+            specFiles: map[string]string{
+                "agentbeat": "component_files:\n- modules/*\n",
+                "osqueryd": "component_files:\n- data/*\n",
+            },
+            wantSubpaths: []string{
+                "agentbeat"+binarySuffix,
+                "agentbeat.yml",
+                "agentbeat.spec.yml",
+                "modules/*",
+                "osqueryd"+binarySuffix,
+                "osqueryd.yml", 
+                "osqueryd.spec.yml",
+                "data/*",
+            },
+        },
+        {
+            name:      "unknown flavor returns error",
+            flavor:    "unknown",
+            wantError: true,
+            errorContains: ErrUnknownFlavor.Error(),
+        },
+        {
+            name:    "empty version home returns default paths",
+            flavor:  FlavorBasic,
+            wantSubpaths: []string{},
+        },
+        {
+            name:   "servers flavor with specs",
+            flavor: FlavorServers,
+            specFiles: map[string]string{
+                "agentbeat": "component_files:\n- modules/*\n",
+                "apm-server": "component_files:\n- apm.bundle.zip\n",
+                "cloudbeat": "component_files:\n- rules/*\n",
+            },
+            wantSubpaths: []string{
+                "agentbeat"+binarySuffix,
+                "agentbeat.yml",
+                "agentbeat.spec.yml",
+                "modules/*",
+                "apm-server"+binarySuffix,
+                "apm-server.yml",
+                "apm-server.spec.yml", 
+                "apm.bundle.zip",
+                "cloudbeat"+binarySuffix,
+                "cloudbeat.yml",
+                "cloudbeat.spec.yml",
+                "rules/*",
+            },
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            // Create temp dir with spec files
+            componentsDir := filepath.Join(versionedHome, "components")
+            require.NoError(t, os.MkdirAll(componentsDir, 0755))
+
+            // Write spec files
+            for component, content := range tt.specFiles {
+                specPath := filepath.Join(componentsDir, component+".spec.yml")
+                require.NoError(t, os.WriteFile(specPath, []byte(content), 0644))
+				defer os.Remove(specPath)
+            }
+
+            // Test function
+            subpaths, err := allowedSubpathsForFlavor(versionedHome, tt.flavor)
+
+            if tt.wantError {
+                require.Error(t, err)
+                assert.Contains(t, err.Error(), tt.errorContains)
+                return
+            }
+
+            require.NoError(t, err)
+            sort.Strings(tt.wantSubpaths)
+            sort.Strings(subpaths) 
+            assert.Equal(t, tt.wantSubpaths, subpaths)
+        })
+    }
+}
