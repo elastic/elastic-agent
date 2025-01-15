@@ -299,7 +299,6 @@ func getPackageMetadataFromZipReader(r *zip.ReadCloser, fileNamePrefix string) (
 }
 
 func untar(log *logger.Logger, archivePath, dataDir string, skipComponents bool, flavor string) (UnpackResult, error) {
-
 	var versionedHome string
 	var rootDir string
 	var hash string
@@ -491,7 +490,7 @@ func skipFnFromTar(log *logger.Logger, archivePath string, flavor string) (insta
 			continue
 		}
 
-		if _, specInRegistry := specs[fileName]; !specInRegistry {
+		if _, specInRegistry := specs[filepath.Base(fileName)]; !specInRegistry {
 			// component not present in a package, skip processing
 			continue
 		}
