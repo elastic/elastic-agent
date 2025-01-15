@@ -299,12 +299,6 @@ collectors:
             - key: cloud.instance.id
               from_attribute: host.id
               action: insert
-        resource/process:
-          attributes:
-            - key: process.executable.name
-              action: delete
-            - key: process.executable.path
-              action: delete
         # [K8s Attributes Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8sattributesprocessor)
         k8sattributes:
           filter:
@@ -342,28 +336,6 @@ collectors:
               - tag_name: app.label.version
                 key: app.kubernetes.io/version
                 from: pod
-        k8sattributes/ecs:
-          filter:
-            # Only retrieve pods running on the same node as the collector
-            node_from_env_var: OTEL_K8S_NODE_NAME
-          passthrough: false
-          pod_association:
-            # Below association takes a look at the k8s.pod.ip and k8s.pod.uid resource attributes or connection's context, and tries to match it with the pod having the same attribute.
-            - sources:
-                - from: resource_attribute
-                  name: k8s.pod.ip
-            - sources:
-                - from: resource_attribute
-                  name: k8s.pod.uid
-            - sources:
-                - from: connection
-          extract:
-            metadata:
-              - "k8s.replicaset.name"
-              - "k8s.statefulset.name"
-              - "k8s.daemonset.name"
-              - "k8s.cronjob.name"
-              - "k8s.job.name"
       receivers:
         # [OTLP Receiver](https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver)
         otlp:
@@ -845,6 +817,12 @@ collectors:
             - key: event.dataset
               from_attribute: data_stream.dataset
               action: upsert
+        resource/process:
+          attributes:
+            - key: process.executable.name
+              action: delete
+            - key: process.executable.path
+              action: delete
         batch:
           send_batch_size: 1000
           timeout: 1s
@@ -899,6 +877,7 @@ collectors:
             processors:
               - elasticinframetrics
               - attributes/dataset
+              - resource/process
               - batch
             exporters: [debug, elasticsearch/ecs]
           metrics/otel:
