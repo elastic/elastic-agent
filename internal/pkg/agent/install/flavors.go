@@ -203,7 +203,11 @@ func skipComponentsPath(relPath string, allowedSubpaths []string) bool {
 	}
 
 	subPath := relPath[componentsIdx+len(componentsDir):]
-	subDirsSuffix := fmt.Sprintf("%c*", os.PathSeparator)
+	if runtime.GOOS == "windows" {
+		subPath = strings.ReplaceAll(subPath, "\\", "/")
+	}
+	
+	subDirsSuffix := `/*`
 	for _, allowedSubpath := range allowedSubpaths {
 		if allowedSubpath == subPath {
 			// exact match is allowed

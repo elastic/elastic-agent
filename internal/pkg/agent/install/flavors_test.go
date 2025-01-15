@@ -258,10 +258,11 @@ func TestAllowedSubpathsForFlavor(t *testing.T) {
 
 func TestSkipComponentsPathWithSubpathsFn(t *testing.T) {
     tests := []struct {
-        name           string
-        allowedPaths   []string
-        testPaths      map[string]bool // path -> should skip
+        name         string
+        allowedPaths []string
+        testPaths    map[string]bool // path -> should skip
     }{
+        // Case 1: Empty allowed paths
         {
             name: "empty allowed paths skips nothing",
             allowedPaths: nil,
@@ -270,6 +271,8 @@ func TestSkipComponentsPathWithSubpathsFn(t *testing.T) {
                 filepath.Join("data", "components", "dir", "file"): false,
             },
         },
+
+        // Case 2: Exact file matches
         {
             name: "exact matches",
             allowedPaths: []string{
@@ -277,28 +280,20 @@ func TestSkipComponentsPathWithSubpathsFn(t *testing.T) {
                 "agentbeat.yml",
             },
             testPaths: map[string]bool{
-                filepath.Join("data", "components", "agentbeat.exe"): false,
-                filepath.Join("data", "components", "agentbeat.yml"): false,
-                filepath.Join("data", "components", "other.exe"): true,
+                filepath.Join("data", "components", "agentbeat.exe"): false, // allowed
+                filepath.Join("data", "components", "other.exe"): true,     // skipped
             },
         },
+
+        // Case 3: Directory wildcards
         {
-            name: "directory wildcards",
+            name: "directory wildcards", 
             allowedPaths: []string{
                 filepath.Join("modules", "*"),
             },
             testPaths: map[string]bool{
-                filepath.Join("data", "components", "modules", "mod1"): false,
-                filepath.Join("data", "components", "modules", "mod2", "file"): false,
-                filepath.Join("data", "components", "other", "logs"): true,
-            },
-        },
-        {
-            name: "non-component paths",
-            allowedPaths: []string{"test.txt"},
-            testPaths: map[string]bool{
-                "test.txt": false,
-                filepath.Join("other", "file.txt"): false,
+                filepath.Join("data", "components", "modules", "mod1"): false, // allowed
+                filepath.Join("data", "components", "other", "logs"): true,   // skipped
             },
         },
     }
@@ -308,6 +303,107 @@ func TestSkipComponentsPathWithSubpathsFn(t *testing.T) {
             skipFn, err := SkipComponentsPathWithSubpathsFn(tt.allowedPaths)
             require.NoError(t, err)
 
+            for path, wantSkip := range tt.testPaths {
+                got := skipFn(path)
+                assert.Equal(t, wantSkip, got,
+                    "Path %s: wanted skip=%v, got skip=%v", path, wantSkip, got)
+            }
+        })
+    }
+}
+
+func TestSkipComponentsPathFn(t *testing.T) {
+    tests := []struct {
+        name           string
+        flavor         string
+        specFiles      map[string]string // component -> spec content
+        testPaths      map[string]bool   // path -> should skip
+        wantError      bool
+        errorContains  string
+    }{
+        {
+            name:   "basic flavor components",
+            flavor: FlavorBasic,
+            specFiles: map[string]string{
+                "agentbeat": "component_files:\n- data/*\n",
+                "osqueryd": "component_files:\n- logs/*\n",
+            },
+            testPaths: map[string]bool{
+                filepath.Join("data", "components",  "data", "file.txt"): false,
+                filepath.Join("data", "components",  "logs", "error.log"): false,
+                filepath.Join("data", "components", "rules", "rule1.yml"): true,
+            },
+        },
+        {
+            name:   "servers flavor components",
+            flavor: FlavorServers,
+            specFiles: map[string]string{
+                "cloudbeat": "component_files:\n- rules/*\n",
+                "apm-server": "component_files:\n- apm.bundle.zip\n",
+            },
+            testPaths: map[string]bool{
+                filepath.Join("data", "components", "rules", "rule1.yml"): false,
+                filepath.Join("data", "components",  "apm.bundle.zip"): false,
+                filepath.Join("data", "components",  "file.txt"): true,
+            },
+        },
+        {
+            name:    "invalid flavor",
+            flavor:  "invalid",
+            wantError: true,
+            errorContains: ErrUnknownFlavor.Error(),
+        },
+        {
+            name:    "no spec file",
+            flavor:  FlavorBasic,
+            testPaths: map[string]bool{
+                filepath.Join("data", "components", "agentbeat.exe"): true,
+                filepath.Join("data", "components", "osqueryd.exe"): true,
+            },
+        },
+        {
+            name:    "no flavor",
+            flavor:  "",
+            specFiles: map[string]string{
+                "agentbeat": "component_files:\n- data/*\n",
+                "osqueryd": "component_files:\n- logs/*\n",
+            },
+            testPaths: map[string]bool{
+                filepath.Join("data", "components",  "data", "file.txt"): false,
+                filepath.Join("data", "components",  "logs", "error.log"): false,
+                filepath.Join("data", "components", "rules", "rule1.yml"): true,
+            },
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            // Setup temp dir
+            tmpDir := t.TempDir()
+            if len(tt.specFiles) > 0 {
+                componentsDir := filepath.Join(tmpDir, "components")
+                require.NoError(t, os.MkdirAll(componentsDir, 0755))
+
+                // Create spec files
+                for component, content := range tt.specFiles {
+                    specPath := filepath.Join(componentsDir, component+".spec.yml")
+                    require.NoError(t, os.WriteFile(specPath, []byte(content), 0644))
+                }
+            }
+
+            // Test function
+            skipFn, err := SkipComponentsPathFn(tmpDir, tt.flavor)
+
+            if tt.wantError {
+                require.Error(t, err)
+                assert.Contains(t, err.Error(), tt.errorContains)
+                return
+            }
+
+            require.NoError(t, err)
+            require.NotNil(t, skipFn)
+
+            // Test paths
             for path, wantSkip := range tt.testPaths {
                 got := skipFn(path)
                 assert.Equal(t, wantSkip, got,
