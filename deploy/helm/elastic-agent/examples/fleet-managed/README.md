@@ -5,6 +5,12 @@ In this example we deploy an Elastic Agent that is managed by [Fleet](https://ww
 ## Prerequisites:
 1. Follow [this guide](https://www.elastic.co/guide/en/fleet/current/install-fleet-managed-elastic-agent.html#elastic-agent-installation-steps) to set up an agent policy and enroll an agent to it. Do not download any binary, from the proposed enrollment command just extract the Fleet URL (`--url=$FLEET_URL`) and Enrollment token (`--enrollment-token=$FLEET_TOKEN`).
 
+2. Build the dependencies of the Helm chart
+    ```console
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+    helm dependency build ../../
+    ```
+
 ## Run:
 
 ```console

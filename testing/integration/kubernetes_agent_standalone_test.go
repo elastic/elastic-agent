@@ -52,6 +52,7 @@ import (
 	aclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/helm"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 )
 
@@ -248,8 +249,11 @@ func TestKubernetesAgentHelm(t *testing.T) {
 	ctx := context.Background()
 	kCtx := k8sGetContext(t, info)
 
+	err := helm.BuildChartDependencies(agentK8SHelm)
+	require.NoError(t, err, "failed to build helm dependencies")
+
 	nodeList := corev1.NodeList{}
-	err := kCtx.client.Resources().List(ctx, &nodeList)
+	err = kCtx.client.Resources().List(ctx, &nodeList)
 	require.NoError(t, err)
 
 	schedulableNodeCount, err := k8sSchedulableNodeCount(ctx, kCtx)

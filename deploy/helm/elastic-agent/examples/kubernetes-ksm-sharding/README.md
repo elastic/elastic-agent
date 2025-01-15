@@ -12,6 +12,11 @@ In this example we install the built-in `kubernetes` integration with the defaul
 
 2. `kubernetes` integration assets installed through Kibana ([Kibana - Install and uninstall Elastic Agent integration assets](https://www.elastic.co/guide/en/fleet/current/install-uninstall-integration-assets.html))
 
+3. Build the dependencies of the Helm chart
+    ```console
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+    helm dependency build ../../
+    ```
 ## Run:
 
 #### Public image registry:

@@ -3,14 +3,19 @@
 In this example we install the built-in `kubernetes` integration with the default built-in values.
 
 ## Prerequisites:
-1. A k8s secret that contains the connection details to an Elasticsearch cluster such as the URL and the API key ([Kibana - Creating API Keys](https://www.elastic.co/guide/en/kibana/current/api-keys.html)):
+1. Build the dependencies of the Helm chart
+    ```console
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+    helm dependency build ../../
+    ```
+2. A k8s secret that contains the connection details to an Elasticsearch cluster such as the URL and the API key ([Kibana - Creating API Keys](https://www.elastic.co/guide/en/kibana/current/api-keys.html)):
     ```console
     kubectl create secret generic es-api-secret \
        --from-literal=api_key=... \
        --from-literal=url=...
     ```
 
-2. `kubernetes` integration assets installed through Kibana ([Kibana - Install and uninstall Elastic Agent integration assets](https://www.elastic.co/guide/en/fleet/current/install-uninstall-integration-assets.html))
+3. `kubernetes` integration assets installed through Kibana ([Kibana - Install and uninstall Elastic Agent integration assets](https://www.elastic.co/guide/en/fleet/current/install-uninstall-integration-assets.html))
 
 ## Run:
 

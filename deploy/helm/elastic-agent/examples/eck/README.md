@@ -24,6 +24,12 @@ In this example we install the built-in `kubernetes` integration with the defaul
    4. Open https://localhost:12000 in your browser
    5. Install kubernetes integration through Kibana
 
+4. Build the dependencies of the Helm chart
+    ```console
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+    helm dependency build ../../
+    ```
+
 ## Run:
 ```console
 helm install elastic-agent ../../ \

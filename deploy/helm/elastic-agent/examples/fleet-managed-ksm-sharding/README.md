@@ -2,6 +2,13 @@
 
 In this example we will perform two Helm chart installations, one installing elastic-agent as a Daemonset and the other installing kube-state-metrics with the `autosharding` feature enabled and elastic-agent as a sidecar container. All the agents are managed by [Fleet](https://www.elastic.co/guide/en/fleet/current/manage-agents-in-fleet.html). Such a type of setup is recommended for big k8s clusters, featuring a lot of k8s resources, where scaling of kube-state-metrics extraction is required.
 
+## Prerequisites:
+1. Build the dependencies of the Helm chart
+    ```console
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+    helm dependency build ../../
+    ```
+
 ## Run:
 
 1. Follow [this guide](https://www.elastic.co/guide/en/fleet/current/install-fleet-managed-elastic-agent.html#elastic-agent-installation-steps) to set up an agent policy and enroll an agent to it. In the policy unselect the "Collect system logs and metrics" options and continue to agent enrollment. Do not download any binary, from the proposed enrollment command just extract the Fleet URL (`--url=$FLEET_URL`) and Enrollment token (`--enrollment-token=$FLEET_TOKEN`).
