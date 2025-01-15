@@ -29,7 +29,7 @@ type SkipFn func(relPath string) bool
 
 var ErrUnknownFlavor = fmt.Errorf("unknown flavor")
 
-var flavors map[string][]string = map[string][]string{
+var flavorsRegistry map[string][]string = map[string][]string{
 	FlavorBasic: {
 		"agentbeat",
 		"osqueryd",
@@ -49,33 +49,19 @@ var flavors map[string][]string = map[string][]string{
 	},
 }
 
-func SpecsInFlavor(flavor string) ([]string, error) {
-	ff, found := flavors[flavor]
-	if !found {
-		return nil, ErrUnknownFlavor
+// SpecsForFlavor returns spec files associated with specific flavor
+func SpecsForFlavor(flavor string) ([]string, error) {
+	components, err := componentsForFlavor(flavor, false)
+	if err != nil {
+		return nil, err
 	}
 
 	specs := []string{}
-	for _, f := range ff {
-		specs = append(specs, fmt.Sprintf("%s.spec.yml", f))
+	for _, component := range components {
+		specs = append(specs, fmt.Sprintf("%s.spec.yml", component))
 	}
 
 	return specs, nil
-}
-
-func SpecInFlavor(specFilename string, flavor string) (bool, error) {
-	ff, found := flavors[flavor]
-	if !found {
-		return false, ErrUnknownFlavor
-	}
-
-	for _, f := range ff {
-		if strings.HasSuffix(specFilename, fmt.Sprintf("%s.spec.yml", f)) {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }
 
 // MarkFlavor persists flavor used with agent.
@@ -107,7 +93,7 @@ func Flavor(topPath string, defaultFlavor string, log *logger.Logger) (string, e
 	}
 
 	detectedFlavor := string(content)
-	_, found := flavors[detectedFlavor]
+	_, found := flavorsRegistry[detectedFlavor]
 	if !found {
 		log.Warnf("unknown flavor detected: %v", detectedFlavor)
 		return "", ErrUnknownFlavor
@@ -116,20 +102,18 @@ func Flavor(topPath string, defaultFlavor string, log *logger.Logger) (string, e
 	return detectedFlavor, nil
 }
 
+// ApplyFlavor scans agent comonents directory and removes anything
+// that is not mapped and needed for currently used flavor
 func ApplyFlavor(versionedHome string, flavor string) error {
 	skipFn, err := SkipComponentsPathFn(versionedHome, flavor)
 	if err != nil {
 		return err
 	}
 
-	return ApplyFlavorWithSkip(versionedHome, flavor, skipFn)
-}
-
-func ApplyFlavorWithSkip(versionedHome string, flavor string, skipFn SkipFn) error {
 	componentsDir := filepath.Join(versionedHome, "components")
 	filesToRemove := []string{}
 
-	err := filepath.Walk(componentsDir, func(path string, info fs.FileInfo, err error) error {
+	err = filepath.Walk(componentsDir, func(path string, info fs.FileInfo, err error) error {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil
 		}
@@ -152,12 +136,43 @@ func ApplyFlavorWithSkip(versionedHome string, flavor string, skipFn SkipFn) err
 		if removeErr := os.RemoveAll(ftr); !os.IsNotExist(removeErr) {
 			err = removeErr
 		}
-
 	}
 
 	return err
 }
 
+// ParseComponentFiles parses spec files and returns list of associated paths with component.
+// Default set consisting of binary, spec file and default config file is always present
+func ParseComponentFiles(content []byte, filename string, includeDefaults bool) ([]string, error) {
+	def := struct {
+		Files []string `yaml:"component_files"`
+	}{}
+
+	if err := yaml.Unmarshal(content, &def); err != nil {
+		return nil, err
+	}
+
+	var files []string
+	files = append(files, def.Files...)
+
+	if includeDefaults {
+		component := strings.TrimSuffix(filepath.Base(filename), ".spec.yml")
+		binaryName := component
+		if runtime.GOOS == "windows" {
+			binaryName += ".exe"
+		}
+		files = append(files,
+			binaryName,
+			fmt.Sprintf("%s.spec.yml", component),
+			fmt.Sprintf("%s.yml", component))
+	}
+
+	return files, nil
+}
+
+// SkipComponentsPathWithSubpathsFn returns a skip function that returns true if
+// path is not part of a any component associated with flavor.
+// Paths are detected from spec files located in versionHome/components
 func SkipComponentsPathFn(versionedHome, flavor string) (SkipFn, error) {
 	allowedSubpaths, err := allowedSubpathsForFlavor(versionedHome, flavor)
 	if err != nil {
@@ -167,6 +182,8 @@ func SkipComponentsPathFn(versionedHome, flavor string) (SkipFn, error) {
 	return SkipComponentsPathWithSubpathsFn(allowedSubpaths)
 }
 
+// SkipComponentsPathWithSubpathsFn with already known set of allowed subpaths.
+// allow list is not detected from spec files in this case
 func SkipComponentsPathWithSubpathsFn(allowedSubpaths []string) (SkipFn, error) {
 	return func(relPath string) bool {
 		return skipComponentsPath(relPath, allowedSubpaths)
@@ -209,8 +226,7 @@ func skipComponentsPath(relPath string, allowedSubpaths []string) bool {
 // allowedSubpathsForFlavor returns allowed /components/* subpath for specific flavors
 // includes components, spec files, config files and other files specified in spec
 func allowedSubpathsForFlavor(versionedHome, flavor string) ([]string, error) {
-	components, err := componentsForFlavor(flavor)
-	fmt.Println("got components for flavor", flavor, components)
+	components, err := componentsForFlavor(flavor, true)
 	if err != nil {
 		return nil, err
 	}
@@ -246,41 +262,14 @@ func subpathsForComponent(component, sourceComponentsDir string) ([]string, erro
 	return ParseComponentFiles(content, specFilename, true)
 }
 
-func ParseComponentFiles(content []byte, filename string, includeDefaults bool) ([]string, error) {
-	def := struct {
-		Files []string `yaml:"component_files"`
-	}{}
-
-	if err := yaml.Unmarshal(content, &def); err != nil {
-		return nil, err
-	}
-
-	var files []string
-	files = append(files, def.Files...)
-
-	if includeDefaults {
-		component := strings.TrimSuffix(filepath.Base(filename), ".spec.yml")
-		binaryName := component
-		if runtime.GOOS == "windows" {
-			binaryName += ".exe"
-		}
-		files = append(files,
-			binaryName,
-			fmt.Sprintf("%s.spec.yml", component),
-			fmt.Sprintf("%s.yml", component))
-	}
-
-	return files, nil
-}
-
 // componentsForFlavor returns a list of components for selected flavor.
 // In case no flavor is provided components for 'basic' are returned.
 // ErrUnknownFlavor is returned in case flavor is not recognized.
-func componentsForFlavor(flavor string) ([]string, error) {
-	if flavor == "" {
+func componentsForFlavor(flavor string, allowFallback bool) ([]string, error) {
+	if flavor == "" && allowFallback {
 		flavor = DefaultFlavor
 	}
-	components, found := flavors[flavor]
+	components, found := flavorsRegistry[flavor]
 	if !found {
 		return nil, ErrUnknownFlavor
 	}

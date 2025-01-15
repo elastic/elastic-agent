@@ -220,7 +220,7 @@ func skipFnFromZip(log *logger.Logger, r *zip.ReadCloser, flavor string, fileNam
 		return func(relPath string) bool { return false }, nil
 	}
 
-	specsInFlavor, _ := install.SpecsInFlavor(flavor)
+	specsInFlavor, _ := install.SpecsForFlavor(flavor) // ignoring error flavor exists, it was loaded before
 
 	// fix versionedHome
 	versionedHome = strings.ReplaceAll(versionedHome, "\\", "/")
@@ -466,7 +466,10 @@ func skipFnFromTar(log *logger.Logger, archivePath string, flavor string) (insta
 
 	fileNamePrefix := getFileNamePrefix(archivePath)
 	var allowedPaths []string
-
+	specs, err := specRegistry(flavor)
+	if err != nil {
+		return nil, err
+	}
 	// go through all the content of a tar archive
 	// if elastic-agent.active.commit file is found, get commit of the version unpacked
 	// otherwise copy everything inside data directory (everything related to new version),
@@ -488,14 +491,10 @@ func skipFnFromTar(log *logger.Logger, archivePath string, flavor string) (insta
 			continue
 		}
 
-		specInFlavor, err := install.SpecInFlavor(fileName, flavor)
-		if err != nil {
-			return nil, err
-		}
-		if !specInFlavor {
+		if _, specInRegistry := specs[fileName]; !specInRegistry {
+			// component not present in a package, skip processing
 			continue
 		}
-		log.Errorf("Spec %q in flavor %q", fileName)
 
 		fi := f.FileInfo()
 		mode := fi.Mode()
@@ -517,6 +516,19 @@ func skipFnFromTar(log *logger.Logger, archivePath string, flavor string) (insta
 	}
 
 	return install.SkipComponentsPathWithSubpathsFn(allowedPaths)
+}
+
+func specRegistry(flavor string) (map[string]struct{}, error) {
+	specs, err := install.SpecsForFlavor(flavor)
+	if err != nil {
+		return nil, err
+	}
+
+	registry := make(map[string]struct{})
+	for _, s := range specs {
+		registry[s] = struct{}{}
+	}
+	return registry, nil
 }
 
 func getPackageMetadataFromTar(archivePath string) (packageMetadata, error) {
