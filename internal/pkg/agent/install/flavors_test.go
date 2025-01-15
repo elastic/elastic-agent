@@ -289,7 +289,7 @@ func TestSkipComponentsPathWithSubpathsFn(t *testing.T) {
         {
             name: "directory wildcards", 
             allowedPaths: []string{
-                filepath.Join("modules", "*"),
+                "modules/*",
             },
             testPaths: map[string]bool{
                 filepath.Join("data", "components", "modules", "mod1"): false, // allowed
