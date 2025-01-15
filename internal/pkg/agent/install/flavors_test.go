@@ -11,6 +11,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -511,6 +512,76 @@ component_files:
 
             require.NoError(t, err)
             assert.ElementsMatch(t, tt.want, got)
+        })
+    }
+}
+
+func TestFlavor(t *testing.T) { 
+    tests := []struct {
+        name          string
+        setupFn       func(dir string) error
+        defaultFlavor string
+        wantFlavor    string
+        wantError     bool
+        errorIs       error
+    }{
+        {
+            name: "no flavor file uses default",
+            defaultFlavor: FlavorBasic,
+            wantFlavor: FlavorBasic, 
+        },
+        {
+            name: "valid flavor file",
+            setupFn: func(dir string) error {
+                return os.WriteFile(filepath.Join(dir, flavorFileName), 
+                    []byte(FlavorServers), 0644)
+            },
+            wantFlavor: FlavorServers,
+        },
+        {
+            name: "invalid flavor in file",
+            setupFn: func(dir string) error {
+                return os.WriteFile(filepath.Join(dir, flavorFileName), 
+                    []byte("invalid"), 0644)
+            },
+            wantError: true,
+            errorIs: ErrUnknownFlavor,
+        },
+        {
+            name: "empty flavor file",
+            setupFn: func(dir string) error {
+                return os.WriteFile(filepath.Join(dir, flavorFileName), 
+                    []byte(""), 0644)
+            },
+            wantError: true,
+            errorIs: ErrUnknownFlavor,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            // Setup test directory
+            tmpDir := t.TempDir()
+            if tt.setupFn != nil {
+                require.NoError(t, tt.setupFn(tmpDir))
+            }
+
+            // Create mock logger
+            log, _ := logger.New("test", false)
+
+            // Test function
+            got, err := Flavor(tmpDir, tt.defaultFlavor, log)
+
+            if tt.wantError {
+                require.Error(t, err)
+                if tt.errorIs != nil {
+                    assert.ErrorIs(t, err, tt.errorIs)
+                }
+                return
+            }
+
+            require.NoError(t, err)
+            assert.Equal(t, tt.wantFlavor, got)
         })
     }
 }
