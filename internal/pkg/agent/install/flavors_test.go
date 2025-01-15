@@ -11,9 +11,10 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func TestComponentsForFlavor(t *testing.T) {

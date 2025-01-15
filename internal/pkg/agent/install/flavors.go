@@ -13,8 +13,9 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"gopkg.in/yaml.v3"
+
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -206,7 +207,7 @@ func skipComponentsPath(relPath string, allowedSubpaths []string) bool {
 	if runtime.GOOS == "windows" {
 		subPath = strings.ReplaceAll(subPath, "\\", "/")
 	}
-	
+
 	subDirsSuffix := `/*`
 	for _, allowedSubpath := range allowedSubpaths {
 		if allowedSubpath == subPath {
