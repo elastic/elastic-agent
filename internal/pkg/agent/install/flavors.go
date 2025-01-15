@@ -250,6 +250,9 @@ func allowedSubpathsForFlavor(versionedHome, flavor string) ([]string, error) {
 }
 
 func subpathsForComponent(component, sourceComponentsDir string) ([]string, error) {
+	if component == "" {
+		return nil, fmt.Errorf("empty component name")
+	}
 	specFilename := fmt.Sprintf("%s.spec.yml", component)
 	content, err := os.ReadFile(filepath.Join(sourceComponentsDir, specFilename))
 	if err != nil {
