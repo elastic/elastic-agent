@@ -5,7 +5,6 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.rabbitmq.log.enabled} == true or ${kubernetes.hints.rabbitmq.enabled} == true
-          id: filestream-rabbitmq-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: rabbitmq.log
             type: logs
@@ -13,6 +12,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-rabbitmq-rabbitmq-log-${kubernetes.hints.container_id}
           multiline:
             match: after
             negate: true
