@@ -827,6 +827,9 @@ collectors:
           send_batch_size: 1000
           timeout: 1s
           send_batch_max_size: 1500
+        batch/aggs:
+          send_batch_size: 16384 # 2x the default
+          timeout: 10s
         # [Elastic Trace Processor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elastictraceprocessor)
         elastictrace: {} # The processor enriches traces with elastic specific requirements.
         # [LSM Interval Processor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/lsmintervalprocessor)
@@ -896,7 +899,7 @@ collectors:
             receivers:
               - signaltometrics
             processors:
-              - batch
+              - batch/aggs
               - lsminterval
             exporters:
               - debug
