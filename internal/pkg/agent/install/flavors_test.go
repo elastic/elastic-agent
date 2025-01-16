@@ -179,16 +179,12 @@ func TestAllowedSubpathsForFlavor(t *testing.T) {
 			flavor: FlavorBasic,
 			specFiles: map[string]string{
 				"agentbeat": "component_files:\n- modules/*\n",
-				"osqueryd":  "component_files:\n- data/*\n",
 			},
 			wantSubpaths: []string{
 				"agentbeat" + binarySuffix,
 				"agentbeat.yml",
 				"agentbeat.spec.yml",
 				"modules/*",
-				"osqueryd" + binarySuffix,
-				"osqueryd.yml",
-				"osqueryd.spec.yml",
 				"data/*",
 			},
 		},
@@ -328,7 +324,6 @@ func TestSkipComponentsPathFn(t *testing.T) {
 			flavor: FlavorBasic,
 			specFiles: map[string]string{
 				"agentbeat": "component_files:\n- data/*\n",
-				"osqueryd":  "component_files:\n- logs/*\n",
 			},
 			testPaths: map[string]bool{
 				filepath.Join("data", "components", "data", "file.txt"):   false,
@@ -360,7 +355,6 @@ func TestSkipComponentsPathFn(t *testing.T) {
 			flavor: FlavorBasic,
 			testPaths: map[string]bool{
 				filepath.Join("data", "components", "agentbeat.exe"): true,
-				filepath.Join("data", "components", "osqueryd.exe"):  true,
 			},
 		},
 		{
@@ -368,7 +362,6 @@ func TestSkipComponentsPathFn(t *testing.T) {
 			flavor: "",
 			specFiles: map[string]string{
 				"agentbeat": "component_files:\n- data/*\n",
-				"osqueryd":  "component_files:\n- logs/*\n",
 			},
 			testPaths: map[string]bool{
 				filepath.Join("data", "components", "data", "file.txt"):   false,
@@ -600,7 +593,6 @@ func TestSpecsForFlavor(t *testing.T) {
 			flavor: FlavorBasic,
 			wantSpecs: []string{
 				"agentbeat.spec.yml",
-				"osqueryd.spec.yml",
 				"endpoint-security.spec.yml",
 				"pf-host-agent.spec.yml",
 			},
@@ -610,7 +602,6 @@ func TestSpecsForFlavor(t *testing.T) {
 			flavor: FlavorServers,
 			wantSpecs: []string{
 				"agentbeat.spec.yml",
-				"osqueryd.spec.yml",
 				"endpoint-security.spec.yml",
 				"pf-host-agent.spec.yml",
 				"cloudbeat.spec.yml",

@@ -281,10 +281,6 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			return fmt.Errorf("error installing package: %w", err)
 		}
 
-		if err := install.MarkFlavor(topPath, flavor); err != nil {
-			return err
-		}
-
 		defer func() {
 			if err != nil {
 				progBar.Describe("Uninstalling")

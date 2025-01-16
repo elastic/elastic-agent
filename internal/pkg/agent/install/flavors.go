@@ -33,7 +33,6 @@ var ErrUnknownFlavor = fmt.Errorf("unknown flavor")
 var flavorsRegistry map[string][]string = map[string][]string{
 	FlavorBasic: {
 		"agentbeat",
-		"osqueryd",
 		"endpoint-security",
 		"pf-host-agent",
 	},
@@ -63,17 +62,6 @@ func SpecsForFlavor(flavor string) ([]string, error) {
 	}
 
 	return specs, nil
-}
-
-// MarkFlavor persists flavor used with agent.
-// This mark is used during upgrades in order to upgrade to proper set.
-func MarkFlavor(topPath string, flavor string) error {
-	filename := filepath.Join(topPath, flavorFileName)
-	if err := os.WriteFile(filename, []byte(flavor), 0o600); err != nil {
-		return fmt.Errorf("failed marking flavor: %w", err)
-	}
-
-	return nil
 }
 
 // Flavor reads flavor from mark file.
@@ -226,6 +214,17 @@ func skipComponentsPath(relPath string, allowedSubpaths []string) bool {
 	}
 
 	return true
+}
+
+// markFlavor persists flavor used with agent.
+// This mark is used during upgrades in order to upgrade to proper set.
+func markFlavor(topPath string, flavor string) error {
+	filename := filepath.Join(topPath, flavorFileName)
+	if err := os.WriteFile(filename, []byte(flavor), 0o600); err != nil {
+		return fmt.Errorf("failed marking flavor: %w", err)
+	}
+
+	return nil
 }
 
 // allowedSubpathsForFlavor returns allowed /components/* subpath for specific flavors

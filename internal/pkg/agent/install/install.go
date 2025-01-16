@@ -86,6 +86,10 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 		return utils.FileOwner{}, err
 	}
 
+	if err := markFlavor(topPath, flavor); err != nil {
+		return utils.FileOwner{}, err
+	}
+
 	pt.Describe("Successfully copied files")
 
 	// place shell wrapper, if present on platform
