@@ -266,23 +266,11 @@ spec:
           runAsGroup: 1000
           runAsUser: 1000
         volumeMounts:
-        - mountPath: /hostfs/proc
-          name: proc
-          readOnly: true
-        - mountPath: /hostfs/sys/fs/cgroup
-          name: cgroup
-          readOnly: true
         - mountPath: /var/lib/docker/containers
           name: varlibdockercontainers
           readOnly: true
         - mountPath: /var/log
           name: varlog
-          readOnly: true
-        - mountPath: /hostfs/etc
-          name: etc-full
-          readOnly: true
-        - mountPath: /hostfs/var/lib
-          name: var-lib
           readOnly: true
         - mountPath: /usr/share/elastic-agent/state
           name: agent-data
@@ -297,23 +285,11 @@ spec:
       serviceAccountName: agent-pernode-example
       volumes:
       - hostPath:
-          path: /proc
-        name: proc
-      - hostPath:
-          path: /sys/fs/cgroup
-        name: cgroup
-      - hostPath:
           path: /var/lib/docker/containers
         name: varlibdockercontainers
       - hostPath:
           path: /var/log
         name: varlog
-      - hostPath:
-          path: /etc
-        name: etc-full
-      - hostPath:
-          path: /var/lib
-        name: var-lib
       - hostPath:
           path: /etc/elastic-agent/default/agent-pernode-example/state
           type: DirectoryOrCreate
