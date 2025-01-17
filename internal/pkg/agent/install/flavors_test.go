@@ -13,75 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
-
-func TestComponentsForFlavor(t *testing.T) {
-	tests := []struct {
-		name           string
-		flavor         string
-		allowFallback  bool
-		wantError      bool
-		errorContains  string
-		wantComponents []string
-	}{
-		{
-			name:           "empty flavor with fallback returns default",
-			flavor:         "",
-			allowFallback:  true,
-			wantComponents: flavorsRegistry[DefaultFlavor],
-		},
-		{
-			name:          "empty flavor without fallback returns error",
-			flavor:        "",
-			allowFallback: false,
-			wantError:     true,
-			errorContains: ErrUnknownFlavor.Error(),
-		},
-		{
-			name:          "unknown flavor with fallback returns error",
-			flavor:        "unknown",
-			allowFallback: true,
-			wantError:     true,
-			errorContains: ErrUnknownFlavor.Error(),
-		},
-		{
-			name:          "unknown flavor without fallback returns error",
-			flavor:        "unknown",
-			allowFallback: false,
-			wantError:     true,
-			errorContains: ErrUnknownFlavor.Error(),
-		},
-		{
-			name:           "basic flavor returns components",
-			flavor:         FlavorBasic,
-			allowFallback:  false,
-			wantComponents: flavorsRegistry[FlavorBasic],
-		},
-		{
-			name:           "servers flavor returns components",
-			flavor:         FlavorServers,
-			allowFallback:  false,
-			wantComponents: flavorsRegistry[FlavorServers],
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			components, err := componentsForFlavor(tt.flavor, tt.allowFallback)
-
-			if tt.wantError {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errorContains)
-				return
-			}
-
-			require.NoError(t, err)
-			assert.Equal(t, tt.wantComponents, components)
-		})
-	}
-}
 
 func TestSubpathsForComponent(t *testing.T) {
 	binarySuffix := ""
@@ -178,7 +110,7 @@ func TestAllowedSubpathsForFlavor(t *testing.T) {
 			name:   "basic flavor with specs",
 			flavor: FlavorBasic,
 			specFiles: map[string]string{
-				"agentbeat": "component_files:\n- modules/*\n",
+				"agentbeat": "component_files:\n- modules/*\n- data/*\n",
 			},
 			wantSubpaths: []string{
 				"agentbeat" + binarySuffix,
@@ -238,13 +170,15 @@ func TestAllowedSubpathsForFlavor(t *testing.T) {
 			}
 
 			// Test function
-			subpaths, err := allowedSubpathsForFlavor(versionedHome, tt.flavor)
-
+			flavor, err := Flavor(tt.flavor, RegistryFileName, nil)
 			if tt.wantError {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorContains)
 				return
 			}
+
+			subpaths, err := allowedSubpathsForFlavor(versionedHome, flavor)
+			assert.NoError(t, err)
 
 			require.NoError(t, err)
 			sort.Strings(tt.wantSubpaths)
@@ -323,7 +257,7 @@ func TestSkipComponentsPathFn(t *testing.T) {
 			name:   "basic flavor components",
 			flavor: FlavorBasic,
 			specFiles: map[string]string{
-				"agentbeat": "component_files:\n- data/*\n",
+				"agentbeat": "component_files:\n- data/*\n- logs/*\n",
 			},
 			testPaths: map[string]bool{
 				filepath.Join("data", "components", "data", "file.txt"):   false,
@@ -358,7 +292,7 @@ func TestSkipComponentsPathFn(t *testing.T) {
 			},
 		},
 		{
-			name:   "no flavor",
+			name:   "no flavor falls back to keep all",
 			flavor: "",
 			specFiles: map[string]string{
 				"agentbeat": "component_files:\n- data/*\n",
@@ -366,7 +300,7 @@ func TestSkipComponentsPathFn(t *testing.T) {
 			testPaths: map[string]bool{
 				filepath.Join("data", "components", "data", "file.txt"):   false,
 				filepath.Join("data", "components", "logs", "error.log"):  false,
-				filepath.Join("data", "components", "rules", "rule1.yml"): true,
+				filepath.Join("data", "components", "rules", "rule1.yml"): false,
 			},
 		},
 	}
@@ -387,13 +321,15 @@ func TestSkipComponentsPathFn(t *testing.T) {
 			}
 
 			// Test function
-			skipFn, err := SkipComponentsPathFn(tmpDir, tt.flavor)
-
+			flavor, err := Flavor(tt.flavor, RegistryFileName, nil)
 			if tt.wantError {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorContains)
 				return
 			}
+
+			skipFn, err := SkipComponentsPathFn(tmpDir, flavor)
+			assert.NoError(t, err)
 
 			require.NoError(t, err)
 			require.NotNil(t, skipFn)
@@ -532,24 +468,6 @@ func TestFlavor(t *testing.T) {
 			},
 			wantFlavor: FlavorServers,
 		},
-		{
-			name: "invalid flavor in file",
-			setupFn: func(dir string) error {
-				return os.WriteFile(filepath.Join(dir, flavorFileName),
-					[]byte("invalid"), 0644)
-			},
-			wantError: true,
-			errorIs:   ErrUnknownFlavor,
-		},
-		{
-			name: "empty flavor file",
-			setupFn: func(dir string) error {
-				return os.WriteFile(filepath.Join(dir, flavorFileName),
-					[]byte(""), 0644)
-			},
-			wantError: true,
-			errorIs:   ErrUnknownFlavor,
-		},
 	}
 
 	for _, tt := range tests {
@@ -560,11 +478,8 @@ func TestFlavor(t *testing.T) {
 				require.NoError(t, tt.setupFn(tmpDir))
 			}
 
-			// Create mock logger
-			log, _ := logger.New("test", false)
-
 			// Test function
-			got, err := Flavor(tmpDir, tt.defaultFlavor, log)
+			got, err := UsedFlavor(tmpDir, tt.defaultFlavor)
 
 			if tt.wantError {
 				require.Error(t, err)
@@ -627,15 +542,16 @@ func TestSpecsForFlavor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			specs, err := SpecsForFlavor(tt.flavor)
-
+			flavor, err := Flavor(tt.flavor, RegistryFileName, nil)
 			if tt.wantError {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorContains)
 				return
 			}
+			assert.NoError(t, err)
 
-			require.NoError(t, err)
+			specs, err := SpecsForFlavor(flavor)
+			assert.NoError(t, err)
 			assert.ElementsMatch(t, tt.wantSpecs, specs)
 		})
 	}

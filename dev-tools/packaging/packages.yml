@@ -125,6 +125,9 @@ shared:
       mode: 0644
       content: >
         {{ manifest }}
+    '.flavors':
+      mode: 0644
+      source: '{{ repo.RootDir }}/internal/pkg/agent/install/.flavors'
 
   - &agent_binary_files
     '{{.BeatName}}{{.BinaryExt}}':

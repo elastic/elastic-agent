@@ -235,7 +235,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	// no default flavor, keep everything in case flavor is not
 	// in case of error fallback to keep-all
-	detectedFlavor, _ := install.Flavor(paths.Top(), "", u.log)
+	detectedFlavor, _ := install.UsedFlavor(paths.Top(), "")
 	unpackRes, err := u.unpack(version, archivePath, paths.Data(), true, detectedFlavor)
 	if err != nil {
 		return nil, err

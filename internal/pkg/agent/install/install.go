@@ -75,9 +75,17 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 
 	pt.Describe("Copying install files")
 	copyConcurrency := calculateCopyConcurrency(streams)
-	skipFn, err := SkipComponentsPathFn(paths.VersionedHome(dir), flavor)
-	if err != nil {
-		return utils.FileOwner{}, err
+
+	skipFn := func(relPath string) bool { return false }
+	if flavor != "" {
+		flavorDefinition, err := Flavor(flavor, RegistryFilePath(dir), nil)
+		if err != nil {
+			return utils.FileOwner{}, err
+		}
+		skipFn, err = SkipComponentsPathFn(paths.VersionedHome(dir), flavorDefinition)
+		if err != nil {
+			return utils.FileOwner{}, err
+		}
 	}
 
 	err = copyFiles(copyConcurrency, pathMappings, dir, topPath, skipFn)
@@ -247,7 +255,7 @@ func copyFiles(copyConcurrency int, pathMappings []map[string]string, srcDir str
 						return false, fmt.Errorf("calculating relative path for %s: %w", src, err)
 					}
 
-					if skipFn(relPath) {
+					if skipFn != nil && skipFn(relPath) {
 						return true, nil
 					}
 
@@ -303,7 +311,7 @@ func copyFiles(copyConcurrency int, pathMappings []map[string]string, srcDir str
 				return false, fmt.Errorf("calculating relative path for %s: %w", src, err)
 			}
 
-			if skipFn(relPath) {
+			if skipFn != nil && skipFn(relPath) {
 				return true, nil
 			}
 

@@ -214,12 +214,35 @@ func getPackageMetadataFromZip(archivePath string) (packageMetadata, error) {
 	return getPackageMetadataFromZipReader(r, fileNamePrefix)
 }
 
-func skipFnFromZip(log *logger.Logger, r *zip.ReadCloser, flavor string, fileNamePrefix string, versionedHome string) (install.SkipFn, error) {
-	if flavor == "" {
+func skipFnFromZip(log *logger.Logger, r *zip.ReadCloser, detectedFlavor string, fileNamePrefix string, versionedHome string) (install.SkipFn, error) {
+	if detectedFlavor == "" {
 		// no flavor don't skip anything
 		return func(relPath string) bool { return false }, nil
 	}
 
+	registryFile, err := r.Open(path.Join(fileNamePrefix, install.RegistryFileName))
+	if err != nil {
+		if os.IsNotExist(err) {
+			// no flavor definition don't skip anything
+			return func(relPath string) bool { return false }, nil
+		}
+
+		return nil, err
+	}
+
+	registry, err := install.LoadRegistry(registryFile)
+	if err != nil {
+		return nil, err
+	}
+
+	flavor, err := install.Flavor(detectedFlavor, "", registry)
+	if err != nil {
+		if err == install.ErrUnknownFlavor {
+			// unknown flavor fallback to copy all
+			return func(relPath string) bool { return false }, nil
+		}
+		return nil, err
+	}
 	specsInFlavor, _ := install.SpecsForFlavor(flavor) // ignoring error flavor exists, it was loaded before
 
 	// fix versionedHome
@@ -449,6 +472,41 @@ func skipFnFromTar(log *logger.Logger, archivePath string, flavor string) (insta
 		return func(relPath string) bool { return false }, nil
 	}
 
+	fileNamePrefix := getFileNamePrefix(archivePath)
+	loadFlavor := func(flavor string) (install.FlavorDefinition, error) {
+		r, err := os.Open(archivePath)
+		if err != nil {
+			return install.FlavorDefinition{}, errors.New(fmt.Sprintf("artifact for 'elastic-agent' could not be found at '%s'", archivePath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, archivePath))
+		}
+
+		zr, err := gzip.NewReader(r)
+		if err != nil {
+			return install.FlavorDefinition{}, errors.New("requires gzip-compressed body", err, errors.TypeFilesystem)
+		}
+
+		tr := tar.NewReader(zr)
+
+		defer r.Close()
+
+		for {
+			f, err := tr.Next()
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
+				return install.FlavorDefinition{}, err
+			}
+
+			fileName := strings.TrimPrefix(f.Name, fileNamePrefix)
+			if fileName != install.RegistryFileName {
+				continue
+			}
+
+		}
+
+		return install.FlavorDefinition{}, nil
+	}
+
 	// scan tar archive for spec file and extract allowed paths
 	r, err := os.Open(archivePath)
 	if err != nil {
@@ -463,9 +521,16 @@ func skipFnFromTar(log *logger.Logger, archivePath string, flavor string) (insta
 
 	tr := tar.NewReader(zr)
 
-	fileNamePrefix := getFileNamePrefix(archivePath)
 	var allowedPaths []string
-	specs, err := specRegistry(flavor)
+	flavorDefinition, err := loadFlavor(flavor)
+	if err != nil {
+		if err == install.ErrUnknownFlavor {
+			// unknown flavor fallback to copy all
+			return func(relPath string) bool { return false }, nil
+		}
+		return nil, err
+	}
+	specs, err := specRegistry(flavorDefinition)
 	if err != nil {
 		return nil, err
 	}
@@ -517,7 +582,7 @@ func skipFnFromTar(log *logger.Logger, archivePath string, flavor string) (insta
 	return install.SkipComponentsPathWithSubpathsFn(allowedPaths)
 }
 
-func specRegistry(flavor string) (map[string]struct{}, error) {
+func specRegistry(flavor install.FlavorDefinition) (map[string]struct{}, error) {
 	specs, err := install.SpecsForFlavor(flavor)
 	if err != nil {
 		return nil, err
