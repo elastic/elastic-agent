@@ -237,7 +237,7 @@ func skipFnFromZip(log *logger.Logger, r *zip.ReadCloser, detectedFlavor string,
 
 	flavor, err := install.Flavor(detectedFlavor, "", registry)
 	if err != nil {
-		if err == install.ErrUnknownFlavor {
+		if errors.Is(err, install.ErrUnknownFlavor) {
 			// unknown flavor fallback to copy all
 			return func(relPath string) bool { return false }, nil
 		}
@@ -524,7 +524,7 @@ func skipFnFromTar(log *logger.Logger, archivePath string, flavor string) (insta
 	var allowedPaths []string
 	flavorDefinition, err := loadFlavor(flavor)
 	if err != nil {
-		if err == install.ErrUnknownFlavor {
+		if errors.Is(err, install.ErrUnknownFlavor) {
 			// unknown flavor fallback to copy all
 			return func(relPath string) bool { return false }, nil
 		}

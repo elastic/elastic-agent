@@ -45,7 +45,7 @@ func LoadRegistry(r io.Reader) (FlavorsRegistry, error) {
 	flavorMap := make(map[string][]string)
 	d := yaml.NewDecoder(r)
 	if err := d.Decode(flavorMap); err != nil {
-		return FlavorsRegistry{}, fmt.Errorf("failed to parse flavor registry: %v", err)
+		return FlavorsRegistry{}, fmt.Errorf("failed to parse flavor registry: %w", err)
 	}
 
 	reg := make(FlavorsRegistry)
