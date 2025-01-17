@@ -17,6 +17,12 @@ In this example we install the built-in `kubernetes` integration with the defaul
     kubectl create serviceaccount user-sa
     ```
 
+4. Build the dependencies of the Helm chart
+   ```console
+   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+   helm dependency build ../../
+   ```
+
 ## Run:
 ```console
 helm install elastic-agent ../../ \

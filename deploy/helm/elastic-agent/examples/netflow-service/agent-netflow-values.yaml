@@ -3,6 +3,9 @@ outputs:
     type: ESSecretAuthAPI
     secretName: es-api-secret
 
+kube-state-metrics:
+  enabled: false
+
 extraIntegrations:
   netflow:
     id: netflow-netflow-60a9d5b2-c611-4749-90bf-5e2443936c1d
