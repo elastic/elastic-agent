@@ -2,20 +2,63 @@
 set -euo pipefail
 
 source .buildkite/scripts/common2.sh
+
 source .buildkite/scripts/steps/ess.sh
 
+# Make sure that all tools are installed
+asdf install
+
+GROUP_NAME=$1
+TEST_SUDO=$2
+if [ -z "$GROUP_NAME" ]; then
+  echo "Error: Specify the group name: integration_tests_tf.sh [group_name]" >&2
+  exit 1
+fi
+
+if [ -z "$TEST_SUDO" ]; then
+  echo "Error: Specify the test sudo: integration_tests_tf.sh [group_name] [test_sudo]" >&2
+  exit 1
+fi
 
 # Override the agent package version using a string with format <major>.<minor>.<patch>
 # There is a time when the snapshot is not built yet, so we cannot use the latest version automatically
 # This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
-OVERRIDE_AGENT_PACKAGE_VERSION="$(cat .package-version)"
-OVERRIDE_TEST_AGENT_VERSION=${OVERRIDE_AGENT_PACKAGE_VERSION}"-SNAPSHOT"
+OVERRIDE_STACK_VERSION="$(cat .package-version)"
+OVERRIDE_STACK_VERSION=${OVERRIDE_STACK_VERSION}"-SNAPSHOT"
 
-echo "~~~ Bulding test binaries"
+echo "~~~ Building test binaries"
 mage build:testBinaries
 
-ess_up $OVERRIDE_TEST_AGENT_VERSION || echo "Failed to start ESS stack" >&2
-trap 'ess_down' EXIT
+# If the step is retried, we start the stack again.
+# BUILDKITE_RETRY_COUNT == "0" for the first run
+# BUILDKITE_RETRY_COUNT > 0 for the retries
+if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
+  echo "~~~ The steps is retried, starting the ESS stack again"
+  trap 'ess_down' EXIT
+  ess_up $OVERRIDE_STACK_VERSION || echo "Failed to start ESS stack" >&2
+else 
+  # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data
+  echo "~~~ Receiving ESS stack metadata"
+  export ELASTICSEARCH_HOST=$(buildkite-agent meta-data get "es.host")
+  export ELASTICSEARCH_USERNAME=$(buildkite-agent meta-data get "es.username")
+  export ELASTICSEARCH_PASSWORD=$(buildkite-agent meta-data get "es.pwd")
+  export KIBANA_HOST=$(buildkite-agent meta-data get "kibana.host")
+  export KIBANA_USERNAME=$(buildkite-agent meta-data get "kibana.username")
+  export KIBANA_PASSWORD=$(buildkite-agent meta-data get "kibana.pwd")
+fi
 
+# TODO: move to common.sh when it's refactored
+# BK analytics
+echo "--- Prepare BK test analytics token :vault:"
+BUILDKITE_ANALYTICS_TOKEN=$(vault kv get -field token kv/ci-shared/platform-ingest/buildkite_analytics_token)
+export BUILDKITE_ANALYTICS_TOKEN
+
+# Run integration tests
 echo "~~~ Running integration tests"
-AGENT_VERSION="8.16.0-SNAPSHOT" SNAPSHOT=true TEST_DEFINE_PREFIX=non_sudo_linux gotestsum --no-color -f standard-verbose --junitfile build/TEST-go-integration.xml --jsonfile build/TEST-go-integration.out.json -- -tags integration github.com/elastic/elastic-agent/testing/integration
+
+if [ "$TEST_SUDO" == "true" ]; then
+  sudo -E .buildkite/scripts/buildkite-integration-tests.sh $@
+else
+  .buildkite/scripts/buildkite-integration-tests.sh $@
+fi
+
