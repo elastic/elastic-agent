@@ -651,7 +651,7 @@ func parseBeatVersion(data []byte) (string, error) {
 	if len(matches) != 2 {
 		return "", errors.New("failed to parse beat version file")
 	}
-	return string(matches[1]) + SnapshotSuffix(), nil
+	return string(matches[1]), nil
 }
 
 func parseGoVersion(data []byte) (string, error) {

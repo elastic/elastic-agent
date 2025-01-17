@@ -504,22 +504,22 @@ func Package(ctx context.Context) error {
 
 	var err error
 	var manifestResponse *manifest.Build
+	var dependenciesVersion string
 	if devtools.PackagingFromManifest {
-		manifestResponse, _, err = downloadManifestAndSetVersion(ctx, devtools.ManifestURL)
+		var parsedDependenciesVersion *version.ParsedSemVer
+		manifestResponse, parsedDependenciesVersion, err = downloadManifestAndSetVersion(ctx, devtools.ManifestURL)
 		if err != nil {
 			return fmt.Errorf("failed downloading manifest: %w", err)
 		}
-	}
-
-	var dependenciesVersion string
-	if beatVersion, found := os.LookupEnv("BEAT_VERSION"); !found {
-		dependenciesVersion = bversion.GetDefaultVersion()
+		dependenciesVersion = parsedDependenciesVersion.Original()
 	} else {
-		dependenciesVersion = beatVersion
+		if beatVersion, found := os.LookupEnv("BEAT_VERSION"); !found {
+			dependenciesVersion = bversion.GetDefaultVersion() + devtools.SnapshotSuffix()
+		} else {
+			dependenciesVersion = beatVersion
+		}
 	}
-
-	packageAgent(ctx, platforms, dependenciesVersion, manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(CrossBuild), devtools.SelectedPackageTypes)
-	return nil
+	return packageAgent(ctx, platforms, dependenciesVersion, manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(CrossBuild), devtools.SelectedPackageTypes)
 }
 
 // DownloadManifest downloads the provided manifest file into the predefined folder and downloads all components in the manifest.
@@ -984,7 +984,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	}
 
 	// download/copy all the necessary dependencies for packaging elastic-agent
-	archivePath, dropPath := collectPackageDependencies(platforms, dependenciesVersion, platformPackageSuffixes, packageTypes)
+	archivePath, dropPath := collectPackageDependencies(ctx, platforms, dependenciesVersion, platformPackageSuffixes, packageTypes)
 
 	// cleanup after build
 	defer os.RemoveAll(archivePath)
@@ -1018,7 +1018,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 // NOTE: after the build is done the caller must:
 // - delete archivePath and dropPath contents
 // - unset AGENT_DROP_PATH environment variable
-func collectPackageDependencies(platforms []string, packageVersion string, platformPackageSuffixes []string, packageTypes []mage.PackageType) (archivePath string, dropPath string) {
+func collectPackageDependencies(ctx context.Context, platforms []string, packageVersion string, platformPackageSuffixes []string, packageTypes []mage.PackageType) (archivePath string, dropPath string) {
 	dropPath, found := os.LookupEnv(agentDropPath)
 
 	// try not to shadow too many variables
@@ -1038,14 +1038,14 @@ func collectPackageDependencies(platforms []string, packageVersion string, platf
 		}
 		archivePath = movePackagesToArchive(dropPath, platformPackageSuffixes, packageVersion)
 
-		if hasSnapshotEnv() {
-			packageVersion = fmt.Sprintf("%s-SNAPSHOT", packageVersion)
-		}
+		//if hasSnapshotEnv() {
+		//	packageVersion = fmt.Sprintf("%s-SNAPSHOT", packageVersion)
+		//}
 
 		os.Setenv(agentDropPath, dropPath)
 
-		if devtools.ExternalBuild == true {
-
+		if devtools.ExternalBuild {
+			log.Printf("--- Detected EXTERNAL=%v", devtools.ExternalBuild)
 			// Only log fatal logs for logs produced. This is the global logger
 			// used by github.com/elastic/elastic-agent/dev-tools/mage/downloads which can only be configured globally like this.
 			//
@@ -1053,23 +1053,33 @@ func collectPackageDependencies(platforms []string, packageVersion string, platf
 			// download artifacts on unsupported platforms and choose to ignore the errors.
 			//
 			// Change this to InfoLevel to see exactly what the downloader is doing.
-			downloads.LogLevel.Set(downloads.FatalLevel)
+			downloads.LogLevel.Set(downloads.TraceLevel)
 
-			errGroup, ctx := errgroup.WithContext(context.Background())
+			errGroup, ctx := errgroup.WithContext(ctx)
 			completedDownloads := &atomic.Int32{}
 			for _, spec := range manifest.ExpectedBinaries {
+				if mg.Verbose() {
+					log.Printf("--- Checking spec %s...", spec.ProjectName)
+				}
 				for _, platform := range platforms {
 					if !spec.SupportsPlatform(platform) {
-						fmt.Printf("--- Binary %s does not support %s, download skipped\n", spec.BinaryName, platform)
+						log.Printf("--- Binary %s does not support %s, download skipped", spec.BinaryName, platform)
 						continue
+					}
+					if mg.Verbose() {
+						log.Printf("--- Iterating over pkgTypes %s...", packageTypes)
 					}
 					for _, pkgType := range packageTypes {
 						if !spec.SupportsPackageType(pkgcommon.PackageType(pkgType)) {
+							log.Printf("--- Package type %s is not supported for spec %s", pkgType, spec.ProjectName)
 							continue
 						}
 						targetPath := filepath.Join(archivePath, manifest.PlatformPackages[platform])
 						os.MkdirAll(targetPath, 0o755)
 						packageName := spec.GetPackageName(packageVersion, platform)
+						if mg.Verbose() {
+							log.Printf("--- Starting download for package %s into %s...", packageName, targetPath)
+						}
 						errGroup.Go(downloadBinary(ctx, spec.ProjectName, packageName, spec.BinaryName, platform, packageVersion, targetPath, completedDownloads))
 					}
 				}
