@@ -43,7 +43,6 @@ collectors:
           verbosity: basic # Options: basic, detailed. Choose verbosity level for debug logs.
           # [Elasticsearch exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/README.md)
         otlp/gateway:
-          # !!! Elastic APM https endpoint WITHOUT the "https://" prefix
           endpoint: "http://opentelemetry-kube-stack-gateway-collector:4317"
           tls:
             insecure: true
@@ -206,7 +205,6 @@ collectors:
         debug:
           verbosity: basic
         otlp/gateway:
-          # !!! Elastic APM https endpoint WITHOUT the "https://" prefix
           endpoint: "http://opentelemetry-kube-stack-gateway-collector-headless:4317"
           tls:
             insecure: true
