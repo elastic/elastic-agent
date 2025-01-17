@@ -46,6 +46,7 @@ func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Comman
 
 	setupOtelFlags(cmd.Flags())
 	cmd.AddCommand(newValidateCommandWithArgs(args, streams))
+	cmd.AddCommand(newComponentsCommandWithArgs(args, streams))
 
 	return cmd
 }
