@@ -46,6 +46,7 @@ import (
 	tcommon "github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
+	"github.com/elastic/elastic-agent/pkg/testing/helm"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/kind"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"
@@ -3413,7 +3414,9 @@ type Helm mg.Namespace
 // RenderExamples runs the equivalent of `helm template` and `helm lint`
 // for the examples of the Elastic Helm chart which are located at
 // `deploy/helm/elastic-agent/examples` directory.
-func (Helm) RenderExamples() error {
+func (h Helm) RenderExamples() error {
+	mg.SerialDeps(h.BuildDependencies)
+
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
@@ -3530,7 +3533,9 @@ func (Helm) UpdateAgentVersion() error {
 }
 
 // Lint lints the Elastic-Agent Helm chart.
-func (Helm) Lint() error {
+func (h Helm) Lint() error {
+	mg.SerialDeps(h.BuildDependencies)
+
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
@@ -3594,6 +3599,10 @@ func updateYamlFile(path string, keyVal ...struct {
 		return fmt.Errorf("failed to encode updated YAML: %w", err)
 	}
 	return nil
+}
+
+func (Helm) BuildDependencies() error {
+	return helm.BuildChartDependencies(helmChartPath)
 }
 
 func updateYamlNodes(rootNode *yaml.Node, value string, keys ...string) error {

@@ -15,41 +15,22 @@ metadata:
   name: kube-state-metrics
   namespace: default
 ---
-# Source: elastic-agent/templates/agent/service-account.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: agent-pernode-example
-  namespace: "default"
-  labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
-    app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.0.0
----
-# Source: elastic-agent/templates/agent/k8s/secret.yaml
+# Source: elastic-agent/templates/agent/k8s/statefulset.yaml
 apiVersion: v1
 kind: Secret
 metadata:
-  name: agent-pernode-example
+  name: agent-ksm
   namespace: "default"
-  labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
-    app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.0.0
 stringData:
-
   agent.yml: |-
     fleet:
       enabled: true
     providers:
       kubernetes:
-        node: ${NODE_NAME}
-        scope: node
+        enabled: false
       kubernetes_leaderelection:
-        enabled: true
-        leader_lease: example-pernode
+        enabled: false
+        leader_lease: agent-ksm-sharded
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -206,86 +187,6 @@ rules:
     - volumeattachments
   verbs: ["list", "watch"]
 ---
-# Source: elastic-agent/templates/agent/cluster-role.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: agent-perNode-example-default
-  labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
-    app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.0.0
-rules:
-  - apiGroups: [ "" ] # "" indicates the core API group
-    resources:
-      - nodes
-      - namespaces
-      - events
-      - pods
-      - services
-      - configmaps
-      - persistentvolumes
-      - persistentvolumeclaims
-      - persistentvolumeclaims/status
-      - nodes/metrics
-      - nodes/proxy
-      - nodes/stats
-    verbs:
-      - get
-      - watch
-      - list
-  - apiGroups:
-      - storage.k8s.io
-    resources:
-      - storageclasses
-    verbs:
-      - get
-      - watch
-      - list
-  - nonResourceURLs:
-      - /metrics
-    verbs:
-      - get
-      - watch
-      - list
-  - apiGroups: [ "coordination.k8s.io" ]
-    resources:
-      - leases
-    verbs:
-      - get
-      - create
-      - update
-  - nonResourceURLs:
-      - /healthz
-      - /healthz/*
-      - /livez
-      - /livez/*
-      - /metrics
-      - /metrics/slis
-      - /readyz
-      - /readyz/*
-    verbs:
-      - get
-  - apiGroups: [ "apps" ]
-    resources:
-      - replicasets
-      - deployments
-      - daemonsets
-      - statefulsets
-    verbs:
-      - get
-      - list
-      - watch
-  - apiGroups: [ "batch" ]
-    resources:
-      - jobs
-      - cronjobs
-    verbs:
-      - get
-      - list
-      - watch
----
 # Source: elastic-agent/charts/kube-state-metrics/templates/clusterrolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -308,24 +209,60 @@ subjects:
   name: kube-state-metrics
   namespace: default
 ---
-# Source: elastic-agent/templates/agent/cluster-role-binding.yaml
+# Source: elastic-agent/charts/kube-state-metrics/templates/stsdiscovery-role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: Role
 metadata:
-  name: agent-perNode-example-default
-  labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
-    app.kubernetes.io/name: elastic-agent
+  name: stsdiscovery-kube-state-metrics
+  namespace: default
+  labels:    
+    helm.sh/chart: kube-state-metrics-5.28.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: kube-state-metrics
+    app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.0.0
+    app.kubernetes.io/version: "2.14.0"
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+- apiGroups:
+  - apps
+  resourceNames:
+  - kube-state-metrics
+  resources:
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - watch
+---
+# Source: elastic-agent/charts/kube-state-metrics/templates/stsdiscovery-rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: stsdiscovery-kube-state-metrics
+  namespace: default
+  labels:    
+    helm.sh/chart: kube-state-metrics-5.28.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: kube-state-metrics
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: "2.14.0"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: stsdiscovery-kube-state-metrics
 subjects:
   - kind: ServiceAccount
-    name: agent-pernode-example
-    namespace: "default"
-roleRef:
-  kind: ClusterRole
-  name: agent-perNode-example-default
-  apiGroup: rbac.authorization.k8s.io
+    name: kube-state-metrics
+    namespace: default
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/service.yaml
 apiVersion: v1
@@ -351,131 +288,14 @@ spec:
     port: 8080
     targetPort: 8080
   
+  clusterIP: None
   selector:    
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
 ---
-# Source: elastic-agent/templates/agent/k8s/daemonset.yaml
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  name: agent-pernode-example
-  namespace: "default"
-  labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
-    app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.0.0
-spec:
-  selector:
-    matchLabels:
-      name: agent-pernode-example
-  template:
-    metadata:
-      labels:
-        name: agent-pernode-example
-      annotations:
-        checksum/config: cd7c5c4f03cc8377d18ee22cf236428090959fc194ee647bd97a39b79f38c807
-    spec:
-      automountServiceAccountToken: true
-      containers:
-      - args:
-        - -c
-        - /etc/elastic-agent/agent.yml
-        - -e
-        env:
-        - name: NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: STATE_PATH
-          value: /usr/share/elastic-agent/state
-        - name: ELASTIC_NETINFO
-          value: "false"
-        - name: FLEET_URL
-          value: http://localhost:8220
-        - name: FLEET_ENROLLMENT_TOKEN
-          value: fleetToken
-        - name: FLEET_INSECURE
-          value: "false"
-        - name: FLEET_ENROLL
-          value: "1"
-        image: docker.elastic.co/beats/elastic-agent:9.0.0-SNAPSHOT
-        imagePullPolicy: IfNotPresent
-        name: agent
-        resources:
-          limits:
-            memory: 1000Mi
-          requests:
-            cpu: 100m
-            memory: 400Mi
-        securityContext:
-          runAsUser: 0
-        volumeMounts:
-        - mountPath: /var/lib/docker/containers
-          name: varlibdockercontainers
-          readOnly: true
-        - mountPath: /var/log
-          name: varlog
-          readOnly: true
-        - mountPath: /hostfs/proc
-          name: proc
-          readOnly: true
-        - mountPath: /hostfs/sys/fs/cgroup
-          name: cgroup
-          readOnly: true
-        - mountPath: /hostfs/var/lib
-          name: var-lib
-          readOnly: true
-        - mountPath: /hostfs/etc
-          name: etc-full
-          readOnly: true
-        - mountPath: /usr/share/elastic-agent/state
-          name: agent-data
-        - mountPath: /etc/elastic-agent/agent.yml
-          name: config
-          readOnly: true
-          subPath: agent.yml
-      dnsPolicy: ClusterFirstWithHostNet
-      hostNetwork: true
-      nodeSelector:
-        kubernetes.io/os: linux
-      serviceAccountName: agent-pernode-example
-      volumes:
-      - hostPath:
-          path: /var/lib/docker/containers
-        name: varlibdockercontainers
-      - hostPath:
-          path: /var/log
-        name: varlog
-      - hostPath:
-          path: /proc
-        name: proc
-      - hostPath:
-          path: /sys/fs/cgroup
-        name: cgroup
-      - hostPath:
-          path: /etc
-        name: etc-full
-      - hostPath:
-          path: /var/lib
-        name: var-lib
-      - hostPath:
-          path: /etc/elastic-agent/default/agent-pernode-example-managed/state
-          type: DirectoryOrCreate
-        name: agent-data
-      - name: config
-        secret:
-          defaultMode: 292
-          secretName: agent-pernode-example
----
 # Source: elastic-agent/charts/kube-state-metrics/templates/deployment.yaml
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: kube-state-metrics
   namespace: default
@@ -493,9 +313,9 @@ spec:
       app.kubernetes.io/name: kube-state-metrics
       app.kubernetes.io/instance: example
   replicas: 1
-  strategy:
-    type: RollingUpdate
   revisionHistoryLimit: 10
+  serviceName: kube-state-metrics
+  volumeClaimTemplates: []
   template:
     metadata:
       labels:        
@@ -506,6 +326,9 @@ spec:
         app.kubernetes.io/name: kube-state-metrics
         app.kubernetes.io/instance: example
         app.kubernetes.io/version: "2.14.0"
+      annotations:
+      
+        checksum/config: 23ea9986d03b780c70c0a67796c271f1336b53e217163de5b5971495c39e2ff9
     spec:
       automountServiceAccountToken: true
       hostNetwork: false
@@ -519,9 +342,21 @@ spec:
           type: RuntimeDefault
       containers:
       - name: kube-state-metrics
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        
         args:
         - --port=8080
         - --resources=certificatesigningrequests,configmaps,cronjobs,daemonsets,deployments,endpoints,horizontalpodautoscalers,ingresses,jobs,leases,limitranges,mutatingwebhookconfigurations,namespaces,networkpolicies,nodes,persistentvolumeclaims,persistentvolumes,poddisruptionbudgets,pods,replicasets,replicationcontrollers,resourcequotas,secrets,services,statefulsets,storageclasses,validatingwebhookconfigurations,volumeattachments
+        - --pod=$(POD_NAME)
+        - --pod-namespace=$(POD_NAMESPACE)
         imagePullPolicy: IfNotPresent
         image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.14.0
         ports:
@@ -557,3 +392,45 @@ spec:
             drop:
             - ALL
           readOnlyRootFilesystem: true
+      - args:
+        - -c
+        - /etc/elastic-agent/agent.yml
+        - -e
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: STATE_PATH
+          value: /usr/share/elastic-agent/state
+        - name: FLEET_URL
+          value: http://localhost:8220
+        - name: FLEET_ENROLLMENT_TOKEN
+          value: fleetToken
+        - name: FLEET_INSECURE
+          value: "false"
+        - name: FLEET_ENROLL
+          value: "1"
+        image: docker.elastic.co/beats/elastic-agent:9.0.0-SNAPSHOT
+        imagePullPolicy: IfNotPresent
+        name: agent
+        resources:
+          limits:
+            memory: 800Mi
+          requests:
+            cpu: 100m
+            memory: 400Mi
+        volumeMounts:
+        - mountPath: /etc/elastic-agent/agent.yml
+          name: config
+          readOnly: true
+          subPath: agent.yml
+      volumes:
+        - name: config
+          secret:
+            defaultMode: 292
+            secretName: agent-ksm
