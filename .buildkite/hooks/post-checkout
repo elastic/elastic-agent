@@ -36,6 +36,25 @@ pull_request="${BUILDKITE_PULL_REQUEST:-false}"
 
 if [[ "${pull_request}" == "false" ]]; then
     echo "Not a pull request, skipping"
+
+    USE_FORKED_REPO="${FORKED_REPO:-}"
+    USE_FORKED_BRANCH="${FORKED_BRANCH:-}"
+
+    echo "Forked repo: ${USE_FORKED_REPO}"
+    echo "Forked branch: ${USE_FORKED_BRANCH}"
+    if [ -n "${USE_FORKED_REPO}" ]; then
+        echo "Insided forked repo if"
+        if [ -n "${USE_FORKED_BRANCH}" ]; then
+            echo "Inside forked branch if"
+            # checkout
+            echo "Checking out branch ${USE_FORKED_BRANCH} from github repo ${USE_FORKED_REPO}"
+            git remote add forked "git@github.com:${USE_FORKED_REPO}"
+            git fetch forked
+            git checkout "${USE_FORKED_BRANCH}"
+        fi
+    fi
+    echo "After forked repo/branch statements"
+
     exit 0
 fi
 
@@ -51,16 +70,3 @@ git --no-pager log --format=%B -n 1
 
 # Ensure buildkite groups are rendered
 echo ""
-
-USE_FORKED_REPO="${FORKED_REPO:-}"
-USE_FORKED_BRANCH="${FORKED_BRANCH:-}"
-
-if [ -n "${USE_FORKED_REPO}" ]; then
-    if [ -n "${USE_FORKED_BRANCH}" ]; then
-        # checkout
-        echo "Checking out branch ${USE_FORKED_BRANCH} from github repo ${USE_FORKED_REPO}"
-        git remote add forked "git@github.com:${USE_FORKED_REPO}"
-        git fetch forked
-        git checkout "${USE_FORKED_BRANCH}"
-    fi
-fi
