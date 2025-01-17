@@ -3,7 +3,6 @@
 {{- $preset := $.Values.agent.presets.perNode -}}
 {{- $inputVal := (include "elasticagent.system.config.metrics.input" $ | fromYamlArray) -}}
 {{- include "elasticagent.preset.mutate.inputs" (list $ $preset $inputVal) -}}
-{{- include "elasticagent.preset.applyOnce" (list $ $preset "elasticagent.kubernetes.pernode.preset") -}}
 {{- end -}}
 {{- end -}}
 

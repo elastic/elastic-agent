@@ -116,13 +116,9 @@
                             "type": "boolean",
                             "description": "Enable state streams based on kube-state-metrics."
                         },
-                        "deployKSM": {
-                            "type": "boolean",
-                            "description": "Deploy kube-state-metrics service as a sidecar container."
-                        },
                         "host": {
                             "type": "string",
-                            "description": "Host of the kube-state-metrics service, used when deployKSM is set to false."
+                            "description": "Host of the kube-state-metrics service, used when kube-state-metrics.enabled is set to false."
                         },
                         "vars": {
                             "type": "object",
@@ -130,27 +126,8 @@
                         }
                     },
                     "required": [
-                        "enabled",
-                        "deployKSM"
-                    ],
-                    "if": {
-                        "properties": {
-                            "deployKSM": {
-                                "const": false
-                            }
-                        }
-                    },
-                    "then": {
-                        "properties": {
-                            "host": {
-                                "type": "string",
-                                "format": "uri"
-                            }
-                        },
-                        "required": [
-                            "host"
-                        ]
-                    }
+                        "enabled"
+                    ]
                 },
                 "metrics": {
                     "type": "object",
@@ -413,8 +390,7 @@
                                 ],
                                 "properties": {
                                     "preset": {
-                                        "type": "string",
-                                        "minLength": 1
+                                        "type": "string"
                                     },
                                     "url": {
                                         "type": "string",
@@ -436,8 +412,7 @@
                                 ],
                                 "properties": {
                                     "preset": {
-                                        "type": "string",
-                                        "minLength": 1
+                                        "type": "string"
                                     },
                                     "url": {
                                         "type": "string",
@@ -491,33 +466,135 @@
         "outputs",
         "agent"
     ],
-    "if": {
-        "properties": {
-            "agent": {
+    "allOf": [
+        {
+            "if": {
                 "properties": {
-                    "engine": {
-                        "const": "k8s"
+                    "agent": {
+                        "properties": {
+                            "engine": {
+                                "const": "k8s"
+                            }
+                        }
+                    }
+                }
+            },
+            "then": {
+                "not": {
+                    "properties": {
+                        "outputs": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "properties": {
+                                    "type": {
+                                        "const": "ESECKRef"
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
-        }
-    },
-    "then": {
-        "not": {
-            "properties": {
-                "outputs": {
-                    "type": "object",
-                    "additionalProperties": {
+        },
+        {
+            "if": {
+                "properties": {
+                    "kube-state-metrics": {
                         "properties": {
-                            "type": {
-                                "const": "ESECKRef"
+                            "enabled": {
+                                "const": true
+                            }
+                        }
+                    },
+                    "agent": {
+                        "properties": {
+                            "engine": {
+                                "const": "eck"
+                            }
+                        }
+                    }
+                }
+            },
+            "then": {
+                "properties": {
+                    "kubernetes": {
+                        "properties": {
+                            "state": {
+                                "properties": {
+                                    "agentAsSidecar": {
+                                        "properties": {
+                                            "enabled": {
+                                                "const": false
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "if": {
+                "properties": {
+                    "kube-state-metrics": {
+                        "properties": {
+                            "enabled": {
+                                "const": true
+                            }
+                        }
+                    },
+                    "kubernetes": {
+                        "properties": {
+                            "state": {
+                                "properties": {
+                                    "agentAsSidecar": {
+                                        "properties": {
+                                            "enabled": {
+                                                "const": true
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "agent": {
+                        "fleet": {
+                            "enabled": {
+                                "const": true
+                            }
+                        }
+                    }
+                }
+            },
+            "then": {
+                "properties": {
+                    "agent": {
+                        "fleet": {
+                            "preset": {
+                                "type": "string",
+                                "minLength": 0
+                            }
+                        }
+                    }
+                }
+            },
+            "else": {
+                "properties": {
+                    "agent": {
+                        "fleet": {
+                            "preset": {
+                                "type": "string",
+                                "minLength": 1
                             }
                         }
                     }
                 }
             }
         }
-    },
+    ],
     "definitions": {
         "OutputObject": {
             "type": "object",
@@ -846,8 +923,7 @@
                         ],
                         "properties": {
                             "preset": {
-                                "type": "string",
-                                "minLength": 1
+                                "type": "string"
                             },
                             "url": {
                                 "type": "string",
@@ -869,8 +945,7 @@
                         ],
                         "properties": {
                             "preset": {
-                                "type": "string",
-                                "minLength": 1
+                                "type": "string"
                             },
                             "url": {
                                 "type": "string",
