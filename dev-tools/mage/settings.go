@@ -48,7 +48,7 @@ const (
 	//ManifestUrlEnvVar is the name fo the environment variable containing the Manifest URL to be used for packaging agent
 	ManifestUrlEnvVar = "MANIFEST_URL"
 	// AgentCommitHashEnvVar allows to override agent commit hash string during packaging
-	AgentCommitHashEnvVar
+	AgentCommitHashEnvVar = "AGENT_COMMIT_HASH_OVERRIDE"
 
 	// Mapped functions
 	agentPackageVersionMappedFunc    = "agent_package_version"
