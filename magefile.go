@@ -81,6 +81,7 @@ const (
 	metaDir           = "_meta"
 	snapshotEnv       = "SNAPSHOT"
 	devEnv            = "DEV"
+	fipsEnv           = "FIPS"
 	externalArtifacts = "EXTERNAL"
 	platformsEnv      = "PLATFORMS"
 	packagesEnv       = "PACKAGES"
@@ -786,6 +787,9 @@ func (Cloud) Image(ctx context.Context) {
 	variant := os.Getenv(dockerVariants)
 	defer os.Setenv(dockerVariants, variant)
 
+	fips := os.Getenv(fipsEnv)
+	defer os.Setenv(fipsEnv, fips)
+
 	os.Setenv(platformsEnv, "linux/amd64")
 	os.Setenv(packagesEnv, "docker")
 	os.Setenv(devEnv, "true")
@@ -798,6 +802,14 @@ func (Cloud) Image(ctx context.Context) {
 	} else {
 		os.Setenv(snapshotEnv, "true")
 		devtools.Snapshot = true
+	}
+
+	if f, err := strconv.ParseBool(fips); err == nil && !f {
+		os.Setenv(fipsEnv, "false")
+		devtools.FIPSBuild = false
+	} else {
+		os.Setenv(fipsEnv, "true")
+		devtools.FIPSBuild = true
 	}
 
 	devtools.DevBuild = true
@@ -1755,6 +1767,12 @@ func buildVars() map[string]string {
 
 	isSnapshot, _ := os.LookupEnv(snapshotEnv)
 	vars["github.com/elastic/elastic-agent/internal/pkg/release.snapshot"] = isSnapshot
+
+	if fipsFlag, fipsFound := os.LookupEnv(fipsEnv); fipsFound {
+		if fips, err := strconv.ParseBool(fipsFlag); err == nil && fips {
+			vars["github.com/elastic/elastic-agent/internal/pkg/release.fips"] = "true"
+		}
+	}
 
 	if isDevFlag, devFound := os.LookupEnv(devEnv); devFound {
 		if isDev, err := strconv.ParseBool(isDevFlag); err == nil && isDev {

@@ -35,6 +35,8 @@ const (
 	beatsFPMImage = "docker.elastic.co/beats-dev/fpm"
 	// BeatsCrossBuildImage is the image used for crossbuilding Beats.
 	BeatsCrossBuildImage = "docker.elastic.co/beats-dev/golang-crossbuild"
+	//FIPSBuildImage is the image used for building FIPS compliant artifacts
+	FIPSBuildImage = "mcr.microsoft.com/oss/go/microsoft/golang"
 
 	elasticAgentImportPath = "github.com/elastic/elastic-agent"
 
@@ -88,6 +90,7 @@ var (
 	Snapshot      bool
 	DevBuild      bool
 	ExternalBuild bool
+	FIPSBuild     bool
 
 	versionQualified bool
 	versionQualifier string
@@ -153,6 +156,11 @@ func initGlobals() {
 		panic(fmt.Errorf("failed to parse EXTERNAL env value: %w", err))
 	}
 
+	FIPSBuild, err = strconv.ParseBool(EnvOr("FIPS", "false"))
+	if err != nil {
+		panic(fmt.Errorf("failed to parse FIPS env value: %w", err))
+	}
+
 	versionQualifier, versionQualified = os.LookupEnv("VERSION_QUALIFIER")
 
 	agentPackageVersion = EnvOr(agentPackageVersionEnvVar, "")
@@ -210,6 +218,7 @@ func varMap(args ...map[string]interface{}) map[string]interface{} {
 		"Snapshot":        Snapshot,
 		"DEV":             DevBuild,
 		"EXTERNAL":        ExternalBuild,
+		"FIPS":            FIPSBuild,
 		"Qualifier":       versionQualifier,
 		"CI":              CI,
 	}

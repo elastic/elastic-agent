@@ -53,6 +53,10 @@ func DefaultBuildArgs() BuildArgs {
 		args.ExtraFlags = append(args.ExtraFlags, "-buildmode", "pie")
 	}
 
+	if FIPSBuild {
+		args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips")
+	}
+
 	if DevBuild {
 		// Disable optimizations (-N) and inlining (-l) for debugging.
 		args.ExtraFlags = append(args.ExtraFlags, `-gcflags=all=-N -l`)
@@ -151,6 +155,12 @@ func Build(params BuildArgs) error {
 	if params.CGO {
 		cgoEnabled = "1"
 	}
+
+	if FIPSBuild {
+		cgoEnabled = "1"
+		env["GOEXPERIMENT"] = "systemcrypto"
+	}
+
 	env["CGO_ENABLED"] = cgoEnabled
 
 	// Spec
