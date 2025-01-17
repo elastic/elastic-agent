@@ -6,9 +6,10 @@ package otel
 
 import (
 	"fmt"
+	"sort"
+
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
-	"sort"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/connector"
@@ -22,7 +23,6 @@ import (
 
 type componentWithStability struct {
 	Name      component.Type
-	Module    string
 	Stability map[string]string
 }
 
@@ -37,7 +37,6 @@ type componentsOutput struct {
 
 func Components(cmd *cobra.Command) error {
 	set := NewSettings(release.Version(), []string{})
-
 	factories, err := set.Factories()
 	if err != nil {
 		return fmt.Errorf("failed to initialize factories: %w", err)
@@ -46,8 +45,7 @@ func Components(cmd *cobra.Command) error {
 	components := componentsOutput{}
 	for _, con := range sortFactoriesByType[connector.Factory](factories.Connectors) {
 		components.Connectors = append(components.Connectors, componentWithStability{
-			Name:   con.Type(),
-			Module: factories.ConnectorModules[con.Type()],
+			Name: con.Type(),
 			Stability: map[string]string{
 				"logs-to-logs":    con.LogsToLogsStability().String(),
 				"logs-to-metrics": con.LogsToMetricsStability().String(),
@@ -65,8 +63,7 @@ func Components(cmd *cobra.Command) error {
 	}
 	for _, ext := range sortFactoriesByType[extension.Factory](factories.Extensions) {
 		components.Extensions = append(components.Extensions, componentWithStability{
-			Name:   ext.Type(),
-			Module: factories.ExtensionModules[ext.Type()],
+			Name: ext.Type(),
 			Stability: map[string]string{
 				"extension": ext.Stability().String(),
 			},
@@ -74,8 +71,7 @@ func Components(cmd *cobra.Command) error {
 	}
 	for _, prs := range sortFactoriesByType[processor.Factory](factories.Processors) {
 		components.Processors = append(components.Processors, componentWithStability{
-			Name:   prs.Type(),
-			Module: factories.ProcessorModules[prs.Type()],
+			Name: prs.Type(),
 			Stability: map[string]string{
 				"logs":    prs.LogsStability().String(),
 				"metrics": prs.MetricsStability().String(),
@@ -85,8 +81,7 @@ func Components(cmd *cobra.Command) error {
 	}
 	for _, rcv := range sortFactoriesByType[receiver.Factory](factories.Receivers) {
 		components.Receivers = append(components.Receivers, componentWithStability{
-			Name:   rcv.Type(),
-			Module: factories.ReceiverModules[rcv.Type()],
+			Name: rcv.Type(),
 			Stability: map[string]string{
 				"logs":    rcv.LogsStability().String(),
 				"metrics": rcv.MetricsStability().String(),
@@ -96,8 +91,7 @@ func Components(cmd *cobra.Command) error {
 	}
 	for _, exp := range sortFactoriesByType[exporter.Factory](factories.Exporters) {
 		components.Exporters = append(components.Exporters, componentWithStability{
-			Name:   exp.Type(),
-			Module: factories.ExporterModules[exp.Type()],
+			Name: exp.Type(),
 			Stability: map[string]string{
 				"logs":    exp.LogsStability().String(),
 				"metrics": exp.MetricsStability().String(),
