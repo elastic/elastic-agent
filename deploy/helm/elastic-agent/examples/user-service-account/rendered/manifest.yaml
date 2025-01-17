@@ -1,4 +1,20 @@
 ---
+# Source: elastic-agent/charts/kube-state-metrics/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+automountServiceAccountToken: true
+metadata:
+  labels:    
+    helm.sh/chart: kube-state-metrics-5.28.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: kube-state-metrics
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: "2.14.0"
+  name: kube-state-metrics
+  namespace: default
+---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
 kind: Secret
@@ -48,6 +64,7 @@ stringData:
           - /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
         type: kubernetes/metrics
         use_output: default
+<<<<<<< HEAD
     providers:
       kubernetes:
         node: ${NODE_NAME}
@@ -87,256 +104,188 @@ stringData:
         namespace: default
         use_output: default
     inputs:
+=======
+>>>>>>> edd342afa ([helm] add kube-state-metric subchart dependency (#6495))
       - data_stream:
           namespace: default
-        id: kubernetes/metrics-kubernetes.state_container
+        id: kube-state-metrics-kubernetes/metrics
         streams:
         - add_metadata: true
           bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          condition: ${kubernetes_leaderelection.leader} == true
           data_stream:
             dataset: kubernetes.state_container
             type: metrics
           hosts:
-          - localhost:8080
+          - kube-state-metrics:8080
           id: kubernetes/metrics-kubernetes.state_container
           metricsets:
           - state_container
           period: 10s
-        type: kubernetes/metrics
-        use_output: default
-      - data_stream:
-          namespace: default
-        id: kubernetes/metrics-kubernetes.state_cronjob
-        streams:
         - add_metadata: true
           bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          condition: ${kubernetes_leaderelection.leader} == true
           data_stream:
             dataset: kubernetes.state_cronjob
             type: metrics
           hosts:
-          - localhost:8080
+          - kube-state-metrics:8080
           id: kubernetes/metrics-kubernetes.state_cronjob
           metricsets:
           - state_cronjob
           period: 10s
-        type: kubernetes/metrics
-        use_output: default
-      - data_stream:
-          namespace: default
-        id: kubernetes/metrics-kubernetes.state_daemonset
-        streams:
         - add_metadata: true
           bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          condition: ${kubernetes_leaderelection.leader} == true
           data_stream:
             dataset: kubernetes.state_daemonset
             type: metrics
           hosts:
-          - localhost:8080
+          - kube-state-metrics:8080
           id: kubernetes/metrics-kubernetes.state_daemonset
           metricsets:
           - state_daemonset
           period: 10s
-        type: kubernetes/metrics
-        use_output: default
-      - data_stream:
-          namespace: default
-        id: kubernetes/metrics-kubernetes.state_deployment
-        streams:
         - add_metadata: true
           bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          condition: ${kubernetes_leaderelection.leader} == true
           data_stream:
             dataset: kubernetes.state_deployment
             type: metrics
           hosts:
-          - localhost:8080
+          - kube-state-metrics:8080
           id: kubernetes/metrics-kubernetes.state_deployment
           metricsets:
           - state_deployment
           period: 10s
-        type: kubernetes/metrics
-        use_output: default
-      - data_stream:
-          namespace: default
-        id: kubernetes/metrics-kubernetes.state_job
-        streams:
         - add_metadata: true
           bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          condition: ${kubernetes_leaderelection.leader} == true
           data_stream:
             dataset: kubernetes.state_job
             type: metrics
           hosts:
-          - localhost:8080
+          - kube-state-metrics:8080
           id: kubernetes/metrics-kubernetes.state_job
           metricsets:
           - state_job
           period: 10s
-        type: kubernetes/metrics
-        use_output: default
-      - data_stream:
-          namespace: default
-        id: kubernetes/metrics-kubernetes.state_namespace
-        streams:
         - add_metadata: true
           bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          condition: ${kubernetes_leaderelection.leader} == true
           data_stream:
             dataset: kubernetes.state_namespace
             type: metrics
           hosts:
-          - localhost:8080
+          - kube-state-metrics:8080
           id: kubernetes/metrics-kubernetes.state_namespace
           metricsets:
           - state_namespace
           period: 10s
-        type: kubernetes/metrics
-        use_output: default
-      - data_stream:
-          namespace: default
-        id: kubernetes/metrics-kubernetes.state_node
-        streams:
         - add_metadata: true
           bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          condition: ${kubernetes_leaderelection.leader} == true
           data_stream:
             dataset: kubernetes.state_node
             type: metrics
           hosts:
-          - localhost:8080
+          - kube-state-metrics:8080
           id: kubernetes/metrics-kubernetes.state_node
           metricsets:
           - state_node
           period: 10s
-        type: kubernetes/metrics
-        use_output: default
-      - data_stream:
-          namespace: default
-        id: kubernetes/metrics-kubernetes.state_persistentvolumeclaim
-        streams:
         - add_metadata: true
           bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          condition: ${kubernetes_leaderelection.leader} == true
           data_stream:
             dataset: kubernetes.state_persistentvolumeclaim
             type: metrics
           hosts:
-          - localhost:8080
+          - kube-state-metrics:8080
           id: kubernetes/metrics-kubernetes.state_persistentvolumeclaim
           metricsets:
           - state_persistentvolumeclaim
           period: 10s
-        type: kubernetes/metrics
-        use_output: default
-      - data_stream:
-          namespace: default
-        id: kubernetes/metrics-kubernetes.state_persistentvolume
-        streams:
         - add_metadata: true
           bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          condition: ${kubernetes_leaderelection.leader} == true
           data_stream:
             dataset: kubernetes.state_persistentvolume
             type: metrics
           hosts:
-          - localhost:8080
+          - kube-state-metrics:8080
           id: kubernetes/metrics-kubernetes.state_persistentvolume
           metricsets:
           - state_persistentvolume
           period: 10s
-        type: kubernetes/metrics
-        use_output: default
-      - data_stream:
-          namespace: default
-        id: kubernetes/metrics-kubernetes.state_pod
-        streams:
         - add_metadata: true
           bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          condition: ${kubernetes_leaderelection.leader} == true
           data_stream:
             dataset: kubernetes.state_pod
             type: metrics
           hosts:
-          - localhost:8080
+          - kube-state-metrics:8080
           id: kubernetes/metrics-kubernetes.state_pod
           metricsets:
           - state_pod
           period: 10s
-        type: kubernetes/metrics
-        use_output: default
-      - data_stream:
-          namespace: default
-        id: kubernetes/metrics-kubernetes.state_replicaset
-        streams:
         - add_metadata: true
           bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          condition: ${kubernetes_leaderelection.leader} == true
           data_stream:
             dataset: kubernetes.state_replicaset
             type: metrics
           hosts:
-          - localhost:8080
+          - kube-state-metrics:8080
           id: kubernetes/metrics-kubernetes.state_replicaset
           metricsets:
           - state_replicaset
           period: 10s
-        type: kubernetes/metrics
-        use_output: default
-      - data_stream:
-          namespace: default
-        id: kubernetes/metrics-kubernetes.state_resourcequota
-        streams:
         - add_metadata: true
           bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          condition: ${kubernetes_leaderelection.leader} == true
           data_stream:
             dataset: kubernetes.state_resourcequota
             type: metrics
           hosts:
-          - localhost:8080
+          - kube-state-metrics:8080
           id: kubernetes/metrics-kubernetes.state_resourcequota
           metricsets:
           - state_resourcequota
           period: 10s
-        type: kubernetes/metrics
-        use_output: default
-      - data_stream:
-          namespace: default
-        id: kubernetes/metrics-kubernetes.state_service
-        streams:
         - add_metadata: true
           bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          condition: ${kubernetes_leaderelection.leader} == true
           data_stream:
             dataset: kubernetes.state_service
             type: metrics
           hosts:
-          - localhost:8080
+          - kube-state-metrics:8080
           id: kubernetes/metrics-kubernetes.state_service
           metricsets:
           - state_service
           period: 10s
-          use_output: default
-        type: kubernetes/metrics
-        use_output: default
-      - data_stream:
-          namespace: default
-        id: kubernetes/metrics-kubernetes.state_statefulset
-        streams:
         - add_metadata: true
           bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          condition: ${kubernetes_leaderelection.leader} == true
           data_stream:
             dataset: kubernetes.state_statefulset
             type: metrics
           hosts:
-          - localhost:8080
+          - kube-state-metrics:8080
           id: kubernetes/metrics-kubernetes.state_statefulset
           metricsets:
           - state_statefulset
           period: 10s
-        type: kubernetes/metrics
-        use_output: default
-      - data_stream:
-          namespace: default
-        id: kubernetes/metrics-kubernetes.state_storageclass
-        streams:
         - add_metadata: true
           bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          condition: ${kubernetes_leaderelection.leader} == true
           data_stream:
             dataset: kubernetes.state_storageclass
             type: metrics
           hosts:
-          - localhost:8080
+          - kube-state-metrics:8080
           id: kubernetes/metrics-kubernetes.state_storageclass
           metricsets:
           - state_storageclass
@@ -345,10 +294,11 @@ stringData:
         use_output: default
     providers:
       kubernetes:
-        enabled: false
+        node: ${NODE_NAME}
+        scope: cluster
       kubernetes_leaderelection:
-        enabled: false
-        leader_lease: example-ksmsharded
+        enabled: true
+        leader_lease: example-clusterwide
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -533,6 +483,161 @@ stringData:
         enabled: false
         leader_lease: example-pernode
 ---
+# Source: elastic-agent/charts/kube-state-metrics/templates/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:    
+    helm.sh/chart: kube-state-metrics-5.28.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: kube-state-metrics
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: "2.14.0"
+  name: kube-state-metrics
+rules:
+
+- apiGroups: ["certificates.k8s.io"]
+  resources:
+  - certificatesigningrequests
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - configmaps
+  verbs: ["list", "watch"]
+
+- apiGroups: ["batch"]
+  resources:
+  - cronjobs
+  verbs: ["list", "watch"]
+
+- apiGroups: ["extensions", "apps"]
+  resources:
+  - daemonsets
+  verbs: ["list", "watch"]
+
+- apiGroups: ["extensions", "apps"]
+  resources:
+  - deployments
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - endpoints
+  verbs: ["list", "watch"]
+
+- apiGroups: ["autoscaling"]
+  resources:
+  - horizontalpodautoscalers
+  verbs: ["list", "watch"]
+
+- apiGroups: ["extensions", "networking.k8s.io"]
+  resources:
+  - ingresses
+  verbs: ["list", "watch"]
+
+- apiGroups: ["batch"]
+  resources:
+  - jobs
+  verbs: ["list", "watch"]
+
+- apiGroups: ["coordination.k8s.io"]
+  resources:
+  - leases
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - limitranges
+  verbs: ["list", "watch"]
+
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources:
+    - mutatingwebhookconfigurations
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - namespaces
+  verbs: ["list", "watch"]
+
+- apiGroups: ["networking.k8s.io"]
+  resources:
+  - networkpolicies
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - nodes
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - persistentvolumeclaims
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - persistentvolumes
+  verbs: ["list", "watch"]
+
+- apiGroups: ["policy"]
+  resources:
+    - poddisruptionbudgets
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - pods
+  verbs: ["list", "watch"]
+
+- apiGroups: ["extensions", "apps"]
+  resources:
+  - replicasets
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - replicationcontrollers
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - resourcequotas
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - secrets
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - services
+  verbs: ["list", "watch"]
+
+- apiGroups: ["apps"]
+  resources:
+  - statefulsets
+  verbs: ["list", "watch"]
+
+- apiGroups: ["storage.k8s.io"]
+  resources:
+    - storageclasses
+  verbs: ["list", "watch"]
+
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources:
+    - validatingwebhookconfigurations
+  verbs: ["list", "watch"]
+
+- apiGroups: ["storage.k8s.io"]
+  resources:
+    - volumeattachments
+  verbs: ["list", "watch"]
+---
 # Source: elastic-agent/templates/agent/cluster-role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -614,6 +719,7 @@ rules:
       - get
       - list
       - watch
+<<<<<<< HEAD
   - apiGroups:
     - ""
     resources:
@@ -889,6 +995,8 @@ rules:
     - get
     - list
     - watch
+=======
+>>>>>>> edd342afa ([helm] add kube-state-metric subchart dependency (#6495))
 ---
 # Source: elastic-agent/templates/agent/cluster-role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -972,6 +1080,28 @@ rules:
       - list
       - watch
 ---
+# Source: elastic-agent/charts/kube-state-metrics/templates/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:    
+    helm.sh/chart: kube-state-metrics-5.28.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: kube-state-metrics
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: "2.14.0"
+  name: kube-state-metrics
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kube-state-metrics
+subjects:
+- kind: ServiceAccount
+  name: kube-state-metrics
+  namespace: default
+---
 # Source: elastic-agent/templates/agent/cluster-role-binding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -995,6 +1125,7 @@ roleRef:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
+<<<<<<< HEAD
   name: agent-ksmSharded-example-default
   labels:
     helm.sh/chart: elastic-agent-8.18.0-beta
@@ -1014,6 +1145,8 @@ roleRef:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
+=======
+>>>>>>> edd342afa ([helm] add kube-state-metric subchart dependency (#6495))
   name: agent-perNode-example-default
   labels:
     helm.sh/chart: elastic-agent-8.18.0-beta
@@ -1028,6 +1161,34 @@ roleRef:
   kind: ClusterRole
   name: agent-perNode-example-default
   apiGroup: rbac.authorization.k8s.io
+---
+# Source: elastic-agent/charts/kube-state-metrics/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-state-metrics
+  namespace: default
+  labels:    
+    helm.sh/chart: kube-state-metrics-5.28.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: kube-state-metrics
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: "2.14.0"
+  annotations:
+    prometheus.io/scrape: 'true'
+spec:
+  type: "ClusterIP"
+  ports:
+  - name: "http"
+    protocol: TCP
+    port: 8080
+    targetPort: 8080
+  
+  selector:    
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/instance: example
 ---
 # Source: elastic-agent/templates/agent/k8s/daemonset.yaml
 apiVersion: apps/v1
@@ -1092,23 +1253,11 @@ spec:
           runAsGroup: 1000
           runAsUser: 1000
         volumeMounts:
-        - mountPath: /hostfs/proc
-          name: proc
-          readOnly: true
-        - mountPath: /hostfs/sys/fs/cgroup
-          name: cgroup
-          readOnly: true
         - mountPath: /var/lib/docker/containers
           name: varlibdockercontainers
           readOnly: true
         - mountPath: /var/log
           name: varlog
-          readOnly: true
-        - mountPath: /hostfs/etc
-          name: etc-full
-          readOnly: true
-        - mountPath: /hostfs/var/lib
-          name: var-lib
           readOnly: true
         - mountPath: /usr/share/elastic-agent/state
           name: agent-data
@@ -1123,23 +1272,11 @@ spec:
       serviceAccountName: user-sa-perNode
       volumes:
       - hostPath:
-          path: /proc
-        name: proc
-      - hostPath:
-          path: /sys/fs/cgroup
-        name: cgroup
-      - hostPath:
           path: /var/lib/docker/containers
         name: varlibdockercontainers
       - hostPath:
           path: /var/log
         name: varlog
-      - hostPath:
-          path: /etc
-        name: etc-full
-      - hostPath:
-          path: /var/lib
-        name: var-lib
       - hostPath:
           path: /etc/elastic-agent/default/agent-pernode-example/state
           type: DirectoryOrCreate
@@ -1148,6 +1285,91 @@ spec:
         secret:
           defaultMode: 292
           secretName: agent-pernode-example
+---
+# Source: elastic-agent/charts/kube-state-metrics/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kube-state-metrics
+  namespace: default
+  labels:    
+    helm.sh/chart: kube-state-metrics-5.28.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: kube-state-metrics
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: "2.14.0"
+spec:
+  selector:
+    matchLabels:      
+      app.kubernetes.io/name: kube-state-metrics
+      app.kubernetes.io/instance: example
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  revisionHistoryLimit: 10
+  template:
+    metadata:
+      labels:        
+        helm.sh/chart: kube-state-metrics-5.28.0
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/component: metrics
+        app.kubernetes.io/part-of: kube-state-metrics
+        app.kubernetes.io/name: kube-state-metrics
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/version: "2.14.0"
+    spec:
+      automountServiceAccountToken: true
+      hostNetwork: false
+      serviceAccountName: kube-state-metrics
+      securityContext:
+        fsGroup: 65534
+        runAsGroup: 65534
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: kube-state-metrics
+        args:
+        - --port=8080
+        - --resources=certificatesigningrequests,configmaps,cronjobs,daemonsets,deployments,endpoints,horizontalpodautoscalers,ingresses,jobs,leases,limitranges,mutatingwebhookconfigurations,namespaces,networkpolicies,nodes,persistentvolumeclaims,persistentvolumes,poddisruptionbudgets,pods,replicasets,replicationcontrollers,resourcequotas,secrets,services,statefulsets,storageclasses,validatingwebhookconfigurations,volumeattachments
+        imagePullPolicy: IfNotPresent
+        image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.14.0
+        ports:
+        - containerPort: 8080
+          name: "http"
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            httpHeaders:
+            path: /livez
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            httpHeaders:
+            path: /readyz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        resources:
+          {}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
 ---
 # Source: elastic-agent/templates/agent/k8s/deployment.yaml
 apiVersion: apps/v1
@@ -1169,7 +1391,7 @@ spec:
       labels:
         name: agent-clusterwide-example
       annotations:
-        checksum/config: 97e62ed0d731dea2ecadf31b0a7b4160db1b8a253589b7324f3a381af2519591
+        checksum/config: d5c563235f87ab23840416f6679b42b15c094cf361b8794d087b4fdfb8285b4b
     spec:
       automountServiceAccountToken: true
       containers:
@@ -1229,6 +1451,7 @@ spec:
         secret:
           defaultMode: 292
           secretName: agent-clusterwide-example
+<<<<<<< HEAD
 ---
 # Source: elastic-agent/templates/agent/k8s/statefulset.yaml
 apiVersion: apps/v1
@@ -1351,3 +1574,5 @@ spec:
         secret:
           defaultMode: 292
           secretName: agent-ksmsharded-example
+=======
+>>>>>>> edd342afa ([helm] add kube-state-metric subchart dependency (#6495))
