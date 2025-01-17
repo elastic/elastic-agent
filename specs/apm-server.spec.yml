@@ -1,4 +1,7 @@
 version: 2
+component_files: 
+ - "java-attarcher.jar"
+ - "module/*" 
 inputs:
   - name: apm
     description: "APM Server"

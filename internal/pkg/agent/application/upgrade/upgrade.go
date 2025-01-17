@@ -231,7 +231,12 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	u.log.Infow("Unpacking agent package", "version", newVersion)
 
 	// Nice to have: add check that no archive files end up in the current versioned home
-	unpackRes, err := u.unpack(version, archivePath, paths.Data())
+	// default to extended flavor to avoid breaking behavior
+
+	// no default flavor, keep everything in case flavor is not
+	// in case of error fallback to keep-all
+	detectedFlavor, _ := install.UsedFlavor(paths.Top(), "")
+	unpackRes, err := u.unpack(version, archivePath, paths.Data(), true, detectedFlavor)
 	if err != nil {
 		return nil, err
 	}

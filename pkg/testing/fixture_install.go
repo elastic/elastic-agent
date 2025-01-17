@@ -110,6 +110,7 @@ type InstallOpts struct {
 	DelayEnroll    bool   // --delay-enroll
 	Develop        bool   // --develop, not supported for DEB and RPM. Calling Install() sets Namespace to the development namespace so that checking only for a Namespace is sufficient.
 	Namespace      string // --namespace, not supported for DEB and RPM.
+	InstallServers bool   // --install-servers
 
 	Privileged bool // inverse of --unprivileged (as false is the default)
 	Username   string
@@ -151,6 +152,10 @@ func (i *InstallOpts) ToCmdArgs() []string {
 			// If --namespace was used it will override the development namespace.
 			i.Namespace = paths.DevelopmentNamespace
 		}
+	}
+
+	if i.InstallServers {
+		args = append(args, "--install-servers")
 	}
 
 	if i.Username != "" {
