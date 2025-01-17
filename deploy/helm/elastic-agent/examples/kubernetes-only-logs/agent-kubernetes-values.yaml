@@ -18,5 +18,8 @@ kubernetes:
   hints:
     enabled: false
 
+kube-state-metrics:
+  enabled: false
+
 agent:
   unprivileged: true

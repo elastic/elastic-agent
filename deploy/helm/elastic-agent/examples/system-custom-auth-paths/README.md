@@ -12,6 +12,12 @@ In this example we install the built-in `system` integration and specify custom 
 
 2. `system` integration assets installed through Kibana ([Kibana - Install and uninstall Elastic Agent integration assets](https://www.elastic.co/guide/en/fleet/current/install-uninstall-integration-assets.html))
 
+3. Build the dependencies of the Helm chart
+    ```console
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+    helm dependency build ../../
+    ```
+
 ## Run:
 ```console
 helm install elastic-agent ../../ \

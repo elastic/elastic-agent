@@ -524,21 +524,25 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 	}
 
 	c.log.Infof("1st enrollment attempt failed, retrying enrolling to URL: %s with exponential backoff (init %s, max %s)", c.client.URI(), enrollBackoffInit, enrollBackoffMax)
+
 	signal := make(chan struct{})
 	defer close(signal)
 	backExp := backoff.NewExpBackoff(signal, enrollBackoffInit, enrollBackoffMax)
 
 	for {
 		retry := false
-		if errors.Is(err, fleetapi.ErrTooManyRequests) {
+		switch {
+		case errors.Is(err, fleetapi.ErrTooManyRequests):
 			c.log.Warn("Too many requests on the remote server, will retry in a moment.")
 			retry = true
-		} else if errors.Is(err, fleetapi.ErrConnRefused) {
-			c.log.Warn("Remote server is not ready to accept connections, will retry in a moment.")
+		case errors.Is(err, fleetapi.ErrConnRefused):
+			c.log.Warn("Remote server is not ready to accept connections(Connection Refused), will retry in a moment.")
 			retry = true
-		} else if errors.Is(err, fleetapi.ErrTemporaryServerError) {
-			c.log.Warn("Remote server failed to handle the request, will retry in a moment.")
+		case errors.Is(err, fleetapi.ErrTemporaryServerError):
+			c.log.Warnf("Remote server failed to handle the request(%s), will retry in a moment.", err.Error())
 			retry = true
+		case err != nil:
+			c.log.Warnf("Enrollment failed: %s", err.Error())
 		}
 		if !retry {
 			break
