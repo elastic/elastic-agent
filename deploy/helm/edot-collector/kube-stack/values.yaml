@@ -45,7 +45,6 @@ collectors:
         otlp/gateway:
           # !!! Elastic APM https endpoint WITHOUT the "https://" prefix
           endpoint: "http://opentelemetry-kube-stack-gateway-collector:4317"
-          compression: none
           tls:
             insecure: true
       processors:
@@ -209,7 +208,6 @@ collectors:
         otlp/gateway:
           # !!! Elastic APM https endpoint WITHOUT the "https://" prefix
           endpoint: "http://opentelemetry-kube-stack-gateway-collector-headless:4317"
-          compression: none
           tls:
             insecure: true
       processors:
