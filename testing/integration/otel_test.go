@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"text/template"
 	"time"
@@ -1094,6 +1095,194 @@ service:
 		},
 		2*time.Minute, 1*time.Second,
 		"Expected at least %d logs, got %v", 1, actualHits)
+
+	cancel()
+	fixtureWg.Wait()
+	require.True(t, err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded), "Retrieved unexpected error: %s", err.Error())
+}
+
+func TestFBOtelRestartE2E(t *testing.T) {
+	// This test ensures that filebeatreceiver is able to deliver logs even
+	// in advent of a collector restart.
+	// The input is a file that is being appended to n times during the test.
+	// It starts a filebeat receiver and then restarts it a couple times.
+	// At the end it asserts that the number of logs in ES is equal to the number of
+	// lines in the input file.
+	info := define.Require(t, define.Requirements{
+		Group: Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+	tmpDir := t.TempDir()
+
+	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
+	require.NoError(t, err, "failed to create temp file to hold data to ingest")
+	inputFilePath := inputFile.Name()
+
+	// Create the otel configuration file
+	type otelConfigOptions struct {
+		InputPath  string
+		HomeDir    string
+		ESEndpoint string
+		ESApiKey   string
+		Index      string
+	}
+	esEndpoint, err := getESHost()
+	require.NoError(t, err, "error getting elasticsearch endpoint")
+	esApiKey, err := createESApiKey(info.ESClient)
+	require.NoError(t, err, "error creating API key")
+	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	index := "logs-integration-default"
+	otelConfigTemplate := `receivers:
+  filebeatreceiver:
+    filebeat:
+      inputs:
+        - type: filestream
+          id: filestream-end-to-end
+          enabled: true
+          paths:
+            - {{.InputPath}}
+    output:
+      otelconsumer:
+    logging:
+      level: info
+      selectors:
+        - '*'
+    path.home: {{.HomeDir}}
+    queue.mem.flush.timeout: 0s
+exporters:
+  elasticsearch/log:
+    endpoints:
+      - {{.ESEndpoint}}
+    api_key: {{.ESApiKey}}
+    logs_index: {{.Index}}
+    batcher:
+      enabled: true
+      flush_timeout: 1s
+    mapping:
+      mode: bodymap
+service:
+  pipelines:
+    logs:
+      receivers:
+        - filebeatreceiver
+      exporters:
+        - elasticsearch/log
+`
+	otelConfigPath := filepath.Join(tmpDir, "otel.yml")
+	var otelConfigBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("otelConfig").Parse(otelConfigTemplate)).Execute(&otelConfigBuffer,
+			otelConfigOptions{
+				InputPath:  inputFilePath,
+				HomeDir:    tmpDir,
+				ESEndpoint: esEndpoint,
+				ESApiKey:   esApiKey.Encoded,
+				Index:      index,
+			}))
+	require.NoError(t, os.WriteFile(otelConfigPath, otelConfigBuffer.Bytes(), 0o600))
+	t.Cleanup(func() {
+		if t.Failed() {
+			contents, err := os.ReadFile(otelConfigPath)
+			if err != nil {
+				t.Logf("No otel configuration file at %s", otelConfigPath)
+				return
+			}
+			t.Logf("Contents of otel config file:\n%s\n", string(contents))
+		}
+	})
+	// Now we can actually create the fixture and run it
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", otelConfigPath}))
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx, fakeComponent)
+	require.NoError(t, err)
+
+	// Write logs to input file
+	var inputLinesCounter atomic.Int64
+	var stopInputWriter atomic.Bool
+	go func() {
+		for i := 0; ; i++ {
+			if stopInputWriter.Load() {
+				break
+			}
+
+			_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
+			require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+			inputLinesCounter.Add(1)
+			time.Sleep(100 * time.Millisecond)
+		}
+		err = inputFile.Close()
+		require.NoError(t, err, "failed to close input file")
+	}()
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			contents, err := os.ReadFile(inputFilePath)
+			if err != nil {
+				t.Logf("no data file to import at %s", inputFilePath)
+				return
+			}
+			t.Logf("contents of import file:\n%s\n", string(contents))
+		}
+	})
+
+	var restartCount atomic.Int64
+	var fixtureWg sync.WaitGroup
+	fixtureWg.Add(1)
+	go func() {
+		defer fixtureWg.Done()
+
+		for {
+			// restart the collector every couple seconds while new data is being written
+			prevCount := inputLinesCounter.Load()
+			fCtx, cancel := context.WithDeadline(ctx, time.Now().Add(2*time.Second))
+			err = fixture.RunOtelWithClient(fCtx)
+			cancel()
+			require.True(t, errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled), "unexpected error: %v", err)
+			require.True(t, inputLinesCounter.Load() > prevCount, "expected input lines to increase")
+			restartCount.Add(1)
+
+			if stopInputWriter.Load() {
+				break
+			}
+		}
+
+		// start the collector again for the remaining of the test
+		fCtx, cancel := context.WithDeadline(ctx, time.Now().Add(5*time.Minute))
+		defer cancel()
+		err = fixture.RunOtelWithClient(fCtx)
+	}()
+
+	time.Sleep(5 * time.Second)
+	stopInputWriter.Store(true)
+
+	require.True(t, restartCount.Load() > 0, "expected the collector to restart at least once")
+
+	// Make sure all the logs are ingested
+	actualHits := &struct{ Hits int }{}
+	require.Eventually(t,
+		func() bool {
+			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer findCancel()
+
+			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]interface{}{
+				"log.file.path": inputFilePath,
+			})
+			require.NoError(t, err)
+
+			actualHits.Hits = docs.Hits.Total.Value
+			return actualHits.Hits == int(inputLinesCounter.Load())
+		},
+		2*time.Minute, 1*time.Second,
+		"Expected %d logs, got %v", int(inputLinesCounter.Load()), actualHits)
 
 	cancel()
 	fixtureWg.Wait()
