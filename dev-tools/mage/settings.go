@@ -471,7 +471,7 @@ func BeatQualifiedVersion() (string, error) {
 		return "", err
 	}
 	// version qualifier can intentionally be set to "" to override build time var
-	if !versionQualified || versionQualifier == "" {
+	if PackagingFromManifest || !versionQualified || versionQualifier == "" {
 		return version, nil
 	}
 	return version + "-" + versionQualifier, nil
@@ -648,11 +648,10 @@ func (s *BuildVariableSources) GetDocBranch() (string, error) {
 
 func parseBeatVersion(data []byte) (string, error) {
 	matches := beatVersionRegex.FindSubmatch(data)
-	if len(matches) == 2 {
-		return string(matches[1]), nil
+	if len(matches) != 2 {
+		return "", errors.New("failed to parse beat version file")
 	}
-
-	return "", errors.New("failed to parse beat version file")
+	return string(matches[1]) + SnapshotSuffix(), nil
 }
 
 func parseGoVersion(data []byte) (string, error) {

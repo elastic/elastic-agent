@@ -1319,13 +1319,13 @@ func downloadManifestAndSetVersion(ctx context.Context, url string) (*manifest.B
 		return nil, nil, fmt.Errorf("parsing manifest version %s: %w", resp.Version, err)
 	}
 
-	// When getting the packageVersion from snapshot we should also update the env of SNAPSHOT=true which is
-	// something that we use as an implicit parameter to various functions
-	if parsedVersion.IsSnapshot() {
-		os.Setenv(snapshotEnv, "true")
-		mage.Snapshot = true
-	}
-	os.Setenv("BEAT_VERSION", parsedVersion.CoreVersion())
+	//// When getting the packageVersion from snapshot we should also update the env of SNAPSHOT=true which is
+	//// something that we use as an implicit parameter to various functions
+	//if parsedVersion.IsSnapshot() {
+	//	os.Setenv(snapshotEnv, "true")
+	//	mage.Snapshot = true
+	//}
+	os.Setenv("BEAT_VERSION", resp.Version)
 
 	return &resp, parsedVersion, nil
 }
