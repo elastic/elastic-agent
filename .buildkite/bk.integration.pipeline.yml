@@ -92,18 +92,18 @@ steps:
           image: "family/platform-ingest-elastic-agent-ubuntu-2404"
         matrix:
           - default
-          - standalone-upgrade
-          - install-uninstall
-          - container
           - upgrade
+          - standalone-upgrade
           - fleet
           - fleet-endpoint-security
           - fleet-airgapped
           - fleet-airgapped-privileged
           - fleet-privileged
           - fleet-upgrade-to-pr-build
+          - install-uninstall
           - fqdn
           - deb
+          - container
 
       - label: "arm:sudo: {{matrix}}"
         skip: true
@@ -119,18 +119,18 @@ steps:
           instanceType: "m6g.2xlarge"
         matrix:
           - default
-          - standalone-upgrade
-          - install-uninstall
-          - container
-          - fleet-upgrade-to-pr-build
           - upgrade
+          - standalone-upgrade
           - fleet
           - fleet-endpoint-security
           - fleet-airgapped
-          - fleet-privileged
           - fleet-airgapped-privileged
+          - fleet-privileged
+          - fleet-upgrade-to-pr-build
+          - install-uninstall
           - fqdn
           - deb
+          - container
 
       - label: "arm:non-sudo: {{matrix}}"
         skip: true
