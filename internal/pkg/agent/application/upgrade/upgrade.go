@@ -233,7 +233,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	// Nice to have: add check that no archive files end up in the current versioned home
 	// default to extended flavor to avoid breaking behavior
 
-	// no default flavor, keep everything in case flavor is not
+	// no default flavor, keep everything in case flavor is not wspecified
 	// in case of error fallback to keep-all
 	detectedFlavor, _ := install.UsedFlavor(paths.Top(), "")
 	unpackRes, err := u.unpack(version, archivePath, paths.Data(), true, detectedFlavor)

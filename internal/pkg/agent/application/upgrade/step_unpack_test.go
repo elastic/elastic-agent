@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
@@ -59,6 +60,82 @@ inputs:
         - bar
         - baz
 `
+
+const foo_component_spec_with_dirs = `
+component_files:
+ - component_dir/*
+version: 2
+inputs:
+  - name: foobar
+    description: "Foo input"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+      - darwin/amd64
+      - darwin/arm64
+    outputs:
+      - elasticsearch
+      - kafka
+      - logstash
+    command:
+      args:
+        - foo
+        - bar
+        - baz
+`
+const foo_component_spec_with_archive = `
+component_files:
+ - component.zip
+version: 2
+inputs:
+  - name: foobar
+    description: "Foo input"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+      - darwin/amd64
+      - darwin/arm64
+    outputs:
+      - elasticsearch
+      - kafka
+      - logstash
+    command:
+      args:
+        - foo
+        - bar
+        - baz
+`
+
+const flavors = `
+basic:
+ - comp1
+ - comp2
+servers:
+ - comp1
+ - comp2
+ - comp3
+`
+
+var archiveFilesWithMoreComponents = []files{
+	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/" + v1.ManifestFileName, content: ea_123_manifest, mode: fs.ModePerm & 0o640},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/" + agentCommitFile, content: "abcdefghijklmnopqrstuvwxyz", mode: fs.ModePerm & 0o640},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/" + install.RegistryFileName, content: flavors, mode: fs.ModePerm & 0o640},
+	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
+	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/" + agentName, content: agentBinaryPlaceholderContent, mode: fs.ModePerm & 0o750},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/package.version", content: "1.2.3", mode: fs.ModePerm & 0o640},
+	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp1", content: "Placeholder for component", mode: fs.ModePerm & 0o750},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp1.spec.yml", content: foo_component_spec, mode: fs.ModePerm & 0o640},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp2", content: "Placeholder for component", mode: fs.ModePerm & 0o750},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp2.spec.yml", content: foo_component_spec_with_dirs, mode: fs.ModePerm & 0o640},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp3", content: "Placeholder for component", mode: fs.ModePerm & 0o750},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp3.spec.yml", content: foo_component_spec_with_archive, mode: fs.ModePerm & 0o640},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/component.zip", content: "inner file content", mode: fs.ModePerm & 0o640},
+	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/component_dir", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/component_dir/inner_file", content: "inner file content", mode: fs.ModePerm & 0o640},
+}
 
 var archiveFilesWithManifestNoSymlink = []files{
 	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
@@ -142,6 +219,7 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 		want       UnpackResult
 		wantErr    assert.ErrorAssertionFunc
 		checkFiles checkExtractedPath
+		flavor     string
 	}{
 		{
 			name: "file before containing folder",
@@ -178,6 +256,57 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 			wantErr:    assert.NoError,
 			checkFiles: checkExtractedFilesWithManifest,
 		},
+		{
+			name: "package with basic flavor",
+			args: args{
+				version:      "1.2.3",
+				archiveFiles: append(archiveFilesWithMoreComponents, agentArchiveSymLink),
+				archiveGenerator: func(t *testing.T, i []files) (string, error) {
+					return createTarArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.tar.gz", i)
+				},
+			},
+			want: UnpackResult{
+				Hash:          "abcdef",
+				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
+			},
+			wantErr: assert.NoError,
+			flavor:  "basic",
+			checkFiles: func(t *testing.T, testDataDir string) {
+				checkFilesPresence(t, testDataDir,
+					[]string{
+						"components/comp1", "components/comp1.spec.yml",
+						"components/comp2", "components/comp2.spec.yml",
+						"components/component_dir/inner_file",
+					},
+					[]string{"components/comp3", "components/comp3.spec.yml", "components/component.zip"})
+			},
+		},
+		{
+			name: "package with servers flavor",
+			args: args{
+				version:      "1.2.3",
+				archiveFiles: append(archiveFilesWithMoreComponents, agentArchiveSymLink),
+				archiveGenerator: func(t *testing.T, i []files) (string, error) {
+					return createTarArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.tar.gz", i)
+				},
+			},
+			want: UnpackResult{
+				Hash:          "abcdef",
+				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
+			},
+			wantErr: assert.NoError,
+			flavor:  "servers",
+			checkFiles: func(t *testing.T, testDataDir string) {
+				checkFilesPresence(t, testDataDir,
+					[]string{
+						"components/comp1", "components/comp1.spec.yml",
+						"components/comp2", "components/comp2.spec.yml",
+						"components/component_dir/inner_file",
+						"components/comp3", "components/comp3.spec.yml", "components/component.zip",
+					},
+					[]string{})
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -190,7 +319,7 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 			archiveFile, err := tt.args.archiveGenerator(t, tt.args.archiveFiles)
 			require.NoError(t, err, "creation of test archive file failed")
 
-			got, err := untar(log, archiveFile, testDataDir, false, "")
+			got, err := untar(log, archiveFile, testDataDir, tt.flavor)
 			if !tt.wantErr(t, err, fmt.Sprintf("untar(%v, %v, %v)", tt.args.version, archiveFile, testDataDir)) {
 				return
 			}
@@ -214,6 +343,7 @@ func TestUpgrader_unpackZip(t *testing.T) {
 		want       UnpackResult
 		wantErr    assert.ErrorAssertionFunc
 		checkFiles checkExtractedPath
+		flavor     string
 	}{
 		{
 			name: "file before containing folder",
@@ -248,6 +378,56 @@ func TestUpgrader_unpackZip(t *testing.T) {
 			wantErr:    assert.NoError,
 			checkFiles: checkExtractedFilesWithManifest,
 		},
+
+		{
+			name: "package with basic flavor",
+			args: args{
+				archiveFiles: archiveFilesWithMoreComponents,
+				archiveGenerator: func(t *testing.T, i []files) (string, error) {
+					return createZipArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.zip", i)
+				},
+			},
+			want: UnpackResult{
+				Hash:          "abcdef",
+				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
+			},
+			wantErr: assert.NoError,
+			flavor:  "basic",
+			checkFiles: func(t *testing.T, testDataDir string) {
+				checkFilesPresence(t, testDataDir,
+					[]string{
+						"components/comp1", "components/comp1.spec.yml",
+						"components/comp2", "components/comp2.spec.yml",
+						"components/component_dir/inner_file",
+					},
+					[]string{"components/comp3", "components/comp3.spec.yml", "components/component.zip"})
+			},
+		},
+		{
+			name: "package with servers flavor",
+			args: args{
+				archiveFiles: archiveFilesWithMoreComponents,
+				archiveGenerator: func(t *testing.T, i []files) (string, error) {
+					return createZipArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.zip", i)
+				},
+			},
+			want: UnpackResult{
+				Hash:          "abcdef",
+				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
+			},
+			wantErr: assert.NoError,
+			flavor:  "servers",
+			checkFiles: func(t *testing.T, testDataDir string) {
+				checkFilesPresence(t, testDataDir,
+					[]string{
+						"components/comp1", "components/comp1.spec.yml",
+						"components/comp2", "components/comp2.spec.yml",
+						"components/component_dir/inner_file",
+						"components/comp3", "components/comp3.spec.yml", "components/component.zip",
+					},
+					[]string{})
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -261,7 +441,7 @@ func TestUpgrader_unpackZip(t *testing.T) {
 			archiveFile, err := tt.args.archiveGenerator(t, tt.args.archiveFiles)
 			require.NoError(t, err, "creation of test archive file failed")
 
-			got, err := unzip(log, archiveFile, testDataDir, "")
+			got, err := unzip(log, archiveFile, testDataDir, tt.flavor)
 			if !tt.wantErr(t, err, fmt.Sprintf("unzip(%v, %v)", archiveFile, testDataDir)) {
 				return
 			}
@@ -309,6 +489,16 @@ func checkExtractedFilesWithManifest(t *testing.T, testDataDir string) {
 		if assert.NoErrorf(t, err, "error reading package manifest %q", mappedPackageManifest) {
 			assert.Equal(t, ea_123_manifest, string(fileBytes), "package manifest content does not match")
 		}
+	}
+}
+
+func checkFilesPresence(t *testing.T, testDataDir string, requiredFiles, unwantedFiles []string) {
+	versionedHome := filepath.Join(testDataDir, "elastic-agent-1.2.3-SNAPSHOT-abcdef")
+	for _, f := range requiredFiles {
+		assert.FileExists(t, filepath.Join(versionedHome, f))
+	}
+	for _, f := range unwantedFiles {
+		assert.NoFileExists(t, filepath.Join(versionedHome, f))
 	}
 }
 

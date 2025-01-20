@@ -43,7 +43,7 @@ func (u *Upgrader) unpack(version, archivePath, dataDir string, skipComponents b
 	if runtime.GOOS == windows {
 		unpackRes, err = unzip(u.log, archivePath, dataDir, flavor)
 	} else {
-		unpackRes, err = untar(u.log, archivePath, dataDir, skipComponents, flavor)
+		unpackRes, err = untar(u.log, archivePath, dataDir, flavor)
 	}
 
 	if err != nil {
@@ -321,7 +321,7 @@ func getPackageMetadataFromZipReader(r *zip.ReadCloser, fileNamePrefix string) (
 	return ret, nil
 }
 
-func untar(log *logger.Logger, archivePath, dataDir string, skipComponents bool, flavor string) (UnpackResult, error) {
+func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (UnpackResult, error) {
 	var versionedHome string
 	var rootDir string
 	var hash string
@@ -502,6 +502,12 @@ func skipFnFromTar(log *logger.Logger, archivePath string, flavor string) (insta
 				continue
 			}
 
+			reg, err := install.LoadRegistry(tr)
+			if err != nil {
+				return install.FlavorDefinition{}, err
+			}
+
+			return reg[flavor], nil
 		}
 
 		return install.FlavorDefinition{}, nil
