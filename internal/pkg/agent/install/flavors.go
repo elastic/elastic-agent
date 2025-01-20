@@ -199,8 +199,10 @@ func skipComponentsPath(relPath string, allowedSubpaths []string) bool {
 	if allowedSubpaths == nil {
 		return false
 	}
-
-	componentsDir := fmt.Sprintf("%ccomponents%c", os.PathSeparator, os.PathSeparator)
+	if runtime.GOOS == "windows" {
+		relPath = strings.ReplaceAll(relPath, "\\", "/")
+	}
+	componentsDir := "/components/" // fmt.Sprintf("%ccomponents%c",  .PathSeparator, os.PathSeparator)
 	componentsIdx := strings.Index(relPath, componentsDir)
 	if componentsIdx == -1 {
 		// not a components subpath, not blocking
@@ -208,9 +210,7 @@ func skipComponentsPath(relPath string, allowedSubpaths []string) bool {
 	}
 
 	subPath := relPath[componentsIdx+len(componentsDir):]
-	if runtime.GOOS == "windows" {
-		subPath = strings.ReplaceAll(subPath, "\\", "/")
-	}
+	
 
 	subDirsSuffix := `/*`
 	for _, allowedSubpath := range allowedSubpaths {
