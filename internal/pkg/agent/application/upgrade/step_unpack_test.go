@@ -126,12 +126,12 @@ var archiveFilesWithMoreComponents = []files{
 	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/" + agentName, content: agentBinaryPlaceholderContent, mode: fs.ModePerm & 0o750},
 	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/package.version", content: "1.2.3", mode: fs.ModePerm & 0o640},
 	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
-	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp1", binary:true, content: "Placeholder for component", mode: fs.ModePerm & 0o750},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp1", binary: true, content: "Placeholder for component", mode: fs.ModePerm & 0o750},
 	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp1", content: "Placeholder for component", mode: fs.ModePerm & 0o750},
 	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp1.spec.yml", content: foo_component_spec, mode: fs.ModePerm & 0o640},
-	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp2", binary:true, content: "Placeholder for component", mode: fs.ModePerm & 0o750},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp2", binary: true, content: "Placeholder for component", mode: fs.ModePerm & 0o750},
 	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp2.spec.yml", content: foo_component_spec_with_dirs, mode: fs.ModePerm & 0o640},
-	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp3", binary:true, content: "Placeholder for component", mode: fs.ModePerm & 0o750},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp3", binary: true, content: "Placeholder for component", mode: fs.ModePerm & 0o750},
 	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp3.spec.yml", content: foo_component_spec_with_archive, mode: fs.ModePerm & 0o640},
 	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/component.zip", content: "inner file content", mode: fs.ModePerm & 0o640},
 	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/component_dir", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
@@ -178,7 +178,7 @@ type files struct {
 	path    string
 	content string
 	mode    fs.FileMode
-	binary bool
+	binary  bool
 }
 
 func (f files) Name() string {
@@ -212,7 +212,7 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 	type args struct {
 		version          string
 		archiveGenerator createArchiveFunc
-		archiveFiles     []files 
+		archiveFiles     []files
 	}
 
 	binarySuffix := ""
@@ -281,11 +281,11 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 			checkFiles: func(t *testing.T, testDataDir string) {
 				checkFilesPresence(t, testDataDir,
 					[]string{
-						filepath.Join("components","comp1"+binarySuffix), filepath.Join("components","comp1.spec.yml"),
-						filepath.Join("components","comp2"+binarySuffix), filepath.Join("components","comp2.spec.yml"),
-						filepath.Join("components","component_dir","inner_file"),
+						filepath.Join("components", "comp1"+binarySuffix), filepath.Join("components", "comp1.spec.yml"),
+						filepath.Join("components", "comp2"+binarySuffix), filepath.Join("components", "comp2.spec.yml"),
+						filepath.Join("components", "component_dir", "inner_file"),
 					},
-					[]string{filepath.Join("components","comp3"), filepath.Join("components","comp3.spec.yml"), filepath.Join("components","component.zip")})
+					[]string{filepath.Join("components", "comp3"), filepath.Join("components", "comp3.spec.yml"), filepath.Join("components", "component.zip")})
 			},
 		},
 		{
@@ -305,12 +305,11 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 			flavor:  "servers",
 			checkFiles: func(t *testing.T, testDataDir string) {
 				checkFilesPresence(t, testDataDir,
-					
 					[]string{
-						filepath.Join("components","comp1"+binarySuffix), filepath.Join("components","comp1.spec.yml"),
-						filepath.Join("components","comp2"+binarySuffix), filepath.Join("components","comp2.spec.yml"),
-						filepath.Join("components","component_dir","inner_file"),
-						filepath.Join("components","comp3"+binarySuffix), filepath.Join("components","comp3.spec.yml"), filepath.Join("components","component.zip"),
+						filepath.Join("components", "comp1"+binarySuffix), filepath.Join("components", "comp1.spec.yml"),
+						filepath.Join("components", "comp2"+binarySuffix), filepath.Join("components", "comp2.spec.yml"),
+						filepath.Join("components", "component_dir", "inner_file"),
+						filepath.Join("components", "comp3"+binarySuffix), filepath.Join("components", "comp3.spec.yml"), filepath.Join("components", "component.zip"),
 					},
 					[]string{})
 			},
@@ -409,11 +408,11 @@ func TestUpgrader_unpackZip(t *testing.T) {
 			checkFiles: func(t *testing.T, testDataDir string) {
 				checkFilesPresence(t, testDataDir,
 					[]string{
-						filepath.Join("components","comp1"+binarySuffix), filepath.Join("components","comp1.spec.yml"),
-						filepath.Join("components","comp2"+binarySuffix), filepath.Join("components","comp2.spec.yml"),
-						filepath.Join("components","component_dir","inner_file"),
+						filepath.Join("components", "comp1"+binarySuffix), filepath.Join("components", "comp1.spec.yml"),
+						filepath.Join("components", "comp2"+binarySuffix), filepath.Join("components", "comp2.spec.yml"),
+						filepath.Join("components", "component_dir", "inner_file"),
 					},
-					[]string{filepath.Join("components","comp3"+binarySuffix), filepath.Join("components","comp3.spec.yml"), filepath.Join("components","component.zip")})
+					[]string{filepath.Join("components", "comp3"+binarySuffix), filepath.Join("components", "comp3.spec.yml"), filepath.Join("components", "component.zip")})
 			},
 		},
 		{
@@ -432,12 +431,11 @@ func TestUpgrader_unpackZip(t *testing.T) {
 			flavor:  "servers",
 			checkFiles: func(t *testing.T, testDataDir string) {
 				checkFilesPresence(t, testDataDir,
-					
 					[]string{
-						filepath.Join("components","comp1"+binarySuffix), filepath.Join("components","comp1.spec.yml"),
-						filepath.Join("components","comp2"+binarySuffix), filepath.Join("components","comp2.spec.yml"),
-						filepath.Join("components","component_dir","inner_file"),					
-						filepath.Join("components","comp3"+binarySuffix), filepath.Join("components","comp3.spec.yml"), filepath.Join("components","component.zip"),
+						filepath.Join("components", "comp1"+binarySuffix), filepath.Join("components", "comp1.spec.yml"),
+						filepath.Join("components", "comp2"+binarySuffix), filepath.Join("components", "comp2.spec.yml"),
+						filepath.Join("components", "component_dir", "inner_file"),
+						filepath.Join("components", "comp3"+binarySuffix), filepath.Join("components", "comp3.spec.yml"), filepath.Join("components", "component.zip"),
 					},
 					[]string{})
 			},
@@ -547,7 +545,7 @@ func addEntryToTarArchive(af files, writer *tar.Writer) error {
 	if af.binary && runtime.GOOS == "windows" {
 		af.path += ".exe"
 	}
-	
+
 	header, err := tar.FileInfoHeader(&af, af.content)
 	if err != nil {
 		return fmt.Errorf("creating header for %q: %w", af.path, err)
@@ -602,7 +600,7 @@ func addEntryToZipArchive(af files, writer *zip.Writer) error {
 	if af.binary && runtime.GOOS == "windows" {
 		af.path += ".exe"
 	}
-	
+
 	header, err := zip.FileInfoHeader(&af)
 	if err != nil {
 		return fmt.Errorf("creating header for %q: %w", af.path, err)

@@ -210,7 +210,6 @@ func skipComponentsPath(relPath string, allowedSubpaths []string) bool {
 	}
 
 	subPath := relPath[componentsIdx+len(componentsDir):]
-	
 
 	subDirsSuffix := `/*`
 	for _, allowedSubpath := range allowedSubpaths {
