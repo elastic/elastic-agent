@@ -136,7 +136,7 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 			t.Cleanup(func() {
 				_ = os.Chdir(cwd)
 			})
-			out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true, InstallServers: true})
+			out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 			require.Error(t, err, "uninstall should have failed")
 			require.Containsf(t, string(out), "uninstall must be run from outside the installed path", "expected error string not found in: %s err: %s", out, err)
 		}
@@ -182,7 +182,7 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 			t.Cleanup(func() {
 				_ = os.Chdir(cwd)
 			})
-			out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true, InstallServers: true})
+			out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 			require.Error(t, err, "uninstall should have failed")
 			require.Containsf(t, string(out), "uninstall must be run from outside the installed path", "expected error string not found in: %s err: %s", out, err)
 		}
