@@ -1,7 +1,8 @@
 version: 2
 component_files: 
  - "java-attarcher.jar"
- - "module/*" 
+ - "install-service.ps1"
+ - "uninstall-service.ps1"
 inputs:
   - name: apm
     description: "APM Server"
