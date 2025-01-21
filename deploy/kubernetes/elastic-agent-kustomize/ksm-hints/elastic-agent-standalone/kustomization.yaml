@@ -19,7 +19,7 @@ patches:
         spec:
           initContainers:
             - name: k8s-templates-downloader
-              image: docker.elastic.co/beats/elastic-agent:8.16.3
+              image: docker.elastic.co/beats/elastic-agent:8.16.4
               command: ['bash']
               args:
                 - -c
