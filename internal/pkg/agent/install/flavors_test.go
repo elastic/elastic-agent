@@ -15,6 +15,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var flavorsRegistry = map[string][]string{
+	"basic":   {"agentbeat", "endpoint-security", "pf-host-agent"},
+	"servers": {"agentbeat", "endpoint-security", "pf-host-agent", "cloudbeat", "apm-server", "fleet-server", "pf-elastic-symbolizer", "pf-elastic-collector"},
+}
+
 func TestSubpathsForComponent(t *testing.T) {
 	binarySuffix := ""
 	if runtime.GOOS == "windows" {
@@ -170,7 +175,7 @@ func TestAllowedSubpathsForFlavor(t *testing.T) {
 			}
 
 			// Test function
-			flavor, err := Flavor(tt.flavor, RegistryFileName, nil)
+			flavor, err := Flavor(tt.flavor, "", flavorsRegistry)
 			if tt.wantError {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorContains)
@@ -321,7 +326,7 @@ func TestSkipComponentsPathFn(t *testing.T) {
 			}
 
 			// Test function
-			flavor, err := Flavor(tt.flavor, RegistryFileName, nil)
+			flavor, err := Flavor(tt.flavor, "", flavorsRegistry)
 			if tt.wantError {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorContains)
@@ -542,7 +547,7 @@ func TestSpecsForFlavor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			flavor, err := Flavor(tt.flavor, RegistryFileName, nil)
+			flavor, err := Flavor(tt.flavor, "", nil)
 			if tt.wantError {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorContains)

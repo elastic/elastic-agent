@@ -7,20 +7,19 @@ package install
 import (
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 
+	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"gopkg.in/yaml.v3"
 )
 
 const (
-	FlavorBasic      = "basic"
-	FlavorServers    = "servers"
-	RegistryFileName = ".flavors"
+	FlavorBasic   = "basic"
+	FlavorServers = "servers"
 
 	DefaultFlavor  = FlavorBasic
 	flavorFileName = ".flavor"
@@ -33,27 +32,6 @@ var ErrUnknownFlavor = fmt.Errorf("unknown flavor")
 type FlavorDefinition struct {
 	Name       string
 	Components []string
-}
-
-type FlavorsRegistry map[string]FlavorDefinition
-
-func RegistryFilePath(topPath string) string {
-	return filepath.Join(topPath, RegistryFileName)
-}
-
-func LoadRegistry(r io.Reader) (FlavorsRegistry, error) {
-	flavorMap := make(map[string][]string)
-	d := yaml.NewDecoder(r)
-	if err := d.Decode(flavorMap); err != nil {
-		return FlavorsRegistry{}, fmt.Errorf("failed to parse flavor registry: %w", err)
-	}
-
-	reg := make(FlavorsRegistry)
-	for name, components := range flavorMap {
-		reg[name] = FlavorDefinition{name, components}
-	}
-
-	return reg, nil
 }
 
 func UsedFlavor(topPath, defaultFlavor string) (string, error) {
@@ -73,25 +51,26 @@ func UsedFlavor(topPath, defaultFlavor string) (string, error) {
 	return string(content), nil
 }
 
-func Flavor(detectedFlavor string, registryPath string, flavorsRegistry FlavorsRegistry) (FlavorDefinition, error) {
+func Flavor(detectedFlavor string, registryPath string, flavorsRegistry map[string][]string) (FlavorDefinition, error) {
 	if flavorsRegistry == nil {
 		f, err := os.Open(registryPath)
 		if err != nil {
 			return FlavorDefinition{}, err
 		}
-		flavorsRegistry, err = LoadRegistry(f)
+		manifest, err := v1.ParseManifest(f)
 		if err != nil {
 			return FlavorDefinition{}, err
 		}
 		defer f.Close()
+		flavorsRegistry = manifest.Package.Flavors
 	}
 
-	flavor, found := flavorsRegistry[detectedFlavor]
+	components, found := flavorsRegistry[detectedFlavor]
 	if !found {
 		return FlavorDefinition{}, ErrUnknownFlavor
 	}
 
-	return flavor, nil
+	return FlavorDefinition{detectedFlavor, components}, nil
 }
 
 // SpecsForFlavor returns spec files associated with specific flavor

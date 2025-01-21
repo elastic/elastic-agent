@@ -78,7 +78,7 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 
 	skipFn := func(relPath string) bool { return false }
 	if flavor != "" {
-		flavorDefinition, err := Flavor(flavor, RegistryFilePath(dir), nil)
+		flavorDefinition, err := Flavor(flavor, "", manifest.Package.Flavors)
 		if err != nil {
 			return utils.FileOwner{}, err
 		}

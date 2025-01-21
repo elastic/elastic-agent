@@ -40,7 +40,8 @@ const (
 
 	elasticAgentModulePath = "github.com/elastic/elastic-agent"
 
-	defaultName = "elastic-agent"
+	defaultName             = "elastic-agent"
+	flavorsRegistryFilename = ".flavors"
 
 	// Env vars
 	// agent package version
@@ -346,10 +347,15 @@ func PackageManifest() (string, error) {
 		return "", fmt.Errorf("retrieving agent commit hash: %w", err)
 	}
 
-	return GeneratePackageManifest(BeatName, packageVersion, Snapshot, hash, commitHashShort)
+	registry, err := loadFlavorsRegistry()
+	if err != nil {
+		return "", fmt.Errorf("retrieving agent flavors: %w", err)
+	}
+
+	return GeneratePackageManifest(BeatName, packageVersion, Snapshot, hash, commitHashShort, registry)
 }
 
-func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, fullHash, shortHash string) (string, error) {
+func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, fullHash, shortHash string, flavorsRegistry map[string][]string) (string, error) {
 	m := v1.NewManifest()
 	m.Package.Version = packageVersion
 	m.Package.Snapshot = snapshot
@@ -360,6 +366,7 @@ func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, ful
 	m.Package.PathMappings = []map[string]string{{}}
 	m.Package.PathMappings[0][versionedHomePath] = fmt.Sprintf("data/%s-%s%s-%s", beatName, m.Package.Version, GenerateSnapshotSuffix(snapshot), shortHash)
 	m.Package.PathMappings[0][v1.ManifestFileName] = fmt.Sprintf("data/%s-%s%s-%s/%s", beatName, m.Package.Version, GenerateSnapshotSuffix(snapshot), shortHash, v1.ManifestFileName)
+	m.Package.Flavors = flavorsRegistry
 	yamlBytes, err := yaml.Marshal(m)
 	if err != nil {
 		return "", fmt.Errorf("marshaling manifest: %w", err)
@@ -461,6 +468,10 @@ var (
 	beatVersionValue string
 	beatVersionErr   error
 	beatVersionOnce  sync.Once
+
+	flavorsRegistry    map[string][]string
+	flavorsRegistryErr error
+	flavorsOnce        sync.Once
 )
 
 // BeatQualifiedVersion returns the Beat's qualified version.  The value can be overwritten by
@@ -492,6 +503,14 @@ func beatVersion() (string, error) {
 	return beatVersionValue, beatVersionErr
 }
 
+func loadFlavorsRegistry() (map[string][]string, error) {
+	flavorsOnce.Do(func() {
+		flavorsRegistry, flavorsRegistryErr = getBuildVariableSources().GetFlavorsRegistry()
+	})
+
+	return flavorsRegistry, flavorsRegistryErr
+}
+
 var (
 	beatDocBranchRegex     = regexp.MustCompile(`(?m)doc-branch:\s*([^\s]+)\r?$`)
 	beatDocSiteBranchRegex = regexp.MustCompile(`(?m)doc-site-branch:\s*([^\s]+)\r?$`)
@@ -521,9 +540,10 @@ var (
 	// DefaultBeatBuildVariableSources contains the default locations build
 	// variables are read from by Elastic Beats.
 	DefaultBeatBuildVariableSources = &BuildVariableSources{
-		BeatVersion: "{{ elastic_beats_dir }}/version/version.go",
-		GoVersion:   "{{ elastic_beats_dir }}/.go-version",
-		DocBranch:   "{{ elastic_beats_dir }}/version/docs/version.asciidoc",
+		BeatVersion:     "{{ elastic_beats_dir }}/version/version.go",
+		GoVersion:       "{{ elastic_beats_dir }}/.go-version",
+		DocBranch:       "{{ elastic_beats_dir }}/version/docs/version.asciidoc",
+		FlavorsRegistry: "{{ elastic_beats_dir }}/.flavors",
 	}
 
 	buildVariableSources     *BuildVariableSources
@@ -584,6 +604,9 @@ type BuildVariableSources struct {
 
 	// Parses the documentation branch from the DocBranch file.
 	DocBranchParser func(data []byte) (string, error)
+
+	// File containing definition of flavors.
+	FlavorsRegistry string
 }
 
 func (s *BuildVariableSources) expandVar(in string) (string, error) {
@@ -626,6 +649,26 @@ func (s *BuildVariableSources) GetGoVersion() (string, error) {
 		s.GoVersionParser = parseGoVersion
 	}
 	return s.GoVersionParser(data)
+}
+
+// GetGoVersion reads the GoVersion file and parses the version from it.
+func (s *BuildVariableSources) GetFlavorsRegistry() (map[string][]string, error) {
+	file, err := s.expandVar(s.FlavorsRegistry)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read go version file=%v: %w", file, err)
+	}
+
+	registry := make(map[string][]string)
+	if err := yaml.Unmarshal(data, registry); err != nil {
+		return nil, err
+	}
+
+	return registry, nil
 }
 
 // GetDocBranch reads the DocBranch file and parses the branch from it.

@@ -22,7 +22,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
@@ -36,6 +35,14 @@ package:
   version: 1.2.3
   snapshot: true
   versioned-home: data/elastic-agent-abcdef
+  flavors:
+    basic:
+      - comp1
+      - comp2
+    servers:
+      - comp1
+      - comp2
+      - comp3
   path-mappings:
     - data/elastic-agent-abcdef: data/elastic-agent-1.2.3-SNAPSHOT-abcdef
       manifest.yaml: data/elastic-agent-1.2.3-SNAPSHOT-abcdef/manifest.yaml
@@ -106,21 +113,10 @@ inputs:
         - baz
 `
 
-const flavors = `
-basic:
- - comp1
- - comp2
-servers:
- - comp1
- - comp2
- - comp3
-`
-
 var archiveFilesWithMoreComponents = []files{
 	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
 	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/" + v1.ManifestFileName, content: ea_123_manifest, mode: fs.ModePerm & 0o640},
 	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/" + agentCommitFile, content: "abcdefghijklmnopqrstuvwxyz", mode: fs.ModePerm & 0o640},
-	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/" + install.RegistryFileName, content: flavors, mode: fs.ModePerm & 0o640},
 	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
 	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
 	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/" + agentName, content: agentBinaryPlaceholderContent, mode: fs.ModePerm & 0o750},
