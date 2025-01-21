@@ -364,7 +364,7 @@ func execUninstall(streams *cli.IOStreams, topPath string, binName string) error
 		"--force",
 	}
 
-	// Using the topPath with binaryName is feasable as the shell wrapper (linux) does not
+	// Using the topPath with binaryName is feasable only because the shell wrapper (linux) does not
 	// do anything complicated aside from calling the agent binary. If this were
 	// to change, the implementation here may need to change as well.
 	binPath := filepath.Join(topPath, binName)
