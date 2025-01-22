@@ -7,7 +7,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -370,10 +369,6 @@ func execUninstall(streams *cli.IOStreams, topPath string, binName string) error
 	binPath := filepath.Join(topPath, binName)
 	fi, err := os.Stat(binPath)
 	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return fmt.Errorf("unable to find %s on path: %w", binPath, err)
-		}
-
 		return fmt.Errorf("error checking binary path %s: %w", binPath, err)
 	}
 
