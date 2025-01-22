@@ -37,7 +37,7 @@ steps:
           provider: "gcp"
           imageProject: elastic-images-qa
           machineType: "n1-standard-8"
-          image: "platform-ingest-elastic-agent-ubuntu-2404-1736344402"
+          image: "platform-ingest-elastic-agent-ubuntu-2404-1737461441"
         matrix:
           - default
 
@@ -52,7 +52,7 @@ steps:
           provider: "gcp"
           imageProject: elastic-images-qa
           machineType: "n1-standard-8"
-          image: "platform-ingest-elastic-agent-ubuntu-2404-1736344402"
+          image: "platform-ingest-elastic-agent-ubuntu-2404-1737461441"
         matrix:
           - default
           - container
