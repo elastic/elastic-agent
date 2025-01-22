@@ -382,7 +382,7 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 	t.Run("check second agent installs with --develop", testSecondAgentCanInstall(ctx, fixture, randomBasePath, true, opts))
 	t.Run("check second agent can be installed again with --develop --force", testSecondAgentCanInstallWithForce(ctx, fixture, randomBasePath, true, opts))
 	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
-		require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
 	})
 }
 
