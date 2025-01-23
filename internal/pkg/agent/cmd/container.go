@@ -783,19 +783,7 @@ func containerCfgOverrides(cfg *configuration.Configuration) {
 		cfg.Settings.EventLoggingConfig.ToStderr = true
 	}
 
-	// Default the container gRPC port to 0 in containers. This allows multiple agent pods to run on the same
-	// node when host networking is used (or when some other pod uses the same port). The ELASTIC_AGENT_GRPC_PORT
-	// variable is intentionally undocumented, nobody should need to use it but it's available in case of the unexpected.
-	defaultContainerGRPCPort := 0
-	grpcPortEnv := envWithDefault(strconv.Itoa(defaultContainerGRPCPort), "ELASTIC_AGENT_GRPC_PORT")
-	grpcPort, err := strconv.Atoi(grpcPortEnv)
-	if err != nil {
-		grpcPort = defaultContainerGRPCPort
-		logp.Warn("cannot parse ELASTIC_AGENT_GRPC_PORT='%s' as integer, using default %d'", grpcPortEnv, grpcPort)
-	}
-
-	cfg.Settings.GRPC.Port = uint16(grpcPort)
-	logp.Warn("Overrode default gRPC port with %d", cfg.Settings.GRPC.Port)
+	configuration.OverrideDefaultContainerGRPCPort(cfg.Settings.GRPC)
 }
 
 func setPaths(statePath, configPath, logsPath, socketPath string, writePaths bool) error {
