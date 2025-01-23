@@ -21,6 +21,7 @@ import (
 	k8sobjectsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver"
 	kubeletstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver"
 	prometheusreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver"
+	receivercreator "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator"
 	zipkinreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
 
@@ -52,6 +53,7 @@ import (
 
 	// Extensions
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension"
+	k8sobserver "github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver"
 	pprofextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension"
 	filestorage "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage"
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
@@ -78,6 +80,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			httpcheckreceiver.NewFactory(),
 			k8sobjectsreceiver.NewFactory(),
 			prometheusreceiver.NewFactory(),
+			receivercreator.NewFactory(),
 			jaegerreceiver.NewFactory(),
 			zipkinreceiver.NewFactory(),
 			fbreceiver.NewFactory(),
@@ -132,6 +135,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			filestorage.NewFactory(),
 			healthcheckextension.NewFactory(),
 			pprofextension.NewFactory(),
+			k8sobserver.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)
 		factories.Extensions, err = extension.MakeFactoryMap(extensions...)
