@@ -77,7 +77,6 @@ The following actions are possible and grouped based on the actions.
   ELASTIC_AGENT_CERT - path to certificate to use for connecting to fleet-server.
   ELASTIC_AGENT_CERT_KEY - path to private key use for connecting to fleet-server.
 
-
   The following vars are need in the scenario that Elastic Agent should automatically fetch its own token.
 
   KIBANA_FLEET_HOST - Kibana host to enable create enrollment token on [$KIBANA_HOST]
@@ -282,7 +281,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 	_, err = os.Stat(paths.AgentConfigFile())
 	if !os.IsNotExist(err) && !cfg.Fleet.Force {
 		// already enrolled, just run the standard run
-		return run(logToStderr, false, initTimeout, isContainer)
+		return run(containerCfgOverrides, false, initTimeout, isContainer)
 	}
 
 	if cfg.FleetServer.Enable {
@@ -336,7 +335,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		}
 	}
 
-	return run(logToStderr, false, initTimeout, isContainer)
+	return run(containerCfgOverrides, false, initTimeout, isContainer)
 }
 
 // TokenResp is used to decode a response for generating a service token
@@ -766,7 +765,7 @@ func runLegacyAPMServer(streams *cli.IOStreams) (*process.Info, error) {
 	return process.Start(spec.BinaryPath, options...)
 }
 
-func logToStderr(cfg *configuration.Configuration) {
+func containerCfgOverrides(cfg *configuration.Configuration) {
 	logsPath := envWithDefault("", "LOGS_PATH")
 	if logsPath == "" {
 		// when no LOGS_PATH defined the container should log to stderr
@@ -783,6 +782,20 @@ func logToStderr(cfg *configuration.Configuration) {
 		cfg.Settings.EventLoggingConfig.ToFiles = false
 		cfg.Settings.EventLoggingConfig.ToStderr = true
 	}
+
+	// Default the container gRPC port to 0 in containers. This allows multiple agent pods to run on the same
+	// node when host networking is used (or when some other pod uses the same port). The ELASTIC_AGENT_GRPC_PORT
+	// variable is intentionally undocumented, nobody should need to use it but it's available in case of the unexpected.
+	defaultContainerGRPCPort := 0
+	grpcPortEnv := envWithDefault(strconv.Itoa(defaultContainerGRPCPort), "ELASTIC_AGENT_GRPC_PORT")
+	grpcPort, err := strconv.Atoi(grpcPortEnv)
+	if err != nil {
+		grpcPort = defaultContainerGRPCPort
+		logp.Warn("cannot parse ELASTIC_AGENT_GRPC_PORT='%s' as integer, using default %d'", grpcPortEnv, grpcPort)
+	}
+
+	cfg.Settings.GRPC.Port = uint16(grpcPort)
+	logp.Warn("Overrode default gRPC port with %d", cfg.Settings.GRPC.Port)
 }
 
 func setPaths(statePath, configPath, logsPath, socketPath string, writePaths bool) error {
