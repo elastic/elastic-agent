@@ -3,6 +3,8 @@ repos:
     rev: v4.6.0
     hooks:
     -   id: check-executables-have-shebangs
+        exclude: (.*/.*.(ps1|bat|bash)$)
     -   id: check-shebang-scripts-are-executable
+        exclude: (.*/.*.(tmpl|tftpl)$)
     -   id: check-merge-conflict
         args: ['--assume-in-merge']
