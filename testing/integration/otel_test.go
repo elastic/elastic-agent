@@ -1150,6 +1150,8 @@ func TestFBOtelRestartE2E(t *testing.T) {
           parsers:
             - ndjson:
                 document_id: "id"
+          prospector.scanner.fingerprint.enabled: false
+          file_identity.native: ~
     output:
       otelconsumer:
     logging:
@@ -1157,6 +1159,7 @@ func TestFBOtelRestartE2E(t *testing.T) {
       selectors:
         - '*'
     path.home: {{.HomeDir}}
+    path.logs: {{.HomeDir}}
     queue.mem.flush.timeout: 0s
 exporters:
   debug:
@@ -1223,8 +1226,10 @@ service:
 				break
 			}
 
-			_, err = inputFile.Write([]byte(fmt.Sprintf(`{"id": "%d", "text": "line %d"}\n`, i, i)))
+			_, err = inputFile.Write([]byte(fmt.Sprintf(`{"id": "%d", "message": "line %d"}`, i, i)))
 			require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+			_, err = inputFile.Write([]byte("\n"))
+			require.NoErrorf(t, err, "failed to write newline to temp file")
 			inputLinesCounter.Add(1)
 			time.Sleep(100 * time.Millisecond)
 		}
