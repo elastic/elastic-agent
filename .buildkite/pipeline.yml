@@ -261,7 +261,7 @@ steps:
                   - GH_VERSION=2.4.0
 
   # Trigger for pull requests
-  - label: "Trigger Integration tests for Pull request"
+  - label: "Trigger Extended tests for Pull request"
     if: |
       (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
       build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
@@ -274,6 +274,7 @@ steps:
                 - internal/
                 - dev-tools/
                 - pkg/
+                - deploy/
                 - testing/
                 - version/
                 - specs/
@@ -301,7 +302,7 @@ steps:
                     - GITHUB_PR_LABELS=${GITHUB_PR_LABELS}
 
   # Trigger for branches
-  - label: "Triggering Integration tests for branches"
+  - label: "Triggering Extended tests for branches"
     if: build.pull_request.id == null
     trigger: "elastic-agent-extended-testing"
     build:

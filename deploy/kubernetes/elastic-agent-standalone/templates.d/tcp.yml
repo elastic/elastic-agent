@@ -1,22 +1,11 @@
 inputs:
-    - name: tcp-tcp
-      id: tcp-tcp-${kubernetes.hints.container_id}
-      type: tcp
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.tcp.generic.enabled} == true or ${kubernetes.hints.tcp.enabled} == true
-          data_stream:
-            dataset: tcp.generic
-            type: logs
-          host: localhost:8080
-          timeout: ${kubernetes.hints.tcp.generic.timeout|kubernetes.hints.tcp.timeout|''}
-      data_stream.namespace: default
     - name: filestream-tcp
       id: filestream-tcp-${kubernetes.hints.container_id}
       type: filestream
       use_output: default
       streams:
-        - condition: ${kubernetes.hints.tcp.container_logs.enabled} == true
+        - id: tcp-container-logs-${kubernetes.hints.container_id}
+          condition: ${kubernetes.hints.tcp.container_logs.enabled} == true
           data_stream:
             dataset: tcp.container_logs
             type: logs
@@ -32,4 +21,16 @@ inputs:
             scanner:
                 symlinks: true
           tags: []
+      data_stream.namespace: default
+    - name: tcp-tcp
+      id: tcp-tcp-${kubernetes.hints.container_id}
+      type: tcp
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.tcp.generic.enabled} == true or ${kubernetes.hints.tcp.enabled} == true
+          data_stream:
+            dataset: tcp.generic
+            type: logs
+          host: localhost:8080
+          timeout: ${kubernetes.hints.tcp.generic.timeout|kubernetes.hints.tcp.timeout|''}
       data_stream.namespace: default

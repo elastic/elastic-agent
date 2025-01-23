@@ -10,6 +10,9 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
+          id: filestream-snort-snort-log-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -26,6 +29,8 @@ inputs:
                 target: _tmp
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - forwarded

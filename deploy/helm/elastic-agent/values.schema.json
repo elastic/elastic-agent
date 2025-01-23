@@ -116,13 +116,9 @@
                             "type": "boolean",
                             "description": "Enable state streams based on kube-state-metrics."
                         },
-                        "deployKSM": {
-                            "type": "boolean",
-                            "description": "Deploy kube-state-metrics service as a sidecar container."
-                        },
                         "host": {
                             "type": "string",
-                            "description": "Host of the kube-state-metrics service, used when deployKSM is set to false."
+                            "description": "Host of the kube-state-metrics service, used when kube-state-metrics.enabled is set to false."
                         },
                         "vars": {
                             "type": "object",
@@ -130,27 +126,8 @@
                         }
                     },
                     "required": [
-                        "enabled",
-                        "deployKSM"
-                    ],
-                    "if": {
-                        "properties": {
-                            "deployKSM": {
-                                "const": false
-                            }
-                        }
-                    },
-                    "then": {
-                        "properties": {
-                            "host": {
-                                "type": "string",
-                                "format": "uri"
-                            }
-                        },
-                        "required": [
-                            "host"
-                        ]
-                    }
+                        "enabled"
+                    ]
                 },
                 "metrics": {
                     "type": "object",
@@ -413,8 +390,7 @@
                                 ],
                                 "properties": {
                                     "preset": {
-                                        "type": "string",
-                                        "minLength": 1
+                                        "type": "string"
                                     },
                                     "url": {
                                         "type": "string",
@@ -436,8 +412,7 @@
                                 ],
                                 "properties": {
                                     "preset": {
-                                        "type": "string",
-                                        "minLength": 1
+                                        "type": "string"
                                     },
                                     "url": {
                                         "type": "string",
@@ -491,33 +466,135 @@
         "outputs",
         "agent"
     ],
-    "if": {
-        "properties": {
-            "agent": {
+    "allOf": [
+        {
+            "if": {
                 "properties": {
-                    "engine": {
-                        "const": "k8s"
+                    "agent": {
+                        "properties": {
+                            "engine": {
+                                "const": "k8s"
+                            }
+                        }
+                    }
+                }
+            },
+            "then": {
+                "not": {
+                    "properties": {
+                        "outputs": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "properties": {
+                                    "type": {
+                                        "const": "ESECKRef"
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
-        }
-    },
-    "then": {
-        "not": {
-            "properties": {
-                "outputs": {
-                    "type": "object",
-                    "additionalProperties": {
+        },
+        {
+            "if": {
+                "properties": {
+                    "kube-state-metrics": {
                         "properties": {
-                            "type": {
-                                "const": "ESECKRef"
+                            "enabled": {
+                                "const": true
+                            }
+                        }
+                    },
+                    "agent": {
+                        "properties": {
+                            "engine": {
+                                "const": "eck"
+                            }
+                        }
+                    }
+                }
+            },
+            "then": {
+                "properties": {
+                    "kubernetes": {
+                        "properties": {
+                            "state": {
+                                "properties": {
+                                    "agentAsSidecar": {
+                                        "properties": {
+                                            "enabled": {
+                                                "const": false
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "if": {
+                "properties": {
+                    "kube-state-metrics": {
+                        "properties": {
+                            "enabled": {
+                                "const": true
+                            }
+                        }
+                    },
+                    "kubernetes": {
+                        "properties": {
+                            "state": {
+                                "properties": {
+                                    "agentAsSidecar": {
+                                        "properties": {
+                                            "enabled": {
+                                                "const": true
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "agent": {
+                        "fleet": {
+                            "enabled": {
+                                "const": true
+                            }
+                        }
+                    }
+                }
+            },
+            "then": {
+                "properties": {
+                    "agent": {
+                        "fleet": {
+                            "preset": {
+                                "type": "string",
+                                "minLength": 0
+                            }
+                        }
+                    }
+                }
+            },
+            "else": {
+                "properties": {
+                    "agent": {
+                        "fleet": {
+                            "preset": {
+                                "type": "string",
+                                "minLength": 1
                             }
                         }
                     }
                 }
             }
         }
-    },
+    ],
     "definitions": {
         "OutputObject": {
             "type": "object",
@@ -846,8 +923,7 @@
                         ],
                         "properties": {
                             "preset": {
-                                "type": "string",
-                                "minLength": 1
+                                "type": "string"
                             },
                             "url": {
                                 "type": "string",
@@ -869,8 +945,7 @@
                         ],
                         "properties": {
                             "preset": {
-                                "type": "string",
-                                "minLength": 1
+                                "type": "string"
                             },
                             "url": {
                                 "type": "string",
@@ -936,6 +1011,149 @@
                             "annotationKey": "annotationValue"
                         }
                     ]
+                },
+                "service": {
+                    "type": "object",
+                    "description": "Service configuration.",
+                    "properties": {
+                        "clusterIP": {
+                            "type": "string",
+                            "description": "The IP address of the service. Automatically assigned unless specified."
+                        },
+                        "clusterIPs": {
+                            "type": "array",
+                            "description": "A list of IP addresses assigned to this service, used for dual-stack services.",
+                            "items": { "type": "string" }
+                        },
+                        "type": {
+                            "type": "string",
+                            "enum": ["ClusterIP", "NodePort", "LoadBalancer"],
+                            "description": "Determines how the service is exposed. Defaults to ClusterIP."
+                        },
+                        "externalIPs": {
+                            "type": "array",
+                            "description": "A list of external IP addresses for the service to accept traffic on.",
+                            "items": { "type": "string" }
+                        },
+                        "sessionAffinity": {
+                            "type": "string",
+                            "enum": ["None", "ClientIP"],
+                            "description": "Specifies session affinity. Defaults to None."
+                        },
+                        "loadBalancerIP": {
+                            "type": "string",
+                            "description": "The load balancer IP address, if applicable and supported by the cloud provider."
+                        },
+                        "loadBalancerSourceRanges": {
+                            "type": "array",
+                            "description": "CIDR ranges that allow access to the load balancer.",
+                            "items": { "type": "string" }
+                        },
+                        "externalName": {
+                            "type": "string",
+                            "description": "The external reference name used by ExternalName services."
+                        },
+                        "externalTrafficPolicy": {
+                            "type": "string",
+                            "enum": ["Cluster", "Local"],
+                            "description": "Specifies how nodes handle external traffic. Defaults to Cluster."
+                        },
+                        "healthCheckNodePort": {
+                            "type": "integer",
+                            "description": "The health check node port for LoadBalancer services with local traffic policy."
+                        },
+                        "publishNotReadyAddresses": {
+                            "type": "boolean",
+                            "description": "If true, publishes addresses even if the pods are not ready."
+                        },
+                        "sessionAffinityConfig": {
+                            "type": "object",
+                            "description": "Configuration for session affinity."
+                        },
+                        "ipFamilies": {
+                            "type": "array",
+                            "description": "The IP families (IPv4, IPv6) assigned to the service for dual-stack clusters.",
+                            "items": { "type": "string", "enum": ["IPv4", "IPv6"] }
+                        },
+                        "ipFamilyPolicy": {
+                            "type": "string",
+                            "enum": ["SingleStack", "PreferDualStack", "RequireDualStack"],
+                            "description": "Defines the dual-stack behavior of the service."
+                        },
+                        "allocateLoadBalancerNodePorts": {
+                            "type": "boolean",
+                            "description": "If true, allocates NodePorts for LoadBalancer services. Defaults to true."
+                        },
+                        "loadBalancerClass": {
+                            "type": "string",
+                            "description": "The class of the load balancer implementation for this service."
+                        },
+                        "internalTrafficPolicy": {
+                            "type": "string",
+                            "enum": ["Cluster", "Local"],
+                            "description": "Describes how internal traffic is distributed. Defaults to Cluster."
+                        },
+                        "trafficDistribution": {
+                            "type": "string",
+                            "description": "Specifies traffic distribution preferences. This is an alpha feature."
+                        }
+                    },
+                    "required": [
+                        "type"
+                    ],
+                    "examples": [
+                        {
+                            "type": "ClusterIP"
+                        }
+                    ]
+                },
+                "ports": {
+                    "type": "array",
+                    "description": "Port configuration.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "The name of the port."
+                            },
+                            "hostPort": {
+                                "type": "integer",
+                                "description": "Specifies the port on the node that the container ports is exposed."
+                            },
+                            "containerPort": {
+                                "type": "integer",
+                                "description": "The port number on which the service is exposed."
+                            },
+                            "protocol": {
+                                "type": "string",
+                                "description": "The protocol used by both the service and container ports. Defaults to TCP."
+                            },
+                            "hostIP": {
+                                "type": "string",
+                                "description": "Specifies the host IP to bind the external port to."
+                            },
+                            "servicePort": {
+                                "type": "integer",
+                                "description": "Specifies the port that the service should listen on."
+                            },
+                            "serviceNodePort": {
+                                "type": "integer",
+                                "description": "The port on each node to expose the service if the type is NodePort."
+                            },
+                            "appProtocol": {
+                                "type": "string",
+                                "description": "The application protocol for this port, such as HTTP, HTTPS, or GRPC."
+                            },
+                            "nodePort": {
+                                "type": "integer",
+                                "description": "The port on each node to expose the service if the type is NodePort."
+                            }
+                        },
+                        "required": [
+                            "containerPort"
+                        ]
+                    }
                 },
                 "affinity": {
                     "type": "object",
