@@ -2,11 +2,8 @@ repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.0.1
     hooks:
-<<<<<<< HEAD
-=======
     -   id: check-executables-have-shebangs
         exclude: (.*/.*.(ps1|bat|bash)$)
     -   id: check-shebang-scripts-are-executable
         exclude: (.*/.*.(tmpl|tftpl)$)
->>>>>>> 6d9b1fc9d (pre-commit: fix failures (#6571))
     -   id: check-merge-conflict
