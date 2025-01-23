@@ -52,6 +52,7 @@ import (
 	aclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/helm"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 )
 
@@ -248,8 +249,11 @@ func TestKubernetesAgentHelm(t *testing.T) {
 	ctx := context.Background()
 	kCtx := k8sGetContext(t, info)
 
+	err := helm.BuildChartDependencies(agentK8SHelm)
+	require.NoError(t, err, "failed to build helm dependencies")
+
 	nodeList := corev1.NodeList{}
-	err := kCtx.client.Resources().List(ctx, &nodeList)
+	err = kCtx.client.Resources().List(ctx, &nodeList)
 	require.NoError(t, err)
 
 	schedulableNodeCount, err := k8sSchedulableNodeCount(ctx, kCtx)
@@ -287,11 +291,9 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				}),
 				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
 				k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
-				k8sStepCheckAgentStatus("name=agent-ksmsharded-helm-agent", 1, "agent", nil),
 				k8sStepCheckRestrictUpgrade("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
 				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
 				k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
-				k8sStepRunInnerTests("name=agent-ksmsharded-helm-agent", 1, "agent"),
 			},
 		},
 		{
@@ -301,6 +303,11 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
 					"kubernetes": map[string]any{
 						"enabled": true,
+						"state": map[string]any{
+							"agentAsSidecar": map[string]any{
+								"enabled": true,
+							},
+						},
 					},
 					"agent": map[string]any{
 						"unprivileged": true,
@@ -320,11 +327,11 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				}),
 				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
 				k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
-				k8sStepCheckAgentStatus("name=agent-ksmsharded-helm-agent", 1, "agent", nil),
+				k8sStepCheckAgentStatus("app.kubernetes.io/name=kube-state-metrics", 1, "agent", nil),
 				k8sStepCheckRestrictUpgrade("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
 				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
 				k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
-				k8sStepRunInnerTests("name=agent-ksmsharded-helm-agent", 1, "agent"),
+				k8sStepRunInnerTests("app.kubernetes.io/name=kube-state-metrics", 1, "agent"),
 			},
 		},
 		{
@@ -381,11 +388,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				k8sStepCreateNamespace(),
 				k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
 					"agent": map[string]any{
-						// NOTE: Setting the version to something released is mandatory as when we enable hints
-						// we have an init container that downloads a released agent archive and extracts
-						// the templates from there. If and when we embed the templates directly in the
-						// agent image, we can remove this.
-						"version":      "8.16.0",
 						"unprivileged": true,
 						"image": map[string]any{
 							"repository": kCtx.agentImageRepo,
@@ -398,6 +400,11 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						"hints": map[string]any{
 							"enabled": true,
 						},
+						"state": map[string]any{
+							"agentAsSidecar": map[string]any{
+								"enabled": true,
+							},
+						},
 					},
 					"outputs": map[string]any{
 						"default": map[string]any{
@@ -409,10 +416,10 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				}),
 				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
 				k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
-				k8sStepCheckAgentStatus("name=agent-ksmsharded-helm-agent", 1, "agent", nil),
+				k8sStepCheckAgentStatus("app.kubernetes.io/name=kube-state-metrics", 1, "agent", nil),
 				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
 				k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
-				k8sStepRunInnerTests("name=agent-ksmsharded-helm-agent", 1, "agent"),
+				k8sStepRunInnerTests("app.kubernetes.io/name=kube-state-metrics", 1, "agent"),
 				k8sStepHintsRedisCreate(),
 				k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", true),
 				k8sStepHintsRedisDelete(),
@@ -426,11 +433,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				k8sStepHintsRedisCreate(),
 				k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
 					"agent": map[string]any{
-						// NOTE: Setting the version to something released is mandatory as when we enable hints
-						// we have an init container that downloads a released agent archive and extracts
-						// the templates from there. If and when we embed the templates directly in the
-						// agent image, we can remove this.
-						"version":      "8.16.0",
 						"unprivileged": true,
 						"image": map[string]any{
 							"repository": kCtx.agentImageRepo,
@@ -443,6 +445,11 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						"hints": map[string]any{
 							"enabled": true,
 						},
+						"state": map[string]any{
+							"agentAsSidecar": map[string]any{
+								"enabled": true,
+							},
+						},
 					},
 					"outputs": map[string]any{
 						"default": map[string]any{
@@ -454,10 +461,10 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				}),
 				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
 				k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
-				k8sStepCheckAgentStatus("name=agent-ksmsharded-helm-agent", 1, "agent", nil),
+				k8sStepCheckAgentStatus("app.kubernetes.io/name=kube-state-metrics", 1, "agent", nil),
 				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
 				k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
-				k8sStepRunInnerTests("name=agent-ksmsharded-helm-agent", 1, "agent"),
+				k8sStepRunInnerTests("app.kubernetes.io/name=kube-state-metrics", 1, "agent"),
 				k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", true),
 				k8sStepHintsRedisDelete(),
 				k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", false),
