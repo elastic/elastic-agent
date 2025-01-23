@@ -354,7 +354,7 @@ data:
             condition: '${host.platform} == ''windows'''
             ignore_older: 72h
       # Input ID allowing Elastic Agent to track the state of this input. Must be unique.
-      - id: container-log-${kubernetes.pod.name}-${kubernetes.container.id}
+      - id: container-log-${kubernetes.namespace}-${kubernetes.pod.name}-${kubernetes.container.id}
         type: filestream
         use_output: default
         meta:
@@ -366,7 +366,7 @@ data:
         streams:
           # Stream ID for this data stream allowing Filebeat to track the state of the ingested files. Must be unique.
           # Each filestream data stream creates a separate instance of the Filebeat filestream input.
-          - id: container-log-${kubernetes.pod.name}-${kubernetes.container.id}
+          - id: container-log-${kubernetes.namespace}-${kubernetes.pod.name}-${kubernetes.container.id}
             data_stream:
               dataset: kubernetes.container_logs
               type: logs
@@ -381,7 +381,7 @@ data:
               #     negate: true
               #     match: after
             paths:
-              - /var/log/containers/*${kubernetes.container.id}.log
+              - /var/log/pods/${kubernetes.namespace}_${kubernetes.pod.name}_${kubernetes.pod.uid}/${kubernetes.container.name}/*.log
       - id: audit-log
         type: filestream
         use_output: default
