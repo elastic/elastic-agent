@@ -13,8 +13,9 @@ import (
 	"runtime"
 	"strings"
 
-	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"gopkg.in/yaml.v3"
+
+	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 )
 
 const (
