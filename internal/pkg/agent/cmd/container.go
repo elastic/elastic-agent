@@ -41,6 +41,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/crypto"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -993,6 +994,14 @@ func isContainer(detail component.PlatformDetail) component.PlatformDetail {
 	return detail
 }
 
+var (
+	newFleetClient = func(log *logger.Logger, apiKey string, cfg remote.Config) (fleetclient.Sender, error) {
+		return fleetclient.NewAuthWithConfig(log, apiKey, cfg)
+	}
+	newEncryptedDiskStore = storage.NewEncryptedDiskStore
+	statAgentConfigFile   = os.Stat
+)
+
 // agentInfo implements the AgentInfo interface, and it used in shouldFleetEnroll.
 type agentInfo struct {
 	id string
@@ -1005,25 +1014,24 @@ func (a *agentInfo) AgentID() string {
 // shouldFleetEnroll returns true if the elastic-agent should enroll to fleet.
 func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	if !setupCfg.Fleet.Enroll {
-		// fleet enrollment is not enabled
+		// Enrollment is explicitly disabled in the setup configuration.
 		return false, nil
 	}
 
 	if setupCfg.Fleet.Force {
-		// fleet enrollment is enforced
+		// Enrollment is explicitly enforced by the setup configuration.
 		return true, nil
 	}
 
 	agentCfgFilePath := paths.AgentConfigFile()
-	_, err := os.Stat(agentCfgFilePath)
+	_, err := statAgentConfigFile(agentCfgFilePath)
 	if os.IsNotExist(err) {
-		// config file does not exist so elastic-agent should enroll
+		// The agent configuration file does not exist, so enrollment is required.
 		return true, nil
 	}
 
-	// read the stored elastic-agent state to extract the previous fleet url and enrollment token
 	ctx := context.Background()
-	store, err := storage.NewEncryptedDiskStore(ctx, agentCfgFilePath)
+	store, err := newEncryptedDiskStore(ctx, agentCfgFilePath)
 	if err != nil {
 		return false, fmt.Errorf("failed to instantiate encrypted disk store: %w", err)
 	}
@@ -1045,14 +1053,14 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 
 	storedFleetHosts := storedConfig.Fleet.Client.GetHosts()
 	if len(storedFleetHosts) == 0 || !slices.Contains(storedFleetHosts, setupCfg.Fleet.URL) {
-		// fleet url changed thus elastic-agent should enroll
+		// The Fleet URL in the setup does not exist in the stored configuration, so enrollment is required.
 		return true, nil
 	}
 
-	// here we don't return true if there is no previously saved enrollment token hash
-	// as an older version of elastic-agent won't have one.
-	if len(storedConfig.Fleet.EnrollmentTokenHash) > 0 {
-		// we have previously saved an enrollment token hash
+	// Evaluate the stored enrollment token hash against the setup enrollment token if both are present.
+	// Note that when "upgrading" from an older agent version the enrollment token hash will not exist
+	// in the stored configuration.
+	if len(storedConfig.Fleet.EnrollmentTokenHash) > 0 && len(setupCfg.Fleet.EnrollmentToken) > 0 {
 		enrollmentHashBytes, err := base64.StdEncoding.DecodeString(storedConfig.Fleet.EnrollmentTokenHash)
 		if err != nil {
 			return false, fmt.Errorf("failed to decode hash: %w", err)
@@ -1061,30 +1069,28 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 		err = crypto.ComparePBKDF2HashAndPassword(enrollmentHashBytes, []byte(setupCfg.Fleet.EnrollmentToken))
 		switch {
 		case errors.Is(err, crypto.ErrMismatchedHashAndPassword):
-			// the enrollment token hash does not match thus elastic-agent should enroll
+			// The stored enrollment token hash does not match the new token, so enrollment is required.
 			return true, nil
 		case err != nil:
 			return false, fmt.Errorf("failed to compare hash: %w", err)
 		}
 	}
 
-	// Although fleet url and enrollment token are the same, we must also validate the api token.
-	// The agent might have been unenrolled from kibana which doesn't require for fleet url and
-	// enrollment token need to be changed
+	// Validate the stored API token to check if the agent is still authorized with Fleet.
 	log, err := logger.New("fleet_client", false)
 	if err != nil {
 		return false, fmt.Errorf("failed to create logger: %w", err)
 	}
-	fc, err := fleetclient.NewAuthWithConfig(log, storedConfig.Fleet.AccessAPIKey, storedConfig.Fleet.Client)
+	fc, err := newFleetClient(log, storedConfig.Fleet.AccessAPIKey, storedConfig.Fleet.Client)
 	if err != nil {
 		return false, fmt.Errorf("failed to create fleet client: %w", err)
 	}
 
-	// exploit the ACK request of fleet with **empty events**
-	// to validate the api token of the elastic-agent
-	ackRequest := &fleetapi.AckRequest{
-		Events: nil,
-	}
+	// Perform an ACK request with **empty events** to verify the validity of the API token.
+	// If the agent has been manually un-enrolled through the Kibana UI, the ACK request will fail due to an invalid API token.
+	// In such cases, the agent should automatically re-enroll and "recover" their enrollment status without manual intervention,
+	// maintaining seamless operation.
+	ackRequest := &fleetapi.AckRequest{Events: nil}
 	ackCMD := fleetapi.NewAckCmd(&agentInfo{storedConfig.Fleet.Info.ID}, fc)
 
 	const retryInterval = time.Second
@@ -1104,16 +1110,15 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	}, &backoff.ConstantBackOff{Interval: retryInterval})
 	switch {
 	case errors.Is(err, fleetclient.ErrInvalidAPIKey):
-		// this elastic-agent has not valid api token thus it should enroll
+		// The API key is invalid, so enrollment is required.
 		return true, nil
 	case err != nil:
 		return false, fmt.Errorf("failed to validate api token: %w", err)
 	}
 
-	if len(storedConfig.Fleet.EnrollmentTokenHash) == 0 {
-		// previous EnrollmentTokenHash was empty, but we just validated
-		// that this elastic-agent is still eligible to authenticate with fleet.
-		// Update the config with the validated EnrollmentTokenHash.
+	// Update the stored enrollment token hash if there is no previous enrollment token hash
+	// (can happen when "upgrading" from an older version of the agent) and setup enrollment token is present.
+	if len(storedConfig.Fleet.EnrollmentTokenHash) == 0 && len(setupCfg.Fleet.EnrollmentToken) > 0 {
 		enrollmentHashBytes, err := crypto.GeneratePBKDF2FromPassword([]byte(setupCfg.Fleet.EnrollmentToken))
 		if err != nil {
 			return false, errors.New("failed to generate enrollment hash")
