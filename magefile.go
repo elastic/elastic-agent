@@ -751,7 +751,7 @@ func BuildFleetCfg() error {
 	out := filepath.Join("internal", "pkg", "agent", "application", "configuration_embed.go")
 
 	fmt.Printf(">> BuildFleetCfg %s to %s\n", in, out)
-	return RunGo("run", goF, "--in", in, "--out", out)
+	return RunGo("run", goF, "--in", in, "--output", out)
 }
 
 // Enroll runs agent which enrolls before running.
