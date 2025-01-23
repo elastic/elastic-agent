@@ -7,16 +7,31 @@ on:
     - cron: "0 0 * * *"
 
 jobs:
+  filter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    outputs:
+      matrix: ${{ steps.generator.outputs.matrix }}
+    steps:
+      - id: generator
+        uses: elastic/oblt-actions/elastic/active-branches@v1
+        with:
+          exclude-branches: "7.17"
+
   update_versions:
     runs-on: ubuntu-latest
+    needs: [filter]
     permissions:
       contents: write
       pull-requests: write
+    strategy:
+      matrix: ${{ fromJson(needs.filter.outputs.matrix) }}
     steps:
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: "${{ matrix.branch }}"
+
           # no depth limit
           # so, we can generate snapshot versions based on release branches
           fetch-depth: 0
@@ -44,11 +59,13 @@ jobs:
         run: ./.github/workflows/bump-agent-versions.sh
 
       - if: ${{ failure()  }}
-        uses: slackapi/slack-github-action@e598089eaef53883a2d9b325e044899548518a03 # v2.0.0
+        uses: slackapi/slack-github-action@485a9d42d3a73031f12ec201c457e2162c45d02d # v2.0.0
         with:
-          channel-id: '#ingest-notifications'
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
           payload: |
             {
+              "channel": "#ingest-notifications",
               "text": "${{ env.SLACK_MESSAGE }}",
               "blocks": [
                 {
@@ -61,16 +78,17 @@ jobs:
               ]
             }
         env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           SLACK_MESSAGE: ":traffic_cone: Elastic Agent version update failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
         # if a PR was created as a result of this job, we notify on the Slack channel
       - if: ${{ startsWith(steps.update.outputs.pr, 'https') }}
-        uses: slackapi/slack-github-action@e598089eaef53883a2d9b325e044899548518a03 # v2.0.0
+        uses: slackapi/slack-github-action@485a9d42d3a73031f12ec201c457e2162c45d02d # v2.0.0
         with:
-          channel-id: '#ingest-notifications'
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
           payload: |
             {
+              "channel": "#ingest-notifications",
               "text": "${{ env.SLACK_MESSAGE }}",
               "blocks": [
                 {
@@ -83,5 +101,4 @@ jobs:
               ]
             }
         env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           SLACK_MESSAGE: "Update for Elastic Agent versions has been created: ${{ steps.update.outputs.pr }}"

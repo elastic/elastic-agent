@@ -1,4 +1,27 @@
 inputs:
+    - name: filestream-qnap_nas
+      id: filestream-qnap_nas-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - id: qnap_nas-container-logs-${kubernetes.hints.container_id}
+          condition: ${kubernetes.hints.qnap_nas.container_logs.enabled} == true
+          data_stream:
+            dataset: qnap_nas.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default
     - name: tcp-qnap_nas
       id: tcp-qnap_nas-${kubernetes.hints.container_id}
       type: tcp
@@ -38,26 +61,4 @@ inputs:
           tags:
             - qnap-nas
             - forwarded
-      data_stream.namespace: default
-    - name: filestream-qnap_nas
-      id: filestream-qnap_nas-${kubernetes.hints.container_id}
-      type: filestream
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.qnap_nas.container_logs.enabled} == true
-          data_stream:
-            dataset: qnap_nas.container_logs
-            type: logs
-          exclude_files: []
-          exclude_lines: []
-          parsers:
-            - container:
-                format: auto
-                stream: all
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          prospector:
-            scanner:
-                symlinks: true
-          tags: []
       data_stream.namespace: default

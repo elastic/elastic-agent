@@ -5,6 +5,8 @@
 package gotool
 
 import (
+	"fmt"
+
 	"github.com/magefile/mage/sh"
 )
 
@@ -15,7 +17,13 @@ var LinkCheck goLinkCheck = runGoLinkCheck
 
 func runGoLinkCheck(opts ...ArgOpt) error {
 	args := buildArgs(opts).build()
-	return sh.RunV("link-patrol", args...)
+	output, err := sh.Output("link-patrol", args...)
+	if err != nil {
+		fmt.Println(output)
+		return err
+	}
+
+	return nil
 }
 
 func (goLinkCheck) Path(path string) ArgOpt { return flagArgIf("-f", path) }

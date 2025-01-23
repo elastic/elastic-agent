@@ -12,8 +12,13 @@ import (
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"gopkg.in/yaml.v3"
+
+	"github.com/elastic/elastic-agent-libs/mapstr"
 
 	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 
@@ -82,7 +87,7 @@ var (
 // returns true, up to the given timeout duration, and reports a test failure
 // if it doesn't arrive.
 func waitForState(
-	t *testing.T,
+	t testing.TB,
 	stateChan chan State,
 	stateCallback func(State) bool,
 	timeout time.Duration,
@@ -325,6 +330,77 @@ func mustNewStruct(t *testing.T, v map[string]interface{}) *structpb.Struct {
 	str, err := structpb.NewStruct(v)
 	require.NoError(t, err)
 	return str
+}
+
+func TestCoordinator_VarsMgr_Observe(t *testing.T) {
+	coordCh := make(chan error)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	coord, cfgMgr, varsMgr := createCoordinator(t, ctx)
+	stateChan := coord.StateSubscribe(ctx, 32)
+	go func() {
+		err := coord.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			// allowed error
+			err = nil
+		}
+		coordCh <- err
+	}()
+
+	// wait for it to be in starting state
+	waitForState(t, stateChan, func(state State) bool {
+		return state.State == agentclient.Starting &&
+			state.Message == "Waiting for initial configuration and composable variables"
+	}, 3*time.Second)
+
+	// set vars state should stay same (until config)
+	varsMgr.Vars(ctx, []*transpiler.Vars{{}})
+
+	// State changes happen asynchronously in the Coordinator goroutine, so
+	// wait a little bit to make sure no changes are reported; if the Vars
+	// call does trigger a change, it should happen relatively quickly.
+	select {
+	case <-stateChan:
+		assert.Fail(t, "Vars call shouldn't cause a state change")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	// set configuration that has variables present
+	cfg, err := config.NewConfigFrom(map[string]interface{}{
+		"inputs": []interface{}{
+			map[string]interface{}{
+				"type": "filestream",
+				"paths": []interface{}{
+					"${env.filestream_path|env.log_path|'/var/log/syslog'}",
+				},
+			},
+			map[string]interface{}{
+				"type":      "windows",
+				"condition": "${host.platform} == 'windows'",
+			},
+		},
+	})
+	require.NoError(t, err)
+	cfgMgr.Config(ctx, cfg)
+
+	// healthy signals that the configuration has been computed
+	waitForState(t, stateChan, func(state State) bool {
+		return state.State == agentclient.Healthy && state.Message == "Running"
+	}, 3*time.Second)
+
+	// get the set observed vars from the fake vars manager
+	varsMgr.observedMx.Lock()
+	observed := varsMgr.observed
+	varsMgr.observedMx.Unlock()
+
+	// stop the coordinator
+	cancel()
+	err = <-coordCh
+	require.NoError(t, err)
+
+	// verify that the observed vars are the expected vars
+	assert.Equal(t, []string{"env.filestream_path", "env.log_path", "host.platform"}, observed)
 }
 
 func TestCoordinator_State_Starting(t *testing.T) {
@@ -843,6 +919,48 @@ func TestCoordinator_UpgradeDetails(t *testing.T) {
 	require.Equal(t, expectedErr.Error(), coord.state.UpgradeDetails.Metadata.ErrorMsg)
 }
 
+func BenchmarkCoordinator_generateComponentModel(b *testing.B) {
+	// load variables
+	varsMaps := []map[string]any{}
+	varsMapsBytes, err := os.ReadFile("./testdata/variables.yaml")
+	require.NoError(b, err)
+	err = yaml.Unmarshal(varsMapsBytes, &varsMaps)
+	require.NoError(b, err)
+	vars := make([]*transpiler.Vars, len(varsMaps))
+	for i, vm := range varsMaps {
+		vars[i], err = transpiler.NewVars(fmt.Sprintf("%d", i), vm, mapstr.M{})
+		require.NoError(b, err)
+	}
+
+	// load config
+	cfgMap := map[string]any{}
+	cfgMapBytes, err := os.ReadFile("./testdata/config.yaml")
+	require.NoError(b, err)
+	err = yaml.Unmarshal(cfgMapBytes, &cfgMap)
+	require.NoError(b, err)
+	cfg, err := config.NewConfigFrom(cfgMap)
+	require.NoError(b, err)
+	cfgMap, err = cfg.ToMapStr()
+	require.NoError(b, err)
+	cfgAst, err := transpiler.NewAST(cfgMap)
+	require.NoError(b, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	coord, _, _ := createCoordinator(b, ctx)
+
+	coord.ast = cfgAst
+	coord.vars = vars
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err = coord.generateComponentModel()
+		require.NoError(b, err)
+	}
+
+}
+
 type createCoordinatorOpts struct {
 	managed        bool
 	upgradeManager UpgradeManager
@@ -872,7 +990,7 @@ func WithComponentInputSpec(spec component.InputSpec) CoordinatorOpt {
 // createCoordinator creates a coordinator that using a fake config manager and a fake vars manager.
 //
 // The runtime specifications is set up to use the fake component.
-func createCoordinator(t *testing.T, ctx context.Context, opts ...CoordinatorOpt) (*Coordinator, *fakeConfigManager, *fakeVarsManager) {
+func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt) (*Coordinator, *fakeConfigManager, *fakeVarsManager) {
 	t.Helper()
 
 	o := &createCoordinatorOpts{
@@ -930,7 +1048,7 @@ func getComponentState(states []runtime.ComponentComponentState, componentID str
 	return nil
 }
 
-func newErrorLogger(t *testing.T) *logger.Logger {
+func newErrorLogger(t testing.TB) *logger.Logger {
 	t.Helper()
 
 	loggerCfg := logger.DefaultLoggingConfig()
@@ -1072,6 +1190,9 @@ func (l *configChange) Fail(err error) {
 type fakeVarsManager struct {
 	varsCh chan []*transpiler.Vars
 	errCh  chan error
+
+	observedMx sync.RWMutex
+	observed   []string
 }
 
 func newFakeVarsManager() *fakeVarsManager {
@@ -1099,6 +1220,12 @@ func (f *fakeVarsManager) ReportError(ctx context.Context, err error) {
 
 func (f *fakeVarsManager) Watch() <-chan []*transpiler.Vars {
 	return f.varsCh
+}
+
+func (f *fakeVarsManager) Observe(observed []string) {
+	f.observedMx.Lock()
+	defer f.observedMx.Unlock()
+	f.observed = observed
 }
 
 func (f *fakeVarsManager) Vars(ctx context.Context, vars []*transpiler.Vars) {
@@ -1190,7 +1317,7 @@ func (r *fakeRuntimeManager) PerformComponentDiagnostics(_ context.Context, _ []
 	return nil, nil
 }
 
-func testBinary(t *testing.T, name string) string {
+func testBinary(t testing.TB, name string) string {
 	t.Helper()
 
 	var err error

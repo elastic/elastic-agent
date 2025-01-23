@@ -1,6 +1,9 @@
 kubernetes:
   enabled: false
 
+kube-state-metrics:
+  enabled: false
+
 extraIntegrations:
   nginx/metrics:
     id: nginx/metrics-nginx-69240207-6fcc-4d19-aee3-dbf716e3bb0f

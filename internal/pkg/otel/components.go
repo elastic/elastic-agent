@@ -25,6 +25,7 @@ import (
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
 
 	fbreceiver "github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
+	mbreceiver "github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
 
 	// Processors:
 	attributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor" // for modifying signal attributes
@@ -45,7 +46,8 @@ import (
 	// Exporters:
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter"
 	fileexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter" // for e2e tests
-	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter"                           // for dev
+	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter"
+	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter" // for dev
 	"go.opentelemetry.io/collector/exporter/otlpexporter"
 	otlphttpexporter "go.opentelemetry.io/collector/exporter/otlphttpexporter"
 
@@ -56,6 +58,7 @@ import (
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
 
 	// Connectors
+	routingconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector"
 	spanmetricsconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector"
 
 	"github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector"
@@ -79,6 +82,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			jaegerreceiver.NewFactory(),
 			zipkinreceiver.NewFactory(),
 			fbreceiver.NewFactory(),
+			mbreceiver.NewFactory(),
 		)
 		if err != nil {
 			return otelcol.Factories{}, err
@@ -109,6 +113,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			debugexporter.NewFactory(),
 			fileexporter.NewFactory(),
 			elasticsearchexporter.NewFactory(),
+			loadbalancingexporter.NewFactory(),
 			otlphttpexporter.NewFactory(),
 		)
 		if err != nil {
@@ -116,6 +121,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		}
 
 		factories.Connectors, err = connector.MakeFactoryMap(
+			routingconnector.NewFactory(),
 			spanmetricsconnector.NewFactory(),
 			signaltometricsconnector.NewFactory(),
 		)

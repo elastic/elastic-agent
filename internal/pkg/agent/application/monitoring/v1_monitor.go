@@ -7,6 +7,7 @@ package monitoring
 import (
 	"crypto/sha256"
 	"fmt"
+	"math"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -64,8 +65,8 @@ const (
 	defaultMetricsCollectionInterval = 60 * time.Second
 
 	// metricset stream failure threshold before the stream is marked as DEGRADED
-	// to avoid marking the agent degraded for transient errors, we set the default threshold to 2
-	defaultMetricsStreamFailureThreshold = uint(2)
+	// to avoid marking the agent degraded for transient errors, we set the default threshold to 5
+	defaultMetricsStreamFailureThreshold = uint(5)
 )
 
 var (
@@ -164,12 +165,25 @@ func (b *BeatsMonitor) MonitoringConfig(
 						case uint:
 							failureThreshold = &policyValue
 						case int:
+							if policyValue < 0 {
+								return nil, fmt.Errorf("converting policy failure threshold int to uint, value must be non-negative: %v", policyValue)
+							}
 							unsignedValue := uint(policyValue)
 							failureThreshold = &unsignedValue
+						case float64:
+							if policyValue < 0 || policyValue > math.MaxUint {
+								return nil, fmt.Errorf("converting policy failure threshold float64 to uint, value out of range: %v", policyValue)
+							}
+							truncatedUnsignedValue := uint(policyValue)
+							failureThreshold = &truncatedUnsignedValue
 						case string:
-							parsedPolicyValue, err := strconv.Atoi(policyValue)
+							parsedPolicyValue, err := strconv.ParseUint(policyValue, 10, 64)
 							if err != nil {
-								return nil, fmt.Errorf("failed to convert policy failure threshold string to int: %w", err)
+								return nil, fmt.Errorf("converting policy failure threshold string to uint: %w", err)
+							}
+							if parsedPolicyValue > math.MaxUint {
+								// this is to catch possible overflow in 32-bit envs, should not happen that often
+								return nil, fmt.Errorf("converting policy failure threshold from string to uint, value out of range: %v", policyValue)
 							}
 							uintPolicyValue := uint(parsedPolicyValue)
 							failureThreshold = &uintPolicyValue

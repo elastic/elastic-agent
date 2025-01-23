@@ -71,7 +71,7 @@ func runCollector(cmdCtx context.Context, configFiles []string) error {
 	stop := make(chan bool)
 	ctx, cancel := context.WithCancel(cmdCtx)
 
-	var stopCollector = func() {
+	stopCollector := func() {
 		close(stop)
 	}
 

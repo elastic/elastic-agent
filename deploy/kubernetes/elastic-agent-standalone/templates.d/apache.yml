@@ -1,4 +1,20 @@
 inputs:
+    - name: apache/metrics-apache
+      id: apache/metrics-apache-${kubernetes.hints.container_id}
+      type: apache/metrics
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.apache.status.enabled} == true or ${kubernetes.hints.apache.enabled} == true
+          data_stream:
+            dataset: apache.status
+            type: metrics
+          hosts:
+            - ${kubernetes.hints.apache.status.host|kubernetes.hints.apache.host|'http://127.0.0.1'}
+          metricsets:
+            - status
+          period: ${kubernetes.hints.apache.status.period|kubernetes.hints.apache.period|'30s'}
+          server_status_path: /server-status
+      data_stream.namespace: default
     - name: filestream-apache
       id: filestream-apache-${kubernetes.hints.container_id}
       type: filestream
@@ -10,6 +26,9 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
+          id: filestream-apache-apache-access-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -18,6 +37,8 @@ inputs:
             - /var/log/containers/*${kubernetes.hints.container_id}.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - apache-access
@@ -27,6 +48,9 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
+          id: filestream-apache-apache-error-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -37,6 +61,8 @@ inputs:
             - add_locale: null
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - apache-error
@@ -122,20 +148,4 @@ inputs:
           tags:
             - forwarded
             - apache-error
-      data_stream.namespace: default
-    - name: apache/metrics-apache
-      id: apache/metrics-apache-${kubernetes.hints.container_id}
-      type: apache/metrics
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.apache.status.enabled} == true or ${kubernetes.hints.apache.enabled} == true
-          data_stream:
-            dataset: apache.status
-            type: metrics
-          hosts:
-            - ${kubernetes.hints.apache.status.host|kubernetes.hints.apache.host|'http://127.0.0.1'}
-          metricsets:
-            - status
-          period: ${kubernetes.hints.apache.status.period|kubernetes.hints.apache.period|'30s'}
-          server_status_path: /server-status
       data_stream.namespace: default

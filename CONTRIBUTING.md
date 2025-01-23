@@ -44,6 +44,8 @@ Keep these in mind as both authors and reviewers of PRs:
   - The PR must contain related changes and leave out unrelated changes (e.g. refactorings, etc. that could be their own PR instead).
   - If the PR could be broken up into two or more PRs either "vertically" (by separating concerns logically) or horizontally (by sharding the PR into a series of PRs --- usually works well with mass refactoring or cleanup type PRs), it should. A set of such related PRs can be tracked and given context in a meta issue.
 
+* The PR changeset should be rather small: 500 lines of code (excluding generated code or other changes that normally should not require close review by a human) is the soft limit that should be used to judge if a PR is "too big".
+
 * I must strive to please the reviewer(s). In other words, bias towards taking the reviewers suggestions rather than getting into a protracted argument. This helps move the PR forward. A convenient "escape hatch" to use might be to file a new issue for a follow up discussion/PR. If you find yourself getting into a drawn out argument, ask yourself: is this a good use of our time?
 
 ## As a reviewer of a PR:
@@ -57,5 +59,7 @@ Keep these in mind as both authors and reviewers of PRs:
   * If no, ask for clarifications on the PR. This will usually lead to changes in the code such as renaming of variables/functions or extracting of functions or simply adding "why" inline comments. But first ask the author for clarifications before assuming any intent on their part.
 
 * I must not focus on personal preferences or nitpicks. If I understand the code in the PR but simply would've implemented the same solution a different way that's great but it is not feedback that belongs in the PR. Such feedback only serves to slow down progress for little to no gain.
+
+* If I'm making a suggestion, I must provide a rationale for it.  It should be clear to the author of the PR why my suggestion is better than what is already in the PR.
 
 

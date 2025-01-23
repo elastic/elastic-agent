@@ -42,6 +42,7 @@ func newEnrollCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command
 		Run: func(c *cobra.Command, args []string) {
 			if err := enroll(streams, c); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				logExternal(fmt.Sprintf("%s enroll failed: %s", paths.BinaryName, err))
 				os.Exit(1)
 			}
 		},
@@ -351,6 +352,24 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	fromInstall, _ := cmd.Flags().GetBool(fromInstallArg)
 
+	hasRoot, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("checking if running with root/Administrator privileges: %w", err)
+	}
+	if hasRoot && !fromInstall {
+		binPath, err := os.Executable()
+		if err != nil {
+			return fmt.Errorf("error while getting executable path: %w", err)
+		}
+		isOwner, err := isOwnerExec(binPath)
+		if err != nil {
+			return fmt.Errorf("ran into an error while figuring out if user is allowed to execute the enroll command: %w", err)
+		}
+		if !isOwner {
+			return UserOwnerMismatchError
+		}
+	}
+
 	pathConfigFile := paths.ConfigFile()
 	rawConfig, err := config.LoadFile(pathConfigFile)
 	if err != nil {
@@ -525,7 +544,6 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		pathConfigFile,
 		store,
 	)
-
 	if err != nil {
 		return err
 	}

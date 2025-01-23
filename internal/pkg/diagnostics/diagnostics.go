@@ -333,8 +333,8 @@ func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResu
 			// Best effort, output a warning but still include the file
 			fmt.Fprintf(errOut, "[WARNING] Could not redact %s due to unmarshalling error: %s\n", fullFilePath, err)
 		} else {
-			unmarshalled = RedactSecretPaths(unmarshalled, errOut)
-			redacted, err := yaml.Marshal(redactMap(errOut, unmarshalled))
+			unmarshalled = Redact(unmarshalled, errOut)
+			redacted, err := yaml.Marshal(unmarshalled)
 			if err != nil {
 				// Best effort, output a warning but still include the file
 				fmt.Fprintf(errOut, "[WARNING] Could not redact %s due to marshalling error: %s\n", fullFilePath, err)
@@ -393,6 +393,7 @@ func redactKey(k string) bool {
 		return false
 	}
 
+	k = strings.ToLower(k)
 	return strings.Contains(k, "certificate") ||
 		strings.Contains(k, "passphrase") ||
 		strings.Contains(k, "password") ||
@@ -572,6 +573,11 @@ func saveLogs(name string, logPath string, zw *zip.Writer) error {
 	}
 
 	return nil
+}
+
+// Redact redacts sensitive values from the passed mapStr.
+func Redact(mapStr map[string]any, errOut io.Writer) map[string]any {
+	return redactMap(errOut, RedactSecretPaths(mapStr, errOut))
 }
 
 // RedactSecretPaths will check the passed mapStr input for a secret_paths attribute.

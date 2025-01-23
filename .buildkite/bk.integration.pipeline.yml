@@ -6,21 +6,10 @@ env:
   ASDF_MAGE_VERSION: 1.14.0
 
 steps:
-  - label: "Integration tests: packaging"
-    key: "package-it"
-    command: ".buildkite/scripts/steps/integration-package.sh"
-    artifact_paths:
-      - build/distributions/**
-    agents:
-      provider: "gcp"
-      machineType: "n1-standard-8"
-
   - label: Start ESS stack for integration tests
     key: integration-ess
     env:
       ASDF_TERRAFORM_VERSION: 1.9.2
-    depends_on:
-      - package-it
     command: |
       #!/usr/bin/env bash
       set -euo pipefail
@@ -36,14 +25,14 @@ steps:
     key: integration-tests-win
     depends_on:
       - integration-ess
-      - package-it
     steps:
       - label: "Win2022:sudo:{{matrix}}"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
           .buildkite/scripts/integration-tests.ps1 {{matrix}} true
         artifact_paths:
           - build/**
+          - build/diagnostics/**
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
@@ -56,10 +45,11 @@ steps:
 
       - label: "Win2022:non-sudo:{{matrix}}"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
           .buildkite/scripts/integration-tests.ps1 {{matrix}} false
         artifact_paths:
           - build/**
+          - build/diagnostics/**
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
@@ -71,14 +61,14 @@ steps:
     key: integration-tests-ubuntu
     depends_on:
       - integration-ess
-      - package-it
     steps:
       - label: "x86_64:non-sudo: {{matrix}}"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
+          - build/diagnostics/**
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
@@ -88,10 +78,11 @@ steps:
 
       - label: "x86_64:sudo: {{matrix}}"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
+          - build/diagnostics/**
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
@@ -109,11 +100,13 @@ steps:
           - fleet-airgapped-privileged
 
       - label: "arm:sudo: {{matrix}}"
+        skip: true
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
+          - build/diagnostics/**
         agents:
           provider: "aws"
           imagePrefix: "platform-ingest-beats-ubuntu-2404-aarch64"
@@ -131,11 +124,13 @@ steps:
           - fleet-airgapped-privileged
 
       - label: "arm:non-sudo: {{matrix}}"
+        skip: true
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
+          - build/diagnostics/**
         agents:
           provider: "aws"
           imagePrefix: "platform-ingest-beats-ubuntu-2404-aarch64"
@@ -146,15 +141,15 @@ steps:
   - group: "Stateful(Sudo):RHEL8"
     key: integration-tests-rhel8
     depends_on:
-      - package-it
       - integration-ess
     steps:
       - label: "x86_64:sudo:rpm"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it'
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
           .buildkite/scripts/steps/integration_tests_tf.sh rpm true
         artifact_paths:
           - build/**
+          - build/diagnostics/**
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
@@ -173,3 +168,26 @@ steps:
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
+
+  - label: Aggregate test reports
+    # Warning: The key has a hook in pre-command
+    key: aggregate-reports
+    depends_on:
+      - integration-tests-ubuntu
+      - integration-tests-win
+      - integration-tests-rhel8
+    allow_dependency_failure: true
+    command: |
+      buildkite-agent artifact download "build/*.xml" .
+      buildkite-agent artifact download "build\*.xml" .
+    agents:
+      image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
+      useCustomGlobalHooks: true
+    soft_fail:
+      - exit_status: "*"
+    plugins:
+      - test-collector#v1.10.1:
+          files: "build/*.xml"
+          format: "junit"
+          branches: "main"
+          debug: true
