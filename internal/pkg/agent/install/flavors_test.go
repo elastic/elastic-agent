@@ -555,8 +555,7 @@ func TestSpecsForFlavor(t *testing.T) {
 			}
 			assert.NoError(t, err)
 
-			specs, err := SpecsForFlavor(flavor)
-			assert.NoError(t, err)
+			specs := SpecsForFlavor(flavor)
 			assert.ElementsMatch(t, tt.wantSpecs, specs)
 		})
 	}

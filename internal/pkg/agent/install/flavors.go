@@ -74,13 +74,13 @@ func Flavor(detectedFlavor string, registryPath string, flavorsRegistry map[stri
 }
 
 // SpecsForFlavor returns spec files associated with specific flavor
-func SpecsForFlavor(flavor FlavorDefinition) ([]string, error) {
+func SpecsForFlavor(flavor FlavorDefinition) []string {
 	specs := []string{}
 	for _, component := range flavor.Components {
 		specs = append(specs, fmt.Sprintf("%s.spec.yml", component))
 	}
 
-	return specs, nil
+	return specs
 }
 
 // ApplyFlavor scans agent comonents directory and removes anything

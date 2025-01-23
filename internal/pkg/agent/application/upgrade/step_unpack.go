@@ -229,7 +229,7 @@ func skipFnFromZip(log *logger.Logger, r *zip.ReadCloser, detectedFlavor string,
 		}
 		return nil, err
 	}
-	specsInFlavor, _ := install.SpecsForFlavor(flavor) // ignoring error flavor exists, it was loaded before
+	specsInFlavor := install.SpecsForFlavor(flavor) // ignoring error flavor exists, it was loaded before
 
 	// fix versionedHome
 	versionedHome = strings.ReplaceAll(versionedHome, "\\", "/")
@@ -539,11 +539,7 @@ func skipFnFromTar(log *logger.Logger, archivePath string, flavor string, regist
 }
 
 func specRegistry(flavor install.FlavorDefinition) (map[string]struct{}, error) {
-	specs, err := install.SpecsForFlavor(flavor)
-	if err != nil {
-		return nil, err
-	}
-
+	specs := install.SpecsForFlavor(flavor)
 	registry := make(map[string]struct{})
 	for _, s := range specs {
 		registry[s] = struct{}{}
