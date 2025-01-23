@@ -64,7 +64,7 @@ func OverrideDefaultContainerGRPCPort(cfg *GRPCConfig) {
 	if ok {
 		port, err := strconv.Atoi(grpcPortEnv)
 		if err == nil {
-			cfg.Port = uint16(port)
+			cfg.Port = uint16(port) //nolint:gosec // integer size truncation is fine here.
 		}
 	}
 }
