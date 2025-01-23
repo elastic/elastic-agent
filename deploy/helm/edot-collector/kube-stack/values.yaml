@@ -846,6 +846,12 @@ collectors:
                 - set(resource.attributes["metricset.interval"], "60m")
                 - set(attributes["data_stream.dataset"], Concat([attributes["metricset.name"], "60m"], "."))
                 - set(attributes["processor.event"], "metric")
+        # Fix for Kibana services ui (logs and metrics tab)
+        resource/agentname:
+          attributes:
+            - key: agent.name
+              value: "edot-collector"
+              action: upsert
       exporters:
         debug: {}
         # [Elasticsearch exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/README.md)
@@ -881,11 +887,11 @@ collectors:
             exporters: [debug, elasticsearch/ecs]
           metrics/otel:
             receivers: [routing]
-            processors: [batch]
+            processors: [batch, resource/agentname]
             exporters: [debug, signaltometrics, elasticsearch/otel]
           logs:
             receivers: [otlp]
-            processors: [batch]
+            processors: [batch, resource/agentname]
             exporters: [debug, signaltometrics, elasticsearch/otel]
           traces:
             receivers: [otlp]
