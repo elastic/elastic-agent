@@ -24,6 +24,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 
@@ -1085,7 +1086,22 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 		Events: nil,
 	}
 	ackCMD := fleetapi.NewAckCmd(&agentInfo{storedConfig.Fleet.Info.ID}, fc)
-	_, err = ackCMD.Execute(ctx, ackRequest)
+
+	const retryInterval = time.Second
+	const maxRetries = 3
+	retries := 0
+	err = backoff.Retry(func() error {
+		retries++
+		_, reqErr := ackCMD.Execute(ctx, ackRequest)
+		switch {
+		case reqErr == nil:
+			return nil
+		case errors.Is(reqErr, fleetclient.ErrInvalidAPIKey) || retries == maxRetries:
+			return backoff.Permanent(reqErr)
+		default:
+			return reqErr
+		}
+	}, &backoff.ConstantBackOff{Interval: retryInterval})
 	switch {
 	case errors.Is(err, fleetclient.ErrInvalidAPIKey):
 		// this elastic-agent has not valid api token thus it should enroll
