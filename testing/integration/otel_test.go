@@ -1107,7 +1107,7 @@ func TestFBOtelRestartE2E(t *testing.T) {
 	// The input is a file that is being appended to n times during the test.
 	// It starts a filebeat receiver and then restarts it a couple times.
 	// At the end it asserts that the number of logs in ES is equal to the number of
-	// lines in the input file.
+	// lines in the input file as well as ensuring that each log line was ingested only once.
 	info := define.Require(t, define.Requirements{
 		Group: Default,
 		Local: true,
@@ -1226,7 +1226,7 @@ service:
 				break
 			}
 
-			_, err = inputFile.Write([]byte(fmt.Sprintf(`{"id": "%d", "message": "line %d"}`, i, i)))
+			_, err = inputFile.Write([]byte(fmt.Sprintf(`{"id": "%d", "message": "%d"}`, i, i)))
 			require.NoErrorf(t, err, "failed to write line %d to temp file", i)
 			_, err = inputFile.Write([]byte("\n"))
 			require.NoErrorf(t, err, "failed to write newline to temp file")
@@ -1293,7 +1293,19 @@ service:
 			require.NoError(t, err)
 
 			actualHits.Hits = docs.Hits.Total.Value
-			return actualHits.Hits == int(inputLinesCounter.Load())
+			if actualHits.Hits != int(inputLinesCounter.Load()) {
+				return false
+			}
+
+			t.Log("Docs", docs.Hits.Hits)
+			var allIds []string
+			for i, hit := range docs.Hits.Hits {
+				id, found := hit.Source["message"]
+				require.True(t, found, "expected message field in hit %d", i)
+				allIds = append(allIds, id.(string))
+			}
+
+			return len(allIds) == int(inputLinesCounter.Load())
 		},
 		2*time.Minute, 1*time.Second,
 		"Expected %d logs, got %v", int(inputLinesCounter.Load()), actualHits)
