@@ -893,7 +893,7 @@ collectors:
           metrics/otel:
             receivers: [routing]
             processors: [batch]
-            exporters: [debug, signaltometrics, elasticsearch/otel]
+            exporters: [debug, elasticsearch/otel]
           logs:
             receivers: [otlp]
             processors: [batch]
