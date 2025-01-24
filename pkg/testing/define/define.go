@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -143,6 +144,22 @@ func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Inf
 	if err := req.Validate(); err != nil {
 		panic(fmt.Sprintf("test %s has invalid requirements: %s", t.Name(), err))
 	}
+
+	filteredGroups := GroupsFilter.values
+	if len(filteredGroups) > 0 && !slices.Contains(filteredGroups, req.Group) {
+		t.Skipf("group %s not found in groups filter %s. Skipping", req.Group, filteredGroups)
+		return nil
+	}
+
+	if SudoFilter.value != nil && req.Sudo != *SudoFilter.value {
+		t.Skipf("sudo requirement %t not matching sudo filter %t. Skipping", req.Sudo, *SudoFilter.value)
+	}
+
+	// record autodiscover after filtering by group and sudo and before validating against the actual environment
+	if AutoDiscover {
+		discoverTest(t, req)
+	}
+
 	if !req.Local && local {
 		t.Skip("running local only tests and this test doesn't support local")
 		return nil
@@ -173,6 +190,11 @@ func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Inf
 		t.Skipf("platform: %s, architecture: %s, version: %s, and distro: %s combination is not supported by test.  required: %v", runtime.GOOS, runtime.GOARCH, osInfo.Version, osInfo.Platform, req.OS)
 		return nil
 	}
+
+	if DryRun {
+		return dryRun(t, req)
+	}
+
 	namespace, err := getNamespace(t, local)
 	if err != nil {
 		panic(err)

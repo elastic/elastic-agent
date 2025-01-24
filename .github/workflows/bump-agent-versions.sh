@@ -18,7 +18,7 @@ else
         echo "Another PR for $current_ref is in review, skipping..."
         exit 0
     fi
-		pr_branch="$current_ref-update-agent-versions-$GITHUB_RUN_ID"
+    pr_branch="update/$current_ref-update-agent-versions-$GITHUB_RUN_ID"
     # the mage target above requires to be on a release branch
     # so, the new branch should not be created before the target is run
     git checkout -b "$pr_branch"
