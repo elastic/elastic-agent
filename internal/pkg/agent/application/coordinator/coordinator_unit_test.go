@@ -468,6 +468,7 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 		upgradeMgr: upgradeMgr,
 		// Add a placeholder runtime manager that will accept any updates
 		runtimeMgr: &fakeRuntimeManager{},
+		otelMgr:    &fakeOTelManager{},
 
 		// Set valid but empty initial values for ast and vars
 		vars:               emptyVars(t),
@@ -583,6 +584,7 @@ func TestCoordinatorReportsComponentModelError(t *testing.T) {
 		},
 		// Add a placeholder runtime manager that will accept any updates
 		runtimeMgr: &fakeRuntimeManager{},
+		otelMgr:    &fakeOTelManager{},
 
 		// Set valid but empty initial values for ast and vars
 		vars:               emptyVars(t),
@@ -681,6 +683,7 @@ func TestCoordinatorPolicyChangeUpdatesMonitorReloader(t *testing.T) {
 			configManagerUpdate: configChan,
 		},
 		runtimeMgr:         runtimeManager,
+		otelMgr:            &fakeOTelManager{},
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
@@ -950,7 +953,9 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 			// manager, so it receives the update result.
 			runtimeManagerError: updateErrChan,
 		},
-		runtimeMgr:         runtimeManager,
+		runtimeMgr: runtimeManager,
+		otelMgr:    &fakeOTelManager{},
+
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
@@ -1075,6 +1080,7 @@ func TestCoordinatorAppliesVarsToPolicy(t *testing.T) {
 			varsManagerUpdate:   varsChan,
 		},
 		runtimeMgr:         runtimeManager,
+		otelMgr:            &fakeOTelManager{},
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
