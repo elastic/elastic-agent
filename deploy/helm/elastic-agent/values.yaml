@@ -47,7 +47,7 @@ kubernetes:
   # -- enable Kubernetes integration.
   # @section -- 2 - Kubernetes integration
   # @sectionDescriptionTemplate -- Kubernetes
-  enabled: false
+  enabled: true
   # -- name of the output used in kubernetes integration. Note that this output needs to be defined in
   # [outputs](#1-outputs)
   # @section -- 2 - Kubernetes integration
@@ -325,13 +325,13 @@ extraIntegrations: {}
 agent:
   # -- elastic-agent version
   # @section -- 6 - Elastic-Agent Configuration
-  version: 8.17.1
+  version: 8.17.2
   # -- image configuration
   # @section -- 6 - Elastic-Agent Configuration
   image:
     repository: docker.elastic.co/beats/elastic-agent
     pullPolicy: IfNotPresent
-    tag: "8.17.1-SNAPSHOT"
+    tag: "8.17.2-SNAPSHOT"
   # -- image pull secrets
   # @section -- 6 - Elastic-Agent Configuration
   imagePullSecrets: []
@@ -438,6 +438,7 @@ agent:
         create: true
       clusterRole:
         create: true
+      hostNetwork: true
       resources:
         limits:
           memory: 1000Mi

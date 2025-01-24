@@ -276,6 +276,7 @@ steps:
                 - internal/
                 - dev-tools/
                 - pkg/
+                - deploy/
                 - testing/
                 - version/
                 - specs/
