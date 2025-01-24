@@ -266,7 +266,7 @@ func TestVars_Replace(t *testing.T) {
 			if test.Error {
 				assert.Error(t, err)
 			} else if test.NoMatch {
-				assert.Error(t, ErrNoMatch, err)
+				assert.ErrorIs(t, ErrNoMatch, err)
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, test.Result, res)

@@ -152,7 +152,23 @@ func replaceVars(value string, replacer func(variable string) (Node, Processors,
 				}
 			}
 			if !set && reqMatch {
-				return NewStrVal(""), ErrNoMatch
+				var sb strings.Builder
+				sb.WriteString("${")
+				for i, val := range vars {
+					switch val.(type) {
+					case *constString:
+						sb.WriteString(`'`)
+						sb.WriteString(val.Value())
+						sb.WriteString(`'`)
+					case *varString:
+						sb.WriteString(val.Value())
+						if i < len(vars)-1 {
+							sb.WriteString("|")
+						}
+					}
+				}
+				sb.WriteString("}")
+				return NewStrVal(""), fmt.Errorf("%w: %s", ErrNoMatch, sb.String())
 			}
 			lastIndex = r[1]
 		}

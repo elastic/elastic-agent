@@ -35,6 +35,7 @@ func RenderOutputs(outputs Node, varsArray []*Vars) (Node, error) {
 		key, ok := node.(*Key)
 		if !ok {
 			// not possible, but be defensive
+			keys[i] = node
 			continue
 		}
 		if key.value == nil {
@@ -44,19 +45,21 @@ func RenderOutputs(outputs Node, varsArray []*Vars) (Node, error) {
 		dict, ok := key.value.(*Dict)
 		if !ok {
 			// not possible, but be defensive
+			keys[i] = key
 			continue
 		}
 		// Apply creates a new Node with a deep copy of all the values
-		var err error
-		key.value, err = dict.Apply(vars)
+		value, err := dict.Apply(vars)
 		// inputs allows a variable not to match and it will be removed
 		// outputs are not that way, if an ErrNoMatch is returned we
 		// return it back to the caller
 		if err != nil {
-			// another error that needs to be reported
-			return nil, err
+			return nil, fmt.Errorf("rendering output %q failed: %w", key.name, err)
 		}
-		keys[i] = key
+		keys[i] = &Key{
+			name:  key.name,
+			value: value,
+		}
 	}
 	return &Dict{keys, nil}, nil
 }

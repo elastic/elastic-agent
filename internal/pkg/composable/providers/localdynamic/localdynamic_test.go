@@ -7,6 +7,7 @@ package localdynamic
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -63,9 +64,11 @@ func TestContextProvider(t *testing.T) {
 	provider, err := builder(nil, cfg, true)
 	require.NoError(t, err)
 
-	comm := ctesting.NewDynamicComm(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	comm := ctesting.NewDynamicComm(ctx)
 	err = provider.Run(comm)
-	require.NoError(t, err)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
 
 	curr1, ok1 := comm.Current("0")
 	assert.True(t, ok1)
