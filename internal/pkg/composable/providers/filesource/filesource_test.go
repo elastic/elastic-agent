@@ -75,7 +75,7 @@ func TestContextProvider_Config(t *testing.T) {
 }
 
 func TestContextProvider(t *testing.T) {
-	const testTimeout = 10 * time.Second
+	const testTimeout = 3 * time.Second
 
 	tmpDir := t.TempDir()
 	value1 := "value1"
@@ -130,28 +130,34 @@ func TestContextProvider(t *testing.T) {
 	require.NoError(t, os.WriteFile(file1, []byte(value1), 0o644))
 
 	// wait for file1 to be updated
-	var oneUpdated map[string]interface{}
-	select {
-	case oneUpdated = <-setChan:
-	case <-time.After(testTimeout):
-		require.FailNow(t, "timeout waiting for provider to call Set")
-	}
+	for {
+		var oneUpdated map[string]interface{}
+		select {
+		case oneUpdated = <-setChan:
+		case <-time.After(testTimeout):
+			require.FailNow(t, "timeout waiting for provider to call Set")
+		}
 
-	require.Equal(t, value1, oneUpdated["one"])
-	require.Equal(t, value2, oneUpdated["two"])
+		if value1 == oneUpdated["one"] && value2 == oneUpdated["two"] {
+			break
+		}
+	}
 
 	// update the value in two
 	value2 = "update2"
 	require.NoError(t, os.WriteFile(file2, []byte(value2), 0o644))
 
-	// wait for file2 to be updated
-	var twoUpdated map[string]interface{}
-	select {
-	case twoUpdated = <-setChan:
-	case <-time.After(testTimeout):
-		require.FailNow(t, "timeout waiting for provider to call Set")
-	}
+	for {
+		// wait for file2 to be updated
+		var twoUpdated map[string]interface{}
+		select {
+		case twoUpdated = <-setChan:
+		case <-time.After(testTimeout):
+			require.FailNow(t, "timeout waiting for provider to call Set")
+		}
 
-	require.Equal(t, value1, twoUpdated["one"])
-	require.Equal(t, value2, twoUpdated["two"])
+		if value1 == twoUpdated["one"] && value2 == twoUpdated["two"] {
+			break
+		}
+	}
 }
