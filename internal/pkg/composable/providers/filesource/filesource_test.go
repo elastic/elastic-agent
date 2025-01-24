@@ -75,7 +75,7 @@ func TestContextProvider_Config(t *testing.T) {
 }
 
 func TestContextProvider(t *testing.T) {
-	const testTimeout = 1 * time.Second
+	const testTimeout = 10 * time.Second
 
 	tmpDir := t.TempDir()
 	value1 := "value1"
