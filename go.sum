@@ -1214,6 +1214,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckrece
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver v0.117.0/go.mod h1:CJ8g9tulvdBgyRB3UPCi9MQF7oVMZ9tCThmQ4EFc+M0=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.117.0 h1:II39WzwaFVzU7cDNL60xcEzxaymbEJ4zCA6Mz76phjc=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.117.0/go.mod h1:WUz1ccnskld9mrTVoLp/TfI++Qrg0PTXmoceh51VWPE=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver v0.117.0 h1:Xefa7cXCPdninCxDKNUmm1OPuBpdrpuzHCdq2fn83uk=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver v0.117.0/go.mod h1:Wb4Jdpbb/l4kXFke0V3iC4uWl0LxK+GgiIs7ExdUwDk=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver v0.117.0 h1:ffORZMJZgAgLwVoqKfTYMVgbbnfwtFinchjY/nxwJrk=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver v0.117.0/go.mod h1:JScN+Jg5i3ATKT5KeB4URvwv1SGbw6AF3Q10NLaGztQ=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.117.0 h1:fus4xS+nveMqai6SFEQQ91BRBrvPqGY+y3Y6JeeWvSA=

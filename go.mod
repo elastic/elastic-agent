@@ -50,6 +50,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.117.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.117.0
