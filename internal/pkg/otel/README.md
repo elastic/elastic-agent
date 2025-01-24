@@ -30,6 +30,7 @@ This section provides a summary of components included in the Elastic Distributi
 | Component | Version |
 |---|---|
 | [jaegerreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/jaegerreceiver/v0.117.0/receiver/jaegerreceiver/README.md) | v0.117.0 |
+| [kafkareceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/kafkareceiver/v0.117.0/receiver/kafkareceiver/README.md) | v0.117.0 |
 | [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusreceiver/v0.117.0/receiver/prometheusreceiver/README.md) | v0.117.0 |
 | [zipkinreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zipkinreceiver/v0.117.0/receiver/zipkinreceiver/README.md) | v0.117.0 |
 | [filelogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/filelogreceiver/v0.117.0/receiver/filelogreceiver/README.md) | v0.117.0 |
@@ -44,6 +45,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+| [kafkaexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/kafkaexporter/v0.117.0/exporter/kafkaexporter/README.md) | v0.117.0 |
 | [loadbalancingexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/loadbalancingexporter/v0.117.0/exporter/loadbalancingexporter/README.md) | v0.117.0 |
 | [elasticsearchexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/elasticsearchexporter/v0.117.0/exporter/elasticsearchexporter/README.md) | v0.117.0 |
 | [fileexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/fileexporter/v0.117.0/exporter/fileexporter/README.md) | v0.117.0 |
