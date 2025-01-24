@@ -45,7 +45,7 @@ type fileSourceConfig struct {
 type providerConfig struct {
 	Enabled bool                         `config:"enabled"` // handled by composable manager (but here to show that it is part of the config)
 	Sources map[string]*fileSourceConfig `config:"sources"`
-	MaxSize uint                         `config:"max_size"`
+	MaxSize int                          `config:"max_size"`
 }
 
 type contextProvider struct {
@@ -134,7 +134,7 @@ func (c *contextProvider) Run(ctx context.Context, comm corecomp.ContextProvider
 					changed := false
 					value := c.readContents(path)
 					for _, source := range sources {
-						previous, _ := current[source]
+						previous := current[source]
 						if previous != value {
 							current[source] = value
 							changed = true
@@ -157,7 +157,7 @@ func (c *contextProvider) Run(ctx context.Context, comm corecomp.ContextProvider
 // the maximum size.
 func (c *contextProvider) readContents(path string) string {
 	maxSize := c.cfg.MaxSize
-	if maxSize == 0 {
+	if maxSize <= 0 {
 		maxSize = DefaultMaxSize
 	}
 
@@ -178,8 +178,8 @@ func (c *contextProvider) readContents(path string) string {
 	size++ // one byte for final read at EOF
 
 	// don't allow more than maxSize
-	if uint(size) > maxSize {
-		size = int(maxSize)
+	if size > maxSize {
+		size = maxSize
 	}
 
 	// If a file claims a small size, read at least 512 bytes.
