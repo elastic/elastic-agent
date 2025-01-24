@@ -16,7 +16,7 @@ import (
 )
 
 func TestVars_Replace(t *testing.T) {
-	vars := mustMakeVars(map[string]interface{}{
+	vars := mustMakeVarsWithDefault(map[string]interface{}{
 		"un-der_score": map[string]interface{}{
 			"key1":      "data1",
 			"key2":      "data2",
@@ -42,7 +42,7 @@ func TestVars_Replace(t *testing.T) {
 			"key5": "${",
 			"key6": "$${",
 		},
-	})
+	}, "other")
 	tests := []struct {
 		Input   string
 		Result  Node
@@ -75,6 +75,12 @@ func TestVars_Replace(t *testing.T) {
 		},
 		{
 			"${un-der_score.missing|un-der_score.missing2|other.data}",
+			NewStrVal("info"),
+			false,
+			false,
+		},
+		{
+			"${un-der_score.missing|un-der_score.missing2|data}",
 			NewStrVal("info"),
 			false,
 			false,
@@ -297,10 +303,14 @@ func TestVars_ReplaceWithProcessors(t *testing.T) {
 		},
 		"dynamic",
 		processers,
-		nil)
+		nil, "testing")
 	require.NoError(t, err)
 
 	res, err := vars.Replace("${testing.key1}")
+	require.NoError(t, err)
+	assert.Equal(t, NewStrVal("data1"), res)
+
+	res, err = vars.Replace("${key1}")
 	require.NoError(t, err)
 	assert.Equal(t, NewStrVal("data1"), res)
 
@@ -364,7 +374,7 @@ func TestVars_ReplaceWithFetchContextProvider(t *testing.T) {
 		},
 		"dynamic",
 		processers,
-		fetchContextProviders)
+		fetchContextProviders, "")
 	require.NoError(t, err)
 
 	res, err := vars.Replace("${testing.key1}")

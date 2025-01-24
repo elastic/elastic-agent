@@ -196,7 +196,7 @@ func TestDiagnosticVariables(t *testing.T) {
 		map[string]interface{}{
 			"testvar": "testvalue",
 		},
-		nil)
+		nil, "")
 	require.NoError(t, err)
 
 	expected := `

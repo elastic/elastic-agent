@@ -172,6 +172,9 @@ type ConfigManager interface {
 type VarsManager interface {
 	Runner
 
+	// DefaultProvider returns the default provider that the variable manager is configured to use.
+	DefaultProvider() string
+
 	// Observe instructs the variables to observe.
 	Observe([]string)
 
@@ -1337,14 +1340,15 @@ func (c *Coordinator) observeASTVars() {
 		c.varsMgr.Observe(nil)
 		return
 	}
-	inputs, ok := transpiler.Lookup(c.ast, "inputs")
-	if !ok {
-		// No inputs; no vars
-		c.varsMgr.Observe(nil)
-		return
-	}
 	var vars []string
-	vars = inputs.Vars(vars)
+	inputs, ok := transpiler.Lookup(c.ast, "inputs")
+	if ok {
+		vars = inputs.Vars(vars, c.varsMgr.DefaultProvider())
+	}
+	outputs, ok := transpiler.Lookup(c.ast, "outputs")
+	if ok {
+		vars = outputs.Vars(vars, c.varsMgr.DefaultProvider())
+	}
 	c.varsMgr.Observe(vars)
 }
 
@@ -1421,6 +1425,8 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	}()
 
 	ast := c.ast.ShallowClone()
+
+	// perform variable substitution for inputs
 	inputs, ok := transpiler.Lookup(ast, "inputs")
 	if ok {
 		renderedInputs, err := transpiler.RenderInputs(inputs, c.vars)
@@ -1430,6 +1436,20 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		err = transpiler.Insert(ast, renderedInputs, "inputs")
 		if err != nil {
 			return fmt.Errorf("inserting rendered inputs failed: %w", err)
+		}
+	}
+
+	// perform variable substitution for outputs
+	// outputs only support the context variables (dynamic provides are not provide to the outputs)
+	outputs, ok := transpiler.Lookup(ast, "outputs")
+	if ok {
+		renderedOutputs, err := transpiler.RenderOutputs(outputs, c.vars)
+		if err != nil {
+			return fmt.Errorf("rendering outputs failed: %w", err)
+		}
+		err = transpiler.Insert(ast, renderedOutputs, "outputs")
+		if err != nil {
+			return fmt.Errorf("inserting rendered outputs failed: %w", err)
 		}
 	}
 

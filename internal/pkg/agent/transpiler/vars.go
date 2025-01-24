@@ -26,30 +26,31 @@ type Vars struct {
 	processorsKey         string
 	processors            Processors
 	fetchContextProviders mapstr.M
+	defaultProvider       string
 }
 
 // NewVars returns a new instance of vars.
-func NewVars(id string, mapping map[string]interface{}, fetchContextProviders mapstr.M) (*Vars, error) {
-	return NewVarsWithProcessors(id, mapping, "", nil, fetchContextProviders)
+func NewVars(id string, mapping map[string]interface{}, fetchContextProviders mapstr.M, defaultProvider string) (*Vars, error) {
+	return NewVarsWithProcessors(id, mapping, "", nil, fetchContextProviders, defaultProvider)
 }
 
 // NewVarsFromAst returns a new instance of vars. It takes the mapping as an *AST.
-func NewVarsFromAst(id string, tree *AST, fetchContextProviders mapstr.M) *Vars {
-	return &Vars{id, tree, "", nil, fetchContextProviders}
+func NewVarsFromAst(id string, tree *AST, fetchContextProviders mapstr.M, defaultProvider string) *Vars {
+	return &Vars{id, tree, "", nil, fetchContextProviders, defaultProvider}
 }
 
 // NewVarsWithProcessors returns a new instance of vars with attachment of processors.
-func NewVarsWithProcessors(id string, mapping map[string]interface{}, processorKey string, processors Processors, fetchContextProviders mapstr.M) (*Vars, error) {
+func NewVarsWithProcessors(id string, mapping map[string]interface{}, processorKey string, processors Processors, fetchContextProviders mapstr.M, defaultProvider string) (*Vars, error) {
 	tree, err := NewAST(mapping)
 	if err != nil {
 		return nil, err
 	}
-	return &Vars{id, tree, processorKey, processors, fetchContextProviders}, nil
+	return &Vars{id, tree, processorKey, processors, fetchContextProviders, defaultProvider}, nil
 }
 
 // NewVarsWithProcessorsFromAst returns a new instance of vars with attachment of processors. It takes the mapping as an *AST.
-func NewVarsWithProcessorsFromAst(id string, tree *AST, processorKey string, processors Processors, fetchContextProviders mapstr.M) *Vars {
-	return &Vars{id, tree, processorKey, processors, fetchContextProviders}
+func NewVarsWithProcessorsFromAst(id string, tree *AST, processorKey string, processors Processors, fetchContextProviders mapstr.M, defaultProvider string) *Vars {
+	return &Vars{id, tree, processorKey, processors, fetchContextProviders, defaultProvider}
 }
 
 // Replace returns a new value based on variable replacement.
@@ -61,7 +62,7 @@ func (v *Vars) Replace(value string) (Node, error) {
 			processors = v.processors
 		}
 		return node, processors, ok
-	}, true)
+	}, true, v.defaultProvider)
 }
 
 // ID returns the unique ID for the vars.
@@ -103,7 +104,7 @@ func (v *Vars) lookupNode(name string) (Node, bool) {
 	return Lookup(v.tree, name)
 }
 
-func replaceVars(value string, replacer func(variable string) (Node, Processors, bool), reqMatch bool) (Node, error) {
+func replaceVars(value string, replacer func(variable string) (Node, Processors, bool), reqMatch bool, defaultProvider string) (Node, error) {
 	var processors Processors
 	matchIdxs := varsRegex.FindAllSubmatchIndex([]byte(value), -1)
 	if !validBrackets(value, matchIdxs) {
@@ -120,7 +121,7 @@ func replaceVars(value string, replacer func(variable string) (Node, Processors,
 				continue
 			}
 			// match on a non-escaped var
-			vars, err := extractVars(value[r[i+2]:r[i+3]])
+			vars, err := extractVars(value[r[i+2]:r[i+3]], defaultProvider)
 			if err != nil {
 				return nil, fmt.Errorf(`error parsing variable "%s": %w`, value[r[i]:r[i+1]], err)
 			}
@@ -206,7 +207,7 @@ func (v *constString) Value() string {
 	return v.value
 }
 
-func extractVars(i string) ([]varI, error) {
+func extractVars(i string, defaultProvider string) ([]varI, error) {
 	const out = rune(0)
 
 	quote := out
@@ -226,7 +227,7 @@ func extractVars(i string) ([]varI, error) {
 					if is[len(is)-1] == '.' {
 						return nil, fmt.Errorf("variable cannot end with '.'")
 					}
-					res = append(res, &varString{string(is)})
+					res = append(res, &varString{maybeAddDefaultProvider(string(is), defaultProvider)})
 				}
 				is = is[:0] // slice to zero length; to keep allocated memory
 				constant = false
@@ -267,7 +268,7 @@ func extractVars(i string) ([]varI, error) {
 		if is[len(is)-1] == '.' {
 			return nil, fmt.Errorf("variable cannot end with '.'")
 		}
-		res = append(res, &varString{string(is)})
+		res = append(res, &varString{maybeAddDefaultProvider(string(is), defaultProvider)})
 	}
 	return res, nil
 }
@@ -275,4 +276,16 @@ func extractVars(i string) ([]varI, error) {
 func varPrefixMatched(val string, key string) bool {
 	s := strings.SplitN(val, ".", 2)
 	return s[0] == key
+}
+
+func maybeAddDefaultProvider(val string, defaultProvider string) string {
+	if defaultProvider == "" {
+		return val
+	}
+	if strings.Contains(val, ".") {
+		// already has a provider in the variable name
+		return val
+	}
+	// at this point they variable doesn't have a provider
+	return fmt.Sprintf("%s.%s", defaultProvider, val)
 }

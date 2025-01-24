@@ -928,7 +928,7 @@ func BenchmarkCoordinator_generateComponentModel(b *testing.B) {
 	require.NoError(b, err)
 	vars := make([]*transpiler.Vars, len(varsMaps))
 	for i, vm := range varsMaps {
-		vars[i], err = transpiler.NewVars(fmt.Sprintf("%d", i), vm, mapstr.M{})
+		vars[i], err = transpiler.NewVars(fmt.Sprintf("%d", i), vm, mapstr.M{}, "")
 		require.NoError(b, err)
 	}
 
@@ -1233,6 +1233,10 @@ func (f *fakeVarsManager) Vars(ctx context.Context, vars []*transpiler.Vars) {
 	case <-ctx.Done():
 	case f.varsCh <- vars:
 	}
+}
+
+func (f *fakeVarsManager) DefaultProvider() string {
+	return ""
 }
 
 type fakeOTelManager struct {

@@ -379,3 +379,34 @@ func TestCancellation(t *testing.T) {
 		}
 	})
 }
+
+func TestDefaultProvider(t *testing.T) {
+	log, err := logger.New("", false)
+	require.NoError(t, err)
+
+	t.Run("default env", func(t *testing.T) {
+		c, err := composable.New(log, nil, false)
+		require.NoError(t, err)
+		assert.Equal(t, "env", c.DefaultProvider())
+	})
+
+	t.Run("no default", func(t *testing.T) {
+		cfg, err := config.NewConfigFrom(map[string]interface{}{
+			"agent.providers.default": "",
+		})
+		require.NoError(t, err)
+		c, err := composable.New(log, cfg, false)
+		require.NoError(t, err)
+		assert.Equal(t, "", c.DefaultProvider())
+	})
+
+	t.Run("custom default", func(t *testing.T) {
+		cfg, err := config.NewConfigFrom(map[string]interface{}{
+			"agent.providers.default": "custom",
+		})
+		require.NoError(t, err)
+		c, err := composable.New(log, cfg, false)
+		require.NoError(t, err)
+		assert.Equal(t, "custom", c.DefaultProvider())
+	})
+}

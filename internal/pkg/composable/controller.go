@@ -23,7 +23,8 @@ import (
 )
 
 const (
-	defaultRetryInterval = 30 * time.Second
+	defaultRetryInterval   = 30 * time.Second
+	defaultDefaultProvider = "env"
 )
 
 // Controller manages the state of the providers current context.
@@ -41,6 +42,11 @@ type Controller interface {
 
 	// Observe instructs the variables to observe.
 	Observe([]string)
+
+	// DefaultProvider returns the default provider used by the controller.
+	//
+	// This is used by any variable reference that doesn't add a provider prefix.
+	DefaultProvider() string
 }
 
 // controller manages the state of the providers current context.
@@ -50,6 +56,7 @@ type controller struct {
 	observedCh      chan map[string]bool
 	errCh           chan error
 	restartInterval time.Duration
+	defaultProvider string
 
 	managed                 bool
 	contextProviderBuilders map[string]contextProvider
@@ -80,6 +87,11 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 	restartInterval := defaultRetryInterval
 	if providersCfg.ProvidersRestartInterval != nil {
 		restartInterval = *providersCfg.ProvidersRestartInterval
+	}
+
+	defaultProvider := defaultDefaultProvider
+	if providersCfg.ProvidersDefaultProvider != nil {
+		defaultProvider = *providersCfg.ProvidersDefaultProvider
 	}
 
 	// build all the context providers
@@ -117,6 +129,7 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 		errCh:                   make(chan error),
 		managed:                 managed,
 		restartInterval:         restartInterval,
+		defaultProvider:         defaultProvider,
 		contextProviderBuilders: contextProviders,
 		dynamicProviderBuilders: dynamicProviders,
 		contextProviderStates:   make(map[string]*contextProviderState),
@@ -237,7 +250,7 @@ func (c *controller) Run(ctx context.Context) error {
 
 func (c *controller) sendVars(ctx context.Context, fetchContextProviders mapstr.M) error {
 	c.logger.Debugf("Computing new variable state for composable inputs")
-	vars := c.generateVars(fetchContextProviders)
+	vars := c.generateVars(fetchContextProviders, c.defaultProvider)
 	for {
 		select {
 		case c.ch <- vars:
@@ -283,6 +296,11 @@ func (c *controller) Observe(vars []string) {
 	// drain the channel first, if the previous vars had not been used yet the new list should be used instead
 	drainChan(c.observedCh)
 	c.observedCh <- topLevel
+}
+
+// DefaultProvider returns the default provider being used by the controller.
+func (c *controller) DefaultProvider() string {
+	return c.defaultProvider
 }
 
 func (c *controller) handleObserved(ctx context.Context, wg *sync.WaitGroup, fetchCh chan fetchProvider, stateChangedChan chan bool, observed map[string]bool) bool {
@@ -470,14 +488,14 @@ func (c *controller) startDynamicProvider(ctx context.Context, wg *sync.WaitGrou
 	return state
 }
 
-func (c *controller) generateVars(fetchContextProviders mapstr.M) []*transpiler.Vars {
+func (c *controller) generateVars(fetchContextProviders mapstr.M, defaultProvider string) []*transpiler.Vars {
 	// build the vars list of mappings
 	vars := make([]*transpiler.Vars, 1)
 	mapping, _ := transpiler.NewAST(map[string]any{})
 	for name, state := range c.contextProviderStates {
 		_ = mapping.Insert(state.Current(), name)
 	}
-	vars[0] = transpiler.NewVarsFromAst("", mapping, fetchContextProviders)
+	vars[0] = transpiler.NewVarsFromAst("", mapping, fetchContextProviders, defaultProvider)
 
 	// add to the vars list for each dynamic providers mappings
 	for name, state := range c.dynamicProviderStates {
@@ -485,7 +503,7 @@ func (c *controller) generateVars(fetchContextProviders mapstr.M) []*transpiler.
 			local := mapping.ShallowClone()
 			_ = local.Insert(mappings.mapping, name)
 			id := fmt.Sprintf("%s-%s", name, mappings.id)
-			v := transpiler.NewVarsWithProcessorsFromAst(id, local, name, mappings.processors, fetchContextProviders)
+			v := transpiler.NewVarsWithProcessorsFromAst(id, local, name, mappings.processors, fetchContextProviders, defaultProvider)
 			vars = append(vars, v)
 		}
 	}
