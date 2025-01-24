@@ -9,14 +9,15 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
-
-	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
+	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -30,16 +31,20 @@ func TestContextProvider_Config(t *testing.T) {
 		{
 			Name: "no path",
 			Config: config.MustNewConfigFrom(map[string]interface{}{
-				"one": map[string]interface{}{},
+				"sources": map[string]interface{}{
+					"one": map[string]interface{}{},
+				},
 			}),
 			Err: errors.New(`"one" is missing a defined path`),
 		},
 		{
 			Name: "invalid type",
 			Config: config.MustNewConfigFrom(map[string]interface{}{
-				"one": map[string]interface{}{
-					"type": "json",
-					"path": "/etc/agent/content",
+				"sources": map[string]interface{}{
+					"one": map[string]interface{}{
+						"type": "json",
+						"path": "/etc/agent/content",
+					},
 				},
 			}),
 			Err: errors.New(`"one" defined an unsupported type "json"`),
@@ -49,11 +54,13 @@ func TestContextProvider_Config(t *testing.T) {
 		{
 			Name: "valid path",
 			Config: config.MustNewConfigFrom(map[string]interface{}{
-				"one": map[string]interface{}{
-					"path": "/etc/agent/content1",
-				},
-				"two": map[string]interface{}{
-					"path": "/etc/agent/content2",
+				"sources": map[string]interface{}{
+					"one": map[string]interface{}{
+						"path": "/etc/agent/content1",
+					},
+					"two": map[string]interface{}{
+						"path": "/etc/agent/content2",
+					},
 				},
 			}),
 		},
@@ -79,21 +86,34 @@ func TestContextProvider(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	value1 := "value1"
-	file1 := filepath.Join(tmpDir, "value1_path")
+	file1 := filepath.Join(tmpDir, "vAlUe1_path")
 	require.NoError(t, os.WriteFile(file1, []byte(value1), 0o644))
 	value2 := "value2"
-	file2 := filepath.Join(tmpDir, "value2_path")
+	file2 := filepath.Join(tmpDir, "vAlUe2_path")
 	require.NoError(t, os.WriteFile(file2, []byte(value2), 0o644))
 
 	log, err := logger.New("filesource_test", false)
 	require.NoError(t, err)
 
+	osPath := func(path string) string {
+		return path
+	}
+	if runtime.GOOS == "windows" {
+		// on Windows configure the path as lower case even though it
+		// is written as non-lower case to ensure that on Windows the
+		// filewatcher observes the correct path
+		osPath = func(path string) string {
+			return strings.ToLower(path)
+		}
+	}
 	c, err := config.NewConfigFrom(map[string]interface{}{
-		"one": map[string]interface{}{
-			"path": file1,
-		},
-		"two": map[string]interface{}{
-			"path": file2,
+		"sources": map[string]interface{}{
+			"one": map[string]interface{}{
+				"path": osPath(file1),
+			},
+			"two": map[string]interface{}{
+				"path": osPath(file2),
+			},
 		},
 	})
 	require.NoError(t, err)
