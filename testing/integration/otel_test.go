@@ -1204,8 +1204,6 @@ service:
 				return
 			}
 			t.Logf("Contents of otel config file:\n%s\n", string(contents))
-			// TODO(mauri870): remove this line before merging
-			os.WriteFile("/tmp/otel.yml", contents, 0o600)
 		}
 	})
 	// Now we can actually create the fixture and run it
@@ -1248,11 +1246,13 @@ service:
 		}
 	})
 
-	var restartCount atomic.Int64
 	var fixtureWg sync.WaitGroup
 	fixtureWg.Add(1)
+
+	restartCh := make(chan int, 1)
 	go func() {
 		defer fixtureWg.Done()
+		var restartCount int
 
 		for {
 			// restart the collector every couple seconds while new data is being written
@@ -1261,27 +1261,51 @@ service:
 			err = fixture.RunOtelWithClient(fCtx)
 			cancel()
 			require.True(t, errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled), "unexpected error: %v", err)
-			require.True(t, inputLinesCounter.Load() > prevCount, "expected input lines to increase")
-			restartCount.Add(1)
 
 			if stopInputWriter.Load() {
 				break
 			}
+
+			require.True(t, inputLinesCounter.Load() > prevCount, "expected input lines to increase")
+			restartCount++
+			restartCh <- restartCount
 		}
 
 		// start the collector again for the remaining of the test
+		close(restartCh)
 		fCtx, cancel := context.WithDeadline(ctx, time.Now().Add(5*time.Minute))
 		defer cancel()
 		err = fixture.RunOtelWithClient(fCtx)
 	}()
 
-	time.Sleep(5 * time.Second)
+	// Wait for the collector to restart a couple times
+waitLoop:
+	for {
+		select {
+		case n := <-restartCh:
+			if n > 2 {
+				break waitLoop
+			}
+		case <-time.After(5 * time.Second):
+			require.Fail(t, "expected the collector to have restarted")
+		}
+	}
+
+	// Stop generating input data
 	stopInputWriter.Store(true)
 
-	require.True(t, restartCount.Load() > 0, "expected the collector to restart at least once")
+	// wait for the collector to start one last time
+	select {
+	case <-restartCh:
+	case <-time.After(5 * time.Second):
+		require.Fail(t, "expected the collector to have restarted")
+	}
 
 	// Make sure all the logs are ingested
-	actualHits := &struct{ Hits int }{}
+	actualHits := &struct {
+		Hits       int
+		UniqueHits int
+	}{}
 	require.Eventually(t,
 		func() bool {
 			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -1297,15 +1321,19 @@ service:
 				return false
 			}
 
-			t.Log("Docs", docs.Hits.Hits)
-			var allIds []string
-			for i, hit := range docs.Hits.Hits {
-				id, found := hit.Source["message"]
-				require.True(t, found, "expected message field in hit %d", i)
-				allIds = append(allIds, id.(string))
+			uniqueIngestedLogs := make(map[string]struct{})
+			for _, hit := range docs.Hits.Hits {
+				message, found := hit.Source["message"]
+				require.True(t, found, "expected message field in document %q", hit.Source)
+				msg, ok := message.(string)
+				require.True(t, ok, "expected message field to be a string, got %T", message)
+				if _, found := uniqueIngestedLogs[msg]; found {
+					require.Fail(t, "log line %q was ingested more than once", message)
+				}
+				uniqueIngestedLogs[msg] = struct{}{}
 			}
-
-			return len(allIds) == int(inputLinesCounter.Load())
+			actualHits.UniqueHits = len(uniqueIngestedLogs)
+			return actualHits.UniqueHits == int(inputLinesCounter.Load())
 		},
 		2*time.Minute, 1*time.Second,
 		"Expected %d logs, got %v", int(inputLinesCounter.Load()), actualHits)
