@@ -191,13 +191,10 @@ func TestVars_Replace(t *testing.T) {
 			false,
 		},
 		{
-			`list inside string ${un-der_score.list} causes no match`,
-			NewList([]Node{
-				NewStrVal("array1"),
-				NewStrVal("array2"),
-			}),
+			`list inside string ${un-der_score.list} strings array`,
+			NewStrVal(`list inside string [array1,array2] strings array`),
 			false,
-			true,
+			false,
 		},
 		{
 			`${un-der_score.dict}`,
@@ -209,13 +206,10 @@ func TestVars_Replace(t *testing.T) {
 			false,
 		},
 		{
-			`dict inside string ${un-der_score.dict} causes no match`,
-			NewDict([]Node{
-				NewKey("key1", NewStrVal("value1")),
-				NewKey("key2", NewStrVal("value2")),
-			}),
+			`dict inside string ${un-der_score.dict} strings dict`,
+			NewStrVal(`dict inside string {key1:value1},{key2:value2} strings dict`),
 			false,
-			true,
+			false,
 		},
 		{
 			`start $${keep} ${un-der_score.key1} $${un-der_score.key1}`,
