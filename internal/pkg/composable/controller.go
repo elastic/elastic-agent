@@ -43,7 +43,8 @@ type Controller interface {
 	// Observe instructs the controller to enable the observed providers.
 	//
 	// This is a blocking call until the observation is handled and the most recent
-	// set of variables are returned the caller. This current observed state of variables
+	// set of variables are returned the caller in the case a change occurred. If no change occurred then
+	// it will return with a nil array. If changed the current observed state of variables
 	// that is returned is not sent over the Watch channel, the caller should coordinate this fact.
 	//
 	// Only error that is returned from this function is the result of the passed context.
@@ -231,6 +232,9 @@ func (c *controller) Run(ctx context.Context) error {
 					c.logger.Debugf("Observed state changed for composable inputs; debounce started")
 					drainChan(stateChangedChan)
 					break DEBOUNCE
+				} else {
+					observedResult <- nil
+					observedResult = nil
 				}
 			case <-stateChangedChan:
 				t.Reset(100 * time.Millisecond)
@@ -266,6 +270,13 @@ func (c *controller) sendVars(ctx context.Context, observedResult chan []*transp
 	c.logger.Debugf("Computing new variable state for composable inputs")
 	vars := c.generateVars(fetchContextProviders, c.defaultProvider)
 	if observedResult != nil {
+		// drain any vars sitting on the watch channel
+		// this new set of vars replaces that set if that current
+		// value has not been read then it will result in vars state being incorrect
+		select {
+		case <-c.ch:
+		default:
+		}
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -302,9 +313,14 @@ func (c *controller) Watch() <-chan []*transpiler.Vars {
 	return c.ch
 }
 
-// Observe sends the observed variables from the AST to the controller.
+// Observe instructs the controller to enable the observed providers.
 //
-// Based on this information it will determine which providers should even be running.
+// This is a blocking call until the observation is handled and the most recent
+// set of variables are returned the caller in the case a change occurred. If no change occurred then
+// it will return with a nil array. If changed the current observed state of variables
+// that is returned is not sent over the Watch channel, the caller should coordinate this fact.
+//
+// Only error that is returned from this function is the result of the passed context.
 func (c *controller) Observe(ctx context.Context, vars []string) ([]*transpiler.Vars, error) {
 	// only need the top-level variables to determine which providers to run
 	//

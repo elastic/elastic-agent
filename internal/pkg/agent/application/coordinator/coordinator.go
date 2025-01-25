@@ -1339,31 +1339,26 @@ func (c *Coordinator) observeASTVars(ctx context.Context) error {
 		// No varsMgr (only happens in testing)
 		return nil
 	}
-	if c.ast == nil {
-		// No AST; no vars
-		updated, err := c.varsMgr.Observe(ctx, nil)
-		if err != nil {
-			// context cancel
-			return err
-		}
-		c.vars = updated
-		return nil
-	}
 	var vars []string
-	inputs, ok := transpiler.Lookup(c.ast, "inputs")
-	if ok {
-		vars = inputs.Vars(vars, c.varsMgr.DefaultProvider())
-	}
-	outputs, ok := transpiler.Lookup(c.ast, "outputs")
-	if ok {
-		vars = outputs.Vars(vars, c.varsMgr.DefaultProvider())
+	if c.ast != nil {
+		inputs, ok := transpiler.Lookup(c.ast, "inputs")
+		if ok {
+			vars = inputs.Vars(vars, c.varsMgr.DefaultProvider())
+		}
+		outputs, ok := transpiler.Lookup(c.ast, "outputs")
+		if ok {
+			vars = outputs.Vars(vars, c.varsMgr.DefaultProvider())
+		}
 	}
 	updated, err := c.varsMgr.Observe(ctx, vars)
 	if err != nil {
 		// context cancel
 		return err
 	}
-	c.vars = updated
+	if updated != nil {
+		// provided an updated set of vars (observed changed)
+		c.vars = updated
+	}
 	return nil
 }
 

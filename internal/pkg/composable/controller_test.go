@@ -247,14 +247,36 @@ func TestProvidersDefaultDisabled(t *testing.T) {
 				errCh <- c.Run(ctx)
 			}()
 
-			setVars, err := c.Observe(timeoutCtx, tt.observed)
-			require.NoError(t, err)
+			var setVars []*transpiler.Vars
+			go func() {
+				defer cancel()
+
+				observed := false
+				for {
+					select {
+					case <-timeoutCtx.Done():
+						return
+					case vars := <-c.Watch():
+						setVars = vars
+					default:
+						if !observed {
+							vars, err := c.Observe(timeoutCtx, tt.observed)
+							require.NoError(t, err)
+							if vars != nil {
+								setVars = vars
+							}
+							observed = true
+						}
+					}
+				}
+			}()
 
 			err = <-errCh
 			if errors.Is(err, context.Canceled) {
 				err = nil
 			}
 			require.NoError(t, err)
+			require.NotNil(t, setVars)
 
 			if len(tt.context) > 0 {
 				for _, name := range tt.context {
