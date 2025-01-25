@@ -1188,6 +1188,9 @@ func (l *configChange) Fail(err error) {
 }
 
 type fakeVarsManager struct {
+	varsMx sync.RWMutex
+	vars   []*transpiler.Vars
+
 	varsCh chan []*transpiler.Vars
 	errCh  chan error
 
@@ -1222,13 +1225,19 @@ func (f *fakeVarsManager) Watch() <-chan []*transpiler.Vars {
 	return f.varsCh
 }
 
-func (f *fakeVarsManager) Observe(observed []string) {
+func (f *fakeVarsManager) Observe(ctx context.Context, observed []string) ([]*transpiler.Vars, error) {
 	f.observedMx.Lock()
 	defer f.observedMx.Unlock()
 	f.observed = observed
+	f.varsMx.RLock()
+	defer f.varsMx.RUnlock()
+	return f.vars, nil
 }
 
 func (f *fakeVarsManager) Vars(ctx context.Context, vars []*transpiler.Vars) {
+	f.varsMx.Lock()
+	f.vars = vars
+	f.varsMx.Unlock()
 	select {
 	case <-ctx.Done():
 	case f.varsCh <- vars:

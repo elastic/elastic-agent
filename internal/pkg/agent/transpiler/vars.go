@@ -5,6 +5,7 @@
 package transpiler
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -17,7 +18,7 @@ import (
 var varsRegex = regexp.MustCompile(`\$\$?{([\p{L}\d\s\\\-_|.'":\/]*)}`)
 
 // ErrNoMatch is return when the replace didn't fail, just that no vars match to perform the replace.
-var ErrNoMatch = fmt.Errorf("no matching vars")
+var ErrNoMatch = errors.New("no matching vars")
 
 // Vars is a context of variables that also contain a list of processors that go with the mapping.
 type Vars struct {

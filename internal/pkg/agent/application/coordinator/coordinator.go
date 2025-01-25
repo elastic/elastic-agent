@@ -176,7 +176,7 @@ type VarsManager interface {
 	DefaultProvider() string
 
 	// Observe instructs the variables to observe.
-	Observe([]string)
+	Observe(context.Context, []string) ([]*transpiler.Vars, error)
 
 	// Watch returns the chanel to watch for variable changes.
 	Watch() <-chan []*transpiler.Vars
@@ -1247,7 +1247,11 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 	}
 
 	// pass the observed vars from the AST to the varsMgr
-	c.observeASTVars()
+	err = c.observeASTVars(ctx)
+	if err != nil {
+		// only possible error here is the context being cancelled
+		return err
+	}
 
 	// Disabled for 8.8.0 release in order to limit the surface
 	// https://github.com/elastic/security-team/issues/6501
@@ -1330,15 +1334,20 @@ func (c *Coordinator) generateAST(cfg *config.Config) (err error) {
 // observeASTVars identifies the variables that are referenced in the computed AST and passed to
 // the varsMgr so it knows what providers are being referenced. If a providers is not being
 // referenced then the provider does not need to be running.
-func (c *Coordinator) observeASTVars() {
+func (c *Coordinator) observeASTVars(ctx context.Context) error {
 	if c.varsMgr == nil {
 		// No varsMgr (only happens in testing)
-		return
+		return nil
 	}
 	if c.ast == nil {
 		// No AST; no vars
-		c.varsMgr.Observe(nil)
-		return
+		updated, err := c.varsMgr.Observe(ctx, nil)
+		if err != nil {
+			// context cancel
+			return err
+		}
+		c.vars = updated
+		return nil
 	}
 	var vars []string
 	inputs, ok := transpiler.Lookup(c.ast, "inputs")
@@ -1349,7 +1358,13 @@ func (c *Coordinator) observeASTVars() {
 	if ok {
 		vars = outputs.Vars(vars, c.varsMgr.DefaultProvider())
 	}
-	c.varsMgr.Observe(vars)
+	updated, err := c.varsMgr.Observe(ctx, vars)
+	if err != nil {
+		// context cancel
+		return err
+	}
+	c.vars = updated
+	return nil
 }
 
 // processVars updates the transpiler vars in the Coordinator.

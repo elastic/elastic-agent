@@ -40,8 +40,14 @@ type Controller interface {
 	// Watch returns the channel to watch for variable changes.
 	Watch() <-chan []*transpiler.Vars
 
-	// Observe instructs the variables to observe.
-	Observe([]string)
+	// Observe instructs the controller to enable the observed providers.
+	//
+	// This is a blocking call until the observation is handled and the most recent
+	// set of variables are returned the caller. This current observed state of variables
+	// that is returned is not sent over the Watch channel, the caller should coordinate this fact.
+	//
+	// Only error that is returned from this function is the result of the passed context.
+	Observe(context.Context, []string) ([]*transpiler.Vars, error)
 
 	// DefaultProvider returns the default provider used by the controller.
 	//
@@ -49,11 +55,16 @@ type Controller interface {
 	DefaultProvider() string
 }
 
+type observer struct {
+	vars   map[string]bool
+	result chan []*transpiler.Vars
+}
+
 // controller manages the state of the providers current context.
 type controller struct {
 	logger          *logger.Logger
 	ch              chan []*transpiler.Vars
-	observedCh      chan map[string]bool
+	observedCh      chan observer
 	errCh           chan error
 	restartInterval time.Duration
 	defaultProvider string
@@ -125,7 +136,7 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 	return &controller{
 		logger:                  l,
 		ch:                      make(chan []*transpiler.Vars, 1),
-		observedCh:              make(chan map[string]bool, 1),
+		observedCh:              make(chan observer),
 		errCh:                   make(chan error),
 		managed:                 managed,
 		restartInterval:         restartInterval,
@@ -196,7 +207,7 @@ func (c *controller) Run(ctx context.Context) error {
 
 	// send initial vars state
 	fetchProvidersLock.RLock()
-	err := c.sendVars(ctx, fetchProviders)
+	err := c.sendVars(ctx, nil, fetchProviders)
 	if err != nil {
 		fetchProvidersLock.RUnlock()
 		// only error is context cancel, no need to add error message context
@@ -205,6 +216,7 @@ func (c *controller) Run(ctx context.Context) error {
 	fetchProvidersLock.RUnlock()
 
 	// performs debounce of notifies; accumulates them into 100 millisecond chunks
+	var observedResult chan []*transpiler.Vars
 	for {
 	DEBOUNCE:
 		for {
@@ -212,7 +224,8 @@ func (c *controller) Run(ctx context.Context) error {
 			case <-ctx.Done():
 				return ctx.Err()
 			case observed := <-c.observedCh:
-				changed := c.handleObserved(localCtx, &wg, fetchCh, stateChangedChan, observed)
+				observedResult = observed.result
+				changed := c.handleObserved(localCtx, &wg, fetchCh, stateChangedChan, observed.vars)
 				if changed {
 					t.Reset(100 * time.Millisecond)
 					c.logger.Debugf("Observed state changed for composable inputs; debounce started")
@@ -236,9 +249,10 @@ func (c *controller) Run(ctx context.Context) error {
 			// batching done, gather results
 		}
 
-		// send the vars to the watcher
+		// send the vars to the watcher or the observer caller
 		fetchProvidersLock.RLock()
-		err := c.sendVars(ctx, fetchProviders)
+		err := c.sendVars(ctx, observedResult, fetchProviders)
+		observedResult = nil
 		if err != nil {
 			fetchProvidersLock.RUnlock()
 			// only error is context cancel, no need to add error message context
@@ -248,9 +262,17 @@ func (c *controller) Run(ctx context.Context) error {
 	}
 }
 
-func (c *controller) sendVars(ctx context.Context, fetchContextProviders mapstr.M) error {
+func (c *controller) sendVars(ctx context.Context, observedResult chan []*transpiler.Vars, fetchContextProviders mapstr.M) error {
 	c.logger.Debugf("Computing new variable state for composable inputs")
 	vars := c.generateVars(fetchContextProviders, c.defaultProvider)
+	if observedResult != nil {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case observedResult <- vars:
+			return nil
+		}
+	}
 	for {
 		select {
 		case c.ch <- vars:
@@ -283,7 +305,7 @@ func (c *controller) Watch() <-chan []*transpiler.Vars {
 // Observe sends the observed variables from the AST to the controller.
 //
 // Based on this information it will determine which providers should even be running.
-func (c *controller) Observe(vars []string) {
+func (c *controller) Observe(ctx context.Context, vars []string) ([]*transpiler.Vars, error) {
 	// only need the top-level variables to determine which providers to run
 	//
 	// future: possible that all vars could be organized and then passed to each provider to
@@ -293,9 +315,19 @@ func (c *controller) Observe(vars []string) {
 		vs := strings.SplitN(v, ".", 2)
 		topLevel[vs[0]] = true
 	}
-	// drain the channel first, if the previous vars had not been used yet the new list should be used instead
-	drainChan(c.observedCh)
-	c.observedCh <- topLevel
+	// blocks waiting for an updated set of variables
+	ch := make(chan []*transpiler.Vars)
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case c.observedCh <- observer{topLevel, ch}:
+	}
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case vars := <-ch:
+		return vars, nil
+	}
 }
 
 // DefaultProvider returns the default provider being used by the controller.
@@ -335,24 +367,28 @@ func (c *controller) handleObserved(ctx context.Context, wg *sync.WaitGroup, fet
 			continue
 		}
 
+		found := false
 		contextInfo, ok := c.contextProviderBuilders[name]
 		if ok {
+			found = true
 			state := c.startContextProvider(ctx, wg, fetchCh, stateChangedChan, name, contextInfo)
 			if state != nil {
 				changed = true
 				c.contextProviderStates[name] = state
-
 			}
 		}
 		dynamicInfo, ok := c.dynamicProviderBuilders[name]
 		if ok {
+			found = true
 			state := c.startDynamicProvider(ctx, wg, stateChangedChan, name, dynamicInfo)
 			if state != nil {
 				changed = true
 				c.dynamicProviderStates[name] = state
 			}
 		}
-		c.logger.Warnf("provider %q referenced in policy but no provider exists or was explicitly disabled", name)
+		if !found {
+			c.logger.Warnf("provider %q referenced in policy but no provider exists or was explicitly disabled", name)
+		}
 	}
 
 	// running remaining need to be stopped

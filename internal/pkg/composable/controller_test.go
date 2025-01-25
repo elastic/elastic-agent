@@ -86,22 +86,17 @@ func TestController(t *testing.T) {
 	var setVars2 []*transpiler.Vars
 	var setVars3 []*transpiler.Vars
 	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case vars := <-c.Watch():
-				if setVars1 == nil {
-					setVars1 = vars
-					c.Observe([]string{"local.vars.key1", "local_dynamic.vars.key1"}) // observed local and local_dynamic
-				} else if setVars2 == nil {
-					setVars2 = vars
-					c.Observe(nil) // no observed (will turn off those providers)
-				} else {
-					setVars3 = vars
-					cancel()
-				}
-			}
+		defer cancel()
+		select {
+		case <-ctx.Done():
+			return
+		case vars := <-c.Watch():
+			// initial vars
+			setVars1 = vars
+			setVars2, err = c.Observe(ctx, []string{"local.vars.key1", "local_dynamic.vars.key1"}) // observed local and local_dynamic
+			require.NoError(t, err)
+			setVars3, err = c.Observe(ctx, nil) // no observed (will turn off those providers)
+			require.NoError(t, err)
 		}
 	}()
 
@@ -241,31 +236,20 @@ func TestProvidersDefaultDisabled(t *testing.T) {
 			c, err := composable.New(log, cfg, false)
 			require.NoError(t, err)
 
-			c.Observe(tt.observed)
-
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
 			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 1*time.Second)
 			defer timeoutCancel()
 
-			var setVars []*transpiler.Vars
-			go func() {
-				defer cancel()
-				for {
-					select {
-					case <-timeoutCtx.Done():
-						return
-					case vars := <-c.Watch():
-						setVars = vars
-					}
-				}
-			}()
-
 			errCh := make(chan error)
 			go func() {
 				errCh <- c.Run(ctx)
 			}()
+
+			setVars, err := c.Observe(timeoutCtx, tt.observed)
+			require.NoError(t, err)
+
 			err = <-errCh
 			if errors.Is(err, context.Canceled) {
 				err = nil
