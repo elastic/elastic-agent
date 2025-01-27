@@ -275,7 +275,10 @@ func ContextProviderBuilder(log *logger.Logger, c *config.Config, _ bool) (corec
 func drainQueue(e <-chan fsnotify.Event) {
 	for {
 		select {
-		case _, _ = <-e:
+		case _, ok := <-e:
+			if !ok {
+				return
+			}
 		default:
 			return
 		}
