@@ -45,7 +45,7 @@ fully_qualified_group_name="${GROUP_NAME}${root_suffix}_${os_data}"
 outputXML="build/${fully_qualified_group_name}.integration.xml"
 outputJSON="build/${fully_qualified_group_name}.integration.out.json"
 set +e
-TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${PACKAGE_VERSION}" SNAPSHOT=true gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args -integration.groups="${GROUP_NAME}" -integration.sudo="${TEST_SUDO}"
+TEST_BINARY_NAME="elastic-agent" AGENT_VERSION=$(mage -v printVersion) SNAPSHOT=true gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args -integration.groups="${GROUP_NAME}" -integration.sudo="${TEST_SUDO}"
 TESTS_EXIT_STATUS=$?
 set -e
 
