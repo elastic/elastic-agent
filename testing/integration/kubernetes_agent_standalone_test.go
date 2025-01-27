@@ -268,7 +268,10 @@ func TestKubernetesAgentHelm(t *testing.T) {
 		steps      []k8sTestStep
 	}{
 		{
-			name: "helm standalone agent default kubernetes privileged",
+			// Configure the perNode and clusterWide agents to both use host networking. On the node that
+			// runs the clusterWide agent, this tests that two agents do not try to bind to the same
+			// gRPC control protocol port by default preventing one from starting.
+			name: "helm standalone agent default kubernetes privileged without host network port collision",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
 				k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
@@ -281,6 +284,14 @@ func TestKubernetesAgentHelm(t *testing.T) {
 							"repository": kCtx.agentImageRepo,
 							"tag":        kCtx.agentImageTag,
 							"pullPolicy": "Never",
+						},
+						"presets": map[string]any{
+							"clusterWide": map[string]any{
+								"hostNetwork": true,
+							},
+							"perNode": map[string]any{
+								"hostNetwork": true,
+							},
 						},
 					},
 					"outputs": map[string]any{
