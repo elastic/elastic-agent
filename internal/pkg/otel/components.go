@@ -25,6 +25,7 @@ import (
 	prometheusreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver"
 	receivercreator "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator"
 	zipkinreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver"
+	nopreceiver "go.opentelemetry.io/collector/receiver/nopreceiver"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
 
 	fbreceiver "github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
@@ -91,6 +92,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			mbreceiver.NewFactory(),
 			jmxreceiver.NewFactory(),
 			kafkareceiver.NewFactory(),
+			nopreceiver.NewFactory(),
 		)
 		if err != nil {
 			return otelcol.Factories{}, err
