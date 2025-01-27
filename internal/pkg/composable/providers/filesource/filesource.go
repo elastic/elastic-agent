@@ -6,6 +6,7 @@ package filesource
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -95,15 +96,23 @@ func (c *contextProvider) Run(ctx context.Context, comm corecomp.ContextProvider
 	// this ensures that if the value changed between this code and the loop below
 	// the updated file changes will not be missed
 	current := make(map[string]interface{}, len(c.cfg.Sources))
-	for path, sources := range inverted {
-		value := c.readContents(path)
-		for _, source := range sources {
-			current[source] = value
+	readAll := func() error {
+		for path, sources := range inverted {
+			value := c.readContents(path)
+			for _, source := range sources {
+				current[source] = value
+			}
 		}
+		err = comm.Set(current)
+		if err != nil {
+			return fmt.Errorf("failed to set current context: %w", err)
+		}
+		return nil
 	}
-	err = comm.Set(current)
+	err = readAll()
 	if err != nil {
-		return fmt.Errorf("failed to set current context: %w", err)
+		// context for the error already added
+		return err
 	}
 
 	for {
@@ -113,6 +122,19 @@ func (c *contextProvider) Run(ctx context.Context, comm corecomp.ContextProvider
 		case err, ok := <-watcher.Errors:
 			if ok {
 				c.logger.Errorf("file watcher errored: %s", err)
+				if errors.Is(err, fsnotify.ErrEventOverflow) {
+					// the queue is full and some events have been dropped
+					// at this point we don't know what has changed
+					// clear the queue of events and read all again
+					c.logger.Debug("draining file watcher queue")
+					drainQueue(watcher.Events)
+					c.logger.Infof("reading all sources to handle overflow")
+					err = readAll()
+					if err != nil {
+						// context for the error already added
+						c.logger.Error(err)
+					}
+				}
 			}
 		case e, ok := <-watcher.Events:
 			if ok {
@@ -248,4 +270,14 @@ func ContextProviderBuilder(log *logger.Logger, c *config.Config, _ bool) (corec
 		p.cfg.Sources[sourceName] = sourceCfg
 	}
 	return p, nil
+}
+
+func drainQueue(e <-chan fsnotify.Event) {
+	for {
+		select {
+		case _, _ = <-e:
+		default:
+			return
+		}
+	}
 }
