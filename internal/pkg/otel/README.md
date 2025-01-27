@@ -19,6 +19,12 @@ To validate OTel configuration run `otel validate` subcommand:
 ./elastic-agent otel validate --config otel.yml
 ```
 
+Use the components command to get the list of components included in the binary:
+
+```bash
+./elastic-agent otel components
+```
+
 [feature gates](https://github.com/open-telemetry/opentelemetry-collector/blob/main/featuregate/README.md#controlling-gates) are supported using `--feature-gates` flag.
 
 ## Components
@@ -30,6 +36,7 @@ This section provides a summary of components included in the Elastic Distributi
 | Component | Version |
 |---|---|
 | [jaegerreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/jaegerreceiver/v0.117.0/receiver/jaegerreceiver/README.md) | v0.117.0 |
+| [kafkareceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/kafkareceiver/v0.117.0/receiver/kafkareceiver/README.md) | v0.117.0 |
 | [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusreceiver/v0.117.0/receiver/prometheusreceiver/README.md) | v0.117.0 |
 | [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.117.0/receiver/receivercreator/README.md) | v0.117.0 |
 | [zipkinreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zipkinreceiver/v0.117.0/receiver/zipkinreceiver/README.md) | v0.117.0 |
@@ -45,6 +52,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+| [kafkaexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/kafkaexporter/v0.117.0/exporter/kafkaexporter/README.md) | v0.117.0 |
 | [loadbalancingexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/loadbalancingexporter/v0.117.0/exporter/loadbalancingexporter/README.md) | v0.117.0 |
 | [elasticsearchexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/elasticsearchexporter/v0.117.0/exporter/elasticsearchexporter/README.md) | v0.117.0 |
 | [fileexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/fileexporter/v0.117.0/exporter/fileexporter/README.md) | v0.117.0 |
@@ -88,9 +96,9 @@ This section provides a summary of components included in the Elastic Distributi
 | [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.117.0/connector/spanmetricsconnector/README.md) | v0.117.0 |
 ## Persistence in OpenTelemetry Collector
 
-By default, the OpenTelemetry Collector is stateless, which means it doesn't store offsets on disk while reading files. As a result, if you restart the collector, it won't retain the last read offset, potentially leading to data duplication or loss. However, we have configured persistence in the settings provided with the Elastic Agent package. 
+By default, the OpenTelemetry Collector is stateless, which means it doesn't store offsets on disk while reading files. As a result, if you restart the collector, it won't retain the last read offset, potentially leading to data duplication or loss. However, we have configured persistence in the settings provided with the Elastic Agent package.
 
-To enable persistence for the `filelogreceiver`, we add the `file_storage` extension and activate it for `filelog`. 
+To enable persistence for the `filelogreceiver`, we add the `file_storage` extension and activate it for `filelog`.
 Execute `export STATE_PATH=/path/to/store/otel/offsets` and use the following configuration to enable persistence:
 
 ```yaml
@@ -116,10 +124,10 @@ service:
       exporters: [...]
 ```
 
-> [!WARNING]  
+> [!WARNING]
 Removing the storage key from the filelog section will disable persistence, which will lead to data duplication or loss when the collector restarts.
 
-> [!IMPORTANT]  
+> [!IMPORTANT]
 If you remove the `create_directory: true` option, you'll need to manually create a directory to store the data. You can ignore this option if the directory already exists.
 
 ### Persistence in standalone Docker mode
