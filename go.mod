@@ -47,11 +47,13 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.117.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.117.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.117.0
 	github.com/otiai10/copy v1.14.0
 	github.com/rednafi/link-patrol v0.0.0-20240826150821-057643e74d4d
@@ -433,6 +435,7 @@ require (
 	github.com/nxadm/tail v1.4.11 // indirect
 	github.com/onsi/ginkgo/v2 v2.20.0 // indirect
 	github.com/onsi/gomega v1.34.1 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer v0.117.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/aws/ecsutil v0.117.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.117.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.117.0 // indirect
@@ -487,7 +490,7 @@ require (
 	github.com/shirou/gopsutil/v4 v4.24.12 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/spf13/cast v1.6.0 // indirect
+	github.com/spf13/cast v1.7.1 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect

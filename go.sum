@@ -1139,6 +1139,10 @@ github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/otl
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/otlpencodingextension v0.117.0/go.mod h1:aciOawCoydp9lNAw9/jaSZXWiswE7wdcmBEaBf5fPQc=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.117.0 h1:Voy2gnN4x/DcTJSvILddotoZl6K5rHhAJC7msKLBl24=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.117.0/go.mod h1:SGSLpR8qh1Oi2ME45jJaQayspKBer8HupJoFnuHNQaw=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer v0.117.0 h1:ufDupkC25Ok0d50FqfiyKQGqf67SfwWGIWqsYSBJg80=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer v0.117.0/go.mod h1:+GPzqBFeqV90U4/bntDRPMxo/i/12lxH7GyPJmqz4ls=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.117.0 h1:0KoWMGmHYlpoPwaRwnF3OeiQl0y35hSmTVd+JDLNpSY=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.117.0/go.mod h1:jyepqHvP5D5/a4M+c10obO2aqai92bHSUHleXkHiw+k=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.117.0 h1:j4AYS+tiQQ9BVrP7sb8qppT+saixHNg2tS9EOLounMw=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.117.0/go.mod h1:mxgN0tP1CroT0muDDKLmIxHT75aAkeC3QeGNcwbkCyo=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage v0.117.0 h1:SbD/rcj6VQ59QutRM8Kfw+36s8Z/U0p/tcrQCLaji0s=
@@ -1231,6 +1235,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsr
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver v0.117.0/go.mod h1:1ELm4C0E0On6u7hwVqVJymwmfx8NhfgAwZNb/g/IN00=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.117.0 h1:ZukmPvZSJnDPvUH0ECDliYxyRgSMs6mWXnX70uGnhvk=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.117.0/go.mod h1:aZzeEf3lN/i6gH5vVGzLdzH6JO2r6xwep0S0fvW8iMI=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.117.0 h1:fHQzeVV8uMHApo9tBtxSXocv2IcCeswFPZwjvOAkDrc=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.117.0/go.mod h1:0HQuGsZePaLKa1dOhvSqP1aV36j/cnT7i536TEJV1R8=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.117.0 h1:ZzESLZAIBZ3Z7e33WCUCdX2tDjxD1/A748aTmqReEvo=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.117.0/go.mod h1:zClB9Yr77xTGG2b2g4+EGpzdW84lPCTPemFWjsyJFMw=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
@@ -1387,8 +1393,8 @@ github.com/spf13/afero v1.2.2/go.mod h1:9ZxEEn6pIJ8Rxe320qSDBk6AsU0r9pR7Q4OcevTd
 github.com/spf13/afero v1.11.0 h1:WJQKhtpdm3v2IzqG8VMqrr6Rf3UYpEF239Jy9wNepM8=
 github.com/spf13/afero v1.11.0/go.mod h1:GH9Y3pIexgf1MTIWtNGyogA5MwRIDXGUr+hbWNoBjkY=
 github.com/spf13/cast v1.3.1/go.mod h1:Qx5cxh0v+4UWYiBimWS+eyWzqEqokIECu5etghLkUJE=
-github.com/spf13/cast v1.6.0 h1:GEiTHELF+vaR5dhz3VqZfFSzZjYbgeKDpBxQVS4GYJ0=
-github.com/spf13/cast v1.6.0/go.mod h1:ancEpBxwJDODSW/UG4rDrAqiKolqNNh2DX3mk86cAdo=
+github.com/spf13/cast v1.7.1 h1:cuNEagBQEHWN1FnbGEjCXL2szYEXqfJPbP2HNUaca9Y=
+github.com/spf13/cast v1.7.1/go.mod h1:ancEpBxwJDODSW/UG4rDrAqiKolqNNh2DX3mk86cAdo=
 github.com/spf13/cobra v1.8.1 h1:e5/vxKd/rZsfSJMUX1agtjeTDf+qv1/JdBF8gg5k9ZM=
 github.com/spf13/cobra v1.8.1/go.mod h1:wHxEcudfqmLYa8iTfL+OuZPbBZkmvliBWKIezN3kD9Y=
 github.com/spf13/pflag v0.0.0-20170130214245-9ff6c6923cff/go.mod h1:DYY7MBk1bdzusC3SYhjObp+wFpr4gzcvqqNjLnInEg4=
