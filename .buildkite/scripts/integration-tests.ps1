@@ -18,7 +18,7 @@ if ($PACKAGE_VERSION) {
     $PACKAGE_VERSION = "${PACKAGE_VERSION}-SNAPSHOT"
 }
 $env:TEST_BINARY_NAME = "elastic-agent"
-$env:AGENT_VERSION = (mage -v printVersion) + "-SNAPSHOT"
+$env:AGENT_VERSION = (mage printVersion) + "-SNAPSHOT"
 echo "~~~ Agent version: $env:AGENT_VERSION"
 $env:SNAPSHOT = $true
 
