@@ -897,11 +897,6 @@ func getVersion() string {
 	return version
 }
 
-// Prints current elastic-agent version
-func PrintVersion() {
-	fmt.Println(getVersion())
-}
-
 func runAgent(ctx context.Context, env map[string]string) error {
 	prevPlatforms := os.Getenv("PLATFORMS")
 	defer os.Setenv("PLATFORMS", prevPlatforms)

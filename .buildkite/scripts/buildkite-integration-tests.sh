@@ -30,6 +30,7 @@ echo "~~~ Running integration tests as $USER"
 go install gotest.tools/gotestsum
 gotestsum --version
 
+# Parsing version.go. Will be simplified here: https://github.com/elastic/ingest-dev/issues/4925
 AGENT_VERSION=$(grep "const defaultBeatVersion =" version/version.go | cut -d\" -f2)
 AGENT_VERSION="${AGENT_VERSION}-SNAPSHOT"
 export AGENT_VERSION
