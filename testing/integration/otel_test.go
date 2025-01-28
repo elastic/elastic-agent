@@ -1154,12 +1154,13 @@ func TestHybridAgentE2E(t *testing.T) {
 	require.NoError(t, err, "error creating API key")
 	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
 
-	// TODO: add some processors here
 	configTemplate := `inputs:
   - id: filestream-filebeat
     type: filestream
     paths:
       - {{.InputPath}}
+    prospector.scanner.fingerprint.enabled: false
+    file_identity.native: ~
     use_output: default
 outputs:
   default:
@@ -1175,6 +1176,8 @@ receivers:
           enabled: true
           paths:
             - {{.InputPath}}
+          prospector.scanner.fingerprint.enabled: false
+          file_identity.native: ~
     output:
       otelconsumer:
     logging:
