@@ -17,6 +17,7 @@ import (
 	hostmetricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver"
 	httpcheckreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver"
 	jaegerreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver"
+	jmxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver"
 	k8sclusterreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver"
 	k8sobjectsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver"
 	kafkareceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver"
@@ -24,6 +25,7 @@ import (
 	prometheusreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver"
 	receivercreator "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator"
 	zipkinreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver"
+	nopreceiver "go.opentelemetry.io/collector/receiver/nopreceiver"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
 
 	fbreceiver "github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
@@ -32,6 +34,7 @@ import (
 	// Processors:
 	attributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor" // for modifying signal attributes
 	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor"
+	geoipprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/geoipprocessor"                 // for adding geographical metadata associated to an IP address
 	k8sattributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor" // for adding k8s metadata
 	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor"
 	resourceprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor"   // for modifying resource attributes
@@ -87,7 +90,9 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			zipkinreceiver.NewFactory(),
 			fbreceiver.NewFactory(),
 			mbreceiver.NewFactory(),
+			jmxreceiver.NewFactory(),
 			kafkareceiver.NewFactory(),
+			nopreceiver.NewFactory(),
 		)
 		if err != nil {
 			return otelcol.Factories{}, err
@@ -100,6 +105,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			attributesprocessor.NewFactory(),
 			transformprocessor.NewFactory(),
 			filterprocessor.NewFactory(),
+			geoipprocessor.NewFactory(),
 			k8sattributesprocessor.NewFactory(),
 			elasticinframetricsprocessor.NewFactory(),
 			resourcedetectionprocessor.NewFactory(),
