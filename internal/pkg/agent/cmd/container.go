@@ -1091,24 +1091,7 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	// If the agent has been manually un-enrolled through the Kibana UI, the ACK request will fail due to an invalid API token.
 	// In such cases, the agent should automatically re-enroll and "recover" their enrollment status without manual intervention,
 	// maintaining seamless operation.
-	ackRequest := &fleetapi.AckRequest{Events: nil}
-	ackCMD := fleetapi.NewAckCmd(&agentInfo{storedConfig.Fleet.Info.ID}, fc)
-
-	const retryInterval = time.Second
-	const maxRetries = 3
-	retries := 0
-	err = backoff.Retry(func() error {
-		retries++
-		_, reqErr := ackCMD.Execute(ctx, ackRequest)
-		switch {
-		case reqErr == nil:
-			return nil
-		case errors.Is(reqErr, fleetclient.ErrInvalidAPIKey) || retries == maxRetries:
-			return backoff.Permanent(reqErr)
-		default:
-			return reqErr
-		}
-	}, &backoff.ConstantBackOff{Interval: retryInterval})
+	err = ackFleet(ctx, fc, storedConfig.Fleet.Info.ID)
 	switch {
 	case errors.Is(err, fleetclient.ErrInvalidAPIKey):
 		// The API key is invalid, so enrollment is required.
@@ -1138,4 +1121,25 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	}
 
 	return false, nil
+}
+
+// ackFleet performs an ACK request to the fleet server with **empty events**.
+func ackFleet(ctx context.Context, client fleetclient.Sender, agentID string) error {
+	const retryInterval = time.Second
+	const maxRetries = 3
+	ackRequest := &fleetapi.AckRequest{Events: nil}
+	ackCMD := fleetapi.NewAckCmd(&agentInfo{agentID}, client)
+	retries := 0
+	return backoff.Retry(func() error {
+		retries++
+		_, err := ackCMD.Execute(ctx, ackRequest)
+		switch {
+		case err == nil:
+			return nil
+		case errors.Is(err, fleetclient.ErrInvalidAPIKey) || retries == maxRetries:
+			return backoff.Permanent(err)
+		default:
+			return err
+		}
+	}, &backoff.ConstantBackOff{Interval: retryInterval})
 }
