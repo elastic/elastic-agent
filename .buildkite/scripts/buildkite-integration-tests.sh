@@ -30,7 +30,8 @@ echo "~~~ Running integration tests as $USER"
 go install gotest.tools/gotestsum
 gotestsum --version
 
-AGENT_VERSION="$(mage printVersion)-SNAPSHOT"
+AGENT_VERSION=$(grep "const defaultBeatVersion =" version/version.go | cut -d\" -f2)
+AGENT_VERSION="${AGENT_VERSION}-SNAPSHOT"
 export AGENT_VERSION
 echo "~~~ Agent version: ${AGENT_VERSION}"
 

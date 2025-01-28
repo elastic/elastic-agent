@@ -18,7 +18,9 @@ if ($PACKAGE_VERSION) {
     $PACKAGE_VERSION = "${PACKAGE_VERSION}-SNAPSHOT"
 }
 $env:TEST_BINARY_NAME = "elastic-agent"
-$env:AGENT_VERSION = (mage printVersion) + "-SNAPSHOT"
+
+$AGENT_VERSION = (Get-Content version/version.go | Select-String -Pattern 'const defaultBeatVersion =' | ForEach-Object { $_ -replace '.*?"(.*?)".*', '$1' })
+$env:AGENT_VERSION = $AGENT_VERSION + "-SNAPSHOT"
 echo "~~~ Agent version: $env:AGENT_VERSION"
 $env:SNAPSHOT = $true
 
