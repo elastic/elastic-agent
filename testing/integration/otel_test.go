@@ -1122,11 +1122,14 @@ func TestHybridAgentE2E(t *testing.T) {
 	require.NoError(t, err, "failed to create input log file")
 	inputFilePath := inputFile.Name()
 	for i := 0; i < numEvents; i++ {
-		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
+		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d", i)))
 		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+		_, err = inputFile.Write([]byte("\n"))
+		require.NoErrorf(t, err, "failed to write newline to input file")
+		time.Sleep(100 * time.Millisecond)
 	}
 	err = inputFile.Close()
-	require.NoError(t, err, "failed to close data temp file")
+	require.NoError(t, err, "failed to close data input file")
 
 	t.Cleanup(func() {
 		if t.Failed() {
