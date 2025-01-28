@@ -40,8 +40,7 @@ const (
 
 	elasticAgentModulePath = "github.com/elastic/elastic-agent"
 
-	defaultName             = "elastic-agent"
-	flavorsRegistryFilename = ".flavors"
+	defaultName = "elastic-agent"
 
 	// Env vars
 	// agent package version
@@ -543,7 +542,7 @@ var (
 		BeatVersion:     "{{ elastic_beats_dir }}/version/version.go",
 		GoVersion:       "{{ elastic_beats_dir }}/.go-version",
 		DocBranch:       "{{ elastic_beats_dir }}/version/docs/version.asciidoc",
-		FlavorsRegistry: "{{ elastic_beats_dir }}/.flavors",
+		FlavorsRegistry: "{{ elastic_beats_dir }}/_meta/.flavors",
 	}
 
 	buildVariableSources     *BuildVariableSources
@@ -651,7 +650,7 @@ func (s *BuildVariableSources) GetGoVersion() (string, error) {
 	return s.GoVersionParser(data)
 }
 
-// GetGoVersion reads the GoVersion file and parses the version from it.
+// GetFlavorsRegistry reads the flavors file and parses the list of components of it.
 func (s *BuildVariableSources) GetFlavorsRegistry() (map[string][]string, error) {
 	file, err := s.expandVar(s.FlavorsRegistry)
 	if err != nil {
@@ -660,12 +659,12 @@ func (s *BuildVariableSources) GetFlavorsRegistry() (map[string][]string, error)
 
 	data, err := os.ReadFile(file)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read go version file=%v: %w", file, err)
+		return nil, fmt.Errorf("failed to read flavors from file=%v: %w", file, err)
 	}
 
 	registry := make(map[string][]string)
 	if err := yaml.Unmarshal(data, registry); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse flavors: %w", err)
 	}
 
 	return registry, nil
