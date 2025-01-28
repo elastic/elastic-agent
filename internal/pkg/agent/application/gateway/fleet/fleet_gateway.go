@@ -6,7 +6,6 @@ package fleet
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -141,26 +140,20 @@ func (f *FleetGateway) Actions() <-chan []fleetapi.Action {
 // or shorter between checkins. Regular Periodic scheduler is used for long wait
 // times as the jitter is not significant compared to the wait time, and
 // PeriodicJitter is used otherwise
-func (f *FleetGateway) tryReplaceScheduler() error {
-	switch v := f.scheduler.(type) {
+func (f *FleetGateway) tryReplaceScheduler() {
+	switch f.scheduler.(type) {
 	case *scheduler.Periodic:
 		if !f.isLongSched {
 			// If the current scheduler is Periodic and the wait time needs to be
 			// short, switch to using PeriodicJitter with short duration
 			f.scheduler = scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 		}
-		return nil
 	case *scheduler.PeriodicJitter:
 		if f.isLongSched {
 			// If the current scheduler is PeriodicJitter and the wait time needs to
 			// be long, switch to using Periodic with long duration
 			f.scheduler = scheduler.NewPeriodic(defaultGatewaySettings.ErrDuration)
 		}
-		return nil
-	default:
-		// This case should not be executed under normal circumstances, added here
-		// to be extra cautious
-		return fmt.Errorf("unexpected scheduler type received: %T\n", v)
 	}
 }
 
@@ -188,10 +181,7 @@ func (f *FleetGateway) Run(ctx context.Context) error {
 				continue
 			}
 
-			err = f.tryReplaceScheduler()
-			if err != nil {
-				f.errCh <- coordinator.NewWarningError(fmt.Sprintf("error replacing scheduler: %s", err.Error()))
-			}
+			f.tryReplaceScheduler()
 
 			actions := make([]fleetapi.Action, len(resp.Actions))
 			copy(actions, resp.Actions)
