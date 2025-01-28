@@ -12,6 +12,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-nginx-nginx-access-${kubernetes.hints.container_id}
           ignore_older: 72h
           parsers:
             - container:
@@ -36,6 +37,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-nginx-nginx-error-${kubernetes.hints.container_id}
           ignore_older: 72h
           multiline:
             match: after

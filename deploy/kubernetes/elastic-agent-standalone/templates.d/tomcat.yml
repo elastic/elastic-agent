@@ -1,20 +1,30 @@
 inputs:
-    - name: udp-tomcat
-      id: udp-tomcat-${kubernetes.hints.container_id}
-      type: udp
+    - name: filestream-tomcat
+      id: filestream-tomcat-${kubernetes.hints.container_id}
+      type: filestream
       use_output: default
       streams:
-        - condition: ${kubernetes.hints.tomcat.log.enabled} == true or ${kubernetes.hints.tomcat.enabled} == true
+        - condition: ${kubernetes.hints.tomcat.log.enabled} == true and ${kubernetes.hints.tomcat.enabled} == true
           data_stream:
             dataset: tomcat.log
             type: logs
+          exclude_files:
+            - .gz$
           fields:
             observer:
                 product: TomCat
                 type: Web
                 vendor: Apache
           fields_under_root: true
-          host: localhost:9523
+          file_identity:
+            fingerprint: null
+          id: filestream-tomcat-tomcat-log-${kubernetes.hints.container_id}
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.tomcat.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
           processors:
             - script:
                 lang: javascript
@@ -2757,10 +2767,14 @@ inputs:
                 target_field: url.registered_domain
                 target_subdomain_field: url.subdomain
             - add_locale: null
+          prospector:
+            scanner:
+                fingerprint:
+                    enabled: true
+                symlinks: true
           tags:
             - tomcat-log
             - forwarded
-          udp: null
       data_stream.namespace: default
     - name: tcp-tomcat
       id: tcp-tomcat-${kubernetes.hints.container_id}
@@ -5525,31 +5539,22 @@ inputs:
             - forwarded
           tcp: null
       data_stream.namespace: default
-    - name: filestream-tomcat
-      id: filestream-tomcat-${kubernetes.hints.container_id}
-      type: filestream
+    - name: udp-tomcat
+      id: udp-tomcat-${kubernetes.hints.container_id}
+      type: udp
       use_output: default
       streams:
-        - condition: ${kubernetes.hints.tomcat.log.enabled} == true and ${kubernetes.hints.tomcat.enabled} == true
+        - condition: ${kubernetes.hints.tomcat.log.enabled} == true or ${kubernetes.hints.tomcat.enabled} == true
           data_stream:
             dataset: tomcat.log
             type: logs
-          exclude_files:
-            - .gz$
           fields:
             observer:
                 product: TomCat
                 type: Web
                 vendor: Apache
           fields_under_root: true
-          file_identity:
-            fingerprint: null
-          parsers:
-            - container:
-                format: auto
-                stream: ${kubernetes.hints.tomcat.log.stream|'all'}
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          host: localhost:9523
           processors:
             - script:
                 lang: javascript
@@ -8292,12 +8297,8 @@ inputs:
                 target_field: url.registered_domain
                 target_subdomain_field: url.subdomain
             - add_locale: null
-          prospector:
-            scanner:
-                fingerprint:
-                    enabled: true
-                symlinks: true
           tags:
             - tomcat-log
             - forwarded
+          udp: null
       data_stream.namespace: default

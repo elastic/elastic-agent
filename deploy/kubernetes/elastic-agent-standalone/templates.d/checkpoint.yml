@@ -12,6 +12,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-checkpoint-checkpoint-firewall-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
