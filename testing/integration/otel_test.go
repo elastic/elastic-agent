@@ -1165,6 +1165,7 @@ func TestHybridAgentE2E(t *testing.T) {
     prospector.scanner.fingerprint.enabled: false
     file_identity.native: ~
     use_output: default
+    queue.mem.flush.timeout: 0s
 outputs:
   default:
     type: elasticsearch
@@ -1188,7 +1189,7 @@ receivers:
       level: info
       selectors:
         - '*'
-    path.home: {{.HomeDir}}
+    path.home: {{.HomeDir}}/fbreceiver
     queue.mem.flush.timeout: 0s
 exporters:
   debug:
