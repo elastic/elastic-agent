@@ -26,6 +26,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,7 +34,7 @@ import (
 	"time"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/otiai10/copy"
+	copydir "github.com/otiai10/copy"
 
 	devmachine "github.com/elastic/elastic-agent/dev-tools/devmachine"
 	"github.com/elastic/elastic-agent/dev-tools/mage"
@@ -1543,8 +1544,8 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestUrl string) error 
 
 		log.Printf("copying %q to %q", srcBinaryPath, dstBinaryPath)
 
-		err = copy.Copy(srcBinaryPath, dstBinaryPath, copy.Options{
-			PermissionControl: copy.PerservePermission,
+		err = copydir.Copy(srcBinaryPath, dstBinaryPath, copydir.Options{
+			PermissionControl: copydir.PerservePermission,
 		})
 		if err != nil {
 			return fmt.Errorf("copying %q to %q: %w", srcBinaryPath, dstBinaryPath, err)
@@ -3289,15 +3290,15 @@ func getOtelDependencies() (*otelDependencies, error) {
 		}
 
 		if dependency.ComponentType == "connector" {
-			connectors = append(connectors, dependency)
+			connectors = insertSorted(connectors, dependency)
 		} else if dependency.ComponentType == "exporter" {
-			exporters = append(exporters, dependency)
+			exporters = insertSorted(exporters, dependency)
 		} else if dependency.ComponentType == "extension" {
-			extensions = append(extensions, dependency)
+			extensions = insertSorted(extensions, dependency)
 		} else if dependency.ComponentType == "processor" {
-			processors = append(processors, dependency)
+			processors = insertSorted(processors, dependency)
 		} else if dependency.ComponentType == "receiver" {
-			receivers = append(receivers, dependency)
+			receivers = insertSorted(receivers, dependency)
 		}
 	}
 
@@ -3308,6 +3309,14 @@ func getOtelDependencies() (*otelDependencies, error) {
 		Processors: processors,
 		Receivers:  receivers,
 	}, nil
+}
+
+func insertSorted(list []*otelDependency, item *otelDependency) []*otelDependency {
+	insertIndex := sort.Search(len(list), func(i int) bool { return list[i].Name >= item.Name })
+	list = append(list, &otelDependency{})
+	copy(list[insertIndex+1:], list[insertIndex:])
+	list[insertIndex] = item
+	return list
 }
 
 type otelDependency struct {
