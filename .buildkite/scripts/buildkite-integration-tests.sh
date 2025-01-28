@@ -35,24 +35,24 @@ AGENT_VERSION="$(mage -v printVersion)-SNAPSHOT"
 export AGENT_VERSION
 echo "~~~ Agent version: ${AGENT_VERSION}"
 
-# os_data=$(uname -spr | tr ' ' '_')
-# root_suffix=""
-# if [ "$TEST_SUDO" == "true" ]; then
-#   root_suffix="_sudo"
-# fi
-# fully_qualified_group_name="${GROUP_NAME}${root_suffix}_${os_data}"
-# outputXML="build/${fully_qualified_group_name}.integration.xml"
-# outputJSON="build/${fully_qualified_group_name}.integration.out.json"
-# set +e
-# TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args -integration.groups="${GROUP_NAME}" -integration.sudo="${TEST_SUDO}"
-# TESTS_EXIT_STATUS=$?
-# set -e
+os_data=$(uname -spr | tr ' ' '_')
+root_suffix=""
+if [ "$TEST_SUDO" == "true" ]; then
+  root_suffix="_sudo"
+fi
+fully_qualified_group_name="${GROUP_NAME}${root_suffix}_${os_data}"
+outputXML="build/${fully_qualified_group_name}.integration.xml"
+outputJSON="build/${fully_qualified_group_name}.integration.out.json"
+set +e
+TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args -integration.groups="${GROUP_NAME}" -integration.sudo="${TEST_SUDO}"
+TESTS_EXIT_STATUS=$?
+set -e
 
-# if [ -f "$outputXML" ]; then
-#   go install github.com/alexec/junit2html@latest
-#   junit2html < "$outputXML" > build/TEST-report.html
-# else
-#     echo "Cannot generate HTML test report: $outputXML not found"
-# fi
+if [ -f "$outputXML" ]; then
+  go install github.com/alexec/junit2html@latest
+  junit2html < "$outputXML" > build/TEST-report.html
+else
+    echo "Cannot generate HTML test report: $outputXML not found"
+fi
 
-# exit $TESTS_EXIT_STATUS
+exit $TESTS_EXIT_STATUS
