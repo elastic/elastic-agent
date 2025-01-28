@@ -51,6 +51,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.117.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.117.0
@@ -72,6 +73,7 @@ require (
 	go.elastic.co/go-licence-detector v0.7.0
 	go.opentelemetry.io/collector/component/componentstatus v0.117.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.117.0
+	go.opentelemetry.io/collector/receiver/nopreceiver v0.117.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.32.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
@@ -107,6 +109,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.117.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/geoipprocessor v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor v0.117.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.117.0
@@ -464,6 +467,8 @@ require (
 	github.com/openshift/api v3.9.0+incompatible // indirect
 	github.com/openshift/client-go v0.0.0-20210521082421-73d9475a9142 // indirect
 	github.com/openzipkin/zipkin-go v0.4.3 // indirect
+	github.com/oschwald/geoip2-golang v1.11.0 // indirect
+	github.com/oschwald/maxminddb-golang v1.13.0 // indirect
 	github.com/ovh/go-ovh v1.6.0 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
