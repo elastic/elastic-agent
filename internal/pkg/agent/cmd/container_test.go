@@ -270,14 +270,15 @@ func TestShouldEnroll(t *testing.T) {
 	for name, tc := range map[string]struct {
 		cfg                  setupConfig
 		statFn               func(path string) (os.FileInfo, error)
-		encryptedDiskStoreFn func(savedConfig *configuration.Configuration) storage.Storage
-		fleetClientFn        func() client.Sender
+		encryptedDiskStoreFn func(t *testing.T, savedConfig *configuration.Configuration) storage.Storage
+		fleetClientFn        func(t *testing.T) client.Sender
 		expectedSavedConfig  func(t *testing.T, savedConfig *configuration.Configuration)
 		expectedShouldEnroll bool
 		expectedErr          error
 	}{
 		"should not enroll if fleet enroll is disabled": {
-			cfg: setupConfig{Fleet: fleetConfig{Enroll: false}},
+			cfg:                  setupConfig{Fleet: fleetConfig{Enroll: false}},
+			expectedShouldEnroll: false,
 		},
 		"should enroll if fleet force is true": {
 			cfg:                  setupConfig{Fleet: fleetConfig{Enroll: true, Force: true}},
@@ -291,8 +292,8 @@ func TestShouldEnroll(t *testing.T) {
 		"should enroll on fleet url change": {
 			statFn: func(path string) (os.FileInfo, error) { return nil, nil },
 			cfg:    setupConfig{Fleet: fleetConfig{Enroll: true, URL: "host1"}},
-			encryptedDiskStoreFn: func(savedConfig *configuration.Configuration) storage.Storage {
-				m := &mockStorage.Storage{}
+			encryptedDiskStoreFn: func(t *testing.T, savedConfig *configuration.Configuration) storage.Storage {
+				m := mockStorage.NewStorage(t)
 				m.On("Load").Return(io.NopCloser(strings.NewReader(`fleet:
   enabled: true
   access_api_key: "test-key"
@@ -301,7 +302,7 @@ func TestShouldEnroll(t *testing.T) {
     - host2
     - host3
   agent:
-  protocol: "https"`)), nil)
+  protocol: "https"`)), nil).Once()
 				return m
 			},
 			expectedShouldEnroll: true,
@@ -309,8 +310,8 @@ func TestShouldEnroll(t *testing.T) {
 		"should enroll on fleet token change": {
 			statFn: func(path string) (os.FileInfo, error) { return nil, nil },
 			cfg:    setupConfig{Fleet: fleetConfig{Enroll: true, URL: "host1", EnrollmentToken: enrollmentTokenOther}},
-			encryptedDiskStoreFn: func(savedConfig *configuration.Configuration) storage.Storage {
-				m := &mockStorage.Storage{}
+			encryptedDiskStoreFn: func(t *testing.T, savedConfig *configuration.Configuration) storage.Storage {
+				m := mockStorage.NewStorage(t)
 				m.On("Load").Return(io.NopCloser(strings.NewReader(`fleet:
   enabled: true
   access_api_key: "test-key"
@@ -320,7 +321,7 @@ func TestShouldEnroll(t *testing.T) {
     - host2
     - host3
   agent:
-  protocol: "https"`)), nil)
+  protocol: "https"`)), nil).Once()
 				return m
 			},
 			expectedShouldEnroll: true,
@@ -328,8 +329,8 @@ func TestShouldEnroll(t *testing.T) {
 		"should enroll on unauthorized api": {
 			statFn: func(path string) (os.FileInfo, error) { return nil, nil },
 			cfg:    setupConfig{Fleet: fleetConfig{Enroll: true, URL: "host1", EnrollmentToken: enrollmentToken}},
-			encryptedDiskStoreFn: func(savedConfig *configuration.Configuration) storage.Storage {
-				m := &mockStorage.Storage{}
+			encryptedDiskStoreFn: func(t *testing.T, savedConfig *configuration.Configuration) storage.Storage {
+				m := mockStorage.NewStorage(t)
 				m.On("Load").Return(io.NopCloser(strings.NewReader(`fleet:
   enabled: true
   access_api_key: "test-key"
@@ -339,12 +340,12 @@ func TestShouldEnroll(t *testing.T) {
     - host2
     - host3
   agent:
-  protocol: "https"`)), nil)
+  protocol: "https"`)), nil).Once()
 				return m
 			},
-			fleetClientFn: func() client.Sender {
+			fleetClientFn: func(t *testing.T) client.Sender {
 				tries := 0
-				m := &mockFleetClient.Sender{}
+				m := mockFleetClient.NewSender(t)
 				call := m.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 				call.Run(func(args mock.Arguments) {
 					if tries <= 1 {
@@ -353,7 +354,7 @@ func TestShouldEnroll(t *testing.T) {
 						call.Return(nil, client.ErrInvalidAPIKey)
 					}
 					tries++
-				})
+				}).Times(3)
 				return m
 			},
 			expectedShouldEnroll: true,
@@ -361,8 +362,8 @@ func TestShouldEnroll(t *testing.T) {
 		"should not enroll on no changes": {
 			statFn: func(path string) (os.FileInfo, error) { return nil, nil },
 			cfg:    setupConfig{Fleet: fleetConfig{Enroll: true, URL: "host1", EnrollmentToken: enrollmentToken}},
-			encryptedDiskStoreFn: func(savedConfig *configuration.Configuration) storage.Storage {
-				m := &mockStorage.Storage{}
+			encryptedDiskStoreFn: func(t *testing.T, savedConfig *configuration.Configuration) storage.Storage {
+				m := mockStorage.NewStorage(t)
 				m.On("Load").Return(io.NopCloser(strings.NewReader(`fleet:
   enabled: true
   access_api_key: "test-key"
@@ -372,12 +373,12 @@ func TestShouldEnroll(t *testing.T) {
     - host2
     - host3
   agent:
-  protocol: "https"`)), nil)
+  protocol: "https"`)), nil).Once()
 				return m
 			},
-			fleetClientFn: func() client.Sender {
+			fleetClientFn: func(t *testing.T) client.Sender {
 				tries := 0
-				m := &mockFleetClient.Sender{}
+				m := mockFleetClient.NewSender(t)
 				call := m.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 				call.Run(func(args mock.Arguments) {
 					if tries <= 1 {
@@ -389,7 +390,7 @@ func TestShouldEnroll(t *testing.T) {
 						}, nil)
 					}
 					tries++
-				})
+				}).Times(3)
 				return m
 			},
 			expectedShouldEnroll: false,
@@ -397,8 +398,8 @@ func TestShouldEnroll(t *testing.T) {
 		"should fail on fleet network errors": {
 			statFn: func(path string) (os.FileInfo, error) { return nil, nil },
 			cfg:    setupConfig{Fleet: fleetConfig{Enroll: true, URL: "host1", EnrollmentToken: enrollmentToken}},
-			encryptedDiskStoreFn: func(savedConfig *configuration.Configuration) storage.Storage {
-				m := &mockStorage.Storage{}
+			encryptedDiskStoreFn: func(t *testing.T, savedConfig *configuration.Configuration) storage.Storage {
+				m := mockStorage.NewStorage(t)
 				m.On("Load").Return(io.NopCloser(strings.NewReader(`fleet:
   enabled: true
   access_api_key: "test-key"
@@ -408,13 +409,13 @@ func TestShouldEnroll(t *testing.T) {
     - host2
     - host3
   agent:
-  protocol: "https"`)), nil)
+  protocol: "https"`)), nil).Once()
 				return m
 			},
-			fleetClientFn: func() client.Sender {
-				m := &mockFleetClient.Sender{}
+			fleetClientFn: func(t *testing.T) client.Sender {
+				m := mockFleetClient.NewSender(t)
 				m.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-					Return(nil, fleetNetworkErr)
+					Return(nil, fleetNetworkErr).Times(3)
 				return m
 			},
 			expectedErr: fleetNetworkErr,
@@ -422,8 +423,8 @@ func TestShouldEnroll(t *testing.T) {
 		"should not update the enrollment token hash if it does not exist in setup configuration": {
 			statFn: func(path string) (os.FileInfo, error) { return nil, nil },
 			cfg:    setupConfig{Fleet: fleetConfig{Enroll: true, URL: "host1", EnrollmentToken: ""}},
-			encryptedDiskStoreFn: func(savedConfig *configuration.Configuration) storage.Storage {
-				m := &mockStorage.Storage{}
+			encryptedDiskStoreFn: func(t *testing.T, savedConfig *configuration.Configuration) storage.Storage {
+				m := mockStorage.NewStorage(t)
 				m.On("Load").Return(io.NopCloser(strings.NewReader(`fleet:
   enabled: true
   access_api_key: "test-key"
@@ -432,16 +433,16 @@ func TestShouldEnroll(t *testing.T) {
     - host2
     - host3
   agent:
-  protocol: "https"`)), nil)
+  protocol: "https"`)), nil).Once()
 				return m
 			},
-			fleetClientFn: func() client.Sender {
-				m := &mockFleetClient.Sender{}
+			fleetClientFn: func(t *testing.T) client.Sender {
+				m := mockFleetClient.NewSender(t)
 				m.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(&http.Response{
 						StatusCode: http.StatusOK,
 						Body:       io.NopCloser(strings.NewReader(`{"action": "acks", "items":[]}`)),
-					}, nil)
+					}, nil).Once()
 				return m
 			},
 			expectedShouldEnroll: false,
@@ -449,8 +450,8 @@ func TestShouldEnroll(t *testing.T) {
 		"should not enroll on no changes and update the stored enrollment token hash": {
 			statFn: func(path string) (os.FileInfo, error) { return nil, nil },
 			cfg:    setupConfig{Fleet: fleetConfig{Enroll: true, URL: "host1", EnrollmentToken: enrollmentToken}},
-			encryptedDiskStoreFn: func(savedConfig *configuration.Configuration) storage.Storage {
-				m := &mockStorage.Storage{}
+			encryptedDiskStoreFn: func(t *testing.T, savedConfig *configuration.Configuration) storage.Storage {
+				m := mockStorage.NewStorage(t)
 				m.On("Load").Return(io.NopCloser(strings.NewReader(`fleet:
   enabled: true
   access_api_key: "test-key"
@@ -459,21 +460,21 @@ func TestShouldEnroll(t *testing.T) {
     - host2
     - host3
   agent:
-  protocol: "https"`)), nil)
+  protocol: "https"`)), nil).Once()
 				m.On("Save", mock.Anything).Run(func(args mock.Arguments) {
 					reader := args.Get(0).(io.Reader)
 					data, _ := io.ReadAll(reader)
 					_ = yaml.Unmarshal(data, savedConfig)
-				}).Return(nil)
+				}).Return(nil).Times(0)
 				return m
 			},
-			fleetClientFn: func() client.Sender {
-				m := &mockFleetClient.Sender{}
+			fleetClientFn: func(t *testing.T) client.Sender {
+				m := mockFleetClient.NewSender(t)
 				m.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(&http.Response{
 						StatusCode: http.StatusOK,
 						Body:       io.NopCloser(strings.NewReader(`{"action": "acks", "items":[]}`)),
-					}, nil)
+					}, nil).Once()
 				return m
 			},
 			expectedSavedConfig: func(t *testing.T, savedConfig *configuration.Configuration) {
@@ -498,7 +499,7 @@ func TestShouldEnroll(t *testing.T) {
 			if tc.encryptedDiskStoreFn != nil {
 				oldEncryptedDiskStore := newEncryptedDiskStore
 				newEncryptedDiskStore = func(ctx context.Context, target string, opts ...storage.EncryptedOptionFunc) (storage.Storage, error) {
-					return tc.encryptedDiskStoreFn(savedConfig), nil
+					return tc.encryptedDiskStoreFn(t, savedConfig), nil
 				}
 				t.Cleanup(func() {
 					newEncryptedDiskStore = oldEncryptedDiskStore
@@ -507,7 +508,7 @@ func TestShouldEnroll(t *testing.T) {
 			if tc.fleetClientFn != nil {
 				oldFleetClient := newFleetClient
 				newFleetClient = func(log *logger.Logger, apiKey string, cfg remote.Config) (client.Sender, error) {
-					return tc.fleetClientFn(), nil
+					return tc.fleetClientFn(t), nil
 				}
 				t.Cleanup(func() {
 					newFleetClient = oldFleetClient
