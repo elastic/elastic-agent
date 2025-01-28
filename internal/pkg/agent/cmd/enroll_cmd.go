@@ -7,6 +7,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"math/rand/v2"
@@ -33,6 +34,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent/internal/pkg/crypto"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -586,7 +588,7 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 			errors.TypeNetwork)
 	}
 
-	fleetConfig, err := createFleetConfigFromEnroll(resp.Item.AccessAPIKey, c.remoteConfig)
+	fleetConfig, err := createFleetConfigFromEnroll(resp.Item.AccessAPIKey, c.options.EnrollAPIKey, c.remoteConfig)
 	if err != nil {
 		return err
 	}
@@ -1024,12 +1026,17 @@ func createFleetServerBootstrapConfig(
 	return cfg, nil
 }
 
-func createFleetConfigFromEnroll(accessAPIKey string, cli remote.Config) (*configuration.FleetAgentConfig, error) {
+func createFleetConfigFromEnroll(accessAPIKey string, enrollmentToken string, cli remote.Config) (*configuration.FleetAgentConfig, error) {
 	cfg := configuration.DefaultFleetAgentConfig()
 	cfg.Enabled = true
 	cfg.AccessAPIKey = accessAPIKey
 	cfg.Client = cli
-
+	enrollmentHashBytes, err := crypto.GeneratePBKDF2FromPassword([]byte(enrollmentToken))
+	if err != nil {
+		return nil, errors.New(err, "failed to generate enrollment hash", errors.TypeConfig)
+	}
+	enrollmentTokenHash := base64.StdEncoding.EncodeToString(enrollmentHashBytes)
+	cfg.EnrollmentTokenHash = enrollmentTokenHash
 	if err := cfg.Valid(); err != nil {
 		return nil, errors.New(err, "invalid enrollment options", errors.TypeConfig)
 	}
