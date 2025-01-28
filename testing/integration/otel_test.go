@@ -1170,6 +1170,7 @@ outputs:
     type: elasticsearch
     hosts: [{{.ESEndpoint}}]
     api_key: {{.BeatsESApiKey}}
+    compression_level: 0	
 receivers:
   filebeatreceiver:
     filebeat:
@@ -1196,6 +1197,7 @@ exporters:
   elasticsearch/log:
     endpoints:
       - {{.ESEndpoint}}
+    compression: none
     api_key: {{.ESApiKey}}
     logs_index: {{.FBReceiverIndex}}
     batcher:
