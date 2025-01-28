@@ -34,7 +34,7 @@ import (
 	"time"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	copydir "github.com/otiai10/copy"
+	"github.com/otiai10/copy"
 
 	devmachine "github.com/elastic/elastic-agent/dev-tools/devmachine"
 	"github.com/elastic/elastic-agent/dev-tools/mage"
@@ -1544,8 +1544,8 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestUrl string) error 
 
 		log.Printf("copying %q to %q", srcBinaryPath, dstBinaryPath)
 
-		err = copydir.Copy(srcBinaryPath, dstBinaryPath, copydir.Options{
-			PermissionControl: copydir.PerservePermission,
+		err = copy.Copy(srcBinaryPath, dstBinaryPath, copy.Options{
+			PermissionControl: copy.PerservePermission,
 		})
 		if err != nil {
 			return fmt.Errorf("copying %q to %q: %w", srcBinaryPath, dstBinaryPath, err)
@@ -3290,16 +3290,20 @@ func getOtelDependencies() (*otelDependencies, error) {
 		}
 
 		if dependency.ComponentType == "connector" {
-			connectors = insertSorted(connectors, dependency)
+			connectors = append(connectors, dependency)
 		} else if dependency.ComponentType == "exporter" {
-			exporters = insertSorted(exporters, dependency)
+			exporters = append(exporters, dependency)
 		} else if dependency.ComponentType == "extension" {
-			extensions = insertSorted(extensions, dependency)
+			extensions = append(extensions, dependency)
 		} else if dependency.ComponentType == "processor" {
-			processors = insertSorted(processors, dependency)
+			processors = append(processors, dependency)
 		} else if dependency.ComponentType == "receiver" {
-			receivers = insertSorted(receivers, dependency)
+			receivers = append(receivers, dependency)
 		}
+	}
+
+	for _, list := range [][]*otelDependency{connectors, exporters, extensions, processors, receivers} {
+		sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
 	}
 
 	return &otelDependencies{
@@ -3309,14 +3313,6 @@ func getOtelDependencies() (*otelDependencies, error) {
 		Processors: processors,
 		Receivers:  receivers,
 	}, nil
-}
-
-func insertSorted(list []*otelDependency, item *otelDependency) []*otelDependency {
-	insertIndex := sort.Search(len(list), func(i int) bool { return list[i].Name >= item.Name })
-	list = append(list, &otelDependency{})
-	copy(list[insertIndex+1:], list[insertIndex:])
-	list[insertIndex] = item
-	return list
 }
 
 type otelDependency struct {
