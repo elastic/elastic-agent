@@ -1664,6 +1664,7 @@ func TestHybridAgentE2E(t *testing.T) {
     file_identity.native: ~
     use_output: default
     queue.mem.flush.timeout: 0s
+    path.home: {{.HomeDir}}/filebeat
 outputs:
   default:
     type: elasticsearch
@@ -1732,10 +1733,11 @@ service:
 	t.Cleanup(func() {
 		if t.Failed() {
 			t.Logf("Contents of agent config file:\n%s\n", string(configContents))
-			// TODO(mauri870): for debugging, remove this line
-			require.NoError(t, os.WriteFile("/tmp/agent.yml", configContents, 0o600))
 		}
 	})
+	// TODO(mauri870): for debugging, remove this line
+	require.NoError(t, os.WriteFile("/tmp/agent.yml", configContents, 0o600))
+
 	// Now we can actually create the fixture and run it
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
