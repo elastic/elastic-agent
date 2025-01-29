@@ -1,12 +1,12 @@
 receivers:
   # Receiver for platform specific log files
   filelog/platformlogs:
-    include: [ /var/log/*.log ]
+    include: [/var/log/*.log]
     retry_on_failure:
       enabled: true
     start_at: end
     storage: file_storage
-#    start_at: beginning
+  #    start_at: beginning
 
   # Receiver for CPU, Disk, Memory, and Filesystem metrics
   hostmetrics/system:
@@ -51,239 +51,6 @@ extensions:
   file_storage:
     directory: ${env:STORAGE_DIR}
 
-connectors:
-  signaltometrics:
-    logs:
-      - name: service_summary
-        include_resource_attributes:
-          - key: service.name
-          - key: deployment.environment # service.environment
-          - key: telemetry.sdk.language # service.language.name
-          - key: agent.name # set via elastictraceprocessor
-        attributes:
-          - key: metricset.name
-            default_value: service_summary
-        sum:
-          value: "1"
-    datapoints:
-      - name: service_summary
-        include_resource_attributes:
-          - key: service.name
-          - key: deployment.environment # service.environment
-          - key: telemetry.sdk.language # service.language.name
-          - key: agent.name # set via elastictraceprocessor
-        attributes:
-          - key: metricset.name
-            default_value: service_summary
-        sum:
-          value: "1"
-    spans:
-      - name: service_summary
-        include_resource_attributes:
-          - key: service.name
-          - key: deployment.environment # service.environment
-          - key: telemetry.sdk.language # service.language.name
-          - key: agent.name # set via elastictraceprocessor
-        attributes:
-          - key: metricset.name
-            default_value: service_summary
-        sum:
-          value: Int(AdjustedCount())
-      - name: transaction.duration.histogram
-        description: APM service transaction aggregated metrics as histogram
-        include_resource_attributes:
-          - key: service.name
-          - key: deployment.environment # service.environment
-          - key: telemetry.sdk.language # service.language.name
-          - key: agent.name # set via elastictraceprocessor
-        attributes:
-          - key: transaction.root
-          - key: transaction.type
-          - key: metricset.name
-            default_value: service_transaction
-          - key: elasticsearch.mapping.hints
-            default_value: [_doc_count]
-        unit: us
-        exponential_histogram:
-          value: Microseconds(end_time - start_time)
-      - name: transaction.duration.summary
-        description: APM service transaction aggregated metrics as summary
-        include_resource_attributes:
-          - key: service.name
-          - key: deployment.environment # service.environment
-          - key: telemetry.sdk.language # service.language.name
-          - key: agent.name # set via elastictraceprocessor
-        attributes:
-          - key: transaction.root
-          - key: transaction.type
-          - key: metricset.name
-            default_value: service_transaction
-          - key: elasticsearch.mapping.hints
-            default_value: [aggregate_metric_double]
-        unit: us
-        histogram:
-          buckets: [1]
-          value: Microseconds(end_time - start_time)
-      - name: transaction.duration.histogram
-        description: APM transaction aggregated metrics as histogram
-        ephemeral_resource_attribute: true
-        include_resource_attributes:
-          - key: service.name
-          - key: deployment.environment # service.environment
-          - key: telemetry.sdk.language # service.language.name
-          - key: agent.name # set via elastictraceprocessor
-          - key: container.id
-          - key: k8s.pod.name
-          - key: service.version
-          - key: service.instance.id # service.node.name
-          - key: process.runtime.name # service.runtime.name
-          - key: process.runtime.version # service.runtime.version
-          - key: telemetry.sdk.version # service.language.version??
-          - key: host.name
-          - key: os.type # host.os.platform
-          - key: faas.instance
-          - key: faas.name
-          - key: faas.version
-          - key: cloud.provider
-          - key: cloud.region
-          - key: cloud.availability_zone
-          - key: cloud.platform # cloud.servicename
-          - key: cloud.account.id
-        attributes:
-          - key: transaction.root
-          - key: transaction.name
-          - key: transaction.type
-          - key: transaction.result
-          - key: event.outcome
-          - key: metricset.name
-            default_value: transaction
-          - key: elasticsearch.mapping.hints
-            default_value: [_doc_count]
-        unit: us
-        exponential_histogram:
-          value: Microseconds(end_time - start_time)
-      - name: transaction.duration.summary
-        description: APM transaction aggregated metrics as summary
-        ephemeral_resource_attribute: true
-        include_resource_attributes:
-          - key: service.name
-          - key: deployment.environment # service.environment
-          - key: telemetry.sdk.language # service.language.name
-          - key: agent.name # set via elastictraceprocessor
-          - key: container.id
-          - key: k8s.pod.name
-          - key: service.version
-          - key: service.instance.id # service.node.name
-          - key: process.runtime.name # service.runtime.name
-          - key: process.runtime.version # service.runtime.version
-          - key: telemetry.sdk.version # service.language.version??
-          - key: host.name
-          - key: os.type # host.os.platform
-          - key: faas.instance
-          - key: faas.name
-          - key: faas.version
-          - key: cloud.provider
-          - key: cloud.region
-          - key: cloud.availability_zone
-          - key: cloud.platform # cloud.servicename
-          - key: cloud.account.id
-        attributes:
-          - key: transaction.root
-          - key: transaction.name
-          - key: transaction.type
-          - key: transaction.result
-          - key: event.outcome
-          - key: metricset.name
-            default_value: transaction
-          - key: elasticsearch.mapping.hints
-            default_value: [aggregate_metric_double]
-        unit: us
-        histogram:
-          buckets: [1]
-          value: Microseconds(end_time - start_time)
-      - name: span.destination.service.response_time.sum.us
-        description: APM span destination metrics
-        ephemeral_resource_attribute: true
-        include_resource_attributes:
-          - key: service.name
-          - key: deployment.environment # service.environment
-          - key: telemetry.sdk.language # service.language.name
-          - key: agent.name # set via elastictraceprocessor
-        attributes:
-          - key: span.name
-          - key: event.outcome
-          - key: service.target.type
-          - key: service.target.name
-          - key: span.destination.service.resource
-          - key: metricset.name
-            default_value: service_destination
-        unit: us
-        sum:
-          value: Double(Microseconds(end_time - start_time))
-      - name: span.destination.service.response_time.count
-        description: APM span destination metrics
-        ephemeral_resource_attribute: true
-        include_resource_attributes:
-          - key: service.name
-          - key: deployment.environment # service.environment
-          - key: telemetry.sdk.language # service.language.name
-          - key: agent.name # set via elastictraceprocessor
-        attributes:
-          - key: span.name
-          - key: event.outcome
-          - key: service.target.type
-          - key: service.target.name
-          - key: span.destination.service.resource
-          - key: metricset.name
-            default_value: service_destination
-        sum:
-          value: Int(AdjustedCount())
-      # event.success_count is populated using 2 metric definition with different conditions
-      # and value for the histogram bucket based on event outcome. Both metric definition
-      # are created using same name and attribute and will result in a single histogram.
-      # We use mapping hint of aggregate_metric_double, so, only the sum and the count
-      # values are required and the actual histogram bucket is ignored.
-      - name: event.success_count
-        description: Success count as a metric for service transaction
-        include_resource_attributes:
-          - key: service.name
-          - key: deployment.environment # service.environment
-          - key: telemetry.sdk.language # service.language.name
-          - key: agent.name # set via elastictraceprocessor
-        attributes:
-          - key: transaction.root
-          - key: transaction.type
-          - key: metricset.name
-            default_value: service_transaction
-          - key: elasticsearch.mapping.hints
-            default_value: [aggregate_metric_double]
-        conditions:
-          - attributes["event.outcome"] != nil and attributes["event.outcome"] == "success"
-        histogram:
-          buckets: [1]
-          count: Int(AdjustedCount())
-          value: Int(AdjustedCount())
-      - name: event.success_count
-        description: Success count as a metric for service transaction
-        include_resource_attributes:
-          - key: service.name
-          - key: deployment.environment # service.environment
-          - key: telemetry.sdk.language # service.language.name
-          - key: agent.name # set via elastictraceprocessor
-        attributes:
-          - key: transaction.root
-          - key: transaction.type
-          - key: metricset.name
-            default_value: service_transaction
-          - key: elasticsearch.mapping.hints
-            default_value: [aggregate_metric_double]
-        conditions:
-          - attributes["event.outcome"] != nil and attributes["event.outcome"] != "success"
-        histogram:
-          buckets: [0]
-          count: Int(AdjustedCount())
-          value: Double(0)
-
 processors:
   elasticinframetrics:
   resourcedetection:
@@ -317,94 +84,38 @@ processors:
           enabled: true
         os.type:
           enabled: true
-  attributes/dataset:
-    actions:
-      - key: event.dataset
-        from_attribute: data_stream.dataset
-        action: upsert
-  resource/process:
-    attributes:
-      - key: process.executable.name
-        action: delete
-      - key: process.executable.path
-        action: delete
-
-  elastictrace:
-  lsminterval:
-    intervals:
-      - duration: 1m
-        statements:
-          - set(resource.attributes["metricset.interval"], "1m")
-          - set(attributes["data_stream.dataset"], Concat([attributes["metricset.name"], "1m"], "."))
-          - set(attributes["processor.event"], "metric")
-      - duration: 10m
-        statements:
-          - set(resource.attributes["metricset.interval"], "10m")
-          - set(attributes["data_stream.dataset"], Concat([attributes["metricset.name"], "10m"], "."))
-          - set(attributes["processor.event"], "metric")
-      - duration: 60m
-        statements:
-          - set(resource.attributes["metricset.interval"], "60m")
-          - set(attributes["data_stream.dataset"], Concat([attributes["metricset.name"], "60m"], "."))
-          - set(attributes["processor.event"], "metric")
-  batch/aggs:
-    send_batch_size: 16384 # 2x the default
-    timeout: 10s
+  batch:
 
 exporters:
-  elasticsearch/ecs:
-    endpoints: ["${env:ELASTIC_ENDPOINT}"]
-    api_key: ${env:ELASTIC_API_KEY}
-    mapping:
-      mode: ecs
-    logs_dynamic_index:
-      enabled: true
-    metrics_dynamic_index:
-      enabled: true
-    traces_dynamic_index:
-      enabled: true
-
-  elasticsearch/otel:
-    endpoints: [ "${env:ELASTIC_ENDPOINT}" ]
-    api_key: ${env:ELASTIC_API_KEY}
-    mapping:
-      mode: otel
-    logs_dynamic_index:
-      enabled: true
-    metrics_dynamic_index:
-      enabled: true
-    traces_dynamic_index:
-      enabled: true
+  otlp/ingest:
+    endpoint: ${env:ELASTIC_ENDPOINT}
+    headers:
+      Authorization: ${env:ELASTIC_API_KEY}
 
 service:
   extensions: [file_storage]
   pipelines:
     traces/fromsdk:
       receivers: [otlp/fromsdk]
-      processors: [elastictrace]
-      exporters: [signaltometrics, elasticsearch/otel]
+      processors: [batch]
+      exporters: [otlp/ingest]
 
     metrics/fromsdk:
       receivers: [otlp/fromsdk]
-      processors: []
-      exporters: [signaltometrics, elasticsearch/otel]
-
-    metrics/hostmetrics:
-      receivers: [hostmetrics/system]
-      processors: [elasticinframetrics, resourcedetection, attributes/dataset, resource/process]
-      exporters: [elasticsearch/ecs]
-
-    metrics/aggregated-metrics:
-      receivers: [signaltometrics]
-      processors: [batch/aggs, lsminterval]
-      exporters: [elasticsearch/otel]
+      processors: [batch]
+      exporters: [otlp/ingest]
 
     logs/fromsdk:
       receivers: [otlp/fromsdk]
-      processors: []
-      exporters: [signaltometrics, elasticsearch/otel]
+      processors: [batch]
+      exporters: [otlp/ingest]
+
+    metrics/hostmetrics:
+      receivers: [hostmetrics/system]
+      processors: [resourcedetection, batch]
+      exporters: [otlp/ingest]
 
     logs/platformlogs:
       receivers: [filelog/platformlogs]
-      processors: [resourcedetection]
-      exporters: [elasticsearch/otel]
+      processors: [resourcedetection, batch]
+      exporters: [otlp/ingest]

@@ -1,7 +1,7 @@
 receivers:
   # Receiver for platform specific log files
   filelog/platformlogs:
-    include: [ /var/log/*.log ]
+    include: [/var/log/*.log]
     retry_on_failure:
       enabled: true
     start_at: end
@@ -52,18 +52,11 @@ exporters:
     sampling_initial: 5
     sampling_thereafter: 1000
 
-  # Exporter to send logs and metrics to Elasticsearch
-  elasticsearch/otel:
-    endpoints: ["${env:ELASTIC_ENDPOINT}"]
-    api_key: ${env:ELASTIC_API_KEY}
-    mapping:
-      mode: otel
-    logs_dynamic_index:
-      enabled: true
-    metrics_dynamic_index:
-      enabled: true
-    traces_dynamic_index:
-      enabled: true
+  # Exporter to send logs and metrics to Elasticsearch Motel
+  otlp/ingest:
+    endpoint: ${env:ELASTIC_ENDPOINT}
+    headers:
+      Authorization: ${env:ELASTIC_API_KEY}
 
 service:
   extensions: [file_storage]
@@ -71,4 +64,4 @@ service:
     logs/platformlogs:
       receivers: [filelog/platformlogs]
       processors: [resourcedetection]
-      exporters: [debug, elasticsearch/otel]
+      exporters: [debug, otlp/ingest]
