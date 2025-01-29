@@ -18,7 +18,7 @@ jobs:
         ./bin/elastic-agent-changelog-tool pr-has-fragment --repo ${{ github.event.repository.name }} ${{github.event.number}}
     - name: get elasti-agent version
       run: |
-        gv=$(awk '$0 ~ /[0-9]+\.[0-9]+\.[0-9]+/ {print $4}' version/version.go)
+        gv=$(cat version/.agent-version)
         echo "agent-version=$gv" >> $GITHUB_OUTPUT
       id: agent-version
     - name: check fragment-syntax

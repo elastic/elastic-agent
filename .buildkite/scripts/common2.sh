@@ -7,7 +7,7 @@ if [[ -z "${WORKSPACE-""}" ]]; then
     export WORKSPACE
 fi
 
-BEAT_VERSION=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\-[a-zA-Z]+[0-9]+)?' "${WORKSPACE}/version/version.go")
+BEAT_VERSION=$(cat version/.agent-version)
 export BEAT_VERSION
 
 getOSOptions() {

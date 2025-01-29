@@ -4,5 +4,8 @@
 
 package version
 
-const defaultBeatVersion = "9.0.0"
-const Agent = defaultBeatVersion
+import _ "embed"
+
+// go:embed .agent-version
+var defaultBeatVersion string
+var Agent = defaultBeatVersion
