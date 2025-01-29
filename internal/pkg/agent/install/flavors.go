@@ -13,9 +13,8 @@ import (
 	"runtime"
 	"strings"
 
-	"gopkg.in/yaml.v3"
-
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 const (
@@ -123,35 +122,6 @@ func ApplyFlavor(versionedHome string, flavor FlavorDefinition) error {
 	return err
 }
 
-// ParseComponentFiles parses spec files and returns list of associated paths with component.
-// Default set consisting of binary, spec file and default config file is always present
-func ParseComponentFiles(content []byte, filename string, includeDefaults bool) ([]string, error) {
-	def := struct {
-		Files []string `yaml:"component_files"`
-	}{}
-
-	if err := yaml.Unmarshal(content, &def); err != nil {
-		return nil, err
-	}
-
-	var files []string
-	files = append(files, def.Files...)
-
-	if includeDefaults {
-		component := strings.TrimSuffix(filepath.Base(filename), ".spec.yml")
-		binaryName := component
-		if runtime.GOOS == "windows" {
-			binaryName += ".exe"
-		}
-		files = append(files,
-			binaryName,
-			fmt.Sprintf("%s.spec.yml", component),
-			fmt.Sprintf("%s.yml", component))
-	}
-
-	return files, nil
-}
-
 // SkipComponentsPathWithSubpathsFn returns a skip function that returns true if
 // path is not part of a any component associated with flavor.
 // Paths are detected from spec files located in versionHome/components
@@ -182,7 +152,7 @@ func skipComponentsPath(relPath string, allowedSubpaths []string) bool {
 	if runtime.GOOS == "windows" {
 		relPath = strings.ReplaceAll(relPath, "\\", "/")
 	}
-	componentsDir := "/components/" // fmt.Sprintf("%ccomponents%c",  .PathSeparator, os.PathSeparator)
+	componentsDir := "/components/"
 	componentsIdx := strings.Index(relPath, componentsDir)
 	if componentsIdx == -1 {
 		// not a components subpath, not blocking
@@ -242,11 +212,11 @@ func allowedSubpathsForFlavor(versionedHome string, flavor FlavorDefinition) ([]
 	return allowedPaths, nil
 }
 
-func subpathsForComponent(component, sourceComponentsDir string) ([]string, error) {
-	if component == "" {
+func subpathsForComponent(componentName, sourceComponentsDir string) ([]string, error) {
+	if componentName == "" {
 		return nil, fmt.Errorf("empty component name")
 	}
-	specFilename := fmt.Sprintf("%s.spec.yml", component)
+	specFilename := fmt.Sprintf("%s.spec.yml", componentName)
 	content, err := os.ReadFile(filepath.Join(sourceComponentsDir, specFilename))
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -255,5 +225,5 @@ func subpathsForComponent(component, sourceComponentsDir string) ([]string, erro
 		return nil, err
 	}
 
-	return ParseComponentFiles(content, specFilename, true)
+	return component.ParseComponentFiles(content, specFilename, true)
 }

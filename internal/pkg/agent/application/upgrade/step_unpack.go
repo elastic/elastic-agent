@@ -22,6 +22,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -35,7 +36,7 @@ type UnpackResult struct {
 }
 
 // unpack unpacks archive correctly, skips root (symlink, config...) unpacks data/*
-func (u *Upgrader) unpack(version, archivePath, dataDir string, skipComponents bool, flavor string) (UnpackResult, error) {
+func (u *Upgrader) unpack(version, archivePath, dataDir string, flavor string) (UnpackResult, error) {
 	// unpack must occur in directory that holds the installation directory
 	// or the extraction will be double nested
 	var unpackRes UnpackResult
@@ -205,6 +206,8 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 	}, nil
 }
 
+// getPackageMetadataFromZip reads an archive on a path archivePath and parses metadata from manifest file
+// located inside an archive
 func getPackageMetadataFromZip(archivePath string) (packageMetadata, error) {
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
@@ -233,10 +236,8 @@ func skipFnFromZip(log *logger.Logger, r *zip.ReadCloser, detectedFlavor string,
 
 	// fix versionedHome
 	versionedHome = strings.ReplaceAll(versionedHome, "\\", "/")
-	log.Errorf("using %q", versionedHome)
 
 	readFile := func(specFilePath string) ([]byte, error) {
-		log.Errorf("reading %q", specFilePath)
 		f, err := r.Open(specFilePath)
 		if err != nil {
 			return nil, err
@@ -258,8 +259,7 @@ func skipFnFromZip(log *logger.Logger, r *zip.ReadCloser, detectedFlavor string,
 			return nil, err
 		}
 
-		paths, err := install.ParseComponentFiles(contentBytes, specFilePath, true)
-		log.Errorf("parsing %q: %v", specFilePath, paths)
+		paths, err := component.ParseComponentFiles(contentBytes, specFilePath, true)
 		if err != nil {
 			return nil, errors.New("failed to read paths from %q: %v", specFilePath, err)
 		}
@@ -524,9 +524,7 @@ func skipFnFromTar(log *logger.Logger, archivePath string, flavor string, regist
 			if err != nil {
 				return nil, errors.New("failed to read %q: %v", fileName, err)
 			}
-			paths, err := install.ParseComponentFiles(contentBytes, fileName, true)
-
-			log.Errorf("Spec %q retrieved paths %v", fileName, paths)
+			paths, err := component.ParseComponentFiles(contentBytes, fileName, true)
 			if err != nil {
 				return nil, errors.New("failed to read paths from %q: %v", fileName, err)
 			}

@@ -95,7 +95,7 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	}
 
 	if err := markFlavor(topPath, flavor); err != nil {
-		return utils.FileOwner{}, err
+		return utils.FileOwner{}, fmt.Errorf("failed marking flavor %q at %q: %w", flavor, topPath, err)
 	}
 
 	pt.Describe("Successfully copied files")
