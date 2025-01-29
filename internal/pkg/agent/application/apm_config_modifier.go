@@ -112,40 +112,74 @@ func noop(change coordinator.ConfigChange) coordinator.ConfigChange {
 // will patch the configuration coming from Fleet adding the APM parameters from the elastic agent configuration file
 // until Fleet supports this config directly
 func PatchAPMConfig(log *logger.Logger, rawConfig *config.Config) func(change coordinator.ConfigChange) coordinator.ConfigChange {
-	configMap, err := rawConfig.ToMapStr()
+	rawConfigMap, err := rawConfig.ToMapStr()
 	if err != nil {
 		log.Errorf("error decoding raw config, patching disabled: %v", err)
 		return noop
 	}
 
-	tracesEnabled, err := getAPMTracesEnabled(configMap)
+	log.Infof("Raw configuration: %s", rawConfigMap)
+
+	tracesEnabledInRawCfg, err := getAPMTracesEnabled(rawConfigMap)
 	if err != nil {
 		log.Errorf("error retrieving trace flag, patching disabled: %v", err)
 		return noop
 	}
 
-	apmConfig, err := getAPMConfigFromMap(configMap)
+	apmConfig, err := getAPMConfigFromMap(rawConfigMap)
 	if err != nil {
 		log.Errorf("error retrieving apm config, patching disabled: %v", err)
 		return noop
 	}
 
-	if !tracesEnabled && apmConfig == nil {
+	if !tracesEnabledInRawCfg && apmConfig == nil {
 		// traces disabled and no apm config -> no patching happening
-		log.Debugf("traces disabled and no apm config: no patching necessary")
+		log.Infof("traces disabled and no apm config: no patching necessary")
 		return noop
 	}
-	monitoringPatch := map[string]any{"traces": tracesEnabled}
+	monitoringPatch := map[string]any{"traces": tracesEnabledInRawCfg}
 	if apmConfig != nil {
 		monitoringPatch["apm"] = apmConfig
 	}
 
 	return func(change coordinator.ConfigChange) coordinator.ConfigChange {
-		err := change.Config().Merge(map[string]any{"agent": map[string]any{"monitoring": monitoringPatch}})
+		incomingChangeMap, err := change.Config().ToMapStr()
 		if err != nil {
-			log.Errorf("error patching apm config into configchange: %v", err)
+			log.Errorf("error trasforming incoming change into a map: %v", err)
+			return change
 		}
 
+		_, err = utils.GetNestedMap(incomingChangeMap, "agent", "monitoring", "apm")
+
+		if err == nil {
+			// we found the apm config key in the incoming change -> don't modify the config
+			log.Info("incoming change already contains APM config, no patching necessary")
+			return change
+		}
+
+		if err != nil && !errors.Is(err, utils.ErrKeyNotFound) {
+			// a generic error has happened
+			log.Errorf("error checking incoming change for APM config: %v", err)
+			return change
+		}
+
+		// We didn't find the APM config key in the incoming config change, we may need to patch
+		incomingChangeTracesEnabled, err := getAPMTracesEnabled(incomingChangeMap)
+		if err != nil {
+			log.Errorf("error checking for monitoring.traces in configchange: %v", err)
+			return change
+		}
+
+		if tracesEnabledInRawCfg || incomingChangeTracesEnabled {
+			log.Infof("patching APM settings from config file: %v", monitoringPatch)
+			err = change.Config().Merge(map[string]any{"agent": map[string]any{"monitoring": monitoringPatch}})
+			if err != nil {
+				log.Errorf("error patching apm config into configchange: %v", err)
+			}
+			return change
+		}
+
+		log.Infof("APM settings not patched: tracesEnabledInRawCfg=%v incomingChangeTracesEnabled=%v", tracesEnabledInRawCfg, incomingChangeTracesEnabled)
 		return change
 	}
 }
