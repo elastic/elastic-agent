@@ -43,4 +43,19 @@ if test -L "$symlink"; then
     fi
 else
     echo "no previous installation found"
+
+    # create dir in case it does not exist
+    mkdir -p "$new_agent_dir" 
+    
+    # 2 is upgrade for Fedora, do not upgrade file when upgrading and file exists
+    if [[ "$1" != "2" ]]; then
+        if [[ -n "${ELASTIC_AGENT_FLAVOR}" ]]; then
+            # Do not modify the file if it already exists
+            echo "${ELASTIC_AGENT_FLAVOR}" > "/var/lib/elastic-agent/.flavor"
+        else
+            # Defaults to basic installation
+            echo "basic" > "/var/lib/elastic-agent/.flavor"
+        fi
+    fi
 fi
+

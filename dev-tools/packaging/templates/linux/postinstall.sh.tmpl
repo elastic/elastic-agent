@@ -17,11 +17,6 @@ fi
 echo "create symlink "$symlink" to "$new_agent_dir/elastic-agent""
 ln -s "$new_agent_dir/elastic-agent" "$symlink"
 
-# apply flavor cleanup
-if [[ -n "${ELASTIC_AGENT_FLAVOR}" ]]; then
-  # Write the content of ENV1 to the file
-  echo "${ELASTIC_AGENT_FLAVOR}" > "/var/lib/elastic-agent/.flavor"
-fi
 $new_agent_dir/elastic-agent apply-flavor
 
 # reload systemctl and then restart service
