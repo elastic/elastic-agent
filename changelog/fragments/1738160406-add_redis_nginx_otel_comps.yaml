@@ -11,7 +11,7 @@
 kind: feature
 
 # Change summary; a 80ish characters long description of the change.
-summary: add_redis_nginx_otel_comps
+summary: Add Nginx receiver and Redis receiver OTel components
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
@@ -19,7 +19,7 @@ summary: add_redis_nginx_otel_comps
 #description:
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
-component: Add redisreceiver and nginxreceiver otel components
+component: elastic-agent
 
 # PR URL; optional; the PR number that added the changeset.
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
