@@ -6,6 +6,6 @@ package version
 
 import _ "embed"
 
-// go:embed .agent-version
+//go:embed .agent-version
 var defaultBeatVersion string
 var Agent = defaultBeatVersion
