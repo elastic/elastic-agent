@@ -127,6 +127,7 @@ func newFleetGatewayWithScheduler(
 		acker:        acker,
 		stateFetcher: stateFetcher,
 		stateStore:   stateStore,
+		isLongSched:  false,
 		errCh:        make(chan error),
 		actionCh:     make(chan []fleetapi.Action, 1),
 	}, nil
