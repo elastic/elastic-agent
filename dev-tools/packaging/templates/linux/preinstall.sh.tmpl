@@ -5,6 +5,7 @@ set -e
 commit_hash="{{ commit_short }}"
 version_dir="{{agent_package_version}}{{snapshot_suffix}}"
 symlink="/usr/share/elastic-agent/bin/elastic-agent"
+flavor_file="/var/lib/elastic-agent/.flavor"
 new_agent_dir="/var/lib/elastic-agent/data/elastic-agent-$version_dir-$commit_hash"
 old_agent_dir=""
 
@@ -51,10 +52,10 @@ else
     if [[ "$1" != "2" ]]; then
         if [[ -n "${ELASTIC_AGENT_FLAVOR}" ]]; then
             # Do not modify the file if it already exists
-            echo "${ELASTIC_AGENT_FLAVOR}" > "/var/lib/elastic-agent/.flavor"
+            echo "${ELASTIC_AGENT_FLAVOR}" > "$flavor_file"
         else
             # Defaults to basic installation
-            echo "basic" > "/var/lib/elastic-agent/.flavor"
+            echo "basic" > "$flavor_file"
         fi
     fi
 fi
