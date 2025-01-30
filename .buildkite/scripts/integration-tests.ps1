@@ -26,6 +26,10 @@ $env:SNAPSHOT = $true
 
 echo "~~~ Building test binaries"
 mage build:testBinaries
+if ($LASTEXITCODE -ne 0) {    
+    Write-Error "Failed to build test binaries"
+    exit 1
+}
 $osInfo = (Get-CimInstance Win32_OperatingSystem).Caption + " " + (Get-CimInstance Win32_OperatingSystem).OSArchitecture -replace " ", "_"
 $root_suffix=""
 if ($TEST_SUDO -eq "true") {
