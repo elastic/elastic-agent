@@ -67,7 +67,7 @@ func Flavor(detectedFlavor string, registryPath string, flavorsRegistry map[stri
 
 	components, found := flavorsRegistry[detectedFlavor]
 	if !found {
-		return FlavorDefinition{}, fmt.Errorf("Detected flavor %q not found in a registry %v read from %q: %w", detectedFlavor, flavorsRegistry, registryPath, ErrUnknownFlavor)
+		return FlavorDefinition{}, ErrUnknownFlavor
 	}
 
 	return FlavorDefinition{detectedFlavor, components}, nil
