@@ -5,7 +5,6 @@
 package transpiler
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
@@ -13,6 +12,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/cespare/xxhash/v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
 )
@@ -52,10 +53,16 @@ type Node interface {
 	//Close clones the current node.
 	Clone() Node
 
+	// ShallowClone makes a shallow clone of the node.
+	ShallowClone() Node
+
 	// Hash compute a sha256 hash of the current node and recursively call any children.
 	Hash() []byte
 
-	// Apply apply the current vars, returning the new value for the node.
+	// Hash64With recursively computes the given hash for the Node and its children
+	Hash64With(h *xxhash.Digest) error
+
+	// Apply apply the current vars, returning the new value for the node. This does not modify the original Node.
 	Apply(*Vars) (Node, error)
 
 	// Processors returns any attached processors, because of variable substitution.
@@ -137,6 +144,20 @@ func (d *Dict) Clone() Node {
 	return &Dict{value: nodes}
 }
 
+// ShallowClone makes a shallow clone of the node.
+func (d *Dict) ShallowClone() Node {
+	nodes := make([]Node, 0, len(d.value))
+	for _, i := range d.value {
+		if i == nil {
+			continue
+		}
+		// Dict nodes are key-value pairs, and we do want to make a copy of the key here
+		nodes = append(nodes, i.ShallowClone())
+
+	}
+	return &Dict{value: nodes}
+}
+
 // Hash compute a sha256 hash of the current node and recursively call any children.
 func (d *Dict) Hash() []byte {
 	h := sha256.New()
@@ -146,7 +167,17 @@ func (d *Dict) Hash() []byte {
 	return h.Sum(nil)
 }
 
-// Apply applies the vars to all the nodes in the dictionary.
+// Hash64With recursively computes the given hash for the Node and its children
+func (d *Dict) Hash64With(h *xxhash.Digest) error {
+	for _, v := range d.value {
+		if err := v.Hash64With(h); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Apply applies the vars to all the nodes in the dictionary. This does not modify the original dictionary.
 func (d *Dict) Apply(vars *Vars) (Node, error) {
 	nodes := make([]Node, 0, len(d.value))
 	for _, v := range d.value {
@@ -194,13 +225,14 @@ func (d *Dict) sort() {
 
 // Key represents a Key / value pair in the dictionary.
 type Key struct {
-	name  string
-	value Node
+	name      string
+	value     Node
+	condition *eql.Expression
 }
 
 // NewKey creates a new key with provided name node pair.
 func NewKey(name string, val Node) *Key {
-	return &Key{name, val}
+	return &Key{name: name, value: val}
 }
 
 func (k *Key) String() string {
@@ -246,6 +278,11 @@ func (k *Key) Clone() Node {
 	return &Key{name: k.name, value: nil}
 }
 
+// ShallowClone makes a shallow clone of the node.
+func (k *Key) ShallowClone() Node {
+	return &Key{name: k.name, value: k.value}
+}
+
 // Hash compute a sha256 hash of the current node and recursively call any children.
 func (k *Key) Hash() []byte {
 	h := sha256.New()
@@ -256,7 +293,18 @@ func (k *Key) Hash() []byte {
 	return h.Sum(nil)
 }
 
-// Apply applies the vars to the value.
+// Hash64With recursively computes the given hash for the Node and its children
+func (k *Key) Hash64With(h *xxhash.Digest) error {
+	if _, err := h.WriteString(k.name); err != nil {
+		return err
+	}
+	if k.value != nil {
+		return k.value.Hash64With(h)
+	}
+	return nil
+}
+
+// Apply applies the vars to the value. This does not modify the original node.
 func (k *Key) Apply(vars *Vars) (Node, error) {
 	if k.value == nil {
 		return k, nil
@@ -266,11 +314,18 @@ func (k *Key) Apply(vars *Vars) (Node, error) {
 		case *BoolVal:
 			return k, nil
 		case *StrVal:
-			cond, err := eql.Eval(v.value, vars, true)
+			var err error
+			if k.condition == nil {
+				k.condition, err = eql.New(v.value)
+				if err != nil {
+					return nil, fmt.Errorf(`invalid condition "%s": %w`, v.value, err)
+				}
+			}
+			cond, err := k.condition.Eval(vars, true)
 			if err != nil {
 				return nil, fmt.Errorf(`condition "%s" evaluation failed: %w`, v.value, err)
 			}
-			return &Key{k.name, NewBoolVal(cond)}, nil
+			return &Key{name: k.name, value: NewBoolVal(cond)}, nil
 		}
 		return nil, fmt.Errorf("condition key's value must be a string; received %T", k.value)
 	}
@@ -281,7 +336,7 @@ func (k *Key) Apply(vars *Vars) (Node, error) {
 	if v == nil {
 		return nil, nil
 	}
-	return &Key{k.name, v}, nil
+	return &Key{name: k.name, value: v}, nil
 }
 
 // Processors returns any attached processors, because of variable substitution.
@@ -331,6 +386,16 @@ func (l *List) Hash() []byte {
 	return h.Sum(nil)
 }
 
+// Hash64With recursively computes the given hash for the Node and its children
+func (l *List) Hash64With(h *xxhash.Digest) error {
+	for _, v := range l.value {
+		if err := v.Hash64With(h); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Find takes an index and return the values at that index.
 func (l *List) Find(idx string) (Node, bool) {
 	i, err := strconv.Atoi(idx)
@@ -364,7 +429,19 @@ func (l *List) Clone() Node {
 	return &List{value: nodes}
 }
 
-// Apply applies the vars to all nodes in the list.
+// ShallowClone makes a shallow clone of the node.
+func (l *List) ShallowClone() Node {
+	nodes := make([]Node, 0, len(l.value))
+	for _, i := range l.value {
+		if i == nil {
+			continue
+		}
+		nodes = append(nodes, i)
+	}
+	return &List{value: nodes}
+}
+
+// Apply applies the vars to all nodes in the list. This does not modify the original list.
 func (l *List) Apply(vars *Vars) (Node, error) {
 	nodes := make([]Node, 0, len(l.value))
 	for _, v := range l.value {
@@ -429,12 +506,23 @@ func (s *StrVal) Clone() Node {
 	return &k
 }
 
+// ShallowClone makes a shallow clone of the node.
+func (s *StrVal) ShallowClone() Node {
+	return s.Clone()
+}
+
 // Hash we return the byte slice of the string.
 func (s *StrVal) Hash() []byte {
 	return []byte(s.value)
 }
 
-// Apply applies the vars to the string value.
+// Hash64With recursively computes the given hash for the Node and its children
+func (s *StrVal) Hash64With(h *xxhash.Digest) error {
+	_, err := h.WriteString(s.value)
+	return err
+}
+
+// Apply applies the vars to the string value. This does not modify the original string.
 func (s *StrVal) Apply(vars *Vars) (Node, error) {
 	return vars.Replace(s.value)
 }
@@ -480,6 +568,11 @@ func (s *IntVal) Clone() Node {
 	return &k
 }
 
+// ShallowClone makes a shallow clone of the node.
+func (s *IntVal) ShallowClone() Node {
+	return s.Clone()
+}
+
 // Apply does nothing.
 func (s *IntVal) Apply(_ *Vars) (Node, error) {
 	return s, nil
@@ -488,6 +581,12 @@ func (s *IntVal) Apply(_ *Vars) (Node, error) {
 // Hash we convert the value into a string and return the byte slice.
 func (s *IntVal) Hash() []byte {
 	return []byte(s.String())
+}
+
+// Hash64With recursively computes the given hash for the Node and its children
+func (s *IntVal) Hash64With(h *xxhash.Digest) error {
+	_, err := h.WriteString(s.String())
+	return err
 }
 
 // Processors returns any linked processors that are now connected because of Apply.
@@ -531,9 +630,20 @@ func (s *UIntVal) Clone() Node {
 	return &k
 }
 
+// ShallowClone makes a shallow clone of the node.
+func (s *UIntVal) ShallowClone() Node {
+	return s.Clone()
+}
+
 // Hash we convert the value into a string and return the byte slice.
 func (s *UIntVal) Hash() []byte {
 	return []byte(s.String())
+}
+
+// Hash64With recursively computes the given hash for the Node and its children
+func (s *UIntVal) Hash64With(h *xxhash.Digest) error {
+	_, err := h.WriteString(s.String())
+	return err
 }
 
 // Apply does nothing.
@@ -583,9 +693,25 @@ func (s *FloatVal) Clone() Node {
 	return &k
 }
 
+// ShallowClone makes a shallow clone of the node.
+func (s *FloatVal) ShallowClone() Node {
+	return s.Clone()
+}
+
 // Hash return a string representation of the value, we try to return the minimal precision we can.
 func (s *FloatVal) Hash() []byte {
-	return []byte(strconv.FormatFloat(s.value, 'f', -1, 64))
+	return []byte(s.hashString())
+}
+
+// Hash64With recursively computes the given hash for the Node and its children
+func (s *FloatVal) Hash64With(h *xxhash.Digest) error {
+	_, err := h.WriteString(s.hashString())
+	return err
+}
+
+// hashString returns a string representation of s suitable for hashing.
+func (s *FloatVal) hashString() string {
+	return strconv.FormatFloat(s.value, 'f', -1, 64)
 }
 
 // Apply does nothing.
@@ -637,12 +763,29 @@ func (s *BoolVal) Clone() Node {
 	return &k
 }
 
+// ShallowClone makes a shallow clone of the node.
+func (s *BoolVal) ShallowClone() Node {
+	return s.Clone()
+}
+
 // Hash returns a single byte to represent the boolean value.
 func (s *BoolVal) Hash() []byte {
 	if s.value {
 		return trueVal
 	}
 	return falseVal
+}
+
+// Hash64With recursively computes the given hash for the Node and its children
+func (s *BoolVal) Hash64With(h *xxhash.Digest) error {
+	var encodedBool []byte
+	if s.value {
+		encodedBool = trueVal
+	} else {
+		encodedBool = falseVal
+	}
+	_, err := h.Write(encodedBool)
+	return err
 }
 
 // Apply does nothing.
@@ -750,9 +893,19 @@ func (a *AST) Clone() *AST {
 	return &AST{root: a.root.Clone()}
 }
 
+// ShallowClone makes a shallow clone of the node.
+func (a *AST) ShallowClone() *AST {
+	return &AST{root: a.root.ShallowClone()}
+}
+
 // Hash calculates a hash from all the included nodes in the tree.
 func (a *AST) Hash() []byte {
 	return a.root.Hash()
+}
+
+// Hash64With recursively computes the given hash for the Node and its children
+func (a *AST) Hash64With(h *xxhash.Digest) error {
+	return a.root.Hash64With(h)
 }
 
 // HashStr return the calculated hash as a base64 url encoded string.
@@ -762,7 +915,16 @@ func (a *AST) HashStr() string {
 
 // Equal check if two AST are equals by using the computed hash.
 func (a *AST) Equal(other *AST) bool {
-	return bytes.Equal(a.Hash(), other.Hash())
+	if a.root == nil || other.root == nil {
+		return a.root == other.root
+	}
+	hasher := xxhash.New()
+	_ = a.Hash64With(hasher)
+	thisHash := hasher.Sum64()
+	hasher.Reset()
+	_ = other.Hash64With(hasher)
+	otherHash := hasher.Sum64()
+	return thisHash == otherHash
 }
 
 // Lookup looks for a value from the AST.
@@ -927,6 +1089,12 @@ func Lookup(a *AST, selector Selector) (Node, bool) {
 	}
 
 	return current, true
+}
+
+// Insert inserts an AST into an existing AST, will return and error if the target position cannot
+// accept a new node.
+func (a *AST) Insert(b *AST, to Selector) error {
+	return Insert(a, b.root, to)
 }
 
 // Insert inserts a node into an existing AST, will return and error if the target position cannot
