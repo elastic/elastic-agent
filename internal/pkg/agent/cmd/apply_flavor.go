@@ -10,11 +10,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/spf13/cobra"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
-	"github.com/spf13/cobra"
 )
 
 func newApplyFlavorCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
