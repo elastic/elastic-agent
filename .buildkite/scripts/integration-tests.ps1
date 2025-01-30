@@ -25,7 +25,7 @@ echo "~~~ Agent version: $env:AGENT_VERSION"
 $env:SNAPSHOT = $true
 
 echo "~~~ Building test binaries"
-mage build:testBinaries
+& mage build:testBinaries
 if ($LASTEXITCODE -ne 0) {    
     Write-Error "Failed to build test binaries"
     exit 1
