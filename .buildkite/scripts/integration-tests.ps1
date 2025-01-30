@@ -18,7 +18,10 @@ if ($PACKAGE_VERSION) {
     $PACKAGE_VERSION = "${PACKAGE_VERSION}-SNAPSHOT"
 }
 $env:TEST_BINARY_NAME = "elastic-agent"
-$env:AGENT_VERSION = $PACKAGE_VERSION
+# Parsing version.go. Will be simplified here: https://github.com/elastic/ingest-dev/issues/4925
+$AGENT_VERSION = (Get-Content version/version.go | Select-String -Pattern 'const defaultBeatVersion =' | ForEach-Object { $_ -replace '.*?"(.*?)".*', '$1' })
+$env:AGENT_VERSION = $AGENT_VERSION + "-SNAPSHOT"
+echo "~~~ Agent version: $env:AGENT_VERSION"
 $env:SNAPSHOT = $true
 
 echo "~~~ Building test binaries"
@@ -32,12 +35,12 @@ $fully_qualified_group_name="${GROUP_NAME}${root_suffix}_${osInfo}"
 $outputXML = "build/${fully_qualified_group_name}.integration.xml"
 $outputJSON = "build/${fully_qualified_group_name}.integration.out.json"
 try {
-    Get-Ess-Stack -StackVersion $PACKAGE_VERSION    
+    Get-Ess-Stack -StackVersion $PACKAGE_VERSION
     Write-Output "~~~ Running integration test group: $GROUP_NAME as user: $env:USERNAME"
-    gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags=integration -shuffle=on -timeout=2h0m0s "github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=$GROUP_NAME" "-integration.sudo=$TEST_SUDO" 
+    gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags=integration -shuffle=on -timeout=2h0m0s "github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=$GROUP_NAME" "-integration.sudo=$TEST_SUDO"
 } finally {
     ess_down
-    
+
     if (Test-Path $outputXML) {
         # Install junit2html if not installed
         go install github.com/alexec/junit2html@latest
