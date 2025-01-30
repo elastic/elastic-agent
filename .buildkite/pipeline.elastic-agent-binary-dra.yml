@@ -61,11 +61,19 @@ steps:
     key: "dra-core-staging"
     if: build.branch =~ /^[0-9]+\.[0-9x]+\$/ || build.env("RUN_STAGING") == "true" || build.env('VERSION_QUALIFIER') != null
     steps:
+<<<<<<< HEAD
     - label: ":package: Elastic-Agent Core staging"
       commands: |
         source .buildkite/scripts/version_qualifier.sh
         .buildkite/scripts/steps/build-agent-core.sh
       key: "build-dra-staging-x86"
+=======
+    - label: ":package: Build Elastic-Agent Core staging"
+      commands: |
+        source .buildkite/scripts/version_qualifier.sh
+        .buildkite/scripts/steps/build-agent-core.sh
+      key: "build-dra-staging"
+>>>>>>> 297af6daa (use centralized version qualifier (#6651))
       artifact_paths:
         - "build/distributions/**/*"
       agents:
@@ -94,6 +102,7 @@ steps:
 
     - label: ":hammer: DRA Publish Elastic-Agent Core staging"
       command: |
+        source .buildkite/scripts/version_qualifier.sh
         echo "+++ Restoring Artifacts"
         buildkite-agent artifact download "build/**/*" .
         echo "+++ Changing permissions for the release manager"
