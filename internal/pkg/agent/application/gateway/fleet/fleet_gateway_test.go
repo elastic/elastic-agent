@@ -27,6 +27,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -611,4 +612,77 @@ func TestTryReplaceScheduler(t *testing.T) {
 
 		assert.Same(t, initialScheduler2, gateway2.scheduler)
 	})
+}
+
+func TestFleetGatewaySchedulerSwitch(t *testing.T) {
+	agentInfo := &testAgentInfo{}
+	settings := &fleetGatewaySettings{
+		Duration: 5 * time.Second,
+		Backoff:  backoffSettings{Init: 1 * time.Second, Max: 5 * time.Second},
+	}
+
+	t.Run("if unauthorized responses exceed the set limit, the scheduler should be switched to the long-wait scheduler", withGateway(agentInfo, settings, func(
+		t *testing.T,
+		gateway coordinator.FleetGateway,
+		c *testingClient,
+		sch *scheduler.Stepper,
+	) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		unauth := func(_ http.Header, _ io.Reader) (*http.Response, error) {
+			return nil, client.ErrInvalidAPIKey
+		}
+
+		clientWaitFn := c.Answer(unauth)
+		g, ok := gateway.(*FleetGateway)
+		require.True(t, ok)
+		g.scheduler = scheduler.NewPeriodicJitter(time.Second, time.Second)
+
+		errCh := runFleetGateway(ctx, gateway)
+
+		for i := 0; i <= maxUnauthCounter; i++ {
+			<-clientWaitFn
+		}
+
+		cancel()
+		err := <-errCh
+		require.NoError(t, err)
+
+		_, ok = g.scheduler.(*scheduler.Periodic)
+		require.True(t, ok)
+		require.True(t, g.isLongSched)
+	}))
+
+	t.Run("should switch back to short-wait scheduler if the a successful response is received", withGateway(agentInfo, settings, func(
+		t *testing.T,
+		gateway coordinator.FleetGateway,
+		c *testingClient,
+		sch *scheduler.Stepper,
+	) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		unauth := func(_ http.Header, _ io.Reader) (*http.Response, error) {
+			resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
+			return resp, nil
+		}
+
+		clientWaitFn := c.Answer(unauth)
+		g, ok := gateway.(*FleetGateway)
+		require.True(t, ok)
+		g.scheduler = scheduler.NewPeriodic(time.Second)
+
+		errCh := runFleetGateway(ctx, gateway)
+
+		<-clientWaitFn
+
+		cancel()
+		err := <-errCh
+		require.NoError(t, err)
+
+		_, ok = g.scheduler.(*scheduler.PeriodicJitter)
+		require.True(t, ok)
+		require.False(t, g.isLongSched)
+	}))
 }
