@@ -4,12 +4,9 @@ env:
   DOCKER_REGISTRY: "docker.elastic.co"
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
 
-  # Packaging
-  SNAPSHOT: true
-  EXTERNAL: true
-
 steps:
   - group: "Integration tests: packaging"
+    key: "int-packaging"
     steps:
       - label: "Packaging: Ubuntu x86_64"
         key: "packaging-ubuntu-x86-64"
@@ -70,10 +67,7 @@ steps:
   - label: "Serverless integration test"
     key: "serverless-integration-tests"
     depends_on:
-      - packaging-ubuntu-x86-64
-      - packaging-ubuntu-arm64
-      - packaging-windows
-      - packaging-containers
+      - int-packaging
     concurrency_group: elastic-agent-extended-testing/serverless-integration
     concurrency: 8
     env:
@@ -95,10 +89,7 @@ steps:
   - label: "Extended runtime leak tests"
     key: "extended-integration-tests"
     depends_on:
-      - packaging-ubuntu-x86-64
-      - packaging-ubuntu-arm64
-      - packaging-windows
-      - packaging-containers
+      - int-packaging
     concurrency_group: elastic-agent-extended-testing/leak-tests
     concurrency: 8
     env:
