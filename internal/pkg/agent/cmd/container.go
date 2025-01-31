@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"net/url"
 	"os"
 	"os/exec"
@@ -896,6 +897,7 @@ func tryContainerLoadPaths() error {
 		// no container-paths.yml file exists, so nothing to do
 		return nil
 	}
+	log.Printf("container path file '%s' found", pathFile)
 	cfg, err := config.LoadFile(pathFile)
 	if err != nil {
 		return fmt.Errorf("failed to load %s: %w", pathFile, err)
@@ -905,6 +907,8 @@ func tryContainerLoadPaths() error {
 	if err != nil {
 		return fmt.Errorf("failed to unpack %s: %w", pathFile, err)
 	}
+	log.Printf("state Path: '%s', config path: '%s', logs path: '%s', socket path: '%s'", paths.StatePath, paths.ConfigPath, paths.LogsPath, paths.SocketPath)
+
 	return setPaths(paths.StatePath, paths.ConfigPath, paths.LogsPath, paths.SocketPath, false)
 }
 
