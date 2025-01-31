@@ -57,8 +57,9 @@ func TestDiagnosticLocalConfig(t *testing.T) {
 	// local-config hook correctly returns it.
 	cfg := &configuration.Configuration{
 		Fleet: &configuration.FleetAgentConfig{
-			Enabled:      true,
-			AccessAPIKey: "test-key",
+			Enabled:             true,
+			AccessAPIKey:        "test-key",
+			EnrollmentTokenHash: "test-hash",
 			Client: remote.Config{
 				Protocol: "test-protocol",
 			},
@@ -119,6 +120,7 @@ agent:
 fleet:
   enabled: true
   access_api_key: "test-key"
+  enrollment_token_hash: "test-hash"
   agent:
   protocol: "test-protocol"
 `

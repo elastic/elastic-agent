@@ -6,10 +6,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
+    helm.sh/chart: elastic-agent-9.1.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.0.0
+    app.kubernetes.io/version: 9.1.0
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -18,10 +18,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
+    helm.sh/chart: elastic-agent-9.1.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.0.0
+    app.kubernetes.io/version: 9.1.0
 stringData:
 
   agent.yml: |-
@@ -182,10 +182,10 @@ kind: ClusterRole
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
+    helm.sh/chart: elastic-agent-9.1.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.0.0
+    app.kubernetes.io/version: 9.1.0
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
     resources:
@@ -262,10 +262,10 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
+    helm.sh/chart: elastic-agent-9.1.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.0.0
+    app.kubernetes.io/version: 9.1.0
 subjects:
   - kind: ServiceAccount
     name: agent-pernode-example
@@ -282,10 +282,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.0.0-beta
+    helm.sh/chart: elastic-agent-9.1.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.0.0
+    app.kubernetes.io/version: 9.1.0
 spec:
   selector:
     matchLabels:
@@ -316,7 +316,7 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
-        image: docker.elastic.co/beats/elastic-agent:9.0.0-SNAPSHOT
+        image: docker.elastic.co/beats/elastic-agent:9.1.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
