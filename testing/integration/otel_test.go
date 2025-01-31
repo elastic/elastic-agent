@@ -1340,7 +1340,9 @@ service:
 		"host.os.type",
 		"host.os.version",
 
-		// fbreceiver adds metadata fields that are internal in filebeat
+		// TODO: fbreceiver adds metadata fields that are internal in filebeat.
+		// Remove this once https://github.com/elastic/beats/pull/42412
+		// is available in agent.
 		"@metadata.beat",
 		"@metadata.type",
 		"@metadata.version",
