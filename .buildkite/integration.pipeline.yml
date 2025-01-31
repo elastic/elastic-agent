@@ -109,10 +109,7 @@ steps:
 
   - label: "Triggering Integration tests"
     depends_on:
-      - packaging-ubuntu-x86-64
-      - packaging-ubuntu-arm64
-      - packaging-windows
-      - packaging-containers
+      - int-packaging
     trigger: "elastic-agent-extended-testing-bk"
     build:
       commit: "${BUILDKITE_COMMIT}"
