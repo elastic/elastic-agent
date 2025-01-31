@@ -39,7 +39,6 @@ This section provides a summary of components included in the Elastic Distributi
 | [hostmetricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/hostmetricsreceiver/v0.117.0/receiver/hostmetricsreceiver/README.md) | v0.117.0 |
 | [httpcheckreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/httpcheckreceiver/v0.117.0/receiver/httpcheckreceiver/README.md) | v0.117.0 |
 | [jaegerreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/jaegerreceiver/v0.117.0/receiver/jaegerreceiver/README.md) | v0.117.0 |
-| [jmxreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/jmxreceiver/v0.117.0/receiver/jmxreceiver/README.md) | v0.117.0 |
 | [k8sclusterreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/k8sclusterreceiver/v0.117.0/receiver/k8sclusterreceiver/README.md) | v0.117.0 |
 | [k8sobjectsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/k8sobjectsreceiver/v0.117.0/receiver/k8sobjectsreceiver/README.md) | v0.117.0 |
 | [kafkareceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/kafkareceiver/v0.117.0/receiver/kafkareceiver/README.md) | v0.117.0 |
