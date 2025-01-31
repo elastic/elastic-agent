@@ -16,6 +16,7 @@ inputs:
           fields_under_root: true
           file_identity:
             fingerprint: null
+          id: filestream-modsecurity-modsecurity-auditlog-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto

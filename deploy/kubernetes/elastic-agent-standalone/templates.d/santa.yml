@@ -12,6 +12,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-santa-santa-log-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto

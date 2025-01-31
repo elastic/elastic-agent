@@ -17,6 +17,7 @@ inputs:
           fields_under_root: true
           file_identity:
             fingerprint: null
+          id: filestream-symantec_endpoint-symantec_endpoint-log-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto

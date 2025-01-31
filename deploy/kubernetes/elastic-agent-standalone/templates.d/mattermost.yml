@@ -12,6 +12,7 @@ inputs:
             - \.gz$
           file_identity:
             fingerprint: null
+          id: filestream-mattermost-mattermost-audit-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto

@@ -7,6 +7,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"math/rand/v2"
@@ -33,6 +34,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent/internal/pkg/crypto"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -524,21 +526,25 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 	}
 
 	c.log.Infof("1st enrollment attempt failed, retrying enrolling to URL: %s with exponential backoff (init %s, max %s)", c.client.URI(), enrollBackoffInit, enrollBackoffMax)
+
 	signal := make(chan struct{})
 	defer close(signal)
 	backExp := backoff.NewExpBackoff(signal, enrollBackoffInit, enrollBackoffMax)
 
 	for {
 		retry := false
-		if errors.Is(err, fleetapi.ErrTooManyRequests) {
+		switch {
+		case errors.Is(err, fleetapi.ErrTooManyRequests):
 			c.log.Warn("Too many requests on the remote server, will retry in a moment.")
 			retry = true
-		} else if errors.Is(err, fleetapi.ErrConnRefused) {
-			c.log.Warn("Remote server is not ready to accept connections, will retry in a moment.")
+		case errors.Is(err, fleetapi.ErrConnRefused):
+			c.log.Warn("Remote server is not ready to accept connections(Connection Refused), will retry in a moment.")
 			retry = true
-		} else if errors.Is(err, fleetapi.ErrTemporaryServerError) {
-			c.log.Warn("Remote server failed to handle the request, will retry in a moment.")
+		case errors.Is(err, fleetapi.ErrTemporaryServerError):
+			c.log.Warnf("Remote server failed to handle the request(%s), will retry in a moment.", err.Error())
 			retry = true
+		case err != nil:
+			c.log.Warnf("Enrollment failed: %s", err.Error())
 		}
 		if !retry {
 			break
@@ -582,7 +588,7 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 			errors.TypeNetwork)
 	}
 
-	fleetConfig, err := createFleetConfigFromEnroll(resp.Item.AccessAPIKey, c.remoteConfig)
+	fleetConfig, err := createFleetConfigFromEnroll(resp.Item.AccessAPIKey, c.options.EnrollAPIKey, c.remoteConfig)
 	if err != nil {
 		return err
 	}
@@ -662,9 +668,6 @@ func (c *enrollCmd) startAgent(ctx context.Context) (<-chan *os.ProcessState, er
 	}
 	if paths.Downloads() != "" {
 		args = append(args, "--path.downloads", paths.Downloads())
-	}
-	if paths.Install() != "" {
-		args = append(args, "--path.install", paths.Install())
 	}
 	if !paths.IsVersionHome() {
 		args = append(args, "--path.home.unversioned")
@@ -1020,12 +1023,17 @@ func createFleetServerBootstrapConfig(
 	return cfg, nil
 }
 
-func createFleetConfigFromEnroll(accessAPIKey string, cli remote.Config) (*configuration.FleetAgentConfig, error) {
+func createFleetConfigFromEnroll(accessAPIKey string, enrollmentToken string, cli remote.Config) (*configuration.FleetAgentConfig, error) {
 	cfg := configuration.DefaultFleetAgentConfig()
 	cfg.Enabled = true
 	cfg.AccessAPIKey = accessAPIKey
 	cfg.Client = cli
-
+	enrollmentHashBytes, err := crypto.GeneratePBKDF2FromPassword([]byte(enrollmentToken))
+	if err != nil {
+		return nil, errors.New(err, "failed to generate enrollment hash", errors.TypeConfig)
+	}
+	enrollmentTokenHash := base64.StdEncoding.EncodeToString(enrollmentHashBytes)
+	cfg.EnrollmentTokenHash = enrollmentTokenHash
 	if err := cfg.Valid(); err != nil {
 		return nil, errors.New(err, "invalid enrollment options", errors.TypeConfig)
 	}

@@ -3,6 +3,7 @@
 Here is a collection of example configurations for the eck-integrations chart.
 
 - [Kubernetes - defaults](kubernetes-default/README.md)
+- [Kubernetes - KSM autosharding](kubernetes-ksm-sharding/README.md)
 - [System - custom authlogs path](kubernetes-default/README.md)
 - [Kubernetes - only container logs](kubernetes-only-logs/README.md)
 - [Kubernetes - only hints autodiscover](kubernetes-hints-autodiscover/README.md)
@@ -10,6 +11,7 @@ Here is a collection of example configurations for the eck-integrations chart.
 - [Multiple Integrations](multiple-integrations/README.md)
 - [ECK - Kubernetes - defaults](eck/README.md)
 - [Fleet - Managed Agent](fleet-managed/README.md)
+- [Fleet - Managed Agent with KSM autosharding](fleet-managed-ksm-sharding/README.md)
 - [User created cluster role](user-cluster-role/README.md)
 - [User created service account](user-service-account/README.md)
 
