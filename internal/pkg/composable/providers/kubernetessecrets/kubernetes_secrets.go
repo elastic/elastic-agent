@@ -21,96 +21,183 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-var _ corecomp.FetchContextProvider = (*contextProviderK8sSecrets)(nil)
-var getK8sClientFunc = getK8sClient
+var (
+	_                corecomp.FetchContextProvider = (*contextProviderK8SSecrets)(nil)
+	getK8sClientFunc                               = kubernetes.GetKubernetesClient
+)
 
 func init() {
 	composable.Providers.MustAddContextProvider("kubernetes_secrets", ContextProviderBuilder)
 }
 
-type contextProviderK8sSecrets struct {
-	logger *logger.Logger
-	config *Config
-
-	clientMx sync.Mutex
-	client   k8sclient.Interface
-
-	secretsCacheMx sync.RWMutex
-	secretsCache   map[string]*secretsData
+type store interface {
+	// AddConditionally adds the given secret to the store if the given condition returns true. If there is no existing
+	// secret, the condition will be called with an empty secret and false. If updateAccess is true and the secret already exists,
+	// then the lastAccess timestamp is updated to time.Now() independently of the condition result.
+	AddConditionally(key string, sd secret, updateAccess bool, cond conditionFn)
+	// ListKeys returns a list of all the keys of the secrets in the store without checking for expiration
+	ListKeys() []string
+	// List returns a list of all the secrets in the store that are not expired
+	List() []secret
+	// Get returns the secret associated with the given key from the store if it exists and is not expired. If updateAccess is true
+	// and the secret exists, essentially the expiration check is skipped and the lastAccess timestamp is updated to time.Now().
+	Get(key string, updateAccess bool) (secret, bool)
 }
 
-type secretsData struct {
-	value      string
-	lastAccess time.Time
+// secret represents the data of a kubernetes secret that is stored in the cache
+type secret struct {
+	// name is the name of the secret, and it derives from key
+	name string
+	// namespace is the name of the namespace, and it derives from key
+	namespace string
+	// key is the key inside the secret, and it derives from key
+	key string
+	// value is the value of key inside the secret
+	value string
+	// apiExists is true if the secret was fetched from the API with no errors
+	apiExists bool
+	// apiFetchTime is the time the secret was fetched from the API
+	apiFetchTime time.Time
 }
 
-// ContextProviderBuilder builds the context provider.
+type conditionFn func(existing secret, exists bool) bool
+
+type contextProviderK8SSecrets struct {
+	logger    *logger.Logger
+	config    *Config
+	client    k8sclient.Interface
+	clientMtx sync.RWMutex
+	running   chan struct{}
+	store     store
+}
+
+// ContextProviderBuilder builds the kubernetes_secrets context provider. By default, this provider employs a cache
+// to reduce the number of requests to the API server. The cache refreshes the secrets referenced during each Fetch call
+// every Config.RefreshInterval. To maintain only secrets that are actually needed by the agent, each secret reference
+// expires based on the Config.TTLDelete. During expiration of secret references or actual changes of secret values,
+// the kubernetes_secrets provider calls the ContextProviderComm.Signal() to notify the agent. The cache mechanism
+// can be disabled by setting Config.DisableCache to true.
 func ContextProviderBuilder(logger *logger.Logger, c *config.Config, _ bool) (corecomp.ContextProvider, error) {
-	var cfg Config
+	cfg := defaultConfig()
+
 	if c == nil {
 		c = config.New()
 	}
-	err := c.UnpackTo(&cfg)
+
+	err := c.UnpackTo(cfg)
 	if err != nil {
 		return nil, errors.New(err, "failed to unpack configuration")
 	}
-	return &contextProviderK8sSecrets{
-		logger:       logger,
-		config:       &cfg,
-		secretsCache: make(map[string]*secretsData),
+	return &contextProviderK8SSecrets{
+		logger:  logger,
+		config:  cfg,
+		client:  nil,
+		running: make(chan struct{}),
+		store:   newExpirationStore(cfg.TTLDelete),
 	}, nil
 }
 
-func (p *contextProviderK8sSecrets) Fetch(key string) (string, bool) {
-	if p.config.DisableCache {
-		valid := p.validateKey(key)
-		if valid {
-			return p.fetchSecretWithTimeout(key)
-		} else {
-			return "", false
-		}
-	} else {
-		return p.getFromCache(key)
-	}
-}
-
 // Run initializes the k8s secrets context provider.
-func (p *contextProviderK8sSecrets) Run(ctx context.Context, comm corecomp.ContextProviderComm) error {
+func (p *contextProviderK8SSecrets) Run(ctx context.Context, comm corecomp.ContextProviderComm) error {
 	client, err := getK8sClientFunc(p.config.KubeConfig, p.config.KubeClientOptions)
 	if err != nil {
-		p.logger.Debugf("kubernetes_secrets provider skipped, unable to connect: %s", err)
-		return nil
+		// signal that the provider has initialized
+		close(p.running)
+		p.logger.Debug("kubernetes_secrets provider skipped, unable to connect: ", err.Error())
+		return err
 	}
-	p.clientMx.Lock()
+	p.clientMtx.Lock()
 	p.client = client
-	p.clientMx.Unlock()
+	p.clientMtx.Unlock()
 
 	if !p.config.DisableCache {
-		go p.updateSecrets(ctx, comm)
+		go p.refreshCache(ctx, comm)
 	}
 
+	// signal that the provider has initialized
+	close(p.running)
 	<-comm.Done()
 
-	p.clientMx.Lock()
+	p.clientMtx.Lock()
 	p.client = nil
-	p.clientMx.Unlock()
+	p.clientMtx.Unlock()
+
 	return comm.Err()
 }
 
-func getK8sClient(kubeconfig string, opt kubernetes.KubeClientOptions) (k8sclient.Interface, error) {
-	return kubernetes.GetKubernetesClient(kubeconfig, opt)
+// Fetch returns the secret value for the given key
+func (p *contextProviderK8SSecrets) Fetch(key string) (string, bool) {
+	// Make sure the key has the expected format "kubernetes_secrets.somenamespace.somesecret.value"
+	tokens := strings.Split(key, ".")
+	if len(tokens) > 0 && tokens[0] != "kubernetes_secrets" {
+		return "", false
+	}
+	if len(tokens) != 4 {
+		p.logger.Warn("Invalid secret key format: ", key, ". Secrets should be of the format kubernetes_secrets.namespace.secret_name.value")
+		return "", false
+	}
+
+	ctx := context.Background()
+
+	secretNamespace := tokens[1]
+	secretName := tokens[2]
+	secretKey := tokens[3]
+
+	// Wait for the provider to be initialized
+	<-p.running
+
+	if p.config.DisableCache {
+		// cache disabled - fetch secret from the API
+		return p.fetchFromAPI(ctx, secretName, secretNamespace, secretKey)
+	}
+
+	// cache enabled
+	sd, exists := p.store.Get(key, true)
+	if exists {
+		// cache hit
+		return sd.value, sd.apiExists
+	}
+
+	// cache miss - fetch secret from the API
+	apiSecretValue, apiExists := p.fetchFromAPI(ctx, secretName, secretNamespace, secretKey)
+	now := time.Now()
+	sd = secret{
+		name:         secretName,
+		namespace:    secretNamespace,
+		key:          secretKey,
+		value:        apiSecretValue,
+		apiExists:    apiExists,
+		apiFetchTime: now,
+	}
+	p.store.AddConditionally(key, sd, true, func(existing secret, exists bool) bool {
+		if !exists {
+			// no existing secret in the cache thus add it
+			return true
+		}
+		if existing.value != apiSecretValue && !existing.apiFetchTime.After(now) {
+			// there is an existing secret in the cache but its value has changed since the last time
+			// it was fetched from the API thus update it
+			return true
+		}
+		// there is an existing secret in the cache, and it points already to the latest value
+		// thus do not update it and derive the value and apiExists from the existing secret
+		apiSecretValue = existing.value
+		apiExists = existing.apiExists
+		return false
+	})
+	return apiSecretValue, apiExists
 }
 
-// Update the secrets in the cache every RefreshInterval
-func (p *contextProviderK8sSecrets) updateSecrets(ctx context.Context, comm corecomp.ContextProviderComm) {
+// refreshCache refreshes the secrets in the cache every p.config.RefreshInterval
+func (p *contextProviderK8SSecrets) refreshCache(ctx context.Context, comm corecomp.ContextProviderComm) {
 	timer := time.NewTimer(p.config.RefreshInterval)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-timer.C:
-			updatedCache := p.updateCache()
-			if updatedCache {
+			hasUpdate := p.updateSecrets(ctx)
+			if hasUpdate {
 				p.logger.Info("Secrets cache was updated, the agent will be notified.")
 				comm.Signal()
 			}
@@ -119,197 +206,79 @@ func (p *contextProviderK8sSecrets) updateSecrets(ctx context.Context, comm core
 	}
 }
 
-// mergeWithCurrent merges the updated map with the cache map.
-// This function needs to be called between the mutex lock for the map.
-func (p *contextProviderK8sSecrets) mergeWithCurrent(updatedMap map[string]*secretsData) (map[string]*secretsData, bool) {
-	merged := make(map[string]*secretsData)
-	updatedCache := false
+// updateSecrets causes all the non-expired secrets to be re-fetched from the API server and returns true if
+// any of the secrets an updated value or has expired
+func (p *contextProviderK8SSecrets) updateSecrets(ctx context.Context) bool {
+	// Keep track whether the cache had updates
+	hasUpdates := false
 
-	for name, data := range p.secretsCache {
-		diff := time.Since(data.lastAccess)
-		if diff < p.config.TTLDelete {
-			merged[name] = data
-			// Check if this key is part of the updatedMap. If it is not, we know the secrets cache was updated,
-			// and we need to signal that.
-			_, ok := updatedMap[name]
-			if !ok {
-				updatedCache = true
+	secretKeys := p.store.ListKeys()
+	for _, key := range secretKeys {
+		sd, exists := p.store.Get(key, false)
+		if !exists {
+			// this item has expired thus mark that the cache has updates and continue
+			hasUpdates = true
+			continue
+		}
+
+		apiSecretValue, apiExists := p.fetchFromAPI(ctx, sd.name, sd.namespace, sd.key)
+		now := time.Now()
+		sd = secret{
+			name:         sd.name,
+			namespace:    sd.namespace,
+			key:          sd.key,
+			value:        apiSecretValue,
+			apiExists:    apiExists,
+			apiFetchTime: now,
+		}
+
+		p.store.AddConditionally(key, sd, false, func(existing secret, exists bool) bool {
+			if !exists {
+				// no existing secret which means it has been removed until we fetched it
+				// from the API. In this case we do not want to update the cache, but we
+				// mark that the cache has updates
+				hasUpdates = true
+				return false
 			}
-		}
-	}
-
-	for name, data := range updatedMap {
-		// We need to check if the key is already in the new map. If it is, lastAccess cannot be overwritten since
-		// it could have been updated when trying to fetch the secret at the same time we are running update cache.
-		// In that case, we only update the value.
-		if _, ok := merged[name]; ok {
-			if merged[name].value != data.value {
-				merged[name].value = data.value
-				updatedCache = true
+			if existing.value != apiSecretValue && !existing.apiFetchTime.After(now) {
+				// the secret value has changed and the above fetchFromAPI is more recent thus
+				// add it and mark that the cache has updates
+				hasUpdates = true
+				return true
 			}
-		}
+			// the secret value has not changed
+			return false
+		})
 	}
 
-	return merged, updatedCache
+	return hasUpdates
 }
 
-func (p *contextProviderK8sSecrets) updateCache() bool {
-	// Keep track whether the cache had values changing, so we can notify the agent
-	updatedCache := false
-
-	// deleting entries does not free the memory, so we need to create a new map
-	// to place the secrets we want to keep
-	cacheTmp := make(map[string]*secretsData)
-
-	// to not hold the lock for long, we copy the current state of the cache map
-	copyMap := make(map[string]secretsData)
-	p.secretsCacheMx.RLock()
-	for name, data := range p.secretsCache {
-		copyMap[name] = *data
-	}
-	p.secretsCacheMx.RUnlock()
-
-	// The only way to update an entry in the cache is through the last access time (to delete the key)
-	// or if the value gets updated.
-	for name, data := range copyMap {
-		diff := time.Since(data.lastAccess)
-		if diff < p.config.TTLDelete {
-			value, ok := p.fetchSecretWithTimeout(name)
-			if ok {
-				newData := &secretsData{
-					value:      value,
-					lastAccess: data.lastAccess,
-				}
-				cacheTmp[name] = newData
-				if value != data.value {
-					updatedCache = true
-				}
-			}
-		} else {
-			updatedCache = true
-		}
-	}
-
-	// While the cache was updated, it is possible that some secret was added through another go routine.
-	// We need to merge the updated map with the current cache map to catch the new entries and avoid
-	// loss of data.
-	var updated bool
-	p.secretsCacheMx.Lock()
-	p.secretsCache, updated = p.mergeWithCurrent(cacheTmp)
-	p.secretsCacheMx.Unlock()
-
-	return updatedCache || updated
-}
-
-func (p *contextProviderK8sSecrets) getFromCache(key string) (string, bool) {
-	p.secretsCacheMx.RLock()
-	_, ok := p.secretsCache[key]
-	p.secretsCacheMx.RUnlock()
-
-	// if value is still not present in cache, it is possible we haven't tried to fetch it yet
-	if !ok {
-		value, ok := p.addToCache(key)
-		// if it was not possible to fetch the secret, return
-		if !ok {
-			return value, ok
-		}
-	}
-
-	p.secretsCacheMx.Lock()
-	data, ok := p.secretsCache[key]
-	data.lastAccess = time.Now()
-	pass := data.value
-	p.secretsCacheMx.Unlock()
-
-	return pass, ok
-}
-
-func (p *contextProviderK8sSecrets) validateKey(key string) bool {
-	// Make sure the key has the expected format "kubernetes_secrets.somenamespace.somesecret.value"
-	tokens := strings.Split(key, ".")
-	if len(tokens) > 0 && tokens[0] != "kubernetes_secrets" {
-		return false
-	}
-	if len(tokens) != 4 {
-		p.logger.Debugf(
-			"not valid secret key: %v. Secrets should be of the following format %v",
-			key,
-			"kubernetes_secrets.somenamespace.somesecret.value",
-		)
-		return false
-	}
-	return true
-}
-
-func (p *contextProviderK8sSecrets) addToCache(key string) (string, bool) {
-	valid := p.validateKey(key)
-	if !valid {
-		return "", false
-	}
-
-	value, ok := p.fetchSecretWithTimeout(key)
-	if ok {
-		p.secretsCacheMx.Lock()
-		p.secretsCache[key] = &secretsData{value: value}
-		p.secretsCacheMx.Unlock()
-	}
-	return value, ok
-}
-
-type Result struct {
-	value string
-	ok    bool
-}
-
-func (p *contextProviderK8sSecrets) fetchSecretWithTimeout(key string) (string, bool) {
-	ctxTimeout, cancel := context.WithTimeout(context.Background(), p.config.RequestTimeout)
+// fetchFromAPI fetches the secret value from the API
+func (p *contextProviderK8SSecrets) fetchFromAPI(ctx context.Context, secretName string, secretNamespace string, secretKey string) (string, bool) {
+	ctx, cancel := context.WithTimeout(ctx, p.config.RequestTimeout)
 	defer cancel()
 
-	resultCh := make(chan Result, 1)
-	p.fetchSecret(ctxTimeout, key, resultCh)
-
-	select {
-	case <-ctxTimeout.Done():
-		p.logger.Errorf("Could not retrieve value for key %v: %v", key, ctxTimeout.Err())
+	p.clientMtx.RLock()
+	if p.client == nil {
+		// k8s client is nil most probably due to an error at p.Run
+		p.clientMtx.RUnlock()
 		return "", false
-	case result := <-resultCh:
-		return result.value, result.ok
 	}
-}
+	c := p.client
+	p.clientMtx.RUnlock()
 
-func (p *contextProviderK8sSecrets) fetchSecret(context context.Context, key string, resultCh chan Result) {
-	p.clientMx.Lock()
-	client := p.client
-	p.clientMx.Unlock()
-	if client == nil {
-		resultCh <- Result{value: "", ok: false}
-		return
-	}
-
-	tokens := strings.Split(key, ".")
-	// key has the format "kubernetes_secrets.somenamespace.somesecret.value"
-	// This function is only called from:
-	// - addToCache, where we already validated that the key has the right format.
-	// - updateCache, where the results are only added to the cache through addToCache
-	// Because of this we no longer need to validate the key
-	ns := tokens[1]
-	secretName := tokens[2]
-	secretVar := tokens[3]
-
-	secretInterface := client.CoreV1().Secrets(ns)
-	secret, err := secretInterface.Get(context, secretName, metav1.GetOptions{})
-
+	si := c.CoreV1().Secrets(secretNamespace)
+	secret, err := si.Get(ctx, secretName, metav1.GetOptions{})
 	if err != nil {
-		p.logger.Errorf("Could not retrieve secret from k8s API: %v", err)
-		resultCh <- Result{value: "", ok: false}
-		return
-	}
-	if _, ok := secret.Data[secretVar]; !ok {
-		p.logger.Errorf("Could not retrieve value %v for secret %v", secretVar, secretName)
-		resultCh <- Result{value: "", ok: false}
-		return
+		p.logger.Warn("Could not retrieve secret ", secretName, " at namespace ", secretNamespace, ": ", err.Error())
+		return "", false
 	}
 
-	secretString := secret.Data[secretVar]
-	resultCh <- Result{value: string(secretString), ok: true}
+	if _, ok := secret.Data[secretKey]; !ok {
+		p.logger.Warn("Could not retrieve value of key ", secretKey, " for secret ", secretName, " at namespace ", secretNamespace)
+		return "", false
+	}
+
+	return string(secret.Data[secretKey]), true
 }
