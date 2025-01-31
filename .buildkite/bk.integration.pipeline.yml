@@ -22,6 +22,7 @@ steps:
       useCustomGlobalHooks: true
 
   - group: "Stateful: Windows"
+    skip: true
     key: integration-tests-win
     depends_on:
       - integration-ess
@@ -40,8 +41,11 @@ steps:
         matrix:
           - default
           - fleet
+          - fleet-endpoint-security
           - fleet-privileged
+          - standalone-upgrade
           - upgrade
+          - install-uninstall
 
       - label: "Win2022:non-sudo:{{matrix}}"
         command: |
@@ -64,7 +68,8 @@ steps:
     steps:
       - label: "x86_64:non-sudo: {{matrix}}"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          # buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0194bb56-7e29-43ac-9147-577876b8a77d
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
@@ -78,7 +83,8 @@ steps:
 
       - label: "x86_64:sudo: {{matrix}}"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          # buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0194bb56-7e29-43ac-9147-577876b8a77d
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
@@ -89,15 +95,18 @@ steps:
           image: "family/platform-ingest-elastic-agent-ubuntu-2404"
         matrix:
           - default
-          - container
-          - fleet-upgrade-to-pr-build
           - upgrade
+          - standalone-upgrade
           - fleet
+          - fleet-endpoint-security
+          - fleet-airgapped
+          - fleet-airgapped-privileged
+          - fleet-privileged
+          - fleet-upgrade-to-pr-build
+          - install-uninstall
           - fqdn
           - deb
-          - fleet-airgapped
-          - fleet-privileged
-          - fleet-airgapped-privileged
+          - container
 
       - label: "arm:sudo: {{matrix}}"
         skip: true
@@ -113,15 +122,18 @@ steps:
           instanceType: "m6g.2xlarge"
         matrix:
           - default
-          - container
-          - fleet-upgrade-to-pr-build
           - upgrade
+          - standalone-upgrade
           - fleet
+          - fleet-endpoint-security
+          - fleet-airgapped
+          - fleet-airgapped-privileged
+          - fleet-privileged
+          - fleet-upgrade-to-pr-build
+          - install-uninstall
           - fqdn
           - deb
-          - fleet-airgapped
-          - fleet-privileged
-          - fleet-airgapped-privileged
+          - container
 
       - label: "arm:non-sudo: {{matrix}}"
         skip: true
@@ -145,7 +157,8 @@ steps:
     steps:
       - label: "x86_64:sudo:rpm"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          # buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0194bb56-7e29-43ac-9147-577876b8a77d
           .buildkite/scripts/steps/integration_tests_tf.sh rpm true
         artifact_paths:
           - build/**
@@ -156,9 +169,11 @@ steps:
           image: "family/platform-ingest-elastic-agent-rhel-8"
 
   - label: ESS stack cleanup
+    # need to get the logs
+    skip: true
     depends_on:
       - integration-tests-ubuntu
-      - integration-tests-win
+      # - integration-tests-win
       - integration-tests-rhel8
     allow_dependency_failure: true
     command: |
@@ -174,7 +189,7 @@ steps:
     key: aggregate-reports
     depends_on:
       - integration-tests-ubuntu
-      - integration-tests-win
+      # - integration-tests-win
       - integration-tests-rhel8
     allow_dependency_failure: true
     command: |

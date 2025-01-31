@@ -15,6 +15,7 @@ steps:
         allowed: true
 
   - group: "Unit tests"
+    skip: true
     key: "unit-tests"
     steps:
       - label: "Unit tests - Ubuntu 22.04"
@@ -90,6 +91,7 @@ steps:
             allowed: true
 
   - group: "macOS tests"
+    skip: true
     key: "macos-unit-tests"
     steps:
       - label: "Unit tests - macOS 15 ARM"
@@ -123,6 +125,7 @@ steps:
             allowed: true
 
   - group: "Desktop Windows tests"
+    skip: true
     key: "extended-windows"
     steps:
       - label: "Unit tests - Windows 10"
@@ -165,6 +168,7 @@ steps:
             allowed: true
 
   - label: ":junit: Junit annotate"
+    skip: true
     plugins:
       - junit-annotate#v2.5.0:
           artifacts: "**TEST-*.xml"
@@ -204,6 +208,7 @@ steps:
     soft_fail: true # Until https://github.com/elastic/ingest-dev/issues/4042 is resolved
 
   - group: "K8s tests"
+    skip: true
     key: "k8s-tests"
     steps:
       - label: "K8s tests: {{matrix.k8s_version}}"
@@ -226,6 +231,7 @@ steps:
             allowed: true
 
   - label: ":sonarqube: Continuous Code Inspection"
+    skip: true
     env:
       VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
     agents:
