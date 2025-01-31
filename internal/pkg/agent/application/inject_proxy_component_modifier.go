@@ -79,7 +79,7 @@ func injectProxyURL(m map[string]interface{}, hosts []string) {
 
 	// Check if a proxy is defined for the hosts
 	for _, host := range hosts {
-		// nolint:noctx // this request will not be executed
+		//nolint:noctx // this request will not be executed
 		request, err := http.NewRequest("GET", host, nil)
 		if err != nil {
 			continue
