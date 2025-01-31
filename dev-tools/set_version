@@ -23,18 +23,10 @@ def get_rootfolder():
     # Libbeat detected
     return os.path.dirname(script_directory)
 
-def replace_in_file(filename, varname, version):
-    new_lines = []
-    with open(filename, 'r') as f:
-        for line in f:
-            if line.startswith("const " + varname):
-                new_lines.append('const {} = "{}"\n'.format(varname, version))
-            else:
-                new_lines.append(line)
-
+def replace_in_file(filename, version):    
     with open(filename, 'w') as f:
-        for line in new_lines:
-            f.write(line)
+        f.write(version)
+            
     print ("Set version {} in file {}".format(version, filename))
 
 def main():
@@ -43,18 +35,10 @@ def main():
     parser.add_argument("version",
                         help="The new version")
     args = parser.parse_args()
-    version = args.version
-
-    is_libbeat = vendored_elastic_agent not in os.path.realpath(__file__)
-    if is_libbeat:
-        goversion_filepath  = os.path.join(get_rootfolder(), "version", "version.go")
-        go_var = goversion_var_elastic_agent
-    else:
-        goversion_filepath  = os.path.join(get_rootfolder(), "version.go")
-        go_var = goversion_var
-
-    # Create version.go and version.yml files
-    replace_in_file(goversion_filepath, go_var, version)
+    version = args.version    
+    goversion_filepath  = os.path.join(get_rootfolder(), "version", ".agent-version")
+    # Update version/.agent-version file
+    replace_in_file(goversion_filepath, version)
 
 if __name__ == "__main__":
     main()

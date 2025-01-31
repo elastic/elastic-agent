@@ -11,8 +11,7 @@ terraform {
 provider "ec" {}
 
 locals {
-  match            = regex("const defaultBeatVersion = \"(.*)\"", file("${path.module}/../../../version/version.go"))[0]
-  stack_version    = format("%s-SNAPSHOT", local.match) 
+  stack_version = format("%s-SNAPSHOT", file("${path.module}/../../../version/.agent-version"))
 }
 
 module "ec_deployment" {
