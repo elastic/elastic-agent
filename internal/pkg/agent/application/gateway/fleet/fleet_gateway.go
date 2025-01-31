@@ -74,7 +74,6 @@ type FleetGateway struct {
 	log                *logger.Logger
 	client             client.Sender
 	scheduler          scheduler.Scheduler
-	isLongSched        bool
 	settings           *fleetGatewaySettings
 	agentInfo          agentInfo
 	acker              acker.Acker
@@ -127,7 +126,6 @@ func newFleetGatewayWithScheduler(
 		acker:        acker,
 		stateFetcher: stateFetcher,
 		stateStore:   stateStore,
-		isLongSched:  false,
 		errCh:        make(chan error),
 		actionCh:     make(chan []fleetapi.Action, 1),
 	}, nil
@@ -135,27 +133,6 @@ func newFleetGatewayWithScheduler(
 
 func (f *FleetGateway) Actions() <-chan []fleetapi.Action {
 	return f.actionCh
-}
-
-// Replaces scheduler depending on whether the fleetgateway needs to wait longer
-// or shorter between checkins. Regular Periodic scheduler is used for long wait
-// times as the jitter is not significant compared to the wait time, and
-// PeriodicJitter is used otherwise
-func (f *FleetGateway) tryReplaceScheduler() {
-	switch f.scheduler.(type) {
-	case *scheduler.Periodic:
-		if !f.isLongSched {
-			// If the current scheduler is Periodic and the wait time needs to be
-			// short, switch to using PeriodicJitter with short duration
-			f.scheduler = scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
-		}
-	case *scheduler.PeriodicJitter:
-		if f.isLongSched {
-			// If the current scheduler is PeriodicJitter and the wait time needs to
-			// be long, switch to using Periodic with long duration
-			f.scheduler = scheduler.NewPeriodic(defaultGatewaySettings.ErrDuration)
-		}
-	}
 }
 
 func (f *FleetGateway) Run(ctx context.Context) error {
@@ -181,8 +158,6 @@ func (f *FleetGateway) Run(ctx context.Context) error {
 			if err != nil {
 				continue
 			}
-
-			f.tryReplaceScheduler()
 
 			actions := make([]fleetapi.Action, len(resp.Actions))
 			copy(actions, resp.Actions)
@@ -385,16 +360,17 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	if isUnauth(err) {
 		f.unauthCounter++
 		if f.shouldUseLongSched() {
-			// If we exceed the unauth response
-			f.isLongSched = true
 			f.log.Warnf("retrieved an invalid api key error '%d' times. will use long scheduler", f.unauthCounter)
+			f.scheduler = scheduler.NewPeriodic(defaultGatewaySettings.ErrDuration)
 			return &fleetapi.CheckinResponse{}, took, nil
 		}
 
 		return nil, took, err
 	}
 
-	f.isLongSched = false
+	if _, ok := f.scheduler.(*scheduler.PeriodicJitter); !ok {
+		f.scheduler = scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
+	}
 
 	f.unauthCounter = 0
 	if err != nil {

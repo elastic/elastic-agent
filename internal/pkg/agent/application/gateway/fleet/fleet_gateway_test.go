@@ -566,54 +566,6 @@ func TestAgentStateToString(t *testing.T) {
 	}
 }
 
-func TestTryReplaceScheduler(t *testing.T) {
-	t.Run("switch from long to short wait duration when isLongSched flag is false and the current scheduler is a long-wait scheduler", func(t *testing.T) {
-		gateway := &FleetGateway{
-			scheduler:   scheduler.NewPeriodic(defaultGatewaySettings.ErrDuration),
-			isLongSched: false,
-		}
-
-		gateway.tryReplaceScheduler()
-
-		_, ok := gateway.scheduler.(*scheduler.PeriodicJitter)
-		require.True(t, ok)
-	})
-
-	t.Run("switch from short to long wait duration when isLongSched flag is true and the current scheduler is a short-wait scheduler", func(t *testing.T) {
-		gateway := &FleetGateway{
-			scheduler:   scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter),
-			isLongSched: true,
-		}
-
-		gateway.tryReplaceScheduler()
-
-		_, ok := gateway.scheduler.(*scheduler.Periodic)
-		require.True(t, ok)
-	})
-
-	t.Run("no change needed when scheduler type matches what's required", func(t *testing.T) {
-		initialScheduler := scheduler.NewPeriodic(defaultGatewaySettings.Duration)
-		gateway := &FleetGateway{
-			scheduler:   initialScheduler,
-			isLongSched: true,
-		}
-
-		gateway.tryReplaceScheduler()
-
-		assert.Same(t, initialScheduler, gateway.scheduler)
-
-		initialScheduler2 := scheduler.NewPeriodic(defaultGatewaySettings.Duration)
-		gateway2 := &FleetGateway{
-			scheduler:   initialScheduler2,
-			isLongSched: true,
-		}
-
-		gateway2.tryReplaceScheduler()
-
-		assert.Same(t, initialScheduler2, gateway2.scheduler)
-	})
-}
-
 func TestFleetGatewaySchedulerSwitch(t *testing.T) {
 	agentInfo := &testAgentInfo{}
 	settings := &fleetGatewaySettings{
@@ -651,7 +603,6 @@ func TestFleetGatewaySchedulerSwitch(t *testing.T) {
 
 		_, ok = g.scheduler.(*scheduler.Periodic)
 		require.True(t, ok)
-		require.True(t, g.isLongSched)
 	}))
 
 	t.Run("should switch back to short-wait scheduler if the a successful response is received", withGateway(agentInfo, settings, func(
@@ -683,6 +634,5 @@ func TestFleetGatewaySchedulerSwitch(t *testing.T) {
 
 		_, ok = g.scheduler.(*scheduler.PeriodicJitter)
 		require.True(t, ok)
-		require.False(t, g.isLongSched)
 	}))
 }
