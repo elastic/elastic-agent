@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	aTesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -1103,6 +1104,9 @@ service:
 }
 
 func TestHybridAgentE2E(t *testing.T) {
+	// This test is a hybrid agent test that ingests a single log with
+	// filebeat and fbreceiver. It then compares the final documents in
+	// Elasticsearch to ensure they have no meaningful differences.
 	info := define.Require(t, define.Requirements{
 		Group: Default,
 		Local: true,
@@ -1142,8 +1146,7 @@ func TestHybridAgentE2E(t *testing.T) {
 		}
 	})
 
-	// Create the otel configuration file
-	type otelConfigOptions struct {
+	type configOptions struct {
 		InputPath       string
 		HomeDir         string
 		ESEndpoint      string
@@ -1223,7 +1226,7 @@ service:
 	var configBuffer bytes.Buffer
 	require.NoError(t,
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
-			otelConfigOptions{
+			configOptions{
 				InputPath:       inputFilePath,
 				HomeDir:         tmpDir,
 				ESEndpoint:      esEndpoint,
@@ -1237,8 +1240,6 @@ service:
 			t.Logf("Contents of agent config file:\n%s\n", string(configContents))
 		}
 	})
-	// TODO(mauri870): for debugging, remove this line
-	require.NoError(t, os.WriteFile("/tmp/agent.yml", configContents, 0o600))
 
 	// Now we can actually create the fixture and run it
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -1246,31 +1247,32 @@ service:
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
 	defer cancel()
+
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
+	err = fixture.Configure(ctx, configContents)
+	require.NoError(t, err)
 
-	var fixtureWg sync.WaitGroup
-	fixtureWg.Add(1)
-	go func() {
-		defer fixtureWg.Done()
-		err = fixture.Run(ctx, aTesting.State{
-			Configure: string(configContents),
-			Reached: func(state *client.AgentState) bool {
-				// keep running (context cancel will stop it)
-				return false
-			},
-		})
-	}()
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err)
+	cmd.WaitDelay = 1 * time.Second
 
-	// // TODO(mauri870): uncomment this when the PR is ready
-	// require.Eventually(t, func() bool {
-	// 	err = fixture.IsHealthy(ctx)
-	// 	if err != nil {
-	// 		t.Logf("waiting for agent healthy: %s", err.Error())
-	// 		return false
-	// 	}
-	// 	return true
-	// }, 10*time.Minute, 1*time.Second)
+	var output strings.Builder
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	err = cmd.Start()
+	require.NoError(t, err)
+	cmd.WaitDelay = 1 * time.Second
+
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 1*time.Minute, 1*time.Second)
 
 	var fbDocs, fbReceiverDocs estools.Documents
 	actualHits := &struct {
@@ -1300,10 +1302,55 @@ service:
 		1*time.Minute, 1*time.Second,
 		"Expected %d logs in elasticsearch, got: %v", numEvents, actualHits)
 
-	// TODO(mauri870): will likely have to ignore some fields from the doc.
-	require.Equal(t, "", cmp.Diff(fbDocs.Hits.Hits, fbReceiverDocs.Hits.Hits), "filebeat and fbreceiver docs are not equal")
+	fbDoc := fbDocs.Hits.Hits[0].Source
+	fbReceiverDoc := fbReceiverDocs.Hits.Hits[0].Source
+	ignoredFields := []string{
+		// Expected to change between filebeat and fbreceiver
+		"@timestamp",
+		"agent.ephemeral_id",
+		"agent.id",
+
+		// Missing from fbreceiver doc
+		"data_stream.dataset",
+		"data_stream.namespace",
+		"data_stream.type",
+		"elastic_agent.id",
+		"elastic_agent.snapshot",
+		"elastic_agent.version",
+		"event.dataset",
+		"host.architecture",
+		"host.containerized",
+		"host.hostname",
+		"host.id",
+		"host.ip",
+		"host.mac",
+		"host.os.build",
+		"host.os.family",
+		"host.os.kernel",
+		"host.os.name",
+		"host.os.platform",
+		"host.os.type",
+		"host.os.version",
+
+		// fbreceiver adds metadata fields that are internal in filebeat
+		"@metadata.beat",
+		"@metadata.type",
+		"@metadata.version",
+	}
+
+	require.Equal(t, "", diffMapstrM(fbDoc, fbReceiverDoc, ignoredFields), "filebeat and fbreceiver docs are not equal")
 
 	cancel()
-	fixtureWg.Wait()
-	require.True(t, err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded), "Retrieved unexpected error: %s", err.Error())
+	err = cmd.Wait()
+	require.True(t, err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || strings.Contains(err.Error(), "signal: killed"), "Retrieved unexpected error: %s", err.Error())
+}
+
+func diffMapstrM(m1, m2 mapstr.M, ignoredFields []string) string {
+	flatM1 := m1.Flatten()
+	flatM2 := m2.Flatten()
+	for _, f := range ignoredFields {
+		flatM1.Delete(f)
+		flatM2.Delete(f)
+	}
+	return cmp.Diff(flatM1, flatM2)
 }
