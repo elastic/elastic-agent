@@ -4,8 +4,8 @@ inputs:
       type: filestream
       use_output: default
       streams:
-        - condition: ${kubernetes.hints.sentinel_one.container_logs.enabled} == true
-          id: filestream-sentinel_one-logs-${kubernetes.hints.container_id}
+        - id: sentinel_one-container-logs-${kubernetes.hints.container_id}
+          condition: ${kubernetes.hints.sentinel_one.container_logs.enabled} == true
           data_stream:
             dataset: sentinel_one.container_logs
             type: logs

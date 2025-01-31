@@ -9,8 +9,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 
 	"github.com/elastic/go-ucfg/yaml"
+
+	yamlv3 "gopkg.in/yaml.v3"
 )
 
 const (
@@ -62,6 +66,35 @@ func SkipBinaryCheck() LoadRuntimeOption {
 	return func(o *loadRuntimeOpts) {
 		o.skipBinaryCheck = true
 	}
+}
+
+// ParseComponentFiles parses spec files and returns list of associated paths with component.
+// Default set consisting of binary, spec file and default config file is always present
+func ParseComponentFiles(content []byte, filename string, includeDefaults bool) ([]string, error) {
+	def := struct {
+		Files []string `yaml:"component_files"`
+	}{}
+
+	if err := yamlv3.Unmarshal(content, &def); err != nil {
+		return nil, err
+	}
+
+	var files []string
+	files = append(files, def.Files...)
+
+	if includeDefaults {
+		component := strings.TrimSuffix(filepath.Base(filename), ".spec.yml")
+		binaryName := component
+		if runtime.GOOS == "windows" {
+			binaryName += ".exe"
+		}
+		files = append(files,
+			binaryName,
+			fmt.Sprintf("%s.spec.yml", component),
+			fmt.Sprintf("%s.yml", component))
+	}
+
+	return files, nil
 }
 
 // LoadRuntimeSpecs loads all the component input specifications from the provided directory.

@@ -5,7 +5,6 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.mysql.error.enabled} == true or ${kubernetes.hints.mysql.enabled} == true
-          id: filestream-mysql-error-${kubernetes.hints.container_id}
           data_stream:
             dataset: mysql.error
             type: logs
@@ -13,6 +12,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-mysql-mysql-error-${kubernetes.hints.container_id}
           multiline:
             match: after
             negate: true
@@ -31,7 +31,6 @@ inputs:
                     enabled: true
                 symlinks: true
         - condition: ${kubernetes.hints.mysql.slowlog.enabled} == true or ${kubernetes.hints.mysql.enabled} == true
-          id: filestream-mysql-slowlog-${kubernetes.hints.container_id}
           data_stream:
             dataset: mysql.slowlog
             type: logs
@@ -42,6 +41,7 @@ inputs:
             - ^# Time:.*
           file_identity:
             fingerprint: null
+          id: filestream-mysql-mysql-slowlog-${kubernetes.hints.container_id}
           multiline:
             match: after
             negate: true

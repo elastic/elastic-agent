@@ -21,10 +21,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/testing/estools"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
-	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 )
 
@@ -115,6 +115,7 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 				Policy:       policy.ID,
 				Port:         8220,
 			},
+			InstallServers: true,
 		}
 		out, err := fixture.Install(ctx, opts)
 		if err != nil {
@@ -160,6 +161,7 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 				Policy:       policy.ID,
 				Port:         8220,
 			},
+			InstallServers: true,
 		}
 		out, err := fixture.Install(ctx, opts)
 		if err != nil {

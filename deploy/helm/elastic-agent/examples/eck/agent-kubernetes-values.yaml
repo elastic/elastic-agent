@@ -1,5 +1,11 @@
 kubernetes:
   enabled: true
+  state:
+    agentAsSidecar:
+      enabled: false # deploying elastic-agent with ECK as sidecar container is not supported
+
+kube-state-metrics:
+  enabled: true
 
 agent:
   unprivileged: true

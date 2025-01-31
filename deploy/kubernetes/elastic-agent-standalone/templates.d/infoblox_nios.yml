@@ -5,7 +5,6 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.infoblox_nios.log.enabled} == true or ${kubernetes.hints.infoblox_nios.enabled} == true
-          id: filestream-infoblox_nios-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: infoblox_nios.log
             type: logs
@@ -17,6 +16,7 @@ inputs:
           fields_under_root: true
           file_identity:
             fingerprint: null
+          id: filestream-infoblox_nios-infoblox_nios-log-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
