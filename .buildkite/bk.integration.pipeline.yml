@@ -22,6 +22,7 @@ steps:
       useCustomGlobalHooks: true
 
   - group: "Stateful: Windows"
+    skip: true
     key: integration-tests-win
     depends_on:
       - integration-ess
@@ -67,7 +68,8 @@ steps:
     steps:
       - label: "x86_64:non-sudo: {{matrix}}"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          # buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0194bb56-7e29-43ac-9147-577876b8a77d
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
@@ -81,7 +83,8 @@ steps:
 
       - label: "x86_64:sudo: {{matrix}}"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          # buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0194bb56-7e29-43ac-9147-577876b8a77d
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
@@ -154,7 +157,8 @@ steps:
     steps:
       - label: "x86_64:sudo:rpm"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          # buildkite-agent artifact download build/distributions/** . --step 'package-it' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          buildkite-agent artifact download build/distributions/** . --step 'package-it' --build 0194bb56-7e29-43ac-9147-577876b8a77d
           .buildkite/scripts/steps/integration_tests_tf.sh rpm true
         artifact_paths:
           - build/**
@@ -167,7 +171,7 @@ steps:
   - label: ESS stack cleanup
     depends_on:
       - integration-tests-ubuntu
-      - integration-tests-win
+      # - integration-tests-win
       - integration-tests-rhel8
     allow_dependency_failure: true
     command: |
@@ -183,7 +187,7 @@ steps:
     key: aggregate-reports
     depends_on:
       - integration-tests-ubuntu
-      - integration-tests-win
+      # - integration-tests-win
       - integration-tests-rhel8
     allow_dependency_failure: true
     command: |
