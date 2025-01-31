@@ -1160,7 +1160,9 @@ func TestHybridAgentE2E(t *testing.T) {
 	require.NoError(t, err, "error creating API key")
 	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
 
-	configTemplate := `inputs:
+	configTemplate := `agent.logging.level: info
+agent.logging.to_stderr: true
+inputs:
   - id: filestream-filebeat
     type: filestream
     paths:
@@ -1263,7 +1265,13 @@ service:
 
 	err = cmd.Start()
 	require.NoError(t, err)
-	cmd.WaitDelay = 1 * time.Second
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
 
 	require.Eventually(t, func() bool {
 		err = fixture.IsHealthy(ctx)
