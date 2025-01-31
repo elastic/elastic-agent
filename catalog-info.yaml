@@ -37,7 +37,7 @@ spec:
       name: elastic-agent
       description: Buildkite pipeline for the Elastic Agent project
     spec:
-      branch_configuration: "main 7.* 8.* 9.* v7.* x8.* v9.*"
+      branch_configuration: "main 7.* 8.* 9.* v7.* v8.* v9.*"
       repository: elastic/elastic-agent
       pipeline_file: ".buildkite/pipeline.yml"
       provider_settings:
