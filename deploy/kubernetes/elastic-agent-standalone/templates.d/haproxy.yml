@@ -5,7 +5,6 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.haproxy.log.enabled} == true or ${kubernetes.hints.haproxy.enabled} == true
-          id: filestream-haproxy-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: haproxy.log
             type: logs
@@ -13,6 +12,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-haproxy-haproxy-log-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -27,23 +27,6 @@ inputs:
                     enabled: true
                 symlinks: true
           tags:
-            - haproxy-log
-      data_stream.namespace: default
-    - name: syslog-haproxy
-      id: syslog-haproxy-${kubernetes.hints.container_id}
-      type: syslog
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.haproxy.log.enabled} == true or ${kubernetes.hints.haproxy.enabled} == true
-          data_stream:
-            dataset: haproxy.log
-            type: logs
-          processors:
-            - add_locale: null
-          protocol.udp:
-            host: localhost:9001
-          tags:
-            - forwarded
             - haproxy-log
       data_stream.namespace: default
     - name: haproxy/metrics-haproxy
@@ -73,4 +56,21 @@ inputs:
           password: ${kubernetes.hints.haproxy.stat.password|kubernetes.hints.haproxy.password|'admin'}
           period: ${kubernetes.hints.haproxy.stat.period|kubernetes.hints.haproxy.period|'10s'}
           username: ${kubernetes.hints.haproxy.stat.username|kubernetes.hints.haproxy.username|'admin'}
+      data_stream.namespace: default
+    - name: syslog-haproxy
+      id: syslog-haproxy-${kubernetes.hints.container_id}
+      type: syslog
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.haproxy.log.enabled} == true or ${kubernetes.hints.haproxy.enabled} == true
+          data_stream:
+            dataset: haproxy.log
+            type: logs
+          processors:
+            - add_locale: null
+          protocol.udp:
+            host: localhost:9001
+          tags:
+            - forwarded
+            - haproxy-log
       data_stream.namespace: default

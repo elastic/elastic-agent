@@ -9,6 +9,7 @@ import (
 	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/agent"
 	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/docker"
 	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/env"
+	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/filesource"
 	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/host"
 	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/kubernetes"
 	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/kubernetesleaderelection"

@@ -5,7 +5,6 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.nginx.access.enabled} == true or ${kubernetes.hints.nginx.enabled} == true
-          id: filestream-nginx-access-${kubernetes.hints.container_id}
           data_stream:
             dataset: nginx.access
             type: logs
@@ -13,6 +12,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-nginx-nginx-access-${kubernetes.hints.container_id}
           ignore_older: 72h
           parsers:
             - container:
@@ -30,7 +30,6 @@ inputs:
           tags:
             - nginx-access
         - condition: ${kubernetes.hints.nginx.error.enabled} == true or ${kubernetes.hints.nginx.enabled} == true
-          id: filestream-nginx-error-${kubernetes.hints.container_id}
           data_stream:
             dataset: nginx.error
             type: logs
@@ -38,6 +37,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-nginx-nginx-error-${kubernetes.hints.container_id}
           ignore_older: 72h
           multiline:
             match: after

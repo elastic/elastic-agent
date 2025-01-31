@@ -5,7 +5,6 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.mattermost.audit.enabled} == true or ${kubernetes.hints.mattermost.enabled} == true
-          id: filestream-mattermost-audit-${kubernetes.hints.container_id}
           data_stream:
             dataset: mattermost.audit
             type: logs
@@ -13,6 +12,7 @@ inputs:
             - \.gz$
           file_identity:
             fingerprint: null
+          id: filestream-mattermost-mattermost-audit-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto

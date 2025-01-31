@@ -5,7 +5,6 @@ inputs:
       use_output: default
       streams:
         - condition: ${kubernetes.hints.snort.log.enabled} == true or ${kubernetes.hints.snort.enabled} == true
-          id: filestream-snort-log-${kubernetes.hints.container_id}
           data_stream:
             dataset: snort.log
             type: logs
@@ -13,6 +12,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-snort-snort-log-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
