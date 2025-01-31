@@ -74,7 +74,7 @@ steps:
       # we run each step in a different data center to spread the load
       TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-a"
     commands:
-      - buildkite-agent artifact download "build/distributions/**" . --build $BUILDKITE_BUILD_ID
+      - buildkite-agent artifact download "build/distributions/**" . $BUILDKITE_BUILD_ID
       - .buildkite/scripts/steps/integration_tests.sh serverless integration:single TestLogIngestionFleetManaged #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
     artifact_paths:
       - "build/TEST-**"
@@ -95,7 +95,7 @@ steps:
     env:
       TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-b"
     commands:
-      - buildkite-agent artifact download "build/distributions/**" . --build $BUILDKITE_BUILD_ID
+      - buildkite-agent artifact download "build/distributions/**" . $BUILDKITE_BUILD_ID
       - .buildkite/scripts/steps/integration_tests.sh stateful integration:TestForResourceLeaks
     artifact_paths:
       - "build/TEST-**"
@@ -127,7 +127,7 @@ steps:
     env:
       TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-a"
     commands:
-      - buildkite-agent artifact download "build/distributions/**" . --build $BUILDKITE_BUILD_ID
+      - buildkite-agent artifact download "build/distributions/**" . $BUILDKITE_BUILD_ID
       - .buildkite/scripts/steps/beats_tests.sh
     agents:
       provider: "gcp"
