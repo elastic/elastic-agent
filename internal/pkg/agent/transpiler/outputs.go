@@ -27,7 +27,7 @@ func RenderOutputs(outputs Node, varsArray []*Vars) (Node, error) {
 
 	d, ok := outputs.Value().(*Dict)
 	if !ok {
-		return nil, fmt.Errorf("outputs must be an dict")
+		return nil, fmt.Errorf("outputs must be an dict, got %T instead", outputs.Value())
 	}
 	nodes := d.Value().([]Node)
 	keys := make([]Node, len(nodes))

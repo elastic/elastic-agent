@@ -153,28 +153,32 @@ func replaceVars(value string, replacer func(variable string) (Node, Processors,
 				}
 			}
 			if !set && reqMatch {
-				var sb strings.Builder
-				sb.WriteString("${")
-				for i, val := range vars {
-					switch val.(type) {
-					case *constString:
-						sb.WriteString(`'`)
-						sb.WriteString(val.Value())
-						sb.WriteString(`'`)
-					case *varString:
-						sb.WriteString(val.Value())
-						if i < len(vars)-1 {
-							sb.WriteString("|")
-						}
-					}
-				}
-				sb.WriteString("}")
-				return NewStrVal(""), fmt.Errorf("%w: %s", ErrNoMatch, sb.String())
+				return NewStrVal(""), fmt.Errorf("%w: %s", ErrNoMatch, toRepresentation(vars))
 			}
 			lastIndex = r[1]
 		}
 	}
 	return NewStrValWithProcessors(result+value[lastIndex:], processors), nil
+}
+
+func toRepresentation(vars []varI) string {
+	var sb strings.Builder
+	sb.WriteString("${")
+	for i, val := range vars {
+		switch val.(type) {
+		case *constString:
+			sb.WriteString(`'`)
+			sb.WriteString(val.Value())
+			sb.WriteString(`'`)
+		case *varString:
+			sb.WriteString(val.Value())
+			if i < len(vars)-1 {
+				sb.WriteString("|")
+			}
+		}
+	}
+	sb.WriteString("}")
+	return sb.String()
 }
 
 // nodeToValue ensures that the node is an actual value.

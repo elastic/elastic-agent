@@ -225,6 +225,9 @@ func (c *controller) Run(ctx context.Context) error {
 			case <-ctx.Done():
 				return ctx.Err()
 			case observed := <-c.observedCh:
+				// observedResult holds the channel to send the latest observed results on
+				// if nothing is changed then nil will be sent over the channel if the set of running
+				// providers does change then the latest observed variables will be sent over the channel
 				observedResult = observed.result
 				changed := c.handleObserved(localCtx, &wg, fetchCh, stateChangedChan, observed.vars)
 				if changed {
@@ -233,6 +236,8 @@ func (c *controller) Run(ctx context.Context) error {
 					drainChan(stateChangedChan)
 					break DEBOUNCE
 				} else {
+					// nothing changed send nil to alert the caller
+					// observedResult must be set to nil here so on next loop it is not set
 					observedResult <- nil
 					observedResult = nil
 				}

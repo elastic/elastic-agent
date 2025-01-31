@@ -80,6 +80,7 @@ func TestVars_Replace(t *testing.T) {
 			false,
 		},
 		{
+			// data will be resolved to other.data
 			"${un-der_score.missing|un-der_score.missing2|data}",
 			NewStrVal("info"),
 			false,
