@@ -79,8 +79,15 @@ func injectProxyURL(m map[string]interface{}, hosts []string) {
 
 	// Check if a proxy is defined for the hosts
 	for _, host := range hosts {
-		proxyURL, _ := http.ProxyFromEnvironment(&http.Request{Host: host})
-		if proxyURL.String() != "" {
+		request, err := http.NewRequest("GET", host, nil)
+		if err != nil {
+			continue
+		}
+		proxyURL, err := http.ProxyFromEnvironment(request)
+		if err != nil {
+			continue
+		}
+		if proxyURL != nil && proxyURL.String() != "" {
 			m["proxy_url"] = proxyURL.String()
 			return
 		}
