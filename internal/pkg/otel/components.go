@@ -21,8 +21,10 @@ import (
 	k8sobjectsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver"
 	kafkareceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver"
 	kubeletstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver"
+	nginxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver"
 	prometheusreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver"
 	receivercreator "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator"
+	redisreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver"
 	zipkinreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver"
 	nopreceiver "go.opentelemetry.io/collector/receiver/nopreceiver"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
@@ -85,6 +87,8 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			k8sobjectsreceiver.NewFactory(),
 			prometheusreceiver.NewFactory(),
 			receivercreator.NewFactory(),
+			redisreceiver.NewFactory(),
+			nginxreceiver.NewFactory(),
 			jaegerreceiver.NewFactory(),
 			zipkinreceiver.NewFactory(),
 			fbreceiver.NewFactory(),
