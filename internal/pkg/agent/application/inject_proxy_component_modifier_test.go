@@ -43,7 +43,7 @@ func TestInjectProxyEndpointModifier(t *testing.T) {
 								Type: elasticsearch,
 								Source: func() *structpb.Struct {
 									var source structpb.Struct
-									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["https://localhost:9200"]}`))
+									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["https://example.output:9200"]}`))
 									require.NoError(t, err)
 									return &source
 								}(),
@@ -64,7 +64,7 @@ func TestInjectProxyEndpointModifier(t *testing.T) {
 								Type: elasticsearch,
 								Source: func() *structpb.Struct {
 									var source structpb.Struct
-									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["https://localhost:9200"]}`))
+									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["https://example.output:9200"]}`))
 									require.NoError(t, err)
 									return &source
 								}(),
@@ -88,7 +88,7 @@ func TestInjectProxyEndpointModifier(t *testing.T) {
 								Type: elasticsearch,
 								Source: func() *structpb.Struct {
 									var source structpb.Struct
-									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["https://localhost:9200"],"proxy_url":"https://proxy:8080"}`))
+									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["https://example.output:9200"],"proxy_url":"https://proxy:8080"}`))
 									require.NoError(t, err)
 									return &source
 								}(),
@@ -109,7 +109,7 @@ func TestInjectProxyEndpointModifier(t *testing.T) {
 								Type: elasticsearch,
 								Source: func() *structpb.Struct {
 									var source structpb.Struct
-									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["https://localhost:9200"],"proxy_url":"https://proxy:8080"}`))
+									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["https://example.output:9200"],"proxy_url":"https://proxy:8080"}`))
 									require.NoError(t, err)
 									return &source
 								}(),
@@ -133,7 +133,7 @@ func TestInjectProxyEndpointModifier(t *testing.T) {
 								Type: elasticsearch,
 								Source: func() *structpb.Struct {
 									var source structpb.Struct
-									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["https://localhost:9200"],"proxy_url":""}`))
+									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["https://example.output:9200"],"proxy_url":""}`))
 									require.NoError(t, err)
 									return &source
 								}(),
@@ -154,7 +154,7 @@ func TestInjectProxyEndpointModifier(t *testing.T) {
 								Type: elasticsearch,
 								Source: func() *structpb.Struct {
 									var source structpb.Struct
-									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["https://localhost:9200"],"proxy_url":""}`))
+									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["https://example.output:9200"],"proxy_url":""}`))
 									require.NoError(t, err)
 									return &source
 								}(),
@@ -178,7 +178,7 @@ func TestInjectProxyEndpointModifier(t *testing.T) {
 								Type: elasticsearch,
 								Source: func() *structpb.Struct {
 									var source structpb.Struct
-									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["https://localhost:9200"],"proxy_disable":true}`))
+									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["https://example.output:9200"],"proxy_disable":true}`))
 									require.NoError(t, err)
 									return &source
 								}(),
@@ -199,7 +199,7 @@ func TestInjectProxyEndpointModifier(t *testing.T) {
 								Type: elasticsearch,
 								Source: func() *structpb.Struct {
 									var source structpb.Struct
-									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["https://localhost:9200"],"proxy_disable":true}`))
+									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["https://example.output:9200"],"proxy_disable":true}`))
 									require.NoError(t, err)
 									return &source
 								}(),
@@ -223,7 +223,7 @@ func TestInjectProxyEndpointModifier(t *testing.T) {
 								Type: elasticsearch,
 								Source: func() *structpb.Struct {
 									var source structpb.Struct
-									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["https://localhost:9200"]}`))
+									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["https://example.output:9200"]}`))
 									require.NoError(t, err)
 									return &source
 								}(),
@@ -244,7 +244,7 @@ func TestInjectProxyEndpointModifier(t *testing.T) {
 								Type: elasticsearch,
 								Source: func() *structpb.Struct {
 									var source structpb.Struct
-									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["https://localhost:9200"],"proxy_url":"https://localhost:8080"}`))
+									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["https://example.output:9200"],"proxy_url":"https://localhost:8080"}`))
 									require.NoError(t, err)
 									return &source
 								}(),
@@ -268,7 +268,7 @@ func TestInjectProxyEndpointModifier(t *testing.T) {
 								Type: elasticsearch,
 								Source: func() *structpb.Struct {
 									var source structpb.Struct
-									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["http://localhost:9200"]}`))
+									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["http://example.output:9200"]}`))
 									require.NoError(t, err)
 									return &source
 								}(),
@@ -289,7 +289,7 @@ func TestInjectProxyEndpointModifier(t *testing.T) {
 								Type: elasticsearch,
 								Source: func() *structpb.Struct {
 									var source structpb.Struct
-									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["http://localhost:9200"],"proxy_url":"http://localhost:8081"}`))
+									err := source.UnmarshalJSON([]byte(`{"type":"elasticsearch","hosts":["http://example.output:9200"],"proxy_url":"http://localhost:8081"}`))
 									require.NoError(t, err)
 									return &source
 								}(),
@@ -347,8 +347,7 @@ func Test_injectProxyURL(t *testing.T) {
 		m:      map[string]interface{}{"key": "value"},
 		hosts:  []string{"https://example:443"},
 		expect: map[string]interface{}{"key": "value", "proxy_url": "https://localhost:8080"},
-	},
-	{
+	}, {
 		name:   "host skipped by NO_PROXY",
 		m:      map[string]interface{}{"key": "value"},
 		hosts:  []string{"https://do.not.inject.proxy.for.me", "https://do.not.inject.proxy.for.me:8080", "really.do.not.inject.proxy.for.me"},
