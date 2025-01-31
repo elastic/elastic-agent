@@ -59,6 +59,25 @@ func TestRenderInputs(t *testing.T) {
 				}),
 			},
 		},
+		"basic single var with default": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("key", NewStrVal("${name}")),
+				}),
+			})),
+			expected: NewList([]Node{
+				NewDict([]Node{
+					NewKey("key", NewStrVal("value1")),
+				}),
+			}),
+			varsArray: []*Vars{
+				mustMakeVarsWithDefault(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "value1",
+					},
+				}, "var1"),
+			},
+		},
 		"duplicate result is removed": {
 			input: NewKey("inputs", NewList([]Node{
 				NewDict([]Node{
@@ -785,7 +804,7 @@ func TestRenderInputs(t *testing.T) {
 }
 
 func mustMakeVarsP(id string, mapping map[string]interface{}, processorKey string, processors Processors) *Vars {
-	v, err := NewVarsWithProcessors(id, mapping, processorKey, processors, nil)
+	v, err := NewVarsWithProcessors(id, mapping, processorKey, processors, nil, "")
 	if err != nil {
 		panic(err)
 	}

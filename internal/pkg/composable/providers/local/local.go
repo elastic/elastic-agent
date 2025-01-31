@@ -29,7 +29,8 @@ func (c *contextProvider) Run(ctx context.Context, comm corecomp.ContextProvider
 	if err != nil {
 		return errors.New(err, "failed to set mapping", errors.TypeUnexpected)
 	}
-	return nil
+	<-ctx.Done()
+	return ctx.Err()
 }
 
 // ContextProviderBuilder builds the context provider.

@@ -1104,7 +1104,7 @@ inputs:
 	components = nil
 	vars, err := transpiler.NewVars("", map[string]interface{}{
 		"TEST_VAR": "input-id",
-	}, nil)
+	}, nil, "")
 	require.NoError(t, err, "Vars creation must succeed")
 	varsChan <- []*transpiler.Vars{vars}
 	coord.runLoopIteration(ctx)
@@ -1121,7 +1121,7 @@ inputs:
 	components = nil
 	vars, err = transpiler.NewVars("", map[string]interface{}{
 		"TEST_VAR": "changed-input-id",
-	}, nil)
+	}, nil, "")
 	require.NoError(t, err, "Vars creation must succeed")
 	varsChan <- []*transpiler.Vars{vars}
 	coord.runLoopIteration(ctx)
@@ -1239,7 +1239,7 @@ func TestCoordinatorInitiatesUpgrade(t *testing.T) {
 // (Coordinator will only regenerate its component model when it has non-nil
 // vars).
 func emptyVars(t *testing.T) []*transpiler.Vars {
-	vars, err := transpiler.NewVars("", map[string]interface{}{}, nil)
+	vars, err := transpiler.NewVars("", map[string]interface{}{}, nil, "")
 	require.NoError(t, err, "Vars creation must succeed")
 	return []*transpiler.Vars{vars}
 }

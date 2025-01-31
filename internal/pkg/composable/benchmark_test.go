@@ -76,6 +76,6 @@ func BenchmarkGenerateVars100Pods(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		c.generateVars(mapstr.M{})
+		c.generateVars(mapstr.M{}, "")
 	}
 }
