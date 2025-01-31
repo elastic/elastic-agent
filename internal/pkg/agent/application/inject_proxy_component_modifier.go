@@ -5,8 +5,7 @@
 package application
 
 import (
-	"os"
-	"strings"
+	"net/http"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -59,9 +58,8 @@ func InjectProxyEndpointModifier() coordinator.ComponentsModifier {
 
 // injectProxyURL will inject the a proxy_url into the passed map if there is no existing key and there is an appropriate proxy through defined as an env var.
 //
-// The 1st item of the passed hosts list is checked to see if it starts with https or http and the corresponding proxy var is used.
-// Nothing is injected if the *_PROXY env var is empty, the map contains proxy_url: "", or the map has proxy_disable: true.
-// If no hosts are passed, then the HTTPS_PROXY value is used over the HTTP_PROXY value if it's defined.
+// Go http client is used to determine the proxy URL, to ensure consistent behavior across all components.
+// Traffic through proxy is preferred if the proxy is defined for any of the hosts.
 func injectProxyURL(m map[string]interface{}, hosts []string) {
 	if m == nil {
 		return
@@ -79,28 +77,12 @@ func injectProxyURL(m map[string]interface{}, hosts []string) {
 		}
 	}
 
-	var proxyURL string
-	matched := false
-	// If hosts are specified, check the 1st to see if HTTPS or HTTP is used to determine proxy
-	if len(hosts) > 0 {
-		if strings.HasPrefix(hosts[0], "https://") {
-			matched = true
-			proxyURL = os.Getenv("HTTPS_PROXY")
-		} else if strings.HasPrefix(hosts[0], "http://") {
-			matched = true
-			proxyURL = os.Getenv("HTTP_PROXY")
+	// Check if a proxy is defined for the hosts
+	for _, host := range hosts {
+		proxyURL, _ := http.ProxyFromEnvironment(&http.Request{Host: host})
+		if proxyURL.String() != "" {
+			m["proxy_url"] = proxyURL.String()
+			return
 		}
 	}
-	// if no hosts are specified, or it could not match a host prefix prefer HTTPS_PROXY over HTTP_PROXY
-	if proxyURL == "" && !matched {
-		proxyURL = os.Getenv("HTTPS_PROXY")
-		if proxyURL == "" {
-			proxyURL = os.Getenv("HTTP_PROXY")
-		}
-	}
-	// No proxy defined
-	if proxyURL == "" {
-		return
-	}
-	m["proxy_url"] = proxyURL
 }
