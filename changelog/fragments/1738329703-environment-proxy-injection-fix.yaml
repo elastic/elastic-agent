@@ -16,8 +16,7 @@ summary: environment-proxy-injection-fix
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-description:
-When injecting environment proxy into Elastic Defend config the Agent should use http library to resolve the proxy settings to ensure consistency across all components.
+description: When injecting environment proxy into Elastic Defend config the Agent should use http library to resolve the proxy settings to ensure consistency across all components.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
