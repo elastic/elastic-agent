@@ -169,6 +169,8 @@ steps:
           image: "family/platform-ingest-elastic-agent-rhel-8"
 
   - label: ESS stack cleanup
+    # need to get the logs
+    skip: true
     depends_on:
       - integration-tests-ubuntu
       # - integration-tests-win
