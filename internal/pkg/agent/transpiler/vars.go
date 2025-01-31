@@ -15,6 +15,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/composable"
 )
 
+const varsSeperator = "."
+
 var varsRegex = regexp.MustCompile(`\$\$?{([\p{L}\d\s\\\-_|.'":\/]*)}`)
 
 // ErrNoMatch is return when the replace didn't fail, just that no vars match to perform the replace.
@@ -295,16 +297,13 @@ func extractVars(i string, defaultProvider string) ([]varI, error) {
 }
 
 func varPrefixMatched(val string, key string) bool {
-	s := strings.SplitN(val, ".", 2)
+	s := strings.SplitN(val, varsSeperator, 2)
 	return s[0] == key
 }
 
 func maybeAddDefaultProvider(val string, defaultProvider string) string {
-	if defaultProvider == "" {
-		return val
-	}
-	if strings.Contains(val, ".") {
-		// already has a provider in the variable name
+	if defaultProvider == "" || strings.Contains(val, varsSeperator) {
+		// no default set or already has a provider in the variable name
 		return val
 	}
 	// at this point they variable doesn't have a provider
