@@ -115,6 +115,8 @@ type enrollCmdOption struct {
 	Key                  string                     `yaml:"key,omitempty"`
 	KeyPassphrasePath    string                     `yaml:"key_passphrase_path,omitempty"`
 	Insecure             bool                       `yaml:"insecure,omitempty"`
+	ID                   string                     `yaml:"id,omitempty"`
+	ReplaceToken         string                     `yaml:"replace_token,omitempty"`
 	EnrollAPIKey         string                     `yaml:"enrollment_key,omitempty"`
 	Staging              string                     `yaml:"staging,omitempty"`
 	ProxyURL             string                     `yaml:"proxy_url,omitempty"`
@@ -574,6 +576,8 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 	r := &fleetapi.EnrollRequest{
 		EnrollAPIKey: c.options.EnrollAPIKey,
 		Type:         fleetapi.PermanentEnroll,
+		ID:           c.options.ID,
+		ReplaceToken: c.options.ReplaceToken,
 		Metadata: fleetapi.Metadata{
 			Local:        metadata,
 			UserProvided: c.options.UserProvidedMetadata,
