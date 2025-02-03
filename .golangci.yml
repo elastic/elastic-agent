@@ -120,11 +120,7 @@ linters-settings:
 
   gosimple:
     # Select the Go version to target. The default is '1.13'.
-<<<<<<< HEAD
-    go: "1.22.9"
-=======
     go: "1.22.11"
->>>>>>> 3145177fd ([Automation] Bump Golang version to 1.22.11 (#6663))
 
   nolintlint:
     # Enable to ensure that nolint directives are all used. Default is true.
@@ -140,29 +136,17 @@ linters-settings:
 
   staticcheck:
     # Select the Go version to target. The default is '1.13'.
-<<<<<<< HEAD
-    go: "1.22.9"
-=======
     go: "1.22.11"
->>>>>>> 3145177fd ([Automation] Bump Golang version to 1.22.11 (#6663))
     checks: ["all"]
 
   stylecheck:
     # Select the Go version to target. The default is '1.13'.
-<<<<<<< HEAD
-    go: "1.22.9"
-=======
     go: "1.22.11"
->>>>>>> 3145177fd ([Automation] Bump Golang version to 1.22.11 (#6663))
     checks: ["all"]
 
   unused:
     # Select the Go version to target. The default is '1.13'.
-<<<<<<< HEAD
-    go: "1.22.9"
-=======
     go: "1.22.11"
->>>>>>> 3145177fd ([Automation] Bump Golang version to 1.22.11 (#6663))
 
   gosec:
     excludes:
