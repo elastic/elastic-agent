@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-ARG GO_VERSION=1.22.9
-=======
 ARG GO_VERSION=1.22.11
->>>>>>> 3145177fd ([Automation] Bump Golang version to 1.22.11 (#6663))
 ARG crossbuild_image="docker.elastic.co/beats-dev/golang-crossbuild"
 ARG AGENT_VERSION=8.9.0-SNAPSHOT
 ARG AGENT_IMAGE="docker.elastic.co/beats/elastic-agent"
