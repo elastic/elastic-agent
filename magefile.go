@@ -26,6 +26,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -46,6 +47,7 @@ import (
 	tcommon "github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
+	"github.com/elastic/elastic-agent/pkg/testing/helm"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/kind"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"
@@ -84,6 +86,7 @@ const (
 	externalArtifacts = "EXTERNAL"
 	platformsEnv      = "PLATFORMS"
 	packagesEnv       = "PACKAGES"
+	dockerVariants    = "DOCKER_VARIANTS"
 	configFile        = "elastic-agent.yml"
 	agentDropPath     = "AGENT_DROP_PATH"
 	checksumFilename  = "checksum.yml"
@@ -749,7 +752,7 @@ func BuildFleetCfg() error {
 	out := filepath.Join("internal", "pkg", "agent", "application", "configuration_embed.go")
 
 	fmt.Printf(">> BuildFleetCfg %s to %s\n", in, out)
-	return RunGo("run", goF, "--in", in, "--out", out)
+	return RunGo("run", goF, "--in", in, "--output", out)
 }
 
 // Enroll runs agent which enrolls before running.
@@ -782,9 +785,13 @@ func (Cloud) Image(ctx context.Context) {
 	dev := os.Getenv(devEnv)
 	defer os.Setenv(devEnv, dev)
 
+	variant := os.Getenv(dockerVariants)
+	defer os.Setenv(dockerVariants, variant)
+
 	os.Setenv(platformsEnv, "linux/amd64")
 	os.Setenv(packagesEnv, "docker")
 	os.Setenv(devEnv, "true")
+	os.Setenv(dockerVariants, "cloud")
 
 	if s, err := strconv.ParseBool(snapshot); err == nil && !s {
 		// only disable SNAPSHOT build when explicitely defined
@@ -798,6 +805,7 @@ func (Cloud) Image(ctx context.Context) {
 	devtools.DevBuild = true
 	devtools.Platforms = devtools.Platforms.Filter("linux/amd64")
 	devtools.SelectedPackageTypes = []devtools.PackageType{devtools.Docker}
+	devtools.SelectedDockerVariants = []devtools.DockerVariant{devtools.Cloud}
 
 	if _, hasExternal := os.LookupEnv(externalArtifacts); !hasExternal {
 		devtools.ExternalBuild = true
@@ -3294,6 +3302,10 @@ func getOtelDependencies() (*otelDependencies, error) {
 		}
 	}
 
+	for _, list := range [][]*otelDependency{connectors, exporters, extensions, processors, receivers} {
+		sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
+	}
+
 	return &otelDependencies{
 		Connectors: connectors,
 		Exporters:  exporters,
@@ -3407,16 +3419,13 @@ type Helm mg.Namespace
 // RenderExamples runs the equivalent of `helm template` and `helm lint`
 // for the examples of the Elastic Helm chart which are located at
 // `deploy/helm/elastic-agent/examples` directory.
-func (Helm) RenderExamples() error {
+func (h Helm) RenderExamples() error {
+	mg.SerialDeps(h.BuildDependencies)
+
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
-	helmChart, err := loader.Load(helmChartPath)
-	if err != nil {
-		return fmt.Errorf("failed to load helm chart: %w", err)
-	}
-
-	err = actionConfig.Init(settings.RESTClientGetter(), "default", "",
+	err := actionConfig.Init(settings.RESTClientGetter(), "default", "",
 		func(format string, v ...interface{}) {})
 	if err != nil {
 		return fmt.Errorf("failed to init helm action config: %w", err)
@@ -3431,6 +3440,11 @@ func (Helm) RenderExamples() error {
 	for _, d := range dirEntries {
 		if !d.IsDir() {
 			continue
+		}
+
+		helmChart, err := loader.Load(helmChartPath)
+		if err != nil {
+			return fmt.Errorf("failed to load helm chart: %w", err)
 		}
 
 		exampleFullPath := filepath.Join(examplesPath, d.Name())
@@ -3524,7 +3538,9 @@ func (Helm) UpdateAgentVersion() error {
 }
 
 // Lint lints the Elastic-Agent Helm chart.
-func (Helm) Lint() error {
+func (h Helm) Lint() error {
+	mg.SerialDeps(h.BuildDependencies)
+
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
@@ -3588,6 +3604,10 @@ func updateYamlFile(path string, keyVal ...struct {
 		return fmt.Errorf("failed to encode updated YAML: %w", err)
 	}
 	return nil
+}
+
+func (Helm) BuildDependencies() error {
+	return helm.BuildChartDependencies(helmChartPath)
 }
 
 func updateYamlNodes(rootNode *yaml.Node, value string, keys ...string) error {

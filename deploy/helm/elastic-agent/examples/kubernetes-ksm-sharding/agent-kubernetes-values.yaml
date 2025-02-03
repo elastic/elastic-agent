@@ -1,0 +1,13 @@
+outputs:
+  default:
+    type: ESSecretAuthAPI
+    secretName: es-api-secret
+
+kubernetes:
+  enabled: true
+  state:
+    agentAsSidecar:
+      enabled: true
+
+agent:
+  unprivileged: true

@@ -10,6 +10,9 @@ inputs:
             type: logs
           exclude_files:
             - .gz$
+          file_identity:
+            fingerprint: null
+          id: filestream-mongodb-mongodb-log-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -18,6 +21,8 @@ inputs:
             - /var/log/containers/*${kubernetes.hints.container_id}.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - mongodb-logs
@@ -53,7 +58,7 @@ inputs:
           password: ${kubernetes.hints.mongodb.dbstats.password|kubernetes.hints.mongodb.password|''}
           period: ${kubernetes.hints.mongodb.dbstats.period|kubernetes.hints.mongodb.period|'10s'}
           ssl.certificate: null
-          ssl.enabled: false
+          ssl.enabled: null
           ssl.key: null
           ssl.verification_mode: null
           username: ${kubernetes.hints.mongodb.dbstats.username|kubernetes.hints.mongodb.username|''}
@@ -83,7 +88,7 @@ inputs:
           password: ${kubernetes.hints.mongodb.replstatus.password|kubernetes.hints.mongodb.password|''}
           period: ${kubernetes.hints.mongodb.replstatus.period|kubernetes.hints.mongodb.period|'10s'}
           ssl.certificate: null
-          ssl.enabled: null
+          ssl.enabled: false
           ssl.key: null
           ssl.verification_mode: null
           username: ${kubernetes.hints.mongodb.replstatus.username|kubernetes.hints.mongodb.username|''}

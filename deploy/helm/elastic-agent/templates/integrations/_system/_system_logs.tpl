@@ -4,7 +4,6 @@
 {{- $inputVal := (include "elasticagent.system.config.logs.input" $ | fromYaml) -}}
 {{- if ($inputVal).streams }}
 {{- include "elasticagent.preset.mutate.inputs" (list $ $preset (list $inputVal)) -}}
-{{- include "elasticagent.preset.applyOnce" (list $ $preset "elasticagent.kubernetes.pernode.preset") -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}

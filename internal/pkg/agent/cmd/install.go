@@ -29,6 +29,7 @@ const (
 	flagInstallDevelopment            = "develop"
 	flagInstallNamespace              = "namespace"
 	flagInstallRunUninstallFromBinary = "run-uninstall-from-binary"
+	flagInstallServers                = "install-servers"
 
 	flagInstallCustomUser  = "user"
 	flagInstallCustomGroup = "group"
@@ -47,6 +48,7 @@ would like the Agent to operate.
 		Run: func(c *cobra.Command, _ []string) {
 			if err := installCmd(streams, c); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				logExternal(fmt.Sprintf("%s install failed: %s", paths.BinaryName, err))
 				os.Exit(1)
 			}
 		},
@@ -56,6 +58,7 @@ would like the Agent to operate.
 	cmd.Flags().BoolP("non-interactive", "n", false, "Install Elastic Agent in non-interactive mode which will not prompt on missing parameters but fails instead.")
 	cmd.Flags().String(flagInstallBasePath, paths.DefaultBasePath, "The path where the Elastic Agent will be installed. It must be an absolute path.")
 	cmd.Flags().Bool(flagInstallUnprivileged, false, "Install in unprivileged mode, limiting the access of the Elastic Agent. (beta)")
+	cmd.Flags().Bool(flagInstallServers, false, "Install larger version of agent that includes server components")
 
 	cmd.Flags().Bool(flagInstallRunUninstallFromBinary, false, "Run the uninstall command from this binary instead of using the binary found in the system's path.")
 	_ = cmd.Flags().MarkHidden(flagInstallRunUninstallFromBinary) // Advanced option to force a new agent to override an existing installation, it may orphan installed components.
@@ -252,7 +255,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 				return err
 			}
 		} else {
-			err := install.Uninstall(cmd.Context(), cfgFile, topPath, "", log, progBar)
+			err := install.Uninstall(cmd.Context(), cfgFile, topPath, "", log, progBar, false)
 			if err != nil {
 				progBar.Describe("Uninstall from binary failed")
 				return err
@@ -268,7 +271,12 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			customPass, _ = cmd.Flags().GetString(flagInstallCustomPass)
 		}
 
-		ownership, err = install.Install(cfgFile, topPath, unprivileged, log, progBar, streams, customUser, customGroup, customPass)
+		flavor := install.DefaultFlavor
+		if installServers, _ := cmd.Flags().GetBool(flagInstallServers); installServers {
+			flavor = install.FlavorServers
+		}
+
+		ownership, err = install.Install(cfgFile, topPath, unprivileged, log, progBar, streams, customUser, customGroup, customPass, flavor)
 		if err != nil {
 			return fmt.Errorf("error installing package: %w", err)
 		}
@@ -276,7 +284,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		defer func() {
 			if err != nil {
 				progBar.Describe("Uninstalling")
-				innerErr := install.Uninstall(cmd.Context(), cfgFile, topPath, "", log, progBar)
+				innerErr := install.Uninstall(cmd.Context(), cfgFile, topPath, "", log, progBar, false)
 				if innerErr != nil {
 					progBar.Describe("Failed to Uninstall")
 				} else {

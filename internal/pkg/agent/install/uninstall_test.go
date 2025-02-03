@@ -26,6 +26,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 )
@@ -225,4 +226,45 @@ func TestNotifyFleetAuditUnenroll(t *testing.T) {
 		assert.EqualError(t, err, "notify Fleet: failed")
 
 	})
+}
+
+type MockNotifyFleetAuditUninstall struct {
+	Called bool
+}
+
+func (m *MockNotifyFleetAuditUninstall) Call(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai fleetapi.AgentInfo) {
+	m.Called = true
+}
+
+func TestSkipFleetAuditUnenroll(t *testing.T) {
+	log := &logp.Logger{}
+	pt := &progressbar.ProgressBar{}
+	cfg := &configuration.Configuration{}
+	var agentID agentInfo = "testID"
+
+	testCases := []struct {
+		notifyFleet    bool
+		localFleet     bool
+		skipFleetAudit bool
+	}{
+		{true, true, true},
+		{true, true, false},
+		{true, false, true},
+		{false, true, true},
+		{false, true, false},
+		{false, false, true},
+		{false, false, false},
+	}
+
+	for i, tc := range testCases {
+		t.Run(
+			fmt.Sprintf("test case #%d: %t:%t:%t", i, tc.notifyFleet, tc.localFleet, tc.skipFleetAudit),
+			func(t *testing.T) {
+				mockNotify := &MockNotifyFleetAuditUninstall{}
+				notifyFleetIfNeeded(context.Background(), log, pt, cfg, agentID, tc.notifyFleet, tc.localFleet, tc.skipFleetAudit, notifyFleetAuditUninstall)
+				assert.False(t, mockNotify.Called, "NotifyFleetAuditUninstall should not be invoked when notifyFleet: %t - localFleet: %t - skipFleetAudit: %t", tc.notifyFleet, tc.localFleet, tc.skipFleetAudit)
+			},
+		)
+	}
+
 }
