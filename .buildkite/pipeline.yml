@@ -28,7 +28,7 @@ steps:
         agents:
           provider: "gcp"
           imageProject: elastic-images-qa
-          image: "platform-ingest-elastic-agent-ubuntu-2404-1738230722"
+          image: "platform-ingest-elastic-agent-debian-12-1738608775"
         retry:
           manual:
             allowed: true
