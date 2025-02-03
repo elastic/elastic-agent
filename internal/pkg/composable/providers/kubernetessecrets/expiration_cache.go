@@ -16,7 +16,7 @@ import (
 // when deleted from the map. More importantly working with a pointer makes the entry in the map bucket, that doesn't
 // get deallocated, to utilise only 8 bytes on a 64-bit system.
 type expirationCache struct {
-	sync.RWMutex
+	sync.Mutex
 	// ttl is the time-to-live for items in the cache
 	ttl time.Duration
 	// items is the underlying cache store.
@@ -31,8 +31,8 @@ type cacheEntry struct {
 // Get returns the secret associated with the given key from the store if it exists and is not expired. If updateAccess is true
 // and the secret exists, essentially the expiration check is skipped and the lastAccess timestamp is updated to time.Now().
 func (c *expirationCache) Get(key string, updateAccess bool) (secret, bool) {
-	c.RLock()
-	defer c.RUnlock()
+	c.Lock()
+	defer c.Unlock()
 
 	entry, exists := c.items[key]
 	if !exists {
@@ -82,8 +82,8 @@ func (c *expirationCache) isExpired(lastAccess time.Time) bool {
 
 // ListKeys returns a list of all the keys of the secrets in the store without checking for expiration
 func (c *expirationCache) ListKeys() []string {
-	c.RLock()
-	defer c.RUnlock()
+	c.Lock()
+	defer c.Unlock()
 
 	length := len(c.items)
 	if length == 0 {
@@ -98,8 +98,8 @@ func (c *expirationCache) ListKeys() []string {
 
 // List returns a list of all the secrets in the store that are not expired
 func (c *expirationCache) List() []secret {
-	c.RLock()
-	defer c.RUnlock()
+	c.Lock()
+	defer c.Unlock()
 
 	length := len(c.items)
 	if length == 0 {
