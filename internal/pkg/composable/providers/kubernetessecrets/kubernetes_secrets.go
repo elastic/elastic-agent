@@ -93,7 +93,7 @@ func ContextProviderBuilder(logger *logger.Logger, c *config.Config, _ bool) (co
 		config:  cfg,
 		client:  nil,
 		running: make(chan struct{}),
-		store:   newExpirationStore(cfg.TTLDelete),
+		store:   newExpirationCache(cfg.TTLDelete),
 	}, nil
 }
 

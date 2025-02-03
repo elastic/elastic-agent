@@ -115,8 +115,8 @@ func (c *expirationCache) List() []secret {
 	return list
 }
 
-// newExpirationStore creates and returns an expirationCache
-func newExpirationStore(ttl time.Duration) *expirationCache {
+// newExpirationCache creates and returns an expirationCache
+func newExpirationCache(ttl time.Duration) *expirationCache {
 	return &expirationCache{
 		items: make(map[string]*cacheEntry),
 		ttl:   ttl,

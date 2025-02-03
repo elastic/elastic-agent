@@ -50,7 +50,7 @@ func Test_Fetch(t *testing.T) {
 			k8sClient: k8sfake.NewClientset(
 				testDataBuilder.buildK8SSecret("secret_value"),
 			),
-			storeInit:     func(t *testing.T) store { return newExpirationStore(time.Minute) },
+			storeInit:     func(t *testing.T) store { return newExpirationCache(time.Minute) },
 			keyToFetch:    "secret_name",
 			expectedValue: "",
 			expectedFound: false,
@@ -64,7 +64,7 @@ func Test_Fetch(t *testing.T) {
 			k8sClient: k8sfake.NewClientset(
 				testDataBuilder.buildK8SSecret("secret_value"),
 			),
-			storeInit:     func(t *testing.T) store { return newExpirationStore(time.Minute) },
+			storeInit:     func(t *testing.T) store { return newExpirationCache(time.Minute) },
 			keyToFetch:    "kubernetes_secrets.default.secret_name",
 			expectedValue: "",
 			expectedFound: false,
@@ -78,7 +78,7 @@ func Test_Fetch(t *testing.T) {
 			k8sClient: k8sfake.NewClientset(
 				testDataBuilder.buildK8SSecret("secret_value"),
 			),
-			storeInit:     func(t *testing.T) store { return newExpirationStore(time.Minute) },
+			storeInit:     func(t *testing.T) store { return newExpirationCache(time.Minute) },
 			keyToFetch:    "kubernetes_secrets.default.secret_name.wrong",
 			expectedValue: "",
 			expectedFound: false,
@@ -92,7 +92,7 @@ func Test_Fetch(t *testing.T) {
 				RequestTimeout: time.Second,
 			},
 			k8sClient:     nil,
-			storeInit:     func(t *testing.T) store { return newExpirationStore(time.Minute) },
+			storeInit:     func(t *testing.T) store { return newExpirationCache(time.Minute) },
 			keyToFetch:    testDataBuilder.getFetchKey(),
 			expectedValue: "",
 			expectedFound: false,
@@ -110,7 +110,7 @@ func Test_Fetch(t *testing.T) {
 				testDataBuilder.buildK8SSecret("secret_value"),
 			),
 			keyToFetch:    testDataBuilder.getFetchKey(),
-			storeInit:     func(t *testing.T) store { return newExpirationStore(time.Minute) },
+			storeInit:     func(t *testing.T) store { return newExpirationCache(time.Minute) },
 			expectedValue: "secret_value",
 			expectedFound: true,
 		},
@@ -122,7 +122,7 @@ func Test_Fetch(t *testing.T) {
 			},
 			k8sClient:     k8sfake.NewClientset(),
 			keyToFetch:    testDataBuilder.getFetchKey(),
-			storeInit:     func(t *testing.T) store { return newExpirationStore(time.Minute) },
+			storeInit:     func(t *testing.T) store { return newExpirationCache(time.Minute) },
 			expectedValue: "",
 			expectedFound: false,
 		},
@@ -136,7 +136,7 @@ func Test_Fetch(t *testing.T) {
 			),
 			keyToFetch: testDataBuilder.getFetchKey(),
 			storeInit: func(t *testing.T) store {
-				s := newExpirationStore(time.Minute)
+				s := newExpirationCache(time.Minute)
 				s.Lock()
 				s.items = buildCacheMap(
 					testDataBuilder.buildCacheEntry("secret_value", true, time.Now(), time.Now()),
@@ -159,7 +159,7 @@ func Test_Fetch(t *testing.T) {
 				testDataBuilder.buildK8SSecret("secret_value"),
 			),
 			keyToFetch:    testDataBuilder.getFetchKey(),
-			storeInit:     func(t *testing.T) store { return newExpirationStore(time.Minute) },
+			storeInit:     func(t *testing.T) store { return newExpirationCache(time.Minute) },
 			expectedValue: "secret_value",
 			expectedFound: true,
 			expectedCache: buildCacheMap(
@@ -173,7 +173,7 @@ func Test_Fetch(t *testing.T) {
 			},
 			k8sClient:     k8sfake.NewClientset(),
 			keyToFetch:    testDataBuilder.getFetchKey(),
-			storeInit:     func(t *testing.T) store { return newExpirationStore(time.Minute) },
+			storeInit:     func(t *testing.T) store { return newExpirationCache(time.Minute) },
 			expectedValue: "",
 			expectedFound: false,
 			expectedCache: buildCacheMap(
@@ -188,7 +188,7 @@ func Test_Fetch(t *testing.T) {
 			k8sClient:  k8sfake.NewClientset(),
 			keyToFetch: testDataBuilder.getFetchKey(),
 			storeInit: func(t *testing.T) store {
-				exps := newExpirationStore(time.Minute)
+				exps := newExpirationCache(time.Minute)
 				ms := newMockStore(t)
 				ms.On("Get", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 					// when Fetch calls Get, we silently insert another secret with the same key
@@ -229,7 +229,7 @@ func Test_Fetch(t *testing.T) {
 			k8sClient:  k8sfake.NewClientset(),
 			keyToFetch: testDataBuilder.getFetchKey(),
 			storeInit: func(t *testing.T) store {
-				exps := newExpirationStore(time.Minute)
+				exps := newExpirationCache(time.Minute)
 				ms := newMockStore(t)
 				ms.On("Get", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 					// when Fetch calls Get, we silently insert another secret with the same key
@@ -273,7 +273,7 @@ func Test_Fetch(t *testing.T) {
 			),
 			keyToFetch: testDataBuilder.getFetchKey(),
 			storeInit: func(t *testing.T) store {
-				exps := newExpirationStore(time.Minute)
+				exps := newExpirationCache(time.Minute)
 				ms := newMockStore(t)
 				ms.On("Get", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 					// when Fetch calls Get, we silently insert another secret with the same key
@@ -366,7 +366,7 @@ func Test_UpdateCache(t *testing.T) {
 				testDataBuilder.buildK8SSecret("secret_value"),
 			),
 			storeInit: func(t *testing.T) store {
-				exps := newExpirationStore(time.Minute)
+				exps := newExpirationCache(time.Minute)
 				exps.Lock()
 				exps.items = buildCacheMap(
 					testDataBuilder.buildCacheEntry("secret_value", true, time.Now(), time.Now().Add(-time.Hour)),
@@ -383,7 +383,7 @@ func Test_UpdateCache(t *testing.T) {
 				testDataBuilder.buildK8SSecret("secret_value"),
 			),
 			storeInit: func(t *testing.T) store {
-				exps := newExpirationStore(time.Minute)
+				exps := newExpirationCache(time.Minute)
 				exps.Lock()
 				exps.items = buildCacheMap(
 					testDataBuilder.buildCacheEntry("secret_value", true, time.Now(), time.Now()),
@@ -403,7 +403,7 @@ func Test_UpdateCache(t *testing.T) {
 				testDataBuilder.buildK8SSecret("secret_value_new"),
 			),
 			storeInit: func(t *testing.T) store {
-				exps := newExpirationStore(time.Minute)
+				exps := newExpirationCache(time.Minute)
 				exps.Lock()
 				exps.items = buildCacheMap(
 					testDataBuilder.buildCacheEntry("secret_value", true, time.Now(), time.Now()),
@@ -421,7 +421,7 @@ func Test_UpdateCache(t *testing.T) {
 			name:      "secret-change API-miss",
 			k8sClient: k8sfake.NewClientset(),
 			storeInit: func(t *testing.T) store {
-				exps := newExpirationStore(time.Minute)
+				exps := newExpirationCache(time.Minute)
 				exps.Lock()
 				exps.items = buildCacheMap(
 					testDataBuilder.buildCacheEntry("secret_value", true, time.Now(), time.Now()),
@@ -441,7 +441,7 @@ func Test_UpdateCache(t *testing.T) {
 				testDataBuilder.buildK8SSecret("secret_value"),
 			),
 			storeInit: func(t *testing.T) store {
-				exps := newExpirationStore(time.Minute)
+				exps := newExpirationCache(time.Minute)
 				exps.Lock()
 				exps.items = buildCacheMap(
 					testDataBuilder.buildCacheEntry("secret_value_old", true, time.Now(), time.Now()),
@@ -490,7 +490,7 @@ func Test_UpdateCache(t *testing.T) {
 				testDataBuilder.buildK8SSecret("secret_value"),
 			),
 			storeInit: func(t *testing.T) store {
-				exps := newExpirationStore(time.Minute)
+				exps := newExpirationCache(time.Minute)
 				exps.Lock()
 				exps.items = buildCacheMap(
 					testDataBuilder.buildCacheEntry("secret_value", true, time.Now(), time.Now()),
@@ -536,7 +536,7 @@ func Test_UpdateCache(t *testing.T) {
 			name:      "secret-change contention secret removed",
 			k8sClient: k8sfake.NewClientset(),
 			storeInit: func(t *testing.T) store {
-				exps := newExpirationStore(time.Minute)
+				exps := newExpirationCache(time.Minute)
 				exps.Lock()
 				exps.items = buildCacheMap(
 					testDataBuilder.buildCacheEntry("secret_value", true, time.Now(), time.Now()),
@@ -583,7 +583,7 @@ func Test_UpdateCache(t *testing.T) {
 				testDataBuilder.buildK8SSecret("secret_value"),
 			),
 			storeInit: func(t *testing.T) store {
-				exps := newExpirationStore(time.Minute)
+				exps := newExpirationCache(time.Minute)
 				exps.Lock()
 				exps.items = buildCacheMap(
 					testDataBuilder.buildCacheEntry("secret_value_cached", true, time.Now(), time.Now()),
