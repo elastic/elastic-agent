@@ -566,12 +566,36 @@ func TestAgentStateToString(t *testing.T) {
 	}
 }
 
+type MockScheduler struct {
+	Duration time.Duration
+	Ticker   *time.Ticker
+}
+
+func (m *MockScheduler) WaitTick() <-chan time.Time {
+	return m.Ticker.C
+}
+
+func (m *MockScheduler) SetDuration(d time.Duration) {
+	m.Duration = d
+}
+
+func (m *MockScheduler) Stop() {
+	m.Ticker.Stop()
+}
+
 func TestFleetGatewaySchedulerSwitch(t *testing.T) {
 	agentInfo := &testAgentInfo{}
 	settings := &fleetGatewaySettings{
-		Duration: 5 * time.Second,
-		Backoff:  backoffSettings{Init: 1 * time.Second, Max: 5 * time.Second},
+		Duration: 1 * time.Second,
+		Backoff:  backoffSettings{Init: 1 * time.Millisecond, Max: 2 * time.Millisecond},
 	}
+
+	tempSet := *defaultGatewaySettings
+	defaultGatewaySettings.Duration = 500 * time.Millisecond
+	defaultGatewaySettings.ErrConsecutiveUnauthDuration = 700 * time.Millisecond
+	defer func() {
+		*defaultGatewaySettings = tempSet
+	}()
 
 	t.Run("if unauthorized responses exceed the set limit, the scheduler should be switched to the long-wait scheduler", withGateway(agentInfo, settings, func(
 		t *testing.T,
@@ -589,8 +613,12 @@ func TestFleetGatewaySchedulerSwitch(t *testing.T) {
 		clientWaitFn := c.Answer(unauth)
 		g, ok := gateway.(*FleetGateway)
 		require.True(t, ok)
-		g.scheduler = scheduler.NewPeriodicJitter(time.Second, time.Second)
 
+		ms := &MockScheduler{
+			Duration: defaultGatewaySettings.Duration,
+			Ticker:   time.NewTicker(defaultGatewaySettings.Duration),
+		}
+		g.scheduler = ms
 		errCh := runFleetGateway(ctx, gateway)
 
 		for i := 0; i <= maxUnauthCounter; i++ {
@@ -601,8 +629,7 @@ func TestFleetGatewaySchedulerSwitch(t *testing.T) {
 		err := <-errCh
 		require.NoError(t, err)
 
-		_, ok = g.scheduler.(*scheduler.Periodic)
-		require.True(t, ok)
+		require.Equal(t, ms.Duration, defaultGatewaySettings.ErrConsecutiveUnauthDuration)
 	}))
 
 	t.Run("should switch back to short-wait scheduler if the a successful response is received", withGateway(agentInfo, settings, func(
@@ -622,8 +649,12 @@ func TestFleetGatewaySchedulerSwitch(t *testing.T) {
 		clientWaitFn := c.Answer(unauth)
 		g, ok := gateway.(*FleetGateway)
 		require.True(t, ok)
-		g.scheduler = scheduler.NewPeriodic(time.Second)
 
+		ms := &MockScheduler{
+			Duration: defaultGatewaySettings.ErrConsecutiveUnauthDuration,
+			Ticker:   time.NewTicker(defaultGatewaySettings.ErrConsecutiveUnauthDuration),
+		}
+		g.scheduler = ms
 		errCh := runFleetGateway(ctx, gateway)
 
 		<-clientWaitFn
@@ -632,7 +663,6 @@ func TestFleetGatewaySchedulerSwitch(t *testing.T) {
 		err := <-errCh
 		require.NoError(t, err)
 
-		_, ok = g.scheduler.(*scheduler.PeriodicJitter)
-		require.True(t, ok)
+		require.Equal(t, ms.Duration, defaultGatewaySettings.Duration)
 	}))
 }

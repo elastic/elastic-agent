@@ -39,9 +39,9 @@ const (
 
 // Default Configuration for the Fleet Gateway.
 var defaultGatewaySettings = &fleetGatewaySettings{
-	Duration:    1 * time.Second,        // time between successful calls
-	Jitter:      500 * time.Millisecond, // used as a jitter for duration
-	ErrDuration: 1 * time.Hour,          // time between calls when the agent exceeds unauthorized response limit
+	Duration:                     1 * time.Second,        // time between successful calls
+	Jitter:                       500 * time.Millisecond, // used as a jitter for duration
+	ErrConsecutiveUnauthDuration: 1 * time.Hour,          // time between calls when the agent exceeds unauthorized response limit
 	Backoff: backoffSettings{ // time after a failed call
 		Init: 60 * time.Second,
 		Max:  10 * time.Minute,
@@ -49,10 +49,10 @@ var defaultGatewaySettings = &fleetGatewaySettings{
 }
 
 type fleetGatewaySettings struct {
-	Duration    time.Duration   `config:"checkin_frequency"`
-	Jitter      time.Duration   `config:"jitter"`
-	Backoff     backoffSettings `config:"backoff"`
-	ErrDuration time.Duration
+	Duration                     time.Duration   `config:"checkin_frequency"`
+	Jitter                       time.Duration   `config:"jitter"`
+	Backoff                      backoffSettings `config:"backoff"`
+	ErrConsecutiveUnauthDuration time.Duration
 }
 
 type backoffSettings struct {
@@ -361,16 +361,14 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 		f.unauthCounter++
 		if f.shouldUseLongSched() {
 			f.log.Warnf("retrieved an invalid api key error '%d' times. will use long scheduler", f.unauthCounter)
-			f.scheduler = scheduler.NewPeriodic(defaultGatewaySettings.ErrDuration)
+			f.scheduler.SetDuration(defaultGatewaySettings.ErrConsecutiveUnauthDuration)
 			return &fleetapi.CheckinResponse{}, took, nil
 		}
 
 		return nil, took, err
 	}
 
-	if _, ok := f.scheduler.(*scheduler.PeriodicJitter); !ok {
-		f.scheduler = scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
-	}
+	f.scheduler.SetDuration(defaultGatewaySettings.Duration)
 
 	f.unauthCounter = 0
 	if err != nil {
