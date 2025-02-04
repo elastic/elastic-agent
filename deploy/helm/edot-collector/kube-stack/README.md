@@ -17,14 +17,25 @@ The DaemonSet collectors handle the following data:
 - Logs: Utilizes [File Log Receiver receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/filelogreceiver#readme) to gather logs from all Pods running on the respective node.
 - OTLP Traces: Utilizes [OTLP Receiver]( https://github.com/open-telemetry/opentelemetry-collector/blob/main/receiver/otlpreceiver#readme) which configures both HTTP and GRPC endpoints on the node to receive OTLP trace data.
 
-### Deployment collector
+### Deployment collectors
+
+#### Cluster
 
 The OpenTelemetry components deployed within a Deployment collector focus on gathering data at the cluster level rather than at individual nodes.  A Deployment instance of the collector operates as a standalone (unlike DaemonSet collector instances, which are deployed on every node)
 
-The Deployment collector handles the following data:
+The Cluster Deployment collector handles the following data:
 
 - Kubernetes Events: Monitors and collects events occurring across the entire Kubernetes cluster, utilizing [Kubernetes Objects Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sobjectsreceiver#readme).
 - Cluster Metrics: Captures metrics that provide insights into the overall health and performance of the Kubernetes cluster, utilizing [Kubernetes Cluster Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sclusterreceiver#readme).
+
+#### Gateway
+
+The OpenTelemetry components deployed within the `Gateway` Deployment collectors focus on processing and exporting OTLP data to Elasticsearch. Processing components:
+
+- [Elastic Trace processor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elastictraceprocessor): The processor enriches traces with elastic specific requirements. It uses opentelemetry-lib to perform the actual enrichments.
+- [Elastic Infra Metrics processor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticinframetricsprocessor): The Elastic Infra Metrics Processor is used to bridge the gap between OTEL and Elastic Infra Metrics.
+- [LSM interval processor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/lsmintervalprocessor): [Interval processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/intervalprocessor) with db-backed persistence.
+- [Signal to Metrics connector](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/signaltometricsconnector): Produces metrics from all signal types (traces, logs, or metrics).
 
 ### Auto-instrumentation
 
