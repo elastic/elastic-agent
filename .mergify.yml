@@ -123,6 +123,9 @@ pull_request_rules:
           To fixup this pull request, you need to add the backport labels for the needed
           branches, such as:
           * `backport-./d./d` is the label to automatically backport to the `8./d` branch. `/d` is the digit
+          * `backport-active-branches` is the label to automatically backport to all active branches
+          * `backport-active-minors` is the label to automatically backport to all active minor branches
+
   - name: backport patches to 7.17 branch
     conditions:
       - merged
