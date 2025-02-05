@@ -318,6 +318,10 @@ func TestInjectProxyEndpointModifier(t *testing.T) {
 }
 
 func Test_injectProxyURL(t *testing.T) {
+	t.Setenv("HTTPS_PROXY", "https://localhost:8080")
+	t.Setenv("HTTP_PROXY", "http://localhost:8081")
+	t.Setenv("NO_PROXY", "do.not.inject.proxy.for.me")
+
 	tests := []struct {
 		name   string
 		m      map[string]interface{}
@@ -356,10 +360,6 @@ func Test_injectProxyURL(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Setenv("HTTPS_PROXY", "https://localhost:8080")
-			t.Setenv("HTTP_PROXY", "http://localhost:8081")
-			t.Setenv("NO_PROXY", "do.not.inject.proxy.for.me")
-
 			injectProxyURL(tc.m, tc.hosts)
 			require.Equal(t, tc.expect, tc.m)
 		})

@@ -10,6 +10,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"golang.org/x/net/http/httpproxy"
 )
 
 // InjectProxyEndpointModifier injects a proxy_url value into endpoint's output config if one is not set.
@@ -84,7 +85,8 @@ func injectProxyURL(m map[string]interface{}, hosts []string) {
 		if err != nil {
 			continue
 		}
-		proxyURL, err := http.ProxyFromEnvironment(request)
+		// not using http.ProxyFromEnvironment() to be able to change the environment in unit tests
+		proxyURL, err := httpproxy.FromEnvironment().ProxyFunc()(request.URL)
 		if err != nil {
 			continue
 		}
