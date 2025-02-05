@@ -47,6 +47,8 @@ type Controller interface {
 	// it will return with a nil array. If changed the current observed state of variables
 	// that is returned is not sent over the Watch channel, the caller should coordinate this fact.
 	//
+	// Maximum amount of time for resolve is 500ms as that is the debounce window for variable resolution.
+	//
 	// Only error that is returned from this function is the result of the passed context.
 	Observe(context.Context, []string) ([]*transpiler.Vars, error)
 
@@ -324,6 +326,8 @@ func (c *controller) Watch() <-chan []*transpiler.Vars {
 // set of variables are returned the caller in the case a change occurred. If no change occurred then
 // it will return with a nil array. If changed the current observed state of variables
 // that is returned is not sent over the Watch channel, the caller should coordinate this fact.
+//
+// Maximum amount of time for resolve is 500ms as that is the debounce window for variable resolution.
 //
 // Only error that is returned from this function is the result of the passed context.
 func (c *controller) Observe(ctx context.Context, vars []string) ([]*transpiler.Vars, error) {

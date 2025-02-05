@@ -80,7 +80,8 @@ func TestVars_Replace(t *testing.T) {
 			false,
 		},
 		{
-			// data will be resolved to other.data
+			// data will be resolved to other.data since 'other' is the default provider
+			// set at variable creation (see mustMakeVarsWithDefault call)
 			"${un-der_score.missing|un-der_score.missing2|data}",
 			NewStrVal("info"),
 			false,

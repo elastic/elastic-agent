@@ -15,7 +15,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/composable"
 )
 
-const varsSeperator = "."
+const varsSeparator = "."
 
 var varsRegex = regexp.MustCompile(`\$\$?{([\p{L}\d\s\\\-_|.'":\/]*)}`)
 
@@ -297,12 +297,19 @@ func extractVars(i string, defaultProvider string) ([]varI, error) {
 }
 
 func varPrefixMatched(val string, key string) bool {
-	s := strings.SplitN(val, varsSeperator, 2)
+	s := strings.SplitN(val, varsSeparator, 2)
 	return s[0] == key
 }
 
+// maybeAddDefaultProvider adds a defaultProvide as a prefix on the value only in the case that
+// the defaultProvider is set and the val doesn't contain any varsSeparator.
+//
+// This is done here and not at resolve time of the variable because the Observe flow of the AST
+// for the variables provider needs to known exactly which providers to run. It also is an issue with
+// using fetch providers because we would have to hit each to determine if that variable was present first
+// before apply the default and we do not want that behavior.
 func maybeAddDefaultProvider(val string, defaultProvider string) string {
-	if defaultProvider == "" || strings.Contains(val, varsSeperator) {
+	if defaultProvider == "" || strings.Contains(val, varsSeparator) {
 		// no default set or already has a provider in the variable name
 		return val
 	}
