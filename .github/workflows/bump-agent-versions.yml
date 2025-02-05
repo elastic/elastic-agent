@@ -12,11 +12,14 @@ jobs:
     timeout-minutes: 1
     outputs:
       matrix: ${{ steps.generator.outputs.matrix }}
+    permissions:
+      contents: read
     steps:
       - id: generator
         uses: elastic/oblt-actions/elastic/active-branches@v1
         with:
           exclude-branches: "7.17"
+          filter-branches: true
 
   update_versions:
     runs-on: ubuntu-latest
