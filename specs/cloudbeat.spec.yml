@@ -1,4 +1,6 @@
 version: 2
+component_files:
+ - bundle.tar.gz
 inputs:
   - name: cloudbeat
     description: "Cloudbeat"

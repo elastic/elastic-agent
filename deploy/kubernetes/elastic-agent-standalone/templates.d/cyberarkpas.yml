@@ -1,4 +1,35 @@
 inputs:
+    - name: filestream-cyberarkpas
+      id: filestream-cyberarkpas-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.cyberarkpas.audit.enabled} == true and ${kubernetes.hints.cyberarkpas.enabled} == true
+          data_stream:
+            dataset: cyberarkpas.audit
+            type: logs
+          exclude_files:
+            - .gz$
+          file_identity:
+            fingerprint: null
+          id: filestream-cyberarkpas-cyberarkpas-audit-${kubernetes.hints.container_id}
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.cyberarkpas.audit.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          processors:
+            - add_locale: null
+          prospector:
+            scanner:
+                fingerprint:
+                    enabled: true
+                symlinks: true
+          tags:
+            - forwarded
+            - cyberarkpas-audit
+      data_stream.namespace: default
     - name: tcp-cyberarkpas
       id: tcp-cyberarkpas-${kubernetes.hints.container_id}
       type: tcp
@@ -32,35 +63,4 @@ inputs:
             - cyberarkpas-audit
             - forwarded
           udp: null
-      data_stream.namespace: default
-    - name: filestream-cyberarkpas
-      id: filestream-cyberarkpas-${kubernetes.hints.container_id}
-      type: filestream
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.cyberarkpas.audit.enabled} == true and ${kubernetes.hints.cyberarkpas.enabled} == true
-          id: filestream-cyberarkpas-audit-${kubernetes.hints.container_id}
-          data_stream:
-            dataset: cyberarkpas.audit
-            type: logs
-          exclude_files:
-            - .gz$
-          file_identity:
-            fingerprint: null
-          parsers:
-            - container:
-                format: auto
-                stream: ${kubernetes.hints.cyberarkpas.audit.stream|'all'}
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          processors:
-            - add_locale: null
-          prospector:
-            scanner:
-                fingerprint:
-                    enabled: true
-                symlinks: true
-          tags:
-            - forwarded
-            - cyberarkpas-audit
       data_stream.namespace: default

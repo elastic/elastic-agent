@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
+	aTesting "github.com/elastic/elastic-agent/pkg/testing"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
@@ -32,6 +34,11 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/installtest"
 )
+
+type componentPresenceDefinition struct {
+	name      string
+	platforms []string
+}
 
 func TestInstallWithoutBasePath(t *testing.T) {
 	define.Require(t, define.Requirements{
@@ -156,6 +163,118 @@ func TestInstallWithBasePath(t *testing.T) {
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	t.Run("check second agent installs with --namespace", testSecondAgentCanInstall(ctx, fixture, basePath, false, opts))
+	t.Run("check second agent can be installed again with --namespace --force", testSecondAgentCanInstallWithForce(ctx, fixture, basePath, false, opts))
+	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+	})
+
+	t.Run("check components set",
+		testComponentsPresence(ctx, fixture,
+			[]componentPresenceDefinition{
+				{"agentbeat", []string{"windows", "linux", "darwin"}},
+				{"endpoint-security", []string{"windows", "linux", "darwin"}},
+				{"pf-host-agent", []string{"linux"}},
+			},
+			[]componentPresenceDefinition{
+				{"cloudbeat", []string{"linux"}},
+				{"apm-server", []string{"windows", "linux", "darwin"}},
+				{"fleet-server", []string{"windows", "linux", "darwin"}},
+				{"pf-elastic-symbolizer", []string{"linux"}},
+				{"pf-elastic-collector", []string{"linux"}},
+			}))
+
+	// Make sure uninstall from within the topPath fails on Windows
+	if runtime.GOOS == "windows" {
+		cwd, err := os.Getwd()
+		require.NoErrorf(t, err, "GetWd failed: %s", err)
+		err = os.Chdir(topPath)
+		require.NoErrorf(t, err, "Chdir to topPath failed: %s", err)
+		t.Cleanup(func() {
+			_ = os.Chdir(cwd)
+		})
+		out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+		require.Error(t, err, "uninstall should have failed")
+		require.Containsf(t, string(out), "uninstall must be run from outside the installed path", "expected error string not found in: %s err: %s", out, err)
+	}
+}
+
+func TestInstallServersWithBasePath(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: Default,
+		// We require sudo for this test to run
+		// `elastic-agent install` (even though it will
+		// be installed as non-root).
+		Sudo: true,
+
+		// It's not safe to run this test locally as it
+		// installs Elastic Agent.
+		Local: false,
+	})
+
+	// Get path to Elastic Agent executable
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	// Prepare the Elastic Agent so the binary is extracted and ready to use.
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	// When installing with unprivileged using a base path the
+	// base needs to be accessible by the `elastic-agent-user` user that will be
+	// executing the process, but is not created yet. Using a base that exists
+	// and is known to be accessible by standard users, ensures this tests
+	// works correctly and will not hit a permission issue when spawning the
+	// elastic-agent service.
+	var basePath string
+	switch runtime.GOOS {
+	case define.Linux:
+		basePath = `/usr`
+	case define.Windows:
+		basePath = `C:\`
+	default:
+		// Set up random temporary directory to serve as base path for Elastic Agent
+		// installation.
+		tmpDir := t.TempDir()
+		basePath = filepath.Join(tmpDir, strings.ToLower(randStr(8)))
+	}
+
+	// Run `elastic-agent install`.  We use `--force` to prevent interactive
+	// execution.
+	opts := atesting.InstallOpts{
+		BasePath:       basePath,
+		Force:          true,
+		Privileged:     false,
+		InstallServers: true,
+	}
+	out, err := fixture.Install(ctx, &opts)
+	if err != nil {
+		t.Logf("install output: %s", out)
+		require.NoError(t, err)
+	}
+
+	// Check that Agent was installed in the custom base path
+	topPath := filepath.Join(basePath, "Elastic", "Agent")
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+
+	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
+	t.Run("check second agent installs with --namespace", testSecondAgentCanInstall(ctx, fixture, basePath, false, opts))
+
+	t.Run("check components set",
+		testComponentsPresence(ctx, fixture,
+			[]componentPresenceDefinition{
+				{"agentbeat", []string{"windows", "linux", "darwin"}},
+				{"endpoint-security", []string{"windows", "linux", "darwin"}},
+				{"pf-host-agent", []string{"linux"}},
+				{"cloudbeat", []string{"linux"}},
+				{"apm-server", []string{"windows", "linux", "darwin"}},
+				{"fleet-server", []string{"windows", "linux", "darwin"}},
+				{"pf-elastic-symbolizer", []string{"linux"}},
+				{"pf-elastic-collector", []string{"linux"}},
+			},
+			[]componentPresenceDefinition{}))
 
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
@@ -209,6 +328,10 @@ func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	t.Run("check second agent installs with --namespace", testSecondAgentCanInstall(ctx, fixture, "", false, opts))
+	t.Run("check second agent can be installed again with --namespace --force", testSecondAgentCanInstallWithForce(ctx, fixture, "", false, opts))
+	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+	})
 }
 
 func TestInstallPrivilegedWithBasePath(t *testing.T) {
@@ -257,6 +380,10 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	t.Run("check second agent installs with --develop", testSecondAgentCanInstall(ctx, fixture, randomBasePath, true, opts))
+	t.Run("check second agent can be installed again with --develop --force", testSecondAgentCanInstallWithForce(ctx, fixture, randomBasePath, true, opts))
+	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+	})
 }
 
 func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T, fixture *atesting.Fixture, customUsername, customGroup string) {
@@ -288,6 +415,11 @@ func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T,
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	t.Run("check second agent installs with --develop", testSecondAgentCanInstall(ctx, fixture, "", true, opts))
 
+	t.Run("check second agent can be installed again with --develop --force", testSecondAgentCanInstallWithForce(ctx, fixture, "", true, opts))
+	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
+	})
+
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
 		cwd, err := os.Getwd()
@@ -301,6 +433,48 @@ func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T,
 		require.Error(t, err, "uninstall should have failed")
 		require.Containsf(t, string(out), "uninstall must be run from outside the installed path", "expected error string not found in: %s err: %s", out, err)
 	}
+}
+
+func testComponentsPresence(ctx context.Context, fixture *atesting.Fixture, requiredComponents []componentPresenceDefinition, unwantedComponents []componentPresenceDefinition) func(*testing.T) {
+	return func(t *testing.T) {
+		agentWorkDir := fixture.WorkDir()
+		componentsDir, err := aTesting.FindComponentsDir(agentWorkDir)
+		require.NoError(t, err)
+
+		componentsPaths := func(component string) []string {
+			binarySuffix := ""
+			if runtime.GOOS == "windows" {
+				binarySuffix += ".exe"
+			}
+			return []string{
+				filepath.Join(componentsDir, component+binarySuffix),
+				filepath.Join(componentsDir, component+".spec.yml"),
+			}
+		}
+
+		for _, requiredComponent := range requiredComponents {
+			for _, reqPath := range componentsPaths(requiredComponent.name) {
+				_, err := os.Stat(reqPath)
+				if slices.Contains(requiredComponent.platforms, runtime.GOOS) {
+					require.NoErrorf(t, err, "expecting component %q to be present: %v", requiredComponent, err)
+				} else {
+					require.ErrorIs(t, err, os.ErrNotExist, "expecting component %q to be missing but was found", requiredComponent)
+				}
+			}
+		}
+
+		for _, unwantedComponent := range unwantedComponents {
+			for _, reqPath := range componentsPaths(unwantedComponent.name) {
+				_, err := os.Stat(reqPath)
+				require.ErrorIs(t, err, os.ErrNotExist, "expecting component %q to be missing but was found", unwantedComponent)
+			}
+		}
+	}
+}
+
+func testSecondAgentCanInstallWithForce(ctx context.Context, fixture *atesting.Fixture, basePath string, develop bool, installOpts atesting.InstallOpts) func(*testing.T) {
+	installOpts.Force = true
+	return testSecondAgentCanInstall(ctx, fixture, basePath, develop, installOpts)
 }
 
 // Tests that a second agent can be installed in an isolated namespace, using either --develop or --namespace.
@@ -541,7 +715,7 @@ func TestRepeatedInstallUninstallFleet(t *testing.T) {
 }
 
 func randStr(length int) string {
-	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 	runes := make([]rune, length)
 	for i := range runes {

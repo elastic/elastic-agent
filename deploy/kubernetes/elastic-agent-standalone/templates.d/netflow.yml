@@ -1,4 +1,27 @@
 inputs:
+    - name: filestream-netflow
+      id: filestream-netflow-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - id: netflow-container-logs-${kubernetes.hints.container_id}
+          condition: ${kubernetes.hints.netflow.container_logs.enabled} == true
+          data_stream:
+            dataset: netflow.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default
     - name: netflow-netflow
       id: netflow-netflow-${kubernetes.hints.container_id}
       type: netflow
@@ -25,27 +48,4 @@ inputs:
             - netflow
             - forwarded
           timeout: ${kubernetes.hints.netflow.log.timeout|kubernetes.hints.netflow.timeout|'}
-      data_stream.namespace: default
-    - name: filestream-netflow
-      id: filestream-netflow-${kubernetes.hints.container_id}
-      type: filestream
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.netflow.container_logs.enabled} == true
-          id: filestream-netflow-logs-${kubernetes.hints.container_id}
-          data_stream:
-            dataset: netflow.container_logs
-            type: logs
-          exclude_files: []
-          exclude_lines: []
-          parsers:
-            - container:
-                format: auto
-                stream: all
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          prospector:
-            scanner:
-                symlinks: true
-          tags: []
       data_stream.namespace: default
