@@ -20,7 +20,6 @@ import (
 	"github.com/schollz/progressbar/v3"
 
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -48,8 +47,15 @@ var (
 	fleetAuditWaitMax  = time.Second * 10
 )
 
+// agentInfo is a custom type that implements the fleetapi.AgentInfo interface
+type agentInfo string
+
+func (a *agentInfo) AgentID() string {
+	return string(*a)
+}
+
 // Uninstall uninstalls persistently Elastic Agent on the system.
-func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
+func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar, skipFleetAudit bool) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("unable to get current working directory")
@@ -57,6 +63,49 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 
 	if runtime.GOOS == "windows" && paths.HasPrefix(cwd, topPath) {
 		return fmt.Errorf("uninstall must be run from outside the installed path '%s'", topPath)
+	}
+
+	// check if the agent was installed using --unprivileged by checking the file vault for the agent secret (needed on darwin to correctly load the vault)
+	unprivileged, err := checkForUnprivilegedVault(ctx)
+	if err != nil {
+		return fmt.Errorf("error checking for unprivileged vault: %w", err)
+	}
+
+	// will only notify fleet of the uninstall command if it can gather config and agentinfo, and is not a stand-alone install
+	localFleet := false
+	notifyFleet := false
+	var agentID agentInfo
+	var cfg *configuration.Configuration
+	func() { // check if we need to notify in a func to allow us to return early if a (non-fatal) error is encountered.
+		// read local config
+		c, err := operations.LoadFullAgentConfig(ctx, log, cfgFile, false, unprivileged)
+		if err != nil {
+			pt.Describe("notify Fleet failed: unable to read config")
+			return
+		}
+		cfg, err = configuration.NewFromConfig(c)
+		if err != nil {
+			pt.Describe("notify Fleet failed: error transforming config")
+			return
+		}
+
+		if cfg != nil && !configuration.IsStandalone(cfg.Fleet) {
+			agentID = agentInfo(cfg.Settings.ID)
+			notifyFleet = true
+			if cfg.Fleet != nil && cfg.Fleet.Server != nil {
+				localFleet = true
+			}
+		}
+	}()
+
+	// Notify fleet-server while it is still running if it's running locally
+	if notifyFleet && localFleet {
+		// host is set in the agent/cmd/enroll_cmd.go by createFleetServerBootstrapConfig
+		// hosts is set in agent/application/actions/handlers/handler_action_policy_change.go by updateFleetConfig
+		// agents running the fleet-server integration should communicate over the internal API (defaults to localhost:8221)
+		// This may need to be fixed with https://github.com/elastic/elastic-agent/issues/4771
+		cfg.Fleet.Client.Hosts = []string{cfg.Fleet.Client.Host}
+		notifyFleetAuditUninstall(ctx, log, pt, cfg, &agentID) //nolint:errcheck // ignore the error as we can't act on it
 	}
 
 	// ensure service is stopped
@@ -69,12 +118,6 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	// kill any running watcher
 	if err := killWatcher(pt); err != nil {
 		return fmt.Errorf("failed trying to kill any running watcher: %w", err)
-	}
-
-	// check if the agent was installed using --unprivileged by checking the file vault for the agent secret (needed on darwin to correctly load the vault)
-	unprivileged, err := checkForUnprivilegedVault(ctx)
-	if err != nil {
-		return fmt.Errorf("error checking for unprivileged vault: %w", err)
 	}
 
 	// Uninstall components first
@@ -111,27 +154,6 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 		}
 	}
 
-	// will only notify fleet of the uninstall command if it can gather config and agentinfo, and is not a stand-alone install
-	notifyFleet := false
-	var ai *info.AgentInfo
-	c, err := operations.LoadFullAgentConfig(ctx, log, cfgFile, false, unprivileged)
-	if err != nil {
-		pt.Describe(fmt.Sprintf("unable to read agent config to determine if notifying Fleet is needed: %v", err))
-	}
-	cfg, err := configuration.NewFromConfig(c)
-	if err != nil {
-		pt.Describe(fmt.Sprintf("notify Fleet: unable to transform *config.Config to *configuration.Configuration: %v", err))
-	}
-
-	if cfg != nil && !configuration.IsStandalone(cfg.Fleet) {
-		ai, err = info.NewAgentInfo(ctx, false)
-		if err != nil {
-			pt.Describe(fmt.Sprintf("unable to read agent info, Fleet will not be notified of uninstall: %v", err))
-		} else {
-			notifyFleet = true
-		}
-	}
-
 	// remove existing directory
 	pt.Describe("Removing install directory")
 	err = RemovePath(topPath)
@@ -144,17 +166,23 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	}
 	pt.Describe("Removed install directory")
 
-	if notifyFleet {
-		notifyFleetAuditUninstall(ctx, log, pt, cfg, ai) //nolint:errcheck // ignore the error as we can't act on it
-	}
-
+	notifyFleetIfNeeded(ctx, log, pt, cfg, agentID, notifyFleet, localFleet, skipFleetAudit, notifyFleetAuditUninstall)
 	return nil
 }
+
+// Injecting notifyFleetAuditUninstall for easier unit testing
+func notifyFleetIfNeeded(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, agentID agentInfo, notifyFleet, localFleet, skipFleetAudit bool, notifyFleetAuditUninstall NotifyFleetAuditUninstall) {
+	if notifyFleet && !localFleet && !skipFleetAudit {
+		notifyFleetAuditUninstall(ctx, log, pt, cfg, &agentID) //nolint:errcheck // ignore the error as we can't act on it)
+	}
+}
+
+type NotifyFleetAuditUninstall func(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai fleetapi.AgentInfo) error
 
 // notifyFleetAuditUninstall will attempt to notify fleet-server of the agent's uninstall.
 //
 // There are retries for the attempt after a 10s wait, but it is a best-effort approach.
-func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai *info.AgentInfo) error {
+func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai fleetapi.AgentInfo) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	pt.Describe("Attempting to notify Fleet of uninstall")

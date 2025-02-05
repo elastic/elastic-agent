@@ -1,47 +1,221 @@
 ---
+# Source: elastic-agent/charts/kube-state-metrics/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+automountServiceAccountToken: true
+metadata:
+  labels:    
+    helm.sh/chart: kube-state-metrics-5.28.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: kube-state-metrics
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: "2.14.0"
+  name: kube-state-metrics
+  namespace: default
+---
 # Source: elastic-agent/templates/agent/service-account.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: agent-nginx-example
+  name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-9.1.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.0.0
+    app.kubernetes.io/version: 9.1.0
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
 kind: Secret
 metadata:
-  name: agent-nginx-example
+  name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-9.1.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.0.0
+    app.kubernetes.io/version: 9.1.0
 stringData:
 
   agent.yml: |-
     fleet:
       enabled: true
     providers:
+      kubernetes:
+        node: ${NODE_NAME}
+        scope: node
       kubernetes_leaderelection:
-        enabled: false
-        leader_lease: example-nginx
+        enabled: true
+        leader_lease: example-pernode
+---
+# Source: elastic-agent/charts/kube-state-metrics/templates/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:    
+    helm.sh/chart: kube-state-metrics-5.28.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: kube-state-metrics
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: "2.14.0"
+  name: kube-state-metrics
+rules:
+
+- apiGroups: ["certificates.k8s.io"]
+  resources:
+  - certificatesigningrequests
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - configmaps
+  verbs: ["list", "watch"]
+
+- apiGroups: ["batch"]
+  resources:
+  - cronjobs
+  verbs: ["list", "watch"]
+
+- apiGroups: ["extensions", "apps"]
+  resources:
+  - daemonsets
+  verbs: ["list", "watch"]
+
+- apiGroups: ["extensions", "apps"]
+  resources:
+  - deployments
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - endpoints
+  verbs: ["list", "watch"]
+
+- apiGroups: ["autoscaling"]
+  resources:
+  - horizontalpodautoscalers
+  verbs: ["list", "watch"]
+
+- apiGroups: ["extensions", "networking.k8s.io"]
+  resources:
+  - ingresses
+  verbs: ["list", "watch"]
+
+- apiGroups: ["batch"]
+  resources:
+  - jobs
+  verbs: ["list", "watch"]
+
+- apiGroups: ["coordination.k8s.io"]
+  resources:
+  - leases
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - limitranges
+  verbs: ["list", "watch"]
+
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources:
+    - mutatingwebhookconfigurations
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - namespaces
+  verbs: ["list", "watch"]
+
+- apiGroups: ["networking.k8s.io"]
+  resources:
+  - networkpolicies
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - nodes
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - persistentvolumeclaims
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - persistentvolumes
+  verbs: ["list", "watch"]
+
+- apiGroups: ["policy"]
+  resources:
+    - poddisruptionbudgets
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - pods
+  verbs: ["list", "watch"]
+
+- apiGroups: ["extensions", "apps"]
+  resources:
+  - replicasets
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - replicationcontrollers
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - resourcequotas
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - secrets
+  verbs: ["list", "watch"]
+
+- apiGroups: [""]
+  resources:
+  - services
+  verbs: ["list", "watch"]
+
+- apiGroups: ["apps"]
+  resources:
+  - statefulsets
+  verbs: ["list", "watch"]
+
+- apiGroups: ["storage.k8s.io"]
+  resources:
+    - storageclasses
+  verbs: ["list", "watch"]
+
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources:
+    - validatingwebhookconfigurations
+  verbs: ["list", "watch"]
+
+- apiGroups: ["storage.k8s.io"]
+  resources:
+    - volumeattachments
+  verbs: ["list", "watch"]
 ---
 # Source: elastic-agent/templates/agent/cluster-role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: agent-nginx-example-default
+  name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-9.1.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.0.0
+    app.kubernetes.io/version: 9.1.0
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
     resources:
@@ -111,73 +285,97 @@ rules:
       - get
       - list
       - watch
-  - apiGroups:
-    - ""
-    resources:
-    - nodes
-    - namespaces
-    - pods
-    verbs:
-    - get
-    - watch
-    - list
-  - apiGroups:
-    - apps
-    resources:
-    - replicasets
-    verbs:
-    - get
-    - list
-    - watch
-  - apiGroups:
-    - batch
-    resources:
-    - jobs
-    verbs:
-    - get
-    - list
-    - watch
+---
+# Source: elastic-agent/charts/kube-state-metrics/templates/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:    
+    helm.sh/chart: kube-state-metrics-5.28.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: kube-state-metrics
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: "2.14.0"
+  name: kube-state-metrics
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kube-state-metrics
+subjects:
+- kind: ServiceAccount
+  name: kube-state-metrics
+  namespace: default
 ---
 # Source: elastic-agent/templates/agent/cluster-role-binding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: agent-nginx-example-default
+  name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-9.1.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.0.0
+    app.kubernetes.io/version: 9.1.0
 subjects:
   - kind: ServiceAccount
-    name: agent-nginx-example
+    name: agent-pernode-example
     namespace: "default"
 roleRef:
   kind: ClusterRole
-  name: agent-nginx-example-default
+  name: agent-perNode-example-default
   apiGroup: rbac.authorization.k8s.io
 ---
-# Source: elastic-agent/templates/agent/k8s/deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
+# Source: elastic-agent/charts/kube-state-metrics/templates/service.yaml
+apiVersion: v1
+kind: Service
 metadata:
-  name: agent-nginx-example
+  name: kube-state-metrics
+  namespace: default
+  labels:    
+    helm.sh/chart: kube-state-metrics-5.28.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: kube-state-metrics
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: "2.14.0"
+  annotations:
+    prometheus.io/scrape: 'true'
+spec:
+  type: "ClusterIP"
+  ports:
+  - name: "http"
+    protocol: TCP
+    port: 8080
+    targetPort: 8080
+  
+  selector:    
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/instance: example
+---
+# Source: elastic-agent/templates/agent/k8s/daemonset.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-0.0.1
+    helm.sh/chart: elastic-agent-9.1.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.0.0
+    app.kubernetes.io/version: 9.1.0
 spec:
   selector:
     matchLabels:
-      name: agent-nginx-example
+      name: agent-pernode-example
   template:
     metadata:
       labels:
-        name: agent-nginx-example
+        name: agent-pernode-example
       annotations:
-        checksum/config: 975ed05540e0d099fe1b28b15d6403aacee676d0776a69fb75eb8624e19ad2de
+        checksum/config: cd7c5c4f03cc8377d18ee22cf236428090959fc194ee647bd97a39b79f38c807
     spec:
       automountServiceAccountToken: true
       containers:
@@ -196,6 +394,8 @@ spec:
               fieldPath: metadata.name
         - name: STATE_PATH
           value: /usr/share/elastic-agent/state
+        - name: ELASTIC_NETINFO
+          value: "false"
         - name: FLEET_URL
           value: http://localhost:8220
         - name: FLEET_ENROLLMENT_TOKEN
@@ -204,12 +404,36 @@ spec:
           value: "false"
         - name: FLEET_ENROLL
           value: "1"
-        image: docker.elastic.co/beats/elastic-agent:9.0.0-SNAPSHOT
+        image: docker.elastic.co/beats/elastic-agent:9.1.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
+        resources:
+          limits:
+            memory: 1000Mi
+          requests:
+            cpu: 100m
+            memory: 400Mi
         securityContext:
           runAsUser: 0
         volumeMounts:
+        - mountPath: /var/lib/docker/containers
+          name: varlibdockercontainers
+          readOnly: true
+        - mountPath: /var/log
+          name: varlog
+          readOnly: true
+        - mountPath: /hostfs/proc
+          name: proc
+          readOnly: true
+        - mountPath: /hostfs/sys/fs/cgroup
+          name: cgroup
+          readOnly: true
+        - mountPath: /hostfs/var/lib
+          name: var-lib
+          readOnly: true
+        - mountPath: /hostfs/etc
+          name: etc-full
+          readOnly: true
         - mountPath: /usr/share/elastic-agent/state
           name: agent-data
         - mountPath: /etc/elastic-agent/agent.yml
@@ -217,13 +441,119 @@ spec:
           readOnly: true
           subPath: agent.yml
       dnsPolicy: ClusterFirstWithHostNet
-      serviceAccountName: agent-nginx-example
+      hostNetwork: true
+      nodeSelector:
+        kubernetes.io/os: linux
+      serviceAccountName: agent-pernode-example
       volumes:
       - hostPath:
-          path: /etc/elastic-agent/default/agent-nginx-example-managed/state
+          path: /var/lib/docker/containers
+        name: varlibdockercontainers
+      - hostPath:
+          path: /var/log
+        name: varlog
+      - hostPath:
+          path: /proc
+        name: proc
+      - hostPath:
+          path: /sys/fs/cgroup
+        name: cgroup
+      - hostPath:
+          path: /etc
+        name: etc-full
+      - hostPath:
+          path: /var/lib
+        name: var-lib
+      - hostPath:
+          path: /etc/elastic-agent/default/agent-pernode-example-managed/state
           type: DirectoryOrCreate
         name: agent-data
       - name: config
         secret:
           defaultMode: 292
-          secretName: agent-nginx-example
+          secretName: agent-pernode-example
+---
+# Source: elastic-agent/charts/kube-state-metrics/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kube-state-metrics
+  namespace: default
+  labels:    
+    helm.sh/chart: kube-state-metrics-5.28.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: kube-state-metrics
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: "2.14.0"
+spec:
+  selector:
+    matchLabels:      
+      app.kubernetes.io/name: kube-state-metrics
+      app.kubernetes.io/instance: example
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  revisionHistoryLimit: 10
+  template:
+    metadata:
+      labels:        
+        helm.sh/chart: kube-state-metrics-5.28.0
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/component: metrics
+        app.kubernetes.io/part-of: kube-state-metrics
+        app.kubernetes.io/name: kube-state-metrics
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/version: "2.14.0"
+    spec:
+      automountServiceAccountToken: true
+      hostNetwork: false
+      serviceAccountName: kube-state-metrics
+      securityContext:
+        fsGroup: 65534
+        runAsGroup: 65534
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: kube-state-metrics
+        args:
+        - --port=8080
+        - --resources=certificatesigningrequests,configmaps,cronjobs,daemonsets,deployments,endpoints,horizontalpodautoscalers,ingresses,jobs,leases,limitranges,mutatingwebhookconfigurations,namespaces,networkpolicies,nodes,persistentvolumeclaims,persistentvolumes,poddisruptionbudgets,pods,replicasets,replicationcontrollers,resourcequotas,secrets,services,statefulsets,storageclasses,validatingwebhookconfigurations,volumeattachments
+        imagePullPolicy: IfNotPresent
+        image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.14.0
+        ports:
+        - containerPort: 8080
+          name: "http"
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            httpHeaders:
+            path: /livez
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            httpHeaders:
+            path: /readyz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        resources:
+          {}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true

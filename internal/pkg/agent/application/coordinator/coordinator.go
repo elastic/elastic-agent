@@ -575,6 +575,11 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 	if err != nil {
 		c.ClearOverrideState()
+		if errors.Is(err, upgrade.ErrUpgradeSameVersion) {
+			// Set upgrade state to completed so update no longer shows in-progress.
+			det.SetState(details.StateCompleted)
+			return nil
+		}
 		det.Fail(err)
 		return err
 	}
@@ -1400,6 +1405,7 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 	}
 
 	c.logger.Info("Updating running component model")
+	c.logger.With("components", model.Components).Debug("Updating running component model")
 	c.runtimeMgr.Update(model)
 	return nil
 }

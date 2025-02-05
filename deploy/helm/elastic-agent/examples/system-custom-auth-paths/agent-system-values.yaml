@@ -8,6 +8,9 @@ system:
     vars:
       paths:
         - /var/log/custom_syslog.log
-
+kubernetes:
+  enabled: false
+kube-state-metrics:
+  enabled: false
 agent:
   unprivileged: true

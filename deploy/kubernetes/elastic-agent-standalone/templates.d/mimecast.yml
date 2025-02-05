@@ -1,9 +1,1149 @@
 inputs:
+    - name: cel-mimecast
+      id: cel-mimecast-${kubernetes.hints.container_id}
+      type: cel
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.mimecast.archive_search_logs.enabled} == true and ${kubernetes.hints.mimecast.enabled} == true
+          config_version: 2
+          data_stream:
+            dataset: mimecast.archive_search_logs
+            type: logs
+          fields_under_root: true
+          interval: 5m
+          keep_null: true
+          program: |
+            // This program is shared amongst archive_search_logs, dlp_logs,
+            // message_release_logs, ttp_ap_logs, ttp_ip_logs, and ttp_url_logs.
+            // If it is changed here changes should be reflected in the other
+            // data streams. Do not differentiate the logic between these data
+            // streams lightly; use the state variable for this unless absolutely
+            // required.
+            state.with(
+              (
+                (has(state.?token.expires) && now() < timestamp(state.token.expires)) ?
+                  // The token we have is still valid.
+                  state.token
+                :
+                  // Get a new token.
+                  post_request(state.url.trim_right("/") + "/oauth/token", "application/x-www-form-urlencoded",
+                    {
+                      "client_id": [state.client_id],
+                      "client_secret": [state.client_secret],
+                      "grant_type": ["client_credentials"],
+                    }.format_query()
+                  ).do_request().as(auth, auth.StatusCode == 200 ?
+                    bytes(auth.Body).decode_json().as(auth_body, auth_body.with({
+                      // Include 60s grace period to avoid attempting to make
+                      // a request with a stale authentication token.
+                      "expires": now()+duration(string(int(auth_body.expires_in)-60)+"s"),
+                    }))
+                  :
+                    {
+                      "events": {
+                        "error": {
+                          "code": string(auth.StatusCode),
+                          "id": string(auth.Status),
+                          "message": "POST /oauth/token: "+(
+                            size(auth.Body) != 0 ?
+                              string(auth.Body)
+                            :
+                              string(auth.Status) + ' (' + string(auth.StatusCode) + ')'
+                          ),
+                        },
+                      },
+                      "want_more": false,
+                    }
+                  )
+              ).as(token, !has(token.access_token) ? token :
+                {
+                  "data": state.?last_page.data.orValue([{
+                    state.start_field: state.?cursor.last.orValue((now - duration(state.look_back)).format(time_layout.RFC3339)),
+                    state.end_field: now.format(time_layout.RFC3339),
+                  }]),
+                }.as(req,
+                  post_request(state.url.trim_right("/") + state.path, "application/json",
+                    {
+                      "meta": {
+                        "pagination": {
+                          "pageSize": state.page_size,
+                          ?"pageToken": state.?last_page.next,
+                        }
+                      },
+                      "data": req.data,
+                    }.encode_json()
+                  ).with({
+                    "Header": {
+                      "Authorization": ["Bearer " + token.access_token],
+                      "Accept": ["application/json"],
+                      "Content-Type": ["application/json"],
+                    }
+                  }).do_request().as(resp, resp.StatusCode == 200 ?
+                    bytes(resp.Body).decode_json().as(body, body.?fail.orValue([]).size() == 0 ?
+                      {
+                        "events": body.data.map(e, e[state.data_path].map(l, {"message": l.encode_json()})).flatten(),
+                        "cursor": {
+                          "last": ([now] + body.data.map(e,
+                            e[state.data_path].map(l,
+                              l[state.time_field].parse_time(["2006-01-02T15:04:05-0700", time_layout.RFC3339])
+                            )
+                          ).flatten()).max().format(time_layout.RFC3339),
+                        },
+                        ?"last_page": has(body.?meta.pagination.next) && size(body.data) != 0 ?
+                          optional.of({
+                            ?"next": body.?meta.pagination.next,
+                            "data": req.data,
+                          })
+                        :
+                          optional.none(),
+                        "token": {
+                          "access_token": token.access_token,
+                          "expires": token.expires,
+                        },
+                        "want_more": has(body.?meta.pagination.next) && size(body.data) != 0,
+                      }
+                    :
+                      // Mimecast can return failure states with a 200. This
+                      // is detected by a non-empty fail array at the root
+                      // of the response body. Don't attempt to parse this
+                      // out, just dump the whole body into the error message.
+                      {
+                        "events": {
+                          "error": {
+                            "code": string(resp.StatusCode),
+                            "id": string(resp.Status),
+                            "message": "POST " + state.path + ":" + string(resp.Body), // We know this is not empty.
+                          },
+                        },
+                        "want_more": false,
+                      }
+                    )
+                  :
+                    {
+                      "events": {
+                        "error": {
+                          "code": string(resp.StatusCode),
+                          "id": string(resp.Status),
+                          "message": "POST " + state.path + ": " + (
+                            size(resp.Body) != 0 ?
+                              string(resp.Body)
+                            :
+                              string(resp.Status) + ' (' + string(resp.StatusCode) + ')'
+                          ),
+                        },
+                      },
+                      "want_more": false,
+                    }
+                  )
+                )
+              )
+            )
+          redact:
+            fields:
+                - client_id
+                - client_secret
+                - token.access_token
+          resource.url: https://api.services.mimecast.com
+          state:
+            client_id: null
+            client_secret: null
+            data_path: logs
+            end_field: end
+            look_back: 24h
+            page_size: 100
+            path: /api/archive/get-archive-search-logs
+            start_field: start
+            time_field: createTime
+          tags:
+            - forwarded
+            - mimecast-archive-search-logs
+        - condition: ${kubernetes.hints.mimecast.audit_events.enabled} == true and ${kubernetes.hints.mimecast.enabled} == true
+          config_version: 2
+          data_stream:
+            dataset: mimecast.audit_events
+            type: logs
+          fields_under_root: true
+          interval: 5m
+          keep_null: true
+          program: "state.with(\n  (\n    (has(state.?token.expires) && now() < timestamp(state.token.expires)) ?\n      // The token we have is still valid.\n      state.token\n    :\n      // Get a new token.\n      post_request(state.url.trim_right(\"/\") + \"/oauth/token\", \"application/x-www-form-urlencoded\",\n        {\n          \"client_id\": [state.client_id],\n          \"client_secret\": [state.client_secret],\n          \"grant_type\": [\"client_credentials\"],\n        }.format_query()\n      ).do_request().as(auth, auth.StatusCode == 200 ?\n        bytes(auth.Body).decode_json().as(auth_body, auth_body.with({\n          // Include 60s grace period to avoid attempting to make\n          // a request with a stale authentication token.\n          \"expires\": now()+duration(string(int(auth_body.expires_in)-60)+\"s\"),\n        }))\n      :\n        {\n          \"events\": {\n            \"error\": {\n              \"code\": string(auth.StatusCode),\n              \"id\": string(auth.Status),\n              \"message\": \"POST /oauth/token:\"+(\n                size(auth.Body) != 0 ?\n                  string(auth.Body)\n                :\n                  string(auth.Status) + ' (' + string(auth.StatusCode) + ')'\n              ),\n            },\n          },\n          \"want_more\": false,\n        }\n      )\n  ).as(token, !has(token.access_token) ? token :\n    {\n      \"data\": state.?last_page.data.orValue([{\n        state.start_field: state.?cursor.last.orValue(now - duration(state.look_back)).format(time_layout.RFC3339),\n        state.end_field: now.format(time_layout.RFC3339),\n      }]),\n    }.as(req,\n      post_request(state.url.trim_right(\"/\") + state.path, \"application/json\", \n        {\n          \"meta\": {\n            \"pagination\": {\n              \"pageSize\": state.page_size,\n              ?\"pageToken\": state.?last_page.next,\n            }\n          },\n          \"data\": req.data,\n        }.encode_json()\n      ).with({\n        \"Header\": {\n          \"Authorization\": [\"Bearer \" + token.access_token], \n          \"Accept\": [\"application/json\"],\n          \"Content-Type\": [\"application/json\"],\n        }\n      }).do_request().as(resp, resp.StatusCode == 200 ?\n        bytes(resp.Body).decode_json().as(body, body.?fail.orValue([]).size() == 0 ?\n          {\n            \"events\": body.data.map(e, {\"message\": e.encode_json()}),\n            \"cursor\": {\n              \"last\": ([now] + body.data.map(e, e[state.time_field].parse_time([\"2006-01-02T15:04:05-0700\", time_layout.RFC3339]))).max(),\n            },\n            ?\"last_page\": has(body.?meta.pagination.next) && size(body.data) != 0 ?\n              optional.of({\n                ?\"next\": body.?meta.pagination.next,\n                \"data\": req.data,\n              })\n            :\n              optional.none(),\n            \"token\": {\n              \"access_token\": token.access_token,\n              \"expires\": token.expires,\n            },\n            \"want_more\": has(body.?meta.pagination.next) && size(body.data) != 0,\n          }\n        :\n          // Mimecast can return failure states with a 200. This\n          // is detected by a non-empty fail array at the root\n          // of the response body. Don't attempt to parse this\n          // out, just dump the whole body into the error message.\n          {\n            \"events\": {\n              \"error\": {\n                \"code\": string(resp.StatusCode),\n                \"id\": string(resp.Status),\n                \"message\": \"POST \" + state.path + \":\" + string(resp.Body), // We know this is not empty.\n              },\n            },\n            \"want_more\": false,\n          }\n        )\n      :\n        {\n          \"events\": {\n            \"error\": {\n              \"code\": string(resp.StatusCode),\n              \"id\": string(resp.Status),\n              \"message\": \"POST \" + state.path + \":\" + (\n                size(resp.Body) != 0 ?\n                  string(resp.Body)\n                :\n                  string(resp.Status) + ' (' + string(resp.StatusCode) + ')'\n              ),\n            },\n          },\n          \"want_more\": false,\n        }\n      )\n    )\n  )\n)\n"
+          redact:
+            fields:
+                - client_id
+                - client_secret
+                - token.access_token
+          resource.url: https://api.services.mimecast.com
+          state:
+            client_id: null
+            client_secret: null
+            end_field: endDateTime
+            look_back: 24h
+            page_size: 100
+            path: /api/audit/get-audit-events
+            start_field: startDateTime
+            time_field: eventTime
+          tags:
+            - forwarded
+            - mimecast-audit-events
+        - condition: ${kubernetes.hints.mimecast.cloud_integrated_logs.enabled} == true and ${kubernetes.hints.mimecast.enabled} == true
+          config_version: 2
+          data_stream:
+            dataset: mimecast.cloud_integrated_logs
+            type: logs
+          fields_under_root: true
+          interval: 5m
+          keep_null: true
+          program: "// This program is shared between cloud_integrated_logs and siem_logs\n// If it is changed here changes should be reflected in the other data\n// streams. Do not differentiate the logic between these data streams\n// lightly; use the state variable for this unless absolutely required.\nstate.with(\n  (\n    (has(state.?token.expires) && now() < timestamp(state.token.expires)) ?\n      // The token we have is still valid.\n      state.token\n    :\n      // Get a new token.\n      post_request(state.url.trim_right(\"/\") + \"/oauth/token\", \"application/x-www-form-urlencoded\",\n        {\n          \"client_id\": [state.client_id],\n          \"client_secret\": [state.client_secret],\n          \"grant_type\": [\"client_credentials\"],\n        }.format_query()\n      ).do_request().as(auth, auth.StatusCode == 200 ?\n        bytes(auth.Body).decode_json().as(auth_body, auth_body.with({\n          // Include 60s grace period to avoid attempting to make\n          // a request with a stale authentication token.\n          \"expires\": now()+duration(string(int(auth_body.expires_in)-60)+\"s\"),\n        }))\n      :\n        {\n          \"events\": {\n            \"error\": {\n              \"code\": string(auth.StatusCode),\n              \"id\": string(auth.Status),\n              \"message\": \"POST /oauth/token: \"+(\n                size(auth.Body) != 0 ?\n                  string(auth.Body)\n                :\n                  string(auth.Status) + ' (' + string(auth.StatusCode) + ')'\n              ),\n            },\n          },\n          \"want_more\": false,\n        }\n      )\n  ).as(token, !has(token.access_token) ? token :\n    state.?cursor.work_list.orValue(state.types.map(t, {\"type\": t})).as(work_list, size(work_list) == 0 ?\n      state.types.map(t, {\"type\": t})\n    :\n      work_list\n    ).as(work_list,\n      get_request(\n        state.url.trim_right(\"/\") + state.path + \"?\" + {\n          \"type\": [work_list[0].type],\n          ?\"nextPage\": work_list[0].?next.optMap(next, [next]),\n          ?\"dateRangeStartsAt\": state.?start.optMap(start, [start.format(\"2006-01-02\")]),\n          ?\"dateRangeEndsAt\": state.?end.optMap(end, [end.format(\"2006-01-02\")]),\n          ?\"pageSize\": state.?page_size.optMap(size, [string(int(size))]),\n        }.format_query()\n      ).with({\n        \"Header\": {\n          \"Authorization\": [\"Bearer \" + token.access_token], \n          \"Accept\": [\"application/json\"],\n          \"Content-Type\": [\"application/json\"],\n        }\n      }).do_request().as(resp, resp.StatusCode == 200 ?\n        bytes(resp.Body).decode_json().as(body,\n          {\n            \"events\": body.value.map(b, has(b.url),\n              get(b.url).as(batch, batch.StatusCode == 200 ?\n                bytes(batch.Body).mime(\"application/gzip\").mime(\"application/x-ndjson\").map(e,\n                  {\n                    \"message\": dyn(e.encode_json()),\n                  }\n                )\n              :\n                  [{\n                    \"error\": {\n                      \"code\": string(batch.StatusCode),\n                      \"id\": string(batch.Status),\n                      \"message\": \"GET \" + b.url + \": \" + (\n                        size(batch.Body) != 0 ?\n                          string(batch.Body)\n                        :\n                          string(batch.Status) + ' (' + string(batch.StatusCode) + ')'\n                      ),\n                    },\n                  }]\n              )\n            ).flatten(),\n            \"cursor\": {\n              \"work_list\": (\n                \"@nextPage\" in body && size(body.value) != 0 ?\n                  [work_list[0].with({\"next\": body[\"@nextPage\"]})]\n                :\n                  []\n              ) + tail(work_list),\n            },\n            \"token\": {\n              \"access_token\": token.access_token,\n              \"expires\": token.expires,\n            },\n            \"want_more\": \"@nextPage\" in body && size(body.value) != 0,\n          }.as(to_publish, to_publish.with({\n            \"want_more\": to_publish.want_more || size(to_publish.cursor.work_list) != 0,\n          }))\n        ).as(state, \n          // Check whether we still need to get more, but have\n          // no event for this type. If we do, populate events\n          // with a place-holder to be discarded by the ingest\n          // pipeline.\n          state.want_more && size(state.events) == 0 ?\n            state.with({\"events\": [{\"message\": \"want_more\"}]})\n          :\n            state\n        )\n      :\n        {\n          \"events\": {\n            \"error\": {\n              \"code\": string(resp.StatusCode),\n              \"id\": string(resp.Status),\n              \"message\": \"GET \" + state.path + \": \" + (\n                size(resp.Body) != 0 ?\n                  string(resp.Body)\n                :\n                  string(resp.Status) + ' (' + string(resp.StatusCode) + ')'\n              ),\n            },\n          },\n          \"want_more\": false,\n        }\n      )\n    )\n  )\n)\n"
+          redact:
+            fields:
+                - client_id
+                - client_secret
+                - token.access_token
+          resource.url: https://api.services.mimecast.com
+          state:
+            client_id: null
+            client_secret: null
+            end_field: dateRangeEndsAt
+            look_back: 24h
+            page_size: null
+            path: /siem/v1/batch/events/ci
+            start_field: dateRangeStartsAt
+            types:
+                - entities
+                - mailflow
+                - urlclick
+          tags:
+            - forwarded
+            - mimecast-cloud-integrated-logs
+        - condition: ${kubernetes.hints.mimecast.dlp_logs.enabled} == true and ${kubernetes.hints.mimecast.enabled} == true
+          config_version: 2
+          data_stream:
+            dataset: mimecast.dlp_logs
+            type: logs
+          fields_under_root: true
+          interval: 5m
+          keep_null: true
+          program: |
+            // This program is shared amongst archive_search_logs, dlp_logs,
+            // message_release_logs, ttp_ap_logs, ttp_ip_logs, and ttp_url_logs.
+            // If it is changed here changes should be reflected in the other
+            // data streams. Do not differentiate the logic between these data
+            // streams lightly; use the state variable for this unless absolutely
+            // required.
+            state.with(
+              (
+                (has(state.?token.expires) && now() < timestamp(state.token.expires)) ?
+                  // The token we have is still valid.
+                  state.token
+                :
+                  // Get a new token.
+                  post_request(state.url.trim_right("/") + "/oauth/token", "application/x-www-form-urlencoded",
+                    {
+                      "client_id": [state.client_id],
+                      "client_secret": [state.client_secret],
+                      "grant_type": ["client_credentials"],
+                    }.format_query()
+                  ).do_request().as(auth, auth.StatusCode == 200 ?
+                    bytes(auth.Body).decode_json().as(auth_body, auth_body.with({
+                      // Include 60s grace period to avoid attempting to make
+                      // a request with a stale authentication token.
+                      "expires": now()+duration(string(int(auth_body.expires_in)-60)+"s"),
+                    }))
+                  :
+                    {
+                      "events": {
+                        "error": {
+                          "code": string(auth.StatusCode),
+                          "id": string(auth.Status),
+                          "message": "POST /oauth/token: "+(
+                            size(auth.Body) != 0 ?
+                              string(auth.Body)
+                            :
+                              string(auth.Status) + ' (' + string(auth.StatusCode) + ')'
+                          ),
+                        },
+                      },
+                      "want_more": false,
+                    }
+                  )
+              ).as(token, !has(token.access_token) ? token :
+                {
+                  "data": state.?last_page.data.orValue([{
+                    state.start_field: state.?cursor.last.orValue((now - duration(state.look_back)).format(time_layout.RFC3339)),
+                    state.end_field: now.format(time_layout.RFC3339),
+                  }]),
+                }.as(req,
+                  post_request(state.url.trim_right("/") + state.path, "application/json",
+                    {
+                      "meta": {
+                        "pagination": {
+                          "pageSize": state.page_size,
+                          ?"pageToken": state.?last_page.next,
+                        }
+                      },
+                      "data": req.data,
+                    }.encode_json()
+                  ).with({
+                    "Header": {
+                      "Authorization": ["Bearer " + token.access_token],
+                      "Accept": ["application/json"],
+                      "Content-Type": ["application/json"],
+                    }
+                  }).do_request().as(resp, resp.StatusCode == 200 ?
+                    bytes(resp.Body).decode_json().as(body, body.?fail.orValue([]).size() == 0 ?
+                      {
+                        "events": body.data.map(e, e[state.data_path].map(l, {"message": l.encode_json()})).flatten(),
+                        "cursor": {
+                          "last": ([now] + body.data.map(e,
+                            e[state.data_path].map(l,
+                              l[state.time_field].parse_time(["2006-01-02T15:04:05-0700", time_layout.RFC3339])
+                            )
+                          ).flatten()).max().format(time_layout.RFC3339),
+                        },
+                        ?"last_page": has(body.?meta.pagination.next) && size(body.data) != 0 ?
+                          optional.of({
+                            ?"next": body.?meta.pagination.next,
+                            "data": req.data,
+                          })
+                        :
+                          optional.none(),
+                        "token": {
+                          "access_token": token.access_token,
+                          "expires": token.expires,
+                        },
+                        "want_more": has(body.?meta.pagination.next) && size(body.data) != 0,
+                      }
+                    :
+                      // Mimecast can return failure states with a 200. This
+                      // is detected by a non-empty fail array at the root
+                      // of the response body. Don't attempt to parse this
+                      // out, just dump the whole body into the error message.
+                      {
+                        "events": {
+                          "error": {
+                            "code": string(resp.StatusCode),
+                            "id": string(resp.Status),
+                            "message": "POST " + state.path + ":" + string(resp.Body), // We know this is not empty.
+                          },
+                        },
+                        "want_more": false,
+                      }
+                    )
+                  :
+                    {
+                      "events": {
+                        "error": {
+                          "code": string(resp.StatusCode),
+                          "id": string(resp.Status),
+                          "message": "POST " + state.path + ": " + (
+                            size(resp.Body) != 0 ?
+                              string(resp.Body)
+                            :
+                              string(resp.Status) + ' (' + string(resp.StatusCode) + ')'
+                          ),
+                        },
+                      },
+                      "want_more": false,
+                    }
+                  )
+                )
+              )
+            )
+          redact:
+            fields:
+                - client_id
+                - client_secret
+                - token.access_token
+          resource.url: https://api.services.mimecast.com
+          state:
+            client_id: null
+            client_secret: null
+            data_path: dlpLogs
+            end_field: to
+            look_back: 24h
+            page_size: 100
+            path: /api/dlp/get-logs
+            start_field: from
+            time_field: eventTime
+          tags:
+            - forwarded
+            - mimecast-dlp-logs
+        - condition: ${kubernetes.hints.mimecast.message_release_logs.enabled} == true and ${kubernetes.hints.mimecast.enabled} == true
+          config_version: 2
+          data_stream:
+            dataset: mimecast.message_release_logs
+            type: logs
+          fields_under_root: true
+          interval: 5m
+          keep_null: true
+          program: |
+            // This program is shared amongst archive_search_logs, dlp_logs,
+            // message_release_logs, ttp_ap_logs, ttp_ip_logs, and ttp_url_logs.
+            // If it is changed here changes should be reflected in the other
+            // data streams. Do not differentiate the logic between these data
+            // streams lightly; use the state variable for this unless absolutely
+            // required.
+            state.with(
+              (
+                (has(state.?token.expires) && now() < timestamp(state.token.expires)) ?
+                  // The token we have is still valid.
+                  state.token
+                :
+                  // Get a new token.
+                  post_request(state.url.trim_right("/") + "/oauth/token", "application/x-www-form-urlencoded",
+                    {
+                      "client_id": [state.client_id],
+                      "client_secret": [state.client_secret],
+                      "grant_type": ["client_credentials"],
+                    }.format_query()
+                  ).do_request().as(auth, auth.StatusCode == 200 ?
+                    bytes(auth.Body).decode_json().as(auth_body, auth_body.with({
+                      // Include 60s grace period to avoid attempting to make
+                      // a request with a stale authentication token.
+                      "expires": now()+duration(string(int(auth_body.expires_in)-60)+"s"),
+                    }))
+                  :
+                    {
+                      "events": {
+                        "error": {
+                          "code": string(auth.StatusCode),
+                          "id": string(auth.Status),
+                          "message": "POST /oauth/token: "+(
+                            size(auth.Body) != 0 ?
+                              string(auth.Body)
+                            :
+                              string(auth.Status) + ' (' + string(auth.StatusCode) + ')'
+                          ),
+                        },
+                      },
+                      "want_more": false,
+                    }
+                  )
+              ).as(token, !has(token.access_token) ? token :
+                {
+                  "data": state.?last_page.data.orValue([{
+                    state.start_field: state.?cursor.last.orValue((now - duration(state.look_back)).format(time_layout.RFC3339)),
+                    state.end_field: now.format(time_layout.RFC3339),
+                  }]),
+                }.as(req,
+                  post_request(state.url.trim_right("/") + state.path, "application/json",
+                    {
+                      "meta": {
+                        "pagination": {
+                          "pageSize": state.page_size,
+                          ?"pageToken": state.?last_page.next,
+                        }
+                      },
+                      "data": req.data,
+                    }.encode_json()
+                  ).with({
+                    "Header": {
+                      "Authorization": ["Bearer " + token.access_token],
+                      "Accept": ["application/json"],
+                      "Content-Type": ["application/json"],
+                    }
+                  }).do_request().as(resp, resp.StatusCode == 200 ?
+                    bytes(resp.Body).decode_json().as(body, body.?fail.orValue([]).size() == 0 ?
+                      {
+                        "events": body.data.map(e, e[state.data_path].map(l, {"message": l.encode_json()})).flatten(),
+                        "cursor": {
+                          "last": ([now] + body.data.map(e,
+                            e[state.data_path].map(l,
+                              l[state.time_field].parse_time(["2006-01-02T15:04:05-0700", time_layout.RFC3339])
+                            )
+                          ).flatten()).max().format(time_layout.RFC3339),
+                        },
+                        ?"last_page": has(body.?meta.pagination.next) && size(body.data) != 0 ?
+                          optional.of({
+                            ?"next": body.?meta.pagination.next,
+                            "data": req.data,
+                          })
+                        :
+                          optional.none(),
+                        "token": {
+                          "access_token": token.access_token,
+                          "expires": token.expires,
+                        },
+                        "want_more": has(body.?meta.pagination.next) && size(body.data) != 0,
+                      }
+                    :
+                      // Mimecast can return failure states with a 200. This
+                      // is detected by a non-empty fail array at the root
+                      // of the response body. Don't attempt to parse this
+                      // out, just dump the whole body into the error message.
+                      {
+                        "events": {
+                          "error": {
+                            "code": string(resp.StatusCode),
+                            "id": string(resp.Status),
+                            "message": "POST " + state.path + ":" + string(resp.Body), // We know this is not empty.
+                          },
+                        },
+                        "want_more": false,
+                      }
+                    )
+                  :
+                    {
+                      "events": {
+                        "error": {
+                          "code": string(resp.StatusCode),
+                          "id": string(resp.Status),
+                          "message": "POST " + state.path + ": " + (
+                            size(resp.Body) != 0 ?
+                              string(resp.Body)
+                            :
+                              string(resp.Status) + ' (' + string(resp.StatusCode) + ')'
+                          ),
+                        },
+                      },
+                      "want_more": false,
+                    }
+                  )
+                )
+              )
+            )
+          redact:
+            fields:
+                - client_id
+                - client_secret
+                - token.access_token
+          resource.url: https://api.services.mimecast.com
+          state:
+            client_id: null
+            client_secret: null
+            data_path: heldReleaseLogs
+            end_field: end
+            look_back: 24h
+            page_size: 100
+            path: /api/gateway/get-held-release-logs
+            start_field: start
+            time_field: released
+          tags:
+            - forwarded
+            - mimecast-message-release-logs
+        - condition: ${kubernetes.hints.mimecast.siem_logs.enabled} == true and ${kubernetes.hints.mimecast.enabled} == true
+          config_version: 2
+          data_stream:
+            dataset: mimecast.siem_logs
+            type: logs
+          fields_under_root: true
+          interval: 5m
+          keep_null: true
+          program: "// This program is shared between cloud_integrated_logs and siem_logs\n// If it is changed here changes should be reflected in the other data\n// streams. Do not differentiate the logic between these data streams\n// lightly; use the state variable for this unless absolutely required.\nstate.with(\n  (\n    (has(state.?token.expires) && now() < timestamp(state.token.expires)) ?\n      // The token we have is still valid.\n      state.token\n    :\n      // Get a new token.\n      post_request(state.url.trim_right(\"/\") + \"/oauth/token\", \"application/x-www-form-urlencoded\",\n        {\n          \"client_id\": [state.client_id],\n          \"client_secret\": [state.client_secret],\n          \"grant_type\": [\"client_credentials\"],\n        }.format_query()\n      ).do_request().as(auth, auth.StatusCode == 200 ?\n        bytes(auth.Body).decode_json().as(auth_body, auth_body.with({\n          // Include 60s grace period to avoid attempting to make\n          // a request with a stale authentication token.\n          \"expires\": now()+duration(string(int(auth_body.expires_in)-60)+\"s\"),\n        }))\n      :\n        {\n          \"events\": {\n            \"error\": {\n              \"code\": string(auth.StatusCode),\n              \"id\": string(auth.Status),\n              \"message\": \"POST /oauth/token: \"+(\n                size(auth.Body) != 0 ?\n                  string(auth.Body)\n                :\n                  string(auth.Status) + ' (' + string(auth.StatusCode) + ')'\n              ),\n            },\n          },\n          \"want_more\": false,\n        }\n      )\n  ).as(token, !has(token.access_token) ? token :\n    state.?cursor.work_list.orValue(state.types.map(t, {\"type\": t})).as(work_list, size(work_list) == 0 ?\n      state.types.map(t, {\"type\": t})\n    :\n      work_list\n    ).as(work_list,\n      get_request(\n        state.url.trim_right(\"/\") + state.path + \"?\" + {\n          \"type\": [work_list[0].type],\n          ?\"nextPage\": work_list[0].?next.optMap(next, [next]),\n          ?\"dateRangeStartsAt\": state.?start.optMap(start, [start.format(\"2006-01-02\")]),\n          ?\"dateRangeEndsAt\": state.?end.optMap(end, [end.format(\"2006-01-02\")]),\n          ?\"pageSize\": state.?page_size.optMap(size, [string(int(size))]),\n        }.format_query()\n      ).with({\n        \"Header\": {\n          \"Authorization\": [\"Bearer \" + token.access_token], \n          \"Accept\": [\"application/json\"],\n          \"Content-Type\": [\"application/json\"],\n        }\n      }).do_request().as(resp, resp.StatusCode == 200 ?\n        bytes(resp.Body).decode_json().as(body,\n          {\n            \"events\": body.value.map(b, has(b.url),\n              get(b.url).as(batch, batch.StatusCode == 200 ?\n                bytes(batch.Body).mime(\"application/gzip\").mime(\"application/x-ndjson\").map(e,\n                  {\n                    \"message\": dyn(e.encode_json()),\n                  }\n                )\n              :\n                  [{\n                    \"error\": {\n                      \"code\": string(batch.StatusCode),\n                      \"id\": string(batch.Status),\n                      \"message\": \"GET \" + b.url + \": \" + (\n                        size(batch.Body) != 0 ?\n                          string(batch.Body)\n                        :\n                          string(batch.Status) + ' (' + string(batch.StatusCode) + ')'\n                      ),\n                    },\n                  }]\n              )\n            ).flatten(),\n            \"cursor\": {\n              \"work_list\": (\n                \"@nextPage\" in body && size(body.value) != 0 ?\n                  [work_list[0].with({\"next\": body[\"@nextPage\"]})]\n                :\n                  []\n              ) + tail(work_list),\n            },\n            \"token\": {\n              \"access_token\": token.access_token,\n              \"expires\": token.expires,\n            },\n            \"want_more\": \"@nextPage\" in body && size(body.value) != 0,\n          }.as(to_publish, to_publish.with({\n            \"want_more\": to_publish.want_more || size(to_publish.cursor.work_list) != 0,\n          }))\n        ).as(state, \n          // Check whether we still need to get more, but have\n          // no event for this type. If we do, populate events\n          // with a place-holder to be discarded by the ingest\n          // pipeline.\n          state.want_more && size(state.events) == 0 ?\n            state.with({\"events\": [{\"message\": \"want_more\"}]})\n          :\n            state\n        )\n      :\n        {\n          \"events\": {\n            \"error\": {\n              \"code\": string(resp.StatusCode),\n              \"id\": string(resp.Status),\n              \"message\": \"GET \" + state.path + \": \" + (\n                size(resp.Body) != 0 ?\n                  string(resp.Body)\n                :\n                  string(resp.Status) + ' (' + string(resp.StatusCode) + ')'\n              ),\n            },\n          },\n          \"want_more\": false,\n        }\n      )\n    )\n  )\n)\n"
+          redact:
+            fields:
+                - client_id
+                - client_secret
+                - token.access_token
+          resource.url: https://api.services.mimecast.com
+          state:
+            client_id: null
+            client_secret: null
+            end_field: dateRangeEndsAt
+            look_back: 24h
+            page_size: null
+            path: /siem/v1/batch/events/cg
+            start_field: dateRangeStartsAt
+            types:
+                - av
+                - delivery
+                - internal email protect
+                - impersonation protect
+                - journal
+                - process
+                - receipt
+                - attachment protect
+                - spam
+                - url protect
+          tags:
+            - forwarded
+            - mimecast-siem-logs
+        - condition: ${kubernetes.hints.mimecast.threat_intel_malware_customer.enabled} == true and ${kubernetes.hints.mimecast.enabled} == true
+          config_version: 2
+          data_stream:
+            dataset: mimecast.threat_intel_malware_customer
+            type: logs
+          fields_under_root: true
+          interval: 5m
+          keep_null: true
+          program: "// This program is shared between threat_intel_malware_customer and\n// threat_intel_malware_grid. If it is changed here changes should be\n// reflected in the other data streams. Do not differentiate the logic\n// between these data streams lightly; use the state variable for this\n// unless absolutely required.\nstate.with(\n  (\n    (has(state.?token.expires) && now() < timestamp(state.token.expires)) ?\n      // The token we have is still valid.\n      state.token\n    :\n      // Get a new token.\n      post_request(state.url.trim_right(\"/\") + \"/oauth/token\", \"application/x-www-form-urlencoded\",\n        {\n          \"client_id\": [state.client_id],\n          \"client_secret\": [state.client_secret],\n          \"grant_type\": [\"client_credentials\"],\n        }.format_query()\n      ).do_request().as(auth, auth.StatusCode == 200 ?\n        bytes(auth.Body).decode_json().as(auth_body, auth_body.with({\n          // Include 60s grace period to avoid attempting to make\n          // a request with a stale authentication token.\n          \"expires\": now()+duration(string(int(auth_body.expires_in)-60)+\"s\"),\n        }))\n      :\n        {\n          \"events\": {\n            \"error\": {\n              \"code\": string(auth.StatusCode),\n              \"id\": string(auth.Status),\n              \"message\": \"POST /oauth/token: \"+(\n                size(auth.Body) != 0 ?\n                  string(auth.Body)\n                :\n                  string(auth.Status) + ' (' + string(auth.StatusCode) + ')'\n              ),\n            },\n          },\n          \"want_more\": false,\n        }\n      )\n  ).as(token, !has(token.access_token) ? token :\n    {\n      \"data\": state.?last_page.data.orValue([{\n        ?\"start\": has(state.?cursor.token) ? optional.none() :\n          optional.of(state.?cursor.last.orValue((now - duration(state.look_back)).format(time_layout.RFC3339))),\n        ?\"end\": has(state.?cursor.token) ? optional.none() :\n          optional.of(now.format(time_layout.RFC3339)),\n        \"feedType\": state.feed_type,\n        ?\"token\": state.?cursor.token,\n        \"fileType\": \"stix\",\n      }]),\n    }.as(req,\n      post_request(state.url.trim_right(\"/\") + state.path, \"application/json\", \n        req.encode_json()\n      ).with({\n        \"Header\": {\n          \"Authorization\": [\"Bearer \" + token.access_token], \n          \"Accept\": [\"application/json\"],\n          \"Content-Type\": [\"application/json\"],\n        }\n      }).do_request().as(resp, resp.StatusCode == 200 ?\n        bytes(resp.Body).decode_json().as(body, body.?fail.orValue([]).size() == 0 ?\n          {\n            \"events\": body.objects.map(e, e.type == \"indicator\", {\"message\": e.encode_json()}),\n            \"cursor\": {\n              // The last timestamp may step past the last timestamp\n              // seen for an indicator. We assume here that if another\n              // type has a later timestamp, then the time at the API\n              // has progressed past the last indicator and we do not\n              // need to reach back that far.\n              \"last\": ([now] + body.objects.map(e, timestamp(e.modified))).max().format(time_layout.RFC3339),\n              ?\"token\": resp.?Header[\"X-Mc-Threat-Feed-Next-Token\"][?0],\n            },\n            \"token\": {\n              \"access_token\": token.access_token,\n              \"expires\": token.expires,\n            },\n            \"want_more\": resp.?Header[\"X-Mc-Threat-Feed-Next-Token\"].hasValue(),\n          }\n        :\n          // Mimecast can return failure states with a 200. This\n          // is detected by a non-empty fail array at the root\n          // of the response body. Don't attempt to parse this\n          // out, just dump the whole body into the error message.\n          {\n            \"events\": {\n              \"error\": {\n                \"code\": string(resp.StatusCode),\n                \"id\": string(resp.Status),\n                \"message\": \"POST \" + state.path + \": \" + string(resp.Body), // We know this is not empty.\n              },\n            },\n            \"want_more\": false,\n          }\n        )\n      : resp.StatusCode == 429 ?\n        // For reasons, Mimecast does not set X-RateLimit-* headers\n        // until the rate limit has been exceeded, so treat 429 codes\n        // as a sentinel to back off. We don't want to log errors and\n        // we do not want to update the cursor, so return an empty\n        // events array.\n        {\n          \"events\": [],\n          // Log the rate limit excession at DEBUG level.\n          \"rate_limited\": debug(\"rate_limit_exceeded\", bytes(resp.Body).decode_json().?fail[0].message.orValue(\"missing message\")),\n          \"want_more\": false,\n        }\n      :\n        {\n          \"events\": {\n            \"error\": {\n              \"code\": string(resp.StatusCode),\n              \"id\": string(resp.Status),\n              \"message\": \"POST \" + state.path + \": \" + (\n                size(resp.Body) != 0 ?\n                  string(resp.Body)\n                :\n                  string(resp.Status) + ' (' + string(resp.StatusCode) + ')'\n              ),\n            },\n          },\n          \"want_more\": false,\n        }\n      )\n    )\n  )\n)\n"
+          redact:
+            fields:
+                - client_id
+                - client_secret
+                - token.access_token
+          resource.url: https://api.services.mimecast.com
+          state:
+            client_id: null
+            client_secret: null
+            feed_type: malware_customer
+            look_back: 24h
+            page_size: null
+            path: /api/ttp/threat-intel/get-feed
+          tags:
+            - forwarded
+            - mimecast-threat-intel-feed-malware-customer
+        - condition: ${kubernetes.hints.mimecast.threat_intel_malware_grid.enabled} == true and ${kubernetes.hints.mimecast.enabled} == true
+          config_version: 2
+          data_stream:
+            dataset: mimecast.threat_intel_malware_grid
+            type: logs
+          fields_under_root: true
+          interval: 5m
+          keep_null: true
+          program: "// This program is shared between threat_intel_malware_customer and\n// threat_intel_malware_grid. If it is changed here changes should be\n// reflected in the other data streams. Do not differentiate the logic\n// between these data streams lightly; use the state variable for this\n// unless absolutely required.\nstate.with(\n  (\n    (has(state.?token.expires) && now() < timestamp(state.token.expires)) ?\n      // The token we have is still valid.\n      state.token\n    :\n      // Get a new token.\n      post_request(state.url.trim_right(\"/\") + \"/oauth/token\", \"application/x-www-form-urlencoded\",\n        {\n          \"client_id\": [state.client_id],\n          \"client_secret\": [state.client_secret],\n          \"grant_type\": [\"client_credentials\"],\n        }.format_query()\n      ).do_request().as(auth, auth.StatusCode == 200 ?\n        bytes(auth.Body).decode_json().as(auth_body, auth_body.with({\n          // Include 60s grace period to avoid attempting to make\n          // a request with a stale authentication token.\n          \"expires\": now()+duration(string(int(auth_body.expires_in)-60)+\"s\"),\n        }))\n      :\n        {\n          \"events\": {\n            \"error\": {\n              \"code\": string(auth.StatusCode),\n              \"id\": string(auth.Status),\n              \"message\": \"POST /oauth/token: \"+(\n                size(auth.Body) != 0 ?\n                  string(auth.Body)\n                :\n                  string(auth.Status) + ' (' + string(auth.StatusCode) + ')'\n              ),\n            },\n          },\n          \"want_more\": false,\n        }\n      )\n  ).as(token, !has(token.access_token) ? token :\n    {\n      \"data\": state.?last_page.data.orValue([{\n        ?\"start\": has(state.?cursor.token) ? optional.none() :\n          optional.of(state.?cursor.last.orValue((now - duration(state.look_back)).format(time_layout.RFC3339))),\n        ?\"end\": has(state.?cursor.token) ? optional.none() :\n          optional.of(now.format(time_layout.RFC3339)),\n        \"feedType\": state.feed_type,\n        ?\"token\": state.?cursor.token,\n        \"fileType\": \"stix\",\n      }]),\n    }.as(req,\n      post_request(state.url.trim_right(\"/\") + state.path, \"application/json\", \n        req.encode_json()\n      ).with({\n        \"Header\": {\n          \"Authorization\": [\"Bearer \" + token.access_token], \n          \"Accept\": [\"application/json\"],\n          \"Content-Type\": [\"application/json\"],\n        }\n      }).do_request().as(resp, resp.StatusCode == 200 ?\n        bytes(resp.Body).decode_json().as(body, body.?fail.orValue([]).size() == 0 ?\n          {\n            \"events\": body.objects.map(e, e.type == \"indicator\", {\"message\": e.encode_json()}),\n            \"cursor\": {\n              // The last timestamp may step past the last timestamp\n              // seen for an indicator. We assume here that if another\n              // type has a later timestamp, then the time at the API\n              // has progressed past the last indicator and we do not\n              // need to reach back that far.\n              \"last\": ([now] + body.objects.map(e, timestamp(e.modified))).max().format(time_layout.RFC3339),\n              ?\"token\": resp.?Header[\"X-Mc-Threat-Feed-Next-Token\"][?0],\n            },\n            \"token\": {\n              \"access_token\": token.access_token,\n              \"expires\": token.expires,\n            },\n            \"want_more\": resp.?Header[\"X-Mc-Threat-Feed-Next-Token\"].hasValue(),\n          }\n        :\n          // Mimecast can return failure states with a 200. This\n          // is detected by a non-empty fail array at the root\n          // of the response body. Don't attempt to parse this\n          // out, just dump the whole body into the error message.\n          {\n            \"events\": {\n              \"error\": {\n                \"code\": string(resp.StatusCode),\n                \"id\": string(resp.Status),\n                \"message\": \"POST \" + state.path + \": \" + string(resp.Body), // We know this is not empty.\n              },\n            },\n            \"want_more\": false,\n          }\n        )\n      : resp.StatusCode == 429 ?\n        // For reasons, Mimecast does not set X-RateLimit-* headers\n        // until the rate limit has been exceeded, so treat 429 codes\n        // as a sentinel to back off. We don't want to log errors and\n        // we do not want to update the cursor, so return an empty\n        // events array.\n        {\n          \"events\": [],\n          // Log the rate limit excession at DEBUG level.\n          \"rate_limited\": debug(\"rate_limit_exceeded\", bytes(resp.Body).decode_json().?fail[0].message.orValue(\"missing message\")),\n          \"want_more\": false,\n        }\n      :\n        {\n          \"events\": {\n            \"error\": {\n              \"code\": string(resp.StatusCode),\n              \"id\": string(resp.Status),\n              \"message\": \"POST \" + state.path + \": \" + (\n                size(resp.Body) != 0 ?\n                  string(resp.Body)\n                :\n                  string(resp.Status) + ' (' + string(resp.StatusCode) + ')'\n              ),\n            },\n          },\n          \"want_more\": false,\n        }\n      )\n    )\n  )\n)\n"
+          redact:
+            fields:
+                - client_id
+                - client_secret
+                - token.access_token
+          resource.url: https://api.services.mimecast.com
+          state:
+            client_id: null
+            client_secret: null
+            feed_type: malware_grid
+            look_back: 24h
+            page_size: null
+            path: /api/ttp/threat-intel/get-feed
+          tags:
+            - forwarded
+            - mimecast-threat-intel-feed-malware-grid
+        - condition: ${kubernetes.hints.mimecast.ttp_ap_logs.enabled} == true and ${kubernetes.hints.mimecast.enabled} == true
+          config_version: 2
+          data_stream:
+            dataset: mimecast.ttp_ap_logs
+            type: logs
+          fields_under_root: true
+          interval: 5m
+          keep_null: true
+          program: |
+            // This program is shared amongst archive_search_logs, dlp_logs,
+            // message_release_logs, ttp_ap_logs, ttp_ip_logs, and ttp_url_logs.
+            // If it is changed here changes should be reflected in the other
+            // data streams. Do not differentiate the logic between these data
+            // streams lightly; use the state variable for this unless absolutely
+            // required.
+            state.with(
+              (
+                (has(state.?token.expires) && now() < timestamp(state.token.expires)) ?
+                  // The token we have is still valid.
+                  state.token
+                :
+                  // Get a new token.
+                  post_request(state.url.trim_right("/") + "/oauth/token", "application/x-www-form-urlencoded",
+                    {
+                      "client_id": [state.client_id],
+                      "client_secret": [state.client_secret],
+                      "grant_type": ["client_credentials"],
+                    }.format_query()
+                  ).do_request().as(auth, auth.StatusCode == 200 ?
+                    bytes(auth.Body).decode_json().as(auth_body, auth_body.with({
+                      // Include 60s grace period to avoid attempting to make
+                      // a request with a stale authentication token.
+                      "expires": now()+duration(string(int(auth_body.expires_in)-60)+"s"),
+                    }))
+                  :
+                    {
+                      "events": {
+                        "error": {
+                          "code": string(auth.StatusCode),
+                          "id": string(auth.Status),
+                          "message": "POST /oauth/token: "+(
+                            size(auth.Body) != 0 ?
+                              string(auth.Body)
+                            :
+                              string(auth.Status) + ' (' + string(auth.StatusCode) + ')'
+                          ),
+                        },
+                      },
+                      "want_more": false,
+                    }
+                  )
+              ).as(token, !has(token.access_token) ? token :
+                {
+                  "data": state.?last_page.data.orValue([{
+                    state.start_field: state.?cursor.last.orValue((now - duration(state.look_back)).format(time_layout.RFC3339)),
+                    state.end_field: now.format(time_layout.RFC3339),
+                  }]),
+                }.as(req,
+                  post_request(state.url.trim_right("/") + state.path, "application/json",
+                    {
+                      "meta": {
+                        "pagination": {
+                          "pageSize": state.page_size,
+                          ?"pageToken": state.?last_page.next,
+                        }
+                      },
+                      "data": req.data,
+                    }.encode_json()
+                  ).with({
+                    "Header": {
+                      "Authorization": ["Bearer " + token.access_token],
+                      "Accept": ["application/json"],
+                      "Content-Type": ["application/json"],
+                    }
+                  }).do_request().as(resp, resp.StatusCode == 200 ?
+                    bytes(resp.Body).decode_json().as(body, body.?fail.orValue([]).size() == 0 ?
+                      {
+                        "events": body.data.map(e, e[state.data_path].map(l, {"message": l.encode_json()})).flatten(),
+                        "cursor": {
+                          "last": ([now] + body.data.map(e,
+                            e[state.data_path].map(l,
+                              l[state.time_field].parse_time(["2006-01-02T15:04:05-0700", time_layout.RFC3339])
+                            )
+                          ).flatten()).max().format(time_layout.RFC3339),
+                        },
+                        ?"last_page": has(body.?meta.pagination.next) && size(body.data) != 0 ?
+                          optional.of({
+                            ?"next": body.?meta.pagination.next,
+                            "data": req.data,
+                          })
+                        :
+                          optional.none(),
+                        "token": {
+                          "access_token": token.access_token,
+                          "expires": token.expires,
+                        },
+                        "want_more": has(body.?meta.pagination.next) && size(body.data) != 0,
+                      }
+                    :
+                      // Mimecast can return failure states with a 200. This
+                      // is detected by a non-empty fail array at the root
+                      // of the response body. Don't attempt to parse this
+                      // out, just dump the whole body into the error message.
+                      {
+                        "events": {
+                          "error": {
+                            "code": string(resp.StatusCode),
+                            "id": string(resp.Status),
+                            "message": "POST " + state.path + ":" + string(resp.Body), // We know this is not empty.
+                          },
+                        },
+                        "want_more": false,
+                      }
+                    )
+                  :
+                    {
+                      "events": {
+                        "error": {
+                          "code": string(resp.StatusCode),
+                          "id": string(resp.Status),
+                          "message": "POST " + state.path + ": " + (
+                            size(resp.Body) != 0 ?
+                              string(resp.Body)
+                            :
+                              string(resp.Status) + ' (' + string(resp.StatusCode) + ')'
+                          ),
+                        },
+                      },
+                      "want_more": false,
+                    }
+                  )
+                )
+              )
+            )
+          redact:
+            fields:
+                - client_id
+                - client_secret
+                - token.access_token
+          resource.url: https://api.services.mimecast.com
+          state:
+            client_id: null
+            client_secret: null
+            data_path: attachmentLogs
+            end_field: to
+            look_back: 24h
+            page_size: 100
+            path: /api/ttp/attachment/get-logs
+            start_field: from
+            time_field: date
+          tags:
+            - forwarded
+            - mimecast-ttp-ap
+        - condition: ${kubernetes.hints.mimecast.ttp_ip_logs.enabled} == true and ${kubernetes.hints.mimecast.enabled} == true
+          config_version: 2
+          data_stream:
+            dataset: mimecast.ttp_ip_logs
+            type: logs
+          fields_under_root: true
+          interval: 5m
+          keep_null: true
+          program: |
+            // This program is shared amongst archive_search_logs, dlp_logs,
+            // message_release_logs, ttp_ap_logs, ttp_ip_logs, and ttp_url_logs.
+            // If it is changed here changes should be reflected in the other
+            // data streams. Do not differentiate the logic between these data
+            // streams lightly; use the state variable for this unless absolutely
+            // required.
+            state.with(
+              (
+                (has(state.?token.expires) && now() < timestamp(state.token.expires)) ?
+                  // The token we have is still valid.
+                  state.token
+                :
+                  // Get a new token.
+                  post_request(state.url.trim_right("/") + "/oauth/token", "application/x-www-form-urlencoded",
+                    {
+                      "client_id": [state.client_id],
+                      "client_secret": [state.client_secret],
+                      "grant_type": ["client_credentials"],
+                    }.format_query()
+                  ).do_request().as(auth, auth.StatusCode == 200 ?
+                    bytes(auth.Body).decode_json().as(auth_body, auth_body.with({
+                      // Include 60s grace period to avoid attempting to make
+                      // a request with a stale authentication token.
+                      "expires": now()+duration(string(int(auth_body.expires_in)-60)+"s"),
+                    }))
+                  :
+                    {
+                      "events": {
+                        "error": {
+                          "code": string(auth.StatusCode),
+                          "id": string(auth.Status),
+                          "message": "POST /oauth/token: "+(
+                            size(auth.Body) != 0 ?
+                              string(auth.Body)
+                            :
+                              string(auth.Status) + ' (' + string(auth.StatusCode) + ')'
+                          ),
+                        },
+                      },
+                      "want_more": false,
+                    }
+                  )
+              ).as(token, !has(token.access_token) ? token :
+                {
+                  "data": state.?last_page.data.orValue([{
+                    state.start_field: state.?cursor.last.orValue((now - duration(state.look_back)).format(time_layout.RFC3339)),
+                    state.end_field: now.format(time_layout.RFC3339),
+                  }]),
+                }.as(req,
+                  post_request(state.url.trim_right("/") + state.path, "application/json",
+                    {
+                      "meta": {
+                        "pagination": {
+                          "pageSize": state.page_size,
+                          ?"pageToken": state.?last_page.next,
+                        }
+                      },
+                      "data": req.data,
+                    }.encode_json()
+                  ).with({
+                    "Header": {
+                      "Authorization": ["Bearer " + token.access_token],
+                      "Accept": ["application/json"],
+                      "Content-Type": ["application/json"],
+                    }
+                  }).do_request().as(resp, resp.StatusCode == 200 ?
+                    bytes(resp.Body).decode_json().as(body, body.?fail.orValue([]).size() == 0 ?
+                      {
+                        "events": body.data.map(e, e[state.data_path].map(l, {"message": l.encode_json()})).flatten(),
+                        "cursor": {
+                          "last": ([now] + body.data.map(e,
+                            e[state.data_path].map(l,
+                              l[state.time_field].parse_time(["2006-01-02T15:04:05-0700", time_layout.RFC3339])
+                            )
+                          ).flatten()).max().format(time_layout.RFC3339),
+                        },
+                        ?"last_page": has(body.?meta.pagination.next) && size(body.data) != 0 ?
+                          optional.of({
+                            ?"next": body.?meta.pagination.next,
+                            "data": req.data,
+                          })
+                        :
+                          optional.none(),
+                        "token": {
+                          "access_token": token.access_token,
+                          "expires": token.expires,
+                        },
+                        "want_more": has(body.?meta.pagination.next) && size(body.data) != 0,
+                      }
+                    :
+                      // Mimecast can return failure states with a 200. This
+                      // is detected by a non-empty fail array at the root
+                      // of the response body. Don't attempt to parse this
+                      // out, just dump the whole body into the error message.
+                      {
+                        "events": {
+                          "error": {
+                            "code": string(resp.StatusCode),
+                            "id": string(resp.Status),
+                            "message": "POST " + state.path + ":" + string(resp.Body), // We know this is not empty.
+                          },
+                        },
+                        "want_more": false,
+                      }
+                    )
+                  :
+                    {
+                      "events": {
+                        "error": {
+                          "code": string(resp.StatusCode),
+                          "id": string(resp.Status),
+                          "message": "POST " + state.path + ": " + (
+                            size(resp.Body) != 0 ?
+                              string(resp.Body)
+                            :
+                              string(resp.Status) + ' (' + string(resp.StatusCode) + ')'
+                          ),
+                        },
+                      },
+                      "want_more": false,
+                    }
+                  )
+                )
+              )
+            )
+          redact:
+            fields:
+                - client_id
+                - client_secret
+                - token.access_token
+          resource.url: https://api.services.mimecast.com
+          state:
+            client_id: null
+            client_secret: null
+            data_path: impersonationLogs
+            end_field: to
+            look_back: 24h
+            page_size: 100
+            path: /api/ttp/impersonation/get-logs
+            start_field: from
+            time_field: eventTime
+          tags:
+            - forwarded
+            - mimecast-ttp-ip
+        - condition: ${kubernetes.hints.mimecast.ttp_url_logs.enabled} == true and ${kubernetes.hints.mimecast.enabled} == true
+          config_version: 2
+          data_stream:
+            dataset: mimecast.ttp_url_logs
+            type: logs
+          fields_under_root: true
+          interval: 5m
+          keep_null: true
+          program: |
+            // This program is shared amongst archive_search_logs, dlp_logs,
+            // message_release_logs, ttp_ap_logs, ttp_ip_logs, and ttp_url_logs.
+            // If it is changed here changes should be reflected in the other
+            // data streams. Do not differentiate the logic between these data
+            // streams lightly; use the state variable for this unless absolutely
+            // required.
+            state.with(
+              (
+                (has(state.?token.expires) && now() < timestamp(state.token.expires)) ?
+                  // The token we have is still valid.
+                  state.token
+                :
+                  // Get a new token.
+                  post_request(state.url.trim_right("/") + "/oauth/token", "application/x-www-form-urlencoded",
+                    {
+                      "client_id": [state.client_id],
+                      "client_secret": [state.client_secret],
+                      "grant_type": ["client_credentials"],
+                    }.format_query()
+                  ).do_request().as(auth, auth.StatusCode == 200 ?
+                    bytes(auth.Body).decode_json().as(auth_body, auth_body.with({
+                      // Include 60s grace period to avoid attempting to make
+                      // a request with a stale authentication token.
+                      "expires": now()+duration(string(int(auth_body.expires_in)-60)+"s"),
+                    }))
+                  :
+                    {
+                      "events": {
+                        "error": {
+                          "code": string(auth.StatusCode),
+                          "id": string(auth.Status),
+                          "message": "POST /oauth/token: "+(
+                            size(auth.Body) != 0 ?
+                              string(auth.Body)
+                            :
+                              string(auth.Status) + ' (' + string(auth.StatusCode) + ')'
+                          ),
+                        },
+                      },
+                      "want_more": false,
+                    }
+                  )
+              ).as(token, !has(token.access_token) ? token :
+                {
+                  "data": state.?last_page.data.orValue([{
+                    state.start_field: state.?cursor.last.orValue((now - duration(state.look_back)).format(time_layout.RFC3339)),
+                    state.end_field: now.format(time_layout.RFC3339),
+                  }]),
+                }.as(req,
+                  post_request(state.url.trim_right("/") + state.path, "application/json",
+                    {
+                      "meta": {
+                        "pagination": {
+                          "pageSize": state.page_size,
+                          ?"pageToken": state.?last_page.next,
+                        }
+                      },
+                      "data": req.data,
+                    }.encode_json()
+                  ).with({
+                    "Header": {
+                      "Authorization": ["Bearer " + token.access_token],
+                      "Accept": ["application/json"],
+                      "Content-Type": ["application/json"],
+                    }
+                  }).do_request().as(resp, resp.StatusCode == 200 ?
+                    bytes(resp.Body).decode_json().as(body, body.?fail.orValue([]).size() == 0 ?
+                      {
+                        "events": body.data.map(e, e[state.data_path].map(l, {"message": l.encode_json()})).flatten(),
+                        "cursor": {
+                          "last": ([now] + body.data.map(e,
+                            e[state.data_path].map(l,
+                              l[state.time_field].parse_time(["2006-01-02T15:04:05-0700", time_layout.RFC3339])
+                            )
+                          ).flatten()).max().format(time_layout.RFC3339),
+                        },
+                        ?"last_page": has(body.?meta.pagination.next) && size(body.data) != 0 ?
+                          optional.of({
+                            ?"next": body.?meta.pagination.next,
+                            "data": req.data,
+                          })
+                        :
+                          optional.none(),
+                        "token": {
+                          "access_token": token.access_token,
+                          "expires": token.expires,
+                        },
+                        "want_more": has(body.?meta.pagination.next) && size(body.data) != 0,
+                      }
+                    :
+                      // Mimecast can return failure states with a 200. This
+                      // is detected by a non-empty fail array at the root
+                      // of the response body. Don't attempt to parse this
+                      // out, just dump the whole body into the error message.
+                      {
+                        "events": {
+                          "error": {
+                            "code": string(resp.StatusCode),
+                            "id": string(resp.Status),
+                            "message": "POST " + state.path + ":" + string(resp.Body), // We know this is not empty.
+                          },
+                        },
+                        "want_more": false,
+                      }
+                    )
+                  :
+                    {
+                      "events": {
+                        "error": {
+                          "code": string(resp.StatusCode),
+                          "id": string(resp.Status),
+                          "message": "POST " + state.path + ": " + (
+                            size(resp.Body) != 0 ?
+                              string(resp.Body)
+                            :
+                              string(resp.Status) + ' (' + string(resp.StatusCode) + ')'
+                          ),
+                        },
+                      },
+                      "want_more": false,
+                    }
+                  )
+                )
+              )
+            )
+          redact:
+            fields:
+                - client_id
+                - client_secret
+                - token.access_token
+          resource.url: https://api.services.mimecast.com
+          state:
+            client_id: null
+            client_secret: null
+            data_path: clickLogs
+            end_field: to
+            look_back: 24h
+            page_size: 100
+            path: /api/ttp/url/get-logs
+            start_field: from
+            time_field: date
+          tags:
+            - forwarded
+            - mimecast-ttp-url
+      data_stream.namespace: default
+    - name: filestream-mimecast
+      id: filestream-mimecast-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - id: mimecast-container-logs-${kubernetes.hints.container_id}
+          condition: ${kubernetes.hints.mimecast.container_logs.enabled} == true
+          data_stream:
+            dataset: mimecast.container_logs
+            type: logs
+          exclude_files: []
+          exclude_lines: []
+          parsers:
+            - container:
+                format: auto
+                stream: all
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                symlinks: true
+          tags: []
+      data_stream.namespace: default
     - name: httpjson-mimecast
       id: httpjson-mimecast-${kubernetes.hints.container_id}
       type: httpjson
       use_output: default
       streams:
+        - condition: ${kubernetes.hints.mimecast.archive_search_logs.enabled} == true or ${kubernetes.hints.mimecast.enabled} == true
+          config_version: "2"
+          cursor:
+            next_date:
+                value: '[[.first_event.createTime]]'
+          data_stream:
+            dataset: mimecast.archive_search_logs
+            type: logs
+          interval: 5m
+          request.method: POST
+          request.transforms:
+            - set:
+                target: body.meta.pagination.pageSize
+                value: 100
+            - set:
+                target: header.x-mc-app-id
+                value: null
+            - set:
+                target: header.x-mc-date
+                value: '[[formatDate (now) "RFC1123"]]'
+            - set:
+                target: header.x-mc-req-id
+                value: '[[uuid]]'
+            - set:
+                fail_on_template_error: true
+                target: header.Authorization
+                value: MC :[[hmacBase64 "sha1" (base64Decode "") (sprintf "%s:%s:/api/archive/get-archive-search-logs:" (.header.Get "x-mc-date") (.header.Get "x-mc-req-id"))]]
+          request.url: https://eu-api.mimecast.com/api/archive/get-archive-search-logs
+          response.decode_as: application/json
+          response.pagination:
+            - delete:
+                target: body.data
+            - set:
+                fail_on_template_error: true
+                target: body.meta.pagination.pageToken
+                value: |-
+                    [[- if index .last_response.body.meta.pagination "next" -]]
+                      [[- .last_response.body.meta.pagination.next -]]
+                    [[- end -]]
+          response.split:
+            ignore_empty_value: true
+            split:
+                ignore_empty_value: true
+                keep_parent: false
+                target: body.logs
+            target: body.data
+          tags:
+            - forwarded
+            - mimecast-archive-search-logs
         - condition: ${kubernetes.hints.mimecast.audit_events.enabled} == true or ${kubernetes.hints.mimecast.enabled} == true
           config_version: "2"
           cursor:
@@ -135,6 +1275,7 @@ inputs:
           request.url: https://eu-api.mimecast.com/api/audit/get-siem-logs
           response.decode_as: application/zip
           response.split:
+            ignore_empty_value: true
             target: body.data
             transforms:
                 - set:
@@ -363,26 +1504,4 @@ inputs:
           tags:
             - forwarded
             - mimecast-ttp-url
-      data_stream.namespace: default
-    - name: filestream-mimecast
-      id: filestream-mimecast-${kubernetes.hints.container_id}
-      type: filestream
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.mimecast.container_logs.enabled} == true
-          data_stream:
-            dataset: mimecast.container_logs
-            type: logs
-          exclude_files: []
-          exclude_lines: []
-          parsers:
-            - container:
-                format: auto
-                stream: all
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          prospector:
-            scanner:
-                symlinks: true
-          tags: []
       data_stream.namespace: default
