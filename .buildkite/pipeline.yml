@@ -275,6 +275,7 @@ steps:
                 - dev-tools/
                 - pkg/
                 - deploy/
+                - test_infra/
                 - testing/
                 - version/
                 - specs/
