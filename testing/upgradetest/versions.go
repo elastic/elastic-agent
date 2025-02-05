@@ -223,7 +223,7 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 			currentMajor = version.Major()
 			currentMinor = version.Minor()
 			previousMajorsToFind--
-			previousMinorsToFind-- // count as prev moinor as well
+			previousMinorsToFind-- // count as prev minor as well
 			skipCurrentMajor = true
 
 		// since the list is sorted we can stop here
