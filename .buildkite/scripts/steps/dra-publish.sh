@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -uo pipefail
+set -euo pipefail
 
 DRY_RUN="${DRA_DRY_RUN:=""}"
 WORKFLOW="${DRA_WORKFLOW:=""}"
@@ -73,7 +73,7 @@ function run_release_manager_collect() {
         --workflow "${_workflow}" \
         --version "${_version}" \
         --artifact-set "${_artifact_set}" \
-        --qualifier "${VERSION_QUALIFIER}"
+        --qualifier "${VERSION_QUALIFIER}" \
         ${_dry_run}
 }
 
