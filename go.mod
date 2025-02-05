@@ -27,7 +27,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector v0.3.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.13.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.3.0
-	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.3.0
+	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.4.0
 	github.com/fatih/color v1.17.0
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-viper/mapstructure/v2 v2.2.1
@@ -236,6 +236,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.11 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.10 // indirect
 	github.com/aws/smithy-go v1.22.2 // indirect
+	github.com/axiomhq/hyperloglog v0.2.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.8.1 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
@@ -246,7 +247,7 @@ require (
 	github.com/cockroachdb/errors v1.11.3 // indirect
 	github.com/cockroachdb/fifo v0.0.0-20240606204812-0bbfbd93a7ce // indirect
 	github.com/cockroachdb/logtags v0.0.0-20230118201751-21c54148d20b // indirect
-	github.com/cockroachdb/pebble v1.1.2 // indirect
+	github.com/cockroachdb/pebble v1.1.3 // indirect
 	github.com/cockroachdb/redact v1.1.5 // indirect
 	github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06 // indirect
 	github.com/containerd/containerd v1.7.18 // indirect
@@ -260,6 +261,7 @@ require (
 	github.com/devigned/tab v0.1.2-0.20190607222403-0c15cf42f9a2 // indirect
 	github.com/dgraph-io/badger/v4 v4.5.0 // indirect
 	github.com/dgraph-io/ristretto/v2 v2.0.0 // indirect
+	github.com/dgryski/go-metro v0.0.0-20180109044635-280f6062b5bc // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/digitalocean/go-libvirt v0.0.0-20240709142323-d8406205c752 // indirect
 	github.com/digitalocean/godo v1.122.0 // indirect
