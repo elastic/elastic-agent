@@ -1348,19 +1348,26 @@ service:
 		"@metadata.version",
 	}
 
-	require.Equal(t, "", diffMapstrM(fbDoc, fbReceiverDoc, ignoredFields), "filebeat and fbreceiver docs are not equal")
-
+	assertMapsEqual(t, fbDoc, fbReceiverDoc, ignoredFields)
 	cancel()
 	err = cmd.Wait()
 	require.True(t, err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || strings.Contains(err.Error(), "signal: killed"), "Retrieved unexpected error: %s", err.Error())
 }
 
-func diffMapstrM(m1, m2 mapstr.M, ignoredFields []string) string {
+func assertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string) {
+	t.Helper()
+
 	flatM1 := m1.Flatten()
 	flatM2 := m2.Flatten()
 	for _, f := range ignoredFields {
+		hasKeyM1, _ := flatM1.HasKey(f)
+		hasKeyM2, _ := flatM2.HasKey(f)
+		if !hasKeyM1 && !hasKeyM2 {
+			assert.Failf(t, "ignored field %s not found in both maps", f)
+		}
+
 		flatM1.Delete(f)
 		flatM2.Delete(f)
 	}
-	return cmp.Diff(flatM1, flatM2)
+	require.Equal(t, "", cmp.Diff(flatM1, flatM2), "expected maps to be equal")
 }
