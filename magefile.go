@@ -26,6 +26,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -751,7 +752,7 @@ func BuildFleetCfg() error {
 	out := filepath.Join("internal", "pkg", "agent", "application", "configuration_embed.go")
 
 	fmt.Printf(">> BuildFleetCfg %s to %s\n", in, out)
-	return RunGo("run", goF, "--in", in, "--out", out)
+	return RunGo("run", goF, "--in", in, "--output", out)
 }
 
 // Enroll runs agent which enrolls before running.
@@ -3299,6 +3300,10 @@ func getOtelDependencies() (*otelDependencies, error) {
 		} else if dependency.ComponentType == "receiver" {
 			receivers = append(receivers, dependency)
 		}
+	}
+
+	for _, list := range [][]*otelDependency{connectors, exporters, extensions, processors, receivers} {
+		sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
 	}
 
 	return &otelDependencies{

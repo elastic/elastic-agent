@@ -347,6 +347,9 @@ processors:
           - set(resource.attributes["metricset.interval"], "60m")
           - set(attributes["data_stream.dataset"], Concat([attributes["metricset.name"], "60m"], "."))
           - set(attributes["processor.event"], "metric")
+  batch/aggs:
+    send_batch_size: 16384 # 2x the default
+    timeout: 10s
 
 exporters:
   elasticsearch/ecs:
@@ -393,7 +396,7 @@ service:
 
     metrics/aggregated-metrics:
       receivers: [signaltometrics]
-      processors: [lsminterval]
+      processors: [batch/aggs, lsminterval]
       exporters: [elasticsearch/otel]
 
     logs/fromsdk:
