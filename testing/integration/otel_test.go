@@ -1189,6 +1189,11 @@ receivers:
             - {{.InputPath}}
           prospector.scanner.fingerprint.enabled: false
           file_identity.native: ~
+          processors:
+            - add_host_metadata: ~
+            - add_cloud_metadata: ~
+            - add_docker_metadata: ~
+            - add_kubernetes_metadata: ~
     output:
       otelconsumer:
     logging:
@@ -1326,19 +1331,6 @@ service:
 		"elastic_agent.snapshot",
 		"elastic_agent.version",
 		"event.dataset",
-		"host.architecture",
-		"host.containerized",
-		"host.hostname",
-		"host.id",
-		"host.ip",
-		"host.mac",
-		"host.os.build",
-		"host.os.family",
-		"host.os.kernel",
-		"host.os.name",
-		"host.os.platform",
-		"host.os.type",
-		"host.os.version",
 
 		// TODO: fbreceiver adds metadata fields that are internal in filebeat.
 		// Remove this once https://github.com/elastic/beats/pull/42412
