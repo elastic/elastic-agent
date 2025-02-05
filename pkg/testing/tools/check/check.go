@@ -65,3 +65,28 @@ func FleetAgentStatus(ctx context.Context,
 		return false
 	}
 }
+
+// FleetAgentStatusByAgentID returns a niladic function that returns true if the agent with given ID
+// has reached expectedStatus; false otherwise. The returned function is intended
+// for use with assert.Eventually or require.Eventually.
+func FleetAgentStatusByAgentID(ctx context.Context,
+	t *testing.T,
+	client *kibana.Client,
+	agentID,
+	expectedStatus string) func() bool {
+	return func() bool {
+		req := kibana.GetAgentRequest{
+			ID: agentID,
+		}
+		resp, err := client.GetAgent(ctx, req)
+		if err != nil {
+			t.Logf("failed to get agent by ID: %s", err)
+			return false
+		}
+		if resp.Status == expectedStatus {
+			return true
+		}
+		t.Logf("Agent fleet status: %s", resp.Status)
+		return false
+	}
+}
