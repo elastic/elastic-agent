@@ -1340,13 +1340,13 @@ service:
 		"@metadata.version",
 	}
 
-	assertMapsEqual(t, fbDoc, fbReceiverDoc, ignoredFields)
+	assertMapsEqual(t, fbDoc, fbReceiverDoc, ignoredFields, "expected documents to be equal")
 	cancel()
 	err = cmd.Wait()
 	require.True(t, err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || strings.Contains(err.Error(), "signal: killed"), "Retrieved unexpected error: %s", err.Error())
 }
 
-func assertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string) {
+func assertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg string) {
 	t.Helper()
 
 	flatM1 := m1.Flatten()
@@ -1354,8 +1354,19 @@ func assertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string) {
 	for _, f := range ignoredFields {
 		hasKeyM1, _ := flatM1.HasKey(f)
 		hasKeyM2, _ := flatM2.HasKey(f)
+
+		// Check if the ignored field exists in either map
 		if !hasKeyM1 && !hasKeyM2 {
-			assert.Failf(t, "ignored field %s not found in both maps", f)
+			require.Failf(t, msg, "ignored field %q does not exist in either map, please remove it from the ignored fields", f)
+		}
+
+		// If the ignored field exists and is equal in both maps then it shouldn't be ignored
+		if hasKeyM1 && hasKeyM2 {
+			valM1, _ := flatM1.GetValue(f)
+			valM2, _ := flatM2.GetValue(f)
+			if valM1 == valM2 {
+				require.Failf(t, msg, "ignored field %q is equal in both maps, please remove it from the ignored fields", f)
+			}
 		}
 
 		flatM1.Delete(f)
