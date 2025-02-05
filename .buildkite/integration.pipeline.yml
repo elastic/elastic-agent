@@ -116,6 +116,7 @@ steps:
       branch: "${BUILDKITE_BRANCH}"
 
   - label: "Serverless Beats Tests"
+    # To speedup the build process only packaging-ubuntu-x86-64 artifact dependency is required
     depends_on:
       - packaging-ubuntu-x86-64
     key: "serverless-beats-integration-tests"

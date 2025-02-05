@@ -63,6 +63,7 @@ steps:
       - integration-ess
     steps:
       - label: "x86_64:non-sudo: {{matrix}}"
+        # only packaging-ubuntu-x86-64 artifact dependency is required
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
@@ -77,6 +78,7 @@ steps:
           - default
 
       - label: "x86_64:sudo: {{matrix}}"
+        # due to deb group present in matrix tar.gz and deb packages artifacts are required
         command: |
           buildkite-agent artifact download build/distributions/** . --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
