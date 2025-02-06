@@ -242,7 +242,7 @@ shared:
 
   - &docker_elastic_spec
     extra_vars:
-      repository: 'docker.elastic.co/beats'
+      repository: 'docker.elastic.co/elastic-agent'
 
   - &agent_docker_spec
     <<: *agent_binary_spec
