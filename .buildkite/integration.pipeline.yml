@@ -18,7 +18,7 @@ steps:
         - build/distributions/**
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
 
       - label: "Packaging: Ubuntu arm64"
         key: "packaging-ubuntu-arm64"
@@ -30,7 +30,7 @@ steps:
           - build/distributions/**
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
 
       - label: "Packaging: Windows"
         key: "packaging-windows"
@@ -42,7 +42,7 @@ steps:
           - build/distributions/**
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
 
       - label: "Packaging: Containers {{matrix.ext}} {{matrix.arch}}"
         key: "packaging-containers"
@@ -54,7 +54,7 @@ steps:
           - build/distributions/**
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
         matrix:
           setup:
             arch:
@@ -73,15 +73,15 @@ steps:
     env:
       # we run each step in a different data center to spread the load
       TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-a"
-    commands:
-      - buildkite-agent artifact download "build/distributions/**" . $BUILDKITE_BUILD_ID
-      - .buildkite/scripts/steps/integration_tests.sh serverless integration:single TestLogIngestionFleetManaged #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
+    command: |
+      buildkite-agent artifact download "build/distributions/**" . $BUILDKITE_BUILD_ID
+      .buildkite/scripts/steps/integration_tests.sh serverless integration:single TestLogIngestionFleetManaged #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
     agents:
       provider: "gcp"
-      machineType: "n1-standard-8"
+      machineType: "n2-standard-8"
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Serverless integration test"
@@ -94,15 +94,15 @@ steps:
     concurrency: 8
     env:
       TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-b"
-    commands:
-      - buildkite-agent artifact download "build/distributions/**" . $BUILDKITE_BUILD_ID
-      - .buildkite/scripts/steps/integration_tests.sh stateful integration:TestForResourceLeaks
+    command: |
+      buildkite-agent artifact download "build/distributions/**" . $BUILDKITE_BUILD_ID
+      .buildkite/scripts/steps/integration_tests.sh stateful integration:TestForResourceLeaks
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
     agents:
       provider: "gcp"
-      machineType: "n1-standard-8"
+      machineType: "n2-standard-8"
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Extended runtime leak tests"
@@ -124,12 +124,12 @@ steps:
     concurrency: 8
     env:
       TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-a"
-    commands:
-      - buildkite-agent artifact download "build/distributions/**" . $BUILDKITE_BUILD_ID
-      - .buildkite/scripts/steps/beats_tests.sh
+    command: |
+      buildkite-agent artifact download "build/distributions/**" . $BUILDKITE_BUILD_ID
+      .buildkite/scripts/steps/beats_tests.sh
     agents:
       provider: "gcp"
-      machineType: "n1-standard-8"
+      machineType: "n2-standard-8"
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Serverless Beats Tests"
