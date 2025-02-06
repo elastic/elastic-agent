@@ -7,10 +7,11 @@ package application
 import (
 	"net/http"
 
+	"golang.org/x/net/http/httpproxy"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/pkg/component"
-	"golang.org/x/net/http/httpproxy"
 )
 
 // InjectProxyEndpointModifier injects a proxy_url value into endpoint's output config if one is not set.
