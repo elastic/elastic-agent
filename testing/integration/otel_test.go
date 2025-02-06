@@ -1249,11 +1249,8 @@ service:
 
 	// Start the collector, ingest some logs and then stop it
 	stoppedCh := make(chan int, 1)
-	fCtx, cancel := context.WithDeadline(ctx, time.Now().Add(20*time.Second))
+	fCtx, cancel := context.WithDeadline(ctx, time.Now().Add(1*time.Minute))
 	go func() {
-		err = fixture.RunOtelWithClient(fCtx)
-		err = fixture.RunOtelWithClient(fCtx)
-		cancel()
 		err = fixture.RunOtelWithClient(fCtx)
 		cancel()
 		require.True(t, errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled), "unexpected error: %v", err)
@@ -1272,7 +1269,7 @@ service:
 		require.NoError(t, err)
 		hits += int(docs.Hits.Total.Value)
 		return hits >= 10
-	}, 1*time.Minute, 1*time.Second, "Expected to ingest at least 10 logs, got %v", hits)
+	}, 1*time.Minute, 1*time.Second, "Expected to ingest at least 10 logs, got %d", hits)
 	cancel()
 
 	select {
