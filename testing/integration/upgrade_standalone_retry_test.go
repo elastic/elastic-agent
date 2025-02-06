@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -32,6 +33,10 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
+
+	if runtime.GOOS == "windows" {
+		t.Skip("This test is flaky on windows. See https://github.com/elastic/elastic-agent/issues/6731")
+	}
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
