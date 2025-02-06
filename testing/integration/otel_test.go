@@ -1120,7 +1120,7 @@ func TestHybridAgentE2E(t *testing.T) {
 	tmpDir := t.TempDir()
 	numEvents := 1
 	fbIndex := "logs-generic-default"
-	fbReceiverIndex := "logs-fbreceiver-default"
+	fbReceiverIndex := "logs-generic-default"
 
 	inputFile, err := os.CreateTemp(tmpDir, "input-*.log")
 	require.NoError(t, err, "failed to create input log file")
@@ -1191,9 +1191,16 @@ receivers:
           file_identity.native: ~
     processors:
       - add_host_metadata: ~
-      - add_cloud_metadata: ~
-      - add_docker_metadata: ~
-      - add_kubernetes_metadata: ~
+      - add_fields:
+          fields:
+            dataset: generic
+            namespace: default
+            type: logs
+          target: data_stream
+      - add_fields:
+          fields:
+            dataset: generic
+          target: event
     output:
       otelconsumer:
     logging:
@@ -1287,36 +1294,29 @@ service:
 		return true
 	}, 1*time.Minute, 1*time.Second)
 
-	var fbDocs, fbReceiverDocs estools.Documents
+	var docs estools.Documents
 	actualHits := &struct {
-		FB         int
-		FBReceiver int
+		Hits int
 	}{}
 	require.Eventually(t,
 		func() bool {
 			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer findCancel()
 
-			fbDocs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbIndex+"*", map[string]interface{}{
+			docs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbIndex+"*", map[string]interface{}{
 				"log.file.path": inputFilePath,
 			})
 			require.NoError(t, err)
 
-			fbReceiverDocs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbReceiverIndex+"*", map[string]interface{}{
-				"log.file.path": inputFilePath,
-			})
-			require.NoError(t, err)
+			actualHits.Hits = docs.Hits.Total.Value
 
-			actualHits.FB = fbDocs.Hits.Total.Value
-			actualHits.FBReceiver = fbReceiverDocs.Hits.Total.Value
-
-			return actualHits.FB == numEvents && actualHits.FBReceiver == numEvents
+			return actualHits.Hits == numEvents*2 // filebeat + fbreceiver
 		},
 		1*time.Minute, 1*time.Second,
 		"Expected %d logs in elasticsearch, got: %v", numEvents, actualHits)
 
-	fbDoc := fbDocs.Hits.Hits[0].Source
-	fbReceiverDoc := fbReceiverDocs.Hits.Hits[0].Source
+	doc1 := docs.Hits.Hits[0].Source
+	doc2 := docs.Hits.Hits[1].Source
 	ignoredFields := []string{
 		// Expected to change between filebeat and fbreceiver
 		"@timestamp",
@@ -1324,13 +1324,9 @@ service:
 		"agent.id",
 
 		// Missing from fbreceiver doc
-		"data_stream.dataset",
-		"data_stream.namespace",
-		"data_stream.type",
 		"elastic_agent.id",
 		"elastic_agent.snapshot",
 		"elastic_agent.version",
-		"event.dataset",
 
 		// TODO: fbreceiver adds metadata fields that are internal in filebeat.
 		// Remove this once https://github.com/elastic/beats/pull/42412
@@ -1340,7 +1336,7 @@ service:
 		"@metadata.version",
 	}
 
-	assertMapsEqual(t, fbDoc, fbReceiverDoc, ignoredFields, "expected documents to be equal")
+	assertMapsEqual(t, doc1, doc2, ignoredFields, "expected documents to be equal")
 	cancel()
 	err = cmd.Wait()
 	require.True(t, err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || strings.Contains(err.Error(), "signal: killed"), "Retrieved unexpected error: %s", err.Error())
@@ -1355,9 +1351,8 @@ func assertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg 
 		hasKeyM1, _ := flatM1.HasKey(f)
 		hasKeyM2, _ := flatM2.HasKey(f)
 
-		// Check if the ignored field exists in either map
 		if !hasKeyM1 && !hasKeyM2 {
-			require.Failf(t, msg, "ignored field %q does not exist in either map, please remove it from the ignored fields", f)
+			assert.Failf(t, msg, "ignored field %q does not exist in either map, please remove it from the ignored fields", f)
 		}
 
 		// If the ignored field exists and is equal in both maps then it shouldn't be ignored
@@ -1365,7 +1360,7 @@ func assertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg 
 			valM1, _ := flatM1.GetValue(f)
 			valM2, _ := flatM2.GetValue(f)
 			if valM1 == valM2 {
-				require.Failf(t, msg, "ignored field %q is equal in both maps, please remove it from the ignored fields", f)
+				assert.Failf(t, msg, "ignored field %q is equal in both maps, please remove it from the ignored fields", f)
 			}
 		}
 
