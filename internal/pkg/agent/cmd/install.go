@@ -11,8 +11,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
@@ -83,6 +85,12 @@ would like the Agent to operate.
 
 func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	var err error
+
+	if isFleetServerFlagProvided(cmd) {
+		if installServers, _ := cmd.Flags().GetBool(flagInstallServers); !installServers {
+			return fmt.Errorf("to install fleet server `--%s` flag must be used", flagInstallServers)
+		}
+	}
 
 	err = validateEnrollFlags(cmd)
 	if err != nil {
@@ -354,6 +362,27 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	_ = progBar.Exit()
 	fmt.Fprintf(streams.Out, "\n%s has been successfully installed.\n", paths.ServiceDisplayName())
 	return nil
+}
+
+func isFleetServerFlagProvided(cmd *cobra.Command) bool {
+	var fleetServerFlagPresent bool
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		if fleetServerFlagPresent {
+			return
+		}
+
+		if !strings.HasPrefix(f.Name, "fleet-server-") {
+			return
+		}
+
+		flag := cmd.Flags().Lookup(f.Name)
+		if flag != nil && flag.Changed {
+			fleetServerFlagPresent = true
+		}
+
+	})
+
+	return fleetServerFlagPresent
 }
 
 // execUninstall execs "elastic-agent uninstall --force" from the elastic agent installed on the system (found in PATH)
