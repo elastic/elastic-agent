@@ -244,7 +244,7 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
-        image: docker.elastic.co/beats/elastic-agent:9.1.0-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:9.1.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:

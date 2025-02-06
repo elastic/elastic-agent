@@ -980,7 +980,7 @@ spec:
             secretKeyRef:
               key: api_key
               name: es-api-secret
-        image: docker.elastic.co/beats/elastic-agent:9.1.0-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:9.1.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
@@ -1086,7 +1086,7 @@ spec:
             secretKeyRef:
               key: api_key
               name: es-api-secret
-        image: docker.elastic.co/beats/elastic-agent:9.1.0-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:9.1.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
@@ -1250,7 +1250,7 @@ spec:
             secretKeyRef:
               key: api_key
               name: es-api-secret
-        image: docker.elastic.co/beats/elastic-agent:9.1.0-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:9.1.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:

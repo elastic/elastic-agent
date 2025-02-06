@@ -19,7 +19,7 @@ patches:
         spec:
           initContainers:
             - name: k8s-templates-downloader
-              image: docker.elastic.co/beats/elastic-agent:9.1.0
+              image: docker.elastic.co/elastic-agent/elastic-agent:9.1.0
               command: ['bash']
               args:
                 - -c
@@ -37,4 +37,3 @@ patches:
           volumes:
             - name: external-inputs
               emptyDir: {}
-          
