@@ -205,7 +205,7 @@ func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progre
 			if errors.Is(err, context.Canceled) {
 				return ctx.Err()
 			} else if errors.Is(err, fleetclient.ErrInvalidAPIKey) {
-				pt.Describe("API key is invalid, notification dropped.")
+				pt.Describe("API key is invalid (normal if already unenrolled), notification dropped.")
 				return nil
 			} else if errors.As(err, &reqErr) {
 				pt.Describe(fmt.Sprintf("notify Fleet: encountered unretryable error: %v", err))
