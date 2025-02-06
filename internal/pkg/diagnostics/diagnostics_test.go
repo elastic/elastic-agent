@@ -274,13 +274,14 @@ inputs:
         namespace: default
       streams:
         - config_version: "2"
-          request.transforms:
-            - set:
-                target: header.Authorization
-                value: <REDACTED>
-            - set:
-                target: url.params.limit
-                value: "1000"
+          request:
+            transforms:
+                - set:
+                    target: header.Authorization
+                    value: <REDACTED>
+                - set:
+                    target: url.params.limit
+                    value: "1000"
       type: httpjson
 secret_paths:
     - inputs.0.streams.0.request.transforms.0.set.value

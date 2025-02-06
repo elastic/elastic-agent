@@ -594,7 +594,7 @@ func RedactSecretPaths(mapStr map[string]any, errOut io.Writer) map[string]any {
 		fmt.Fprintln(errOut, "No output redaction: secret_paths attribute is not a list.")
 		return mapStr
 	}
-	cfg := ucfg.MustNewFrom(mapStr)
+	cfg := ucfg.MustNewFrom(mapStr, ucfg.PathSep("."))
 	for _, v := range arr {
 		key, ok := v.(string)
 		if !ok {
