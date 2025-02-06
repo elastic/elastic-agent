@@ -258,6 +258,12 @@ func TestContainerCMDWithAVeryLongStatePath(t *testing.T) {
 				t.Fatalf("error running container cmd: %s", err)
 			}
 
+			statusCmd, agentStatusOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"status", "--output", "full"}, env)
+			t.Logf(">> running binary with: %v", statusCmd.Args)
+			if err := statusCmd.Start(); err != nil {
+				t.Fatalf("error running status cmd: %s", err)
+			}
+
 			require.Eventuallyf(t, func() bool {
 				// This will return errors until it connects to the agent,
 				// they're mostly noise because until the agent starts running
@@ -269,8 +275,8 @@ func TestContainerCMDWithAVeryLongStatePath(t *testing.T) {
 				return err == nil
 			},
 				1*time.Minute, time.Second,
-				"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",
-				err, agentOutput,
+				"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent status output: \"%v\", Agent logs\n%s",
+				err, agentStatusOutput, agentOutput,
 			)
 
 			t.Cleanup(func() {
