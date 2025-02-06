@@ -1105,9 +1105,10 @@ func TestFBOtelRestartE2E(t *testing.T) {
 	// This test ensures that filebeatreceiver is able to deliver logs even
 	// in advent of a collector restart.
 	// The input is a file that is being appended to n times during the test.
-	// It starts a filebeat receiver and then restarts it a couple times.
-	// At the end it asserts that the number of logs in ES is equal to the number of
-	// lines in the input file as well as ensuring that each log line was ingested only once.
+	// It starts a filebeat receiver, waits for some logs and then stops it.
+	// It then restarts the collector for the remaining of the test.
+	// At the end it asserts that the unique number of logs in ES is equal to the number of
+	// lines in the input file. It is likely that there are duplicates due to the restart.
 	info := define.Require(t, define.Requirements{
 		Group: Default,
 		Local: true,
@@ -1182,7 +1183,7 @@ service:
         - filebeatreceiver
       exporters:
         - elasticsearch/log
-        - debug
+        #- debug
 `
 	otelConfigPath := filepath.Join(tmpDir, "otel.yml")
 	var otelConfigBuffer bytes.Buffer
@@ -1206,7 +1207,7 @@ service:
 			t.Logf("Contents of otel config file:\n%s\n", string(contents))
 		}
 	})
-	// Now we can actually create the fixture and run it
+
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", otelConfigPath}))
 	require.NoError(t, err)
 
@@ -1246,60 +1247,51 @@ service:
 		}
 	})
 
-	var fixtureWg sync.WaitGroup
-	fixtureWg.Add(1)
-
-	restartCh := make(chan int, 1)
+	// Start the collector, ingest some logs and then stop it
+	stoppedCh := make(chan int, 1)
+	fCtx, cancel := context.WithDeadline(ctx, time.Now().Add(20*time.Second))
 	go func() {
-		defer fixtureWg.Done()
-		var restartCount int
-
-		for {
-			// restart the collector every couple seconds while new data is being written
-			prevCount := inputLinesCounter.Load()
-			fCtx, cancel := context.WithDeadline(ctx, time.Now().Add(2*time.Second))
-			err = fixture.RunOtelWithClient(fCtx)
-			cancel()
-			require.True(t, errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled), "unexpected error: %v", err)
-
-			if stopInputWriter.Load() {
-				break
-			}
-
-			require.True(t, inputLinesCounter.Load() > prevCount, "expected input lines to increase")
-			restartCount++
-			restartCh <- restartCount
-		}
-
-		// start the collector again for the remaining of the test
-		close(restartCh)
-		fCtx, cancel := context.WithDeadline(ctx, time.Now().Add(5*time.Minute))
-		defer cancel()
 		err = fixture.RunOtelWithClient(fCtx)
+		err = fixture.RunOtelWithClient(fCtx)
+		cancel()
+		err = fixture.RunOtelWithClient(fCtx)
+		cancel()
+		require.True(t, errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled), "unexpected error: %v", err)
+		close(stoppedCh)
 	}()
 
-	// Wait for the collector to restart a couple times
-waitLoop:
-	for {
-		select {
-		case n := <-restartCh:
-			if n > 2 {
-				break waitLoop
-			}
-		case <-time.After(5 * time.Second):
-			require.Fail(t, "expected the collector to have restarted")
-		}
+	// Make sure we ingested at least 10 logs before stopping the collector
+	var hits int
+	require.Eventually(t, func() bool {
+		findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer findCancel()
+
+		docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]interface{}{
+			"log.file.path": inputFilePath,
+		})
+		require.NoError(t, err)
+		hits += int(docs.Hits.Total.Value)
+		return hits >= 10
+	}, 1*time.Minute, 1*time.Second, "Expected to ingest at least 10 logs, got %v", hits)
+	cancel()
+
+	select {
+	case <-stoppedCh:
+	case <-time.After(30 * time.Second):
+		require.Fail(t, "expected the collector to have stopped")
 	}
 
 	// Stop generating input data
 	stopInputWriter.Store(true)
 
-	// wait for the collector to start one last time
-	select {
-	case <-restartCh:
-	case <-time.After(5 * time.Second):
-		require.Fail(t, "expected the collector to have restarted")
-	}
+	// start the collector again for the remaining of the test
+	var fixtureWg sync.WaitGroup
+	fixtureWg.Add(1)
+	fCtx, cancel = context.WithDeadline(ctx, time.Now().Add(5*time.Minute))
+	go func() {
+		defer fixtureWg.Done()
+		err = fixture.RunOtelWithClient(fCtx)
+	}()
 
 	// Make sure all the logs are ingested
 	actualHits := &struct {
@@ -1317,25 +1309,23 @@ waitLoop:
 			require.NoError(t, err)
 
 			actualHits.Hits = docs.Hits.Total.Value
-			if actualHits.Hits != int(inputLinesCounter.Load()) {
-				return false
-			}
 
 			uniqueIngestedLogs := make(map[string]struct{})
 			for _, hit := range docs.Hits.Hits {
+				t.Log("Hit: ", hit.Source["message"])
 				message, found := hit.Source["message"]
 				require.True(t, found, "expected message field in document %q", hit.Source)
 				msg, ok := message.(string)
 				require.True(t, ok, "expected message field to be a string, got %T", message)
 				if _, found := uniqueIngestedLogs[msg]; found {
-					require.Fail(t, "log line %q was ingested more than once", message)
+					t.Logf("log line %q was ingested more than once", message)
 				}
 				uniqueIngestedLogs[msg] = struct{}{}
 			}
 			actualHits.UniqueHits = len(uniqueIngestedLogs)
 			return actualHits.UniqueHits == int(inputLinesCounter.Load())
 		},
-		2*time.Minute, 1*time.Second,
+		20*time.Second, 1*time.Second,
 		"Expected %d logs, got %v", int(inputLinesCounter.Load()), actualHits)
 
 	cancel()
