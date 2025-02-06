@@ -8,6 +8,12 @@ packages:
   github.com/elastic/elastic-agent/pkg/control/v2/client:
     interfaces:
       Client:
+  github.com/elastic/elastic-agent/internal/pkg/fleetapi/client:
+    interfaces:
+      Sender:
+  github.com/elastic/elastic-agent/internal/pkg/agent/storage:
+    interfaces:
+      Storage:
   github.com/elastic/elastic-agent/internal/pkg/agent/application/actions/handlers:
     interfaces:
       Uploader:
