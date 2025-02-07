@@ -602,13 +602,15 @@ func RedactSecretPaths(mapStr map[string]any, errOut io.Writer) map[string]any {
 			continue
 		}
 
-		if ok, err := cfg.Has(key, -1, ucfg.PathSep(".")); ok {
+		if ok, err := cfg.Has(key, -1, ucfg.PathSep(".")); err != nil {
+			fmt.Fprintf(errOut, "Error redacting secret path %q: %v.\n", key, err)
+		} else if ok {
 			err := cfg.SetString(key, -1, REDACTED, ucfg.PathSep("."))
 			if err != nil {
 				fmt.Fprintf(errOut, "No output redaction for %q: %v.\n", key, err)
 			}
 		} else {
-			fmt.Fprintf(errOut, "Unable to find secret path %q for redaction: %v.\n", key, err)
+			fmt.Fprintf(errOut, "Unable to find secret path %q for redaction.\n", key)
 		}
 	}
 	result, err := config.MustNewConfigFrom(cfg).ToMapStr()
