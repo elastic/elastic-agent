@@ -26,7 +26,7 @@ var (
 	getK8sClientFunc                               = kubernetes.GetKubernetesClient
 )
 
-const k8sSecretsProviderName = "kubernetes_secrets"
+const k8sSecretsProviderName = "kubernetes_secrets" //nolint:gosec // G101: False positive on Potential hardcoded credentials
 
 func init() {
 	composable.Providers.MustAddContextProvider(k8sSecretsProviderName, ContextProviderBuilder)
