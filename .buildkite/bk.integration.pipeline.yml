@@ -41,8 +41,13 @@ steps:
       - label: "Default"
         key: stateful-ubuntu-default-sudo
         command: |
+<<<<<<< HEAD
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf_sudo.sh "default" "^(TestAPMConfig|TestDiagnosticsOptionalValues|TestIsolatedUnitsDiagnosticsOptionalValues|TestDiagnosticsCommand|TestIsolatedUnitsDiagnosticsCommand|TestEventLogFile|TestFakeComponent|TestFakeIsolatedUnitsComponent|TestOtelFileProcessing|TestOtelLogsIngestion|TestOtelAPMIngestion|TestPackageVersion)$$"
+=======
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          .buildkite/scripts/integration-tests.ps1 {{matrix}} true
+>>>>>>> e956b4d2d (Split packaging into separate steps (#6401))
         artifact_paths:
           - build/**
         agents:
@@ -54,8 +59,13 @@ steps:
       - label: "Upgrade"
         key: stateful-ubuntu-upgrade-sudo
         command: |
+<<<<<<< HEAD
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           .buildkite/scripts/steps/integration_tests_tf_sudo.sh "upgrade" "^(TestUpgradeBrokenPackageVersion|TestStandaloneUpgradeWithGPGFallback|TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing|TestStandaloneUpgradeRollback|TestStandaloneUpgradeRollbackOnRestarts|TestStandaloneUpgradeFailsWhenUpgradeIsInProgress|TestStandaloneUpgradeRetryDownload|TestStandaloneUpgradeSameCommit|TestStandaloneUpgrade|TestStandaloneUpgradeUninstallKillWatcher)$$"
+=======
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          .buildkite/scripts/integration-tests.ps1 {{matrix}} false
+>>>>>>> e956b4d2d (Split packaging into separate steps (#6401))
         artifact_paths:
           - build/**
         agents:
@@ -64,12 +74,25 @@ steps:
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-ubuntu-2204"
 
+<<<<<<< HEAD
       - label: "Fleet"
         key: stateful-ubuntu-fleet-sudo
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           ls -lah build/distributions/
           .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fleet" "^(TestLongRunningAgentForLeaks|TestDelayEnroll|TestDelayEnrollUnprivileged|TestInstallAndCLIUninstallWithEndpointSecurity|TestInstallAndUnenrollWithEndpointSecurity|TestInstallWithEndpointSecurityAndRemoveEndpointIntegration|TestEndpointSecurityNonDefaultBasePath|TestEndpointSecurityUnprivileged|TestEndpointSecurityCannotSwitchToUnprivileged|TestEndpointLogsAreCollectedInDiagnostics|TestForceInstallOverProtectedPolicy|TestSetLogLevelFleetManaged|TestLogIngestionFleetManaged|TestMetricsMonitoringCorrectBinaries|TestEndpointAgentServiceMonitoring|TestMonitoringPreserveTextConfig|TestMonitoringLivenessReloadable|TestComponentBuildHashInDiagnostics|TestProxyURL|TestFleetManagedUpgradeUnprivileged)$$"
+=======
+  - group: "Stateful:Ubuntu"
+    key: integration-tests-ubuntu
+    depends_on:
+      - integration-ess
+    steps:
+      - label: "x86_64:non-sudo: {{matrix}}"
+        # only packaging-ubuntu-x86-64 artifact dependency is required
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
+>>>>>>> e956b4d2d (Split packaging into separate steps (#6401))
         artifact_paths:
           - build/**
         agents:
@@ -78,12 +101,20 @@ steps:
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-ubuntu-2204"
 
+<<<<<<< HEAD
       - label: "FQDN"
         key: stateful-ubuntu-fqdn-sudo
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           ls -lah build/distributions/
           .buildkite/scripts/steps/integration_tests_tf_sudo.sh "fqdn" "^(TestFQDN)$$"
+=======
+      - label: "x86_64:sudo: {{matrix}}"
+        # due to deb group present in matrix tar.gz and deb packages artifacts are required
+        command: |
+          buildkite-agent artifact download build/distributions/** . --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
+>>>>>>> e956b4d2d (Split packaging into separate steps (#6401))
         artifact_paths:
           - build/**
         agents:
@@ -95,11 +126,62 @@ steps:
       - label: "Deb"
         key: stateful-ubuntu-deb-sudo
         command: |
+<<<<<<< HEAD
           buildkite-agent artifact download build/distributions/** . --step 'package-it'
           ls -lah build/distributions/
           .buildkite/scripts/steps/integration_tests_tf_sudo.sh "deb" "^(TestDebLogIngestFleetManaged|TestDebFleetUpgrade)$$"
         artifact_paths:
           - build/**
+=======
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        agents:
+          provider: "aws"
+          imagePrefix: "platform-ingest-beats-ubuntu-2404-aarch64"
+          instanceType: "m6g.2xlarge"
+        matrix:
+          - default
+          - container
+          - fleet-upgrade-to-pr-build
+          - upgrade
+          - fleet
+          - fqdn
+          - deb
+          - fleet-airgapped
+          - fleet-privileged
+          - fleet-airgapped-privileged
+
+      - label: "arm:non-sudo: {{matrix}}"
+        skip: true
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        agents:
+          provider: "aws"
+          imagePrefix: "platform-ingest-beats-ubuntu-2404-aarch64"
+          instanceType: "m6g.xlarge"
+        matrix:
+          - default
+
+  - group: "Stateful(Sudo):RHEL8"
+    key: integration-tests-rhel8
+    depends_on:
+      - integration-ess
+    steps:
+      - label: "x86_64:sudo:rpm"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          .buildkite/scripts/steps/integration_tests_tf.sh rpm true
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+>>>>>>> e956b4d2d (Split packaging into separate steps (#6401))
         agents:
           provider: "gcp"
           imageProject: elastic-images-qa
