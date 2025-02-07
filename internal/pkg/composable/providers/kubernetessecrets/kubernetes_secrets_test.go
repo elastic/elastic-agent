@@ -65,7 +65,7 @@ func Test_Fetch(t *testing.T) {
 				testDataBuilder.buildK8SSecret("secret_value"),
 			),
 			storeInit:     func(t *testing.T) store { return newExpirationCache(time.Minute) },
-			keyToFetch:    "kubernetes_secrets.default.secret_name",
+			keyToFetch:    fmt.Sprintf("%s.default.secret_name", k8sSecretsProviderName),
 			expectedValue: "",
 			expectedFound: false,
 			expectedCache: nil,
@@ -79,7 +79,7 @@ func Test_Fetch(t *testing.T) {
 				testDataBuilder.buildK8SSecret("secret_value"),
 			),
 			storeInit:     func(t *testing.T) store { return newExpirationCache(time.Minute) },
-			keyToFetch:    "kubernetes_secrets.default.secret_name.wrong",
+			keyToFetch:    fmt.Sprintf("%s.default.secret_name.wrong", k8sSecretsProviderName),
 			expectedValue: "",
 			expectedFound: false,
 			expectedCache: buildCacheMap(
@@ -328,7 +328,7 @@ func Test_Fetch(t *testing.T) {
 
 			cacheMap := make(map[string]secret)
 			for _, s := range list {
-				cacheMap[fmt.Sprintf("kubernetes_secrets.%s.%s.%s", s.namespace, s.name, s.key)] = s
+				cacheMap[fmt.Sprintf("%s.%s.%s.%s", k8sSecretsProviderName, s.namespace, s.name, s.key)] = s
 			}
 			for k, v := range tc.expectedCache {
 				inCache, exists := cacheMap[k]
@@ -645,7 +645,7 @@ func Test_UpdateCache(t *testing.T) {
 
 			cacheMap := make(map[string]secret)
 			for _, s := range list {
-				cacheMap[fmt.Sprintf("kubernetes_secrets.%s.%s.%s", s.namespace, s.name, s.key)] = s
+				cacheMap[fmt.Sprintf("%s.%s.%s.%s", k8sSecretsProviderName, s.namespace, s.name, s.key)] = s
 			}
 			for k, v := range tc.expectedCache {
 				inCache, exists := cacheMap[k]
@@ -758,7 +758,7 @@ func Test_Run(t *testing.T) {
 				testDataBuilder.buildK8SSecret("secret_value"),
 			),
 			k8sClientErr:  nil,
-			secretToFetch: "kubernetes_secrets.default.secret_name.secret_key",
+			secretToFetch: fmt.Sprintf("%s.default.secret_name.secret_key", k8sSecretsProviderName),
 			preCacheState: map[string]*cacheEntry{},
 			postCacheState: buildCacheMap(
 				testDataBuilder.buildCacheEntry("secret_value", true, time.Now(), time.Now()),
@@ -850,7 +850,7 @@ func Test_Run(t *testing.T) {
 
 			cacheMap := make(map[string]secret)
 			for _, s := range list {
-				cacheMap[fmt.Sprintf("kubernetes_secrets.%s.%s.%s", s.namespace, s.name, s.key)] = s
+				cacheMap[fmt.Sprintf("%s.%s.%s.%s", k8sSecretsProviderName, s.namespace, s.name, s.key)] = s
 			}
 			for k, v := range tc.postCacheState {
 				inCache, exists := cacheMap[k]
@@ -945,7 +945,7 @@ func (b secretTestDataBuilder) buildK8SSecret(value string) *v1.Secret {
 }
 
 func (b secretTestDataBuilder) getFetchKey() string {
-	return fmt.Sprintf("kubernetes_secrets.%s.%s.%s", b.namespace, b.name, b.key)
+	return fmt.Sprintf("%s.%s.%s.%s", k8sSecretsProviderName, b.namespace, b.name, b.key)
 }
 
 func buildSecret(namespace string, name string, key string, value string, exists bool, apiFetchTime time.Time) secret {
@@ -967,7 +967,7 @@ func buildCacheEntry(namespace string, name string, key string, value string, ex
 }
 
 func buildCacheEntryKey(e *cacheEntry) string {
-	return fmt.Sprintf("kubernetes_secrets.%s.%s.%s", e.s.namespace, e.s.name, e.s.key)
+	return fmt.Sprintf("%s.%s.%s.%s", k8sSecretsProviderName, e.s.namespace, e.s.name, e.s.key)
 }
 
 func buildK8SSecret(namespace string, name string, key string, value string) *v1.Secret {

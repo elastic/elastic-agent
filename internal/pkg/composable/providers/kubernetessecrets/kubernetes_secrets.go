@@ -26,8 +26,10 @@ var (
 	getK8sClientFunc                               = kubernetes.GetKubernetesClient
 )
 
+const k8sSecretsProviderName = "kubernetes_secrets"
+
 func init() {
-	composable.Providers.MustAddContextProvider("kubernetes_secrets", ContextProviderBuilder)
+	composable.Providers.MustAddContextProvider(k8sSecretsProviderName, ContextProviderBuilder)
 }
 
 type store interface {
@@ -103,7 +105,7 @@ func (p *contextProviderK8SSecrets) Run(ctx context.Context, comm corecomp.Conte
 	if err != nil {
 		// signal that the provider has initialized
 		close(p.running)
-		p.logger.Debug("kubernetes_secrets provider skipped, unable to connect: ", err.Error())
+		p.logger.Debug(k8sSecretsProviderName, " provider skipped, unable to connect: ", err.Error())
 		return err
 	}
 	p.clientMtx.Lock()
@@ -129,7 +131,7 @@ func (p *contextProviderK8SSecrets) Run(ctx context.Context, comm corecomp.Conte
 func (p *contextProviderK8SSecrets) Fetch(key string) (string, bool) {
 	// Make sure the key has the expected format "kubernetes_secrets.somenamespace.somesecret.value"
 	tokens := strings.Split(key, ".")
-	if len(tokens) > 0 && tokens[0] != "kubernetes_secrets" {
+	if len(tokens) > 0 && tokens[0] != k8sSecretsProviderName {
 		return "", false
 	}
 	if len(tokens) != 4 {
