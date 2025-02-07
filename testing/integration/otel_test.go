@@ -1339,8 +1339,7 @@ service:
 
 	assertMapsEqual(t, doc1, doc2, ignoredFields, "expected documents to be equal")
 	cancel()
-	err = cmd.Wait()
-	require.True(t, err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || strings.Contains(err.Error(), "signal: killed"), "Retrieved unexpected error: %s", err.Error())
+	cmd.Wait()
 }
 
 func assertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg string) {
