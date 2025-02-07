@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"io"
 	"io/fs"
 	"net/url"
@@ -1001,9 +1002,16 @@ func isContainer(detail component.PlatformDetail) component.PlatformDetail {
 	return detail
 }
 
+type AgentInfo interface {
+	AgentID() string
+}
+
 var (
 	newFleetClient = func(log *logger.Logger, apiKey string, cfg remote.Config) (fleetclient.Sender, error) {
 		return fleetclient.NewAuthWithConfig(log, apiKey, cfg)
+	}
+	getAgentInfo = func(ctx context.Context, createAgentID bool) (AgentInfo, error) {
+		return info.NewAgentInfo(ctx, createAgentID)
 	}
 	newEncryptedDiskStore = storage.NewEncryptedDiskStore
 	statAgentConfigFile   = os.Stat
@@ -1037,7 +1045,21 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 		return true, nil
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Check if enrolling with a specifically defined Elastic Agent ID.
+	// If the ID's don't match then it needs to enroll.
+	if setupCfg.Fleet.ID != "" {
+		ai, err := getAgentInfo(ctx, false)
+		if err != nil {
+			return false, fmt.Errorf("failed to load agent info: %w", err)
+		}
+		if ai.AgentID() != setupCfg.Fleet.ID {
+			return true, nil
+		}
+	}
+
 	store, err := newEncryptedDiskStore(ctx, agentCfgFilePath)
 	if err != nil {
 		return false, fmt.Errorf("failed to instantiate encrypted disk store: %w", err)
@@ -1070,7 +1092,7 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	if len(storedConfig.Fleet.EnrollmentTokenHash) > 0 && len(setupCfg.Fleet.EnrollmentToken) > 0 {
 		enrollmentHashBytes, err := base64.StdEncoding.DecodeString(storedConfig.Fleet.EnrollmentTokenHash)
 		if err != nil {
-			return false, fmt.Errorf("failed to decode hash: %w", err)
+			return false, fmt.Errorf("failed to decode enrollment token hash: %w", err)
 		}
 
 		err = crypto.ComparePBKDF2HashAndPassword(enrollmentHashBytes, []byte(setupCfg.Fleet.EnrollmentToken))
@@ -1079,7 +1101,26 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 			// The stored enrollment token hash does not match the new token, so enrollment is required.
 			return true, nil
 		case err != nil:
-			return false, fmt.Errorf("failed to compare hash: %w", err)
+			return false, fmt.Errorf("failed to compare enrollment token hash: %w", err)
+		}
+	}
+
+	// Evaluate the stored replace token hash against the setup replace token if both are present.
+	// Note that when "upgrading" from an older agent version the replace token hash will not exist
+	// in the stored configuration.
+	if len(storedConfig.Fleet.ReplaceTokenHash) > 0 && len(setupCfg.Fleet.ReplaceToken) > 0 {
+		replaceHashBytes, err := base64.StdEncoding.DecodeString(storedConfig.Fleet.ReplaceTokenHash)
+		if err != nil {
+			return false, fmt.Errorf("failed to decode replace token hash: %w", err)
+		}
+
+		err = crypto.ComparePBKDF2HashAndPassword(replaceHashBytes, []byte(setupCfg.Fleet.ReplaceToken))
+		switch {
+		case errors.Is(err, crypto.ErrMismatchedHashAndPassword):
+			// The stored enrollment token hash does not match the new token, so enrollment is required.
+			return true, nil
+		case err != nil:
+			return false, fmt.Errorf("failed to compare replace token hash: %w", err)
 		}
 	}
 
@@ -1106,16 +1147,33 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 		return false, fmt.Errorf("failed to validate api token: %w", err)
 	}
 
+	saveConfig := false
+
 	// Update the stored enrollment token hash if there is no previous enrollment token hash
 	// (can happen when "upgrading" from an older version of the agent) and setup enrollment token is present.
 	if len(storedConfig.Fleet.EnrollmentTokenHash) == 0 && len(setupCfg.Fleet.EnrollmentToken) > 0 {
 		enrollmentHashBytes, err := crypto.GeneratePBKDF2FromPassword([]byte(setupCfg.Fleet.EnrollmentToken))
 		if err != nil {
-			return false, errors.New("failed to generate enrollment hash")
+			return false, errors.New("failed to generate enrollment token hash")
 		}
 		enrollmentTokenHash := base64.StdEncoding.EncodeToString(enrollmentHashBytes)
 		storedConfig.Fleet.EnrollmentTokenHash = enrollmentTokenHash
+		saveConfig = true
+	}
 
+	// Update the stored replace token hash if there is no previous replace token hash
+	// (can happen when "upgrading" from an older version of the agent) and setup replace token is present.
+	if len(storedConfig.Fleet.ReplaceTokenHash) == 0 && len(setupCfg.Fleet.ReplaceToken) > 0 {
+		replaceHashBytes, err := crypto.GeneratePBKDF2FromPassword([]byte(setupCfg.Fleet.ReplaceToken))
+		if err != nil {
+			return false, errors.New("failed to generate replace token hash")
+		}
+		replaceTokenHash := base64.StdEncoding.EncodeToString(replaceHashBytes)
+		storedConfig.Fleet.ReplaceTokenHash = replaceTokenHash
+		saveConfig = true
+	}
+
+	if saveConfig {
 		data, err := yaml.Marshal(storedConfig)
 		if err != nil {
 			return false, errors.New("could not marshal config")
