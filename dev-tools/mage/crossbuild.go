@@ -250,7 +250,7 @@ func CrossBuildImage(platform string) (string, error) {
 	}
 
 	if FIPSBuild {
-		return FIPSBuildImage + ":" + goVersion + "-1-fips-bookworm", nil
+		tagSuffix += "-fips"
 	}
 
 	return BeatsCrossBuildImage + ":" + goVersion + "-" + tagSuffix, nil
