@@ -1191,6 +1191,7 @@ receivers:
           file_identity.native: ~
     processors:
       - add_host_metadata: ~
+      - add_cloud_metadata: ~
       - add_fields:
           fields:
             dataset: generic
