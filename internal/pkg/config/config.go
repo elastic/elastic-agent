@@ -54,7 +54,7 @@ var DefaultOptions = []interface{}{
 	ucfg.PathSep("."),
 	ucfg.ResolveEnv,
 	ucfg.VarExp,
-	VarSkipKeys("inputs"),
+	VarSkipKeys("inputs", "outputs"),
 	ucfg.IgnoreCommas,
 	OTelKeys("connectors", "receivers", "processors", "exporters", "extensions", "service"),
 }
