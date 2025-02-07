@@ -27,7 +27,8 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
-          image: "family/core-ubuntu-2204"
+          imageProject: elastic-images-qa
+          image: "platform-ingest-elastic-agent-debian-12-1738608775"
         retry:
           manual:
             allowed: true

@@ -97,7 +97,8 @@ steps:
     agents:
       provider: "gcp"
       machineType: "c2-standard-16"
-      image: "family/core-ubuntu-2204"
+      imageProject: elastic-images-qa
+      image: "platform-ingest-elastic-agent-ubuntu-2404-1738230722"
       diskSizeGb: 400
     notify:
       - github_commit_status:
