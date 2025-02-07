@@ -36,6 +36,7 @@ type store interface {
 	// AddConditionally adds the given secret to the store if the given condition returns true. If there is no existing
 	// secret, the condition will be called with an empty secret and false. If updateAccess is true and the secret already exists,
 	// then the lastAccess timestamp is updated to time.Now() independently of the condition result.
+	// Note: if the given condition is nil, then it is considered as a condition that always returns false.
 	AddConditionally(key string, sd secret, updateAccess bool, cond conditionFn)
 	// ListKeys returns a list of all the keys of the secrets in the store without checking for expiration
 	ListKeys() []string

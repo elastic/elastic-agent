@@ -51,6 +51,7 @@ func (c *expirationCache) Get(key string, updateAccess bool) (secret, bool) {
 // AddConditionally adds the given secret to the store if the given condition returns true. If there is no existing
 // secret, the condition will be called with an empty secret and false. If updateAccess is true and the secret already exists,
 // then the lastAccess timestamp is updated to time.Now() independently of the condition result.
+// Note: if the given condition is nil, then it is considered as a condition that always returns false.
 func (c *expirationCache) AddConditionally(key string, in secret, updateAccess bool, condition conditionFn) {
 	c.Lock()
 	defer c.Unlock()
