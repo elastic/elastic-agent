@@ -32,7 +32,7 @@ func ConnectedToFleet(ctx context.Context, t *testing.T, fixture *integrationtes
 
 	connected := assert.Eventually(t, assertFn, timeout, 5*time.Second,
 		"want fleet state %s, got %s. agent status: %v",
-		cproto.State_HEALTHY, cproto.State(agentStatus.FleetState), agentStatus)
+		cproto.State_HEALTHY, cproto.State(agentStatus.FleetState), agentStatus) //nolint:gosec // G115 always under 32-bit
 
 	if !connected && err != nil {
 		t.Logf("agent isn't connected to fleet-server: last error from agent status command: %v",
