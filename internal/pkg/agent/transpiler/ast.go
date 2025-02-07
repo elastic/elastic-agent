@@ -64,7 +64,7 @@ type Node interface {
 
 	// Vars adds to the array with the variables identified in the node. Returns the array in-case
 	// the capacity of the array had to be changed.
-	Vars([]string) []string
+	Vars([]string, string) []string
 
 	// Apply apply the current vars, returning the new value for the node. This does not modify the original Node.
 	Apply(*Vars) (Node, error)
@@ -182,10 +182,10 @@ func (d *Dict) Hash64With(h *xxhash.Digest) error {
 }
 
 // Vars returns a list of all variables referenced in the dictionary.
-func (d *Dict) Vars(vars []string) []string {
+func (d *Dict) Vars(vars []string, defaultProvider string) []string {
 	for _, v := range d.value {
 		k := v.(*Key)
-		vars = k.Vars(vars)
+		vars = k.Vars(vars, defaultProvider)
 	}
 	return vars
 }
@@ -318,11 +318,11 @@ func (k *Key) Hash64With(h *xxhash.Digest) error {
 }
 
 // Vars returns a list of all variables referenced in the value.
-func (k *Key) Vars(vars []string) []string {
+func (k *Key) Vars(vars []string, defaultProvider string) []string {
 	if k.value == nil {
 		return vars
 	}
-	return k.value.Vars(vars)
+	return k.value.Vars(vars, defaultProvider)
 }
 
 // Apply applies the vars to the value. This does not modify the original node.
@@ -463,9 +463,9 @@ func (l *List) ShallowClone() Node {
 }
 
 // Vars returns a list of all variables referenced in the list.
-func (l *List) Vars(vars []string) []string {
+func (l *List) Vars(vars []string, defaultProvider string) []string {
 	for _, v := range l.value {
-		vars = v.Vars(vars)
+		vars = v.Vars(vars, defaultProvider)
 	}
 	return vars
 }
@@ -552,12 +552,12 @@ func (s *StrVal) Hash64With(h *xxhash.Digest) error {
 }
 
 // Vars returns a list of all variables referenced in the string.
-func (s *StrVal) Vars(vars []string) []string {
+func (s *StrVal) Vars(vars []string, defaultProvider string) []string {
 	// errors are ignored (if there is an error determine the vars it will also error computing the policy)
 	_, _ = replaceVars(s.value, func(variable string) (Node, Processors, bool) {
 		vars = append(vars, variable)
 		return nil, nil, false
-	}, false)
+	}, false, defaultProvider)
 	return vars
 }
 
@@ -613,7 +613,7 @@ func (s *IntVal) ShallowClone() Node {
 }
 
 // Vars does nothing. Cannot have variable in an IntVal.
-func (s *IntVal) Vars(vars []string) []string {
+func (s *IntVal) Vars(vars []string, defaultProvider string) []string {
 	return vars
 }
 
@@ -691,7 +691,7 @@ func (s *UIntVal) Hash64With(h *xxhash.Digest) error {
 }
 
 // Vars does nothing. Cannot have variable in an UIntVal.
-func (s *UIntVal) Vars(vars []string) []string {
+func (s *UIntVal) Vars(vars []string, defaultProvider string) []string {
 	return vars
 }
 
@@ -764,7 +764,7 @@ func (s *FloatVal) hashString() string {
 }
 
 // Vars does nothing. Cannot have variable in an FloatVal.
-func (s *FloatVal) Vars(vars []string) []string {
+func (s *FloatVal) Vars(vars []string, defaultProvider string) []string {
 	return vars
 }
 
@@ -843,7 +843,7 @@ func (s *BoolVal) Hash64With(h *xxhash.Digest) error {
 }
 
 // Vars does nothing. Cannot have variable in an BoolVal.
-func (s *BoolVal) Vars(vars []string) []string {
+func (s *BoolVal) Vars(vars []string, defaultProvider string) []string {
 	return vars
 }
 
