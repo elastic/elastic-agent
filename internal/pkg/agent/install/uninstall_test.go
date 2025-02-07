@@ -26,11 +26,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
-<<<<<<< HEAD
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
-=======
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
->>>>>>> c82d568b8 (Clean up message when audit/uninstall returns 401 (#6735))
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 )
 
