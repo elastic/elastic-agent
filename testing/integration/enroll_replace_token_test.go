@@ -94,6 +94,15 @@ func TestEnrollReplaceToken(t *testing.T) {
 		t.Fatalf("failed uninstalling the agent: %s", err)
 	}
 
+	// Wait for Agent to be offline
+	require.Eventually(
+		t,
+		check.FleetAgentStatusByAgentID(ctx, t, info.KibanaClient, agentID, "offline"),
+		10*time.Minute,
+		10*time.Second,
+		"Elastic Agent status didn't go offline",
+	)
+
 	// Using a clean fixture to ensure that no previous state is used
 	// re-enroll again and ensure that it all works again.
 	fixture, err = define.NewFixtureFromLocalBuild(t, define.Version())
