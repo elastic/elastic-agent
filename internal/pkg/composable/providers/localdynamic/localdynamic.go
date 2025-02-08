@@ -37,7 +37,8 @@ func (c *dynamicProvider) Run(comm composable.DynamicProviderComm) error {
 			return errors.New(err, fmt.Sprintf("failed to add mapping for index %d", i), errors.TypeUnexpected)
 		}
 	}
-	return nil
+	<-comm.Done()
+	return comm.Err()
 }
 
 // DynamicProviderBuilder builds the dynamic provider.

@@ -79,6 +79,7 @@ require (
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.32.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
+	golang.org/x/net v0.34.0
 	golang.org/x/sync v0.10.0
 	golang.org/x/sys v0.29.0
 	golang.org/x/term v0.28.0
@@ -607,7 +608,6 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/mod v0.21.0 // indirect
-	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/oauth2 v0.24.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	gonum.org/v1/gonum v0.15.1 // indirect
@@ -640,8 +640,7 @@ require (
 )
 
 replace (
-	github.com/Shopify/sarama => github.com/elastic/sarama v1.19.1-0.20220310193331-ebc2b0d8eef3
-	github.com/dop251/goja => github.com/andrewkroh/goja v0.0.0-20190128172624-dd2ac4456e20
+	github.com/dop251/goja => github.com/elastic/goja v0.0.0-20190128172624-dd2ac4456e20
 	// fsnotify and goja are required for beats import
 	github.com/fsnotify/fsnotify => github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3
 	// openshift removed all tags from their repo, use the pseudoversion from the release-3.9 branch HEAD
