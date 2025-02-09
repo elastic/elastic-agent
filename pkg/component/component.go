@@ -712,7 +712,7 @@ type outputI struct {
 // varsForPlatform sets the runtime variables that are available in the
 // input specification runtime checks. This function should always be
 // edited in sync with the documentation in specs/README.md.
-func varsForPlatform(platform PlatformDetail) (*transpiler.Vars, error) {
+func varsForPlatform(platform PlatformDetail, defaultProvider string) (*transpiler.Vars, error) {
 	return transpiler.NewVars("", map[string]interface{}{
 		"install": map[string]interface{}{
 			"in_default": paths.ArePathsEqual(paths.Top(), paths.InstallPath(paths.DefaultBasePath)) || platform.IsInstalledViaExternalPkgMgr,
@@ -729,14 +729,14 @@ func varsForPlatform(platform PlatformDetail) (*transpiler.Vars, error) {
 		"user": map[string]interface{}{
 			"root": platform.User.Root,
 		},
-	}, nil)
+	}, nil, defaultProvider)
 }
 
 func validateRuntimeChecks(
 	runtime *RuntimeSpec,
 	platform PlatformDetail,
 ) error {
-	vars, err := varsForPlatform(platform)
+	vars, err := varsForPlatform(platform, "") // no default provider
 	if err != nil {
 		return err
 	}
