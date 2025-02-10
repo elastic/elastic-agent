@@ -11,7 +11,7 @@
 kind: security
 
 # Change summary; a 80ish characters long description of the change.
-summary: Upgrade to Go 1.22.11.
+summary: Upgrade to Go 1.22.12.
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
