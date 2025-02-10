@@ -154,7 +154,7 @@ func InstallAgentForPolicyWithToken(ctx context.Context, t *testing.T,
 	// Wait for Agent to be healthy
 	require.Eventually(
 		t,
-		check.FleetAgentStatus(ctx, t, kibClient, policyID, "online"),
+		check.FleetAgentStatus(ctx, t, agentFixture, kibClient, policyID, "online"),
 		timeout,
 		10*time.Second,
 		"Elastic Agent status is not online",

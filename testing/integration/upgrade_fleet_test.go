@@ -412,7 +412,7 @@ func testUpgradeFleetManagedElasticAgent(
 	t.Log("Waiting for enrolled Agent status to be online...")
 	require.Eventually(t,
 		check.FleetAgentStatus(
-			ctx, t, kibClient, policyResp.ID, "online"),
+			ctx, t, startFixture, kibClient, policyResp.ID, "online"),
 		2*time.Minute,
 		10*time.Second,
 		"Agent status is not online")
