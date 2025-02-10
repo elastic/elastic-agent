@@ -15,4 +15,5 @@ type Config struct {
 	Providers                map[string]*config.Config `config:"providers"`
 	ProvidersInitialDefault  *bool                     `config:"agent.providers.initial_default"`
 	ProvidersRestartInterval *time.Duration            `config:"agent.providers.restart_interval"`
+	ProvidersDefaultProvider *string                   `config:"agent.providers.default"`
 }
