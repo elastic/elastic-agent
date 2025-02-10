@@ -42,6 +42,7 @@ type upgradeOpts struct {
 	skipDefaultPgp   bool
 	customPgp        *CustomPGP
 	customWatcherCfg string
+	installServers   bool
 
 	// Used to disable upgrade details checks for versions that don't support them, like 7.17.x.
 	// See also WithDisableUpgradeWatcherUpgradeDetailsCheck.
@@ -128,6 +129,13 @@ func WithPostUpgradeHook(hook func() error) UpgradeOpt {
 func WithCustomWatcherConfig(cfg string) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.customWatcherCfg = cfg
+	}
+}
+
+// WithServers will use start version with servers flavor.
+func WithServers() UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.installServers = true
 	}
 }
 
@@ -260,6 +268,7 @@ func PerformUpgrade(
 		NonInteractive: nonInteractiveFlag,
 		Force:          true,
 		Privileged:     !(*upgradeOpts.unprivileged),
+		InstallServers: upgradeOpts.installServers,
 	}
 	output, err := startFixture.Install(ctx, &installOpts)
 	if err != nil {
