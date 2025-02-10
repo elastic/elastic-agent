@@ -415,7 +415,7 @@ spec:
           value: "false"
         - name: FLEET_ENROLL
           value: "1"
-        image: docker.elastic.co/beats/elastic-agent:8.18.0-SNAPSHOT
+        image: docker.elastic.co/beats/elastic-agent:8.19.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
