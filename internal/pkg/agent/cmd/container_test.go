@@ -277,7 +277,6 @@ func TestShouldEnroll(t *testing.T) {
 	for name, tc := range map[string]struct {
 		cfg                  setupConfig
 		statFn               func(path string) (os.FileInfo, error)
-		agentID              string
 		encryptedDiskStoreFn func(t *testing.T, savedConfig *configuration.Configuration) storage.Storage
 		fleetClientFn        func(t *testing.T) client.Sender
 		expectedSavedConfig  func(t *testing.T, savedConfig *configuration.Configuration)
@@ -298,14 +297,38 @@ func TestShouldEnroll(t *testing.T) {
 			expectedShouldEnroll: true,
 		},
 		"should enroll on agent id but no existing id": {
-			statFn:               func(path string) (os.FileInfo, error) { return nil, nil },
-			cfg:                  setupConfig{Fleet: fleetConfig{Enroll: true, URL: "host1", ID: "custom-agent-id"}},
+			statFn: func(path string) (os.FileInfo, error) { return nil, nil },
+			cfg:    setupConfig{Fleet: fleetConfig{Enroll: true, URL: "host1", ID: "diff-agent-id"}},
+			encryptedDiskStoreFn: func(t *testing.T, savedConfig *configuration.Configuration) storage.Storage {
+				m := mockStorage.NewStorage(t)
+				m.On("Load").Return(io.NopCloser(strings.NewReader(`fleet:
+  enabled: true
+  access_api_key: "test-key"
+  enrollment_token_hash: "test-hash"
+  hosts:
+    - host1
+  agent:
+  protocol: "https"`)), nil).Once()
+				return m
+			},
 			expectedShouldEnroll: true,
 		},
-		"should enroll on agent id but diff id": {
-			agentID:              "custom-agent-id",
-			statFn:               func(path string) (os.FileInfo, error) { return nil, nil },
-			cfg:                  setupConfig{Fleet: fleetConfig{Enroll: true, URL: "host1", ID: "diff-agent-id"}},
+		"should enroll on agent id but diff agent id": {
+			statFn: func(path string) (os.FileInfo, error) { return nil, nil },
+			cfg:    setupConfig{Fleet: fleetConfig{Enroll: true, URL: "host1", ID: "diff-agent-id"}},
+			encryptedDiskStoreFn: func(t *testing.T, savedConfig *configuration.Configuration) storage.Storage {
+				m := mockStorage.NewStorage(t)
+				m.On("Load").Return(io.NopCloser(strings.NewReader(`fleet:
+  enabled: true
+  access_api_key: "test-key"
+  enrollment_token_hash: "test-hash"
+  hosts:
+    - host1
+  agent:
+    id: "agent-id"
+  protocol: "https"`)), nil).Once()
+				return m
+			},
 			expectedShouldEnroll: true,
 		},
 		"should enroll on fleet url change": {
@@ -435,9 +458,8 @@ func TestShouldEnroll(t *testing.T) {
 			expectedShouldEnroll: false,
 		},
 		"should not enroll on no changes with agent ID and replace token": {
-			agentID: "custom-id",
-			statFn:  func(path string) (os.FileInfo, error) { return nil, nil },
-			cfg:     setupConfig{Fleet: fleetConfig{Enroll: true, URL: "host1", ID: "custom-id", EnrollmentToken: enrollmentToken, ReplaceToken: replaceToken}},
+			statFn: func(path string) (os.FileInfo, error) { return nil, nil },
+			cfg:    setupConfig{Fleet: fleetConfig{Enroll: true, URL: "host1", ID: "custom-id", EnrollmentToken: enrollmentToken, ReplaceToken: replaceToken}},
 			encryptedDiskStoreFn: func(t *testing.T, savedConfig *configuration.Configuration) storage.Storage {
 				m := mockStorage.NewStorage(t)
 				m.On("Load").Return(io.NopCloser(strings.NewReader(`fleet:
@@ -450,6 +472,7 @@ func TestShouldEnroll(t *testing.T) {
     - host2
     - host3
   agent:
+    id: "custom-id"
   protocol: "https"`)), nil).Once()
 				return m
 			},
@@ -642,13 +665,6 @@ func TestShouldEnroll(t *testing.T) {
 					statAgentConfigFile = oldStatFn
 				})
 			}
-			oldAgentInfoFn := getAgentInfo
-			getAgentInfo = func(ctx context.Context, createAgentID bool) (AgentInfo, error) {
-				return &agentInfo{id: tc.agentID}, nil
-			}
-			t.Cleanup(func() {
-				getAgentInfo = oldAgentInfoFn
-			})
 			if tc.encryptedDiskStoreFn != nil {
 				oldEncryptedDiskStore := newEncryptedDiskStore
 				newEncryptedDiskStore = func(ctx context.Context, target string, opts ...storage.EncryptedOptionFunc) (storage.Storage, error) {

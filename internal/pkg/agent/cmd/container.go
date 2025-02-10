@@ -32,7 +32,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -1002,16 +1001,9 @@ func isContainer(detail component.PlatformDetail) component.PlatformDetail {
 	return detail
 }
 
-type AgentInfo interface {
-	AgentID() string
-}
-
 var (
 	newFleetClient = func(log *logger.Logger, apiKey string, cfg remote.Config) (fleetclient.Sender, error) {
 		return fleetclient.NewAuthWithConfig(log, apiKey, cfg)
-	}
-	getAgentInfo = func(ctx context.Context, createAgentID bool) (AgentInfo, error) {
-		return info.NewAgentInfo(ctx, createAgentID)
 	}
 	newEncryptedDiskStore = storage.NewEncryptedDiskStore
 	statAgentConfigFile   = os.Stat
@@ -1048,18 +1040,6 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Check if enrolling with a specifically defined Elastic Agent ID.
-	// If the ID's don't match then it needs to enroll.
-	if setupCfg.Fleet.ID != "" {
-		ai, err := getAgentInfo(ctx, false)
-		if err != nil {
-			return false, fmt.Errorf("failed to load agent info: %w", err)
-		}
-		if ai.AgentID() != setupCfg.Fleet.ID {
-			return true, nil
-		}
-	}
-
 	store, err := newEncryptedDiskStore(ctx, agentCfgFilePath)
 	if err != nil {
 		return false, fmt.Errorf("failed to instantiate encrypted disk store: %w", err)
@@ -1078,6 +1058,13 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 	storedConfig, err := configuration.NewFromConfig(cfg)
 	if err != nil {
 		return false, fmt.Errorf("failed to read from disk store: %w", err)
+	}
+
+	// Check if enrolling with a specifically defined Elastic Agent ID.
+	// If the ID's don't match then it needs to enroll.
+	if setupCfg.Fleet.ID != "" && (storedConfig.Fleet.Info == nil || storedConfig.Fleet.Info.ID != setupCfg.Fleet.ID) {
+		// ID is a mismatch
+		return true, nil
 	}
 
 	storedFleetHosts := storedConfig.Fleet.Client.GetHosts()
