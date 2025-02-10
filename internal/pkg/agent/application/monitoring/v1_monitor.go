@@ -424,13 +424,6 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 								"to":   "data_stream.dataset_original",
 							},
 						},
-						"when": map[string]any{
-							"not": map[string]any{
-								"has_fields": []any{
-									"data_stream.dataset_original",
-								},
-							},
-						},
 					},
 				},
 				// drop the dataset field so following copy_field can copy to it
@@ -448,13 +441,6 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 							map[string]interface{}{
 								"from": "component.dataset",
 								"to":   "data_stream.dataset",
-							},
-						},
-						"when": map[string]any{
-							"not": map[string]any{
-								"has_fields": []any{
-									"data_stream.dataset",
-								},
 							},
 						},
 						"fail_on_error":  false,
@@ -492,13 +478,6 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 				// update event.dataset with the now used data_stream.dataset
 				map[string]interface{}{
 					"copy_fields": map[string]interface{}{
-						"when": map[string]any{
-							"not": map[string]any{
-								"has_fields": []any{
-									"event.dataset",
-								},
-							},
-						},
 						"fields": []interface{}{
 							map[string]interface{}{
 								"from": "data_stream.dataset",
