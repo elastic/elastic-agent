@@ -234,7 +234,7 @@ func getSignalForComponent(comp *component.Component) (pipeline.Signal, error) {
 	case "filebeat":
 		return pipeline.SignalLogs, nil
 	case "metricbeat":
-		return pipeline.SignalMetrics, nil
+		return pipeline.SignalLogs, nil
 	default:
 		return pipeline.Signal{}, fmt.Errorf("input type not supported by Otel: %s", comp.InputType)
 	}
