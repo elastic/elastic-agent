@@ -22,6 +22,7 @@
         - normalized_percentages
       metricsets:
         - cpu
+      system.hostfs: '/hostfs'
     - data_stream:
         dataset: system.diskio
         type: metrics
@@ -29,12 +30,14 @@
       diskio.include_devices: null
       metricsets:
         - diskio
+      system.hostfs: '/hostfs'
     - data_stream:
         dataset: system.filesystem
         type: metrics
       period: 1m
       metricsets:
         - filesystem
+      system.hostfs: '/hostfs'
       processors:
         - drop_event.when.regexp:
             system.filesystem.mount_point: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
@@ -44,6 +47,7 @@
       period: 1m
       metricsets:
         - fsstat
+      system.hostfs: '/hostfs'
       processors:
         - drop_event.when.regexp:
             system.fsstat.mount_point: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
@@ -60,6 +64,7 @@
       period: 10s
       metricsets:
         - memory
+      system.hostfs: '/hostfs'
     - data_stream:
         dataset: system.network
         type: metrics
@@ -80,6 +85,7 @@
       process.include_cpu_ticks: false
       metricsets:
         - process
+      system.hostfs: '/hostfs'
       process.include_cpu_ticks: false
     - data_stream:
         dataset: system.process_summary
@@ -87,12 +93,14 @@
       period: 10s
       metricsets:
         - process_summary
+      system.hostfs: '/hostfs'
     - data_stream:
         dataset: system.socket_summary
         type: metrics
       period: 10s
       metricsets:
         - socket_summary
+      system.hostfs: '/hostfs'
     - data_stream:
         type: metrics
         dataset: system.uptime
