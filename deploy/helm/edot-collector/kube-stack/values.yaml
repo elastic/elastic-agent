@@ -16,7 +16,7 @@ crds:
   create: true # Install the OpenTelemetry Operator CRDs.
 defaultCRConfig:
   image:
-    repository: "docker.elastic.co/beats/elastic-agent"
+    repository: "docker.elastic.co/elastic-agent/elastic-agent"
     tag: "9.1.0"
   targetAllocator:
     enabled: false # Enable/disable the Operator's Target allocator.

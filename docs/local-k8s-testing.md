@@ -36,7 +36,7 @@ FLEET_URL=https://<fleet host>:443
 FLEET_ENROLLMENT_TOKEN=<enrollment token>
 ```
 
-### Run agent 
+### Run agent
 
 In order to just deploy agent on your local cluster, open a terminal and then execute
 
@@ -49,7 +49,7 @@ and the output should be something similar to this:
 Generating tags...
  ...
 Checking cache...
- - docker.elastic.co/beats/elastic-agent: Found Locally
+ - docker.elastic.co/elastic-agent/elastic-agent: Found Locally
 Starting test...
 Starting pre-render hooks...
 Completed pre-render hooks
@@ -104,7 +104,7 @@ Images loaded in 35.802479ms
 Waiting for deployments to stabilize...
 Deployments stabilized in 7.654873ms
 Listing files to watch...
- - docker.elastic.co/beats/elastic-agent
+ - docker.elastic.co/elastic-agent/elastic-agent
 Press Ctrl+C to exit
 Not watching for changes...
 WARN[0003] unable to get owner from reference: {apps/v1 DaemonSet elastic-agent-standalone 0c579ec4-319a-4e85-99ec-c409260cb6ce 0xc000f950a0 0xc000f950a1}  subtask=-1 task=DevLoop
