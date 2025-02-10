@@ -320,51 +320,11 @@ func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T,
 	}
 }
 
-<<<<<<< HEAD
-=======
-func testComponentsPresence(ctx context.Context, fixture *atesting.Fixture, requiredComponents []componentPresenceDefinition, unwantedComponents []componentPresenceDefinition) func(*testing.T) {
-	return func(t *testing.T) {
-		agentWorkDir := fixture.WorkDir()
-		componentsDir, err := aTesting.FindComponentsDir(agentWorkDir)
-		require.NoError(t, err)
-
-		componentsPaths := func(component string) []string {
-			binarySuffix := ""
-			if runtime.GOOS == "windows" {
-				binarySuffix += ".exe"
-			}
-			return []string{
-				filepath.Join(componentsDir, component+binarySuffix),
-				filepath.Join(componentsDir, component+".spec.yml"),
-			}
-		}
-
-		for _, requiredComponent := range requiredComponents {
-			for _, reqPath := range componentsPaths(requiredComponent.name) {
-				_, err := os.Stat(reqPath)
-				if slices.Contains(requiredComponent.platforms, runtime.GOOS) {
-					require.NoErrorf(t, err, "expecting component %q to be present: %v", requiredComponent, err)
-				} else {
-					require.ErrorIs(t, err, os.ErrNotExist, "expecting component %q to be missing but was found", requiredComponent)
-				}
-			}
-		}
-
-		for _, unwantedComponent := range unwantedComponents {
-			for _, reqPath := range componentsPaths(unwantedComponent.name) {
-				_, err := os.Stat(reqPath)
-				require.ErrorIs(t, err, os.ErrNotExist, "expecting component %q to be missing but was found", unwantedComponent)
-			}
-		}
-	}
-}
-
 func testSecondAgentCanInstallWithForce(ctx context.Context, fixture *atesting.Fixture, basePath string, develop bool, installOpts atesting.InstallOpts) func(*testing.T) {
 	installOpts.Force = true
 	return testSecondAgentCanInstall(ctx, fixture, basePath, develop, installOpts)
 }
 
->>>>>>> 6b9ff26ac (Fix/5595 force uninstall correct installation (#6559))
 // Tests that a second agent can be installed in an isolated namespace, using either --develop or --namespace.
 func testSecondAgentCanInstall(ctx context.Context, fixture *atesting.Fixture, basePath string, develop bool, installOpts atesting.InstallOpts) func(*testing.T) {
 	return func(t *testing.T) {
