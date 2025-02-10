@@ -6,6 +6,8 @@ package cmd
 
 import (
 	"bytes"
+	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,12 +17,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 
@@ -31,8 +35,13 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/crypto"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -76,7 +85,6 @@ The following actions are possible and grouped based on the actions.
   FLEET_INSECURE - communicate with Fleet with either insecure HTTP or unverified HTTPS
   ELASTIC_AGENT_CERT - path to certificate to use for connecting to fleet-server.
   ELASTIC_AGENT_CERT_KEY - path to private key use for connecting to fleet-server.
-
 
   The following vars are need in the scenario that Elastic Agent should automatically fetch its own token.
 
@@ -271,19 +279,8 @@ func containerCmd(streams *cli.IOStreams) error {
 
 func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 	var err error
-	var client *kibana.Client
-	executable, err := os.Executable()
-	if err != nil {
-		return err
-	}
 
 	initTimeout := envTimeout(fleetInitTimeoutName)
-
-	_, err = os.Stat(paths.AgentConfigFile())
-	if !os.IsNotExist(err) && !cfg.Fleet.Force {
-		// already enrolled, just run the standard run
-		return run(logToStderr, false, initTimeout, isContainer)
-	}
 
 	if cfg.FleetServer.Enable {
 		err = ensureServiceToken(streams, &cfg)
@@ -292,15 +289,17 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		}
 	}
 
-	if cfg.Fleet.Enroll {
+	shouldEnroll, err := shouldFleetEnroll(cfg)
+	if err != nil {
+		return err
+	}
+	if shouldEnroll {
 		var policy *kibanaPolicy
 		token := cfg.Fleet.EnrollmentToken
 		if token == "" && !cfg.FleetServer.Enable {
-			if client == nil {
-				client, err = kibanaClient(cfg.Kibana, cfg.Kibana.Headers)
-				if err != nil {
-					return err
-				}
+			client, err := kibanaClient(cfg.Kibana, cfg.Kibana.Headers)
+			if err != nil {
+				return err
 			}
 			policy, err = kibanaFetchPolicy(cfg, client, streams)
 			if err != nil {
@@ -317,6 +316,11 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		}
 		if policyID != "" {
 			logInfo(streams, "Policy selected for enrollment: ", policyID)
+		}
+
+		executable, err := os.Executable()
+		if err != nil {
+			return err
 		}
 
 		cmdArgs, err := buildEnrollArgs(cfg, token, policyID)
@@ -336,7 +340,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		}
 	}
 
-	return run(logToStderr, false, initTimeout, isContainer)
+	return run(containerCfgOverrides, false, initTimeout, isContainer)
 }
 
 // TokenResp is used to decode a response for generating a service token
@@ -769,7 +773,7 @@ func runLegacyAPMServer(streams *cli.IOStreams) (*process.Info, error) {
 	return process.Start(spec.BinaryPath, options...)
 }
 
-func logToStderr(cfg *configuration.Configuration) {
+func containerCfgOverrides(cfg *configuration.Configuration) {
 	logsPath := envWithDefault("", "LOGS_PATH")
 	if logsPath == "" {
 		// when no LOGS_PATH defined the container should log to stderr
@@ -786,6 +790,8 @@ func logToStderr(cfg *configuration.Configuration) {
 		cfg.Settings.EventLoggingConfig.ToFiles = false
 		cfg.Settings.EventLoggingConfig.ToStderr = true
 	}
+
+	configuration.OverrideDefaultContainerGRPCPort(cfg.Settings.GRPC)
 }
 
 func setPaths(statePath, configPath, logsPath, socketPath string, writePaths bool) error {
@@ -990,4 +996,153 @@ func envIntWithDefault(defVal string, keys ...string) (int, error) {
 func isContainer(detail component.PlatformDetail) component.PlatformDetail {
 	detail.OS = component.Container
 	return detail
+}
+
+var (
+	newFleetClient = func(log *logger.Logger, apiKey string, cfg remote.Config) (fleetclient.Sender, error) {
+		return fleetclient.NewAuthWithConfig(log, apiKey, cfg)
+	}
+	newEncryptedDiskStore = storage.NewEncryptedDiskStore
+	statAgentConfigFile   = os.Stat
+)
+
+// agentInfo implements the AgentInfo interface, and it used in shouldFleetEnroll.
+type agentInfo struct {
+	id string
+}
+
+func (a *agentInfo) AgentID() string {
+	return a.id
+}
+
+// shouldFleetEnroll returns true if the elastic-agent should enroll to fleet.
+func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
+	if !setupCfg.Fleet.Enroll {
+		// Enrollment is explicitly disabled in the setup configuration.
+		return false, nil
+	}
+
+	if setupCfg.Fleet.Force {
+		// Enrollment is explicitly enforced by the setup configuration.
+		return true, nil
+	}
+
+	agentCfgFilePath := paths.AgentConfigFile()
+	_, err := statAgentConfigFile(agentCfgFilePath)
+	if os.IsNotExist(err) {
+		// The agent configuration file does not exist, so enrollment is required.
+		return true, nil
+	}
+
+	ctx := context.Background()
+	store, err := newEncryptedDiskStore(ctx, agentCfgFilePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to instantiate encrypted disk store: %w", err)
+	}
+
+	reader, err := store.Load()
+	if err != nil {
+		return false, fmt.Errorf("failed to load from disk store: %w", err)
+	}
+
+	cfg, err := config.NewConfigFrom(reader)
+	if err != nil {
+		return false, fmt.Errorf("failed to read from disk store: %w", err)
+	}
+
+	storedConfig, err := configuration.NewFromConfig(cfg)
+	if err != nil {
+		return false, fmt.Errorf("failed to read from disk store: %w", err)
+	}
+
+	storedFleetHosts := storedConfig.Fleet.Client.GetHosts()
+	if len(storedFleetHosts) == 0 || !slices.Contains(storedFleetHosts, setupCfg.Fleet.URL) {
+		// The Fleet URL in the setup does not exist in the stored configuration, so enrollment is required.
+		return true, nil
+	}
+
+	// Evaluate the stored enrollment token hash against the setup enrollment token if both are present.
+	// Note that when "upgrading" from an older agent version the enrollment token hash will not exist
+	// in the stored configuration.
+	if len(storedConfig.Fleet.EnrollmentTokenHash) > 0 && len(setupCfg.Fleet.EnrollmentToken) > 0 {
+		enrollmentHashBytes, err := base64.StdEncoding.DecodeString(storedConfig.Fleet.EnrollmentTokenHash)
+		if err != nil {
+			return false, fmt.Errorf("failed to decode hash: %w", err)
+		}
+
+		err = crypto.ComparePBKDF2HashAndPassword(enrollmentHashBytes, []byte(setupCfg.Fleet.EnrollmentToken))
+		switch {
+		case errors.Is(err, crypto.ErrMismatchedHashAndPassword):
+			// The stored enrollment token hash does not match the new token, so enrollment is required.
+			return true, nil
+		case err != nil:
+			return false, fmt.Errorf("failed to compare hash: %w", err)
+		}
+	}
+
+	// Validate the stored API token to check if the agent is still authorized with Fleet.
+	log, err := logger.New("fleet_client", false)
+	if err != nil {
+		return false, fmt.Errorf("failed to create logger: %w", err)
+	}
+	fc, err := newFleetClient(log, storedConfig.Fleet.AccessAPIKey, storedConfig.Fleet.Client)
+	if err != nil {
+		return false, fmt.Errorf("failed to create fleet client: %w", err)
+	}
+
+	// Perform an ACK request with **empty events** to verify the validity of the API token.
+	// If the agent has been manually un-enrolled through the Kibana UI, the ACK request will fail due to an invalid API token.
+	// In such cases, the agent should automatically re-enroll and "recover" their enrollment status without manual intervention,
+	// maintaining seamless operation.
+	err = ackFleet(ctx, fc, storedConfig.Fleet.Info.ID)
+	switch {
+	case errors.Is(err, fleetclient.ErrInvalidAPIKey):
+		// The API key is invalid, so enrollment is required.
+		return true, nil
+	case err != nil:
+		return false, fmt.Errorf("failed to validate api token: %w", err)
+	}
+
+	// Update the stored enrollment token hash if there is no previous enrollment token hash
+	// (can happen when "upgrading" from an older version of the agent) and setup enrollment token is present.
+	if len(storedConfig.Fleet.EnrollmentTokenHash) == 0 && len(setupCfg.Fleet.EnrollmentToken) > 0 {
+		enrollmentHashBytes, err := crypto.GeneratePBKDF2FromPassword([]byte(setupCfg.Fleet.EnrollmentToken))
+		if err != nil {
+			return false, errors.New("failed to generate enrollment hash")
+		}
+		enrollmentTokenHash := base64.StdEncoding.EncodeToString(enrollmentHashBytes)
+		storedConfig.Fleet.EnrollmentTokenHash = enrollmentTokenHash
+
+		data, err := yaml.Marshal(storedConfig)
+		if err != nil {
+			return false, errors.New("could not marshal config")
+		}
+
+		if err := safelyStoreAgentInfo(store, bytes.NewReader(data)); err != nil {
+			return false, fmt.Errorf("failed to store agent config: %w", err)
+		}
+	}
+
+	return false, nil
+}
+
+// ackFleet performs an ACK request to the fleet server with **empty events**.
+func ackFleet(ctx context.Context, client fleetclient.Sender, agentID string) error {
+	const retryInterval = time.Second
+	const maxRetries = 3
+	ackRequest := &fleetapi.AckRequest{Events: nil}
+	ackCMD := fleetapi.NewAckCmd(&agentInfo{agentID}, client)
+	retries := 0
+	return backoff.Retry(func() error {
+		retries++
+		_, err := ackCMD.Execute(ctx, ackRequest)
+		switch {
+		case err == nil:
+			return nil
+		case errors.Is(err, fleetclient.ErrInvalidAPIKey) || retries == maxRetries:
+			return backoff.Permanent(err)
+		default:
+			return err
+		}
+	}, &backoff.ConstantBackOff{Interval: retryInterval})
 }
