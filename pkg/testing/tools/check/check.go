@@ -13,6 +13,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 )
@@ -47,6 +48,7 @@ func ConnectedToFleet(ctx context.Context, t *testing.T, fixture *integrationtes
 // for use with assert.Eventually or require.Eventually.
 func FleetAgentStatus(ctx context.Context,
 	t *testing.T,
+	fixture *atesting.Fixture,
 	client *kibana.Client,
 	policyID,
 	expectedStatus string) func() bool {
@@ -61,7 +63,13 @@ func FleetAgentStatus(ctx context.Context,
 			return true
 		}
 
-		t.Logf("Agent fleet status: %s", currentStatus)
+		agentStatus, err := fixture.ExecStatus(ctx)
+		if err != nil {
+			t.Logf("Agent fleet status: %s Error getting local status: %s", currentStatus, err)
+			return false
+		}
+
+		t.Logf("Agent fleet status: %s Local status: %v", currentStatus, agentStatus)
 		return false
 	}
 }
