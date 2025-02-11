@@ -88,16 +88,20 @@ func (p EnrollType) MarshalJSON() ([]byte, error) {
 // Example:
 // POST /api/fleet/agents/enroll
 //
-//	{
-//		"type": "PERMANENT",
-//	  "metadata": {
-//		  "local": { "os": "macos"},
-//		  "user_provided": { "region": "us-east"}
-//	  }
-//	}
+//	 {
+//		  "type": "PERMANENT",
+//		  "id": "custom-id", // optional
+//		  "replace_token": "replacetokenvalue", // optional
+//		  "metadata": {
+//		    "local": { "os": "macos"},
+//		    "user_provided": { "region": "us-east"}
+//		  }
+//		}
 type EnrollRequest struct {
 	EnrollAPIKey string     `json:"-"`
 	Type         EnrollType `json:"type"`
+	ID           string     `json:"id"`
+	ReplaceToken string     `json:"replace_token"`
 	Metadata     Metadata   `json:"metadata"`
 }
 
