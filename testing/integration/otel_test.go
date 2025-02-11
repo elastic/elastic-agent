@@ -1176,6 +1176,8 @@ exporters:
       flush_timeout: 1s
     mapping:
       mode: bodymap
+    logs_dynamic_id:
+      enabled: true
 service:
   pipelines:
     logs:
@@ -1226,14 +1228,14 @@ service:
 			}
 
 			_, err = inputFile.Write([]byte(fmt.Sprintf(`{"id": "%d", "message": "%d"}`, i, i)))
-			require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+			assert.NoErrorf(t, err, "failed to write line %d to temp file", i)
 			_, err = inputFile.Write([]byte("\n"))
-			require.NoErrorf(t, err, "failed to write newline to temp file")
+			assert.NoErrorf(t, err, "failed to write newline to temp file")
 			inputLinesCounter.Add(1)
 			time.Sleep(100 * time.Millisecond)
 		}
 		err = inputFile.Close()
-		require.NoError(t, err, "failed to close input file")
+		assert.NoError(t, err, "failed to close input file")
 	}()
 
 	t.Cleanup(func() {
@@ -1253,7 +1255,7 @@ service:
 	go func() {
 		err = fixture.RunOtelWithClient(fCtx)
 		cancel()
-		require.True(t, errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled), "unexpected error: %v", err)
+		assert.True(t, err == nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled), "unexpected error: %v", err)
 		close(stoppedCh)
 	}()
 
@@ -1314,9 +1316,8 @@ service:
 				require.True(t, found, "expected message field in document %q", hit.Source)
 				msg, ok := message.(string)
 				require.True(t, ok, "expected message field to be a string, got %T", message)
-				if _, found := uniqueIngestedLogs[msg]; found {
-					t.Logf("log line %q was ingested more than once", message)
-				}
+				_, found = uniqueIngestedLogs[msg]
+				require.False(t, found, "found duplicated log message %q", msg)
 				uniqueIngestedLogs[msg] = struct{}{}
 			}
 			actualHits.UniqueHits = len(uniqueIngestedLogs)
