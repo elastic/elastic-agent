@@ -49,6 +49,23 @@ steps:
           manual:
             allowed: true
 
+      - label: "Unit tests - Debian 12"
+        key: "unit-tests-deb-12"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "aws"
+          imagePrefix: "platform-ingest-elastic-agent-debian-12"
+          diskSizeGb: 200
+          instanceType: "m6g.xlarge"
+        retry:
+          manual:
+            allowed: true
+
       - label: "Unit tests - Windows 2022"
         key: "unit-tests-win2022"
         command: |
