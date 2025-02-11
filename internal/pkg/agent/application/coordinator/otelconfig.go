@@ -116,9 +116,6 @@ func getCollectorConfigForComponent(comp *component.Component, info info.Agent) 
 		return nil, err
 	}
 	exportersConfig, err := getExportersConfigForComponent(comp)
-	processorsConfig := map[string]any{
-		getTransformProcessorName(): getTransformProcessorConfig(),
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -128,16 +125,14 @@ func getCollectorConfigForComponent(comp *component.Component, info info.Agent) 
 	}
 	pipelinesConfig := map[string]any{
 		pipelineID.String(): map[string][]string{
-			"exporters":  maps.Keys(exportersConfig),
-			"receivers":  maps.Keys(receiversConfig),
-			"processors": maps.Keys(processorsConfig),
+			"exporters": maps.Keys(exportersConfig),
+			"receivers": maps.Keys(receiversConfig),
 		},
 	}
 
 	fullConfig := map[string]any{
-		"receivers":  receiversConfig,
-		"exporters":  exportersConfig,
-		"processors": processorsConfig,
+		"receivers": receiversConfig,
+		"exporters": exportersConfig,
 		"service": map[string]any{
 			"pipelines": pipelinesConfig,
 		},
@@ -334,31 +329,4 @@ func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
 	// for compatibility with beats, we want bodymap mapping
 	esConfig["mapping"] = map[string]any{"mode": "bodymap"}
 	return esConfig, nil
-}
-
-// getTransformProcessorConfig returns a transform processor configuration needed for all pipelines involving beats
-// receivers and the elasticsearch exporter.
-// beats receivers currently put all event fields into the log body, but we need some of them in log record attributes
-// instead for ES exporter
-func getTransformProcessorConfig() map[string]any {
-	return map[string]any{
-		"error_mode": "ignore",
-		"log_statements": []map[string]any{
-			{
-				"context": "log",
-				"conditions": []string{
-					`IsMap(body) and IsMap(body["data_stream"])`,
-				},
-				// move dataset fields to log record attributes, so ES exporter can use them for index selection
-				"statements": []string{
-					`set(attributes["data_stream.dataset"], body["data_stream"]["dataset"])`,
-					`set(attributes["data_stream.namespace"], body["data_stream"]["namespace"])`,
-				},
-			},
-		},
-	}
-}
-
-func getTransformProcessorName() string {
-	return "transform"
 }
