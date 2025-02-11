@@ -219,19 +219,26 @@ func getPackageMetadataFromZip(archivePath string) (packageMetadata, error) {
 }
 
 func skipFnFromZip(log *logger.Logger, r *zip.ReadCloser, detectedFlavor string, fileNamePrefix string, versionedHome string, registry map[string][]string) (install.SkipFn, error) {
+	acceptAllFn := func(relPath string) bool { return false }
 	if detectedFlavor == "" {
 		// no flavor don't skip anything
-		return func(relPath string) bool { return false }, nil
+		return acceptAllFn, nil
 	}
 
 	flavor, err := install.Flavor(detectedFlavor, "", registry)
 	if err != nil {
 		if errors.Is(err, install.ErrUnknownFlavor) {
 			// unknown flavor fallback to copy all
-			return func(relPath string) bool { return false }, nil
+			return acceptAllFn, nil
 		}
 		return nil, err
 	}
+
+	// no flavor loaded
+	if flavor.Name == "" {
+		return acceptAllFn, nil
+	}
+
 	specsInFlavor := install.SpecsForFlavor(flavor) // ignoring error flavor exists, it was loaded before
 
 	// fix versionedHome
@@ -455,20 +462,13 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 }
 
 func skipFnFromTar(log *logger.Logger, archivePath string, flavor string, registry map[string][]string) (install.SkipFn, error) {
+	acceptAllFn := func(relPath string) bool { return false }
 	if flavor == "" {
 		// no flavor don't skip anything
-		return func(relPath string) bool { return false }, nil
+		return acceptAllFn, nil
 	}
 
 	fileNamePrefix := getFileNamePrefix(archivePath)
-	loadFlavor := func(flavor string) install.FlavorDefinition {
-		components, found := registry[flavor]
-		if !found {
-			return install.FlavorDefinition{}
-		}
-
-		return install.FlavorDefinition{Name: flavor, Components: components}
-	}
 
 	// scan tar archive for spec file and extract allowed paths
 	r, err := os.Open(archivePath)
@@ -485,7 +485,20 @@ func skipFnFromTar(log *logger.Logger, archivePath string, flavor string, regist
 	tr := tar.NewReader(zr)
 
 	var allowedPaths []string
-	flavorDefinition := loadFlavor(flavor)
+	flavorDefinition, err := install.Flavor(flavor, "", registry)
+	if err != nil {
+		if errors.Is(err, install.ErrUnknownFlavor) {
+			// unknown flavor fallback to copy all
+			return acceptAllFn, nil
+		}
+		return nil, err
+	}
+
+	// no flavor loaded
+	if flavorDefinition.Name == "" {
+		return acceptAllFn, nil
+	}
+
 	specs, err := specRegistry(flavorDefinition)
 	if err != nil {
 		return nil, err

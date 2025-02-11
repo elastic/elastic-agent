@@ -55,6 +55,10 @@ func Flavor(detectedFlavor string, registryPath string, flavorsRegistry map[stri
 	if flavorsRegistry == nil {
 		f, err := os.Open(registryPath)
 		if err != nil {
+			if os.IsNotExist(err) {
+				return FlavorDefinition{}, ErrUnknownFlavor
+			}
+
 			return FlavorDefinition{}, err
 		}
 		manifest, err := v1.ParseManifest(f)
