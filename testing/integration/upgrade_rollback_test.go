@@ -168,10 +168,6 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
-	if runtime.GOOS == "windows" {
-		t.Skip("This test is flaky on windows. See https://github.com/elastic/elastic-agent/issues/6733")
-	}
-
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 

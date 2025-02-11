@@ -18,7 +18,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -82,11 +81,6 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 	})
 
 	t.Run(fmt.Sprintf("Upgrade on a repackaged version of agent %s (%s)", currentVersion, unPrivilegedString), func(t *testing.T) {
-
-		if runtime.GOOS == "windows" {
-			t.Skip("This test is flaky on windows. See https://github.com/elastic/elastic-agent/issues/6729")
-		}
-
 		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 		defer cancel()
 
