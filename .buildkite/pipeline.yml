@@ -58,10 +58,8 @@ steps:
           - "build/diagnostics/*"
           - "coverage-*.out"
         agents:
-          provider: "aws"
-          imagePrefix: "platform-ingest-elastic-agent-debian-12"
-          diskSizeGb: 200
-          instanceType: "m6g.xlarge"
+          provider: "gcp"
+          image: "family/platform-ingest-elastic-agent-debian-12"
         retry:
           manual:
             allowed: true
