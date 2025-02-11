@@ -1176,6 +1176,8 @@ exporters:
       flush_timeout: 1s
     mapping:
       mode: bodymap
+    logs_dynamic_id:
+      enabled: true
 service:
   pipelines:
     logs:
@@ -1314,9 +1316,8 @@ service:
 				require.True(t, found, "expected message field in document %q", hit.Source)
 				msg, ok := message.(string)
 				require.True(t, ok, "expected message field to be a string, got %T", message)
-				if _, found := uniqueIngestedLogs[msg]; found {
-					t.Logf("log line %q was ingested more than once", message)
-				}
+				_, found = uniqueIngestedLogs[msg]
+				require.False(t, found, "found duplicated log message %q", msg)
 				uniqueIngestedLogs[msg] = struct{}{}
 			}
 			actualHits.UniqueHits = len(uniqueIngestedLogs)
