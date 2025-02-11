@@ -191,7 +191,11 @@ func TestOTelManager_ConfigError(t *testing.T) {
 
 	go func() {
 		err := m.Run(ctx)
+<<<<<<< HEAD
 		assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
+=======
+		require.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
+>>>>>>> 371399ccb (Fix runtime error reporting in Otel manager (#6793))
 	}()
 
 	// watch is synchronous, so we need to read from it to avoid blocking the manager
@@ -205,6 +209,7 @@ func TestOTelManager_ConfigError(t *testing.T) {
 		}
 	}()
 
+<<<<<<< HEAD
 	// Errors channel is non-blocking, should be able to send an Update that causes an error multiple
 	// times without it blocking on sending over the errCh.
 	for range 3 {
@@ -221,6 +226,10 @@ func TestOTelManager_ConfigError(t *testing.T) {
 	//
 	// a nil error just means that the collector is trying to restart
 	// which clears the error on the restart loop
+=======
+	cfg := confmap.New() // invalid config
+	m.Update(cfg)
+>>>>>>> 371399ccb (Fix runtime error reporting in Otel manager (#6793))
 	timeoutCh := time.After(time.Second * 5)
 	var err error
 outer:

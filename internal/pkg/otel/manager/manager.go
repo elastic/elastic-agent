@@ -108,7 +108,14 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				}
 				// pass the error to the errCh so the coordinator, unless it's a cancel error
 				if !errors.Is(err, context.Canceled) {
+<<<<<<< HEAD
 					m.reportErr(ctx, err)
+=======
+					select {
+					case m.errCh <- err:
+					case <-ctx.Done():
+					}
+>>>>>>> 371399ccb (Fix runtime error reporting in Otel manager (#6793))
 				}
 			}
 		case cfg := <-m.cfgCh:
