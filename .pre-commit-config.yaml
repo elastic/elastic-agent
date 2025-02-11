@@ -1,9 +1,10 @@
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.0.1
+    rev: v4.6.0
     hooks:
     -   id: check-executables-have-shebangs
         exclude: (.*/.*.(ps1|bat|bash)$)
     -   id: check-shebang-scripts-are-executable
         exclude: (.*/.*.(tmpl|tftpl)$)
     -   id: check-merge-conflict
+        args: ['--assume-in-merge']
