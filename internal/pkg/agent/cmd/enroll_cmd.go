@@ -115,6 +115,8 @@ type enrollCmdOption struct {
 	Key                  string                     `yaml:"key,omitempty"`
 	KeyPassphrasePath    string                     `yaml:"key_passphrase_path,omitempty"`
 	Insecure             bool                       `yaml:"insecure,omitempty"`
+	ID                   string                     `yaml:"id,omitempty"`
+	ReplaceToken         string                     `yaml:"replace_token,omitempty"`
 	EnrollAPIKey         string                     `yaml:"enrollment_key,omitempty"`
 	Staging              string                     `yaml:"staging,omitempty"`
 	ProxyURL             string                     `yaml:"proxy_url,omitempty"`
@@ -574,6 +576,8 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 	r := &fleetapi.EnrollRequest{
 		EnrollAPIKey: c.options.EnrollAPIKey,
 		Type:         fleetapi.PermanentEnroll,
+		ID:           c.options.ID,
+		ReplaceToken: c.options.ReplaceToken,
 		Metadata: fleetapi.Metadata{
 			Local:        metadata,
 			UserProvided: c.options.UserProvidedMetadata,
@@ -588,7 +592,7 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 			errors.TypeNetwork)
 	}
 
-	fleetConfig, err := createFleetConfigFromEnroll(resp.Item.AccessAPIKey, c.options.EnrollAPIKey, c.remoteConfig)
+	fleetConfig, err := createFleetConfigFromEnroll(resp.Item.AccessAPIKey, c.options.EnrollAPIKey, c.options.ReplaceToken, c.remoteConfig)
 	if err != nil {
 		return err
 	}
@@ -1023,17 +1027,28 @@ func createFleetServerBootstrapConfig(
 	return cfg, nil
 }
 
-func createFleetConfigFromEnroll(accessAPIKey string, enrollmentToken string, cli remote.Config) (*configuration.FleetAgentConfig, error) {
+func fleetHashToken(token string) (string, error) {
+	enrollmentHashBytes, err := crypto.GeneratePBKDF2FromPassword([]byte(token))
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(enrollmentHashBytes), nil
+}
+
+func createFleetConfigFromEnroll(accessAPIKey string, enrollmentToken string, replaceToken string, cli remote.Config) (*configuration.FleetAgentConfig, error) {
+	var err error
 	cfg := configuration.DefaultFleetAgentConfig()
 	cfg.Enabled = true
 	cfg.AccessAPIKey = accessAPIKey
 	cfg.Client = cli
-	enrollmentHashBytes, err := crypto.GeneratePBKDF2FromPassword([]byte(enrollmentToken))
+	cfg.EnrollmentTokenHash, err = fleetHashToken(enrollmentToken)
 	if err != nil {
 		return nil, errors.New(err, "failed to generate enrollment hash", errors.TypeConfig)
 	}
-	enrollmentTokenHash := base64.StdEncoding.EncodeToString(enrollmentHashBytes)
-	cfg.EnrollmentTokenHash = enrollmentTokenHash
+	cfg.ReplaceTokenHash, err = fleetHashToken(replaceToken)
+	if err != nil {
+		return nil, errors.New(err, "failed to generate replace token hash", errors.TypeConfig)
+	}
 	if err := cfg.Valid(); err != nil {
 		return nil, errors.New(err, "invalid enrollment options", errors.TypeConfig)
 	}
