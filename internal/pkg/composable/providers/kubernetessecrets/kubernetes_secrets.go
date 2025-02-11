@@ -86,12 +86,8 @@ func ContextProviderBuilder(logger *logger.Logger, c *config.Config, _ bool) (co
 	if c == nil {
 		c = config.New()
 	}
-<<<<<<< HEAD
-	err := c.Unpack(&cfg)
-=======
 
-	err := c.UnpackTo(cfg)
->>>>>>> 6d4b91ccb ([k8s] Fix logical race conditions in kubernetes_secrets provider (#6623))
+	err := c.Unpack(cfg)
 	if err != nil {
 		return nil, errors.New(err, "failed to unpack configuration")
 	}
