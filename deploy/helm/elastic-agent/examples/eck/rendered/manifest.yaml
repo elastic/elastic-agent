@@ -1093,7 +1093,6 @@ spec:
             privileged: false
             runAsGroup: 1000
             runAsUser: 1000
-          volumeMounts: null
         dnsPolicy: ClusterFirstWithHostNet
         nodeSelector:
           kubernetes.io/os: linux
