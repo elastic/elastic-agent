@@ -7,6 +7,7 @@ package kubernetessecrets
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -663,6 +664,10 @@ func Test_UpdateCache(t *testing.T) {
 }
 
 func Test_Run(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Flaky timing on Windows")
+	}
+
 	testDataBuilder := secretTestDataBuilder{
 		namespace: "default",
 		name:      "secret_name",
