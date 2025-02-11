@@ -39,12 +39,8 @@ $TestsExitCode = 0
 try {
     Get-Ess-Stack -StackVersion $PACKAGE_VERSION    
     Write-Output "~~~ Running integration test group: $GROUP_NAME as user: $env:USERNAME"
-<<<<<<< HEAD
-    gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags=integration -shuffle=on -timeout=2h0m0s "github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=$GROUP_NAME" "-integration.sudo=$TEST_SUDO" 
-=======
     & gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags=integration -shuffle=on -timeout=2h0m0s "github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=$GROUP_NAME" "-integration.sudo=$TEST_SUDO"
     $TestsExitCode = $LASTEXITCODE    
->>>>>>> 87360e698 ([CI] Fix throttled windows test failures (#6662))
 } finally {
     ess_down
     
