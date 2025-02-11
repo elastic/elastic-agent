@@ -309,6 +309,7 @@ func Test_Fetch(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			tc := tc
 			running := make(chan struct{})
 			close(running)
 			p := contextProviderK8SSecrets{
@@ -627,6 +628,7 @@ func Test_UpdateCache(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			tc := tc
 			running := make(chan struct{})
 			close(running)
 			p := contextProviderK8SSecrets{
