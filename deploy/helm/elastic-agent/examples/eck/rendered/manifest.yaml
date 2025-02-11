@@ -1033,6 +1033,10 @@ spec:
         - hostPath:
             path: /var/log
           name: varlog
+        - hostPath:
+            path: /etc/elastic-agent/default/agent-pernode-example/state
+            type: DirectoryOrCreate
+          name: agent-data
 ---
 # Source: elastic-agent/templates/agent/eck/deployment.yaml
 apiVersion: agent.k8s.elastic.co/v1alpha1
