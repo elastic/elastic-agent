@@ -406,7 +406,10 @@ func mapProcess(p agentsystemprocess.ProcState) runningProcess {
 }
 
 func getElasticAgentProcesses(t *gotesting.T) []runningProcess {
-	return getProcesses(t, `.*elastic\-agent.*`)
+	// Include both the main elastic-agent process and the agentbeat sub-processes to ensure
+	// that no sub-processes are orhpaned from their parent process and left running. This
+	// primarily tests that Windows Job Object assignment works.
+	return getProcesses(t, `.*(elastic\-agent|agentbeat).*`)
 }
 
 func getProcesses(t *gotesting.T, regex string) []runningProcess {
