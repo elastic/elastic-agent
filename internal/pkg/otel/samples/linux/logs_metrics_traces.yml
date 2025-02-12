@@ -52,7 +52,6 @@ extensions:
     directory: ${env:STORAGE_DIR}
 
 processors:
-  elasticinframetrics:
   resourcedetection:
     detectors: ["system"]
     system:

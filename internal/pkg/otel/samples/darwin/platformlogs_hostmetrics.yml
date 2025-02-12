@@ -39,7 +39,6 @@ extensions:
     directory: ${env:STORAGE_DIR}
 
 processors:
-  elasticinframetrics:
   resourcedetection:
     detectors: ["system"]
     system:
@@ -71,51 +70,22 @@ processors:
           enabled: true
         os.type:
           enabled: true
-  attributes/dataset:
-    actions:
-      - key: event.dataset
-        from_attribute: data_stream.dataset
-        action: upsert
-  resource/process:
-    attributes:
-      - key: process.executable.name
-        action: delete
-      - key: process.executable.path
-        action: delete
 
 exporters:
-  # Exporter to send logs and metrics to Elasticsearch
-  elasticsearch/ecs:
-    endpoints: ["${env:ELASTIC_ENDPOINT}"]
-    api_key: ${env:ELASTIC_API_KEY}
-    mapping:
-      mode: ecs
-    logs_dynamic_index:
-      enabled: true
-    metrics_dynamic_index:
-      enabled: true
-    traces_dynamic_index:
-      enabled: true
-  elasticsearch/otel:
-    endpoints: [ "${env:ELASTIC_ENDPOINT}" ]
-    api_key: ${env:ELASTIC_API_KEY}
-    mapping:
-      mode: otel
-    logs_dynamic_index:
-      enabled: true
-    metrics_dynamic_index:
-      enabled: true
-    traces_dynamic_index:
-      enabled: true
+  # Exporter to send logs and metrics to Elasticsearch Motel
+  otlp/ingest:
+    endpoint: ${env:ELASTIC_ENDPOINT}
+    headers:
+      Authorization: ${env:ELASTIC_API_KEY}
 
 service:
   extensions: [file_storage]
   pipelines:
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
-      processors: [elasticinframetrics, resourcedetection, attributes/dataset, resource/process]
-      exporters: [elasticsearch/ecs]
+      processors: [resourcedetection]
+      exporters: [otlp/ingest]
     logs/platformlogs:
       receivers: [filelog/platformlogs]
       processors: [resourcedetection]
-      exporters: [elasticsearch/otel]
+      exporters: [otlp/ingest]
