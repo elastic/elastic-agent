@@ -2085,10 +2085,7 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 	return nil
 }
 
-// UpdatePackageVersion update the file that contains the latest available snapshot version
-func (Integration) UpdatePackageVersion(ctx context.Context) error {
-	const packageVersionFilename = ".package-version"
-
+func (Integration) GetPackageVersion(ctx context.Context) error {
 	currentReleaseBranch, err := git.GetCurrentReleaseBranch(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to identify the current release branch: %w", err)
@@ -2102,19 +2099,7 @@ func (Integration) UpdatePackageVersion(ctx context.Context) error {
 	if len(versions) != 1 {
 		return fmt.Errorf("expected a single version, got %v", versions)
 	}
-	packageVersion := versions[0].CoreVersion()
-	file, err := os.OpenFile(packageVersionFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
-	if err != nil {
-		return fmt.Errorf("failed to open %s for write: %w", packageVersionFilename, err)
-	}
-	defer file.Close()
-	_, err = file.WriteString(packageVersion)
-	if err != nil {
-		return fmt.Errorf("failed to write the package version file %s: %w", packageVersionFilename, err)
-	}
-
-	fmt.Println(packageVersion)
-
+	fmt.Println(versions[0].CoreVersion())
 	return nil
 }
 
