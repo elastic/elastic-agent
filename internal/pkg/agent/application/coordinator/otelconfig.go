@@ -147,12 +147,8 @@ func getReceiversConfigForComponent(comp *component.Component, info info.Agent) 
 	if err != nil {
 		return nil, err
 	}
-	signal, err := getSignalForComponent(comp)
-	if err != nil {
-		return nil, err
-	}
 	// this is necessary to convert policy config format to beat config format
-	defaultDataStreamType, err := signalToDefaultDatastreamType(signal)
+	defaultDataStreamType, err := getDefaultDatastreamTypeForComponent(comp)
 	if err != nil {
 		return nil, err
 	}
@@ -215,6 +211,7 @@ func getExportersConfigForComponent(comp *component.Component) (map[string]any, 
 	return exportersConfig, nil
 }
 
+// getBeatNameForComponent returns the beat binary name that would be used to run this component.
 func getBeatNameForComponent(comp *component.Component) string {
 	// TODO: Add this information directly to the spec?
 	if comp.InputSpec == nil || comp.InputSpec.BinaryName != "agentbeat" {
@@ -223,6 +220,8 @@ func getBeatNameForComponent(comp *component.Component) string {
 	return comp.InputSpec.Spec.Command.Args[0]
 }
 
+// getSignalForComponent returns the otel signal for the given component. Currently, this is always logs, even for
+// metricbeat.
 func getSignalForComponent(comp *component.Component) (pipeline.Signal, error) {
 	beatName := getBeatNameForComponent(comp)
 	switch beatName {
@@ -235,6 +234,7 @@ func getSignalForComponent(comp *component.Component) (pipeline.Signal, error) {
 	}
 }
 
+// getReceiverTypeForComponent returns the receiver type for the given component.
 func getReceiverTypeForComponent(comp *component.Component) (otelcomponent.Type, error) {
 	beatName := getBeatNameForComponent(comp)
 	switch beatName {
@@ -247,6 +247,7 @@ func getReceiverTypeForComponent(comp *component.Component) (otelcomponent.Type,
 	}
 }
 
+// getExporterTypeForComponent returns the exporter type for the given component.
 func getExporterTypeForComponent(comp *component.Component) (otelcomponent.Type, error) {
 	switch comp.OutputType {
 	case "elasticsearch":
@@ -256,6 +257,7 @@ func getExporterTypeForComponent(comp *component.Component) (otelcomponent.Type,
 	}
 }
 
+// unitToExporterConfig translates a component.Unit to an otel exporter configuration.
 func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type) (map[string]any, error) {
 	if unit.Type == client.UnitTypeInput {
 		return nil, fmt.Errorf("unit type is an input, expected output: %v", unit)
@@ -304,19 +306,21 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 	return inputs, nil
 }
 
-// signalTypeToDefaultDatastreamType returns the default datastream type for a given otel signal type.
+// getDefaultDatastreamTypeForComponent returns the default datastream type for a given component.
 // This is needed to translate from the agent policy config format to the beats config format.
-func signalToDefaultDatastreamType(signal pipeline.Signal) (string, error) {
-	switch signal {
-	case pipeline.SignalLogs:
+func getDefaultDatastreamTypeForComponent(comp *component.Component) (string, error) {
+	beatName := getBeatNameForComponent(comp)
+	switch beatName {
+	case "filebeat":
 		return "logs", nil
-	case pipeline.SignalMetrics:
+	case "metricbeat":
 		return "metrics", nil
 	default:
-		return "", fmt.Errorf("signal type not supported by Beats receivers: %s", signal)
+		return "", fmt.Errorf("input type not supported by Otel: %s", comp.InputType)
 	}
 }
 
+// translateEsOutputToExporter translates an elasticsearch output configuration to an elasticsearch expoter configuration.
 func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
 	esConfig, err := elasticsearchtranslate.ToOTelConfig(cfg)
 	if err != nil {
