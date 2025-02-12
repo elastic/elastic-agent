@@ -51,7 +51,9 @@ steps:
 
       - label: "Unit tests - Windows 2022"
         key: "unit-tests-win2022"
-        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+        command: |
+          .\\.buildkite\\scripts\\install-go.ps1
+          .\\.buildkite\\scripts\\steps\\unit-tests.ps1
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -69,7 +71,9 @@ steps:
 
       - label: "Unit tests - Windows 2016"
         key: "unit-tests-win2016"
-        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+        command: |
+          .\\.buildkite\\scripts\\install-go.ps1
+          .\\.buildkite\\scripts\\steps\\unit-tests.ps1
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -123,7 +127,9 @@ steps:
     steps:
       - label: "Unit tests - Windows 10"
         key: "unit-tests-win10"
-        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+        command: |
+          .\\.buildkite\\scripts\\install-go.ps1
+          .\\.buildkite\\scripts\\steps\\unit-tests.ps1
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -140,7 +146,9 @@ steps:
             allowed: true
       - label: "Unit tests - Windows 11"
         key: "unit-tests-win11"
-        command: ".\\.buildkite\\scripts\\steps\\unit-tests.ps1"
+        command: |
+          .\\.buildkite\\scripts\\install-go.ps1
+          .\\.buildkite\\scripts\\steps\\unit-tests.ps1
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -255,7 +263,7 @@ steps:
                   - GH_VERSION=2.4.0
 
   # Trigger for pull requests
-  - label: "Trigger Integration tests for Pull request"
+  - label: "Trigger Extended tests for Pull request"
     if: |
       (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
       build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
@@ -296,7 +304,7 @@ steps:
                     - GITHUB_PR_LABELS=${GITHUB_PR_LABELS}
 
   # Trigger for branches
-  - label: "Triggering Integration tests for branches"
+  - label: "Triggering Extended tests for branches"
     if: build.pull_request.id == null
     trigger: "elastic-agent-extended-testing"
     build:
