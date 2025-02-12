@@ -183,3 +183,44 @@ func TestOTelManager_Run(t *testing.T) {
 		t.Errorf("otel manager returned unexpected error: %v", runErr)
 	}
 }
+
+func TestOTelManager_ConfigError(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, _ := loggertest.New("otel")
+	m := NewOTelManager(l)
+
+	go func() {
+		err := m.Run(ctx)
+		require.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
+	}()
+
+	// watch is synchronous, so we need to read from it to avoid blocking the manager
+	go func() {
+		for {
+			select {
+			case <-m.Watch():
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	cfg := confmap.New() // invalid config
+	m.Update(cfg)
+	timeoutCh := time.After(time.Second * 5)
+	var err error
+outer:
+	for {
+		select {
+		case e := <-m.Errors():
+			if e != nil {
+				err = e
+				break outer
+			}
+		case <-timeoutCh:
+			break outer
+		}
+	}
+	assert.Error(t, err, "otel manager should have returned an error")
+}
