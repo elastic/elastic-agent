@@ -14,29 +14,39 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
-func TestSignalToDefaultDatastreamType(t *testing.T) {
+func TestBeatNameToDefaultDatastreamType(t *testing.T) {
 	tests := []struct {
-		signal        pipeline.Signal
+		beatName      string
 		expectedType  string
 		expectedError error
 	}{
 		{
-			signal:       pipeline.SignalLogs,
+			beatName:     "filebeat",
 			expectedType: "logs",
 		},
 		{
-			signal:       pipeline.SignalMetrics,
+			beatName:     "metricbeat",
 			expectedType: "metrics",
 		},
 		{
-			signal:        pipeline.SignalTraces,
-			expectedError: fmt.Errorf("signal type not supported by Beats receivers: traces"),
+			beatName:      "cloudbeat",
+			expectedError: fmt.Errorf("input type not supported by Otel: "),
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(fmt.Sprintf("signal=%v", tt.signal), func(t *testing.T) {
-			actualType, actualError := signalToDefaultDatastreamType(tt.signal)
+		t.Run(fmt.Sprintf("%v", tt.beatName), func(t *testing.T) {
+			comp := component.Component{
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "agentbeat",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{tt.beatName},
+						},
+					},
+				},
+			}
+			actualType, actualError := getDefaultDatastreamTypeForComponent(&comp)
 			assert.Equal(t, tt.expectedType, actualType)
 
 			if tt.expectedError != nil {
