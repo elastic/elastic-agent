@@ -115,7 +115,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				// pass the error to the errCh so the coordinator, unless it's a cancel error
 				if !errors.Is(err, context.Canceled) {
 					select {
-					case m.errCh <- nil:
+					case m.errCh <- err:
 					case <-ctx.Done():
 					}
 				}

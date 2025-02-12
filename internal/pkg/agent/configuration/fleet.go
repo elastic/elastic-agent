@@ -14,6 +14,7 @@ import (
 type FleetAgentConfig struct {
 	Enabled             bool               `config:"enabled" yaml:"enabled"`
 	AccessAPIKey        string             `config:"access_api_key" yaml:"access_api_key"`
+	ReplaceTokenHash    string             `config:"replace_token_hash" yaml:"replace_token_hash"`
 	EnrollmentTokenHash string             `config:"enrollment_token_hash" yaml:"enrollment_token_hash"`
 	Client              remote.Config      `config:",inline" yaml:",inline"`
 	Info                *AgentInfo         `config:"agent" yaml:"agent"`

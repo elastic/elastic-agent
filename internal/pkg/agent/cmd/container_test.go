@@ -259,12 +259,19 @@ func TestKibanaFetchToken(t *testing.T) {
 }
 
 func TestShouldEnroll(t *testing.T) {
-	enrollmentToken := "test-token"
+	// enroll token
+	enrollmentToken := "test-enroll-token"
 	enrollmentTokenHash, err := crypto.GeneratePBKDF2FromPassword([]byte(enrollmentToken))
 	require.NoError(t, err)
 	enrollmentTokenHashBase64 := base64.StdEncoding.EncodeToString(enrollmentTokenHash)
+	enrollmentTokenOther := "test-enroll-token-other"
 
-	enrollmentTokenOther := "test-token-other"
+	// replace token
+	replaceToken := "test-replace-token"
+	replaceTokenHash, err := crypto.GeneratePBKDF2FromPassword([]byte(replaceToken))
+	require.NoError(t, err)
+	replaceTokenHashBase64 := base64.StdEncoding.EncodeToString(replaceTokenHash)
+	replaceTokenOther := "test-replace-token-other"
 
 	fleetNetworkErr := errors.New("fleet network error")
 	for name, tc := range map[string]struct {
@@ -287,6 +294,41 @@ func TestShouldEnroll(t *testing.T) {
 		"should enroll if config file does not exist": {
 			statFn:               func(path string) (os.FileInfo, error) { return nil, os.ErrNotExist },
 			cfg:                  setupConfig{Fleet: fleetConfig{Enroll: true, Force: true}},
+			expectedShouldEnroll: true,
+		},
+		"should enroll on agent id but no existing id": {
+			statFn: func(path string) (os.FileInfo, error) { return nil, nil },
+			cfg:    setupConfig{Fleet: fleetConfig{Enroll: true, URL: "host1", ID: "diff-agent-id"}},
+			encryptedDiskStoreFn: func(t *testing.T, savedConfig *configuration.Configuration) storage.Storage {
+				m := mockStorage.NewStorage(t)
+				m.On("Load").Return(io.NopCloser(strings.NewReader(`fleet:
+  enabled: true
+  access_api_key: "test-key"
+  enrollment_token_hash: "test-hash"
+  hosts:
+    - host1
+  agent:
+  protocol: "https"`)), nil).Once()
+				return m
+			},
+			expectedShouldEnroll: true,
+		},
+		"should enroll on agent id but diff agent id": {
+			statFn: func(path string) (os.FileInfo, error) { return nil, nil },
+			cfg:    setupConfig{Fleet: fleetConfig{Enroll: true, URL: "host1", ID: "diff-agent-id"}},
+			encryptedDiskStoreFn: func(t *testing.T, savedConfig *configuration.Configuration) storage.Storage {
+				m := mockStorage.NewStorage(t)
+				m.On("Load").Return(io.NopCloser(strings.NewReader(`fleet:
+  enabled: true
+  access_api_key: "test-key"
+  enrollment_token_hash: "test-hash"
+  hosts:
+    - host1
+  agent:
+    id: "agent-id"
+  protocol: "https"`)), nil).Once()
+				return m
+			},
 			expectedShouldEnroll: true,
 		},
 		"should enroll on fleet url change": {
@@ -316,6 +358,26 @@ func TestShouldEnroll(t *testing.T) {
   enabled: true
   access_api_key: "test-key"
   enrollment_token_hash: "`+enrollmentTokenHashBase64+`"
+  hosts:
+    - host1
+    - host2
+    - host3
+  agent:
+  protocol: "https"`)), nil).Once()
+				return m
+			},
+			expectedShouldEnroll: true,
+		},
+		"should enroll on replace token change": {
+			statFn: func(path string) (os.FileInfo, error) { return nil, nil },
+			cfg:    setupConfig{Fleet: fleetConfig{Enroll: true, URL: "host1", EnrollmentToken: enrollmentToken, ReplaceToken: replaceTokenOther}},
+			encryptedDiskStoreFn: func(t *testing.T, savedConfig *configuration.Configuration) storage.Storage {
+				m := mockStorage.NewStorage(t)
+				m.On("Load").Return(io.NopCloser(strings.NewReader(`fleet:
+  enabled: true
+  access_api_key: "test-key"
+  enrollment_token_hash: "`+enrollmentTokenHashBase64+`"
+  replace_token_hash: "`+replaceTokenHashBase64+`"
   hosts:
     - host1
     - host2
@@ -395,6 +457,44 @@ func TestShouldEnroll(t *testing.T) {
 			},
 			expectedShouldEnroll: false,
 		},
+		"should not enroll on no changes with agent ID and replace token": {
+			statFn: func(path string) (os.FileInfo, error) { return nil, nil },
+			cfg:    setupConfig{Fleet: fleetConfig{Enroll: true, URL: "host1", ID: "custom-id", EnrollmentToken: enrollmentToken, ReplaceToken: replaceToken}},
+			encryptedDiskStoreFn: func(t *testing.T, savedConfig *configuration.Configuration) storage.Storage {
+				m := mockStorage.NewStorage(t)
+				m.On("Load").Return(io.NopCloser(strings.NewReader(`fleet:
+  enabled: true
+  access_api_key: "test-key"
+  enrollment_token_hash: "`+enrollmentTokenHashBase64+`"
+  replace_token_hash: "`+replaceTokenHashBase64+`"
+  hosts:
+    - host1
+    - host2
+    - host3
+  agent:
+    id: "custom-id"
+  protocol: "https"`)), nil).Once()
+				return m
+			},
+			fleetClientFn: func(t *testing.T) client.Sender {
+				tries := 0
+				m := mockFleetClient.NewSender(t)
+				call := m.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+				call.Run(func(args mock.Arguments) {
+					if tries <= 1 {
+						call.Return(nil, fleetNetworkErr)
+					} else {
+						call.Return(&http.Response{
+							StatusCode: http.StatusOK,
+							Body:       io.NopCloser(strings.NewReader(`{"action": "acks", "items":[]}`)),
+						}, nil)
+					}
+					tries++
+				}).Times(3)
+				return m
+			},
+			expectedShouldEnroll: false,
+		},
 		"should fail on fleet network errors": {
 			statFn: func(path string) (os.FileInfo, error) { return nil, nil },
 			cfg:    setupConfig{Fleet: fleetConfig{Enroll: true, URL: "host1", EnrollmentToken: enrollmentToken}},
@@ -423,6 +523,33 @@ func TestShouldEnroll(t *testing.T) {
 		"should not update the enrollment token hash if it does not exist in setup configuration": {
 			statFn: func(path string) (os.FileInfo, error) { return nil, nil },
 			cfg:    setupConfig{Fleet: fleetConfig{Enroll: true, URL: "host1", EnrollmentToken: ""}},
+			encryptedDiskStoreFn: func(t *testing.T, savedConfig *configuration.Configuration) storage.Storage {
+				m := mockStorage.NewStorage(t)
+				m.On("Load").Return(io.NopCloser(strings.NewReader(`fleet:
+  enabled: true
+  access_api_key: "test-key"
+  hosts:
+    - host1
+    - host2
+    - host3
+  agent:
+  protocol: "https"`)), nil).Once()
+				return m
+			},
+			fleetClientFn: func(t *testing.T) client.Sender {
+				m := mockFleetClient.NewSender(t)
+				m.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(&http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(`{"action": "acks", "items":[]}`)),
+					}, nil).Once()
+				return m
+			},
+			expectedShouldEnroll: false,
+		},
+		"should not update the replace token hash if it does not exist in setup configuration": {
+			statFn: func(path string) (os.FileInfo, error) { return nil, nil },
+			cfg:    setupConfig{Fleet: fleetConfig{Enroll: true, URL: "host1", EnrollmentToken: "", ReplaceToken: ""}},
 			encryptedDiskStoreFn: func(t *testing.T, savedConfig *configuration.Configuration) storage.Storage {
 				m := mockStorage.NewStorage(t)
 				m.On("Load").Return(io.NopCloser(strings.NewReader(`fleet:
@@ -483,6 +610,48 @@ func TestShouldEnroll(t *testing.T) {
 				enrollmentTokeHash, err := base64.StdEncoding.DecodeString(savedConfig.Fleet.EnrollmentTokenHash)
 				require.NoError(t, err)
 				require.NoError(t, crypto.ComparePBKDF2HashAndPassword(enrollmentTokeHash, []byte(enrollmentToken)))
+			},
+			expectedShouldEnroll: false,
+		},
+		"should not enroll on no changes and update the stored enrollment and replace token hash": {
+			statFn: func(path string) (os.FileInfo, error) { return nil, nil },
+			cfg:    setupConfig{Fleet: fleetConfig{Enroll: true, URL: "host1", EnrollmentToken: enrollmentToken, ReplaceToken: replaceToken}},
+			encryptedDiskStoreFn: func(t *testing.T, savedConfig *configuration.Configuration) storage.Storage {
+				m := mockStorage.NewStorage(t)
+				m.On("Load").Return(io.NopCloser(strings.NewReader(`fleet:
+  enabled: true
+  access_api_key: "test-key"
+  hosts:
+    - host1
+    - host2
+    - host3
+  agent:
+  protocol: "https"`)), nil).Once()
+				m.On("Save", mock.Anything).Run(func(args mock.Arguments) {
+					reader := args.Get(0).(io.Reader)
+					data, _ := io.ReadAll(reader)
+					_ = yaml.Unmarshal(data, savedConfig)
+				}).Return(nil).Times(0)
+				return m
+			},
+			fleetClientFn: func(t *testing.T) client.Sender {
+				m := mockFleetClient.NewSender(t)
+				m.On("Send", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(&http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(`{"action": "acks", "items":[]}`)),
+					}, nil).Once()
+				return m
+			},
+			expectedSavedConfig: func(t *testing.T, savedConfig *configuration.Configuration) {
+				require.NotNil(t, savedConfig)
+				require.NotNil(t, savedConfig.Fleet)
+				enrollmentTokenHash, err := base64.StdEncoding.DecodeString(savedConfig.Fleet.EnrollmentTokenHash)
+				require.NoError(t, err)
+				require.NoError(t, crypto.ComparePBKDF2HashAndPassword(enrollmentTokenHash, []byte(enrollmentToken)))
+				replaceTokenHash, err := base64.StdEncoding.DecodeString(savedConfig.Fleet.ReplaceTokenHash)
+				require.NoError(t, err)
+				require.NoError(t, crypto.ComparePBKDF2HashAndPassword(replaceTokenHash, []byte(replaceToken)))
 			},
 			expectedShouldEnroll: false,
 		},
