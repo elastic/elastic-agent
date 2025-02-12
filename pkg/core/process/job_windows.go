@@ -85,11 +85,11 @@ func (job Job) Assign(p *os.Process) error {
 	// examples also add VM_READ or the safer PROCESS_QUERY_LIMITED_INFORMATION so include that too.
 	//   https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-assignprocesstojobobject
 	desiredAccess := uint32(windows.PROCESS_QUERY_LIMITED_INFORMATION | windows.PROCESS_SET_QUOTA | windows.PROCESS_TERMINATE)
-	processHandle, err := windows.OpenProcess(desiredAccess, false, uint32(p.Pid))
+	processHandle, err := windows.OpenProcess(desiredAccess, false, uint32(p.Pid)) //nolint:gosec // G115 Conversion from int to uint32 is safe here.
 	if err != nil {
 		return fmt.Errorf("opening process handle: %w", err)
 	}
-	defer windows.CloseHandle(processHandle)
+	defer windows.CloseHandle(processHandle) //nolint:errcheck // No way to handle errors returned here so safe to ignore.
 
 	err = windows.AssignProcessToJobObject(windows.Handle(job), processHandle)
 	if err != nil {
