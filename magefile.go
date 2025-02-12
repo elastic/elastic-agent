@@ -26,6 +26,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -40,11 +41,13 @@ import (
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
+	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/pkg/testing/buildkite"
 	tcommon "github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
+	"github.com/elastic/elastic-agent/pkg/testing/helm"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/kind"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"
@@ -83,6 +86,7 @@ const (
 	externalArtifacts = "EXTERNAL"
 	platformsEnv      = "PLATFORMS"
 	packagesEnv       = "PACKAGES"
+	dockerVariants    = "DOCKER_VARIANTS"
 	configFile        = "elastic-agent.yml"
 	agentDropPath     = "AGENT_DROP_PATH"
 	checksumFilename  = "checksum.yml"
@@ -93,9 +97,9 @@ const (
 	baseURLForStagingDRA = "https://staging.elastic.co/"
 	agentCoreProjectName = "elastic-agent-core"
 
-	helmChartPath = "./deploy/helm/elastic-agent"
-
-	sha512FileExt = ".sha512"
+	helmChartPath     = "./deploy/helm/elastic-agent"
+	helmOtelChartPath = "./deploy/helm/edot-collector/kube-stack"
+	sha512FileExt     = ".sha512"
 )
 
 var (
@@ -396,7 +400,7 @@ func (Build) TestBinaries() error {
 		if err != nil {
 			return err
 		}
-		err = os.Chmod(outputName, 0755)
+		err = os.Chmod(outputName, 0o755)
 		if err != nil {
 			return err
 		}
@@ -475,7 +479,8 @@ func AssembleDarwinUniversal() error {
 	args := []string{
 		"build/golang-crossbuild/%s-darwin-universal",
 		"build/golang-crossbuild/%s-darwin-arm64",
-		"build/golang-crossbuild/%s-darwin-amd64"}
+		"build/golang-crossbuild/%s-darwin-amd64",
+	}
 
 	for _, arg := range args {
 		lipoArgs = append(lipoArgs, fmt.Sprintf(arg, devtools.BeatName))
@@ -514,7 +519,7 @@ func Package(ctx context.Context) error {
 		dependenciesVersion = beatVersion
 	}
 
-	packageAgent(ctx, platforms, dependenciesVersion, manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(CrossBuild))
+	packageAgent(ctx, platforms, dependenciesVersion, manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(CrossBuild), devtools.SelectedPackageTypes)
 	return nil
 }
 
@@ -629,7 +634,7 @@ func GoInstall(link string) error {
 // Mkdir returns a function that create a directory.
 func Mkdir(dir string) func() error {
 	return func() error {
-		if err := os.MkdirAll(dir, 0700); err != nil {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return fmt.Errorf("failed to create directory: %v, error: %+v", dir, err)
 		}
 		return nil
@@ -747,7 +752,7 @@ func BuildFleetCfg() error {
 	out := filepath.Join("internal", "pkg", "agent", "application", "configuration_embed.go")
 
 	fmt.Printf(">> BuildFleetCfg %s to %s\n", in, out)
-	return RunGo("run", goF, "--in", in, "--out", out)
+	return RunGo("run", goF, "--in", in, "--output", out)
 }
 
 // Enroll runs agent which enrolls before running.
@@ -780,9 +785,13 @@ func (Cloud) Image(ctx context.Context) {
 	dev := os.Getenv(devEnv)
 	defer os.Setenv(devEnv, dev)
 
+	variant := os.Getenv(dockerVariants)
+	defer os.Setenv(dockerVariants, variant)
+
 	os.Setenv(platformsEnv, "linux/amd64")
 	os.Setenv(packagesEnv, "docker")
 	os.Setenv(devEnv, "true")
+	os.Setenv(dockerVariants, "cloud")
 
 	if s, err := strconv.ParseBool(snapshot); err == nil && !s {
 		// only disable SNAPSHOT build when explicitely defined
@@ -796,6 +805,7 @@ func (Cloud) Image(ctx context.Context) {
 	devtools.DevBuild = true
 	devtools.Platforms = devtools.Platforms.Filter("linux/amd64")
 	devtools.SelectedPackageTypes = []devtools.PackageType{devtools.Docker}
+	devtools.SelectedDockerVariants = []devtools.DockerVariant{devtools.Cloud}
 
 	if _, hasExternal := os.LookupEnv(externalArtifacts); !hasExternal {
 		devtools.ExternalBuild = true
@@ -855,7 +865,7 @@ func (Devmachine) Create(instanceName string) error {
 	if instanceName == "" {
 		return errors.New(
 			`instanceName is required.
-	Example: 
+	Example:
 	mage devmachine:create "pavel-dev-machine"  `)
 	}
 	return devmachine.Run(instanceName)
@@ -916,7 +926,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 		// produce docker package
 		packageAgent(ctx, []string{
 			"linux/amd64",
-		}, dependenciesVersion, nil, mg.F(devtools.UseElasticAgentDemoPackaging), mg.F(CrossBuild))
+		}, dependenciesVersion, nil, mg.F(devtools.UseElasticAgentDemoPackaging), mg.F(CrossBuild), devtools.SelectedPackageTypes)
 
 		dockerPackagePath := filepath.Join("build", "package", "elastic-agent", "elastic-agent-linux-amd64.docker", "docker-build")
 		if err := os.Chdir(dockerPackagePath); err != nil {
@@ -963,7 +973,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-func packageAgent(ctx context.Context, platforms []string, dependenciesVersion string, manifestResponse *manifest.Build, agentPackaging, agentBinaryTarget mg.Fn) error {
+func packageAgent(ctx context.Context, platforms []string, dependenciesVersion string, manifestResponse *manifest.Build, agentPackaging, agentBinaryTarget mg.Fn, packageTypes []mage.PackageType) error {
 	fmt.Println("--- Package Elastic-Agent")
 
 	platformPackageSuffixes := []string{}
@@ -975,7 +985,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	}
 
 	// download/copy all the necessary dependencies for packaging elastic-agent
-	archivePath, dropPath := collectPackageDependencies(platforms, dependenciesVersion, platformPackageSuffixes)
+	archivePath, dropPath := collectPackageDependencies(platforms, dependenciesVersion, platformPackageSuffixes, packageTypes)
 
 	// cleanup after build
 	defer os.RemoveAll(archivePath)
@@ -987,7 +997,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	if mg.Verbose() {
 		log.Printf("--- creating flat dir in .elastic-agent_flat")
 	}
-	os.MkdirAll(flatPath, 0755)
+	os.MkdirAll(flatPath, 0o755)
 	defer os.RemoveAll(flatPath)
 
 	// extract all dependencies from their archives into flat dir
@@ -1009,8 +1019,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 // NOTE: after the build is done the caller must:
 // - delete archivePath and dropPath contents
 // - unset AGENT_DROP_PATH environment variable
-func collectPackageDependencies(platforms []string, packageVersion string, platformPackageSuffixes []string) (archivePath string, dropPath string) {
-
+func collectPackageDependencies(platforms []string, packageVersion string, platformPackageSuffixes []string, packageTypes []mage.PackageType) (archivePath string, dropPath string) {
 	dropPath, found := os.LookupEnv(agentDropPath)
 
 	// try not to shadow too many variables
@@ -1055,10 +1064,15 @@ func collectPackageDependencies(platforms []string, packageVersion string, platf
 						fmt.Printf("--- Binary %s does not support %s, download skipped\n", spec.BinaryName, platform)
 						continue
 					}
-					targetPath := filepath.Join(archivePath, manifest.PlatformPackages[platform])
-					os.MkdirAll(targetPath, 0755)
-					packageName := spec.GetPackageName(packageVersion, platform)
-					errGroup.Go(downloadBinary(ctx, spec.ProjectName, packageName, spec.BinaryName, platform, packageVersion, targetPath, completedDownloads))
+					for _, pkgType := range packageTypes {
+						if !spec.SupportsPackageType(pkgcommon.PackageType(pkgType)) {
+							continue
+						}
+						targetPath := filepath.Join(archivePath, manifest.PlatformPackages[platform])
+						os.MkdirAll(targetPath, 0o755)
+						packageName := spec.GetPackageName(packageVersion, platform)
+						errGroup.Go(downloadBinary(ctx, spec.ProjectName, packageName, spec.BinaryName, platform, packageVersion, targetPath, completedDownloads))
+					}
 				}
 			}
 
@@ -1105,7 +1119,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, platf
 					}
 
 					targetPath := filepath.Join(archivePath, rp)
-					os.MkdirAll(targetPath, 0755)
+					os.MkdirAll(targetPath, 0o755)
 					for _, f := range files {
 						// safety check; if the user has an older version of the beats repo,
 						// for example right after a release where you've `git pulled` from on repo and not the other,
@@ -1160,14 +1174,13 @@ func removePythonWheels(matches []string, version string) []string {
 // flattenDependencies will extract all the required packages collected in archivePath and dropPath in flatPath and
 // regenerate checksums
 func flattenDependencies(requiredPackages []string, packageVersion, archivePath, dropPath, flatPath string, manifestResponse *manifest.Build) {
-
 	for _, rp := range requiredPackages {
 		targetPath := filepath.Join(archivePath, rp)
 		versionedFlatPath := filepath.Join(flatPath, rp)
 		versionedDropPath := filepath.Join(dropPath, rp)
-		os.MkdirAll(targetPath, 0755)
-		os.MkdirAll(versionedFlatPath, 0755)
-		os.MkdirAll(versionedDropPath, 0755)
+		os.MkdirAll(targetPath, 0o755)
+		os.MkdirAll(versionedFlatPath, 0o755)
+		os.MkdirAll(versionedDropPath, 0o755)
 
 		// untar all
 		matches, err := filepath.Glob(filepath.Join(targetPath, "*tar.gz"))
@@ -1239,7 +1252,6 @@ type branchInfo struct {
 // FetchLatestAgentCoreStagingDRA is a mage target that will retrieve the elastic-agent-core DRA artifacts and
 // place them under build/dra/buildID. It accepts one argument that has to be a release branch present in staging DRA
 func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
-
 	branchInfo, err := findLatestBuildForBranch(ctx, baseURLForStagingDRA, branch)
 
 	// Create a dir with the buildID at <root>/build/dra/<buildID>
@@ -1259,7 +1271,7 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 	}
 
 	fmt.Println("Downloaded agent core DRAs:")
-	for k, _ := range artifacts {
+	for k := range artifacts {
 		fmt.Println(k)
 	}
 	return nil
@@ -1267,7 +1279,6 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 
 // PackageUsingDRA packages elastic-agent for distribution using Daily Released Artifacts specified in manifest.
 func PackageUsingDRA(ctx context.Context) error {
-
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
@@ -1295,7 +1306,7 @@ func PackageUsingDRA(ctx context.Context) error {
 		return fmt.Errorf("setting agent commit hash %q: %w", agentCoreProject.CommitHash, err)
 	}
 
-	return packageAgent(ctx, platforms, parsedVersion.VersionWithPrerelease(), manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(useDRAAgentBinaryForPackage, devtools.ManifestURL))
+	return packageAgent(ctx, platforms, parsedVersion.VersionWithPrerelease(), manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(useDRAAgentBinaryForPackage, devtools.ManifestURL), devtools.SelectedPackageTypes)
 }
 
 func downloadManifestAndSetVersion(ctx context.Context, url string) (*manifest.Build, *version.ParsedSemVer, error) {
@@ -1479,7 +1490,6 @@ func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir s
 }
 
 func useDRAAgentBinaryForPackage(ctx context.Context, manifestUrl string) error {
-
 	repositoryRoot, err := findRepositoryRoot()
 	if err != nil {
 		return fmt.Errorf("looking up for repository root: %w", err)
@@ -1583,13 +1593,13 @@ func appendComponentChecksums(versionedDropPath string, checksums map[string]str
 		return err
 	}
 
-	return os.WriteFile(filepath.Join(versionedDropPath, checksumFilename), content, 0644)
+	return os.WriteFile(filepath.Join(versionedDropPath, checksumFilename), content, 0o644)
 }
 
 // movePackagesToArchive Create archive folder and move any pre-existing artifacts into it.
 func movePackagesToArchive(dropPath string, platformPackageSuffixes []string, packageVersion string) string {
 	archivePath := filepath.Join(dropPath, "archives")
-	os.MkdirAll(archivePath, 0755)
+	os.MkdirAll(archivePath, 0o755)
 
 	// move archives to archive path
 	matches, err := filepath.Glob(filepath.Join(dropPath, "*tar.gz*"))
@@ -1628,7 +1638,7 @@ func movePackagesToArchive(dropPath string, platformPackageSuffixes []string, pa
 
 			targetPath := filepath.Join(archivePath, packageSuffix, filepath.Base(f))
 			targetDir := filepath.Dir(targetPath)
-			if err := os.MkdirAll(targetDir, 0750); err != nil {
+			if err := os.MkdirAll(targetDir, 0o750); err != nil {
 				fmt.Printf("warning: failed to create directory %s: %s", targetDir, err)
 			}
 
@@ -1812,7 +1822,7 @@ func saveIronbank() error {
 
 	distributionsDir := "build/distributions"
 	if _, err := os.Stat(distributionsDir); os.IsNotExist(err) {
-		err := os.MkdirAll(distributionsDir, 0750)
+		err := os.MkdirAll(distributionsDir, 0o750)
 		if err != nil {
 			return fmt.Errorf("cannot create folder for docker artifacts: %+v", err)
 		}
@@ -1874,7 +1884,6 @@ func prepareIronbankBuild() error {
 		}
 		return nil
 	})
-
 	if err != nil {
 		return fmt.Errorf("cannot create templates for the IronBank: %+v", err)
 	}
@@ -2053,7 +2062,7 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 	versionFileData := upgradetest.AgentVersions{
 		TestVersions: versions,
 	}
-	file, err := os.OpenFile(upgradetest.AgentVersionsFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(upgradetest.AgentVersionsFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
 		return fmt.Errorf("failed to open %s for write: %w", upgradetest.AgentVersionsFilename, err)
 	}
@@ -2094,7 +2103,7 @@ func (Integration) UpdatePackageVersion(ctx context.Context) error {
 		return fmt.Errorf("expected a single version, got %v", versions)
 	}
 	packageVersion := versions[0].CoreVersion()
-	file, err := os.OpenFile(packageVersionFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(packageVersionFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
 		return fmt.Errorf("failed to open %s for write: %w", packageVersionFilename, err)
 	}
@@ -2109,8 +2118,10 @@ func (Integration) UpdatePackageVersion(ctx context.Context) error {
 	return nil
 }
 
-var stateDir = ".integration-cache"
-var stateFile = "state.yml"
+var (
+	stateDir  = ".integration-cache"
+	stateFile = "state.yml"
+)
 
 // readFrameworkState reads the state file from the integration test framework
 func readFrameworkState() (runner.State, error) {
@@ -2184,8 +2195,8 @@ func listStacks() (string, error) {
 	for i, stack := range state.Stacks {
 		t := table.NewWriter()
 		t.AppendRows([]table.Row{
-			table.Row{"#", i},
-			table.Row{"Type", stack.Provisioner},
+			{"#", i},
+			{"Type", stack.Provisioner},
 		})
 
 		switch {
@@ -2666,15 +2677,15 @@ func integRunnerOnce(ctx context.Context, matrix bool, singleTest string) (int, 
 	_ = os.Remove("build/TEST-go-integration.out")
 	_ = os.Remove("build/TEST-go-integration.out.json")
 	_ = os.Remove("build/TEST-go-integration.xml")
-	err = writeFile("build/TEST-go-integration.out", results.Output, 0644)
+	err = writeFile("build/TEST-go-integration.out", results.Output, 0o644)
 	if err != nil {
 		return 0, fmt.Errorf("error writing test out file: %w", err)
 	}
-	err = writeFile("build/TEST-go-integration.out.json", results.JSONOutput, 0644)
+	err = writeFile("build/TEST-go-integration.out.json", results.JSONOutput, 0o644)
 	if err != nil {
 		return 0, fmt.Errorf("error writing test out json file: %w", err)
 	}
-	err = writeFile("build/TEST-go-integration.xml", results.XMLOutput, 0644)
+	err = writeFile("build/TEST-go-integration.xml", results.XMLOutput, 0o644)
 	if err != nil {
 		return 0, fmt.Errorf("error writing test out xml file: %w", err)
 	}
@@ -2840,7 +2851,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	}
 
 	diagDir := filepath.Join("build", "diagnostics")
-	_ = os.MkdirAll(diagDir, 0755)
+	_ = os.MkdirAll(diagDir, 0o755)
 
 	cfg := tcommon.Config{
 		AgentVersion:   agentVersion,
@@ -3044,7 +3055,7 @@ func authGCP(ctx context.Context) error {
 	if err := json.Unmarshal(output, &svcList); err != nil {
 		return fmt.Errorf("unable to parse service accounts: %w", err)
 	}
-	var found = false
+	found := false
 	for _, svc := range svcList {
 		if svc.Email == iamAcctName {
 			found = true
@@ -3126,11 +3137,11 @@ func authESS(ctx context.Context) error {
 	}
 	_, err = os.Stat(essAPIKeyFile)
 	if os.IsNotExist(err) {
-		if err := os.MkdirAll(filepath.Dir(essAPIKeyFile), 0700); err != nil {
+		if err := os.MkdirAll(filepath.Dir(essAPIKeyFile), 0o700); err != nil {
 			return fmt.Errorf("unable to create ESS config directory: %w", err)
 		}
 
-		if err := os.WriteFile(essAPIKeyFile, nil, 0600); err != nil {
+		if err := os.WriteFile(essAPIKeyFile, nil, 0o600); err != nil {
 			return fmt.Errorf("unable to initialize ESS API key file: %w", err)
 		}
 	} else if err != nil {
@@ -3170,7 +3181,7 @@ func authESS(ctx context.Context) error {
 	}
 
 	// Write API key to file for future use
-	if err := os.WriteFile(essAPIKeyFile, []byte(essAPIKey), 0600); err != nil {
+	if err := os.WriteFile(essAPIKeyFile, []byte(essAPIKey), 0o600); err != nil {
 		return fmt.Errorf("unable to persist ESS API key for future use: %w", err)
 	}
 
@@ -3242,7 +3253,7 @@ func (Otel) Readme() error {
 	}
 
 	// resolve template
-	out, err := os.OpenFile(readmeOut, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	out, err := os.OpenFile(readmeOut, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
 		return fmt.Errorf("failed to open file %s: %w", readmeOut, err)
 	}
@@ -3289,6 +3300,10 @@ func getOtelDependencies() (*otelDependencies, error) {
 		} else if dependency.ComponentType == "receiver" {
 			receivers = append(receivers, dependency)
 		}
+	}
+
+	for _, list := range [][]*otelDependency{connectors, exporters, extensions, processors, receivers} {
+		sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
 	}
 
 	return &otelDependencies{
@@ -3401,16 +3416,16 @@ type otelDependencies struct {
 
 type Helm mg.Namespace
 
-func (Helm) RenderExamples() error {
+// RenderExamples runs the equivalent of `helm template` and `helm lint`
+// for the examples of the Elastic Helm chart which are located at
+// `deploy/helm/elastic-agent/examples` directory.
+func (h Helm) RenderExamples() error {
+	mg.SerialDeps(h.BuildDependencies)
+
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
-	helmChart, err := loader.Load(helmChartPath)
-	if err != nil {
-		return fmt.Errorf("failed to load helm chart: %w", err)
-	}
-
-	err = actionConfig.Init(settings.RESTClientGetter(), "default", "",
+	err := actionConfig.Init(settings.RESTClientGetter(), "default", "",
 		func(format string, v ...interface{}) {})
 	if err != nil {
 		return fmt.Errorf("failed to init helm action config: %w", err)
@@ -3427,6 +3442,11 @@ func (Helm) RenderExamples() error {
 			continue
 		}
 
+		helmChart, err := loader.Load(helmChartPath)
+		if err != nil {
+			return fmt.Errorf("failed to load helm chart: %w", err)
+		}
+
 		exampleFullPath := filepath.Join(examplesPath, d.Name())
 
 		helmValues := make(map[string]any)
@@ -3441,6 +3461,12 @@ func (Helm) RenderExamples() error {
 				return fmt.Errorf("failed to load helm values file: %w", err)
 			}
 			maps.Copy(helmValues, data)
+		}
+
+		lintAction := action.NewLint()
+		lintResult := lintAction.Run([]string{helmChartPath}, helmValues)
+		if len(lintResult.Errors) > 0 {
+			return fmt.Errorf("failed to lint helm chart for example %s: %w", exampleFullPath, errors.Join(lintResult.Errors...))
 		}
 
 		installAction := action.NewInstall(actionConfig)
@@ -3475,70 +3501,46 @@ func (Helm) RenderExamples() error {
 	return nil
 }
 
+// UpdateAgentVersion updates the agent version in the Elastic-Agent and EDOT-Collector Helm charts.
 func (Helm) UpdateAgentVersion() error {
-	valuesFile := filepath.Join(helmChartPath, "values.yaml")
+	agentVersion := bversion.GetParsedAgentPackageVersion().CoreVersion()
+	agentSnapshotVersion := agentVersion + "-SNAPSHOT"
+	// until the Helm chart reaches GA this remains with -beta suffix
+	agentChartVersion := agentVersion + "-beta"
 
-	data, err := os.ReadFile(valuesFile)
-	if err != nil {
-		return fmt.Errorf("failed to read file: %w", err)
-	}
-
-	isTagged, err := devtools.TagContainsCommit()
-	if err != nil {
-		return fmt.Errorf("failed to check if tag contains commit: %w", err)
-	}
-
-	if !isTagged {
-		isTagged = os.Getenv(snapshotEnv) != ""
-	}
-
-	agentVersion := getVersion()
-
-	// Parse YAML into a Node structure because
-	// it maintains comments
-	var rootNode yaml.Node
-	err = yaml.Unmarshal(data, &rootNode)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal YAML: %w", err)
-	}
-
-	if rootNode.Kind != yaml.DocumentNode {
-		return fmt.Errorf("root node is not a document node")
-	} else if len(rootNode.Content) == 0 {
-		return fmt.Errorf("root node has no content")
-	}
-
-	if err := updateYamlNodes(rootNode.Content[0], agentVersion, "agent", "version"); err != nil {
-		return fmt.Errorf("failed to update agent version: %w", err)
-	}
-
-	if !isTagged {
-		if err := updateYamlNodes(rootNode.Content[0], fmt.Sprintf("%s-SNAPSHOT", agentVersion), "agent", "image", "tag"); err != nil {
-			return fmt.Errorf("failed to update agent image tag: %w", err)
+	for yamlFile, keyVals := range map[string][]struct {
+		key   string
+		value string
+	}{
+		// values file for elastic-agent Helm Chart
+		filepath.Join(helmChartPath, "values.yaml"): {
+			{"agent.version", agentVersion},
+			// always use the SNAPSHOT version for image tag
+			// for the chart that resides in the git repo
+			{"agent.image.tag", agentSnapshotVersion},
+		},
+		// Chart.yaml for elastic-agent Helm Chart
+		filepath.Join(helmChartPath, "Chart.yaml"): {
+			{"appVersion", agentVersion},
+			{"version", agentChartVersion},
+		},
+		// edot-collector values file for kube-stack Helm Chart
+		filepath.Join(helmOtelChartPath, "values.yaml"): {
+			{"defaultCRConfig.image.tag", agentVersion},
+		},
+	} {
+		if err := updateYamlFile(yamlFile, keyVals...); err != nil {
+			return fmt.Errorf("failed to update agent version: %w", err)
 		}
-	}
-
-	// Truncate values file
-	file, err := os.Create(valuesFile)
-	if err != nil {
-		return fmt.Errorf("failed to open file for writing: %w", err)
-	}
-	defer file.Close()
-
-	// Create a YAML encoder with 2-space indentation
-	encoder := yaml.NewEncoder(file)
-	encoder.SetIndent(2)
-
-	// Encode the updated YAML node back to the file
-	err = encoder.Encode(&rootNode)
-	if err != nil {
-		return fmt.Errorf("failed to encode updated YAML: %w", err)
 	}
 
 	return nil
 }
 
-func (Helm) Lint() error {
+// Lint lints the Elastic-Agent Helm chart.
+func (h Helm) Lint() error {
+	mg.SerialDeps(h.BuildDependencies)
+
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
@@ -3554,6 +3556,58 @@ func (Helm) Lint() error {
 		return fmt.Errorf("failed to lint helm chart: %w", errors.Join(lintResult.Errors...))
 	}
 	return nil
+}
+
+func updateYamlFile(path string, keyVal ...struct {
+	key   string
+	value string
+}) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Parse YAML into a Node structure because
+	// it maintains comments
+	var rootNode yaml.Node
+	err = yaml.Unmarshal(data, &rootNode)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal YAML: %w", err)
+	}
+
+	if rootNode.Kind != yaml.DocumentNode {
+		return fmt.Errorf("root node is not a document node")
+	} else if len(rootNode.Content) == 0 {
+		return fmt.Errorf("root node has no content")
+	}
+
+	for _, kv := range keyVal {
+		if err := updateYamlNodes(rootNode.Content[0], kv.value, strings.Split(kv.key, ".")...); err != nil {
+			return fmt.Errorf("failed to update agent version: %w", err)
+		}
+	}
+
+	// Truncate values file
+	file, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("failed to open file for writing: %w", err)
+	}
+	defer file.Close()
+
+	// Create a YAML encoder with 2-space indentation
+	encoder := yaml.NewEncoder(file)
+	encoder.SetIndent(2)
+
+	// Encode the updated YAML node back to the file
+	err = encoder.Encode(&rootNode)
+	if err != nil {
+		return fmt.Errorf("failed to encode updated YAML: %w", err)
+	}
+	return nil
+}
+
+func (Helm) BuildDependencies() error {
+	return helm.BuildChartDependencies(helmChartPath)
 }
 
 func updateYamlNodes(rootNode *yaml.Node, value string, keys ...string) error {

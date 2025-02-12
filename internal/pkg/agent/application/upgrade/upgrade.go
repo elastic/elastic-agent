@@ -55,6 +55,7 @@ var agentArtifact = artifact.Artifact{
 }
 
 var ErrWatcherNotStarted = errors.New("watcher did not start in time")
+var ErrUpgradeSameVersion = errors.New("upgrade did not occur because it is the same version")
 
 // Upgrader performs an upgrade
 type Upgrader struct {
@@ -110,7 +111,7 @@ func (u *Upgrader) Reload(rawConfig *config.Config) error {
 		FleetSourceURI string `json:"agent.download.source_uri" config:"agent.download.source_uri"`
 	}
 	fleetSourceURI := &fleetCfg{}
-	if err := rawConfig.Unpack(&fleetSourceURI); err != nil {
+	if err := rawConfig.UnpackTo(&fleetSourceURI); err != nil {
 		return errors.New(err, "failed to unpack config during reload")
 	}
 
@@ -162,6 +163,19 @@ func (av agentVersion) String() string {
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 
+	currentVersion := agentVersion{
+		version:  release.Version(),
+		snapshot: release.Snapshot(),
+		hash:     release.Commit(),
+	}
+
+	// Compare versions and exit before downloading anything if the upgrade
+	// is for the same release version that is currently running
+	if isSameReleaseVersion(u.log, currentVersion, version) {
+		u.log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
+		return nil, ErrUpgradeSameVersion
+	}
+
 	// Inform the Upgrade Marker Watcher that we've started upgrading. Note that this
 	// is only possible to do in-memory since, today, the  process that's initiating
 	// the upgrade is the same as the Agent process in which the Upgrade Marker Watcher is
@@ -206,21 +220,27 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, fmt.Errorf("reading metadata for elastic agent version %s package %q: %w", version, archivePath, err)
 	}
 
-	currentVersion := agentVersion{
-		version:  release.Version(),
-		snapshot: release.Snapshot(),
-		hash:     release.Commit(),
-	}
-
+	// Compare the downloaded version (including git hash) to see if we need to upgrade
+	// versions are the same if the numbers and hash match which may occur in a SNAPSHOT -> SNAPSHOT upgrage
 	same, newVersion := isSameVersion(u.log, currentVersion, metadata, version)
 	if same {
-		return nil, fmt.Errorf("agent version is already %s", currentVersion)
+		u.log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
+		return nil, ErrUpgradeSameVersion
 	}
 
 	u.log.Infow("Unpacking agent package", "version", newVersion)
 
 	// Nice to have: add check that no archive files end up in the current versioned home
-	unpackRes, err := u.unpack(version, archivePath, paths.Data())
+	// default to no flavor to avoid breaking behavior
+
+	// no default flavor, keep everything in case flavor is not specified
+	// in case of error fallback to keep-all
+	detectedFlavor, err := install.UsedFlavor(paths.Top(), "")
+	if err != nil {
+		u.log.Warnf("error encountered when detecting used flavor with top path %q: %w", paths.Top(), err)
+	}
+	u.log.Debugf("detected used flavor: %q", detectedFlavor)
+	unpackRes, err := u.unpack(version, archivePath, paths.Data(), detectedFlavor)
 	if err != nil {
 		return nil, err
 	}
@@ -625,4 +645,22 @@ func IsInProgress(c client.Client, watcherPIDsFetcher func() ([]int, error)) (bo
 	}
 
 	return state.State == cproto.State_UPGRADING, nil
+}
+
+// isSameReleaseVersion will return true if upgradeVersion and currentVersion are equal using only release numbers and SNAPSHOT prerelease qualifiers.
+// They are not equal if either are a SNAPSHOT, or if the semver numbers (including prerelease and build identifiers) differ.
+func isSameReleaseVersion(log *logger.Logger, current agentVersion, upgradeVersion string) bool {
+	if current.snapshot {
+		return false
+	}
+	target, err := agtversion.ParseVersion(upgradeVersion)
+	if err != nil {
+		log.Warnw("Unable too parse version for released version comparison", upgradeVersion, err)
+		return false
+	}
+	targetVersion, targetSnapshot := target.ExtractSnapshotFromVersionString()
+	if targetSnapshot {
+		return false
+	}
+	return current.version == targetVersion
 }

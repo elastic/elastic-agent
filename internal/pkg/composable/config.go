@@ -4,10 +4,16 @@
 
 package composable
 
-import "github.com/elastic/elastic-agent/internal/pkg/config"
+import (
+	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/config"
+)
 
 // Config is config for multiple providers.
 type Config struct {
-	Providers               map[string]*config.Config `config:"providers"`
-	ProvidersInitialDefault *bool                     `config:"agent.providers.initial_default"`
+	Providers                map[string]*config.Config `config:"providers"`
+	ProvidersInitialDefault  *bool                     `config:"agent.providers.initial_default"`
+	ProvidersRestartInterval *time.Duration            `config:"agent.providers.restart_interval"`
+	ProvidersDefaultProvider *string                   `config:"agent.providers.default"`
 }

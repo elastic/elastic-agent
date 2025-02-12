@@ -33,10 +33,10 @@ var ErrConnRefused = errors.New("connection refused")
 var ErrTemporaryServerError = errors.New("temporary server error, please retry later")
 
 // temporaryServerErrorCodes defines status codes that allow clients to retry their request.
-var temporaryServerErrorCodes = map[int]struct{}{
-	http.StatusBadGateway:         {},
-	http.StatusServiceUnavailable: {},
-	http.StatusGatewayTimeout:     {},
+var temporaryServerErrorCodes = map[int]string{
+	http.StatusBadGateway:         "BadGateway",
+	http.StatusServiceUnavailable: "ServiceUnavailable",
+	http.StatusGatewayTimeout:     "GatewayTimeout",
 }
 
 const (
@@ -88,16 +88,20 @@ func (p EnrollType) MarshalJSON() ([]byte, error) {
 // Example:
 // POST /api/fleet/agents/enroll
 //
-//	{
-//		"type": "PERMANENT",
-//	  "metadata": {
-//		  "local": { "os": "macos"},
-//		  "user_provided": { "region": "us-east"}
-//	  }
-//	}
+//	 {
+//		  "type": "PERMANENT",
+//		  "id": "custom-id", // optional
+//		  "replace_token": "replacetokenvalue", // optional
+//		  "metadata": {
+//		    "local": { "os": "macos"},
+//		    "user_provided": { "region": "us-east"}
+//		  }
+//		}
 type EnrollRequest struct {
 	EnrollAPIKey string     `json:"-"`
 	Type         EnrollType `json:"type"`
+	ID           string     `json:"id"`
+	ReplaceToken string     `json:"replace_token"`
 	Metadata     Metadata   `json:"metadata"`
 }
 
@@ -223,8 +227,8 @@ func (e *EnrollCmd) Execute(ctx context.Context, r *EnrollRequest) (*EnrollRespo
 		return nil, ErrTooManyRequests
 	}
 
-	if _, temporary := temporaryServerErrorCodes[resp.StatusCode]; temporary {
-		return nil, fmt.Errorf("received code %d: %w", resp.StatusCode, ErrTemporaryServerError)
+	if status, temporary := temporaryServerErrorCodes[resp.StatusCode]; temporary {
+		return nil, fmt.Errorf("received status code %d (%s): %w", resp.StatusCode, status, ErrTemporaryServerError)
 	}
 
 	if resp.StatusCode != http.StatusOK {

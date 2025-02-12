@@ -5,6 +5,7 @@
 package component
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -15,7 +16,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/install/pkgmgr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
@@ -172,6 +172,39 @@ func (c Component) MarshalYAML() (interface{}, error) {
 		c.ErrMsg = c.Err.Error()
 	}
 	return c, nil
+}
+
+func (c *Component) MarshalJSON() ([]byte, error) {
+	marshalableComponent := struct {
+		ID         string `json:"ID"`
+		InputType  string `json:"InputType"`
+		OutputType string `json:"OutputType"`
+		ErrMsg     string `json:"ErrMsg,omitempty"`
+		Units      []struct {
+			ID     string `json:"ID"`
+			ErrMsg string `json:"ErrMsg,omitempty"`
+		} `json:"Units"`
+	}{
+		ID:         c.ID,
+		InputType:  c.InputType,
+		OutputType: c.OutputType,
+	}
+	if c.Err != nil {
+		marshalableComponent.ErrMsg = c.Err.Error()
+	}
+	for i := range c.Units {
+		marshalableComponent.Units = append(marshalableComponent.Units, struct {
+			ID     string `json:"ID"`
+			ErrMsg string `json:"ErrMsg,omitempty"`
+		}{
+			ID: c.Units[i].ID,
+		})
+		if c.Units[i].Err != nil {
+			marshalableComponent.Units[i].ErrMsg = c.Units[i].Err.Error()
+		}
+	}
+
+	return json.Marshal(marshalableComponent)
 }
 
 // Type returns the type of the component.
@@ -679,10 +712,10 @@ type outputI struct {
 // varsForPlatform sets the runtime variables that are available in the
 // input specification runtime checks. This function should always be
 // edited in sync with the documentation in specs/README.md.
-func varsForPlatform(platform PlatformDetail) (*transpiler.Vars, error) {
+func varsForPlatform(platform PlatformDetail, defaultProvider string) (*transpiler.Vars, error) {
 	return transpiler.NewVars("", map[string]interface{}{
 		"install": map[string]interface{}{
-			"in_default": paths.ArePathsEqual(paths.Top(), paths.InstallPath(paths.DefaultBasePath)) || pkgmgr.InstalledViaExternalPkgMgr(),
+			"in_default": paths.ArePathsEqual(paths.Top(), paths.InstallPath(paths.DefaultBasePath)) || platform.IsInstalledViaExternalPkgMgr,
 		},
 		"runtime": map[string]interface{}{
 			"platform":    platform.String(),
@@ -696,14 +729,14 @@ func varsForPlatform(platform PlatformDetail) (*transpiler.Vars, error) {
 		"user": map[string]interface{}{
 			"root": platform.User.Root,
 		},
-	}, nil)
+	}, nil, defaultProvider)
 }
 
 func validateRuntimeChecks(
 	runtime *RuntimeSpec,
 	platform PlatformDetail,
 ) error {
-	vars, err := varsForPlatform(platform)
+	vars, err := varsForPlatform(platform, "") // no default provider
 	if err != nil {
 		return err
 	}

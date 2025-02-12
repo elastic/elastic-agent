@@ -1,9 +1,5 @@
 {{- if gt (len $.Values.agent.presets) 0}}
-{{- if $.Release.IsInstall }}
-🙌 Release "{{ .Release.Name }}" is installed at "{{ $.Release.Namespace }}" namespace
-{{- else if $.Release.IsUpgrade }}
-🚀 Release "{{ .Release.Name }}" at "{{ $.Release.Namespace }}" namespace upgraded
-{{- end }}
+Release "{{ .Release.Name }}" is installed at "{{ $.Release.Namespace }}" namespace
 {{ if gt (len $.Values.agent.presets) 1 }}
 Installed agents:
 {{- else }}
@@ -14,6 +10,15 @@ Installed agent:
   - {{$presetName}} [{{($presetVal).mode}} - managed mode]
 {{- else }}
   - {{$presetName}} [{{($presetVal).mode}} - standalone mode]
+{{- end }}
+{{- end }}
+
+{{ if eq (index $.Values "kube-state-metrics" "enabled") true -}}
+Installed kube-state-metrics at "{{ $.Release.Namespace }}" namespace.
+{{- if eq $.Values.kubernetes.enabled true -}}
+{{- if eq $.Values.kubernetes.state.agentAsSidecar.enabled true }}
+  - elastic-agent runs as a sidecar container
+{{- end }}
 {{- end }}
 {{- end }}
 

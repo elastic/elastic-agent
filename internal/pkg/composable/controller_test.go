@@ -11,16 +11,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/core/logger"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
-
 	"github.com/stretchr/testify/assert"
-
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/env"
 	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/host"
@@ -82,22 +79,24 @@ func TestController(t *testing.T) {
 	c, err := composable.New(log, cfg, false)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 1*time.Second)
-	defer timeoutCancel()
-
-	var setVars []*transpiler.Vars
+	var setVars1 []*transpiler.Vars
+	var setVars2 []*transpiler.Vars
+	var setVars3 []*transpiler.Vars
 	go func() {
 		defer cancel()
-		for {
-			select {
-			case <-timeoutCtx.Done():
-				return
-			case vars := <-c.Watch():
-				setVars = vars
-			}
+		select {
+		case <-ctx.Done():
+			return
+		case vars := <-c.Watch():
+			// initial vars
+			setVars1 = vars
+			setVars2, err = c.Observe(ctx, []string{"local.vars.key1", "local_dynamic.vars.key1"}) // observed local and local_dynamic
+			require.NoError(t, err)
+			setVars3, err = c.Observe(ctx, nil) // no observed (will turn off those providers)
+			require.NoError(t, err)
 		}
 	}()
 
@@ -111,52 +110,67 @@ func TestController(t *testing.T) {
 	}
 	require.NoError(t, err)
 
-	assert.Len(t, setVars, 3)
+	assert.Len(t, setVars1, 1)
+	assert.Len(t, setVars2, 3)
+	assert.Len(t, setVars3, 1)
 
-	_, hostExists := setVars[0].Lookup("host")
-	assert.True(t, hostExists)
-	_, envExists := setVars[0].Lookup("env")
-	assert.False(t, envExists)
-	local, _ := setVars[0].Lookup("local")
+	vars1map, err := setVars1[0].Map()
+	require.NoError(t, err)
+	assert.Len(t, vars1map, 0) // should be empty on initial
+
+	_, hostExists := setVars2[0].Lookup("host")
+	assert.False(t, hostExists) // should not exist, not referenced
+	_, envExists := setVars2[0].Lookup("env")
+	assert.False(t, envExists) // should not exist, not referenced
+	local, _ := setVars2[0].Lookup("local")
 	localMap, ok := local.(map[string]interface{})
 	require.True(t, ok)
 	assert.Equal(t, "value1", localMap["key1"])
 
-	local, _ = setVars[1].Lookup("local_dynamic")
+	local, _ = setVars2[1].Lookup("local_dynamic")
 	localMap, ok = local.(map[string]interface{})
 	require.True(t, ok)
 	assert.Equal(t, "value1", localMap["key1"])
 
-	local, _ = setVars[2].Lookup("local_dynamic")
+	local, _ = setVars2[2].Lookup("local_dynamic")
 	localMap, ok = local.(map[string]interface{})
 	require.True(t, ok)
 	assert.Equal(t, "value2", localMap["key1"])
+
+	vars3map, err := setVars3[0].Map()
+	require.NoError(t, err)
+	assert.Len(t, vars3map, 0) // should be empty after empty Observe
 }
 
 func TestProvidersDefaultDisabled(t *testing.T) {
 	tests := []struct {
-		name string
-		cfg  map[string]interface{}
-		want int
+		name     string
+		cfg      map[string]interface{}
+		observed []string
+		context  []string
+		dynamic  []string
 	}{
 		{
 			name: "default disabled",
 			cfg: map[string]interface{}{
 				"agent.providers.initial_default": "false",
 			},
-			want: 0,
+			observed: []string{"env.var1", "host.name"}, // has observed but explicitly disabled
+			context:  nil,                               // should have none
 		},
 		{
 			name: "default enabled",
 			cfg: map[string]interface{}{
 				"agent.providers.initial_default": "true",
 			},
-			want: 1,
+			observed: []string{"env.var1", "host.name"},
+			context:  []string{"env", "host"},
 		},
 		{
-			name: "default enabled - no config",
-			cfg:  map[string]interface{}{},
-			want: 1,
+			name:     "default enabled - no config",
+			cfg:      map[string]interface{}{},
+			observed: nil, // none observed
+			context:  nil, // should have none
 		},
 		{
 			name: "default enabled - explicit config",
@@ -206,7 +220,9 @@ func TestProvidersDefaultDisabled(t *testing.T) {
 					},
 				},
 			},
-			want: 3,
+			observed: []string{"local.vars.key1", "local_dynamic.vars.key1"},
+			context:  []string{"local"},
+			dynamic:  []string{"local_dynamic", "local_dynamic"},
 		},
 	}
 
@@ -226,30 +242,62 @@ func TestProvidersDefaultDisabled(t *testing.T) {
 			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 1*time.Second)
 			defer timeoutCancel()
 
+			errCh := make(chan error)
+			go func() {
+				errCh <- c.Run(ctx)
+			}()
+
 			var setVars []*transpiler.Vars
 			go func() {
 				defer cancel()
+
+				observed := false
 				for {
 					select {
 					case <-timeoutCtx.Done():
 						return
 					case vars := <-c.Watch():
 						setVars = vars
+					default:
+						if !observed {
+							vars, err := c.Observe(timeoutCtx, tt.observed)
+							require.NoError(t, err)
+							if vars != nil {
+								setVars = vars
+							}
+							observed = true
+						}
 					}
 				}
 			}()
 
-			errCh := make(chan error)
-			go func() {
-				errCh <- c.Run(ctx)
-			}()
 			err = <-errCh
 			if errors.Is(err, context.Canceled) {
 				err = nil
 			}
 			require.NoError(t, err)
+			require.NotNil(t, setVars)
 
-			assert.Len(t, setVars, tt.want)
+			if len(tt.context) > 0 {
+				for _, name := range tt.context {
+					_, ok := setVars[0].Lookup(name)
+					assert.Truef(t, ok, "context vars group missing %s", name)
+				}
+			} else {
+				m, err := setVars[0].Map()
+				if assert.NoErrorf(t, err, "failed to convert context vars to map") {
+					assert.Len(t, m, 0) // should be empty
+				}
+			}
+			if len(tt.dynamic) > 0 {
+				for i, name := range tt.dynamic {
+					_, ok := setVars[i+1].Lookup(name)
+					assert.Truef(t, ok, "dynamic vars group %d missing %s", i+1, name)
+				}
+			} else {
+				// should not have any dynamic vars
+				assert.Len(t, setVars, 1)
+			}
 		})
 	}
 }
@@ -312,7 +360,6 @@ func TestCancellation(t *testing.T) {
 		t.Run(fmt.Sprintf("test run %d", i), func(t *testing.T) {
 			c, err := composable.New(log, cfg, false)
 			require.NoError(t, err)
-			defer c.Close()
 
 			ctx, cancelFn := context.WithTimeout(context.Background(), timeout)
 			defer cancelFn()
@@ -328,7 +375,6 @@ func TestCancellation(t *testing.T) {
 	t.Run("immediate cancellation", func(t *testing.T) {
 		c, err := composable.New(log, cfg, false)
 		require.NoError(t, err)
-		defer c.Close()
 
 		ctx, cancelFn := context.WithTimeout(context.Background(), 0)
 		cancelFn()
@@ -337,5 +383,36 @@ func TestCancellation(t *testing.T) {
 		if err != nil {
 			require.True(t, errors.Is(err, context.DeadlineExceeded))
 		}
+	})
+}
+
+func TestDefaultProvider(t *testing.T) {
+	log, err := logger.New("", false)
+	require.NoError(t, err)
+
+	t.Run("default env", func(t *testing.T) {
+		c, err := composable.New(log, nil, false)
+		require.NoError(t, err)
+		assert.Equal(t, "env", c.DefaultProvider())
+	})
+
+	t.Run("no default", func(t *testing.T) {
+		cfg, err := config.NewConfigFrom(map[string]interface{}{
+			"agent.providers.default": "",
+		})
+		require.NoError(t, err)
+		c, err := composable.New(log, cfg, false)
+		require.NoError(t, err)
+		assert.Equal(t, "", c.DefaultProvider())
+	})
+
+	t.Run("custom default", func(t *testing.T) {
+		cfg, err := config.NewConfigFrom(map[string]interface{}{
+			"agent.providers.default": "custom",
+		})
+		require.NoError(t, err)
+		c, err := composable.New(log, cfg, false)
+		require.NoError(t, err)
+		assert.Equal(t, "custom", c.DefaultProvider())
 	})
 }

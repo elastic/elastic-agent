@@ -59,6 +59,32 @@ func TestComponentMarshalError(t *testing.T) {
 	require.Contains(t, string(outData), "test error value")
 }
 
+func TestMarshalJSON(t *testing.T) {
+	testComponent := Component{
+		ID:  "test-device",
+		Err: testErr{data: "test error value"},
+		Units: []Unit{
+			{
+				ID: "test-unit",
+				Config: &proto.UnitExpectedConfig{
+					Source: &structpb.Struct{
+						Fields: map[string]*structpb.Value{
+							"api_key": structpb.NewStringValue("test-api-key"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	marshaledBytes, err := testComponent.MarshalJSON()
+	require.NoError(t, err)
+	marshaledJsonString := string(marshaledBytes)
+	assert.Contains(t, marshaledJsonString, "test error value")
+	assert.Contains(t, marshaledJsonString, "test-unit")
+	assert.NotContains(t, marshaledJsonString, "test-api-key")
+}
+
 func TestToComponents(t *testing.T) {
 	linuxAMD64Platform := PlatformDetail{
 		Platform: Platform{
@@ -2364,7 +2390,7 @@ func TestPreventionsAreValid(t *testing.T) {
 		"user": map[string]interface{}{
 			"root": false,
 		},
-	}, nil)
+	}, nil, "")
 	require.NoError(t, err)
 
 	for path, spec := range specFiles {

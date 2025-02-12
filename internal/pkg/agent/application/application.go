@@ -9,10 +9,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/features"
-	"github.com/elastic/elastic-agent/pkg/limits"
-	"github.com/elastic/elastic-agent/version"
-
 	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -27,12 +23,20 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
+	"github.com/elastic/elastic-agent/internal/pkg/composable/providers/kubernetes"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/elastic-agent/pkg/limits"
+	"github.com/elastic/elastic-agent/version"
 )
+
+// CfgOverrider allows for application driven overrides of configuration read from disk.
+type CfgOverrider func(cfg *configuration.Configuration)
 
 // New creates a new Agent and bootstrap the required subsystem.
 func New(
@@ -46,6 +50,7 @@ func New(
 	testingMode bool,
 	fleetInitTimeout time.Duration,
 	disableMonitoring bool,
+	override CfgOverrider,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
@@ -95,9 +100,14 @@ func New(
 	if err := info.InjectAgentConfig(rawConfig); err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
+
 	cfg, err := configuration.NewFromConfig(rawConfig)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	if override != nil {
+		override(cfg)
 	}
 
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
@@ -135,7 +145,12 @@ func New(
 		log.Info("Parsed configuration and determined agent is managed locally")
 
 		loader := config.NewLoader(log, paths.ExternalInputs())
-		discover := config.Discoverer(pathConfigFile, cfg.Settings.Path, paths.ExternalInputs())
+		rawCfgMap, err := rawConfig.ToMapStr()
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to transform agent configuration into a map: %w", err)
+		}
+		discover := config.Discoverer(pathConfigFile, cfg.Settings.Path, paths.ExternalInputs(),
+			kubernetes.GetHintsInputConfigPath(log, rawCfgMap))
 		if !cfg.Settings.Reload.Enabled {
 			log.Debug("Reloading of configuration is off")
 			configMgr = newOnce(log, discover, loader)
@@ -176,13 +191,13 @@ func New(
 		}
 	}
 
-	// no need for vars in otel mode
 	varsManager, err := composable.New(log, rawConfig, composableManaged)
 	if err != nil {
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
-	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, compModifiers...)
+	otelManager := otelmanager.NewOTelManager(log.Named("otel_manager"))
+	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelManager, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created

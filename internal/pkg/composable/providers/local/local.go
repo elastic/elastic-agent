@@ -29,14 +29,15 @@ func (c *contextProvider) Run(ctx context.Context, comm corecomp.ContextProvider
 	if err != nil {
 		return errors.New(err, "failed to set mapping", errors.TypeUnexpected)
 	}
-	return nil
+	<-ctx.Done()
+	return ctx.Err()
 }
 
 // ContextProviderBuilder builds the context provider.
 func ContextProviderBuilder(_ *logger.Logger, c *config.Config, _ bool) (corecomp.ContextProvider, error) {
 	p := &contextProvider{}
 	if c != nil {
-		err := c.Unpack(p)
+		err := c.UnpackTo(p)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unpack vars: %w", err)
 		}

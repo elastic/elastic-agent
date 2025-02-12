@@ -30,8 +30,8 @@ Entrypoint for chart initialisation
 {{- if not (hasKey $.Values.agent "initialised") -}}
 {{/* init order matters */}}
 {{- include (printf "elasticagent.engine.%s.init" $.Values.agent.engine) $ -}}
-{{- include "elasticagent.init.fleet" $ -}}
 {{- include "elasticagent.init.inputs" $ -}}
+{{- include "elasticagent.init.fleet" $ -}}
 {{- include "elasticagent.init.presets" $ -}}
 {{- $_ := set $.Values.agent "initialised" dict -}}
 {{- end -}}
@@ -46,8 +46,10 @@ Validate fleet configuration
 {{- if eq $.Values.agent.fleet.enabled true -}}
 {{/* check if the preset exists */}}
 {{- $fleetPresetName := $.Values.agent.fleet.preset -}}
+{{- if $fleetPresetName -}}
 {{- $fleetPresetVal := get $.Values.agent.presets $fleetPresetName -}}
 {{- $_ := required (printf "preset with name \"%s\" of fleet not defined" $fleetPresetName) $fleetPresetVal -}}
+{{- end -}}
 {{/* disable all presets except the fleet one */}}
 {{- range $presetName, $presetVal := $.Values.agent.presets}}
 {{- if ne $presetName $fleetPresetName -}}
@@ -62,10 +64,12 @@ Initialise input templates if we are not deploying as managed
 */}}
 {{- define "elasticagent.init.inputs" -}}
 {{- $ := . -}}
-{{- if eq $.Values.agent.fleet.enabled false -}}
-{{/* standalone agent so initialise inputs */}}
+{{/* initialise inputs of the built-in integrations, even if fleet is enabled,
+ as they change the k8s configuration of presets e.g. necessary volume mounts, etc. */}}
 {{- include "elasticagent.kubernetes.init" $ -}}
 {{- include "elasticagent.system.init" $ -}}
+{{/* initialise inputs the custom integrations only if fleet is disabled */}}
+{{- if eq $.Values.agent.fleet.enabled false -}}
 {{- range $customInputName, $customInputVal := $.Values.extraIntegrations -}}
 {{- $customInputPresetName := ($customInputVal).preset -}}
 {{- $presetVal := get $.Values.agent.presets $customInputPresetName -}}
@@ -82,6 +86,8 @@ Validate and initialise the defined agent presets
 */}}
 {{- define "elasticagent.init.presets" -}}
 {{- $ := . -}}
+{{- include "elasticagent.presets.pernode.init" $ -}}
+{{- include "elasticagent.presets.ksm.sidecar.init" $ -}}
 {{- range $presetName, $presetVal := $.Values.agent.presets -}}
 {{- include "elasticagent.preset.mutate.unprivileged" (list $ $presetVal) -}}
 {{- include "elasticagent.preset.mutate.fleet" (list $ $presetVal) -}}
@@ -97,7 +103,6 @@ Validate and initialise the defined agent presets
 {{- end -}}
 {{- end -}}
 {{- end -}}
-{{/* by default we disable leader election but we also set the name of the leader lease in case it is explicitly enabled */}}
 {{- if empty ($presetVal).providers -}}
 {{- $_ := set $presetVal "providers" dict -}}
 {{- end -}}
@@ -106,7 +111,13 @@ Validate and initialise the defined agent presets
 {{- $_ := set $presetProviders "kubernetes_leaderelection" dict -}}
 {{- end -}}
 {{- $presetLeaderLeaseName := (printf "%s-%s" $.Release.Name $presetName) | lower  -}}
+{{/* by default we disable leader election but we also set the name of the leader lease in case it is explicitly enabled */}}
 {{- $defaultLeaderElection := dict "enabled" false "leader_lease" $presetLeaderLeaseName -}}
+{{- if eq $.Values.agent.fleet.enabled true -}}
+{{/* for fleet mode the leader election is enabled by default */}}
+{{- $_ := set $defaultLeaderElection "enabled" true -}}
+{{- end -}}
+{{/* merge the default leader election with the leader election from the preset giving priority to the one from the preset */}}
 {{- $presetLeaderElection := mergeOverwrite dict $defaultLeaderElection ($presetProviders).kubernetes_leaderelection -}}
 {{- $_ := set $presetProviders "kubernetes_leaderelection" $presetLeaderElection -}}
 {{- end -}}
@@ -203,7 +214,6 @@ Common labels
 {{- define "elasticagent.labels" -}}
 helm.sh/chart: {{ include "elasticagent.chart" . }}
 {{ include "elasticagent.selectorLabels" . }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
@@ -215,20 +225,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/version: {{ .Values.agent.version}}
 {{- end }}
 
-{{- define "elasticagent.preset.applyOnce" -}}
-{{- $ := index . 0 -}}
-{{- $preset := index . 1 -}}
-{{- $templateName := index . 2 -}}
-{{- if not (hasKey $preset "_appliedMutationTemplates") -}}
-{{- $_ := set $preset "_appliedMutationTemplates" dict }}
-{{- end -}}
-{{- $appliedMutationTemplates := get $preset "_appliedMutationTemplates" -}}
-{{- if not (hasKey $appliedMutationTemplates $templateName) -}}
-{{- include $templateName $ -}}
-{{- $_ := set $appliedMutationTemplates $templateName dict}}
-{{- end -}}
-{{- end -}}
-
 {{- define "elasticagent.preset.mutate.inputs" -}}
 {{- $ := index . 0 -}}
 {{- $preset := index . 1 -}}
@@ -239,9 +235,8 @@ app.kubernetes.io/version: {{ .Values.agent.version}}
 {{- end -}}
 
 {{- define "elasticagent.preset.mutate.securityContext.capabilities.add" -}}
-{{- $ := index . 0 -}}
-{{- $preset := index . 1 -}}
-{{- $templateName := index . 2 -}}
+{{- $preset := index . 0 -}}
+{{- $capabilities := index . 1 -}}
 {{- if not (hasKey $preset "securityContext") -}}
 {{- $_ := set $preset "securityContext" dict }}
 {{- end -}}
@@ -254,15 +249,14 @@ app.kubernetes.io/version: {{ .Values.agent.version}}
 {{- $_ := set $presetSecurityContextCapabilities "add" list }}
 {{- end -}}
 {{- $presetSecurityContextCapabilitiesAdd := get $presetSecurityContextCapabilities "add" }}
-{{- $capabilitiesAddToAdd := dig "securityContext" "capabilities" "add" (list) (include $templateName $ | fromYaml) -}}
+{{- $capabilitiesAddToAdd := dig "securityContext" "capabilities" "add" (list) $capabilities -}}
 {{- $presetSecurityContextCapabilitiesAdd = uniq (concat $presetSecurityContextCapabilitiesAdd $capabilitiesAddToAdd) -}}
 {{- $_ := set $presetSecurityContextCapabilities "add" $presetSecurityContextCapabilitiesAdd -}}
 {{- end -}}
 
 {{- define "elasticagent.preset.mutate.providers.kubernetes.hints" -}}
-{{- $ := index . 0 -}}
-{{- $preset := index . 1 -}}
-{{- $templateName := index . 2 -}}
+{{- $preset := index . 0 -}}
+{{- $providers := index . 1 -}}
 {{- if not (hasKey $preset "providers") -}}
 {{- $_ := set $preset "providers" dict }}
 {{- end -}}
@@ -275,21 +269,9 @@ app.kubernetes.io/version: {{ .Values.agent.version}}
 {{- $_ := set $presetProvidersKubernetes "hints" dict }}
 {{- end -}}
 {{- $presetProvidersKubernetesHints := get $presetProvidersKubernetes "hints" }}
-{{- $presetProvidersKubernetesHintsToAdd := dig "providers" "kubernetes" "hints" (dict) (include $templateName $ | fromYaml) -}}
+{{- $presetProvidersKubernetesHintsToAdd := dig "providers" "kubernetes" "hints" (dict) $providers -}}
 {{- $presetProvidersKubernetesHints = merge $presetProvidersKubernetesHintsToAdd $presetProvidersKubernetesHints -}}
 {{- $_ := set $presetProvidersKubernetes "hints" $presetProvidersKubernetesHints -}}
-{{- end -}}
-
-{{- define "elasticagent.preset.mutate.rules" -}}
-{{- $ := index . 0 -}}
-{{- $preset := index . 1 -}}
-{{- $templateName := index . 2 -}}
-{{- if eq ($preset).clusterRole.create true -}}
-{{- $presetClusterRoleRules := dig "rules" (list) ($preset).clusterRole -}}
-{{- $rulesToAdd := get (include $templateName $ | fromYaml) "rules" -}}
-{{- $presetClusterRoleRules = uniq (concat $presetClusterRoleRules $rulesToAdd) -}}
-{{- $_ := set ($preset).clusterRole "rules" $presetClusterRoleRules -}}
-{{- end -}}
 {{- end -}}
 
 {{- define "elasticagent.preset.mutate.annotations" -}}
@@ -301,54 +283,29 @@ app.kubernetes.io/version: {{ .Values.agent.version}}
 {{- $_ := set $preset "annotations" $presetAnnotations -}}
 {{- end -}}
 
-{{- define "elasticagent.preset.mutate.containers" -}}
-{{- $ := index . 0 -}}
-{{- $preset := index . 1 -}}
-{{- $templateName := index . 2 -}}
-{{- $presetContainers := dig "extraContainers" (list) $preset -}}
-{{- $containersToAdd := get (include $templateName $ | fromYaml) "extraContainers"}}
-{{- $presetContainers = uniq (concat $presetContainers $containersToAdd) -}}
-{{- $_ := set $preset "extraContainers" $presetContainers -}}
-{{- end -}}
-
 {{- define "elasticagent.preset.mutate.tolerations" -}}
-{{- $ := index . 0 -}}
-{{- $preset := index . 1 -}}
-{{- $templateName := index . 2 -}}
-{{- $tolerationsToAdd := dig "tolerations" (list) (include $templateName $ | fromYaml) }}
-{{- if $tolerationsToAdd -}}
+{{- $preset := index . 0 -}}
+{{- $tolerations := index . 1 -}}
+{{- $tolerationsToAdd := dig "tolerations" (list) (include $tolerations $ | fromYaml) }}
 {{- $presetTolerations := dig "tolerations" (list) $preset -}}
 {{- $presetTolerations = uniq (concat $presetTolerations $tolerationsToAdd) -}}
 {{- $_ := set $preset "tolerations" $tolerationsToAdd -}}
 {{- end -}}
-{{- end -}}
-
-{{- define "elasticagent.preset.mutate.initcontainers" -}}
-{{- $ := index . 0 -}}
-{{- $preset := index . 1 -}}
-{{- $templateName := index . 2 -}}
-{{- $presetInitContainers := dig "initContainers" (list) $preset -}}
-{{- $initContainersToAdd := get (include $templateName $ | fromYaml) "initContainers"}}
-{{- $presetInitContainers = uniq (concat $presetInitContainers $initContainersToAdd) -}}
-{{- $_ := set $preset "initContainers" $presetInitContainers -}}
-{{- end -}}
 
 {{- define "elasticagent.preset.mutate.volumes" -}}
-{{- $ := index . 0 -}}
-{{- $preset := index . 1 -}}
-{{- $templateName := index . 2 -}}
+{{- $preset := index . 0 -}}
+{{- $volumes := index . 1 -}}
 {{- $presetVolumes := dig "extraVolumes" (list) $preset -}}
-{{- $volumesToAdd := get (include $templateName $ | fromYaml) "extraVolumes"}}
+{{- $volumesToAdd := dig "extraVolumes" (list) $volumes -}}
 {{- $presetVolumes = uniq (concat $presetVolumes $volumesToAdd) -}}
 {{- $_ := set $preset "extraVolumes" $presetVolumes -}}
 {{- end -}}
 
 {{- define "elasticagent.preset.mutate.volumemounts" -}}
-{{- $ := index . 0 -}}
-{{- $preset := index . 1 -}}
-{{- $templateName := index . 2 -}}
+{{- $preset := index . 0 -}}
+{{- $volumeMounts := index . 1 -}}
 {{- $presetVolumeMounts := dig "extraVolumeMounts" (list) $preset -}}
-{{- $volumeMountsToAdd := get (include $templateName $ | fromYaml) "extraVolumeMounts"}}
+{{- $volumeMountsToAdd := dig "extraVolumeMounts" (list) $volumeMounts}}
 {{- $presetVolumeMounts = uniq (concat $presetVolumeMounts $volumeMountsToAdd) -}}
 {{- $_ := set $preset "extraVolumeMounts" $presetVolumeMounts -}}
 {{- end -}}

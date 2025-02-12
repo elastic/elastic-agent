@@ -54,7 +54,8 @@ linters:
     - noctx # noctx finds sending http request without context.Context
     - unconvert # Remove unnecessary type conversions
     - wastedassign # wastedassign finds wasted assignment statements.
-    - gomodguard # check for blocked dependencies
+    - depguard # check for blocked imports from Go files
+    - gomodguard # check for blocked imports from go.mod
     - gomoddirectives
 
 # all available settings of specific linters
@@ -88,9 +89,9 @@ linters-settings:
   goimports:
     local-prefixes: github.com/elastic
 
+  # Check for blocked dependencies in go.mod.
   gomodguard:
     blocked:
-      # List of blocked modules.
       modules:
         # Blocked module.
         - github.com/pkg/errors:
@@ -104,6 +105,15 @@ linters-settings:
             recommendations:
               - github.com/gofrs/uuid/v5
             reason: "Use one uuid library consistently across the codebase"
+
+  # Check for blocked imports in Go files.
+  depguard:
+    rules:
+      main:
+        list-mode: lax
+        deny:
+          - pkg: "math/rand$"
+            desc: "superseded by math/rand/v2"
 
   gomoddirectives:
     # Forbid local `replace` directives
@@ -120,7 +130,7 @@ linters-settings:
 
   gosimple:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.22.9"
+    go: "1.22.11"
 
   nolintlint:
     # Enable to ensure that nolint directives are all used. Default is true.
@@ -136,17 +146,17 @@ linters-settings:
 
   staticcheck:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.22.9"
+    go: "1.22.11"
     checks: ["all"]
 
   stylecheck:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.22.9"
+    go: "1.22.11"
     checks: ["all"]
 
   unused:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.22.9"
+    go: "1.22.11"
 
   gosec:
     excludes:

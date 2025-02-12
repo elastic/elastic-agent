@@ -42,6 +42,7 @@ func newEnrollCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command
 		Run: func(c *cobra.Command, args []string) {
 			if err := enroll(streams, c); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				logExternal(fmt.Sprintf("%s enroll failed: %s", paths.BinaryName, err))
 				os.Exit(1)
 			}
 		},
@@ -63,6 +64,8 @@ func newEnrollCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command
 func addEnrollFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("url", "", "", "URL to enroll Agent into Fleet")
 	cmd.Flags().StringP("enrollment-token", "t", "", "Enrollment token to use to enroll Agent into Fleet")
+	cmd.Flags().StringP("id", "", "", "Agent ID to use for enrollment into Fleet")
+	cmd.Flags().StringP("replace-token", "", "", "Replace token that that allows the Agent to be replace with the provided --id as long as this token matches")
 	cmd.Flags().StringP("fleet-server-es", "", "", "Start and run a Fleet Server alongside this Elastic Agent connecting to the provided Elasticsearch")
 	cmd.Flags().StringP("fleet-server-es-ca", "", "", "Path to certificate authority for Fleet Server to use to communicate with Elasticsearch")
 	cmd.Flags().StringP("fleet-server-es-ca-trusted-fingerprint", "", "", "Elasticsearch certificate authority's SHA256 fingerprint for Fleet Server to use")
@@ -171,6 +174,8 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	if token == "" {
 		token, _ = cmd.Flags().GetString("enrollment-token")
 	}
+	id, _ := cmd.Flags().GetString("id")
+	replaceToken, _ := cmd.Flags().GetString("replace-token")
 	fServer, _ := cmd.Flags().GetString("fleet-server-es")
 	fElasticSearchCA, _ := cmd.Flags().GetString("fleet-server-es-ca")
 	fElasticSearchCASHA256, _ := cmd.Flags().GetString("fleet-server-es-ca-trusted-fingerprint")
@@ -211,6 +216,14 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	if token != "" {
 		args = append(args, "--enrollment-token")
 		args = append(args, token)
+	}
+	if id != "" {
+		args = append(args, "--id")
+		args = append(args, id)
+	}
+	if replaceToken != "" {
+		args = append(args, "--replace-token")
+		args = append(args, replaceToken)
 	}
 	if fServer != "" {
 		args = append(args, "--fleet-server-es")
@@ -351,6 +364,24 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	fromInstall, _ := cmd.Flags().GetBool(fromInstallArg)
 
+	hasRoot, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("checking if running with root/Administrator privileges: %w", err)
+	}
+	if hasRoot && !fromInstall {
+		binPath, err := os.Executable()
+		if err != nil {
+			return fmt.Errorf("error while getting executable path: %w", err)
+		}
+		isOwner, err := isOwnerExec(binPath)
+		if err != nil {
+			return fmt.Errorf("ran into an error while figuring out if user is allowed to execute the enroll command: %w", err)
+		}
+		if !isOwner {
+			return UserOwnerMismatchError
+		}
+	}
+
 	pathConfigFile := paths.ConfigFile()
 	rawConfig, err := config.LoadFile(pathConfigFile)
 	if err != nil {
@@ -405,6 +436,8 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	insecure, _ := cmd.Flags().GetBool("insecure")
 	url, _ := cmd.Flags().GetString("url")
 	enrollmentToken, _ := cmd.Flags().GetString("enrollment-token")
+	id, _ := cmd.Flags().GetString("id")
+	replaceToken, _ := cmd.Flags().GetString("replace-token")
 	fServer, _ := cmd.Flags().GetString("fleet-server-es")
 	fElasticSearchCA, _ := cmd.Flags().GetString("fleet-server-es-ca")
 	fElasticSearchCASHA256, _ := cmd.Flags().GetString("fleet-server-es-ca-trusted-fingerprint")
@@ -461,6 +494,8 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	options := enrollCmdOption{
 		EnrollAPIKey:         enrollmentToken,
+		ID:                   id,
+		ReplaceToken:         replaceToken,
 		URL:                  url,
 		CAs:                  CAs,
 		CASha256:             caSHA256,
@@ -525,7 +560,6 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		pathConfigFile,
 		store,
 	)
-
 	if err != nil {
 		return err
 	}

@@ -2,8 +2,6 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build !windows
-
 package cmd
 
 import (
@@ -19,6 +17,7 @@ func newValidateCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "validate",
 		Short:         "Validates the OpenTelemetry collector configuration without running the collector",
+		Long:          "Validates the OpenTelemetry collector configuration without running the collector. Validation will fail for otel-elastic hybrid configuration files. This command will return true for valid otel configurations only.",
 		SilenceUsage:  true, // do not display usage on error
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {

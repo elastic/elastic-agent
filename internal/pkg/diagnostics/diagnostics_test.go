@@ -164,7 +164,33 @@ inputs:
 outputs:
     default:
         api_key: <REDACTED>
-        redactOtherKey: secretOutputValue
+        redactOtherKey: <REDACTED>
+        type: elasticsearch
+`,
+	}, {
+		name: "uppercase fields are redacted",
+		input: []byte(`id: test-policy
+inputs:
+  - type: test_input
+outputs:
+  default:
+    type: elasticsearch
+    api_key: secretKey
+    Certificate: secretCert
+    PassPhrase: secretPassphrase
+    PASSWORD: secretPassword
+    tOkEn: secretToken
+`),
+		expect: `id: test-policy
+inputs:
+    - type: test_input
+outputs:
+    default:
+        Certificate: <REDACTED>
+        PASSWORD: <REDACTED>
+        PassPhrase: <REDACTED>
+        api_key: <REDACTED>
+        tOkEn: <REDACTED>
         type: elasticsearch
 `,
 	}, {
@@ -223,15 +249,54 @@ secret_paths:
     - inputs.1.missingKey
     - outputs.default.redactOtherKey
 `,
+	}, {
+		name: "path in nested list",
+		input: []byte(`id: test-policy
+inputs:
+    - type: httpjson
+      data_stream:
+        namespace: default
+      streams:
+        - config_version: "2"
+          request.transforms:
+            - set:
+                target: header.Authorization
+                value: SSWS this-should-be-redacted
+            - set:
+                target: url.params.limit
+                value: "1000"
+secret_paths:
+    - inputs.0.streams.0.request.transforms.0.set.value
+`),
+		expect: `id: test-policy
+inputs:
+    - data_stream:
+        namespace: default
+      streams:
+        - config_version: "2"
+          request:
+            transforms:
+                - set:
+                    target: header.Authorization
+                    value: <REDACTED>
+                - set:
+                    target: url.params.limit
+                    value: "1000"
+      type: httpjson
+secret_paths:
+    - inputs.0.streams.0.request.transforms.0.set.value
+`,
 	}}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			file := client.DiagnosticFileResult{Content: tc.input, ContentType: "application/yaml"}
 			var out bytes.Buffer
-			err := writeRedacted(io.Discard, &out, "testPath", file)
+			var errOut bytes.Buffer
+			err := writeRedacted(&errOut, &out, "testPath", file)
 			require.NoError(t, err)
 
+			t.Logf("Error output: %s", errOut.String())
 			assert.Equal(t, tc.expect, out.String())
 		})
 	}
