@@ -27,7 +27,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: elastic-agent
-          image: docker.elastic.co/beats/elastic-agent:8.16.4
+          image: docker.elastic.co/beats/elastic-agent:8.16.5
           env:
             # Set to 1 for enrollment into Fleet server. If not set, Elastic Agent is run in standalone mode
             - name: FLEET_ENROLL

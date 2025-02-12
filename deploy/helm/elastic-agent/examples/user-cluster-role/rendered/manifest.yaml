@@ -6,10 +6,10 @@ metadata:
   name: agent-nginx-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-8.16.4-beta
+    helm.sh/chart: elastic-agent-8.16.5-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.4
+    app.kubernetes.io/version: 8.16.5
   annotations:
     elastic-agent.k8s.elastic.co/preset: nginx
     elastic-agent.k8s.elastic.co/sa: nginx
@@ -21,10 +21,10 @@ metadata:
   name: agent-nginx-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-8.16.4-beta
+    helm.sh/chart: elastic-agent-8.16.5-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.4
+    app.kubernetes.io/version: 8.16.5
   annotations:
     elastic-agent.k8s.elastic.co/preset: nginx
 stringData:
@@ -77,10 +77,10 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-nginx-example-default
   labels:
-    helm.sh/chart: elastic-agent-8.16.4-beta
+    helm.sh/chart: elastic-agent-8.16.5-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.4
+    app.kubernetes.io/version: 8.16.5
   annotations:
     elastic-agent.k8s.elastic.co/preset: nginx
 subjects:
@@ -99,10 +99,10 @@ metadata:
   name: agent-nginx-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-8.16.4-beta
+    helm.sh/chart: elastic-agent-8.16.5-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.16.4
+    app.kubernetes.io/version: 8.16.5
 spec:
   selector:
     matchLabels:
@@ -132,7 +132,7 @@ spec:
               fieldPath: metadata.name
         - name: STATE_PATH
           value: /usr/share/elastic-agent/state
-        image: docker.elastic.co/beats/elastic-agent:8.16.4-SNAPSHOT
+        image: docker.elastic.co/beats/elastic-agent:8.16.5-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         securityContext:
