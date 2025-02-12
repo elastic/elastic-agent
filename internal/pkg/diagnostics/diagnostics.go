@@ -398,7 +398,8 @@ func redactKey(k string) bool {
 		strings.Contains(k, "passphrase") ||
 		strings.Contains(k, "password") ||
 		strings.Contains(k, "token") ||
-		strings.Contains(k, "key")
+		strings.Contains(k, "key") ||
+		strings.Contains(k, "secret")
 }
 
 func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool) error {
@@ -588,7 +589,7 @@ func RedactSecretPaths(mapStr map[string]any, errOut io.Writer) map[string]any {
 		fmt.Fprintln(errOut, "No output redaction: secret_paths attribute is not a list.")
 		return mapStr
 	}
-	cfg := ucfg.MustNewFrom(mapStr)
+	cfg := ucfg.MustNewFrom(mapStr, ucfg.PathSep("."))
 	for _, v := range arr {
 		key, ok := v.(string)
 		if !ok {
@@ -596,11 +597,15 @@ func RedactSecretPaths(mapStr map[string]any, errOut io.Writer) map[string]any {
 			continue
 		}
 
-		if ok, _ := cfg.Has(key, -1, ucfg.PathSep(".")); ok {
+		if ok, err := cfg.Has(key, -1, ucfg.PathSep(".")); err != nil {
+			fmt.Fprintf(errOut, "Error redacting secret path %q: %v.\n", key, err)
+		} else if ok {
 			err := cfg.SetString(key, -1, REDACTED, ucfg.PathSep("."))
 			if err != nil {
 				fmt.Fprintf(errOut, "No output redaction for %q: %v.\n", key, err)
 			}
+		} else {
+			fmt.Fprintf(errOut, "Unable to find secret path %q for redaction.\n", key)
 		}
 	}
 	result, err := config.MustNewConfigFrom(cfg).ToMapStr()
