@@ -1,0 +1,12 @@
+kubernetes:
+  enabled: true
+  state:
+    agentAsSidecar:
+      enabled: true
+
+agent:
+  fleet:
+    enabled: true
+    url: http://localhost:8220
+    token: fleetToken
+    preset: ""

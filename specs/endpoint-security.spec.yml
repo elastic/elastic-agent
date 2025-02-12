@@ -1,4 +1,6 @@
 version: 2
+component_files: 
+ - endpoint-security-resources.zip
 inputs:
   - name: endpoint
     description: "Endpoint Security"

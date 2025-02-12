@@ -18,6 +18,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -81,6 +82,11 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 	})
 
 	t.Run(fmt.Sprintf("Upgrade on a repackaged version of agent %s (%s)", currentVersion, unPrivilegedString), func(t *testing.T) {
+
+		if runtime.GOOS == "windows" {
+			t.Skip("This test is flaky on windows. See https://github.com/elastic/elastic-agent/issues/6729")
+		}
+
 		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 		defer cancel()
 
@@ -368,8 +374,8 @@ func generateNewManifestContent(t *testing.T, manifestReader io.Reader, newVersi
 	t.Logf("read old manifest: %+v", oldManifest)
 
 	// replace manifest content
-	newManifest, err := mage.GeneratePackageManifest("elastic-agent", newVersion.String(), oldManifest.Package.Snapshot, oldManifest.Package.Hash, oldManifest.Package.Hash[:6])
-	require.NoErrorf(t, err, "GeneratePackageManifest(%v, %v, %v, %v) failed", newVersion.String(), oldManifest.Package.Snapshot, oldManifest.Package.Hash, oldManifest.Package.Hash[:6])
+	newManifest, err := mage.GeneratePackageManifest("elastic-agent", newVersion.String(), oldManifest.Package.Snapshot, oldManifest.Package.Hash, oldManifest.Package.Hash[:6], nil)
+	require.NoErrorf(t, err, "GeneratePackageManifest(%v, %v, %v, %v, %v) failed", newVersion.String(), oldManifest.Package.Snapshot, oldManifest.Package.Hash, oldManifest.Package.Hash[:6], nil)
 
 	t.Logf("generated new manifest:\n%s", newManifest)
 	return newManifest

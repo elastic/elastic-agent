@@ -12,6 +12,12 @@ In this example we define a `netflow` custom integration alongside a custom agen
 
 2. `NetFlow Records` integration assets are installed through Kibana
 
+3. Build the dependencies of the Helm chart
+    ```console
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+    helm dependency build ../../
+    ```
+
 ## Run:
 1. Install Helm chart
     ```console

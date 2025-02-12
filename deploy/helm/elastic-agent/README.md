@@ -5,7 +5,7 @@
 
 # elastic-agent
 
-![Version: 0.0.1](https://img.shields.io/badge/Version-0.0.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)
+![Version: 9.0.0-beta](https://img.shields.io/badge/Version-9.0.0--beta-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 9.0.0](https://img.shields.io/badge/AppVersion-9.0.0-informational?style=flat-square)
 
 Elastic-Agent Helm Chart
 
@@ -67,8 +67,9 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 | kubernetes.namespace | string | `"default"` | kubernetes namespace |
 | kubernetes.hints.enabled | bool | `false` | enable [elastic-agent autodiscovery](https://www.elastic.co/guide/en/fleet/current/elastic-agent-kubernetes-autodiscovery.html) feature |
 | kubernetes.state.enabled | bool | `true` | integration global switch to enable state streams based on kube-state-metrics. Note that setting this to `false` results in overriding and *disabling all* the respective state streams |
-| kubernetes.state.deployKSM | bool | `true` | deploy kube-state-metrics service as a sidecar container to the elastic agent of `ksmSharded` preset. If set to `false`, kube-state-metrics will *not* get deployed and `clusterWide` agent preset will be used for collecting kube-state-metrics. |
-| kubernetes.state.host | string | `"kube-state-metrics:8080"` | host of the kube-state-metrics service. Note that this used only when `deployKSM` is set to `false`. |
+| kubernetes.state.agentAsSidecar.enabled | bool | `false` | enable [ksm autosharding](https://github.com/kubernetes/kube-state-metrics?tab=readme-ov-file#automated-sharding) and deploy elastic-agent as a sidecar container. If `kube-state-metrics.enabled` is set to `false` this has no effect. |
+| kubernetes.state.agentAsSidecar.resources | object | `{"limits":{"memory":"800Mi"},"requests":{"cpu":"100m","memory":"400Mi"}}` | resources of the elastic-agent sidecar if `agentAsSidecar.enabled` is set to `true` |
+| kubernetes.state.host | string | `"kube-state-metrics:8080"` | host of the kube-state-metrics service. This used only when `kube-state-metrics.enabled` is set to `false`. |
 | kubernetes.state.vars | object | `{}` | state streams variables such as `add_metadata`, `hosts`, `period`, `bearer_token_file`. Please note that colliding vars also defined in respective state streams will *not* be overridden. |
 | kubernetes.metrics.enabled | bool | `true` | integration global switch to enable metric streams based on kubelet. Note that setting this to false results in overriding and *disabling all* the respective metric streams |
 | kubernetes.metrics.vars | object | `{}` | metric streams variables such as `add_metadata`, `hosts`, `period`, `bearer_token_file`, `ssl.verification_mode`. Please note that colliding vars also defined in respective metric streams will *not* be overridden. |
@@ -148,7 +149,7 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 | agent.imagePullSecrets | list | `[]` | image pull secrets |
 | agent.engine | string | `"k8s"` | generate kubernetes manifests or [ECK](https://github.com/elastic/cloud-on-k8s) CRDs |
 | agent.unprivileged | bool | `false` | enable unprivileged mode |
-| agent.presets | map[string]{} | `{ "perNode" : {...}, "clusterWide": {...}, "ksmSharded": {...} }` | Map of deployment presets for the Elastic Agent. The key of the map is the name of the preset. See more for the presets required by the built-in Kubernetes integration [here](./values.yaml) |
+| agent.presets | map[string]{} | `{ "perNode" : {...}, "clusterWide": {...}}` | Map of deployment presets for the Elastic Agent. The key of the map is the name of the preset. See more for the presets required by the built-in Kubernetes integration [here](./values.yaml) |
 
 ### 6.1 - Elastic-Agent Managed Configuration
 | Key | Type | Default | Description |

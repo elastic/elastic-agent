@@ -3,5 +3,10 @@ name: elastic-agent
 description: Elastic-Agent Helm Chart
 kubeVersion: ">= 1.27.0-0"
 type: application
-appVersion: 9.0.0
-version: 9.0.0-beta
+appVersion: 9.1.0
+version: 9.1.0-beta
+dependencies:
+  - name: kube-state-metrics
+    version: "5.28.0"
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: kube-state-metrics.enabled
