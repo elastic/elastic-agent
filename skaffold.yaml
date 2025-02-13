@@ -8,7 +8,7 @@ build:
     useBuildkit: false
     useDockerCLI: true
   artifacts:
-    - image: docker.elastic.co/beats/elastic-agent
+    - image: docker.elastic.co/elastic-agent/elastic-agent
       docker:
         dockerfile: Dockerfile.skaffold
         noCache: false

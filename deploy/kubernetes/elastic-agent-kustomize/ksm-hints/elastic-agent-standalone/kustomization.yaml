@@ -19,7 +19,11 @@ patches:
         spec:
           initContainers:
             - name: k8s-templates-downloader
+<<<<<<< HEAD
               image: docker.elastic.co/beats/elastic-agent:8.16.5
+=======
+              image: docker.elastic.co/elastic-agent/elastic-agent:9.1.0
+>>>>>>> ed7c19f3b ([k8s] Correct agent image repository (#6724))
               command: ['bash']
               args:
                 - -c
@@ -37,4 +41,3 @@ patches:
           volumes:
             - name: external-inputs
               emptyDir: {}
-          
