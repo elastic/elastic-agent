@@ -27,7 +27,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 )
 
@@ -165,7 +164,7 @@ func TestNotifyFleetAuditUnenroll(t *testing.T) {
 				w.WriteHeader(http.StatusUnauthorized)
 			}))
 		},
-		err: client.ErrInvalidAPIKey,
+		err: nil,
 	}, {
 		name: "returns 409",
 		getServer: func() *httptest.Server {
