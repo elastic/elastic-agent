@@ -784,7 +784,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 // information about the state of the Elastic Agent.
 // Called by external goroutines.
 func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
-	return diagnostics.Hooks{
+	hooks := diagnostics.Hooks{
 		{
 			Name:        "agent-info",
 			Filename:    "agent-info.yaml",
@@ -1024,7 +1024,9 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 				return o
 			},
 		},
-		{
+	}
+	if c.runComponentsInOtelManager {
+		otelComponentHook := diagnostics.Hook{
 			Name:        "otel-final",
 			Filename:    "otel-final.yaml",
 			Description: "Final otel configuration used by the Elastic Agent. Includes hybrid mode config and component config.",
@@ -1039,8 +1041,10 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 				}
 				return o
 			},
-		},
+		}
+		hooks = append(hooks, otelComponentHook)
 	}
+	return hooks
 }
 
 // runner performs the actual work of running all the managers.
