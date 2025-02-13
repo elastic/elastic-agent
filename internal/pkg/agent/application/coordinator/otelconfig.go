@@ -111,7 +111,8 @@ func getExporterID(exporterType otelcomponent.Type, outputName string) otelcompo
 // getCollectorConfigForComponent returns the Otel collector config required to run the given component.
 // This function returns a full, valid configuration that can then be merged with configurations for other components.
 func getCollectorConfigForComponent(comp *component.Component, info info.Agent) (*confmap.Conf, error) {
-	receiversConfig, err := getReceiversConfigForComponent(comp, info)
+	outputQueueConfig := getOutputQueueConfig(comp)
+	receiversConfig, err := getReceiversConfigForComponent(comp, info, outputQueueConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +143,7 @@ func getCollectorConfigForComponent(comp *component.Component, info info.Agent) 
 
 // getReceiversConfigForComponent returns the receivers configuration for a component. Usually this will be a single
 // receiver, but in principle it could be more.
-func getReceiversConfigForComponent(comp *component.Component, info info.Agent) (map[string]any, error) {
+func getReceiversConfigForComponent(comp *component.Component, info info.Agent, outputQueueConfig map[string]any) (map[string]any, error) {
 	receiverType, err := getReceiverTypeForComponent(comp)
 	if err != nil {
 		return nil, err
@@ -171,22 +172,26 @@ func getReceiversConfigForComponent(comp *component.Component, info info.Agent) 
 	// always safe. We should either ensure this is always the case, or have an explicit mapping.
 	beatName := strings.TrimSuffix(receiverType.String(), "receiver")
 	beatDataPath := filepath.Join(paths.Home(), "run", comp.ID)
-	receiversConfig := map[string]any{
-		receiverId.String(): map[string]any{
-			beatName: map[string]any{
-				"inputs": inputs,
-			},
-			// the output needs to be otelconsumer
-			"output": map[string]any{
-				"otelconsumer": map[string]any{},
-			},
-			// just like we do for beats processes, each receiver needs its own data path
-			"path": map[string]any{
-				"data": beatDataPath,
-			},
+	receiverConfig := map[string]any{
+		beatName: map[string]any{
+			"inputs": inputs,
+		},
+		// the output needs to be otelconsumer
+		"output": map[string]any{
+			"otelconsumer": map[string]any{},
+		},
+		// just like we do for beats processes, each receiver needs its own data path
+		"path": map[string]any{
+			"data": beatDataPath,
 		},
 	}
-	return receiversConfig, nil
+	// add the output queue config if present
+	if outputQueueConfig != nil {
+		receiverConfig["output"] = outputQueueConfig
+	}
+	return map[string]any{
+		receiverId.String(): receiverConfig,
+	}, nil
 }
 
 // getReceiversConfigForComponent returns the exporters configuration for a component. Usually this will be a single
@@ -333,4 +338,31 @@ func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
 	// for compatibility with beats, we want bodymap mapping
 	esConfig["mapping"] = map[string]any{"mode": "bodymap"}
 	return esConfig, nil
+}
+
+// This is copied from https://github.com/elastic/beats/blob/main/libbeat/otelbeat/beatconverter/beatconverter.go
+// getOutputQueueConfig gets the queue settings for the output unit in the component. We need to move these settings
+// to the receiver configuration.
+func getOutputQueueConfig(comp *component.Component) map[string]any {
+	// find the output unit config
+	var unitConfigMap map[string]any
+	for _, unit := range comp.Units {
+		if unit.Type == client.UnitTypeOutput {
+			unitConfigMap = unit.Config.GetSource().AsMap()
+		}
+	}
+	if unitConfigMap == nil {
+		return nil
+	}
+
+	queueConfig, ok := unitConfigMap["queue"]
+	if !ok {
+		return nil
+	}
+	queueConfigMap, ok := queueConfig.(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	return queueConfigMap
 }
