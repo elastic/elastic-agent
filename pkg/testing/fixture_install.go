@@ -413,7 +413,7 @@ func getElasticAgentProcesses(t *gotesting.T) []runningProcess {
 }
 
 // Includes both the main elastic-agent process and the agentbeat sub-processes for ensuring
-// that no sub-processes are orhpaned from their parent process and left running. This
+// that no sub-processes are orphaned from their parent process and left running. This
 // primarily tests that Windows Job Object assignment works.
 func getElasticAgentAndAgentbeatProcesses(t *gotesting.T) []runningProcess {
 	return getProcesses(t, `.*(elastic\-agent|agentbeat).*`)
