@@ -461,6 +461,7 @@ func testUninstallAuditUnenroll(ctx context.Context, fixture *atesting.Fixture, 
 	}
 }
 
+<<<<<<< HEAD
 // TestRepeatedInstallUninstall will install then uninstall the agent
 // repeatedly.  This test exists because of a number of race
 // conditions that have occurred in the uninstall process.  Current
@@ -468,6 +469,16 @@ func testUninstallAuditUnenroll(ctx context.Context, fixture *atesting.Fixture, 
 func TestRepeatedInstallUninstall(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: Default,
+=======
+// TestRepeatedInstallUninstallFleet will install then uninstall the agent
+// repeatedly with it enrolled into Fleet.  This test exists because of a number
+// of race conditions that have occurred in the uninstall process when enrolled
+// into Fleet. Current testing shows each iteration takes around 16 seconds.
+func TestRepeatedInstallUninstallFleet(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: InstallUninstall,
+		Stack: &define.Stack{}, // needs a fleet-server.
+>>>>>>> 37be67f65 ([CI] Integration tests regrouping (#6349))
 		// We require sudo for this test to run
 		// `elastic-agent install` (even though it will
 		// be installed as non-root).
@@ -479,6 +490,7 @@ func TestRepeatedInstallUninstall(t *testing.T) {
 	})
 
 	maxRunTime := 2 * time.Minute
+<<<<<<< HEAD
 	iterations := 100
 	for i := 0; i < iterations; i++ {
 		t.Run(fmt.Sprintf("%s-%d", t.Name(), i), func(t *testing.T) {
@@ -487,6 +499,10 @@ func TestRepeatedInstallUninstall(t *testing.T) {
 			fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 			require.NoError(t, err)
 
+=======
+	for i := 0; i < iterations(); i++ {
+		successful := t.Run(fmt.Sprintf("%s-%d", t.Name(), i), func(t *testing.T) {
+>>>>>>> 37be67f65 ([CI] Integration tests regrouping (#6349))
 			ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(maxRunTime))
 			defer cancel()
 
@@ -510,6 +526,14 @@ func TestRepeatedInstallUninstall(t *testing.T) {
 			require.NoErrorf(t, err, "uninstall failed: %s", err)
 		})
 	}
+}
+
+func iterations() int {
+	// If running in CI, reduce the number of iterations to speed up the test.
+	if os.Getenv("BUILDKITE_PULL_REQUEST") != "" {
+		return 50
+	}
+	return 100
 }
 
 func randStr(length int) string {
