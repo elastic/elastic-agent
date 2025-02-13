@@ -90,6 +90,7 @@ stringData:
           metricsets:
           - cpu
           period: 10s
+          system.hostfs: /hostfs
         - data_stream:
             dataset: system.diskio
             type: metrics
@@ -97,6 +98,7 @@ stringData:
           metricsets:
           - diskio
           period: 10s
+          system.hostfs: /hostfs
         - data_stream:
             dataset: system.filesystem
             type: metrics
@@ -106,6 +108,7 @@ stringData:
           processors:
           - drop_event.when.regexp:
               system.filesystem.mount_point: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
+          system.hostfs: /hostfs
         - data_stream:
             dataset: system.fsstat
             type: metrics
@@ -115,6 +118,7 @@ stringData:
           processors:
           - drop_event.when.regexp:
               system.fsstat.mount_point: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
+          system.hostfs: /hostfs
         - condition: ${host.platform} != 'windows'
           data_stream:
             dataset: system.load
@@ -128,6 +132,7 @@ stringData:
           metricsets:
           - memory
           period: 10s
+          system.hostfs: /hostfs
         - data_stream:
             dataset: system.network
             type: metrics
@@ -148,18 +153,21 @@ stringData:
           process.include_top_n.by_memory: 5
           processes:
           - .*
+          system.hostfs: /hostfs
         - data_stream:
             dataset: system.process_summary
             type: metrics
           metricsets:
           - process_summary
           period: 10s
+          system.hostfs: /hostfs
         - data_stream:
             dataset: system.socket_summary
             type: metrics
           metricsets:
           - socket_summary
           period: 10s
+          system.hostfs: /hostfs
         - data_stream:
             dataset: system.uptime
             type: metrics
@@ -295,7 +303,7 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: 535875b1a8f244fc529158f3467dec1983ca2ef19d365518da249fd46e22d0ef
+        checksum/config: dc3e48e999091f8db08e8ce2c2de127239731b26d598b6399ad93ef3636a3245
     spec:
       automountServiceAccountToken: true
       containers:
