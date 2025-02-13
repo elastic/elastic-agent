@@ -60,7 +60,6 @@ resource "ec_deployment" "integration-testing" {
 
   elasticsearch = {
     autoscale                 = false
-    instance_configuration_id = "gcp.es.datahot.n2.68x10x45"
 
     hot = {
       autoscaling = {}
@@ -71,7 +70,6 @@ resource "ec_deployment" "integration-testing" {
   kibana = {
     size                      = "1g"
     zone_count                = 1
-    instance_configuration_id = "gcp.kibana.n2.68x32x45"
     config = {
       user_settings_json = jsonencode({
         "xpack.fleet.enableExperimental"                          = ["agentTamperProtectionEnabled"]
@@ -82,7 +80,6 @@ resource "ec_deployment" "integration-testing" {
   }
 
   integrations_server = {
-    instance_configuration_id = "gcp.integrationsserver.n2.68x32x45"
     topology = {
       size       = "1g"
       zone_count = 1
