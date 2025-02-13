@@ -132,11 +132,7 @@ spec:
               fieldPath: metadata.name
         - name: STATE_PATH
           value: /usr/share/elastic-agent/state
-<<<<<<< HEAD
-        image: docker.elastic.co/beats/elastic-agent:8.19.0-SNAPSHOT
-=======
-        image: docker.elastic.co/elastic-agent/elastic-agent:9.1.0-SNAPSHOT
->>>>>>> ed7c19f3b ([k8s] Correct agent image repository (#6724))
+        image: docker.elastic.co/elastic-agent/elastic-agent:8.19.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         securityContext:
