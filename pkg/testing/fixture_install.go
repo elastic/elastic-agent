@@ -40,8 +40,10 @@ type CmdOpts interface {
 
 // EnrollOpts specifies the options for the enroll command
 type EnrollOpts struct {
+	ID              string // --id
 	URL             string // --url
 	EnrollmentToken string // --enrollment-token
+	ReplaceToken    string // --replace-token
 
 	// SSL/TLS options
 	CertificateAuthorities []string // --certificate-authorities
@@ -52,11 +54,17 @@ type EnrollOpts struct {
 
 func (e EnrollOpts) toCmdArgs() []string {
 	var args []string
+	if e.ID != "" {
+		args = append(args, "--id", e.ID)
+	}
 	if e.URL != "" {
 		args = append(args, "--url", e.URL)
 	}
 	if e.EnrollmentToken != "" {
 		args = append(args, "--enrollment-token", e.EnrollmentToken)
+	}
+	if e.ReplaceToken != "" {
+		args = append(args, "--replace-token", e.ReplaceToken)
 	}
 
 	if len(e.CertificateAuthorities) > 0 {
@@ -596,8 +604,9 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 }
 
 type UninstallOpts struct {
-	Force          bool // --force
-	UninstallToken string
+	Force          bool   // --force
+	UninstallToken string // --uninstall-token
+	SkipFleetAudit bool   // --skip-fleet-audit
 }
 
 func (i UninstallOpts) toCmdArgs() []string {
@@ -608,6 +617,10 @@ func (i UninstallOpts) toCmdArgs() []string {
 
 	if i.UninstallToken != "" {
 		args = append(args, "--uninstall-token", i.UninstallToken)
+	}
+
+	if i.SkipFleetAudit {
+		args = append(args, "--skip-fleet-audit")
 	}
 
 	return args
