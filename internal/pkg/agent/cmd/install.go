@@ -86,10 +86,9 @@ would like the Agent to operate.
 func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	var err error
 
-	if isFleetServerFlagProvided(cmd) {
-		if installServers, _ := cmd.Flags().GetBool(flagInstallServers); !installServers {
-			return fmt.Errorf("to install fleet server `--%s` flag must be used", flagInstallServers)
-		}
+	if installServers, _ := cmd.Flags().GetBool(flagInstallServers); isFleetServerFlagProvided(cmd) && !installServers {
+		cmd.Flags().Lookup(flagInstallServers).Value.Set("true")
+		fmt.Fprintf(streams.Out, "fleet-server installation detected, using --%s flag\n", flagInstallServers)
 	}
 
 	err = validateEnrollFlags(cmd)
