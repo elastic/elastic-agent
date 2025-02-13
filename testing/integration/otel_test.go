@@ -1906,13 +1906,13 @@ func TestMonitoringAgentE2E(t *testing.T) {
                 target: '@metadata'
             - add_fields:
                 fields:
-                  dataset: elastic_agent
+                  dataset: otel
                   namespace: default
                   type: logs
                 target: data_stream
             - add_fields:
                 fields:
-                  dataset: elastic_agent
+                  dataset: otel
                 target: event
             - add_fields:
                 fields:
@@ -1987,9 +1987,9 @@ func TestMonitoringAgentE2E(t *testing.T) {
             not:
               contains:
                 tags: forwarded
-      - add_cloud_data: ~
+      - add_cloud_metadata: ~
       - add_docker_metadata: ~
-      - add_kubernetes_metadata:~
+      - add_kubernetes_metadata: ~
 	setup.ilm.enabled: false 
 	setup.template.enabled: false
 	filebeat.config.modules.enabled: false
@@ -2004,7 +2004,8 @@ exporters:
       - {{.ESEndpoint}}
     compression: none
     api_key: {{.ESApiKey}}
-    logs_index: {{.fbReceiverMonitoringIndex}}
+    logs_dynamic_index:
+	  enabled: true
     batcher:
       enabled: true
       flush_timeout: 1s
