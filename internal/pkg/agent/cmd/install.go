@@ -87,7 +87,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	var err error
 
 	if installServers, _ := cmd.Flags().GetBool(flagInstallServers); isFleetServerFlagProvided(cmd) && !installServers {
-		cmd.Flags().Lookup(flagInstallServers).Value.Set("true")
+		_ = cmd.Flags().Lookup(flagInstallServers).Value.Set("true") // this can fail only when parsing bool
 		fmt.Fprintf(streams.Out, "fleet-server installation detected, using --%s flag\n", flagInstallServers)
 	}
 
