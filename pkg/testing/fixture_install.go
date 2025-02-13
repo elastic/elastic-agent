@@ -200,7 +200,7 @@ func (f *Fixture) installFunc(ctx context.Context, installOpts *InstallOpts, sho
 
 	// check for running agents before installing, but only if not installed into a namespace whose point is allowing two agents at once.
 	if installOpts != nil && !installOpts.Develop && installOpts.Namespace == "" {
-		assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at beginning of Install()")
+		assert.Empty(f.t, getElasticAgentAndAgentbeatProcesses(f.t), "there should be no running agent at beginning of Install()")
 	}
 
 	switch f.packageFormat {
@@ -287,19 +287,22 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 
 	f.t.Cleanup(func() {
 		// check for running agents after uninstall had a chance to run
-		processes := getElasticAgentProcesses(f.t)
-
 		// there can be a single agent left when using --develop mode
 		if f.installOpts != nil && f.installOpts.Namespace != "" {
-			assert.LessOrEqualf(f.t, len(processes), 1, "More than one agent left running at the end of the test when second agent in namespace %s was used: %v", f.installOpts.Namespace, processes)
+			// Only consider the main agent process and not sub-processes so that we can detect when
+			// multiple agents are running without needing to know the number of input sub-processes to expect.
+			agentProcesses := getElasticAgentProcesses(f.t)
+			assert.LessOrEqualf(f.t, len(agentProcesses), 1, "More than one agent left running at the end of the test when second agent in namespace %s was used: %v", f.installOpts.Namespace, processes)
 			// The agent left running has to be the non-development agent. The development agent should be uninstalled first as a convention.
-			if len(processes) > 0 {
-				assert.NotContainsf(f.t, processes[0].Cmdline, paths.InstallDirNameForNamespace(f.installOpts.Namespace),
+			if len(agentProcesses) > 0 {
+				assert.NotContainsf(f.t, agentProcesses[0].Cmdline, paths.InstallDirNameForNamespace(f.installOpts.Namespace),
 					"The agent installed into namespace %s was left running at the end of the test or was not uninstalled first: %v", f.installOpts.Namespace, processes)
 			}
 			return
 		}
 
+		// If not using an installation namespace, there should be no elastic-agent or agentbeat processes left running.
+		processes := getElasticAgentAndAgentbeatProcesses(f.t)
 		assert.Empty(f.t, processes, "there should be no running agent at the end of the test")
 	})
 
@@ -406,9 +409,13 @@ func mapProcess(p agentsystemprocess.ProcState) runningProcess {
 }
 
 func getElasticAgentProcesses(t *gotesting.T) []runningProcess {
-	// Include both the main elastic-agent process and the agentbeat sub-processes to ensure
-	// that no sub-processes are orhpaned from their parent process and left running. This
-	// primarily tests that Windows Job Object assignment works.
+	return getProcesses(t, `.*elastic\-agent.*`)
+}
+
+// Includes both the main elastic-agent process and the agentbeat sub-processes for ensuring
+// that no sub-processes are orhpaned from their parent process and left running. This
+// primarily tests that Windows Job Object assignment works.
+func getElasticAgentAndAgentbeatProcesses(t *gotesting.T) []runningProcess {
 	return getProcesses(t, `.*(elastic\-agent|agentbeat).*`)
 }
 
