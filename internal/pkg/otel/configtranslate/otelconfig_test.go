@@ -6,7 +6,16 @@ package configtranslate
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
+	"time"
+
+	"go.opentelemetry.io/collector/confmap"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/pipeline"
@@ -71,6 +80,46 @@ func TestGetSignalForComponent(t *testing.T) {
 			component:     component.Component{InputType: "test"},
 			expectedError: fmt.Errorf("input type not supported by Otel: %s", "test"),
 		},
+		{
+			name: "not agentbeat",
+			component: component.Component{
+				InputType: "test",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "cloudbeat",
+				},
+			},
+			expectedError: fmt.Errorf("input type not supported by Otel: %s", "test"),
+		},
+		{
+			name: "filebeat",
+			component: component.Component{
+				InputType: "filestream",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "agentbeat",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+			},
+			expectedSignal: pipeline.SignalLogs,
+		},
+		{
+			name: "metricbeat",
+			component: component.Component{
+				InputType: "filestream",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "agentbeat",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{"metricbeat"},
+						},
+					},
+				},
+			},
+			expectedSignal: pipeline.SignalLogs,
+		},
 	}
 
 	for _, tt := range tests {
@@ -78,6 +127,201 @@ func TestGetSignalForComponent(t *testing.T) {
 			actualSignal, actualError := getSignalForComponent(&tt.component)
 			assert.Equal(t, tt.expectedSignal, actualSignal)
 
+			if tt.expectedError != nil {
+				assert.Error(t, actualError)
+				assert.EqualError(t, actualError, tt.expectedError.Error())
+			} else {
+				assert.NoError(t, actualError)
+			}
+		})
+	}
+}
+
+func TestGetOtelConfig(t *testing.T) {
+	agentInfo := &info.AgentInfo{}
+	fileStreamConfig := map[string]any{
+		"id":    "test",
+		"type":  "filestream",
+		"paths": map[string]any{},
+	}
+	esOutputConfig := map[string]any{
+		"type":     "elasticsearch",
+		"hosts":    []any{"localhost:9200"},
+		"username": "elastic",
+		"password": "password",
+	}
+	defaultProcessors := []any{
+		mapstr.M{
+			"add_fields": mapstr.M{
+				"fields": mapstr.M{
+					"input_id": "test",
+				},
+				"target": "@metadata",
+			},
+		},
+		mapstr.M{
+			"add_fields": mapstr.M{
+				"fields": mapstr.M{
+					"dataset":   "generic",
+					"namespace": "default",
+					"type":      "logs",
+				},
+				"target": "data_stream",
+			},
+		},
+		mapstr.M{
+			"add_fields": mapstr.M{
+				"fields": mapstr.M{
+					"dataset": "generic",
+				},
+				"target": "event",
+			},
+		},
+		mapstr.M{
+			"add_fields": mapstr.M{
+				"fields": mapstr.M{
+					"id":       agentInfo.AgentID(),
+					"snapshot": agentInfo.Snapshot(),
+					"version":  agentInfo.Version(),
+				},
+				"target": "elastic_agent",
+			},
+		},
+		mapstr.M{
+			"add_fields": mapstr.M{
+				"fields": mapstr.M{
+					"id": agentInfo.AgentID(),
+				},
+				"target": "agent",
+			},
+		},
+	}
+	tests := []struct {
+		name           string
+		model          *component.Model
+		expectedConfig *confmap.Conf
+		expectedError  error
+	}{
+		{
+			name: "no supported components",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						InputType: "test",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "cloudbeat",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "filestream",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "test",
+						InputType:  "filestream",
+						OutputType: "elasticsearch",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "agentbeat",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"filebeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "test-unit",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(fileStreamConfig),
+							},
+							{
+								ID:     "test-default",
+								Type:   client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(esOutputConfig),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"elasticsearch/_agent-component/default": map[string]any{
+						"batcher": map[string]any{
+							"enabled":        true,
+							"max_size_items": 1600,
+						},
+						"mapping": map[string]any{
+							"mode": "bodymap",
+						},
+						"endpoints": []string{"http://localhost:9200"},
+						"password":  "password",
+						"user":      "elastic",
+						"retry": map[string]any{
+							"enabled":          true,
+							"initial_interval": 1 * time.Second,
+							"max_interval":     1 * time.Minute,
+							"max_retries":      3,
+						},
+						"logs_dynamic_index": map[string]any{
+							"enabled": true,
+						},
+						"num_workers":       0,
+						"api_key":           "",
+						"logs_index":        "filebeat-9.0.0",
+						"timeout":           90 * time.Second,
+						"idle_conn_timeout": 3 * time.Second,
+						"metrics_dynamic_index": map[string]any{
+							"enabled": true,
+						},
+					},
+				},
+				"receivers": map[string]any{
+					"filebeatreceiver/_agent-component/test": map[string]any{
+						"filebeat": map[string]any{
+							"inputs": []map[string]any{
+								{
+									"id":         "test",
+									"type":       "filestream",
+									"paths":      map[string]any{},
+									"index":      "logs-generic-default",
+									"processors": defaultProcessors,
+								},
+							},
+						},
+						"output": map[string]any{
+							"otelconsumer": map[string]any{},
+						},
+						"path": map[string]any{
+							"data": filepath.Join(paths.Home(), "run", "test"),
+						},
+					},
+				},
+				"service": map[string]any{
+					"pipelines": map[string]any{
+						"logs/_agent-component/test": map[string][]string{
+							"exporters": []string{"elasticsearch/_agent-component/default"},
+							"receivers": []string{"filebeatreceiver/_agent-component/test"},
+						},
+					},
+				},
+			}),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actualConf, actualError := GetOtelConfig(tt.model, agentInfo)
+			if actualConf == nil || tt.expectedConfig == nil {
+				assert.Equal(t, tt.expectedConfig, actualConf)
+			} else { // this gives a nicer diff
+				assert.Equal(t, tt.expectedConfig.ToStringMap(), actualConf.ToStringMap())
+			}
+
+			if actualConf != nil {
+				t.Logf("%v", actualConf.ToStringMap())
+			}
 			if tt.expectedError != nil {
 				assert.Error(t, actualError)
 				assert.EqualError(t, actualError, tt.expectedError.Error())
