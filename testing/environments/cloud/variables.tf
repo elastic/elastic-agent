@@ -1,13 +1,13 @@
 ## Deployment configuration
 
 variable "ess_region" {
-  default     = "gcp-us-west2"
-  description = "Optional ESS region where the deployment will be created. Defaults to gcp-us-west2"
+  default     = "gcp-us-west1"
+  description = "Optional ESS region where the deployment will be created. Defaults to gcp-us-west1"
   type        = string
 }
 
 variable "deployment_template" {
-  default     = "gcp-compute-optimized-v2"
+  default     = "gcp-compute-optimized"
   description = "Optional deployment template. Defaults to the CPU optimized template for GCP"
   type        = string
 }

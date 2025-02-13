@@ -58,6 +58,16 @@ inputs:
 #         paths:
 #           - /var/log/*.log
 
+#   # Collecting journald logs, including coredumps.
+#   - type: journald
+#     # Input ID allowing Elastic Agent to track the state of this input. Must be unique.
+#     id: your-journald-input-id
+#     streams:
+#       # Stream ID for this data stream allowing Filebeat to track the state of the ingested data. Must be unique.
+#       # Each journald data stream creates a separate instance of the Filebeat journald input.
+#       - id: your-journald-stream-id
+#         data_stream:
+#           dataset: generic
 
 # agent.monitoring:
 #   # enabled turns on monitoring of running processes

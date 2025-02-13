@@ -2,6 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
+// you may not use this file except in compliance with the Elastic License 2.0.
+
 package download
 
 import (
@@ -84,7 +86,7 @@ type Verifier interface {
 	// If the checksum does no match Verify returns a *download.ChecksumMismatchError.
 	// If the PGP signature check fails then Verify returns a
 	// *download.InvalidSignatureError.
-	Verify(a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error
+	Verify(ctx context.Context, a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error
 }
 
 // VerifySHA512HashWithCleanup calls VerifySHA512Hash and, in case of a
@@ -210,7 +212,8 @@ func readChecksumFile(checksumFile, filename string) (string, error) {
 }
 
 func VerifyPGPSignatureWithKeys(
-	log infoWarnLogger, file string, asciiArmorSignature []byte, publicKeys [][]byte) error {
+	log infoWarnLogger, file string, asciiArmorSignature []byte, publicKeys [][]byte,
+) error {
 	var err error
 	for i, key := range publicKeys {
 		err = VerifyPGPSignature(file, asciiArmorSignature, key)

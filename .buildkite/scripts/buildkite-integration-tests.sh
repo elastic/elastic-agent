@@ -15,9 +15,10 @@ if [ -z "$TEST_SUDO" ]; then
 fi
 
 if [ "$TEST_SUDO" == "true" ]; then
-  echo "Re-initializing ASDF. The user is changed to root..."  
-  export HOME=/opt/buildkite-agent
-  source /opt/buildkite-agent/hooks/pre-command 
+  echo "Re-initializing ASDF. The user is changed to root..."
+  export ASDF_DATA_DIR="/opt/buildkite-agent/.asdf"
+  export PATH="$ASDF_DATA_DIR/bin:$ASDF_DATA_DIR/shims:$PATH"
+  source /opt/buildkite-agent/hooks/pre-command
   source .buildkite/hooks/pre-command || echo "No pre-command hook found"
 fi
 
@@ -25,23 +26,34 @@ fi
 asdf install
 
 echo "~~~ Running integration tests as $USER"
-echo "~~~ Integration tests: ${GROUP_NAME}"
 
 go install gotest.tools/gotestsum
 gotestsum --version
 
-PACKAGE_VERSION="$(cat .package-version)"
-if [[ -n "$PACKAGE_VERSION" ]]; then
-    PACKAGE_VERSION=${PACKAGE_VERSION}"-SNAPSHOT"
+# Parsing version.go. Will be simplified here: https://github.com/elastic/ingest-dev/issues/4925
+#AGENT_VERSION=$(grep "const defaultBeatVersion =" version/version.go | cut -d\" -f2)
+#AGENT_VERSION="${AGENT_VERSION}-SNAPSHOT"
+
+# Remove agent pinning once 9.0.0 is released
+AGENT_VERSION=9.0.0-SNAPSHOT
+export AGENT_VERSION
+echo "~~~ Agent version: ${AGENT_VERSION}"
+
+os_data=$(uname -spr | tr ' ' '_')
+root_suffix=""
+if [ "$TEST_SUDO" == "true" ]; then
+  root_suffix="_sudo"
 fi
+fully_qualified_group_name="${GROUP_NAME}${root_suffix}_${os_data}"
+outputXML="build/${fully_qualified_group_name}.integration.xml"
+outputJSON="build/${fully_qualified_group_name}.integration.out.json"
+
+echo "~~~ Integration tests: ${GROUP_NAME}"
 
 set +e
-TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${PACKAGE_VERSION}" SNAPSHOT=true gotestsum --no-color -f standard-quiet --junitfile "build/${GROUP_NAME}.integration.xml" --jsonfile "build/${GROUP_NAME}.integration.out.json" -- -tags integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args -integration.groups="${GROUP_NAME}" -integration.sudo="${TEST_SUDO}"
+TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args -integration.groups="${GROUP_NAME}" -integration.sudo="${TEST_SUDO}"
 TESTS_EXIT_STATUS=$?
 set -e
-
-# HTML report
-outputXML="build/${GROUP_NAME}.integration.xml"
 
 if [ -f "$outputXML" ]; then
   go install github.com/alexec/junit2html@latest

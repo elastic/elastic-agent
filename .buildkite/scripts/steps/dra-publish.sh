@@ -1,12 +1,13 @@
 #!/bin/bash
 
-set -uo pipefail
+set -euo pipefail
 
 DRY_RUN="${DRA_DRY_RUN:=""}"
 WORKFLOW="${DRA_WORKFLOW:=""}"
 COMMIT="${DRA_COMMIT:="${BUILDKITE_COMMIT:=""}"}"
 BRANCH="${DRA_BRANCH:="${BUILDKITE_BRANCH:=""}"}"
 PACKAGE_VERSION="${DRA_VERSION:="${BEAT_VERSION:=""}"}"
+VERSION_QUALIFIER="${VERSION_QUALIFIER:=""}"
 
 # force main branch on PR's or it won't execute
 # because the PR branch does not have a project folder in release-manager
@@ -50,7 +51,8 @@ function run_release_manager_list() {
         --commit "${_commit}" \
         --workflow "${_workflow}" \
         --version "${_version}" \
-        --artifact-set "${_artifact_set}"
+        --artifact-set "${_artifact_set}" \
+        --qualifier "${VERSION_QUALIFIER}"
 }
 
 # Publish DRA artifacts
@@ -71,10 +73,11 @@ function run_release_manager_collect() {
         --workflow "${_workflow}" \
         --version "${_version}" \
         --artifact-set "${_artifact_set}" \
+        --qualifier "${VERSION_QUALIFIER}" \
         ${_dry_run}
 }
 
-echo "+++ Release Manager ${WORKFLOW} / ${BRANCH} / ${COMMIT}";
+echo "+++ Release Manager Workflow: ${WORKFLOW} / Branch: ${BRANCH} / VERSION_QUALIFIER: ${VERSION_QUALIFIER} / Commit: ${COMMIT}"
 run_release_manager_list "${DRA_PROJECT_ID}" "${DRA_PROJECT_ARTIFACT_ID}" "${WORKFLOW}" "${COMMIT}" "${BRANCH}" "${PACKAGE_VERSION}"
 run_release_manager_collect "${DRA_PROJECT_ID}" "${DRA_PROJECT_ARTIFACT_ID}" "${WORKFLOW}" "${COMMIT}" "${BRANCH}" "${PACKAGE_VERSION}" "${DRY_RUN}"
 RM_EXIT_CODE=$?

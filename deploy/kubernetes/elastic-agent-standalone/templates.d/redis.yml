@@ -12,6 +12,9 @@ inputs:
             - .gz$
           exclude_lines:
             - ^\s+[\-`('.|_]
+          file_identity:
+            fingerprint: null
+          id: filestream-redis-redis-log-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -20,6 +23,8 @@ inputs:
             - /var/log/containers/*${kubernetes.hints.container_id}.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - redis-log

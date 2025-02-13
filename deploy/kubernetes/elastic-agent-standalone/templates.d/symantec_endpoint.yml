@@ -15,6 +15,9 @@ inputs:
                 remove_mapped_fields: false
                 tz_offset: UTC
           fields_under_root: true
+          file_identity:
+            fingerprint: null
+          id: filestream-symantec_endpoint-symantec_endpoint-log-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto
@@ -23,6 +26,8 @@ inputs:
             - /var/log/containers/*${kubernetes.hints.container_id}.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - symantec-endpoint-log

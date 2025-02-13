@@ -172,8 +172,11 @@ type ConfigManager interface {
 type VarsManager interface {
 	Runner
 
+	// DefaultProvider returns the default provider that the variable manager is configured to use.
+	DefaultProvider() string
+
 	// Observe instructs the variables to observe.
-	Observe([]string)
+	Observe(context.Context, []string) ([]*transpiler.Vars, error)
 
 	// Watch returns the chanel to watch for variable changes.
 	Watch() <-chan []*transpiler.Vars
@@ -575,6 +578,11 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 	if err != nil {
 		c.ClearOverrideState()
+		if errors.Is(err, upgrade.ErrUpgradeSameVersion) {
+			// Set upgrade state to completed so update no longer shows in-progress.
+			det.SetState(details.StateCompleted)
+			return nil
+		}
 		det.Fail(err)
 		return err
 	}
@@ -1239,7 +1247,11 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 	}
 
 	// pass the observed vars from the AST to the varsMgr
-	c.observeASTVars()
+	err = c.observeASTVars(ctx)
+	if err != nil {
+		// only possible error here is the context being cancelled
+		return err
+	}
 
 	// Disabled for 8.8.0 release in order to limit the surface
 	// https://github.com/elastic/security-team/issues/6501
@@ -1322,25 +1334,32 @@ func (c *Coordinator) generateAST(cfg *config.Config) (err error) {
 // observeASTVars identifies the variables that are referenced in the computed AST and passed to
 // the varsMgr so it knows what providers are being referenced. If a providers is not being
 // referenced then the provider does not need to be running.
-func (c *Coordinator) observeASTVars() {
+func (c *Coordinator) observeASTVars(ctx context.Context) error {
 	if c.varsMgr == nil {
 		// No varsMgr (only happens in testing)
-		return
-	}
-	if c.ast == nil {
-		// No AST; no vars
-		c.varsMgr.Observe(nil)
-		return
-	}
-	inputs, ok := transpiler.Lookup(c.ast, "inputs")
-	if !ok {
-		// No inputs; no vars
-		c.varsMgr.Observe(nil)
-		return
+		return nil
 	}
 	var vars []string
-	vars = inputs.Vars(vars)
-	c.varsMgr.Observe(vars)
+	if c.ast != nil {
+		inputs, ok := transpiler.Lookup(c.ast, "inputs")
+		if ok {
+			vars = inputs.Vars(vars, c.varsMgr.DefaultProvider())
+		}
+		outputs, ok := transpiler.Lookup(c.ast, "outputs")
+		if ok {
+			vars = outputs.Vars(vars, c.varsMgr.DefaultProvider())
+		}
+	}
+	updated, err := c.varsMgr.Observe(ctx, vars)
+	if err != nil {
+		// context cancel
+		return err
+	}
+	if updated != nil {
+		// provided an updated set of vars (observed changed)
+		c.vars = updated
+	}
+	return nil
 }
 
 // processVars updates the transpiler vars in the Coordinator.
@@ -1400,6 +1419,7 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 	}
 
 	c.logger.Info("Updating running component model")
+	c.logger.With("components", model.Components).Debug("Updating running component model")
 	c.runtimeMgr.Update(model)
 	return nil
 }
@@ -1414,7 +1434,9 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		c.setComponentGenError(err)
 	}()
 
-	ast := c.ast.Clone()
+	ast := c.ast.ShallowClone()
+
+	// perform variable substitution for inputs
 	inputs, ok := transpiler.Lookup(ast, "inputs")
 	if ok {
 		renderedInputs, err := transpiler.RenderInputs(inputs, c.vars)
@@ -1424,6 +1446,20 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		err = transpiler.Insert(ast, renderedInputs, "inputs")
 		if err != nil {
 			return fmt.Errorf("inserting rendered inputs failed: %w", err)
+		}
+	}
+
+	// perform variable substitution for outputs
+	// outputs only support the context variables (dynamic provides are not provide to the outputs)
+	outputs, ok := transpiler.Lookup(ast, "outputs")
+	if ok {
+		renderedOutputs, err := transpiler.RenderOutputs(outputs, c.vars)
+		if err != nil {
+			return fmt.Errorf("rendering outputs failed: %w", err)
+		}
+		err = transpiler.Insert(ast, renderedOutputs, "outputs")
+		if err != nil {
+			return fmt.Errorf("inserting rendered outputs failed: %w", err)
 		}
 	}
 

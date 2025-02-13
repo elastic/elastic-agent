@@ -49,14 +49,15 @@ const (
 )
 
 var (
-	excludedPathsPattern   = regexp.MustCompile(`node_modules`)
-	configFilePattern      = regexp.MustCompile(`.*beat\.spec.yml$|.*beat\.yml$|apm-server\.yml|elastic-agent\.yml$$`)
-	manifestFilePattern    = regexp.MustCompile(`manifest.yml`)
-	modulesDirPattern      = regexp.MustCompile(`module/.+`)
-	modulesDDirPattern     = regexp.MustCompile(`modules.d/$`)
-	modulesDFilePattern    = regexp.MustCompile(`modules.d/.+`)
-	monitorsDFilePattern   = regexp.MustCompile(`monitors.d/.+`)
-	systemdUnitFilePattern = regexp.MustCompile(`/lib/systemd/system/.*\.service`)
+	excludedPathsPattern    = regexp.MustCompile(`node_modules`)
+	configFilePattern       = regexp.MustCompile(`.*beat\.spec.yml$|.*beat\.yml$|apm-server\.yml|elastic-agent\.yml$$`)
+	manifestFilePattern     = regexp.MustCompile(`manifest.yml`)
+	modulesDirPattern       = regexp.MustCompile(`module/.+`)
+	modulesDDirPattern      = regexp.MustCompile(`modules.d/$`)
+	modulesDFilePattern     = regexp.MustCompile(`modules.d/.+`)
+	monitorsDFilePattern    = regexp.MustCompile(`monitors.d/.+`)
+	systemdUnitFilePattern  = regexp.MustCompile(`/lib/systemd/system/.*\.service`)
+	hintsInputsDFilePattern = regexp.MustCompile(`usr/share/elastic-agent/hints.inputs.d/.*\.yml`)
 
 	licenseFiles = []string{"LICENSE.txt", "NOTICE.txt"}
 )
@@ -297,6 +298,7 @@ func checkDocker(t *testing.T, file string) {
 	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
 	checkModulesPresent(t, "", p)
 	checkModulesDPresent(t, "", p)
+	checkHintsInputsD(t, "hints.inputs.d", hintsInputsDFilePattern, p)
 	checkLicensesPresent(t, "licenses/", p)
 }
 
@@ -445,6 +447,21 @@ func checkMonitorsDPresent(t *testing.T, prefix string, p *packageFile) {
 	if *monitorsd {
 		checkMonitors(t, "monitors.d", prefix, monitorsDFilePattern, p)
 	}
+}
+
+func checkHintsInputsD(t *testing.T, name string, r *regexp.Regexp, p *packageFile) {
+	t.Run(fmt.Sprintf("%s %s contents", p.Name, name), func(t *testing.T) {
+		total := 0
+		for _, entry := range p.Contents {
+			if r.MatchString(entry.File) {
+				total++
+			}
+		}
+
+		if total == 0 {
+			t.Errorf("no hints inputs found under %s", name)
+		}
+	})
 }
 
 func checkModules(t *testing.T, name, prefix string, r *regexp.Regexp, p *packageFile) {
@@ -711,7 +728,7 @@ func readTarContents(tarName string, data io.Reader) (*packageFile, error) {
 			File: header.Name,
 			UID:  header.Uid,
 			GID:  header.Gid,
-			Mode: os.FileMode(header.Mode),
+			Mode: os.FileMode(header.Mode), //nolint:gosec // Reason: header.Mode should never overflow from int64 -> uint32
 		}
 	}
 

@@ -12,6 +12,9 @@ inputs:
             - .gz$
           exclude_lines:
             - ^#
+          file_identity:
+            fingerprint: null
+          id: filestream-iis-iis-access-${kubernetes.hints.container_id}
           ignore_older: 72h
           parsers:
             - container:
@@ -21,6 +24,8 @@ inputs:
             - /var/log/containers/*${kubernetes.hints.container_id}.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - iis-access
@@ -32,6 +37,9 @@ inputs:
             - .gz$
           exclude_lines:
             - ^#
+          file_identity:
+            fingerprint: null
+          id: filestream-iis-iis-error-${kubernetes.hints.container_id}
           ignore_older: 72h
           parsers:
             - container:
@@ -41,6 +49,8 @@ inputs:
             - /var/log/containers/*${kubernetes.hints.container_id}.log
           prospector:
             scanner:
+                fingerprint:
+                    enabled: true
                 symlinks: true
           tags:
             - iis-error

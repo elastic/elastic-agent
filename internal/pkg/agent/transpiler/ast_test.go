@@ -9,6 +9,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/elastic/elastic-agent-libs/mapstr"
+
+	"github.com/elastic/elastic-agent/internal/pkg/eql"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -852,6 +856,41 @@ func TestHash(t *testing.T) {
 	}
 }
 
+func TestApplyDoesNotMutate(t *testing.T) {
+	tests := map[string]struct {
+		input Node
+	}{
+		"dict": {
+			&Dict{
+				value: []Node{
+					&Key{name: "str", value: &StrVal{value: "${var}"}},
+				},
+			},
+		},
+		"list": {
+			&List{
+				value: []Node{
+					&StrVal{value: "${var}"},
+				},
+			},
+		},
+		"key": {
+			&Key{name: "str", value: &StrVal{value: "${var}"}},
+		},
+		"str": {&StrVal{value: "${var}"}},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			vars, err := NewVars("", map[string]any{"var": "value"}, mapstr.M{}, "")
+			require.NoError(t, err)
+			applied, err := test.input.Apply(vars)
+			require.NoError(t, err)
+			assert.NotEqual(t, test.input, applied)
+		})
+	}
+}
+
 func TestShallowClone(t *testing.T) {
 	tests := map[string]struct {
 		input *AST
@@ -909,7 +948,7 @@ func TestShallowClone(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			cloned := test.input.ShallowClone()
 			assert.Equal(t, test.input, cloned)
-			err := test.input.Insert(&AST{root: &BoolVal{value: true}}, "key")
+			err := test.input.Insert(&AST{root: &Key{name: "integer", value: &IntVal{value: 7}}}, "integer")
 			if err == nil {
 				assert.NotEqual(t, test.input, cloned)
 			} else if list, ok := test.input.root.(*List); ok {
@@ -922,8 +961,9 @@ func TestShallowClone(t *testing.T) {
 
 func TestVars(t *testing.T) {
 	tests := map[string]struct {
-		input  map[string]interface{}
-		result []string
+		input           map[string]interface{}
+		result          []string
+		defaultProvider string
 	}{
 		"empty": {
 			input:  map[string]interface{}{},
@@ -1006,6 +1046,66 @@ func TestVars(t *testing.T) {
 			},
 			result: []string{"var1", "var2", "var3", "var1", "var5", "var6", "var1"},
 		},
+		"nested with default": {
+			input: map[string]interface{}{
+				"novars": map[string]interface{}{
+					"list1": []interface{}{
+						map[string]interface{}{
+							"int":   1,
+							"float": 1.1234,
+							"bool":  true,
+							"str":   "value1",
+						},
+					},
+					"list2": []interface{}{
+						map[string]interface{}{
+							"int":   2,
+							"float": 2.3456,
+							"bool":  false,
+							"str":   "value2",
+						},
+					},
+				},
+				"vars1": map[string]interface{}{
+					"list1": []interface{}{
+						map[string]interface{}{
+							"int":   1,
+							"float": 1.1234,
+							"bool":  true,
+							"str":   "${custom.var1|host.var2|'constant'}",
+						},
+					},
+					"list2": []interface{}{
+						map[string]interface{}{
+							"int":   2,
+							"float": 2.3456,
+							"bool":  false,
+							"str":   "${var3|custom.var1|'constant'}",
+						},
+					},
+				},
+				"vars2": map[string]interface{}{
+					"list1": []interface{}{
+						map[string]interface{}{
+							"int":   1,
+							"float": 1.1234,
+							"bool":  true,
+							"str":   "${host.var5|host.var6|'constant'}",
+						},
+					},
+					"list2": []interface{}{
+						map[string]interface{}{
+							"int":   2,
+							"float": 2.3456,
+							"bool":  false,
+							"str":   "${var1}",
+						},
+					},
+				},
+			},
+			result:          []string{"custom.var1", "host.var2", "custom.var3", "custom.var1", "host.var5", "host.var6", "custom.var1"},
+			defaultProvider: "custom",
+		},
 	}
 
 	for name, test := range tests {
@@ -1013,7 +1113,7 @@ func TestVars(t *testing.T) {
 			ast, err := NewAST(test.input)
 			require.NoError(t, err)
 			var vars []string
-			vars = ast.root.Vars(vars)
+			vars = ast.root.Vars(vars, test.defaultProvider)
 			assert.Equal(t, test.result, vars)
 		})
 	}
@@ -1071,8 +1171,51 @@ func TestLookup(t *testing.T) {
 	}
 }
 
+func TestCondition(t *testing.T) {
+	vars := mustMakeVars(map[string]interface{}{
+		"other": map[string]interface{}{
+			"data": "info",
+		}})
+
+	input := NewKey("condition", NewStrVal("${other.data} == 'info'"))
+	expected := NewKey("condition", NewBoolVal(true))
+
+	// the condition string hasn't been parsed yet
+	assert.Nil(t, input.condition)
+
+	output, err := input.Apply(vars)
+	require.NoError(t, err)
+	assert.Equal(t, expected, output)
+
+	// check if the condition was parsed and cached
+	assert.NotNil(t, input.condition)
+	condition, err := eql.New(input.value.Value().(string))
+	require.NoError(t, err)
+	assert.Equal(t, condition, input.condition)
+
+	// create a dict with the key
+	dict := NewDict([]Node{input})
+	ast := &AST{root: NewKey("key", dict)}
+	// the cached condition remains
+	assert.Equal(t, condition, input.condition)
+
+	// replace the key with a new one, without a cached condition
+	input2 := NewKey("condition", NewStrVal("${other.data} == 'info'"))
+	err = Insert(ast, input2, "")
+	require.NoError(t, err)
+	assert.Nil(t, input2.condition)
+}
+
 func mustMakeVars(mapping map[string]interface{}) *Vars {
-	v, err := NewVars("", mapping, nil)
+	v, err := NewVars("", mapping, nil, "")
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
+func mustMakeVarsWithDefault(mapping map[string]interface{}, defaultProvider string) *Vars {
+	v, err := NewVars("", mapping, nil, defaultProvider)
 	if err != nil {
 		panic(err)
 	}

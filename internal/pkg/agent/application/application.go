@@ -23,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
+	"github.com/elastic/elastic-agent/internal/pkg/composable/providers/kubernetes"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -33,6 +34,9 @@ import (
 	"github.com/elastic/elastic-agent/pkg/limits"
 	"github.com/elastic/elastic-agent/version"
 )
+
+// CfgOverrider allows for application driven overrides of configuration read from disk.
+type CfgOverrider func(cfg *configuration.Configuration)
 
 // New creates a new Agent and bootstrap the required subsystem.
 func New(
@@ -46,6 +50,7 @@ func New(
 	testingMode bool,
 	fleetInitTimeout time.Duration,
 	disableMonitoring bool,
+	override CfgOverrider,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
@@ -95,9 +100,14 @@ func New(
 	if err := info.InjectAgentConfig(rawConfig); err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
+
 	cfg, err := configuration.NewFromConfig(rawConfig)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	if override != nil {
+		override(cfg)
 	}
 
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
@@ -135,7 +145,12 @@ func New(
 		log.Info("Parsed configuration and determined agent is managed locally")
 
 		loader := config.NewLoader(log, paths.ExternalInputs())
-		discover := config.Discoverer(pathConfigFile, cfg.Settings.Path, paths.ExternalInputs())
+		rawCfgMap, err := rawConfig.ToMapStr()
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to transform agent configuration into a map: %w", err)
+		}
+		discover := config.Discoverer(pathConfigFile, cfg.Settings.Path, paths.ExternalInputs(),
+			kubernetes.GetHintsInputConfigPath(log, rawCfgMap))
 		if !cfg.Settings.Reload.Enabled {
 			log.Debug("Reloading of configuration is off")
 			configMgr = newOnce(log, discover, loader)

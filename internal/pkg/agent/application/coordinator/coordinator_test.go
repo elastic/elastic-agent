@@ -16,6 +16,10 @@ import (
 	"testing"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
+	"github.com/elastic/elastic-agent-libs/mapstr"
+
 	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -83,7 +87,7 @@ var (
 // returns true, up to the given timeout duration, and reports a test failure
 // if it doesn't arrive.
 func waitForState(
-	t *testing.T,
+	t testing.TB,
 	stateChan chan State,
 	stateCallback func(State) bool,
 	timeout time.Duration,
@@ -915,6 +919,48 @@ func TestCoordinator_UpgradeDetails(t *testing.T) {
 	require.Equal(t, expectedErr.Error(), coord.state.UpgradeDetails.Metadata.ErrorMsg)
 }
 
+func BenchmarkCoordinator_generateComponentModel(b *testing.B) {
+	// load variables
+	varsMaps := []map[string]any{}
+	varsMapsBytes, err := os.ReadFile("./testdata/variables.yaml")
+	require.NoError(b, err)
+	err = yaml.Unmarshal(varsMapsBytes, &varsMaps)
+	require.NoError(b, err)
+	vars := make([]*transpiler.Vars, len(varsMaps))
+	for i, vm := range varsMaps {
+		vars[i], err = transpiler.NewVars(fmt.Sprintf("%d", i), vm, mapstr.M{}, "")
+		require.NoError(b, err)
+	}
+
+	// load config
+	cfgMap := map[string]any{}
+	cfgMapBytes, err := os.ReadFile("./testdata/config.yaml")
+	require.NoError(b, err)
+	err = yaml.Unmarshal(cfgMapBytes, &cfgMap)
+	require.NoError(b, err)
+	cfg, err := config.NewConfigFrom(cfgMap)
+	require.NoError(b, err)
+	cfgMap, err = cfg.ToMapStr()
+	require.NoError(b, err)
+	cfgAst, err := transpiler.NewAST(cfgMap)
+	require.NoError(b, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	coord, _, _ := createCoordinator(b, ctx)
+
+	coord.ast = cfgAst
+	coord.vars = vars
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err = coord.generateComponentModel()
+		require.NoError(b, err)
+	}
+
+}
+
 type createCoordinatorOpts struct {
 	managed        bool
 	upgradeManager UpgradeManager
@@ -944,7 +990,7 @@ func WithComponentInputSpec(spec component.InputSpec) CoordinatorOpt {
 // createCoordinator creates a coordinator that using a fake config manager and a fake vars manager.
 //
 // The runtime specifications is set up to use the fake component.
-func createCoordinator(t *testing.T, ctx context.Context, opts ...CoordinatorOpt) (*Coordinator, *fakeConfigManager, *fakeVarsManager) {
+func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt) (*Coordinator, *fakeConfigManager, *fakeVarsManager) {
 	t.Helper()
 
 	o := &createCoordinatorOpts{
@@ -1002,7 +1048,7 @@ func getComponentState(states []runtime.ComponentComponentState, componentID str
 	return nil
 }
 
-func newErrorLogger(t *testing.T) *logger.Logger {
+func newErrorLogger(t testing.TB) *logger.Logger {
 	t.Helper()
 
 	loggerCfg := logger.DefaultLoggingConfig()
@@ -1142,6 +1188,9 @@ func (l *configChange) Fail(err error) {
 }
 
 type fakeVarsManager struct {
+	varsMx sync.RWMutex
+	vars   []*transpiler.Vars
+
 	varsCh chan []*transpiler.Vars
 	errCh  chan error
 
@@ -1176,17 +1225,27 @@ func (f *fakeVarsManager) Watch() <-chan []*transpiler.Vars {
 	return f.varsCh
 }
 
-func (f *fakeVarsManager) Observe(observed []string) {
+func (f *fakeVarsManager) Observe(ctx context.Context, observed []string) ([]*transpiler.Vars, error) {
 	f.observedMx.Lock()
 	defer f.observedMx.Unlock()
 	f.observed = observed
+	f.varsMx.RLock()
+	defer f.varsMx.RUnlock()
+	return f.vars, nil
 }
 
 func (f *fakeVarsManager) Vars(ctx context.Context, vars []*transpiler.Vars) {
+	f.varsMx.Lock()
+	f.vars = vars
+	f.varsMx.Unlock()
 	select {
 	case <-ctx.Done():
 	case f.varsCh <- vars:
 	}
+}
+
+func (f *fakeVarsManager) DefaultProvider() string {
+	return ""
 }
 
 type fakeOTelManager struct {
@@ -1271,7 +1330,7 @@ func (r *fakeRuntimeManager) PerformComponentDiagnostics(_ context.Context, _ []
 	return nil, nil
 }
 
-func testBinary(t *testing.T, name string) string {
+func testBinary(t testing.TB, name string) string {
 	t.Helper()
 
 	var err error

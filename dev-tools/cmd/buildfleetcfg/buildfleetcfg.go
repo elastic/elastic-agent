@@ -25,9 +25,7 @@ var (
 
 func init() {
 	flag.StringVar(&input, "in", "", "config to embed")
-	if flag.Lookup("out") == nil {
-		flag.StringVar(&output, "out", "-", "Output path. \"-\" means writing to stdout")
-	}
+	flag.StringVar(&output, "output", "-", "Output path. \"-\" means writing to stdout")
 	flag.StringVar(&license, "license", "Elasticv2", "License header for generated file.")
 }
 
@@ -85,7 +83,8 @@ func main() {
 
 	err = os.WriteFile(output, data, 0640)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error while writing the file, err: %+v\n", err)
+		fmt.Fprintf(os.Stderr, "Error while writing the file to '%s', err: %+v\n", output, err)
+		os.Exit(1)
 	}
 
 	return

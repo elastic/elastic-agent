@@ -18,6 +18,12 @@ In this example we define a `nginx` custom integration alongside a custom agent 
     kubectl create clusterrole user-cr --verb=get,list,watch --resource=pods,namespaces,nodes,replicasets,jobs
     ```
 
+4. Build the dependencies of the Helm chart
+    ```console
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+    helm dependency build ../../
+    ```
+
 ## Run:
 1. Install Helm chart
     ```console

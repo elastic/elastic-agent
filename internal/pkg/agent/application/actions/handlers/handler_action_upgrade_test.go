@@ -123,7 +123,7 @@ func TestUpgradeHandler(t *testing.T) {
 
 	// Make sure this test does not dead lock or wait for too long
 	select {
-	case <-time.Tick(50 * time.Millisecond):
+	case <-time.Tick(1 * time.Second):
 		t.Fatal("mockUpgradeManager.Upgrade was not called")
 	case <-upgradeCalledChan:
 	}
@@ -184,7 +184,7 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 
 	// Make sure this test does not dead lock or wait for too long
 	select {
-	case <-time.Tick(50 * time.Millisecond):
+	case <-time.Tick(1 * time.Second):
 		t.Fatal("mockUpgradeManager.Upgrade was not called")
 	case <-upgradeCalledChan:
 	}
