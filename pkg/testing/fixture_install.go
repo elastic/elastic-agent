@@ -292,11 +292,11 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 			// Only consider the main agent process and not sub-processes so that we can detect when
 			// multiple agents are running without needing to know the number of input sub-processes to expect.
 			agentProcesses := getElasticAgentProcesses(f.t)
-			assert.LessOrEqualf(f.t, len(agentProcesses), 1, "More than one agent left running at the end of the test when second agent in namespace %s was used: %v", f.installOpts.Namespace, processes)
+			assert.LessOrEqualf(f.t, len(agentProcesses), 1, "More than one agent left running at the end of the test when second agent in namespace %s was used: %v", f.installOpts.Namespace, agentProcesses)
 			// The agent left running has to be the non-development agent. The development agent should be uninstalled first as a convention.
 			if len(agentProcesses) > 0 {
 				assert.NotContainsf(f.t, agentProcesses[0].Cmdline, paths.InstallDirNameForNamespace(f.installOpts.Namespace),
-					"The agent installed into namespace %s was left running at the end of the test or was not uninstalled first: %v", f.installOpts.Namespace, processes)
+					"The agent installed into namespace %s was left running at the end of the test or was not uninstalled first: %v", f.installOpts.Namespace, agentProcesses)
 			}
 			return
 		}
