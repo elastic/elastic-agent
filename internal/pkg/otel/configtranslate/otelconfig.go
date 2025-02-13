@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package coordinator
+package configtranslate
 
 import (
 	"fmt"
@@ -41,10 +41,10 @@ var (
 	}
 )
 
-// getOtelConfig returns the Otel collector configuration for the given component model.
+// GetOtelConfig returns the Otel collector configuration for the given component model.
 // All added component and pipelines names are prefixed with OtelNamePrefix.
 // Unsupported components are quietly ignored.
-func getOtelConfig(model *component.Model, info info.Agent) (*confmap.Conf, error) {
+func GetOtelConfig(model *component.Model, info info.Agent) (*confmap.Conf, error) {
 	components := getSupportedComponents(model)
 	if len(components) == 0 {
 		return nil, nil
@@ -66,8 +66,8 @@ func getOtelConfig(model *component.Model, info info.Agent) (*confmap.Conf, erro
 	return otelConfig, nil
 }
 
-// isComponentOtelSupported checks if the given component can be run in an Otel Collector.
-func isComponentOtelSupported(comp *component.Component) bool {
+// IsComponentOtelSupported checks if the given component can be run in an Otel Collector.
+func IsComponentOtelSupported(comp *component.Component) bool {
 	return slices.Contains(OtelSupportedOutputTypes, comp.OutputType) &&
 		slices.Contains(OtelSupportedInputTypes, comp.InputType)
 }
@@ -77,7 +77,7 @@ func getSupportedComponents(model *component.Model) []*component.Component {
 	var supportedComponents []*component.Component
 
 	for _, comp := range model.Components {
-		if isComponentOtelSupported(&comp) {
+		if IsComponentOtelSupported(&comp) {
 			comp := comp
 			supportedComponents = append(supportedComponents, &comp)
 		}

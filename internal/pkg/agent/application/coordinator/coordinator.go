@@ -13,6 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/otel/configtranslate"
+
 	"go.opentelemetry.io/collector/component/componentstatus"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -1460,7 +1462,7 @@ func (c *Coordinator) updateOtelManagerConfig(model *component.Model) error {
 	if len(model.Components) > 0 {
 		var err error
 		c.logger.With("components", model.Components).Debug("Updating otel manager model")
-		componentOtelCfg, err = getOtelConfig(model, c.agentInfo)
+		componentOtelCfg, err = configtranslate.GetOtelConfig(model, c.agentInfo)
 		if err != nil {
 			c.logger.Errorf("failed to generate otel config: %v", err)
 		}
@@ -1501,7 +1503,7 @@ func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtime
 	}
 	var otelComponents, runtimeComponents []component.Component
 	for _, comp := range model.Components {
-		if isComponentOtelSupported(&comp) {
+		if configtranslate.IsComponentOtelSupported(&comp) {
 			otelComponents = append(otelComponents, comp)
 		} else {
 			runtimeComponents = append(runtimeComponents, comp)
