@@ -59,7 +59,8 @@ func TestDiagnosticLocalConfig(t *testing.T) {
 		Fleet: &configuration.FleetAgentConfig{
 			Enabled:             true,
 			AccessAPIKey:        "test-key",
-			EnrollmentTokenHash: "test-hash",
+			EnrollmentTokenHash: "test-enroll-hash",
+			ReplaceTokenHash:    "test-replace-hash",
 			Client: remote.Config{
 				Protocol: "test-protocol",
 			},
@@ -120,7 +121,8 @@ agent:
 fleet:
   enabled: true
   access_api_key: "test-key"
-  enrollment_token_hash: "test-hash"
+  enrollment_token_hash: "test-enroll-hash"
+  replace_token_hash: "test-replace-hash"
   agent:
   protocol: "test-protocol"
 `
