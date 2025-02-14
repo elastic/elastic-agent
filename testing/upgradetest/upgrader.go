@@ -343,6 +343,14 @@ func PerformUpgrade(
 		}
 	}
 
+	// check status
+	if status := getStatus(ctx, startFixture); status != nil {
+		if status.State == 2 && status.UpgradeDetails == nil {
+			logger.Logf("Agent status indicates no upgrade is in progress.")
+			return nil
+		}
+	}
+
 	// wait for the watcher to show up
 	logger.Logf("waiting for upgrade watcher to start")
 	err = WaitForWatcher(ctx, 5*time.Minute, 10*time.Second)
@@ -652,4 +660,24 @@ func windowsBaseTemp() (string, error) {
 		return "", fmt.Errorf("failed to chmod %s: %w", baseTmp, err)
 	}
 	return baseTmp, nil
+}
+
+// getStatus will attempt to get the agent status with retries if enounters an error
+func getStatus(ctx context.Context, fixture *atesting.Fixture) *atesting.AgentStatusOutput {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+	defer cancel()
+	ticker := time.NewTicker(time.Second * 5)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			status, err := fixture.ExecStatus(ctx)
+			if err != nil {
+				continue
+			}
+			return &status
+		}
+	}
 }
