@@ -24,7 +24,7 @@ import (
 
 func TestStandaloneUpgrade_Flavor_Basic(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: Upgrade,
+		Group: UpgradeFlavor,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
@@ -82,7 +82,7 @@ func TestStandaloneUpgrade_Flavor_Basic(t *testing.T) {
 
 func TestStandaloneUpgrade_Flavor_Servers(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: Upgrade,
+		Group: UpgradeFlavor,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
@@ -139,7 +139,7 @@ func TestStandaloneUpgrade_Flavor_Servers(t *testing.T) {
 
 func TestStandaloneUpgrade_Flavor_UpgradeFromUnflavored(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: Upgrade,
+		Group: UpgradeFlavor,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
