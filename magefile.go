@@ -26,6 +26,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -3282,6 +3283,10 @@ func getOtelDependencies() (*otelDependencies, error) {
 		} else if dependency.ComponentType == "receiver" {
 			receivers = append(receivers, dependency)
 		}
+	}
+
+	for _, list := range [][]*otelDependency{connectors, exporters, extensions, processors, receivers} {
+		sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
 	}
 
 	return &otelDependencies{

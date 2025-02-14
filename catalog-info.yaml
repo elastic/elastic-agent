@@ -37,7 +37,7 @@ spec:
       name: elastic-agent
       description: Buildkite pipeline for the Elastic Agent project
     spec:
-      branch_configuration: "main 7.* 8.* v7.* v8.*"
+      branch_configuration: "main 7.* 8.* 9.* v7.* v8.* v9.*"
       repository: elastic/elastic-agent
       pipeline_file: ".buildkite/pipeline.yml"
       provider_settings:
@@ -216,7 +216,7 @@ spec:
       name: elastic-agent-binary-dra
       description: Buildkite pipeline for packaging Elastic Agent core binary and publish it to DRA
     spec:
-      branch_configuration: "main 7.* 8.* v7.* v8.*"
+      branch_configuration: "main 7.* 8.* 9.* v7.* v8.* v9.*"
       pipeline_file: ".buildkite/pipeline.elastic-agent-binary-dra.yml"
       provider_settings:
         build_pull_request_forks: false
