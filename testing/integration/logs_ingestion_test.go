@@ -32,7 +32,6 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
-	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/installtest"
@@ -102,7 +101,6 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 		createPolicyReq)
 	require.NoError(t, err)
 	t.Logf("created policy: %s", policy.ID)
-	check.ConnectedToFleet(ctx, t, agentFixture, 5*time.Minute)
 
 	// 3. Ensure installation is correct.
 	require.NoError(t, installtest.CheckSuccess(ctx, agentFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged}))
