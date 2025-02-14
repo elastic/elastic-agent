@@ -7,6 +7,7 @@ package agent
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,12 +24,12 @@ func TestContextProvider(t *testing.T) {
 	provider, err := builder(nil, nil, true)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	comm := ctesting.NewContextComm(context.Background())
+	comm := ctesting.NewContextComm(ctx)
 	err = provider.Run(ctx, comm)
-	require.NoError(t, err)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
 
 	current := comm.Current()
 	_, hasID := current["id"]

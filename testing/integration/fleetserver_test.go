@@ -115,6 +115,7 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 				Policy:       policy.ID,
 				Port:         8220,
 			},
+			InstallServers: true,
 		}
 		out, err := fixture.Install(ctx, opts)
 		if err != nil {
@@ -160,6 +161,7 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 				Policy:       policy.ID,
 				Port:         8220,
 			},
+			InstallServers: true,
 		}
 		out, err := fixture.Install(ctx, opts)
 		if err != nil {
