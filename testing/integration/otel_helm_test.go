@@ -58,7 +58,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 		steps []k8sTestStep
 	}{
 		{
-			name: "helm kube-stack operator standalone agent kubernetes privileged",
+			name: "managed helm kube-stack operator standalone agent kubernetes privileged",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
 				k8sStepHelmDeployWithValueOptions(chartLocation, "kube-stack-otel",
@@ -83,6 +83,34 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				// - Two Gateway pods to collect, aggregate and forward
 				// telemetry.
 				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 4, "otc-container"),
+			},
+		},
+		{
+			name: "mOTel helm kube-stack operator standalone agent kubernetes privileged",
+			steps: []k8sTestStep{
+				k8sStepCreateNamespace(),
+				k8sStepHelmDeployWithValueOptions(chartLocation, "kube-stack-otel",
+					values.Options{
+						ValueFiles: []string{"../../deploy/helm/edot-collector/kube-stack/motel/values.yaml"},
+						Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
+
+						// override secrets reference with env variables
+						JSONValues: []string{
+							fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, kCtx.esHost),
+							fmt.Sprintf(`collectors.gateway.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, kCtx.esAPIKey),
+						},
+					},
+				),
+				// - An OpenTelemetry Operator Deployment (1 pod per
+				// cluster)
+				k8sStepCheckRunningPods("app.kubernetes.io/name=opentelemetry-operator", 1, "manager"),
+				// - A Daemonset to collect K8s node's metrics and logs
+				// (1 EDOT collector pod per node)
+				// - A Cluster wide Deployment to collect K8s metrics and
+				// events (1 EDOT collector pod per cluster)
+				// - One Gateway pod to collect, aggregate and forward
+				// telemetry.
+				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 3, "otc-container"),
 			},
 		},
 	}
