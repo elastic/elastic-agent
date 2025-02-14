@@ -105,6 +105,7 @@ type PackageSpec struct {
 	Qualifier         string                 `yaml:"qualifier,omitempty"`   // Optional
 	OutputFile        string                 `yaml:"output_file,omitempty"` // Optional
 	ExtraVars         map[string]string      `yaml:"extra_vars,omitempty"`  // Optional
+	ExtraTags         []string               `yaml:"extra_tags,omitempty"`  // Optional
 
 	evalContext            map[string]interface{}
 	packageDir             string
@@ -383,6 +384,12 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 
 	for k, v := range s.ExtraVars {
 		s.evalContext[k] = mustExpand(v)
+	}
+
+	if s.ExtraTags != nil {
+		for i, tag := range s.ExtraTags {
+			s.ExtraTags[i] = mustExpand(tag)
+		}
 	}
 
 	s.Name = mustExpand(s.Name)
