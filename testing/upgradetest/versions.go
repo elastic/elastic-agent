@@ -188,6 +188,7 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 	currentMajor := parsedUpgradeToVersion.Major()
 	currentMinor := parsedUpgradeToVersion.Minor()
 
+	skipCurrentMajor := false
 	currentMajorsToFind := reqs.CurrentMajors
 	previousMajorsToFind := reqs.PreviousMajors
 	previousMinorsToFind := reqs.PreviousMinors
@@ -214,7 +215,7 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 			currentMajorsToFind-- // counts as the current major as well
 
 		// current majors
-		case currentMajorsToFind > 0 && version.Major() == currentMajor:
+		case currentMajorsToFind > 0 && version.Major() == currentMajor && !skipCurrentMajor:
 			upgradableVersions = append(upgradableVersions, version.String())
 			currentMajorsToFind--
 
@@ -222,7 +223,10 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 		case previousMajorsToFind > 0 && version.Major() < currentMajor:
 			upgradableVersions = append(upgradableVersions, version.String())
 			currentMajor = version.Major()
+			currentMinor = version.Minor()
 			previousMajorsToFind--
+			previousMinorsToFind-- // count as prev minor as well
+			skipCurrentMajor = true
 
 		// since the list is sorted we can stop here
 		default:
