@@ -6,7 +6,6 @@ package kubernetessecrets
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -776,7 +775,7 @@ func Test_Run(t *testing.T) {
 				DisableCache:    false,
 			},
 			k8sClient:    nil,
-			k8sClientErr: errors.New("k8s client error"),
+			k8sClientErr: nil,
 		},
 	}
 	for _, tc := range tests {

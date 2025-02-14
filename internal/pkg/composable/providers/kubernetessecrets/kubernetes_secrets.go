@@ -107,7 +107,7 @@ func (p *contextProviderK8SSecrets) Run(ctx context.Context, comm corecomp.Conte
 		// signal that the provider has initialized
 		close(p.running)
 		p.logger.Debug(k8sSecretsProviderName, " provider skipped, unable to connect: ", err.Error())
-		return err
+		return nil
 	}
 	p.clientMtx.Lock()
 	p.client = client
