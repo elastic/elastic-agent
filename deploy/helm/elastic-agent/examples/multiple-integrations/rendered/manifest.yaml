@@ -1128,7 +1128,7 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
-        image: docker.elastic.co/beats/elastic-agent:8.17.3-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:8.17.3-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
@@ -1263,7 +1263,7 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
-        image: docker.elastic.co/beats/elastic-agent:8.17.3-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:8.17.3-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
@@ -1375,7 +1375,7 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
-        image: docker.elastic.co/beats/elastic-agent:8.17.3-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:8.17.3-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
