@@ -120,6 +120,18 @@ Validate and initialise the defined agent presets
 {{/* merge the default leader election with the leader election from the preset giving priority to the one from the preset */}}
 {{- $presetLeaderElection := mergeOverwrite dict $defaultLeaderElection ($presetProviders).kubernetes_leaderelection -}}
 {{- $_ := set $presetProviders "kubernetes_leaderelection" $presetLeaderElection -}}
+{{/* set a sensible default to preset.statePersistence if no value is already present in the preset */}}
+{{- if empty ($presetVal).statePersistence -}}
+{{- if eq ($presetMode) "daemonset" -}}
+{{- $_ := set $presetVal "statePersistence" "HostPath" -}}
+{{- else if eq ($presetMode) "deployment" -}}
+{{- $_ := set $presetVal "statePersistence" "EmptyDir" -}}
+{{- else if eq ($presetMode) "statefulset" -}}
+{{- $_ := set $presetVal "statePersistence" "EmptyDir" -}}
+{{- else -}}
+fail printf "Unsupported mode %v for preset %v" ($presetMode) $($presetName)
+{{- end -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 
@@ -322,4 +334,61 @@ app.kubernetes.io/version: {{ .Values.agent.version}}
 {{- $_ := set $presetOutputs $outputName $outputCopy}}
 {{- end -}}
 {{- $_ := set $preset "outputs" $presetOutputs -}}
+{{- end -}}
+
+{{/*
+Render a yaml with volumes and volumeMounts keys, rendering state volumes and extra volumes and their respective mounts
+*/}}
+{{- define "elasticagent.preset.render.volumes" -}}
+{{- $ := index . 0 -}}
+{{- $presetVal := index . 1 -}}
+{{- $agentName := index . 2 -}}
+volumes:
+{{- $definedAgentStateVolume := false -}}
+  {{- with ($presetVal).extraVolumes }}
+  {{- . | toYaml | nindent 2 }}
+  {{- range $idx, $volume := . -}}
+  {{- if eq $definedAgentStateVolume false -}}
+  {{- if eq ($volume).name "agent-data" -}}
+  {{- $definedAgentStateVolume = true}}
+  {{- end -}}
+  {{- end -}}
+  {{- end -}}
+  {{- end }}
+  {{- if ne ($presetVal).statePersistence "None" }}
+  {{- if eq $definedAgentStateVolume false }}
+  - name: agent-data
+    {{- if eq ($presetVal).statePersistence "HostPath" }}
+    hostPath:
+      {{- if eq $.Values.agent.fleet.enabled true }}
+      {{/* different state hostPath for managed agents */}}
+      path: /etc/elastic-agent/{{$.Release.Namespace}}/{{$agentName}}-managed/state
+      {{- else }}
+      {{/* different state hostPath for standalone agents */}}
+      path: /etc/elastic-agent/{{$.Release.Namespace}}/{{$agentName}}/state
+      {{- end }}
+      type: DirectoryOrCreate
+    {{- else if eq ($presetVal).statePersistence "EmptyDir" }}
+    emptyDir: {}
+    {{- end }}
+  {{- end }}
+  {{- end }}
+volumeMounts:
+  {{- $definedAgentStateVolumeMount := false -}}
+  {{- with ($presetVal).extraVolumeMounts }}
+  {{- . | toYaml | nindent 2}}
+  {{- range $idx, $volumeMount := . -}}
+  {{- if eq $definedAgentStateVolumeMount false -}}
+  {{- if eq ($volumeMount).name "agent-data" -}}
+  {{- $definedAgentStateVolumeMount = true}}
+  {{- end -}}
+  {{- end -}}
+  {{- end -}}
+  {{- end }}
+  {{- if ne ($presetVal).statePersistence "None" }}
+  {{- if eq $definedAgentStateVolumeMount false }}
+  - name: agent-data
+    mountPath: /usr/share/elastic-agent/state
+  {{- end }}
+  {{- end }}
 {{- end -}}

@@ -2,6 +2,7 @@
 {{- $ := index . 0 -}}
 {{- $presetVal := index . 1 -}}
 {{- $agentName := index . 2 }}
+{{- $agentVolumes := (include "elasticagent.preset.render.volumes"  (list $ $presetVal $agentName) | fromYaml) -}}
 apiVersion: v1
 kind: PodTemplate
 template:
@@ -39,10 +40,10 @@ template:
     topologySpreadConstraints:
       {{- . | toYaml | nindent 6 }}
     {{- end }}
+    {{- with ($agentVolumes).volumes }}
     volumes:
-      {{- with ($presetVal).extraVolumes }}
       {{- . | toYaml | nindent 6 }}
-      {{- end }}
+    {{- end }}
     {{- with ($presetVal).initContainers }}
     initContainers:
       {{- . | toYaml | nindent 6 }}
@@ -90,10 +91,10 @@ template:
           {{- end }}
         {{- end }}
         {{- end }}
+        {{- with ($presetVal).extraVolumeMounts }}
         volumeMounts:
-          {{- with ($presetVal).extraVolumeMounts }}
           {{- . | toYaml | nindent 10 }}
-          {{- end }}
+        {{- end }}
         env:
           - name: NODE_NAME
             valueFrom:

@@ -1356,6 +1356,15 @@
                         ]
                     ]
                 },
+                "statePersistence": {
+                    "type": "string",
+                    "enum": [
+                        "HostPath",
+                        "EmptyDir",
+                        "None"
+                    ],
+                    "description": "Volume type used for Agent state persistence."
+                },
                 "extraVolumes": {
                     "type": "array",
                     "items": {
