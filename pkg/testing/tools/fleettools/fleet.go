@@ -34,17 +34,11 @@ func GetAgentByPolicyIDAndHostnameFromList(ctx context.Context, client *kibana.C
 	for i, item := range listAgentsResp.Items {
 		agentHostname := item.LocalMetadata.Host.Hostname
 		agentPolicyID := item.PolicyID
-<<<<<<< HEAD
-
-		if strings.EqualFold(agentHostname, hostname) && agentPolicyID == policyID {
-			hostnameAgents = append(hostnameAgents, &listAgentsResp.Items[i])
-=======
 		if agentPolicyID == policyID {
 			onPolicy = append(onPolicy, agentHostname)
 			if strings.EqualFold(agentHostname, hostname) {
 				matching = append(matching, &listAgentsResp.Items[i])
 			}
->>>>>>> 37be67f65 ([CI] Integration tests regrouping (#6349))
 		}
 	}
 
