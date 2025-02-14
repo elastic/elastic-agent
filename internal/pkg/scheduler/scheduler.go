@@ -14,6 +14,7 @@ import (
 type Scheduler interface {
 	WaitTick() <-chan time.Time
 	Stop()
+	SetDuration(time.Duration)
 }
 
 // Stepper is a scheduler where each Tick is manually triggered, this is useful in scenario
@@ -31,6 +32,9 @@ func (s *Stepper) Next() {
 func (s *Stepper) WaitTick() <-chan time.Time {
 	return s.C
 }
+
+// Sets the wait duration for the scheduler. Noop for stepper scheduler
+func (s *Stepper) SetDuration(_ time.Duration) {}
 
 // Stop is stopping the scheduler, in the case of the Stepper scheduler nothing is done.
 func (s *Stepper) Stop() {}
@@ -66,6 +70,10 @@ func (p *Periodic) WaitTick() <-chan time.Time {
 	p.ran = true
 
 	return rC
+}
+
+func (p *Periodic) SetDuration(d time.Duration) {
+	p.Ticker = time.NewTicker(d)
 }
 
 // Stop stops the internal Ticker.
@@ -121,6 +129,10 @@ func (p *PeriodicJitter) WaitTick() <-chan time.Time {
 	}
 
 	return p.C
+}
+
+func (p *PeriodicJitter) SetDuration(d time.Duration) {
+	p.d = d
 }
 
 // Stop stops the PeriodicJitter scheduler.
