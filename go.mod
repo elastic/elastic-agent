@@ -51,6 +51,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.119.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.119.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.119.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver v0.119.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver v0.119.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver v0.119.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.119.0
