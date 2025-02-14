@@ -1,5 +1,6 @@
 param (
-    [string]$GROUP_NAME
+    [string]$GROUP_NAME,
+    [string]$TEST_SUDO
 )
 
 echo "~~~ Preparing environment"
@@ -45,8 +46,7 @@ try {
     $TestsExitCode = $LASTEXITCODE    
 } finally {
     ess_down
-    # Generate HTML report if XML output exists
-    $outputXML = "build/${GROUP_NAME}.integration.xml"
+
     if (Test-Path $outputXML) {
         # Install junit2html if not installed
         go install github.com/alexec/junit2html@latest
