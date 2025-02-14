@@ -228,6 +228,15 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	return nil
 }
 
+// Return fixture running directory, should only be called after Prepare()
+func (f *Fixture) GetRunningDir(ctx context.Context) (string, error) {
+	err := f.EnsurePrepared(ctx)
+	if err != nil {
+		return "", fmt.Errorf("error preparing binary: %w", err)
+	}
+	return f.extractDir, nil
+}
+
 // WriteFileToWorkDir sends a file to the working directory alongside the unpacked tar build.
 func (f *Fixture) WriteFileToWorkDir(ctx context.Context, data string, name string) error {
 	err := f.EnsurePrepared(ctx)
