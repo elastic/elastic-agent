@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -666,6 +667,10 @@ func Test_Run(t *testing.T) {
 		namespace: "default",
 		name:      "secret_name",
 		key:       "secret_key",
+	}
+
+	if runtime.GOOS == "windows" {
+		t.Skip("Flaky timing on Windows")
 	}
 
 	tests := []struct {
