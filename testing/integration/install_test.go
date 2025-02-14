@@ -163,6 +163,10 @@ func TestInstallWithBasePath(t *testing.T) {
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	t.Run("check second agent installs with --namespace", testSecondAgentCanInstall(ctx, fixture, basePath, false, opts))
+	t.Run("check second agent can be installed again with --namespace --force", testSecondAgentCanInstallWithForce(ctx, fixture, basePath, false, opts))
+	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+	})
 
 	t.Run("check components set",
 		testComponentsPresence(ctx, fixture,
@@ -324,6 +328,10 @@ func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	t.Run("check second agent installs with --namespace", testSecondAgentCanInstall(ctx, fixture, "", false, opts))
+	t.Run("check second agent can be installed again with --namespace --force", testSecondAgentCanInstallWithForce(ctx, fixture, "", false, opts))
+	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+	})
 }
 
 func TestInstallPrivilegedWithBasePath(t *testing.T) {
@@ -372,6 +380,10 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	t.Run("check second agent installs with --develop", testSecondAgentCanInstall(ctx, fixture, randomBasePath, true, opts))
+	t.Run("check second agent can be installed again with --develop --force", testSecondAgentCanInstallWithForce(ctx, fixture, randomBasePath, true, opts))
+	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+	})
 }
 
 func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T, fixture *atesting.Fixture, customUsername, customGroup string) {
@@ -402,6 +414,11 @@ func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T,
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 	t.Run("check second agent installs with --develop", testSecondAgentCanInstall(ctx, fixture, "", true, opts))
+
+	t.Run("check second agent can be installed again with --develop --force", testSecondAgentCanInstallWithForce(ctx, fixture, "", true, opts))
+	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
+	})
 
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
@@ -453,6 +470,11 @@ func testComponentsPresence(ctx context.Context, fixture *atesting.Fixture, requ
 			}
 		}
 	}
+}
+
+func testSecondAgentCanInstallWithForce(ctx context.Context, fixture *atesting.Fixture, basePath string, develop bool, installOpts atesting.InstallOpts) func(*testing.T) {
+	installOpts.Force = true
+	return testSecondAgentCanInstall(ctx, fixture, basePath, develop, installOpts)
 }
 
 // Tests that a second agent can be installed in an isolated namespace, using either --develop or --namespace.
@@ -693,7 +715,7 @@ func TestRepeatedInstallUninstallFleet(t *testing.T) {
 }
 
 func randStr(length int) string {
-	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 	runes := make([]rune, length)
 	for i := range runes {
