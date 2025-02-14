@@ -6,20 +6,13 @@ receivers:
       enabled: true
     start_at: end
     storage: file_storage
-#   start_at: beginning
+#    start_at: beginning
 
   # Receiver for CPU, Disk, Memory, and Filesystem metrics
   hostmetrics/system:
     collection_interval: 30s
     scrapers:
-      disk:
       filesystem:
-      cpu:
-        metrics:
-          system.cpu.utilization:
-            enabled: true
-          system.cpu.logical.count:
-            enabled: true
       memory:
         metrics:
           system.memory.utilization:
@@ -41,12 +34,18 @@ receivers:
       processes:
       load:
 
+  # Receiver for logs, traces, and metrics from SDKs
+  otlp/fromsdk:
+    protocols:
+      grpc:
+      http:
+
 extensions:
   file_storage:
     directory: ${env:STORAGE_DIR}
 
 processors:
-  elasticinframetrics:
+  batch:
   resourcedetection:
     detectors: ["system"]
     system:
@@ -78,51 +77,37 @@ processors:
           enabled: true
         os.type:
           enabled: true
-  attributes/dataset:
-    actions:
-      - key: event.dataset
-        from_attribute: data_stream.dataset
-        action: upsert
-  resource/process:
-    attributes:
-      - key: process.executable.name
-        action: delete
-      - key: process.executable.path
-        action: delete
 
 exporters:
-  # Exporter to send logs and metrics to Elasticsearch
-  elasticsearch/ecs:
-    endpoints: ["${env:ELASTIC_ENDPOINT}"]
-    api_key: ${env:ELASTIC_API_KEY}
-    mapping:
-      mode: ecs
-    logs_dynamic_index:
-      enabled: true
-    metrics_dynamic_index:
-      enabled: true
-    traces_dynamic_index:
-      enabled: true
-  elasticsearch/otel:
-    endpoints: [ "${env:ELASTIC_ENDPOINT}" ]
-    api_key: ${env:ELASTIC_API_KEY}
-    mapping:
-      mode: otel
-    logs_dynamic_index:
-      enabled: true
-    metrics_dynamic_index:
-      enabled: true
-    traces_dynamic_index:
-      enabled: true
+  otlp/ingest:
+    endpoint: ${env:ELASTIC_ENDPOINT}
+    headers:
+      Authorization: ${env:ELASTIC_API_KEY}
 
 service:
   extensions: [file_storage]
   pipelines:
+    traces/fromsdk:
+      receivers: [otlp/fromsdk]
+      processors: [batch]
+      exporters: [otlp/ingest]
+
+    metrics/fromsdk:
+      receivers: [otlp/fromsdk]
+      processors: [batch]
+      exporters: [otlp/ingest]
+
+    logs/fromsdk:
+      receivers: [otlp/fromsdk]
+      processors: [batch]
+      exporters: [otlp/ingest]
+
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
-      processors: [elasticinframetrics, resourcedetection, attributes/dataset, resource/process]
-      exporters: [elasticsearch/ecs]
+      processors: [resourcedetection, batch]
+      exporters: [otlp/ingest]
+
     logs/platformlogs:
       receivers: [filelog/platformlogs]
-      processors: [resourcedetection]
-      exporters: [elasticsearch/otel]
+      processors: [resourcedetection, batch]
+      exporters: [otlp/ingest]
