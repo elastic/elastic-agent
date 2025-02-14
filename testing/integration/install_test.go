@@ -413,7 +413,7 @@ func testUninstallAuditUnenroll(ctx context.Context, fixture *atesting.Fixture, 
 // testing shows each iteration takes around 16 seconds.
 func TestRepeatedInstallUninstall(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: Default,
+		Group: InstallUninstall,
 		// We require sudo for this test to run
 		// `elastic-agent install` (even though it will
 		// be installed as non-root).
@@ -425,8 +425,7 @@ func TestRepeatedInstallUninstall(t *testing.T) {
 	})
 
 	maxRunTime := 2 * time.Minute
-	iterations := 100
-	for i := 0; i < iterations; i++ {
+	for i := 0; i < iterations(); i++ {
 		t.Run(fmt.Sprintf("%s-%d", t.Name(), i), func(t *testing.T) {
 
 			// Get path to Elastic Agent executable
@@ -456,6 +455,14 @@ func TestRepeatedInstallUninstall(t *testing.T) {
 			require.NoErrorf(t, err, "uninstall failed: %s", err)
 		})
 	}
+}
+
+func iterations() int {
+	// If running in CI, reduce the number of iterations to speed up the test.
+	if os.Getenv("BUILDKITE_PULL_REQUEST") != "" {
+		return 50
+	}
+	return 100
 }
 
 func randStr(length int) string {
