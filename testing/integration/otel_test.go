@@ -1902,7 +1902,7 @@ service:
 		"@timestamp",
 		"agent.ephemeral_id",
 		"agent.id",
-		"data_stream.dataset" 
+		"data_stream.dataset",
 		"elastic_agent.id",
 		"elastic_agent.snapshot",
 		"elastic_agent.version",
@@ -1911,7 +1911,6 @@ service:
 		"Attributes.data_stream.dataset",
 		"Attributes.data_stream.namespace",
 		"Attributes.log.file.name",
-
 	}
 
 	assertMapsEqual(t, doc1, doc2, ignoredFields, "expected documents to be equal")
