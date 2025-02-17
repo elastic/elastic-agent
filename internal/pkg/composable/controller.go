@@ -23,7 +23,8 @@ import (
 )
 
 const (
-	defaultRetryInterval = 30 * time.Second
+	defaultRetryInterval   = 30 * time.Second
+	defaultDefaultProvider = "env"
 )
 
 // Controller manages the state of the providers current context.
@@ -39,17 +40,37 @@ type Controller interface {
 	// Watch returns the channel to watch for variable changes.
 	Watch() <-chan []*transpiler.Vars
 
-	// Observe instructs the variables to observe.
-	Observe([]string)
+	// Observe instructs the controller to enable the observed providers.
+	//
+	// This is a blocking call until the observation is handled and the most recent
+	// set of variables are returned the caller in the case a change occurred. If no change occurred then
+	// it will return with a nil array. If changed the current observed state of variables
+	// that is returned is not sent over the Watch channel, the caller should coordinate this fact.
+	//
+	// Maximum amount of time for resolve is 500ms as that is the debounce window for variable resolution.
+	//
+	// Only error that is returned from this function is the result of the passed context.
+	Observe(context.Context, []string) ([]*transpiler.Vars, error)
+
+	// DefaultProvider returns the default provider used by the controller.
+	//
+	// This is used by any variable reference that doesn't add a provider prefix.
+	DefaultProvider() string
+}
+
+type observer struct {
+	vars   map[string]bool
+	result chan []*transpiler.Vars
 }
 
 // controller manages the state of the providers current context.
 type controller struct {
 	logger          *logger.Logger
 	ch              chan []*transpiler.Vars
-	observedCh      chan map[string]bool
+	observedCh      chan observer
 	errCh           chan error
 	restartInterval time.Duration
+	defaultProvider string
 
 	managed                 bool
 	contextProviderBuilders map[string]contextProvider
@@ -80,6 +101,11 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 	restartInterval := defaultRetryInterval
 	if providersCfg.ProvidersRestartInterval != nil {
 		restartInterval = *providersCfg.ProvidersRestartInterval
+	}
+
+	defaultProvider := defaultDefaultProvider
+	if providersCfg.ProvidersDefaultProvider != nil {
+		defaultProvider = *providersCfg.ProvidersDefaultProvider
 	}
 
 	// build all the context providers
@@ -113,10 +139,11 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 	return &controller{
 		logger:                  l,
 		ch:                      make(chan []*transpiler.Vars, 1),
-		observedCh:              make(chan map[string]bool, 1),
+		observedCh:              make(chan observer),
 		errCh:                   make(chan error),
 		managed:                 managed,
 		restartInterval:         restartInterval,
+		defaultProvider:         defaultProvider,
 		contextProviderBuilders: contextProviders,
 		dynamicProviderBuilders: dynamicProviders,
 		contextProviderStates:   make(map[string]*contextProviderState),
@@ -183,7 +210,7 @@ func (c *controller) Run(ctx context.Context) error {
 
 	// send initial vars state
 	fetchProvidersLock.RLock()
-	err := c.sendVars(ctx, fetchProviders)
+	err := c.sendVars(ctx, nil, fetchProviders)
 	if err != nil {
 		fetchProvidersLock.RUnlock()
 		// only error is context cancel, no need to add error message context
@@ -192,6 +219,7 @@ func (c *controller) Run(ctx context.Context) error {
 	fetchProvidersLock.RUnlock()
 
 	// performs debounce of notifies; accumulates them into 100 millisecond chunks
+	var observedResult chan []*transpiler.Vars
 	for {
 	DEBOUNCE:
 		for {
@@ -199,12 +227,21 @@ func (c *controller) Run(ctx context.Context) error {
 			case <-ctx.Done():
 				return ctx.Err()
 			case observed := <-c.observedCh:
-				changed := c.handleObserved(localCtx, &wg, fetchCh, stateChangedChan, observed)
+				// observedResult holds the channel to send the latest observed results on
+				// if nothing is changed then nil will be sent over the channel if the set of running
+				// providers does change then the latest observed variables will be sent over the channel
+				observedResult = observed.result
+				changed := c.handleObserved(localCtx, &wg, fetchCh, stateChangedChan, observed.vars)
 				if changed {
 					t.Reset(100 * time.Millisecond)
 					c.logger.Debugf("Observed state changed for composable inputs; debounce started")
 					drainChan(stateChangedChan)
 					break DEBOUNCE
+				} else {
+					// nothing changed send nil to alert the caller
+					// observedResult must be set to nil here so on next loop it is not set
+					observedResult <- nil
+					observedResult = nil
 				}
 			case <-stateChangedChan:
 				t.Reset(100 * time.Millisecond)
@@ -223,9 +260,10 @@ func (c *controller) Run(ctx context.Context) error {
 			// batching done, gather results
 		}
 
-		// send the vars to the watcher
+		// send the vars to the watcher or the observer caller
 		fetchProvidersLock.RLock()
-		err := c.sendVars(ctx, fetchProviders)
+		err := c.sendVars(ctx, observedResult, fetchProviders)
+		observedResult = nil
 		if err != nil {
 			fetchProvidersLock.RUnlock()
 			// only error is context cancel, no need to add error message context
@@ -235,9 +273,24 @@ func (c *controller) Run(ctx context.Context) error {
 	}
 }
 
-func (c *controller) sendVars(ctx context.Context, fetchContextProviders mapstr.M) error {
+func (c *controller) sendVars(ctx context.Context, observedResult chan []*transpiler.Vars, fetchContextProviders mapstr.M) error {
 	c.logger.Debugf("Computing new variable state for composable inputs")
-	vars := c.generateVars(fetchContextProviders)
+	vars := c.generateVars(fetchContextProviders, c.defaultProvider)
+	if observedResult != nil {
+		// drain any vars sitting on the watch channel
+		// this new set of vars replaces that set if that current
+		// value has not been read then it will result in vars state being incorrect
+		select {
+		case <-c.ch:
+		default:
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case observedResult <- vars:
+			return nil
+		}
+	}
 	for {
 		select {
 		case c.ch <- vars:
@@ -267,10 +320,17 @@ func (c *controller) Watch() <-chan []*transpiler.Vars {
 	return c.ch
 }
 
-// Observe sends the observed variables from the AST to the controller.
+// Observe instructs the controller to enable the observed providers.
 //
-// Based on this information it will determine which providers should even be running.
-func (c *controller) Observe(vars []string) {
+// This is a blocking call until the observation is handled and the most recent
+// set of variables are returned the caller in the case a change occurred. If no change occurred then
+// it will return with a nil array. If changed the current observed state of variables
+// that is returned is not sent over the Watch channel, the caller should coordinate this fact.
+//
+// Maximum amount of time for resolve is 500ms as that is the debounce window for variable resolution.
+//
+// Only error that is returned from this function is the result of the passed context.
+func (c *controller) Observe(ctx context.Context, vars []string) ([]*transpiler.Vars, error) {
 	// only need the top-level variables to determine which providers to run
 	//
 	// future: possible that all vars could be organized and then passed to each provider to
@@ -280,9 +340,24 @@ func (c *controller) Observe(vars []string) {
 		vs := strings.SplitN(v, ".", 2)
 		topLevel[vs[0]] = true
 	}
-	// drain the channel first, if the previous vars had not been used yet the new list should be used instead
-	drainChan(c.observedCh)
-	c.observedCh <- topLevel
+	// blocks waiting for an updated set of variables
+	ch := make(chan []*transpiler.Vars)
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case c.observedCh <- observer{topLevel, ch}:
+	}
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case vars := <-ch:
+		return vars, nil
+	}
+}
+
+// DefaultProvider returns the default provider being used by the controller.
+func (c *controller) DefaultProvider() string {
+	return c.defaultProvider
 }
 
 func (c *controller) handleObserved(ctx context.Context, wg *sync.WaitGroup, fetchCh chan fetchProvider, stateChangedChan chan bool, observed map[string]bool) bool {
@@ -317,24 +392,28 @@ func (c *controller) handleObserved(ctx context.Context, wg *sync.WaitGroup, fet
 			continue
 		}
 
+		found := false
 		contextInfo, ok := c.contextProviderBuilders[name]
 		if ok {
+			found = true
 			state := c.startContextProvider(ctx, wg, fetchCh, stateChangedChan, name, contextInfo)
 			if state != nil {
 				changed = true
 				c.contextProviderStates[name] = state
-
 			}
 		}
 		dynamicInfo, ok := c.dynamicProviderBuilders[name]
 		if ok {
+			found = true
 			state := c.startDynamicProvider(ctx, wg, stateChangedChan, name, dynamicInfo)
 			if state != nil {
 				changed = true
 				c.dynamicProviderStates[name] = state
 			}
 		}
-		c.logger.Warnf("provider %q referenced in policy but no provider exists or was explicitly disabled", name)
+		if !found {
+			c.logger.Warnf("provider %q referenced in policy but no provider exists or was explicitly disabled", name)
+		}
 	}
 
 	// running remaining need to be stopped
@@ -470,14 +549,14 @@ func (c *controller) startDynamicProvider(ctx context.Context, wg *sync.WaitGrou
 	return state
 }
 
-func (c *controller) generateVars(fetchContextProviders mapstr.M) []*transpiler.Vars {
+func (c *controller) generateVars(fetchContextProviders mapstr.M, defaultProvider string) []*transpiler.Vars {
 	// build the vars list of mappings
 	vars := make([]*transpiler.Vars, 1)
 	mapping, _ := transpiler.NewAST(map[string]any{})
 	for name, state := range c.contextProviderStates {
 		_ = mapping.Insert(state.Current(), name)
 	}
-	vars[0] = transpiler.NewVarsFromAst("", mapping, fetchContextProviders)
+	vars[0] = transpiler.NewVarsFromAst("", mapping, fetchContextProviders, defaultProvider)
 
 	// add to the vars list for each dynamic providers mappings
 	for name, state := range c.dynamicProviderStates {
@@ -485,7 +564,7 @@ func (c *controller) generateVars(fetchContextProviders mapstr.M) []*transpiler.
 			local := mapping.ShallowClone()
 			_ = local.Insert(mappings.mapping, name)
 			id := fmt.Sprintf("%s-%s", name, mappings.id)
-			v := transpiler.NewVarsWithProcessorsFromAst(id, local, name, mappings.processors, fetchContextProviders)
+			v := transpiler.NewVarsWithProcessorsFromAst(id, local, name, mappings.processors, fetchContextProviders, defaultProvider)
 			vars = append(vars, v)
 		}
 	}

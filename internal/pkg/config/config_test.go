@@ -29,8 +29,8 @@ func TestInputsResolveNOOP(t *testing.T) {
 			"default": map[string]interface{}{
 				"type":     "elasticsearch",
 				"hosts":    []interface{}{"127.0.0.1:9200"},
-				"username": "elastic",
-				"password": "changeme",
+				"username": "${env.ES_USER}",
+				"password": "${env.ES_PASSWORD}",
 			},
 		},
 		"inputs": []interface{}{
