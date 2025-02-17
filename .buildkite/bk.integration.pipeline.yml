@@ -42,6 +42,11 @@ steps:
           - fleet
           - fleet-privileged
           - upgrade
+<<<<<<< HEAD
+=======
+          - upgrade-flavor
+          - install-uninstall
+>>>>>>> 633272c5b ([CI] New upgrade-flavor test group for TestStandaloneUpgrade_Flavor tests (#6870))
 
       - label: "Win2022:non-sudo:{{matrix}}"
         command: |
@@ -91,7 +96,18 @@ steps:
           image: "family/platform-ingest-elastic-agent-ubuntu-2404"
         matrix:
           - default
+<<<<<<< HEAD
           - container
+=======
+          - upgrade
+          - upgrade-flavor
+          - standalone-upgrade
+          - fleet
+          - fleet-endpoint-security
+          - fleet-airgapped
+          - fleet-airgapped-privileged
+          - fleet-privileged
+>>>>>>> 633272c5b ([CI] New upgrade-flavor test group for TestStandaloneUpgrade_Flavor tests (#6870))
           - fleet-upgrade-to-pr-build
           - upgrade
           - fleet
@@ -115,7 +131,18 @@ steps:
           instanceType: "m6g.2xlarge"
         matrix:
           - default
+<<<<<<< HEAD
           - container
+=======
+          - upgrade
+          - upgrade-flavor
+          - standalone-upgrade
+          - fleet
+          - fleet-endpoint-security
+          - fleet-airgapped
+          - fleet-airgapped-privileged
+          - fleet-privileged
+>>>>>>> 633272c5b ([CI] New upgrade-flavor test group for TestStandaloneUpgrade_Flavor tests (#6870))
           - fleet-upgrade-to-pr-build
           - upgrade
           - fleet
