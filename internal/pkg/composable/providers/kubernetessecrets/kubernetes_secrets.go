@@ -176,13 +176,13 @@ func (p *contextProviderK8SSecrets) Fetch(key string) (string, bool) {
 	p.store.AddConditionally(key, sd, true, func(existing secret, exists bool) bool {
 		if !exists {
 			// no existing secret in the cache thus add it
-			p.logger.Info("Fetch: \"", key, "\" inserted. Resource Version of secret: \"", apiSecretResourceVersion, "\"")
+			p.logger.Infof("Fetch: \"%s\" inserted. Resource Version of secret: \"%s\"", key, apiSecretResourceVersion)
 			return true
 		}
 		if existing.value != apiSecretValue && !existing.apiFetchTime.After(now) {
 			// there is an existing secret in the cache but its value has changed since the last time
 			// it was fetched from the API thus update it
-			p.logger.Info("Fetch: \"", key, "\" updated. Resource Version of secret: \"", apiSecretResourceVersion, "\"")
+			p.logger.Infof("Fetch: \"%s\" updated. Resource Version of secret: \"%s\"", key, apiSecretResourceVersion)
 			return true
 		}
 		// there is an existing secret in the cache, and it points already to the latest value
@@ -226,7 +226,7 @@ func (p *contextProviderK8SSecrets) updateSecrets(ctx context.Context) bool {
 		sd, exists := p.store.Get(key, false)
 		if !exists {
 			// this item has expired thus mark that the cache has updates and continue
-			p.logger.Info("Cache: \"", key, "\" expired")
+			p.logger.Infof("Cache: \"%s\" expired", key)
 			hasUpdates = true
 			continue
 		}
@@ -254,7 +254,7 @@ func (p *contextProviderK8SSecrets) updateSecrets(ctx context.Context) bool {
 				// the secret value has changed and the above fetchFromAPI is more recent thus
 				// add it and mark that the cache has updates
 				hasUpdates = true
-				p.logger.Info("Cache: \"", sd.key, "\" updated. Resource Version of secret: \"", apiResourceVersion, "\"")
+				p.logger.Infof("Cache: \"%s\" updated. Resource Version of secret: \"%s\"", key, apiResourceVersion)
 				return true
 			}
 			// the secret value has not changed
