@@ -123,7 +123,7 @@ steps:
           - upgrade
           - standalone-upgrade
           - fleet
-          #
+          # ARM tests are enabled for only selected groups in order to save resources
           # - fleet-endpoint-security
           # - fleet-airgapped
           # - fleet-airgapped-privileged
