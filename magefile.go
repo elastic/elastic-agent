@@ -2038,7 +2038,7 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 	}
 
 	// it's not a part of this repository, cannot be retrieved with `GetReleaseBranches`
-	branches = append(branches, "7.17")
+	branches = append(branches, "7.17", "9.0")
 
 	// uncomment if want to have the current version snapshot on the list as well
 	// branches = append([]string{"master"}, branches...)
