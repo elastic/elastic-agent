@@ -40,6 +40,8 @@ func TestSetLogLevelFleetManaged(t *testing.T) {
 		Sudo:  true,
 	})
 
+	t.Skip("Skipping due to https://github.com/elastic/elastic-agent/issues/5193")
+
 	deadline := time.Now().Add(10 * time.Minute)
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), deadline)
 	defer cancel()
@@ -271,7 +273,7 @@ func updatePolicyLogLevel(ctx context.Context, t *testing.T, kibanaClient *kiban
 	   "name": "{{ .policyName }}",
 	   "namespace": "{{ .namespace }}",
 	   "advanced_settings": {
-		"agent_logging_level": {{ .logLevel }}	
+		"agent_logging_level": {{ .logLevel }}
 	   }
 	}`
 	updateLogLevelTemplate, err := template.New("updatePolicyLogLevel").Parse(updateLogLevelTemplateString)
