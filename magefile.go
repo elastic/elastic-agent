@@ -99,7 +99,7 @@ const (
 
 	helmChartPath      = "./deploy/helm/elastic-agent"
 	helmOtelChartPath  = "./deploy/helm/edot-collector/kube-stack"
-	helmMOtelChartPath = "./deploy/helm/edot-collector/kube-stack/motel"
+	helmMOtelChartPath = "./deploy/helm/edot-collector/kube-stack/managed_otlp"
 	sha512FileExt      = ".sha512"
 )
 
