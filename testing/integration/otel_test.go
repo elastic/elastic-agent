@@ -28,10 +28,12 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	aTesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
+	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/go-elasticsearch/v8"
 )
 
@@ -1614,18 +1616,17 @@ func TestMonitoringAgentE2E(t *testing.T) {
 		Stack: &define.Stack{},
 	})
 
-	// fbMonitoringIndex := "logs-elastic_agent-default"
+	fbMonitoringIndex := "logs-elastic_agent-default"
 	fbReceiverMonitoringIndex := "logs-otel-default"
 	tmpDir := t.TempDir()
-	// endpoint := utils.SocketURLWithFallback(unit, paths.TempDir())
 
 	type configOptions struct {
-		InputPath string
-		// HttpEndpoint    string
-		HomeDir       string
-		ESEndpoint    string
-		ESApiKey      string
-		BeatsESApiKey string
+		InputPath      string
+		HomeDir        string
+		ESEndpoint     string
+		ESApiKey       string
+		BeatsESApiKey  string
+		SocketEndpoint string
 	}
 	esEndpoint, err := getESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
@@ -1645,10 +1646,11 @@ func TestMonitoringAgentE2E(t *testing.T) {
 
 	// Get the running dir
 	inputPath, err := fixture.GetRunningDir(ctx)
+	socketEndpoint := utils.SocketURLWithFallback("uniqueID", paths.TempDir())
 
 	configTemplate := `
 agent.grpc:
-  port: 6792
+  port: 6796
 outputs:
   default:
     type: elasticsearch
@@ -1779,7 +1781,9 @@ receivers:
     setup.template.enabled: false
     filebeat.config.modules.enabled: false
     logging.event_data.to_stderr: true
-    logging.event_data.to_files: false 
+    logging.event_data.to_files: false
+    http.enabled: true
+    http.host: {{ .SocketEndpoint }}
 exporters:
   debug:
     use_internal_logger: false
@@ -1803,6 +1807,7 @@ service:
         - filebeatreceiver/filestream-monitoring-agent
       exporters:
         - elasticsearch/log
+        - debug
 `
 
 	beatsApiKey, err := base64.StdEncoding.DecodeString(esApiKey.Encoded)
@@ -1812,12 +1817,12 @@ service:
 	require.NoError(t,
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 			configOptions{
-				InputPath: inputPath,
-				// HttpEndpoint:    endpoint,
-				HomeDir:       tmpDir,
-				ESEndpoint:    esEndpoint,
-				ESApiKey:      esApiKey.Encoded,
-				BeatsESApiKey: string(beatsApiKey),
+				InputPath:      inputPath,
+				HomeDir:        tmpDir,
+				ESEndpoint:     esEndpoint,
+				ESApiKey:       esApiKey.Encoded,
+				BeatsESApiKey:  string(beatsApiKey),
+				SocketEndpoint: socketEndpoint,
 			}))
 	configContents := configBuffer.Bytes()
 	t.Cleanup(func() {
@@ -1854,9 +1859,9 @@ service:
 			return false
 		}
 		return true
-	}, 1*time.Minute, 1*time.Second)
+	}, 30*time.Second, 1*time.Second)
 
-	// check if elastic-agent log files exist in the path
+	// check if elastic-agent log path exists
 	// This is important for the test to succeed
 	pattern := inputPath + "/data/elastic-agent-*/logs/elastic-agent-*.ndjson"
 	files, err := filepath.Glob(pattern)
@@ -1868,88 +1873,48 @@ service:
 		t.Errorf("No matching files found in path: %s", pattern)
 	}
 
-	var docs estools.Documents
-	var docs2 estools.Documents
-	// var docs2 estools.Documents
-	actualHits := &struct {
-		Hits int
-	}{}
+	var agentDocs estools.Documents
+	var otelDocs estools.Documents
 	require.Eventually(t,
 		func() bool {
 			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer findCancel()
 
-			// docs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbMonitoringIndex+"*", map[string]interface{}{
-			// 	"data_stream.dataset": "elastic_agent",
-			// })
+			agentDocs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbMonitoringIndex+"*", map[string]interface{}{
+				"data_stream.dataset": "elastic_agent",
+			})
 
-			docs2, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbReceiverMonitoringIndex+"*", map[string]interface{}{
-				"Attributes.data_stream.namespace": "default",
+			require.NoError(t, err)
+			otelDocs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbReceiverMonitoringIndex+"*", map[string]interface{}{
+				"Attributes.data_stream.dataset": "otel",
 			})
 			require.NoError(t, err)
 
-			// s, _ := json.MarshalIndent(docs, "", " ")
-			// fmt.Println(string(s))
-
-			// s, _ = json.MarshalIndent(docs2, "", " ")
-			// fmt.Println(string(s))
-
-			actualHits.Hits = docs.Hits.Total.Value
-
-			return docs2.Hits.Total.Value > 2
+			// Atleast 1 Document in each index should be present
+			return otelDocs.Hits.Total.Value > 1 && agentDocs.Hits.Total.Value > 1
 		},
 		1*time.Minute, 1*time.Second, "the number of logs in both index are not same")
 
-	// doc1 := docs.Hits.Hits[0].Source
-	// doc2 := docs.Hits.Hits[1].Source
-	// ignoredFields := []string{
-	// 	// Expected to change between filebeat and fbreceiver
-	// 	"@timestamp",
-	// 	"agent.ephemeral_id",
-	// 	"agent.id",
+	doc1 := agentDocs.Hits.Hits[0].Source
+	doc2 := otelDocs.Hits.Hits[0].Source
+	ignoredFields := []string{
+		// Expected to change between agentDocs and OtelDocs
+		"@timestamp",
+		"agent.ephemeral_id",
+		"agent.id",
+		"data_stream.dataset" 
+		"elastic_agent.id",
+		"elastic_agent.snapshot",
+		"elastic_agent.version",
 
-	// 	// Missing from fbreceiver doc
-	// 	"elastic_agent.id",
-	// 	"elastic_agent.snapshot",
-	// 	"elastic_agent.version",
+		// Missing in agent Docs
+		"Attributes.data_stream.dataset",
+		"Attributes.data_stream.namespace",
+		"Attributes.log.file.name",
 
-	// 	// TODO: fbreceiver adds metadata fields that are internal in filebeat.
-	// 	// Remove this once https://github.com/elastic/beats/pull/42412
-	// 	// is available in agent.
-	// 	"@metadata.beat",
-	// 	"@metadata.type",
-	// 	"@metadata.version",
-	// }
+	}
 
-	// assertMapsEqual(t, doc1, doc2, ignoredFields, "expected documents to be equal")
+	assertMapsEqual(t, doc1, doc2, ignoredFields, "expected documents to be equal")
 	cancel()
 	cmd.Wait()
-}
-
-func assertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg string) {
-	t.Helper()
-
-	flatM1 := m1.Flatten()
-	flatM2 := m2.Flatten()
-	for _, f := range ignoredFields {
-		hasKeyM1, _ := flatM1.HasKey(f)
-		hasKeyM2, _ := flatM2.HasKey(f)
-
-		if !hasKeyM1 && !hasKeyM2 {
-			assert.Failf(t, msg, "ignored field %q does not exist in either map, please remove it from the ignored fields", f)
-		}
-
-		// If the ignored field exists and is equal in both maps then it shouldn't be ignored
-		if hasKeyM1 && hasKeyM2 {
-			valM1, _ := flatM1.GetValue(f)
-			valM2, _ := flatM2.GetValue(f)
-			if valM1 == valM2 {
-				assert.Failf(t, msg, "ignored field %q is equal in both maps, please remove it from the ignored fields", f)
-			}
-		}
-
-		flatM1.Delete(f)
-		flatM2.Delete(f)
-	}
-	require.Equal(t, "", cmp.Diff(flatM1, flatM2), "expected maps to be equal")
 }
