@@ -35,15 +35,12 @@ const (
 	// Upgrade group of tests. Used for testing upgrades.
 	Upgrade = "upgrade"
 
-<<<<<<< HEAD
-=======
 	// UpgradeFlavor group of tests. Used for testing flavored upgrades.
 	UpgradeFlavor = "upgrade-flavor"
 
 	// StandaloneUpgrade group of tests. Used for TestStandaloneUpgrade.
 	StandaloneUpgrade = "standalone-upgrade"
 
->>>>>>> 633272c5b ([CI] New upgrade-flavor test group for TestStandaloneUpgrade_Flavor tests (#6870))
 	// Deb group of tests. Used for testing .deb packages install & upgrades
 	Deb = "deb"
 
