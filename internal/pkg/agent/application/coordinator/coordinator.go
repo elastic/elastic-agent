@@ -1460,6 +1460,8 @@ func (c *Coordinator) updateManagersWithConfig(model *component.Model) error {
 	return c.updateOtelManagerConfig(otelModel)
 }
 
+// updateOtelManagerConfig updates the otel collector configuration for the otel manager. It assembles this configuration
+// from the component model passed in and from the hybrid-mode otel config set on the Coordinator.
 func (c *Coordinator) updateOtelManagerConfig(model *component.Model) error {
 	finalOtelCfg := confmap.New()
 	var componentOtelCfg *confmap.Conf
@@ -1496,8 +1498,7 @@ func (c *Coordinator) updateOtelManagerConfig(model *component.Model) error {
 	return nil
 }
 
-// updateRuntimesWithModel updates runtime managers with the component model.
-// Components may be sent to different runtimes depending on various criteria.
+// splitModelBetweenManager splits the model components between the runtime manager and the otel manager.
 func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtimeModel *component.Model, otelModel *component.Model) {
 	if !c.runComponentsInOtelManager {
 		// Runtime manager gets all the components, this is the default

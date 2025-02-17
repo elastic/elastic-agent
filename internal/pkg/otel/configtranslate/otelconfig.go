@@ -230,9 +230,7 @@ func getBeatNameForComponent(comp *component.Component) string {
 func getSignalForComponent(comp *component.Component) (pipeline.Signal, error) {
 	beatName := getBeatNameForComponent(comp)
 	switch beatName {
-	case "filebeat":
-		return pipeline.SignalLogs, nil
-	case "metricbeat":
+	case "filebeat", "metricbeat":
 		return pipeline.SignalLogs, nil
 	default:
 		return pipeline.Signal{}, fmt.Errorf("input type not supported by Otel: %s", comp.InputType)
