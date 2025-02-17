@@ -57,8 +57,10 @@ func TestDiagnosticLocalConfig(t *testing.T) {
 	// local-config hook correctly returns it.
 	cfg := &configuration.Configuration{
 		Fleet: &configuration.FleetAgentConfig{
-			Enabled:      true,
-			AccessAPIKey: "test-key",
+			Enabled:             true,
+			AccessAPIKey:        "test-key",
+			EnrollmentTokenHash: "test-enroll-hash",
+			ReplaceTokenHash:    "test-replace-hash",
 			Client: remote.Config{
 				Protocol: "test-protocol",
 			},
@@ -119,6 +121,8 @@ agent:
 fleet:
   enabled: true
   access_api_key: "test-key"
+  enrollment_token_hash: "test-enroll-hash"
+  replace_token_hash: "test-replace-hash"
   agent:
   protocol: "test-protocol"
 `
@@ -196,7 +200,7 @@ func TestDiagnosticVariables(t *testing.T) {
 		map[string]interface{}{
 			"testvar": "testvalue",
 		},
-		nil)
+		nil, "")
 	require.NoError(t, err)
 
 	expected := `

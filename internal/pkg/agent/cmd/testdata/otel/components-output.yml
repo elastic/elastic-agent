@@ -1,0 +1,199 @@
+buildinfo:
+  command: ./build/elastic-agent
+  description: Elastic opentelemetry-collector distribution
+  version: 9.0.0
+receivers:
+  - name: filebeatreceiver
+    stability:
+      logs: Alpha
+      metrics: Undefined
+      traces: Undefined
+  - name: filelog
+    stability:
+      logs: Beta
+      metrics: Undefined
+      traces: Undefined
+  - name: hostmetrics
+    stability:
+      logs: Development
+      metrics: Beta
+      traces: Undefined
+  - name: httpcheck
+    stability:
+      logs: Undefined
+      metrics: Alpha
+      traces: Undefined
+  - name: jaeger
+    stability:
+      logs: Undefined
+      metrics: Undefined
+      traces: Beta
+  - name: k8s_cluster
+    stability:
+      logs: Beta
+      metrics: Beta
+      traces: Undefined
+  - name: k8sobjects
+    stability:
+      logs: Beta
+      metrics: Undefined
+      traces: Undefined
+  - name: kubeletstats
+    stability:
+      logs: Undefined
+      metrics: Beta
+      traces: Undefined
+  - name: metricbeatreceiver
+    stability:
+      logs: Alpha
+      metrics: Undefined
+      traces: Undefined
+  - name: otlp
+    stability:
+      logs: Beta
+      metrics: Stable
+      traces: Stable
+  - name: prometheus
+    stability:
+      logs: Undefined
+      metrics: Beta
+      traces: Undefined
+  - name: zipkin
+    stability:
+      logs: Undefined
+      metrics: Undefined
+      traces: Beta
+processors:
+  - name: attributes
+    stability:
+      logs: Beta
+      metrics: Beta
+      traces: Beta
+  - name: batch
+    stability:
+      logs: Beta
+      metrics: Beta
+      traces: Beta
+  - name: elasticinframetrics
+    stability:
+      logs: Undefined
+      metrics: Alpha
+      traces: Undefined
+  - name: elastictrace
+    stability:
+      logs: Undefined
+      metrics: Undefined
+      traces: Alpha
+  - name: filter
+    stability:
+      logs: Alpha
+      metrics: Alpha
+      traces: Alpha
+  - name: k8sattributes
+    stability:
+      logs: Beta
+      metrics: Beta
+      traces: Beta
+  - name: lsminterval
+    stability:
+      logs: Undefined
+      metrics: Development
+      traces: Undefined
+  - name: memory_limiter
+    stability:
+      logs: Beta
+      metrics: Beta
+      traces: Beta
+  - name: resource
+    stability:
+      logs: Beta
+      metrics: Beta
+      traces: Beta
+  - name: resourcedetection
+    stability:
+      logs: Beta
+      metrics: Beta
+      traces: Beta
+  - name: transform
+    stability:
+      logs: Alpha
+      metrics: Alpha
+      traces: Alpha
+exporters:
+  - name: debug
+    stability:
+      logs: Development
+      metrics: Development
+      traces: Development
+  - name: elasticsearch
+    stability:
+      logs: Beta
+      metrics: Development
+      traces: Beta
+  - name: file
+    stability:
+      logs: Alpha
+      metrics: Alpha
+      traces: Alpha
+  - name: loadbalancing
+    stability:
+      logs: Beta
+      metrics: Development
+      traces: Beta
+  - name: otlp
+    stability:
+      logs: Beta
+      metrics: Stable
+      traces: Stable
+  - name: otlphttp
+    stability:
+      logs: Beta
+      metrics: Stable
+      traces: Stable
+connectors:
+  - name: routing
+    stability:
+      logs-to-logs: Alpha
+      logs-to-metrics: Undefined
+      logs-to-traces: Undefined
+      metrics-to-logs: Undefined
+      metrics-to-metrics: Alpha
+      metrics-to-traces: Undefined
+      traces-to-logs: Undefined
+      traces-to-metrics: Undefined
+      traces-to-traces: Alpha
+  - name: signaltometrics
+    stability:
+      logs-to-logs: Undefined
+      logs-to-metrics: Alpha
+      logs-to-traces: Undefined
+      metrics-to-logs: Undefined
+      metrics-to-metrics: Alpha
+      metrics-to-traces: Undefined
+      traces-to-logs: Undefined
+      traces-to-metrics: Alpha
+      traces-to-traces: Undefined
+  - name: spanmetrics
+    stability:
+      logs-to-logs: Undefined
+      logs-to-metrics: Undefined
+      logs-to-traces: Undefined
+      metrics-to-logs: Undefined
+      metrics-to-metrics: Undefined
+      metrics-to-traces: Undefined
+      traces-to-logs: Undefined
+      traces-to-metrics: Alpha
+      traces-to-traces: Undefined
+extensions:
+  - name: file_storage
+    stability:
+      extension: Beta
+  - name: health_check
+    stability:
+      extension: Beta
+  - name: memory_limiter
+    stability:
+      extension: Development
+  - name: pprof
+    stability:
+      extension: Beta

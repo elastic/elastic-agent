@@ -6,8 +6,28 @@ package configuration
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+)
+
+const (
+	// DefaultGRPCPort is the default non-zero port in most situations. Ideally we'd always bind to
+	// port 0 to avoid collisions with other Elastic Agents or applications, but this would be a
+	// breaking change for users that have to manually whitelist the gRPC port in local firewall rules.
+	DefaultGRPCPort = uint16(6789)
+
+	// DefaultGRPCPortInInstallNamespace is the port used when explicitly installed in an installation
+	// namespace to allow multiple Elastic Agents on the same machine. Must be zero to avoid collisions.
+	DefaultGRPCPortInInstallNamespace = uint16(0)
+
+	// DefaultGPRCPortInContainer is the port used in a container. Defaults to zero to allow use of
+	// host networking (hostNetwork: true) in Kubernetes without port collisions between pods.
+	DefaultGPRCPortInContainer = uint16(0)
+
+	// grpcPortContainerEnvVar is the environment variable allowing containers to specify a fixed port.
+	grpcPortContainerEnvVar = "ELASTIC_AGENT_GRPC_PORT"
 )
 
 // GRPCConfig is a configuration of GRPC server.
@@ -20,17 +40,9 @@ type GRPCConfig struct {
 
 // DefaultGRPCConfig creates a default server configuration.
 func DefaultGRPCConfig() *GRPCConfig {
-	// When in an installation namespace, bind to port zero to select a random free port to avoid
-	// collisions with any already installed Elastic Agent. Ideally we'd always bind to port zero,
-	// but this would be breaking for users that had to manually whitelist the gRPC port in local
-	// firewall rules.
-	//
-	// Note: this uses local TCP by default. A port of -1 switches to unix domain sockets / named
-	// pipes. Using domain sockets by default is preferable but is currently blocked because the
-	// gRPC library endpoint security uses does not support Windows named pipes.
-	defaultPort := uint16(6789)
+	defaultPort := DefaultGRPCPort
 	if paths.InInstallNamespace() {
-		defaultPort = 0
+		defaultPort = DefaultGRPCPortInInstallNamespace
 	}
 
 	return &GRPCConfig{
@@ -38,6 +50,22 @@ func DefaultGRPCConfig() *GRPCConfig {
 		Port:                    defaultPort,
 		MaxMsgSize:              1024 * 1024 * 100, // grpc default 4MB is unsufficient for diagnostics
 		CheckinChunkingDisabled: false,             // on by default
+	}
+}
+
+// OverrideDefaultContainerGRPCPort is the configuration override used by the container command
+// to switch to a more convenient default port.
+func OverrideDefaultContainerGRPCPort(cfg *GRPCConfig) {
+	cfg.Port = DefaultGPRCPortInContainer
+
+	// Allow manually specifying the port via an undocumented environment variable in case
+	// the change from the original DefaultGRPCPort causes unexpected problems.
+	grpcPortEnv, ok := os.LookupEnv(grpcPortContainerEnvVar)
+	if ok {
+		port, err := strconv.Atoi(grpcPortEnv)
+		if err == nil {
+			cfg.Port = uint16(port) //nolint:gosec // integer size truncation is fine here.
+		}
 	}
 }
 
