@@ -18,6 +18,8 @@ type fleetConfig struct {
 	CA              string        `config:"ca"`
 	Enroll          bool          `config:"enroll"`
 	EnrollmentToken string        `config:"enrollment_token"`
+	ID              string        `config:"id"`
+	ReplaceToken    string        `config:"replace_token"`
 	Force           bool          `config:"force"`
 	Insecure        bool          `config:"insecure"`
 	TokenName       string        `config:"token_name"`
@@ -86,6 +88,8 @@ func defaultAccessConfig() (setupConfig, error) {
 			CA:              envWithDefault("", "FLEET_CA", "KIBANA_CA", "ELASTICSEARCH_CA"),
 			Enroll:          envBool("FLEET_ENROLL", "FLEET_SERVER_ENABLE"),
 			EnrollmentToken: envWithDefault("", "FLEET_ENROLLMENT_TOKEN"),
+			ID:              envWithDefault("", "ELASTIC_AGENT_ID"),
+			ReplaceToken:    envWithDefault("", "FLEET_REPLACE_TOKEN"),
 			Force:           envBool("FLEET_FORCE"),
 			Insecure:        envBool("FLEET_INSECURE"),
 			TokenName:       envWithDefault("Default", "FLEET_TOKEN_NAME"),

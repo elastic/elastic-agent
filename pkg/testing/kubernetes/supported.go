@@ -50,19 +50,19 @@ var variants = []struct {
 }{
 	{
 		Name:  "basic",
-		Image: "docker.elastic.co/beats/elastic-agent",
+		Image: "docker.elastic.co/elastic-agent/elastic-agent",
 	},
 	{
 		Name:  "wolfi",
-		Image: "docker.elastic.co/beats/elastic-agent-wolfi",
+		Image: "docker.elastic.co/elastic-agent/elastic-agent-wolfi",
 	},
 	{
 		Name:  "complete",
-		Image: "docker.elastic.co/beats/elastic-agent-complete",
+		Image: "docker.elastic.co/elastic-agent/elastic-agent-complete",
 	},
 	{
 		Name:  "complete-wolfi",
-		Image: "docker.elastic.co/beats/elastic-agent-complete-wolfi",
+		Image: "docker.elastic.co/elastic-agent/elastic-agent-complete-wolfi",
 	},
 	{
 		Name:  "cloud",
