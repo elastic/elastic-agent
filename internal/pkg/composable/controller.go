@@ -79,12 +79,10 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 		if err != nil {
 			return nil, errors.New(err, fmt.Sprintf("failed to build provider '%s'", name), errors.TypeConfig, errors.M("provider", name))
 		}
-		emptyMapping, _ := transpiler.NewAST(nil)
 		contextProviders[name] = &contextProviderState{
 			// Safe for Context to be nil here because it will be filled in
 			// by (*controller).Run before the provider is started.
 			provider: provider,
-			mapping:  emptyMapping,
 		}
 	}
 
@@ -279,7 +277,10 @@ func (c *controller) generateVars(fetchContextProviders mapstr.M) []*transpiler.
 	vars := make([]*transpiler.Vars, 1)
 	mapping, _ := transpiler.NewAST(map[string]any{})
 	for name, state := range c.contextProviders {
-		_ = mapping.Insert(state.Current(), name)
+		providerMapping := state.Current()
+		if providerMapping != nil { // the provider may not have emitted any data yet
+			_ = mapping.Insert(providerMapping, name)
+		}
 	}
 	// this is ensured not to error, by how the mappings states are verified
 	vars[0] = transpiler.NewVarsFromAst("", mapping, fetchContextProviders)

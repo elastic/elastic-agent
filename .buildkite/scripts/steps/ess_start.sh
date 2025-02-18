@@ -8,7 +8,7 @@ source .buildkite/scripts/steps/ess.sh
 OVERRIDE_STACK_VERSION="$(cat .package-version)"
 OVERRIDE_STACK_VERSION=${OVERRIDE_STACK_VERSION}"-SNAPSHOT"
 
-ess_up $OVERRIDE_STACK_VERSION || echo "Failed to start ESS stack" >&2
+ess_up $OVERRIDE_STACK_VERSION
 
 echo "ES_HOST: ${ELASTICSEARCH_HOST}"
 buildkite-agent meta-data set "es.host" $ELASTICSEARCH_HOST

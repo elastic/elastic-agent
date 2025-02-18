@@ -10,7 +10,8 @@ env:
 steps:
   - group: ":beats: DRA Elastic-Agent Core Snapshot :beats:"
     key: "dra-core-snapshot"
-    if: build.branch == 'main' || build.branch =~ /^[0-9]+\.[0-9x]+\$/ || build.env("RUN_SNAPSHOT") == "true"
+    # don't run snapshot builds with prereleases (non empty VERSION_QUALIFIER) unless forced (RUN_SNAPSHOT=true)
+    if: build.env("RUN_SNAPSHOT") == "true" || (build.env('VERSION_QUALIFIER') == null && (build.branch == 'main' || build.branch =~ /^[0-9]+\.[0-9x]+\$/))
     steps:
     - label: ":package: Build Elastic-Agent Core Snapshot"
       commands:
@@ -43,11 +44,12 @@ steps:
 
   - group: ":beats: DRA Elastic-Agent Core Staging :beats:"
     key: "dra-core-staging"
-    if: build.branch =~ /^[0-9]+\.[0-9x]+\$/ || build.env("RUN_STAGING") == "true"
+    if: build.branch =~ /^[0-9]+\.[0-9x]+\$/ || build.env("RUN_STAGING") == "true" || build.env('VERSION_QUALIFIER') != null
     steps:
     - label: ":package: Build Elastic-Agent Core staging"
-      commands:
-        - .buildkite/scripts/steps/build-agent-core.sh
+      commands: |
+        source .buildkite/scripts/version_qualifier.sh
+        .buildkite/scripts/steps/build-agent-core.sh
       key: "build-dra-staging"
       artifact_paths:
         - "build/distributions/**/*"
@@ -61,6 +63,7 @@ steps:
 
     - label: ":hammer: DRA Publish Elastic-Agent Core staging"
       command: |
+        source .buildkite/scripts/version_qualifier.sh
         echo "+++ Restoring Artifacts"
         buildkite-agent artifact download "build/**/*" .
         echo "+++ Changing permissions for the release manager"

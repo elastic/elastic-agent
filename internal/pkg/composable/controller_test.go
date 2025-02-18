@@ -147,6 +147,16 @@ func TestProvidersDefaultDisabled(t *testing.T) {
 			want: 0,
 		},
 		{
+			name: "default disabled, local provider without data",
+			cfg: map[string]interface{}{
+				"agent.providers.initial_default": "false",
+				"providers": map[string]any{
+					"local": map[string]any{},
+				},
+			},
+			want: 1,
+		},
+		{
 			name: "default enabled",
 			cfg: map[string]interface{}{
 				"agent.providers.initial_default": "true",
