@@ -40,4 +40,7 @@ const (
 
 	// RPM group of tests. Used for testing .rpm packages install & upgrades
 	RPM = "rpm"
+
+	// FIPS group of tests. Used for testing the FIPS distributions.
+	FIPS = "fips"
 )

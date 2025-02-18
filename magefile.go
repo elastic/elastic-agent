@@ -806,7 +806,10 @@ func (Cloud) Image(ctx context.Context) {
 		devtools.Snapshot = true
 	}
 
-	if f, err := strconv.ParseBool(fips); err == nil && !f {
+	if f, err := strconv.ParseBool(fips); err != nil {
+		os.Setenv(fipsEnv, "false")
+		devtools.FIPSBuild = false
+	} else if !f {
 		os.Setenv(fipsEnv, "false")
 		devtools.FIPSBuild = false
 	} else {
