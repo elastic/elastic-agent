@@ -336,7 +336,7 @@ agent:
   # -- image configuration
   # @section -- 6 - Elastic-Agent Configuration
   image:
-    repository: docker.elastic.co/beats/elastic-agent
+    repository: docker.elastic.co/elastic-agent/elastic-agent
     pullPolicy: IfNotPresent
     tag: "9.1.0-SNAPSHOT"
   # -- image pull secrets

@@ -642,7 +642,7 @@ func testUninstallAuditUnenroll(ctx context.Context, fixture *atesting.Fixture, 
 // into Fleet. Current testing shows each iteration takes around 16 seconds.
 func TestRepeatedInstallUninstallFleet(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: InstallUninstall,
 		Stack: &define.Stack{}, // needs a fleet-server.
 		// We require sudo for this test to run
 		// `elastic-agent install` (even though it will
@@ -673,8 +673,7 @@ func TestRepeatedInstallUninstallFleet(t *testing.T) {
 	require.NoError(t, err)
 
 	maxRunTime := 2 * time.Minute
-	iterations := 100
-	for i := 0; i < iterations; i++ {
+	for i := 0; i < iterations(); i++ {
 		successful := t.Run(fmt.Sprintf("%s-%d", t.Name(), i), func(t *testing.T) {
 			ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(maxRunTime))
 			defer cancel()
@@ -712,6 +711,14 @@ func TestRepeatedInstallUninstallFleet(t *testing.T) {
 			return
 		}
 	}
+}
+
+func iterations() int {
+	// If running in CI, reduce the number of iterations to speed up the test.
+	if os.Getenv("BUILDKITE_PULL_REQUEST") != "" {
+		return 50
+	}
+	return 100
 }
 
 func randStr(length int) string {
