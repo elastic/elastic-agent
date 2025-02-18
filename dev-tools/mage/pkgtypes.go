@@ -14,6 +14,7 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -969,7 +970,7 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 		}
 
 		if mg.Verbose() {
-			log.Println("Adding", os.FileMode(header.Mode), header.Name)
+			log.Println("Adding", os.FileMode(mustConvertToUnit32(header.Mode)), header.Name)
 		}
 		if err := ar.WriteHeader(header); err != nil {
 			return err
@@ -1037,7 +1038,7 @@ func addSymlinkToTar(tmpdir string, ar *tar.Writer, baseDir string, pkgFile Pack
 		header.Typeflag = tar.TypeSymlink
 
 		if mg.Verbose() {
-			log.Println("Adding", os.FileMode(header.Mode), header.Name)
+			log.Println("Adding", os.FileMode(mustConvertToUnit32(header.Mode)), header.Name)
 		}
 		if err := ar.WriteHeader(header); err != nil {
 			return err
@@ -1058,4 +1059,11 @@ func PackageDocker(spec PackageSpec) error {
 		return err
 	}
 	return b.Build()
+}
+
+func mustConvertToUnit32(i int64) uint32 {
+	if i > math.MaxUint32 {
+		panic(fmt.Sprintf("%d is bigger than math.MaxUint32", i))
+	}
+	return uint32(i) // #nosec
 }
