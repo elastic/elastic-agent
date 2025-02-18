@@ -8,6 +8,7 @@ package integration
 
 import (
 	"context"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -97,6 +98,10 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
+
+	if runtime.GOOS == "windows" {
+		t.Skip("This test is flaky on windows. See https://github.com/elastic/elastic-agent/issues/6732")
+	}
 
 	minVersion := upgradetest.Version_8_10_0_SNAPSHOT
 	currentVersion, err := version.ParseVersion(define.Version())
