@@ -13,6 +13,7 @@ scms:
       token: '{{ requiredEnv "GITHUB_TOKEN" }}'
       commitusingapi: true
       branch: main
+      force: false
 
 actions:
   elastic-agent:

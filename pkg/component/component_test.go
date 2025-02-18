@@ -2390,7 +2390,7 @@ func TestPreventionsAreValid(t *testing.T) {
 		"user": map[string]interface{}{
 			"root": false,
 		},
-	}, nil)
+	}, nil, "")
 	require.NoError(t, err)
 
 	for path, spec := range specFiles {

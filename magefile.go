@@ -26,6 +26,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -650,7 +651,7 @@ func commitID() string {
 
 // Update is an alias for executing control protocol, configs, and specs.
 func Update() {
-	mg.SerialDeps(Config, BuildPGP, BuildFleetCfg, Otel.Readme)
+	mg.Deps(Config, BuildPGP, BuildFleetCfg, Otel.Readme)
 }
 
 func EnsureCrossBuildOutputDir() error {
@@ -3299,6 +3300,10 @@ func getOtelDependencies() (*otelDependencies, error) {
 		} else if dependency.ComponentType == "receiver" {
 			receivers = append(receivers, dependency)
 		}
+	}
+
+	for _, list := range [][]*otelDependency{connectors, exporters, extensions, processors, receivers} {
+		sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
 	}
 
 	return &otelDependencies{

@@ -13,7 +13,7 @@
             "always_trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it|extended))|^/test\\W*(?:extended|)",
             "skip_ci_labels": [ "skip-ci" ],
             "skip_target_branches": [ ],
-            "skip_ci_on_only_changed": [ "^.ci/", "^.github/", "^updatecli-compose.yaml", "^changelog", "^docs/", "\\.md$", "^docker-compose.yml", "^.pre-commit-config.yaml", "skaffold.yaml", "^Dockerfile.skaffold", "^Dockerfile"],
+            "skip_ci_on_only_changed": [ "^.ci/", "^.github/", "^updatecli-compose.yaml", "^changelog", "^docs/", "\\.md$", "^docker-compose.yml", "^.mergify.yml", "^.pre-commit-config.yaml", "skaffold.yaml", "^Dockerfile.skaffold", "^Dockerfile"],
             "always_require_ci_on_changed": [ ]
         },
         {

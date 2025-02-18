@@ -20,6 +20,7 @@ type PackageDesc struct {
 	Hash          string              `yaml:"hash,omitempty" json:"hash,omitempty"`
 	VersionedHome string              `yaml:"versioned-home,omitempty" json:"versionedHome,omitempty"`
 	PathMappings  []map[string]string `yaml:"path-mappings,omitempty" json:"pathMappings,omitempty"`
+	Flavors       map[string][]string `yaml:"flavors,omitempty" json:"flavors,omitempty"`
 }
 
 type PackageManifest struct {

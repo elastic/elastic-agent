@@ -27,6 +27,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -563,4 +564,105 @@ func TestAgentStateToString(t *testing.T) {
 			assert.Equal(t, tc.expectedFleetState, actualFleetState)
 		})
 	}
+}
+
+type MockScheduler struct {
+	Duration time.Duration
+	Ticker   *time.Ticker
+}
+
+func (m *MockScheduler) WaitTick() <-chan time.Time {
+	return m.Ticker.C
+}
+
+func (m *MockScheduler) SetDuration(d time.Duration) {
+	m.Duration = d
+}
+
+func (m *MockScheduler) Stop() {
+	m.Ticker.Stop()
+}
+
+func TestFleetGatewaySchedulerSwitch(t *testing.T) {
+	agentInfo := &testAgentInfo{}
+	settings := &fleetGatewaySettings{
+		Duration: 1 * time.Second,
+		Backoff:  backoffSettings{Init: 1 * time.Millisecond, Max: 2 * time.Millisecond},
+	}
+
+	tempSet := *defaultGatewaySettings
+	defaultGatewaySettings.Duration = 500 * time.Millisecond
+	defaultGatewaySettings.ErrConsecutiveUnauthDuration = 700 * time.Millisecond
+	defer func() {
+		*defaultGatewaySettings = tempSet
+	}()
+
+	t.Run("if unauthorized responses exceed the set limit, the scheduler should be switched to the long-wait scheduler", withGateway(agentInfo, settings, func(
+		t *testing.T,
+		gateway coordinator.FleetGateway,
+		c *testingClient,
+		sch *scheduler.Stepper,
+	) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		unauth := func(_ http.Header, _ io.Reader) (*http.Response, error) {
+			return nil, client.ErrInvalidAPIKey
+		}
+
+		clientWaitFn := c.Answer(unauth)
+		g, ok := gateway.(*FleetGateway)
+		require.True(t, ok)
+
+		ms := &MockScheduler{
+			Duration: defaultGatewaySettings.Duration,
+			Ticker:   time.NewTicker(defaultGatewaySettings.Duration),
+		}
+		g.scheduler = ms
+		errCh := runFleetGateway(ctx, gateway)
+
+		for i := 0; i <= maxUnauthCounter; i++ {
+			<-clientWaitFn
+		}
+
+		cancel()
+		err := <-errCh
+		require.NoError(t, err)
+
+		require.Equal(t, ms.Duration, defaultGatewaySettings.ErrConsecutiveUnauthDuration)
+	}))
+
+	t.Run("should switch back to short-wait scheduler if the a successful response is received", withGateway(agentInfo, settings, func(
+		t *testing.T,
+		gateway coordinator.FleetGateway,
+		c *testingClient,
+		sch *scheduler.Stepper,
+	) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		unauth := func(_ http.Header, _ io.Reader) (*http.Response, error) {
+			resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
+			return resp, nil
+		}
+
+		clientWaitFn := c.Answer(unauth)
+		g, ok := gateway.(*FleetGateway)
+		require.True(t, ok)
+
+		ms := &MockScheduler{
+			Duration: defaultGatewaySettings.ErrConsecutiveUnauthDuration,
+			Ticker:   time.NewTicker(defaultGatewaySettings.ErrConsecutiveUnauthDuration),
+		}
+		g.scheduler = ms
+		errCh := runFleetGateway(ctx, gateway)
+
+		<-clientWaitFn
+
+		cancel()
+		err := <-errCh
+		require.NoError(t, err)
+
+		require.Equal(t, ms.Duration, defaultGatewaySettings.Duration)
+	}))
 }
