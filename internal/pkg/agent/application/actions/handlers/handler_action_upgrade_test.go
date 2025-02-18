@@ -110,7 +110,7 @@ func TestUpgradeHandler(t *testing.T) {
 				return nil, nil
 			},
 		},
-		nil, nil, nil, nil, nil, false)
+		nil, nil, nil, nil, nil, false, nil)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 
@@ -123,7 +123,7 @@ func TestUpgradeHandler(t *testing.T) {
 
 	// Make sure this test does not dead lock or wait for too long
 	select {
-	case <-time.Tick(50 * time.Millisecond):
+	case <-time.Tick(1 * time.Second):
 		t.Fatal("mockUpgradeManager.Upgrade was not called")
 	case <-upgradeCalledChan:
 	}
@@ -169,7 +169,7 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 				return nil, err
 			},
 		},
-		nil, nil, nil, nil, nil, false)
+		nil, nil, nil, nil, nil, false, nil)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 
@@ -184,7 +184,7 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 
 	// Make sure this test does not dead lock or wait for too long
 	select {
-	case <-time.Tick(50 * time.Millisecond):
+	case <-time.Tick(1 * time.Second):
 		t.Fatal("mockUpgradeManager.Upgrade was not called")
 	case <-upgradeCalledChan:
 	}
@@ -230,7 +230,7 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 				return nil, nil
 			},
 		},
-		nil, nil, nil, nil, nil, false)
+		nil, nil, nil, nil, nil, false, nil)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 

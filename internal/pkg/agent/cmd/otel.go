@@ -2,8 +2,6 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build !windows
-
 package cmd
 
 import (
@@ -48,6 +46,7 @@ func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Comman
 
 	setupOtelFlags(cmd.Flags())
 	cmd.AddCommand(newValidateCommandWithArgs(args, streams))
+	cmd.AddCommand(newComponentsCommandWithArgs(args, streams))
 
 	return cmd
 }
@@ -73,7 +72,7 @@ func runCollector(cmdCtx context.Context, configFiles []string) error {
 	stop := make(chan bool)
 	ctx, cancel := context.WithCancel(cmdCtx)
 
-	var stopCollector = func() {
+	stopCollector := func() {
 		close(stop)
 	}
 

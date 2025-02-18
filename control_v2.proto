@@ -23,6 +23,18 @@ enum State {
   ROLLBACK = 8;
 }
 
+// CollectorComponentStatus used for OTel collector components.
+enum CollectorComponentStatus {
+    StatusNone = 0;
+    StatusStarting = 1;
+    StatusOK = 2;
+    StatusRecoverableError = 3;
+    StatusPermanentError = 4;
+    StatusFatalError = 5;
+    StatusStopping = 6;
+    StatusStopped = 7;
+}
+
 // Unit Type running inside a component.
 enum UnitType {
   INPUT = 0;
@@ -173,6 +185,18 @@ message StateAgentInfo {
   bool isManaged = 8;
 }
 
+// CollectorComponent is the status of an OTel collector component.
+message CollectorComponent {
+  // Status of the component.
+  CollectorComponentStatus status = 1;
+  // Error is set to the reported error.
+  string error = 2;
+  // Timestamp of status.
+  string timestamp = 3;
+  // Status information for sub-components of this component.
+  map<string, CollectorComponent> ComponentStatusMap = 4;
+}
+
 // StateResponse is the current state of Elastic Agent.
 // Next unused id: 8
 message StateResponse {
@@ -194,6 +218,9 @@ message StateResponse {
 
   // Upgrade details
   UpgradeDetails upgrade_details = 7;
+
+  // OTel collector component status information.
+  CollectorComponent collector = 8;
 }
 
 // UpgradeDetails captures the details of an ongoing Agent upgrade.

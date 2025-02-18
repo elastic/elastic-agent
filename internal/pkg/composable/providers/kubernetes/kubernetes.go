@@ -46,7 +46,7 @@ func DynamicProviderBuilder(logger *logger.Logger, c *config.Config, managed boo
 	if c == nil {
 		c = config.New()
 	}
-	err := c.Unpack(&cfg)
+	err := c.UnpackTo(&cfg)
 	if err != nil {
 		return nil, errors.New(err, "failed to unpack configuration")
 	}

@@ -42,6 +42,7 @@ type upgradeOpts struct {
 	skipDefaultPgp   bool
 	customPgp        *CustomPGP
 	customWatcherCfg string
+	installServers   bool
 
 	// Used to disable upgrade details checks for versions that don't support them, like 7.17.x.
 	// See also WithDisableUpgradeWatcherUpgradeDetailsCheck.
@@ -128,6 +129,13 @@ func WithPostUpgradeHook(hook func() error) UpgradeOpt {
 func WithCustomWatcherConfig(cfg string) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.customWatcherCfg = cfg
+	}
+}
+
+// WithServers will use start version with servers flavor.
+func WithServers() UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.installServers = true
 	}
 }
 
@@ -260,6 +268,7 @@ func PerformUpgrade(
 		NonInteractive: nonInteractiveFlag,
 		Force:          true,
 		Privileged:     !(*upgradeOpts.unprivileged),
+		InstallServers: upgradeOpts.installServers,
 	}
 	output, err := startFixture.Install(ctx, &installOpts)
 	if err != nil {
@@ -340,6 +349,14 @@ func PerformUpgrade(
 		isConnectionInterrupted := strings.Contains(outputString, "Unavailable") && strings.Contains(outputString, "EOF")
 		if !isConnectionInterrupted {
 			return fmt.Errorf("failed to start agent upgrade to version %q: %w\n%s", endVersionInfo.Binary.Version, err, upgradeOutput)
+		}
+	}
+
+	// check status
+	if status := getStatus(ctx, startFixture); status != nil {
+		if status.State == 2 && status.UpgradeDetails == nil {
+			logger.Logf("Agent status indicates no upgrade is in progress.")
+			return nil
 		}
 	}
 
@@ -652,4 +669,24 @@ func windowsBaseTemp() (string, error) {
 		return "", fmt.Errorf("failed to chmod %s: %w", baseTmp, err)
 	}
 	return baseTmp, nil
+}
+
+// getStatus will attempt to get the agent status with retries if enounters an error
+func getStatus(ctx context.Context, fixture *atesting.Fixture) *atesting.AgentStatusOutput {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+	defer cancel()
+	ticker := time.NewTicker(time.Second * 5)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			status, err := fixture.ExecStatus(ctx)
+			if err != nil {
+				continue
+			}
+			return &status
+		}
+	}
 }

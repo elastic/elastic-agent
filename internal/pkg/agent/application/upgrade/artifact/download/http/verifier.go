@@ -53,6 +53,9 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte) (*Veri
 		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
 			return download.WithHeaders(rt, download.Headers)
 		}),
+		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
+			return WithBackoff(rt, log)
+		}),
 	)
 	if err != nil {
 		return nil, err
@@ -88,7 +91,7 @@ func (v *Verifier) Reload(c *artifact.Config) error {
 
 // Verify checks downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func (v *Verifier) Verify(a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
+func (v *Verifier) Verify(ctx context.Context, a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
 	artifactPath, err := artifact.GetArtifactPath(a, version, v.config.OS(), v.config.Arch(), v.config.TargetDirectory)
 	if err != nil {
 		return errors.New(err, "retrieving package path")
@@ -98,7 +101,7 @@ func (v *Verifier) Verify(a artifact.Artifact, version agtversion.ParsedSemVer, 
 		return fmt.Errorf("failed to verify SHA512 hash: %w", err)
 	}
 
-	if err = v.verifyAsc(a, version, skipDefaultPgp, pgpBytes...); err != nil {
+	if err = v.verifyAsc(ctx, a, version, skipDefaultPgp, pgpBytes...); err != nil {
 		var invalidSignatureErr *download.InvalidSignatureError
 		if errors.As(err, &invalidSignatureErr) {
 			if err := os.Remove(artifactPath); err != nil {
@@ -116,7 +119,7 @@ func (v *Verifier) Verify(a artifact.Artifact, version agtversion.ParsedSemVer, 
 	return nil
 }
 
-func (v *Verifier) verifyAsc(a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultKey bool, pgpSources ...string) error {
+func (v *Verifier) verifyAsc(ctx context.Context, a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultKey bool, pgpSources ...string) error {
 	filename, err := artifact.GetArtifactName(a, version, v.config.OS(), v.config.Arch())
 	if err != nil {
 		return errors.New(err, "retrieving package name")
@@ -132,7 +135,7 @@ func (v *Verifier) verifyAsc(a artifact.Artifact, version agtversion.ParsedSemVe
 		return errors.New(err, "composing URI for fetching asc file", errors.TypeNetwork)
 	}
 
-	ascBytes, err := v.getPublicAsc(ascURI)
+	ascBytes, err := v.getPublicAsc(ctx, ascURI)
 	if err != nil {
 		return errors.New(err, fmt.Sprintf("fetching asc file from %s", ascURI), errors.TypeNetwork, errors.M(errors.MetaKeyURI, ascURI))
 	}
@@ -163,8 +166,8 @@ func (v *Verifier) composeURI(filename, artifactName string) (string, error) {
 	return uri.String(), nil
 }
 
-func (v *Verifier) getPublicAsc(sourceURI string) ([]byte, error) {
-	ctx, cancelFn := context.WithTimeout(context.Background(), 30*time.Second)
+func (v *Verifier) getPublicAsc(ctx context.Context, sourceURI string) ([]byte, error) {
+	ctx, cancelFn := context.WithTimeout(ctx, 30*time.Second)
 	defer cancelFn()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURI, nil)
 	if err != nil {

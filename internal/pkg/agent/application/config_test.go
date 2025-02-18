@@ -24,7 +24,7 @@ func testMgmtMode(t *testing.T) {
 	t.Run("succeed when local mode is selected", func(t *testing.T) {
 		c := mustWithConfigMode(true)
 		m := localConfig{}
-		err := c.Unpack(&m)
+		err := c.UnpackTo(&m)
 		require.NoError(t, err)
 		assert.Equal(t, false, m.Fleet.Enabled)
 		assert.Equal(t, true, configuration.IsStandalone(m.Fleet))
@@ -34,7 +34,7 @@ func testMgmtMode(t *testing.T) {
 	t.Run("succeed when fleet mode is selected", func(t *testing.T) {
 		c := mustWithConfigMode(false)
 		m := localConfig{}
-		err := c.Unpack(&m)
+		err := c.UnpackTo(&m)
 		require.NoError(t, err)
 		assert.Equal(t, true, m.Fleet.Enabled)
 		assert.Equal(t, false, configuration.IsStandalone(m.Fleet))
@@ -49,7 +49,7 @@ func testLocalConfig(t *testing.T) {
 		})
 
 		m := configuration.ReloadConfig{}
-		err := c.Unpack(&m)
+		err := c.UnpackTo(&m)
 		assert.Error(t, err)
 
 		c = config.MustNewConfigFrom(map[string]interface{}{
@@ -57,7 +57,7 @@ func testLocalConfig(t *testing.T) {
 			"period":  1,
 		})
 
-		err = c.Unpack(&m)
+		err = c.UnpackTo(&m)
 		assert.NoError(t, err)
 		assert.Equal(t, 1*time.Second, m.Period)
 	})

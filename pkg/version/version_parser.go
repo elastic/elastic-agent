@@ -20,6 +20,7 @@ const preReleaseSeparator = "-"
 const metadataSeparator = "+"
 const prereleaseTokenSeparator = "."
 const snapshotPrereleaseToken = "SNAPSHOT"
+const IsIndependentReleaseFormat = `^build\d{12}`
 
 var semVerFmtRegEx *regexp.Regexp
 var numericPrereleaseTokenRegEx *regexp.Regexp
@@ -129,6 +130,20 @@ func (psv ParsedSemVer) IsSnapshot() bool {
 	return slices.Contains(prereleaseTokens, snapshotPrereleaseToken)
 }
 
+func (psv ParsedSemVer) IsIndependentRelease() bool {
+	matched, err := regexp.MatchString(IsIndependentReleaseFormat, psv.buildMetadata)
+	return err == nil && matched
+}
+
+func (psv ParsedSemVer) IndependentBuildID() string {
+	r := regexp.MustCompile(IsIndependentReleaseFormat)
+	if matches := r.FindAllString(psv.buildMetadata, -1); len(matches) > 0 {
+		return matches[0]
+	}
+
+	return ""
+}
+
 func (psv ParsedSemVer) Less(other ParsedSemVer) bool {
 	// compare major version
 	if psv.major != other.major {
@@ -145,8 +160,31 @@ func (psv ParsedSemVer) Less(other ParsedSemVer) bool {
 		return psv.patch < other.patch
 	}
 
+	if psv.IsIndependentRelease() || other.IsIndependentRelease() {
+		// one of them is independent release let's compare those
+		return psv.compareIndependentBuild(other)
+	}
+
 	// compare prerelease strings as major.minor.patch are equal
 	return psv.comparePrerelease(other)
+}
+
+func (psv ParsedSemVer) compareIndependentBuild(other ParsedSemVer) bool {
+	// spare regex parsing
+	psvIsIndependent := psv.IsIndependentRelease()
+	otherIsIndependent := other.IsIndependentRelease()
+
+	if !psvIsIndependent && !otherIsIndependent {
+		return false
+	}
+
+	if psvIsIndependent != otherIsIndependent {
+		// independent release is always newer
+		return !psvIsIndependent
+	}
+
+	// compare build IDs
+	return psv.IndependentBuildID() < other.IndependentBuildID()
 }
 
 // comparePrerelease compares the prerelease part of 2 ParsedSemVer objects
@@ -251,6 +289,7 @@ func ParseVersion(version string) (*ParsedSemVer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parsing patch version: %w", err)
 	}
+
 	return &ParsedSemVer{
 		original:      version,
 		major:         major,

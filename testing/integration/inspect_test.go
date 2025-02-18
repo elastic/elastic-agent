@@ -78,6 +78,12 @@ func TestInspect(t *testing.T) {
 	require.NoErrorf(t, err, "Error when running inspect, output: %s", p)
 	// Unmarshal into minimal object just to check if a secret has been redacted.
 	var yObj struct {
+		Agent struct {
+			Protection struct {
+				SigningKey         string `yaml:"signing_key"`
+				UninstallTokenHash string `yaml:"uninstall_token_hash"`
+			} `yaml:"protection"`
+		} `yaml:"agent"`
 		SecretPaths []string `yaml:"secret_paths"`
 		Inputs      []struct {
 			CustomAttr string `yaml:"custom_attr"`
@@ -88,4 +94,6 @@ func TestInspect(t *testing.T) {
 	assert.ElementsMatch(t, []string{"inputs.0.custom_attr"}, yObj.SecretPaths)
 	require.Len(t, yObj.Inputs, 1)
 	assert.Equalf(t, "<REDACTED>", yObj.Inputs[0].CustomAttr, "inspect output: %s", p)
+	assert.Equalf(t, "<REDACTED>", yObj.Agent.Protection.SigningKey, "`signing_key` is not redacted but it should be, because it contains `key`. inspect output: %s", p)
+	assert.Equalf(t, "<REDACTED>", yObj.Agent.Protection.UninstallTokenHash, "`uninstall_token_hash` is not redacted but it should be, because it contains `token`. inspect output: %s", p)
 }

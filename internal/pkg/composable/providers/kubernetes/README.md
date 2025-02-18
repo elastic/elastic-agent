@@ -1,20 +1,30 @@
-##  Autodiscover provider in Elastic Agent
+## Autodiscover provider in Elastic Agent
 
-https://www.elastic.co/guide/en/fleet/8.0/dynamic-input-configuration.html#dynamic-providers
+  
 
-Currently Kubernetes dynamic provider can only be configured in [standalone](https://github.com/elastic/beats/blob/03bf16907bea9768427f8305a5c345368b55d834/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L24) agent.
-In fleet managed agent it is enabled by default with default values.
+https://www.elastic.co/guide/en/fleet/current/kubernetes-provider.html
 
-Template based autodiscover of Kubernetes resources is only supported in standalone mode as of now.
-It is not part of the Kubernetes Integration yet.
+  
 
-Hints based autodiscover is not supported yet.
+Kubernetes provider can be configured both in **standalone** and **fleet managed** elastic agent.
 
-### Template based autodiscover
+a. In  **standalone** elastic agent, the kubernetes provider is configured inside the [elastic-agent-standalone-kubernetes.yaml](https://github.com/elastic/elastic-agent/blob/f994f5bfdf68db27902a4175c3b655b4d611cf7c/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L28). User can update the parameters based on their needs.
 
-Example:
-As an example we will use again redis module.
-In agent.yml(configmap) an extra input block needs to be added.
+b. In **fleet managed** elastic agent, kubernetes provider is enabled by default with default values. User needs to follow the steps described in the [documentation](https://www.elastic.co/guide/en/fleet/current/advanced-kubernetes-managed-by-fleet.html) to configure it.
+
+Condition based autodiscover is supported both in **fleet managed** elastic agent and in **standalone** elastic agent (see [doc](https://www.elastic.co/guide/en/fleet/current/conditions-based-autodiscover.html)).
+
+Hints based autodiscover is only supported in **standalone** elastic agent (see [doc](https://www.elastic.co/guide/en/fleet/current/hints-annotations-autodiscovery.html)).
+
+  
+
+### Conditions based autodiscover
+
+
+As an example we will use the redis module.
+
+To automatically identify a Redis Pod and monitor it with the Redis integration, add the following input configuration inside the [Elastic Agent Standalone manifest](https://github.com/elastic/elastic-agent/blob/main/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml):
+
 ```
 # Add extra input blocks here, based on conditions
 # so as to automatically identify targeted Pods and start monitoring them
@@ -43,28 +53,54 @@ In agent.yml(configmap) an extra input block needs to be added.
       condition: ${kubernetes.pod.labels.app} == 'redis'
 ```
 
-What makes this input block dynamic are the variables hosts and condition.
-`${kubernetes.pod.ip}` and `${kubernetes.pod.labels.app}`
+  
+
+What makes this input block dynamic are the variables under hosts block and the condition.
+
+`${kubernetes.pod.ip}` and `${kubernetes.pod.labels.app} == 'redis'`
+
+  
 
 #### High level description
-The Kubernetes dynamic provider watches for Kubernetes resources and generates mappings from them (similar to events in beats provider). The mappings include those variables([list of variables](https://www.elastic.co/guide/en/fleet/03bf16907bea9768427f8305a5c345368b55d834/dynamic-input-configuration.html#kubernetes-provider)) for each k8s resource with unique value for each one of them.
-Agent composable controller which controls all the providers receives these mappings and tries to match them with the  input blogs of the configurations.
-This means that for every mapping that the condition matches (kubernetes.pod.labels.app equals to redis), a
-new input will be created in which the condition will be removed(not needed anymore) and the `kubernetes.pod.ip` variable will be substituted from the value in the same mapping.
-The updated complete inputs blog will be then forwarded to agent to spawn/update metricbeat and filebeat instances.
 
-##### Internals
+The Kubernetes provider watches for Kubernetes resources and generates mappings from them (similar to events in beats provider). The mappings include those variables ([list of variables](https://www.elastic.co/guide/en/fleet/current/kubernetes-provider.html#_provider_for_pod_resources)) for each k8s resource with unique value for each one of them.
 
-Step-by-step walkthrough
-1. Elastic agent running in local mode initiates a new [composable controller](https://github.com/elastic/beats/blob/03bf16907bea9768427f8305a5c345368b55d834/x-pack/elastic-agent/pkg/agent/application/local_mode.go#L112).
-2. The controller consists of all contextProviders and [dynamicProviders](https://github.com/elastic/beats/blob/03bf16907bea9768427f8305a5c345368b55d834/x-pack/elastic-agent/pkg/composable/controller.go#L73).
-3. Agent initiates a new [emitter](https://github.com/elastic/beats/blob/03bf16907bea9768427f8305a5c345368b55d834/x-pack/elastic-agent/pkg/agent/application/local_mode.go#L118) which [starts](https://github.com/elastic/beats/blob/03bf16907bea9768427f8305a5c345368b55d834/x-pack/elastic-agent/pkg/agent/application/pipeline/emitter/emitter.go#L27) all the dynamicProviders of the [controller](https://github.com/elastic/beats/blob/03bf16907bea9768427f8305a5c345368b55d834/x-pack/elastic-agent/pkg/composable/controller.go#L122).
-4. Kubernetes Dynamic provider depending on the [resource type](https://github.com/elastic/beats/blob/03bf16907bea9768427f8305a5c345368b55d834/x-pack/elastic-agent/pkg/composable/providers/kubernetes/kubernetes.go#L56) (default is pod) initiates a [watcher](https://github.com/elastic/beats/blob/3c77c9a92a2e90b85f525293cb4c2cfc5bc996b1/x-pack/elastic-agent/pkg/composable/providers/kubernetes/pod.go#L69) for
-   the specific resource the same way as in metrcbeat/filebeat kubernetes provider.
-5. Under the hood a dedicated watcher starts for pods, nodes and namespaces as well as a metadata generator.
-6. The difference is that the watchers instead of publishing events, they create [data](https://github.com/elastic/beats/blob/3c77c9a92a2e90b85f525293cb4c2cfc5bc996b1/x-pack/elastic-agent/pkg/composable/providers/kubernetes/pod.go#L134) from the objects read from the queue. These [data](https://github.com/elastic/beats/blob/3c77c9a92a2e90b85f525293cb4c2cfc5bc996b1/x-pack/elastic-agent/pkg/composable/providers/kubernetes/pod.go#L244) consist of mappings, processors and a priority .
-7. A [mapping](https://github.com/elastic/beats/blob/3c77c9a92a2e90b85f525293cb4c2cfc5bc996b1/x-pack/elastic-agent/pkg/composable/providers/kubernetes/pod.go#L217) includes all those variables retrieved from the kubernetes resource metadata while the [processors](https://github.com/elastic/beats/blob/3c77c9a92a2e90b85f525293cb4c2cfc5bc996b1/x-pack/elastic-agent/pkg/composable/providers/kubernetes/pod.go#L236) indicate the addition of extra fields.
-8. Composable controller [collects](https://github.com/elastic/beats/blob/3c77c9a92a2e90b85f525293cb4c2cfc5bc996b1/x-pack/elastic-agent/pkg/composable/controller.go#L244) the created data and [compares](https://github.com/elastic/beats/blob/3c77c9a92a2e90b85f525293cb4c2cfc5bc996b1/x-pack/elastic-agent/pkg/composable/controller.go#L263) their mappings and processors against the existing ones. If there is a change, it updates the dynamicProviderState and notifies a worker thread through a [signal](https://github.com/elastic/beats/blob/3c77c9a92a2e90b85f525293cb4c2cfc5bc996b1/x-pack/elastic-agent/pkg/composable/controller.go#L272).
-9. When the worker gets [notified](https://github.com/elastic/beats/blob/3c77c9a92a2e90b85f525293cb4c2cfc5bc996b1/x-pack/elastic-agent/pkg/composable/controller.go#L141) for a change it creates new [variables](https://github.com/elastic/beats/blob/3c77c9a92a2e90b85f525293cb4c2cfc5bc996b1/x-pack/elastic-agent/pkg/composable/controller.go#L170) from the mappings and processors.
-10. It then updates the [emitter](https://github.com/elastic/beats/blob/3c77c9a92a2e90b85f525293cb4c2cfc5bc996b1/x-pack/elastic-agent/pkg/agent/application/pipeline/emitter/controller.go#L111) with them.
-11. The emitter controller will update the ast that is then used by the agent to generate the final inputs and spawn new programs to deploy the changes([code](https://github.com/elastic/beats/blob/3c77c9a92a2e90b85f525293cb4c2cfc5bc996b1/x-pack/elastic-agent/pkg/agent/application/pipeline/emitter/controller.go#L151)).
+Agent [composable controller](https://github.com/elastic/elastic-agent/blob/f994f5bfdf68db27902a4175c3b655b4d611cf7c/internal/pkg/composable/controller.go#L117) which controls all the providers [receives](https://github.com/elastic/elastic-agent/blob/f994f5bfdf68db27902a4175c3b655b4d611cf7c/internal/pkg/composable/controller.go#L371) these mappings and tries to match them with the input blocks of the configurations.
+
+This means that for every mapping that the condition matches (`kubernetes.pod.labels.app == redis`), a new input will be created in which the condition will be removed(not needed anymore) and the `kubernetes.pod.ip` variable will be substituted from the value in the same mapping.
+
+The updated complete inputs block will be then forwarded to agent to spawn/update metricbeat and filebeat instances.
+
+
+### Hints based autodiscover
+
+Standalone elastic agent supports autodiscover based on hints collected from the [Kubernetes Provider](https://www.elastic.co/guide/en/fleet/current/kubernetes-provider.html). The hints mechanism looks for hints in kubernetes pod annotations that have the prefix `co.elastic.hints`. As soon as the Pod is ready, elastic agent checks it for hints and launches the proper configuration for the container. Hints tell elastic agent how to monitor the container by using the proper integration.
+The full list of supported hints can be found [here](https://www.elastic.co/guide/en/fleet/current/hints-annotations-autodiscovery.html#_required_hints).
+
+Example:
+
+As an example we will use again redis module.
+Add the following annotations to a redis pod. Elastic agent will then initiate a new input with redis module to properly monitor the redis pod.
+```
+apiVersion: v1 
+kind: Pod
+metadata:
+  name: redis 
+  annotations:
+    co.elastic.hints/package: redis
+    co.elastic.hints/data_streams: info
+    co.elastic.hints/info.period: 5m
+```
+
+In order to enable hints based autodiscover, user needs to uncomment the following lines in the [Elastic Agent Standalone manifest](https://github.com/elastic/elastic-agent/blob/main/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml)
+1. [Enable hints](https://github.com/elastic/elastic-agent/blob/4e983446837ff551a9f058fdc575a193d9afcbab/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L32) feature in kubernetes provider configuration.
+2. Add the [init container]((https://github.com/elastic/elastic-agent/blob/c01636e7383a9b2af9a588e0fcf1a4cae7d0d65c/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L697-L709)) that downloads the templates of various packages.
+3. Add the [volumeMount](https://github.com/elastic/elastic-agent/blob/c01636e7383a9b2af9a588e0fcf1a4cae7d0d65c/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L783-L785) and [volume](https://github.com/elastic/elastic-agent/blob/c01636e7383a9b2af9a588e0fcf1a4cae7d0d65c/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L824-L826).
+
+**Note:** If hints are enabled, the [`default_container_logs`](https://github.com/elastic/elastic-agent/blob/4e983446837ff551a9f058fdc575a193d9afcbab/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L33C8-L33C42) option is set to `True` by default. This means that logs from all discovered pods will be collected automatically, without requiring any annotations. To disable this behavior, set the option to `False`. This will stop the automatic log collection from all discovered pods. In this case, you must explicitly annotate your pods with the annotation `co.elastic.hints/package: "container_logs"` to collect their logs.
+
+
+The init container will start before the elastic agent pod and will donwload all the templates of packages [supported](https://github.com/elastic/elastic-agent/tree/main/deploy/kubernetes/elastic-agent-standalone/templates.d). 
+Elastic agent will then collect from the pods running (through the watchers mechanism) all the hints annotations and will try to match them with the correct package.
+In the redis example, it will use the [redis template](https://github.com/elastic/elastic-agent/blob/main/deploy/kubernetes/elastic-agent-standalone/templates.d/redis.yml) and substitute the template variables with the values specified in the annotations. Default values will be used for variables not provided.
+A new input will be then created for redis and redis-specific data will start being collected.

@@ -94,7 +94,7 @@ func (sr *ServerReloader) Addr() net.Addr {
 
 func (sr *ServerReloader) Reload(rawConfig *aConfig.Config) error {
 	newConfig := configuration.DefaultConfiguration()
-	if err := rawConfig.Unpack(&newConfig); err != nil {
+	if err := rawConfig.UnpackTo(&newConfig); err != nil {
 		return errors.New(err, "failed to unpack monitoring config during reload")
 	}
 

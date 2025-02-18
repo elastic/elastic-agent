@@ -5,6 +5,7 @@
 package fs
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -65,7 +66,7 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte) (*Veri
 
 // Verify checks downloaded package on preconfigured
 // location against a key stored on elastic.co website.
-func (v *Verifier) Verify(a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
+func (v *Verifier) Verify(ctx context.Context, a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
 	filename, err := artifact.GetArtifactName(a, version, v.config.OS(), v.config.Arch())
 	if err != nil {
 		return fmt.Errorf("could not get artifact name: %w", err)

@@ -1,4 +1,6 @@
 version: 2
+component_files: 
+ - endpoint-security-resources.zip
 inputs:
   - name: endpoint
     description: "Endpoint Security"
@@ -14,6 +16,8 @@ inputs:
       - UPGRADE
     runtime:
       preventions:
+        - condition: ${runtime.arch} != ${runtime.native_arch}
+          message: "Elastic Defend cannot run on an emulated architecture"
         - condition: ${runtime.arch} == 'arm64' and ${runtime.family} == 'redhat' and ${runtime.major} == 7
           message: "Elastic Defend doesn't support RHEL7 on arm64"
         - condition: ${user.root} == false
@@ -57,6 +61,8 @@ inputs:
     proxied_actions: *proxied_actions
     runtime:
       preventions:
+        - condition: ${runtime.arch} != ${runtime.native_arch}
+          message: "Elastic Defend cannot run on an emulated architecture"
         - condition: ${user.root} == false
           message: "Elastic Defend requires Elastic Agent be running as root"
         - condition: ${install.in_default} == false

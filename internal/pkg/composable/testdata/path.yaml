@@ -1,0 +1,4 @@
+config: /usr/share/elastic-agent/state
+data: /usr/share/elastic-agent/state/data
+home: /usr/share/elastic-agent/state/data
+logs: /usr/share/elastic-agent

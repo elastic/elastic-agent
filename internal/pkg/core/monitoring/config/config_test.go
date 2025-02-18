@@ -99,7 +99,7 @@ metrics: true`,
 			require.NoError(t, err, "failed to create config")
 
 			cfg := testCase.startingCfg
-			err = c.Unpack(&cfg)
+			err = c.UnpackTo(&cfg)
 			require.NoError(t, err, "failed to unpack config")
 
 			assert.Equal(t, testCase.expectedEnabled, cfg.HTTP.Enabled, "enabled incorrect")
@@ -151,7 +151,7 @@ http:
 			require.NoError(t, err, "failed to create config")
 
 			cfg := DefaultConfig()
-			err = c.Unpack(&cfg)
+			err = c.UnpackTo(&cfg)
 			require.NoError(t, err, "failed to unpack config")
 
 			require.Equal(t, tc.expectedHost, cfg.HTTP.Host)
@@ -222,7 +222,7 @@ func TestAPMConfig(t *testing.T) {
 			require.NoError(t, err)
 
 			cfg := DefaultConfig()
-			require.NoError(t, in.Unpack(cfg))
+			require.NoError(t, in.UnpackTo(cfg))
 			require.NotNil(t, cfg)
 
 			assert.Equal(t, tc.out, cfg.APM)

@@ -16,7 +16,7 @@ import (
 )
 
 func TestVars_Replace(t *testing.T) {
-	vars := mustMakeVars(map[string]interface{}{
+	vars := mustMakeVarsWithDefault(map[string]interface{}{
 		"un-der_score": map[string]interface{}{
 			"key1":      "data1",
 			"key2":      "data2",
@@ -42,7 +42,7 @@ func TestVars_Replace(t *testing.T) {
 			"key5": "${",
 			"key6": "$${",
 		},
-	})
+	}, "other")
 	tests := []struct {
 		Input   string
 		Result  Node
@@ -75,6 +75,14 @@ func TestVars_Replace(t *testing.T) {
 		},
 		{
 			"${un-der_score.missing|un-der_score.missing2|other.data}",
+			NewStrVal("info"),
+			false,
+			false,
+		},
+		{
+			// data will be resolved to other.data since 'other' is the default provider
+			// set at variable creation (see mustMakeVarsWithDefault call)
+			"${un-der_score.missing|un-der_score.missing2|data}",
 			NewStrVal("info"),
 			false,
 			false,
@@ -185,13 +193,10 @@ func TestVars_Replace(t *testing.T) {
 			false,
 		},
 		{
-			`list inside string ${un-der_score.list} causes no match`,
-			NewList([]Node{
-				NewStrVal("array1"),
-				NewStrVal("array2"),
-			}),
+			`list inside string ${un-der_score.list} strings array`,
+			NewStrVal(`list inside string [array1,array2] strings array`),
 			false,
-			true,
+			false,
 		},
 		{
 			`${un-der_score.dict}`,
@@ -203,13 +208,10 @@ func TestVars_Replace(t *testing.T) {
 			false,
 		},
 		{
-			`dict inside string ${un-der_score.dict} causes no match`,
-			NewDict([]Node{
-				NewKey("key1", NewStrVal("value1")),
-				NewKey("key2", NewStrVal("value2")),
-			}),
+			`dict inside string ${un-der_score.dict} strings dict`,
+			NewStrVal(`dict inside string {key1:value1},{key2:value2} strings dict`),
 			false,
-			true,
+			false,
 		},
 		{
 			`start $${keep} ${un-der_score.key1} $${un-der_score.key1}`,
@@ -260,7 +262,7 @@ func TestVars_Replace(t *testing.T) {
 			if test.Error {
 				assert.Error(t, err)
 			} else if test.NoMatch {
-				assert.Error(t, ErrNoMatch, err)
+				assert.ErrorIs(t, err, ErrNoMatch)
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, test.Result, res)
@@ -297,10 +299,14 @@ func TestVars_ReplaceWithProcessors(t *testing.T) {
 		},
 		"dynamic",
 		processers,
-		nil)
+		nil, "testing")
 	require.NoError(t, err)
 
 	res, err := vars.Replace("${testing.key1}")
+	require.NoError(t, err)
+	assert.Equal(t, NewStrVal("data1"), res)
+
+	res, err = vars.Replace("${key1}")
 	require.NoError(t, err)
 	assert.Equal(t, NewStrVal("data1"), res)
 
@@ -364,7 +370,7 @@ func TestVars_ReplaceWithFetchContextProvider(t *testing.T) {
 		},
 		"dynamic",
 		processers,
-		fetchContextProviders)
+		fetchContextProviders, "")
 	require.NoError(t, err)
 
 	res, err := vars.Replace("${testing.key1}")

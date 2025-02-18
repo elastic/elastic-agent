@@ -37,14 +37,15 @@ func (c *dynamicProvider) Run(comm composable.DynamicProviderComm) error {
 			return errors.New(err, fmt.Sprintf("failed to add mapping for index %d", i), errors.TypeUnexpected)
 		}
 	}
-	return nil
+	<-comm.Done()
+	return comm.Err()
 }
 
 // DynamicProviderBuilder builds the dynamic provider.
 func DynamicProviderBuilder(_ *logger.Logger, c *config.Config, _ bool) (composable.DynamicProvider, error) {
 	p := &dynamicProvider{}
 	if c != nil {
-		err := c.Unpack(p)
+		err := c.UnpackTo(p)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unpack vars: %w", err)
 		}

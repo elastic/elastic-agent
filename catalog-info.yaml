@@ -29,7 +29,7 @@ metadata:
 spec:
   type: buildkite-pipeline
   owner: group:ingest-fp
-  system: buildkite
+  system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
     kind: Pipeline
@@ -37,14 +37,15 @@ spec:
       name: elastic-agent
       description: Buildkite pipeline for the Elastic Agent project
     spec:
-      branch_configuration: "main 7.* 8.* v7.* v8.*"
+      branch_configuration: "main 7.* 8.* 9.*"
       repository: elastic/elastic-agent
       pipeline_file: ".buildkite/pipeline.yml"
       provider_settings:
         build_pull_request_forks: false
         build_pull_requests: true
-        build_tags: true
+        build_tags: false
         filter_enabled: true
+        # TODO: what's the reason for this filter?
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       schedules:
@@ -81,7 +82,7 @@ metadata:
 spec:
   type: buildkite-pipeline
   owner: group:ingest-fp
-  system: buildkite
+  system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
     kind: Pipeline
@@ -122,7 +123,7 @@ metadata:
 spec:
   type: buildkite-pipeline
   owner: group:ingest-fp
-  system: buildkite
+  system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
     kind: Pipeline
@@ -136,11 +137,6 @@ spec:
         trigger_mode: none # don't trigger jobs from github activity
       cancel_intermediate_builds: false
       skip_intermediate_builds: false
-      schedules:
-        daily:
-          branch: main
-          cronline: "0 */6 * * *" # every 6 hours
-          message: Test execution of the new pipeline
       teams:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ
@@ -161,7 +157,7 @@ metadata:
 spec:
   type: buildkite-pipeline
   owner: group:ingest-fp
-  system: buildkite
+  system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
     kind: Pipeline
@@ -172,9 +168,9 @@ spec:
       repository: elastic/elastic-agent
       pipeline_file: ".buildkite/pipeline.elastic-agent-package.yml"
       env:
-        ELASTIC_SLACK_NOTIFICATIONS_ENABLED: 'true'
+        ELASTIC_SLACK_NOTIFICATIONS_ENABLED: "true"
         SLACK_NOTIFICATIONS_CHANNEL: "#ingest-notifications"
-        SLACK_NOTIFICATIONS_ON_SUCCESS: 'false'
+        SLACK_NOTIFICATIONS_ON_SUCCESS: "false"
         SLACK_NOTIFICATIONS_ALL_BRANCHES: "true"
       provider_settings:
         build_pull_request_forks: false
@@ -213,7 +209,7 @@ metadata:
 spec:
   type: buildkite-pipeline
   owner: group:ingest-fp
-  system: buildkite
+  system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
     kind: Pipeline
@@ -221,7 +217,7 @@ spec:
       name: elastic-agent-binary-dra
       description: Buildkite pipeline for packaging Elastic Agent core binary and publish it to DRA
     spec:
-      branch_configuration: "main 7.* 8.* v7.* v8.*"
+      branch_configuration: "main 7.* 8.* 9.*"
       pipeline_file: ".buildkite/pipeline.elastic-agent-binary-dra.yml"
       provider_settings:
         build_pull_request_forks: false
@@ -230,6 +226,7 @@ spec:
         build_tags: false
         build_branches: true # enable build for branches. This relies on the filter in .buildkite/pipeline.elastic-agent-binary-dra.yml
         filter_enabled: true
+        # TODO: what's the reason for this filter?
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       repository: elastic/elastic-agent
@@ -258,7 +255,7 @@ metadata:
 spec:
   type: buildkite-pipeline
   owner: group:ingest-fp
-  system: buildkite
+  system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
     kind: Pipeline
@@ -300,7 +297,7 @@ metadata:
 spec:
   type: buildkite-pipeline
   owner: group:ingest-fp
-  system: buildkite
+  system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
     kind: Pipeline
@@ -316,6 +313,7 @@ spec:
         build_tags: false
         build_branches: false
         filter_enabled: true
+        # TODO: what's the reason for this filter?
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       repository: elastic/elastic-agent

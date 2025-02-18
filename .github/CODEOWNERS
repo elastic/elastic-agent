@@ -9,7 +9,8 @@
 /.ci @elastic/ingest-eng-prod
 /.github @elastic/ingest-eng-prod
 /.github/CODEOWNERS @elastic/ingest-tech-lead
-/deploy/kubernetes @elastic/obs-cloudnative-monitoring
-/dev-tools/kubernetes @elastic/obs-cloudnative-monitoring
+/deploy/helm @elastic/elastic-agent-control-plane
+/deploy/kubernetes @elastic/elastic-agent-control-plane
+/dev-tools/kubernetes @elastic/elastic-agent-control-plane
 /internal/pkg/agent/application/configuration_embed_changed_test.go @elastic/cloudbeat
-/internal/pkg/composable/providers/kubernetes @elastic/obs-cloudnative-monitoring
+/internal/pkg/composable/providers/kubernetes @elastic/elastic-agent-control-plane

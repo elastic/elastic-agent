@@ -7,8 +7,10 @@ package config
 import (
 	"fmt"
 	"io"
+	"maps"
 	"os"
 
+	"go.opentelemetry.io/collector/confmap"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/go-ucfg"
@@ -17,11 +19,21 @@ import (
 
 // options hold the specified options
 type options struct {
+	otelKeys []string
 	skipKeys []string
 }
 
 // Option is an option type that modifies how loading configs work
 type Option func(*options)
+
+// OTelKeys maps top-level keys to OTel specific configuration.
+//
+// The provided keys only skip if the keys are top-level keys.
+func OTelKeys(keys ...string) Option {
+	return func(opts *options) {
+		opts.otelKeys = keys
+	}
+}
 
 // VarSkipKeys prevents variable expansion for these keys.
 //
@@ -37,16 +49,22 @@ var DefaultOptions = []interface{}{
 	ucfg.PathSep("."),
 	ucfg.ResolveEnv,
 	ucfg.VarExp,
-	VarSkipKeys("inputs"),
+	VarSkipKeys("inputs", "outputs"),
 	ucfg.IgnoreCommas,
+	OTelKeys("connectors", "receivers", "processors", "exporters", "extensions", "service"),
 }
 
-// Config custom type over a ucfg.Config to add new methods on the object.
-type Config ucfg.Config
+// Config custom type that can provide both an Agent configuration alongside of an optional OTel configuration.
+type Config struct {
+	// Agent configuration
+	Agent *ucfg.Config
+	// OTel configuration (YAML bytes raw)
+	OTel *confmap.Conf
+}
 
 // New creates a new empty config.
 func New() *Config {
-	return newConfigFrom(ucfg.New())
+	return newConfigFrom(ucfg.New(), nil)
 }
 
 // NewConfigFrom takes a interface and read the configuration like it was YAML.
@@ -83,10 +101,20 @@ func NewConfigFrom(from interface{}, opts ...interface{}) (*Config, error) {
 			return nil, err
 		}
 	} else if contents, ok := from.(map[string]interface{}); ok {
-		data = contents
+		// don't modify the incoming contents
+		data = maps.Clone(contents)
 	} else {
 		c, err := ucfg.NewFrom(from, ucfgOpts...)
-		return newConfigFrom(c), err
+		return newConfigFrom(c, nil), err
+	}
+
+	otelKeys := map[string]interface{}{}
+	for _, skip := range local.otelKeys {
+		val, ok := data[skip]
+		if ok {
+			otelKeys[skip] = val
+			delete(data, skip)
+		}
 	}
 
 	skippedKeys := map[string]interface{}{}
@@ -103,14 +131,17 @@ func NewConfigFrom(from interface{}, opts ...interface{}) (*Config, error) {
 	}
 	if len(skippedKeys) > 0 {
 		err = cfg.Merge(skippedKeys, ucfg.ResolveNOOP)
-
-		// we modified incoming object
-		// cleanup so skipped keys are not missing
-		for k, v := range skippedKeys {
-			data[k] = v
+		if err != nil {
+			return nil, err
 		}
 	}
-	return newConfigFrom(cfg), err
+
+	var otelCfg *confmap.Conf
+	if len(otelKeys) > 0 {
+		otelCfg = confmap.NewFromStringMap(otelKeys)
+	}
+
+	return newConfigFrom(cfg, otelCfg), nil
 }
 
 // MustNewConfigFrom try to create a configuration based on the type passed as arguments and panic
@@ -123,12 +154,23 @@ func MustNewConfigFrom(from interface{}) *Config {
 	return c
 }
 
-func newConfigFrom(in *ucfg.Config) *Config {
-	return (*Config)(in)
+func newConfigFrom(in *ucfg.Config, otel *confmap.Conf) *Config {
+	return &Config{
+		Agent: in,
+		OTel:  otel,
+	}
 }
 
-// Unpack unpacks a struct to Config.
-func (c *Config) Unpack(to interface{}, opts ...interface{}) error {
+// Unpack implements the ucfg.Unpacker interface.
+func (c *Config) Unpack(val interface{}) error {
+	if c.Agent == nil {
+		c.Agent = ucfg.New()
+	}
+	return c.Agent.Merge(val)
+}
+
+// UnpackTo unpacks this config into to with the given options.
+func (c *Config) UnpackTo(to interface{}, opts ...interface{}) error {
 	ucfgOpts, _, err := getOptions(opts...)
 	if err != nil {
 		return err
@@ -137,7 +179,7 @@ func (c *Config) Unpack(to interface{}, opts ...interface{}) error {
 }
 
 func (c *Config) access() *ucfg.Config {
-	return (*ucfg.Config)(c)
+	return c.Agent
 }
 
 // Merge merges two configuration together.
@@ -145,6 +187,24 @@ func (c *Config) Merge(from interface{}, opts ...interface{}) error {
 	ucfgOpts, _, err := getOptions(opts...)
 	if err != nil {
 		return err
+	}
+	cfg, ok := from.(*Config)
+	if ok {
+		// can merge both together
+		err = c.access().Merge(cfg.Agent, ucfgOpts...)
+		if err != nil {
+			return err
+		}
+		if c.OTel == nil && cfg.OTel != nil {
+			// simple, update to other retrieved configuration
+			c.OTel = cfg.OTel
+		} else if cfg.OTel != nil {
+			err = c.OTel.Merge(cfg.OTel)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 	return c.access().Merge(from, ucfgOpts...)
 }
@@ -223,7 +283,7 @@ func (c *Config) Enabled() bool {
 	if c == nil {
 		return false
 	}
-	if err := c.Unpack(&testEnabled); err != nil {
+	if err := c.UnpackTo(&testEnabled); err != nil {
 		// if unpacking fails, expect 'enabled' being set to default value
 		return true
 	}
@@ -248,7 +308,7 @@ func LoadFiles(paths ...string) (*Config, error) {
 			return nil, err
 		}
 	}
-	return newConfigFrom(merger.Config()), nil
+	return newConfigFrom(merger.Config(), nil), nil
 }
 
 func getOptions(opts ...interface{}) ([]ucfg.Option, options, error) {

@@ -26,13 +26,12 @@ import (
 	"github.com/hectane/go-acl"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
-	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
-	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/installtest"
@@ -102,7 +101,6 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 		createPolicyReq)
 	require.NoError(t, err)
 	t.Logf("created policy: %s", policy.ID)
-	check.ConnectedToFleet(ctx, t, agentFixture, 5*time.Minute)
 
 	// 3. Ensure installation is correct.
 	require.NoError(t, installtest.CheckSuccess(ctx, agentFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged}))
@@ -208,6 +206,7 @@ func testMonitoringLogsAreShipped(
 			"add_cloud_metadata: received error for provider digitalocean: failed with http status code 404",
 			"add_cloud_metadata: received error for provider azure: failed with http status code 404",
 			"add_cloud_metadata: received error for provider openstack: failed with http status code 404",
+			"add_cloud_metadata: received error for provider gcp: failed with http status code 404",
 			"elastic-agent-client error: rpc error: code = Canceled desc = context canceled", // can happen on restart
 			"failed to invoke rollback watcher: failed to start Upgrade Watcher",             // on debian this happens probably need to fix.
 			"falling back to IMDSv1: operation error ec2imds: getToken",                      // okay for the cloud metadata to not work

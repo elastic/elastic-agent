@@ -9,19 +9,12 @@ updates:
       - automation
       - skip-changelog
       - Team:Elastic-Agent-Control-Plane
-    groups:
-        otel-dependencies:
-            exclude-patterns:
-             - "github.com/elastic/*"
-            update-types:
-             - "minor"
-             - "patch"
     allow:
       # Only update internal dependencies for now while we evaluate this workflow.
       - dependency-name: "github.com/elastic/*"
-      - dependency-name: "go.opentelemetry.io/collector/*"
-      - dependency-name: "github.com/open-telemetry/opentelemetry-collector-contrib/*"
       - dependency-name: "github.com/elastic/opentelemetry-collector-components/*"
+    ignore:
+      - dependency-name: "github.com/elastic/beats/*"
     reviewers:
       - "elastic/elastic-agent-control-plane"
     open-pull-requests-limit: 10

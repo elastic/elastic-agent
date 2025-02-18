@@ -5,6 +5,7 @@
 package composed
 
 import (
+	"context"
 	goerrors "errors"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
@@ -39,11 +40,11 @@ func NewVerifier(log *logger.Logger, verifiers ...download.Verifier) *Verifier {
 }
 
 // Verify checks the package from configured source.
-func (v *Verifier) Verify(a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
+func (v *Verifier) Verify(ctx context.Context, a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
 	var errs []error
 
 	for _, verifier := range v.vv {
-		e := verifier.Verify(a, version, skipDefaultPgp, pgpBytes...)
+		e := verifier.Verify(ctx, a, version, skipDefaultPgp, pgpBytes...)
 		if e == nil {
 			// Success
 			return nil

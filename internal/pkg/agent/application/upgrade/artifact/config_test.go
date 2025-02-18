@@ -307,6 +307,6 @@ func TestConfig_Unpack(t *testing.T) {
 	require.NoError(t, err, "could not create config from empty string")
 
 	err = defaultcfg.Unpack(emptycgf)
-	require.NoError(t, err, "Unpack failed")
+	require.NoError(t, err, "UnpackTo failed")
 	assert.Equal(t, DefaultConfig(), defaultcfg)
 }

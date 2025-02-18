@@ -8,6 +8,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -18,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/otelhelpers"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -27,15 +30,18 @@ import (
 const maxUnauthCounter int = 6
 
 // Consts for states at fleet checkin
-const fleetStateDegraded = "DEGRADED"
-const fleetStateOnline = "online"
-const fleetStateError = "error"
-const fleetStateStarting = "starting"
+const (
+	fleetStateDegraded = "DEGRADED"
+	fleetStateOnline   = "online"
+	fleetStateError    = "error"
+	fleetStateStarting = "starting"
+)
 
 // Default Configuration for the Fleet Gateway.
 var defaultGatewaySettings = &fleetGatewaySettings{
-	Duration: 1 * time.Second,        // time between successful calls
-	Jitter:   500 * time.Millisecond, // used as a jitter for duration
+	Duration:                     1 * time.Second,        // time between successful calls
+	Jitter:                       500 * time.Millisecond, // used as a jitter for duration
+	ErrConsecutiveUnauthDuration: 1 * time.Hour,          // time between calls when the agent exceeds unauthorized response limit
 	Backoff: backoffSettings{ // time after a failed call
 		Init: 60 * time.Second,
 		Max:  10 * time.Minute,
@@ -43,9 +49,10 @@ var defaultGatewaySettings = &fleetGatewaySettings{
 }
 
 type fleetGatewaySettings struct {
-	Duration time.Duration   `config:"checkin_frequency"`
-	Jitter   time.Duration   `config:"jitter"`
-	Backoff  backoffSettings `config:"backoff"`
+	Duration                     time.Duration   `config:"checkin_frequency"`
+	Jitter                       time.Duration   `config:"jitter"`
+	Backoff                      backoffSettings `config:"backoff"`
+	ErrConsecutiveUnauthDuration time.Duration
 }
 
 type backoffSettings struct {
@@ -87,7 +94,6 @@ func New(
 	stateFetcher func() coordinator.State,
 	stateStore stateStore,
 ) (*FleetGateway, error) {
-
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	return newFleetGatewayWithScheduler(
 		log,
@@ -232,7 +238,7 @@ func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 	return nil, ctx.Err()
 }
 
-func (f *FleetGateway) convertToCheckinComponents(components []runtime.ComponentComponentState) []fleetapi.CheckinComponent {
+func (f *FleetGateway) convertToCheckinComponents(components []runtime.ComponentComponentState, collector *status.AggregateStatus) []fleetapi.CheckinComponent {
 	if components == nil {
 		return nil
 	}
@@ -250,7 +256,11 @@ func (f *FleetGateway) convertToCheckinComponents(components []runtime.Component
 		return ""
 	}
 
-	checkinComponents := make([]fleetapi.CheckinComponent, 0, len(components))
+	size := len(components)
+	if collector != nil {
+		size += len(collector.ComponentStatusMap)
+	}
+	checkinComponents := make([]fleetapi.CheckinComponent, 0, size)
 
 	for _, item := range components {
 		component := item.Component
@@ -280,6 +290,36 @@ func (f *FleetGateway) convertToCheckinComponents(components []runtime.Component
 		checkinComponents = append(checkinComponents, checkinComponent)
 	}
 
+	// OTel status is placed as a component for each top-level component in OTel
+	// and each subcomponent is a unit.
+	if collector != nil {
+		for id, item := range collector.ComponentStatusMap {
+			state, msg := otelhelpers.StateWithMessage(item)
+
+			checkinComponent := fleetapi.CheckinComponent{
+				ID:      id,
+				Type:    "otel",
+				Status:  stateString(state),
+				Message: msg,
+			}
+
+			if len(item.ComponentStatusMap) > 0 {
+				units := make([]fleetapi.CheckinUnit, 0, len(item.ComponentStatusMap))
+				for unitId, unitItem := range item.ComponentStatusMap {
+					unitState, unitMsg := otelhelpers.StateWithMessage(unitItem)
+					units = append(units, fleetapi.CheckinUnit{
+						ID:      unitId,
+						Status:  stateString(unitState),
+						Message: unitMsg,
+					})
+				}
+				checkinComponent.Units = units
+			}
+
+			checkinComponents = append(checkinComponents, checkinComponent)
+		}
+	}
+
 	return checkinComponents
 }
 
@@ -299,7 +339,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	state := f.stateFetcher()
 
 	// convert components into checkin components structure
-	components := f.convertToCheckinComponents(state.Components)
+	components := f.convertToCheckinComponents(state.Components, state.Collector)
 
 	f.log.Debugf("correcting agent loglevel from %s to %s using coordinator state", ecsMeta.Elastic.Agent.LogLevel, state.LogLevel.String())
 	// Fix loglevel with the current log level used by coordinator
@@ -319,16 +359,16 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	resp, took, err := cmd.Execute(ctx, req)
 	if isUnauth(err) {
 		f.unauthCounter++
-
-		if f.shouldUnenroll() {
-			f.log.Warnf("retrieved an invalid api key error '%d' times. Starting to unenroll the elastic agent.", f.unauthCounter)
-			return &fleetapi.CheckinResponse{
-				Actions: []fleetapi.Action{&fleetapi.ActionUnenroll{ActionID: "", ActionType: "UNENROLL", IsDetected: true}},
-			}, took, nil
+		if f.shouldUseLongSched() {
+			f.log.Warnf("retrieved an invalid api key error '%d' times. will use long scheduler", f.unauthCounter)
+			f.scheduler.SetDuration(defaultGatewaySettings.ErrConsecutiveUnauthDuration)
+			return &fleetapi.CheckinResponse{}, took, nil
 		}
 
 		return nil, took, err
 	}
+
+	f.scheduler.SetDuration(defaultGatewaySettings.Duration)
 
 	f.unauthCounter = 0
 	if err != nil {
@@ -347,8 +387,8 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	return resp, took, nil
 }
 
-// shouldUnenroll checks if the max number of trying an invalid key is reached
-func (f *FleetGateway) shouldUnenroll() bool {
+// shouldUseLongSched checks if the max number of trying an invalid key is reached
+func (f *FleetGateway) shouldUseLongSched() bool {
 	return f.unauthCounter > maxUnauthCounter
 }
 

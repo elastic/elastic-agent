@@ -17,7 +17,7 @@
       {{- . | toYaml | nindent 6}}
     {{- end }}
     inputs:
-      {{- with ($presetVal)._inputs -}}
+      {{- with ($presetVal)._inputs }}
       {{- . | toYaml | nindent 6 }}
       {{- end }}
     {{- else }}

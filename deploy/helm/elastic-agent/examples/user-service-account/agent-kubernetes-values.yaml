@@ -18,10 +18,3 @@ agent:
       clusterRole:
         annotations:
           elastic-agent.k8s.elastic.co/cr: nginx
-    ksmSharded:
-      serviceAccount:
-        create: false
-        name: user-sa-ksmSharded
-      clusterRole:
-        annotations:
-          elastic-agent.k8s.elastic.co/cr: nginx

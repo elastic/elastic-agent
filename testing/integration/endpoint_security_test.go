@@ -69,7 +69,7 @@ var protectionTests = []struct {
 // test automatically.
 func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: FleetEndpointSecurity,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -96,7 +96,7 @@ func TestInstallAndCLIUninstallWithEndpointSecurity(t *testing.T) {
 // but at this point endpoint is already uninstalled.
 func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: FleetEndpointSecurity,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -124,7 +124,7 @@ func TestInstallAndUnenrollWithEndpointSecurity(t *testing.T) {
 // but at this point endpoint should be already uninstalled.
 func TestInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: FleetEndpointSecurity,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -399,7 +399,7 @@ type agentPolicyUpdateRequest struct {
 // path other than default
 func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: FleetEndpointSecurity,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -470,7 +470,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 // Tests that install of Elastic Defend fails if Agent is installed unprivileged.
 func TestEndpointSecurityUnprivileged(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: FleetEndpointSecurity,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -550,7 +550,7 @@ func TestEndpointSecurityUnprivileged(t *testing.T) {
 // Tests that trying to switch from privileged to unprivileged with Elastic Defend fails.
 func TestEndpointSecurityCannotSwitchToUnprivileged(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: FleetEndpointSecurity,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -620,7 +620,7 @@ func TestEndpointSecurityCannotSwitchToUnprivileged(t *testing.T) {
 // TestEndpointLogsAreCollectedInDiagnostics tests that diagnostics archive contain endpoint logs
 func TestEndpointLogsAreCollectedInDiagnostics(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: FleetEndpointSecurity,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -838,7 +838,7 @@ func agentIsHealthyNoEndpoint(t *testing.T, ctx context.Context, agentClient cli
 // when an installed agent is running a policy with tamper protection enabled fails.
 func TestForceInstallOverProtectedPolicy(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: FleetEndpointSecurity,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -904,7 +904,7 @@ func TestForceInstallOverProtectedPolicy(t *testing.T) {
 
 func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 	stack := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: FleetEndpointSecurity,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -1063,8 +1063,8 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 				require.NoErrorf(t, err, "error running inspect cmd")
 
 				assert.Equal(t, proxyCLI.URL, got.Fleet.ProxyURL)
-				assert.Equal(t, mtlsCLI.clientCertPath, got.Fleet.Ssl.Certificate)
-				assert.Equal(t, mtlsCLI.clientCertKeyPath, got.Fleet.Ssl.Key)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.Certificate)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.Key)
 				assert.Empty(t, got.Fleet.Ssl.KeyPassphrasePath, "policy should have removed key_passphrase_path as key isn't passphrase protected anymore")
 			},
 		},
@@ -1083,9 +1083,9 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 				require.NoErrorf(t, err, "error running inspect cmd")
 
 				assert.Equal(t, proxyCLI.URL, got.Fleet.ProxyURL)
-				assert.Equal(t, mtlsCLI.clientCertPath, got.Fleet.Ssl.Certificate)
-				assert.Equal(t, mtlsCLI.clientCertKeyEncPath, got.Fleet.Ssl.Key)
-				assert.Equal(t, mtlsCLI.clientCertKeyPassPath, got.Fleet.Ssl.KeyPassphrasePath)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.Certificate)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.Key)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.KeyPassphrasePath)
 			},
 		},
 		{
@@ -1155,8 +1155,8 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 					return
 				}
 				assert.Equal(t, proxyPolicymTLS.URL, got.Fleet.ProxyURL)
-				assert.Equal(t, mtlsPolicy.clientCertPath, got.Fleet.Ssl.Certificate)
-				assert.Equal(t, mtlsPolicy.clientCertKeyPath, got.Fleet.Ssl.Key)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.Certificate)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.Key)
 				assert.Empty(t, got.Fleet.Ssl.KeyPassphrasePath, "policy should have removed key_passphrase_path as key isn't passphrase protected anymore")
 			},
 		},
@@ -1193,8 +1193,8 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 				}
 
 				assert.Equal(t, proxyPolicymTLS.URL, got.Fleet.ProxyURL)
-				assert.Equal(t, mtlsPolicy.clientCertPath, got.Fleet.Ssl.Certificate)
-				assert.Equal(t, mtlsPolicy.clientCertKeyPath, got.Fleet.Ssl.Key)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.Certificate)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.Key)
 				assert.Empty(t, got.Fleet.Ssl.KeyPassphrasePath, "policy should have removed key_passphrase_path as key isn't passphrase protected anymore")
 			},
 		},
@@ -1225,8 +1225,8 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 				}
 
 				assert.Equal(t, proxyPolicymTLS.URL, got.Fleet.ProxyURL)
-				assert.Equal(t, mtlsPolicy.clientCertPath, got.Fleet.Ssl.Certificate)
-				assert.Equal(t, mtlsPolicy.clientCertKeyPath, got.Fleet.Ssl.Key)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.Certificate)
+				assert.Equal(t, "<REDACTED>", got.Fleet.Ssl.Key)
 				assert.Empty(t, got.Fleet.Ssl.KeyPassphrasePath, "key_passphrase_path was never set")
 			},
 		},
