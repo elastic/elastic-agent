@@ -30,15 +30,18 @@ import (
 const maxUnauthCounter int = 6
 
 // Consts for states at fleet checkin
-const fleetStateDegraded = "DEGRADED"
-const fleetStateOnline = "online"
-const fleetStateError = "error"
-const fleetStateStarting = "starting"
+const (
+	fleetStateDegraded = "DEGRADED"
+	fleetStateOnline   = "online"
+	fleetStateError    = "error"
+	fleetStateStarting = "starting"
+)
 
 // Default Configuration for the Fleet Gateway.
 var defaultGatewaySettings = &fleetGatewaySettings{
-	Duration: 1 * time.Second,        // time between successful calls
-	Jitter:   500 * time.Millisecond, // used as a jitter for duration
+	Duration:                     1 * time.Second,        // time between successful calls
+	Jitter:                       500 * time.Millisecond, // used as a jitter for duration
+	ErrConsecutiveUnauthDuration: 1 * time.Hour,          // time between calls when the agent exceeds unauthorized response limit
 	Backoff: backoffSettings{ // time after a failed call
 		Init: 60 * time.Second,
 		Max:  10 * time.Minute,
@@ -46,9 +49,10 @@ var defaultGatewaySettings = &fleetGatewaySettings{
 }
 
 type fleetGatewaySettings struct {
-	Duration time.Duration   `config:"checkin_frequency"`
-	Jitter   time.Duration   `config:"jitter"`
-	Backoff  backoffSettings `config:"backoff"`
+	Duration                     time.Duration   `config:"checkin_frequency"`
+	Jitter                       time.Duration   `config:"jitter"`
+	Backoff                      backoffSettings `config:"backoff"`
+	ErrConsecutiveUnauthDuration time.Duration
 }
 
 type backoffSettings struct {
@@ -90,7 +94,6 @@ func New(
 	stateFetcher func() coordinator.State,
 	stateStore stateStore,
 ) (*FleetGateway, error) {
-
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	return newFleetGatewayWithScheduler(
 		log,
@@ -356,16 +359,16 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	resp, took, err := cmd.Execute(ctx, req)
 	if isUnauth(err) {
 		f.unauthCounter++
-
-		if f.shouldUnenroll() {
-			f.log.Warnf("retrieved an invalid api key error '%d' times. Starting to unenroll the elastic agent.", f.unauthCounter)
-			return &fleetapi.CheckinResponse{
-				Actions: []fleetapi.Action{&fleetapi.ActionUnenroll{ActionID: "", ActionType: "UNENROLL", IsDetected: true}},
-			}, took, nil
+		if f.shouldUseLongSched() {
+			f.log.Warnf("retrieved an invalid api key error '%d' times. will use long scheduler", f.unauthCounter)
+			f.scheduler.SetDuration(defaultGatewaySettings.ErrConsecutiveUnauthDuration)
+			return &fleetapi.CheckinResponse{}, took, nil
 		}
 
 		return nil, took, err
 	}
+
+	f.scheduler.SetDuration(defaultGatewaySettings.Duration)
 
 	f.unauthCounter = 0
 	if err != nil {
@@ -384,8 +387,8 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	return resp, took, nil
 }
 
-// shouldUnenroll checks if the max number of trying an invalid key is reached
-func (f *FleetGateway) shouldUnenroll() bool {
+// shouldUseLongSched checks if the max number of trying an invalid key is reached
+func (f *FleetGateway) shouldUseLongSched() bool {
 	return f.unauthCounter > maxUnauthCounter
 }
 
