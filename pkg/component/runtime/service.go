@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"os"
 	"runtime"
 	"time"
 
@@ -346,7 +345,6 @@ func injectSigned(comp component.Component, signed *component.Signed) (component
 }
 
 func (s *serviceRuntime) start(ctx context.Context) (err error) {
-	s.log.Info("HERE STARTING SERVICE")
 	name := s.name()
 
 	// Set state to starting
@@ -361,18 +359,7 @@ func (s *serviceRuntime) start(ctx context.Context) (err error) {
 		s.log.Infof("failed check %s service: %v, try install", name, err)
 		err = s.install(ctx)
 		if err != nil {
-			s.log.Infof("GETTING UNINSTALL_TOKEN")
-			uninstallToken := os.Getenv("UNINSTALL_TOKEN")
-			s.log.Infof("GOT THE UNINSTALL TOKEN %s", uninstallToken)
-			err = s.uninstall(ctx, uninstallToken, true)
-			if err != nil {
-				return fmt.Errorf("failed to uninstall %s service with uninstall token: %w", name, err)
-			}
-
-			err = s.install(ctx)
-			if err != nil {
-				return fmt.Errorf("failed install %s service: %w", name, err)
-			}
+			return fmt.Errorf("failed install %s service: %w", name, err)
 		}
 	}
 
@@ -408,7 +395,7 @@ func (s *serviceRuntime) stop(ctx context.Context, comm Communicator, lastChecki
 		}
 
 		s.log.Infof("uninstall %s service", name)
-		err := s.uninstall(ctx, "", false)
+		err := s.uninstall(ctx)
 		if err != nil {
 			s.log.Errorf("failed %s service uninstall, err: %v", name, err)
 		}
@@ -664,15 +651,15 @@ func (s *serviceRuntime) install(ctx context.Context) error {
 }
 
 // uninstall executes the service uninstall command
-func (s *serviceRuntime) uninstall(ctx context.Context, uninstallToken string, shouldKeepState bool) error {
+func (s *serviceRuntime) uninstall(ctx context.Context) error {
 	// Always retry for internal attempts to uninstall, because they are an attempt to converge the agent's current state
 	// with its desired state based on the agent policy.
-	return uninstallService(ctx, s.log, s.comp, uninstallToken, shouldKeepState, s.executeServiceCommandImpl)
+	return uninstallService(ctx, s.log, s.comp, "", s.executeServiceCommandImpl)
 }
 
 // UninstallService uninstalls the service. When shouldRetry is true the uninstall command will be retried until it succeeds.
 func UninstallService(ctx context.Context, log *logger.Logger, comp component.Component, uninstallToken string) error {
-	return uninstallService(ctx, log, comp, uninstallToken, false, executeServiceCommand)
+	return uninstallService(ctx, log, comp, uninstallToken, executeServiceCommand)
 }
 
 //nolint:gosec // was false flagged as hardcoded credentials by linter. it is not.
@@ -685,9 +672,7 @@ const uninstallTokenArg = "--uninstall-token"
 // 2. Inject the value of uninstallToken after the --uninstall-token argument
 //
 // If args do not contain "--uninstall-token", older endpoint spec, do nothing
-func resolveUninstallTokenArg(log *logger.Logger, uninstallSpec *component.ServiceOperationsCommandSpec, uninstallToken string) *component.ServiceOperationsCommandSpec {
-	log.Infof("RESOLVE UNINSTALL TOKEN %s", uninstallToken)
-	log.Infof("UNINSTALL SPEC %v", uninstallSpec)
+func resolveUninstallTokenArg(uninstallSpec *component.ServiceOperationsCommandSpec, uninstallToken string) *component.ServiceOperationsCommandSpec {
 	if uninstallSpec == nil {
 		return nil
 	}
@@ -707,7 +692,7 @@ func resolveUninstallTokenArg(log *logger.Logger, uninstallSpec *component.Servi
 	return &spec
 }
 
-func uninstallService(ctx context.Context, log *logger.Logger, comp component.Component, uninstallToken string, shouldKeepState bool, executeServiceCommandImpl executeServiceCommandFunc) error {
+func uninstallService(ctx context.Context, log *logger.Logger, comp component.Component, uninstallToken string, executeServiceCommandImpl executeServiceCommandFunc) error {
 	if comp.InputSpec.Spec.Service.Operations.Uninstall == nil {
 		log.Errorf("missing uninstall spec for %s service", comp.BinaryName())
 		return ErrOperationSpecUndefined
@@ -719,16 +704,7 @@ func uninstallService(ctx context.Context, log *logger.Logger, comp component.Co
 		uninstallToken = ""
 	}
 
-	uninstallSpec := resolveUninstallTokenArg(log, comp.InputSpec.Spec.Service.Operations.Uninstall, uninstallToken)
-
-	log.Infof("UNINSTALL ARGS BEFORE KEEPSTATE %v", uninstallSpec.Args)
-
-	if shouldKeepState {
-		uninstallSpec.Args = append(uninstallSpec.Args, "--keepstate")
-		log.Info("adding keepstate to unisntall args")
-	}
-
-	log.Infof("UNINSTALL ARGS AFTER KEEP STATE %v", uninstallSpec.Args)
+	uninstallSpec := resolveUninstallTokenArg(comp.InputSpec.Spec.Service.Operations.Uninstall, uninstallToken)
 
 	log.Debugf("uninstall %s service", comp.BinaryName())
 	return executeServiceCommandImpl(ctx, log, comp.InputSpec.BinaryPath, uninstallSpec)
