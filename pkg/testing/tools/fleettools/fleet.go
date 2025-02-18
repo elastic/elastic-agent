@@ -29,29 +29,29 @@ func GetAgentByPolicyIDAndHostnameFromList(ctx context.Context, client *kibana.C
 		return nil, err
 	}
 
-	var agentHostnames []string
-	hostnameAgents := make([]*kibana.AgentExisting, 0)
+	onPolicy := make([]string, 0, len(listAgentsResp.Items))
+	matching := make([]*kibana.AgentExisting, 0, 1)
 	for i, item := range listAgentsResp.Items {
 		agentHostname := item.LocalMetadata.Host.Hostname
 		agentPolicyID := item.PolicyID
-
-		agentHostnames = append(agentHostnames, agentHostname)
-
-		if strings.EqualFold(agentHostname, hostname) && agentPolicyID == policyID {
-			hostnameAgents = append(hostnameAgents, &listAgentsResp.Items[i])
+		if agentPolicyID == policyID {
+			onPolicy = append(onPolicy, agentHostname)
+			if strings.EqualFold(agentHostname, hostname) {
+				matching = append(matching, &listAgentsResp.Items[i])
+			}
 		}
 	}
 
-	if len(hostnameAgents) == 0 {
+	if len(matching) == 0 {
 		return nil, fmt.Errorf("unable to find agent with hostname [%s] for policy [%s]. Found: %v",
-			hostname, policyID, agentHostnames)
+			hostname, policyID, onPolicy)
 	}
 
-	if len(hostnameAgents) > 1 {
-		return nil, fmt.Errorf("found %d agents with hostname [%s]; expected to find only one", len(hostnameAgents), hostname)
+	if len(matching) > 1 {
+		return nil, fmt.Errorf("found %d agents with hostname [%s]; expected to find only one", len(matching), hostname)
 	}
 
-	return hostnameAgents[0], nil
+	return matching[0], nil
 }
 
 func GetAgentIDByHostname(ctx context.Context, client *kibana.Client, policyID, hostname string) (string, error) {
