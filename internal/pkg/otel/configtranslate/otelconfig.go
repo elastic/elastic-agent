@@ -77,8 +77,8 @@ func getSupportedComponents(model *component.Model) []*component.Component {
 	var supportedComponents []*component.Component
 
 	for _, comp := range model.Components {
+		comp := comp
 		if IsComponentOtelSupported(&comp) {
-			comp := comp
 			supportedComponents = append(supportedComponents, &comp)
 		}
 	}
@@ -171,7 +171,7 @@ func getReceiversConfigForComponent(comp *component.Component, info info.Agent, 
 	// Beat config inside a beat receiver is nested under an additional key. Not sure if this simple translation is
 	// always safe. We should either ensure this is always the case, or have an explicit mapping.
 	beatName := strings.TrimSuffix(receiverType.String(), "receiver")
-	beatDataPath := filepath.Join(paths.Home(), "run", comp.ID)
+	beatDataPath := filepath.Join(paths.Run(), comp.ID)
 	receiverConfig := map[string]any{
 		beatName: map[string]any{
 			"inputs": inputs,
@@ -204,7 +204,7 @@ func getExportersConfigForComponent(comp *component.Component) (map[string]any, 
 	}
 	for _, unit := range comp.Units {
 		if unit.Type == client.UnitTypeOutput {
-			unitExportersConfig, expErr := unitToExporterConfig(unit, exporterType)
+			unitExportersConfig, expErr := unitToExporterConfig(unit, exporterType, comp.InputType)
 			if expErr != nil {
 				return nil, expErr
 			}
@@ -261,7 +261,7 @@ func getExporterTypeForComponent(comp *component.Component) (otelcomponent.Type,
 }
 
 // unitToExporterConfig translates a component.Unit to an otel exporter configuration.
-func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type) (map[string]any, error) {
+func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, inputType string) (map[string]any, error) {
 	if unit.Type == client.UnitTypeInput {
 		return nil, fmt.Errorf("unit type is an input, expected output: %v", unit)
 	}
@@ -271,7 +271,7 @@ func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type) 
 	}
 	// we'd like to use the same exporter for all outputs with the same name, so we parse out the name for the unit id
 	// these will be deduplicated by the configuration merging process at the end
-	outputName := strings.Split(unit.ID, "-")[1]
+	outputName := strings.TrimPrefix(unit.ID, inputType+"-") // TODO: Use a more structured approach here
 	exporterId := getExporterID(exporterType, outputName)
 
 	// translate the configuration
@@ -323,7 +323,7 @@ func getDefaultDatastreamTypeForComponent(comp *component.Component) (string, er
 	}
 }
 
-// translateEsOutputToExporter translates an elasticsearch output configuration to an elasticsearch expoter configuration.
+// translateEsOutputToExporter translates an elasticsearch output configuration to an elasticsearch exporter configuration.
 func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
 	esConfig, err := elasticsearchtranslate.ToOTelConfig(cfg)
 	if err != nil {
@@ -332,6 +332,9 @@ func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
 	// we want to use dynamic indexing
 	esConfig["logs_dynamic_index"] = map[string]any{"enabled": true}
 	esConfig["metrics_dynamic_index"] = map[string]any{"enabled": true}
+
+	// we also want to use dynamic log ids
+	esConfig["logs_dynamic_id"] = map[string]any{"enabled": true}
 
 	// for compatibility with beats, we want bodymap mapping
 	esConfig["mapping"] = map[string]any{"mode": "bodymap"}

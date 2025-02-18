@@ -220,7 +220,7 @@ func TestGetOtelConfig(t *testing.T) {
 			model: &component.Model{
 				Components: []component.Component{
 					{
-						ID:         "test",
+						ID:         "filestream-default",
 						InputType:  "filestream",
 						OutputType: "elasticsearch",
 						InputSpec: &component.InputRuntimeSpec{
@@ -233,12 +233,12 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 						Units: []component.Unit{
 							{
-								ID:     "test-unit",
+								ID:     "filestream-unit",
 								Type:   client.UnitTypeInput,
 								Config: component.MustExpectedConfig(fileStreamConfig),
 							},
 							{
-								ID:     "test-default",
+								ID:     "filestream-default",
 								Type:   client.UnitTypeOutput,
 								Config: component.MustExpectedConfig(esOutputConfig),
 							},
@@ -268,6 +268,9 @@ func TestGetOtelConfig(t *testing.T) {
 						"logs_dynamic_index": map[string]any{
 							"enabled": true,
 						},
+						"logs_dynamic_id": map[string]any{
+							"enabled": true,
+						},
 						"num_workers":       0,
 						"api_key":           "",
 						"logs_index":        "filebeat-9.0.0",
@@ -279,7 +282,7 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 				"receivers": map[string]any{
-					"filebeatreceiver/_agent-component/test": map[string]any{
+					"filebeatreceiver/_agent-component/filestream-default": map[string]any{
 						"filebeat": map[string]any{
 							"inputs": []map[string]any{
 								{
@@ -295,15 +298,15 @@ func TestGetOtelConfig(t *testing.T) {
 							"otelconsumer": map[string]any{},
 						},
 						"path": map[string]any{
-							"data": filepath.Join(paths.Home(), "run", "test"),
+							"data": filepath.Join(paths.Run(), "filestream-default"),
 						},
 					},
 				},
 				"service": map[string]any{
 					"pipelines": map[string]any{
-						"logs/_agent-component/test": map[string][]string{
+						"logs/_agent-component/filestream-default": map[string][]string{
 							"exporters": []string{"elasticsearch/_agent-component/default"},
-							"receivers": []string{"filebeatreceiver/_agent-component/test"},
+							"receivers": []string{"filebeatreceiver/_agent-component/filestream-default"},
 						},
 					},
 				},
