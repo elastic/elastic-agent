@@ -3,20 +3,18 @@
 set -e
 
 endpoint_active=false
-temp_vault=""
 
 if systemctl --quiet is-active ElasticEndpoint; then
     endpoint_active=true
     cleanup_state=$(mktemp)
+    temp_vault=$(mktemp -d)
 
     cleanup() {
         rm -f "$cleanup_state"
-        if [ -n "$temp_vault" ] && [ -d "$temp_vault" ]; then
-            rm -rf "$temp_vault"
-        fi
+        rm -rf "$temp_vault"
     }
 
-    # Function to restore endpoint and vault if installation fails
+    # restore endpoint and vault if installation fails
     restore_endpoint() {
         if [ -f "$cleanup_state" ]; then
             # Check if we need to restore the vault
@@ -27,13 +25,11 @@ if systemctl --quiet is-active ElasticEndpoint; then
                     cp -r "$temp_vault/vault" "/opt/Elastic/Endpoint/state/"
                 fi
             fi
-
             # Check if we need to restart the service
             if grep -q "stopped" "$cleanup_state"; then
                 echo "Installation failed, restarting ElasticEndpoint"
                 systemctl --quiet start ElasticEndpoint
             fi
-
             rm -f "$cleanup_state"
         fi
     }
@@ -45,13 +41,14 @@ if systemctl --quiet is-active ElasticEndpoint; then
     systemctl --quiet stop ElasticEndpoint
     echo "stopped" > "$cleanup_state"
 
-    # Back up the vault directory if it exists
+    # Back up and remove the vault directory if it exists
     if [ -d "/opt/Elastic/Endpoint/state/vault" ]; then
-        temp_vault=$(mktemp -d)
         echo "backing up Endpoint vault directory"
         cp -r "/opt/Elastic/Endpoint/state/vault" "$temp_vault/"
+
         echo "removing Endpoint vault directory"
         rm -rf "/opt/Elastic/Endpoint/state/vault"
+
         echo "vault_removed" >> "$cleanup_state"
     fi
 fi
