@@ -96,8 +96,9 @@ func TestOtelKubeStackHelm(t *testing.T) {
 
 						// override secrets reference with env variables
 						JSONValues: []string{
-							fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, kCtx.esHost),
-							fmt.Sprintf(`collectors.gateway.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, kCtx.esAPIKey),
+							// TODO: replace with managed OTLP ingest endpoint/apiKey when available
+							fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, "https://otlp.ingest:433"),
+							fmt.Sprintf(`collectors.gateway.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, "CHANGEME=="),
 						},
 					},
 				),
