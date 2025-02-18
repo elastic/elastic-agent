@@ -65,8 +65,8 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	skipFleetAudit, _ := cmd.Flags().GetBool("skip-fleet-audit")
 	if status == install.Broken {
 		if !force {
-			fmt.Fprintf(streams.Out, "Elastic Agent is installed but currently broken: %s\n", reason)
-			confirm, err := cli.Confirm(fmt.Sprintf("Continuing will uninstall the broken Elastic Agent at %s. Do you want to continue?", paths.Top()), true)
+			fmt.Fprintf(streams.Out, "%s is installed but currently broken: %s\n", paths.ServiceDisplayName(), reason)
+			confirm, err := cli.Confirm(fmt.Sprintf("Continuing will uninstall the broken %s at %s. Do you want to continue?", paths.ServiceDisplayName(), paths.Top()), true)
 			if err != nil {
 				return fmt.Errorf("problem reading prompt response")
 			}
@@ -76,7 +76,7 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		}
 	} else {
 		if !force {
-			confirm, err := cli.Confirm(fmt.Sprintf("Elastic Agent will be uninstalled from your system at %s. Do you want to continue?", paths.Top()), true)
+			confirm, err := cli.Confirm(fmt.Sprintf("%s will be uninstalled from your system at %s. Do you want to continue?", paths.ServiceDisplayName(), paths.Top()), true)
 			if err != nil {
 				return fmt.Errorf("problem reading prompt response")
 			}
@@ -86,7 +86,7 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		}
 	}
 
-	progBar := install.CreateAndStartNewSpinner(streams.Out, "Uninstalling Elastic Agent...")
+	progBar := install.CreateAndStartNewSpinner(streams.Out, fmt.Sprintf("Uninstalling %s...", paths.ServiceDisplayName()))
 
 	log, logBuff := logger.NewInMemory("uninstall", logp.ConsoleEncoderConfig())
 	defer func() {
@@ -106,7 +106,7 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 	_ = progBar.Finish()
 	_ = progBar.Exit()
-	fmt.Fprintf(streams.Out, "\nElastic Agent has been uninstalled.\n")
+	fmt.Fprintf(streams.Out, "\n%s has been uninstalled.\n", paths.ServiceDisplayName())
 
 	_ = install.RemovePath(paths.Top())
 	return nil

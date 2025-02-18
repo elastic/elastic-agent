@@ -247,9 +247,9 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	cfgFile := paths.ConfigFile()
 	if status == install.Installed {
 		// Uninstall the agent
-		progBar.Describe("Uninstalling current Elastic Agent")
+		progBar.Describe(fmt.Sprintf("Uninstalling current %s", paths.ServiceDisplayName()))
 		if !runUninstallBinary {
-			err := execUninstall(streams)
+			err := execUninstall(streams, topPath, paths.BinaryName)
 			if err != nil {
 				progBar.Describe("Uninstall failed")
 				return err
@@ -263,6 +263,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		}
 		progBar.Describe("Successfully uninstalled Elastic Agent")
 	}
+
 	if status != install.PackageInstall {
 		customUser, _ := cmd.Flags().GetString(flagInstallCustomUser)
 		customGroup, _ := cmd.Flags().GetString(flagInstallCustomGroup)
@@ -316,7 +317,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			}()
 		}
 
-		fmt.Fprintln(streams.Out, "Elastic Agent successfully installed, starting enrollment.")
+		fmt.Fprintf(streams.Out, "%s successfully installed, starting enrollment.\n", paths.ServiceDisplayName())
 	}
 
 	if enroll {
@@ -331,7 +332,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			return err
 		}
 
-		progBar.Describe("Enrolling Elastic Agent with Fleet")
+		progBar.Describe(fmt.Sprintf("Enrolling %s with Fleet", paths.ServiceDisplayName()))
 		err = enrollCmd.Start()
 		if err != nil {
 			progBar.Describe("Failed to Enroll")
@@ -351,21 +352,31 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	progBar.Describe("Done")
 	_ = progBar.Finish()
 	_ = progBar.Exit()
-	fmt.Fprint(streams.Out, "\nElastic Agent has been successfully installed.\n")
+	fmt.Fprintf(streams.Out, "\n%s has been successfully installed.\n", paths.ServiceDisplayName())
 	return nil
 }
 
 // execUninstall execs "elastic-agent uninstall --force" from the elastic agent installed on the system (found in PATH)
-func execUninstall(streams *cli.IOStreams) error {
+func execUninstall(streams *cli.IOStreams, topPath string, binName string) error {
 	args := []string{
 		"uninstall",
 		"--force",
 	}
-	execPath, err := exec.LookPath(paths.BinaryName)
+
+	// Using the topPath with binaryName is feasible only because the shell wrapper (linux) does not
+	// do anything complicated aside from calling the agent binary. If this were
+	// to change, the implementation here may need to change as well.
+	binPath := filepath.Join(topPath, binName)
+	fi, err := os.Stat(binPath)
 	if err != nil {
-		return fmt.Errorf("unable to find %s on path: %w", paths.BinaryName, err)
+		return fmt.Errorf("error checking binary path %s: %w", binPath, err)
 	}
-	uninstall := exec.Command(execPath, args...)
+
+	if fi.IsDir() {
+		return fmt.Errorf("expected file, found a directory at %s", binPath)
+	}
+
+	uninstall := exec.Command(binPath, args...)
 	uninstall.Stdout = streams.Out
 	uninstall.Stderr = streams.Err
 	if err := uninstall.Start(); err != nil {
