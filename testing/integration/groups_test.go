@@ -52,7 +52,4 @@ const (
 
 	// FleetInstall group of tests. Used for the long running fleet-related "TestInstall..." tests.
 	FleetEndpointSecurity = "fleet-endpoint-security"
-
-	// FIPS group of tests. Used for testing the FIPS distributions.
-	FIPS = "fips"
 )

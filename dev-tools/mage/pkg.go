@@ -247,6 +247,10 @@ func TestPackages(options ...TestPackagesOption) error {
 		args = append(args, "-root-owner")
 	}
 
+	if FIPSBuild {
+		args = append(args, "-fips")
+	}
+
 	args = append(args, "-files", MustExpand("{{.PWD}}/build/distributions/*"))
 
 	if out, err := goTest(args...); err != nil {

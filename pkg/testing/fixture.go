@@ -337,7 +337,7 @@ func (f *Fixture) RunBeat(ctx context.Context) error {
 	args = append(args, f.additionalArgs...)
 
 	proc, err := process.Start(
-		f.BinaryPath(),
+		f.binaryPath(),
 		process.WithContext(ctx),
 		process.WithArgs(args),
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
@@ -540,7 +540,7 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 	args = append(args, f.additionalArgs...)
 
 	proc, err := process.Start(
-		f.BinaryPath(),
+		f.binaryPath(),
 		process.WithContext(ctx),
 		process.WithArgs(args),
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
@@ -675,7 +675,7 @@ func (f *Fixture) PrepareAgentCommand(ctx context.Context, args []string, opts .
 	}
 
 	// #nosec G204 -- Not so many ways to support variadic arguments to the elastic-agent command :(
-	cmd := exec.CommandContext(ctx, f.BinaryPath(), args...)
+	cmd := exec.CommandContext(ctx, f.binaryPath(), args...)
 	for _, o := range opts {
 		if err := o(cmd); err != nil {
 			return nil, fmt.Errorf("error adding opts to Exec: %w", err)
@@ -831,7 +831,7 @@ func (f *Fixture) EnsurePrepared(ctx context.Context) error {
 	return nil
 }
 
-func (f *Fixture) BinaryPath() string {
+func (f *Fixture) binaryPath() string {
 	workDir := f.workDir
 	if f.installed {
 		installDir := "Agent"
