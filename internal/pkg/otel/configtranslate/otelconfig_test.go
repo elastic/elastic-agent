@@ -78,7 +78,7 @@ func TestGetSignalForComponent(t *testing.T) {
 		{
 			name:          "no input spec",
 			component:     component.Component{InputType: "test"},
-			expectedError: fmt.Errorf("input type not supported by Otel: %s", "test"),
+			expectedError: fmt.Errorf("unknown otel signal for input type: %s", "test"),
 		},
 		{
 			name: "not agentbeat",
@@ -88,7 +88,7 @@ func TestGetSignalForComponent(t *testing.T) {
 					BinaryName: "cloudbeat",
 				},
 			},
-			expectedError: fmt.Errorf("input type not supported by Otel: %s", "test"),
+			expectedError: fmt.Errorf("unknown otel signal for input type: %s", "test"),
 		},
 		{
 			name: "filebeat",
@@ -140,9 +140,28 @@ func TestGetSignalForComponent(t *testing.T) {
 func TestGetOtelConfig(t *testing.T) {
 	agentInfo := &info.AgentInfo{}
 	fileStreamConfig := map[string]any{
-		"id":    "test",
-		"type":  "filestream",
-		"paths": map[string]any{},
+		"id":         "test",
+		"use_output": "default",
+		"streams": []any{
+			map[string]any{
+				"id": "test-1",
+				"data_stream": map[string]any{
+					"dataset": "generic-1",
+				},
+				"paths": []any{
+					"/var/log/*.log",
+				},
+			},
+			map[string]any{
+				"id": "test-2",
+				"data_stream": map[string]any{
+					"dataset": "generic-2",
+				},
+				"paths": []any{
+					"/var/log/*.log",
+				},
+			},
+		},
 	}
 	esOutputConfig := map[string]any{
 		"type":     "elasticsearch",
@@ -150,51 +169,61 @@ func TestGetOtelConfig(t *testing.T) {
 		"username": "elastic",
 		"password": "password",
 	}
-	defaultProcessors := []any{
-		mapstr.M{
-			"add_fields": mapstr.M{
-				"fields": mapstr.M{
-					"input_id": "test",
+	defaultProcessors := func(streamId, dataset string) []any {
+		return []any{
+			mapstr.M{
+				"add_fields": mapstr.M{
+					"fields": mapstr.M{
+						"input_id": "test",
+					},
+					"target": "@metadata",
 				},
-				"target": "@metadata",
 			},
-		},
-		mapstr.M{
-			"add_fields": mapstr.M{
-				"fields": mapstr.M{
-					"dataset":   "generic",
-					"namespace": "default",
-					"type":      "logs",
+			mapstr.M{
+				"add_fields": mapstr.M{
+					"fields": mapstr.M{
+						"dataset":   dataset,
+						"namespace": "default",
+						"type":      "logs",
+					},
+					"target": "data_stream",
 				},
-				"target": "data_stream",
 			},
-		},
-		mapstr.M{
-			"add_fields": mapstr.M{
-				"fields": mapstr.M{
-					"dataset": "generic",
+			mapstr.M{
+				"add_fields": mapstr.M{
+					"fields": mapstr.M{
+						"dataset": dataset,
+					},
+					"target": "event",
 				},
-				"target": "event",
 			},
-		},
-		mapstr.M{
-			"add_fields": mapstr.M{
-				"fields": mapstr.M{
-					"id":       agentInfo.AgentID(),
-					"snapshot": agentInfo.Snapshot(),
-					"version":  agentInfo.Version(),
+			mapstr.M{
+				"add_fields": mapstr.M{
+					"fields": mapstr.M{
+						"stream_id": streamId,
+					},
+					"target": "@metadata",
 				},
-				"target": "elastic_agent",
 			},
-		},
-		mapstr.M{
-			"add_fields": mapstr.M{
-				"fields": mapstr.M{
-					"id": agentInfo.AgentID(),
+			mapstr.M{
+				"add_fields": mapstr.M{
+					"fields": mapstr.M{
+						"id":       agentInfo.AgentID(),
+						"snapshot": agentInfo.Snapshot(),
+						"version":  agentInfo.Version(),
+					},
+					"target": "elastic_agent",
 				},
-				"target": "agent",
 			},
-		},
+			mapstr.M{
+				"add_fields": mapstr.M{
+					"fields": mapstr.M{
+						"id": agentInfo.AgentID(),
+					},
+					"target": "agent",
+				},
+			},
+		}
 	}
 	tests := []struct {
 		name           string
@@ -286,11 +315,28 @@ func TestGetOtelConfig(t *testing.T) {
 						"filebeat": map[string]any{
 							"inputs": []map[string]any{
 								{
-									"id":         "test",
-									"type":       "filestream",
-									"paths":      map[string]any{},
-									"index":      "logs-generic-default",
-									"processors": defaultProcessors,
+									"id":   "test-1",
+									"type": "filestream",
+									"data_stream": map[string]any{
+										"dataset": "generic-1",
+									},
+									"paths": []any{
+										"/var/log/*.log",
+									},
+									"index":      "logs-generic-1-default",
+									"processors": defaultProcessors("test-1", "generic-1"),
+								},
+								{
+									"id":   "test-2",
+									"type": "filestream",
+									"data_stream": map[string]any{
+										"dataset": "generic-2",
+									},
+									"paths": []any{
+										"/var/log/*.log",
+									},
+									"index":      "logs-generic-2-default",
+									"processors": defaultProcessors("test-2", "generic-2"),
 								},
 							},
 						},

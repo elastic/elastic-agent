@@ -159,7 +159,7 @@ func getReceiversConfigForComponent(comp *component.Component, info info.Agent, 
 	var inputs []map[string]any
 	for _, unit := range comp.Units {
 		if unit.Type == client.UnitTypeInput {
-			unitInputs, err := getInputsForUnit(unit, info, defaultDataStreamType)
+			unitInputs, err := getInputsForUnit(unit, info, defaultDataStreamType, comp.InputType)
 			if err != nil {
 				return nil, err
 			}
@@ -233,7 +233,7 @@ func getSignalForComponent(comp *component.Component) (pipeline.Signal, error) {
 	case "filebeat", "metricbeat":
 		return pipeline.SignalLogs, nil
 	default:
-		return pipeline.Signal{}, fmt.Errorf("input type not supported by Otel: %s", comp.InputType)
+		return pipeline.Signal{}, fmt.Errorf("unknown otel signal for input type: %s", comp.InputType)
 	}
 }
 
@@ -246,7 +246,7 @@ func getReceiverTypeForComponent(comp *component.Component) (otelcomponent.Type,
 	case "metricbeat":
 		return otelcomponent.MustNewType(mbreceiver.Name), nil
 	default:
-		return otelcomponent.Type{}, fmt.Errorf("input type not supported by Otel: %s", comp.InputType)
+		return otelcomponent.Type{}, fmt.Errorf("unknown otel receiver type for input type: %s", comp.InputType)
 	}
 }
 
@@ -256,7 +256,7 @@ func getExporterTypeForComponent(comp *component.Component) (otelcomponent.Type,
 	case "elasticsearch":
 		return otelcomponent.MustNewType("elasticsearch"), nil
 	default:
-		return otelcomponent.Type{}, fmt.Errorf("output type not supported by Otel: %s", comp.OutputType)
+		return otelcomponent.Type{}, fmt.Errorf("unknown otel exporter type for output type: %s", comp.OutputType)
 	}
 }
 
@@ -294,7 +294,7 @@ func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, 
 
 // getInputsForUnit returns the beat inputs for a unit. These can directly be plugged into a beats receiver config.
 // It mainly calls a conversion function from the control protocol client.
-func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamType string) ([]map[string]any, error) {
+func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamType string, inputType string) ([]map[string]any, error) {
 	agentInfo := &client.AgentInfo{
 		ID:           info.AgentID(),
 		Version:      info.Version(),
@@ -306,6 +306,15 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 	if err != nil {
 		return nil, err
 	}
+	// Add the type to each input. CreateInputsFromStreams doesn't do this, each beat does it on its own in a transform
+	// function. For filebeat, see: https://github.com/elastic/beats/blob/main/x-pack/filebeat/cmd/agent.go
+
+	for _, input := range inputs {
+		if _, ok := input["type"]; !ok {
+			input["type"] = inputType
+		}
+	}
+
 	return inputs, nil
 }
 
