@@ -889,6 +889,8 @@ func TestOtelFBReceiverE2E(t *testing.T) {
           enabled: true
           paths:
             - {{.InputPath}}
+          prospector.scanner.fingerprint.enabled: false
+          file_identity.native: ~
     output:
       otelconsumer:
     logging:
@@ -1326,18 +1328,12 @@ service:
 		"@timestamp",
 		"agent.ephemeral_id",
 		"agent.id",
+		"agent.version",
 
 		// Missing from fbreceiver doc
 		"elastic_agent.id",
 		"elastic_agent.snapshot",
 		"elastic_agent.version",
-
-		// TODO: fbreceiver adds metadata fields that are internal in filebeat.
-		// Remove this once https://github.com/elastic/beats/pull/42412
-		// is available in agent.
-		"@metadata.beat",
-		"@metadata.type",
-		"@metadata.version",
 	}
 
 	assertMapsEqual(t, doc1, doc2, ignoredFields, "expected documents to be equal")

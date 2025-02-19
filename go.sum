@@ -261,8 +261,8 @@ github.com/aws/aws-sdk-go-v2/credentials v1.17.55 h1:CDhKnDEaGkLA5ZszV/qw5uwN5M8
 github.com/aws/aws-sdk-go-v2/credentials v1.17.55/go.mod h1:kPD/vj+RB5MREDUky376+zdnjZpR+WgdBBvwrmnlmKE=
 github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.25 h1:kU7tmXNaJ07LsyN3BUgGqAmVmQtq0w6duVIHAKfp0/w=
 github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.25/go.mod h1:OiC8+OiqrURb1wrwmr/UbOVLFSWEGxjinj5C299VQdo=
-github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.13 h1:X8EeaOjl91c8sP14NG8EHx5ZxXLJg0tHDp+KQSghp28=
-github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.13/go.mod h1:kEI/h2bETfm09LSd7xEEH2qcU1cd//+5HH4Le7p9JgY=
+github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.44 h1:2zxMLXLedpB4K1ilbJFxtMKsVKaexOqDttOhc0QGm3Q=
+github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.44/go.mod h1:VuLHdqwjSvgftNC7yqPWyGVhEwPmJpeRi07gOgOfHF8=
 github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.29 h1:Ej0Rf3GMv50Qh4G4852j2djtoDb7AzQ7MuQeFHa3D70=
 github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.29/go.mod h1:oeNTC7PwJNoM5AznVr23wxhLnuJv0ZDe5v7w0wqIs9M=
 github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.29 h1:6e8a71X+9GfghragVevC5bZqvATtc3mAMgxpSNbgzF0=
@@ -275,8 +275,8 @@ github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.45.1 h1:f6jhr4U8osQQrJrzK
 github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.45.1/go.mod h1:u8Bi6DG9tLOVIS9MNqtE3vh9T6I/U/8RBpYvy/VyMjc=
 github.com/aws/aws-sdk-go-v2/service/ec2 v1.202.0 h1:/kB9Uf7fgpYNLvwhAW0YiDSg7xQyxB6MbEYoC0yXtjs=
 github.com/aws/aws-sdk-go-v2/service/ec2 v1.202.0/go.mod h1:cRD0Fhzj0YD+uAh16NChQAv9/BB0S9x3YK9hLx1jb/k=
-github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.34.2 h1:pWaVzH7OFh4MmHTjIGBNRTbFauJDVpIaRTtGF1BEq2o=
-github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.34.2/go.mod h1:rdgCuor2mAOU7LhpD7tO3TPl7BACCY4PzM9N0jnnHyo=
+github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.43.2 h1:cbbM8HdENk64Vm8vrgk962p2CRzrZj2bybsWJwinM6E=
+github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.43.2/go.mod h1:vaGBfWQyju9wbTBd3k0ujKFKKE/UfscXZwS8f+j55QM=
 github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.2 h1:D4oz8/CzT9bAEYtVhSBmFj2dNOtaHOtMKc2vHBwYizA=
 github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.2/go.mod h1:Za3IHqTQ+yNcRHxu1OFucBh0ACZT4j4VQFF0BqpZcLY=
 github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.4.7 h1:tB4tNw83KcajNAzaIMhkhVI2Nt8fAZd5A5ro113FEMY=
@@ -466,8 +466,8 @@ github.com/eclipse/paho.mqtt.golang v1.3.5 h1:sWtmgNxYM9P2sP+xEItMozsR3w0cqZFlqn
 github.com/eclipse/paho.mqtt.golang v1.3.5/go.mod h1:eTzb4gxwwyWpqBUHGQZ4ABAV7+Jgm1PklsYT/eo8Hcc=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
 github.com/elastic/bayeux v1.0.5/go.mod h1:CSI4iP7qeo5MMlkznGvYKftp8M7qqP/3nzmVZoXHY68=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20241212201805-58af1537830b h1:BMd6gkQF5Zk4rQ7ZbySgUpF5dPZFy4zAzV3Ujds6fw4=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20241212201805-58af1537830b/go.mod h1:JZIuztvKeiuHUM8zvfQ24wz6nJPPOM1DVqu9FHu9a0Q=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250218044933-ef79280d53a2 h1:uFkXCFhDQPU9z+vuMFUXJpJrftU0L8LGHiQNsJtSHIE=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250218044933-ef79280d53a2/go.mod h1:0SbkhgTf03/hmtq6wOF2H2wUWR+w4oXuQ9eDiVYOarM=
 github.com/elastic/elastic-agent-autodiscover v0.9.0 h1:+iWIKh0u3e8I+CJa3FfWe9h0JojNasPgYIA47gpuuns=
 github.com/elastic/elastic-agent-autodiscover v0.9.0/go.mod h1:5iUxLHhVdaGSWYTveSwfJEY4RqPXTG13LPiFoxcpFd4=
 github.com/elastic/elastic-agent-client/v7 v7.17.1 h1:ORCDXzFs1JyhI5neWbTAPWCwaFi+BtKojSLiCpaAbf0=
@@ -1054,6 +1054,8 @@ github.com/maxmind/mmdbwriter v1.0.0 h1:bieL4P6yaYaHvbtLSwnKtEvScUKKD6jcKaLiTM3W
 github.com/maxmind/mmdbwriter v1.0.0/go.mod h1:noBMCUtyN5PUQ4H8ikkOvGSHhzhLok51fON2hcrpKj8=
 github.com/microsoft/go-mssqldb v1.7.2 h1:CHkFJiObW7ItKTJfHo1QX7QBBD1iV+mn1eOyRP3b/PA=
 github.com/microsoft/go-mssqldb v1.7.2/go.mod h1:kOvZKUdrhhFQmxLZqbwUV0rHkNkZpthMITIb2Ko1IoA=
+github.com/microsoft/wmi v0.25.1 h1:sQv9hCEHtW5K6yEVL78T6XGRMGxk4aTpcJwCiB5rLN0=
+github.com/microsoft/wmi v0.25.1/go.mod h1:1zbdSF0A+5OwTUII5p3hN7/K6KF2m3o27pSG6Y51VU8=
 github.com/miekg/dns v1.1.26/go.mod h1:bPDLeHnStXmXAq1m/Ch/hvfNHr14JKNPMBo3VZKjuso=
 github.com/miekg/dns v1.1.41/go.mod h1:p6aan82bvRIyn+zDIv9xYNUpwa73JcSh9BKwknJysuI=
 github.com/miekg/dns v1.1.62 h1:cN8OuEF1/x5Rq6Np+h1epln8OiyPWV+lROx9LxcGgIQ=
