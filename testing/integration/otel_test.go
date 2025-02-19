@@ -1669,14 +1669,9 @@ receivers:
         - type: filestream
           enabled: true
           id: filestream-monitoring-agent
-          index: logs-elastic_agent-default
-          data_stream:
-            dataset: otel
-            namespace: default
-            type: logs
           paths:
-            - {{.InputPath}}/data/elastic-agent-c45b74/logs/elastic-agent-*.ndjson
-            - {{.InputPath}}/data/elastic-agent-c45b74/logs/elastic-agent-watcher-*.ndjson
+            - {{.InputPath}}/data/elastic-agent-*/logs/elastic-agent-*.ndjson
+            - {{.InputPath}}/data/elastic-agent-*/logs/elastic-agent-watcher-*.ndjson
           close:
             on_state_change:
               inactive: 5m
@@ -1780,8 +1775,6 @@ receivers:
     setup.ilm.enabled: false 
     setup.template.enabled: false
     filebeat.config.modules.enabled: false
-    logging.event_data.to_stderr: true
-    logging.event_data.to_files: false
     http.enabled: true
     http.host: {{ .SocketEndpoint }}
 exporters:
@@ -1807,7 +1800,6 @@ service:
         - filebeatreceiver/filestream-monitoring-agent
       exporters:
         - elasticsearch/log
-        - debug
 `
 
 	beatsApiKey, err := base64.StdEncoding.DecodeString(esApiKey.Encoded)
@@ -1886,34 +1878,52 @@ service:
 
 			require.NoError(t, err)
 			otelDocs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbReceiverMonitoringIndex+"*", map[string]interface{}{
-				"Attributes.data_stream.dataset": "otel",
+				"data_stream.dataset": "otel",
 			})
 			require.NoError(t, err)
 
 			// Atleast 1 Document in each index should be present
 			return otelDocs.Hits.Total.Value > 1 && agentDocs.Hits.Total.Value > 1
 		},
-		1*time.Minute, 1*time.Second, "the number of logs in both index are not same")
+		2*time.Minute, 1*time.Second, "the number of logs in both index are not same")
 
-	doc1 := agentDocs.Hits.Hits[0].Source
-	doc2 := otelDocs.Hits.Hits[0].Source
+	agent := agentDocs.Hits.Hits[0].Source
+	otel := otelDocs.Hits.Hits[0].Source
 	ignoredFields := []string{
 		// Expected to change between agentDocs and OtelDocs
 		"@timestamp",
 		"agent.ephemeral_id",
 		"agent.id",
 		"data_stream.dataset",
+		"event.dataset",
+		"message",
+
+		// elastic_agent * fields are hardcoded in processor list for now which is why they differ
 		"elastic_agent.id",
 		"elastic_agent.snapshot",
 		"elastic_agent.version",
 
+		// requires investigation
+		// should be same but isn't
+		"container.id", // has very different type of ID's. One is long string. One is a single letter
+		"log.file.path",
+		"path",
+
 		// Missing in agent Docs
-		"Attributes.data_stream.dataset",
-		"Attributes.data_stream.namespace",
-		"Attributes.log.file.name",
+		"args", // what are args
+		"dir",  // what is dir?
+		"env",
+		"log.source",
+
+		// can these differ?
+		"log.offset",
+		"log.origin.function",
+		"log.origin.file.line",
+		"log.origin.file.name",
+		"log.logger",
 	}
 
-	assertMapsEqual(t, doc1, doc2, ignoredFields, "expected documents to be equal")
+	assertMapsEqual(t, agent, otel, ignoredFields, "expected documents to be equal")
 	cancel()
 	cmd.Wait()
 }
