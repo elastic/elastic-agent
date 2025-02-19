@@ -806,16 +806,12 @@ func (Cloud) Image(ctx context.Context) {
 		devtools.Snapshot = true
 	}
 
-	if f, err := strconv.ParseBool(fips); err != nil {
-		os.Setenv(fipsEnv, "false")
-		devtools.FIPSBuild = false
-	} else if !f {
-		os.Setenv(fipsEnv, "false")
-		devtools.FIPSBuild = false
-	} else {
-		os.Setenv(fipsEnv, "true")
-		devtools.FIPSBuild = true
+	fipsVal, err := strconv.ParseBool(fips)
+	if err != nil {
+		fipsVal = false
 	}
+	os.Setenv(fipsEnv, strconv.FormatBool(fipsVal))
+	devtools.FIPSBuild = fipsVal
 
 	devtools.DevBuild = true
 	devtools.Platforms = devtools.Platforms.Filter("linux/amd64")

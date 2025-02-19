@@ -38,12 +38,16 @@ func TestVerifyFIPSBinary(t *testing.T) {
 	require.NoError(t, err)
 
 	checkLinks := false
+	foundTags := false
+	foundExperiment := false
 	for _, setting := range info.Settings {
 		switch setting.Key {
 		case "-tags":
+			foundTags = true
 			require.Contains(t, setting.Value, "requirefips")
 			continue
 		case "GOEXPERIMENT":
+			foundExperiment = true
 			require.Contains(t, setting.Value, "systemcrypto")
 			continue
 		case "-ldflags":
@@ -53,6 +57,9 @@ func TestVerifyFIPSBinary(t *testing.T) {
 			}
 		}
 	}
+
+	require.True(t, foundTags, "Did not find -tags within binary description")
+	require.True(t, foundExperiment, "Did not find GOEXPERIMENT within binary description")
 
 	if checkLinks {
 		t.Log("checking artifact symbols")

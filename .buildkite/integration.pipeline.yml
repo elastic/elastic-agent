@@ -31,7 +31,7 @@ steps:
         - build/distributions/**
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "n2-standard-4"
 
       - label: "Packaging: Ubuntu arm64"
         key: "packaging-ubuntu-arm64"
@@ -56,7 +56,7 @@ steps:
           - build/distributions/**
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "n2-standard-4"
 
       - label: "Packaging: Windows"
         key: "packaging-windows"
