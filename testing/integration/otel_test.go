@@ -1326,6 +1326,7 @@ service:
 		"@timestamp",
 		"agent.ephemeral_id",
 		"agent.id",
+		"agent.version",
 
 		// Missing from fbreceiver doc
 		"elastic_agent.id",
