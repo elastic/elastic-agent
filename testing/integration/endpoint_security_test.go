@@ -39,6 +39,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/proxytest"
+	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
 const (
@@ -56,6 +57,130 @@ var protectionTests = []struct {
 		name:      "protected",
 		protected: true,
 	},
+}
+
+func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Deb,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+		OS: []define.OS{
+			{Type: define.Linux, Arch: define.AMD64},
+		},
+	})
+
+	// Get previous agent Version
+	// Install
+	// Start the service and enabled
+	// Check Healthy
+	//
+	// Create a policy
+	// Install Endpoint
+	// Get Enrollment token
+	// Enroll
+	// Check both agent and endpoint are healthy
+	// Check version
+	//
+	// Install fixture non-interactive
+	// Check healthy
+	// Check version
+	//
+
+	ver, err := upgradetest.GetUpgradableVersions()
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	upgradeFromVersion, err := upgradetest.PreviousMinor()
+	require.NoError(t, err)
+	startFixture, err := atesting.NewFixture(
+		t,
+		upgradeFromVersion.String(),
+		atesting.WithFetcher(atesting.ArtifactFetcher()),
+		atesting.WithPackageFormat("deb"),
+	)
+	require.NoError(t, err)
+	startFixture.Prepare(ctx)
+
+	installOpts := &atesting.InstallOpts{
+		NonInteractive: true,
+		Privileged:     true,
+	}
+	startFixture.InstallWithoutEnroll(ctx, installOpts)
+
+	assert.Eventuallyf(t, func() bool {
+		return startFixture.IsHealthy(ctx) == nil
+	},
+		2*time.Minute, time.Second,
+		"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",
+	)
+
+	t.Log("Creating policy with endpoint and tamper protection")
+	policyUUID := uuid.Must(uuid.NewV4()).String()
+
+	createPolicyReq := buildPolicyWithTamperProtection(
+		kibana.AgentPolicy{
+			Name:        "test-policy-" + policyUUID,
+			Namespace:   "default",
+			Description: "Test policy " + policyUUID,
+			MonitoringEnabled: []kibana.MonitoringEnabledOption{
+				kibana.MonitoringEnabledLogs,
+				kibana.MonitoringEnabledMetrics,
+			},
+		},
+		true,
+	)
+
+	// Create policy
+	// _, err = info.KibanaClient.CreatePolicy(ctx, createPolicyReq)
+	// // policy, err := info.KibanaClient.CreatePolicy(ctx, createPolicyReq)
+	// require.NoError(t, err)
+	//
+
+	basicPolicy := createBasicPolicy()
+	policyResp, enrollKeyResp := createPolicyAndEnrollmentToken(ctx, t, info.KibanaClient, basicPolicy)
+
+	fleetServerURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
+	require.NoError(t, err)
+
+	fmt.Println("###########################")
+	fmt.Println(fleetServerURL)
+	fmt.Println("###########################")
+
+	// require.True(t, false)
+	// fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("deb"))
+	// require.NoError(t, err)
+	// fixture.Prepare(ctx)
+	//
+	// agentPath, err := fixture.SrcPackage(ctx)
+	// require.NoError(t, err)
+	//
+	// out, err := exec.Command("sudo", "apt-get", "install", "-y", agentPath).CombinedOutput()
+	// t.Log(string(out))
+	// require.NoError(t, err)
+	//
+	// assert.Eventuallyf(t, func() bool {
+	// 	out, err := exec.Command("elastic-agent", "status", "--output", "json").CombinedOutput()
+	// 	if err != nil {
+	// 		return false
+	// 	}
+	//
+	// 	status := atesting.AgentStatusOutput{}
+	// 	err = json.Unmarshal(out, &status)
+	// 	if err != nil {
+	// 		return false
+	// 	}
+	//
+	// 	if status.IsZero() {
+	// 		return false
+	// 	}
+	//
+	// 	return status.State == int(cproto.State_HEALTHY)
+	// },
+	// 	2*time.Minute, time.Second,
+	// 	"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",
+	// )
 }
 
 // TestInstallAndCLIUninstallWithEndpointSecurity tests that the agent can
@@ -699,7 +824,6 @@ func TestEndpointLogsAreCollectedInDiagnostics(t *testing.T) {
 }
 
 func getEndpointComponents(ctx context.Context, t *testing.T, c client.Client) []string {
-
 	err := c.Connect(ctx)
 	require.NoError(t, err, "connecting to agent to retrieve endpoint components")
 	defer c.Disconnect()
@@ -1265,8 +1389,8 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 }
 
 func prepareProxies(t *testing.T, fleethostWrong *url.URL, defaultFleetHost string) (
-	certificatePaths, certificatePaths, certificatePaths, *proxytest.Proxy, *proxytest.Proxy, *proxytest.Proxy) {
-
+	certificatePaths, certificatePaths, certificatePaths, *proxytest.Proxy, *proxytest.Proxy, *proxytest.Proxy,
+) {
 	mtlsCLI := generateMTLSCerts(t, "mtlsCLI")
 	mtlsPolicy := generateMTLSCerts(t, "mtlsPolicy")
 	oneWayTLSPolicy := generateMTLSCerts(t, "oneWayTLSPolicy")
