@@ -1559,17 +1559,10 @@ github.com/zeebo/xxh3 v1.0.2 h1:xZmwmqxHZA8AI603jOQ0tMqmBr9lPeFwGg6d+xy9DC0=
 github.com/zeebo/xxh3 v1.0.2/go.mod h1:5NWz9Sef7zIDm2JHfFlcQvNekmcEl9ekUZQQKCYaDcA=
 github.com/zyedidia/generic v1.2.1 h1:Zv5KS/N2m0XZZiuLS82qheRG4X1o5gsWreGb0hR7XDc=
 github.com/zyedidia/generic v1.2.1/go.mod h1:ly2RBz4mnz1yeuVbQA/VFwGjK3mnHGRj1JuoG336Bis=
-<<<<<<< HEAD
-go.einride.tech/aip v0.67.1 h1:d/4TW92OxXBngkSOwWS2CH5rez869KpKMaN44mdxkFI=
-go.einride.tech/aip v0.67.1/go.mod h1:ZGX4/zKw8dcgzdLsrvpOOGxfxI2QSk12SlP7d6c0/XI=
-go.elastic.co/apm/module/apmelasticsearch/v2 v2.6.2 h1:x5LIkBAIo2XT8nBqoAjPeJKUJC94le7D9aclBYP9uCw=
-go.elastic.co/apm/module/apmelasticsearch/v2 v2.6.2/go.mod h1:LkYiSaKsGns6yRqXKAMbFyz7Nk8ikPCD/5CGkgQOY/A=
-=======
 go.einride.tech/aip v0.68.0 h1:4seM66oLzTpz50u4K1zlJyOXQ3tCzcJN7I22tKkjipw=
 go.einride.tech/aip v0.68.0/go.mod h1:7y9FF8VtPWqpxuAxl0KQWqaULxW4zFIesD6zF5RIHHg=
-go.elastic.co/apm/module/apmelasticsearch/v2 v2.6.3 h1:5CuemBg1oZnXI6jz+jkLqM95Np1XHasdy0CCelX62Ec=
-go.elastic.co/apm/module/apmelasticsearch/v2 v2.6.3/go.mod h1:MVK2TIrvMGQaL7bnO4dbnJ+jpDNqmkj+BukDRBYTI60=
->>>>>>> e274a8411 (chore(go.mod): update beats dependency (#6837))
+go.elastic.co/apm/module/apmelasticsearch/v2 v2.6.2 h1:x5LIkBAIo2XT8nBqoAjPeJKUJC94le7D9aclBYP9uCw=
+go.elastic.co/apm/module/apmelasticsearch/v2 v2.6.2/go.mod h1:LkYiSaKsGns6yRqXKAMbFyz7Nk8ikPCD/5CGkgQOY/A=
 go.elastic.co/apm/module/apmgorilla/v2 v2.6.0 h1:vXMZPNFss4a9146sIuT4zxQemVpQjNUDIIS9RMOr9PE=
 go.elastic.co/apm/module/apmgorilla/v2 v2.6.0/go.mod h1:w3/W4oDZPWBye0McuIpM7d5xSQ1WoFnMmgmEIzCsxIk=
 go.elastic.co/apm/module/apmgrpc/v2 v2.6.0 h1:0HPYGtjjS6wUE/f7Pw7L4R7IvgptGlXY8qMKFifFZj0=
