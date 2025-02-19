@@ -165,7 +165,7 @@ func checkDeb(t *testing.T, file string, buf *bytes.Buffer) {
 	checkSystemdUnitPermissions(t, p)
 }
 
-func checkTar(t *testing.T, file string, checkFIPS bool) {
+func checkTar(t *testing.T, file string, fipsCheck bool) {
 	p, err := readTar(file)
 	if err != nil {
 		t.Error(err)
@@ -187,7 +187,7 @@ func checkTar(t *testing.T, file string, checkFIPS bool) {
 		require.NoError(t, err, "error extracting tar archive")
 		containingDir := strings.TrimSuffix(path.Base(file), ".tar.gz")
 		checkManifestFileContents(t, filepath.Join(tempExtractionPath, containingDir))
-		if checkFIPS {
+		if fipsCheck {
 			checkFIPS(t, filepath.Join(tempExtractionPath, containingDir))
 		}
 	})
