@@ -993,7 +993,7 @@ spec:
             value: /usr/share/elastic-agent/state
           - name: ELASTIC_NETINFO
             value: "false"
-          image: docker.elastic.co/beats/elastic-agent:9.1.0-SNAPSHOT
+          image: docker.elastic.co/elastic-agent/elastic-agent:9.1.0-SNAPSHOT
           imagePullPolicy: IfNotPresent
           name: agent
           resources:
@@ -1033,6 +1033,10 @@ spec:
         - hostPath:
             path: /var/log
           name: varlog
+        - hostPath:
+            path: /etc/elastic-agent/default/agent-pernode-example/state
+            type: DirectoryOrCreate
+          name: agent-data
 ---
 # Source: elastic-agent/templates/agent/eck/deployment.yaml
 apiVersion: agent.k8s.elastic.co/v1alpha1
@@ -1072,7 +1076,7 @@ spec:
             value: /usr/share/elastic-agent/state
           - name: ELASTIC_NETINFO
             value: "false"
-          image: docker.elastic.co/beats/elastic-agent:9.1.0-SNAPSHOT
+          image: docker.elastic.co/elastic-agent/elastic-agent:9.1.0-SNAPSHOT
           imagePullPolicy: IfNotPresent
           name: agent
           resources:
@@ -1093,7 +1097,6 @@ spec:
             privileged: false
             runAsGroup: 1000
             runAsUser: 1000
-          volumeMounts: null
         dnsPolicy: ClusterFirstWithHostNet
         nodeSelector:
           kubernetes.io/os: linux
