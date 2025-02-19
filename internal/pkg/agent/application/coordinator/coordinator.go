@@ -1487,7 +1487,6 @@ func (c *Coordinator) updateOtelManagerConfig(model *component.Model) error {
 		}
 	}
 
-	c.logger.With("otel config", finalOtelCfg.ToStringMap()).Debug("Updating otel config")
 	if len(finalOtelCfg.AllKeys()) == 0 {
 		// if the config is empty, we want to send nil to the manager, so it knows to stop the collector
 		finalOtelCfg = nil
@@ -1516,7 +1515,7 @@ func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtime
 	}
 	otelModel = &component.Model{
 		Components: otelComponents,
-		Signed:     model.Signed,
+		// the signed portion of the policy is only used by Defend, so otel doesn't need it for anything
 	}
 	runtimeModel = &component.Model{
 		Components: runtimeComponents,
