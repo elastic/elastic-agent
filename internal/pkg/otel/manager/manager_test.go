@@ -205,8 +205,22 @@ func TestOTelManager_ConfigError(t *testing.T) {
 		}
 	}()
 
-	cfg := confmap.New() // invalid config
-	m.Update(cfg)
+	// Errors channel is non-blocking, should be able to send an Update that causes an error multiple
+	// times without it blocking on sending over the errCh.
+	for range 3 {
+		cfg := confmap.New() // invalid config
+		m.Update(cfg)
+
+		// delay between updates to ensure the collector will have to fail
+		<-time.After(100 * time.Millisecond)
+	}
+
+	// because of the retry logic and timing we need to ensure
+	// that this keeps retrying to see the error and only store
+	// an actual error
+	//
+	// a nil error just means that the collector is trying to restart
+	// which clears the error on the restart loop
 	timeoutCh := time.After(time.Second * 5)
 	var err error
 outer:
