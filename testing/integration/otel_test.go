@@ -9,6 +9,7 @@ package integration
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/url"
@@ -21,9 +22,11 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	aTesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -1103,8 +1106,6 @@ service:
 	require.True(t, err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded), "Retrieved unexpected error: %s", err.Error())
 }
 
-<<<<<<< HEAD
-=======
 func TestHybridAgentE2E(t *testing.T) {
 	// This test is a hybrid agent test that ingests a single log with
 	// filebeat and fbreceiver. It then compares the final documents in
@@ -1366,7 +1367,6 @@ func assertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg 
 	require.Equal(t, "", cmp.Diff(flatM1, flatM2), "expected maps to be equal")
 }
 
->>>>>>> e274a8411 (chore(go.mod): update beats dependency (#6837))
 func TestFBOtelRestartE2E(t *testing.T) {
 	// This test ensures that filebeatreceiver is able to deliver logs even
 	// in advent of a collector restart.
