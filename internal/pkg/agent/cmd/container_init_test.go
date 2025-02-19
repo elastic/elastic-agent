@@ -193,8 +193,8 @@ func Test_raiseEffectiveCapabilities(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				require.ElementsMatch(t, tt.expectedCaps, slices.Collect(maps.Keys(tt.mockedProcCaps.effectiveCaps)))
-				require.ElementsMatch(t, tt.expectedCaps, slices.Collect(maps.Keys(tt.mockedProcCaps.inheritableCaps)))
+				require.ElementsMatch(t, tt.expectedCaps, slices.Collect(Keys(tt.mockedProcCaps.effectiveCaps)))
+				require.ElementsMatch(t, tt.expectedCaps, slices.Collect(Keys(tt.mockedProcCaps.inheritableCaps)))
 			}
 		})
 	}
@@ -292,7 +292,7 @@ func Test_raiseAmbientCapabilities(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				require.ElementsMatch(t, tt.expectedAmbientCaps, maps.Keys(tt.mockedBoundCaps.ambientCaps))
+				require.ElementsMatch(t, tt.expectedAmbientCaps, slices.Collect(maps.Keys(tt.mockedBoundCaps.ambientCaps)))
 			}
 		})
 	}
