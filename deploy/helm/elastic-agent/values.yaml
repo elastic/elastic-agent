@@ -336,7 +336,7 @@ agent:
   # -- image configuration
   # @section -- 6 - Elastic-Agent Configuration
   image:
-    repository: docker.elastic.co/beats/elastic-agent
+    repository: docker.elastic.co/elastic-agent/elastic-agent
     pullPolicy: IfNotPresent
     tag: "9.1.0-SNAPSHOT"
   # -- image pull secrets
@@ -396,6 +396,7 @@ agent:
     #    tolerations: []
     #    topologySpreadConstraints: []
     #    extraEnv: []
+    #    statePersistence: [HostPath, EmptyDir, None]
     #    extraVolumes: []
     #    extraVolumeMounts: []
     #    https://github.com/elastic/elastic-agent/blob/main/_meta/elastic-agent.yml
@@ -418,10 +419,8 @@ agent:
           memory: 400Mi
       nodeSelector:
         kubernetes.io/os: linux
-      extraVolumes:
-        # override the default agent-data volume and make it an emptyDir
-        - name: agent-data
-          emptyDir: {}
+      statePersistence: EmptyDir
+      extraVolumes: []
       extraEnvs:
         - name: ELASTIC_NETINFO
           value: "false"
@@ -454,6 +453,7 @@ agent:
           memory: 400Mi
       nodeSelector:
         kubernetes.io/os: linux
+      statePersistence: HostPath
       extraEnvs:
         - name: ELASTIC_NETINFO
           value: "false"
