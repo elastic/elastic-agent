@@ -65,7 +65,7 @@ func TestVerifyFIPSBinary(t *testing.T) {
 		t.Log("checking artifact symbols")
 		cmd := exec.CommandContext(ctx, "go", "tool", "nm", path)
 		output, err := cmd.CombinedOutput()
-		suite.Require().NoError(err)
-		suite.Require().Contains(string(output), "OpenSSL_version", "Unable to find OpenSSL symbol links within binary")
+		require.NoError(t, err)
+		require.Contains(t, string(output), "OpenSSL_version", "Unable to find OpenSSL symbol links within binary")
 	}
 }
