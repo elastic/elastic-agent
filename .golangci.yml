@@ -128,10 +128,6 @@ linters-settings:
       - github.com/fsnotify/fsnotify
       - github.com/openshift/api
 
-  gosimple:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.22.10"
-
   nolintlint:
     # Enable to ensure that nolint directives are all used. Default is true.
     allow-unused: false
@@ -145,18 +141,10 @@ linters-settings:
     require-specific: false
 
   staticcheck:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.22.10"
     checks: ["all"]
 
   stylecheck:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.22.10"
     checks: ["all"]
-
-  unused:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.22.10"
 
   gosec:
     excludes:
