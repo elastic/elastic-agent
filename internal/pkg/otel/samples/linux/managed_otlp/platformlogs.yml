@@ -54,7 +54,7 @@ exporters:
 
   # Exporter to send logs and metrics to Elasticsearch Managed OTLP Input
   otlp/ingest:
-    endpoint: ${env:ELASTIC_ENDPOINT}
+    endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
     headers:
       Authorization: ${env:ELASTIC_API_KEY}
 
