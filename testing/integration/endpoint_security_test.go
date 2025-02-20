@@ -131,16 +131,19 @@ func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageF
 	initEndpointVersion := getEndpointVersion(t)
 	require.Equal(t, initEndpointVersion, upgradeFromVersion.String())
 
-	// try to uninstall endpoint without token and assert error
-	// out, err = exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "uninstall").CombinedOutput()
-	// require.Error(t, err) // This fails, should be getting an error when trying to uninstall without token
+	// try to uninstall endpoint without token and assert that endpoint is not removed
+	_, err = exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "uninstall").CombinedOutput()
+	require.NoError(t, err)
+
+	_, err = os.Stat("/opt/Elastic/Endpoint/elastic-endpoint")
+	require.NoError(t, err)
 
 	// upgrade to the built agent
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat(packageFormat))
 	require.NoError(t, err)
 	fixture.Prepare(ctx)
 
-	out, err := fixture.SimpleInstallDeb(ctx)
+	_, err = fixture.SimpleInstallDeb(ctx)
 	require.NoError(t, err)
 
 	upgradedAgentClient := fixture.Client()
@@ -158,12 +161,20 @@ func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageF
 	upgradedEndpointVersion := getEndpointVersion(t)
 	require.Equal(t, define.Version(), upgradedEndpointVersion)
 
-	// try to uninstall endpoint without token and assert error
-	// out, err = exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "uninstall").CombinedOutput()
-	// require.Error(t, err) // This fails, should be getting an error when trying to uninstall without token
+	// try to uninstall endpoint without token and assert that endpoint is not removed
+	_, err = exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "uninstall").CombinedOutput()
+	require.NoError(t, err)
 
-	out, err = exec.Command("/opt/Elastic/Endpoint/elastic-endpoint", "uninstall", "--uninstall-token", fixture.UninstallToken()).CombinedOutput()
-	require.NoError(t, err, string(out))
+	_, err = os.Stat("/opt/Elastic/Endpoint/elastic-endpoint")
+	require.NoError(t, err)
+
+	// uninstall with the uninstall token and assert that endpoint is indeed
+	// removed. The uninstall token for both of the fixtures is the same
+	_, err = exec.Command("/opt/Elastic/Endpoint/elastic-endpoint", "uninstall", "--uninstall-token", fixture.UninstallToken()).CombinedOutput()
+	require.NoError(t, err)
+
+	_, err = os.Stat("/opt/Elastic/Endpoint/elastic-endpoint")
+	require.True(t, os.IsNotExist(err))
 }
 
 // TestInstallAndCLIUninstallWithEndpointSecurity tests that the agent can
