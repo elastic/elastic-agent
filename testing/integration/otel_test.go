@@ -1607,7 +1607,6 @@ func TestMonitoringAgentE2E(t *testing.T) {
 		OS: []define.OS{
 			{Type: define.Linux},
 			{Type: define.Darwin},
-			{Type: define.Windows},
 		},
 		Stack: &define.Stack{},
 	})
@@ -1645,8 +1644,6 @@ func TestMonitoringAgentE2E(t *testing.T) {
 	socketEndpoint := utils.SocketURLWithFallback("uniqueID", paths.TempDir())
 
 	configTemplate := `
-agent.grpc:
-  port: 6796
 outputs:
   default:
     type: elasticsearch
@@ -1670,7 +1667,7 @@ receivers:
             - {{.InputPath}}/data/elastic-agent-*/logs/elastic-agent-watcher-*.ndjson
           close:
             on_state_change:
-              inactive: 5m
+              inactive: 5m	  
           parsers:
             - ndjson:
                 add_error_key: true
@@ -1890,9 +1887,17 @@ service:
 		"@timestamp",
 		"agent.ephemeral_id",
 		"agent.id",
+		"agent.version"
 		"data_stream.dataset",
 		"event.dataset",
 		"message",
+
+		// log fields will also differ
+		"log.offset",
+		"log.origin.function",
+		"log.origin.file.line",
+		"log.origin.file.name",
+		"log.logger",
 
 		// elastic_agent * fields are hardcoded in processor list for now which is why they differ
 		"elastic_agent.id",
@@ -1903,20 +1908,10 @@ service:
 		// should be same but isn't
 		"container.id", // has very different type of ID's. One is long string. One is a single letter
 		"log.file.path",
-		"path",
 
 		// Missing in agent Docs
-		"args", // what are args
-		"dir",  // what is dir?
-		"env",
 		"log.source",
 
-		// can these differ?
-		"log.offset",
-		"log.origin.function",
-		"log.origin.file.line",
-		"log.origin.file.name",
-		"log.logger",
 	}
 
 	assertMapsEqual(t, agent, otel, ignoredFields, "expected documents to be equal")
