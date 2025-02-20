@@ -1887,7 +1887,7 @@ service:
 		"@timestamp",
 		"agent.ephemeral_id",
 		"agent.id",
-		"agent.version"
+		"agent.version",
 		"data_stream.dataset",
 		"event.dataset",
 		"message",
@@ -1911,7 +1911,6 @@ service:
 
 		// Missing in agent Docs
 		"log.source",
-
 	}
 
 	assertMapsEqual(t, agent, otel, ignoredFields, "expected documents to be equal")
