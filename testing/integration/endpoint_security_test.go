@@ -17,6 +17,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -69,7 +70,6 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 			{Type: define.Linux, Arch: define.AMD64},
 		},
 	})
-
 	// Get previous agent Version
 	// Install
 	// Start the service and enabled
@@ -87,10 +87,9 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 	// Check version
 	//
 
-	ver, err := upgradetest.GetUpgradableVersions()
-	require.NoError(t, err)
-
 	ctx := context.Background()
+
+	endpointVersionCmd := exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-agent", "version")
 
 	upgradeFromVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
@@ -103,84 +102,58 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 	require.NoError(t, err)
 	startFixture.Prepare(ctx)
 
-	installOpts := &atesting.InstallOpts{
-		NonInteractive: true,
-		Privileged:     true,
-	}
-	startFixture.InstallWithoutEnroll(ctx, installOpts)
+	policy := installSecurityAgentWithFixture(ctx, t, info, startFixture, true)
 
-	assert.Eventuallyf(t, func() bool {
-		return startFixture.IsHealthy(ctx) == nil
-	},
-		2*time.Minute, time.Second,
-		"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",
+	t.Log("Installing Elastic Defend")
+	pkgPolicyResp, err := installElasticDefendPackage(t, info, policy.ID)
+	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
+
+	agentClient := startFixture.Client()
+
+	// clientContext := context.Background()
+	err = agentClient.Connect(ctx)
+	require.NoError(t, err, "could not connect to the initial agent")
+
+	require.Eventually(t,
+		func() bool { return agentAndEndpointAreHealthy(t, ctx, agentClient) },
+		endpointHealthPollingTimeout,
+		time.Second,
+		"Endpoint component or units are not healthy prior to upgrade.",
 	)
 
-	t.Log("Creating policy with endpoint and tamper protection")
-	policyUUID := uuid.Must(uuid.NewV4()).String()
+	out, err := endpointVersionCmd.CombinedOutput()
+	require.NoError(t, err, string(out))
 
-	createPolicyReq := buildPolicyWithTamperProtection(
-		kibana.AgentPolicy{
-			Name:        "test-policy-" + policyUUID,
-			Namespace:   "default",
-			Description: "Test policy " + policyUUID,
-			MonitoringEnabled: []kibana.MonitoringEnabledOption{
-				kibana.MonitoringEnabledLogs,
-				kibana.MonitoringEnabledMetrics,
-			},
-		},
-		true,
-	)
+	fmt.Println("======= BEFORE UPGRADE =========")
+	fmt.Println(string(out))
+	fmt.Println("================================")
 
-	// Create policy
-	// _, err = info.KibanaClient.CreatePolicy(ctx, createPolicyReq)
-	// // policy, err := info.KibanaClient.CreatePolicy(ctx, createPolicyReq)
-	// require.NoError(t, err)
-	//
-
-	basicPolicy := createBasicPolicy()
-	policyResp, enrollKeyResp := createPolicyAndEnrollmentToken(ctx, t, info.KibanaClient, basicPolicy)
-
-	fleetServerURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("deb"))
 	require.NoError(t, err)
+	fixture.Prepare(ctx)
 
-	fmt.Println("###########################")
-	fmt.Println(fleetServerURL)
-	fmt.Println("###########################")
+	out, err = fixture.SimpleInstallDeb(ctx)
+	require.NoError(t, err, string(out))
 
-	// require.True(t, false)
-	// fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("deb"))
-	// require.NoError(t, err)
-	// fixture.Prepare(ctx)
-	//
-	// agentPath, err := fixture.SrcPackage(ctx)
-	// require.NoError(t, err)
-	//
-	// out, err := exec.Command("sudo", "apt-get", "install", "-y", agentPath).CombinedOutput()
-	// t.Log(string(out))
-	// require.NoError(t, err)
-	//
-	// assert.Eventuallyf(t, func() bool {
-	// 	out, err := exec.Command("elastic-agent", "status", "--output", "json").CombinedOutput()
-	// 	if err != nil {
-	// 		return false
-	// 	}
-	//
-	// 	status := atesting.AgentStatusOutput{}
-	// 	err = json.Unmarshal(out, &status)
-	// 	if err != nil {
-	// 		return false
-	// 	}
-	//
-	// 	if status.IsZero() {
-	// 		return false
-	// 	}
-	//
-	// 	return status.State == int(cproto.State_HEALTHY)
-	// },
-	// 	2*time.Minute, time.Second,
-	// 	"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",
-	// )
+	upgradedAgentClient := fixture.Client()
+	err = upgradedAgentClient.Connect(ctx)
+	require.NoError(t, err, "could not connect to the upgraded agent")
+
+	require.Eventually(t,
+		func() bool { return agentAndEndpointAreHealthy(t, ctx, upgradedAgentClient) },
+		endpointHealthPollingTimeout,
+		time.Second,
+		"Endpoint component or units are not healthy after the upgrade.",
+	)
+
+	out, err = endpointVersionCmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	fmt.Println("======= AFTER UPGRADE =========")
+	fmt.Println(string(out))
+	fmt.Println("================================")
+
+	require.True(t, false)
 }
 
 // TestInstallAndCLIUninstallWithEndpointSecurity tests that the agent can
@@ -274,6 +247,12 @@ func installSecurityAgent(ctx context.Context, t *testing.T, info *define.Info, 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err, "could not create agent fixture")
 
+	policyResp := installSecurityAgentWithFixture(ctx, t, info, fixture, protected)
+
+	return fixture, policyResp
+}
+
+func installSecurityAgentWithFixture(ctx context.Context, t *testing.T, info *define.Info, fixture *atesting.Fixture, protected bool) kibana.PolicyResponse {
 	t.Log("Enrolling the agent in Fleet")
 	policyUUID := uuid.Must(uuid.NewV4()).String()
 
@@ -299,7 +278,7 @@ func installSecurityAgent(ctx context.Context, t *testing.T, info *define.Info, 
 	policy, agentID, err := tools.InstallAgentWithPolicy(ctx, t,
 		installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoError(t, err, "failed to install agent with policy")
-	return fixture, policy, agentID
+	return policy
 }
 
 // buildPolicyWithTamperProtection helper function to build the policy request with or without tamper protection
