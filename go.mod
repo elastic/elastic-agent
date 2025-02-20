@@ -23,10 +23,9 @@ require (
 	github.com/elastic/go-sysinfo v1.15.1
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/elastic/mock-es v0.0.0-20241101195702-0a41fa3d30d9
-	github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector v0.3.0
+	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.0.0-20250220091231-84cac07393f1
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.13.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.3.0
-	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.3.0
 	github.com/fatih/color v1.17.0
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-viper/mapstructure/v2 v2.2.1
@@ -233,6 +232,10 @@ require (
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/lunes v0.1.0 // indirect
+	github.com/elastic/mito v1.16.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector v0.3.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
+	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.4.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.14.0 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
