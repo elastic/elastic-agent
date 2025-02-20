@@ -45,7 +45,6 @@ extensions:
     directory: ${env:STORAGE_DIR}
 
 processors:
-  batch:
   resourcedetection:
     detectors: ["system"]
     system:
@@ -89,25 +88,25 @@ service:
   pipelines:
     traces/fromsdk:
       receivers: [otlp/fromsdk]
-      processors: [batch]
+      processors: []
       exporters: [otlp/ingest]
 
     metrics/fromsdk:
       receivers: [otlp/fromsdk]
-      processors: [batch]
+      processors: []
       exporters: [otlp/ingest]
 
     logs/fromsdk:
       receivers: [otlp/fromsdk]
-      processors: [batch]
+      processors: []
       exporters: [otlp/ingest]
 
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
-      processors: [resourcedetection, batch]
+      processors: [resourcedetection]
       exporters: [otlp/ingest]
 
     logs/platformlogs:
       receivers: [filelog/platformlogs]
-      processors: [resourcedetection, batch]
+      processors: [resourcedetection]
       exporters: [otlp/ingest]
