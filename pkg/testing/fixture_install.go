@@ -477,19 +477,6 @@ func (f *Fixture) SimpleInstallDeb(ctx context.Context) ([]byte, error) {
 //   - the combined output of Install command stdout and stderr
 //   - an error if any.
 func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, shouldEnroll bool, opts []process.CmdOption) ([]byte, error) {
-	// f.t.Logf("[test %s] Inside fixture installDeb function", f.t.Name())
-	// // Prepare so that the f.srcPackage string is populated
-	// err := f.EnsurePrepared(ctx)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to prepare: %w", err)
-	// }
-	//
-	// // sudo apt-get install the deb
-	// out, err := exec.CommandContext(ctx, "sudo", "apt-get", "install", "-y", f.srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
-	// if err != nil {
-	// 	return out, fmt.Errorf("apt install failed: %w output:%s", err, string(out))
-	// }
-
 	out, err := f.SimpleInstallDeb(ctx)
 	if err != nil {
 		return out, err
