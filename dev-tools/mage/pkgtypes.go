@@ -45,7 +45,7 @@ const (
 	// tar.gz packages.
 	// NOTE: This uses .BeatName instead of .Name because we wanted the internal
 	// directory to not include "-oss".
-	defaultRootDir = "{{.BeatName}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}"
+	defaultRootDir = "{{.BeatName}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}{{if .FIPS}}-fips{{end}}"
 
 	componentConfigMode os.FileMode = 0600
 
@@ -963,7 +963,7 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 		}
 
 		if mg.Verbose() {
-			log.Println("Adding", os.FileMode(header.Mode), header.Name)
+			log.Println("Adding", os.FileMode(header.Mode), header.Name) //nolint:gosec // we don't care about an int overflow in a log line
 		}
 		if err := ar.WriteHeader(header); err != nil {
 			return err
@@ -1031,7 +1031,7 @@ func addSymlinkToTar(tmpdir string, ar *tar.Writer, baseDir string, pkgFile Pack
 		header.Typeflag = tar.TypeSymlink
 
 		if mg.Verbose() {
-			log.Println("Adding", os.FileMode(header.Mode), header.Name)
+			log.Println("Adding", os.FileMode(header.Mode), header.Name) //nolint:gosec // we don't care about an int overflow in a log line
 		}
 		if err := ar.WriteHeader(header); err != nil {
 			return err
