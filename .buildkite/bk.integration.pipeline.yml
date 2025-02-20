@@ -40,9 +40,12 @@ steps:
         matrix:
           - default
           - fleet
+          - fleet-endpoint-security
           - fleet-privileged
+          - standalone-upgrade
           - upgrade
           - upgrade-flavor
+          - install-uninstall
 
       - label: "Win2022:non-sudo:{{matrix}}"
         command: |
