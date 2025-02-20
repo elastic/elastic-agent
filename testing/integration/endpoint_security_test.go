@@ -60,14 +60,6 @@ var protectionTests = []struct {
 	},
 }
 
-func getEndpointVersion(t *testing.T) string {
-	cmd := exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "version")
-	output, err := cmd.CombinedOutput()
-	require.NoError(t, err)
-	// version: 8.18.0-SNAPSHOT, compiled: Wed Feb 19 01:00:00 2025, branch: HEAD, commit: c450b50f91507c3166b072df8557f5efd871103a
-	return strings.Split(strings.Split(string(output), "version: ")[1], ",")[0]
-}
-
 func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Deb,
@@ -78,23 +70,32 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 			{Type: define.Linux},
 		},
 	})
-	// Get previous agent Version
-	// Install
-	// Start the service and enabled
-	// Check Healthy
-	//
-	// Create a policy
-	// Install Endpoint
-	// Get Enrollment token
-	// Enroll
-	// Check both agent and endpoint are healthy
-	// Check version
-	//
-	// Install fixture non-interactive
-	// Check healthy
-	// Check version
-	//
+	testTamperProtectedDebRpmUpgrades(t, info, "deb")
+}
 
+func TestUpgradeAgentWithTamperProtectedEndpoint_RPM(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: RPM,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+	})
+	testTamperProtectedDebRpmUpgrades(t, info, "rpm")
+}
+
+func getEndpointVersion(t *testing.T) string {
+	cmd := exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "version")
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err)
+	// version: 8.18.0-SNAPSHOT, compiled: Wed Feb 19 01:00:00 2025, branch: HEAD, commit: c450b50f91507c3166b072df8557f5efd871103a
+	return strings.Split(strings.Split(string(output), "version: ")[1], ",")[0]
+}
+
+func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageFormat string) {
+	// TODO: add cleanup to remove agent and endpoint in case of failure
 	ctx := context.Background()
 
 	// Install an older version of the agent
@@ -104,7 +105,7 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 		t,
 		upgradeFromVersion.String(),
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
-		atesting.WithPackageFormat("deb"),
+		atesting.WithPackageFormat(packageFormat),
 	)
 	require.NoError(t, err)
 	startFixture.Prepare(ctx)
@@ -135,7 +136,7 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 	// require.Error(t, err) // This fails, should be getting an error when trying to uninstall without token
 
 	// upgrade to the built agent
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("deb"))
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat(packageFormat))
 	require.NoError(t, err)
 	fixture.Prepare(ctx)
 
