@@ -182,8 +182,6 @@ func TestOTelManager_Run(t *testing.T) {
 		t.Errorf("otel manager returned unexpected error: %v", runErr)
 	}
 }
-<<<<<<< HEAD
-=======
 
 func TestOTelManager_ConfigError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -239,4 +237,3 @@ outer:
 	}
 	assert.Error(t, err, "otel manager should have returned an error")
 }
->>>>>>> 9b572efd2 (Fix deadlock in error handling in OTelManager (#6927))

@@ -108,14 +108,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				}
 				// pass the error to the errCh so the coordinator, unless it's a cancel error
 				if !errors.Is(err, context.Canceled) {
-<<<<<<< HEAD
-					select {
-					case m.errCh <- nil:
-					case <-ctx.Done():
-					}
-=======
 					m.reportErr(ctx, err)
->>>>>>> 9b572efd2 (Fix deadlock in error handling in OTelManager (#6927))
 				}
 			}
 		case cfg := <-m.cfgCh:
