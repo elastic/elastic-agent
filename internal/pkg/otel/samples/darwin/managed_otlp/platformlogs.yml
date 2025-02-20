@@ -52,7 +52,7 @@ exporters:
     sampling_initial: 5
     sampling_thereafter: 1000
 
-# Exporter to send logs and metrics to Elasticsearch Motel
+# Exporter to send logs and metrics to Elasticsearch Managed OTLP Input
   otlp/ingest:
     endpoint: ${env:ELASTIC_ENDPOINT}
     headers:

@@ -79,7 +79,7 @@ processors:
           enabled: true
 
 exporters:
-  # Exporter to send logs and metrics to Elasticsearch Motel
+  # Exporter to send logs and metrics to Elasticsearch Managed OTLP Input
   otlp/ingest:
     endpoint: ${env:ELASTIC_ENDPOINT}
     headers:
