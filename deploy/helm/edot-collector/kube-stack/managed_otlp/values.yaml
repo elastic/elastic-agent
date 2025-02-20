@@ -534,11 +534,11 @@ collectors:
     env:
       - name: ELASTIC_AGENT_OTEL
         value: '"true"'
-      - name: ELASTIC_ENDPOINT
+      - name: ELASTIC_OTLP_ENDPOINT
         valueFrom:
           secretKeyRef:
             name: elastic-secret-otel
-            key: elastic_endpoint
+            key: elastic_otlp_endpoint
       - name: ELASTIC_API_KEY
         valueFrom:
           secretKeyRef:
@@ -560,7 +560,7 @@ collectors:
       exporters:
         debug:
         otlp/ingest:
-          endpoint: ${env:ELASTIC_ENDPOINT}
+          endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
           headers:
             Authorization: ApiKey ${env:ELASTIC_API_KEY}
       service:
