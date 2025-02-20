@@ -522,7 +522,14 @@ collectors:
   #  forwarding telemetry to an Elasticsearch endpoint.
   gateway:
     suffix: gateway
-    replicas: 1
+    replicas: 2
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1000Mi
+      requests:
+        cpu: 100m
+        memory: 500Mi
     enabled: true
     env:
       - name: ELASTIC_AGENT_OTEL
