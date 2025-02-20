@@ -115,5 +115,21 @@ func Notice() (err error) {
 		return fmt.Errorf("failed to append file %s: %w", outfn, err)
 	}
 
+	// dos2unix NOTICE.txt
+	fmt.Printf(">> %s\n", "dos2unix NOTICE.txt")
+
+	content, err := os.ReadFile(outfn)
+	if err != nil {
+		return fmt.Errorf("failed to read entire file %s: %w", outfn, err)
+	}
+
+	// Convert Windows-style line endings to Unix-style
+	newContent := strings.ReplaceAll(string(content), "\r\n", "\n")
+
+	err = os.WriteFile(outfn, []byte(newContent), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to rewrite file using Unix-style line endings %s: %w", outfn, err)
+	}
+
 	return nil
 }
