@@ -80,8 +80,13 @@ type controller struct {
 	dynamicProviderStates map[string]*dynamicProviderState
 }
 
-// New creates a new controller.
+// New creates a new controller with the global set of providers.
 func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error) {
+	return NewWithProviders(log, c, managed, Providers)
+}
+
+// NewWithProviders creates a new controller with the given set of providers.
+func NewWithProviders(log *logger.Logger, c *config.Config, managed bool, providers *ProviderRegistry) (Controller, error) {
 	l := log.Named("composable")
 
 	var providersCfg Config
@@ -110,7 +115,7 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 
 	// build all the context providers
 	contextProviders := map[string]contextProvider{}
-	for name, builder := range Providers.contextProviders {
+	for name, builder := range providers.contextProviders {
 		pCfg, ok := providersCfg.Providers[name]
 		if (ok && !pCfg.Enabled()) || (!ok && !providersInitialDefault) {
 			// explicitly disabled; skipping
@@ -124,7 +129,7 @@ func New(log *logger.Logger, c *config.Config, managed bool) (Controller, error)
 
 	// build all the dynamic providers
 	dynamicProviders := map[string]dynamicProvider{}
-	for name, builder := range Providers.dynamicProviders {
+	for name, builder := range providers.dynamicProviders {
 		pCfg, ok := providersCfg.Providers[name]
 		if (ok && !pCfg.Enabled()) || (!ok && !providersInitialDefault) {
 			// explicitly disabled; skipping
@@ -189,7 +194,8 @@ func (c *controller) Run(ctx context.Context) error {
 
 	// synchronize the fetch providers through a channel
 	var fetchProvidersLock sync.RWMutex
-	var fetchProviders mapstr.M
+	//var fetchProviders mapstr.M
+	fetchProviders := mapstr.M{}
 	fetchCh := make(chan fetchProvider)
 	go func() {
 		for {
