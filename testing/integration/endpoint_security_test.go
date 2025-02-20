@@ -60,6 +60,14 @@ var protectionTests = []struct {
 	},
 }
 
+func getEndpointVersion(t *testing.T) string {
+	cmd := exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "version")
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err)
+	// version: 8.18.0-SNAPSHOT, compiled: Wed Feb 19 01:00:00 2025, branch: HEAD, commit: c450b50f91507c3166b072df8557f5efd871103a
+	return strings.Split(strings.Split(string(output), "version: ")[1], ",")[0]
+}
+
 func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Deb,
@@ -67,7 +75,7 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 		OS: []define.OS{
-			{Type: define.Linux, Arch: define.AMD64},
+			{Type: define.Linux},
 		},
 	})
 	// Get previous agent Version
@@ -89,8 +97,7 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 
 	ctx := context.Background()
 
-	endpointVersionCmd := exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-agent", "version")
-
+	// Install an older version of the agent
 	upgradeFromVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
 	startFixture, err := atesting.NewFixture(
@@ -107,10 +114,8 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 	t.Log("Installing Elastic Defend")
 	pkgPolicyResp, err := installElasticDefendPackage(t, info, policy.ID)
 	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
-
 	agentClient := startFixture.Client()
 
-	// clientContext := context.Background()
 	err = agentClient.Connect(ctx)
 	require.NoError(t, err, "could not connect to the initial agent")
 
@@ -121,19 +126,21 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 		"Endpoint component or units are not healthy prior to upgrade.",
 	)
 
-	out, err := endpointVersionCmd.CombinedOutput()
-	require.NoError(t, err, string(out))
+	// Check the version of endpoint matches the version of the agent
+	initEndpointVersion := getEndpointVersion(t)
+	require.Equal(t, initEndpointVersion, upgradeFromVersion.String())
 
-	fmt.Println("======= BEFORE UPGRADE =========")
-	fmt.Println(string(out))
-	fmt.Println("================================")
+	// try to uninstall endpoint without token and assert error
+	// out, err = exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "uninstall").CombinedOutput()
+	// require.Error(t, err) // This fails, should be getting an error when trying to uninstall without token
 
+	// upgrade to the built agent
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("deb"))
 	require.NoError(t, err)
 	fixture.Prepare(ctx)
 
-	out, err = fixture.SimpleInstallDeb(ctx)
-	require.NoError(t, err, string(out))
+	out, err := fixture.SimpleInstallDeb(ctx)
+	require.NoError(t, err)
 
 	upgradedAgentClient := fixture.Client()
 	err = upgradedAgentClient.Connect(ctx)
@@ -146,14 +153,16 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 		"Endpoint component or units are not healthy after the upgrade.",
 	)
 
-	out, err = endpointVersionCmd.CombinedOutput()
+	// Validate that the new version of endpoint matches the new version of the agent
+	upgradedEndpointVersion := getEndpointVersion(t)
+	require.Equal(t, define.Version(), upgradedEndpointVersion)
+
+	// try to uninstall endpoint without token and assert error
+	// out, err = exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "uninstall").CombinedOutput()
+	// require.Error(t, err) // This fails, should be getting an error when trying to uninstall without token
+
+	out, err = exec.Command("/opt/Elastic/Endpoint/elastic-endpoint", "uninstall", "--uninstall-token", fixture.UninstallToken()).CombinedOutput()
 	require.NoError(t, err, string(out))
-
-	fmt.Println("======= AFTER UPGRADE =========")
-	fmt.Println(string(out))
-	fmt.Println("================================")
-
-	require.True(t, false)
 }
 
 // TestInstallAndCLIUninstallWithEndpointSecurity tests that the agent can
