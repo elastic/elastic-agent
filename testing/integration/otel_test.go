@@ -1365,7 +1365,7 @@ func TestFBOtelRestartE2E(t *testing.T) {
 	// It starts a filebeat receiver, waits for some logs and then stops it.
 	// It then restarts the collector for the remaining of the test.
 	// At the end it asserts that the unique number of logs in ES is equal to the number of
-	// lines in the input file. It is likely that there are duplicates due to the restart.
+	// lines in the input file.
 	info := define.Require(t, define.Requirements{
 		Group: Default,
 		Local: true,
@@ -1395,7 +1395,8 @@ func TestFBOtelRestartE2E(t *testing.T) {
 	esApiKey, err := createESApiKey(info.ESClient)
 	require.NoError(t, err, "error creating API key")
 	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
-	index := "logs-integration-default"
+	// Use a unique index to avoid conflicts with other parallel runners
+	index := strings.ToLower("logs-generic-default-" + randStr(8))
 	otelConfigTemplate := `receivers:
   filebeatreceiver:
     filebeat:
