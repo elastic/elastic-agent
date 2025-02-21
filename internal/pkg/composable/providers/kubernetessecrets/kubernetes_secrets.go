@@ -136,7 +136,7 @@ func (p *contextProviderK8SSecrets) Fetch(key string) (string, bool) {
 		return "", false
 	}
 	if len(tokens) != 4 {
-		p.logger.Warnf(`Invalid secret key format: "%s". Secrets should be of the format kubernetes_secrets.namespace.secret_name.value`, key)
+		p.logger.Warnf(`Invalid secret key format: %q. Secrets should be of the format kubernetes_secrets.namespace.secret_name.value`, key)
 		return "", false
 	}
 
@@ -176,13 +176,13 @@ func (p *contextProviderK8SSecrets) Fetch(key string) (string, bool) {
 	p.store.AddConditionally(key, sd, true, func(existing secret, exists bool) bool {
 		if !exists {
 			// no existing secret in the cache thus add it
-			p.logger.Infof(`Fetch: "%s" inserted. Resource Version of secret: "%s"`, key, apiSecretResourceVersion)
+			p.logger.Infof(`Fetch: %q inserted. Resource Version of secret: %q`, key, apiSecretResourceVersion)
 			return true
 		}
 		if existing.value != apiSecretValue && !existing.apiFetchTime.After(now) {
 			// there is an existing secret in the cache but its value has changed since the last time
 			// it was fetched from the API thus update it
-			p.logger.Infof(`Fetch: "%s" updated. Resource Version of secret: "%s"`, key, apiSecretResourceVersion)
+			p.logger.Infof(`Fetch: %q updated. Resource Version of secret: %q`, key, apiSecretResourceVersion)
 			return true
 		}
 		// there is an existing secret in the cache, and it points already to the latest value
@@ -226,7 +226,7 @@ func (p *contextProviderK8SSecrets) updateSecrets(ctx context.Context) bool {
 		sd, exists := p.store.Get(key, false)
 		if !exists {
 			// this item has expired thus mark that the cache has updates and continue
-			p.logger.Infof(`Cache: "%s" expired`, key)
+			p.logger.Infof(`Cache: %q expired`, key)
 			hasUpdates = true
 			continue
 		}
@@ -254,7 +254,7 @@ func (p *contextProviderK8SSecrets) updateSecrets(ctx context.Context) bool {
 				// the secret value has changed and the above fetchFromAPI is more recent thus
 				// add it and mark that the cache has updates
 				hasUpdates = true
-				p.logger.Infof(`Cache: "%s" updated. Resource Version of secret: "%s"`, key, apiResourceVersion)
+				p.logger.Infof(`Cache: %q updated. Resource Version of secret: %q`, key, apiResourceVersion)
 				return true
 			}
 			// the secret value has not changed
@@ -274,7 +274,7 @@ func (p *contextProviderK8SSecrets) fetchFromAPI(ctx context.Context, secretName
 	if p.client == nil {
 		// k8s client is nil most probably due to an error at p.Run
 		p.clientMtx.RUnlock()
-		p.logger.Warnf(`Could not retrieve secret "%s" at namespace "%s" because k8s client is nil`, secretName, secretNamespace)
+		p.logger.Warnf(`Could not retrieve secret %q at namespace %q because k8s client is nil`, secretName, secretNamespace)
 		return "", "", false
 	}
 	c := p.client
@@ -283,13 +283,13 @@ func (p *contextProviderK8SSecrets) fetchFromAPI(ctx context.Context, secretName
 	si := c.CoreV1().Secrets(secretNamespace)
 	secret, err := si.Get(ctx, secretName, metav1.GetOptions{})
 	if err != nil {
-		p.logger.Warnf(`Could not retrieve secret "%s" at namespace "%s": %s`, secretName, secretNamespace, err.Error())
+		p.logger.Warnf(`Could not retrieve secret %q at namespace %q: %s`, secretName, secretNamespace, err.Error())
 		return "", "", false
 	}
 
 	secretData, ok := secret.Data[secretKey]
 	if !ok {
-		p.logger.Warnf(`Could not retrieve value of key "%s" for secret "%s" at namespace "%s" because it does not exist`, secretKey, secretName, secretNamespace)
+		p.logger.Warnf(`Could not retrieve value of key %q for secret %q at namespace %q because it does not exist`, secretKey, secretName, secretNamespace)
 		return "", "", false
 	}
 
