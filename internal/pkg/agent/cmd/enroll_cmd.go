@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 
+	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
+
 	"go.elastic.co/apm/v2"
 	"gopkg.in/yaml.v2"
 
@@ -54,8 +56,6 @@ const (
 	defaultFleetServerPort         = 8220
 	defaultFleetServerInternalHost = "localhost"
 	defaultFleetServerInternalPort = 8221
-	enrollBackoffInit              = time.Second
-	enrollBackoffMax               = 10 * time.Second
 )
 
 var (
@@ -527,11 +527,12 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 		return nil
 	}
 
-	c.log.Infof("1st enrollment attempt failed, retrying enrolling to URL: %s with exponential backoff (init %s, max %s)", c.client.URI(), enrollBackoffInit, enrollBackoffMax)
+	c.log.Infof("1st enrollment attempt failed, retrying enrolling to URL: %s with exponential backoff", c.client.URI())
 
 	signal := make(chan struct{})
 	defer close(signal)
-	backExp := backoff.NewExpBackoff(signal, enrollBackoffInit, enrollBackoffMax)
+	// Use the same backoff settings as when connecting to Fleet normally
+	backExp := fleetgateway.RequestBackoff(signal)
 
 	for {
 		retry := false
