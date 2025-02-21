@@ -143,10 +143,6 @@ func InstallAgentForPolicyWithToken(ctx context.Context, t *testing.T,
 
 		installOpts.URL = fleetServerURL
 	}
-	fmt.Println("###############################")
-	fmt.Println(installOpts.URL)
-	fmt.Println(enrollmentToken)
-	fmt.Println("###############################")
 	output, err := agentFixture.Install(ctx, &installOpts)
 	if err != nil {
 		t.Log(string(output))
