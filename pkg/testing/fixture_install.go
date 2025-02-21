@@ -470,7 +470,7 @@ func (f *Fixture) simpleInstallRPM(ctx context.Context) ([]byte, error) {
 		return out, fmt.Errorf("apt install failed: %w output:%s", err, string(out))
 	}
 
-	socketPath := "unix:///var/lib/elastic-agent/elastic-agent.sock" // Why does controlSocketRunSylink not work here?
+	socketPath := "unix:///var/lib/elastic-agent/elastic-agent.sock"
 	c := client.New(client.WithAddress(socketPath))
 	f.setClient(c)
 	return nil, nil
@@ -494,7 +494,7 @@ func (f *Fixture) simpleInstallDeb(ctx context.Context) ([]byte, error) {
 		return out, fmt.Errorf("apt install failed: %w output:%s", err, string(out))
 	}
 
-	socketPath := "unix:///var/lib/elastic-agent/elastic-agent.sock" // Why does controlSocketRunSylink not work here?
+	socketPath := "unix:///var/lib/elastic-agent/elastic-agent.sock"
 	c := client.New(client.WithAddress(socketPath))
 	f.setClient(c)
 
@@ -554,7 +554,7 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, shou
 		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
 	}
 
-	socketPath := "unix:///var/lib/elastic-agent/elastic-agent.sock" // Why does controlSocketRunSylink not work here?
+	socketPath := "unix:///var/lib/elastic-agent/elastic-agent.sock"
 	c := client.New(client.WithAddress(socketPath))
 	f.setClient(c)
 
@@ -649,7 +649,7 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
 	}
 
-	socketPath := "unix:///var/lib/elastic-agent/elastic-agent.sock" // Why does controlSocketRunSylink not work here?
+	socketPath := "unix:///var/lib/elastic-agent/elastic-agent.sock"
 	c := client.New(client.WithAddress(socketPath))
 	f.setClient(c)
 
