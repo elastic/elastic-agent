@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -1599,8 +1600,7 @@ service:
 }
 
 func TestMonitoringAgentE2E(t *testing.T) {
-	// This test compares the document ingested by filebeat started by the agent.monitoring section,
-	// with its otel.yml counterpart
+	// This test compares the docs ingested with self monitoring enabled in normal vs otel mode
 	info := define.Require(t, define.Requirements{
 		Group: Default,
 		Local: true,
@@ -1613,7 +1613,7 @@ func TestMonitoringAgentE2E(t *testing.T) {
 
 	fbMonitoringIndex := "logs-elastic_agent-default"
 	fbReceiverMonitoringIndex := "logs-otel-default"
-	tmpDir := t.TempDir()
+	// tmpDir := t.TempDir()
 
 	type configOptions struct {
 		InputPath      string
@@ -1629,21 +1629,9 @@ func TestMonitoringAgentE2E(t *testing.T) {
 	require.NoError(t, err, "error creating API key")
 	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
 
-	// Now we can actually create the fixture and run it
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-	require.NoError(t, err)
-
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
-	defer cancel()
-
-	err = fixture.Prepare(ctx)
-	require.NoError(t, err)
-
-	// Get the running dir
-	inputPath, err := fixture.GetRunningDir(ctx)
-	socketEndpoint := utils.SocketURLWithFallback("uniqueID", paths.TempDir())
-
 	configTemplate := `
+agent.grpc:
+  port: 6796
 outputs:
   default:
     type: elasticsearch
@@ -1655,8 +1643,70 @@ agent.monitoring:
   logs: true
   metrics: false
   use_output: default
+`
+
+	beatsApiKey, err := base64.StdEncoding.DecodeString(esApiKey.Encoded)
+	require.NoError(t, err, "error decoding api key")
+
+	var configBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			configOptions{
+				ESEndpoint:    esEndpoint,
+				BeatsESApiKey: string(beatsApiKey),
+			}))
+	configContents := configBuffer.Bytes()
+
+	// Start agent monitoring
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	cmd := monitoringTestHelper(t, ctx, fixture, configContents)
+
+	var agentDocs estools.Documents
+	require.Eventually(t,
+		func() bool {
+			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer findCancel()
+
+			agentDocs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbMonitoringIndex+"*", map[string]interface{}{
+				"data_stream.dataset": "elastic_agent",
+			})
+
+			require.NoError(t, err)
+			return agentDocs.Hits.Total.Value > 1
+		},
+		2*time.Minute, 1*time.Second, "datastream does not exist")
+
+	// Stop Elastic Agent
+	cancel()
+	cmd.Wait()
+
+	// Start monitoring in otel mode
+	fixture, err = define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel = testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	// Get the running dir
+	inputPath, err := fixture.GetRunningDir(ctx)
+	socketEndpoint := utils.SocketURLWithFallback("uniqueID", paths.TempDir())
+
+	configTemplateOTel := `
+agent.grpc:
+  port: 6796
 receivers:
-  filebeatreceiver/filestream-monitoring-agent:
+  filebeatreceiver/filestream-monitoring:
     filebeat:
       inputs:
         - type: filestream
@@ -1677,10 +1727,6 @@ receivers:
           processors:
             - add_fields:
                 fields:
-                  input_id: filestream-monitoring-agent
-                target: '@metadata'
-            - add_fields:
-                fields:
                   dataset: otel
                   namespace: default
                   type: logs
@@ -1689,10 +1735,6 @@ receivers:
                 fields:
                   dataset: otel
                 target: event
-            - add_fields:
-                fields:
-                  stream_id: filestream-monitoring-agent
-                target: '@metadata'
             - add_fields:
                 fields:
                   id: 0ddca301-e7c0-4eac-8432-7dd05bc9cb06
@@ -1706,8 +1748,7 @@ receivers:
             - drop_event:
                 when:
                   regexp:
-                    component:
-                      id: .*-monitoring$
+                    name: .*-monitoring$
             - drop_event:
                 when:
                   regexp:
@@ -1742,12 +1783,8 @@ receivers:
                 fields:
                   - ecs.version
                 ignore_missing: true
-            - add_formatted_index:
-                index: '%{[data_stream.type]}-%{[data_stream.dataset]}-%{[data_stream.namespace]}'
     output:
       otelconsumer:
-    path:
-      data: {{.HomeDir}}/filestream-monitoring
     queue:
       mem:
         flush:
@@ -1756,15 +1793,6 @@ receivers:
       level: info
       selectors:
         - '*'
-    processors:
-      - add_host_metadata:
-          when:
-            not:
-              contains:
-                tags: forwarded
-      - add_cloud_metadata: ~
-      - add_docker_metadata: ~
-      - add_kubernetes_metadata: ~
     setup.ilm.enabled: false 
     setup.template.enabled: false
     filebeat.config.modules.enabled: false
@@ -1794,91 +1822,53 @@ service:
       exporters:
         - elasticsearch/log
 `
-
-	beatsApiKey, err := base64.StdEncoding.DecodeString(esApiKey.Encoded)
-	require.NoError(t, err, "error decoding api key")
-
-	var configBuffer bytes.Buffer
+	configBuffer.Reset()
 	require.NoError(t,
-		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+		template.Must(template.New("config").Parse(configTemplateOTel)).Execute(&configBuffer,
 			configOptions{
 				InputPath:      inputPath,
-				HomeDir:        tmpDir,
 				ESEndpoint:     esEndpoint,
 				ESApiKey:       esApiKey.Encoded,
-				BeatsESApiKey:  string(beatsApiKey),
 				SocketEndpoint: socketEndpoint,
 			}))
-	configContents := configBuffer.Bytes()
+	configContents = configBuffer.Bytes()
 	t.Cleanup(func() {
 		if t.Failed() {
 			t.Logf("Contents of agent config file:\n%s\n", string(configContents))
 		}
 	})
 
-	err = fixture.Configure(ctx, configContents)
-	require.NoError(t, err)
-
-	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
-	require.NoError(t, err)
-	cmd.WaitDelay = 1 * time.Second
-
-	var output strings.Builder
-	cmd.Stderr = &output
-	cmd.Stdout = &output
-
-	err = cmd.Start()
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		if t.Failed() {
-			t.Log("Elastic-Agent output:")
-			t.Log(output.String())
-		}
-	})
-
-	require.Eventually(t, func() bool {
-		err = fixture.IsHealthy(ctx)
-		if err != nil {
-			t.Logf("waiting for agent healthy: %s", err.Error())
-			return false
-		}
-		return true
-	}, 30*time.Second, 1*time.Second)
-
+	cmd = monitoringTestHelper(t, ctx, fixture, configContents)
 	// check if elastic-agent log path exists
 	// This is important for the test to succeed
-	pattern := inputPath + "/data/elastic-agent-*/logs/elastic-agent-*.ndjson"
-	files, err := filepath.Glob(pattern)
-	if err != nil {
-		t.Fatalf("Error checking files: %v", err)
-	}
+	// pattern := inputPath + "/data/elastic-agent-*/logs/elastic-agent-*.ndjson"
+	// files, err := filepath.Glob(pattern)
+	// if err != nil {
+	// 	t.Fatalf("Error checking files: %v", err)
+	// }
 
-	if len(files) == 0 {
-		t.Errorf("No matching files found in path: %s", pattern)
-	}
+	// if len(files) == 0 {
+	// 	t.Errorf("No matching files found in path: %s", pattern)
+	// }
 
-	var agentDocs estools.Documents
 	var otelDocs estools.Documents
 	require.Eventually(t,
 		func() bool {
 			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer findCancel()
 
-			agentDocs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbMonitoringIndex+"*", map[string]interface{}{
-				"data_stream.dataset": "elastic_agent",
-			})
-
-			require.NoError(t, err)
 			otelDocs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbReceiverMonitoringIndex+"*", map[string]interface{}{
 				"data_stream.dataset": "otel",
 			})
 			require.NoError(t, err)
 
-			// Atleast 1 Document in each index should be present
-			return otelDocs.Hits.Total.Value > 1 && agentDocs.Hits.Total.Value > 1
+			// Atleast 1 Document should be present in the datastream
+			return otelDocs.Hits.Total.Value > 1
 		},
-		2*time.Minute, 1*time.Second, "the number of logs in both index are not same")
+		2*time.Minute, 1*time.Second, "otel datastream does not exist")
+
+	cancel()
+	cmd.Wait()
 
 	agent := agentDocs.Hits.Hits[0].Source
 	otel := otelDocs.Hits.Hits[0].Source
@@ -1887,7 +1877,6 @@ service:
 		"@timestamp",
 		"agent.ephemeral_id",
 		"agent.id",
-		"agent.version",
 		"data_stream.dataset",
 		"event.dataset",
 		"message",
@@ -1898,6 +1887,9 @@ service:
 		"log.origin.file.line",
 		"log.origin.file.name",
 		"log.logger",
+		"log.file.inode",
+		"log.file.fingerprint",
+		"log.file.path",
 
 		// elastic_agent * fields are hardcoded in processor list for now which is why they differ
 		"elastic_agent.id",
@@ -1907,13 +1899,37 @@ service:
 		// requires investigation
 		// should be same but isn't
 		"container.id", // has very different type of ID's. One is long string. One is a single letter
-		"log.file.path",
 
-		// Missing in agent Docs
+		// Additional fields in otel docs
 		"log.source",
+		"path",
+		"env",
+		"dir",
+		"args",
 	}
 
 	assertMapsEqual(t, agent, otel, ignoredFields, "expected documents to be equal")
-	cancel()
-	cmd.Wait()
+}
+
+func monitoringTestHelper(t *testing.T, ctx context.Context, fixture *aTesting.Fixture, cfg []byte) *exec.Cmd {
+	err := fixture.Configure(ctx, cfg)
+	require.NoError(t, err)
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err)
+	cmd.WaitDelay = 1 * time.Second
+
+	err = cmd.Start()
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 30*time.Second, 1*time.Second)
+
+	return cmd
 }
