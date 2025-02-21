@@ -465,7 +465,7 @@ func (f *Fixture) simpleInstallRPM(ctx context.Context) ([]byte, error) {
 	}
 
 	// sudo apt-get install the deb
-	out, err := exec.CommandContext(ctx, "sudo", "dnf", "install", f.srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
+	out, err := exec.CommandContext(ctx, "sudo", "rpm", "-Uvh", f.srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
 	if err != nil {
 		return out, fmt.Errorf("apt install failed: %w output:%s", err, string(out))
 	}
@@ -648,6 +648,10 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 	if err != nil {
 		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
 	}
+
+	socketPath := "unix:///var/lib/elastic-agent/elastic-agent.sock" // Why does controlSocketRunSylink not work here?
+	c := client.New(client.WithAddress(socketPath))
+	f.setClient(c)
 
 	if !shouldEnroll {
 		return nil, nil
