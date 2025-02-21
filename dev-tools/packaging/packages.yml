@@ -281,16 +281,16 @@ shared:
       'data/cloud_downloads/metricbeat.sh':
         source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/metricbeat.sh'
         mode: 0755
-      'data/cloud_downloads/agentbeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz':
-        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/agentbeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
+      'data/cloud_downloads/agentbeat-{{ beat_version }}-{{.GOOS}}-{{.AgentArchName}}.tar.gz':
+        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/agentbeat-{{ beat_version }}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
         mode: 0755
 
   # service build is based on previous cloud variant
   - &agent_docker_service_spec
     docker_variant: 'service'
     files:
-      'data/service/connectors-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip':
-        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/connectors-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip'
+      'data/service/connectors-{{ beat_version }}.zip':
+        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/connectors-{{ beat_version }}.zip'
         mode: 0755
       'data/{{.BeatName}}-{{ commit_short }}/components/connectors':
         source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/connectors.sh'
