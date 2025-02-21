@@ -73,22 +73,25 @@ func InstallAgentWithPolicy(ctx context.Context, t *testing.T,
 	}
 
 	if createPolicyReq.IsProtected {
-		// If protected fetch uninstall token and set it for the fixture
-		resp, err := kibClient.GetPolicyUninstallTokens(ctx, policy.ID)
-		if err != nil {
-			return policy, "", fmt.Errorf("failed to fetch uninstal tokens: %w", err)
+		if err := GetandSetUninstallTokens(ctx, t, kibClient, agentFixture, policy.ID); err != nil {
+			return policy, err
 		}
-		if len(resp.Items) == 0 {
-			return policy, "", fmt.Errorf("expected non-zero number of tokens: %w", err)
-		}
-
-		if len(resp.Items[0].Token) == 0 {
-			return policy, "", fmt.Errorf("expected non-empty token: %w", err)
-		}
-
-		uninstallToken := resp.Items[0].Token
-		t.Logf("Protected with uninstall token: %v", uninstallToken)
-		agentFixture.SetUninstallToken(uninstallToken)
+		// // If protected fetch uninstall token and set it for the fixture
+		// resp, err := kibClient.GetPolicyUninstallTokens(ctx, policy.ID)
+		// if err != nil {
+		// 	return policy, fmt.Errorf("failed to fetch uninstal tokens: %w", err)
+		// }
+		// if len(resp.Items) == 0 {
+		// 	return policy, fmt.Errorf("expected non-zero number of tokens: %w", err)
+		// }
+		//
+		// if len(resp.Items[0].Token) == 0 {
+		// 	return policy, fmt.Errorf("expected non-empty token: %w", err)
+		// }
+		//
+		// uninstallToken := resp.Items[0].Token
+		// t.Logf("Protected with uninstall token: %v", uninstallToken)
+		// agentFixture.SetUninstallToken(uninstallToken)
 	}
 
 	agentID, err := InstallAgentForPolicy(ctx, t, installOpts, agentFixture, kibClient, policy.ID)
@@ -156,7 +159,10 @@ func InstallAgentForPolicyWithToken(ctx context.Context, t *testing.T,
 
 		installOpts.URL = fleetServerURL
 	}
-
+	fmt.Println("###############################")
+	fmt.Println(installOpts.URL)
+	fmt.Println(enrollmentToken)
+	fmt.Println("###############################")
 	output, err := agentFixture.Install(ctx, &installOpts)
 	if err != nil {
 		t.Log(string(output))
