@@ -1627,7 +1627,7 @@ func TestMonitoringAgentE2E(t *testing.T) {
 	require.NoError(t, err, "error getting elasticsearch endpoint")
 	esApiKey, err := createESApiKey(info.ESClient)
 	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	require.NotEmptyf(t, esApiKey.Encoded, "api key is invalid %q", esApiKey)
 
 	configTemplate := `
 agent.grpc:
