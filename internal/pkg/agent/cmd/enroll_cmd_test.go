@@ -496,10 +496,14 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			backoffInit := time.Minute
+			ctx, cancel := context.WithTimeout(context.Background(), 2*backoffInit)
 			defer cancel()
+			now := time.Now()
 			err = cmd.Execute(ctx, streams)
+			elapsed := time.Since(now)
 			require.NoError(t, err, "enroll command should return no error")
+			assert.LessOrEqual(t, backoffInit/2, elapsed, "enroll should wait at least half of the backoff init")
 
 			assert.True(t, store.Called, "the store should have been called")
 			config, err := readConfig(store.Content)
