@@ -372,11 +372,11 @@ func installSecurityAgent(ctx context.Context, t *testing.T, info *define.Info, 
 		Privileged:     true,
 	}
 
-	policyResp, err := tools.InstallAgentWithPolicy(ctx, t,
+	policy, err := tools.InstallAgentWithPolicy(ctx, t,
 		installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoError(t, err, "failed to install agent with policy")
 
-	return fixture, policyResp
+	return fixture, policy
 }
 
 // buildPolicyWithTamperProtection helper function to build the policy request with or without tamper protection
