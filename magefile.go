@@ -95,9 +95,10 @@ const (
 	baseURLForStagingDRA = "https://staging.elastic.co/"
 	agentCoreProjectName = "elastic-agent-core"
 
-	helmChartPath     = "./deploy/helm/elastic-agent"
-	helmOtelChartPath = "./deploy/helm/edot-collector/kube-stack"
-	sha512FileExt     = ".sha512"
+	helmChartPath      = "./deploy/helm/elastic-agent"
+	helmOtelChartPath  = "./deploy/helm/edot-collector/kube-stack"
+	helmMOtelChartPath = "./deploy/helm/edot-collector/kube-stack/managed_otlp"
+	sha512FileExt      = ".sha512"
 )
 
 var (
@@ -3508,6 +3509,9 @@ func (Helm) UpdateAgentVersion() error {
 		filepath.Join(helmOtelChartPath, "values.yaml"): {
 			{"defaultCRConfig.image.tag", agentVersion},
 		},
+		filepath.Join(helmMOtelChartPath, "values.yaml"): {
+			{"defaultCRConfig.image.tag", agentVersion},
+		},
 	} {
 		if err := updateYamlFile(yamlFile, keyVals...); err != nil {
 			return fmt.Errorf("failed to update agent version: %w", err)
@@ -3539,7 +3543,8 @@ func (Helm) Lint() error {
 func updateYamlFile(path string, keyVal ...struct {
 	key   string
 	value string
-}) error {
+},
+) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
