@@ -17,6 +17,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -39,6 +40,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/proxytest"
+	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
 const (
@@ -56,6 +58,200 @@ var protectionTests = []struct {
 		name:      "protected",
 		protected: true,
 	},
+}
+
+func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Deb,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+	})
+	testTamperProtectedDebRpmUpgrades(t, info, "deb")
+}
+
+func TestUpgradeAgentWithTamperProtectedEndpoint_RPM(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: RPM,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+	})
+	testTamperProtectedDebRpmUpgrades(t, info, "rpm")
+}
+
+func getEndpointVersion(t *testing.T) string {
+	cmd := exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "version")
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err)
+	// version: 8.18.0-SNAPSHOT, compiled: Wed Feb 19 01:00:00 2025, branch: HEAD, commit: c450b50f91507c3166b072df8557f5efd871103a
+	return strings.Split(strings.Split(string(output), "version: ")[1], ",")[0]
+}
+
+// The steps in this test are the following
+// * Prepare a fixture with an older version of the agent
+// * Create a generic policy
+// * Generate an enrollment token
+// * Add the elastic defend package to the policy
+// * Update the policy to set "is_protected" to true
+// * Get the uninstall token for the policy and store it in the fixture
+// * Install and enroll the fist agent
+// * Validate the health of both the agent and endpoint
+// * Validate the version of endpoint matches that of the agent
+// * Validate that tamper protection is enabled in endpoint by trying to
+// uninstall it
+// * Setup a fixture with the test build
+// * Install the new agent
+// * Validate that the new agent and endpoint are healthy
+// * Validate that the new version of endpoint matches the new version of the
+// agent
+// * Validate that tamper protection is still enabled by trying to uninstall
+// endpoint
+// * Uninstall endpoint using the uninstall token
+// * Validate that endpoint is indeed uninstalled
+// * Cleanup endpoint
+// * Cleanup agent
+//
+// For cleaning up the agent the test relies on the first installation where the
+// cleanup functions are set
+func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageFormat string) {
+	ctx := context.Background()
+
+	t.Log("Preparing fixture with an older version of the agent")
+	upgradeFromVersion, err := upgradetest.PreviousMinor()
+	require.NoError(t, err)
+	startFixture, err := atesting.NewFixture(
+		t,
+		upgradeFromVersion.String(),
+		atesting.WithFetcher(atesting.ArtifactFetcher()),
+		atesting.WithPackageFormat(packageFormat),
+	)
+	require.NoError(t, err)
+	startFixture.Prepare(ctx)
+
+	t.Log("Creating a generic policy and enrollment token")
+	policy := createBasicPolicy()
+	policyResp, enrollKeyResp := createPolicyAndEnrollmentToken(ctx, t, info.KibanaClient, policy)
+
+	t.Log("Install elastic defend")
+	pkgPolicyResp, err := installElasticDefendPackage(t, info, policyResp.ID)
+	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
+
+	isProtected := true
+	updateReq := kibana.AgentPolicyUpdateRequest{
+		Name:        policy.Name,
+		Namespace:   policy.Namespace,
+		IsProtected: &isProtected,
+	}
+
+	t.Log("Updating the policy to set \"is_protected\" to true")
+	_, err = info.KibanaClient.UpdatePolicy(ctx, policyResp.ID, updateReq)
+
+	t.Log("Get the policy uinstall token and store it in the fixture")
+	tools.GetandSetUninstallTokens(ctx, t, info.KibanaClient, startFixture, policyResp.ID)
+
+	opts := atesting.InstallOpts{}
+	t.Log("Install and enroll the first agent")
+	tools.InstallAgentForPolicyWithToken(ctx, t, opts, startFixture, info.KibanaClient, policyResp.ID, enrollKeyResp)
+
+	t.Cleanup(func() {
+		_, err := os.Stat("/opt/Elastic/Endpoint/elastic-endpoint")
+		if os.IsNotExist(err) {
+			t.Log("Endpoint binary does not exist, aborting endpoint cleanup")
+			return
+		}
+
+		out, err := exec.Command("sudo", "systemctl", "stop", "ElasticEndpoint").CombinedOutput()
+		if err != nil {
+			t.Log(string(out))
+			t.Logf("error while stopping Elastic Endpoint: %s", err.Error())
+		}
+
+		if atesting.KeepInstalledFlag() {
+			t.Logf("\"Keep installed\" flag is set, won't be removing endpoint. If you want to remove endpoint later on, use the following uninstall token: %s", startFixture.UninstallToken())
+		}
+
+		uninstallContext, uninstallCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer uninstallCancel()
+
+		t.Logf("Uninstalling endpoint with the following uinstall token: %s", startFixture.UninstallToken())
+		_, err = exec.CommandContext(uninstallContext, "/opt/Elastic/Endpoint/elastic-endpoint", "uninstall", "--uninstall-token", startFixture.UninstallToken()).CombinedOutput()
+		if err != nil {
+			t.Logf("error when cleaning up elastic-endpoint: uninstall token %s", startFixture.UninstallToken())
+			t.FailNow()
+		}
+
+		t.Log("Endpoint is successfully uninstalled by the cleanup function")
+	})
+
+	agentClient := startFixture.Client()
+	err = agentClient.Connect(ctx)
+	require.NoError(t, err, "could not connect to the initial agent")
+
+	require.Eventually(t,
+		func() bool { return agentAndEndpointAreHealthy(t, ctx, agentClient) },
+		endpointHealthPollingTimeout,
+		time.Second,
+		"Endpoint component or units are not healthy prior to upgrade.",
+	)
+
+	t.Log("The initial installation of both the agent and endpoint are healthy")
+
+	// Check the version of endpoint matches the version of the agent
+	initEndpointVersion := getEndpointVersion(t)
+	require.Equal(t, initEndpointVersion, upgradeFromVersion.String())
+	t.Log("The version of endpoint and agent match")
+
+	// try to uninstall endpoint without token and assert that endpoint is not removed
+	_, err = exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "uninstall", "--log", "stdout").CombinedOutput()
+	require.Error(t, err)
+	t.Log("Tamper protection for the initial installation of the endpoint is enabled")
+
+	t.Log("Setup agent fixture witht the test build")
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat(packageFormat))
+	require.NoError(t, err)
+	fixture.Prepare(ctx)
+
+	t.Log("Installing the second agent, upgrading from the older version")
+	_, err = fixture.SimpleInstall(ctx)
+	require.NoError(t, err)
+
+	upgradedAgentClient := fixture.Client()
+	err = upgradedAgentClient.Connect(ctx)
+	require.NoError(t, err, "could not connect to the upgraded agent")
+
+	require.Eventually(t,
+		func() bool { return agentAndEndpointAreHealthy(t, ctx, upgradedAgentClient) },
+		endpointHealthPollingTimeout,
+		time.Second,
+		"Endpoint component or units are not healthy after the upgrade.",
+	)
+	t.Log("The upgraded agent and endpoint are both healthy")
+
+	// Validate that the new version of endpoint matches the new version of the agent
+	upgradedEndpointVersion := getEndpointVersion(t)
+	require.Equal(t, define.Version(), upgradedEndpointVersion)
+	t.Log("The version of the upgraded agent and the upgraded endpoint match")
+
+	// try to uninstall endpoint without token and assert that endpoint is not removed
+	_, err = exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "uninstall", "--log", "stdout").CombinedOutput()
+	require.Error(t, err)
+	t.Log("tamper protection for the upgraded endpoint is enabled")
+
+	// uninstall with the uninstall token and assert that endpoint is indeed
+	// removed. The uninstall token for both of the fixtures is the same
+	_, err = exec.Command("/opt/Elastic/Endpoint/elastic-endpoint", "uninstall", "--uninstall-token", startFixture.UninstallToken()).CombinedOutput()
+	require.NoError(t, err)
+
+	_, err = os.Stat("/opt/Elastic/Endpoint/elastic-endpoint")
+	require.True(t, os.IsNotExist(err))
+	t.Log("successfully uninstalled endpoint using the uninstall token")
 }
 
 // TestInstallAndCLIUninstallWithEndpointSecurity tests that the agent can
@@ -149,6 +345,12 @@ func installSecurityAgent(ctx context.Context, t *testing.T, info *define.Info, 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err, "could not create agent fixture")
 
+	policyResp := installSecurityAgentWithFixture(ctx, t, info, fixture, protected)
+
+	return fixture, policyResp
+}
+
+func installSecurityAgentWithFixture(ctx context.Context, t *testing.T, info *define.Info, fixture *atesting.Fixture, protected bool) kibana.PolicyResponse {
 	t.Log("Enrolling the agent in Fleet")
 	policyUUID := uuid.Must(uuid.NewV4()).String()
 
@@ -174,7 +376,7 @@ func installSecurityAgent(ctx context.Context, t *testing.T, info *define.Info, 
 	policy, err := tools.InstallAgentWithPolicy(ctx, t,
 		installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoError(t, err, "failed to install agent with policy")
-	return fixture, policy
+	return policy
 }
 
 // buildPolicyWithTamperProtection helper function to build the policy request with or without tamper protection
@@ -705,7 +907,6 @@ func TestEndpointLogsAreCollectedInDiagnostics(t *testing.T) {
 }
 
 func getEndpointComponents(ctx context.Context, t *testing.T, c client.Client) []string {
-
 	err := c.Connect(ctx)
 	require.NoError(t, err, "connecting to agent to retrieve endpoint components")
 	defer c.Disconnect()
@@ -1271,8 +1472,8 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 }
 
 func prepareProxies(t *testing.T, fleethostWrong *url.URL, defaultFleetHost string) (
-	certificatePaths, certificatePaths, certificatePaths, *proxytest.Proxy, *proxytest.Proxy, *proxytest.Proxy) {
-
+	certificatePaths, certificatePaths, certificatePaths, *proxytest.Proxy, *proxytest.Proxy, *proxytest.Proxy,
+) {
 	mtlsCLI := generateMTLSCerts(t, "mtlsCLI")
 	mtlsPolicy := generateMTLSCerts(t, "mtlsPolicy")
 	oneWayTLSPolicy := generateMTLSCerts(t, "oneWayTLSPolicy")
