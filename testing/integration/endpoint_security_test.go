@@ -350,12 +350,6 @@ func installSecurityAgent(ctx context.Context, t *testing.T, info *define.Info, 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err, "could not create agent fixture")
 
-	policyResp := installSecurityAgentWithFixture(ctx, t, info, fixture, protected)
-
-	return fixture, policyResp
-}
-
-func installSecurityAgentWithFixture(ctx context.Context, t *testing.T, info *define.Info, fixture *atesting.Fixture, protected bool) kibana.PolicyResponse {
 	t.Log("Enrolling the agent in Fleet")
 	policyUUID := uuid.Must(uuid.NewV4()).String()
 
@@ -378,10 +372,11 @@ func installSecurityAgentWithFixture(ctx context.Context, t *testing.T, info *de
 		Privileged:     true,
 	}
 
-	policy, agentID, err := tools.InstallAgentWithPolicy(ctx, t,
+	policyResp, err := tools.InstallAgentWithPolicy(ctx, t,
 		installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoError(t, err, "failed to install agent with policy")
-	return policy
+
+	return fixture, policyResp
 }
 
 // buildPolicyWithTamperProtection helper function to build the policy request with or without tamper protection
