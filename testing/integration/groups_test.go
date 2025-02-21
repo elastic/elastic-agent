@@ -35,6 +35,9 @@ const (
 	// Upgrade group of tests. Used for testing upgrades.
 	Upgrade = "upgrade"
 
+	// UpgradeFlavor group of tests. Used for testing flavored upgrades.
+	UpgradeFlavor = "upgrade-flavor"
+
 	// StandaloneUpgrade group of tests. Used for TestStandaloneUpgrade.
 	StandaloneUpgrade = "standalone-upgrade"
 
