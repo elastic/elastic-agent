@@ -67,7 +67,9 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 		OS: []define.OS{
-			{Type: define.Linux},
+			{
+				Type: define.Linux,
+			},
 		},
 	})
 	testTamperProtectedDebRpmUpgrades(t, info, "deb")
@@ -80,7 +82,10 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_RPM(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 		OS: []define.OS{
-			{Type: define.Linux},
+			{
+				Type:   define.Linux,
+				Distro: "rhel",
+			},
 		},
 	})
 	testTamperProtectedDebRpmUpgrades(t, info, "rpm")
