@@ -527,11 +527,10 @@ collectors:
   gateway:
     suffix: gateway
     autoscaler:
-      minReplicas: 2    # Start with at least 2 replicas for better availability.
-      maxReplicas: 5   # Allow more scale-out if needed.
-      targetCPUUtilization: 70  # Scale when CPU usage exceeds 70%.
-      targetMemoryUtilization: 75  # Scale when memory usage exceeds 75%.
-
+      minReplicas: 2 # Start with at least 2 replicas for better availability.
+      maxReplicas: 5 # Allow more scale-out if needed.
+      targetCPUUtilization: 70 # Scale when CPU usage exceeds 70%.
+      targetMemoryUtilization: 75 # Scale when memory usage exceeds 75%.
     resources:
       limits:
         cpu: 500m
