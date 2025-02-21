@@ -8,8 +8,7 @@ steps:
   - group: "Integration tests: packaging"
     key: "int-packaging"
     steps:
-      - label: "Packaging: Ubuntu x86_64"
-        key: "packaging-ubuntu-x86-64"
+      - label: "Packaging: Ubuntu"
         env:
           PACKAGES: "tar.gz"
           PLATFORMS: "linux/amd64"
@@ -19,21 +18,17 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
-
-      - label: "Packaging: Ubuntu arm64"
-        key: "packaging-ubuntu-arm64"
-        env:
-          PACKAGES: "tar.gz"
-          PLATFORMS: "linux/arm64"
-        command: ".buildkite/scripts/steps/integration-package.sh"
-        artifact_paths:
-          - build/distributions/**
-        agents:
-          provider: "gcp"
-          machineType: "n2-standard-8"
+        matrix:
+          setup:
+            arch:
+              - linux/amd64
+              - linux/arm64
+            ext:
+              - rpm
+              - deb
+              - tar.gz
 
       - label: "Packaging: Windows"
-        key: "packaging-windows"
         env:
           PACKAGES: "zip"
           PLATFORMS: "windows/amd64"
@@ -45,16 +40,18 @@ steps:
           machineType: "n2-standard-8"
 
       - label: "Packaging: Containers"
-        key: "packaging-containers"
         env:
           PACKAGES: "docker"
-          PLATFORMS: "linux/amd64,linux/arm64"
+          PLATFORMS: "{{matrix}}"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
+        matrix:
+          - linux/amd64
+          - linux/arm64
 
   - label: "Serverless integration test"
     key: "serverless-integration-tests"
@@ -110,7 +107,7 @@ steps:
   - label: "Serverless Beats Tests"
     # To speedup the build process only packaging-ubuntu-x86-64 artifact dependency is required
     depends_on:
-      - packaging-ubuntu-x86-64
+      - int-packaging
     key: "serverless-beats-integration-tests"
     concurrency_group: elastic-agent-extended-testing/beats-integration
     concurrency: 8
