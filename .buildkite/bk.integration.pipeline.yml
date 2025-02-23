@@ -44,6 +44,7 @@ steps:
           - fleet-privileged
           - standalone-upgrade
           - upgrade
+          - upgrade-flavor
           - install-uninstall
 
       - label: "Win2022:non-sudo:{{matrix}}"
@@ -95,6 +96,7 @@ steps:
         matrix:
           - default
           - upgrade
+          - upgrade-flavor
           - standalone-upgrade
           - fleet
           - fleet-endpoint-security
@@ -121,6 +123,7 @@ steps:
         matrix:
           - default
           - upgrade
+          - upgrade-flavor
           - standalone-upgrade
           - fleet
           # ARM tests are enabled for only selected groups in order to save resources
