@@ -234,7 +234,14 @@ func (f *Fixture) GetRunningDir(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error preparing binary: %w", err)
 	}
-	return f.extractDir, nil
+
+	// resolve symlink path if any
+	resolvedPath, err := filepath.EvalSymlinks(f.extractDir)
+	if err != nil {
+		fmt.Errorf("Error resolving symlink: %v", err)
+	}
+
+	return resolvedPath, nil
 }
 
 // WriteFileToWorkDir sends a file to the working directory alongside the unpacked tar build.
