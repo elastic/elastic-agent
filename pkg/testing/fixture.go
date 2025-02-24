@@ -238,7 +238,7 @@ func (f *Fixture) GetRunningDir(ctx context.Context) (string, error) {
 	// resolve symlink path if any
 	resolvedPath, err := filepath.EvalSymlinks(f.extractDir)
 	if err != nil {
-		fmt.Errorf("error resolving symlink: %v", err)
+		return "", fmt.Errorf("error resolving symlink: %v", err)
 	}
 
 	return resolvedPath, nil
