@@ -1839,7 +1839,7 @@ service:
 	var otelDocs estools.Documents
 	require.Eventually(t,
 		func() bool {
-			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
 			defer findCancel()
 
 			agentDocs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbMonitoringIndex+"*", map[string]interface{}{
@@ -1863,7 +1863,7 @@ service:
 		"@timestamp",
 		"agent.ephemeral_id",
 		"agent.id",
-		"agent.version"
+		"agent.version",
 		"data_stream.dataset",
 		"data_stream.namespace",
 		"event.dataset",
