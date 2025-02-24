@@ -8,13 +8,14 @@ package cmd
 
 import (
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"golang.org/x/exp/maps"
 	"kernel.org/pub/linux/libs/security/libcap/cap"
 )
 
@@ -192,8 +193,8 @@ func Test_raiseEffectiveCapabilities(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				require.ElementsMatch(t, tt.expectedCaps, maps.Keys(tt.mockedProcCaps.effectiveCaps))
-				require.ElementsMatch(t, tt.expectedCaps, maps.Keys(tt.mockedProcCaps.inheritableCaps))
+				require.ElementsMatch(t, tt.expectedCaps, slices.Collect(maps.Keys(tt.mockedProcCaps.effectiveCaps)))
+				require.ElementsMatch(t, tt.expectedCaps, slices.Collect(maps.Keys(tt.mockedProcCaps.inheritableCaps)))
 			}
 		})
 	}
@@ -291,7 +292,7 @@ func Test_raiseAmbientCapabilities(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				require.ElementsMatch(t, tt.expectedAmbientCaps, maps.Keys(tt.mockedBoundCaps.ambientCaps))
+				require.ElementsMatch(t, tt.expectedAmbientCaps, slices.Collect(maps.Keys(tt.mockedBoundCaps.ambientCaps)))
 			}
 		})
 	}

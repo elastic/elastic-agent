@@ -1,0 +1,615 @@
+# For installation and configuration options, refer to the [installation instructions](https://github.com/elastic/opentelemetry/blob/main/docs/kubernetes/operator/README.md)
+
+# For advanced configuration options, refer to the [official OpenTelemetry Helm chart](https://github.com/open-telemetry/opentelemetry-helm-charts/blob/main/charts/opentelemetry-kube-stack/values.yaml)
+# This file has been tested together with opentelemetry-kube-stack helm chart version: 0.3.3
+opentelemetry-operator:
+  manager:
+    extraArgs:
+      - --enable-go-instrumentation
+  admissionWebhooks:
+    certManager:
+      enabled: false # For production environments, it is [recommended to use cert-manager for better security and scalability](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-operator#tls-certificate-requirement).
+    autoGenerateCert:
+      enabled: true # Enable/disable automatic certificate generation. Set to false if manually managing certificates.
+      recreate: true # Force certificate regeneration on updates. Only applicable if autoGenerateCert.enabled is true.
+crds:
+  create: true # Install the OpenTelemetry Operator CRDs.
+defaultCRConfig:
+  image:
+    repository: "docker.elastic.co/beats/elastic-agent"
+    tag: "9.1.0"
+  targetAllocator:
+    enabled: false # Enable/disable the Operator's Target allocator.
+    # Refer to: https://github.com/open-telemetry/opentelemetry-operator/tree/main/cmd/otel-allocator
+clusterRole:
+  rules:
+    - apiGroups: [""]
+      resources: ["configmaps"]
+      verbs: ["get"]
+# `clusterName` specifies the name of the Kubernetes cluster. It sets the 'k8s.cluster.name' field.
+# Cluster Name is automatically detected for EKS/GKE/AKS. Add the below value in environments where cluster name cannot be detected.
+# clusterName: myClusterName
+collectors:
+  #  Cluster is a K8s deployment EDOT collector focused on gathering telemetry
+  #  at the cluster level (Kubernetes Events and cluster metrics).
+  cluster:
+    env:
+      - name: ELASTIC_AGENT_OTEL
+        value: '"true"'
+    config:
+      exporters:
+        # [Debug exporter](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/debugexporter/README.md)
+        debug:
+          verbosity: basic # Options: basic, detailed. Choose verbosity level for debug logs.
+          # [Elasticsearch exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/README.md)
+        otlp/gateway:
+          endpoint: "http://opentelemetry-kube-stack-gateway-collector:4317"
+          tls:
+            insecure: true
+      processors:
+        # [Resource Detection Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor)
+        resourcedetection/eks:
+          detectors: [env, eks] # Detects resources from environment variables and EKS (Elastic Kubernetes Service).
+          timeout: 15s
+          override: true
+          eks:
+            resource_attributes:
+              k8s.cluster.name:
+                enabled: true
+        resourcedetection/gcp:
+          detectors: [env, gcp] # Detects resources from environment variables and GCP (Google Cloud Platform).
+          timeout: 2s
+          override: true
+        resourcedetection/aks:
+          detectors: [env, aks] # Detects resources from environment variables and AKS (Azure Kubernetes Service).
+          timeout: 2s
+          override: true
+          aks:
+            resource_attributes:
+              k8s.cluster.name:
+                enabled: true
+        # [Resource Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourceprocessor)
+        resource/k8s: # Resource attributes tailored for services within Kubernetes.
+          attributes:
+            - key: service.name # Set the service.name resource attribute based on the well-known app.kubernetes.io/name label
+              from_attribute: app.label.name
+              action: insert
+            - key: service.name # Set the service.name resource attribute based on the k8s.container.name attribute
+              from_attribute: k8s.container.name
+              action: insert
+            - key: app.label.name # Delete app.label.name attribute previously used for service.name
+              action: delete
+            - key: service.version # Set the service.version resource attribute based on the well-known app.kubernetes.io/version label
+              from_attribute: app.label.version
+              action: insert
+            - key: app.label.version # Delete app.label.version attribute previously used for service.version
+              action: delete
+        resource/hostname:
+          attributes:
+            - key: host.name
+              from_attribute: k8s.node.name
+              action: upsert
+        # [K8s Attributes Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8sattributesprocessor)
+        k8sattributes:
+          passthrough: false # Annotates resources with the pod IP and does not try to extract any other metadata.
+          pod_association:
+            # Below association takes a look at the k8s.pod.ip and k8s.pod.uid resource attributes or connection's context, and tries to match it with the pod having the same attribute.
+            - sources:
+                - from: resource_attribute
+                  name: k8s.pod.ip
+            - sources:
+                - from: resource_attribute
+                  name: k8s.pod.uid
+            - sources:
+                - from: connection
+          extract:
+            metadata:
+              - "k8s.namespace.name"
+              - "k8s.deployment.name"
+              - "k8s.replicaset.name"
+              - "k8s.statefulset.name"
+              - "k8s.daemonset.name"
+              - "k8s.cronjob.name"
+              - "k8s.job.name"
+              - "k8s.node.name"
+              - "k8s.pod.name"
+              - "k8s.pod.ip"
+              - "k8s.pod.uid"
+              - "k8s.pod.start_time"
+            labels:
+              - tag_name: app.label.name
+                key: app.kubernetes.io/name
+                from: pod
+              - tag_name: app.label.version
+                key: app.kubernetes.io/version
+                from: pod
+      receivers:
+        # [K8s Objects Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sobjectsreceiver)
+        k8sobjects:
+          objects:
+            - name: events
+              mode: "watch"
+              group: "events.k8s.io"
+              exclude_watch_type:
+                - "DELETED"
+        # [K8s Cluster Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sclusterreceiver)
+        k8s_cluster:
+          auth_type: serviceAccount # Determines how to authenticate to the K8s API server. This can be one of none (for no auth), serviceAccount (to use the standard service account token provided to the agent pod), or kubeConfig to use credentials from ~/.kube/config.
+          node_conditions_to_report:
+            - Ready
+            - MemoryPressure
+          allocatable_types_to_report:
+            - cpu
+            - memory
+          metrics:
+            k8s.pod.status_reason:
+              enabled: true
+          resource_attributes:
+            k8s.kubelet.version:
+              enabled: true
+            os.description:
+              enabled: true
+            os.type:
+              enabled: true
+            k8s.container.status.last_terminated_reason:
+              enabled: true
+      # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
+      service:
+        pipelines:
+          metrics:
+            exporters:
+              - debug
+              - otlp/gateway
+            processors:
+              - k8sattributes
+              - resourcedetection/eks
+              - resourcedetection/gcp
+              - resourcedetection/aks
+              - resource/k8s
+              - resource/hostname
+            receivers:
+              - k8s_cluster
+          logs:
+            receivers:
+              - k8sobjects
+            processors:
+              - resourcedetection/eks
+              - resourcedetection/gcp
+              - resourcedetection/aks
+              - resource/hostname
+            exporters:
+              - debug
+              - otlp/gateway
+  #  Daemon is a K8s daemonset EDOT collector focused on gathering telemetry at
+  #  node level and exposing an OTLP endpoint for data ingestion.
+  #  Auto-instrumentation SDKs will use this endpoint.
+  daemon:
+    env:
+      # Work around for open /mounts error: https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/35990
+      - name: HOST_PROC_MOUNTINFO
+        value: ""
+      - name: ELASTIC_AGENT_OTEL
+        value: '"true"'
+    presets:
+      logsCollection:
+        enabled: true # Enable/disable the collection of node's logs.
+        storeCheckpoints: true # Store checkpoints for log collection, allowing for resumption from the last processed log.
+    hostNetwork: true # Use the host's network namespace. This allows the daemon to access the network interfaces of the host directly.
+    securityContext: # Run the daemon as the root user and group for proper metrics collection.
+      runAsUser: 0
+      runAsGroup: 0
+    scrape_configs_file: "" # [Prometheus metrics](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-kube-stack#scrape_configs_file-details)
+    config:
+      exporters:
+        # [Debug exporter](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/debugexporter/README.md)
+        debug:
+          verbosity: basic
+        otlp/gateway:
+          endpoint: "http://opentelemetry-kube-stack-gateway-collector-headless:4317"
+          tls:
+            insecure: true
+      processors:
+        # [Batch Processor](https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor/batchprocessor)
+        batch: {}
+        batch/metrics:
+          # explicitly set send_batch_max_size to 0, as splitting metrics requests may cause version_conflict_engine_exception in TSDB
+          send_batch_max_size: 0
+          timeout: 1s
+        # [Resource Detection Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor)
+        resourcedetection/eks:
+          detectors: [env, eks] # Detects resources from environment variables and EKS (Elastic Kubernetes Service).
+          timeout: 15s
+          override: true
+          eks:
+            resource_attributes:
+              k8s.cluster.name:
+                enabled: true
+        resourcedetection/gcp:
+          detectors: [env, gcp] # Detects resources from environment variables and GCP (Google Cloud Platform).
+          timeout: 2s
+          override: true
+        resourcedetection/aks:
+          detectors: [env, aks] # Detects resources from environment variables and AKS (Azure Kubernetes Service).
+          timeout: 2s
+          override: true
+          aks:
+            resource_attributes:
+              k8s.cluster.name:
+                enabled: true
+        resource/hostname:
+          attributes:
+            - key: host.name
+              from_attribute: k8s.node.name
+              action: upsert
+        resourcedetection/system:
+          detectors: ["system", "ec2"] # Detects resources from the system and EC2 instances.
+          system:
+            hostname_sources: ["os"]
+            resource_attributes:
+              host.name:
+                enabled: true
+              host.id:
+                enabled: false
+              host.arch:
+                enabled: true
+              host.ip:
+                enabled: true
+              host.mac:
+                enabled: true
+              host.cpu.vendor.id:
+                enabled: true
+              host.cpu.family:
+                enabled: true
+              host.cpu.model.id:
+                enabled: true
+              host.cpu.model.name:
+                enabled: true
+              host.cpu.stepping:
+                enabled: true
+              host.cpu.cache.l2.size:
+                enabled: true
+              os.description:
+                enabled: true
+              os.type:
+                enabled: true
+          ec2:
+            resource_attributes:
+              host.name:
+                enabled: false
+              host.id:
+                enabled: true
+        # [Resource Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourceprocessor)
+        resource/k8s: # Resource attributes tailored for services within Kubernetes.
+          attributes:
+            - key: service.name # Set the service.name resource attribute based on the well-known app.kubernetes.io/name label
+              from_attribute: app.label.name
+              action: insert
+            - key: service.name # Set the service.name resource attribute based on the k8s.container.name attribute
+              from_attribute: k8s.container.name
+              action: insert
+            - key: app.label.name # Delete app.label.name attribute previously used for service.name
+              action: delete
+            - key: service.version # Set the service.version resource attribute based on the well-known app.kubernetes.io/version label
+              from_attribute: app.label.version
+              action: insert
+            - key: app.label.version # Delete app.label.version attribute previously used for service.version
+              action: delete
+        resource/cloud:
+          attributes:
+            - key: cloud.instance.id
+              from_attribute: host.id
+              action: insert
+        # [K8s Attributes Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8sattributesprocessor)
+        k8sattributes:
+          filter:
+            # Only retrieve pods running on the same node as the collector
+            node_from_env_var: OTEL_K8S_NODE_NAME
+          passthrough: false
+          pod_association:
+            # Below association takes a look at the k8s.pod.ip and k8s.pod.uid resource attributes or connection's context, and tries to match it with the pod having the same attribute.
+            - sources:
+                - from: resource_attribute
+                  name: k8s.pod.ip
+            - sources:
+                - from: resource_attribute
+                  name: k8s.pod.uid
+            - sources:
+                - from: connection
+          extract:
+            metadata:
+              - "k8s.namespace.name"
+              - "k8s.deployment.name"
+              - "k8s.replicaset.name"
+              - "k8s.statefulset.name"
+              - "k8s.daemonset.name"
+              - "k8s.cronjob.name"
+              - "k8s.job.name"
+              - "k8s.node.name"
+              - "k8s.pod.name"
+              - "k8s.pod.ip"
+              - "k8s.pod.uid"
+              - "k8s.pod.start_time"
+            labels:
+              - tag_name: app.label.name
+                key: app.kubernetes.io/name
+                from: pod
+              - tag_name: app.label.version
+                key: app.kubernetes.io/version
+                from: pod
+      receivers:
+        # [OTLP Receiver](https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver)
+        otlp:
+          protocols:
+            grpc:
+              endpoint: 0.0.0.0:4317
+            http:
+              endpoint: 0.0.0.0:4318
+        # [File Log Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/filelogreceiver)
+        filelog:
+          retry_on_failure:
+            enabled: true
+          start_at: end
+          exclude:
+            # exlude collector logs
+            - /var/log/pods/*opentelemetry-kube-stack*/*/*.log
+          include:
+            - /var/log/pods/*/*/*.log
+          include_file_name: false
+          include_file_path: true
+          operators:
+            - id: container-parser # Extract container's metadata
+              type: container
+        # [Hostmetrics Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/hostmetricsreceiver)
+        hostmetrics:
+          collection_interval: 10s
+          root_path: /hostfs # Mounted node's root file system
+          scrapers:
+            cpu:
+              metrics:
+                system.cpu.utilization:
+                  enabled: true
+                system.cpu.logical.count:
+                  enabled: true
+            memory:
+              metrics:
+                system.memory.utilization:
+                  enabled: true
+            process:
+              mute_process_exe_error: true
+              mute_process_io_error: true
+              mute_process_user_error: true
+              metrics:
+                process.threads:
+                  enabled: true
+                process.open_file_descriptors:
+                  enabled: true
+                process.memory.utilization:
+                  enabled: true
+                process.disk.operations:
+                  enabled: true
+            network: {}
+            processes: {}
+            load: {}
+            disk: {}
+            filesystem:
+              exclude_mount_points:
+                mount_points:
+                  - /dev/*
+                  - /proc/*
+                  - /sys/*
+                  - /run/k3s/containerd/*
+                  - /var/lib/docker/*
+                  - /var/lib/kubelet/*
+                  - /snap/*
+                match_type: regexp
+              exclude_fs_types:
+                fs_types:
+                  - autofs
+                  - binfmt_misc
+                  - bpf
+                  - cgroup2
+                  - configfs
+                  - debugfs
+                  - devpts
+                  - devtmpfs
+                  - fusectl
+                  - hugetlbfs
+                  - iso9660
+                  - mqueue
+                  - nsfs
+                  - overlay
+                  - proc
+                  - procfs
+                  - pstore
+                  - rpc_pipefs
+                  - securityfs
+                  - selinuxfs
+                  - squashfs
+                  - sysfs
+                  - tracefs
+                match_type: strict
+        # [Kubelet Stats Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/kubeletstatsreceiver)
+        kubeletstats:
+          auth_type: serviceAccount # Authentication mechanism with the Kubelet endpoint, refer to: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/kubeletstatsreceiver#configuration
+          collection_interval: 20s
+          endpoint: ${env:OTEL_K8S_NODE_NAME}:10250
+          node: "${env:OTEL_K8S_NODE_NAME}"
+          # Required to work for all CSPs without an issue
+          insecure_skip_verify: true
+          k8s_api_config:
+            auth_type: serviceAccount
+          metrics:
+            k8s.pod.memory.node.utilization:
+              enabled: true
+            k8s.pod.cpu.node.utilization:
+              enabled: true
+            k8s.container.cpu_limit_utilization:
+              enabled: true
+            k8s.pod.cpu_limit_utilization:
+              enabled: true
+            k8s.container.cpu_request_utilization:
+              enabled: true
+            k8s.container.memory_limit_utilization:
+              enabled: true
+            k8s.pod.memory_limit_utilization:
+              enabled: true
+            k8s.container.memory_request_utilization:
+              enabled: true
+            k8s.node.uptime:
+              enabled: true
+            k8s.node.cpu.usage:
+              enabled: true
+            k8s.pod.cpu.usage:
+              enabled: true
+          extra_metadata_labels:
+            - container.id
+      # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
+      service:
+        pipelines:
+          logs/node:
+            receivers:
+              - filelog
+            processors:
+              - batch
+              - k8sattributes
+              - resourcedetection/system
+              - resourcedetection/eks
+              - resourcedetection/gcp
+              - resourcedetection/aks
+              - resource/k8s
+              - resource/hostname
+              - resource/cloud
+            exporters:
+              - otlp/gateway
+          metrics/node/otel:
+            receivers:
+              - kubeletstats
+              - hostmetrics
+            processors:
+              - batch/metrics
+              - k8sattributes
+              - resourcedetection/system
+              - resourcedetection/eks
+              - resourcedetection/gcp
+              - resourcedetection/aks
+              - resource/k8s
+              - resource/hostname
+              - resource/cloud
+            exporters:
+              # - debug
+              - otlp/gateway
+          metrics/otel-apm:
+            receivers:
+              - otlp
+            processors:
+              - batch/metrics
+              - resource/hostname
+            exporters:
+              - otlp/gateway
+          logs/apm:
+            receivers:
+              - otlp
+            processors:
+              - batch
+              - resource/hostname
+            exporters:
+              - otlp/gateway
+          traces/apm:
+            receivers:
+              - otlp
+            processors:
+              - batch
+              - resource/hostname
+            exporters:
+              - otlp/gateway
+  #  Gateway is a K8s deployment EDOT collector focused on processing and
+  #  forwarding telemetry to an Elasticsearch endpoint.
+  gateway:
+    suffix: gateway
+    autoscaler:
+      minReplicas: 2 # Start with at least 2 replicas for better availability.
+      maxReplicas: 5 # Allow more scale-out if needed.
+      targetCPUUtilization: 70 # Scale when CPU usage exceeds 70%.
+      targetMemoryUtilization: 75 # Scale when memory usage exceeds 75%.
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1000Mi
+      requests:
+        cpu: 100m
+        memory: 500Mi
+    enabled: true
+    env:
+      - name: ELASTIC_AGENT_OTEL
+        value: '"true"'
+      - name: ELASTIC_OTLP_ENDPOINT
+        valueFrom:
+          secretKeyRef:
+            name: elastic-secret-otel
+            key: elastic_otlp_endpoint
+      - name: ELASTIC_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: elastic-secret-otel
+            key: elastic_api_key
+    config:
+      receivers:
+        otlp:
+          protocols:
+            grpc:
+              endpoint: ${env:MY_POD_IP}:4317
+            http:
+              endpoint: ${env:MY_POD_IP}:4318
+      processors:
+        batch:
+          send_batch_size: 1000
+          timeout: 1s
+          send_batch_max_size: 1500
+        batch/metrics:
+          # explicitly set send_batch_max_size to 0, as splitting metrics requests may cause version_conflict_engine_exception in TSDB
+          send_batch_max_size: 0
+          timeout: 1s
+      exporters:
+        debug:
+        otlp/ingest:
+          endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
+          headers:
+            Authorization: ApiKey ${env:ELASTIC_API_KEY}
+      service:
+        pipelines:
+          metrics:
+            receivers: [otlp]
+            processors: [batch/metrics]
+            exporters: [debug, otlp/ingest]
+          logs:
+            receivers: [otlp]
+            processors: [batch]
+            exporters: [debug, otlp/ingest]
+          traces:
+            receivers: [otlp]
+            processors: [batch]
+            exporters: [debug, otlp/ingest]
+# For more details on OpenTelemetry's zero-code instrumentation, see:
+# https://opentelemetry.io/docs/concepts/instrumentation/zero-code/
+instrumentation:
+  name: elastic-instrumentation
+  enabled: true # Enable/disable auto-instrumentation.
+  exporter:
+    endpoint: http://opentelemetry-kube-stack-daemon-collector.opentelemetry-operator-system.svc.cluster.local:4318 # The daemonset OpenTelemetry Collector endpoint where telemetry data will be exported.
+  propagators:
+    - tracecontext # W3C TraceContext propagator for distributed tracing.
+    - baggage # Baggage propagator to include baggage information in trace context.
+    - b3 # B3 propagator for Zipkin-based distributed tracing compatibility.
+  sampler:
+    type: parentbased_traceidratio # Sampler type
+    argument: "1.0" # Sampling rate set to 100% (all traces are sampled).
+  java:
+    image: docker.elastic.co/observability/elastic-otel-javaagent:1.0.0
+  nodejs:
+    image: docker.elastic.co/observability/elastic-otel-node:0.4.1
+  dotnet:
+    image: docker.elastic.co/observability/elastic-otel-dotnet:edge
+  python:
+    image: docker.elastic.co/observability/elastic-otel-python:0.3.0
+  go:
+    image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.14.0-alpha
