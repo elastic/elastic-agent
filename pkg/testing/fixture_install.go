@@ -457,7 +457,7 @@ func (f *Fixture) SimpleInstall(ctx context.Context) ([]byte, error) {
 }
 
 func (f *Fixture) simpleInstallRPM(ctx context.Context) ([]byte, error) {
-	f.t.Logf("[test %s] Inside fixture installRPM function", f.t.Name())
+	f.t.Logf("[test %s] Inside fixture simpleInstallRPM function", f.t.Name())
 	// Prepare so that the f.srcPackage string is populated
 	err := f.EnsurePrepared(ctx)
 	if err != nil {
@@ -477,7 +477,7 @@ func (f *Fixture) simpleInstallRPM(ctx context.Context) ([]byte, error) {
 }
 
 func (f *Fixture) simpleInstallDeb(ctx context.Context) ([]byte, error) {
-	f.t.Logf("[test %s] Inside fixture installDeb function", f.t.Name())
+	f.t.Logf("[test %s] Inside fixture simpleInstallDeb function", f.t.Name())
 	// Prepare so that the f.srcPackage string is populated
 	err := f.EnsurePrepared(ctx)
 	if err != nil {
@@ -485,11 +485,7 @@ func (f *Fixture) simpleInstallDeb(ctx context.Context) ([]byte, error) {
 	}
 
 	// sudo apt-get install the deb
-	cmd := exec.CommandContext(ctx, "sudo", "-E", "apt-get", "install", "-y", f.srcPackage) // #nosec G204 -- Need to pass in name of package
-	if installOpts.InstallServers {
-		cmd.Env = append(cmd.Env, "ELASTIC_AGENT_FLAVOR=servers")
-	}
-	out, err := cmd.CombinedOutput() // #nosec G204 -- Need to pass in name of package
+	out, err := exec.CommandContext(ctx, "sudo", "DEBIAN_FRONTEND=noninteractive", "apt-get", "-y", "-q", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold", "install", f.srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
 	if err != nil {
 		return out, fmt.Errorf("apt install failed: %w output:%s", err, string(out))
 	}
