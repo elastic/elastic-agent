@@ -8,27 +8,82 @@ steps:
   - group: "Integration tests: packaging"
     key: "int-packaging"
     steps:
-      - label: "Packaging: {{matrix.arch}} {{matrix.ext}}"
+      # Packaging linux/amd64
+      - label: "Packaging: linux/amd64 rpm"
+        key: packaging-ubuntu-x86-64-rpm
         env:
-          PACKAGES: "{{matrix.ext}}"
-          PLATFORMS: "{{matrix.arch}}"
+          PLATFORMS: "linux/amd64"
+          PACKAGES: "rpm"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
-        matrix:
-          setup:
-            arch:
-              - linux/amd64
-              - linux/arm64
-            ext:
-              - rpm
-              - deb
-              - tar.gz
+
+      - label: "Packaging: linux/amd64 deb"
+        key: packaging-ubuntu-x86-64-deb
+        env:
+          PLATFORMS: "linux/amd64"
+          PACKAGES: "deb"
+        command: ".buildkite/scripts/steps/integration-package.sh"
+        artifact_paths:
+          - build/distributions/**
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+
+      - label: "Packaging: linux/amd64 tar.gz"
+        key: packaging-ubuntu-x86-64-tar
+        env:
+          PLATFORMS: "linux/amd64"
+          PACKAGES: "deb"
+        command: ".buildkite/scripts/steps/integration-package.sh"
+        artifact_paths:
+          - build/distributions/**
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+
+      # Packaging linux/arm64
+      - label: "Packaging: linux/amd64 rpm"
+        key: packaging-ubuntu-arm64-rpm
+        env:
+          PLATFORMS: "linux/arm64"
+          PACKAGES: "rpm"
+        command: ".buildkite/scripts/steps/integration-package.sh"
+        artifact_paths:
+          - build/distributions/**
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+
+      - label: "Packaging: linux/amd64 deb"
+        key: packaging-ubuntu-arm64-deb
+        env:
+          PLATFORMS: "linux/arm64"
+          PACKAGES: "deb"
+        command: ".buildkite/scripts/steps/integration-package.sh"
+        artifact_paths:
+          - build/distributions/**
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+
+      - label: "Packaging: linux/amd64 tar.gz"
+        key: packaging-ubuntu-arm64-tar
+        env:
+          PLATFORMS: "linux/arm64"
+          PACKAGES: "deb"
+        command: ".buildkite/scripts/steps/integration-package.sh"
+        artifact_paths:
+          - build/distributions/**
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
 
       - label: "Packaging: windows/amd64 zip"
+        key: packaging-windows
         env:
           PACKAGES: "zip"
           PLATFORMS: "windows/amd64"
@@ -39,19 +94,30 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
 
-      - label: "Packaging: Containers {{matrix}}"
+      - label: "Packaging: Containers linux/amd64"
+        key: packaging-containers-x86-64
         env:
           PACKAGES: "docker"
-          PLATFORMS: "{{matrix}}"
+          PLATFORMS: "linux/amd64"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
-        matrix:
-          - linux/amd64
-          - linux/arm64
+
+      - label: "Packaging: Containers linux/arm64"
+        key: packaging-containers-arm64
+        env:
+          PACKAGES: "docker"
+          PLATFORMS: "linux/arm64"
+        command: ".buildkite/scripts/steps/integration-package.sh"
+        artifact_paths:
+          - build/distributions/**
+        agents:
+          provider: "aws"
+          instanceType: "t4g.2xlarge"
+          imagePrefix: "core-ubuntu-2204-aarch64"
 
   - label: "Serverless integration test"
     key: "serverless-integration-tests"
