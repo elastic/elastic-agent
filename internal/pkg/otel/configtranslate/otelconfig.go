@@ -362,30 +362,3 @@ func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
 	esConfig["mapping"] = map[string]any{"mode": "bodymap"}
 	return esConfig, nil
 }
-
-// This is copied from https://github.com/elastic/beats/blob/main/libbeat/otelbeat/beatconverter/beatconverter.go
-// getOutputQueueConfig gets the queue settings for the output unit in the component. We need to move these settings
-// to the receiver configuration.
-func getOutputQueueConfig(comp *component.Component) map[string]any {
-	// find the output unit config
-	var unitConfigMap map[string]any
-	for _, unit := range comp.Units {
-		if unit.Type == client.UnitTypeOutput {
-			unitConfigMap = unit.Config.GetSource().AsMap()
-		}
-	}
-	if unitConfigMap == nil {
-		return nil
-	}
-
-	queueConfig, ok := unitConfigMap["queue"]
-	if !ok {
-		return nil
-	}
-	queueConfigMap, ok := queueConfig.(map[string]any)
-	if !ok {
-		return nil
-	}
-
-	return queueConfigMap
-}
