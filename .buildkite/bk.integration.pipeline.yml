@@ -63,7 +63,7 @@ steps:
 
       - label: "Win2025:sudo:{{matrix}}"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} true
         artifact_paths:
           - build/**
@@ -84,7 +84,7 @@ steps:
 
       - label: "Win2025:non-sudo:{{matrix}}"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} false
         artifact_paths:
           - build/**
