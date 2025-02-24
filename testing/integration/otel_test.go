@@ -1604,6 +1604,7 @@ func TestMonitoringAgentE2E(t *testing.T) {
 		Group: Default,
 		Local: true,
 		OS: []define.OS{
+			{Type: define.Linux},
 			{Type: define.Darwin},
 		},
 		Stack: &define.Stack{},
