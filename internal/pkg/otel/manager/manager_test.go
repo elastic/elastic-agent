@@ -24,38 +24,36 @@ import (
 var (
 	testConfig = map[string]interface{}{
 		"receivers": map[string]interface{}{
-			"otlp": map[string]interface{}{
-				"protocols": map[string]interface{}{
-					"grpc": map[string]interface{}{
-						"endpoint": "0.0.0.0:4317",
-					},
-				},
-			},
+			"nop": map[string]interface{}{},
 		},
 		"processors": map[string]interface{}{
 			"batch": map[string]interface{}{},
 		},
 		"exporters": map[string]interface{}{
-			"otlp": map[string]interface{}{
-				"endpoint": "otelcol:4317",
-			},
+			"debug": map[string]interface{}{},
 		},
 		"service": map[string]interface{}{
+			"telemetry": map[string]interface{}{
+				"metrics": map[string]interface{}{
+					"level":   "none",
+					"readers": []any{},
+				},
+			},
 			"pipelines": map[string]interface{}{
 				"traces": map[string]interface{}{
-					"receivers":  []string{"otlp"},
+					"receivers":  []string{"nop"},
 					"processors": []string{"batch"},
-					"exporters":  []string{"otlp"},
+					"exporters":  []string{"debug"},
 				},
 				"metrics": map[string]interface{}{
-					"receivers":  []string{"otlp"},
+					"receivers":  []string{"nop"},
 					"processors": []string{"batch"},
-					"exporters":  []string{"otlp"},
+					"exporters":  []string{"debug"},
 				},
 				"logs": map[string]interface{}{
-					"receivers":  []string{"otlp"},
+					"receivers":  []string{"nop"},
 					"processors": []string{"batch"},
-					"exporters":  []string{"otlp"},
+					"exporters":  []string{"debug"},
 				},
 			},
 		},
@@ -191,7 +189,7 @@ func TestOTelManager_ConfigError(t *testing.T) {
 
 	go func() {
 		err := m.Run(ctx)
-		require.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
+		assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
 	}()
 
 	// watch is synchronous, so we need to read from it to avoid blocking the manager
