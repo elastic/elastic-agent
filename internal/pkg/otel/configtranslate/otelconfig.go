@@ -187,8 +187,8 @@ func getReceiversConfigForComponent(comp *component.Component, info info.Agent, 
 		},
 	}
 	// add the output queue config if present
-	if queue, ok := outputQueueConfig["queue"]; ok {
-		receiverConfig["queue"] = queue
+	if outputQueueConfig != nil {
+		receiverConfig["queue"] = outputQueueConfig
 	}
 	return map[string]any{
 		receiverId.String(): receiverConfig,
@@ -297,6 +297,9 @@ func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, 
 		err := outputCfgC.Unpack(&queueSettings)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error unpacking queue settings for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
+		}
+		if queue, ok := queueSettings["queue"].(map[string]any); ok {
+			queueSettings = queue
 		}
 	}
 
