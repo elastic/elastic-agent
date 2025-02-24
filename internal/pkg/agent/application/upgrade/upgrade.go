@@ -252,7 +252,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	newRunPath := filepath.Join(newHome, "run")
-	oldRunPath := filepath.Join(paths.Home(), "run")
+	oldRunPath := filepath.Join(paths.Run())
 
 	if err := copyRunDirectory(u.log, oldRunPath, newRunPath); err != nil {
 		return nil, errors.New(err, "failed to copy run directory")
