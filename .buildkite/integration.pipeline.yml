@@ -112,7 +112,10 @@ steps:
         env:
           PACKAGES: "docker"
           PLATFORMS: "linux/arm64"
-        command: ".buildkite/scripts/steps/integration-package.sh"
+        command: |
+          echo "Add support for multiarch"
+          docker run --privileged --rm tonistiigi/binfmt:master --install all
+          .buildkite/scripts/steps/integration-package.sh
         artifact_paths:
           - build/distributions/**
         agents:
