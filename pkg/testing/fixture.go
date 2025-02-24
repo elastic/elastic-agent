@@ -228,7 +228,7 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	return nil
 }
 
-// Return fixture running directory, should only be called after Prepare()
+// Return path of running directory, should only be called after Prepare()
 func (f *Fixture) GetRunningDir(ctx context.Context) (string, error) {
 	err := f.EnsurePrepared(ctx)
 	if err != nil {
