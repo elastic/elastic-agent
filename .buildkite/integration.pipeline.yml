@@ -8,10 +8,10 @@ steps:
   - group: "Integration tests: packaging"
     key: "int-packaging"
     steps:
-      - label: "Packaging: Ubuntu"
+      - label: "Packaging: {{matrix.arch}} {{matrix.ext}}"
         env:
-          PACKAGES: "tar.gz"
-          PLATFORMS: "linux/amd64"
+          PACKAGES: "{{matrix.ext}}"
+          PLATFORMS: "{{matrix.arch}}"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
@@ -28,7 +28,7 @@ steps:
               - deb
               - tar.gz
 
-      - label: "Packaging: Windows"
+      - label: "Packaging: windows/amd64 zip"
         env:
           PACKAGES: "zip"
           PLATFORMS: "windows/amd64"
@@ -39,7 +39,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
 
-      - label: "Packaging: Containers"
+      - label: "Packaging: Containers {{matrix}}"
         env:
           PACKAGES: "docker"
           PLATFORMS: "{{matrix}}"
