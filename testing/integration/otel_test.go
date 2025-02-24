@@ -1863,9 +1863,14 @@ service:
 		"@timestamp",
 		"agent.ephemeral_id",
 		"agent.id",
+		"agent.version"
 		"data_stream.dataset",
 		"data_stream.namespace",
 		"event.dataset",
+
+		// needs investigation
+		"event.agent_id_status",
+		"event.ingested",
 
 		// elastic_agent * fields are hardcoded in processor list for now which is why they differ
 		"elastic_agent.id",
