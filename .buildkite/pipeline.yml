@@ -245,7 +245,7 @@ steps:
   - label: "Trigger k8s sync"
     branches: main
     plugins:
-      - monebag/monorepo-diff#v2.5.9:
+      - monorepo-diff#v1.2.0:
           diff: "git diff --name-only HEAD~1"
           watch:
             - path:
@@ -267,7 +267,7 @@ steps:
       build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
 
     plugins:
-      - monorepo-diff#v1.0.1:
+      - monorepo-diff#v1.2.0:
           diff: "git diff --name-only origin/${GITHUB_PR_TARGET_BRANCH}...HEAD"
           watch:
             - path:
