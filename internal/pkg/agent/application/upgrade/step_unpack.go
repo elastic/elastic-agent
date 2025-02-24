@@ -155,11 +155,6 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 			} else if err != nil {
 				return fmt.Errorf("stat() directory %q: %w", dstPath, err)
 			} else {
-				// directory already exists, set the appropriate permissions
-				err = os.Chmod(dstPath, f.Mode().Perm()&0770)
-				if err != nil {
-					return fmt.Errorf("setting permissions %O for directory %q: %w", f.Mode().Perm()&0770, dstPath, err)
-				}
 			}
 
 			_ = os.MkdirAll(dstPath, f.Mode()&0770)
@@ -183,6 +178,22 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 				return err
 			}
 		}
+
+		// ensure the correct permissions are set to all files and folders
+		if err := os.Chmod(dstPath, f.Mode().Perm()&0770); err != nil {
+			return fmt.Errorf("setting permissions %O for %q: %w", f.Mode().Perm()&0770, dstPath, err)
+		}
+
+		if log.IsDebug() {
+			newStat, err := os.Stat(dstPath)
+			if err != nil {
+				log.Warnf("cannot stat %q for debug logs: %s", dstPath, err)
+				return nil
+			}
+
+			log.Debugf("File %q, perms: %O, isDir: %t", dstPath, newStat.Mode().Perm(), newStat.IsDir())
+		}
+
 		return nil
 	}
 
@@ -444,14 +455,24 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 			} else if err != nil {
 				return UnpackResult{}, errors.New(err, "TarInstaller: stat() directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 			} else {
-				// directory already exists, set the appropriate permissions
-				err = os.Chmod(abs, mode.Perm()&0770)
-				if err != nil {
-					return UnpackResult{}, errors.New(err, fmt.Sprintf("TarInstaller: setting permissions %O for directory %q", mode.Perm()&0770, abs), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
-				}
 			}
 		default:
 			return UnpackResult{}, errors.New(fmt.Sprintf("tar file entry %s contained unsupported file type %v", fileName, mode), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fileName))
+		}
+
+		// ensure the appropriate permissions
+		if err := os.Chmod(abs, mode.Perm()&0770); err != nil {
+			return UnpackResult{}, errors.New(err, fmt.Sprintf("TarInstaller: setting permissions %O for %q", mode.Perm()&0770, abs), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+		}
+
+		if log.IsDebug() {
+			newStat, err := os.Stat(abs)
+			if err != nil {
+				log.Warnf("cannot stat %q for debug logs: %s", abs, err)
+				continue
+			}
+
+			log.Debugf("File %q, perms: %O, isDir: %t", abs, newStat.Mode().Perm(), newStat.IsDir())
 		}
 	}
 
