@@ -187,8 +187,8 @@ func getReceiversConfigForComponent(comp *component.Component, info info.Agent, 
 		},
 	}
 	// add the output queue config if present
-	if outputQueueConfig != nil {
-		receiverConfig["queue"] = outputQueueConfig["queue"]
+	if queue, ok := outputQueueConfig["queue"]; ok {
+		receiverConfig["queue"] = queue
 	}
 	return map[string]any{
 		receiverId.String(): receiverConfig,
