@@ -293,7 +293,8 @@ steps:
                 - .buildkite/hooks/
 
               config:
-                trigger: "elastic-agent-extended-testing"
+                label: ":pipeline: Upload extended testing Pipeline"
+                command: "buildkite-agent pipeline upload .buildkite/integration.pipeline.yml"
                 build:
                   commit: "${BUILDKITE_COMMIT}"
                   branch: "${BUILDKITE_BRANCH}"
