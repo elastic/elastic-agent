@@ -164,10 +164,11 @@ func TestGetOtelConfig(t *testing.T) {
 		},
 	}
 	esOutputConfig := map[string]any{
-		"type":     "elasticsearch",
-		"hosts":    []any{"localhost:9200"},
-		"username": "elastic",
-		"password": "password",
+		"type":             "elasticsearch",
+		"hosts":            []any{"localhost:9200"},
+		"username":         "elastic",
+		"password":         "password",
+		"queue.mem.events": 3200,
 	}
 	defaultProcessors := func(streamId, dataset string) []any {
 		return []any{
@@ -305,9 +306,6 @@ func TestGetOtelConfig(t *testing.T) {
 						"logs_index":        "filebeat-9.0.0",
 						"timeout":           90 * time.Second,
 						"idle_conn_timeout": 3 * time.Second,
-						"metrics_dynamic_index": map[string]any{
-							"enabled": true,
-						},
 					},
 				},
 				"receivers": map[string]any{
@@ -345,6 +343,11 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 						"path": map[string]any{
 							"data": filepath.Join(paths.Run(), "filestream-default"),
+						},
+						"queue": map[string]any{
+							"mem": map[string]any{
+								"events": float64(3200),
+							},
 						},
 					},
 				},
