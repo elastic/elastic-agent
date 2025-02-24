@@ -168,6 +168,7 @@ func TestGetOtelConfig(t *testing.T) {
 		"hosts":            []any{"localhost:9200"},
 		"username":         "elastic",
 		"password":         "password",
+		"preset":           "balanced",
 		"queue.mem.events": 3200,
 	}
 	defaultProcessors := func(streamId, dataset string) []any {
@@ -346,7 +347,11 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 						"queue": map[string]any{
 							"mem": map[string]any{
-								"events": float64(3200),
+								"events": uint64(3200),
+								"flush": map[string]any{
+									"min_events": uint64(1600),
+									"timeout":    "10s",
+								},
 							},
 						},
 					},

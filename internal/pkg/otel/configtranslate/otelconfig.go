@@ -195,7 +195,7 @@ func getReceiversConfigForComponent(comp *component.Component, info info.Agent, 
 	}, nil
 }
 
-// getReceiversConfigForComponent returns the exporters configuration for a component. Usually this will be a single
+// getReceiversConfigForComponent returns the exporters configuration and queue settings for a component. Usually this will be a single
 // exporter, but in principle it could be more.
 func getExportersConfigForComponent(comp *component.Component) (exporterCfg map[string]any, queueCfg map[string]any, err error) {
 	exportersConfig := map[string]any{}
@@ -263,7 +263,7 @@ func getExporterTypeForComponent(comp *component.Component) (otelcomponent.Type,
 	}
 }
 
-// unitToExporterConfig translates a component.Unit to an otel exporter configuration.
+// unitToExporterConfig translates a component.Unit to return an otel exporter configuration and output queue settings
 func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, inputType string) (exportersCfg map[string]any, queueSettings map[string]any, err error) {
 	if unit.Type == client.UnitTypeInput {
 		return nil, nil, fmt.Errorf("unit type is an input, expected output: %v", unit)
@@ -283,7 +283,7 @@ func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, 
 	if err != nil {
 		return nil, nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
 	}
-	// Config translation function can mutate queue settings under output config
+	// Config translation function can mutate queue settings defined under output config
 	exporterConfig, err := configTranslationFunc(outputCfgC)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
@@ -293,6 +293,7 @@ func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, 
 		exporterId.String(): exporterConfig,
 	}
 
+	// If output config contains queue settings defined by user/preset field, it should be promoted to the receiver section
 	if ok := outputCfgC.HasField("queue"); ok {
 		err := outputCfgC.Unpack(&queueSettings)
 		if err != nil {
