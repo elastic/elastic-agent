@@ -24,38 +24,36 @@ import (
 var (
 	testConfig = map[string]interface{}{
 		"receivers": map[string]interface{}{
-			"otlp": map[string]interface{}{
-				"protocols": map[string]interface{}{
-					"grpc": map[string]interface{}{
-						"endpoint": "0.0.0.0:4317",
-					},
-				},
-			},
+			"nop": map[string]interface{}{},
 		},
 		"processors": map[string]interface{}{
 			"batch": map[string]interface{}{},
 		},
 		"exporters": map[string]interface{}{
-			"otlp": map[string]interface{}{
-				"endpoint": "otelcol:4317",
-			},
+			"debug": map[string]interface{}{},
 		},
 		"service": map[string]interface{}{
+			"telemetry": map[string]interface{}{
+				"metrics": map[string]interface{}{
+					"level":   "none",
+					"readers": []any{},
+				},
+			},
 			"pipelines": map[string]interface{}{
 				"traces": map[string]interface{}{
-					"receivers":  []string{"otlp"},
+					"receivers":  []string{"nop"},
 					"processors": []string{"batch"},
-					"exporters":  []string{"otlp"},
+					"exporters":  []string{"debug"},
 				},
 				"metrics": map[string]interface{}{
-					"receivers":  []string{"otlp"},
+					"receivers":  []string{"nop"},
 					"processors": []string{"batch"},
-					"exporters":  []string{"otlp"},
+					"exporters":  []string{"debug"},
 				},
 				"logs": map[string]interface{}{
-					"receivers":  []string{"otlp"},
+					"receivers":  []string{"nop"},
 					"processors": []string{"batch"},
-					"exporters":  []string{"otlp"},
+					"exporters":  []string{"debug"},
 				},
 			},
 		},
@@ -63,7 +61,6 @@ var (
 )
 
 func TestOTelManager_Run(t *testing.T) {
-	t.Skip("Flaky test") // https://github.com/elastic/elastic-agent/issues/6119
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	l, _ := loggertest.New("otel")
@@ -192,7 +189,7 @@ func TestOTelManager_ConfigError(t *testing.T) {
 
 	go func() {
 		err := m.Run(ctx)
-		require.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
+		assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
 	}()
 
 	// watch is synchronous, so we need to read from it to avoid blocking the manager
@@ -206,8 +203,22 @@ func TestOTelManager_ConfigError(t *testing.T) {
 		}
 	}()
 
-	cfg := confmap.New() // invalid config
-	m.Update(cfg)
+	// Errors channel is non-blocking, should be able to send an Update that causes an error multiple
+	// times without it blocking on sending over the errCh.
+	for range 3 {
+		cfg := confmap.New() // invalid config
+		m.Update(cfg)
+
+		// delay between updates to ensure the collector will have to fail
+		<-time.After(100 * time.Millisecond)
+	}
+
+	// because of the retry logic and timing we need to ensure
+	// that this keeps retrying to see the error and only store
+	// an actual error
+	//
+	// a nil error just means that the collector is trying to restart
+	// which clears the error on the restart loop
 	timeoutCh := time.After(time.Second * 5)
 	var err error
 outer:
