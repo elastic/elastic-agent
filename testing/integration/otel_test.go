@@ -1609,7 +1609,7 @@ func TestMonitoringAgentE2E(t *testing.T) {
 		Stack: &define.Stack{},
 	})
 
-	fbMonitoringIndex := "logs-elastic_agent-default"
+	fbMonitoringIndex := "logs-elastic_agent-notdefault" // the namespace here is different to avoid reading stale logs from previous runs
 	fbReceiverMonitoringIndex := "logs-otel-default"
 	commonMessage := "Determined allowed capabilities"
 
@@ -1651,6 +1651,7 @@ agent.monitoring:
   logs: true
   metrics: false
   use_output: default
+  namespace: notdefault
 receivers:
   filebeatreceiver/filestream-monitoring:
     filebeat:
@@ -1826,7 +1827,7 @@ service:
 	pattern := inputPath + "/data/elastic-agent-*/logs/elastic-agent-*.ndjson"
 	files, err := filepath.Glob(pattern)
 	if err != nil {
-		t.Fatalf("Error checking files: %v", err)
+		t.Errorf("error checking files: %v", err)
 	}
 
 	if len(files) == 0 {
@@ -1862,6 +1863,7 @@ service:
 		"agent.ephemeral_id",
 		"agent.id",
 		"data_stream.dataset",
+		"data_stream.namespace",
 		"event.dataset",
 
 		// elastic_agent * fields are hardcoded in processor list for now which is why they differ
