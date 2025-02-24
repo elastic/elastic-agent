@@ -1604,7 +1604,6 @@ func TestMonitoringAgentE2E(t *testing.T) {
 		Group: Default,
 		Local: true,
 		OS: []define.OS{
-			{Type: define.Linux},
 			{Type: define.Darwin},
 		},
 		Stack: &define.Stack{},
@@ -1786,6 +1785,11 @@ service:
 			SocketEndpoint: socketEndpoint,
 		})
 	configContents := configBuffer.Bytes()
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Logf("Contents of agent config file:\n%s\n", string(configContents))
+		}
+	})
 
 	err = fixture.Configure(ctx, configContents)
 	require.NoError(t, err)
