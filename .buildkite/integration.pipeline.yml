@@ -8,6 +8,7 @@ steps:
   - group: "Integration tests: packaging"
     key: "int-packaging"
     steps:
+      # Build matrix is not used for packaging in favor to unique step keys
       # Packaging linux/amd64
       - label: "Packaging: linux/amd64 rpm"
         key: packaging-ubuntu-x86-64-rpm
@@ -37,7 +38,7 @@ steps:
         key: packaging-ubuntu-x86-64-tar
         env:
           PLATFORMS: "linux/amd64"
-          PACKAGES: "deb"
+          PACKAGES: "tar.gz"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
@@ -74,7 +75,7 @@ steps:
         key: packaging-ubuntu-arm64-tar
         env:
           PLATFORMS: "linux/arm64"
-          PACKAGES: "deb"
+          PACKAGES: "tar.gz"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
@@ -171,7 +172,6 @@ steps:
       branch: "${BUILDKITE_BRANCH}"
 
   - label: "Serverless Beats Tests"
-    # To speedup the build process only packaging-ubuntu-x86-64 artifact dependency is required
     depends_on:
       - int-packaging
     key: "serverless-beats-integration-tests"
