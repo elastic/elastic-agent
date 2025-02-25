@@ -31,10 +31,4 @@ jobs:
         with:
           go-version-file: .go-version
 
-      - uses: magefile/mage-action@v3
-        with:
-          # https://github.com/magefile/mage/issues/481
-          version: "v1.14.0"
-          install-only: true
-
       - run: .buildkite/scripts/steps/integration-package.sh
