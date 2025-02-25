@@ -1,0 +1,37 @@
+---
+name: macos
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 20 * * 6"
+  # Being: fr testing purposes
+  push:
+    branches:
+      - feature/macos-github-actions
+  # End: for testing purposes
+
+permissions:
+  contents: read
+
+jobs:
+  bump:
+    strategy:
+      matrix:
+        os: [ macos-13, macos-latest, windows-latest ]
+    runs-on: ${{  matrix.os }}
+    env:
+      PLATFORMS: "darwin/amd64 darwin/arm64"
+      PACKAGES: "tar.gz,docker"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
+
+      - uses: magefile/mage-action@v3
+        with:
+          install-only: true
+
+      - run: .buildkite/scripts/steps/integration-package.sh
