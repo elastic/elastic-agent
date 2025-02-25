@@ -5,11 +5,6 @@
 # upgrade integration tests.
 
 testVersions:
-<<<<<<< HEAD
-=======
-  - 9.0.0-SNAPSHOT
-  - 8.19.0-SNAPSHOT
->>>>>>> 2614cb516 (Fix selection of testing version (#6578))
   - 8.17.2
   - 8.16.4
   - 7.17.28-SNAPSHOT
