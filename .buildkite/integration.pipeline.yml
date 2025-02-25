@@ -114,7 +114,7 @@ steps:
           PLATFORMS: "linux/arm64"
         command: |
           echo "Add support for multiarch"
-          docker run --privileged --rm tonistiigi/binfmt:master --install all
+          docker run --privileged --rm tonistiigi/binfmt:qemu-v8.1.5 --install all
           .buildkite/scripts/steps/integration-package.sh
         artifact_paths:
           - build/distributions/**
