@@ -1741,8 +1741,6 @@ receivers:
       level: info
       selectors:
         - '*'
-    setup.ilm.enabled: false 
-    setup.template.enabled: false
     filebeat.config.modules.enabled: false
     http.enabled: true
     http.host: {{ .SocketEndpoint }}
@@ -1755,6 +1753,7 @@ exporters:
       - {{.ESEndpoint}}
     compression: none
     api_key: {{.ESApiKey}}
+	index: filebeat-9.0.0
     logs_dynamic_index:
       enabled: true
     batcher:
@@ -1860,7 +1859,6 @@ service:
 	otel := otelDocs.Hits.Hits[0].Source
 	ignoredFields := []string{
 		// Expected to change between agentDocs and OtelDocs
-		"@timestamp",
 		"agent.ephemeral_id",
 		"agent.id",
 		"agent.version",
