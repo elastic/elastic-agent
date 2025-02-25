@@ -32,4 +32,11 @@ jobs:
         with:
           go-version-file: .go-version
 
+      # NOTE: see https://github.com/actions/runner/issues/1456
+      - name: Install and start Colima
+        run: |
+          brew install colima
+          colima version
+          colima start --cpu 3 --memory 6 --disk 100 --vm-type=qemu --mount-type=sshfs --dns=1.1.1.1
+
       - run: .buildkite/scripts/steps/integration-package.sh
