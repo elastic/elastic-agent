@@ -20,6 +20,7 @@ jobs:
       matrix:
         # NOTE: macos-13 is intel and macos-latest is arm
         os: [ macos-13, macos-latest ]
+      fail-fast: false
     runs-on: ${{  matrix.os }}
     env:
       PLATFORMS: "darwin/amd64 darwin/arm64"
