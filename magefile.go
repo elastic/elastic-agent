@@ -2034,12 +2034,12 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 	}
 
 	// -1 because we manually add 7.17 below
-	if len(branches) > maxSnapshots-2 {
+	if len(branches) > maxSnapshots-1 {
 		branches = branches[:maxSnapshots-2]
 	}
 
 	// it's not a part of this repository, cannot be retrieved with `GetReleaseBranches`
-	branches = append(branches, "7.17", "9.0")
+	branches = append(branches, "7.17")
 
 	// uncomment if want to have the current version snapshot on the list as well
 	// branches = append([]string{"master"}, branches...)
