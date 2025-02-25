@@ -101,6 +101,9 @@ func NewDictWithProcessors(nodes []Node, processors Processors) *Dict {
 // Find takes a string which is a key and try to find the elements in the associated K/V.
 func (d *Dict) Find(key string) (Node, bool) {
 	for _, i := range d.value {
+		if i == nil {
+			continue
+		}
 		if i.(*Key).name == key {
 			return i, true
 		}
@@ -115,9 +118,12 @@ func (d *Dict) Insert(node Node) {
 
 func (d *Dict) String() string {
 	var sb strings.Builder
-	for i := 0; i < len(d.value); i++ {
+	for i, node := range d.value {
+		if node == nil {
+			continue
+		}
 		sb.WriteString("{")
-		sb.WriteString(d.value[i].String())
+		sb.WriteString(node.String())
 		sb.WriteString("}")
 		if i < len(d.value)-1 {
 			sb.WriteString(",")
@@ -162,6 +168,9 @@ func (d *Dict) ShallowClone() Node {
 func (d *Dict) Hash() []byte {
 	h := sha256.New()
 	for _, v := range d.value {
+		if v == nil {
+			continue
+		}
 		h.Write(v.Hash())
 	}
 	return h.Sum(nil)
@@ -170,6 +179,9 @@ func (d *Dict) Hash() []byte {
 // Hash64With recursively computes the given hash for the Node and its children
 func (d *Dict) Hash64With(h *xxhash.Digest) error {
 	for _, v := range d.value {
+		if v == nil {
+			continue
+		}
 		if err := v.Hash64With(h); err != nil {
 			return err
 		}
@@ -181,6 +193,9 @@ func (d *Dict) Hash64With(h *xxhash.Digest) error {
 func (d *Dict) Apply(vars *Vars) (Node, error) {
 	nodes := make([]Node, 0, len(d.value))
 	for _, v := range d.value {
+		if v == nil {
+			continue
+		}
 		k := v.(*Key)
 		n, err := k.Apply(vars)
 		if err != nil {
@@ -209,6 +224,9 @@ func (d *Dict) Processors() Processors {
 		return d.processors
 	}
 	for _, v := range d.value {
+		if v == nil {
+			continue
+		}
 		if p := v.Processors(); p != nil {
 			return p
 		}
@@ -366,8 +384,11 @@ func NewListWithProcessors(nodes []Node, processors Processors) *List {
 func (l *List) String() string {
 	var sb strings.Builder
 	sb.WriteString("[")
-	for i := 0; i < len(l.value); i++ {
-		sb.WriteString(l.value[i].String())
+	for i, v := range l.value {
+		if v == nil {
+			continue
+		}
+		sb.WriteString(v.String())
 		if i < len(l.value)-1 {
 			sb.WriteString(",")
 		}
@@ -380,6 +401,9 @@ func (l *List) String() string {
 func (l *List) Hash() []byte {
 	h := sha256.New()
 	for _, v := range l.value {
+		if v == nil {
+			continue
+		}
 		h.Write(v.Hash())
 	}
 
@@ -389,6 +413,9 @@ func (l *List) Hash() []byte {
 // Hash64With recursively computes the given hash for the Node and its children
 func (l *List) Hash64With(h *xxhash.Digest) error {
 	for _, v := range l.value {
+		if v == nil {
+			continue
+		}
 		if err := v.Hash64With(h); err != nil {
 			return err
 		}
@@ -445,6 +472,9 @@ func (l *List) ShallowClone() Node {
 func (l *List) Apply(vars *Vars) (Node, error) {
 	nodes := make([]Node, 0, len(l.value))
 	for _, v := range l.value {
+		if v == nil {
+			continue
+		}
 		n, err := v.Apply(vars)
 		if err != nil {
 			return nil, err
@@ -463,6 +493,9 @@ func (l *List) Processors() Processors {
 		return l.processors
 	}
 	for _, v := range l.value {
+		if v == nil {
+			continue
+		}
 		if p := v.Processors(); p != nil {
 			return p
 		}
