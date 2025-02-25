@@ -256,7 +256,13 @@ func PreviousMinor() (*version.ParsedSemVer, error) {
 		// will only contain minors from the previous major (vX-1). Further, since the
 		// version list is sorted in descending order (newer versions first), we can return the
 		// first item from the list as it will be the newest minor of the previous major.
-		return versions[0], nil
+		for _, v := range versions {
+			if v.Less(*current) {
+				return v, nil
+			}
+		}
+
+		return nil, ErrNoPreviousMinor
 	}
 
 	for _, v := range versions {
