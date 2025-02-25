@@ -111,12 +111,13 @@ func getExporterID(exporterType otelcomponent.Type, outputName string) otelcompo
 // getCollectorConfigForComponent returns the Otel collector config required to run the given component.
 // This function returns a full, valid configuration that can then be merged with configurations for other components.
 func getCollectorConfigForComponent(comp *component.Component, info info.Agent) (*confmap.Conf, error) {
-	outputQueueConfig := getOutputQueueConfig(comp)
-	receiversConfig, err := getReceiversConfigForComponent(comp, info, outputQueueConfig)
+
+	exportersConfig, outputQueueConfig, err := getExportersConfigForComponent(comp)
 	if err != nil {
 		return nil, err
 	}
-	exportersConfig, err := getExportersConfigForComponent(comp)
+	receiversConfig, err := getReceiversConfigForComponent(comp, info, outputQueueConfig)
+
 	if err != nil {
 		return nil, err
 	}
@@ -187,33 +188,35 @@ func getReceiversConfigForComponent(comp *component.Component, info info.Agent, 
 	}
 	// add the output queue config if present
 	if outputQueueConfig != nil {
-		receiverConfig["output"] = outputQueueConfig
+		receiverConfig["queue"] = outputQueueConfig
 	}
 	return map[string]any{
 		receiverId.String(): receiverConfig,
 	}, nil
 }
 
-// getReceiversConfigForComponent returns the exporters configuration for a component. Usually this will be a single
+// getReceiversConfigForComponent returns the exporters configuration and queue settings for a component. Usually this will be a single
 // exporter, but in principle it could be more.
-func getExportersConfigForComponent(comp *component.Component) (map[string]any, error) {
+func getExportersConfigForComponent(comp *component.Component) (exporterCfg map[string]any, queueCfg map[string]any, err error) {
 	exportersConfig := map[string]any{}
 	exporterType, err := getExporterTypeForComponent(comp)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	var queueSettings map[string]any
 	for _, unit := range comp.Units {
 		if unit.Type == client.UnitTypeOutput {
-			unitExportersConfig, expErr := unitToExporterConfig(unit, exporterType, comp.InputType)
-			if expErr != nil {
-				return nil, expErr
+			var unitExportersConfig map[string]any
+			unitExportersConfig, queueSettings, err = unitToExporterConfig(unit, exporterType, comp.InputType)
+			if err != nil {
+				return nil, nil, err
 			}
 			for k, v := range unitExportersConfig {
 				exportersConfig[k] = v
 			}
 		}
 	}
-	return exportersConfig, nil
+	return exportersConfig, queueSettings, nil
 }
 
 // getBeatNameForComponent returns the beat binary name that would be used to run this component.
@@ -260,14 +263,14 @@ func getExporterTypeForComponent(comp *component.Component) (otelcomponent.Type,
 	}
 }
 
-// unitToExporterConfig translates a component.Unit to an otel exporter configuration.
-func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, inputType string) (map[string]any, error) {
+// unitToExporterConfig translates a component.Unit to return an otel exporter configuration and output queue settings
+func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, inputType string) (exportersCfg map[string]any, queueSettings map[string]any, err error) {
 	if unit.Type == client.UnitTypeInput {
-		return nil, fmt.Errorf("unit type is an input, expected output: %v", unit)
+		return nil, nil, fmt.Errorf("unit type is an input, expected output: %v", unit)
 	}
 	configTranslationFunc, ok := configTranslationFuncForExporter[exporterType]
 	if !ok {
-		return nil, fmt.Errorf("no config translation function for exporter type: %s", exporterType)
+		return nil, nil, fmt.Errorf("no config translation function for exporter type: %s", exporterType)
 	}
 	// we'd like to use the same exporter for all outputs with the same name, so we parse out the name for the unit id
 	// these will be deduplicated by the configuration merging process at the end
@@ -278,18 +281,30 @@ func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, 
 	unitConfigMap := unit.Config.GetSource().AsMap() // this is what beats do in libbeat/management/generate.go
 	outputCfgC, err := config.NewConfigFrom(unitConfigMap)
 	if err != nil {
-		return nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
+		return nil, nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
 	}
+	// Config translation function can mutate queue settings defined under output config
 	exporterConfig, err := configTranslationFunc(outputCfgC)
 	if err != nil {
-		return nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
+		return nil, nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
 	}
 
-	exportersCfg := map[string]any{
+	exportersCfg = map[string]any{
 		exporterId.String(): exporterConfig,
 	}
 
-	return exportersCfg, nil
+	// If output config contains queue settings defined by user/preset field, it should be promoted to the receiver section
+	if ok := outputCfgC.HasField("queue"); ok {
+		err := outputCfgC.Unpack(&queueSettings)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error unpacking queue settings for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
+		}
+		if queue, ok := queueSettings["queue"].(map[string]any); ok {
+			queueSettings = queue
+		}
+	}
+
+	return exportersCfg, queueSettings, nil
 }
 
 // getInputsForUnit returns the beat inputs for a unit. These can directly be plugged into a beats receiver config.
@@ -340,7 +355,6 @@ func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
 	}
 	// we want to use dynamic indexing
 	esConfig["logs_dynamic_index"] = map[string]any{"enabled": true}
-	esConfig["metrics_dynamic_index"] = map[string]any{"enabled": true}
 
 	// we also want to use dynamic log ids
 	esConfig["logs_dynamic_id"] = map[string]any{"enabled": true}
@@ -348,31 +362,4 @@ func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
 	// for compatibility with beats, we want bodymap mapping
 	esConfig["mapping"] = map[string]any{"mode": "bodymap"}
 	return esConfig, nil
-}
-
-// This is copied from https://github.com/elastic/beats/blob/main/libbeat/otelbeat/beatconverter/beatconverter.go
-// getOutputQueueConfig gets the queue settings for the output unit in the component. We need to move these settings
-// to the receiver configuration.
-func getOutputQueueConfig(comp *component.Component) map[string]any {
-	// find the output unit config
-	var unitConfigMap map[string]any
-	for _, unit := range comp.Units {
-		if unit.Type == client.UnitTypeOutput {
-			unitConfigMap = unit.Config.GetSource().AsMap()
-		}
-	}
-	if unitConfigMap == nil {
-		return nil
-	}
-
-	queueConfig, ok := unitConfigMap["queue"]
-	if !ok {
-		return nil
-	}
-	queueConfigMap, ok := queueConfig.(map[string]any)
-	if !ok {
-		return nil
-	}
-
-	return queueConfigMap
 }
