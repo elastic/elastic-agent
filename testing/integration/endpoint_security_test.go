@@ -127,10 +127,11 @@ func getEndpointVersion(t *testing.T) string {
 // cleanup functions are set
 func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageFormat string) {
 	ctx := context.Background()
-
-	t.Log("Preparing fixture with an older version of the agent")
-	upgradeFromVersion, err := upgradetest.PreviousMinor()
+	upgradeables, err := upgradetest.GetUpgradableVersions()
 	require.NoError(t, err)
+	upgradeFromVersion := upgradeables[0]
+	t.Logf("Preparing fixture with agent version %s", upgradeFromVersion.String())
+
 	startFixture, err := atesting.NewFixture(
 		t,
 		upgradeFromVersion.String(),
@@ -208,6 +209,9 @@ func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageF
 
 	t.Log("The initial installation of both the agent and endpoint are healthy")
 
+	initEndpointVersion := getEndpointVersion(t)
+	t.Logf("The initial endpoint version is %s", initEndpointVersion)
+
 	// try to uninstall endpoint without token and assert that endpoint is not removed
 	_, err = exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "uninstall", "--log", "stdout").CombinedOutput()
 	require.Error(t, err)
@@ -235,8 +239,9 @@ func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageF
 	t.Log("The upgraded agent and endpoint are both healthy")
 
 	t.Log("Validate that the initial endpoint version is smaller than the upgraded version")
-	initEndpointVersion := getEndpointVersion(t)
 	upgradedEndpointVersion := getEndpointVersion(t)
+
+	t.Logf("The upgraded endpoint version is %s", upgradedEndpointVersion)
 
 	startEndpointVersion, err := version.ParseVersion(initEndpointVersion)
 	require.NoError(t, err)
