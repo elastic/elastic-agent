@@ -18,7 +18,8 @@ jobs:
   bump:
     strategy:
       matrix:
-        os: [ macos-13, macos-latest, windows-latest ]
+        # NOTE: macos-13 is intel and macos-latest is arm
+        os: [ macos-13, macos-latest ]
     runs-on: ${{  matrix.os }}
     env:
       PLATFORMS: "darwin/amd64 darwin/arm64"
