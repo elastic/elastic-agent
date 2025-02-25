@@ -35,7 +35,6 @@ import (
 	"github.com/cavaliergopher/rpm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
@@ -254,12 +253,11 @@ func parseManifest(t *testing.T, dir string) v1.PackageManifest {
 		assert.NoError(t, err, "error closing manifest file")
 	}(manifestReadCloser)
 
-	var m v1.PackageManifest
-	err = yaml.NewDecoder(manifestReadCloser).Decode(&m)
+	m, err := v1.ParseManifest(manifestReadCloser)
 	if err != nil {
 		t.Errorf("unmarshaling package manifest: %v", err)
 	}
-	return m
+	return *m
 }
 
 const (
