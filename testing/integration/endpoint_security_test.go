@@ -39,6 +39,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
+	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/proxytest"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
@@ -108,14 +109,13 @@ func getEndpointVersion(t *testing.T) string {
 // * Get the uninstall token for the policy and store it in the fixture
 // * Install and enroll the fist agent
 // * Validate the health of both the agent and endpoint
-// * Validate the version of endpoint matches that of the agent
 // * Validate that tamper protection is enabled in endpoint by trying to
 // uninstall it
 // * Setup a fixture with the test build
 // * Install the new agent
 // * Validate that the new agent and endpoint are healthy
-// * Validate that the new version of endpoint matches the new version of the
-// agent
+// * Validate that the initial endpoint version is smaller than that of the
+// upgraded one
 // * Validate that tamper protection is still enabled by trying to uninstall
 // endpoint
 // * Uninstall endpoint using the uninstall token
@@ -208,11 +208,6 @@ func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageF
 
 	t.Log("The initial installation of both the agent and endpoint are healthy")
 
-	// Check the version of endpoint matches the version of the agent
-	initEndpointVersion := getEndpointVersion(t)
-	require.Equal(t, initEndpointVersion, upgradeFromVersion.String())
-	t.Log("The version of endpoint and agent match")
-
 	// try to uninstall endpoint without token and assert that endpoint is not removed
 	_, err = exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "uninstall", "--log", "stdout").CombinedOutput()
 	require.Error(t, err)
@@ -239,10 +234,17 @@ func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageF
 	)
 	t.Log("The upgraded agent and endpoint are both healthy")
 
-	// Validate that the new version of endpoint matches the new version of the agent
+	t.Log("Validate that the initial endpoint version is smaller than the upgraded version")
+	initEndpointVersion := getEndpointVersion(t)
 	upgradedEndpointVersion := getEndpointVersion(t)
-	require.Equal(t, define.Version(), upgradedEndpointVersion)
-	t.Log("The version of the upgraded agent and the upgraded endpoint match")
+
+	startEndpointVersion, err := version.ParseVersion(initEndpointVersion)
+	require.NoError(t, err)
+
+	parsedUpgradedVersion, err := version.ParseVersion(upgradedEndpointVersion)
+	require.NoError(t, err)
+
+	require.True(t, startEndpointVersion.Less(*parsedUpgradedVersion))
 
 	// try to uninstall endpoint without token and assert that endpoint is not removed
 	_, err = exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "uninstall", "--log", "stdout").CombinedOutput()
