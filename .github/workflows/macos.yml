@@ -5,10 +5,10 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "0 20 * * 6"
-  # Being: fr testing purposes
+  # Being: for testing purposes
   push:
     branches:
-      - feature/macos-github-actions
+      - feature/test-macos-gh-action
   # End: for testing purposes
 
 permissions:
