@@ -302,7 +302,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"logs_dynamic_id": map[string]any{
 							"enabled": true,
 						},
-						"num_workers":       0,
+						"num_workers":       1,
 						"api_key":           "",
 						"logs_index":        "filebeat-9.0.0",
 						"timeout":           90 * time.Second,
