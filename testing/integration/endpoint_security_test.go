@@ -244,6 +244,7 @@ func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageF
 	parsedUpgradedVersion, err := version.ParseVersion(upgradedEndpointVersion)
 	require.NoError(t, err)
 
+	t.Logf("Comparing start version %s to upgraded version %s", startEndpointVersion.String(), parsedUpgradedVersion.String())
 	require.True(t, startEndpointVersion.Less(*parsedUpgradedVersion))
 
 	// try to uninstall endpoint without token and assert that endpoint is not removed
