@@ -243,8 +243,6 @@ func PreviousMinor() (*version.ParsedSemVer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse the current version %s: %w", define.Version(), err)
 	}
-<<<<<<< HEAD
-=======
 
 	// Special case: if we are in the first release of a new major (so vX.0.0), we should
 	// return the latest release from the previous major.
@@ -263,7 +261,6 @@ func PreviousMinor() (*version.ParsedSemVer, error) {
 		return nil, ErrNoPreviousMinor
 	}
 
->>>>>>> 2614cb516 (Fix selection of testing version (#6578))
 	for _, v := range versions {
 		if v.Prerelease() != "" || v.BuildMetadata() != "" {
 			continue
