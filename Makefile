@@ -3,15 +3,21 @@ COVERAGE_DIR=$(BUILD_DIR)/coverage
 BEATS?=elastic-agent
 PROJECTS= $(BEATS)
 PYTHON_ENV?=$(BUILD_DIR)/python-env
+# NOTE: tool versions are centralised in the .tool-versions file.
+MAGE_VERSION     := $(shell grep 'mage' .tool-versions | cut -d' ' -f2)
+ifdef MAGE_VERSION
 MAGE_PRESENT     := $(shell mage --version 2> /dev/null | grep $(MAGE_VERSION))
+MAGE_IMPORT_PATH ?= github.com/magefile/mage@v$(MAGE_VERSION)
+else
 MAGE_IMPORT_PATH ?= github.com/magefile/mage
+endif
 export MAGE_IMPORT_PATH
 
 ## mage : Sets mage
 .PHONY: mage
 mage:
 ifndef MAGE_PRESENT
-	@echo Installing mage.
+	@echo Installing mage $(MAGE_IMPORT_PATH).
 	@go install ${MAGE_IMPORT_PATH}
 	@-mage -clean
 else
