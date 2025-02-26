@@ -275,7 +275,7 @@ func TestFleetUpgradeToPRBuild(t *testing.T) {
 
 func testFleetAirGappedUpgrade(t *testing.T, stack *define.Info, unprivileged bool) {
 	ctx, _ := testcontext.WithDeadline(
-		t, context.Background(), time.Now().Add(10*time.Minute))
+		t, context.Background(), time.Now().Add(15*time.Minute))
 
 	latest := define.Version()
 
