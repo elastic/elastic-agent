@@ -120,7 +120,7 @@ steps:
           - build/distributions/**
         agents:
           provider: "aws"
-          instanceType: "t4g.2xlarge"
+          instanceType: "c6g.4xlarge"
           imagePrefix: "core-ubuntu-2204-aarch64"
 
   - label: "Serverless integration test"
