@@ -47,7 +47,7 @@ steps:
           machineType: "n2-standard-8"
 
       # Packaging linux/arm64
-      - label: "Packaging: linux/amd64 rpm"
+      - label: "Packaging: linux/arm64 rpm"
         key: packaging-ubuntu-arm64-rpm
         env:
           PLATFORMS: "linux/arm64"
@@ -59,7 +59,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
 
-      - label: "Packaging: linux/amd64 deb"
+      - label: "Packaging: linux/arm64 deb"
         key: packaging-ubuntu-arm64-deb
         env:
           PLATFORMS: "linux/arm64"
@@ -71,7 +71,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
 
-      - label: "Packaging: linux/amd64 tar.gz"
+      - label: "Packaging: linux/arm64 tar.gz"
         key: packaging-ubuntu-arm64-tar
         env:
           PLATFORMS: "linux/arm64"
