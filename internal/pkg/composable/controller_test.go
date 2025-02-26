@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/env"
@@ -140,6 +142,58 @@ func TestController(t *testing.T) {
 	vars3map, err := setVars3[0].Map()
 	require.NoError(t, err)
 	assert.Len(t, vars3map, 0) // should be empty after empty Observe
+}
+
+func TestControllerWithFetchProvider(t *testing.T) {
+	providers := composable.NewProviderRegistry()
+	providers.MustAddContextProvider("custom_fetch", func(_ *logger.Logger, _ *config.Config, _ bool) (corecomp.ContextProvider, error) {
+		return &customFetchProvider{}, nil
+	})
+
+	cfg := config.New()
+	log, err := logger.New("", false)
+	require.NoError(t, err)
+	c, err := composable.NewWithProviders(log, cfg, false, providers)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var setVars []*transpiler.Vars
+	go func() {
+		defer cancel()
+		select {
+		case <-ctx.Done():
+			return
+		case <-c.Watch():
+			vars, err := c.Observe(ctx, []string{"custom_fetch.vars.key1"})
+			require.NoError(t, err)
+			setVars = vars
+		}
+	}()
+
+	errCh := make(chan error)
+	go func() {
+		errCh <- c.Run(ctx)
+	}()
+	err = <-errCh
+	if errors.Is(err, context.Canceled) {
+		err = nil
+	}
+	require.NoError(t, err)
+
+	if assert.Len(t, setVars, 1) {
+		node, err := setVars[0].Replace("${custom_fetch.vars.key1}")
+		if assert.NoError(t, err) {
+			strNode, ok := node.(*transpiler.StrVal)
+			if assert.True(t, ok) {
+				strVal, ok := strNode.Value().(string)
+				if assert.True(t, ok) {
+					assert.Equal(t, "vars.key1", strVal)
+				}
+			}
+		}
+	}
 }
 
 func TestProvidersDefaultDisabled(t *testing.T) {
@@ -425,3 +479,21 @@ func TestDefaultProvider(t *testing.T) {
 		assert.Equal(t, "custom", c.DefaultProvider())
 	})
 }
+
+type customFetchProvider struct{}
+
+func (c *customFetchProvider) Run(ctx context.Context, comm corecomp.ContextProviderComm) error {
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func (c *customFetchProvider) Fetch(key string) (string, bool) {
+	tokens := strings.SplitN(key, ".", 2)
+	if len(tokens) > 0 && tokens[0] != "custom_fetch" {
+		return "", false
+	}
+	return tokens[1], true
+}
+
+// validate it registers as a fetch provider
+var _ corecomp.FetchContextProvider = (*customFetchProvider)(nil)
