@@ -13,15 +13,45 @@ before:
     # You may remove this if you don't use go modules.
     - go mod tidy
     # you may remove this if you don't need go generate
-    - go generate ./...
+    # - go generate ./...
 
 builds:
   - env:
       - CGO_ENABLED=1
+      # complex, templated envs:
+      - >-
+        {{- if eq .Os "darwin" }}
+          {{- if eq .Arch "amd64"}}CC=o64-clang{{- end }}
+          {{- if eq .Arch "arm64"}}CC=oa64-clang{{- end }}
+        {{- end }}
+        {{- if eq .Os "windows" }}
+          {{- if eq .Arch "amd64" }}CC=x86_64-w64-mingw32-gcc{{- end }}
+        {{- end }}
+        {{- if eq .Os "linux" }}
+          {{- if eq .Arch "amd64" }}CC=gcc{{- end }}
+          {{- if eq .Arch "arm64" }}CC=aarch64-linux-gnu-gcc{{- end }}
+        {{- end }}
+      - >-
+        {{- if eq .Os "darwin" }}
+          {{- if eq .Arch "amd64"}}CXX=o64-clang++{{- end }}
+          {{- if eq .Arch "arm64"}}CXX=oa64-clang++{{- end }}
+        {{- end }}
+        {{- if eq .Os "windows" }}
+          {{- if eq .Arch "amd64" }}CXX=x86_64-w64-mingw32-g++{{- end }}
+        {{- end }}
+        {{- if eq .Os "linux" }}
+          {{- if eq .Arch "amd64" }}CXX=g++{{- end }}
+          {{- if eq .Arch "arm64" }}CXX=aarch64-linux-gnu-g++{{- end }}
+        {{- end }}
+
     goos:
       - linux
       - windows
       - darwin
+    id: elastic-agent
+    binary: elastic-agent
+    ignore:
+      - goarch: 386
 
 archives:
   - format: tar.gz
