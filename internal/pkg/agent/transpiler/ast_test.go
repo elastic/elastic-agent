@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/cespare/xxhash/v2"
+
 	"github.com/elastic/elastic-agent-libs/mapstr"
 
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
@@ -1143,6 +1145,49 @@ func TestCondition(t *testing.T) {
 	err = Insert(ast, input2, "")
 	require.NoError(t, err)
 	assert.Nil(t, input2.condition)
+}
+
+// check that all the methods handle nil values correctly
+func TestNullValues(t *testing.T) {
+	cfgMap := map[string]any{
+		"inputs": map[string]any{
+			"dict": map[string]any{
+				"key": nil,
+			},
+			"list": []any{nil},
+		},
+	}
+	ast, err := NewAST(cfgMap)
+	require.NoError(t, err)
+	inputs, ok := Lookup(ast, "inputs")
+	require.True(t, ok)
+
+	assert.NotEmpty(t, inputs.String())
+
+	node, ok := inputs.Find("dict")
+	assert.True(t, ok)
+	assert.NotNil(t, node)
+
+	assert.NotNil(t, inputs.Value())
+
+	assert.NotNil(t, inputs.Clone())
+
+	assert.NotNil(t, inputs.ShallowClone())
+
+	assert.NotEmpty(t, inputs.Hash())
+
+	h := xxhash.New()
+	err = inputs.Hash64With(h)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, h.Sum64())
+
+	assert.Empty(t, inputs.Vars([]string{}))
+
+	newNode, err := inputs.Apply(nil)
+	assert.NoError(t, err)
+	assert.NotNil(t, newNode)
+
+	assert.Empty(t, inputs.Processors())
 }
 
 func mustMakeVars(mapping map[string]interface{}) *Vars {
