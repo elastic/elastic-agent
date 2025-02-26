@@ -147,6 +147,9 @@ func TestController(t *testing.T) {
 func TestControllerWithFetchProvider(t *testing.T) {
 	providers := composable.NewProviderRegistry()
 	providers.MustAddContextProvider("custom_fetch", func(_ *logger.Logger, _ *config.Config, _ bool) (corecomp.ContextProvider, error) {
+		// add a delay to ensure that even if it takes time to start the provider that it still gets placed
+		// as a fetch provider
+		<-time.After(1 * time.Second)
 		return &customFetchProvider{}, nil
 	})
 
@@ -159,16 +162,47 @@ func TestControllerWithFetchProvider(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	var setVars []*transpiler.Vars
+	observed := false
+	setErr := make(chan error, 1)
 	go func() {
 		defer cancel()
-		select {
-		case <-ctx.Done():
-			return
-		case <-c.Watch():
-			vars, err := c.Observe(ctx, []string{"custom_fetch.vars.key1"})
-			require.NoError(t, err)
-			setVars = vars
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case vars := <-c.Watch():
+				if !observed {
+					vars, err = c.Observe(ctx, []string{"custom_fetch.vars.key1"})
+					if err != nil {
+						setErr <- err
+						return
+					}
+					observed = true
+				}
+				if len(vars) > 0 {
+					node, err := vars[0].Replace("${custom_fetch.vars.key1}")
+					if err == nil {
+						// replace occurred so the fetch provider is now present
+						strNode, ok := node.(*transpiler.StrVal)
+						if !ok {
+							setErr <- fmt.Errorf("expected *transpiler.StrVal")
+							return
+						}
+						strVal, ok := strNode.Value().(string)
+						if !ok {
+							setErr <- fmt.Errorf("expected string")
+							return
+						}
+						if strVal != "vars.key1" {
+							setErr <- fmt.Errorf("expected replaced value error: %s != vars.key1", strVal)
+							return
+						}
+						// replacement worked
+						setErr <- nil
+						return
+					}
+				}
+			}
 		}
 	}()
 
@@ -181,19 +215,8 @@ func TestControllerWithFetchProvider(t *testing.T) {
 		err = nil
 	}
 	require.NoError(t, err)
-
-	if assert.Len(t, setVars, 1) {
-		node, err := setVars[0].Replace("${custom_fetch.vars.key1}")
-		if assert.NoError(t, err) {
-			strNode, ok := node.(*transpiler.StrVal)
-			if assert.True(t, ok) {
-				strVal, ok := strNode.Value().(string)
-				if assert.True(t, ok) {
-					assert.Equal(t, "vars.key1", strVal)
-				}
-			}
-		}
-	}
+	err = <-setErr
+	assert.NoError(t, err)
 }
 
 func TestProvidersDefaultDisabled(t *testing.T) {

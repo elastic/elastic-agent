@@ -192,46 +192,33 @@ func (c *controller) Run(ctx context.Context) error {
 		wg.Wait()
 	}()
 
-	// synchronize the fetch providers through a channel
-	var fetchProvidersLock sync.RWMutex
-	//var fetchProviders mapstr.M
+	// send initial vars state (empty fetch providers initially)
 	fetchProviders := mapstr.M{}
-	fetchCh := make(chan fetchProvider)
-	go func() {
-		for {
-			select {
-			case <-localCtx.Done():
-				return
-			case msg := <-fetchCh:
-				fetchProvidersLock.Lock()
-				if msg.fetchProvider == nil {
-					_ = fetchProviders.Delete(msg.name)
-				} else {
-					_, _ = fetchProviders.Put(msg.name, msg.fetchProvider)
-				}
-				fetchProvidersLock.Unlock()
-			}
-		}
-	}()
-
-	// send initial vars state
-	fetchProvidersLock.RLock()
 	err := c.sendVars(ctx, nil, fetchProviders)
 	if err != nil {
-		fetchProvidersLock.RUnlock()
 		// only error is context cancel, no need to add error message context
 		return err
 	}
-	fetchProvidersLock.RUnlock()
 
 	// performs debounce of notifies; accumulates them into 100 millisecond chunks
 	var observedResult chan []*transpiler.Vars
+	fetchCh := make(chan fetchProvider)
 	for {
 	DEBOUNCE:
 		for {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
+			case msg := <-fetchCh:
+				if msg.fetchProvider == nil {
+					_ = fetchProviders.Delete(msg.name)
+				} else {
+					_, _ = fetchProviders.Put(msg.name, msg.fetchProvider)
+				}
+				t.Reset(100 * time.Millisecond)
+				c.logger.Debugf("Fetch providers state changed for composable inputs; debounce started")
+				drainChan(stateChangedChan) // state change trigger (no need for signal to be handled)
+				break DEBOUNCE
 			case observed := <-c.observedCh:
 				// observedResult holds the channel to send the latest observed results on
 				// if nothing is changed then nil will be sent over the channel if the set of running
@@ -241,7 +228,7 @@ func (c *controller) Run(ctx context.Context) error {
 				if changed {
 					t.Reset(100 * time.Millisecond)
 					c.logger.Debugf("Observed state changed for composable inputs; debounce started")
-					drainChan(stateChangedChan)
+					drainChan(stateChangedChan) // state change trigger (no need for signal to be handled)
 					break DEBOUNCE
 				} else {
 					// nothing changed send nil to alert the caller
@@ -267,15 +254,12 @@ func (c *controller) Run(ctx context.Context) error {
 		}
 
 		// send the vars to the watcher or the observer caller
-		fetchProvidersLock.RLock()
 		err := c.sendVars(ctx, observedResult, fetchProviders)
 		observedResult = nil
 		if err != nil {
-			fetchProvidersLock.RUnlock()
 			// only error is context cancel, no need to add error message context
 			return err
 		}
-		fetchProvidersLock.RUnlock()
 	}
 }
 
