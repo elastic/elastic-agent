@@ -710,16 +710,6 @@ func mapAllTrue(mm map[string]bool) bool {
 	return true
 }
 
-func mapAtLeastOneTrue(mm map[string]bool) bool {
-	for _, v := range mm {
-		if v {
-			return true
-		}
-	}
-
-	return false
-}
-
 func TestFileBeatReceiver(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: Default,
