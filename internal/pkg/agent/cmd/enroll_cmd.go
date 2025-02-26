@@ -16,8 +16,6 @@ import (
 	"strings"
 	"time"
 
-	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
-
 	"go.elastic.co/apm/v2"
 	"gopkg.in/yaml.v2"
 
@@ -56,6 +54,8 @@ const (
 	defaultFleetServerPort         = 8220
 	defaultFleetServerInternalHost = "localhost"
 	defaultFleetServerInternalPort = 8221
+	enrollBackoffInit              = time.Second * 5
+	enrollBackoffMax               = time.Minute * 10
 )
 
 var (
@@ -69,13 +69,14 @@ type saver interface {
 
 // enrollCmd is an enroll subcommand that interacts between the Kibana API and the Agent.
 type enrollCmd struct {
-	log          *logger.Logger
-	options      *enrollCmdOption
-	client       fleetclient.Sender
-	configStore  saver
-	remoteConfig remote.Config
-	agentProc    *process.Info
-	configPath   string
+	log            *logger.Logger
+	options        *enrollCmdOption
+	client         fleetclient.Sender
+	configStore    saver
+	remoteConfig   remote.Config
+	agentProc      *process.Info
+	configPath     string
+	backoffFactory func(done <-chan struct{}) backoff.Backoff
 
 	// For testability
 	daemonReloadFunc func(context.Context) error
@@ -178,13 +179,20 @@ func newEnrollCmd(
 	options *enrollCmdOption,
 	configPath string,
 	store saver,
+	backoffFactory func(done <-chan struct{}) backoff.Backoff,
 ) (*enrollCmd, error) {
+	if backoffFactory == nil {
+		backoffFactory = func(done <-chan struct{}) backoff.Backoff {
+			return backoff.NewEqualJitterBackoff(done, enrollBackoffInit, enrollBackoffMax)
+		}
+	}
 	return &enrollCmd{
 		log:              log,
 		options:          options,
 		configStore:      store,
 		configPath:       configPath,
 		daemonReloadFunc: daemonReload,
+		backoffFactory:   backoffFactory,
 	}, nil
 }
 
@@ -527,12 +535,11 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 		return nil
 	}
 
-	c.log.Infof("1st enrollment attempt failed, retrying enrolling to URL: %s with exponential backoff", c.client.URI())
+	c.log.Infof("1st enrollment attempt failed, retrying enrolling to URL: %s with exponential backoff (init %s, max %s)", c.client.URI(), enrollBackoffInit, enrollBackoffMax)
 
 	signal := make(chan struct{})
 	defer close(signal)
-	// Use the same backoff settings as when connecting to Fleet normally
-	backExp := fleetgateway.RequestBackoff(signal)
+	backExp := c.backoffFactory(signal)
 
 	for {
 		retry := false

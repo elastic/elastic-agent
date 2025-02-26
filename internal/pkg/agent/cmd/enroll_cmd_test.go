@@ -110,6 +110,7 @@ func TestEnroll(t *testing.T) {
 				},
 				"",
 				store,
+				nil,
 			)
 			require.NoError(t, err)
 
@@ -181,6 +182,7 @@ func TestEnroll(t *testing.T) {
 			&enrollOptions,
 			"",
 			store,
+			nil,
 		)
 		require.NoError(t, err, "could not create enroll command")
 
@@ -254,6 +256,7 @@ func TestEnroll(t *testing.T) {
 				},
 				"",
 				store,
+				nil,
 			)
 			require.NoError(t, err)
 
@@ -316,6 +319,7 @@ func TestEnroll(t *testing.T) {
 				},
 				"",
 				store,
+				nil,
 			)
 			require.NoError(t, err)
 
@@ -380,6 +384,7 @@ func TestEnroll(t *testing.T) {
 				},
 				"",
 				store,
+				nil,
 			)
 			require.NoError(t, err)
 
@@ -424,6 +429,7 @@ func TestEnroll(t *testing.T) {
 				},
 				"",
 				store,
+				nil,
 			)
 			require.NoError(t, err)
 
@@ -492,18 +498,15 @@ func TestEnroll(t *testing.T) {
 				},
 				"",
 				store,
+				nil,
 			)
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			backoffInit := time.Minute
-			ctx, cancel := context.WithTimeout(context.Background(), 2*backoffInit)
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 			defer cancel()
-			now := time.Now()
 			err = cmd.Execute(ctx, streams)
-			elapsed := time.Since(now)
 			require.NoError(t, err, "enroll command should return no error")
-			assert.LessOrEqual(t, backoffInit/2, elapsed, "enroll should wait at least half of the backoff init")
 
 			assert.True(t, store.Called, "the store should have been called")
 			config, err := readConfig(store.Content)

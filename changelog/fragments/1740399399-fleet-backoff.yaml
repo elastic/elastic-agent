@@ -11,12 +11,14 @@
 kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
-summary: Make enroll command backoff consistent with other requests to Fleet
+summary: Make enroll command backoff more conservative
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-#description:
+description: |
+  The plain enroll command now has an initial delay of 5s and a maximum of 10 minutes. It also has a jitter.
+  Delayed enroll now uses the same backoff behaviour as other requests to Fleet Server.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
