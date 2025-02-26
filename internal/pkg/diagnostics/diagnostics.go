@@ -327,19 +327,23 @@ func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResu
 
 	// Should we support json too?
 	if fileResult.ContentType == "application/yaml" {
-		unmarshalled := map[string]interface{}{}
+		var unmarshalled any
 		err := yaml.Unmarshal(fileResult.Content, &unmarshalled)
 		if err != nil {
 			// Best effort, output a warning but still include the file
 			fmt.Fprintf(errOut, "[WARNING] Could not redact %s due to unmarshalling error: %s\n", fullFilePath, err)
 		} else {
-			unmarshalled = Redact(unmarshalled, errOut)
-			redacted, err := yaml.Marshal(unmarshalled)
-			if err != nil {
-				// Best effort, output a warning but still include the file
-				fmt.Fprintf(errOut, "[WARNING] Could not redact %s due to marshalling error: %s\n", fullFilePath, err)
-			} else {
-				out = &redacted
+			switch t := unmarshalled.(type) { // could be a plain string, we only redact if this is a proper map
+			case map[string]any:
+				t = Redact(t, errOut)
+				redacted, err := yaml.Marshal(t)
+				if err != nil {
+					// Best effort, output a warning but still include the file
+					fmt.Fprintf(errOut, "[WARNING] Could not redact %s due to marshalling error: %s\n", fullFilePath, err)
+				} else {
+					out = &redacted
+				}
+			default:
 			}
 		}
 	}
