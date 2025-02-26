@@ -35,6 +35,25 @@ func IsPolicyRevision(ctx context.Context, t *testing.T, client *kibana.Client, 
 	}
 }
 
+func GetandSetUninstallTokens(ctx context.Context, t *testing.T, kibClient *kibana.Client, fixture *atesting.Fixture, policyId string) error {
+	resp, err := kibClient.GetPolicyUninstallTokens(ctx, policyId)
+	if err != nil {
+		return fmt.Errorf("failed to fetch uninstal tokens: %w", err)
+	}
+	if len(resp.Items) == 0 {
+		return fmt.Errorf("expected non-zero number of tokens: %w", err)
+	}
+
+	if len(resp.Items[0].Token) == 0 {
+		return fmt.Errorf("expected non-empty token: %w", err)
+	}
+
+	uninstallToken := resp.Items[0].Token
+	t.Logf("Protected with uninstall token: %v", uninstallToken)
+	fixture.SetUninstallToken(uninstallToken)
+	return nil
+}
+
 // InstallAgentWithPolicy creates the given policy, enrolls the given agent
 // fixture in Fleet using the default Fleet Server, waits for the agent to be
 // online, and returns the created policy.
@@ -53,22 +72,9 @@ func InstallAgentWithPolicy(ctx context.Context, t *testing.T,
 	}
 
 	if createPolicyReq.IsProtected {
-		// If protected fetch uninstall token and set it for the fixture
-		resp, err := kibClient.GetPolicyUninstallTokens(ctx, policy.ID)
-		if err != nil {
-			return policy, fmt.Errorf("failed to fetch uninstal tokens: %w", err)
+		if err := GetandSetUninstallTokens(ctx, t, kibClient, agentFixture, policy.ID); err != nil {
+			return policy, err
 		}
-		if len(resp.Items) == 0 {
-			return policy, fmt.Errorf("expected non-zero number of tokens: %w", err)
-		}
-
-		if len(resp.Items[0].Token) == 0 {
-			return policy, fmt.Errorf("expected non-empty token: %w", err)
-		}
-
-		uninstallToken := resp.Items[0].Token
-		t.Logf("Protected with uninstall token: %v", uninstallToken)
-		agentFixture.SetUninstallToken(uninstallToken)
 	}
 
 	err = InstallAgentForPolicy(ctx, t, installOpts, agentFixture, kibClient, policy.ID)
@@ -132,7 +138,6 @@ func InstallAgentForPolicyWithToken(ctx context.Context, t *testing.T,
 
 		installOpts.URL = fleetServerURL
 	}
-
 	output, err := agentFixture.Install(ctx, &installOpts)
 	if err != nil {
 		t.Log(string(output))
