@@ -16,12 +16,12 @@ Config input for container logs
     namespace: {{ .Values.kubernetes.namespace }}
   use_output: {{ .Values.kubernetes.output }}
   streams:
-  - id: kubernetes-container-logs-${kubernetes.pod.name}-${kubernetes.container.id}
+  - id: kubernetes-container-logs-${kubernetes.namespace}-${kubernetes.pod.name}-${kubernetes.container.name}
     data_stream:
       dataset: kubernetes.container_logs
       type: logs
     paths:
-      - '/var/log/containers/*${kubernetes.container.id}.log'
+      - '/var/log/pods/${kubernetes.namespace}_${kubernetes.pod.name}_${kubernetes.pod.uid}/${kubernetes.container.name}/*.log'
     prospector.scanner.symlinks: {{ dig "vars" "symlinks" true .Values.kubernetes.containers.logs }}
     parsers:
       - container:
