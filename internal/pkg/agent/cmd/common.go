@@ -94,6 +94,7 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	addCommandIfNotNil(cmd, newComponentCommandWithArgs(args, streams))
 	addCommandIfNotNil(cmd, newLogsCommandWithArgs(args, streams))
 	addCommandIfNotNil(cmd, newOtelCommandWithArgs(args, streams))
+	addCommandIfNotNil(cmd, newApplyFlavorCommandWithArgs(args, streams))
 
 	// windows special hidden sub-command (only added on Windows)
 	reexec := newReExecWindowsCommand(args, streams)
