@@ -318,11 +318,6 @@ func GolangCrossBuild() error {
 	return nil
 }
 
-// BuildGoDaemon builds the go-daemon binary (use crossBuildGoDaemon).
-func BuildGoDaemon() error {
-	return devtools.BuildGoDaemon()
-}
-
 // BinaryOSS build the fleet artifact.
 func (Build) BinaryOSS() error {
 	mg.Deps(Prepare.Env)
@@ -669,19 +664,13 @@ func CrossBuild() error {
 	return devtools.CrossBuild()
 }
 
-// CrossBuildGoDaemon cross-builds the go-daemon binary using Docker.
-func CrossBuildGoDaemon() error {
-	mg.Deps(EnsureCrossBuildOutputDir)
-	return devtools.CrossBuildGoDaemon()
-}
-
 // PackageAgentCore cross-builds and packages distribution artifacts containing
 // only elastic-agent binaries with no extra files or dependencies.
 func PackageAgentCore() {
 	start := time.Now()
 	defer func() { fmt.Println("packageAgentCore ran for", time.Since(start)) }()
 
-	mg.Deps(CrossBuild, CrossBuildGoDaemon)
+	mg.Deps(CrossBuild)
 
 	devtools.UseElasticAgentCorePackaging()
 
@@ -1010,7 +999,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 
 	log.Println("--- Running post packaging ")
 	mg.Deps(Update)
-	mg.Deps(agentBinaryTarget, CrossBuildGoDaemon)
+	mg.Deps(agentBinaryTarget)
 	mg.SerialDeps(devtools.Package, TestPackages)
 	return nil
 }
