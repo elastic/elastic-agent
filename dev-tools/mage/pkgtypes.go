@@ -14,6 +14,7 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -104,6 +105,7 @@ type PackageSpec struct {
 	Qualifier         string                 `yaml:"qualifier,omitempty"`   // Optional
 	OutputFile        string                 `yaml:"output_file,omitempty"` // Optional
 	ExtraVars         map[string]string      `yaml:"extra_vars,omitempty"`  // Optional
+	ExtraTags         []string               `yaml:"extra_tags,omitempty"`  // Optional
 
 	evalContext            map[string]interface{}
 	packageDir             string
@@ -382,6 +384,12 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 
 	for k, v := range s.ExtraVars {
 		s.evalContext[k] = mustExpand(v)
+	}
+
+	if s.ExtraTags != nil {
+		for i, tag := range s.ExtraTags {
+			s.ExtraTags[i] = mustExpand(tag)
+		}
 	}
 
 	s.Name = mustExpand(s.Name)
@@ -962,7 +970,7 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 		}
 
 		if mg.Verbose() {
-			log.Println("Adding", os.FileMode(header.Mode), header.Name)
+			log.Println("Adding", os.FileMode(mustConvertToUnit32(header.Mode)), header.Name)
 		}
 		if err := ar.WriteHeader(header); err != nil {
 			return err
@@ -1030,7 +1038,7 @@ func addSymlinkToTar(tmpdir string, ar *tar.Writer, baseDir string, pkgFile Pack
 		header.Typeflag = tar.TypeSymlink
 
 		if mg.Verbose() {
-			log.Println("Adding", os.FileMode(header.Mode), header.Name)
+			log.Println("Adding", os.FileMode(mustConvertToUnit32(header.Mode)), header.Name)
 		}
 		if err := ar.WriteHeader(header); err != nil {
 			return err
@@ -1051,4 +1059,11 @@ func PackageDocker(spec PackageSpec) error {
 		return err
 	}
 	return b.Build()
+}
+
+func mustConvertToUnit32(i int64) uint32 {
+	if i > math.MaxUint32 {
+		panic(fmt.Sprintf("%d is bigger than math.MaxUint32", i))
+	}
+	return uint32(i) // #nosec
 }
