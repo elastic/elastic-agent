@@ -8,8 +8,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent-libs/kibana"
+
 	"github.com/gofrs/uuid/v5"
+
+	"github.com/elastic/elastic-agent-libs/kibana"
 )
 
 type EnrollParams struct {
