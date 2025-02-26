@@ -32,7 +32,6 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
-	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/installtest"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
@@ -179,6 +178,10 @@ func testMonitoringLogsAreShipped(
 		"Looking for logs in dataset 'elastic_agent.metricbeat'")
 
 	// Stage 2: make sure all components are healthy
+	t.Logf("Getting Agent ID")
+	agentID, err := agentFixture.AgentID(ctx)
+	require.NoError(t, err)
+	t.Logf("Agent ID: %q", agentID)
 	t.Log("Making sure all components are healthy")
 	status, err := agentFixture.ExecStatus(ctx)
 	require.NoError(t, err,
@@ -237,16 +240,6 @@ func testMonitoringLogsAreShipped(
 	require.NotZero(t, len(docs.Hits.Hits))
 
 	// Stage 4: verify logs from the monitoring components are not sent to the output
-	t.Log("Check monitoring logs")
-	hostname, err := os.Hostname()
-	if err != nil {
-		t.Fatalf("could not get hostname to filter Agent: %s", err)
-	}
-
-	agentID, err := fleettools.GetAgentIDByHostname(ctx, info.KibanaClient, policy.ID, hostname)
-	require.NoError(t, err, "could not get Agent ID by hostname")
-	t.Logf("Agent ID: %q", agentID)
-
 	// We cannot search for `component.id` because at the moment of writing
 	// this field is not mapped. There is an issue for that:
 	// https://github.com/elastic/integrations/issues/6545

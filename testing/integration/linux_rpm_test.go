@@ -167,6 +167,10 @@ func TestRpmFleetUpgrade(t *testing.T) {
 		createPolicyReq)
 	require.NoError(t, err)
 	t.Logf("created policy: %s", policy.ID)
+
+	agentID, err := startFixture.AgentID(ctx)
+	require.NoError(t, err)
+	t.Logf("Agent ID: %q", agentID)
 	check.ConnectedToFleet(ctx, t, startFixture, 5*time.Minute)
 
 	// 3. Upgrade rpm to the build version
@@ -180,7 +184,7 @@ func TestRpmFleetUpgrade(t *testing.T) {
 	noSnapshotVersion := strings.TrimSuffix(define.Version(), "-SNAPSHOT")
 	require.Eventually(t, func() bool {
 		t.Log("Getting Agent version...")
-		newVersion, err := fleettools.GetAgentVersion(ctx, info.KibanaClient, policy.ID)
+		newVersion, err := fleettools.GetAgentVersion(ctx, info.KibanaClient, agentID)
 		if err != nil {
 			t.Logf("error getting agent version: %v", err)
 			return false

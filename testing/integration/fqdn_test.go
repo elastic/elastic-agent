@@ -91,13 +91,16 @@ func TestFQDN(t *testing.T) {
 	policy, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, agentFixture, kibClient, createPolicyReq)
 	require.NoError(t, err)
 
+	agentID, err := agentFixture.AgentID(ctx)
+	require.NoError(t, err)
+
 	t.Cleanup(func() {
 		// Use a separate context as the one in the test body will have been cancelled at this point.
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cleanupCancel()
 
 		t.Log("Un-enrolling Elastic Agent...")
-		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, policy.ID))
+		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, agentID))
 
 		t.Log("Restoring hostname...")
 		err := setHostname(cleanupCtx, origHostname, t.Log)
@@ -109,7 +112,7 @@ func TestFQDN(t *testing.T) {
 	})
 
 	t.Log("Verify that agent name is short hostname")
-	agent := verifyAgentName(ctx, t, policy.ID, shortName, info.KibanaClient)
+	agent := verifyAgentName(ctx, t, agentID, shortName, info.KibanaClient)
 
 	t.Log("Verify that hostname in `logs-*` and `metrics-*` is short hostname")
 	verifyHostNameInIndices(t, "logs-*", shortName, info.Namespace, info.ESClient)
@@ -180,17 +183,17 @@ func TestFQDN(t *testing.T) {
 	// verifyHostNameInIndices(t, "metrics-*", shortName, info.ESClient)
 }
 
-func verifyAgentName(ctx context.Context, t *testing.T, policyID, hostname string, kibClient *kibana.Client) *kibana.AgentExisting {
+func verifyAgentName(ctx context.Context, t *testing.T, agentID, hostname string, kibClient *kibana.Client) kibana.GetAgentResponse {
 	t.Helper()
 
-	var agent *kibana.AgentExisting
+	var agent kibana.GetAgentResponse
 	var err error
 
 	require.Eventually(
 		t,
 		func() bool {
-			agent, err = fleettools.GetAgentByPolicyIDAndHostnameFromList(ctx, kibClient, policyID, hostname)
-			return err == nil && agent != nil
+			agent, err = kibClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
+			return err == nil && agent.LocalMetadata.Host.Hostname == hostname
 		},
 		5*time.Minute,
 		5*time.Second,

@@ -799,6 +799,18 @@ func (f *Fixture) ExecDiagnostics(ctx context.Context, cmd ...string) (string, e
 	return files[0], err
 }
 
+// AgentID returns the ID of the installed Elastic Agent.
+func (f *Fixture) AgentID(ctx context.Context) (string, error) {
+	status, err := f.ExecStatus(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get agent ID: agent status returned an error: %w", err)
+	}
+	if status.Info.ID == "" {
+		return "", fmt.Errorf("failed to get agent ID: agent ID is empty")
+	}
+	return status.Info.ID, nil
+}
+
 // IsHealthy checks whether the prepared Elastic Agent reports itself as healthy.
 // It returns an error if either the reported state isn't healthy or if it fails
 // to fetch the current state. If the status is successfully fetched, but it
