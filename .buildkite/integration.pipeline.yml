@@ -170,10 +170,7 @@ steps:
   - label: "Triggering Integration tests"
     depends_on:
       - int-packaging
-    trigger: "elastic-agent-extended-testing-bk"
-    build:
-      commit: "${BUILDKITE_COMMIT}"
-      branch: "${BUILDKITE_BRANCH}"
+    command: "buildkite-agent pipeline upload .buildkite/bk.integration.pipeline.yml"
 
   - label: "Serverless Beats Tests"
     depends_on:
