@@ -43,6 +43,7 @@ require (
 	github.com/kardianos/service v1.2.1-0.20210728001519-a323c3813bc7
 	github.com/magefile/mage v1.15.0
 	github.com/oklog/ulid/v2 v2.1.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.119.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.119.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.119.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.119.0
