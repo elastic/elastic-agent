@@ -540,6 +540,10 @@ func (c *controller) startDynamicProvider(ctx context.Context, wg *sync.WaitGrou
 }
 
 func (c *controller) generateVars(fetchContextProviders mapstr.M, defaultProvider string) []*transpiler.Vars {
+	// copy fetch providers map so they cannot change in the context
+	// of the currently processed variables
+	fetchContextProviders = fetchContextProviders.Clone()
+
 	// build the vars list of mappings
 	vars := make([]*transpiler.Vars, 1)
 	mapping, _ := transpiler.NewAST(map[string]any{})
