@@ -110,10 +110,7 @@ steps:
   - label: "Triggering Integration tests"
     depends_on:
       - int-packaging
-    trigger: "elastic-agent-extended-testing-bk"
-    build:
-      commit: "${BUILDKITE_COMMIT}"
-      branch: "${BUILDKITE_BRANCH}"
+    command: "buildkite-agent pipeline upload .buildkite/bk.integration.pipeline.yml"
 
   - label: "Serverless Beats Tests"
     # To speedup the build process only packaging-ubuntu-x86-64 artifact dependency is required
