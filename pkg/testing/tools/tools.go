@@ -35,7 +35,7 @@ func IsPolicyRevision(ctx context.Context, t *testing.T, client *kibana.Client, 
 	}
 }
 
-func GetandSetUninstallTokens(ctx context.Context, t *testing.T, kibClient *kibana.Client, fixture *atesting.Fixture, policyId string) error {
+func SetPolicyUninstallTokenInFixture(ctx context.Context, t *testing.T, kibClient *kibana.Client, fixture *atesting.Fixture, policyId string) error {
 	resp, err := kibClient.GetPolicyUninstallTokens(ctx, policyId)
 	if err != nil {
 		return fmt.Errorf("failed to fetch uninstal tokens: %w", err)
@@ -72,7 +72,7 @@ func InstallAgentWithPolicy(ctx context.Context, t *testing.T,
 	}
 
 	if createPolicyReq.IsProtected {
-		if err := GetandSetUninstallTokens(ctx, t, kibClient, agentFixture, policy.ID); err != nil {
+		if err := SetPolicyUninstallTokenInFixture(ctx, t, kibClient, agentFixture, policy.ID); err != nil {
 			return policy, err
 		}
 	}
