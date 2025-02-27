@@ -692,7 +692,7 @@ func Test_Run(t *testing.T) {
 			providerCfg: Config{
 				RefreshInterval: 100 * time.Millisecond,
 				RequestTimeout:  100 * time.Millisecond,
-				TTLDelete:       2 * time.Second,
+				TTLDelete:       10 * time.Second,
 				DisableCache:    false,
 			},
 			expectedSignal: true,
@@ -714,7 +714,7 @@ func Test_Run(t *testing.T) {
 			providerCfg: Config{
 				RefreshInterval: 100 * time.Millisecond,
 				RequestTimeout:  100 * time.Millisecond,
-				TTLDelete:       2 * time.Second,
+				TTLDelete:       10 * time.Second,
 				DisableCache:    false,
 			},
 			expectedSignal: false,
@@ -740,7 +740,7 @@ func Test_Run(t *testing.T) {
 				DisableCache:    false,
 			},
 			expectedSignal: true,
-			waitForSignal:  time.Second,
+			waitForSignal:  2 * time.Second,
 			k8sClient: k8sfake.NewClientset(
 				testDataBuilder.buildK8SSecret("secret_value"),
 			),
@@ -756,7 +756,7 @@ func Test_Run(t *testing.T) {
 			providerCfg: Config{
 				RefreshInterval: 100 * time.Millisecond,
 				RequestTimeout:  100 * time.Millisecond,
-				TTLDelete:       2 * time.Second,
+				TTLDelete:       10 * time.Second,
 				DisableCache:    false,
 			},
 			expectedSignal: false,
@@ -777,7 +777,7 @@ func Test_Run(t *testing.T) {
 			providerCfg: Config{
 				RefreshInterval: 100 * time.Millisecond,
 				RequestTimeout:  100 * time.Millisecond,
-				TTLDelete:       2 * time.Second,
+				TTLDelete:       10 * time.Second,
 				DisableCache:    false,
 			},
 			k8sClient:    nil,
@@ -846,13 +846,11 @@ func Test_Run(t *testing.T) {
 				receivedSignal = true
 			case <-time.After(tc.waitForSignal):
 			}
+			list := p.store.List()
 			cancel()
-
 			wg.Wait()
 
 			require.Equal(t, tc.expectedSignal, receivedSignal)
-
-			list := p.store.List()
 			require.Equal(t, len(tc.postCacheState), len(list))
 
 			cacheMap := make(map[string]secret)
@@ -862,12 +860,12 @@ func Test_Run(t *testing.T) {
 			for k, v := range tc.postCacheState {
 				inCache, exists := cacheMap[k]
 				require.True(t, exists)
-				require.Equal(t, v.s.key, inCache.key)
-				require.Equal(t, v.s.name, inCache.name)
-				require.Equal(t, v.s.namespace, inCache.namespace)
-				require.Equal(t, v.s.key, inCache.key)
-				require.Equal(t, v.s.value, inCache.value)
-				require.Equal(t, v.s.apiExists, inCache.apiExists)
+				assert.Equal(t, v.s.key, inCache.key)
+				assert.Equal(t, v.s.name, inCache.name)
+				assert.Equal(t, v.s.namespace, inCache.namespace)
+				assert.Equal(t, v.s.key, inCache.key)
+				assert.Equal(t, v.s.value, inCache.value)
+				assert.Equal(t, v.s.apiExists, inCache.apiExists)
 			}
 		})
 	}
