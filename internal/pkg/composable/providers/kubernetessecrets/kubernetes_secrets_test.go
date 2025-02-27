@@ -967,7 +967,7 @@ func Test_FetchFromAPI(t *testing.T) {
 			secretKey:       "secret_key_not_found",
 		},
 		{
-			name: "key in secret not found",
+			name: "key in secret found",
 			k8sClient: k8sfake.NewClientset(
 				buildK8SSecretWithResourceVersion("secret_namespace", "secret_name", "secret_key", "secret_value", "100000"),
 			),
