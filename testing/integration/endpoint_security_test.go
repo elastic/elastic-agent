@@ -97,7 +97,13 @@ func getEndpointVersion(t *testing.T) string {
 	output, err := cmd.CombinedOutput()
 	require.NoError(t, err)
 	// version: 8.18.0-SNAPSHOT, compiled: Wed Feb 19 01:00:00 2025, branch: HEAD, commit: c450b50f91507c3166b072df8557f5efd871103a
-	return strings.Split(strings.Split(string(output), "version: ")[1], ",")[0]
+	endpointVersionFragment, _, found := strings.Cut(string(output), ",")
+	require.True(t, found)
+
+	endpointVersion, found := strings.CutPrefix(endpointVersionFragment, "version: ")
+	require.True(t, found)
+
+	return endpointVersion
 }
 
 // The steps in this test are the following
@@ -160,7 +166,7 @@ func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageF
 	_, err = info.KibanaClient.UpdatePolicy(ctx, policyResp.ID, updateReq)
 
 	t.Log("Get the policy uinstall token and store it in the fixture")
-	tools.GetandSetUninstallTokens(ctx, t, info.KibanaClient, startFixture, policyResp.ID)
+	tools.SetPolicyUninstallTokenInFixture(ctx, t, info.KibanaClient, startFixture, policyResp.ID)
 
 	opts := atesting.InstallOpts{}
 	t.Log("Install and enroll the first agent")
