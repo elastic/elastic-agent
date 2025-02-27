@@ -1513,7 +1513,9 @@ service:
 	go func() {
 		err = fixture.RunOtelWithClient(fCtx)
 		cancel()
-		assert.True(t, err == nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled), "unexpected error: %v", err)
+		assert.Conditionf(t, func() bool {
+			return err == nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)
+		}, "unexpected error: %v", err)
 		close(stoppedCh)
 	}()
 
@@ -1574,7 +1576,7 @@ service:
 				require.True(t, found, "expected message field in document %q", hit.Source)
 				msg, ok := message.(string)
 				require.True(t, ok, "expected message field to be a string, got %T", message)
-				require.NotContainsf(uniqueIngestedLogs, msg, "found duplicated log message %q", msg)
+				require.NotContainsf(t, uniqueIngestedLogs, msg, "found duplicated log message %q", msg)
 				uniqueIngestedLogs[msg] = struct{}{}
 			}
 			actualHits.UniqueHits = len(uniqueIngestedLogs)
