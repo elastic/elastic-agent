@@ -21,6 +21,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -209,6 +210,17 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 		if err := unpackFile(f); err != nil {
 			return UnpackResult{}, err
 		}
+	}
+
+	toFix := strings.TrimSuffix(dataDir, "data")
+	toFix = filepath.Join(toFix, versionedHome)
+	abs, err := filepath.Abs(toFix)
+	if err != nil {
+		return UnpackResult{}, err
+	}
+	if err := perms.FixPermissions(abs); err != nil {
+		fmt.Println("FixPermissions error:", err)
+		return UnpackResult{}, fmt.Errorf("cannot fix permissions for '%s': %w", versionedHome, err)
 	}
 
 	return UnpackResult{
@@ -474,6 +486,18 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 
 			log.Debugf("File %q, perms: %O, isDir: %t", abs, newStat.Mode().Perm(), newStat.IsDir())
 		}
+	}
+
+	toFix := strings.TrimSuffix(dataDir, "data")
+	toFix = filepath.Join(toFix, versionedHome)
+	abs, err := filepath.Abs(toFix)
+	if err != nil {
+		return UnpackResult{}, err
+	}
+	log.Info("Calling fix-permissions")
+	if err := perms.FixPermissions(abs); err != nil {
+		fmt.Println("FixPermissions error:", err)
+		return UnpackResult{}, fmt.Errorf("cannot fix permissions for '%s': %w", versionedHome, err)
 	}
 
 	return UnpackResult{
