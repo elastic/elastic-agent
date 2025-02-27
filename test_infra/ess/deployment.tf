@@ -60,11 +60,13 @@ resource "ec_deployment" "integration-testing" {
 
   elasticsearch = {
     autoscale                 = false
-
     hot = {
       autoscaling = {}
       size        = "8g"
       zone_count  = 1
+    }
+    config = {
+      docker_image = "docker.elastic.co/cloud-release/elasticsearch-cloud-ess:9.1.0-6afab230-SNAPSHOT"
     }
   }
   kibana = {
@@ -76,6 +78,7 @@ resource "ec_deployment" "integration-testing" {
         "xpack.fleet.internal.registry.kibanaVersionCheckEnabled" = false
         "server.restrictInternalApis"                             = false
       })
+      docker_image = "docker.elastic.co/cloud-release/kibana-cloud:9.1.0-6afab230-SNAPSHOT"
     }
   }
 
@@ -83,6 +86,9 @@ resource "ec_deployment" "integration-testing" {
     topology = {
       size       = "1g"
       zone_count = 1
+    }
+    config = {
+      docker_image = "docker.elastic.co/cloud-release/elastic-agent-cloud:9.1.0-6afab230-SNAPSHOT"
     }
   }
 
