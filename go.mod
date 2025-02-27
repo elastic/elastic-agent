@@ -299,7 +299,6 @@ require (
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/lunes v0.1.0 // indirect
 	github.com/elastic/mito v1.16.0 // indirect
-	github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector v0.3.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250227072552-1b541dfaf344 // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.5.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.14.0 // indirect
