@@ -290,6 +290,7 @@ steps:
                 - main.go
 
                 - .buildkite/integration.pipeline.yml
+                - .buildkite/bk.integration.pipeline.yml
                 - .buildkite/pipeline.yml
                 - .buildkite/scripts/
                 - .buildkite/hooks/

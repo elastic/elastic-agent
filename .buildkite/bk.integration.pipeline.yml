@@ -60,8 +60,6 @@ steps:
         matrix:
           - default
 
-<<<<<<< HEAD
-=======
       - label: "Win2025:sudo:{{matrix}}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
@@ -97,7 +95,6 @@ steps:
         matrix:
           - default
 
->>>>>>> 33d01371e (Fold triggered pipelines under elastic-agent (#6978))
   - group: "Stateful:Ubuntu"
     key: integration-tests-ubuntu
     depends_on:
