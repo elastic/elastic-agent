@@ -210,7 +210,11 @@ collectors:
             insecure: true
       processors:
         # [Batch Processor](https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor/batchprocessor)
-        batch: {}
+        batch: {} # inherit any values from helm chart
+        batch/metrics:
+          # explicitly set send_batch_max_size to 0, as splitting metrics requests may cause version_conflict_engine_exception in TSDB
+          send_batch_max_size: 0
+          timeout: 1s
         # [Resource Detection Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor)
         resourcedetection/eks:
           detectors: [env, eks] # Detects resources from environment variables and EKS (Elastic Kubernetes Service).
@@ -482,7 +486,7 @@ collectors:
               - kubeletstats
               - hostmetrics
             processors:
-              - batch
+              - batch/metrics
               - k8sattributes
               - resourcedetection/system
               - resourcedetection/eks
@@ -498,7 +502,7 @@ collectors:
             receivers:
               - otlp
             processors:
-              - batch
+              - batch/metrics
               - resource/hostname
             exporters:
               - otlp/gateway
@@ -591,6 +595,10 @@ collectors:
           send_batch_size: 1000
           timeout: 1s
           send_batch_max_size: 1500
+        batch/metrics:
+          # explicitly set send_batch_max_size to 0, as splitting metrics requests may cause version_conflict_engine_exception in TSDB
+          send_batch_max_size: 0
+          timeout: 1s
         # [Elastic Trace Processor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elastictraceprocessor)
         elastictrace: {} # The processor enriches traces with elastic specific requirements.
       exporters:
@@ -624,7 +632,7 @@ collectors:
               - elasticinframetrics
               - attributes/dataset
               - resource/process
-              - batch
+              - batch/metrics
             exporters: [debug, elasticsearch/ecs]
           metrics/otel:
             receivers: [routing]
