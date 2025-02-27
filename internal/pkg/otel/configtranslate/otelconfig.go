@@ -172,6 +172,9 @@ func getReceiversConfigForComponent(comp *component.Component, info info.Agent, 
 	// always safe. We should either ensure this is always the case, or have an explicit mapping.
 	beatName := strings.TrimSuffix(receiverType.String(), "receiver")
 	beatDataPath := filepath.Join(paths.Run(), comp.ID)
+	binaryName := getBeatNameForComponent(comp)
+	dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
+
 	receiverConfig := map[string]any{
 		beatName: map[string]any{
 			"inputs": inputs,
@@ -183,6 +186,19 @@ func getReceiversConfigForComponent(comp *component.Component, info info.Agent, 
 		// just like we do for beats processes, each receiver needs its own data path
 		"path": map[string]any{
 			"data": beatDataPath,
+		},
+		"logging": map[string]any{
+			"with_fields": map[string]any{
+				"component": map[string]interface{}{
+					"id":      comp.ID,
+					"binary":  binaryName,
+					"dataset": dataset,
+					"type":    comp.InputType,
+				},
+				"log": map[string]interface{}{
+					"source": comp.ID,
+				},
+			},
 		},
 	}
 	// add the output queue config if present
@@ -240,6 +256,7 @@ func getSignalForComponent(comp *component.Component) (pipeline.Signal, error) {
 // getReceiverTypeForComponent returns the receiver type for the given component.
 func getReceiverTypeForComponent(comp *component.Component) (otelcomponent.Type, error) {
 	beatName := getBeatNameForComponent(comp)
+	fmt.Println("beatname", beatName)
 	switch beatName {
 	case "filebeat":
 		return otelcomponent.MustNewType(fbreceiver.Name), nil
