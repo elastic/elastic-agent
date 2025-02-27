@@ -21,6 +21,15 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
+func errHandler(err error) error {
+	// Check for Errno = 0 which indicates success
+	// https://pkg.go.dev/golang.org/x/sys/windows#Errno
+	if errors.Is(err, syscall.Errno(0)) {
+		return nil
+	}
+	return err
+}
+
 // FixPermissions fixes the permissions so only SYSTEM and Administrators have access to the files in the install path
 func FixPermissions(topPath string, opts ...OptFunc) error {
 	o, err := newOpts(opts...)
@@ -83,52 +92,41 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 		// token to have the 'SeRestorePrivilege' or it's unable to adjust the ownership
 		return winio.RunWithPrivileges([]string{winio.SeRestorePrivilege}, func() error {
 			return filepath.WalkDir(topPath, func(name string, _ fs.DirEntry, err error) error {
-				if err == nil {
+				switch {
+				case err == nil:
 					// first level doesn't inherit
-					inherit := true
-					if topPath == name {
-						inherit = false
-					}
+					inherit := topPath != name
 
-					err = acl.Apply(name, true, inherit, grants...)
-					if err != nil {
-						// Check for Errno = 0 which indicates success
-						// https://pkg.go.dev/golang.org/x/sys/windows#Errno
-						if errors.Is(err, syscall.Errno(0)) {
-							return nil
-						}
+					if err = errHandler(acl.Apply(name, true, inherit, grants...)); err != nil {
 						return err
 					}
+
 					if userSID != nil && groupSID != nil {
-						err = takeOwnership(name, userSID, groupSID)
+						return errHandler(takeOwnership(name, userSID, groupSID))
 					}
-				} else if errors.Is(err, fs.ErrNotExist) {
 					return nil
+				case errors.Is(err, fs.ErrNotExist):
+					return nil
+				default:
+					return err
 				}
-				return err
 			})
 		})
 	}
 
 	// ownership cannot be changed, this will keep the ownership as it currently is but apply the ACL's
 	return filepath.WalkDir(topPath, func(name string, _ fs.DirEntry, err error) error {
-		if err == nil {
+		switch {
+		case err == nil:
 			// first level doesn't inherit
-			inherit := true
-			if topPath == name {
-				inherit = false
-			}
-			err = acl.Apply(name, true, inherit, grants...)
-			// Check for Errno = 0 which indicates success
-			// https://pkg.go.dev/golang.org/x/sys/windows#Errno
-			if errors.Is(err, syscall.Errno(0)) {
-				return nil
-			}
-			return err
-		} else if errors.Is(err, fs.ErrNotExist) {
+			inherit := topPath != name
+
+			return errHandler(acl.Apply(name, true, inherit, grants...))
+		case errors.Is(err, fs.ErrNotExist):
 			return nil
+		default:
+			return err
 		}
-		return err
 	})
 }
 
