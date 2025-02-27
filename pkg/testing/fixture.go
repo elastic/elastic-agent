@@ -800,15 +800,36 @@ func (f *Fixture) ExecDiagnostics(ctx context.Context, cmd ...string) (string, e
 }
 
 // AgentID returns the ID of the installed Elastic Agent.
+//
+// This will try multiple times to call `elastic-agent status --output=json` to get the ID of the
+// running Elastic Agent. This call does require that the Elastic Agent is running and communication
+// over the control protocol is working.
+//
+// The maximum amount of time this call will use is 1 minute.
 func (f *Fixture) AgentID(ctx context.Context) (string, error) {
-	status, err := f.ExecStatus(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get agent ID: agent status returned an error: %w", err)
+	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+	defer cancel()
+
+	var lastErr error
+	for {
+		if ctx.Err() != nil {
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) && lastErr != nil {
+				// return the last observed error
+				return "", fmt.Errorf("failed to get agent ID: agent status returned an error: %w", lastErr)
+			}
+			return "", fmt.Errorf("failed to get agent ID: agent status returned an error: %w", ctx.Err())
+		}
+		status, err := f.ExecStatus(ctx)
+		if err == nil && status.Info.ID != "" {
+			return status.Info.ID, nil
+		}
+		if err != nil {
+			lastErr = err
+		} else {
+			lastErr = fmt.Errorf("failed to get agent ID: agent ID is empty")
+		}
+		sleepFor(ctx, 1*time.Second)
 	}
-	if status.Info.ID == "" {
-		return "", fmt.Errorf("failed to get agent ID: agent ID is empty")
-	}
-	return status.Info.ID, nil
 }
 
 // IsHealthy checks whether the prepared Elastic Agent reports itself as healthy.
@@ -1461,4 +1482,11 @@ func (v *AgentBinaryVersion) String() string {
 
 type AgentVersionOutput struct {
 	Binary AgentBinaryVersion `yaml:"binary"`
+}
+
+func sleepFor(ctx context.Context, amount time.Duration) {
+	select {
+	case <-ctx.Done():
+	case <-time.After(amount):
+	}
 }
