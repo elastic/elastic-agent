@@ -73,7 +73,7 @@ func InstallAgentWithPolicy(ctx context.Context, t *testing.T,
 	}
 
 	if createPolicyReq.IsProtected {
-		if err := GetandSetUninstallTokens(ctx, t, kibClient, agentFixture, policy.ID); err != nil {
+		if err := SetPolicyUninstallTokenInFixture(ctx, t, kibClient, agentFixture, policy.ID); err != nil {
 			return policy, err
 		}
 	}
