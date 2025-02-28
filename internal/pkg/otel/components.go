@@ -30,9 +30,6 @@ import (
 	nopreceiver "go.opentelemetry.io/collector/receiver/nopreceiver"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
 
-	fbreceiver "github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
-	mbreceiver "github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
-
 	// Processors:
 	attributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor" // for modifying signal attributes
 	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor"
@@ -92,8 +89,6 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			nginxreceiver.NewFactory(),
 			jaegerreceiver.NewFactory(),
 			zipkinreceiver.NewFactory(),
-			fbreceiver.NewFactory(),
-			mbreceiver.NewFactory(),
 			jmxreceiver.NewFactory(),
 			kafkareceiver.NewFactory(),
 			nopreceiver.NewFactory(),
