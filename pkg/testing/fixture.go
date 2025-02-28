@@ -714,24 +714,100 @@ func (e *ExecErr) Unwrap() error {
 	return e.err
 }
 
-// ExecStatus executes the status subcommand on the prepared Elastic Agent binary.
-// It returns the parsed output and the error from the execution. Keep in mind
-// the agent exits with status 1 if it's unhealthy, but it still outputs the
-// status successfully. An empty AgentStatusOutput and non nil error
-// means the output could not be parsed.
-// As long as we get some output, we don't return any error.
-// It should work with any 8.6+ agent
-func (f *Fixture) ExecStatus(ctx context.Context, opts ...process.CmdOption) (AgentStatusOutput, error) {
-	out, err := f.Exec(ctx, []string{"status", "--output", "json"}, opts...)
-	status := AgentStatusOutput{}
-	if uerr := json.Unmarshal(out, &status); uerr != nil {
-		return AgentStatusOutput{},
-			fmt.Errorf("could not unmarshal agent status output: %w:\n%s", errors.Join(uerr, err), out)
-	} else if status.IsZero() {
-		return status, fmt.Errorf("agent status output is empty: %w", err)
+type statusOpts struct {
+	noRetry       bool
+	retryTimeout  time.Duration
+	retryInterval time.Duration
+
+	cmdOptions []process.CmdOption
+}
+
+type statusOpt func(*statusOpts)
+
+// WithNoRetry disables the retry logic in ExecStatus function call.
+func WithNoRetry() func(opt *statusOpts) {
+	return func(opt *statusOpts) {
+		opt.noRetry = true
+	}
+}
+
+// WithRetryTimeout adjusts the retry timeout from the default value of one minute.
+func WithRetryTimeout(duration time.Duration) func(opt *statusOpts) {
+	return func(opt *statusOpts) {
+		opt.retryTimeout = duration
+	}
+}
+
+// WithRetryInterval adjusts the retry interval from the default value of one second.
+func WithRetryInterval(duration time.Duration) func(opt *statusOpts) {
+	return func(opt *statusOpts) {
+		opt.retryInterval = duration
+	}
+}
+
+// WithCmdOptions adjusts the options of the command when status is called.
+func WithCmdOptions(cmdOptions ...process.CmdOption) func(opt *statusOpts) {
+	return func(opt *statusOpts) {
+		opt.cmdOptions = append(opt.cmdOptions, cmdOptions...)
+	}
+}
+
+// ExecStatus executes `elastic-agent status --output=json`.
+//
+// Returns the parsed output and the error from the execution. Keep in mind the agent exits with status 1 if it's
+// unhealthy, but it still outputs the status successfully. This call does require that the Elastic Agent is running
+// and communication over the control protocol is working.
+//
+// By default, retry logic is applied. Use WithNoRetry to disable this behavior. WithRetryTimeout and WithRetryInterval
+// can be used to adjust the retry logic timing. The default retry timeout is one minute and the default retry
+// interval is one second.
+//
+// An empty AgentStatusOutput and non nil error means the output could not be parsed. As long as we get some output,
+// we don't return any error. It should work with any 8.6+ agent
+func (f *Fixture) ExecStatus(ctx context.Context, opts ...statusOpt) (AgentStatusOutput, error) {
+	var opt statusOpts
+	opt.retryTimeout = 1 * time.Minute
+	opt.retryInterval = 1 * time.Second
+	for _, o := range opts {
+		o(&opt)
 	}
 
-	return status, nil
+	if opt.noRetry {
+		out, err := f.Exec(ctx, []string{"status", "--output", "json"}, opt.cmdOptions...)
+		status := AgentStatusOutput{}
+		if uerr := json.Unmarshal(out, &status); uerr != nil {
+			return AgentStatusOutput{},
+				fmt.Errorf("could not unmarshal agent status output: %w:\n%s", errors.Join(uerr, err), out)
+		} else if status.IsZero() {
+			return status, fmt.Errorf("agent status output is empty: %w", err)
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, opt.retryTimeout)
+	defer cancel()
+
+	var lastErr error
+	for {
+		if ctx.Err() != nil {
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) && lastErr != nil {
+				// return the last observed error
+				return AgentStatusOutput{}, fmt.Errorf("agent status returned an error: %w", lastErr)
+			}
+			return AgentStatusOutput{}, fmt.Errorf("agent status failed: %w", ctx.Err())
+		}
+		out, err := f.Exec(ctx, []string{"status", "--output", "json"}, opt.cmdOptions...)
+		status := AgentStatusOutput{}
+		if uerr := json.Unmarshal(out, &status); uerr != nil {
+			// unmarshal error means that json was not outputted due to a communication error
+			lastErr = fmt.Errorf("could not unmarshal agent status output: %w:\n%s", errors.Join(uerr, err), out)
+		} else if status.IsZero() {
+			// still not correct try again for a successful status
+			lastErr = fmt.Errorf("agent status output is empty: %w", err)
+		} else {
+			return status, nil
+		}
+		sleepFor(ctx, opt.retryInterval)
+	}
 }
 
 // ExecInspect executes to inspect subcommand on the prepared Elastic Agent binary.
@@ -799,83 +875,13 @@ func (f *Fixture) ExecDiagnostics(ctx context.Context, cmd ...string) (string, e
 	return files[0], err
 }
 
-type agentIDOpts struct {
-	noRetry       bool
-	retryTimeout  time.Duration
-	retryInterval time.Duration
-}
-
-// WithNoRetry disables the retry logic in AgentID function call.
-func WithNoRetry() func(opt *agentIDOpts) {
-	return func(opt *agentIDOpts) {
-		opt.noRetry = true
-	}
-}
-
-// WithRetryTimeout adjusts the retry timeout from the default value of one minute.
-func WithRetryTimeout(duration time.Duration) func(opt *agentIDOpts) {
-	return func(opt *agentIDOpts) {
-		opt.retryTimeout = duration
-	}
-}
-
-// WithRetryInterval adjusts the retry interval from the default value of one second.
-func WithRetryInterval(duration time.Duration) func(opt *agentIDOpts) {
-	return func(opt *agentIDOpts) {
-		opt.retryInterval = duration
-	}
-}
-
 // AgentID returns the ID of the installed Elastic Agent.
-//
-// Calls `elastic-agent status --output=json` to get the ID of the running Elastic Agent. This call does
-// require that the Elastic Agent is running and communication over the control protocol is working.
-//
-// By default, retry logic is applied. Use WithNoRetry to disable this behavior. WithRetryTimeout and WithRetryInterval
-// can be used to adjust the retry logic timing. The default retry timeout is one minute and the default retry
-// interval is one second.
-func (f *Fixture) AgentID(ctx context.Context, opts ...func(opt *agentIDOpts)) (string, error) {
-	var opt agentIDOpts
-	opt.retryTimeout = 1 * time.Minute
-	opt.retryInterval = 1 * time.Second
-	for _, o := range opts {
-		o(&opt)
+func (f *Fixture) AgentID(ctx context.Context, opts ...statusOpt) (string, error) {
+	status, err := f.ExecStatus(ctx, opts...)
+	if err != nil {
+		return "", err
 	}
-
-	if opt.noRetry {
-		status, err := f.ExecStatus(ctx)
-		if err != nil {
-			return "", fmt.Errorf("failed to get agent ID: agent status returned an error: %w", err)
-		}
-		if status.Info.ID == "" {
-			return "", fmt.Errorf("failed to get agent ID: agent ID is empty")
-		}
-		return status.Info.ID, nil
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, opt.retryTimeout)
-	defer cancel()
-
-	var lastErr error
-	for {
-		if ctx.Err() != nil {
-			if errors.Is(ctx.Err(), context.DeadlineExceeded) && lastErr != nil {
-				// return the last observed error
-				return "", fmt.Errorf("failed to get agent ID: agent status returned an error: %w", lastErr)
-			}
-			return "", fmt.Errorf("failed to get agent ID: agent status returned an error: %w", ctx.Err())
-		}
-		status, err := f.ExecStatus(ctx)
-		if err == nil && status.Info.ID != "" {
-			return status.Info.ID, nil
-		}
-		if err != nil {
-			lastErr = err
-		} else {
-			lastErr = fmt.Errorf("failed to get agent ID: agent ID is empty")
-		}
-		sleepFor(ctx, opt.retryInterval)
-	}
+	return status.Info.ID, nil
 }
 
 // IsHealthy checks whether the prepared Elastic Agent reports itself as healthy.
@@ -883,7 +889,7 @@ func (f *Fixture) AgentID(ctx context.Context, opts ...func(opt *agentIDOpts)) (
 // to fetch the current state. If the status is successfully fetched, but it
 // isn't healthy, the error will contain the reported status.
 // This function is compatible with any Elastic Agent version 8.6 or later.
-func (f *Fixture) IsHealthy(ctx context.Context, opts ...process.CmdOption) error {
+func (f *Fixture) IsHealthy(ctx context.Context, opts ...statusOpt) error {
 	status, err := f.ExecStatus(ctx, opts...)
 	if err != nil {
 		return fmt.Errorf("agent status returned an error: %w", err)
