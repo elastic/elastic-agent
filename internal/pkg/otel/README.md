@@ -45,7 +45,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [kafkareceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/kafkareceiver/v0.120.1/receiver/kafkareceiver/README.md) | v0.120.1 |
 | [kubeletstatsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/kubeletstatsreceiver/v0.120.1/receiver/kubeletstatsreceiver/README.md) | v0.120.1 |
 | [nginxreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/nginxreceiver/v0.120.1/receiver/nginxreceiver/README.md) | v0.120.1 |
-| [nopreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/nopreceiver/v0.119.0/receiver/nopreceiver/README.md) | v0.119.0 |
+| [nopreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/nopreceiver/v0.120.0/receiver/nopreceiver/README.md) | v0.120.0 |
 | [otlpreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/otlpreceiver/v0.120.0/receiver/otlpreceiver/README.md) | v0.120.0 |
 | [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusreceiver/v0.120.1/receiver/prometheusreceiver/README.md) | v0.120.1 |
 | [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.120.1/receiver/receivercreator/README.md) | v0.120.1 |
@@ -76,7 +76,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [geoipprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/geoipprocessor/v0.120.1/processor/geoipprocessor/README.md) | v0.120.1 |
 | [k8sattributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/k8sattributesprocessor/v0.120.1/processor/k8sattributesprocessor/README.md) | v0.120.1 |
 | [lsmintervalprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/lsmintervalprocessor/v0.3.0/processor/lsmintervalprocessor/README.md) | v0.3.0 |
-| [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.119.0/processor/memorylimiterprocessor/README.md) | v0.119.0 |
+| [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.120.0/processor/memorylimiterprocessor/README.md) | v0.120.0 |
 | [resourcedetectionprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourcedetectionprocessor/v0.120.1/processor/resourcedetectionprocessor/README.md) | v0.120.1 |
 | [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.120.1/processor/resourceprocessor/README.md) | v0.120.1 |
 | [transformprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/transformprocessor/v0.120.1/processor/transformprocessor/README.md) | v0.120.1 |
