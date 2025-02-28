@@ -36,6 +36,25 @@ func IsPolicyRevision(ctx context.Context, t *testing.T, client *kibana.Client, 
 	}
 }
 
+func SetPolicyUninstallTokenInFixture(ctx context.Context, t *testing.T, kibClient *kibana.Client, fixture *atesting.Fixture, policyId string) error {
+	resp, err := kibClient.GetPolicyUninstallTokens(ctx, policyId)
+	if err != nil {
+		return fmt.Errorf("failed to fetch uninstall tokens: %w", err)
+	}
+	if len(resp.Items) == 0 {
+		return fmt.Errorf("expected non-zero number of tokens: %w", err)
+	}
+
+	if len(resp.Items[0].Token) == 0 {
+		return fmt.Errorf("expected non-empty token: %w", err)
+	}
+
+	uninstallToken := resp.Items[0].Token
+	t.Logf("Protected with uninstall token: %v", uninstallToken)
+	fixture.SetUninstallToken(uninstallToken)
+	return nil
+}
+
 // InstallAgentWithPolicy creates the given policy, enrolls the given agent
 // fixture in Fleet using the default Fleet Server, waits for the agent to be
 // online, and returns the created policy.
