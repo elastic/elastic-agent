@@ -18,8 +18,8 @@ require (
 	github.com/elastic/elastic-agent-client/v7 v7.17.1
 	github.com/elastic/elastic-agent-libs v0.18.7
 	github.com/elastic/elastic-agent-system-metrics v0.11.8
-	github.com/elastic/elastic-transport-go/v8 v8.6.0
-	github.com/elastic/go-elasticsearch/v8 v8.17.0
+	github.com/elastic/elastic-transport-go/v8 v8.6.1
+	github.com/elastic/go-elasticsearch/v8 v8.17.1
 	github.com/elastic/go-licenser v0.4.2
 	github.com/elastic/go-sysinfo v1.15.1
 	github.com/elastic/go-ucfg v0.8.8
@@ -74,6 +74,7 @@ require (
 	go.elastic.co/ecszap v1.0.2
 	go.elastic.co/go-licence-detector v0.7.0
 	go.opentelemetry.io/collector/component/componentstatus v0.119.0
+	go.opentelemetry.io/collector/pipeline v0.119.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.119.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.119.0
 	go.uber.org/zap v1.27.0
@@ -579,7 +580,6 @@ require (
 	go.opentelemetry.io/collector/pdata v1.25.0 // indirect
 	go.opentelemetry.io/collector/pdata/pprofile v0.119.0 // indirect
 	go.opentelemetry.io/collector/pdata/testdata v0.119.0 // indirect
-	go.opentelemetry.io/collector/pipeline v0.119.0 // indirect
 	go.opentelemetry.io/collector/pipeline/xpipeline v0.119.0 // indirect
 	go.opentelemetry.io/collector/processor/processorhelper/xprocessorhelper v0.119.0 // indirect
 	go.opentelemetry.io/collector/processor/processortest v0.119.0 // indirect

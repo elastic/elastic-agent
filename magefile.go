@@ -83,6 +83,7 @@ const (
 	metaDir           = "_meta"
 	snapshotEnv       = "SNAPSHOT"
 	devEnv            = "DEV"
+	fipsEnv           = "FIPS"
 	externalArtifacts = "EXTERNAL"
 	platformsEnv      = "PLATFORMS"
 	packagesEnv       = "PACKAGES"
@@ -97,9 +98,10 @@ const (
 	baseURLForStagingDRA = "https://staging.elastic.co/"
 	agentCoreProjectName = "elastic-agent-core"
 
-	helmChartPath     = "./deploy/helm/elastic-agent"
-	helmOtelChartPath = "./deploy/helm/edot-collector/kube-stack"
-	sha512FileExt     = ".sha512"
+	helmChartPath      = "./deploy/helm/elastic-agent"
+	helmOtelChartPath  = "./deploy/helm/edot-collector/kube-stack"
+	helmMOtelChartPath = "./deploy/helm/edot-collector/kube-stack/managed_otlp"
+	sha512FileExt      = ".sha512"
 )
 
 var (
@@ -788,6 +790,9 @@ func (Cloud) Image(ctx context.Context) {
 	variant := os.Getenv(dockerVariants)
 	defer os.Setenv(dockerVariants, variant)
 
+	fips := os.Getenv(fipsEnv)
+	defer os.Setenv(fipsEnv, fips)
+
 	os.Setenv(platformsEnv, "linux/amd64")
 	os.Setenv(packagesEnv, "docker")
 	os.Setenv(devEnv, "true")
@@ -801,6 +806,13 @@ func (Cloud) Image(ctx context.Context) {
 		os.Setenv(snapshotEnv, "true")
 		devtools.Snapshot = true
 	}
+
+	fipsVal, err := strconv.ParseBool(fips)
+	if err != nil {
+		fipsVal = false
+	}
+	os.Setenv(fipsEnv, strconv.FormatBool(fipsVal))
+	devtools.FIPSBuild = fipsVal
 
 	devtools.DevBuild = true
 	devtools.Platforms = devtools.Platforms.Filter("linux/amd64")
@@ -1757,6 +1769,12 @@ func buildVars() map[string]string {
 
 	isSnapshot, _ := os.LookupEnv(snapshotEnv)
 	vars["github.com/elastic/elastic-agent/internal/pkg/release.snapshot"] = isSnapshot
+
+	if fipsFlag, fipsFound := os.LookupEnv(fipsEnv); fipsFound {
+		if fips, err := strconv.ParseBool(fipsFlag); err == nil && fips {
+			vars["github.com/elastic/elastic-agent/internal/pkg/release.fips"] = "true"
+		}
+	}
 
 	if isDevFlag, devFound := os.LookupEnv(devEnv); devFound {
 		if isDev, err := strconv.ParseBool(isDevFlag); err == nil && isDev {
@@ -3528,6 +3546,9 @@ func (Helm) UpdateAgentVersion() error {
 		filepath.Join(helmOtelChartPath, "values.yaml"): {
 			{"defaultCRConfig.image.tag", agentVersion},
 		},
+		filepath.Join(helmMOtelChartPath, "values.yaml"): {
+			{"defaultCRConfig.image.tag", agentVersion},
+		},
 	} {
 		if err := updateYamlFile(yamlFile, keyVals...); err != nil {
 			return fmt.Errorf("failed to update agent version: %w", err)
@@ -3561,7 +3582,8 @@ func (h Helm) Lint() error {
 func updateYamlFile(path string, keyVal ...struct {
 	key   string
 	value string
-}) error {
+},
+) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
