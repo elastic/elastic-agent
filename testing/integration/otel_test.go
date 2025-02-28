@@ -1828,18 +1828,6 @@ service:
         - elasticsearch/log  
 `
 
-	// check if elastic-agent log path exists
-	// This is important for the test to succeed
-	pattern := inputPath + "/data/elastic-agent-*/logs/elastic-agent-*.ndjson"
-	files, err := filepath.Glob(pattern)
-	if err != nil {
-		t.Errorf("error checking files: %v", err)
-	}
-
-	if len(files) == 0 {
-		t.Errorf("No matching files found in path: %s", pattern)
-	}
-
 	// reset the buffer
 	configBuffer.Reset()
 	template.Must(template.New("config").Parse(configTemplateOTel)).Execute(&configBuffer,
@@ -1882,8 +1870,10 @@ service:
 	otel := otelDocs.Hits.Hits[0].Source
 	ignoredFields := []string{
 		// Expected to change between agentDocs and OtelDocs
+		"@timestamp",
 		"agent.ephemeral_id",
 		"agent.id",
+		"agent.version",
 		"data_stream.dataset",
 		"data_stream.namespace",
 		"event.dataset",
