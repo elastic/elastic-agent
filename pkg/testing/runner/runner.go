@@ -282,6 +282,13 @@ func (r *Runner) runK8sInstances(ctx context.Context, instances []StateInstance)
 		resultsMx.Lock()
 		results[batch.ID] = result
 		resultsMx.Unlock()
+		if r.cfg.DeleteInstanceAfterTest {
+			logger.Logf("Cleaning up instance after test: %s", instance.Name)
+			err = r.ip.Clean(ctx, r.cfg, []common.Instance{instance.Instance})
+			if err != nil {
+				logger.Logf("Failed to clean up instance %s: %v", instance.Name, err)
+			}
+		}
 	}
 	if err != nil {
 		return nil, err

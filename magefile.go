@@ -1934,7 +1934,7 @@ func (Integration) Clean() error {
 	_, err := os.Stat(".integration-cache")
 	if err == nil {
 		// .integration-cache exists; need to run `Clean` from the runner
-		r, err := createTestRunner(false, "", "")
+		r, err := createTestRunner(false, "", "", false)
 		if err != nil {
 			return fmt.Errorf("error creating test runner: %w", err)
 		}
@@ -2007,17 +2007,17 @@ func (Integration) Auth(ctx context.Context) error {
 
 // Test runs integration tests on remote hosts
 func (Integration) Test(ctx context.Context) error {
-	return integRunner(ctx, false, "")
+	return integRunner(ctx, false, "", false)
 }
 
 // Matrix runs integration tests on a matrix of all supported remote hosts
 func (Integration) Matrix(ctx context.Context) error {
-	return integRunner(ctx, true, "")
+	return integRunner(ctx, true, "", false)
 }
 
 // Single runs single integration test on remote host
 func (Integration) Single(ctx context.Context, testName string) error {
-	return integRunner(ctx, false, testName)
+	return integRunner(ctx, false, testName, false)
 }
 
 // Kubernetes runs kubernetes integration tests
@@ -2027,7 +2027,7 @@ func (Integration) Kubernetes(ctx context.Context) error {
 		return err
 	}
 
-	return integRunner(ctx, false, "")
+	return integRunner(ctx, false, "", false)
 }
 
 // KubernetesMatrix runs a matrix of kubernetes integration tests
@@ -2037,7 +2037,7 @@ func (Integration) KubernetesMatrix(ctx context.Context) error {
 		return err
 	}
 
-	return integRunner(ctx, true, "")
+	return integRunner(ctx, true, "", true)
 }
 
 // UpdateVersions runs an update on the `.agent-versions.yml` fetching
@@ -2514,7 +2514,7 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 	if err != nil {
 		return fmt.Errorf("error setting binary name: %w", err)
 	}
-	return integRunner(ctx, false, "TestBeatsServerless")
+	return integRunner(ctx, false, "TestBeatsServerless", false)
 }
 
 func (Integration) TestForResourceLeaks(ctx context.Context) error {
@@ -2522,7 +2522,7 @@ func (Integration) TestForResourceLeaks(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error setting TEST_LONG_RUNNING: %w", err)
 	}
-	return integRunner(ctx, false, "TestLongRunningAgentForLeaks")
+	return integRunner(ctx, false, "TestLongRunningAgentForLeaks", false)
 }
 
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
@@ -2649,7 +2649,7 @@ func (Integration) Buildkite() error {
 	return nil
 }
 
-func integRunner(ctx context.Context, matrix bool, singleTest string) error {
+func integRunner(ctx context.Context, matrix bool, singleTest string, deleteInstanceAfterTest bool) error {
 	if _, ok := ctx.Deadline(); !ok {
 		// If the context doesn't have a timeout (usually via the mage -t option), give it one.
 		var cancel context.CancelFunc
@@ -2658,7 +2658,7 @@ func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	}
 
 	for {
-		failedCount, err := integRunnerOnce(ctx, matrix, singleTest)
+		failedCount, err := integRunnerOnce(ctx, matrix, singleTest, deleteInstanceAfterTest)
 		if err != nil {
 			return err
 		}
@@ -2677,14 +2677,14 @@ func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	}
 }
 
-func integRunnerOnce(ctx context.Context, matrix bool, singleTest string) (int, error) {
+func integRunnerOnce(ctx context.Context, matrix bool, singleTest string, deleteInstanceAfterTest bool) (int, error) {
 	goTestFlags := os.Getenv("GOTEST_FLAGS")
 
 	batches, err := define.DetermineBatches("testing/integration", goTestFlags, "integration")
 	if err != nil {
 		return 0, fmt.Errorf("failed to determine batches: %w", err)
 	}
-	r, err := createTestRunner(matrix, singleTest, goTestFlags, batches...)
+	r, err := createTestRunner(matrix, singleTest, goTestFlags, deleteInstanceAfterTest, batches...)
 	if err != nil {
 		return 0, fmt.Errorf("error creating test runner: %w", err)
 	}
@@ -2746,7 +2746,7 @@ func getTestRunnerVersions() (string, string, error) {
 	return agentVersion, agentStackVersion, nil
 }
 
-func createTestRunner(matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
+func createTestRunner(matrix bool, singleTest string, goTestFlags string, deleteInstanceAfterTest bool, batches ...define.Batch) (*runner.Runner, error) {
 	goVersion, err := mage.DefaultBeatBuildVariableSources.GetGoVersion()
 	if err != nil {
 		return nil, err
@@ -2872,23 +2872,24 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	_ = os.MkdirAll(diagDir, 0o755)
 
 	cfg := tcommon.Config{
-		AgentVersion:   agentVersion,
-		StackVersion:   agentStackVersion,
-		BuildDir:       agentBuildDir,
-		GOVersion:      goVersion,
-		RepoDir:        repoDir,
-		DiagnosticsDir: diagDir,
-		StateDir:       ".integration-cache",
-		Platforms:      testPlatforms(),
-		Packages:       testPackages(),
-		Groups:         testGroups(),
-		Matrix:         matrix,
-		SingleTest:     singleTest,
-		VerboseMode:    mg.Verbose(),
-		Timestamp:      timestamp,
-		TestFlags:      goTestFlags,
-		ExtraEnv:       extraEnv,
-		BinaryName:     binaryName,
+		AgentVersion:            agentVersion,
+		StackVersion:            agentStackVersion,
+		BuildDir:                agentBuildDir,
+		GOVersion:               goVersion,
+		RepoDir:                 repoDir,
+		DiagnosticsDir:          diagDir,
+		StateDir:                ".integration-cache",
+		Platforms:               testPlatforms(),
+		Packages:                testPackages(),
+		Groups:                  testGroups(),
+		Matrix:                  matrix,
+		SingleTest:              singleTest,
+		VerboseMode:             mg.Verbose(),
+		DeleteInstanceAfterTest: deleteInstanceAfterTest,
+		Timestamp:               timestamp,
+		TestFlags:               goTestFlags,
+		ExtraEnv:                extraEnv,
+		BinaryName:              binaryName,
 	}
 
 	r, err := runner.NewRunner(cfg, instanceProvisioner, stackProvisioner, batches...)
