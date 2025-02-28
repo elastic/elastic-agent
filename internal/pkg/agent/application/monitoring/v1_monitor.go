@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -1127,7 +1128,7 @@ func HttpPlusAgentMonitoringEndpoint(operatingSystem string, cfg *monitoringCfg.
 // AgentMonitoringEndpoint provides an agent monitoring endpoint path.
 func AgentMonitoringEndpoint(operatingSystem string, cfg *monitoringCfg.MonitoringConfig) string {
 	if cfg != nil && cfg.Enabled {
-		return fmt.Sprintf(agentMbEndpointHTTP, cfg.HTTP.Host, cfg.HTTP.Port)
+		return "http://" + net.JoinHostPort(cfg.HTTP.Host, strconv.Itoa(cfg.HTTP.Port))
 	}
 
 	if operatingSystem == windowsOS {
