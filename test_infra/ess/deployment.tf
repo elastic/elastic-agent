@@ -70,7 +70,7 @@ locals {
     }
   )
 
-  integration_server_docker_image = coalesce(coalesce(var.integration_server_docker_image, optional(local.ess_properties.integration_server_image), "docker.elastic.co/cloud-release/elastic-agent-cloud:${var.stack_version}")
+  integration_server_docker_image = coalesce(var.integration_server_docker_image, local.ess_properties.integration_server_image, "docker.elastic.co/cloud-release/elastic-agent-cloud:${var.stack_version}")
   elasticsearch_docker_image = coalesce(var.elasticsearch_docker_image, local.ess_properties.elasticsearch_image, "docker.elastic.co/cloud-release/elasticsearch-cloud-ess:${var.stack_version}")
   kibana_docker_image = coalesce(var.kibana_docker_image, local.ess_properties.kibana_image, "docker.elastic.co/cloud-release/kibana-cloud:${var.stack_version}")
 }
