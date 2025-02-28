@@ -38,7 +38,7 @@ func IsPolicyRevision(ctx context.Context, t *testing.T, client *kibana.Client, 
 func SetPolicyUninstallTokenInFixture(ctx context.Context, t *testing.T, kibClient *kibana.Client, fixture *atesting.Fixture, policyId string) error {
 	resp, err := kibClient.GetPolicyUninstallTokens(ctx, policyId)
 	if err != nil {
-		return fmt.Errorf("failed to fetch uninstal tokens: %w", err)
+		return fmt.Errorf("failed to fetch uninstall tokens: %w", err)
 	}
 	if len(resp.Items) == 0 {
 		return fmt.Errorf("expected non-zero number of tokens: %w", err)
