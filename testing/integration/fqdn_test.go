@@ -143,7 +143,7 @@ func TestFQDN(t *testing.T) {
 	)
 
 	t.Log("Verify that agent name is FQDN")
-	verifyAgentName(ctx, t, policy.ID, fqdn, info.KibanaClient)
+	verifyAgentName(ctx, t, agentID, fqdn, info.KibanaClient)
 
 	t.Log("Verify that hostname in `logs-*` and `metrics-*` is FQDN")
 	verifyHostNameInIndices(t, "logs-*", fqdn, info.Namespace, info.ESClient)
@@ -174,7 +174,7 @@ func TestFQDN(t *testing.T) {
 	)
 
 	t.Log("Verify that agent name is short hostname again")
-	verifyAgentName(ctx, t, policy.ID, shortName, info.KibanaClient)
+	verifyAgentName(ctx, t, agentID, shortName, info.KibanaClient)
 
 	// TODO: Re-enable assertion once https://github.com/elastic/elastic-agent/issues/3078 is
 	// investigated for root cause and resolved.
