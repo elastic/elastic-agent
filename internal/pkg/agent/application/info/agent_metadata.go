@@ -53,7 +53,7 @@ type AgentECSMeta struct {
 	Complete bool `json:"complete"`
 	// Unprivileged is a flag specifying that the agent is running in unprivileged mode.
 	Unprivileged bool `json:"unprivileged"`
-	// FIPS is a flag specifing if the agent is a FIPS distribution
+	// FIPS is a flag specifying if the agent is a FIPS distribution
 	FIPS bool `json:"fips"`
 }
 
