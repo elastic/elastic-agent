@@ -23,7 +23,8 @@ description: |
 
   This commit fixes it by enforcing the correct permissions are always
   set to every folder and file extracted from the archive for all
-  platforms.
+  platforms. This is done by using the same FixPermissions function
+  used by the installation process.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent

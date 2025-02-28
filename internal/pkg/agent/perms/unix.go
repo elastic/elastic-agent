@@ -12,11 +12,10 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-
-	"github.com/elastic/elastic-agent-libs/logp"
 )
 
 // FixPermissions fixes the permissions so only root:root is the owner and no world read-able permissions
+// HERE for Unix
 func FixPermissions(topPath string, opts ...OptFunc) error {
 	o, err := newOpts(opts...)
 	if err != nil {
@@ -37,12 +36,10 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 		}
 
 		// remove any world permissions from the file
-		perms := info.Mode().Perm() & o.mask
-		if err := os.Chmod(name, perms); err != nil {
+		if err := os.Chmod(name, info.Mode().Perm()&o.mask); err != nil {
 			return fmt.Errorf("could not update permissions of %q: %w", topPath, err)
 		}
 
-		logp.L().Named("fix-permissions").Infof("permissions '%s' have been set to %O", name, perms)
 		return nil
 	})
 }

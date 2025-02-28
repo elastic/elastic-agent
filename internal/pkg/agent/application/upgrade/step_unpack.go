@@ -156,6 +156,11 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 			} else if err != nil {
 				return fmt.Errorf("stat() directory %q: %w", dstPath, err)
 			} else {
+				// directory already exists, set the appropriate permissions
+				err = os.Chmod(dstPath, f.Mode().Perm()&0770)
+				if err != nil {
+					return fmt.Errorf("setting permissions %O for directory %q: %w", f.Mode().Perm()&0770, dstPath, err)
+				}
 			}
 
 			_ = os.MkdirAll(dstPath, f.Mode()&0770)
@@ -178,11 +183,6 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 			if _, err = io.Copy(f, rc); err != nil {
 				return err
 			}
-		}
-
-		// ensure the correct permissions are set to all files and folders
-		if err := os.Chmod(dstPath, f.Mode().Perm()&0770); err != nil {
-			return fmt.Errorf("setting permissions %O for %q: %w", f.Mode().Perm()&0770, dstPath, err)
 		}
 
 		if log.IsDebug() {
@@ -212,13 +212,16 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 		}
 	}
 
-	toFix := strings.TrimSuffix(dataDir, "data")
-	toFix = filepath.Join(toFix, versionedHome)
-	abs, err := filepath.Abs(toFix)
+	// We've seen issues with permissions after an upgrade, however they
+	// do not happen on a clean installation, so we apply the same fix
+	// permissions logic used by the installation process.
+	upgradeFolder := strings.TrimSuffix(dataDir, "data")
+	upgradeFolder = filepath.Join(upgradeFolder, versionedHome)
+	absUpgradeFolder, err := filepath.Abs(upgradeFolder)
 	if err != nil {
 		return UnpackResult{}, err
 	}
-	if err := perms.FixPermissions(abs); err != nil {
+	if err := perms.FixPermissions(absUpgradeFolder); err != nil {
 		fmt.Println("FixPermissions error:", err)
 		return UnpackResult{}, fmt.Errorf("cannot fix permissions for '%s': %w", versionedHome, err)
 	}
@@ -467,6 +470,11 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 			} else if err != nil {
 				return UnpackResult{}, errors.New(err, "TarInstaller: stat() directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 			} else {
+				// directory already exists, set the appropriate permissions
+				err = os.Chmod(abs, mode.Perm()&0770)
+				if err != nil {
+					return UnpackResult{}, errors.New(err, fmt.Sprintf("TarInstaller: setting permissions %O for directory %q", mode.Perm()&0770, abs), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+				}
 			}
 		default:
 			return UnpackResult{}, errors.New(fmt.Sprintf("tar file entry %s contained unsupported file type %v", fileName, mode), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fileName))
@@ -488,14 +496,16 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 		}
 	}
 
-	toFix := strings.TrimSuffix(dataDir, "data")
-	toFix = filepath.Join(toFix, versionedHome)
-	abs, err := filepath.Abs(toFix)
+	// We've seen issues with permissions after an upgrade, however they
+	// do not happen on a clean installation, so we apply the same fix
+	// permissions logic used by the installation process.
+	upgradeFolder := strings.TrimSuffix(dataDir, "data")
+	upgradeFolder = filepath.Join(upgradeFolder, versionedHome)
+	absUpgradeFolder, err := filepath.Abs(upgradeFolder)
 	if err != nil {
 		return UnpackResult{}, err
 	}
-	log.Info("Calling fix-permissions")
-	if err := perms.FixPermissions(abs); err != nil {
+	if err := perms.FixPermissions(absUpgradeFolder); err != nil {
 		fmt.Println("FixPermissions error:", err)
 		return UnpackResult{}, fmt.Errorf("cannot fix permissions for '%s': %w", versionedHome, err)
 	}

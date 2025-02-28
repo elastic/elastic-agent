@@ -18,11 +18,11 @@ import (
 	"github.com/hectane/go-acl/api"
 	"golang.org/x/sys/windows"
 
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 // FixPermissions fixes the permissions so only SYSTEM and Administrators have access to the files in the install path
+// HERE
 func FixPermissions(topPath string, opts ...OptFunc) error {
 	o, err := newOpts(opts...)
 	if err != nil {
@@ -96,19 +96,16 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 						// Check for Errno = 0 which indicates success
 						// https://pkg.go.dev/golang.org/x/sys/windows#Errno
 						if errors.Is(err, syscall.Errno(0)) {
-							logp.L().Named("fix-permissions").Infof("permissions '%s' have been set to '%s'", name, grants)
 							return nil
 						}
 						return err
 					}
 					if userSID != nil && groupSID != nil {
-						logp.L().Named("fix-permissions").Infof("permissions '%s' taking ownership", name)
 						err = takeOwnership(name, userSID, groupSID)
 					}
 				} else if errors.Is(err, fs.ErrNotExist) {
 					return nil
 				}
-				logp.L().Named("fix-permissions").Infof("permissions '%s' failed: %s", name, err)
 				return err
 			})
 		})
@@ -126,14 +123,12 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 			// Check for Errno = 0 which indicates success
 			// https://pkg.go.dev/golang.org/x/sys/windows#Errno
 			if errors.Is(err, syscall.Errno(0)) {
-				logp.L().Named("fix-permissions").Infof("[not admin] permissions '%s' have been set to '%s'", name, grants)
 				return nil
 			}
 			return err
 		} else if errors.Is(err, fs.ErrNotExist) {
 			return nil
 		}
-		logp.L().Named("fix-permissions").Infof("[not admin] permissions '%s' failed: %s", name, err)
 		return err
 	})
 }
