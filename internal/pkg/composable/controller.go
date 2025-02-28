@@ -165,47 +165,16 @@ func (c *controller) Run(ctx context.Context) error {
 		wg.Wait()
 	}()
 
-<<<<<<< HEAD
-	// synchronize the fetch providers through a channel
-	var fetchProvidersLock sync.RWMutex
-	var fetchProviders mapstr.M
-	fetchCh := make(chan fetchProvider)
-	go func() {
-		for {
-			select {
-			case <-localCtx.Done():
-				return
-			case msg := <-fetchCh:
-				fetchProvidersLock.Lock()
-				if msg.fetchProvider == nil {
-					_ = fetchProviders.Delete(msg.name)
-				} else {
-					_, _ = fetchProviders.Put(msg.name, msg.fetchProvider)
-				}
-				fetchProvidersLock.Unlock()
-			}
-		}
-	}()
-
-	// send initial vars state
-	fetchProvidersLock.RLock()
-	err := c.sendVars(ctx, fetchProviders)
-=======
 	// send initial vars state (empty fetch providers initially)
 	fetchProviders := mapstr.M{}
-	err := c.sendVars(ctx, nil, fetchProviders)
->>>>>>> 337a42a49 (Fix panic on fetch provider initialization (#6958))
+	err := c.sendVars(ctx, fetchProviders)
 	if err != nil {
 		// only error is context cancel, no need to add error message context
 		return err
 	}
 
 	// performs debounce of notifies; accumulates them into 100 millisecond chunks
-<<<<<<< HEAD
-=======
-	var observedResult chan []*transpiler.Vars
 	fetchCh := make(chan fetchProvider)
->>>>>>> 337a42a49 (Fix panic on fetch provider initialization (#6958))
 	for {
 	DEBOUNCE:
 		for {
@@ -247,15 +216,8 @@ func (c *controller) Run(ctx context.Context) error {
 			// batching done, gather results
 		}
 
-<<<<<<< HEAD
-		// send the vars to the watcher
-		fetchProvidersLock.RLock()
-		err := c.sendVars(ctx, fetchProviders)
-=======
 		// send the vars to the watcher or the observer caller
-		err := c.sendVars(ctx, observedResult, fetchProviders)
-		observedResult = nil
->>>>>>> 337a42a49 (Fix panic on fetch provider initialization (#6958))
+		err := c.sendVars(ctx, fetchProviders)
 		if err != nil {
 			// only error is context cancel, no need to add error message context
 			return err
@@ -498,15 +460,11 @@ func (c *controller) startDynamicProvider(ctx context.Context, wg *sync.WaitGrou
 	return state
 }
 
-<<<<<<< HEAD
 func (c *controller) generateVars(fetchContextProviders mapstr.M) []*transpiler.Vars {
-=======
-func (c *controller) generateVars(fetchContextProviders mapstr.M, defaultProvider string) []*transpiler.Vars {
 	// copy fetch providers map so they cannot change in the context
 	// of the currently processed variables
 	fetchContextProviders = fetchContextProviders.Clone()
 
->>>>>>> 337a42a49 (Fix panic on fetch provider initialization (#6958))
 	// build the vars list of mappings
 	vars := make([]*transpiler.Vars, 1)
 	mapping, _ := transpiler.NewAST(map[string]any{})
