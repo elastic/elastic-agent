@@ -136,7 +136,7 @@ service:
     metrics/fromsdk:
       receivers: [otlp/fromsdk]
       processors: []
-      exporters: [elasticapm, elasticsearch/otel]
+      exporters: [elasticsearch/otel]
 
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
