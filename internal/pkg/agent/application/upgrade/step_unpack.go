@@ -185,16 +185,6 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 			}
 		}
 
-		if log.IsDebug() {
-			newStat, err := os.Stat(dstPath)
-			if err != nil {
-				log.Warnf("cannot stat %q for debug logs: %s", dstPath, err)
-				return nil
-			}
-
-			log.Debugf("File %q, perms: %O, isDir: %t", dstPath, newStat.Mode().Perm(), newStat.IsDir())
-		}
-
 		return nil
 	}
 
@@ -482,16 +472,6 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 		// ensure the appropriate permissions
 		if err := os.Chmod(abs, mode.Perm()&0770); err != nil {
 			return UnpackResult{}, errors.New(err, fmt.Sprintf("TarInstaller: setting permissions %O for %q", mode.Perm()&0770, abs), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
-		}
-
-		if log.IsDebug() {
-			newStat, err := os.Stat(abs)
-			if err != nil {
-				log.Warnf("cannot stat %q for debug logs: %s", abs, err)
-				continue
-			}
-
-			log.Debugf("File %q, perms: %O, isDir: %t", abs, newStat.Mode().Perm(), newStat.IsDir())
 		}
 	}
 
