@@ -405,10 +405,6 @@ func testUpgradeFleetManagedElasticAgent(
 	output, err := startFixture.Install(ctx, &installOpts)
 	require.NoError(t, err, "failed to install start agent [output: %s]", string(output))
 
-	agentID, err := startFixture.AgentID(ctx)
-	require.NoError(t, err)
-	t.Logf("Agent ID: %q", agentID)
-
 	t.Log("Waiting for Agent to be correct version and healthy...")
 	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
 	require.NoError(t, err)
@@ -420,6 +416,10 @@ func testUpgradeFleetManagedElasticAgent(
 		2*time.Minute,
 		10*time.Second,
 		"Agent status is not online")
+
+	agentID, err := startFixture.AgentID(ctx)
+	require.NoError(t, err)
+	t.Logf("Agent ID: %q", agentID)
 
 	t.Logf("Upgrading from version \"%s-%s\" to version \"%s-%s\"...",
 		startParsedVersion, startVersionInfo.Binary.Commit,

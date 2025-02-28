@@ -799,15 +799,61 @@ func (f *Fixture) ExecDiagnostics(ctx context.Context, cmd ...string) (string, e
 	return files[0], err
 }
 
+type agentIDOpts struct {
+	noRetry       bool
+	retryTimeout  time.Duration
+	retryInterval time.Duration
+}
+
+// WithNoRetry disables the retry logic in AgentID function call.
+func WithNoRetry() func(opt *agentIDOpts) {
+	return func(opt *agentIDOpts) {
+		opt.noRetry = true
+	}
+}
+
+// WithRetryTimeout adjusts the retry timeout from the default value of one minute.
+func WithRetryTimeout(duration time.Duration) func(opt *agentIDOpts) {
+	return func(opt *agentIDOpts) {
+		opt.retryTimeout = duration
+	}
+}
+
+// WithRetryInterval adjusts the retry interval from the default value of one second.
+func WithRetryInterval(duration time.Duration) func(opt *agentIDOpts) {
+	return func(opt *agentIDOpts) {
+		opt.retryInterval = duration
+	}
+}
+
 // AgentID returns the ID of the installed Elastic Agent.
 //
-// This will try multiple times to call `elastic-agent status --output=json` to get the ID of the
-// running Elastic Agent. This call does require that the Elastic Agent is running and communication
-// over the control protocol is working.
+// Calls `elastic-agent status --output=json` to get the ID of the running Elastic Agent. This call does
+// require that the Elastic Agent is running and communication over the control protocol is working.
 //
-// The maximum amount of time this call will use is 1 minute.
-func (f *Fixture) AgentID(ctx context.Context) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+// By default, retry logic is applied. Use WithNoRetry to disable this behavior. WithRetryTimeout and WithRetryInterval
+// can be used to adjust the retry logic timing. The default retry timeout is one minute and the default retry
+// interval is one second.
+func (f *Fixture) AgentID(ctx context.Context, opts ...func(opt *agentIDOpts)) (string, error) {
+	var opt agentIDOpts
+	opt.retryTimeout = 1 * time.Minute
+	opt.retryInterval = 1 * time.Second
+	for _, o := range opts {
+		o(&opt)
+	}
+
+	if opt.noRetry {
+		status, err := f.ExecStatus(ctx)
+		if err != nil {
+			return "", fmt.Errorf("failed to get agent ID: agent status returned an error: %w", err)
+		}
+		if status.Info.ID == "" {
+			return "", fmt.Errorf("failed to get agent ID: agent ID is empty")
+		}
+		return status.Info.ID, nil
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, opt.retryTimeout)
 	defer cancel()
 
 	var lastErr error
@@ -828,7 +874,7 @@ func (f *Fixture) AgentID(ctx context.Context) (string, error) {
 		} else {
 			lastErr = fmt.Errorf("failed to get agent ID: agent ID is empty")
 		}
-		sleepFor(ctx, 1*time.Second)
+		sleepFor(ctx, opt.retryInterval)
 	}
 }
 
