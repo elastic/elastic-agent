@@ -15,7 +15,6 @@ import (
 )
 
 // FixPermissions fixes the permissions so only root:root is the owner and no world read-able permissions
-// HERE for Unix
 func FixPermissions(topPath string, opts ...OptFunc) error {
 	o, err := newOpts(opts...)
 	if err != nil {

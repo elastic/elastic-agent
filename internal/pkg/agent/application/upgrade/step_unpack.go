@@ -222,7 +222,6 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 		return UnpackResult{}, err
 	}
 	if err := perms.FixPermissions(absUpgradeFolder); err != nil {
-		fmt.Println("FixPermissions error:", err)
 		return UnpackResult{}, fmt.Errorf("cannot fix permissions for '%s': %w", versionedHome, err)
 	}
 
@@ -506,7 +505,6 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 		return UnpackResult{}, err
 	}
 	if err := perms.FixPermissions(absUpgradeFolder); err != nil {
-		fmt.Println("FixPermissions error:", err)
 		return UnpackResult{}, fmt.Errorf("cannot fix permissions for '%s': %w", versionedHome, err)
 	}
 

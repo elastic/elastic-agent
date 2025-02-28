@@ -22,7 +22,6 @@ import (
 )
 
 // FixPermissions fixes the permissions so only SYSTEM and Administrators have access to the files in the install path
-// HERE
 func FixPermissions(topPath string, opts ...OptFunc) error {
 	o, err := newOpts(opts...)
 	if err != nil {
