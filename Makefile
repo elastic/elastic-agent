@@ -3,20 +3,13 @@ COVERAGE_DIR=$(BUILD_DIR)/coverage
 BEATS?=elastic-agent
 PROJECTS= $(BEATS)
 PYTHON_ENV?=$(BUILD_DIR)/python-env
-MAGE_PRESENT     := $(shell mage --version 2> /dev/null | grep $(MAGE_VERSION))
-MAGE_IMPORT_PATH ?= github.com/magefile/mage
-export MAGE_IMPORT_PATH
 
 ## mage : Sets mage
 .PHONY: mage
 mage:
-ifndef MAGE_PRESENT
-	@echo Installing mage.
-	@go install ${MAGE_IMPORT_PATH}
+	@echo Installing mage
+	@go install github.com/magefile/mage
 	@-mage -clean
-else
-	@echo Mage already installed.
-endif
 
 ## help : Show this help.
 help: Makefile
@@ -51,7 +44,7 @@ check:
 ## check-go: download and run the go linter.
 .PHONY: check-go
 check-go: ## - Run golangci-lint
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.55.2
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.60.1
 	@./bin/golangci-lint run -v
 
 ## check-no-changes : Check there is no local changes.
