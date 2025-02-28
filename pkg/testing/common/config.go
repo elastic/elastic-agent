@@ -51,6 +51,9 @@ type Config struct {
 	// VerboseMode passed along a verbose mode flag to tests
 	VerboseMode bool
 
+	// DeleteInstanceAfterTest causes the runner to delete instances immediately after test completion.
+	DeleteInstanceAfterTest bool
+
 	// Timestamp enables timestamps on the console output.
 	Timestamp bool
 
