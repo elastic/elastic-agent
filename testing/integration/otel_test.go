@@ -1880,6 +1880,8 @@ service:
 		"log.file.inode",
 		"log.file.fingerprint",
 		"log.file.path",
+		"log.offset",
+
 		// needs investigation
 		"event.agent_id_status",
 		"event.ingested",
