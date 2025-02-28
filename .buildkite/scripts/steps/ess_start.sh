@@ -5,10 +5,11 @@ source .buildkite/scripts/common2.sh
 
 source .buildkite/scripts/steps/ess.sh
 
-OVERRIDE_STACK_VERSION="$(cat .package-version)"
-OVERRIDE_STACK_VERSION=${OVERRIDE_STACK_VERSION}"-SNAPSHOT"
+# Parsing version.go. Will be simplified here: https://github.com/elastic/ingest-dev/issues/4925
+STACK_VERSION=$(grep "const defaultBeatVersion =" version/version.go | cut -d\" -f2)
+STACK_VERSION="${STACK_VERSION}-SNAPSHOT"
 
-ess_up $OVERRIDE_STACK_VERSION
+ess_up $STACK_VERSION
 
 echo "ES_HOST: ${ELASTICSEARCH_HOST}"
 buildkite-agent meta-data set "es.host" $ELASTICSEARCH_HOST

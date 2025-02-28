@@ -23,8 +23,8 @@ fi
 # Override the agent package version using a string with format <major>.<minor>.<patch>
 # There is a time when the snapshot is not built yet, so we cannot use the latest version automatically
 # This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
-OVERRIDE_STACK_VERSION="$(cat .package-version)"
-OVERRIDE_STACK_VERSION=${OVERRIDE_STACK_VERSION}"-SNAPSHOT"
+STACK_VERSION=$(grep "const defaultBeatVersion =" version/version.go | cut -d\" -f2)
+STACK_VERSION="${STACK_VERSION}-SNAPSHOT"
 
 echo "~~~ Building test binaries"
 mage build:testBinaries
@@ -35,7 +35,7 @@ mage build:testBinaries
 if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
   echo "~~~ The steps is retried, starting the ESS stack again"
   trap 'ess_down' EXIT
-  ess_up $OVERRIDE_STACK_VERSION || echo "Failed to start ESS stack" >&2
+  ess_up $STACK_VERSION || echo "Failed to start ESS stack" >&2
 else 
   # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data
   echo "~~~ Receiving ESS stack metadata"
