@@ -143,7 +143,6 @@ steps:
           - container
 
       - label: "arm:sudo: {{matrix}}"
-        skip: true
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
@@ -159,15 +158,16 @@ steps:
           - upgrade
           - standalone-upgrade
           - fleet
-          - fleet-endpoint-security
-          - fleet-airgapped
-          - fleet-airgapped-privileged
-          - fleet-privileged
-          - fleet-upgrade-to-pr-build
-          - install-uninstall
-          - fqdn
-          - deb
-          - container
+          # ARM tests are enabled for only selected groups in order to save resources
+          # - fleet-endpoint-security
+          # - fleet-airgapped
+          # - fleet-airgapped-privileged
+          # - fleet-privileged
+          # - fleet-upgrade-to-pr-build
+          # - install-uninstall
+          # - fqdn
+          # - deb
+          # - container
 
       - label: "arm:non-sudo: {{matrix}}"
         skip: true
