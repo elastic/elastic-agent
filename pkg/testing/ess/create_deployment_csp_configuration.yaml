@@ -15,8 +15,8 @@ aws:
   kibana_instance_configuration_id: "aws.kibana.c5d"
 docker:
 #  integration_server_image: "docker.elastic.co/cloud-release/elastic-agent-cloud:8.17.3-665cf526-SNAPSHOT"
-  integration_server_image: ""
+  integration_server_image: "docker.elastic.co/cloud-release/elastic-agent-cloud:8.17.3-SNAPSHOT"
 #  elasticsearch_image: "docker.elastic.co/cloud-release/elasticsearch-cloud-ess:8.17.3-665cf526-SNAPSHOT"
-  elasticsearch_image: ""
+  elasticsearch_image: "docker.elastic.co/cloud-release/elasticsearch-cloud-ess:8.17.3-SNAPSHOT"
 #  kibana_image: "docker.elastic.co/cloud-release/kibana-cloud:8.17.3-665cf526-SNAPSHOT"
-  kibana_image: ""
+  kibana_image: "docker.elastic.co/cloud-release/kibana-cloud:8.17.3-SNAPSHOT"
