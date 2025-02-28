@@ -177,11 +177,7 @@ func TestControllerWithFetchProvider(t *testing.T) {
 				return
 			case vars := <-c.Watch():
 				if !observed {
-					vars, err = c.Observe(ctx, []string{"custom_fetch.vars.key1"})
-					if err != nil {
-						setErr <- err
-						return
-					}
+					c.Observe([]string{"custom_fetch.vars.key1"})
 					observed = true
 				}
 				if len(vars) > 0 {
@@ -465,39 +461,6 @@ func TestCancellation(t *testing.T) {
 		}
 	})
 }
-<<<<<<< HEAD
-=======
-
-func TestDefaultProvider(t *testing.T) {
-	log, err := logger.New("", false)
-	require.NoError(t, err)
-
-	t.Run("default env", func(t *testing.T) {
-		c, err := composable.New(log, nil, false)
-		require.NoError(t, err)
-		assert.Equal(t, "env", c.DefaultProvider())
-	})
-
-	t.Run("no default", func(t *testing.T) {
-		cfg, err := config.NewConfigFrom(map[string]interface{}{
-			"agent.providers.default": "",
-		})
-		require.NoError(t, err)
-		c, err := composable.New(log, cfg, false)
-		require.NoError(t, err)
-		assert.Equal(t, "", c.DefaultProvider())
-	})
-
-	t.Run("custom default", func(t *testing.T) {
-		cfg, err := config.NewConfigFrom(map[string]interface{}{
-			"agent.providers.default": "custom",
-		})
-		require.NoError(t, err)
-		c, err := composable.New(log, cfg, false)
-		require.NoError(t, err)
-		assert.Equal(t, "custom", c.DefaultProvider())
-	})
-}
 
 type customFetchProvider struct{}
 
@@ -516,4 +479,3 @@ func (c *customFetchProvider) Fetch(key string) (string, bool) {
 
 // validate it registers as a fetch provider
 var _ corecomp.FetchContextProvider = (*customFetchProvider)(nil)
->>>>>>> 337a42a49 (Fix panic on fetch provider initialization (#6958))
