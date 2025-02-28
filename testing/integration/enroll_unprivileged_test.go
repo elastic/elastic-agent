@@ -8,7 +8,6 @@ package integration
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/gofrs/uuid/v5"
@@ -57,13 +56,11 @@ func TestEnrollUnprivileged(t *testing.T) {
 		err = tools.InstallAgentForPolicyWithToken(ctx, t, installOpts, fixture, info.KibanaClient, policy.ID, enrollmentApiKey)
 		require.NoError(t, err)
 
-		hostname, err := os.Hostname()
+		agentID, err := fixture.AgentID(ctx)
 		require.NoError(t, err)
+		t.Logf("Agent ID: %q", agentID)
 
-		agent, err := fleettools.GetAgentByPolicyIDAndHostnameFromList(ctx, info.KibanaClient, policy.ID, hostname)
-		require.NoError(t, err)
-
-		_, err = info.KibanaClient.UnEnrollAgent(ctx, kibana.UnEnrollAgentRequest{ID: agent.ID})
+		_, err = info.KibanaClient.UnEnrollAgent(ctx, kibana.UnEnrollAgentRequest{ID: agentID})
 		require.NoError(t, err)
 
 		enrollUrl, err := fleettools.DefaultURL(ctx, info.KibanaClient)

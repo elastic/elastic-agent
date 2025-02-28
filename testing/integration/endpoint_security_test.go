@@ -195,13 +195,15 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 	defer cancel()
 
 	fixture, policy := installSecurityAgent(ctx, t, info, protected)
+	agentID, err := fixture.AgentID(ctx)
+	require.NoError(t, err)
 
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")
 		// Use a separate context as the one in the test body will have been cancelled at this point.
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cleanupCancel()
-		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, policy.ID))
+		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, agentID))
 	})
 
 	t.Log("Installing Elastic Defend")
@@ -230,9 +232,11 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 	defer cn()
 
 	fixture, policy := installSecurityAgent(ctx, t, info, protected)
+	agentID, err := fixture.AgentID(ctx)
+	require.NoError(t, err)
 
 	t.Log("Installing Elastic Defend")
-	_, err := installElasticDefendPackage(t, info, policy.ID)
+	_, err = installElasticDefendPackage(t, info, policy.ID)
 	require.NoError(t, err)
 
 	t.Log("Polling for endpoint-security to become Healthy")
@@ -253,12 +257,6 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 
 	// Unenroll the agent
 	t.Log("Unenrolling the agent")
-
-	hostname, err := os.Hostname()
-	require.NoError(t, err)
-
-	agentID, err := fleettools.GetAgentIDByHostname(ctx, info.KibanaClient, policy.ID, hostname)
-	require.NoError(t, err)
 
 	_, err = info.KibanaClient.UnEnrollAgent(ctx, kibana.UnEnrollAgentRequest{ID: agentID})
 	require.NoError(t, err)
@@ -655,13 +653,15 @@ func TestEndpointLogsAreCollectedInDiagnostics(t *testing.T) {
 
 	policyResp, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoErrorf(t, err, "Policy Response was: %v", policyResp)
+	agentID, err := fixture.AgentID(ctx)
+	require.NoError(t, err)
 
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")
 		// Use a separate context as the one in the test body will have been cancelled at this point.
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cleanupCancel()
-		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, policyResp.ID))
+		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, agentID))
 	})
 
 	t.Log("Installing Elastic Defend")
@@ -852,13 +852,16 @@ func TestForceInstallOverProtectedPolicy(t *testing.T) {
 	defer cancel()
 
 	fixture, policy := installSecurityAgent(ctx, t, info, true)
+	agentID, err := fixture.AgentID(ctx)
+	require.NoError(t, err)
+	t.Logf("Agent ID: %q", agentID)
 
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")
 		// Use a separate context as the one in the test body will have been cancelled at this point.
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cleanupCancel()
-		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, policy.ID))
+		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, agentID))
 	})
 
 	t.Log("Installing Elastic Defend")

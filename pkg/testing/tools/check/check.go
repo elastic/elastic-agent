@@ -49,10 +49,14 @@ func FleetAgentStatus(ctx context.Context,
 	t *testing.T,
 	fixture *integrationtest.Fixture,
 	client *kibana.Client,
-	policyID,
 	expectedStatus string) func() bool {
 	return func() bool {
-		currentStatus, err := fleettools.GetAgentStatus(ctx, client, policyID)
+		agentID, err := fixture.AgentID(ctx)
+		if err != nil {
+			t.Errorf("failed to get agent ID: %s", err.Error())
+			return false
+		}
+		currentStatus, err := fleettools.GetAgentStatus(ctx, client, agentID)
 		if err != nil {
 			t.Errorf("unable to determine agent status: %s", err.Error())
 			return false
