@@ -168,10 +168,8 @@ func Test_generateCreateDeploymentRequestBody(t *testing.T) {
                     "version": "1.2.3",
                     "docker_image": "docker.elastic.co/cloud-release/kibana-cloud:1.2.3-foo-SNAPSHOT",
                     "user_settings_json": {
-                      "xpack.fleet.enableExperimental": ["agentTamperProtectionEnabled"],
-                      "xpack.fleet.internal.registry.kibanaVersionCheckEnabled": false,
-                      "server.restrictInternalApis": false
-                    }
+                      "xpack.fleet.enableExperimental": ["agentTamperProtectionEnabled"]
+					}
                   }
                 },
                 "ref_id": "main-kibana"
