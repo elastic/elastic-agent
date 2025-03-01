@@ -16,6 +16,9 @@ steps:
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
         - build/distributions/**
+        retry:
+          automatic:
+            limit: 1
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
@@ -28,6 +31,9 @@ steps:
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
+        retry:
+          automatic:
+            limit: 1
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
@@ -40,6 +46,9 @@ steps:
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
+        retry:
+          automatic:
+            limit: 1
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
@@ -52,6 +61,9 @@ steps:
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
+        retry:
+          automatic:
+            limit: 1
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
@@ -82,6 +94,9 @@ steps:
     agents:
       provider: "gcp"
       machineType: "n2-standard-8"
+    retry:
+      automatic:
+        limit: 1
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Serverless integration test"
@@ -103,6 +118,9 @@ steps:
     agents:
       provider: "gcp"
       machineType: "n2-standard-8"
+    retry:
+      automatic:
+        limit: 1
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Extended runtime leak tests"
@@ -122,6 +140,9 @@ steps:
     key: "serverless-beats-integration-tests"
     concurrency_group: elastic-agent-extended-testing/beats-integration
     concurrency: 8
+    retry:
+      automatic:
+        limit: 1
     env:
       TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-a"
     command: |
@@ -140,6 +161,9 @@ steps:
       K8S_VERSION: "v1.31.0"
       KIND_VERSION: "v0.24.0"
     command: ".buildkite/scripts/steps/k8s-extended-tests.sh"
+    retry:
+      automatic:
+        limit: 1
     artifact_paths:
       - "build/k8s-logs*/*"
       - "build/k8s-logs*/**/*"
