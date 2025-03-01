@@ -1,0 +1,13 @@
+basic:
+  - agentbeat
+  - endpoint-security
+  - pf-host-agent
+servers:
+  - agentbeat
+  - endpoint-security
+  - pf-host-agent
+  - cloudbeat
+  - apm-server
+  - fleet-server
+  - pf-elastic-symbolizer
+  - pf-elastic-collector
