@@ -5,7 +5,7 @@
 package configuration
 
 import (
-	"fmt"
+	"net"
 	"os"
 	"strconv"
 
@@ -71,7 +71,7 @@ func OverrideDefaultContainerGRPCPort(cfg *GRPCConfig) {
 
 // String returns the composed listen address for the GRPC.
 func (cfg *GRPCConfig) String() string {
-	return fmt.Sprintf("%s:%d", cfg.Address, cfg.Port)
+	return net.JoinHostPort(cfg.Address, strconv.Itoa(int(cfg.Port)))
 }
 
 // IsLocal returns true if port value is less than 0
