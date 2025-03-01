@@ -10,6 +10,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httputil"
@@ -37,11 +38,11 @@ outputs:
     hosts:
       - %s
     protocol: http
-    preset: balanced
-
+    preset: latency
 inputs:
   - type: filestream
     id: your-input-id
+    log_level: debug
     streams:
       - id: your-filestream-stream-id
         data_stream:
@@ -87,7 +88,7 @@ func TestEventLogFile(t *testing.T) {
 	esURL := startMockES(t)
 
 	logFilepath := path.Join(t.TempDir(), t.Name())
-	generateLogFile(t, logFilepath, time.Millisecond*100, 1)
+	generateLogFile(t, logFilepath, time.Millisecond*100, 20)
 
 	cfg := fmt.Sprintf(eventLogConfig, esURL, logFilepath)
 
@@ -126,6 +127,7 @@ func TestEventLogFile(t *testing.T) {
 
 	// Now the Elastic-Agent is running, so validate the Event log file.
 	requireEventLogFileExistsWithData(t, agentFixture)
+	requireNoCopyProcessorError(t, agentFixture)
 
 	// The diagnostics command is already tested by another test,
 	// here we just want to validate the events log behaviour
@@ -307,7 +309,7 @@ func addOverwriteToPolicy(t *testing.T, info *define.Info, policyName, policyID 
 	}
 }
 
-func requireEventLogFileExistsWithData(t *testing.T, agentFixture *atesting.Fixture) {
+func readEventLogFile(t *testing.T, agentFixture *atesting.Fixture) string {
 	// Now the Elastic-Agent is running, so validate the Event log file.
 	// Because the path changes based on the Elastic-Agent version, we
 	// use glob to find the file
@@ -338,8 +340,39 @@ func requireEventLogFileExistsWithData(t *testing.T, agentFixture *atesting.Fixt
 		t.Fatalf("cannot read file '%s': %s", logFileName, err)
 	}
 
-	logEntry := string(logEntryBytes)
-	expectedStr := "Cannot index event"
+	return string(logEntryBytes)
+}
+
+func requireNoCopyProcessorError(t *testing.T, agentFixture *atesting.Fixture) {
+	data := readEventLogFile(t, agentFixture)
+	for _, line := range strings.Split(data, "\n") {
+		logEntry := struct {
+			LogLogger string `json:"log.logger"`
+			Message   string `json:"message"`
+		}{}
+
+		if len(line) == 0 {
+			continue
+		}
+		if err := json.Unmarshal([]byte(line), &logEntry); err != nil {
+			t.Fatalf("could not parse log entry: %q", line)
+		}
+
+		if logEntry.LogLogger == "copy_fields" {
+			if strings.Contains(logEntry.Message, "Failed to copy fields") {
+				if strings.Contains(logEntry.Message, "already exists, drop or rename this field first") {
+					t.Fatal("copy_fields processor must not fail")
+				}
+			}
+		}
+	}
+}
+
+func requireEventLogFileExistsWithData(t *testing.T, agentFixture *atesting.Fixture) {
+	logEntry := readEventLogFile(t, agentFixture)
+	// That's part of the generated event that is logged by the 'processor'
+	// logger at level debug
+	expectedStr := "TestEventLogFile"
 	if !strings.Contains(logEntry, expectedStr) {
 		t.Errorf(
 			"did not find the expected log entry ('%s') in the events log file",
