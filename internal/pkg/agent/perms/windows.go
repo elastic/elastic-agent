@@ -21,7 +21,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-func errHandler(err error) error {
+// filterSuccessErr filters out syscall.Errno(0) which indicates success
+func filterSuccessErr(err error) error {
 	// Check for Errno = 0 which indicates success
 	// https://pkg.go.dev/golang.org/x/sys/windows#Errno
 	if errors.Is(err, syscall.Errno(0)) {
@@ -97,12 +98,12 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 					// first level doesn't inherit
 					inherit := topPath != name
 
-					if err = errHandler(acl.Apply(name, true, inherit, grants...)); err != nil {
+					if err = filterSuccessErr(acl.Apply(name, true, inherit, grants...)); err != nil {
 						return err
 					}
 
 					if userSID != nil && groupSID != nil {
-						return errHandler(takeOwnership(name, userSID, groupSID))
+						return filterSuccessErr(takeOwnership(name, userSID, groupSID))
 					}
 					return nil
 				case errors.Is(err, fs.ErrNotExist):
@@ -121,7 +122,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 			// first level doesn't inherit
 			inherit := topPath != name
 
-			return errHandler(acl.Apply(name, true, inherit, grants...))
+			return filterSuccessErr(acl.Apply(name, true, inherit, grants...))
 		case errors.Is(err, fs.ErrNotExist):
 			return nil
 		default:
