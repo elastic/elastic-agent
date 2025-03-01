@@ -212,7 +212,9 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 		return UnpackResult{}, err
 	}
 	if err := perms.FixPermissions(absUpgradeFolder); err != nil {
-		return UnpackResult{}, fmt.Errorf("cannot fix permissions for '%s': %w", versionedHome, err)
+		// Treat any error as non-fatal. Log as warning because an error here
+		// does not mean a failed upgrade.
+		log.Warnw("cannot update permissions after unpacking the archive", "error.message", err.Error())
 	}
 
 	return UnpackResult{
@@ -485,7 +487,9 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 		return UnpackResult{}, err
 	}
 	if err := perms.FixPermissions(absUpgradeFolder); err != nil {
-		return UnpackResult{}, fmt.Errorf("cannot fix permissions for '%s': %w", versionedHome, err)
+		// Treat any error as non-fatal. Log as warning because an error here
+		// does not mean a failed upgrade.
+		log.Warnw("cannot update permissions after unpacking the archive", "error.message", err.Error())
 	}
 
 	return UnpackResult{
