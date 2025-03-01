@@ -39,13 +39,13 @@ const (
 	packageStagingDir = "build/package"
 
 	// defaultBinaryName specifies the output file for zip and tar.gz.
-	defaultBinaryName = "{{.Name}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}"
+	defaultBinaryName = "{{.Name}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}{{if .FIPS}}-fips{{end}}"
 
 	// defaultRootDir is the default name of the root directory contained inside of zip and
 	// tar.gz packages.
 	// NOTE: This uses .BeatName instead of .Name because we wanted the internal
 	// directory to not include "-oss".
-	defaultRootDir = "{{.BeatName}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}"
+	defaultRootDir = "{{.BeatName}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}{{if .FIPS}}-fips{{end}}"
 
 	componentConfigMode os.FileMode = 0600
 
@@ -92,6 +92,7 @@ type PackageSpec struct {
 	Arch              string                 `yaml:"arch,omitempty"`
 	Vendor            string                 `yaml:"vendor,omitempty"`
 	Snapshot          bool                   `yaml:"snapshot"`
+	FIPS              bool                   `yaml:"fips"`
 	Version           string                 `yaml:"version,omitempty"`
 	License           string                 `yaml:"license,omitempty"`
 	URL               string                 `yaml:"url,omitempty"`
@@ -732,7 +733,7 @@ func runFPM(spec PackageSpec, packageType PackageType) error {
 	}
 	defer os.Remove(inputTar)
 
-	outputFile, err := spec.Expand("{{.Name}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.Arch}}")
+	outputFile, err := spec.Expand("{{.Name}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.Arch}}{{if .FIPS}}-fips{{end}}")
 	if err != nil {
 		return err
 	}
@@ -962,7 +963,7 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 		}
 
 		if mg.Verbose() {
-			log.Println("Adding", os.FileMode(header.Mode), header.Name)
+			log.Println("Adding", os.FileMode(header.Mode), header.Name) //nolint:gosec // we don't care about an int overflow in a log line
 		}
 		if err := ar.WriteHeader(header); err != nil {
 			return err
@@ -1030,7 +1031,7 @@ func addSymlinkToTar(tmpdir string, ar *tar.Writer, baseDir string, pkgFile Pack
 		header.Typeflag = tar.TypeSymlink
 
 		if mg.Verbose() {
-			log.Println("Adding", os.FileMode(header.Mode), header.Name)
+			log.Println("Adding", os.FileMode(header.Mode), header.Name) //nolint:gosec // we don't care about an int overflow in a log line
 		}
 		if err := ar.WriteHeader(header); err != nil {
 			return err
