@@ -24,6 +24,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/ipc"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 type mockCommunicator struct {
@@ -81,11 +82,11 @@ func getAddress(dir string, isLocal bool) string {
 
 		if runtime.GOOS == "windows" {
 			u.Scheme = "npipe"
-			return u.JoinPath("/", testSock).String()
+			return utils.SocketURLWithFallback(testSock, "/")
 		}
 
 		u.Scheme = "unix"
-		return u.JoinPath(dir, testSock).String()
+		return utils.SocketURLWithFallback(testSock, dir)
 	}
 	return fmt.Sprintf("127.0.0.1:%d", testPort)
 }
