@@ -5,13 +5,8 @@
 package configuration
 
 import (
-<<<<<<< HEAD
-	"fmt"
-=======
 	"net"
-	"os"
 	"strconv"
->>>>>>> 5d91620b2 (fix(ipv6): support ipv6 address in grpc config (#7035))
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
