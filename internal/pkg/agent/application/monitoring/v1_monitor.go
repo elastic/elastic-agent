@@ -37,10 +37,10 @@ const (
 	// args: pipeline name, application name
 	agentMbEndpointFileFormatWin = `npipe:///elastic-agent`
 
-	httpPlusPrefix      = "http+"
-	httpPrefix          = "http"
-	fileSchemePrefix    = "file"
-	unixSchemePrefix    = "unix"
+	httpPlusPrefix   = "http+"
+	httpPrefix       = "http"
+	fileSchemePrefix = "file"
+	unixSchemePrefix = "unix"
 
 	defaultOutputName          = "default"
 	outputsKey                 = "outputs"
