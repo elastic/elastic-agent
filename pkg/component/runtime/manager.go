@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -988,9 +989,9 @@ func (m *Manager) getListenAddr() string {
 	if m.isLocal {
 		return m.listenAddr
 	}
-	addr := strings.SplitN(m.listenAddr, ":", 2)
-	if len(addr) == 2 && addr[1] == "0" {
-		return fmt.Sprintf("%s:%d", addr[0], m.listenPort)
+	host, port, err := net.SplitHostPort(m.listenAddr)
+	if err == nil && port == "0" {
+		return net.JoinHostPort(host, strconv.Itoa(m.listenPort))
 	}
 	return m.listenAddr
 }
