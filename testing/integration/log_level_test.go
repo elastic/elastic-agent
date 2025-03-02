@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httputil"
 	"strings"
 	"testing"
 	"text/template"
@@ -245,19 +246,27 @@ func updateAgentLogLevel(ctx context.Context, t *testing.T, kibanaClient *kibana
 	}
 
 	err = updateLogLevelTemplate.Execute(buf, templateData)
+	if err != nil {
+		return fmt.Errorf("rendering updateLogLevelTemplate: %w", err)
+	}
+
 	t.Logf("Updating agent-specific log level to %q", logLevel)
-	_, err = kibanaClient.SendWithContext(ctx, http.MethodPost, "/api/fleet/agents/"+agentID+"/actions", nil, nil, buf)
+	resp, err := kibanaClient.SendWithContext(ctx, http.MethodPost, "/api/fleet/agents/"+agentID+"/actions", nil, nil, buf)
 	if err != nil {
 		return fmt.Errorf("error executing fleet request: %w", err)
 	}
 
-	// The log below is a bit spammy but it can be useful for debugging
-	//respDump, err := httputil.DumpResponse(fleetResp, true)
-	//if err != nil {
-	//	t.Logf("Error dumping Fleet response to updating agent-specific log level: %v", err)
-	//} else {
-	//	t.Logf("Fleet response to updating agent-specific log level:\n----- BEGIN RESPONSE DUMP -----\n%s\n----- END RESPONSE DUMP -----\n", string(respDump))
-	//}
+	if resp.StatusCode != http.StatusOK {
+		t.Logf("error updating agent-specific log level to %q", logLevel)
+		// The log below is a bit spammy but it can be useful for debugging
+		respDump, err := httputil.DumpResponse(resp, true)
+		if err != nil {
+			t.Logf("Error dumping Fleet response to updating agent-specific log level: %v", err)
+		} else {
+			t.Logf("Fleet response to updating agent-specific log level:\n----- BEGIN RESPONSE DUMP -----\n%s\n----- END RESPONSE DUMP -----\n", string(respDump))
+		}
+		return fmt.Errorf("error updating agent-specific log level to %q: fleet response status code: %d", logLevel, resp.StatusCode)
+	}
 
 	return nil
 }
@@ -293,19 +302,23 @@ func updatePolicyLogLevel(ctx context.Context, t *testing.T, kibanaClient *kiban
 		return fmt.Errorf("error rendering policy update template: %w", err)
 	}
 
-	_, err = kibanaClient.SendWithContext(ctx, http.MethodPut, "/api/fleet/agent_policies/"+policy.ID, nil, nil, buf)
+	resp, err := kibanaClient.SendWithContext(ctx, http.MethodPut, "/api/fleet/agent_policies/"+policy.ID, nil, nil, buf)
 
 	if err != nil {
 		return fmt.Errorf("error executing fleet request: %w", err)
 	}
 
-	// The log below is a bit spammy but it can be useful for debugging
-	//respDump, err := httputil.DumpResponse(fleetResp, true)
-	//if err != nil {
-	//	t.Logf("Error dumping Fleet response to updating policy log level: %v", err)
-	//} else {
-	//	t.Logf("Fleet response to updating policy log level:\n----- BEGIN RESPONSE DUMP -----\n%s\n----- END RESPONSE DUMP -----\n", string(respDump))
-	//}
+	if resp.StatusCode != http.StatusOK {
+		t.Logf("error updating policy log level to %q", newPolicyLogLevel)
+		// The log below is a bit spammy but it can be useful for debugging
+		respDump, err := httputil.DumpResponse(resp, true)
+		if err != nil {
+			t.Logf("Error dumping Fleet response to updating policy log level: %v", err)
+		} else {
+			t.Logf("Fleet response to updating policy log level:\n----- BEGIN RESPONSE DUMP -----\n%s\n----- END RESPONSE DUMP -----\n", string(respDump))
+		}
+		return fmt.Errorf("error updating policy log level to %q: fleet response status code: %d", newPolicyLogLevel, resp.StatusCode)
+	}
 
 	return nil
 }
