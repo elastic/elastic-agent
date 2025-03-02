@@ -184,6 +184,7 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 	currentMajor := parsedUpgradeToVersion.Major()
 	currentMinor := parsedUpgradeToVersion.Minor()
 
+	skipCurrentMajor := false
 	currentMajorsToFind := reqs.CurrentMajors
 	previousMajorsToFind := reqs.PreviousMajors
 	previousMinorsToFind := reqs.PreviousMinors
@@ -210,7 +211,7 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 			currentMajorsToFind-- // counts as the current major as well
 
 		// current majors
-		case currentMajorsToFind > 0 && version.Major() == currentMajor:
+		case currentMajorsToFind > 0 && version.Major() == currentMajor && !skipCurrentMajor:
 			upgradableVersions = append(upgradableVersions, version.String())
 			currentMajorsToFind--
 
@@ -218,7 +219,10 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 		case previousMajorsToFind > 0 && version.Major() < currentMajor:
 			upgradableVersions = append(upgradableVersions, version.String())
 			currentMajor = version.Major()
+			currentMinor = version.Minor()
 			previousMajorsToFind--
+			previousMinorsToFind-- // count as prev minor as well
+			skipCurrentMajor = true
 
 		// since the list is sorted we can stop here
 		default:
@@ -239,6 +243,24 @@ func PreviousMinor() (*version.ParsedSemVer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse the current version %s: %w", define.Version(), err)
 	}
+
+	// Special case: if we are in the first release of a new major (so vX.0.0), we should
+	// return the latest release from the previous major.
+	if current.Minor() == 0 && current.Patch() == 0 {
+		// Since the current version is the first release of a new major (vX.0.0), there
+		// will be no minor versions in the versions list from the same major (vX). The list
+		// will only contain minors from the previous major (vX-1). Further, since the
+		// version list is sorted in descending order (newer versions first), we can return the
+		// first item from the list as it will be the newest minor of the previous major.
+		for _, v := range versions {
+			if v.Less(*current) {
+				return v, nil
+			}
+		}
+
+		return nil, ErrNoPreviousMinor
+	}
+
 	for _, v := range versions {
 		if v.Prerelease() != "" || v.BuildMetadata() != "" {
 			continue

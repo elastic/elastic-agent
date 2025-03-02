@@ -10,8 +10,8 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 )
 
-// providerRegistry is a registry of providers
-type providerRegistry struct {
+// ProviderRegistry is a registry of providers
+type ProviderRegistry struct {
 	contextProviders map[string]ContextProviderBuilder
 	dynamicProviders map[string]DynamicProviderBuilder
 
@@ -19,9 +19,14 @@ type providerRegistry struct {
 	lock   sync.RWMutex
 }
 
-// Providers holds all known providers, they must be added to it to enable them for use
-var Providers = &providerRegistry{
-	contextProviders: make(map[string]ContextProviderBuilder),
-	dynamicProviders: make(map[string]DynamicProviderBuilder),
-	logger:           logp.NewLogger("dynamic"),
+// NewProviderRegistry creates a new provider registry.
+func NewProviderRegistry() *ProviderRegistry {
+	return &ProviderRegistry{
+		contextProviders: make(map[string]ContextProviderBuilder),
+		dynamicProviders: make(map[string]DynamicProviderBuilder),
+		logger:           logp.NewLogger("composable"),
+	}
 }
+
+// Providers holds all known providers, they must be added to it to enable them for use
+var Providers = NewProviderRegistry()

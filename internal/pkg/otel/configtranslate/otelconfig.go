@@ -77,7 +77,6 @@ func getSupportedComponents(model *component.Model) []*component.Component {
 	var supportedComponents []*component.Component
 
 	for _, comp := range model.Components {
-		comp := comp
 		if IsComponentOtelSupported(&comp) {
 			supportedComponents = append(supportedComponents, &comp)
 		}
@@ -111,7 +110,6 @@ func getExporterID(exporterType otelcomponent.Type, outputName string) otelcompo
 // getCollectorConfigForComponent returns the Otel collector config required to run the given component.
 // This function returns a full, valid configuration that can then be merged with configurations for other components.
 func getCollectorConfigForComponent(comp *component.Component, info info.Agent) (*confmap.Conf, error) {
-
 	exportersConfig, outputQueueConfig, err := getExportersConfigForComponent(comp)
 	if err != nil {
 		return nil, err
@@ -194,6 +192,7 @@ func getReceiversConfigForComponent(comp *component.Component, info info.Agent, 
 		receiverId.String(): receiverConfig,
 	}, nil
 }
+
 
 // getReceiversConfigForComponent returns the exporters configuration and queue settings for a component. Usually this will be a single
 // exporter, but in principle it could be more.
@@ -363,3 +362,4 @@ func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
 	esConfig["mapping"] = map[string]any{"mode": "bodymap"}
 	return esConfig, nil
 }
+
