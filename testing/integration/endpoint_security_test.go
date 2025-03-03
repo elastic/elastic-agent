@@ -133,9 +133,8 @@ func getEndpointVersion(t *testing.T) string {
 // cleanup functions are set
 func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageFormat string) {
 	ctx := context.Background()
-	upgradeables, err := upgradetest.GetUpgradableVersions()
+	upgradeFromVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
-	upgradeFromVersion := upgradeables[0]
 	t.Logf("Preparing fixture with agent version %s", upgradeFromVersion.String())
 
 	startFixture, err := atesting.NewFixture(
