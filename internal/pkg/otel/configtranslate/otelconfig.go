@@ -193,7 +193,6 @@ func getReceiversConfigForComponent(comp *component.Component, info info.Agent, 
 	}, nil
 }
 
-
 // getReceiversConfigForComponent returns the exporters configuration and queue settings for a component. Usually this will be a single
 // exporter, but in principle it could be more.
 func getExportersConfigForComponent(comp *component.Component) (exporterCfg map[string]any, queueCfg map[string]any, err error) {
@@ -362,4 +361,3 @@ func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
 	esConfig["mapping"] = map[string]any{"mode": "bodymap"}
 	return esConfig, nil
 }
-
