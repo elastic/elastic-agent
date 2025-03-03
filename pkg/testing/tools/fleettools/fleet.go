@@ -6,10 +6,13 @@ package fleettools
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
-	"strings"
 
 	"github.com/gofrs/uuid/v5"
 
@@ -22,36 +25,70 @@ type EnrollParams struct {
 	PolicyID        string `json:"policy_id"`
 }
 
-// GetAgentByPolicyIDAndHostnameFromList get an agent by the local_metadata.host.name property, reading from the agents list
-func GetAgentByPolicyIDAndHostnameFromList(ctx context.Context, client *kibana.Client, policyID, hostname string) (*kibana.AgentExisting, error) {
-	listAgentsResp, err := client.ListAgents(ctx, kibana.ListAgentsRequest{})
-	if err != nil {
-		return nil, err
-	}
-
-	onPolicy := make([]string, 0, len(listAgentsResp.Items))
-	matching := make([]*kibana.AgentExisting, 0, 1)
-	for i, item := range listAgentsResp.Items {
-		agentHostname := item.LocalMetadata.Host.Hostname
-		agentPolicyID := item.PolicyID
-		if agentPolicyID == policyID {
-			onPolicy = append(onPolicy, agentHostname)
-			if strings.EqualFold(agentHostname, hostname) {
-				matching = append(matching, &listAgentsResp.Items[i])
+func extractError(result []byte) error {
+	var kibanaResult struct {
+		Message    string
+		Attributes struct {
+			Objects []struct {
+				ID    string
+				Error struct {
+					Message string
+				}
 			}
 		}
 	}
+	if err := json.Unmarshal(result, &kibanaResult); err != nil {
+		return fmt.Errorf("error extracting JSON for error response: %w", err)
+	}
+	var errs []error
+	if kibanaResult.Message != "" {
+		for _, err := range kibanaResult.Attributes.Objects {
+			errs = append(errs, fmt.Errorf("id: %s, message: %s", err.ID, err.Error.Message))
+		}
+		if len(errs) == 0 {
+			return fmt.Errorf("%s", kibanaResult.Message)
+		}
+		return fmt.Errorf("%s: %w", kibanaResult.Message, errors.Join(errs...))
 
-	if len(matching) == 0 {
-		return nil, fmt.Errorf("unable to find agent with hostname [%s] for policy [%s]. Found: %v",
-			hostname, policyID, onPolicy)
+	}
+	return nil
+}
+
+// GetAgentByPolicyIDAndHostnameFromList get an agent by the local_metadata.host.name property, reading from the agents list
+func GetAgentByPolicyIDAndHostnameFromList(ctx context.Context, client *kibana.Client, policyID, hostname string) (*kibana.AgentExisting, error) {
+	params := url.Values{}
+	params.Add("kuery", fmt.Sprintf(`local_metadata.host.name:"%s" and policy_id:"%s" and active:true`, hostname, policyID))
+
+	resp, err := client.Connection.SendWithContext(ctx, http.MethodGet, "/api/fleet/agents", params, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error calling list agents API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
 	}
 
-	if len(matching) > 1 {
-		return nil, fmt.Errorf("found %d agents with hostname [%s]; expected to find only one", len(matching), hostname)
+	if resp.StatusCode != http.StatusOK {
+		return nil, extractError(b)
+	}
+	var r kibana.ListAgentsResponse
+	err = json.Unmarshal(b, &r)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshalling response json: %w", err)
 	}
 
-	return matching[0], nil
+	if len(r.Items) == 0 {
+		return nil, fmt.Errorf("unable to find agent with hostname [%s] for policy [%s]",
+			hostname, policyID)
+	}
+
+	if len(r.Items) > 1 {
+		return nil, fmt.Errorf("found %d agents with hostname [%s] for policy [%s]; expected to find only one, response:\n%s", len(r.Items), hostname, policyID, b)
+	}
+
+	return &r.Items[0], nil
 }
 
 func GetAgentIDByHostname(ctx context.Context, client *kibana.Client, policyID, hostname string) (string, error) {
