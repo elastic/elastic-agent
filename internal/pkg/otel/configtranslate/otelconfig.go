@@ -77,7 +77,6 @@ func getSupportedComponents(model *component.Model) []*component.Component {
 	var supportedComponents []*component.Component
 
 	for _, comp := range model.Components {
-		comp := comp
 		if IsComponentOtelSupported(&comp) {
 			supportedComponents = append(supportedComponents, &comp)
 		}
