@@ -10,7 +10,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 
 	"github.com/magefile/mage/mg"
@@ -52,11 +51,6 @@ func Package() error {
 					continue
 				}
 
-				if target.Name == "linux/arm64" && pkgType == Docker && runtime.GOARCH != "arm64" {
-					log.Printf("Skipping Docker package type because build host isn't arm")
-					continue
-				}
-
 				packageArch, err := getOSArchName(target, pkgType)
 				if err != nil {
 					log.Printf("Skipping arch %v for package type %v: %v", target.Arch(), pkgType, err)
@@ -80,6 +74,7 @@ func Package() error {
 				spec.OS = target.GOOS()
 				spec.Arch = packageArch
 				spec.Snapshot = Snapshot
+				spec.FIPS = FIPSBuild
 				spec.evalContext = map[string]interface{}{
 					"GOOS":          target.GOOS(),
 					"GOARCH":        target.GOARCH(),
@@ -148,11 +143,11 @@ type packageBuilder struct {
 }
 
 func (b packageBuilder) Build() error {
-	fmt.Printf(">> package: Building %v type=%v for platform=%v\n", b.Spec.Name, b.Type, b.Platform.Name)
+	fmt.Printf(">> package: Building %v type=%v for platform=%v fips=%v\n", b.Spec.Name, b.Type, b.Platform.Name, b.Spec.FIPS)
 	log.Printf("Package spec: %+v", b.Spec)
 	if err := b.Type.Build(b.Spec); err != nil {
-		return fmt.Errorf("failed building %v type=%v for platform=%v : %w",
-			b.Spec.Name, b.Type, b.Platform.Name, err)
+		return fmt.Errorf("failed building %v type=%v for platform=%v fips=%v : %w",
+			b.Spec.Name, b.Type, b.Platform.Name, b.Spec.FIPS, err)
 	}
 	return nil
 }
@@ -245,6 +240,10 @@ func TestPackages(options ...TestPackagesOption) error {
 
 	if BeatUser == "root" {
 		args = append(args, "-root-owner")
+	}
+
+	if FIPSBuild {
+		args = append(args, "-fips")
 	}
 
 	args = append(args, "-files", MustExpand("{{.PWD}}/build/distributions/*"))
