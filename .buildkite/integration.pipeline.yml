@@ -56,8 +56,9 @@ steps:
         artifact_paths:
           - build/distributions/**
         agents:
-          provider: "gcp"
-          machineType: "n2-standard-8"
+          provider: "aws"
+          instanceType: "c6g.4xlarge"
+          imagePrefix: "core-ubuntu-2204-aarch64"
 
       - label: "Packaging: linux/arm64 deb"
         key: packaging-ubuntu-arm64-deb
@@ -68,8 +69,9 @@ steps:
         artifact_paths:
           - build/distributions/**
         agents:
-          provider: "gcp"
-          machineType: "n2-standard-8"
+          provider: "aws"
+          instanceType: "c6g.4xlarge"
+          imagePrefix: "core-ubuntu-2204-aarch64"
 
       - label: "Packaging: linux/arm64 tar.gz"
         key: packaging-ubuntu-arm64-tar
@@ -80,8 +82,9 @@ steps:
         artifact_paths:
           - build/distributions/**
         agents:
-          provider: "gcp"
-          machineType: "n2-standard-8"
+          provider: "aws"
+          instanceType: "c6g.4xlarge"
+          imagePrefix: "core-ubuntu-2204-aarch64"
 
       - label: "Packaging: windows/amd64 zip"
         key: packaging-windows
@@ -113,9 +116,6 @@ steps:
           PACKAGES: "docker"
           PLATFORMS: "linux/arm64"
         command: |
-          # echo "Add support for multiarch"
-          # docker run --privileged --rm tonistiigi/binfmt:qemu-v9.2.0-51 --uninstall qemu-*
-          # docker run --privileged --rm tonistiigi/binfmt:qemu-v9.2.0-51 --install all
           .buildkite/scripts/steps/integration-package.sh
         artifact_paths:
           - build/distributions/**
@@ -142,6 +142,9 @@ steps:
     agents:
       provider: "gcp"
       machineType: "n2-standard-8"
+    retry:
+      automatic:
+        limit: 1
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Serverless integration test"
@@ -163,6 +166,9 @@ steps:
     agents:
       provider: "gcp"
       machineType: "n2-standard-8"
+    retry:
+      automatic:
+        limit: 1
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Extended runtime leak tests"
@@ -178,6 +184,9 @@ steps:
     key: "serverless-beats-integration-tests"
     concurrency_group: elastic-agent-extended-testing/beats-integration
     concurrency: 8
+    retry:
+      automatic:
+        limit: 1
     env:
       TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-a"
     command: |
@@ -196,6 +205,9 @@ steps:
       K8S_VERSION: "v1.31.0"
       KIND_VERSION: "v0.24.0"
     command: ".buildkite/scripts/steps/k8s-extended-tests.sh"
+    retry:
+      automatic:
+        limit: 1
     artifact_paths:
       - "build/k8s-logs*/*"
       - "build/k8s-logs*/**/*"
