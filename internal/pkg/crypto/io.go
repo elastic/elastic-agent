@@ -378,6 +378,5 @@ func randomBytes(length int) ([]byte, error) {
 }
 
 func stretchPassword(password, salt []byte, c, kl int) ([]byte, error) {
-	// return pbkdf2.Key(password, salt, c, kl, sha512.New)
 	return pbkdf2.Key(sha512.New, string(password), salt, c, kl)
 }
