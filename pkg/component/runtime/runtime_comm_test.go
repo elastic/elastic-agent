@@ -15,7 +15,9 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 type agentInfoMock struct {
@@ -50,6 +52,7 @@ func (a agentInfoMock) LogLevel() string                                    { pa
 func (a agentInfoMock) RawLogLevel() string                                 { panic("implement me") }
 func (a agentInfoMock) ReloadID(ctx context.Context) error                  { panic("implement me") }
 func (a agentInfoMock) SetLogLevel(ctx context.Context, level string) error { panic("implement me") }
+func (a agentInfoMock) ECSMetadata(l *logger.Logger) (*info.ECSMeta, error) { panic("implement me") }
 
 func TestCheckinExpected(t *testing.T) {
 	ca, err := authority.NewCA()
