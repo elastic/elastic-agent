@@ -47,32 +47,6 @@ steps:
           machineType: "n2-standard-8"
 
       # Packaging linux/arm64
-      - label: "Packaging: linux/arm64 rpm"
-        key: packaging-ubuntu-arm64-rpm
-        env:
-          PLATFORMS: "linux/arm64"
-          PACKAGES: "rpm"
-        command: ".buildkite/scripts/steps/integration-package.sh"
-        artifact_paths:
-          - build/distributions/**
-        agents:
-          provider: "aws"
-          instanceType: "c6g.4xlarge"
-          imagePrefix: "core-ubuntu-2204-aarch64"
-
-      - label: "Packaging: linux/arm64 deb"
-        key: packaging-ubuntu-arm64-deb
-        env:
-          PLATFORMS: "linux/arm64"
-          PACKAGES: "deb"
-        command: ".buildkite/scripts/steps/integration-package.sh"
-        artifact_paths:
-          - build/distributions/**
-        agents:
-          provider: "aws"
-          instanceType: "c6g.4xlarge"
-          imagePrefix: "core-ubuntu-2204-aarch64"
-
       - label: "Packaging: linux/arm64 tar.gz"
         key: packaging-ubuntu-arm64-tar
         env:
