@@ -445,6 +445,21 @@ func getProcesses(t *gotesting.T, regex string) []runningProcess {
 	return processes
 }
 
+// SimpleInstall is a utility function that only installs the agent and sets up
+// the socketPath for the client. It only implements Deb and Rpm as these two
+// were the only ones needed at the time of implementation. If needed tar.gz can
+// be added as well. This function should be used where you need the agent
+// installed without setting up any cleanup, without enrolling the agent and
+// without calling systemd.
+//
+// A good use case is when there is already an agent (deb or rpm) installed, and
+// when you want to install another agent to upgrade.
+//
+// There are major overlaps between this function and the installDeb and
+// installRpm functions. At the time of implementation refactoring installDeb
+// and installRpm functions were considered; however, to avoid convoluting the
+// code, the relevant parts were duplicated and put into these "simple install"
+// functions.
 func (f *Fixture) SimpleInstall(ctx context.Context) ([]byte, error) {
 	switch f.packageFormat {
 	case "deb":
