@@ -467,7 +467,7 @@ func (f *Fixture) simpleInstallRPM(ctx context.Context) ([]byte, error) {
 	// sudo apt-get install the deb
 	out, err := exec.CommandContext(ctx, "sudo", "rpm", "-Uvh", f.srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
 	if err != nil {
-		return out, fmt.Errorf("apt install failed: %w output:%s", err, string(out))
+		return out, fmt.Errorf("rpm install failed: %w output:%s", err, string(out))
 	}
 
 	socketPath := "unix:///var/lib/elastic-agent/elastic-agent.sock"
