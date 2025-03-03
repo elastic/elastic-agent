@@ -110,7 +110,6 @@ func NewRouter(handlers *Handlers) *mux.Router {
 
 	router := mux.NewRouter().StrictSlash(true)
 	for _, route := range handlers.Routes() {
-		route := route // needed because it's been captured in the closure
 		router.
 			Methods(route.Method).
 			Path(route.Pattern).
@@ -514,7 +513,7 @@ func (s *statusResponseWriter) Header() http.Header {
 
 func (s *statusResponseWriter) Write(bs []byte) (int, error) {
 	n, err := s.w.Write(bs)
-	s.byteCount.Add(uint64(n))
+	s.byteCount.Add(uint64(n)) //nolint:gosec// output of Write is guaranteed to be non-negative
 	return n, err
 }
 
