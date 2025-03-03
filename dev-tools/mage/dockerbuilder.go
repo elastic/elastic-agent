@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -23,20 +24,29 @@ import (
 type dockerBuilder struct {
 	PackageSpec
 
-	imageName string
-	buildDir  string
-	beatDir   string
+	imageName       string
+	buildDir        string
+	beatDir         string
+	isBuildxEnabled bool
 }
 
 func newDockerBuilder(spec PackageSpec) (*dockerBuilder, error) {
 	buildDir := filepath.Join(spec.packageDir, "docker-build")
 	beatDir := filepath.Join(buildDir, "beat")
 
+	buildxEnabled := isBuildxEnabled()
+	if buildxEnabled {
+		fmt.Println("Docker buildx is available, cross-platform builds are possible")
+	} else {
+		fmt.Println("Docker buildx is not available")
+	}
+
 	return &dockerBuilder{
-		PackageSpec: spec,
-		imageName:   spec.ImageName(),
-		buildDir:    buildDir,
-		beatDir:     beatDir,
+		PackageSpec:     spec,
+		imageName:       spec.ImageName(),
+		buildDir:        buildDir,
+		beatDir:         beatDir,
+		isBuildxEnabled: buildxEnabled,
 	}, nil
 }
 
@@ -185,6 +195,18 @@ func (b *dockerBuilder) dockerBuild() (string, error) {
 	if repository := b.ExtraVars["repository"]; repository != "" {
 		tag = fmt.Sprintf("%s/%s", repository, tag)
 	}
+
+	platform := fmt.Sprintf("%s/%s", "linux", b.Arch)
+
+	if runtime.GOARCH != b.Arch { // we need a cross-platform build, check if buildx is available
+		if !b.isBuildxEnabled {
+			return "", fmt.Errorf("cross-platform docker build requested, but buildx is not available")
+		}
+		// if building cross-platform, add the arch name to the tag
+		tag = fmt.Sprintf("%s-%s", tag, b.Arch)
+		return tag, sh.Run("docker", "buildx", "build", "-t", tag, "--platform", platform, "--load", b.buildDir)
+	}
+
 	return tag, sh.Run("docker", "build", "-t", tag, b.buildDir)
 }
 
@@ -249,4 +271,8 @@ func (b *dockerBuilder) dockerSave(tag string) error {
 		return fmt.Errorf("failed to create .sha512 file: %w", err)
 	}
 	return nil
+}
+
+func isBuildxEnabled() bool {
+	return sh.Run("docker", "buildx", "version") == nil
 }
