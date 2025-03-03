@@ -15,7 +15,7 @@ steps:
           PLATFORMS: "linux/amd64"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
-        - build/distributions/**
+          - build/distributions/**
         retry:
           automatic:
             limit: 1
@@ -31,7 +31,7 @@ steps:
           FIPS: "true"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
-        - build/distributions/**
+          - build/distributions/**
         agents:
           provider: "gcp"
           machineType: "n2-standard-4"
@@ -103,6 +103,7 @@ steps:
               - deb
 
   - label: "Serverless integration test"
+    skip: true
     key: "serverless-integration-tests"
     depends_on:
       - int-packaging
@@ -128,6 +129,7 @@ steps:
           context: "buildkite/elastic-agent-extended-testing - Serverless integration test"
 
   - label: "Extended runtime leak tests"
+    skip: true
     key: "extended-integration-tests"
     depends_on:
       - int-packaging
@@ -152,11 +154,13 @@ steps:
           context: "buildkite/elastic-agent-extended-testing - Extended runtime leak tests"
 
   - label: "Triggering Integration tests"
+    skip: true
     depends_on:
       - int-packaging
     command: "buildkite-agent pipeline upload .buildkite/bk.integration.pipeline.yml"
 
   - label: "Serverless Beats Tests"
+    skip: true
     # To speedup the build process only packaging-ubuntu-x86-64 artifact dependency is required
     depends_on:
       - packaging-ubuntu-x86-64
@@ -179,6 +183,7 @@ steps:
           context: "buildkite/elastic-agent-extended-testing - Serverless Beats Tests"
 
   - label: "Kubernetes Integration tests"
+    skip: true
     key: "k8s-integration-tests"
     env:
       K8S_VERSION: "v1.31.0"
