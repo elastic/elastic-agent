@@ -187,9 +187,9 @@ func GoTestBuild(ctx context.Context, params GoTestArgs) error {
 	args := []string{"test", "-c", "-o", params.OutputFile}
 
 	if len(params.Tags) > 0 {
-		params := strings.Join(params.Tags, " ")
+		params := strings.Join(params.Tags, ",")
 		if params != "" {
-			args = append(args, "-tags", params)
+			args = append(args, "-tags="+params)
 		}
 	}
 
