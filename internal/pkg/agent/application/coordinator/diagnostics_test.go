@@ -181,6 +181,7 @@ metadata:
     agent:
       buildoriginal: "8.14.0-SNAPSHOT"
       complete: false
+      fips: false
       id: agent-id
       loglevel: trace
       snapshot: true
