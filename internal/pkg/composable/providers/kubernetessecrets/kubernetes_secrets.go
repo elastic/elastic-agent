@@ -151,8 +151,9 @@ func (p *contextProviderK8SSecrets) Fetch(key string) (string, bool) {
 
 	if p.config.DisableCache {
 		// cache disabled - fetch secret from the API
-		val, _, ok := p.fetchFromAPI(ctx, secretName, secretNamespace, secretKey)
-		return val, ok
+		apiSecretValue, apiSecretResourceVersion, ok := p.fetchFromAPI(ctx, secretName, secretNamespace, secretKey)
+		p.logger.Debugf(`Fetch: %q fetched. Resource Version of secret: %q`, key, apiSecretResourceVersion)
+		return apiSecretValue, ok
 	}
 
 	// cache enabled
