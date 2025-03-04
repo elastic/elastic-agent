@@ -542,6 +542,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		&options,
 		pathConfigFile,
 		store,
+		nil,
 	)
 	if err != nil {
 		return err
