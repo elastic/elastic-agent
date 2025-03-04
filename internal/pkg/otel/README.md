@@ -75,7 +75,6 @@ This section provides a summary of components included in the Elastic Distributi
 | [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.119.0/processor/filterprocessor/README.md) | v0.119.0 |
 | [geoipprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/geoipprocessor/v0.119.0/processor/geoipprocessor/README.md) | v0.119.0 |
 | [k8sattributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/k8sattributesprocessor/v0.119.0/processor/k8sattributesprocessor/README.md) | v0.119.0 |
-| [lsmintervalprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/lsmintervalprocessor/v0.4.0/processor/lsmintervalprocessor/README.md) | v0.4.0 |
 | [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.119.0/processor/memorylimiterprocessor/README.md) | v0.119.0 |
 | [resourcedetectionprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourcedetectionprocessor/v0.119.0/processor/resourcedetectionprocessor/README.md) | v0.119.0 |
 | [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.119.0/processor/resourceprocessor/README.md) | v0.119.0 |
@@ -95,8 +94,8 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+| [elasticapmconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/elasticapmconnector/v0.1.0/connector/elasticapmconnector/README.md) | v0.1.0 |
 | [routingconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/routingconnector/v0.119.0/connector/routingconnector/README.md) | v0.119.0 |
-| [signaltometricsconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/signaltometricsconnector/v0.3.0/connector/signaltometricsconnector/README.md) | v0.3.0 |
 | [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.119.0/connector/spanmetricsconnector/README.md) | v0.119.0 |
 ## Persistence in OpenTelemetry Collector
 
