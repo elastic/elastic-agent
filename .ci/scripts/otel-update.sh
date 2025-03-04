@@ -26,17 +26,10 @@ current_contrib=$(grep 'github\.com/open-telemetry/opentelemetry-collector-contr
 echo "=> Updating core from $current_beta_core/$current_stable_core to $next_beta_core/$next_stable_core"
 echo "=> Updating contrib from $current_contrib to $next_contrib"
 
-if [[ "$OSTYPE" == "darwin"* ]]; then
-  # macOS
-  sed_command="sed -i ''"
-else
-  # Linux
-  sed_command="sed -i"
-fi
-
-$sed_command "s/\(go\.opentelemetry\.io\/collector.*\) $current_beta_core/\1 $next_beta_core/" go.mod
-$sed_command "s/\(go\.opentelemetry\.io\/collector.*\) $current_stable_core/\1 $next_stable_core/" go.mod
-$sed_command "s/\(github\.com\/open-telemetry\/opentelemetry\-collector\-contrib\/.*\) $current_contrib/\1 $next_contrib/" go.mod
+sed -i.bak "s/\(go\.opentelemetry\.io\/collector.*\) $current_beta_core/\1 $next_beta_core/" go.mod
+sed -i.bak "s/\(go\.opentelemetry\.io\/collector.*\) $current_stable_core/\1 $next_stable_core/" go.mod
+sed -i.bak "s/\(github\.com\/open-telemetry\/opentelemetry\-collector\-contrib\/.*\) $current_contrib/\1 $next_contrib/" go.mod
+rm go.mod.bak
 
 echo "=> Running go mod tidy"
 go mod tidy
@@ -48,6 +41,7 @@ mage otel:readme
 echo "=> Creating changelog fragment"
 changelog_fragment_name="update-otel-components-to-$next_contrib"
 elastic-agent-changelog-tool new "$changelog_fragment_name"
-$sed_command "s/^kind:.*$/kind: enhancement/" ./changelog/fragments/*-"${changelog_fragment_name}".yaml
-$sed_command "s/^summary:.*$/summary: Update OTel components to ${next_contrib}/" ./changelog/fragments/*-"${changelog_fragment_name}".yaml
-$sed_command "s/^component:.*$/component: elastic-agent/" ./changelog/fragments/*-"${changelog_fragment_name}".yaml
+sed -i.bak "s/^kind:.*$/kind: enhancement/" ./changelog/fragments/*-"${changelog_fragment_name}".yaml
+sed -i.bak "s/^summary:.*$/summary: Update OTel components to ${next_contrib}/" ./changelog/fragments/*-"${changelog_fragment_name}".yaml
+sed -i.bak "s/^component:.*$/component: elastic-agent/" ./changelog/fragments/*-"${changelog_fragment_name}".yaml
+rm ./changelog/fragments/*-"${changelog_fragment_name}".yaml.bak
