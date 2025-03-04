@@ -34,7 +34,7 @@ type EndpointMetricsMonRunner struct {
 
 func TestEndpointAgentServiceMonitoring(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: FleetEndpointSecurity,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
