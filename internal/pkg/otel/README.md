@@ -71,7 +71,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.120.1/processor/attributesprocessor/README.md) | v0.120.1 |
 | [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.120.0/processor/batchprocessor/README.md) | v0.120.0 |
 | [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.13.0/processor/elasticinframetricsprocessor/README.md) | v0.13.0 |
-| [elastictraceprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elastictraceprocessor/v0.4.0/processor/elastictraceprocessor/README.md) | v0.4.0 |
+| [elastictraceprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elastictraceprocessor/v0.4.1/processor/elastictraceprocessor/README.md) | v0.4.1 |
 | [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.120.1/processor/filterprocessor/README.md) | v0.120.1 |
 | [geoipprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/geoipprocessor/v0.120.1/processor/geoipprocessor/README.md) | v0.120.1 |
 | [k8sattributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/k8sattributesprocessor/v0.120.1/processor/k8sattributesprocessor/README.md) | v0.120.1 |
