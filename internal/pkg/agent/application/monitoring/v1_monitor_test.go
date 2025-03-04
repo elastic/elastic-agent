@@ -738,6 +738,79 @@ func TestMonitoringConfigComponentFields(t *testing.T) {
 	}
 }
 
+func TestMonitoringMetricsDataStreams(t *testing.T) {
+	agentInfo, err := info.NewAgentInfo(context.Background(), false)
+	require.NoError(t, err, "Error creating agent info")
+
+	cfg := &monitoringConfig{
+		C: &monitoringcfg.MonitoringConfig{
+			Enabled:        true,
+			MonitorMetrics: true,
+			Namespace:      "tiaog",
+			HTTP: &monitoringcfg.MonitoringHTTPConfig{
+				Enabled: false,
+			},
+		},
+	}
+
+	policy := map[string]any{
+		"agent": map[string]any{
+			"monitoring": map[string]any{
+				"metrics": true,
+				"logs":    false,
+			},
+		},
+		"outputs": map[string]any{
+			"default": map[string]any{},
+		},
+	}
+
+	b := &BeatsMonitor{
+		enabled:   true,
+		config:    cfg,
+		agentInfo: agentInfo,
+	}
+
+	components := []component.Component{
+		{
+			ID: "filestream-default",
+			InputSpec: &component.InputRuntimeSpec{
+				Spec: component.InputSpec{
+					Service: &component.ServiceSpec{
+						Log: &component.ServiceLogSpec{
+							Path: "/tmp/foo",
+						},
+					},
+				},
+			},
+		},
+	}
+	monitoringConfig, err := b.MonitoringConfig(policy, components, map[string]string{"filestream-default": "filebeat"}, map[string]uint64{})
+	if err != nil {
+		t.Fatalf("cannot render monitoring configuration: %s", err)
+	}
+
+	// The structure of `monitoringConfig` is well know,
+	// so we coerce everything to the correct type. If something does not match
+	// the test will panic.
+	inputsSlice := monitoringConfig["inputs"].([]any)
+	for _, input := range inputsSlice {
+		inputType := input.(map[string]any)["type"]
+		if inputType == "beat/metrics" {
+			// Assert streams are created for given component list plus monitoring beats
+			// In this case, component list includes "filebeat-default"
+			// And the monitoring beats include "beat/metrics" and "http/metrics". Monitoring for logs is disabled
+			assert.Equal(t, 3, len(input.(map[string]any)["streams"].([]any)))
+		}
+		if inputType == "http/metrics" {
+			// Assert monitoring beats is created for elastic-agent's /stats and
+			// filebeat's /input endppoint
+			assert.Equal(t, 2, len(input.(map[string]any)["streams"].([]any)))
+		}
+
+	}
+}
+
 type Processor struct {
 	AddFields AddFields `json:"add_fields"`
 }

@@ -695,8 +695,12 @@ func (b *BeatsMonitor) injectMetricsInput(
 	componentListWithMonitoring := map[string]string{
 		fmt.Sprintf("beat/%s", monitoringMetricsUnitID): "metricbeat",
 		fmt.Sprintf("http/%s", monitoringMetricsUnitID): "metricbeat",
-		monitoringFilesUnitsID:                          "filebeat",
 	}
+	// add a monitoring beat for filebeat only if self-monitoring for logs is true
+	if b.config.C.MonitorLogs {
+		componentListWithMonitoring[monitoringFilesUnitsID] = "filebeat"
+	}
+
 	for k, v := range componentIDToBinary {
 		componentListWithMonitoring[k] = v
 	}
@@ -771,74 +775,6 @@ func (b *BeatsMonitor) injectMetricsInput(
 				},
 			})
 		}
-
-		streams = append(streams, map[string]interface{}{
-			idKey: fmt.Sprintf("%s-%s-1", monitoringMetricsUnitID, name),
-			"data_stream": map[string]interface{}{
-				"type":      "metrics",
-				"dataset":   fmt.Sprintf("elastic_agent.%s", fixedAgentName),
-				"namespace": monitoringNamespace,
-			},
-			"metricsets": []interface{}{"json"},
-			"hosts":      endpoints,
-			"path":       "/stats",
-			"namespace":  "agent",
-			"period":     metricsCollectionIntervalString,
-			"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", fixedAgentName, monitoringNamespace),
-			"processors": []interface{}{
-				map[string]interface{}{
-					"add_fields": map[string]interface{}{
-						"target": "event",
-						"fields": map[string]interface{}{
-							"dataset": fmt.Sprintf("elastic_agent.%s", fixedAgentName),
-						},
-					},
-				},
-				map[string]interface{}{
-					"add_fields": map[string]interface{}{
-						"target": "elastic_agent",
-						"fields": map[string]interface{}{
-							"id":       b.agentInfo.AgentID(),
-							"version":  b.agentInfo.Version(),
-							"snapshot": b.agentInfo.Snapshot(),
-							"process":  name,
-						},
-					},
-				},
-				map[string]interface{}{
-					"add_fields": map[string]interface{}{
-						"target": "agent",
-						"fields": map[string]interface{}{
-							"id": b.agentInfo.AgentID(),
-						},
-					},
-				},
-				map[string]interface{}{
-					"copy_fields": map[string]interface{}{
-						"fields":         httpCopyRules(),
-						"ignore_missing": true,
-						"fail_on_error":  false,
-					},
-				},
-				map[string]interface{}{
-					"drop_fields": map[string]interface{}{
-						"fields": []interface{}{
-							"http",
-						},
-						"ignore_missing": true,
-					},
-				},
-				map[string]interface{}{
-					"add_fields": map[string]interface{}{
-						"target": "component",
-						"fields": map[string]interface{}{
-							"id":     unit,
-							"binary": binaryName,
-						},
-					},
-				},
-			},
-		})
 
 		if strings.EqualFold(name, "filebeat") {
 			fbDataStreamName := "filebeat_input"
