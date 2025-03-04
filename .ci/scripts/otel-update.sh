@@ -4,9 +4,9 @@ set -euo pipefail
 
 usage() {
   echo "Usage: $0 <next-beta-core> <next-stable-core> [<next-contrib>]"
-  echo "  <next-beta-core>: Next beta version of the core component (e.g. v0.120.0)"
-  echo "  <next-stable-core>: Next stable version of the core component (e.g. v1.26.0)"
-  echo "  <next-contrib>: Next beta version of the contrib component (e.g. v0.120.1). If not specified, <next-beta-core> is used."
+  echo "  <next-beta-core>: Next version of the unstable core components (e.g. v0.120.0). Get it from https://github.com/open-telemetry/opentelemetry-collector/releases."
+  echo "  <next-stable-core>: Next stable version of the stable core components (e.g. v1.26.0). Get it from https://github.com/open-telemetry/opentelemetry-collector/releases."
+  echo "  <next-contrib>: Next version of the contrib components (e.g. v0.120.1). Get it from https://github.com/open-telemetry/opentelemetry-collector-contrib/releases. If not specified, <next-beta-core> is used."
   echo
   exit 1
 }
