@@ -22,7 +22,8 @@ import (
 )
 
 const (
-	saltSize = 8
+	iterations = 12022
+	keyLen     = 32
 )
 
 func (v *FileVault) encrypt(data []byte) ([]byte, error) {
@@ -56,7 +57,7 @@ func deriveKey(pw []byte, salt []byte) ([]byte, []byte, error) {
 			return nil, nil, err
 		}
 	}
-	return pbkdf2.Key(pw, salt, 12022, 32, sha256.New), salt, nil
+	return pbkdf2.Key(pw, salt, iterations, keyLen, sha256.New), salt, nil
 }
 
 func tightenPermissions(path string, ownership utils.FileOwner) error {
