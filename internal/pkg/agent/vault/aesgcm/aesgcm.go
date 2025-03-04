@@ -62,7 +62,7 @@ func Encrypt(key, data []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	aesGCM, err := cipher.NewGCM(block)
+	aesGCM, err := cipher.NewGCMWithRandomNonce(block)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func Decrypt(key, data []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	aesGCM, err := cipher.NewGCM(block)
+	aesGCM, err := cipher.NewGCMWithRandomNonce(block)
 	if err != nil {
 		return nil, err
 	}
