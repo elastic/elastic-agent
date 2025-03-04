@@ -559,7 +559,6 @@ collectors:
         routing:
           default_pipelines: [metrics/otel]
           error_mode: ignore
-          match_once: true
           table:
             - context: metric
               statement: route() where instrumentation_scope.name == "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver" or IsMatch(instrumentation_scope.name, "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal/scraper/*")
