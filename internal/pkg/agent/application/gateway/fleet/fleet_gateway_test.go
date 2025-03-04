@@ -124,7 +124,7 @@ func TestFleetGateway(t *testing.T) {
 	agentInfo := &testAgentInfo{}
 	settings := &fleetGatewaySettings{
 		Duration: 5 * time.Second,
-		Backoff:  backoffSettings{Init: 1 * time.Second, Max: 5 * time.Second},
+		Backoff:  &backoffSettings{Init: 1 * time.Second, Max: 5 * time.Second},
 	}
 
 	t.Run("send no event and receive no action", withGateway(agentInfo, settings, func(
@@ -274,7 +274,7 @@ func TestFleetGateway(t *testing.T) {
 			log,
 			&fleetGatewaySettings{
 				Duration: d,
-				Backoff:  backoffSettings{Init: 1 * time.Second, Max: 30 * time.Second},
+				Backoff:  &backoffSettings{Init: 1 * time.Second, Max: 30 * time.Second},
 			},
 			agentInfo,
 			client,
@@ -383,7 +383,7 @@ func TestRetriesOnFailures(t *testing.T) {
 	agentInfo := &testAgentInfo{}
 	settings := &fleetGatewaySettings{
 		Duration: 5 * time.Second,
-		Backoff:  backoffSettings{Init: 100 * time.Millisecond, Max: 5 * time.Second},
+		Backoff:  &backoffSettings{Init: 100 * time.Millisecond, Max: 5 * time.Second},
 	}
 
 	t.Run("When the gateway fails to communicate with the checkin API we will retry",
@@ -434,7 +434,7 @@ func TestRetriesOnFailures(t *testing.T) {
 	t.Run("The retry loop is interruptible",
 		withGateway(agentInfo, &fleetGatewaySettings{
 			Duration: 0 * time.Second,
-			Backoff:  backoffSettings{Init: 10 * time.Minute, Max: 20 * time.Minute},
+			Backoff:  &backoffSettings{Init: 10 * time.Minute, Max: 20 * time.Minute},
 		}, func(
 			t *testing.T,
 			gateway coordinator.FleetGateway,
@@ -587,7 +587,7 @@ func TestFleetGatewaySchedulerSwitch(t *testing.T) {
 	agentInfo := &testAgentInfo{}
 	settings := &fleetGatewaySettings{
 		Duration: 1 * time.Second,
-		Backoff:  backoffSettings{Init: 1 * time.Millisecond, Max: 2 * time.Millisecond},
+		Backoff:  &backoffSettings{Init: 1 * time.Millisecond, Max: 2 * time.Millisecond},
 	}
 
 	tempSet := *defaultGatewaySettings
