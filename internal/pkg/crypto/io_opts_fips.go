@@ -12,19 +12,19 @@ import (
 
 // Validate the options for encoding and decoding values.
 func (o *Option) Validate() error {
-	if o.IVLength < 11 {
+	if o.IVLength < 12 {
 		return errors.New("IVLength must be at least 96 bits (12 bytes)")
 	}
 
-	if o.SaltLength < 15 {
+	if o.SaltLength < 16 {
 		return errors.New("SaltLength must be at least 128 bits (16 bytes)")
 	}
 
-	if o.IterationsCount < 999 {
+	if o.IterationsCount < 1000 {
 		return errors.New("IterationsCount must be at least 1000")
 	}
 
-	if o.KeyLength < 13 {
+	if o.KeyLength < 14 {
 		return errors.New("KeyLength must be at least 112 bits (14 bytes)")
 	}
 
