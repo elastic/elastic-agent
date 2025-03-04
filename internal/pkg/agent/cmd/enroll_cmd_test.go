@@ -110,6 +110,7 @@ func TestEnroll(t *testing.T) {
 				},
 				"",
 				store,
+				nil,
 			)
 			require.NoError(t, err)
 
@@ -181,6 +182,7 @@ func TestEnroll(t *testing.T) {
 			&enrollOptions,
 			"",
 			store,
+			nil,
 		)
 		require.NoError(t, err, "could not create enroll command")
 
@@ -254,6 +256,7 @@ func TestEnroll(t *testing.T) {
 				},
 				"",
 				store,
+				nil,
 			)
 			require.NoError(t, err)
 
@@ -316,6 +319,7 @@ func TestEnroll(t *testing.T) {
 				},
 				"",
 				store,
+				nil,
 			)
 			require.NoError(t, err)
 
@@ -380,6 +384,7 @@ func TestEnroll(t *testing.T) {
 				},
 				"",
 				store,
+				nil,
 			)
 			require.NoError(t, err)
 
@@ -424,6 +429,7 @@ func TestEnroll(t *testing.T) {
 				},
 				"",
 				store,
+				nil,
 			)
 			require.NoError(t, err)
 
@@ -492,6 +498,7 @@ func TestEnroll(t *testing.T) {
 				},
 				"",
 				store,
+				nil,
 			)
 			require.NoError(t, err)
 
