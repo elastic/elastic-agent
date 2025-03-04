@@ -55,7 +55,6 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
 
-      # Packaging linux/arm64
       - label: "Packaging: Ubuntu x86_64 FIPS"
         key: "packaging-ubuntu-x86-64-fips"
         env:
@@ -69,10 +68,10 @@ steps:
           automatic:
             limit: 1
         agents:
-          provider: "aws"
-          instanceType: "c6g.4xlarge"
-          imagePrefix: "core-ubuntu-2204-aarch64"
+          provider: "gcp"
+          machineType: "n2-standard-4"
 
+      # Packaging linux/arm64
       - label: "Packaging: linux/arm64 tar.gz"
         key: packaging-ubuntu-arm64-tar
         env:
@@ -102,8 +101,9 @@ steps:
           automatic:
             limit: 1
         agents:
-          provider: "gcp"
-          machineType: "n2-standard-4"
+          provider: "aws"
+          instanceType: "c6g.4xlarge"
+          imagePrefix: "core-ubuntu-2204-aarch64"
 
       - label: "Packaging: windows/amd64 zip"
         key: packaging-windows
