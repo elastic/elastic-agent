@@ -27,6 +27,8 @@ steps:
       - integration-ess
     steps:
       - label: "Win2022:sudo:{{matrix}}"
+        depends_on:
+          - packaging-windows
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} true
@@ -51,6 +53,8 @@ steps:
           - install-uninstall
 
       - label: "Win2022:non-sudo:{{matrix}}"
+        depends_on:
+          - packaging-windows
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} false
@@ -68,6 +72,8 @@ steps:
           - default
 
       - label: "Win2025:sudo:{{matrix}}"
+        depends_on:
+          - packaging-windows
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} true
@@ -89,6 +95,8 @@ steps:
           - install-uninstall
 
       - label: "Win2025:non-sudo:{{matrix}}"
+        depends_on:
+          - packaging-windows
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} false
@@ -108,6 +116,8 @@ steps:
       - integration-ess
     steps:
       - label: "x86_64:non-sudo: {{matrix}}"
+        depends_on:
+          - packaging-ubuntu-x86-64-tar
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64-tar'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
@@ -125,6 +135,9 @@ steps:
           - default
 
       - label: "x86_64:sudo: {{matrix}}"
+        depends_on:
+          - packaging-ubuntu-x86-64-tar
+          - packaging-ubuntu-x86-64-deb
         # due to deb group present in matrix tar.gz and deb packages artifacts are required
         command: |
           buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64-tar
@@ -157,6 +170,9 @@ steps:
           - container
 
       - label: "arm:sudo: {{matrix}}"
+        depends_on:
+          - packaging-ubuntu-x86-64-tar
+          - packaging-ubuntu-x86-64-deb
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64-tar'
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64-deb'
@@ -190,6 +206,8 @@ steps:
 
       - label: "arm:non-sudo: {{matrix}}"
         skip: true
+        depends_on:
+          - packaging-ubuntu-x86-64-tar
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64-tar'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
@@ -212,6 +230,8 @@ steps:
       - integration-ess
     steps:
       - label: "x86_64:sudo:rpm"
+        depends_on:
+          - packaging-ubuntu-x86-64-rpm
         command: |
           buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64-rpm
           .buildkite/scripts/steps/integration_tests_tf.sh rpm true
