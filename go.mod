@@ -1,6 +1,8 @@
 module github.com/elastic/elastic-agent
 
-go 1.23.0
+go 1.23.6
+
+toolchain go1.24.0
 
 require (
 	github.com/Jeffail/gabs/v2 v2.6.0
@@ -25,7 +27,7 @@ require (
 	github.com/elastic/mock-es v0.0.0-20241101195702-0a41fa3d30d9
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.2.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.13.0
-	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.4.0
+	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.4.1
 	github.com/fatih/color v1.17.0
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-viper/mapstructure/v2 v2.2.1
@@ -128,7 +130,7 @@ require (
 	go.opentelemetry.io/collector/confmap/provider/httpprovider v1.26.0
 	go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.26.0
 	go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.26.0
-	go.opentelemetry.io/collector/connector v0.121.0
+	go.opentelemetry.io/collector/connector v0.120.0
 	go.opentelemetry.io/collector/exporter v0.120.0
 	go.opentelemetry.io/collector/exporter/debugexporter v0.120.0
 	go.opentelemetry.io/collector/exporter/otlpexporter v0.120.0
@@ -236,7 +238,7 @@ require (
 	github.com/elastic/lunes v0.1.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250304113502-535989f7a69f // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.5.1 // indirect
-	github.com/elastic/opentelemetry-lib v0.16.0 // indirect
+	github.com/elastic/opentelemetry-lib v0.16.1 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/envoyproxy/go-control-plane v0.13.1 // indirect

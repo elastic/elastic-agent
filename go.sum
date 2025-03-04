@@ -356,12 +356,12 @@ github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v
 github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250304113502-535989f7a69f/go.mod h1:8e9NcGfE2xeor8r+WV9a+hKBEkzJEDnqZN7tqb3GUe8=
 github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.13.0 h1:Y8DWrxdpNMscYXTN3EoK509vqf+0aD1RfNZF5wOtsQs=
 github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.13.0/go.mod h1:iLTitn5RdFtBHYLC2YVAgjv2OxCKY51rdhtrsT1hQ8I=
-github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.4.0 h1:nY0wQsNIAXMAS6BaaT6A+rne5AWEZ1IFLVZkqMOQVCc=
-github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.4.0/go.mod h1:wV/KETNcmVPk+pTHDjSFD4jtB839hntSeSPmce+tUDY=
+github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.4.1 h1:7Cu5aiyBARa8xwixZ1H2zLNDrqWffDETJsUdr+2RkCk=
+github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.4.1/go.mod h1:gbrGSwTqOlFW0t+1SkpXy1vLTUmIHkKIkNdK6UBRXGk=
 github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.5.1 h1:hyB8mBGR2QcwWZylx80Km7/vTwpwqJpFtDaZ4URsUIY=
 github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.5.1/go.mod h1:f3DLFRi1VX93/W4jXDkGpEnbWsJdK55xAPWqSo2Es2U=
-github.com/elastic/opentelemetry-lib v0.16.0 h1:pmfKCb92wPCeR9FKPazTkbBzLPbrqInYwdBl6LElfec=
-github.com/elastic/opentelemetry-lib v0.16.0/go.mod h1:nyHs704lAmz4K83yDMmwrpLXsVjbMMxHOco3WRsGLP4=
+github.com/elastic/opentelemetry-lib v0.16.1 h1:O+E5d6MRjQN5ggRYtaorHcZPzcZHvkz31kwlUFls72M=
+github.com/elastic/opentelemetry-lib v0.16.1/go.mod h1:auZpyxu1jsRUPSYOli6uGbrVZSOFI9ovzzY0Sken3ac=
 github.com/elastic/pkcs8 v1.0.0 h1:HhitlUKxhN288kcNcYkjW6/ouvuwJWd9ioxpjnD9jVA=
 github.com/elastic/pkcs8 v1.0.0/go.mod h1:ipsZToJfq1MxclVTwpG7U/bgeDtf+0HkUiOxebk95+0=
 github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153/go.mod h1:/Zj4wYkgs4iZTTu3o/KG3Itv/qCCa8VVMlb3i9OVuzc=
@@ -1383,8 +1383,8 @@ go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.26.0 h1:KYHCHGV+t
 go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.26.0/go.mod h1:HHYJ+1t5XUUOTCuFVc7OmyWHPZpIxSMgqckhCTD/F0Y=
 go.opentelemetry.io/collector/confmap/xconfmap v0.121.0 h1:pZ7SOl/i3kUIPdUwIeHHsYqzOHNLCwiyXZnwQ7rLO3E=
 go.opentelemetry.io/collector/confmap/xconfmap v0.121.0/go.mod h1:YI1Sp8mbYro/H3rqH4csTq68VUuie5WVb7LI1o5+tVc=
-go.opentelemetry.io/collector/connector v0.121.0 h1:Bhre1CU8+nvXhOO74ZjCQth6JIwuRgGmUVFU5I6fDhY=
-go.opentelemetry.io/collector/connector v0.121.0/go.mod h1:njtHMkFOuZ5W5Ax2BnsqC8EThgTU7tF1k7OBpRs0+uQ=
+go.opentelemetry.io/collector/connector v0.120.0 h1:t6/2wOhm2UAgOPRKhMhybna8UjvoJI4hX305CIA2hWU=
+go.opentelemetry.io/collector/connector v0.120.0/go.mod h1:REneUxc1SnH07DlNXCvh0ZBBi67wAT4HpzAPRmIt378=
 go.opentelemetry.io/collector/connector/connectortest v0.120.0 h1:Blh4QsVBoPoT9dR4GC6f1oGrzotkOOElevTQOk9Wn7c=
 go.opentelemetry.io/collector/connector/connectortest v0.120.0/go.mod h1:NPyD5TVRND637kd+5nTeik8ZDl82MNJXln3mY80sY2M=
 go.opentelemetry.io/collector/connector/xconnector v0.120.0 h1:waYzmPSRr9BwDJxFO2wYgfPIttPhaIdyKj2xRTYLXZo=
