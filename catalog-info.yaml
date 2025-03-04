@@ -338,7 +338,7 @@ metadata:
   description: Elastic-agent Helm Charts Pipeline
   links:
     - title: Pipeline
-      url: https://buildkite.com/elastic/buildkite-elastic-agent-helm-charts
+      url: https://buildkite.com/elastic/elastic-agent-helm-charts
 
 spec:
   type: buildkite-pipeline
@@ -348,7 +348,7 @@ spec:
     apiVersion: buildkite.elastic.dev/v1
     kind: Pipeline
     metadata:
-      name: buildkite-elastic-agent-helm-charts
+      name: elastic-agent-helm-charts
       description: Runs elastic-agent helm charts
     spec:
       pipeline_file: ".buildkite/pipeline.elastic-agent-helm-charts.yml"
