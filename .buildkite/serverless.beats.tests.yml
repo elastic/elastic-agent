@@ -7,8 +7,8 @@ env:
 steps:
   - label: "Serverless Beats Tests"
     key: "serverless-beats-integration-tests"
-    concurrency_group: elastic-agent-extended-testing/beats-integration
-    concurrency: 8
+    # concurrency_group: elastic-agent-extended-testing/beats-integration
+    # concurrency: 8
     retry:
       automatic:
         limit: 1
