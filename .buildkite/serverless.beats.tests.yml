@@ -15,7 +15,7 @@ steps:
     env:
       TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-a"
     command: |
-      buildkite-agent artifact download "build/distributions/**" . $BUILDKITE_BUILD_ID
+      # buildkite-agent artifact download "build/distributions/**" . $BUILDKITE_BUILD_ID
       .buildkite/scripts/steps/beats_tests.sh
     agents:
       provider: "gcp"
