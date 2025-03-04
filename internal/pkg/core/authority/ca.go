@@ -7,8 +7,11 @@ package authority
 import (
 	"bytes"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -53,6 +56,7 @@ func NewCA() (*CertificateAuthority, error) {
 	}
 
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	ca.SubjectKeyId = generateSubjectKeyID(privateKey)
 	publicKey := &privateKey.PublicKey
 	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, publicKey, privateKey)
 	if err != nil {
@@ -158,4 +162,21 @@ func (c *CertificateAuthority) GeneratePairWithName(name string) (*Pair, error) 
 // Crt returns crt cert of certificate authority
 func (c *CertificateAuthority) Crt() []byte {
 	return c.caPEM
+}
+
+func generateSubjectKeyID(pub crypto.PublicKey) []byte {
+	// SubjectKeyId generated using method 1 in RFC 7093, Section 2:
+	//   1) The keyIdentifier is composed of the leftmost 160-bits of the
+	//   SHA-256 hash of the value of the BIT STRING subjectPublicKey
+	//   (excluding the tag, length, and number of unused bits).
+	var publicKeyBytes []byte
+	switch publicKey := pub.(type) {
+	case *rsa.PublicKey:
+		publicKeyBytes = x509.MarshalPKCS1PublicKey(publicKey)
+	case *ecdsa.PublicKey:
+		//nolint:staticcheck // no alternative
+		publicKeyBytes = elliptic.Marshal(publicKey.Curve, publicKey.X, publicKey.Y)
+	}
+	h := sha256.Sum256(publicKeyBytes)
+	return h[:20]
 }

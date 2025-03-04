@@ -8,14 +8,13 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/pbkdf2"
 	"crypto/rand"
 	"crypto/sha512"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
-
-	"golang.org/x/crypto/pbkdf2"
 )
 
 // Option is the default options used to generate the encrypt and decrypt writer.
@@ -127,12 +126,16 @@ func (w *Writer) Write(b []byte) (int, error) {
 		w.wroteHeader = true
 
 		// Stretch the user provided key.
-		passwordBytes := stretchPassword(
+		passwordBytes, err := stretchPassword(
 			w.password,
 			w.salt,
 			w.option.IterationsCount,
 			w.option.KeyLength,
 		)
+		if err != nil {
+			w.err = fmt.Errorf("could not create password: %w", err)
+			return 0, w.err
+		}
 
 		// Select AES-256: because len(passwordBytes) == 32 bytes.
 		block, err := aes.NewCipher(passwordBytes)
@@ -141,7 +144,7 @@ func (w *Writer) Write(b []byte) (int, error) {
 			return 0, w.err
 		}
 
-		aesgcm, err := cipher.NewGCM(block)
+		aesgcm, err := cipher.NewGCMWithRandomNonce(block)
 		if err != nil {
 			w.err = fmt.Errorf("could not create the GCM to encrypt: %w", err)
 			return 0, w.err
@@ -182,23 +185,23 @@ func (w *Writer) Write(b []byte) (int, error) {
 func (w *Writer) writeBlock(b []byte) error {
 	// randomly generate the salt and the initialization vector, this information will be saved
 	// on disk in the file as part of the header
-	iv, err := w.generator(w.option.IVLength)
-	if err != nil {
-		w.err = fmt.Errorf("fail to generate random IV: %w", err)
-		return w.err
-	}
+	//iv, err := w.generator(w.option.IVLength)
+	//if err != nil {
+	//	w.err = fmt.Errorf("fail to generate random IV: %w", err)
+	//	return w.err
+	//}
 
-	//nolint:errcheck // Ignore the error at this point.
-	w.writer.Write(iv)
+	////nolint:errcheck // Ignore the error at this point.
+	//w.writer.Write(iv)
 
-	encodedBytes := w.gcm.Seal(nil, iv, b, nil)
+	encodedBytes := w.gcm.Seal(nil, nil, b, nil)
 
 	l := make([]byte, 4)
 	binary.LittleEndian.PutUint32(l, uint32(len(encodedBytes)))
 	//nolint:errcheck // Ignore the error at this point.
 	w.writer.Write(l)
 
-	_, err = w.writer.Write(encodedBytes)
+	_, err := w.writer.Write(encodedBytes)
 	if err != nil {
 		return fmt.Errorf("fail to encode data: %w", err)
 	}
@@ -265,12 +268,16 @@ func (r *Reader) Read(b []byte) (int, error) {
 		salt := buf[vLen : vLen+r.option.SaltLength]
 
 		// Stretch the user provided key.
-		passwordBytes := stretchPassword(
+		passwordBytes, err := stretchPassword(
 			r.password,
 			salt,
 			r.option.IterationsCount,
 			r.option.KeyLength,
 		)
+		if err != nil {
+			r.err = fmt.Errorf("could not create password: %w", err)
+			return 0, r.err
+		}
 
 		block, err := aes.NewCipher(passwordBytes)
 		if err != nil {
@@ -278,7 +285,7 @@ func (r *Reader) Read(b []byte) (int, error) {
 			return 0, r.err
 		}
 
-		aesgcm, err := cipher.NewGCM(block)
+		aesgcm, err := cipher.NewGCMWithRandomNonce(block)
 		if err != nil {
 			r.err = fmt.Errorf("could not create the GCM to decrypt the data: %w", err)
 			return 0, r.err
@@ -320,7 +327,7 @@ func (r *Reader) consumeBlock() error {
 	// Retrieve block information:
 	// - Initialization vector
 	// - Length of the block
-	iv, l, err := r.readBlockInfo()
+	_, l, err := r.readBlockInfo()
 	if err != nil {
 		return err
 	}
@@ -331,7 +338,7 @@ func (r *Reader) consumeBlock() error {
 		r.err = fmt.Errorf("fail read the block of %d bytes: %w", l, err)
 	}
 
-	decodedBytes, err := r.gcm.Open(nil, iv, encodedBytes, nil)
+	decodedBytes, err := r.gcm.Open(nil, nil, encodedBytes, nil)
 	if err != nil {
 		return fmt.Errorf("fail to decode bytes: %w", err)
 	}
@@ -341,13 +348,14 @@ func (r *Reader) consumeBlock() error {
 }
 
 func (r *Reader) readBlockInfo() ([]byte, int, error) {
-	buf := make([]byte, r.option.IVLength+4)
+	buf := make([]byte, r.gcm.Overhead())
 	_, err := io.ReadAtLeast(r.reader, buf, len(buf))
 	if err != nil {
 		return nil, 0, err
 	}
 
-	iv := buf[0:r.option.IVLength]
+	// NewGCMWithRandomNonce makes a 96 bit (12 byte) nonce
+	iv := buf[0:12]
 	l := binary.LittleEndian.Uint32(buf[r.option.IVLength:])
 
 	return iv, int(l), nil
@@ -372,6 +380,6 @@ func randomBytes(length int) ([]byte, error) {
 	return r, nil
 }
 
-func stretchPassword(password, salt []byte, c, kl int) []byte {
-	return pbkdf2.Key(password, salt, c, kl, sha512.New)
+func stretchPassword(password, salt []byte, c, kl int) ([]byte, error) {
+	return pbkdf2.Key(sha512.New, string(password), salt, c, kl)
 }
