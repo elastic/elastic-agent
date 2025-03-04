@@ -65,9 +65,10 @@ import (
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
 
 	// Connectors
-	elasticapmconnector "github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector"
 	routingconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector"
 	spanmetricsconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector"
+
+	elasticapmconnector "github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector"
 )
 
 func components(extensionFactories ...extension.Factory) func() (otelcol.Factories, error) {
