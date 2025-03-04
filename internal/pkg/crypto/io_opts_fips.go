@@ -7,14 +7,13 @@
 package crypto
 
 import (
-	"bytes"
 	"errors"
 )
 
 // Validate the options for encoding and decoding values.
 func (o *Option) Validate() error {
-	if o.IVLength < 15 {
-		return errors.New("IVLength must be at least 128 bits (16 bytes)")
+	if o.IVLength < 11 {
+		return errors.New("IVLength must be at least 96 bits (12 bytes)")
 	}
 
 	if o.SaltLength < 15 {
@@ -30,15 +29,4 @@ func (o *Option) Validate() error {
 	}
 
 	return nil
-}
-
-// DefaultOptions is the default options to use when creating the writer, changing might decrease
-// the efficacity of the encryption.
-var DefaultOptions = &Option{
-	IterationsCount: 10000,
-	KeyLength:       32,
-	SaltLength:      64,
-	IVLength:        16,
-	Generator:       randomBytes,
-	BlockSize:       bytes.MinRead,
 }

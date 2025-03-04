@@ -31,6 +31,17 @@ type Option struct {
 	BlockSize int
 }
 
+// DefaultOptions is the default options to use when creating the writer, changing might decrease
+// the efficacity of the encryption.
+var DefaultOptions = &Option{
+	IterationsCount: 10000,
+	KeyLength:       32,
+	SaltLength:      64,
+	IVLength:        12,
+	Generator:       randomBytes,
+	BlockSize:       bytes.MinRead,
+}
+
 // versionMagicHeader is the format version that will be added at the beginning of the header and
 // can be used to change how the decryption work in future version.
 var versionMagicHeader = []byte("v2")

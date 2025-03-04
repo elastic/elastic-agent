@@ -7,7 +7,6 @@
 package crypto
 
 import (
-	"bytes"
 	"errors"
 )
 
@@ -30,15 +29,4 @@ func (o *Option) Validate() error {
 	}
 
 	return nil
-}
-
-// DefaultOptions is the default options to use when creating the writer, changing might decrease
-// the efficacity of the encryption.
-var DefaultOptions = &Option{
-	IterationsCount: 10000,
-	KeyLength:       32,
-	SaltLength:      64,
-	IVLength:        12,
-	Generator:       randomBytes,
-	BlockSize:       bytes.MinRead,
 }
