@@ -20,6 +20,9 @@ func testPackageSpec() PackageSpec {
 		Snapshot: true,
 		OS:       "windows",
 		Arch:     "x86_64",
+		ExtraTags: []string{
+			"git-{{ substring commit 0 12 }}",
+		},
 		Files: map[string]PackageFile{
 			"brewbeat.yml": PackageFile{
 				Source: "./testdata/config.yml",
@@ -65,6 +68,10 @@ func testPackage(t testing.TB, pack func(PackageSpec) error) {
 	readme := spec.Files["README.txt"]
 	readmePath := filepath.ToSlash(filepath.Clean(readme.Source))
 	assert.True(t, strings.HasPrefix(readmePath, packageStagingDir))
+
+	commit := spec.ExtraTags[0]
+	expected := "git-" + commitHash[:12]
+	assert.Equal(t, expected, commit)
 
 	if err := pack(spec); err != nil {
 		t.Fatal(err)
