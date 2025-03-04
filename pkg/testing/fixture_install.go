@@ -330,12 +330,12 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 
 		// environment variable AGENT_KEEP_INSTALLED=true will skip the uninstallation
 		// useful to debug the issue with the Elastic Agent
-		if f.t.Failed() && keepInstalledFlag() {
+		if f.t.Failed() && KeepInstalledFlag() {
 			f.t.Logf("skipping uninstall; test failed and AGENT_KEEP_INSTALLED=true")
 			return
 		}
 
-		if keepInstalledFlag() {
+		if KeepInstalledFlag() {
 			f.t.Logf("ignoring AGENT_KEEP_INSTALLED=true as test succeeded, " +
 				"keeping the agent installed will jeopardise other tests")
 		}
@@ -445,6 +445,73 @@ func getProcesses(t *gotesting.T, regex string) []runningProcess {
 	return processes
 }
 
+// SimpleInstall is a utility function that only installs the agent and sets up
+// the socketPath for the client. It only implements Deb and Rpm as these two
+// were the only ones needed at the time of implementation. If needed tar.gz can
+// be added as well. This function should be used where you need the agent
+// installed without setting up any cleanup, without enrolling the agent and
+// without calling systemd.
+//
+// A good use case is when there is already an agent (deb or rpm) installed, and
+// when you want to install another agent to upgrade.
+//
+// There are major overlaps between this function and the installDeb and
+// installRpm functions. At the time of implementation refactoring installDeb
+// and installRpm functions were considered; however, to avoid convoluting the
+// code, the relevant parts were duplicated and put into these "simple install"
+// functions.
+func (f *Fixture) SimpleInstall(ctx context.Context) ([]byte, error) {
+	switch f.packageFormat {
+	case "deb":
+		return f.simpleInstallDeb(ctx)
+	case "rpm":
+		return f.simpleInstallRPM(ctx)
+	default:
+		return nil, fmt.Errorf("unknown package format for simple install: %s", f.packageFormat)
+	}
+}
+
+func (f *Fixture) simpleInstallRPM(ctx context.Context) ([]byte, error) {
+	f.t.Logf("[test %s] Inside fixture simpleInstallRPM function", f.t.Name())
+	// Prepare so that the f.srcPackage string is populated
+	err := f.EnsurePrepared(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare: %w", err)
+	}
+
+	// sudo apt-get install the deb
+	out, err := exec.CommandContext(ctx, "sudo", "rpm", "-Uvh", f.srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
+	if err != nil {
+		return out, fmt.Errorf("rpm install failed: %w output:%s", err, string(out))
+	}
+
+	socketPath := "unix:///var/lib/elastic-agent/elastic-agent.sock"
+	c := client.New(client.WithAddress(socketPath))
+	f.setClient(c)
+	return nil, nil
+}
+
+func (f *Fixture) simpleInstallDeb(ctx context.Context) ([]byte, error) {
+	f.t.Logf("[test %s] Inside fixture simpleInstallDeb function", f.t.Name())
+	// Prepare so that the f.srcPackage string is populated
+	err := f.EnsurePrepared(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare: %w", err)
+	}
+
+	// sudo apt-get install the deb
+	out, err := exec.CommandContext(ctx, "sudo", "DEBIAN_FRONTEND=noninteractive", "apt-get", "-y", "-q", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold", "install", f.srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
+	if err != nil {
+		return out, fmt.Errorf("apt install failed: %w output:%s", err, string(out))
+	}
+
+	socketPath := "unix:///var/lib/elastic-agent/elastic-agent.sock"
+	c := client.New(client.WithAddress(socketPath))
+	f.setClient(c)
+
+	return nil, nil
+}
+
 // installDeb installs the prepared Elastic Agent binary from the deb
 // package and registers a t.Cleanup function to uninstall the agent if
 // it hasn't been uninstalled. It also takes care of collecting a
@@ -478,7 +545,7 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, shou
 			f.t.Logf("error systemctl stop elastic-agent: %s, output: %s", err, string(out))
 		}
 
-		if keepInstalledFlag() {
+		if KeepInstalledFlag() {
 			f.t.Logf("skipping uninstall; test failed and AGENT_KEEP_INSTALLED=true")
 			return
 		}
@@ -497,6 +564,10 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, shou
 	if err != nil {
 		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
 	}
+
+	socketPath := "unix:///var/lib/elastic-agent/elastic-agent.sock"
+	c := client.New(client.WithAddress(socketPath))
+	f.setClient(c)
 
 	if !shouldEnroll {
 		return nil, nil
@@ -584,6 +655,10 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 	if err != nil {
 		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
 	}
+
+	socketPath := "unix:///var/lib/elastic-agent/elastic-agent.sock"
+	c := client.New(client.WithAddress(socketPath))
+	f.setClient(c)
 
 	if !shouldEnroll {
 		return nil, nil
@@ -817,7 +892,7 @@ func collectDiagFlag() bool {
 	return v
 }
 
-func keepInstalledFlag() bool {
+func KeepInstalledFlag() bool {
 	// failure reports false (ignore error)
 	v, _ := strconv.ParseBool(os.Getenv("AGENT_KEEP_INSTALLED"))
 	return v
