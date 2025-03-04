@@ -328,39 +328,3 @@ spec:
           access_level: MANAGE_BUILD_AND_READ
         everyone:
           access_level: BUILD_AND_READ
-
----
-# yaml-language-server: $schema=https://gist.githubusercontent.com/elasticmachine/988b80dae436cafea07d9a4a460a011d/raw/rre.schema.json
-apiVersion: backstage.io/v1alpha1
-kind: Resource
-metadata:
-  name: buildkite-elastic-agent-helm-charts
-  description: Elastic-agent Helm Charts Pipeline
-  links:
-    - title: Pipeline
-      url: https://buildkite.com/elastic/buildkite-elastic-agent-helm-charts
-
-spec:
-  type: buildkite-pipeline
-  owner: group:ingest-fp
-  system: platform-ingest
-  implementation:
-    apiVersion: buildkite.elastic.dev/v1
-    kind: Pipeline
-    metadata:
-      name: buildkite-elastic-agent-helm-charts
-      description: Runs elastic-agent helm charts
-    spec:
-      pipeline_file: ".buildkite/pipeline.elastic-agent-helm-charts.yml"
-      provider_settings:
-        trigger_mode: none # don't trigger jobs from github activity
-      repository: elastic/elastic-agent
-      teams:
-        ingest-fp:
-          access_level: MANAGE_BUILD_AND_READ
-        observablt-robots:
-          access_level: MANAGE_BUILD_AND_READ
-        release-eng:
-          access_level: BUILD_AND_READ
-        everyone:
-          access_level: READ
