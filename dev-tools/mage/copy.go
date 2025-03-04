@@ -13,9 +13,15 @@ import (
 	"regexp"
 )
 
+type SkipFn func(string) bool
+
 // Copy copies a file or a directory (recursively) and preserves the permissions.
 func Copy(src, dest string) error {
-	copy := &CopyTask{Source: src, Dest: dest}
+	return CopyWithCheck(src, dest, nil)
+}
+
+func CopyWithCheck(src, dest string, skipFn SkipFn) error {
+	copy := &CopyTask{Source: src, Dest: dest, skipFn: skipFn}
 	return copy.Execute()
 }
 
@@ -27,6 +33,7 @@ type CopyTask struct {
 	DirMode  os.FileMode      // Mode to use for copied dirs. Defaults to preserve permissions.
 	Exclude  []string         // Exclude paths that match these regular expressions.
 	excludes []*regexp.Regexp // Compiled exclude regexes.
+	skipFn   SkipFn           // external check, returns true if we skip
 }
 
 // Execute executes the copy and returns an error of there is a failure.
@@ -63,6 +70,15 @@ func (t *CopyTask) isExcluded(src string) bool {
 			return true
 		}
 	}
+
+	return false
+}
+
+func (t *CopyTask) isDestinationExcluded(dst string) bool {
+	if t.skipFn != nil {
+		return t.skipFn(dst)
+	}
+
 	return false
 }
 
@@ -75,6 +91,10 @@ func (t *CopyTask) recursiveCopy(src, dest string, entry fs.DirEntry) error {
 
 func (t *CopyTask) fileCopy(src, dest string, entry fs.DirEntry) error {
 	if t.isExcluded(src) {
+		return nil
+	}
+
+	if t.isDestinationExcluded(dest) {
 		return nil
 	}
 
@@ -114,6 +134,10 @@ func (t *CopyTask) dirCopy(src, dest string, entry fs.DirEntry) error {
 	if t.isExcluded(src) {
 		return nil
 	}
+
+	// if t.isDestinationExcluded(dest) {
+	// 	return nil
+	// }
 
 	info, err := entry.Info()
 	if err != nil {
