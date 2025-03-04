@@ -20,6 +20,3 @@ steps:
     agents:
       provider: "gcp"
       machineType: "n2-standard-8"
-    notify:
-      - github_commit_status:
-          context: "buildkite/elastic-agent-extended-testing - Serverless Beats Tests"
