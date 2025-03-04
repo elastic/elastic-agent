@@ -43,6 +43,9 @@ type Agent interface {
 
 	// IsStandalone returns true is the agent is running in standalone mode, i.e, without fleet
 	IsStandalone() bool
+
+	// ECSMetadata returns the ECS metadata that is attached as part of every Fleet checkin.
+	ECSMetadata(*logger.Logger) (*ECSMeta, error)
 }
 
 // AgentInfo is a collection of information about agent.
