@@ -116,10 +116,9 @@ steps:
       - integration-ess
     steps:
       - label: "x86_64:non-sudo: {{matrix}}"
-        depends_on:
-          - packaging-ubuntu-x86-64-tar
+        depends_on: packaging-ubuntu-x86-64
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64-tar'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
@@ -136,12 +135,10 @@ steps:
 
       - label: "x86_64:sudo: {{matrix}}"
         depends_on:
-          - packaging-ubuntu-x86-64-tar
-          - packaging-ubuntu-x86-64-deb
+          - packaging-ubuntu-x86-64
         # due to deb group present in matrix tar.gz and deb packages artifacts are required
         command: |
-          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64-tar
-          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64-deb
+          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64          
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
@@ -171,11 +168,9 @@ steps:
 
       - label: "arm:sudo: {{matrix}}"
         depends_on:
-          - packaging-ubuntu-x86-64-tar
-          - packaging-ubuntu-x86-64-deb
+          - packaging-ubuntu-arm64
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64-tar'
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64-deb'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
@@ -207,9 +202,9 @@ steps:
       - label: "arm:non-sudo: {{matrix}}"
         skip: true
         depends_on:
-          - packaging-ubuntu-x86-64-tar
+          - packaging-ubuntu-arm64
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64-tar'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
@@ -231,9 +226,9 @@ steps:
     steps:
       - label: "x86_64:sudo:rpm"
         depends_on:
-          - packaging-ubuntu-x86-64-rpm
+          - packaging-ubuntu-arm64
         command: |
-          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64-rpm
+          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-arm64
           .buildkite/scripts/steps/integration_tests_tf.sh rpm true
         artifact_paths:
           - build/**
