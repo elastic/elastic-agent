@@ -111,6 +111,9 @@ func (b *dockerBuilder) copyFiles() error {
 
 			// create filter
 			allowedPaths, err := component.ParseComponentFiles(specContent, specFilename, true)
+			if err != nil {
+				return fmt.Errorf("failed computing component files %q: %w", specFilename, err)
+			}
 			checkFn, err = install.SkipComponentsPathWithSubpathsFn(allowedPaths)
 			if err != nil {
 				return fmt.Errorf("failed compiling skip fn %q: %w", specFilename, err)
