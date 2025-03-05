@@ -54,13 +54,13 @@ func (b *dockerBuilder) Build() error {
 		return fmt.Errorf("failed to prepare build: %w", err)
 	}
 
-	tag, additionalTags, err := b.dockerBuild()
+	tag, additionalNames, err := b.dockerBuild()
 	tries := 3
 	for err != nil && tries != 0 {
 		fmt.Println(">> Building docker images again (after 10 s)")
 		// This sleep is to avoid hitting the docker build issues when resources are not available.
 		time.Sleep(time.Second * 10)
-		tag, additionalTags, err = b.dockerBuild()
+		tag, additionalNames, err = b.dockerBuild()
 		tries--
 	}
 	if err != nil {
@@ -72,10 +72,10 @@ func (b *dockerBuilder) Build() error {
 	}
 
 	// additional tags should not be created with
-	for _, tag := range additionalTags {
+	for _, name := range additionalNames {
 		if err := b.dockerSave(tag, map[string]interface{}{
 			// effectively override the name used from b.ImageName() to the tag
-			"Name": strings.ReplaceAll(tag, ":", "-"),
+			"Name": name,
 		}); err != nil {
 			return fmt.Errorf("failed to save docker with tag %s as artifact: %w", tag, err)
 		}
@@ -185,7 +185,7 @@ func (b *dockerBuilder) expandDockerfile(templatesDir string, data map[string]in
 }
 
 // dockerBuild runs "docker build -t t1 -t t2 ... buildDir"
-// returns the main tag additional tags if specified as part of extra_tags property
+// returns the main tag additional names if specified as part of extra_tags property
 // the extra tags are not push to the registry from b.ExtraVars["repository"]
 // returns an error if the command fails
 func (b *dockerBuilder) dockerBuild() (string, []string, error) {
@@ -200,7 +200,8 @@ func (b *dockerBuilder) dockerBuild() (string, []string, error) {
 	if b.FIPS {
 		mainTag = mainTag + "-fips"
 	}
-	if repository := b.ExtraVars["repository"]; repository != "" {
+	repository := b.ExtraVars["repository"]
+	if repository != "" {
 		mainTag = fmt.Sprintf("%s/%s", repository, mainTag)
 	}
 
@@ -209,15 +210,21 @@ func (b *dockerBuilder) dockerBuild() (string, []string, error) {
 		"-t", mainTag,
 	}
 	extraTags := []string{}
-	for _, tag := range b.ExtraTags {
-		extraTags = append(extraTags, fmt.Sprintf("%s:%s", b.imageName, tag))
+	additionalNames := []string{}
+	for _, t := range b.ExtraTags {
+		tag := fmt.Sprintf("%s:%s", b.imageName, t.Tag)
+		if repository != "" {
+			tag = fmt.Sprintf("%s/%s", repository, tag)
+		}
+		extraTags = append(extraTags, tag)
+		additionalNames = append(additionalNames, fmt.Sprintf("%s-%s", b.imageName, t.Name))
 	}
 	for _, t := range extraTags {
 		args = append(args, "-t", t)
 	}
 	args = append(args, b.buildDir)
 
-	return mainTag, extraTags, sh.Run("docker", args...)
+	return mainTag, additionalNames, sh.Run("docker", args...)
 }
 
 func (b *dockerBuilder) dockerSave(tag string, templateExtraArgs ...map[string]interface{}) error {

@@ -289,7 +289,8 @@ shared:
   - &agent_docker_service_spec
     docker_variant: 'service'
     extra_tags:
-      - 'git-{{ substring commit 0 12 }}'
+      - name: ecp-internal-release 
+        tag: 'git-{{ substring commit 0 12 }}'
     files:
       'data/service/connectors-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip':
         source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/connectors-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}.zip'

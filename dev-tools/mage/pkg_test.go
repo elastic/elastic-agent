@@ -20,8 +20,11 @@ func testPackageSpec() PackageSpec {
 		Snapshot: true,
 		OS:       "windows",
 		Arch:     "x86_64",
-		ExtraTags: []string{
-			"git-{{ substring commit 0 12 }}",
+		ExtraTags: []ExtraDockerTag{
+			{
+				Name: "ecp-internal-release",
+				Tag:  "git-{{ substring commit 0 12 }}",
+			},
 		},
 		Files: map[string]PackageFile{
 			"brewbeat.yml": PackageFile{
@@ -69,7 +72,7 @@ func testPackage(t testing.TB, pack func(PackageSpec) error) {
 	readmePath := filepath.ToSlash(filepath.Clean(readme.Source))
 	assert.True(t, strings.HasPrefix(readmePath, packageStagingDir))
 
-	commit := spec.ExtraTags[0]
+	commit := spec.ExtraTags[0].Tag
 	expected := "git-" + commitHash[:12]
 	assert.Equal(t, expected, commit)
 

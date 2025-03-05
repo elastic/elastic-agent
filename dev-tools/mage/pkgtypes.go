@@ -106,13 +106,18 @@ type PackageSpec struct {
 	Qualifier         string                 `yaml:"qualifier,omitempty"`   // Optional
 	OutputFile        string                 `yaml:"output_file,omitempty"` // Optional
 	ExtraVars         map[string]string      `yaml:"extra_vars,omitempty"`  // Optional
-	ExtraTags         []string               `yaml:"extra_tags,omitempty"`  // Optional
+	ExtraTags         []ExtraDockerTag       `yaml:"extra_tags,omitempty"`  // Optional
 
 	evalContext            map[string]interface{}
 	packageDir             string
 	localPreInstallScript  string
 	localPostInstallScript string
 	localPostRmScript      string
+}
+
+type ExtraDockerTag struct {
+	Name string `yaml:"name"`
+	Tag  string `yaml:"tag"`
 }
 
 // PackageFile represents a file or directory within a package.
@@ -388,8 +393,9 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 	}
 
 	if s.ExtraTags != nil {
-		for i, tag := range s.ExtraTags {
-			s.ExtraTags[i] = mustExpand(tag)
+		for i, t := range s.ExtraTags {
+			data := mustExpand(t.Tag)
+			s.ExtraTags[i].Tag = data
 		}
 	}
 
