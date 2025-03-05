@@ -5,12 +5,8 @@
 package otel
 
 import (
-	"go.opentelemetry.io/collector/connector"
-	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/extension"
 	"go.opentelemetry.io/collector/otelcol"
-	"go.opentelemetry.io/collector/processor"
-	"go.opentelemetry.io/collector/receiver"
 
 	// Receivers:
 	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
@@ -42,7 +38,6 @@ import (
 	"go.opentelemetry.io/collector/processor/memorylimiterprocessor"
 
 	"github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor"
-	"github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor"
 
 	"github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor"
 
@@ -66,7 +61,7 @@ import (
 	routingconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector"
 	spanmetricsconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector"
 
-	"github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector"
+	elasticapmconnector "github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector"
 )
 
 func components(extensionFactories ...extension.Factory) func() (otelcol.Factories, error) {
@@ -75,7 +70,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		factories := otelcol.Factories{}
 
 		// Receivers
-		factories.Receivers, err = receiver.MakeFactoryMap(
+		factories.Receivers, err = otelcol.MakeFactoryMap(
 			otlpreceiver.NewFactory(),
 			filelogreceiver.NewFactory(),
 			kubeletstatsreceiver.NewFactory(),
@@ -98,7 +93,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		}
 
 		// Processors
-		factories.Processors, err = processor.MakeFactoryMap(
+		factories.Processors, err = otelcol.MakeFactoryMap(
 			batchprocessor.NewFactory(),
 			resourceprocessor.NewFactory(),
 			attributesprocessor.NewFactory(),
@@ -109,7 +104,6 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			elasticinframetricsprocessor.NewFactory(),
 			resourcedetectionprocessor.NewFactory(),
 			memorylimiterprocessor.NewFactory(),
-			lsmintervalprocessor.NewFactory(),
 			elastictraceprocessor.NewFactory(),
 		)
 		if err != nil {
@@ -117,7 +111,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		}
 
 		// Exporters
-		factories.Exporters, err = exporter.MakeFactoryMap(
+		factories.Exporters, err = otelcol.MakeFactoryMap(
 			otlpexporter.NewFactory(),
 			debugexporter.NewFactory(),
 			fileexporter.NewFactory(),
@@ -130,10 +124,10 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			return otelcol.Factories{}, err
 		}
 
-		factories.Connectors, err = connector.MakeFactoryMap(
+		factories.Connectors, err = otelcol.MakeFactoryMap(
 			routingconnector.NewFactory(),
 			spanmetricsconnector.NewFactory(),
-			signaltometricsconnector.NewFactory(),
+			elasticapmconnector.NewFactory(),
 		)
 		if err != nil {
 			return otelcol.Factories{}, err
@@ -147,7 +141,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			k8sobserver.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)
-		factories.Extensions, err = extension.MakeFactoryMap(extensions...)
+		factories.Extensions, err = otelcol.MakeFactoryMap(extensions...)
 		if err != nil {
 			return otelcol.Factories{}, err
 		}
