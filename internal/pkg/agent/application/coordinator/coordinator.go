@@ -748,20 +748,21 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			Description: "current state of the agent information of the running Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
+				meta, err := c.agentInfo.ECSMetadata(c.logger)
+				if err != nil {
+					c.logger.Errorw("Error getting ECS metadata", "error.message", err)
+				}
+
 				output := struct {
-					AgentID      string            `yaml:"agent_id"`
-					Headers      map[string]string `yaml:"headers"`
-					LogLevel     string            `yaml:"log_level"`
-					Snapshot     bool              `yaml:"snapshot"`
-					Version      string            `yaml:"version"`
-					Unprivileged bool              `yaml:"unprivileged"`
+					Headers     map[string]string `yaml:"headers"`
+					LogLevel    string            `yaml:"log_level"`
+					RawLogLevel string            `yaml:"log_level_raw"`
+					Metadata    *info.ECSMeta     `yaml:"metadata"`
 				}{
-					AgentID:      c.agentInfo.AgentID(),
-					Headers:      c.agentInfo.Headers(),
-					LogLevel:     c.agentInfo.LogLevel(),
-					Snapshot:     c.agentInfo.Snapshot(),
-					Version:      c.agentInfo.Version(),
-					Unprivileged: c.agentInfo.Unprivileged(),
+					Headers:     c.agentInfo.Headers(),
+					LogLevel:    c.agentInfo.LogLevel(),
+					RawLogLevel: c.agentInfo.RawLogLevel(),
+					Metadata:    meta,
 				}
 				o, err := yaml.Marshal(output)
 				if err != nil {
