@@ -18,7 +18,7 @@ summary: Always rotate when writing to a symbolic link
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
 description: |
   The agent logger rotates files when necessary.  
-  The agent now forces a file rotation when unexpectedly writing to a file through a symbolic link.
+  Elastic Agent now forces a file rotation when unexpectedly writing to a file through a symbolic link.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
