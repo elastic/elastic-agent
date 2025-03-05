@@ -8,26 +8,13 @@ steps:
   - group: "Integration tests: packaging"
     key: "int-packaging"
     steps:
-      - label: "Packaging: Ubuntu x86_64"
-        key: "packaging-ubuntu-x86-64"
+      # Build matrix is not used for packaging in favor to unique step keys
+      # Packaging linux/amd64
+      - label: "Packaging: linux/amd64 rpm"
+        key: packaging-ubuntu-x86-64
         env:
-          PACKAGES: "tar.gz"
           PLATFORMS: "linux/amd64"
-        command: ".buildkite/scripts/steps/integration-package.sh"
-        artifact_paths:
-        - build/distributions/**
-        retry:
-          automatic:
-            limit: 1
-        agents:
-          provider: "gcp"
-          machineType: "n2-standard-8"
-
-      - label: "Packaging: Ubuntu arm64"
-        key: "packaging-ubuntu-arm64"
-        env:
-          PACKAGES: "tar.gz"
-          PLATFORMS: "linux/arm64"
+          PACKAGES: "tar.gz,rpm,deb"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
@@ -38,8 +25,68 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
 
+<<<<<<< HEAD
+      - label: "Packaging: Ubuntu arm64"
+        key: "packaging-ubuntu-arm64"
+=======
+      - label: "Packaging: Ubuntu x86_64 FIPS"
+        key: "packaging-ubuntu-x86-64-fips"
+        env:
+          PACKAGES: "tar.gz"
+          PLATFORMS: "linux/amd64"
+          FIPS: "true"
+        command: ".buildkite/scripts/steps/integration-package.sh"
+        artifact_paths:
+          - build/distributions/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-4"
+
+      # Packaging linux/arm64
+      - label: "Packaging: linux/arm64 tar.gz"
+        key: packaging-ubuntu-arm64
+>>>>>>> 14943f0fc ([CI] Fixed container images packaging (#6972))
+        env:
+          PLATFORMS: "linux/arm64"
+          PACKAGES: "tar.gz"
+        command: ".buildkite/scripts/steps/integration-package.sh"
+        artifact_paths:
+          - build/distributions/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "aws"
+          instanceType: "c6g.4xlarge"
+          imagePrefix: "core-ubuntu-2204-aarch64"
+
+<<<<<<< HEAD
       - label: "Packaging: Windows"
         key: "packaging-windows"
+=======
+      - label: "Packaging: Ubuntu arm64 FIPS"
+        key: "packaging-ubuntu-arm64-fips"
+        env:
+          PACKAGES: "tar.gz"
+          PLATFORMS: "linux/arm64"
+          FIPS: "true"
+        command: ".buildkite/scripts/steps/integration-package.sh"
+        artifact_paths:
+          - build/distributions/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "aws"
+          instanceType: "c6g.4xlarge"
+          imagePrefix: "core-ubuntu-2204-aarch64"
+
+      - label: "Packaging: windows/amd64 zip"
+        key: packaging-windows
+>>>>>>> 14943f0fc ([CI] Fixed container images packaging (#6972))
         env:
           PACKAGES: "zip"
           PLATFORMS: "windows/amd64"
@@ -53,28 +100,31 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
 
-      - label: "Packaging: Containers {{matrix.ext}} {{matrix.arch}}"
-        key: "packaging-containers"
+      - label: "Packaging: Containers linux/amd64"
+        key: packaging-containers-x86-64
         env:
-          PACKAGES: "{{matrix.ext}}"
-          PLATFORMS: "{{matrix.arch}}"
+          PACKAGES: "docker"
+          PLATFORMS: "linux/amd64"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
-        retry:
-          automatic:
-            limit: 1
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
-        matrix:
-          setup:
-            arch:
-              - linux/amd64
-              - linux/arm64
-            ext:
-              - rpm
-              - deb
+
+      - label: "Packaging: Containers linux/arm64"
+        key: packaging-containers-arm64
+        env:
+          PACKAGES: "docker"
+          PLATFORMS: "linux/arm64"
+        command: |
+          .buildkite/scripts/steps/integration-package.sh
+        artifact_paths:
+          - build/distributions/**
+        agents:
+          provider: "aws"
+          instanceType: "c6g.4xlarge"
+          imagePrefix: "core-ubuntu-2204-aarch64"
 
   - label: "Serverless integration test"
     key: "serverless-integration-tests"
@@ -131,9 +181,8 @@ steps:
     command: "buildkite-agent pipeline upload .buildkite/bk.integration.pipeline.yml"
 
   - label: "Serverless Beats Tests"
-    # To speedup the build process only packaging-ubuntu-x86-64 artifact dependency is required
     depends_on:
-      - packaging-ubuntu-x86-64
+      - int-packaging
     key: "serverless-beats-integration-tests"
     concurrency_group: elastic-agent-extended-testing/beats-integration
     concurrency: 8
