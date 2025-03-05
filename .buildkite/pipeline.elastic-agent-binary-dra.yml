@@ -13,7 +13,7 @@ steps:
     # don't run snapshot builds with prereleases (non empty VERSION_QUALIFIER) unless forced (RUN_SNAPSHOT=true)
     if: build.env("RUN_SNAPSHOT") == "true" || (build.env('VERSION_QUALIFIER') == null && (build.branch == 'main' || build.branch =~ /^[0-9]+\.[0-9x]+\$/))
     steps:
-    - label: ":package: x86_64: Elastic-Agent Core Snapshot"
+    - label: ":package: Elastic-Agent Core Snapshot"
       commands:
         - .buildkite/scripts/steps/build-agent-core.sh
       key: "build-dra-snapshot-x86"
