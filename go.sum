@@ -348,6 +348,11 @@ github.com/elastic/gosigar v0.14.3 h1:xwkKwPia+hSfg9GqrCUKYdId102m9qTJIIr7egmK/u
 github.com/elastic/gosigar v0.14.3/go.mod h1:iXRIGg2tLnu7LBdpqzyQfGDEidKCfWcCMS0WKyPWoMs=
 github.com/elastic/lunes v0.1.0 h1:amRtLPjwkWtzDF/RKzcEPMvSsSseLDLW+bnhfNSLRe4=
 github.com/elastic/lunes v0.1.0/go.mod h1:xGphYIt3XdZRtyWosHQTErsQTd4OP1p9wsbVoHelrd4=
+<<<<<<< HEAD
+=======
+github.com/elastic/mito v1.17.0 h1:UEEFfQy5WhS6vVvMPMwHvdn5rH24eBJMb2ZOlGBkI5s=
+github.com/elastic/mito v1.17.0/go.mod h1:nG5MoOsgJwVlglhlANiBFmHWqoIjrpbR5vy612wE8yE=
+>>>>>>> 535610ab7 (build(deps): bump github.com/elastic/mito from 1.16.0 to 1.17.0 (#7000))
 github.com/elastic/mock-es v0.0.0-20241101195702-0a41fa3d30d9 h1:wXto1Zck/WqoXIoxEI8+nqoSSohPGp5dWV5zLskldYU=
 github.com/elastic/mock-es v0.0.0-20241101195702-0a41fa3d30d9/go.mod h1:cXqWcLnmu5y4QveTb2hjk7rgzkHMuZsqeXtbJpNAcu0=
 github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.2.0 h1:LABSYBSCK6LU0uWi5mdIgDt/IjX8XTabZQP3Vp911jo=
