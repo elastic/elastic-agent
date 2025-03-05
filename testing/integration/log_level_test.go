@@ -40,13 +40,7 @@ func TestSetLogLevelFleetManaged(t *testing.T) {
 		Sudo:  true,
 	})
 
-<<<<<<< HEAD
-	t.Skip("Skipping due to https://github.com/elastic/elastic-agent/issues/5193")
-
-	deadline := time.Now().Add(10 * time.Minute)
-=======
 	deadline := time.Now().Add(30 * time.Minute)
->>>>>>> 12fa5571a (Increase timeout for assertions in TestSetLogLevelFleetManaged (#7190))
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), deadline)
 	defer cancel()
 
