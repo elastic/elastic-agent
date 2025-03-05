@@ -16,6 +16,8 @@ import (
 	"syscall"
 	"time"
 
+	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
+
 	"go.elastic.co/apm/v2"
 	apmtransport "go.elastic.co/apm/v2/transport"
 	"gopkg.in/yaml.v2"
@@ -553,6 +555,7 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 		&options,
 		paths.ConfigFile(),
 		store,
+		fleetgateway.RequestBackoff, // for delayed enroll, we want to use the same backoff settings as fleet checkins
 	)
 	if err != nil {
 		return nil, err
