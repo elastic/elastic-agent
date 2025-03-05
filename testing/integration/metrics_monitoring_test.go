@@ -9,7 +9,6 @@ package integration
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -83,7 +82,6 @@ func (runner *MetricsRunner) SetupSuite() {
 func (runner *MetricsRunner) TestBeatsMetrics() {
 	t := runner.T()
 
-	UnitOutputName := "default"
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*20)
 	defer cancel()
 
@@ -91,11 +89,7 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 	require.NoError(t, err, "could not to get agent status")
 
 	componentIds := []string{
-		fmt.Sprintf("system/metrics-%s", UnitOutputName),
-		fmt.Sprintf("log-%s", UnitOutputName),
-		"beat/metrics-monitoring",
 		"elastic-agent",
-		"http/metrics-monitoring",
 		"filestream-monitoring",
 	}
 

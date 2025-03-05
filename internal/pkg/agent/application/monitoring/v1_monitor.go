@@ -628,16 +628,6 @@ func (b *BeatsMonitor) injectMetricsInput(
 			"processors": []interface{}{
 				map[string]interface{}{
 					"add_fields": map[string]interface{}{
-						"target": "data_stream",
-						"fields": map[string]interface{}{
-							"type":      "metrics",
-							"dataset":   fmt.Sprintf("elastic_agent.%s", fixedAgentName),
-							"namespace": monitoringNamespace,
-						},
-					},
-				},
-				map[string]interface{}{
-					"add_fields": map[string]interface{}{
 						"target": "event",
 						"fields": map[string]interface{}{
 							"dataset": fmt.Sprintf("elastic_agent.%s", fixedAgentName),
@@ -726,16 +716,6 @@ func (b *BeatsMonitor) injectMetricsInput(
 				"period":     metricsCollectionIntervalString,
 				"index":      fmt.Sprintf("metrics-elastic_agent.%s-%s", name, monitoringNamespace),
 				"processors": []interface{}{
-					map[string]interface{}{
-						"add_fields": map[string]interface{}{
-							"target": "data_stream",
-							"fields": map[string]interface{}{
-								"type":      "metrics",
-								"dataset":   fmt.Sprintf("elastic_agent.%s", name),
-								"namespace": monitoringNamespace,
-							},
-						},
-					},
 					map[string]interface{}{
 						"add_fields": map[string]interface{}{
 							"target": "event",
@@ -920,16 +900,6 @@ func (b *BeatsMonitor) injectMetricsInput(
 							"process.pid":             comp,
 							"process.cgroups.enabled": false,
 							"processors": []interface{}{
-								map[string]interface{}{
-									"add_fields": map[string]interface{}{
-										"target": "data_stream",
-										"fields": map[string]interface{}{
-											"type":      "metrics",
-											"dataset":   fmt.Sprintf("elastic_agent.%s", name),
-											"namespace": monitoringNamespace,
-										},
-									},
-								},
 								map[string]interface{}{
 									"add_fields": map[string]interface{}{
 										"target": "event",
