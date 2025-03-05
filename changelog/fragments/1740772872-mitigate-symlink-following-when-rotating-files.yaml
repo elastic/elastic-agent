@@ -11,16 +11,14 @@
 kind: security
 
 # Change summary; a 80ish characters long description of the change.
-summary: mitigate symlink following when rotating files
+summary: Always rotate when writing to a symbolic link
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
 description: |
   The agent logger rotates files when necessary.  
-  If an attacker manages to create a symbolic link as the destination file beforehand,  
-  it could cause the agent to write to a sensitive or protected file.  
-  To prevent this, the agent now forces a rotation in such scenarios.
+  The agent now forces a file rotation when unexpectedly writing to a file through a symbolic link.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
