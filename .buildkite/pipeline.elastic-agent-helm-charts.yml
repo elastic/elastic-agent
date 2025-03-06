@@ -4,7 +4,24 @@ steps:
 
   - label: ":elastic-stack: Create helm chart"
     command: |
-      echo "TBC"
+      .buildkite/scripts/steps/helm-charts.sh
+    plugins:
+      - elastic/oblt-google-auth#v1.0.0:
+          lifetime: 1800 # seconds
+    agents:
+      provider: "gcp"
+      machineType: "n1-standard-8"
+
+  - label: ":elastic-stack: Google bucket access"
+    command: |
+      echo "Credentials are located at \$GOOGLE_APPLICATION_CREDENTIALS"
+      gcloud storage buckets list || true
+    plugins:
+      - elastic/oblt-google-auth#v1.0.0:
+          lifetime: 1800 # seconds
+    agents:
+      provider: "gcp"
+      machineType: "n1-standard-8"
 
   - wait: ~
 
