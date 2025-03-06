@@ -91,7 +91,7 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 
 	// 2. Install the Elastic-Agent with the policy that
 	// was just created.
-	policy, err := tools.InstallAgentWithPolicy(
+	policy, _, err := tools.InstallAgentWithPolicy(
 		ctx,
 		t,
 		installOpts,

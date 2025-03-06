@@ -409,17 +409,17 @@ func testUpgradeFleetManagedElasticAgent(
 	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
 	require.NoError(t, err)
 
-	t.Log("Waiting for enrolled Agent status to be online...")
-	require.Eventually(t,
-		check.FleetAgentStatus(
-			ctx, t, startFixture, kibClient, "online"),
-		2*time.Minute,
-		10*time.Second,
-		"Agent status is not online")
-
 	agentID, err := startFixture.AgentID(ctx)
 	require.NoError(t, err)
 	t.Logf("Agent ID: %q", agentID)
+
+	t.Log("Waiting for enrolled Agent status to be online...")
+	require.Eventually(t,
+		check.FleetAgentStatus(
+			ctx, t, kibClient, agentID, "online"),
+		2*time.Minute,
+		10*time.Second,
+		"Agent status is not online")
 
 	t.Logf("Upgrading from version \"%s-%s\" to version \"%s-%s\"...",
 		startParsedVersion, startVersionInfo.Binary.Commit,
@@ -448,7 +448,7 @@ func testUpgradeFleetManagedElasticAgent(
 	require.NoError(t, err)
 
 	t.Log("Waiting for enrolled Agent status to be online...")
-	require.Eventually(t, check.FleetAgentStatus(ctx, t, startFixture, kibClient, "online"), 10*time.Minute, 15*time.Second, "Agent status is not online")
+	require.Eventually(t, check.FleetAgentStatus(ctx, t, kibClient, agentID, "online"), 10*time.Minute, 15*time.Second, "Agent status is not online")
 
 	// wait for version
 	require.Eventually(t, func() bool {

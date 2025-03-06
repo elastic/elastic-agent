@@ -53,12 +53,8 @@ func TestEnrollUnprivileged(t *testing.T) {
 		enrollmentApiKey, err := tools.CreateEnrollmentToken(t, ctx, info.KibanaClient, policy.ID)
 		require.NoError(t, err)
 
-		err = tools.InstallAgentForPolicyWithToken(ctx, t, installOpts, fixture, info.KibanaClient, policy.ID, enrollmentApiKey)
+		agentID, err := tools.InstallAgentForPolicyWithToken(ctx, t, installOpts, fixture, info.KibanaClient, enrollmentApiKey)
 		require.NoError(t, err)
-
-		agentID, err := fixture.AgentID(ctx)
-		require.NoError(t, err)
-		t.Logf("Agent ID: %q", agentID)
 
 		_, err = info.KibanaClient.UnEnrollAgent(ctx, kibana.UnEnrollAgentRequest{ID: agentID})
 		require.NoError(t, err)

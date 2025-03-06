@@ -142,7 +142,7 @@ func TestInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T) {
 
 // installSecurityAgent is a helper function to install an elastic-agent in priviliged mode with the force+non-interactve flags.
 // the policy the agent is enrolled with can have protection enabled if passed
-func installSecurityAgent(ctx context.Context, t *testing.T, info *define.Info, protected bool) (*atesting.Fixture, kibana.PolicyResponse) {
+func installSecurityAgent(ctx context.Context, t *testing.T, info *define.Info, protected bool) (*atesting.Fixture, kibana.PolicyResponse, string) {
 	t.Helper()
 
 	// Get path to agent executable.
@@ -171,10 +171,10 @@ func installSecurityAgent(ctx context.Context, t *testing.T, info *define.Info, 
 		Privileged:     true,
 	}
 
-	policy, err := tools.InstallAgentWithPolicy(ctx, t,
+	policy, agentID, err := tools.InstallAgentWithPolicy(ctx, t,
 		installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoError(t, err, "failed to install agent with policy")
-	return fixture, policy
+	return fixture, policy, agentID
 }
 
 // buildPolicyWithTamperProtection helper function to build the policy request with or without tamper protection
@@ -194,9 +194,7 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), deadline)
 	defer cancel()
 
-	fixture, policy := installSecurityAgent(ctx, t, info, protected)
-	agentID, err := fixture.AgentID(ctx)
-	require.NoError(t, err)
+	fixture, policy, agentID := installSecurityAgent(ctx, t, info, protected)
 
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")
@@ -231,12 +229,10 @@ func testInstallAndUnenrollWithEndpointSecurity(t *testing.T, info *define.Info,
 	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cn()
 
-	fixture, policy := installSecurityAgent(ctx, t, info, protected)
-	agentID, err := fixture.AgentID(ctx)
-	require.NoError(t, err)
+	fixture, policy, agentID := installSecurityAgent(ctx, t, info, protected)
 
 	t.Log("Installing Elastic Defend")
-	_, err = installElasticDefendPackage(t, info, policy.ID)
+	_, err := installElasticDefendPackage(t, info, policy.ID)
 	require.NoError(t, err)
 
 	t.Log("Polling for endpoint-security to become Healthy")
@@ -309,7 +305,7 @@ func testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T, i
 	ctx, cn := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cn()
 
-	fixture, policy := installSecurityAgent(ctx, t, info, protected)
+	fixture, policy, _ := installSecurityAgent(ctx, t, info, protected)
 
 	t.Log("Installing Elastic Defend")
 	pkgPolicyResp, err := installElasticDefendPackage(t, info, policy.ID)
@@ -427,7 +423,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 		Privileged:     true,
 		BasePath:       filepath.Join(paths.DefaultBasePath, "not_default"),
 	}
-	policyResp, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
+	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoErrorf(t, err, "Policy Response was: %v", policyResp)
 
 	t.Log("Installing Elastic Defend")
@@ -504,7 +500,7 @@ func TestEndpointSecurityUnprivileged(t *testing.T) {
 		Force:          true,
 		Privileged:     false, // ensure always unprivileged
 	}
-	policyResp, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
+	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoErrorf(t, err, "Policy Response was: %v", policyResp)
 
 	t.Log("Installing Elastic Defend")
@@ -584,7 +580,7 @@ func TestEndpointSecurityCannotSwitchToUnprivileged(t *testing.T) {
 		Force:          true,
 		Privileged:     true, // ensure always privileged
 	}
-	policyResp, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
+	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoErrorf(t, err, "Policy Response was: %v", policyResp)
 
 	t.Log("Installing Elastic Defend")
@@ -651,10 +647,8 @@ func TestEndpointLogsAreCollectedInDiagnostics(t *testing.T) {
 		Privileged:     true,
 	}
 
-	policyResp, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
+	policyResp, agentID, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoErrorf(t, err, "Policy Response was: %v", policyResp)
-	agentID, err := fixture.AgentID(ctx)
-	require.NoError(t, err)
 
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")
@@ -851,10 +845,7 @@ func TestForceInstallOverProtectedPolicy(t *testing.T) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), deadline)
 	defer cancel()
 
-	fixture, policy := installSecurityAgent(ctx, t, info, true)
-	agentID, err := fixture.AgentID(ctx)
-	require.NoError(t, err)
-	t.Logf("Agent ID: %q", agentID)
+	fixture, policy, agentID := installSecurityAgent(ctx, t, info, true)
 
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")

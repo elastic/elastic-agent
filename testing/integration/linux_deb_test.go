@@ -77,7 +77,7 @@ func TestDebLogIngestFleetManaged(t *testing.T) {
 
 	// 2. Install the Elastic-Agent with the policy that
 	// was just created.
-	policy, err := tools.InstallAgentWithPolicy(
+	policy, _, err := tools.InstallAgentWithPolicy(
 		ctx,
 		t,
 		installOpts,
@@ -157,7 +157,7 @@ func TestDebFleetUpgrade(t *testing.T) {
 
 	// 2. Install the Elastic-Agent with the policy that
 	// was just created.
-	policy, err := tools.InstallAgentWithPolicy(
+	policy, agentID, err := tools.InstallAgentWithPolicy(
 		ctx,
 		t,
 		installOpts,
@@ -167,9 +167,6 @@ func TestDebFleetUpgrade(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("created policy: %s", policy.ID)
 
-	agentID, err := startFixture.AgentID(ctx)
-	require.NoError(t, err)
-	t.Logf("Agent ID: %q", agentID)
 	check.ConnectedToFleet(ctx, t, startFixture, 5*time.Minute)
 
 	// 3. Upgrade deb to the build version
