@@ -11,8 +11,10 @@ import (
 	"fmt"
 	"io"
 	"math/rand/v2"
+	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -54,8 +56,8 @@ const (
 	defaultFleetServerPort         = 8220
 	defaultFleetServerInternalHost = "localhost"
 	defaultFleetServerInternalPort = 8221
-	enrollBackoffInit              = time.Second
-	enrollBackoffMax               = 10 * time.Second
+	enrollBackoffInit              = time.Second * 5
+	enrollBackoffMax               = time.Minute * 10
 )
 
 var (
@@ -69,13 +71,14 @@ type saver interface {
 
 // enrollCmd is an enroll subcommand that interacts between the Kibana API and the Agent.
 type enrollCmd struct {
-	log          *logger.Logger
-	options      *enrollCmdOption
-	client       fleetclient.Sender
-	configStore  saver
-	remoteConfig remote.Config
-	agentProc    *process.Info
-	configPath   string
+	log            *logger.Logger
+	options        *enrollCmdOption
+	client         fleetclient.Sender
+	configStore    saver
+	remoteConfig   remote.Config
+	agentProc      *process.Info
+	configPath     string
+	backoffFactory func(done <-chan struct{}) backoff.Backoff
 
 	// For testability
 	daemonReloadFunc func(context.Context) error
@@ -176,13 +179,20 @@ func newEnrollCmd(
 	options *enrollCmdOption,
 	configPath string,
 	store saver,
+	backoffFactory func(done <-chan struct{}) backoff.Backoff,
 ) (*enrollCmd, error) {
+	if backoffFactory == nil {
+		backoffFactory = func(done <-chan struct{}) backoff.Backoff {
+			return backoff.NewEqualJitterBackoff(done, enrollBackoffInit, enrollBackoffMax)
+		}
+	}
 	return &enrollCmd{
 		log:              log,
 		options:          options,
 		configStore:      store,
 		configPath:       configPath,
 		daemonReloadFunc: daemonReload,
+		backoffFactory:   backoffFactory,
 	}, nil
 }
 
@@ -431,7 +441,7 @@ func (c *enrollCmd) prepareFleetTLS() error {
 			if c.options.FleetServer.Host == "" {
 				c.options.FleetServer.Host = defaultFleetServerInternalHost
 			}
-			c.options.URL = fmt.Sprintf("http://%s:%d", host, port)
+			c.options.URL = "http://" + net.JoinHostPort(host, strconv.Itoa(int(port)))
 			c.options.Insecure = true
 			return nil
 		}
@@ -451,7 +461,7 @@ func (c *enrollCmd) prepareFleetTLS() error {
 		}
 		c.options.FleetServer.Cert = string(pair.Crt)
 		c.options.FleetServer.CertKey = string(pair.Key)
-		c.options.URL = fmt.Sprintf("https://%s:%d", hostname, port)
+		c.options.URL = "https://" + net.JoinHostPort(hostname, strconv.Itoa(int(port)))
 		c.options.CAs = []string{string(ca.Crt())}
 	}
 	// running with custom Cert and CertKey; URL is required to be set
@@ -463,7 +473,7 @@ func (c *enrollCmd) prepareFleetTLS() error {
 		if c.options.FleetServer.InternalPort != defaultFleetServerInternalPort {
 			c.log.Warnf("Internal endpoint configured to: %d. Changing this value is not supported.", c.options.FleetServer.InternalPort)
 		}
-		c.options.InternalURL = fmt.Sprintf("%s:%d", defaultFleetServerInternalHost, c.options.FleetServer.InternalPort)
+		c.options.InternalURL = net.JoinHostPort(defaultFleetServerInternalHost, strconv.Itoa(int(c.options.FleetServer.InternalPort)))
 	}
 
 	return nil
@@ -529,7 +539,7 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 
 	signal := make(chan struct{})
 	defer close(signal)
-	backExp := backoff.NewExpBackoff(signal, enrollBackoffInit, enrollBackoffMax)
+	backExp := c.backoffFactory(signal)
 
 	for {
 		retry := false
