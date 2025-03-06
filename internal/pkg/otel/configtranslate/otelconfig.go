@@ -35,7 +35,7 @@ type exporterConfigTranslationFunc func(*config.C) (map[string]any, error)
 
 var (
 	OtelSupportedOutputTypes         = []string{"elasticsearch"}
-	OtelSupportedInputTypes          = []string{"filestream"}
+	OtelSupportedInputTypes          = []string{"filestream", "http/metrics", "beat/metrics"}
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
 		otelcomponent.MustNewType("elasticsearch"): translateEsOutputToExporter,
 	}
