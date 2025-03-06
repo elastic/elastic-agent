@@ -33,7 +33,10 @@ func GeneratePBKDF2FromPassword(password []byte) ([]byte, error) {
 
 	// Write hash
 	// SALT|KEY
-	key := stretchPassword(password, salt, hashIterations, hashKeyLength)
+	key, err := stretchPassword(password, salt, hashIterations, hashKeyLength)
+	if err != nil {
+		return nil, err
+	}
 	hash := new(bytes.Buffer)
 	hash.Write(salt)
 	hash.Write(key)
@@ -55,8 +58,8 @@ func ComparePBKDF2HashAndPassword(hash []byte, password []byte) error {
 	// SALT|KEY
 	salt := hash[:hashSaltLength]
 	keyFromHash := hash[hashSaltLength:hashTotalLength]
-	keyFromPassword := stretchPassword(password, salt, hashIterations, hashKeyLength)
-	if !hmac.Equal(keyFromHash, keyFromPassword) {
+	keyFromPassword, err := stretchPassword(password, salt, hashIterations, hashKeyLength)
+	if err != nil || !hmac.Equal(keyFromHash, keyFromPassword) {
 		return ErrMismatchedHashAndPassword
 	}
 
