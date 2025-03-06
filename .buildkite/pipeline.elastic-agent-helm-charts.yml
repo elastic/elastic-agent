@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+
+steps:
+
+  - label: ":elastic-stack: Create helm chart"
+    command: |
+      echo "TBC"
+
+  - wait: ~
+
+  - label: ":elastic-stack: Publish helm chart"
+    command: |
+      echo "TBC"
