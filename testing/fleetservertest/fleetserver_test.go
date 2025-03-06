@@ -398,6 +398,7 @@ func ExampleNewServer_enroll() {
 	//         "agent": {
 	//           "build.original": "",
 	//           "complete": false,
+	//           "fips": false,
 	//           "id": "agentID",
 	//           "log_level": "",
 	//           "snapshot": false,
