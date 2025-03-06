@@ -53,6 +53,8 @@ type AgentECSMeta struct {
 	Complete bool `json:"complete"`
 	// Unprivileged is a flag specifying that the agent is running in unprivileged mode.
 	Unprivileged bool `json:"unprivileged"`
+	// FIPS is a flag specifying if the agent is a FIPS distribution
+	FIPS bool `json:"fips"`
 }
 
 // SystemECSMeta is a collection of operating system metadata in ECS compliant object form.
@@ -167,6 +169,7 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 				Upgradeable:  release.Upgradeable() || (paths.RunningInstalled() && RunningUnderSupervisor()),
 				LogLevel:     i.LogLevel(),
 				Unprivileged: i.unprivileged,
+				FIPS:         release.FIPS(),
 			},
 		},
 		Host: &HostECSMeta{
