@@ -24,7 +24,7 @@ steps:
         machineType: "c2-standard-16"
       env:
         DRA_WORKFLOW: "snapshot"
-        PLATFORMS: "linux/amd64,windows/amd64,darwin/amd64,darwin/arm64"
+        PLATFORMS: "linux/amd64 windows/amd64 darwin/amd64 darwin/arm64"
     
     - label: ":package: ARM: Elastic-Agent Core Snapshot"
       commands:
@@ -73,7 +73,7 @@ steps:
         machineType: "c2-standard-16"
       env:
         DRA_WORKFLOW: "staging"
-        PLATFORMS: "linux/amd64,windows/amd64,darwin/amd64,darwin/arm64"
+        PLATFORMS: "linux/amd64 windows/amd64 darwin/amd64 darwin/arm64"
 
     - label: ":package: linux/arm64 Elastic-Agent Core staging"
       commands: |
