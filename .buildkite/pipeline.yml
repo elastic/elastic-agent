@@ -65,6 +65,8 @@ steps:
           provider: "gcp"
           image: "family/platform-ingest-elastic-agent-debian-12"
         retry:
+          automatic:
+            limit: 1
           manual:
             allowed: true
 
