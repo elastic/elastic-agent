@@ -19,9 +19,13 @@ next_stable_core=${2:-}
 next_contrib=${3:-$next_beta_core}
 
 # Get current versions from go.mod
-current_beta_core=$(grep 'go\.opentelemetry\.io/collector/receiver/otlpreceiver ' go.mod | cut -d' ' -f 2)
-current_stable_core=$(grep 'go\.opentelemetry\.io/collector/confmap/provider/fileprovider ' go.mod | cut -d' ' -f 2)
-current_contrib=$(grep 'github\.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver ' go.mod | cut -d' ' -f 2)
+current_beta_core=$(grep 'go\.opentelemetry\.io/collector/receiver/otlpreceiver ' go.mod | cut -d' ' -f 2 || true)
+current_stable_core=$(grep 'go\.opentelemetry\.io/collector/confmap/provider/fileprovider ' go.mod | cut -d' ' -f 2 || true)
+current_contrib=$(grep 'github\.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver ' go.mod | cut -d' ' -f 2 || true)
+
+[[ -n "$current_beta_core" ]] || (echo "Error: couldn't find current beta core version." && exit 2)
+[[ -n "$current_stable_core" ]] || (echo "Error: couldn't find current stable core version" && exit 3)
+[[ -n "$current_contrib" ]] || (echo "Error: couldn't find current contrib version" && exit 4)
 
 echo "=> Updating core from $current_beta_core/$current_stable_core to $next_beta_core/$next_stable_core"
 echo "=> Updating contrib from $current_contrib to $next_contrib"
