@@ -34,7 +34,7 @@ type EndpointMetricsMonRunner struct {
 
 func TestEndpointAgentServiceMonitoring(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: FleetEndpointSecurity,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -135,18 +135,19 @@ func (runner *EndpointMetricsMonRunner) TestEndpointMetricsAfterRestart() {
 	}
 
 	// kill endpoint
-	cmd := exec.Command("pgrep", "-f", "endpoint")
+	cmd := exec.Command("pgrep", "-f", "/opt/Elastic/Endpoint/elastic-endpoint")
 	pgrep, err := cmd.CombinedOutput()
+	require.NoError(runner.T(), err)
 	runner.T().Logf("killing pid: %s", string(pgrep))
 
-	cmd = exec.Command("pkill", "--signal", "SIGKILL", "-f", "endpoint")
+	cmd = exec.Command("pkill", "--signal", "SIGKILL", "-f", "/opt/Elastic/Endpoint/elastic-endpoint")
 	_, err = cmd.CombinedOutput()
 	require.NoError(runner.T(), err)
 
 	// wait for endpoint to come back up. We use `pgrep`
 	// since the agent health status won't immediately register that the endpoint process itself is gone.
 	require.Eventually(runner.T(), func() bool {
-		cmd := exec.Command("pgrep", "-f", "endpoint")
+		cmd := exec.Command("pgrep", "-f", "/opt/Elastic/Endpoint/elastic-endpoint")
 		pgrep, err := cmd.CombinedOutput()
 		runner.T().Logf("found pid: %s", string(pgrep))
 		if err == nil {
