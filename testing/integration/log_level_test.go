@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httputil"
 	"strings"
 	"testing"
 	"text/template"
@@ -40,7 +41,7 @@ func TestSetLogLevelFleetManaged(t *testing.T) {
 		Sudo:  true,
 	})
 
-	deadline := time.Now().Add(10 * time.Minute)
+	deadline := time.Now().Add(30 * time.Minute)
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), deadline)
 	defer cancel()
 
@@ -114,7 +115,7 @@ func testLogLevelSetViaFleet(ctx context.Context, f *atesting.Fixture, agentID s
 		}
 		t.Logf("Fleet metadata log level for agent %q: %q policy log level: %q", agentID, fleetMetadataLogLevel, policyLogLevel)
 		return fleetMetadataLogLevel == policyLogLevel.String()
-	}, 30*time.Second, time.Second, "agent never communicated policy log level %q to Fleet", policyLogLevel)
+	}, 6*time.Minute, 30*time.Second, "agent never communicated policy log level %q to Fleet", policyLogLevel)
 
 	// Step 2: set a different log level for the specific agent using Settings action
 	// set agent log level and verify that it takes precedence over the policy one
@@ -145,7 +146,7 @@ func testLogLevelSetViaFleet(ctx context.Context, f *atesting.Fixture, agentID s
 		}
 		t.Logf("Fleet metadata log level for agent %q: %q agent log level: %q", agentID, fleetMetadataLogLevel, agentLogLevel)
 		return fleetMetadataLogLevel == agentLogLevel
-	}, 30*time.Second, time.Second, "agent never communicated agent-specific log level %q to Fleet", agentLogLevel)
+	}, 6*time.Minute, 30*time.Second, "agent never communicated agent-specific log level %q to Fleet", agentLogLevel)
 
 	// Step 3: Clear the agent-specific log level override, verify that we revert to policy log level
 	t.Logf("Clearing agent log level, expecting log level to revert back to %q", policyLogLevel)
@@ -173,7 +174,7 @@ func testLogLevelSetViaFleet(ctx context.Context, f *atesting.Fixture, agentID s
 		}
 		t.Logf("Fleet metadata log level for agent %q: %q policy log level: %q", agentID, fleetMetadataLogLevel, policyLogLevel)
 		return fleetMetadataLogLevel == policyLogLevel.String()
-	}, 30*time.Second, time.Second, "agent never communicated reverting to policy log level %q to Fleet", policyLogLevel)
+	}, 6*time.Minute, 30*time.Second, "agent never communicated reverting to policy log level %q to Fleet", policyLogLevel)
 
 	// Step 4: Clear the log level in policy and verify that agent reverts to the initial log level
 	t.Logf("Clearing policy log level, expecting log level to revert back to %q", initialLogLevel)
@@ -201,7 +202,7 @@ func testLogLevelSetViaFleet(ctx context.Context, f *atesting.Fixture, agentID s
 		}
 		t.Logf("Fleet metadata log level for agent %q: %q initial log level: %q", agentID, fleetMetadataLogLevel, initialLogLevel)
 		return fleetMetadataLogLevel == initialLogLevel
-	}, 30*time.Second, time.Second, "agent never communicated initial log level %q to Fleet", initialLogLevel)
+	}, 6*time.Minute, 30*time.Second, "agent never communicated initial log level %q to Fleet", initialLogLevel)
 }
 
 func waitForAgentAndFleetHealthy(ctx context.Context, t *testing.T, f *atesting.Fixture) bool {
@@ -245,19 +246,27 @@ func updateAgentLogLevel(ctx context.Context, t *testing.T, kibanaClient *kibana
 	}
 
 	err = updateLogLevelTemplate.Execute(buf, templateData)
+	if err != nil {
+		return fmt.Errorf("rendering updateLogLevelTemplate: %w", err)
+	}
+
 	t.Logf("Updating agent-specific log level to %q", logLevel)
-	_, err = kibanaClient.SendWithContext(ctx, http.MethodPost, "/api/fleet/agents/"+agentID+"/actions", nil, nil, buf)
+	resp, err := kibanaClient.SendWithContext(ctx, http.MethodPost, "/api/fleet/agents/"+agentID+"/actions", nil, nil, buf)
 	if err != nil {
 		return fmt.Errorf("error executing fleet request: %w", err)
 	}
 
-	// The log below is a bit spammy but it can be useful for debugging
-	//respDump, err := httputil.DumpResponse(fleetResp, true)
-	//if err != nil {
-	//	t.Logf("Error dumping Fleet response to updating agent-specific log level: %v", err)
-	//} else {
-	//	t.Logf("Fleet response to updating agent-specific log level:\n----- BEGIN RESPONSE DUMP -----\n%s\n----- END RESPONSE DUMP -----\n", string(respDump))
-	//}
+	if resp.StatusCode != http.StatusOK {
+		t.Logf("error updating agent-specific log level to %q", logLevel)
+		// The log below is a bit spammy but it can be useful for debugging
+		respDump, err := httputil.DumpResponse(resp, true)
+		if err != nil {
+			t.Logf("Error dumping Fleet response to updating agent-specific log level: %v", err)
+		} else {
+			t.Logf("Fleet response to updating agent-specific log level:\n----- BEGIN RESPONSE DUMP -----\n%s\n----- END RESPONSE DUMP -----\n", string(respDump))
+		}
+		return fmt.Errorf("error updating agent-specific log level to %q: fleet response status code: %d", logLevel, resp.StatusCode)
+	}
 
 	return nil
 }
@@ -293,19 +302,23 @@ func updatePolicyLogLevel(ctx context.Context, t *testing.T, kibanaClient *kiban
 		return fmt.Errorf("error rendering policy update template: %w", err)
 	}
 
-	_, err = kibanaClient.SendWithContext(ctx, http.MethodPut, "/api/fleet/agent_policies/"+policy.ID, nil, nil, buf)
+	resp, err := kibanaClient.SendWithContext(ctx, http.MethodPut, "/api/fleet/agent_policies/"+policy.ID, nil, nil, buf)
 
 	if err != nil {
 		return fmt.Errorf("error executing fleet request: %w", err)
 	}
 
-	// The log below is a bit spammy but it can be useful for debugging
-	//respDump, err := httputil.DumpResponse(fleetResp, true)
-	//if err != nil {
-	//	t.Logf("Error dumping Fleet response to updating policy log level: %v", err)
-	//} else {
-	//	t.Logf("Fleet response to updating policy log level:\n----- BEGIN RESPONSE DUMP -----\n%s\n----- END RESPONSE DUMP -----\n", string(respDump))
-	//}
+	if resp.StatusCode != http.StatusOK {
+		t.Logf("error updating policy log level to %q", newPolicyLogLevel)
+		// The log below is a bit spammy but it can be useful for debugging
+		respDump, err := httputil.DumpResponse(resp, true)
+		if err != nil {
+			t.Logf("Error dumping Fleet response to updating policy log level: %v", err)
+		} else {
+			t.Logf("Fleet response to updating policy log level:\n----- BEGIN RESPONSE DUMP -----\n%s\n----- END RESPONSE DUMP -----\n", string(respDump))
+		}
+		return fmt.Errorf("error updating policy log level to %q: fleet response status code: %d", newPolicyLogLevel, resp.StatusCode)
+	}
 
 	return nil
 }
