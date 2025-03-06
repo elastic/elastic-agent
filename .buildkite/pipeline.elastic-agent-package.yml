@@ -84,7 +84,7 @@ steps:
           imagePrefix: "core-ubuntu-2204-aarch64"
         env:
           PLATFORMS: "linux/arm64"
-          PACKAGES: "docker tar.gz deb rpm"
+          PACKAGES: "docker,tar.gz,deb,rpm"
         command: |
           echo "Add support for multiarch"
           docker run --privileged --rm tonistiigi/binfmt:master --install all
