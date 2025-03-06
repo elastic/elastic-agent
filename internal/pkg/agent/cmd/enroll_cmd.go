@@ -54,8 +54,8 @@ const (
 	defaultFleetServerPort         = 8220
 	defaultFleetServerInternalHost = "localhost"
 	defaultFleetServerInternalPort = 8221
-	enrollBackoffInit              = time.Second
-	enrollBackoffMax               = 10 * time.Second
+	enrollBackoffInit              = time.Second * 5
+	enrollBackoffMax               = time.Minute * 10
 )
 
 var (
@@ -69,13 +69,14 @@ type saver interface {
 
 // enrollCmd is an enroll subcommand that interacts between the Kibana API and the Agent.
 type enrollCmd struct {
-	log          *logger.Logger
-	options      *enrollCmdOption
-	client       fleetclient.Sender
-	configStore  saver
-	remoteConfig remote.Config
-	agentProc    *process.Info
-	configPath   string
+	log            *logger.Logger
+	options        *enrollCmdOption
+	client         fleetclient.Sender
+	configStore    saver
+	remoteConfig   remote.Config
+	agentProc      *process.Info
+	configPath     string
+	backoffFactory func(done <-chan struct{}) backoff.Backoff
 
 	// For testability
 	daemonReloadFunc func(context.Context) error
@@ -176,13 +177,20 @@ func newEnrollCmd(
 	options *enrollCmdOption,
 	configPath string,
 	store saver,
+	backoffFactory func(done <-chan struct{}) backoff.Backoff,
 ) (*enrollCmd, error) {
+	if backoffFactory == nil {
+		backoffFactory = func(done <-chan struct{}) backoff.Backoff {
+			return backoff.NewEqualJitterBackoff(done, enrollBackoffInit, enrollBackoffMax)
+		}
+	}
 	return &enrollCmd{
 		log:              log,
 		options:          options,
 		configStore:      store,
 		configPath:       configPath,
 		daemonReloadFunc: daemonReload,
+		backoffFactory:   backoffFactory,
 	}, nil
 }
 
@@ -528,7 +536,7 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 	c.log.Infof("1st enrollment attempt failed, retrying enrolling to URL: %s with exponential backoff (init %s, max %s)", c.client.URI(), enrollBackoffInit, enrollBackoffMax)
 	signal := make(chan struct{})
 	defer close(signal)
-	backExp := backoff.NewExpBackoff(signal, enrollBackoffInit, enrollBackoffMax)
+	backExp := c.backoffFactory(signal)
 
 	for {
 		retry := false
