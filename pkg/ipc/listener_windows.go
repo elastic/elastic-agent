@@ -12,11 +12,11 @@ import (
 	"os/user"
 	"strings"
 
-	"github.com/hectane/go-acl/api"
 	"golang.org/x/sys/windows"
 
 	"github.com/elastic/elastic-agent-libs/api/npipe"
 
+	"github.com/elastic/elastic-agent/internal/pkg/acl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -85,10 +85,10 @@ func securityDescriptor(log *logger.Logger) (string, error) {
 func pathGID(path string) (string, error) {
 	var group *windows.SID
 	var secDesc windows.Handle
-	err := api.GetNamedSecurityInfo(
+	err := acl.GetNamedSecurityInfo(
 		path,
-		api.SE_FILE_OBJECT,
-		api.GROUP_SECURITY_INFORMATION,
+		acl.SE_FILE_OBJECT,
+		acl.GROUP_SECURITY_INFORMATION,
 		nil,
 		&group,
 		nil,
