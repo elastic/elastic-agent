@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # This script runs the helm-charts for the given environment
-# STAGING OR SNAPSHOT
-# And Upload the package to GCS
+# uploads the package to GCS and
+# triggers the unified-release-publish-helm-charts pipeline.
 
 # shellcheck disable=SC1091
 source .buildkite/scripts/common.sh
@@ -15,7 +15,9 @@ echo "--- upload package tests"
 STORAGE=elastic-agent-helm-chart
 gcloud storage cp elastic-agent-*.tgz gs://"${STORAGE}" --print-created-message
 
-# NOTE: store the artifact public url.
-#       This will be used in .buildkite/scripts/steps/trigger-publish-helm-charts.sh
+echo "--- load trigger pipeline"
 HELM_CHART_FILE=$(ls -1 elastic-agent-*.tgz)
-buildkite-agent meta-data set "CHART_URL" "https://storage.googleapis.com/${STORAGE}/${HELM_CHART_FILE}"
+CHART_URL="https://storage.googleapis.com/${STORAGE}/${HELM_CHART_FILE}"
+export CHART_URL
+.buildkite/scripts/steps/trigger-publish-helm-charts.sh
+.buildkite/scripts/steps/trigger-publish-helm-charts.sh | buildkite-agent pipeline upload

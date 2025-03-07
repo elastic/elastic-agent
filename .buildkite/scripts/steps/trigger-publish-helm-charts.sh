@@ -1,22 +1,19 @@
 #!/usr/bin/env bash
 #
-# Create a dynamic buildkite step with the HELM_CHART returned by the
-# script .buildkite/scripts/steps/helm-charts.sh.
-# This step will trigger the unified-release-publish-helm-charts pipeline.
+# Create a dynamic buildkite step that triggers the
+# unified-release-publish-helm-charts pipeline.
 #
 # Required environment variables:
 #  - HELM_REPO_ENV
+#  - CHART_URL
 #
 
 set -eo pipefail
 
 HELM_REPO_ENV=${HELM_REPO_ENV:-"dev"}
 
-## Fetch the URL from .buildkite/scripts/steps/helm-charts.sh
-CHART_URL=$(buildkite-agent meta-data get "CHART_URL")
-
 if [ -z "$CHART_URL" ] ; then
-  echo "CHART_URL metadata could not be loaded."
+  echo "CHART_URL could not be found."
   exit 1
 fi
 
@@ -26,6 +23,6 @@ cat << EOF
     build:
       message: "publish helm-chart for elastic-agent in ${HELM_REPO_ENV}"
       env:
-        CHARTS_URL: "${CHARTS_URL}"
+        CHARTS_URL: "${CHART_URL}"
         HELM_REPO_ENV: ${HELM_REPO_ENV}
 EOF
