@@ -212,7 +212,7 @@ steps:
     artifact_paths:
       - "build/TEST-go-unit.cov"
     agents:
-      image: "golang:1.23.6"
+      image: "golang:1.24.0"
     depends_on:
       - unit-tests
       - extended-windows
@@ -326,3 +326,8 @@ steps:
     build:
       commit: "${BUILDKITE_COMMIT}"
       branch: "${BUILDKITE_BRANCH}"
+
+  - label: "Validate catalog-info.yaml"
+    command: "/agent/check-catalog-info.sh"
+    agents:
+      image: docker.elastic.co/ci-agent-images/pipelib:0.13.0

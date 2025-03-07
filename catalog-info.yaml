@@ -363,4 +363,4 @@ spec:
         release-eng:
           access_level: BUILD_AND_READ
         everyone:
-          access_level: READ
+          access_level: READ_ONLY
