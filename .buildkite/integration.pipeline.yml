@@ -25,10 +25,6 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
 
-<<<<<<< HEAD
-      - label: "Packaging: Ubuntu arm64"
-        key: "packaging-ubuntu-arm64"
-=======
       - label: "Packaging: Ubuntu x86_64 FIPS"
         key: "packaging-ubuntu-x86-64-fips"
         env:
@@ -48,7 +44,6 @@ steps:
       # Packaging linux/arm64
       - label: "Packaging: linux/arm64 tar.gz"
         key: packaging-ubuntu-arm64
->>>>>>> 14943f0fc ([CI] Fixed container images packaging (#6972))
         env:
           PLATFORMS: "linux/arm64"
           PACKAGES: "tar.gz"
@@ -63,10 +58,6 @@ steps:
           instanceType: "c6g.4xlarge"
           imagePrefix: "core-ubuntu-2204-aarch64"
 
-<<<<<<< HEAD
-      - label: "Packaging: Windows"
-        key: "packaging-windows"
-=======
       - label: "Packaging: Ubuntu arm64 FIPS"
         key: "packaging-ubuntu-arm64-fips"
         env:
@@ -86,7 +77,6 @@ steps:
 
       - label: "Packaging: windows/amd64 zip"
         key: packaging-windows
->>>>>>> 14943f0fc ([CI] Fixed container images packaging (#6972))
         env:
           PACKAGES: "zip"
           PLATFORMS: "windows/amd64"
