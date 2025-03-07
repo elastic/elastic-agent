@@ -7,6 +7,7 @@
 package vault
 
 import (
+	"crypto/pbkdf2"
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
@@ -14,8 +15,6 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
-
-	"golang.org/x/crypto/pbkdf2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault/aesgcm"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -56,7 +55,13 @@ func deriveKey(pw []byte, salt []byte) ([]byte, []byte, error) {
 			return nil, nil, err
 		}
 	}
-	return pbkdf2.Key(pw, salt, 12022, 32, sha256.New), salt, nil
+
+	key, err := pbkdf2.Key(sha256.New, string(pw), salt, 12022, 32)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return key, salt, nil
 }
 
 func tightenPermissions(path string, ownership utils.FileOwner) error {
