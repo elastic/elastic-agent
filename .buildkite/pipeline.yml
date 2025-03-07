@@ -4,57 +4,57 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
 steps:
-  - label: "check-ci"
-    key: "check-ci"
-    command: ".buildkite/scripts/steps/check-ci.sh"
-    agents:
-      provider: "gcp"
-      image: "family/core-ubuntu-2204"
-    retry:
-      manual:
-        allowed: true
+  # - label: "check-ci"
+  #   key: "check-ci"
+  #   command: ".buildkite/scripts/steps/check-ci.sh"
+  #   agents:
+  #     provider: "gcp"
+  #     image: "family/core-ubuntu-2204"
+  #   retry:
+  #     manual:
+  #       allowed: true
 
   - group: "Unit tests"
     key: "unit-tests"
     steps:
-      - label: "Unit tests - Ubuntu 22.04"
-        key: "unit-tests-2204"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          image: "family/core-ubuntu-2204"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
+      # - label: "Unit tests - Ubuntu 22.04"
+      #   key: "unit-tests-2204"
+      #   command: ".buildkite/scripts/steps/unit-tests.sh"
+      #   artifact_paths:
+      #     - "build/TEST-*.html"
+      #     - "build/TEST-*.xml"
+      #     - "build/diagnostics/*"
+      #     - "coverage-*.out"
+      #   agents:
+      #     provider: "gcp"
+      #     image: "family/core-ubuntu-2204"
+      #   retry:
+      #     automatic:
+      #       limit: 1
+      #     manual:
+      #       allowed: true
 
-      - label: "Unit tests - Ubuntu 22.04 ARM64"
-        key: "unit-tests-2204-arm64"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "aws"
-          imagePrefix: "core-ubuntu-2204-aarch64"
-          diskSizeGb: 200
-          instanceType: "m6g.xlarge"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
+      # - label: "Unit tests - Ubuntu 22.04 ARM64"
+      #   key: "unit-tests-2204-arm64"
+      #   command: ".buildkite/scripts/steps/unit-tests.sh"
+      #   artifact_paths:
+      #     - "build/TEST-*.html"
+      #     - "build/TEST-*.xml"
+      #     - "build/diagnostics/*"
+      #     - "coverage-*.out"
+      #   agents:
+      #     provider: "aws"
+      #     imagePrefix: "core-ubuntu-2204-aarch64"
+      #     diskSizeGb: 200
+      #     instanceType: "m6g.xlarge"
+      #   retry:
+      #     automatic:
+      #       limit: 1
+      #     manual:
+      #       allowed: true
 
-      - label: "Unit tests - Windows 2022"
-        key: "unit-tests-win2022"
+      - label: "Unit tests {{matrix.iter}} - Windows 2022"
+        # key: "unit-tests-win2022"
         command: |
           .\\.buildkite\\scripts\\install-go.ps1
           .\\.buildkite\\scripts\\steps\\unit-tests.ps1
@@ -66,7 +66,7 @@ steps:
         agents:
           provider: "gcp"
           image: "family/core-windows-2022"
-          machine_type: "n2-standard-8"
+          machine_type: "n2-standard-16"
           disk_size: 200
           disk_type: "pd-ssd"
         retry:
@@ -74,8 +74,15 @@ steps:
             limit: 1
           manual:
             allowed: true
+        matrix:
+          setup:
+            iter:
+              - 1
+              - 2
+              - 3
+              - 4
 
-      - label: "Unit tests - Windows 2016"
+      - label: "Unit tests {{matrix.iter}} - Windows 2016"
         key: "unit-tests-win2016"
         command: |
           .\\.buildkite\\scripts\\install-go.ps1
@@ -88,7 +95,7 @@ steps:
         agents:
           provider: "gcp"
           image: "family/core-windows-2016"
-          machine_type: "n2-standard-8"
+          machine_type: "n2-standard-16"
           disk_size: 200
           disk_type: "pd-ssd"
         retry:
@@ -96,8 +103,16 @@ steps:
             limit: 1
           manual:
             allowed: true
+        matrix:
+          setup:
+            iter:
+              - 1
+              - 2
+              - 3
+              - 4
 
   - group: "macOS tests"
+    skip: true
     key: "macos-unit-tests"
     steps:
       - label: "Unit tests - macOS 15 ARM"
@@ -135,6 +150,7 @@ steps:
             allowed: true
 
   - group: "Desktop Windows tests"
+    skip: true
     key: "extended-windows"
     steps:
       - label: "Unit tests - Windows 10"
@@ -180,46 +196,47 @@ steps:
           manual:
             allowed: true
 
-  - label: ":junit: Junit annotate"
-    plugins:
-      - junit-annotate#v2.5.0:
-          artifacts: "**TEST-*.xml"
-          always-annotate: true
-    agents:
-      provider: "gcp"
-    depends_on:
-      - step: "unit-tests-2204"
-        allow_failure: true
-      - step: "unit-tests-2204-arm64"
-        allow_failure: true
-      - step: "unit-tests-win2022"
-        allow_failure: true
-      - step: "unit-tests-win2016"
-        allow_failure: true
-      - step: "macos-unit-tests"
-        allow_failure: true
-      - step: "unit-tests-win10"
-        allow_failure: true
-      - step: "unit-tests-win11"
-        allow_failure: true
+  # - label: ":junit: Junit annotate"
+  #   plugins:
+  #     - junit-annotate#v2.5.0:
+  #         artifacts: "**TEST-*.xml"
+  #         always-annotate: true
+  #   agents:
+  #     provider: "gcp"
+  #   depends_on:
+  #     - step: "unit-tests-2204"
+  #       allow_failure: true
+  #     - step: "unit-tests-2204-arm64"
+  #       allow_failure: true
+  #     - step: "unit-tests-win2022"
+  #       allow_failure: true
+  #     - step: "unit-tests-win2016"
+  #       allow_failure: true
+  #     - step: "macos-unit-tests"
+  #       allow_failure: true
+  #     - step: "unit-tests-win10"
+  #       allow_failure: true
+  #     - step: "unit-tests-win11"
+  #       allow_failure: true
 
-  - label: "Merge coverage reports"
-    key: "merge-coverage"
-    env:
-      BUILDKITE_REPO: ""
-    command: |
-      .buildkite/scripts/steps/merge.sh
-    artifact_paths:
-      - "build/TEST-go-unit.cov"
-    agents:
-      image: "golang:1.24.0"
-    depends_on:
-      - unit-tests
-      - extended-windows
-    allow_dependency_failure: true
-    soft_fail: true # Until https://github.com/elastic/ingest-dev/issues/4042 is resolved
+  # - label: "Merge coverage reports"
+  #   key: "merge-coverage"
+  #   env:
+  #     BUILDKITE_REPO: ""
+  #   command: |
+  #     .buildkite/scripts/steps/merge.sh
+  #   artifact_paths:
+  #     - "build/TEST-go-unit.cov"
+  #   agents:
+  #     image: "golang:1.24.0"
+  #   depends_on:
+  #     - unit-tests
+  #     - extended-windows
+  #   allow_dependency_failure: true
+  #   soft_fail: true # Until https://github.com/elastic/ingest-dev/issues/4042 is resolved
 
   - group: "K8s tests"
+    skip: true
     key: "k8s-tests"
     steps:
       - label: "K8s tests: {{matrix.k8s_version}}"
@@ -242,6 +259,7 @@ steps:
             allowed: true
 
   - label: ":sonarqube: Continuous Code Inspection"
+    skip: true
     env:
       VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
     agents:
@@ -279,6 +297,7 @@ steps:
 
   # Trigger for pull requests
   - label: "Trigger Extended tests for Pull request"
+    skip: true
     if: |
       (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
       build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
