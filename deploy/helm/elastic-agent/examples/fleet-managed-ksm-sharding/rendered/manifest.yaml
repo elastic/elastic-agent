@@ -5,13 +5,13 @@ kind: ServiceAccount
 automountServiceAccountToken: true
 metadata:
   labels:    
-    helm.sh/chart: kube-state-metrics-5.28.0
+    helm.sh/chart: kube-state-metrics-5.30.1
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: "2.14.0"
+    app.kubernetes.io/version: "2.15.0"
   name: kube-state-metrics
   namespace: default
 ---
@@ -37,13 +37,13 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:    
-    helm.sh/chart: kube-state-metrics-5.28.0
+    helm.sh/chart: kube-state-metrics-5.30.1
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: "2.14.0"
+    app.kubernetes.io/version: "2.15.0"
   name: kube-state-metrics
 rules:
 
@@ -192,13 +192,13 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   labels:    
-    helm.sh/chart: kube-state-metrics-5.28.0
+    helm.sh/chart: kube-state-metrics-5.30.1
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: "2.14.0"
+    app.kubernetes.io/version: "2.15.0"
   name: kube-state-metrics
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -216,13 +216,13 @@ metadata:
   name: stsdiscovery-kube-state-metrics
   namespace: default
   labels:    
-    helm.sh/chart: kube-state-metrics-5.28.0
+    helm.sh/chart: kube-state-metrics-5.30.1
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: "2.14.0"
+    app.kubernetes.io/version: "2.15.0"
 rules:
 - apiGroups:
   - ""
@@ -248,13 +248,13 @@ metadata:
   name: stsdiscovery-kube-state-metrics
   namespace: default
   labels:    
-    helm.sh/chart: kube-state-metrics-5.28.0
+    helm.sh/chart: kube-state-metrics-5.30.1
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: "2.14.0"
+    app.kubernetes.io/version: "2.15.0"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -271,13 +271,13 @@ metadata:
   name: kube-state-metrics
   namespace: default
   labels:    
-    helm.sh/chart: kube-state-metrics-5.28.0
+    helm.sh/chart: kube-state-metrics-5.30.1
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: "2.14.0"
+    app.kubernetes.io/version: "2.15.0"
   annotations:
     prometheus.io/scrape: 'true'
 spec:
@@ -300,13 +300,13 @@ metadata:
   name: kube-state-metrics
   namespace: default
   labels:    
-    helm.sh/chart: kube-state-metrics-5.28.0
+    helm.sh/chart: kube-state-metrics-5.30.1
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: "2.14.0"
+    app.kubernetes.io/version: "2.15.0"
 spec:
   selector:
     matchLabels:      
@@ -319,13 +319,13 @@ spec:
   template:
     metadata:
       labels:        
-        helm.sh/chart: kube-state-metrics-5.28.0
+        helm.sh/chart: kube-state-metrics-5.30.1
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/component: metrics
         app.kubernetes.io/part-of: kube-state-metrics
         app.kubernetes.io/name: kube-state-metrics
         app.kubernetes.io/instance: example
-        app.kubernetes.io/version: "2.14.0"
+        app.kubernetes.io/version: "2.15.0"
       annotations:
       
         checksum/config: 23ea9986d03b780c70c0a67796c271f1336b53e217163de5b5971495c39e2ff9
@@ -358,7 +358,7 @@ spec:
         - --pod=$(POD_NAME)
         - --pod-namespace=$(POD_NAMESPACE)
         imagePullPolicy: IfNotPresent
-        image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.14.0
+        image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.15.0
         ports:
         - containerPort: 8080
           name: "http"
