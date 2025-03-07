@@ -72,6 +72,14 @@ var variants = []struct {
 		Name:  "service",
 		Image: "docker.elastic.co/beats-ci/elastic-agent-service",
 	},
+	{
+		Name:  "edot-collector",
+		Image: "docker.elastic.co/beats-ci/elastic-agent-edot-collector",
+	},
+	{
+		Name:  "slim",
+		Image: "docker.elastic.co/beats-ci/elastic-agent-slim",
+	},
 }
 
 // GetSupported returns the list of supported OS types for Kubernetes.
