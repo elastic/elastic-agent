@@ -180,9 +180,14 @@ func TakeOwnership(name string, owner *windows.SID, group *windows.SID) error {
 // SetEntriesInAcl creates a new access control list (ACL) by merging new access
 // control or audit control information into an existing ACL structure.
 func SetEntriesInAcl(entries []ExplicitAccess, oldAcl windows.Handle, newAcl *windows.Handle) error {
+	var entriesPtr unsafe.Pointer
+	if len(entries) > 0 {
+		entriesPtr = unsafe.Pointer(&entries[0])
+	}
+
 	ret, _, _ := procSetEntriesInAclW.Call(
 		uintptr(len(entries)),
-		uintptr(unsafe.Pointer(&entries[0])),
+		uintptr(entriesPtr),
 		uintptr(oldAcl),
 		uintptr(unsafe.Pointer(newAcl)),
 	)

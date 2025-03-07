@@ -87,11 +87,13 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 					inherit := topPath != name
 
 					if err = acl.Apply(name, true, inherit, grants...); err != nil {
-						return err
+						return fmt.Errorf("apply ACL for %s failed: %w", name, err)
 					}
 
 					if userSID != nil && groupSID != nil {
-						return acl.TakeOwnership(name, userSID, groupSID)
+						if err := acl.TakeOwnership(name, userSID, groupSID); err != nil {
+							return fmt.Errorf("take ownership for %s failed: %w", name, err)
+						}
 					}
 					return nil
 				case errors.Is(err, fs.ErrNotExist):
@@ -110,7 +112,11 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 			// first level doesn't inherit
 			inherit := topPath != name
 
-			return acl.Apply(name, true, inherit, grants...)
+			if err := acl.Apply(name, true, inherit, grants...); err != nil {
+				return fmt.Errorf("apply ACL for %s failed: %w", name, err)
+			}
+
+			return nil
 		case errors.Is(err, fs.ErrNotExist):
 			return nil
 		default:
