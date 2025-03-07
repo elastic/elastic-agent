@@ -16,7 +16,7 @@ require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250218044933-ef79280d53a2
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.1
-	github.com/elastic/elastic-agent-libs v0.18.8
+	github.com/elastic/elastic-agent-libs v0.18.9
 	github.com/elastic/elastic-agent-system-metrics v0.11.8
 	github.com/elastic/elastic-transport-go/v8 v8.6.1
 	github.com/elastic/go-elasticsearch/v8 v8.17.1
@@ -54,7 +54,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver v0.121.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver v0.121.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver v0.121.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.121.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.119.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.121.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver v0.121.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.121.0
@@ -75,7 +75,6 @@ require (
 	go.elastic.co/go-licence-detector v0.7.0
 	go.opentelemetry.io/collector/component/componentstatus v0.121.0
 	go.opentelemetry.io/collector/pipeline v0.121.0
-	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.121.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.121.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.35.0
@@ -500,7 +499,7 @@ require (
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/common/sigv4 v0.1.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
-	github.com/prometheus/prometheus v0.300.1 // indirect
+	github.com/prometheus/prometheus v0.54.1 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
 	github.com/redis/go-redis/v9 v9.7.1 // indirect
 	github.com/relvacode/iso8601 v1.6.0 // indirect
@@ -624,7 +623,6 @@ require (
 	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap/exp v0.3.0 // indirect
 	golang.org/x/mod v0.22.0 // indirect
 	golang.org/x/oauth2 v0.24.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect

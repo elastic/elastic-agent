@@ -193,6 +193,7 @@ func TestGetOtelConfig(t *testing.T) {
 			"batcher": map[string]any{
 				"enabled":        true,
 				"max_size_items": 1600,
+				"min_size_items": 0,
 			},
 			"mapping": map[string]any{
 				"mode": "bodymap",
@@ -219,6 +220,7 @@ func TestGetOtelConfig(t *testing.T) {
 			"idle_conn_timeout": 3 * time.Second,
 		},
 	}
+
 	defaultProcessors := func(streamId, dataset string, namespace string) []any {
 		return []any{
 			mapstr.M{
@@ -376,7 +378,7 @@ func TestGetOtelConfig(t *testing.T) {
 				},
 				"service": map[string]any{
 					"pipelines": map[string]any{
-						"logs/_agent-component/agent-monitoring": map[string][]string{
+						"logs/_agent-component/filestream-default": map[string][]string{
 							"exporters": []string{"elasticsearch/_agent-component/default"},
 							"receivers": []string{"filebeatreceiver/_agent-component/filestream-default"},
 						},
@@ -402,12 +404,12 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 						Units: []component.Unit{
 							{
-								ID:     "agent-monitoring",
+								ID:     "beat/metrics-monitoring",
 								Type:   client.UnitTypeInput,
 								Config: component.MustExpectedConfig(beatMetricsConfig),
 							},
 							{
-								ID:     "agent-monitoring",
+								ID:     "beat/metrics-default",
 								Type:   client.UnitTypeOutput,
 								Config: component.MustExpectedConfig(esOutputConfig),
 							},
@@ -418,18 +420,18 @@ func TestGetOtelConfig(t *testing.T) {
 			expectedConfig: confmap.NewFromStringMap(map[string]any{
 				"exporters": expectedESConfig,
 				"receivers": map[string]any{
-					"metricbeatreceiver/_agent-component/beat-metrics": map[string]any{
+					"metricbeatreceiver/_agent-component/beat-metrics-monitoring": map[string]any{
 						"metricbeat": map[string]any{
-							"inputs": []map[string]any{
+							"modules": []map[string]any{
 								{
 									"data_stream": map[string]any{"dataset": "generic-1"},
 									"hosts":       "http://localhost:5066",
-									"id":          "test-2",
-									"index":       "metrics-generic-2-default",
-									"metricsets":  []string{"stats"},
+									"id":          "test-1",
+									"index":       "metrics-generic-1-default",
+									"metricsets":  []interface{}{"stats"},
 									"period":      "60s",
 									"processors":  defaultProcessors("test-1", "generic-1", "metrics"),
-									"type":        "beat/metrics",
+									"module":      "beat",
 								},
 							},
 						},
@@ -452,8 +454,8 @@ func TestGetOtelConfig(t *testing.T) {
 				},
 				"service": map[string]any{
 					"pipelines": map[string]any{
-						"logs/_agent-component/beat-metrics-monitoring": map[string]any{
-							"exporters": []string{"elasticsearch/_agent-component/agent-monitoring"},
+						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
+							"exporters": []string{"elasticsearch/_agent-component/default"},
 							"receivers": []string{"metricbeatreceiver/_agent-component/beat-metrics-monitoring"},
 						},
 					},
