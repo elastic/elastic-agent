@@ -158,8 +158,26 @@ func Chmod(name string, fileMode os.FileMode) error {
 		name,
 		true,
 		false,
+		// For owner permissions:
+		// (mode&0700)<<23: Extracts the rwx bits for owner (bits 8-6) and shifts them
+		// to bits 31-29 in the Windows ACL
+		// (mode&0200)<<9: Extracts the write bit for owner (bit 7) and shifts it
+		// to bit 16 in the Windows ACL (for additional write permissions)
+		// https://learn.microsoft.com/en-us/windows/win32/secauthz/access-mask
 		GrantSid(((mode&0700)<<23)|((mode&0200)<<9), creatorOwnerSID),
+		// For group permissions:
+		// (mode&0070)<<26: Extracts the rwx bits for group (bits 5-3) and shifts them
+		// to bits 31-29 in the Windows ACL
+		// (mode&0020)<<12: Extracts the write bit for group (bit 4) and shifts it
+		// to bit 16 in the Windows ACL (for additional write permissions)
+		// https://learn.microsoft.com/en-us/windows/win32/secauthz/access-mask
 		GrantSid(((mode&0070)<<26)|((mode&0020)<<12), creatorGroupSID),
+		// For other/everyone permissions:
+		// (mode&0007)<<29: Extracts the rwx bits for others (bits 2-0) and shifts them
+		// to bits 31-29 in the Windows ACL
+		// (mode&0002)<<15: Extracts the write bit for others (bit 1) and shifts it
+		// to bit 16 in the Windows ACL (for additional write permissions)
+		// https://learn.microsoft.com/en-us/windows/win32/secauthz/access-mask
 		GrantSid(((mode&0007)<<29)|((mode&0002)<<15), everyoneSID),
 	)
 }
