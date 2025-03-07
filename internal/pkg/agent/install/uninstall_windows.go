@@ -169,7 +169,7 @@ type fileDispositionInfo struct {
 // On Windows when running in unprivileged mode the internal way that golang uses DuplicateHandle to perform the kill
 // only works when the process is a child of this process.
 func killNoneChildProcess(proc *os.Process) error {
-	h, e := syscall.OpenProcess(syscall.PROCESS_TERMINATE, false, uint32(proc.Pid)) //nolint:gosec // G115 Conversion from int to uint32 is safe here.
+	h, e := syscall.OpenProcess(syscall.PROCESS_TERMINATE, false, uint32(proc.Pid))
 	if e != nil {
 		return os.NewSyscallError("OpenProcess", e)
 	}
