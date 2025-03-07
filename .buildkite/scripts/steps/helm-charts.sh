@@ -9,7 +9,7 @@ source .buildkite/scripts/common.sh
 set -euo pipefail
 
 echo "--- mage helm:package"
-SNAPSHOT=true mage helm:package
+mage helm:package
 
 echo "--- upload package tests"
 STORAGE=elastic-agent-helm-chart
