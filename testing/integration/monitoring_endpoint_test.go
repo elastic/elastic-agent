@@ -80,7 +80,7 @@ func (runner *EndpointMetricsMonRunner) SetupSuite() {
 		Privileged:     true,
 	}
 
-	policy, err := tools.InstallAgentWithPolicy(ctx, runner.T(),
+	policy, _, err := tools.InstallAgentWithPolicy(ctx, runner.T(),
 		installOpts, runner.fixture, runner.info.KibanaClient, createPolicyReq)
 	require.NoError(runner.T(), err, "failed to install agent with policy")
 

@@ -120,7 +120,7 @@ func (runner *MonitoringTextRunner) SetupSuite() {
 	err = runner.agentFixture.WriteFileToWorkDir(ctx, defaultTextCfg, "elastic-agent.yml")
 	require.NoError(runner.T(), err)
 
-	policyResp, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
+	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
 
 	runner.policyID = policyResp.ID
