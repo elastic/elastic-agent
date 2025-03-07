@@ -30,11 +30,16 @@ type HeadersProvider interface {
 	Headers() map[string]string
 }
 
+type RuntimeManager string
+
 const (
 	// defaultUnitLogLevel is the default log level that a unit will get if one is not defined.
-	defaultUnitLogLevel = client.UnitLogLevelInfo
-	headersKey          = "headers"
-	elasticsearchType   = "elasticsearch"
+	defaultUnitLogLevel                  = client.UnitLogLevelInfo
+	headersKey                           = "headers"
+	elasticsearchType                    = "elasticsearch"
+	ProcessRuntimeManager                = RuntimeManager("process")
+	OtelRuntimeManager                   = RuntimeManager("otel")
+	DefaultRuntimeManager RuntimeManager = ProcessRuntimeManager
 )
 
 // ErrInputRuntimeCheckFail error is used when an input specification runtime prevention check occurs.
@@ -514,12 +519,13 @@ func injectInputPolicyID(fleetPolicy map[string]interface{}, inputConfig map[str
 // of components.
 func toIntermediate(policy map[string]interface{}, aliasMapping map[string]string, ll logp.Level, headers HeadersProvider) (map[string]outputI, error) {
 	const (
-		outputsKey   = "outputs"
-		enabledKey   = "enabled"
-		inputsKey    = "inputs"
-		typeKey      = "type"
-		idKey        = "id"
-		useOutputKey = "use_output"
+		outputsKey        = "outputs"
+		enabledKey        = "enabled"
+		inputsKey         = "inputs"
+		typeKey           = "type"
+		idKey             = "id"
+		useOutputKey      = "use_output"
+		runtimeManagerKey = "runtime"
 	)
 
 	// intermediate structure for output to input mapping (this structure allows different input types per output)
@@ -660,17 +666,29 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 			return nil, fmt.Errorf("invalid 'inputs.%d.log_level', %w", idx, err)
 		}
 
+		runtimeManager := DefaultRuntimeManager
+		// determine the runtime manager for the input
+		if runtimeManagerRaw, ok := input[runtimeManagerKey]; ok {
+			runtimeManagerVal, ok := runtimeManagerRaw.(RuntimeManager)
+			if !ok {
+				return nil, fmt.Errorf("invalid 'inputs.%d.runtime', expected a string, not a %T", idx, runtimeManagerRaw)
+			}
+			runtimeManager = runtimeManagerVal
+			delete(input, runtimeManagerKey)
+		}
+
 		// Inject the top level fleet policy revision into each input configuration. This
 		// allows individual inputs (like endpoint) to detect policy changes more easily.
 		injectInputPolicyID(policy, input)
 
 		output.inputs[t] = append(output.inputs[t], inputI{
-			idx:       idx,
-			id:        id,
-			enabled:   enabled,
-			logLevel:  logLevel,
-			inputType: t,
-			config:    input,
+			idx:            idx,
+			id:             id,
+			enabled:        enabled,
+			logLevel:       logLevel,
+			inputType:      t,
+			config:         input,
+			runtimeManager: runtimeManager,
 		})
 	}
 	if len(outputsMap) == 0 {
@@ -680,11 +698,12 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 }
 
 type inputI struct {
-	idx       int
-	id        string
-	enabled   bool
-	logLevel  client.UnitLogLevel
-	inputType string // canonical (non-alias) type
+	idx            int
+	id             string
+	enabled        bool
+	logLevel       client.UnitLogLevel
+	inputType      string // canonical (non-alias) type
+	runtimeManager RuntimeManager
 
 	// The raw configuration for this input, with small cleanups:
 	// - the "enabled", "use_output", and "log_level" keys are removed
