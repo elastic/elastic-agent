@@ -14,38 +14,7 @@ steps:
         key: packaging-ubuntu-x86-64
         env:
           PLATFORMS: "linux/amd64"
-<<<<<<< HEAD
           PACKAGES: "tar.gz,rpm,deb"
-=======
-        command: ".buildkite/scripts/steps/integration-package.sh"
-        artifact_paths:
-        - build/distributions/**
-        retry:
-          automatic:
-            limit: 1
-        agents:
-          provider: "gcp"
-          machineType: "n2-standard-8"
-
-      - label: "Packaging: Ubuntu x86_64 FIPS"
-        key: "packaging-ubuntu-x86-64-fips"
-        env:
-          PACKAGES: "tar.gz"
-          PLATFORMS: "linux/amd64"
-          FIPS: "true"
-        command: ".buildkite/scripts/steps/integration-package.sh"
-        artifact_paths:
-        - build/distributions/**
-        agents:
-          provider: "gcp"
-          machineType: "n2-standard-4"
-
-      - label: "Packaging: Ubuntu arm64"
-        key: "packaging-ubuntu-arm64"
-        env:
-          PACKAGES: "tar.gz"
-          PLATFORMS: "linux/arm64"
->>>>>>> 8f8f7f4362679a767a736c8343676d338b0f9cd5
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
@@ -56,7 +25,6 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
 
-<<<<<<< HEAD
       - label: "Packaging: Ubuntu x86_64 FIPS"
         key: "packaging-ubuntu-x86-64-fips"
         env:
@@ -90,8 +58,6 @@ steps:
           instanceType: "c6g.4xlarge"
           imagePrefix: "core-ubuntu-2204-aarch64"
 
-=======
->>>>>>> 8f8f7f4362679a767a736c8343676d338b0f9cd5
       - label: "Packaging: Ubuntu arm64 FIPS"
         key: "packaging-ubuntu-arm64-fips"
         env:
@@ -101,7 +67,6 @@ steps:
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
-<<<<<<< HEAD
         retry:
           automatic:
             limit: 1
@@ -112,14 +77,6 @@ steps:
 
       - label: "Packaging: windows/amd64 zip"
         key: packaging-windows
-=======
-        agents:
-          provider: "gcp"
-          machineType: "n2-standard-4"
-
-      - label: "Packaging: Windows"
-        key: "packaging-windows"
->>>>>>> 8f8f7f4362679a767a736c8343676d338b0f9cd5
         env:
           PACKAGES: "zip"
           PLATFORMS: "windows/amd64"
