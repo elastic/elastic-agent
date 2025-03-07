@@ -1074,8 +1074,8 @@ specs:
       types: [ docker ]
       spec:
         # The service image is always based on Wolfi
-        <<: *docker_wolfi_spec
-        <<: *docker_builder_spec
+        <<: *docker_wolfi_arm_spec
+        <<: *docker_builder_arm_spec
         <<: *agent_docker_slim_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
@@ -1100,8 +1100,8 @@ specs:
       arch: arm64
       types: [ docker ]
       spec:
-        <<: *docker_wolfi_spec
-        <<: *docker_builder_spec
+        <<: *docker_wolfi_arm_spec
+        <<: *docker_builder_arm_spec
         <<: *agent_docker_edot_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
