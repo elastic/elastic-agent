@@ -114,6 +114,8 @@ func renameHandle(hHandle windows.Handle) error {
 	lpwStream := &wRename[0]
 	rename.FileNameLength = uint32(unsafe.Sizeof(lpwStream))
 
+	// RtlCopyMemory (https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-rtlcopymemory)
+	//   Return value - None
 	_, _, _ = windows.NewLazyDLL("kernel32.dll").NewProc("RtlCopyMemory").Call(
 		uintptr(unsafe.Pointer(&rename.FileName[0])),
 		uintptr(unsafe.Pointer(lpwStream)),
@@ -167,7 +169,7 @@ type fileDispositionInfo struct {
 // On Windows when running in unprivileged mode the internal way that golang uses DuplicateHandle to perform the kill
 // only works when the process is a child of this process.
 func killNoneChildProcess(proc *os.Process) error {
-	h, e := syscall.OpenProcess(syscall.PROCESS_TERMINATE, false, uint32(proc.Pid))
+	h, e := syscall.OpenProcess(syscall.PROCESS_TERMINATE, false, uint32(proc.Pid)) //nolint:gosec // G115 Conversion from int to uint32 is safe here.
 	if e != nil {
 		return os.NewSyscallError("OpenProcess", e)
 	}
