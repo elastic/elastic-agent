@@ -526,6 +526,7 @@ collectors:
   #  forwarding telemetry to an Elasticsearch endpoint.
   gateway:
     suffix: gateway
+    replicas: 2
     autoscaler:
       minReplicas: 2 # Start with at least 2 replicas for better availability.
       maxReplicas: 5 # Allow more scale-out if needed.

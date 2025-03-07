@@ -109,9 +109,9 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				// (1 EDOT collector pod per node)
 				// - A Cluster wide Deployment to collect K8s metrics and
 				// events (1 EDOT collector pod per cluster)
-				// - One Gateway pod to collect, aggregate and forward
+				// - Two Gateway replicas to collect, aggregate and forward
 				// telemetry.
-				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 3, "otc-container"),
+				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 4, "otc-container"),
 			},
 		},
 	}
