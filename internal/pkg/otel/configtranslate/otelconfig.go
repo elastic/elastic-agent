@@ -258,7 +258,6 @@ func getSignalForComponent(comp *component.Component) (pipeline.Signal, error) {
 // getReceiverTypeForComponent returns the receiver type for the given component.
 func getReceiverTypeForComponent(comp *component.Component) (otelcomponent.Type, error) {
 	beatName := getBeatNameForComponent(comp)
-	fmt.Println("beatname", beatName)
 	switch beatName {
 	case "filebeat":
 		return otelcomponent.MustNewType(fbreceiver.Name), nil
