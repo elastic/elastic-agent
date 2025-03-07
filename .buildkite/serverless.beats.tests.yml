@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+
+env:
+  DOCKER_REGISTRY: "docker.elastic.co"
+  VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
+
+steps:
+  - label: "Serverless Beats Tests"
+    key: "serverless-beats-integration-tests"
+    retry:
+      automatic:
+        limit: 1
+    command: |
+      .buildkite/scripts/steps/beats_tests.sh
+    agents:
+      provider: "gcp"
+      machineType: "n2-standard-8"
