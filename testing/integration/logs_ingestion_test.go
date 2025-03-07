@@ -23,9 +23,13 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid/v5"
-	"github.com/hectane/go-acl"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+<<<<<<< HEAD
+=======
+	"github.com/elastic/elastic-agent-libs/testing/estools"
+	"github.com/elastic/elastic-agent/internal/pkg/acl"
+>>>>>>> 7620c88a5 ([bug] handle syscall errno in windows permissions (#7059))
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
