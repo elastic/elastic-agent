@@ -27,8 +27,10 @@ steps:
       - integration-ess
     steps:
       - label: "Win2022:sudo:{{matrix}}"
+        depends_on:
+          - packaging-windows
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} true
         artifact_paths:
           - build/**
@@ -37,6 +39,9 @@ steps:
           provider: "gcp"
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-windows-2022"
+        retry:
+          automatic:
+            limit: 1
         matrix:
           - default
           - fleet
@@ -48,8 +53,10 @@ steps:
           - install-uninstall
 
       - label: "Win2022:non-sudo:{{matrix}}"
+        depends_on:
+          - packaging-windows
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} false
         artifact_paths:
           - build/**
@@ -58,12 +65,17 @@ steps:
           provider: "gcp"
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-windows-2022"
+        retry:
+          automatic:
+            limit: 1
         matrix:
           - default
 
       - label: "Win2025:sudo:{{matrix}}"
+        depends_on:
+          - packaging-windows
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} true
         artifact_paths:
           - build/**
@@ -72,6 +84,9 @@ steps:
           provider: "gcp"
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-windows-2025"
+        retry:
+          automatic:
+            limit: 1
         matrix:
           - default
           - fleet
@@ -83,12 +98,17 @@ steps:
           - install-uninstall
 
       - label: "Win2025:non-sudo:{{matrix}}"
+        depends_on:
+          - packaging-windows
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} false
         artifact_paths:
           - build/**
           - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
@@ -102,13 +122,16 @@ steps:
       - integration-ess
     steps:
       - label: "x86_64:non-sudo: {{matrix}}"
-        # only packaging-ubuntu-x86-64 artifact dependency is required
+        depends_on: packaging-ubuntu-x86-64
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
           - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
@@ -117,13 +140,18 @@ steps:
           - default
 
       - label: "x86_64:sudo: {{matrix}}"
+        depends_on:
+          - packaging-ubuntu-x86-64
         # due to deb group present in matrix tar.gz and deb packages artifacts are required
         command: |
-          buildkite-agent artifact download build/distributions/** . --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64          
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
           - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
@@ -145,9 +173,10 @@ steps:
           - container
 
       - label: "arm:sudo: {{matrix}}"
-        skip: true
+        depends_on:
+          - packaging-ubuntu-arm64
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
@@ -156,30 +185,39 @@ steps:
           provider: "aws"
           imagePrefix: "platform-ingest-beats-ubuntu-2404-aarch64"
           instanceType: "m6g.2xlarge"
+        retry:
+          automatic:
+            limit: 1
         matrix:
           - default
           - upgrade
           - upgrade-flavor
           - standalone-upgrade
           - fleet
-          - fleet-endpoint-security
-          - fleet-airgapped
-          - fleet-airgapped-privileged
-          - fleet-privileged
-          - fleet-upgrade-to-pr-build
-          - install-uninstall
-          - fqdn
-          - deb
-          - container
+          # ARM tests are enabled for only selected groups in order to save resources
+          # - fleet-endpoint-security
+          # - fleet-airgapped
+          # - fleet-airgapped-privileged
+          # - fleet-privileged
+          # - fleet-upgrade-to-pr-build
+          # - install-uninstall
+          # - fqdn
+          # - deb
+          # - container
 
       - label: "arm:non-sudo: {{matrix}}"
         skip: true
+        depends_on:
+          - packaging-ubuntu-arm64
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64' --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
           - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
         agents:
           provider: "aws"
           imagePrefix: "platform-ingest-beats-ubuntu-2404-aarch64"
@@ -193,12 +231,17 @@ steps:
       - integration-ess
     steps:
       - label: "x86_64:sudo:rpm"
+        depends_on:
+          - packaging-ubuntu-x86-64
         command: |
-          buildkite-agent artifact download build/distributions/** . --build ${BUILDKITE_TRIGGERED_FROM_BUILD_ID}
+          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64
           .buildkite/scripts/steps/integration_tests_tf.sh rpm true
         artifact_paths:
           - build/**
           - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"

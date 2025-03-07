@@ -380,7 +380,6 @@ func TestEql(t *testing.T) {
 	}
 
 	for _, test := range testcases {
-		test := test
 		var title string
 		if test.err {
 			title = fmt.Sprintf("%s failed parsing", test.expression)

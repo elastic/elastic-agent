@@ -37,7 +37,7 @@ type DynamicProvider interface {
 type DynamicProviderBuilder func(log *logger.Logger, config *config.Config, managed bool) (DynamicProvider, error)
 
 // MustAddDynamicProvider adds a new DynamicProviderBuilder and panics if it AddDynamicProvider returns an error.
-func (r *providerRegistry) MustAddDynamicProvider(name string, builder DynamicProviderBuilder) {
+func (r *ProviderRegistry) MustAddDynamicProvider(name string, builder DynamicProviderBuilder) {
 	err := r.AddDynamicProvider(name, builder)
 	if err != nil {
 		panic(err)
@@ -47,7 +47,7 @@ func (r *providerRegistry) MustAddDynamicProvider(name string, builder DynamicPr
 // AddDynamicProvider adds a new DynamicProviderBuilder
 //
 //nolint:dupl,goimports,nolintlint // false positive
-func (r *providerRegistry) AddDynamicProvider(providerName string, builder DynamicProviderBuilder) error {
+func (r *ProviderRegistry) AddDynamicProvider(providerName string, builder DynamicProviderBuilder) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -72,7 +72,7 @@ func (r *providerRegistry) AddDynamicProvider(providerName string, builder Dynam
 }
 
 // GetDynamicProvider returns the dynamic provider with the giving name, nil if it doesn't exist
-func (r *providerRegistry) GetDynamicProvider(name string) (DynamicProviderBuilder, bool) {
+func (r *ProviderRegistry) GetDynamicProvider(name string) (DynamicProviderBuilder, bool) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 
