@@ -45,7 +45,7 @@ const (
 	// Env vars
 	// agent package version
 	agentPackageVersionEnvVar = "AGENT_PACKAGE_VERSION"
-	//ManifestUrlEnvVar is the name fo the environment variable containing the Manifest URL to be used for packaging agent
+	// ManifestUrlEnvVar is the name fo the environment variable containing the Manifest URL to be used for packaging agent
 	ManifestUrlEnvVar = "MANIFEST_URL"
 	// AgentCommitHashEnvVar allows to override agent commit hash string during packaging
 	AgentCommitHashEnvVar = "AGENT_COMMIT_HASH_OVERRIDE"
@@ -233,7 +233,7 @@ func varMap(args ...map[string]interface{}) map[string]interface{} {
 }
 
 func dumpVariables() (string, error) {
-	var dumpTemplate = `## Variables
+	dumpTemplate := `## Variables
 
 GOOS             = {{.GOOS}}
 GOARCH           = {{.GOARCH}}
@@ -329,7 +329,6 @@ func TagContainsCommit() (bool, error) {
 }
 
 func AgentPackageVersion() (string, error) {
-
 	if agentPackageVersion != "" {
 		return agentPackageVersion, nil
 	}
@@ -338,7 +337,6 @@ func AgentPackageVersion() (string, error) {
 }
 
 func PackageManifest() (string, error) {
-
 	packageVersion, err := AgentPackageVersion()
 	if err != nil {
 		return "", fmt.Errorf("retrieving agent package version: %w", err)
@@ -359,14 +357,15 @@ func PackageManifest() (string, error) {
 		return "", fmt.Errorf("retrieving agent flavors: %w", err)
 	}
 
-	return GeneratePackageManifest(BeatName, packageVersion, Snapshot, hash, commitHashShort, registry)
+	return GeneratePackageManifest(BeatName, packageVersion, Snapshot, FIPSBuild, hash, commitHashShort, registry)
 }
 
-func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, fullHash, shortHash string, flavorsRegistry map[string][]string) (string, error) {
+func GeneratePackageManifest(beatName, packageVersion string, snapshot, fipsBuild bool, fullHash, shortHash string, flavorsRegistry map[string][]string) (string, error) {
 	m := v1.NewManifest()
 	m.Package.Version = packageVersion
 	m.Package.Snapshot = snapshot
 	m.Package.Hash = fullHash
+	m.Package.IsFips = fipsBuild
 
 	versionedHomePath := path.Join("data", fmt.Sprintf("%s-%s", beatName, shortHash))
 	m.Package.VersionedHome = versionedHomePath
@@ -377,7 +376,6 @@ func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, ful
 	yamlBytes, err := yaml.Marshal(m)
 	if err != nil {
 		return "", fmt.Errorf("marshaling manifest: %w", err)
-
 	}
 	return string(yamlBytes), nil
 }
@@ -451,9 +449,7 @@ func findElasticBeatsDir() (string, error) {
 	return gotool.ListModuleCacheDir(elasticAgentModulePath)
 }
 
-var (
-	buildDate = time.Now().UTC().Format(time.RFC3339)
-)
+var buildDate = time.Now().UTC().Format(time.RFC3339)
 
 // BuildDate returns the time that the build started.
 func BuildDate() string {
