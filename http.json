@@ -1,0 +1,139 @@
+{
+  "_index": ".ds-logs-elastic_agent.elastic_agent-default-2025.03.06-000001",
+  "_id": "1MYCapUBDl9WeN3XRPGx",
+  "_version": 1,
+  "_score": 0,
+  "_source": {
+    "agent": {
+      "name": "Khushis-MacBook-Pro.local",
+      "id": "f9787136-2d04-4999-a504-848c2e25d90e",
+      "type": "metricbeat",
+      "ephemeral_id": "38bc4e9c-8506-4252-bbf7-32449101e822",
+      "version": "9.1.0"
+    },
+    "component": {
+      "binary": "elastic-agent",
+      "id": "elastic-agent"
+    },
+    "@timestamp": "2025-03-06T05:51:27.818Z",
+    "ecs": {
+      "version": "8.0.0"
+    },
+    "data_stream": {
+      "namespace": "default",
+      "type": "logs",
+      "dataset": "elastic_agent.elastic_agent"
+    },
+    "service": {
+      "address": "http://localhost:6790/stats",
+      "type": "http"
+    },
+    "host": {
+      "name": "Khushis-MacBook-Pro.local"
+    },
+    "elastic_agent": {
+      "process": "elastic-agent",
+      "id": "f9787136-2d04-4999-a504-848c2e25d90e",
+      "version": "9.0.0",
+      "snapshot": false
+    },
+    "metricset": {
+      "period": 60000,
+      "name": "json"
+    },
+    "event": {
+      "duration": 8288916,
+      "module": "http",
+      "dataset": "elastic_agent.elastic_agent"
+    },
+    "error": {
+      "message": "error making http request: Get \"http://localhost:6790/stats\": EOF"
+    }
+  },
+  "fields": {
+    "elastic_agent.version": [
+      "9.0.0"
+    ],
+    "component.binary": [
+      "elastic-agent"
+    ],
+    "elastic_agent.process": [
+      "elastic-agent"
+    ],
+    "host.name.text": [
+      "Khushis-MacBook-Pro.local"
+    ],
+    "service.type": [
+      "http"
+    ],
+    "agent.type": [
+      "metricbeat"
+    ],
+    "component.id": [
+      "elastic-agent"
+    ],
+    "event.module": [
+      "http"
+    ],
+    "agent.name.text": [
+      "Khushis-MacBook-Pro.local"
+    ],
+    "agent.name": [
+      "Khushis-MacBook-Pro.local"
+    ],
+    "elastic_agent.snapshot": [
+      false
+    ],
+    "host.name": [
+      "Khushis-MacBook-Pro.local"
+    ],
+    "metricset.name.text": [
+      "json"
+    ],
+    "elastic_agent.id": [
+      "f9787136-2d04-4999-a504-848c2e25d90e"
+    ],
+    "data_stream.namespace": [
+      "default"
+    ],
+    "metricset.period": [
+      60000
+    ],
+    "data_stream.type": [
+      "logs"
+    ],
+    "event.duration": [
+      8288916
+    ],
+    "metricset.name": [
+      "json"
+    ],
+    "@timestamp": [
+      "2025-03-06T05:51:27.818Z"
+    ],
+    "agent.id": [
+      "f9787136-2d04-4999-a504-848c2e25d90e"
+    ],
+    "ecs.version": [
+      "8.0.0"
+    ],
+    "error.message": [
+      "error making http request: Get \"http://localhost:6790/stats\": EOF"
+    ],
+    "service.address": [
+      "http://localhost:6790/stats"
+    ],
+    "data_stream.dataset": [
+      "elastic_agent.elastic_agent"
+    ],
+    "agent.ephemeral_id": [
+      "38bc4e9c-8506-4252-bbf7-32449101e822"
+    ],
+    "agent.version": [
+      "9.1.0"
+    ],
+    "event.dataset": [
+      "elastic_agent.elastic_agent"
+    ]
+  }
+}
