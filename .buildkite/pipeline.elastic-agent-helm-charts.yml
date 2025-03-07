@@ -5,7 +5,6 @@ steps:
   - label: ":elastic-stack: Create helm chart"
     command: |
       .buildkite/scripts/steps/helm-charts.sh
-      gcloud storage cp elastic-agent-*.tgz gs://elastic-agent-helm-chart --print-created-message
     plugins:
       - elastic/oblt-google-auth#v1.0.0:
           lifetime: 1800 # seconds
@@ -16,5 +15,10 @@ steps:
   - wait: ~
 
   - label: ":elastic-stack: Publish helm chart"
-    command: |
-      echo "TBC"
+    trigger: unified-release-publish-helm-charts
+    build:
+      env:
+        # TODO: likely we need some kind of dynamic pipeline generation to capture the version
+        CHARTS_URL: "https://storage.googleapis.com/elastic-agent-helm-chart/elastic-agent-${SEMVER_REGEX}.tgz"
+        # TODO: this env should be customized based on the environment
+        HELM_REPO_ENV: dev
