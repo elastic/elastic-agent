@@ -21,6 +21,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -183,6 +184,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 				return err
 			}
 		}
+
 		return nil
 	}
 
@@ -198,6 +200,21 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 		if err := unpackFile(f); err != nil {
 			return UnpackResult{}, err
 		}
+	}
+
+	// We've seen issues with permissions after an upgrade, however they
+	// do not happen on a clean installation, so we apply the same fix
+	// permissions logic used by the installation process.
+	upgradeFolder := strings.TrimSuffix(dataDir, "data")
+	upgradeFolder = filepath.Join(upgradeFolder, versionedHome)
+	absUpgradeFolder, err := filepath.Abs(upgradeFolder)
+	if err != nil {
+		return UnpackResult{}, err
+	}
+	if err := perms.FixPermissions(absUpgradeFolder); err != nil {
+		// Treat any error as non-fatal. Log as warning because an error here
+		// does not mean a failed upgrade.
+		log.Warnw("cannot update permissions after unpacking the archive", "error.message", err.Error())
 	}
 
 	return UnpackResult{
@@ -453,6 +470,26 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 		default:
 			return UnpackResult{}, errors.New(fmt.Sprintf("tar file entry %s contained unsupported file type %v", fileName, mode), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fileName))
 		}
+
+		// ensure the appropriate permissions
+		if err := os.Chmod(abs, mode.Perm()&0770); err != nil {
+			return UnpackResult{}, errors.New(err, fmt.Sprintf("TarInstaller: setting permissions %O for %q", mode.Perm()&0770, abs), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+		}
+	}
+
+	// We've seen issues with permissions after an upgrade, however they
+	// do not happen on a clean installation, so we apply the same fix
+	// permissions logic used by the installation process.
+	upgradeFolder := strings.TrimSuffix(dataDir, "data")
+	upgradeFolder = filepath.Join(upgradeFolder, versionedHome)
+	absUpgradeFolder, err := filepath.Abs(upgradeFolder)
+	if err != nil {
+		return UnpackResult{}, err
+	}
+	if err := perms.FixPermissions(absUpgradeFolder); err != nil {
+		// Treat any error as non-fatal. Log as warning because an error here
+		// does not mean a failed upgrade.
+		log.Warnw("cannot update permissions after unpacking the archive", "error.message", err.Error())
 	}
 
 	return UnpackResult{
