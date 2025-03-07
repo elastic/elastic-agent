@@ -1,7 +1,8 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+env:
+  HELM_REPO_ENV: ${HELM_REPO_ENV:-"dev"}
 
 steps:
-
   - label: ":elastic-stack: Create helm chart"
     command: |
       .buildkite/scripts/steps/helm-charts.sh
@@ -16,11 +17,6 @@ steps:
 
   - wait: ~
 
-  - label: ":elastic-stack: Publish helm chart"
-    trigger: unified-release-publish-helm-charts
-    build:
-      env:
-        # TODO: likely we need some kind of dynamic pipeline generation to capture the version
-        CHARTS_URL: "https://storage.googleapis.com/elastic-agent-helm-chart/elastic-agent-${SEMVER_REGEX}.tgz"
-        # TODO: this env should be customized based on the environment
-        HELM_REPO_ENV: dev
+  - command: |
+      .buildkite/scripts/steps/trigger-publish-helm-charts.sh
+      .buildkite/scripts/steps/trigger-publish-helm-charts.sh | buildkite-agent pipeline upload

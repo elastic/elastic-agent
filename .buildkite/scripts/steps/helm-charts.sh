@@ -12,8 +12,10 @@ echo "--- mage helm:package"
 SNAPSHOT=true mage helm:package
 
 echo "--- upload package tests"
-gcloud storage cp elastic-agent-*.tgz gs://elastic-agent-helm-chart --print-created-message
+STORAGE=elastic-agent-helm-chart
+gcloud storage cp elastic-agent-*.tgz gs://"${STORAGE}" --print-created-message
 
-# NOTE: store the name of the artifact. This will be used in the next step to download the artifact
+# NOTE: store the artifact public url.
+#       This will be used in .buildkite/scripts/steps/trigger-publish-helm-charts.sh
 HELM_CHART_FILE=$(ls -1 elastic-agent-*.tgz)
-buildkite-agent meta-data set "HELM_CHART" "$HELM_CHART_FILE"
+buildkite-agent meta-data set "CHART_URL" "https://storage.googleapis.com/${STORAGE}/${HELM_CHART_FILE}"
