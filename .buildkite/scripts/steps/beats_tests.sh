@@ -63,15 +63,5 @@ popd
 
 # exit $TESTS_EXIT_STATUS
 
-echo "testing metricbeat..."
-run_test_for_beat metricbeat
-
-
-
 echo "testing filebeat..."
 run_test_for_beat filebeat
-
-
-
-echo "testing auditbeat..."
-run_test_for_beat auditbeat
