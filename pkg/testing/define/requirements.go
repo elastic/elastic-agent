@@ -137,7 +137,7 @@ func (r Requirements) Validate() error {
 }
 
 // runtimeAllowed returns true if the runtime matches a valid OS.
-func (r Requirements) runtimeAllowed(os string, arch string, version string, distro string) bool {
+func (r Requirements) runtimeAllowed(os string, arch string, version string, distro string, dockerVariant string) bool {
 	if len(r.OS) == 0 {
 		// all allowed
 		return true
@@ -157,6 +157,10 @@ func (r Requirements) runtimeAllowed(os string, arch string, version string, dis
 		}
 		if o.Distro != "" && o.Distro != distro {
 			// not allowed on specific distro
+			continue
+		}
+		if o.Type == Kubernetes && dockerVariant != "" && o.DockerVariant != "" && o.DockerVariant != dockerVariant {
+			// not allowed on specific image variant
 			continue
 		}
 		// allowed
