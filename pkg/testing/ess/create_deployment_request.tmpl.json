@@ -17,6 +17,9 @@
           ],
           "integrations_server": {
             "version": "{{ .request.Version }}"
+            {{ if .docker.integration_server_image }}
+            , "docker_image": "{{ .docker.integration_server_image }}"
+            {{ end }}
           }
         },
         "ref_id": "main-integrations_server"
@@ -55,6 +58,9 @@
           ],
           "elasticsearch": {
             "version": "{{ .request.Version }}",
+            {{ if .docker.elasticsearch_image }}
+            "docker_image": "{{ .docker.elasticsearch_image }}",
+            {{ end }}
             "enabled_built_in_plugins": []
           },
           "deployment_template": {
@@ -82,6 +88,9 @@
           ],
           "kibana": {
             "version": "{{ .request.Version }}",
+            {{ if .docker.kibana_image }}
+            "docker_image": "{{ .docker.kibana_image }}",
+            {{ end }}
             "user_settings_json": {
               "xpack.fleet.enableExperimental": ["agentTamperProtectionEnabled"]
             }
