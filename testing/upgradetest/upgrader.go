@@ -17,9 +17,9 @@ import (
 
 	"github.com/elastic/elastic-agent/testing/installtest"
 
-	"github.com/hectane/go-acl"
 	"github.com/otiai10/copy"
 
+	"github.com/elastic/elastic-agent/internal/pkg/acl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	v1client "github.com/elastic/elastic-agent/pkg/control/v1/client"
 	v2proto "github.com/elastic/elastic-agent/pkg/control/v2/cproto"

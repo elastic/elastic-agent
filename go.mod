@@ -35,7 +35,6 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/google/pprof v0.0.0-20240727154555-813a5fbdbec8
 	github.com/gorilla/mux v1.8.1
-	github.com/hectane/go-acl v0.0.0-20190604041725-da78bae5fc95
 	github.com/jaypipes/ghw v0.12.0
 	github.com/jedib0t/go-pretty/v6 v6.4.6
 	github.com/josephspurrier/goversioninfo v1.4.0

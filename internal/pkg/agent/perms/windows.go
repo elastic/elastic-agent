@@ -11,13 +11,11 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
-	"syscall"
 
 	"github.com/Microsoft/go-winio"
-	"github.com/hectane/go-acl"
-	"github.com/hectane/go-acl/api"
 	"golang.org/x/sys/windows"
 
+	"github.com/elastic/elastic-agent/internal/pkg/acl"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -40,7 +38,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 	}
 
 	// https://docs.microsoft.com/en-us/windows/win32/secauthz/access-mask
-	grants := make([]api.ExplicitAccess, 0, 4)
+	grants := make([]acl.ExplicitAccess, 0, 4)
 	grants = append(grants, acl.GrantSid(0xF10F0000, systemSID))         // full control of all acl's
 	grants = append(grants, acl.GrantSid(0xF10F0000, administratorsSID)) // full control of all acl's
 
@@ -83,63 +81,46 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 		// token to have the 'SeRestorePrivilege' or it's unable to adjust the ownership
 		return winio.RunWithPrivileges([]string{winio.SeRestorePrivilege}, func() error {
 			return filepath.WalkDir(topPath, func(name string, _ fs.DirEntry, err error) error {
-				if err == nil {
+				switch {
+				case err == nil:
 					// first level doesn't inherit
-					inherit := true
-					if topPath == name {
-						inherit = false
+					inherit := topPath != name
+
+					if err = acl.Apply(name, true, inherit, grants...); err != nil {
+						return fmt.Errorf("apply ACL for %s failed: %w", name, err)
 					}
 
-					err = acl.Apply(name, true, inherit, grants...)
-					if err != nil {
-						// Check for Errno = 0 which indicates success
-						// https://pkg.go.dev/golang.org/x/sys/windows#Errno
-						if errors.Is(err, syscall.Errno(0)) {
-							return nil
-						}
-						return err
-					}
 					if userSID != nil && groupSID != nil {
-						err = takeOwnership(name, userSID, groupSID)
+						if err := acl.TakeOwnership(name, userSID, groupSID); err != nil {
+							return fmt.Errorf("take ownership for %s failed: %w", name, err)
+						}
 					}
-				} else if errors.Is(err, fs.ErrNotExist) {
 					return nil
+				case errors.Is(err, fs.ErrNotExist):
+					return nil
+				default:
+					return err
 				}
-				return err
 			})
 		})
 	}
 
 	// ownership cannot be changed, this will keep the ownership as it currently is but apply the ACL's
 	return filepath.WalkDir(topPath, func(name string, _ fs.DirEntry, err error) error {
-		if err == nil {
+		switch {
+		case err == nil:
 			// first level doesn't inherit
-			inherit := true
-			if topPath == name {
-				inherit = false
-			}
-			err = acl.Apply(name, true, inherit, grants...)
-			// Check for Errno = 0 which indicates success
-			// https://pkg.go.dev/golang.org/x/sys/windows#Errno
-			if errors.Is(err, syscall.Errno(0)) {
-				return nil
-			}
-			return err
-		} else if errors.Is(err, fs.ErrNotExist) {
-			return nil
-		}
-		return err
-	})
-}
+			inherit := topPath != name
 
-func takeOwnership(name string, owner *windows.SID, group *windows.SID) error {
-	return api.SetNamedSecurityInfo(
-		name,
-		api.SE_FILE_OBJECT,
-		api.OWNER_SECURITY_INFORMATION|api.GROUP_SECURITY_INFORMATION,
-		owner,
-		group,
-		0,
-		0,
-	)
+			if err := acl.Apply(name, true, inherit, grants...); err != nil {
+				return fmt.Errorf("apply ACL for %s failed: %w", name, err)
+			}
+
+			return nil
+		case errors.Is(err, fs.ErrNotExist):
+			return nil
+		default:
+			return err
+		}
+	})
 }
