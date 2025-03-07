@@ -212,13 +212,22 @@ func (p *provisioner) Clean(ctx context.Context, cfg common.Config, instances []
 	// doesn't execute in parallel for the same reasons in Provision
 	// multipass just cannot handle it
 	for _, instance := range instances {
-		func(instance common.Instance) {
-			err := p.deleteCluster(instance.ID)
-			if err != nil {
-				// prevent a failure from stopping the other instances and clean
-				p.logger.Logf("Delete instance %s failed: %s", instance.Name, err)
-			}
-		}(instance)
+		// manually check if the cluster exists
+		// kind will not return an error if we try to delete a nonexistent cluster
+		exists, err := p.clusterExists(instance.Name)
+		if err != nil {
+			p.logger.Logf("Failed to check if cluster exists: %s", err)
+			continue
+		}
+		if !exists {
+			p.logger.Logf("Tried to delete instance, but it was not found: %s", instance.Name)
+			continue
+		}
+		err = p.deleteCluster(instance.Name)
+		if err != nil {
+			// prevent a failure from stopping the other instances and clean
+			p.logger.Logf("Delete instance %s failed: %s", instance.Name, err)
+		}
 	}
 
 	return nil
