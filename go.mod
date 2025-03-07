@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent
 
-go 1.23.6
+go 1.24.0
 
 require (
 	github.com/Jeffail/gabs/v2 v2.6.0
@@ -299,7 +299,7 @@ require (
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/lunes v0.1.0 // indirect
-	github.com/elastic/mito v1.16.0 // indirect
+	github.com/elastic/mito v1.17.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.14.0 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
 	github.com/elastic/sarama v1.19.1-0.20241120141909-c7eabfcee7e5 // indirect
