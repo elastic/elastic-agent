@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 env:
-  HELM_REPO_ENV: ${HELM_REPO_ENV:-"dev"}
+  HELM_REPO_ENV: ${HELM_REPO_ENV:-dev}
 
 steps:
   - label: ":elastic-stack: Create helm chart"
