@@ -6,8 +6,6 @@ steps:
   - label: ":elastic-stack: Create helm chart"
     command: |
       .buildkite/scripts/steps/helm-charts.sh
-      .buildkite/scripts/steps/trigger-publish-helm-charts.sh
-      .buildkite/scripts/steps/trigger-publish-helm-charts.sh | buildkite-agent pipeline upload
     plugins:
       - elastic/oblt-google-auth#feature/support-different-projects:
           lifetime: 1800 # seconds
