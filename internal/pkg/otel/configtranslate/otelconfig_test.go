@@ -354,6 +354,19 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
+						"logging": map[string]any{
+							"with_fields": map[string]any{
+								"component": map[string]any{
+									"binary":  "filebeat",
+									"dataset": "elastic_agent.filebeat",
+									"type":    "filestream",
+									"id":      "filestream-default",
+								},
+								"log": map[string]any{
+									"source": "filestream-default",
+								},
+							},
+						},
 					},
 				},
 				"service": map[string]any{
