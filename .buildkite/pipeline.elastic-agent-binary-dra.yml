@@ -94,6 +94,7 @@ steps:
 
     - label: ":hammer: DRA Publish Elastic-Agent Core staging"
       command: |
+        source .buildkite/scripts/version_qualifier.sh
         echo "+++ Restoring Artifacts"
         buildkite-agent artifact download "build/**/*" .
         echo "+++ Changing permissions for the release manager"
