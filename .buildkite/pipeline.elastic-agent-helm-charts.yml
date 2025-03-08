@@ -8,7 +8,7 @@ steps:
     command: |
       .buildkite/scripts/steps/helm-charts.sh
     plugins:
-      - elastic/oblt-google-auth#feature/support-different-projects:
+      - elastic/oblt-google-auth#v1.2.0:
           lifetime: 1800 # seconds
           project-id: "elastic-observability-ci"
           project-number: "911195782929"
