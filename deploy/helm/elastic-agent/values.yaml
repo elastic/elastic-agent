@@ -325,13 +325,13 @@ extraIntegrations: {}
 agent:
   # -- elastic-agent version
   # @section -- 6 - Elastic-Agent Configuration
-  version: 8.17.3
+  version: 8.17.4
   # -- image configuration
   # @section -- 6 - Elastic-Agent Configuration
   image:
     repository: docker.elastic.co/elastic-agent/elastic-agent
     pullPolicy: IfNotPresent
-    tag: "8.17.3-SNAPSHOT"
+    tag: "8.17.4-SNAPSHOT"
   # -- image pull secrets
   # @section -- 6 - Elastic-Agent Configuration
   imagePullSecrets: []

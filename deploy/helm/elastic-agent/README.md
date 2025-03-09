@@ -5,7 +5,7 @@
 
 # elastic-agent
 
-![Version: 8.17.3-beta](https://img.shields.io/badge/Version-8.17.3--beta-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 8.17.3](https://img.shields.io/badge/AppVersion-8.17.3-informational?style=flat-square)
+![Version: 8.17.4-beta](https://img.shields.io/badge/Version-8.17.4--beta-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 8.17.4](https://img.shields.io/badge/AppVersion-8.17.4-informational?style=flat-square)
 
 Elastic-Agent Helm Chart
 
@@ -143,8 +143,8 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 ### 6 - Elastic-Agent Configuration
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| agent.version | string | `"8.17.3"` | elastic-agent version |
-| agent.image | object | `{"pullPolicy":"IfNotPresent","repository":"docker.elastic.co/elastic-agent/elastic-agent","tag":"8.17.3-SNAPSHOT"}` | image configuration |
+| agent.version | string | `"8.17.4"` | elastic-agent version |
+| agent.image | object | `{"pullPolicy":"IfNotPresent","repository":"docker.elastic.co/elastic-agent/elastic-agent","tag":"8.17.4-SNAPSHOT"}` | image configuration |
 | agent.imagePullSecrets | list | `[]` | image pull secrets |
 | agent.engine | string | `"k8s"` | generate kubernetes manifests or [ECK](https://github.com/elastic/cloud-on-k8s) CRDs |
 | agent.unprivileged | bool | `false` | enable unprivileged mode |
