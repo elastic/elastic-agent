@@ -5,7 +5,8 @@
 package configuration
 
 import (
-	"fmt"
+	"net"
+	"strconv"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
@@ -43,7 +44,7 @@ func DefaultGRPCConfig() *GRPCConfig {
 
 // String returns the composed listen address for the GRPC.
 func (cfg *GRPCConfig) String() string {
-	return fmt.Sprintf("%s:%d", cfg.Address, cfg.Port)
+	return net.JoinHostPort(cfg.Address, strconv.Itoa(int(cfg.Port)))
 }
 
 // IsLocal returns true if port value is less than 0
