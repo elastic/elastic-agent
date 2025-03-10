@@ -6,6 +6,8 @@ env:
   BEAT_URL: "https://www.elastic.co/elastic-agent"
   DRA_PROJECT_ID: "elastic-agent-core"
   DRA_PROJECT_ARTIFACT_ID: "agent-core"
+  BUILDKITE_BRANCH: "main"
+  DRA_BRANCH: "main"
 
 steps:
   - group: ":beats: DRA Elastic-Agent Core Snapshot :beats:"

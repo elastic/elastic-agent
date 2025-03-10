@@ -14,6 +14,9 @@ steps:
         MANIFEST_URL: "https://snapshots.elastic.co/9.1.0-b04c6596/agent-package/agent-artifacts-9.1.0-SNAPSHOT.json"
         DRA_VERSION: "9.1.0"
         DRA_WORKFLOW: "snapshot"
+        BUILDKITE_BRANCH: "main"
+        DRA_BRANCH: "main"
+
 
   - label: "DRA staging"
     trigger: "elastic-agent-package"
@@ -23,3 +26,5 @@ steps:
       env:
         MANIFEST_URL: "https://snapshots.elastic.co/9.1.0-b04c6596/agent-package/agent-artifacts-9.1.0-SNAPSHOT.json"
         DRA_VERSION: "9.1.0"
+        BUILDKITE_BRANCH: "main"
+        DRA_BRANCH: "main"
