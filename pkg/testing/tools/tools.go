@@ -7,13 +7,13 @@ package tools
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
