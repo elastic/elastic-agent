@@ -162,6 +162,8 @@ type Component struct {
 	// The logical output type, i.e. the type of output that was requested.
 	OutputType string `yaml:"output_type"`
 
+	RuntimeManager RuntimeManager `yaml:"-"`
+
 	// Units that should be running inside this component.
 	Units []Unit `yaml:"units"`
 
@@ -365,27 +367,32 @@ func (r *RuntimeSpecs) componentsForInputType(
 			componentErr = ErrOutputNotSupported
 		}
 
-		var units []Unit
+		unitsForRuntimeManager := make(map[RuntimeManager][]Unit)
 		for _, input := range output.inputs[inputType] {
 			if input.enabled {
 				unitID := fmt.Sprintf("%s-%s", componentID, input.id)
-				units = append(units, unitForInput(input, unitID))
+				unitsForRuntimeManager[input.runtimeManager] = append(
+					unitsForRuntimeManager[input.runtimeManager],
+					unitForInput(input, unitID),
+				)
 			}
 		}
-
-		if len(units) > 0 {
-			// Populate the output units for this component
-			units = append(units, unitForOutput(output, componentID))
-			components = append(components, Component{
-				ID:         componentID,
-				Err:        componentErr,
-				InputSpec:  &inputSpec,
-				InputType:  inputType,
-				OutputType: output.outputType,
-				Units:      units,
-				Features:   featureFlags.AsProto(),
-				Component:  componentConfig.AsProto(),
-			})
+		for runtimeManager, units := range unitsForRuntimeManager {
+			if len(units) > 0 {
+				// Populate the output units for this component
+				units = append(units, unitForOutput(output, componentID))
+				components = append(components, Component{
+					ID:             componentID,
+					Err:            componentErr,
+					InputSpec:      &inputSpec,
+					InputType:      inputType,
+					OutputType:     output.outputType,
+					Units:          units,
+					RuntimeManager: runtimeManager,
+					Features:       featureFlags.AsProto(),
+					Component:      componentConfig.AsProto(),
+				})
+			}
 		}
 	} else {
 		for _, input := range output.inputs[inputType] {
@@ -404,14 +411,15 @@ func (r *RuntimeSpecs) componentsForInputType(
 				// each component gets its own output, because of unit isolation
 				units = append(units, unitForOutput(output, componentID))
 				components = append(components, Component{
-					ID:         componentID,
-					Err:        componentErr,
-					InputSpec:  &inputSpec,
-					InputType:  inputType,
-					OutputType: output.outputType,
-					Units:      units,
-					Features:   featureFlags.AsProto(),
-					Component:  componentConfig.AsProto(),
+					ID:             componentID,
+					Err:            componentErr,
+					InputSpec:      &inputSpec,
+					InputType:      inputType,
+					OutputType:     output.outputType,
+					Units:          units,
+					RuntimeManager: input.runtimeManager,
+					Features:       featureFlags.AsProto(),
+					Component:      componentConfig.AsProto(),
 				})
 			}
 		}
@@ -669,9 +677,15 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 		runtimeManager := DefaultRuntimeManager
 		// determine the runtime manager for the input
 		if runtimeManagerRaw, ok := input[runtimeManagerKey]; ok {
-			runtimeManagerVal, ok := runtimeManagerRaw.(RuntimeManager)
+			runtimeManagerStr, ok := runtimeManagerRaw.(string)
 			if !ok {
 				return nil, fmt.Errorf("invalid 'inputs.%d.runtime', expected a string, not a %T", idx, runtimeManagerRaw)
+			}
+			runtimeManagerVal := RuntimeManager(runtimeManagerStr)
+			switch runtimeManagerVal {
+			case OtelRuntimeManager, ProcessRuntimeManager:
+			default:
+				return nil, fmt.Errorf("invalid 'inputs.%d.runtime', valid values are: %s, %s", idx, OtelRuntimeManager, ProcessRuntimeManager)
 			}
 			runtimeManager = runtimeManagerVal
 			delete(input, runtimeManagerKey)
