@@ -136,7 +136,6 @@ steps:
     depends_on:
       - int-packaging
     command: "buildkite-agent pipeline upload .buildkite/bk.integration.pipeline.yml"
-<<<<<<< HEAD
 
   - label: "Serverless Beats Tests"
     depends_on:
@@ -159,27 +158,3 @@ steps:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Serverless Beats Tests"
 
-  - label: "Kubernetes Integration tests"
-    key: "k8s-integration-tests"
-    env:
-      K8S_VERSION: "v1.31.0"
-      KIND_VERSION: "v0.24.0"
-    command: ".buildkite/scripts/steps/k8s-extended-tests.sh"
-    retry:
-      automatic:
-        limit: 1
-    artifact_paths:
-      - "build/k8s-logs*/*"
-      - "build/k8s-logs*/**/*"
-      - "build/TEST-**"
-      - "build/diagnostics/*"
-    agents:
-      provider: "gcp"
-      machineType: "c2-standard-16"
-      image: "family/core-ubuntu-2204"
-      diskSizeGb: 400
-    notify:
-      - github_commit_status:
-          context: "buildkite/elastic-agent-extended-testing - Kubernetes Integration tests"
-=======
->>>>>>> 0d7bcaa67 (feat: invoke kubernetes integration tests on different runner per k8s version (#7191))
