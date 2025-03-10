@@ -3,11 +3,6 @@ buildinfo:
   description: Elastic opentelemetry-collector distribution
   version: 9.0.0
 receivers:
-  - name: filebeatreceiver
-    stability:
-      logs: Alpha
-      metrics: Undefined
-      traces: Undefined
   - name: filelog
     stability:
       logs: Beta
@@ -42,11 +37,6 @@ receivers:
     stability:
       logs: Undefined
       metrics: Beta
-      traces: Undefined
-  - name: metricbeatreceiver
-    stability:
-      logs: Alpha
-      metrics: Undefined
       traces: Undefined
   - name: otlp
     stability:
