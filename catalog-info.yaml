@@ -360,6 +360,8 @@ spec:
           access_level: MANAGE_BUILD_AND_READ
         observablt-robots:
           access_level: MANAGE_BUILD_AND_READ
+        observablt-robots-automation:
+          access_level: BUILD_AND_READ
         release-eng:
           access_level: BUILD_AND_READ
         everyone:
