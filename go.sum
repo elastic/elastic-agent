@@ -1734,6 +1734,8 @@ go.opentelemetry.io/collector/processor v0.121.0 h1:OcLrJ2F17cU0oDtXEYbGvL8vbku/
 go.opentelemetry.io/collector/processor v0.121.0/go.mod h1:BoFEMvPn5/p53eWz+R9cibIxCXzaRZ/RtcBPtvqXNaQ=
 go.opentelemetry.io/collector/processor/batchprocessor v0.121.0 h1:dKE9lMhaQgg0VIU3/cVKPsPz8K8JXpE752C+iFDop8k=
 go.opentelemetry.io/collector/processor/batchprocessor v0.121.0/go.mod h1:dk7ngHltf0n4J2ec/PjwXAS9K8176Cpkx78N4IbAm04=
+go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.119.0 h1:SELqVDUuzQNiLWYbXT/B9KGBlOxRPlvC1ImuyNOU6qY=
+go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.119.0/go.mod h1:aXoBlLNh0Shg+gR3aM+5YD7fQUojakuWKU4I/COYZ9g=
 go.opentelemetry.io/collector/processor/processorhelper/xprocessorhelper v0.121.0 h1:O4CzvJCV1soQOoHSew+FEGhbhXWPxJGB7pYYkAhdEUU=
 go.opentelemetry.io/collector/processor/processorhelper/xprocessorhelper v0.121.0/go.mod h1:CUuVIwN4uAJzuAEr3hYaQXmc865eS37eJl5jQ2LgbWc=
 go.opentelemetry.io/collector/processor/processortest v0.121.0 h1:1c3mEABELrxdC1obSQjIlfh5jZljJlzUravmzy1Mofo=
