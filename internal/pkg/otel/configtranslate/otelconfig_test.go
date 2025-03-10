@@ -193,7 +193,6 @@ func TestGetOtelConfig(t *testing.T) {
 			"batcher": map[string]any{
 				"enabled":        true,
 				"max_size_items": 1600,
-				"min_size_items": 0,
 			},
 			"mapping": map[string]any{
 				"mode": "bodymap",
