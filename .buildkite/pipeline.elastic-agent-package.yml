@@ -105,7 +105,6 @@ steps:
           - "build/distributions/**/*"
 
   - label: ":elastic-stack: Publishing to DRA"
-    if: build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == null || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") != "independent-agent-release-staging"
     key: dra-publish
     depends_on: package
     agents:
