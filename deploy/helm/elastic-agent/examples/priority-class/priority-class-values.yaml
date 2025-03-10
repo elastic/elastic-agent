@@ -1,0 +1,17 @@
+kubernetes:
+  enabled: true
+
+agent:
+  unprivileged: true
+  presets:
+    perNode:
+      priorityClass:
+        create: true
+        value: 456
+        globalDefault: true
+        preemptionPolicy: "Never"
+        description: "Elastic Agent per-node preset priority class"
+    clusterWide:
+      priorityClass:
+        create: false
+        name: "agent-clusterwide-pc"
