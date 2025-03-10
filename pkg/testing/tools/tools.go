@@ -7,6 +7,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"testing"
 	"time"
 
@@ -151,11 +152,21 @@ func InstallAgentForPolicyWithToken(ctx context.Context, t *testing.T,
 		return "", nil
 	}
 
-	// Get the Agent ID
-	agentID, err := agentFixture.AgentID(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get agent ID: %w", err)
-	}
+	// Get the Agent ID of Agent once it has been enrolled and is healthy.
+	var agentID string
+	require.Eventually(t, func() bool {
+		status, err := agentFixture.ExecStatus(ctx)
+		if err != nil {
+			t.Logf("failed to get agent status: %v", err)
+			return false
+		}
+		if cproto.State(status.FleetState) == cproto.State_HEALTHY {
+			agentID = status.Info.ID
+			return true
+		}
+		t.Logf("wanted fleet status to be %v, was %v", cproto.State_HEALTHY, cproto.State(status.FleetState))
+		return false
+	}, timeout, 10*time.Second, "timed out waiting for agent ID to be reported as managed")
 	t.Logf(">>> Enrolled Agent ID: %s", agentID)
 
 	// Wait for Agent to be healthy
