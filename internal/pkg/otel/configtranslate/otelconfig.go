@@ -187,7 +187,7 @@ func getReceiversConfigForComponent(comp *component.Component, info info.Agent, 
 		"path": map[string]any{
 			"data": beatDataPath,
 		},
-		// adds additonal context on logs emitted by beatreceivers to uniquely per component logs
+		// adds additional context on logs emitted by beatreceivers to uniquely per component logs
 		"logging": map[string]any{
 			"with_fields": map[string]any{
 				"component": map[string]interface{}{
