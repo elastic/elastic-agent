@@ -2,11 +2,21 @@
 # This script runs the helm-charts for the given environment
 # uploads the package to GCS and
 # triggers the unified-release-publish-helm-charts pipeline.
+#
+# Required environment variables:
+#  - HELM_REPO_ENV
+#  - SNAPSHOT
 
 # shellcheck disable=SC1091
 source .buildkite/scripts/common.sh
 
 set -euo pipefail
+
+echo "--- validate environment variables"
+if [[ "${SNAPSHOT}" == "true" && "${HELM_REPO_ENV}" == "prod" ]]; then
+  echo "SNAPSHOT=true is not allowed in prod"
+  exit 1
+fi
 
 echo "--- mage helm:package"
 mage helm:package

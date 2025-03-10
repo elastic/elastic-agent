@@ -108,5 +108,25 @@ steps:
       env:
         DRA_WORKFLOW: "staging"
 
+    # TODO: how to ignore for branches < 8.18
+    - label: ":hammer: Publish helm chart snapshot"
+      trigger: elastic-agent-helm-charts
+      build:
+        commit: "${BUILDKITE_COMMIT}"
+        message: "publish helm-chart for elastic-agent in de (snapshot)"
+        env:
+          SNAPSHOT: "true"
+          HELM_REPO_ENV: "dev"
+
+    # TODO: how to ignore for branches < 8.18
+    - label: ":hammer: Publish helm chart staging"
+      trigger: elastic-agent-helm-charts
+      build:
+        commit: "${BUILDKITE_COMMIT}"
+        message: "publish helm-chart for elastic-agent in dev (staging)"
+        env:
+          SNAPSHOT: "false"
+          HELM_REPO_ENV: "dev"
+
 notify:
   - slack: "#ingest-notifications"
