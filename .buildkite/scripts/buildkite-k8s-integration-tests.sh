@@ -9,15 +9,8 @@ DOCKER_VARIANTS="${DOCKER_VARIANTS:-basic,wolfi,complete,complete-wolfi,service,
 CLUSTER_NAME="${K8S_VERSION}-kubernetes"
 
 if [[ -z "${AGENT_VERSION:-}" ]]; then
-  # If not specified, use the version in .package-version
-
-  # Ensure .package-version exists before reading
-  if [[ ! -f .package-version ]]; then
-    echo "Error: .package-version file not found" >&2
-    exit 1
-  fi
-
-  AGENT_VERSION="$(cat .package-version)"
+  # If not specified, use the version in version/version.go
+  AGENT_VERSION="$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\-[a-zA-Z]+[0-9]+)?' "version/version.go")"
   AGENT_VERSION="${AGENT_VERSION}-SNAPSHOT"
 fi
 
