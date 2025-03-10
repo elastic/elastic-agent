@@ -186,7 +186,8 @@ func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Inf
 	if err != nil {
 		panic("failed to get OS information")
 	}
-	if !req.runtimeAllowed(runtime.GOOS, runtime.GOARCH, osInfo.Version, osInfo.Platform) {
+	dockerVariant := os.Getenv("DOCKER_VARIANT")
+	if !req.runtimeAllowed(runtime.GOOS, runtime.GOARCH, osInfo.Version, osInfo.Platform, dockerVariant) {
 		t.Skipf("platform: %s, architecture: %s, version: %s, and distro: %s combination is not supported by test.  required: %v", runtime.GOOS, runtime.GOARCH, osInfo.Version, osInfo.Platform, req.OS)
 		return nil
 	}
