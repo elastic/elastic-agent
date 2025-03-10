@@ -109,4 +109,4 @@ steps:
         DRA_WORKFLOW: "staging"
 
 notify:
-  - slack: "#ingest-notifications"
+  - slack: "#on-week-oblt-productivity"
