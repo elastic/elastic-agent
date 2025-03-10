@@ -259,7 +259,6 @@ steps:
           ASDF_KIND_VERSION: "0.24.0"
           DOCKER_VARIANTS: "{{matrix.variants}}"
           TARGET_ARCH: "amd64"
-          AGENT_VERSION: "9.0.0-SNAPSHOT" # Remove agent pinning once 9.0.0 is released
         command: |
           buildkite-agent artifact download build/distributions/elastic-agent-*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64'
           .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
