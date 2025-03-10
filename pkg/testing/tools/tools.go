@@ -160,11 +160,11 @@ func InstallAgentForPolicyWithToken(ctx context.Context, t *testing.T,
 			t.Logf("failed to get agent status: %v", err)
 			return false
 		}
-		if cproto.State(status.FleetState) == cproto.State_HEALTHY {
+		if cproto.State(status.FleetState) == cproto.State_HEALTHY { //nolint:gosec // G115 always under 32-bit
 			agentID = status.Info.ID
 			return true
 		}
-		t.Logf("wanted fleet status to be %v, was %v", cproto.State_HEALTHY, cproto.State(status.FleetState))
+		t.Logf("wanted fleet status to be %v, was %v", cproto.State_HEALTHY, cproto.State(status.FleetState)) //nolint:gosec // G115 always under 32-bit
 		return false
 	}, timeout, 10*time.Second, "timed out waiting for agent ID to be reported as managed")
 	t.Logf(">>> Enrolled Agent ID: %s", agentID)
