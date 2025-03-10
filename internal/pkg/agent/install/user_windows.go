@@ -24,11 +24,26 @@ const (
 )
 
 var (
-	modnetapi32                 = syscall.NewLazyDLL("netapi32.dll")
-	procNetLocalGroupAdd        = modnetapi32.NewProc("NetLocalGroupAdd")
+	modnetapi32 = syscall.NewLazyDLL("netapi32.dll")
+	// procNetLocalGroupAdd (https://learn.microsoft.com/en-us/windows/win32/api/lmaccess/nf-lmaccess-netlocalgroupadd)
+	//   If the function succeeds, the function returns zero (NERR_Success).
+	//   If the function fails, the return value is non-zero.
+	//   Doesn't set last error.
+	procNetLocalGroupAdd = modnetapi32.NewProc("NetLocalGroupAdd")
+	// procNetLocalGroupAddMembers (https://learn.microsoft.com/en-us/windows/win32/api/lmaccess/nf-lmaccess-netlocalgroupaddmembers)
+	//   If the function succeeds, the function returns zero (NERR_Success).
+	//   If the function fails, the return value is non-zero.
 	procNetLocalGroupAddMembers = modnetapi32.NewProc("NetLocalGroupAddMembers")
-	procNetUserAdd              = modnetapi32.NewProc("NetUserAdd")
-	procNetUserSetInfo          = modnetapi32.NewProc("NetUserSetInfo")
+	// procNetUserAdd (https://learn.microsoft.com/en-us/windows/win32/api/lmaccess/nf-lmaccess-netuseradd)
+	//   If the function succeeds, the function returns zero (NERR_Success).
+	//   If the function fails, the return value is non-zero.
+	//   Doesn't set last error.
+	procNetUserAdd = modnetapi32.NewProc("NetUserAdd")
+	// procNetUserSetInfo (https://learn.microsoft.com/en-us/windows/win32/api/lmaccess/nf-lmaccess-netusersetinfo)
+	//   If the function succeeds, the function returns zero (NERR_Success).
+	//   If the function fails, the return value is non-zero.
+	//   Doesn't set last error.
+	procNetUserSetInfo = modnetapi32.NewProc("NetUserSetInfo")
 )
 
 const (
