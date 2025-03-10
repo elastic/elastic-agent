@@ -47,7 +47,7 @@ function run_release_manager_list() {
         docker.elastic.co/infra/release-manager:latest \
         cli list \
         --project "${_project_id}" \
-        --branch "${_branch}" \
+        --branch "main" \
         --commit "${_commit}" \
         --workflow "${_workflow}" \
         --version "${_version}" \
