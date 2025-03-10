@@ -78,25 +78,14 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 		return fmt.Errorf("failed to determine Administrator: %w", err)
 	}
 	if isAdmin {
-		// call to `takeOwnership` which sets the ownership information requires the current process
-		// token to have the 'SeRestorePrivilege' or it's unable to adjust the ownership
+		// since we are running as Administrator, we will change the ownership which requires SeRestorePrivilege
 		return winio.RunWithPrivileges([]string{winio.SeRestorePrivilege}, func() error {
-			return filepath.WalkDir(topPath, func(name string, _ fs.DirEntry, err error) error {
+			return filepath.WalkDir(topPath, func(walkPath string, _ fs.DirEntry, err error) error {
 				switch {
 				case err == nil:
 					// first level doesn't inherit
-					inherit := topPath != name
-
-					if err = acl.Apply(name, true, inherit, grants...); err != nil {
-						return filterNotFoundErrno(fmt.Errorf("apply ACL for %s failed: %w", name, err))
-					}
-
-					if userSID != nil && groupSID != nil {
-						if err := acl.TakeOwnership(name, userSID, groupSID); err != nil {
-							return filterNotFoundErrno(fmt.Errorf("take ownership for %s failed: %w", name, err))
-						}
-					}
-					return nil
+					inherit := topPath != walkPath
+					return applyPermissions(walkPath, true, inherit, userSID, groupSID, grants...)
 				case errors.Is(err, fs.ErrNotExist):
 					return nil
 				default:
@@ -107,23 +96,34 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 	}
 
 	// ownership cannot be changed, this will keep the ownership as it currently is but apply the ACL's
-	return filepath.WalkDir(topPath, func(name string, _ fs.DirEntry, err error) error {
+	return filepath.WalkDir(topPath, func(walkPath string, _ fs.DirEntry, err error) error {
 		switch {
 		case err == nil:
 			// first level doesn't inherit
-			inherit := topPath != name
-
-			if err := acl.Apply(name, true, inherit, grants...); err != nil {
-				return filterNotFoundErrno(fmt.Errorf("apply ACL for %s failed: %w", name, err))
-			}
-
-			return nil
+			inherit := topPath != walkPath
+			return applyPermissions(walkPath, true, inherit, nil, nil, grants...)
 		case errors.Is(err, fs.ErrNotExist):
 			return nil
 		default:
 			return err
 		}
 	})
+}
+
+// applyPermissions applies the provided access control entries to a path. When the given userSID or groupSID are not nil,
+// it also sets the ownership information which requires the current process token to have the 'SeRestorePrivilege'.
+// If you are not running as Administrator, pass nil for userSID and/or groupSID. Note that windows.ERROR_FILE_NOT_FOUND and
+// windows.ERROR_PATH_NOT_FOUND are explicitly ignored.
+func applyPermissions(path string, replace bool, inherit bool, userSID *windows.SID, groupSID *windows.SID, entries ...acl.ExplicitAccess) error {
+	if err := acl.Apply(path, replace, inherit, entries...); err != nil {
+		return filterNotFoundErrno(fmt.Errorf("apply ACL for %s failed: %w", path, err))
+	}
+	if userSID != nil && groupSID != nil {
+		if err := acl.TakeOwnership(path, userSID, groupSID); err != nil {
+			return filterNotFoundErrno(fmt.Errorf("take ownership for %s failed: %w", path, err))
+		}
+	}
+	return nil
 }
 
 // filterNotFoundErrno returns the given error if it is not an ERROR_FILE_NOT_FOUND or ERROR_PATH_NOT_FOUND
