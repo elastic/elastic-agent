@@ -170,6 +170,7 @@ steps:
       - int-packaging
     command: "buildkite-agent pipeline upload .buildkite/bk.integration.pipeline.yml"
 
+<<<<<<< HEAD
   - label: "Serverless Beats Tests"
     depends_on:
       - int-packaging
@@ -191,6 +192,8 @@ steps:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Serverless Beats Tests"
 
+=======
+>>>>>>> 9366b7248 ([CI] Serverless beats tests migration to beats (#7184))
   - label: "Kubernetes Integration tests"
     key: "k8s-integration-tests"
     env:
