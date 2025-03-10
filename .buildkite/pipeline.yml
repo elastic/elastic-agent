@@ -4,6 +4,15 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
 steps:
+
+  - label: "DRA"
+    trigger: "elastic-agent-package"
+    build:
+      commit: "${BUILDKITE_COMMIT}"
+      branch: "test/golang-crossbuild-533"
+      env:
+        MANIFEST_URL: "https://snapshots.elastic.co/9.1.0-b04c6596/agent-package/agent-artifacts-9.1.0-SNAPSHOT.json"
+
   - label: "check-ci"
     key: "check-ci"
     command: ".buildkite/scripts/steps/check-ci.sh"
