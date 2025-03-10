@@ -10,7 +10,7 @@ CLUSTER_NAME="${K8S_VERSION}-kubernetes"
 
 if [[ -z "${AGENT_VERSION:-}" ]]; then
   # If not specified, use the version in version/version.go
-  AGENT_VERSION="$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\-[a-zA-Z]+[0-9]+)?' "version/version.go")"
+  AGENT_VERSION="$(grep "const defaultBeatVersion =" version/version.go | cut -d\" -f2)"
   AGENT_VERSION="${AGENT_VERSION}-SNAPSHOT"
 fi
 
