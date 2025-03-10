@@ -148,6 +148,7 @@ type agentVersion struct {
 	version  string
 	snapshot bool
 	hash     string
+	fips     bool
 }
 
 func (av agentVersion) String() string {
@@ -170,6 +171,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		version:  release.Version(),
 		snapshot: release.Snapshot(),
 		hash:     release.Commit(),
+		fips:     release.Info().FIPS,
 	}
 
 	// Compare versions and exit before downloading anything if the upgrade
@@ -230,6 +232,12 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		u.log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
 		return nil, ErrUpgradeSameVersion
 	}
+
+	// TODO:
+	// - get current metadata
+	// - check if current agent is fips
+	// - check if downloaded metadata says fips
+	// - if they are both fips, allow upgrade
 
 	u.log.Infow("Unpacking agent package", "version", newVersion)
 
@@ -320,7 +328,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, goerrors.Join(err, rollbackErr)
 	}
 
-	var watcherExecutable = selectWatcherExecutable(paths.Top(), previous, current)
+	watcherExecutable := selectWatcherExecutable(paths.Top(), previous, current)
 
 	var watcherCmd *exec.Cmd
 	if watcherCmd, err = InvokeWatcher(u.log, watcherExecutable); err != nil {
@@ -498,7 +506,6 @@ func copyActionStore(log *logger.Logger, newHome string) error {
 }
 
 func copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error {
-
 	log.Infow("Copying run directory", "new_run_path", newRunPath, "old_run_path", oldRunPath)
 
 	if err := os.MkdirAll(newRunPath, runDirMod); err != nil {
