@@ -7,6 +7,7 @@
 package acl
 
 import (
+	"fmt"
 	"os"
 	"runtime"
 	"testing"
@@ -22,7 +23,8 @@ func TestChmod(t *testing.T) {
 	}
 
 	// Create a temporary file
-	tmpFile, err := os.CreateTemp("", "testfile")
+	tmpDir := t.TempDir()
+	tmpFile, err := os.CreateTemp(tmpDir, "testfile")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -35,31 +37,36 @@ func TestChmod(t *testing.T) {
 	require.NoError(t, err, "failed to close file")
 
 	for _, tc := range []struct {
-		name           string
-		filePath       string
-		expectedErrStr string
+		name        string
+		filePath    string
+		expectedErr error
 	}{
 		{
-			name:           "should succeed",
-			filePath:       tmpFile.Name(),
-			expectedErrStr: "",
+			name:        "should succeed",
+			filePath:    tmpFile.Name(),
+			expectedErr: nil,
 		},
 		{
-			name:           "non existing file",
-			filePath:       `C:\non-existing\non-existing`,
-			expectedErrStr: "call to SetNamedSecurityInfoW failed: ret=3", // ERROR_PATH_NOT_FOUND
+			name:        "non existing file",
+			filePath:    fmt.Sprintf(`%s\non-existing`, tmpDir),
+			expectedErr: windows.ERROR_FILE_NOT_FOUND,
 		},
 		{
-			name:           "invalid path",
-			filePath:       `??INVALID_PATH??`,
-			expectedErrStr: "call to SetNamedSecurityInfoW failed: ret=123", // ERROR_INVALID_NAME
+			name:        "non existing path",
+			filePath:    `C:\non-existing\non-existing`,
+			expectedErr: windows.ERROR_PATH_NOT_FOUND,
+		},
+		{
+			name:        "invalid path",
+			filePath:    `??INVALID_PATH??`,
+			expectedErr: windows.ERROR_INVALID_NAME,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := Chmod(tc.filePath, 0400)
-			if tc.expectedErrStr != "" {
+			if tc.expectedErr != nil {
 				require.Error(t, err, "expected error, got nil")
-				require.Equal(t, tc.expectedErrStr, err.Error(), "errors do not match")
+				require.ErrorIs(t, err, tc.expectedErr, "errors do not match")
 			} else {
 				require.NoError(t, err, "expected no error, got %v", err)
 			}
@@ -83,7 +90,7 @@ func TestSetEntriesInAcl_Error(t *testing.T) {
 
 	require.Error(t, err, "expected error, got nil")
 	// ret=87 ERROR_INVALID_PARAMETER
-	require.Equal(t, "call to SetEntriesInAclW failed: ret=87", err.Error(), "errors do not match")
+	require.ErrorIs(t, err, windows.ERROR_INVALID_PARAMETER, "errors do not match")
 }
 
 func TestGetNamedSecurityInfo_Error(t *testing.T) {
@@ -107,5 +114,5 @@ func TestGetNamedSecurityInfo_Error(t *testing.T) {
 
 	require.Error(t, err, "expected error, got nil")
 	// ret=87 ERROR_INVALID_PARAMETER
-	require.Equal(t, "call to GetNamedSecurityInfoW failed: ret=87", err.Error(), "errors do not match")
+	require.ErrorIs(t, err, windows.ERROR_INVALID_PARAMETER, "errors do not match")
 }

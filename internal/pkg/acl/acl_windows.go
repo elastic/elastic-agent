@@ -210,7 +210,7 @@ func SetEntriesInAcl(entries []ExplicitAccess, oldAcl windows.Handle, newAcl *wi
 		uintptr(unsafe.Pointer(newAcl)),
 	)
 	if ret != 0 {
-		return fmt.Errorf("call to SetEntriesInAclW failed: ret=%d", ret)
+		return fmt.Errorf("call to SetEntriesInAclW failed: ret=%d, error=%w", ret, windows.Errno(ret))
 	}
 	return nil
 }
@@ -229,7 +229,7 @@ func GetNamedSecurityInfo(objectName string, objectType int32, secInfo uint32, o
 		uintptr(unsafe.Pointer(secDesc)),
 	)
 	if ret != 0 {
-		return fmt.Errorf("call to GetNamedSecurityInfoW failed: ret=%d", ret)
+		return fmt.Errorf("call to GetNamedSecurityInfoW failed: ret=%d, error=%w", ret, windows.Errno(ret))
 	}
 	return nil
 }
@@ -247,7 +247,7 @@ func SetNamedSecurityInfo(objectName string, objectType int32, secInfo uint32, o
 		uintptr(sacl),
 	)
 	if ret != 0 {
-		return fmt.Errorf("call to SetNamedSecurityInfoW failed: ret=%d", ret)
+		return fmt.Errorf("call to SetNamedSecurityInfoW failed: ret=%d, error=%w", ret, windows.Errno(ret))
 	}
 	return nil
 }
