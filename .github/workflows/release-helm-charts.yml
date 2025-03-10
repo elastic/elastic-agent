@@ -12,7 +12,7 @@ permissions:
 jobs:
   trigger-release:
     runs-on: ubuntu-latest
-    if: ${{ github.event.action == 'published' && !startsWith(github.ref, '8.16') && !startsWith(github.ref, '8.17') }}
+    if: ${{ github.event.action == 'published' && !startsWith(github.ref_name, '8.16') && !startsWith(github.ref_name, '8.17') }}
     steps:
       - uses: elastic/oblt-actions/buildkite/run@v1
         with:
