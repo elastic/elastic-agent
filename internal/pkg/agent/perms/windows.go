@@ -20,6 +20,7 @@ import (
 )
 
 // FixPermissions fixes the permissions so only SYSTEM and Administrators have access to the files in the install path
+// Note that errors such as ERROR_FILE_NOT_FOUND and ERROR_PATH_NOT_FOUND are explicitly ignored
 func FixPermissions(topPath string, opts ...OptFunc) error {
 	o, err := newOpts(opts...)
 	if err != nil {
@@ -87,12 +88,12 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 					inherit := topPath != name
 
 					if err = acl.Apply(name, true, inherit, grants...); err != nil {
-						return fmt.Errorf("apply ACL for %s failed: %w", name, err)
+						return filterNotFoundErrno(fmt.Errorf("apply ACL for %s failed: %w", name, err))
 					}
 
 					if userSID != nil && groupSID != nil {
 						if err := acl.TakeOwnership(name, userSID, groupSID); err != nil {
-							return fmt.Errorf("take ownership for %s failed: %w", name, err)
+							return filterNotFoundErrno(fmt.Errorf("take ownership for %s failed: %w", name, err))
 						}
 					}
 					return nil
@@ -113,7 +114,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 			inherit := topPath != name
 
 			if err := acl.Apply(name, true, inherit, grants...); err != nil {
-				return fmt.Errorf("apply ACL for %s failed: %w", name, err)
+				return filterNotFoundErrno(fmt.Errorf("apply ACL for %s failed: %w", name, err))
 			}
 
 			return nil
@@ -123,4 +124,18 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 			return err
 		}
 	})
+}
+
+// filterNotFoundErrno returns the given error if it is not an ERROR_FILE_NOT_FOUND or ERROR_PATH_NOT_FOUND
+func filterNotFoundErrno(err error) error {
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, windows.ERROR_FILE_NOT_FOUND):
+		return nil
+	case errors.Is(err, windows.ERROR_PATH_NOT_FOUND):
+		return nil
+	default:
+		return err
+	}
 }
