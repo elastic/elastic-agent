@@ -1612,8 +1612,8 @@ func TestMonitoringAgentE2E(t *testing.T) {
 		Stack: &define.Stack{},
 	})
 
-	fbMonitoringIndex := "logs-elastic_agent-notdefault" // the namespace here is different to avoid reading stale logs from previous runs
-	fbReceiverMonitoringIndex := "logs-otel-default"
+	fbMonitoringIndex := "logs-elastic_agent-monitoring" // we don't use default namespace to avoid reading logs from previous runs
+	fbReceiverMonitoringIndex := "logs-elastic_agent-monitoringotel"
 	commonMessage := "Determined allowed capabilities"
 
 	type configOptions struct {
@@ -1644,7 +1644,7 @@ agent.monitoring:
   logs: true
   metrics: false
   use_output: default
-  namespace: notdefault
+  namespace: monitoring
 `
 
 	// Start agent monitoring
@@ -1734,13 +1734,13 @@ receivers:
           processors:
             - add_fields:
                 fields:
-                  dataset: otel
-                  namespace: default
+                  dataset: elastic_agent
+                  namespace: monitoringotel
                   type: logs
                 target: data_stream
             - add_fields:
                 fields:
-                  dataset: otel
+                  dataset: elastic_agent
                 target: event
             - add_fields:
                 fields:
@@ -1874,9 +1874,7 @@ service:
 		"agent.ephemeral_id",
 		"agent.id",
 		"agent.version",
-		"data_stream.dataset",
 		"data_stream.namespace",
-		"event.dataset",
 		"log.file.inode",
 		"log.file.fingerprint",
 		"log.file.path",
