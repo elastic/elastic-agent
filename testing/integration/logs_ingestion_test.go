@@ -120,8 +120,16 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 	})
 }
 
+<<<<<<< HEAD
 func startMockES(t *testing.T) string {
 	registry := metrics.NewRegistry()
+=======
+// startMockES starts a MockES on a random port using httptest.NewServer.
+// It registers a cleanup function to close the server when the test finishes.
+// The server will respond with the passed error probabilities. If they add
+// up to zero, all requests are a success.
+func startMockES(t *testing.T, percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge uint) string {
+>>>>>>> acf109882 (Add conditions to copy_fields processor (#6730))
 	uid := uuid.Must(uuid.NewV4())
 	clusterUUID := uuid.Must(uuid.NewV4()).String()
 
@@ -129,8 +137,15 @@ func startMockES(t *testing.T) string {
 	mux.Handle("/", mockes.NewAPIHandler(
 		uid,
 		clusterUUID,
+<<<<<<< HEAD
 		registry,
 		time.Now().Add(time.Hour), 0, 0, 0, 100, 0))
+=======
+		nil,
+		time.Now().Add(time.Hour),
+		0,
+		percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge))
+>>>>>>> acf109882 (Add conditions to copy_fields processor (#6730))
 
 	s := httptest.NewServer(mux)
 	t.Cleanup(s.Close)
