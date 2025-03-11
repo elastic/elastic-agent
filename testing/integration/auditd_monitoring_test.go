@@ -53,7 +53,7 @@ func (runner *AuditDRunner) SetupSuite() {
 	policyUUID := uuid.Must(uuid.NewV4()).String()
 	basePolicy := kibana.AgentPolicy{
 		Name:        "test-policy-" + policyUUID,
-		Namespace:   "default",
+		Namespace:   info.Namespace,
 		Description: "Test policy " + policyUUID,
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
 			kibana.MonitoringEnabledLogs,
