@@ -178,10 +178,6 @@ func testMonitoringLogsAreShipped(
 		"Looking for logs in dataset 'elastic_agent.metricbeat'")
 
 	// Stage 2: make sure all components are healthy
-	t.Logf("Getting Agent ID")
-	agentID, err := agentFixture.AgentID(ctx)
-	require.NoError(t, err)
-	t.Logf("Agent ID: %q", agentID)
 	t.Log("Making sure all components are healthy")
 	status, err := agentFixture.ExecStatus(ctx)
 	require.NoError(t, err,
@@ -191,6 +187,8 @@ func testMonitoringLogsAreShipped(
 			"component %s: want %s, got %s",
 			c.Name, client.Healthy, client.State(c.State))
 	}
+	agentID := status.Info.ID
+	t.Logf("Agent ID: %q", agentID)
 
 	// Stage 3: Make sure there are no errors in logs
 	t.Log("Making sure there are no error logs")

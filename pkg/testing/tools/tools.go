@@ -111,6 +111,11 @@ func CreateEnrollmentToken(t *testing.T, ctx context.Context, kibClient *kibana.
 	return enrollmentToken, nil
 }
 
+// InstallAgentForPolicyWithToken installs the Elastic Agent and enrolls into the policy that the provided
+// enrollmentToken belongs to.
+//
+// This function waits for the Elastic Agent to be reported as online by Kibana, unless installOpts.DelayEnroll is set
+// to true.
 func InstallAgentForPolicyWithToken(ctx context.Context, t *testing.T,
 	installOpts atesting.InstallOpts,
 	agentFixture *atesting.Fixture,
