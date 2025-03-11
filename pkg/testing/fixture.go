@@ -808,7 +808,6 @@ func (f *Fixture) ExecStatus(ctx context.Context, opts ...statusOpt) (AgentStatu
 		sleepFor(ctx, opt.retryInterval)
 	}
 }
-}
 
 // ExecInspect executes to inspect subcommand on the prepared Elastic Agent binary.
 // It returns the parsed output and the error from the execution or an empty
