@@ -78,7 +78,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		factories := otelcol.Factories{}
 
 		// Receivers
-		factories.Receivers, err = receiver.MakeFactoryMap(
+		factories.Receivers, err = otelcol.MakeFactoryMap[receiver.Factory](
 			otlpreceiver.NewFactory(),
 			filelogreceiver.NewFactory(),
 			kubeletstatsreceiver.NewFactory(),
@@ -103,7 +103,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		}
 
 		// Processors
-		factories.Processors, err = processor.MakeFactoryMap(
+		factories.Processors, err = otelcol.MakeFactoryMap[processor.Factory](
 			batchprocessor.NewFactory(),
 			resourceprocessor.NewFactory(),
 			attributesprocessor.NewFactory(),
@@ -122,7 +122,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		}
 
 		// Exporters
-		factories.Exporters, err = exporter.MakeFactoryMap(
+		factories.Exporters, err = otelcol.MakeFactoryMap[exporter.Factory](
 			otlpexporter.NewFactory(),
 			debugexporter.NewFactory(),
 			fileexporter.NewFactory(),
@@ -135,7 +135,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			return otelcol.Factories{}, err
 		}
 
-		factories.Connectors, err = connector.MakeFactoryMap(
+		factories.Connectors, err = otelcol.MakeFactoryMap[connector.Factory](
 			routingconnector.NewFactory(),
 			spanmetricsconnector.NewFactory(),
 			signaltometricsconnector.NewFactory(),
@@ -152,7 +152,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			k8sobserver.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)
-		factories.Extensions, err = extension.MakeFactoryMap(extensions...)
+		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)
 		if err != nil {
 			return otelcol.Factories{}, err
 		}
