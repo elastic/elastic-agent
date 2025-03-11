@@ -2,6 +2,7 @@
 {{- $ := index . 0 -}}
 {{- $presetVal := index . 1 -}}
 {{- $agentName := index . 2 }}
+{{- $presetName := index . 3 -}}
 {{- $agentVolumes := (include "elasticagent.preset.render.volumes"  (list $ $presetVal $agentName) | fromYaml) -}}
 apiVersion: v1
 kind: PodTemplate
@@ -35,6 +36,13 @@ template:
     {{- with ($presetVal).tolerations }}
     tolerations:
       {{- . | toYaml | nindent 6 }}
+    {{- end }}
+    {{- with ($presetVal).priorityClass }}
+    {{- if (.).name }}
+    priorityClassName: {{ (.).name }}
+    {{- else }}
+    priorityClassName: {{ printf "agent-%s-%s-%s" $presetName $.Release.Name $.Release.Namespace | lower }}
+    {{- end }}
     {{- end }}
     {{- with ($presetVal).topologySpreadConstraints }}
     topologySpreadConstraints:
