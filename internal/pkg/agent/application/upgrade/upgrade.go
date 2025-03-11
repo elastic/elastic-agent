@@ -233,7 +233,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, ErrUpgradeSameVersion
 	}
 
-	if !metadata.manifest.Package.Fips && !currentVersion.fips {
+	if !metadata.manifest.Package.Fips && currentVersion.fips {
 		return nil, ErrFipsNotUpgradedToFips
 	}
 
