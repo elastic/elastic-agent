@@ -113,6 +113,7 @@ var (
 		"title":                          func(s string) string { return cases.Title(language.English, cases.NoLower).String(s) },
 		"tolower":                        strings.ToLower,
 		"contains":                       strings.Contains,
+		"substring":                      Substring,
 		agentPackageVersionMappedFunc:    AgentPackageVersion,
 		agentManifestGeneratorMappedFunc: PackageManifest,
 		snapshotSuffix:                   SnapshotSuffix,
@@ -383,6 +384,17 @@ func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, ful
 
 func SnapshotSuffix() string {
 	return GenerateSnapshotSuffix(Snapshot)
+}
+
+func Substring(s string, start, length int) string {
+	if start < 0 || start >= len(s) {
+		return ""
+	}
+	end := start + length
+	if end > len(s) {
+		end = len(s)
+	}
+	return s[start:end]
 }
 
 func GenerateSnapshotSuffix(snapshot bool) string {
