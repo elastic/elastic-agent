@@ -53,7 +53,7 @@ func (runner *OsqueryManagerRunner) SetupSuite() {
 	policyUUID := uuid.Must(uuid.NewV4()).String()
 	basePolicy := kibana.AgentPolicy{
 		Name:        "test-policy-" + policyUUID,
-		Namespace:   info.Namespace,
+		Namespace:   runner.info.Namespace,
 		Description: "Test policy " + policyUUID,
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
 			kibana.MonitoringEnabledLogs,
