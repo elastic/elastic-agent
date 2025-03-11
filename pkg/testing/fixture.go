@@ -772,18 +772,12 @@ func (f *Fixture) ExecStatus(ctx context.Context, opts ...statusOpt) (AgentStatu
 		o(&opt)
 	}
 
-	if opt.noRetry {
-		out, err := f.Exec(ctx, []string{"status", "--output", "json"}, opt.cmdOptions...)
-		status := AgentStatusOutput{}
-		if uerr := json.Unmarshal(out, &status); uerr != nil {
-			return AgentStatusOutput{},
-				fmt.Errorf("could not unmarshal agent status output: %w:\n%s", errors.Join(uerr, err), out)
-		} else if status.IsZero() {
-			return status, fmt.Errorf("agent status output is empty: %w", err)
-		}
+	var cancel context.CancelFunc
+	if opt.noRetry || opt.retryTimeout == 0 {
+		ctx, cancel = context.WithCancel(ctx)
+	} else {
+		ctx, cancel = context.WithTimeout(ctx, opt.retryTimeout)
 	}
-
-	ctx, cancel := context.WithTimeout(ctx, opt.retryTimeout)
 	defer cancel()
 
 	var lastErr error
@@ -806,8 +800,14 @@ func (f *Fixture) ExecStatus(ctx context.Context, opts ...statusOpt) (AgentStatu
 		} else {
 			return status, nil
 		}
+
+		if opt.noRetry {
+			return status, lastErr
+		}
+
 		sleepFor(ctx, opt.retryInterval)
 	}
+}
 }
 
 // ExecInspect executes to inspect subcommand on the prepared Elastic Agent binary.
