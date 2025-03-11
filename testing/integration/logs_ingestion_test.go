@@ -117,7 +117,11 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 	})
 }
 
-func startMockES(t *testing.T) string {
+// startMockES starts a MockES on a random port using httptest.NewServer.
+// It registers a cleanup function to close the server when the test finishes.
+// The server will respond with the passed error probabilities. If they add
+// up to zero, all requests are a success.
+func startMockES(t *testing.T, percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge uint) string {
 	uid := uuid.Must(uuid.NewV4())
 	clusterUUID := uuid.Must(uuid.NewV4()).String()
 
@@ -126,7 +130,9 @@ func startMockES(t *testing.T) string {
 		uid,
 		clusterUUID,
 		nil,
-		time.Now().Add(time.Hour), 0, 0, 0, 0, 0))
+		time.Now().Add(time.Hour),
+		0,
+		percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge))
 
 	s := httptest.NewServer(mux)
 	t.Cleanup(s.Close)

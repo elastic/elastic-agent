@@ -85,7 +85,7 @@ func TestEventLogFile(t *testing.T) {
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	esURL := startMockES(t)
+	esURL := startMockES(t, 0, 0, 0, 0)
 
 	logFilepath := path.Join(t.TempDir(), t.Name())
 	generateLogFile(t, logFilepath, time.Millisecond*100, 20)
@@ -171,7 +171,7 @@ func TestEventLogOutputConfiguredViaFleet(t *testing.T) {
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	_, outputID := createMockESOutput(t, info)
+	_, outputID := createMockESOutput(t, info, 0, 0, 100, 0)
 	policyName := fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String())
 	policyID, enrollmentAPIKey := createPolicy(
 		t,
