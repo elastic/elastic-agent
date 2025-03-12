@@ -22,7 +22,7 @@ import (
 )
 
 func (v *FileVault) encrypt(data []byte) ([]byte, error) {
-	key, salt, err := deriveKey(v.seed, nil)
+	key, salt, err := deriveKey(v.seed, v.saltSize, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -38,16 +38,16 @@ func (v *FileVault) decrypt(data []byte) ([]byte, error) {
 		return nil, syscall.EINVAL
 	}
 	salt, data := data[:v.saltSize], data[v.saltSize:]
-	key, _, err := deriveKey(v.seed, salt)
+	key, _, err := deriveKey(v.seed, v.saltSize, salt)
 	if err != nil {
 		return nil, err
 	}
 	return aesgcm.Decrypt(key, data)
 }
 
-func deriveKey(pw []byte, salt []byte) ([]byte, []byte, error) {
+func deriveKey(pw []byte, saltSize int, salt []byte) ([]byte, []byte, error) {
 	if salt == nil {
-		salt = make([]byte, v.saltSize)
+		salt = make([]byte, saltSize)
 		if _, err := rand.Read(salt); err != nil {
 			return nil, nil, err
 		}
