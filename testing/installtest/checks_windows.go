@@ -24,7 +24,10 @@ const ACCESS_DENIED_ACE_TYPE = 1
 
 var (
 	advapi32 = syscall.NewLazyDLL("advapi32.dll")
-
+	// procGetAce (https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-getace)
+	//   If the function succeeds, the function returns nonzero.
+	//   If the function fails, it returns zero.
+	//   Sets last error.
 	procGetAce = advapi32.NewProc("GetAce")
 )
 
@@ -141,9 +144,9 @@ func getAllowedSIDs(secInfo *windows.SECURITY_DESCRIPTOR) ([]*windows.SID, error
 	aceCount := rs.Field(3).Uint()
 	for i := uint64(0); i < aceCount; i++ {
 		ace := &accessAllowedAce{}
-		ret, _, _ := procGetAce.Call(uintptr(unsafe.Pointer(dacl)), uintptr(i), uintptr(unsafe.Pointer(&ace)))
+		ret, _, err := procGetAce.Call(uintptr(unsafe.Pointer(dacl)), uintptr(i), uintptr(unsafe.Pointer(&ace)))
 		if ret == 0 {
-			return nil, fmt.Errorf("while getting ACE: %w", windows.GetLastError())
+			return nil, fmt.Errorf("call to GetAce failed: ret=%d: last_err=%w", ret, err)
 		}
 		if ace.AceType == ACCESS_DENIED_ACE_TYPE {
 			// we never set denied ACE, something is wrong
