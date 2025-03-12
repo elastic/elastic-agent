@@ -47,12 +47,11 @@ func ConnectedToFleet(ctx context.Context, t *testing.T, fixture *integrationtes
 // for use with assert.Eventually or require.Eventually.
 func FleetAgentStatus(ctx context.Context,
 	t *testing.T,
-	fixture *integrationtest.Fixture,
 	client *kibana.Client,
-	policyID,
+	agentID string,
 	expectedStatus string) func() bool {
 	return func() bool {
-		currentStatus, err := fleettools.GetAgentStatus(ctx, client, policyID)
+		currentStatus, err := fleettools.GetAgentStatus(ctx, client, agentID)
 		if err != nil {
 			t.Errorf("unable to determine agent status: %s", err.Error())
 			return false
@@ -61,39 +60,6 @@ func FleetAgentStatus(ctx context.Context,
 		if currentStatus == expectedStatus {
 			return true
 		}
-
-		agentStatus, err := fixture.ExecStatus(ctx)
-		if err != nil {
-			t.Logf("Agent fleet status: %s Error getting local status: %s", currentStatus, err)
-			return false
-		}
-
-		t.Logf("Agent fleet status: %s Local status: %v", currentStatus, agentStatus)
-		return false
-	}
-}
-
-// FleetAgentStatusByAgentID returns a niladic function that returns true if the agent with given ID
-// has reached expectedStatus; false otherwise. The returned function is intended
-// for use with assert.Eventually or require.Eventually.
-func FleetAgentStatusByAgentID(ctx context.Context,
-	t *testing.T,
-	client *kibana.Client,
-	agentID,
-	expectedStatus string) func() bool {
-	return func() bool {
-		req := kibana.GetAgentRequest{
-			ID: agentID,
-		}
-		resp, err := client.GetAgent(ctx, req)
-		if err != nil {
-			t.Logf("failed to get agent by ID: %s", err)
-			return false
-		}
-		if resp.Status == expectedStatus {
-			return true
-		}
-		t.Logf("Agent fleet status: %s", resp.Status)
 		return false
 	}
 }

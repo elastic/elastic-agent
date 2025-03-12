@@ -78,7 +78,7 @@ func TestEnrollReplaceToken(t *testing.T) {
 	// Wait for Agent to be healthy
 	require.Eventually(
 		t,
-		check.FleetAgentStatusByAgentID(ctx, t, info.KibanaClient, agentID, "online"),
+		check.FleetAgentStatus(ctx, t, info.KibanaClient, agentID, "online"),
 		10*time.Minute,
 		10*time.Second,
 		"Elastic Agent status is not online",
@@ -97,7 +97,7 @@ func TestEnrollReplaceToken(t *testing.T) {
 	// Wait for Agent to be offline
 	require.Eventually(
 		t,
-		check.FleetAgentStatusByAgentID(ctx, t, info.KibanaClient, agentID, "offline"),
+		check.FleetAgentStatus(ctx, t, info.KibanaClient, agentID, "offline"),
 		10*time.Minute,
 		10*time.Second,
 		"Elastic Agent status didn't go offline",
@@ -119,7 +119,7 @@ func TestEnrollReplaceToken(t *testing.T) {
 	// Wait for Agent to be healthy
 	require.Eventually(
 		t,
-		check.FleetAgentStatusByAgentID(ctx, t, info.KibanaClient, agentID, "online"),
+		check.FleetAgentStatus(ctx, t, info.KibanaClient, agentID, "online"),
 		10*time.Minute,
 		10*time.Second,
 		"Elastic Agent status is not online again",
