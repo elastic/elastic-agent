@@ -67,7 +67,7 @@ func TestDelayEnroll(t *testing.T) {
 	}
 	// Install the Elastic-Agent with the policy that was just
 	// created.
-	_, err = tools.InstallAgentWithPolicy(
+	_, _, err = tools.InstallAgentWithPolicy(
 		ctx,
 		t,
 		installOpts,
@@ -127,7 +127,7 @@ func TestDelayEnrollUnprivileged(t *testing.T) {
 	}
 	// Install the Elastic-Agent with the policy that was just
 	// created.
-	_, err = tools.InstallAgentWithPolicy(
+	_, _, err = tools.InstallAgentWithPolicy(
 		ctx,
 		t,
 		installOpts,
