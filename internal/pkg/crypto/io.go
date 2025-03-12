@@ -196,7 +196,7 @@ func (w *Writer) writeBlock(b []byte) error {
 	encodedBytes := w.gcm.Seal(nil, iv, b, nil)
 
 	l := make([]byte, 4)
-	binary.LittleEndian.PutUint32(l, uint32(len(encodedBytes)))
+	binary.LittleEndian.PutUint32(l, uint32(len(encodedBytes))) //nolint:gosec // ignoring unsafe type conversion
 	//nolint:errcheck // Ignore the error at this point.
 	w.writer.Write(l)
 
