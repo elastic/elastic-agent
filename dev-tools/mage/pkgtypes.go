@@ -14,6 +14,7 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -39,13 +40,13 @@ const (
 	packageStagingDir = "build/package"
 
 	// defaultBinaryName specifies the output file for zip and tar.gz.
-	defaultBinaryName = "{{.Name}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}"
+	defaultBinaryName = "{{.Name}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}{{if .FIPS}}-fips{{end}}"
 
 	// defaultRootDir is the default name of the root directory contained inside of zip and
 	// tar.gz packages.
 	// NOTE: This uses .BeatName instead of .Name because we wanted the internal
 	// directory to not include "-oss".
-	defaultRootDir = "{{.BeatName}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}"
+	defaultRootDir = "{{.BeatName}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}{{if .FIPS}}-fips{{end}}"
 
 	componentConfigMode os.FileMode = 0600
 
@@ -92,6 +93,7 @@ type PackageSpec struct {
 	Arch              string                 `yaml:"arch,omitempty"`
 	Vendor            string                 `yaml:"vendor,omitempty"`
 	Snapshot          bool                   `yaml:"snapshot"`
+	FIPS              bool                   `yaml:"fips"`
 	Version           string                 `yaml:"version,omitempty"`
 	License           string                 `yaml:"license,omitempty"`
 	URL               string                 `yaml:"url,omitempty"`
@@ -104,6 +106,7 @@ type PackageSpec struct {
 	Qualifier         string                 `yaml:"qualifier,omitempty"`   // Optional
 	OutputFile        string                 `yaml:"output_file,omitempty"` // Optional
 	ExtraVars         map[string]string      `yaml:"extra_vars,omitempty"`  // Optional
+	ExtraTags         []string               `yaml:"extra_tags,omitempty"`  // Optional
 
 	evalContext            map[string]interface{}
 	packageDir             string
@@ -382,6 +385,12 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 
 	for k, v := range s.ExtraVars {
 		s.evalContext[k] = mustExpand(v)
+	}
+
+	if s.ExtraTags != nil {
+		for i, tag := range s.ExtraTags {
+			s.ExtraTags[i] = mustExpand(tag)
+		}
 	}
 
 	s.Name = mustExpand(s.Name)
@@ -732,7 +741,7 @@ func runFPM(spec PackageSpec, packageType PackageType) error {
 	}
 	defer os.Remove(inputTar)
 
-	outputFile, err := spec.Expand("{{.Name}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.Arch}}")
+	outputFile, err := spec.Expand("{{.Name}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.Arch}}{{if .FIPS}}-fips{{end}}")
 	if err != nil {
 		return err
 	}
@@ -962,7 +971,7 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 		}
 
 		if mg.Verbose() {
-			log.Println("Adding", os.FileMode(header.Mode), header.Name)
+			log.Println("Adding", os.FileMode(mustConvertToUnit32(header.Mode)), header.Name)
 		}
 		if err := ar.WriteHeader(header); err != nil {
 			return err
@@ -1030,7 +1039,8 @@ func addSymlinkToTar(tmpdir string, ar *tar.Writer, baseDir string, pkgFile Pack
 		header.Typeflag = tar.TypeSymlink
 
 		if mg.Verbose() {
-			log.Println("Adding", os.FileMode(header.Mode), header.Name)
+			log.Println("Adding", os.FileMode(mustConvertToUnit32(header.Mode)), header.Name)
+
 		}
 		if err := ar.WriteHeader(header); err != nil {
 			return err
@@ -1051,4 +1061,11 @@ func PackageDocker(spec PackageSpec) error {
 		return err
 	}
 	return b.Build()
+}
+
+func mustConvertToUnit32(i int64) uint32 {
+	if i > math.MaxUint32 {
+		panic(fmt.Sprintf("%d is bigger than math.MaxUint32", i))
+	}
+	return uint32(i) // #nosec
 }

@@ -1276,6 +1276,9 @@
                 "clusterRole": {
                     "$ref": "#/definitions/AgentPresetClusterRole"
                 },
+                "priorityClass": {
+                    "$ref": "#/definitions/AgentPriorityClass"
+                },
                 "envFrom": {
                     "type": "array",
                     "items": {
@@ -1355,6 +1358,15 @@
                             }
                         ]
                     ]
+                },
+                "statePersistence": {
+                    "type": "string",
+                    "enum": [
+                        "HostPath",
+                        "EmptyDir",
+                        "None"
+                    ],
+                    "description": "Volume type used for Agent state persistence."
                 },
                 "extraVolumes": {
                     "type": "array",
@@ -1474,6 +1486,94 @@
                 "mode",
                 "serviceAccount",
                 "clusterRole"
+            ]
+        },
+        "AgentPriorityClass": {
+            "type": "object",
+            "properties": {
+                "create": {
+                    "type": "boolean",
+                    "description": "Create the priority class.",
+                    "default": true
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Name of the priority class to use if create is set to false."
+                },
+                "value": {
+                    "type": "integer",
+                    "description": "Value of the priority class."
+                },
+                "preemptionPolicy": {
+                    "type": "string",
+                    "enum": [
+                        "Never",
+                        "PreemptLowerPriority"
+                    ],
+                    "description": "Preemption policy for the priority class."
+                },
+                "globalDefault": {
+                    "type": "boolean",
+                    "description": "Set the priority class as the global default."
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Description of the priority class."
+                }
+            },
+            "examples": [
+                {
+                    "create": true,
+                    "value": 1000000,
+                    "preemptionPolicy": "Never",
+                    "globalDefault": true,
+                    "description": "Elastic Agent priority class"
+                }
+            ],
+            "required": [
+                "create"
+            ],
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "create": {
+                                "const": true
+                            }
+                        }
+                    },
+                    "then": {
+                        "required": [
+                            "value"
+                        ],
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        }
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "create": {
+                                "const": false
+                            }
+                        }
+                    },
+                    "then": {
+                        "required": [
+                            "name"
+                        ],
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "minLength": 1
+                            }
+                        }
+                    }
+                }
             ]
         },
         "AgentPresetClusterRole": {
