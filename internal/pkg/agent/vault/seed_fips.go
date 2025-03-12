@@ -9,15 +9,17 @@ package vault
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 )
 
-func getSeed(path string) ([]byte, int, error) {
-	b, saltSize, err := getSeedV2(path)
-	if err != nil {
-		return nil, 0, err
+// getSeedV1 will return an fs.ErrNotExist in FIPS mode.
+func getSeedV1(path string) ([]byte, error) {
+	return nil, fmt.Errorf("seed V1 format is unsupported in FIPS mode: %w", fs.ErrNotExist)
+}
+
+func checkSalt(size int) error {
+	if size < 16 {
+		return fmt.Errorf("expected salt to be at least 16: %w", errors.ErrUnsupported)
 	}
-	if saltSize < 16 {
-		return nil, 0, fmt.Errorf("detected salt size %d is too low: %w", saltSize, errors.ErrUnsupported)
-	}
-	return b, saltSize, nil
+	return nil
 }

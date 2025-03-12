@@ -49,13 +49,13 @@ func TestFileVaultRekey(t *testing.T) {
 	}
 
 	// Read seed file value
-	seedPath := filepath.Join(vaultPath, ".seed")
-	seedBytes, err := os.ReadFile(seedPath)
+	seedPath := filepath.Join(vaultPath, seedFileV2)
+	seedFileBytes, err := os.ReadFile(seedPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	diff := cmp.Diff(int(aesgcm.AES256), len(seedBytes))
+	diff := cmp.Diff(seedFileV2Size, len(seedFileBytes))
 	if diff != "" {
 		t.Fatal(diff)
 	}

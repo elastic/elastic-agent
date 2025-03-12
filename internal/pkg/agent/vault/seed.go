@@ -20,8 +20,9 @@ const (
 	// seedFile is len(aesgcm.AES256) and contains only the random seed
 	// A default salt size of 8 is used with this seed file
 	seedFile = ".seed"
-	// seedFileV2 is len(aesgcm.AES256+4) and contains the random seed followed by a non-zero salt size (little endian uint32)
-	seedFileV2 = ".seedV2"
+	// seedFileV2 is len(aesgcm.AES256)+4 and contains the random seed followed by a non-zero salt size (little endian uint32)
+	seedFileV2     = ".seedV2"
+	seedFileV2Size = int(aesgcm.AES256) + 4
 )
 
 const (
@@ -33,29 +34,28 @@ var (
 	mxSeed sync.Mutex
 )
 
-func getSeedV1(path string) ([]byte, error) {
-	fp := filepath.Join(path, seedFile)
-
+func getSeed(path string) ([]byte, int, error) {
 	mxSeed.Lock()
 	defer mxSeed.Unlock()
 
-	b, err := os.ReadFile(fp)
-	if err != nil {
-		return nil, fmt.Errorf("could not read seed file: %w", err)
+	// Prefer V2 seeds
+	b, saltSize, errV2 := getSeedV2(path)
+	if errV2 == nil {
+		return b, saltSize, nil
 	}
-
-	// return fs.ErrNotExist if invalid length of bytes returned
-	if len(b) != int(aesgcm.AES256) {
-		return nil, fmt.Errorf("invalid seed length, expected: %v, got: %v: %w", int(aesgcm.AES256), len(b), fs.ErrNotExist)
+	// Fallback to V1 seed
+	b, errV1 := getSeedV1(path)
+	if errV1 == nil {
+		return b, saltSizeV1, nil
 	}
-	return b, nil
+	return nil, 0, errors.Join(errV2, errV1)
 }
 
+// getSeedV2 will read a seedV2 file and return the passphrase and saltSize
+// Will return fs.ErrNotExists if the byte count does not match, or saltSize is 0
+// when in FIPS mode will return fs.ErrUnsupported when saltSize is non-zero but less then 16
 func getSeedV2(path string) ([]byte, int, error) {
 	fp := filepath.Join(path, seedFileV2)
-
-	mxSeed.Lock()
-	defer mxSeed.Unlock()
 
 	b, err := os.ReadFile(fp)
 	if err != nil {
@@ -63,30 +63,48 @@ func getSeedV2(path string) ([]byte, int, error) {
 	}
 
 	// return fs.ErrNotExist if invalid length of bytes returned
-	if len(b) != int(aesgcm.AES256)+4 {
-		return nil, 0, fmt.Errorf("invalid seed length, expected: %v, got: %v: %w", int(aesgcm.AES256)+4, len(b), fs.ErrNotExist)
+	if len(b) != seedFileV2Size {
+		return nil, 0, fmt.Errorf("invalid seed length, expected: %v, got: %v: %w", seedFileV2Size, len(b), fs.ErrNotExist)
 	}
 	pass := b[0:int(aesgcm.AES256)]
 	saltSize := binary.LittleEndian.Uint32(b[int(aesgcm.AES256):])
 	if saltSize == 0 {
 		return nil, 0, fmt.Errorf("salt size 0 detected: %w", fs.ErrNotExist)
 	}
+	if err := checkSalt(int(saltSize)); err != nil {
+		return nil, 0, err
+	}
 	return pass, int(saltSize), nil
 }
 
 func createSeedIfNotExists(path string) ([]byte, int, error) {
-	pass, saltSize, err := getSeed(path)
+	mxSeed.Lock()
+	defer mxSeed.Unlock()
+
+	// Prefer reading V2 seeds
+	pass, saltSize, err := getSeedV2(path)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			return nil, 0, err
 		}
 	}
-	mxSeed.Lock()
-	defer mxSeed.Unlock()
 	if len(pass) != 0 {
 		return pass, saltSize, nil
 	}
 
+	// V1 seed fallback
+	// getSeedV1 will return ErrNotExist when in FIPS mode.
+	pass, err = getSeedV1(path)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, 0, err
+		}
+	}
+	if len(pass) != 0 {
+		return pass, saltSizeV1, nil
+	}
+
+	// Create V2 seed
 	seed, err := aesgcm.NewKey(aesgcm.AES256)
 	if err != nil {
 		return nil, 0, err
