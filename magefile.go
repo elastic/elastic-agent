@@ -3606,8 +3606,74 @@ func updateYamlFile(path string, keyVal ...struct {
 	return nil
 }
 
+// BuildDependencies builds the dependencies for the Elastic-Agent Helm chart.
 func (Helm) BuildDependencies() error {
 	return helm.BuildChartDependencies(helmChartPath)
+}
+
+// Package packages the Elastic-Agent Helm chart. Note that you need to set SNAPSHOT="false" to build a production-ready package.
+func (h Helm) Package() error {
+	mg.SerialDeps(h.BuildDependencies)
+
+	agentVersion := bversion.GetParsedAgentPackageVersion()
+	agentCoreVersion := agentVersion.CoreVersion()
+	agentImageTag := agentCoreVersion + "-SNAPSHOT"
+
+	// need to explicitly set SNAPSHOT="false" to produce a production-ready package
+	productionPackage := os.Getenv("SNAPSHOT") == "false"
+
+	agentChartVersion := agentCoreVersion + "-beta"
+	switch {
+	case productionPackage && agentVersion.Major() >= 9:
+		// for 9.0.0 and later versions, elastic-agent Helm chart is GA
+		agentChartVersion = agentCoreVersion
+	case productionPackage && agentVersion.Major() >= 8 && agentVersion.Minor() >= 18:
+		// for 8.18.0 and later versions, elastic-agent Helm chart is GA
+		agentChartVersion = agentCoreVersion
+	}
+
+	for yamlFile, keyVals := range map[string][]struct {
+		key   string
+		value string
+	}{
+		// values file for elastic-agent Helm Chart
+		filepath.Join(helmChartPath, "values.yaml"): {
+			{"agent.version", agentCoreVersion},
+			// always use the SNAPSHOT version for image tag
+			// for the chart that resides in the git repo
+			{"agent.image.tag", agentImageTag},
+		},
+		// Chart.yaml for elastic-agent Helm Chart
+		filepath.Join(helmChartPath, "Chart.yaml"): {
+			{"appVersion", agentCoreVersion},
+			{"version", agentChartVersion},
+		},
+	} {
+		if err := updateYamlFile(yamlFile, keyVals...); err != nil {
+			return fmt.Errorf("failed to update agent version: %w", err)
+		}
+	}
+
+	// lint before packaging
+	if err := h.Lint(); err != nil {
+		return err
+	}
+
+	settings := cli.New() // Helm CLI settings
+	actionConfig := &action.Configuration{}
+
+	err := actionConfig.Init(settings.RESTClientGetter(), "default", "",
+		func(format string, v ...interface{}) {})
+	if err != nil {
+		return fmt.Errorf("failed to init helm action config: %w", err)
+	}
+
+	packageAction := action.NewPackage()
+	_, err = packageAction.Run(helmChartPath, nil)
+	if err != nil {
+		return fmt.Errorf("failed to package helm chart: %w", err)
+	}
+	return nil
 }
 
 func updateYamlNodes(rootNode *yaml.Node, value string, keys ...string) error {
