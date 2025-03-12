@@ -74,7 +74,11 @@ func SwitchExecutingMode(topPath string, pt *progressbar.ProgressBar, username s
 	//
 	// the install error below will include an error about the service still existing if this failed
 	// to uninstall (really this should never fail, but the unexpected can happen)
-	_ = UninstallService(topPath)
+	err = UninstallService(topPath)
+	if err != nil {
+		// error context already added by UninstallService
+		pt.Describe(err.Error())
+	}
 
 	// re-install service
 	pt.Describe("Installing service")
