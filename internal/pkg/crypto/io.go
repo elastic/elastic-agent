@@ -8,14 +8,13 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/pbkdf2"
 	"crypto/rand"
 	"crypto/sha512"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
-
-	"golang.org/x/crypto/pbkdf2"
 )
 
 // Option is the default options used to generate the encrypt and decrypt writer.
@@ -127,12 +126,15 @@ func (w *Writer) Write(b []byte) (int, error) {
 		w.wroteHeader = true
 
 		// Stretch the user provided key.
-		passwordBytes := stretchPassword(
+		passwordBytes, err := stretchPassword(
 			w.password,
 			w.salt,
 			w.option.IterationsCount,
 			w.option.KeyLength,
 		)
+		if err != nil {
+			return 0, fmt.Errorf("failed to stretch password: %w", err)
+		}
 
 		// Select AES-256: because len(passwordBytes) == 32 bytes.
 		block, err := aes.NewCipher(passwordBytes)
@@ -265,12 +267,15 @@ func (r *Reader) Read(b []byte) (int, error) {
 		salt := buf[vLen : vLen+r.option.SaltLength]
 
 		// Stretch the user provided key.
-		passwordBytes := stretchPassword(
+		passwordBytes, err := stretchPassword(
 			r.password,
 			salt,
 			r.option.IterationsCount,
 			r.option.KeyLength,
 		)
+		if err != nil {
+			return 0, fmt.Errorf("failed to stretch password: %w", err)
+		}
 
 		block, err := aes.NewCipher(passwordBytes)
 		if err != nil {
@@ -372,6 +377,6 @@ func randomBytes(length int) ([]byte, error) {
 	return r, nil
 }
 
-func stretchPassword(password, salt []byte, c, kl int) []byte {
-	return pbkdf2.Key(password, salt, c, kl, sha512.New)
+func stretchPassword(password, salt []byte, c, kl int) ([]byte, error) {
+	return pbkdf2.Key(sha512.New, string(password), salt, c, kl)
 }
