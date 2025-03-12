@@ -56,7 +56,7 @@ func TestGetSeed(t *testing.T) {
 		t.Fatal(err)
 	}
 	// V1 file should not exist
-	if _, err := os.Stat(fp); !errors.is(err, os.ErrNotExist) {
+	if _, err := os.Stat(fp); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal(err)
 	}
 
@@ -79,7 +79,7 @@ func TestGetSeed(t *testing.T) {
 		t.Error(diff)
 	}
 	if gotSaltSize != saltSize {
-		t.Errorf("got salt size %d does not match written salt size: %d".gotSaltSize, altSize)
+		t.Errorf("got salt size %d does not match written salt size: %d", gotSaltSize, saltSize)
 	}
 }
 
@@ -114,6 +114,9 @@ func TestCreateSeedIfNotExists(t *testing.T) {
 	if diff != "" {
 		t.Error(diff)
 	}
+	if saltSize != defaultSaltSize {
+		t.Errorf("expected salt size: %d got: %d", defaultSaltSize, saltSize)
+	}
 }
 
 func TestCreateSeedIfNotExistsRace(t *testing.T) {
@@ -130,7 +133,7 @@ func TestCreateSeedIfNotExistsRace(t *testing.T) {
 	for i := 0; i < count; i++ {
 		g.Go(func(idx int) func() error {
 			return func() error {
-				seed,i _, err := createSeedIfNotExists(dir)
+				seed, _, err := createSeedIfNotExists(dir)
 				mx.Lock()
 				res[idx] = seed
 				mx.Unlock()
