@@ -80,6 +80,8 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 		Group: define.Kubernetes,
 	})
 
+	t.Skip("Flaky test https://github.com/elastic/elastic-agent/issues/7356")
+
 	ctx := context.Background()
 	kCtx := k8sGetContext(t, info)
 
