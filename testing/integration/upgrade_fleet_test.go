@@ -409,10 +409,14 @@ func testUpgradeFleetManagedElasticAgent(
 	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
 	require.NoError(t, err)
 
+	agentID, err := startFixture.AgentID(ctx)
+	require.NoError(t, err)
+	t.Logf("Agent ID: %q", agentID)
+
 	t.Log("Waiting for enrolled Agent status to be online...")
 	require.Eventually(t,
 		check.FleetAgentStatus(
-			ctx, t, startFixture, kibClient, policyResp.ID, "online"),
+			ctx, t, kibClient, agentID, "online"),
 		2*time.Minute,
 		10*time.Second,
 		"Agent status is not online")
@@ -420,15 +424,13 @@ func testUpgradeFleetManagedElasticAgent(
 	t.Logf("Upgrading from version \"%s-%s\" to version \"%s-%s\"...",
 		startParsedVersion, startVersionInfo.Binary.Commit,
 		endVersionInfo.Binary.String(), endVersionInfo.Binary.Commit)
-	err = fleettools.UpgradeAgent(ctx, kibClient, policyResp.ID, endVersionInfo.Binary.String(), true)
+	err = fleettools.UpgradeAgent(ctx, kibClient, agentID, endVersionInfo.Binary.String(), true)
 	require.NoError(t, err)
 
 	t.Log("Waiting from upgrade details to show up in Fleet")
-	hostname, err := os.Hostname()
-	require.NoError(t, err)
-	var agent *kibana.AgentExisting
+	var agent kibana.GetAgentResponse
 	require.Eventuallyf(t, func() bool {
-		agent, err = fleettools.GetAgentByPolicyIDAndHostnameFromList(ctx, kibClient, policy.ID, hostname)
+		agent, err = kibClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
 		return err == nil && agent.UpgradeDetails != nil
 	},
 		5*time.Minute, time.Second,
@@ -446,12 +448,12 @@ func testUpgradeFleetManagedElasticAgent(
 	require.NoError(t, err)
 
 	t.Log("Waiting for enrolled Agent status to be online...")
-	require.Eventually(t, check.FleetAgentStatus(ctx, t, startFixture, kibClient, policyResp.ID, "online"), 10*time.Minute, 15*time.Second, "Agent status is not online")
+	require.Eventually(t, check.FleetAgentStatus(ctx, t, kibClient, agentID, "online"), 10*time.Minute, 15*time.Second, "Agent status is not online")
 
 	// wait for version
 	require.Eventually(t, func() bool {
 		t.Log("Getting Agent version...")
-		newVersion, err := fleettools.GetAgentVersion(ctx, kibClient, policyResp.ID)
+		newVersion, err := fleettools.GetAgentVersion(ctx, kibClient, agentID)
 		if err != nil {
 			t.Logf("error getting agent version: %v", err)
 			return false
@@ -563,10 +565,7 @@ func newArtifactsServer(ctx context.Context, t *testing.T, version string, packa
 	}))
 }
 
-func agentUpgradeDetailsString(a *kibana.AgentExisting) string {
-	if a == nil {
-		return "agent is NIL"
-	}
+func agentUpgradeDetailsString(a kibana.GetAgentResponse) string {
 	if a.UpgradeDetails == nil {
 		return "upgrade details is NIL"
 	}
