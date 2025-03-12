@@ -135,10 +135,6 @@ func (t *CopyTask) dirCopy(src, dest string, entry fs.DirEntry) error {
 		return nil
 	}
 
-	// if t.isDestinationExcluded(dest) {
-	// 	return nil
-	// }
-
 	info, err := entry.Info()
 	if err != nil {
 		return fmt.Errorf("converting dir entry: %w", err)

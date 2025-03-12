@@ -311,8 +311,8 @@ shared:
     <<: *agent_binary_spec_no_components
     docker_variant: 'edot-collector'
     extra_vars:
-      dockerfile: 'Dockerfile.elastic-agent.tmpl'
-      docker_entrypoint: 'docker-entrypoint.elastic-agent.tmpl'
+      dockerfile: 'Dockerfile.edot.tmpl'
+      docker_entrypoint: 'docker-entrypoint.edot.tmpl'
       user: '{{ .BeatName }}'
       linux_capabilities: ''
       beats_install_path: "install"
@@ -329,9 +329,6 @@ shared:
         content: >
           {{ commit }}
         mode: 0644
-      'hints.inputs.d':
-        source: '{{ repo.RootDir }}/deploy/kubernetes/elastic-agent-standalone/templates.d'
-        mode: 0755
       'data/{{.BeatName}}-{{ commit_short }}/components/agentbeat.spec.yml':
         source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/agentbeat.spec.yml'
         expand_spec: true
@@ -1060,8 +1057,7 @@ specs:
       arch: amd64
       types: [ docker ]
       spec:
-        # The service image is always based on Wolfi
-        <<: *docker_wolfi_spec
+        <<: *docker_ubi_spec
         <<: *docker_builder_spec
         <<: *agent_docker_slim_spec
         <<: *docker_elastic_spec
@@ -1073,8 +1069,7 @@ specs:
       arch: arm64
       types: [ docker ]
       spec:
-        # The service image is always based on Wolfi
-        <<: *docker_wolfi_arm_spec
+        <<: *docker_ubi_arm_spec
         <<: *docker_builder_arm_spec
         <<: *agent_docker_slim_spec
         <<: *docker_elastic_spec
@@ -1087,8 +1082,7 @@ specs:
       arch: amd64
       types: [ docker ]
       spec:
-        # The service image is always based on Wolfi
-        <<: *docker_wolfi_spec
+        <<: *docker_ubi_spec
         <<: *docker_builder_spec
         <<: *agent_docker_edot_spec
         <<: *docker_elastic_spec
@@ -1100,7 +1094,7 @@ specs:
       arch: arm64
       types: [ docker ]
       spec:
-        <<: *docker_wolfi_arm_spec
+        <<: *docker_ubi_arm_spec
         <<: *docker_builder_arm_spec
         <<: *agent_docker_edot_spec
         <<: *docker_elastic_spec

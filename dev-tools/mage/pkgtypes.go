@@ -489,6 +489,9 @@ func (s PackageSpec) ImageName() string {
 		// no suffix for basic docker variant
 		return s.Name
 	}
+	if s.DockerVariant == EdotCollector {
+		return s.DockerVariant.String()
+	}
 	return fmt.Sprintf("%s-%s", s.Name, s.DockerVariant)
 }
 

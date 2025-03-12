@@ -1,0 +1,131 @@
+{{- $beatHome := printf "%s/%s" "/usr/share" .BeatName }}
+{{- $beatBinary := printf "%s/%s" $beatHome .BeatName }}
+{{- $repoInfo := repo }}
+
+# Prepare home in a different stage to avoid creating additional layers on
+# the final image because of permission changes.
+FROM {{ .buildFrom }} AS home
+
+
+
+{{- if contains .buildFrom "wolfi" }}
+RUN for iter in {1..10}; do \
+        apk update && \
+        apk add --no-cache shadow libcap-utils && \
+        exit_code=0 && break || exit_code=$? && echo "apk error: retry $iter in 10s" && sleep 10; \
+    done; \
+    (exit $exit_code)
+{{- end }}
+
+COPY beat {{ $beatHome }}
+
+RUN true && \
+    # ECE needs to create config here under non-1000 user
+    chmod 0777 {{ $beatHome}} && \
+    mkdir -p {{ $beatHome }}/data {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/logs && \
+    find {{ $beatHome }} -type d -exec chmod 0755 {} \; && \
+    find {{ $beatHome }} -type f -exec chmod 0644 {} \; && \
+    find {{ $beatHome }}/data -type d -exec chmod 0777 {} \; && \
+    find {{ $beatHome }}/data -type f -exec chmod 0666 {} \; && \
+    rm {{ $beatBinary }} && \
+    ln -s {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/elastic-agent {{ $beatBinary }} && \
+    chmod 0755 {{ $beatHome }}/data/elastic-agent-*/elastic-agent && \
+    find {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components -name "*.yml*" -type f -exec chmod 0644 {} \; && \
+    true
+
+# Keep this after any chown command, chown resets any applied capabilities
+RUN setcap =p {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/elastic-agent && \
+{{- if .linux_capabilities }}
+# Since the beat is stored at the other end of a symlink we must follow the symlink first
+# For security reasons setcap does not support symlinks. This is smart in the general case
+# but in our specific case since we're building a trusted image from trusted binaries this is
+# fine. Thus, we use readlink to follow the link and setcap on the actual binary
+   setcap {{ .linux_capabilities }}  $(readlink -f {{ $beatBinary }}) && \
+{{- end }}
+true
+
+FROM {{ .from }}
+
+ENV BEAT_SETUID_AS={{ .user }}
+
+
+LABEL \
+  org.label-schema.build-date="{{ date }}" \
+  org.label-schema.schema-version="1.0" \
+  org.label-schema.vendor="{{ .BeatVendor }}" \
+  org.label-schema.license="{{ .License }}" \
+  org.label-schema.name="{{ .BeatName }}" \
+  org.label-schema.version="{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}" \
+  org.label-schema.url="{{ .BeatURL }}" \
+  org.label-schema.vcs-url="{{ $repoInfo.RootImportPath }}" \
+  org.label-schema.vcs-ref="{{ commit }}" \
+  io.k8s.description="{{ .BeatDescription }}" \
+  io.k8s.display-name="{{ .BeatName | title }} image" \
+  org.opencontainers.image.created="{{ date }}" \
+  org.opencontainers.image.licenses="{{ .License }}" \
+  org.opencontainers.image.title="{{ .BeatName | title }}" \
+  org.opencontainers.image.vendor="{{ .BeatVendor }}" \
+  org.opencontainers.image.authors="infra@elastic.co" \
+  # The maintainer label is deprecated, but RedHat still checks for it in their preflight validation. If we don't set
+  # it here, we inherit it from the base image, and fail said validation.
+  maintainer="infra@elastic.co" \
+  name="{{ .BeatName }}" \
+  vendor="{{ .BeatVendor }}" \
+  version="{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}" \
+  release="1" \
+  url="{{ .BeatURL }}" \
+  summary="{{ .BeatName }}" \
+  license="{{ .License }}" \
+  description="{{ .BeatDescription }}"
+
+ENV ELASTIC_CONTAINER="true"
+ENV PATH={{ $beatHome }}:$PATH
+ENV GODEBUG="madvdontneed=1"
+ENV ELASTIC_AGENT_OTEL=true
+
+# Add an init process, check the checksum to make sure it's a match
+RUN set -e ; \
+  TINI_BIN=""; \
+  TINI_SHA256=""; \
+  TINI_VERSION="v0.19.0"; \
+  case "$(arch)" in \
+    x86_64) \
+        TINI_BIN="tini-amd64"; \
+        TINI_SHA256="93dcc18adc78c65a028a84799ecf8ad40c936fdfc5f2a57b1acda5a8117fa82c"; \
+        ;; \
+    aarch64) \
+        TINI_BIN="tini-arm64"; \
+        TINI_SHA256="07952557df20bfd2a95f9bef198b445e006171969499a1d361bd9e6f8e5e0e81"; \
+        ;; \
+    *) \
+        echo >&2 ; echo >&2 "Unsupported architecture \$(arch)" ; echo >&2 ; exit 1 ; \
+        ;; \
+  esac ; \
+  curl --retry 8 -S -L -O "https://github.com/krallin/tini/releases/download/${TINI_VERSION}/${TINI_BIN}" ; \
+  echo "${TINI_SHA256} ${TINI_BIN}" | sha256sum -c - ; \
+  mv "${TINI_BIN}" /usr/bin/tini ; \
+  chmod +x /usr/bin/tini
+
+COPY docker-entrypoint /usr/local/bin/docker-entrypoint
+
+COPY --from=home {{ $beatHome }} {{ $beatHome }}
+
+# We do not want to add the agent user to the root group and because of backwards compatibility we can do it only for the new Wolfi image
+RUN groupadd --gid 1000 {{ .BeatName }} && \
+    useradd -M --uid 1000 --gid 1000 --groups 0 {{ .user }} && \
+    chmod 755 /usr/local/bin/docker-entrypoint && \
+    true
+
+RUN mkdir /licenses
+COPY --from=home {{ $beatHome }}/LICENSE.txt /licenses
+COPY --from=home {{ $beatHome }}/NOTICE.txt /licenses
+
+# When running under Docker, we must ensure libbeat monitoring pulls cgroup
+# metrics from /sys/fs/cgroup/<subsystem>/, ignoring any paths found in
+# /proc/self/cgroup.
+ENV LIBBEAT_MONITORING_CGROUPS_HIERARCHY_OVERRIDE=/
+
+WORKDIR {{ $beatHome }}
+
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint"]
+
