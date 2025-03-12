@@ -181,7 +181,7 @@ func TestContainerCMD(t *testing.T) {
 		// the agent logs will be present in the error message
 		// which should help to explain why the agent was not
 		// healthy.
-		err = agentFixture.IsHealthy(ctx, withEnv(env))
+		err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv(env)))
 		return err == nil
 	},
 		5*time.Minute, time.Second,
@@ -265,7 +265,7 @@ func TestContainerCMDWithAVeryLongStatePath(t *testing.T) {
 				// the agent logs will be present in the error message
 				// which should help to explain why the agent was not
 				// healthy.
-				err = agentFixture.IsHealthy(ctx, withEnv(env))
+				err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv(env)))
 				return err == nil
 			},
 				1*time.Minute, time.Second,
@@ -369,7 +369,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 		// the agent logs will be present in the error message
 		// which should help to explain why the agent was not
 		// healthy.
-		err := agentFixture.IsHealthy(ctx, withEnv(env))
+		err := agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv(env)))
 		return err == nil
 	},
 		2*time.Minute, time.Second,
@@ -402,7 +402,7 @@ func createMockESOutput(t *testing.T, info *define.Info) (string, string) {
     "%s"
   ],
   "preset": "latency"
-} 
+}
 `
 	// The API will return an error if the output ID/name contains an
 	// UUID substring, so we replace the '-' by '_' to keep the API happy.
