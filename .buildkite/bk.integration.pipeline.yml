@@ -135,7 +135,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+          image: "family/platform-ingest-elastic-agent-debian-12"
         matrix:
           - default
 
