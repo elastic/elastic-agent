@@ -191,6 +191,8 @@ spec:
           access_level: MANAGE_BUILD_AND_READ
         release-eng:
           access_level: BUILD_AND_READ
+        observablt-robots:
+          access_level: BUILD_AND_READ
         endpoint-ci-admin:
           access_level: BUILD_AND_READ
         everyone:
@@ -401,7 +403,7 @@ spec:
         observablt-robots:
           access_level: MANAGE_BUILD_AND_READ  
         everyone:
-          access_level: BUILD_AND_READ
+          access_level: READ_ONLY
       env:
         ELASTIC_SLACK_NOTIFICATIONS_ENABLED: "true"
         SLACK_NOTIFICATIONS_CHANNEL: "#ingest-notifications"
