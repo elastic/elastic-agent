@@ -75,14 +75,14 @@ func getSeedV2(path string) ([]byte, int, error) {
 }
 
 func createSeedIfNotExists(path string) ([]byte, int, error) {
-	mxSeed.Lock()
-	defer mxSeed.Unlock()
 	pass, saltSize, err := getSeed(path)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			return nil, 0, err
 		}
 	}
+	mxSeed.Lock()
+	defer mxSeed.Unlock()
 	if len(pass) != 0 {
 		return pass, saltSize, nil
 	}
