@@ -714,23 +714,6 @@ func (e *ExecErr) Unwrap() error {
 	return e.err
 }
 
-<<<<<<< HEAD
-// ExecStatus executes the status subcommand on the prepared Elastic Agent binary.
-// It returns the parsed output and the error from the execution. Keep in mind
-// the agent exits with status 1 if it's unhealthy, but it still outputs the
-// status successfully. An empty AgentStatusOutput and non nil error
-// means the output could not be parsed.
-// As long as we get some output, we don't return any error.
-// It should work with any 8.6+ agent
-func (f *Fixture) ExecStatus(ctx context.Context, opts ...process.CmdOption) (AgentStatusOutput, error) {
-	out, err := f.Exec(ctx, []string{"status", "--output", "json"}, opts...)
-	status := AgentStatusOutput{}
-	if uerr := json.Unmarshal(out, &status); uerr != nil {
-		return AgentStatusOutput{},
-			fmt.Errorf("could not unmarshal agent status output: %w", errors.Join(uerr, err))
-	} else if status.IsZero() {
-		return status, fmt.Errorf("agent status output is empty: %w", err)
-=======
 type statusOpts struct {
 	noRetry       bool
 	retryTimeout  time.Duration
@@ -787,7 +770,6 @@ func (f *Fixture) ExecStatus(ctx context.Context, opts ...statusOpt) (AgentStatu
 	opt.retryInterval = 1 * time.Second
 	for _, o := range opts {
 		o(&opt)
->>>>>>> d3b957445 (Update all usages of fleettools to use the installed Agent ID (#7054))
 	}
 
 	var cancel context.CancelFunc

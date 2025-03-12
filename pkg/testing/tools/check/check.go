@@ -60,17 +60,6 @@ func FleetAgentStatus(ctx context.Context,
 		if currentStatus == expectedStatus {
 			return true
 		}
-<<<<<<< HEAD
-
-		agentStatus, err := fixture.ExecStatus(ctx)
-		if err != nil {
-			t.Logf("Agent fleet status: %s Error getting local status: %s", currentStatus, err)
-			return false
-		}
-
-		t.Logf("Agent fleet status: %s Local status: %v", currentStatus, agentStatus)
-=======
->>>>>>> d3b957445 (Update all usages of fleettools to use the installed Agent ID (#7054))
 		return false
 	}
 }
