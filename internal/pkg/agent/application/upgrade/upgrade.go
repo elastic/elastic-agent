@@ -163,6 +163,20 @@ func (av agentVersion) String() string {
 	return buf.String()
 }
 
+//	func checkUpgrade(currentVersion agentVersion, metadata packageMetadata) error {
+//		// Compare the downloaded version (including git hash) to see if we need to upgrade
+//		// versions are the same if the numbers and hash match which may occur in a SNAPSHOT -> SNAPSHOT upgrage
+//		same, newVersion := isSameVersion(u.log, currentVersion, metadata, version)
+//		if same {
+//			u.log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
+//			return ErrUpgradeSameVersion
+//		}
+//
+//		if !metadata.manifest.Package.Fips && currentVersion.fips {
+//			return ErrFipsNotUpgradedToFips
+//		}
+//	}
+//
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
@@ -171,7 +185,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		version:  release.Version(),
 		snapshot: release.Snapshot(),
 		hash:     release.Commit(),
-		fips:     release.FIPS(),
+		fips:     release.FIPS(), // TODO: this may fail isSameReleaseVersion check, validate this
 	}
 
 	// Compare versions and exit before downloading anything if the upgrade
@@ -220,14 +234,15 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	det.SetState(details.StateExtracting)
 
-	metadata, err := u.getPackageMetadata(archivePath)
+	metadata, err := u.getPackageMetadata(archivePath) // TODO: can be a free function
 	if err != nil {
 		return nil, fmt.Errorf("reading metadata for elastic agent version %s package %q: %w", version, archivePath, err)
 	}
 
+	newVersion := extractAgentVersion(metadata, version)
 	// Compare the downloaded version (including git hash) to see if we need to upgrade
 	// versions are the same if the numbers and hash match which may occur in a SNAPSHOT -> SNAPSHOT upgrage
-	same, newVersion := isSameVersion(u.log, currentVersion, metadata, version)
+	same := isSameVersion(u.log, currentVersion, newVersion)
 	if same {
 		u.log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
 		return nil, ErrUpgradeSameVersion
@@ -445,7 +460,7 @@ func (u *Upgrader) sourceURI(retrievedURI string) string {
 	return u.settings.SourceURI
 }
 
-func isSameVersion(log *logger.Logger, current agentVersion, metadata packageMetadata, upgradeVersion string) (bool, agentVersion) {
+func extractAgentVersion(metadata packageMetadata, upgradeVersion string) agentVersion {
 	newVersion := agentVersion{}
 	if metadata.manifest != nil {
 		packageDesc := metadata.manifest.Package
@@ -457,10 +472,12 @@ func isSameVersion(log *logger.Logger, current agentVersion, metadata packageMet
 		newVersion.version, newVersion.snapshot = parsedVersion.ExtractSnapshotFromVersionString()
 	}
 	newVersion.hash = metadata.hash
+	return newVersion
+}
 
+func isSameVersion(log *logger.Logger, current agentVersion, newVersion agentVersion) bool {
 	log.Debugw("Comparing current and new agent version", "current_version", current, "new_version", newVersion)
-
-	return current == newVersion, newVersion
+	return current == newVersion
 }
 
 func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {

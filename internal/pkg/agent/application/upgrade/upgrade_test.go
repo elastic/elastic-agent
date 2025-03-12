@@ -116,7 +116,6 @@ func Test_CopyFile(t *testing.T) {
 }
 
 func TestShutdownCallback(t *testing.T) {
-
 	type testcase struct {
 		name                  string
 		agentHomeDirectory    string
@@ -158,7 +157,6 @@ func TestShutdownCallback(t *testing.T) {
 	}
 
 	for _, tt := range testcases {
-
 		t.Run(tt.name, func(t *testing.T) {
 			l, _ := logger.New(tt.name, false)
 			tmpDir := t.TempDir()
@@ -189,7 +187,6 @@ func TestShutdownCallback(t *testing.T) {
 			require.Equal(t, content, newContent, "contents are not equal")
 		})
 	}
-
 }
 
 func TestIsInProgress(t *testing.T) {
@@ -505,19 +502,22 @@ func TestUpgraderReload_sourceURL(t *testing.T) {
 agent.download:
   source_uri: "https://this.sourceURI.co/downloads/beats/"
   sourceURI: "https://NOT.sourceURI.co/downloads/beats/"
-`}, {
+`,
+		}, {
 			name:      "only sourceURI",
 			sourceURL: "https://this.sourceURI.co/downloads/beats/",
 			cfg: `
 agent.download:
   sourceURI: "https://this.sourceURI.co/downloads/beats/"
-`}, {
+`,
+		}, {
 			name:      "only source_uri",
 			sourceURL: "https://this.sourceURI.co/downloads/beats/",
 			cfg: `
 agent.download:
   source_uri: "https://this.sourceURI.co/downloads/beats/"
-`},
+`,
+		},
 	}
 
 	for _, tc := range tcs {
@@ -569,14 +569,12 @@ var agentVersion123SNAPSHOTghijkl = agentVersion{
 	hash:     "ghijkl",
 }
 
-func TestIsSameVersion(t *testing.T) {
+func TestExtractVersion(t *testing.T) {
 	type args struct {
-		current  agentVersion
 		metadata packageMetadata
 		version  string
 	}
 	type want struct {
-		same       bool
 		newVersion agentVersion
 	}
 
@@ -588,7 +586,6 @@ func TestIsSameVersion(t *testing.T) {
 		{
 			name: "same version, snapshot flag and hash",
 			args: args{
-				current: agentVersion123SNAPSHOTabcdef,
 				metadata: packageMetadata{
 					manifest: &v1.PackageManifest{
 						Package: v1.PackageDesc{
@@ -603,14 +600,12 @@ func TestIsSameVersion(t *testing.T) {
 				version: "unused",
 			},
 			want: want{
-				same:       true,
 				newVersion: agentVersion123SNAPSHOTabcdef,
 			},
 		},
 		{
 			name: "same hash, snapshot flag, different version",
 			args: args{
-				current: agentVersion123SNAPSHOTabcdef,
 				metadata: packageMetadata{
 					manifest: &v1.PackageManifest{
 						Package: v1.PackageDesc{
@@ -625,14 +620,12 @@ func TestIsSameVersion(t *testing.T) {
 				version: "unused",
 			},
 			want: want{
-				same:       false,
 				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
 			},
 		},
 		{
 			name: "same version and hash, different snapshot flag (SNAPSHOT promotion to release)",
 			args: args{
-				current: agentVersion123SNAPSHOTabcdef,
 				metadata: packageMetadata{
 					manifest: &v1.PackageManifest{
 						Package: v1.PackageDesc{
@@ -647,14 +640,12 @@ func TestIsSameVersion(t *testing.T) {
 				version: "unused",
 			},
 			want: want{
-				same:       false,
 				newVersion: agentVersion123abcdef,
 			},
 		},
 		{
 			name: "same version and snapshot, different hash (SNAPSHOT upgrade)",
 			args: args{
-				current: agentVersion123SNAPSHOTabcdef,
 				metadata: packageMetadata{
 					manifest: &v1.PackageManifest{
 						Package: v1.PackageDesc{
@@ -669,14 +660,12 @@ func TestIsSameVersion(t *testing.T) {
 				version: "unused",
 			},
 			want: want{
-				same:       false,
 				newVersion: agentVersion123SNAPSHOTghijkl,
 			},
 		},
 		{
 			name: "same version, snapshot flag and hash, no manifest",
 			args: args{
-				current: agentVersion123SNAPSHOTabcdef,
 				metadata: packageMetadata{
 					manifest: nil,
 					hash:     "abcdef",
@@ -684,14 +673,12 @@ func TestIsSameVersion(t *testing.T) {
 				version: "1.2.3-SNAPSHOT",
 			},
 			want: want{
-				same:       true,
 				newVersion: agentVersion123SNAPSHOTabcdef,
 			},
 		},
 		{
 			name: "same hash, snapshot flag, different version, no manifest",
 			args: args{
-				current: agentVersion123SNAPSHOTabcdef,
 				metadata: packageMetadata{
 					manifest: nil,
 					hash:     "abcdef",
@@ -699,14 +686,12 @@ func TestIsSameVersion(t *testing.T) {
 				version: "1.2.3-SNAPSHOT.repackaged",
 			},
 			want: want{
-				same:       false,
 				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
 			},
 		},
 		{
 			name: "same version and hash, different snapshot flag, no manifest (SNAPSHOT promotion to release)",
 			args: args{
-				current: agentVersion123SNAPSHOTabcdef,
 				metadata: packageMetadata{
 					manifest: nil,
 					hash:     "abcdef",
@@ -714,14 +699,12 @@ func TestIsSameVersion(t *testing.T) {
 				version: "1.2.3",
 			},
 			want: want{
-				same:       false,
 				newVersion: agentVersion123abcdef,
 			},
 		},
 		{
 			name: "same version and snapshot, different hash (SNAPSHOT upgrade)",
 			args: args{
-				current: agentVersion123SNAPSHOTabcdef,
 				metadata: packageMetadata{
 					manifest: nil,
 					hash:     "ghijkl",
@@ -729,21 +712,18 @@ func TestIsSameVersion(t *testing.T) {
 				version: "1.2.3-SNAPSHOT",
 			},
 			want: want{
-				same:       false,
 				newVersion: agentVersion123SNAPSHOTghijkl,
 			},
 		},
 		{
 			name: "same version and snapshot, no hash (SNAPSHOT upgrade before download)",
 			args: args{
-				current: agentVersion123SNAPSHOTabcdef,
 				metadata: packageMetadata{
 					manifest: nil,
 				},
 				version: "1.2.3-SNAPSHOT",
 			},
 			want: want{
-				same: false,
 				newVersion: agentVersion{
 					version:  "1.2.3",
 					snapshot: true,
@@ -751,15 +731,78 @@ func TestIsSameVersion(t *testing.T) {
 			},
 		},
 	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actualNewVersion := extractAgentVersion(test.args.metadata, test.args.version)
+			assert.Equal(t, test.want.newVersion, actualNewVersion, "Unexpected new version result: extractAgentVersion(%v, %v) should be %v",
+				test.args.metadata, test.args.version, test.want.newVersion)
+		})
+	}
+}
+
+func TestIsSameVersion(t *testing.T) {
+	type args struct {
+		current    agentVersion
+		newVersion agentVersion
+	}
+	type want struct {
+		same bool
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "same version, snapshot flag and hash",
+			args: args{
+				current:    agentVersion123SNAPSHOTabcdef,
+				newVersion: agentVersion123SNAPSHOTabcdef,
+			},
+			want: want{
+				same: true,
+			},
+		},
+		{
+			name: "same hash, snapshot flag, different version",
+			args: args{
+				current:    agentVersion123SNAPSHOTabcdef,
+				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
+			},
+			want: want{
+				same: false,
+			},
+		},
+		{
+			name: "same version and hash, different snapshot flag (SNAPSHOT promotion to release)",
+			args: args{
+				current:    agentVersion123SNAPSHOTabcdef,
+				newVersion: agentVersion123abcdef,
+			},
+			want: want{
+				same: false,
+			},
+		},
+		{
+			name: "same version and snapshot, different hash (SNAPSHOT upgrade)",
+			args: args{
+				current:    agentVersion123SNAPSHOTabcdef,
+				newVersion: agentVersion123SNAPSHOTghijkl,
+			},
+			want: want{
+				same: false,
+			},
+		},
+	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			log, _ := loggertest.New(test.name)
-			actualSame, actualNewVersion := isSameVersion(log, test.args.current, test.args.metadata, test.args.version)
+			actualSame := isSameVersion(log, test.args.current, test.args.newVersion)
 
-			assert.Equal(t, test.want.same, actualSame, "Unexpected boolean comparison result: isSameVersion(%v, %v, %v, %v) should be %v",
-				log, test.args.current, test.args.metadata, test.args.version, test.want.same)
-			assert.Equal(t, test.want.newVersion, actualNewVersion, "Unexpected new version result: isSameVersion(%v, %v, %v, %v) should be %v",
-				log, test.args.current, test.args.metadata, test.args.version, test.want.newVersion)
+			assert.Equal(t, test.want.same, actualSame, "Unexpected boolean comparison result: isSameVersion(%v, %v, %v) should be %v",
+				log, test.args.current, test.args.newVersion, test.want.same)
 		})
 	}
 }
@@ -828,7 +871,6 @@ func TestWaitForWatcher(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			deadline, ok := t.Deadline()
 			if !ok {
 				deadline = time.Now().Add(5 * time.Second)
