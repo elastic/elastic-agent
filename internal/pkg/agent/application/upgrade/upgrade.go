@@ -54,8 +54,11 @@ var agentArtifact = artifact.Artifact{
 	Artifact: "beats/" + agentName,
 }
 
-var ErrWatcherNotStarted = errors.New("watcher did not start in time")
-var ErrUpgradeSameVersion = errors.New("upgrade did not occur because it is the same version")
+var (
+	ErrWatcherNotStarted     = errors.New("watcher did not start in time")
+	ErrUpgradeSameVersion    = errors.New("upgrade did not occur because it is the same version")
+	ErrFipsNotUpgradedToFips = errors.New("cannot upgrade from a fips compliant agent to a non-compliant one")
+)
 
 // Upgrader performs an upgrade
 type Upgrader struct {
