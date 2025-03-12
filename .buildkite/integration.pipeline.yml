@@ -169,25 +169,3 @@ steps:
     depends_on:
       - int-packaging
     command: "buildkite-agent pipeline upload .buildkite/bk.integration.pipeline.yml"
-
-  - label: "Serverless Beats Tests"
-    depends_on:
-      - int-packaging
-    key: "serverless-beats-integration-tests"
-    concurrency_group: elastic-agent-extended-testing/beats-integration
-    concurrency: 8
-    retry:
-      automatic:
-        limit: 1
-    env:
-      TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-a"
-    command: |
-      buildkite-agent artifact download "build/distributions/**" . $BUILDKITE_BUILD_ID
-      .buildkite/scripts/steps/beats_tests.sh
-    agents:
-      provider: "gcp"
-      machineType: "n2-standard-8"
-    notify:
-      - github_commit_status:
-          context: "buildkite/elastic-agent-extended-testing - Serverless Beats Tests"
-
