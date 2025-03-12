@@ -98,6 +98,8 @@ steps:
             allowed: true
 
   - group: "macOS tests"
+    # 12.03: Temporarily skipped due to an Orka incident
+    skip: true
     key: "macos-unit-tests"
     steps:
       - label: "Unit tests - macOS 15 ARM"
@@ -196,8 +198,8 @@ steps:
         allow_failure: true
       - step: "unit-tests-win2016"
         allow_failure: true
-      - step: "macos-unit-tests"
-        allow_failure: true
+      # - step: "macos-unit-tests"
+      #   allow_failure: true
       - step: "unit-tests-win10"
         allow_failure: true
       - step: "unit-tests-win11"
