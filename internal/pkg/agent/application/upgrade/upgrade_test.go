@@ -1152,57 +1152,74 @@ func TestIsSameReleaseVersion(t *testing.T) {
 		current agentVersion
 		target  string
 		expect  bool
-	}{{
-		name: "current version is snapshot",
-		current: agentVersion{
-			version:  "1.2.3",
-			snapshot: true,
+	}{
+		{
+			name: "current version is snapshot",
+			current: agentVersion{
+				version:  "1.2.3",
+				snapshot: true,
+			},
+			target: "1.2.3",
+			expect: false,
 		},
-		target: "1.2.3",
-		expect: false,
-	}, {
-		name: "target version is snapshot",
-		current: agentVersion{
-			version: "1.2.3",
+		{
+			name: "target version is snapshot",
+			current: agentVersion{
+				version: "1.2.3",
+			},
+			target: "1.2.3-SNAPSHOT",
+			expect: false,
 		},
-		target: "1.2.3-SNAPSHOT",
-		expect: false,
-	}, {
-		name: "target version is different version",
-		current: agentVersion{
-			version: "1.2.3",
+		{
+			name: "target version is different version",
+			current: agentVersion{
+				version: "1.2.3",
+			},
+			target: "1.2.4",
+			expect: false,
 		},
-		target: "1.2.4",
-		expect: false,
-	}, {
-		name: "target version has same major.minor.patch, different pre-release",
-		current: agentVersion{
-			version: "1.2.3",
+		{
+			name: "target version has same major.minor.patch, different pre-release",
+			current: agentVersion{
+				version: "1.2.3",
+			},
+			target: "1.2.3-custom.info",
+			expect: false,
 		},
-		target: "1.2.3-custom.info",
-		expect: false,
-	}, {
-		name: "target version is same with build",
-		current: agentVersion{
-			version: "1.2.3",
+		{
+			name: "target version is same with build",
+			current: agentVersion{
+				version: "1.2.3",
+			},
+			target: "1.2.3+buildID",
+			expect: false,
 		},
-		target: "1.2.3+buildID",
-		expect: false,
-	}, {
-		name: "target version is same",
-		current: agentVersion{
-			version: "1.2.3",
+		{
+			name: "target version is same",
+			current: agentVersion{
+				version: "1.2.3",
+			},
+			target: "1.2.3",
+			expect: true,
 		},
-		target: "1.2.3",
-		expect: true,
-	}, {
-		name: "target version is invalid",
-		current: agentVersion{
-			version: "1.2.3",
+		{
+			name: "target version is invalid",
+			current: agentVersion{
+				version: "1.2.3",
+			},
+			target: "a.b.c",
+			expect: false,
 		},
-		target: "a.b.c",
-		expect: false,
-	}}
+		{
+			name: "current version is fips",
+			current: agentVersion{
+				version: "1.2.3",
+				fips:    true,
+			},
+			target: "1.2.3",
+			expect: true,
+		},
+	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			log, _ := loggertest.New(tc.name)
