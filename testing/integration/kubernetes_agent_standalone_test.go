@@ -97,9 +97,7 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 			name: "default deployment - rootful agent",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{
-					agentContainerMemoryLimit: "800Mi",
-				}, nil),
+				k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{}, nil),
 				k8sStepCheckAgentStatus("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone", nil),
 			},
 		},
@@ -111,7 +109,6 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 					agentContainerRunUser:          int64Ptr(0),
 					agentContainerCapabilitiesAdd:  []corev1.Capability{},
 					agentContainerCapabilitiesDrop: []corev1.Capability{"ALL"},
-					agentContainerMemoryLimit:      "800Mi",
 				}, nil),
 				k8sStepCheckAgentStatus("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone", nil),
 			},
@@ -124,7 +121,6 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 					agentContainerRunUser:          int64Ptr(0),
 					agentContainerCapabilitiesAdd:  []corev1.Capability{"CHOWN", "SETPCAP"},
 					agentContainerCapabilitiesDrop: []corev1.Capability{"ALL"},
-					agentContainerMemoryLimit:      "800Mi",
 				}, nil),
 				k8sStepCheckAgentStatus("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone", nil),
 				k8sStepRunInnerTests("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone"),
@@ -139,7 +135,6 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 					agentContainerRunGroup:         int64Ptr(1000),
 					agentContainerCapabilitiesAdd:  []corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH", "SYS_PTRACE"},
 					agentContainerCapabilitiesDrop: []corev1.Capability{"ALL"},
-					agentContainerMemoryLimit:      "800Mi",
 				}, nil),
 				k8sStepCheckAgentStatus("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone", nil),
 				k8sStepRunInnerTests("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone"),
@@ -154,7 +149,6 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 					agentContainerRunGroup:         int64Ptr(500),
 					agentContainerCapabilitiesAdd:  []corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH", "SYS_PTRACE"},
 					agentContainerCapabilitiesDrop: []corev1.Capability{"ALL"},
-					agentContainerMemoryLimit:      "800Mi",
 				}, nil),
 				k8sStepCheckAgentStatus("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone", nil),
 				k8sStepRunInnerTests("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone"),
@@ -212,9 +206,8 @@ func TestKubernetesAgentOtel(t *testing.T) {
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
 				k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{
-					agentContainerMemoryLimit: "800Mi",
-					agentContainerExtraEnv:    []corev1.EnvVar{{Name: "ELASTIC_AGENT_OTEL", Value: "true"}},
-					agentContainerArgs:        []string{}, // clear default args
+					agentContainerExtraEnv: []corev1.EnvVar{{Name: "ELASTIC_AGENT_OTEL", Value: "true"}},
+					agentContainerArgs:     []string{}, // clear default args
 				}, nil),
 			},
 		},
