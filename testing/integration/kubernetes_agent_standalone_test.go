@@ -7,6 +7,7 @@
 package integration
 
 import (
+	"archive/tar"
 	"bufio"
 	"bytes"
 	"context"
@@ -869,58 +870,157 @@ func getAgentComponentState(status atesting.AgentStatusOutput, componentName str
 	return -1, false
 }
 
-// k8sDumpAllPodLogs dumps the logs of all pods in the given namespace to the given target directory
-func k8sDumpAllPodLogs(ctx context.Context, client klient.Client, testName string, namespace string, targetDir string) error {
-	podList := &corev1.PodList{}
+// k8sDumpPods creates an archive that contains logs of all pods in the given namespace and kube-system to the given target directory
+func k8sDumpPods(t *testing.T, ctx context.Context, client klient.Client, testName string, namespace string, targetDir string, testStartTime time.Time) {
+	// Create the tar file
+	archivePath := filepath.Join(targetDir, fmt.Sprintf("%s.tar.gz", namespace))
+	tarFile, err := os.Create(archivePath)
+	if err != nil {
+		t.Logf("failed to create archive at path %q", archivePath)
+		return
+	}
+	defer tarFile.Close()
+
+	t.Logf("archive %q contains the dump info for %q test", archivePath, testName)
+
+	// Create a new tar writer
+	tarWriter := tar.NewWriter(tarFile)
+	defer tarWriter.Close()
 
 	clientSet, err := kubernetes.NewForConfig(client.RESTConfig())
 	if err != nil {
-		return fmt.Errorf("error creating clientset: %w", err)
+		t.Logf("error creating clientset: %s", err)
+		return
 	}
 
-	err = client.Resources(namespace).List(ctx, podList)
+	podList := &corev1.PodList{}
+	err = client.Resources("").List(ctx, podList)
 	if err != nil {
-		return fmt.Errorf("error listing pods: %w", err)
+		t.Logf("error listing pods: %s", err)
+		return
 	}
 
-	var errs error
+	type containerPodState struct {
+		Namespace              string `json:"namespace"`
+		PodName                string `json:"pod_name"`
+		ContainerName          string `json:"container_name"`
+		RestartCount           int32  `json:"restart_count"`
+		LastTerminationReason  string `json:"last_termination_reason"`
+		LastTerminationMessage string `json:"last_termination_message"`
+	}
+
+	var statesDump []containerPodState
+
 	for _, pod := range podList.Items {
-		previous := false
-		for _, containerStatus := range pod.Status.ContainerStatuses {
-			if containerStatus.RestartCount > 0 {
-				previous = true
-				break
-			}
+		podNamespace := pod.GetNamespace()
+		if podNamespace != namespace && podNamespace != "kube-system" {
+			continue
 		}
 
 		for _, container := range pod.Spec.Containers {
-			logFilePath := filepath.Join(targetDir, fmt.Sprintf("%s-%s-%s.log", testName, pod.Name, container.Name))
-			logFile, err := os.Create(logFilePath)
-			if err != nil {
-				errs = errors.Join(fmt.Errorf("error creating log file: %w", err), errs)
-				continue
+			state := containerPodState{
+				Namespace:     podNamespace,
+				PodName:       pod.GetName(),
+				ContainerName: container.Name,
+			}
+			previous := false
+
+			for _, containerStatus := range pod.Status.ContainerStatuses {
+				if container.Name != containerStatus.Name {
+					continue
+				}
+
+				state.RestartCount = containerStatus.RestartCount
+				if containerStatus.RestartCount == 0 {
+					break
+				}
+				// since we dump logs from pods that are expected to constantly run,
+				// namely kube-apiserver in kube-system namespace, we need to identify
+				// if a restart of such pod happened during the test to correctly if we
+				// want previous log
+				containerTerminated := containerStatus.LastTerminationState.Terminated
+				if containerTerminated != nil && containerTerminated.FinishedAt.After(testStartTime) {
+					previous = true
+					state.LastTerminationReason = containerTerminated.Reason
+					state.LastTerminationMessage = containerTerminated.Message
+				}
+				break
+			}
+			statesDump = append(statesDump, state)
+
+			var logFileName string
+			if previous {
+				logFileName = fmt.Sprintf("%s-%s-%s-previous.log", podNamespace, pod.Name, container.Name)
+			} else {
+				logFileName = fmt.Sprintf("%s-%s-%s.log", podNamespace, pod.Name, container.Name)
 			}
 
-			req := clientSet.CoreV1().Pods(namespace).GetLogs(pod.Name, &corev1.PodLogOptions{
+			req := clientSet.CoreV1().Pods(podNamespace).GetLogs(pod.Name, &corev1.PodLogOptions{
 				Container: container.Name,
 				Previous:  previous,
+				SinceTime: &metav1.Time{Time: testStartTime},
 			})
-			podLogsStream, err := req.Stream(context.TODO())
+
+			streamCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			podLogsStream, err := req.Stream(streamCtx)
 			if err != nil {
-				errs = errors.Join(fmt.Errorf("error getting container %s of pod %s logs: %w", container.Name, pod.Name, err), errs)
+				cancel()
+				t.Logf("error getting container %q of pod %q logs: %s", container.Name, pod.Name, err)
 				continue
 			}
 
-			_, err = io.Copy(logFile, podLogsStream)
+			b, err := io.ReadAll(podLogsStream)
+			_ = podLogsStream.Close()
+			cancel()
 			if err != nil {
-				errs = errors.Join(fmt.Errorf("error writing container %s of pod %s logs: %w", container.Name, pod.Name, err), errs)
+				t.Logf("error reading container %q logs of pod %q: %s", container.Name, pod.Name, err)
+				continue
 			}
 
-			_ = podLogsStream.Close()
+			header := &tar.Header{
+				Name:       logFileName,
+				Size:       int64(len(b)),
+				Mode:       0600,
+				ModTime:    time.Now(),
+				AccessTime: time.Now(),
+				ChangeTime: time.Now(),
+			}
+
+			if err := tarWriter.WriteHeader(header); err != nil {
+				t.Logf("error writing header of file %q in archive: %s", logFileName, err)
+				continue
+			}
+
+			if _, err := tarWriter.Write(b); err != nil {
+				t.Logf("error writing data of file %q in archive: %s", logFileName, err)
+			}
 		}
 	}
 
-	return errs
+	b, err := json.Marshal(statesDump)
+	if err != nil {
+		t.Logf("error marshalling pod states: %s", err)
+		return
+	}
+
+	statesDumpFile := "containerPodsStates.json"
+	header := &tar.Header{
+		Name:       statesDumpFile,
+		Size:       int64(len(b)),
+		Mode:       0600,
+		ModTime:    time.Now(),
+		AccessTime: time.Now(),
+		ChangeTime: time.Now(),
+	}
+
+	if err := tarWriter.WriteHeader(header); err != nil {
+		t.Logf("error writing header of file %q in archive: %s", statesDumpFile, err)
+		return
+	}
+
+	if _, err := tarWriter.Write(b); err != nil {
+		t.Logf("error writing data of file %q in archive: %s", statesDumpFile, err)
+	}
 }
 
 // k8sKustomizeAdjustObjects adjusts the namespace of given k8s objects and calls the given callbacks for the containers and the pod
@@ -1260,6 +1360,8 @@ type k8sContext struct {
 	esAPIKey string
 	// enrollParams contains the information needed to enroll an agent with Fleet in the test
 	enrollParams *fleettools.EnrollParams
+	// createdAt is the time when the k8sContext was created
+	createdAt time.Time
 }
 
 // getNamespace returns a unique namespace for the current test
@@ -1327,7 +1429,7 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 	testLogsBasePath := os.Getenv("K8S_TESTS_POD_LOGS_BASE")
 	require.NotEmpty(t, testLogsBasePath, "K8S_TESTS_POD_LOGS_BASE must be set")
 
-	err = os.MkdirAll(filepath.Join(testLogsBasePath, t.Name()), 0o755)
+	err = os.MkdirAll(testLogsBasePath, 0o755)
 	require.NoError(t, err, "failed to create test logs directory")
 
 	esHost := os.Getenv("ELASTICSEARCH_HOST")
@@ -1350,6 +1452,7 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 		esHost:         esHost,
 		esAPIKey:       esAPIKey,
 		enrollParams:   enrollParams,
+		createdAt:      time.Now(),
 	}
 }
 
@@ -1474,9 +1577,7 @@ func k8sStepDeployKustomize(kustomizePath string, containerName string, override
 
 		t.Cleanup(func() {
 			if t.Failed() {
-				if err := k8sDumpAllPodLogs(ctx, kCtx.client, namespace, namespace, kCtx.logsBasePath); err != nil {
-					t.Logf("failed to dump logs: %v", err)
-				}
+				k8sDumpPods(t, ctx, kCtx.client, t.Name(), namespace, kCtx.logsBasePath, kCtx.createdAt)
 			}
 
 			err := k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, objects...)
@@ -1594,9 +1695,7 @@ func k8sStepHelmDeploy(chartPath string, releaseName string, values map[string]a
 
 		t.Cleanup(func() {
 			if t.Failed() {
-				if err := k8sDumpAllPodLogs(ctx, kCtx.client, namespace, namespace, kCtx.logsBasePath); err != nil {
-					t.Logf("failed to dump logs: %v", err)
-				}
+				k8sDumpPods(t, ctx, kCtx.client, t.Name(), namespace, kCtx.logsBasePath, kCtx.createdAt)
 			}
 
 			uninstallAction := action.NewUninstall(actionConfig)
