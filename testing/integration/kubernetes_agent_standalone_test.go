@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -1262,9 +1263,13 @@ type k8sContext struct {
 }
 
 // getNamespace returns a unique namespace for the current test
-func (k8sContext) getNamespace(t *testing.T) string {
+func (k k8sContext) getNamespace(t *testing.T) string {
+	nsUUID, err := uuid.NewV4()
+	if err != nil {
+		t.Fatalf("error generating namespace UUID: %v", err)
+	}
 	hasher := sha256.New()
-	hasher.Write([]byte(t.Name()))
+	hasher.Write([]byte(nsUUID.String()))
 	testNamespace := strings.ToLower(base64.URLEncoding.EncodeToString(hasher.Sum(nil)))
 	return noSpecialCharsRegexp.ReplaceAllString(testNamespace, "")
 }
