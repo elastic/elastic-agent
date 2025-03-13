@@ -117,6 +117,12 @@ func createSeedIfNotExists(path string) ([]byte, int, error) {
 		return nil, 0, err
 	}
 
+	// When we use a V1 seed size write a V1 seed file.
+	// This allows the agent to downgrade/rollback versions without issues.
+	if defaultSaltSize == saltSizeV1 {
+		_ = os.WriteFile(filepath.Join(path, seedFile), seed, 0600)
+	}
+
 	return seed, defaultSaltSize, nil
 }
 

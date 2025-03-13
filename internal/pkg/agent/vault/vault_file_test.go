@@ -60,9 +60,15 @@ func TestFileVaultRekey(t *testing.T) {
 		t.Fatal(diff)
 	}
 
-	// Remove the .seed file.
+	// Remove the .seedV2 file.
 	// This will cause the vault seed to be reinitialized for the new vault instance
 	err = os.Remove(seedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Remove .seed file.
+	// (V1) seed file may be present when salt size is set to V1's size (for downgrading versions).
+	err = os.Remove(filepath.Join(vaultPath, seedFile))
 	if err != nil {
 		t.Fatal(err)
 	}
