@@ -354,6 +354,9 @@ func dockerName(file string, labels map[string]string) (string, error) {
 
 	lastPart := parts[len(parts)-1]
 	versionIdx := strings.Index(lastPart, version)
+	if versionIdx < 0 {
+		return "", fmt.Errorf("version not found in nam %q", file)
+	}
 	return lastPart[:versionIdx-1], nil
 }
 
