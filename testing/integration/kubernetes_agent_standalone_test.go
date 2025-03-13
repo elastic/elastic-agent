@@ -800,6 +800,11 @@ func k8sCheckAgentStatus(ctx context.Context, client klient.Client, stdout *byte
 ) error {
 	command := []string{"elastic-agent", "status", "--output=json"}
 	stopCheck := errors.New("stop check")
+
+	// we will wait maximum 120 seconds for the agent to report healthy
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+
 	checkStatus := func() error {
 		pod := corev1.Pod{}
 		if err := client.Resources(namespace).Get(ctx, agentPodName, namespace, &pod); err != nil {
@@ -846,10 +851,6 @@ func k8sCheckAgentStatus(ctx context.Context, client klient.Client, stdout *byte
 		}
 		return err
 	}
-
-	// we will wait maximum 120 seconds for the agent to report healthy
-	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 120*time.Second)
-	defer timeoutCancel()
 	for {
 		err := checkStatus()
 		if err == nil {
@@ -857,7 +858,7 @@ func k8sCheckAgentStatus(ctx context.Context, client klient.Client, stdout *byte
 		} else if errors.Is(err, stopCheck) {
 			return err
 		}
-		if timeoutCtx.Err() != nil {
+		if ctx.Err() != nil {
 			// timeout waiting for agent to become healthy
 			return errors.Join(err, errors.New("timeout waiting for agent to become healthy"))
 		}
@@ -873,7 +874,10 @@ func k8sGetAgentID(ctx context.Context, client klient.Client, stdout *bytes.Buff
 	status := atesting.AgentStatusOutput{} // clear status output
 	stdout.Reset()
 	stderr.Reset()
-	if err := client.Resources().ExecInPod(ctx, namespace, agentPodName, containerName, command, stdout, stderr); err != nil {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	err := client.Resources().ExecInPod(ctx, namespace, agentPodName, containerName, command, stdout, stderr)
+	cancel()
+	if err != nil {
 		return "", err
 	}
 
@@ -1671,8 +1675,10 @@ func k8sStepRunInnerTests(agentPodLabelSelector string, expectedPodNumber int, c
 
 		for _, pod := range perNodePodList.Items {
 			var stdout, stderr bytes.Buffer
+			ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 			err = kCtx.client.Resources().ExecInPod(ctx, namespace, pod.Name, containerName,
 				[]string{"/usr/share/elastic-agent/k8s-inner-tests", "-test.v"}, &stdout, &stderr)
+			cancel()
 			t.Logf("%s k8s-inner-tests output:", pod.Name)
 			t.Log(stdout.String())
 			if err != nil {
@@ -1834,7 +1840,9 @@ func k8sStepCheckRestrictUpgrade(agentPodLabelSelector string, expectedPodNumber
 			var stdout, stderr bytes.Buffer
 
 			command := []string{"elastic-agent", "upgrade", "1.0.0"}
+			ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 			err := kCtx.client.Resources().ExecInPod(ctx, namespace, pod.Name, containerName, command, &stdout, &stderr)
+			cancel()
 			require.Error(t, err)
 			require.Contains(t, stderr.String(), coordinator.ErrNotUpgradable.Error())
 		}
