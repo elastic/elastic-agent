@@ -1,0 +1,47 @@
+---
+name: release-helm-charts
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  trigger-release:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.action == 'published' && !startsWith(github.ref_name, '8.16') && !startsWith(github.ref_name, '8.17') }}
+    steps:
+      - uses: elastic/oblt-actions/buildkite/run@v1
+        with:
+          branch: ${{ github.ref_name }}
+          pipeline: elastic-agent-helm-charts
+          token: ${{ secrets.BUILDKITE_TOKEN }}
+          wait-for: true
+          env-vars: |
+            SNAPSHOT=false
+            HELM_REPO_ENV=prod
+
+      - uses: elastic/oblt-actions/slack/send@v1
+        if: ${{ failure()  }}
+        with:
+          bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel-id: "#ingest-notifications"
+          message: "Helm charts for Elastic Agent version ${{ github.ref_name }} have not been published."
+
+  # NOTE: this will help with testing the workflow
+  trigger-workflow:
+    runs-on: ubuntu-latest
+    if: github.event.action != 'published'
+    steps:
+      - uses: elastic/oblt-actions/buildkite/run@v1
+        with:
+          branch: ${{ github.ref_name }}
+          pipeline: elastic-agent-helm-charts
+          token: ${{ secrets.BUILDKITE_TOKEN }}
+          wait-for: true
+          env-vars: |
+            SNAPSHOT=true
+            HELM_REPO_ENV=dev
