@@ -11,8 +11,10 @@ import (
 	"fmt"
 	"io"
 	"math/rand/v2"
+	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -439,7 +441,7 @@ func (c *enrollCmd) prepareFleetTLS() error {
 			if c.options.FleetServer.Host == "" {
 				c.options.FleetServer.Host = defaultFleetServerInternalHost
 			}
-			c.options.URL = fmt.Sprintf("http://%s:%d", host, port)
+			c.options.URL = "http://" + net.JoinHostPort(host, strconv.Itoa(int(port)))
 			c.options.Insecure = true
 			return nil
 		}
@@ -459,7 +461,7 @@ func (c *enrollCmd) prepareFleetTLS() error {
 		}
 		c.options.FleetServer.Cert = string(pair.Crt)
 		c.options.FleetServer.CertKey = string(pair.Key)
-		c.options.URL = fmt.Sprintf("https://%s:%d", hostname, port)
+		c.options.URL = "https://" + net.JoinHostPort(hostname, strconv.Itoa(int(port)))
 		c.options.CAs = []string{string(ca.Crt())}
 	}
 	// running with custom Cert and CertKey; URL is required to be set
@@ -471,7 +473,7 @@ func (c *enrollCmd) prepareFleetTLS() error {
 		if c.options.FleetServer.InternalPort != defaultFleetServerInternalPort {
 			c.log.Warnf("Internal endpoint configured to: %d. Changing this value is not supported.", c.options.FleetServer.InternalPort)
 		}
-		c.options.InternalURL = fmt.Sprintf("%s:%d", defaultFleetServerInternalHost, c.options.FleetServer.InternalPort)
+		c.options.InternalURL = net.JoinHostPort(defaultFleetServerInternalHost, strconv.Itoa(int(c.options.FleetServer.InternalPort)))
 	}
 
 	return nil
