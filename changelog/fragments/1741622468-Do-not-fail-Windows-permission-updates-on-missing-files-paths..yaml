@@ -1,0 +1,5 @@
+kind: bug-fix
+summary: Do not fail Windows permission updates on missing files/paths.
+component: elastic-agent
+pr: https://github.com/elastic/elastic-agent/pull/7305
+issue: https://github.com/elastic/elastic-agent/issues/7301
