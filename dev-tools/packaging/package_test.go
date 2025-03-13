@@ -311,7 +311,7 @@ func checkNpcapNotices(pkg, file string, contents io.Reader) error {
 }
 
 func checkDocker(t *testing.T, file string) (string, int64) {
-	if strings.HasPrefix(file, "edot-collector") {
+	if strings.Contains(file, "edot-collector") {
 		return checkEdotCollectorDocker(t, file)
 	}
 
