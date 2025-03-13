@@ -77,7 +77,7 @@ func TestDebLogIngestFleetManaged(t *testing.T) {
 
 	// 2. Install the Elastic-Agent with the policy that
 	// was just created.
-	policy, err := tools.InstallAgentWithPolicy(
+	policy, _, err := tools.InstallAgentWithPolicy(
 		ctx,
 		t,
 		installOpts,
@@ -157,7 +157,7 @@ func TestDebFleetUpgrade(t *testing.T) {
 
 	// 2. Install the Elastic-Agent with the policy that
 	// was just created.
-	policy, err := tools.InstallAgentWithPolicy(
+	policy, agentID, err := tools.InstallAgentWithPolicy(
 		ctx,
 		t,
 		installOpts,
@@ -166,6 +166,7 @@ func TestDebFleetUpgrade(t *testing.T) {
 		createPolicyReq)
 	require.NoError(t, err)
 	t.Logf("created policy: %s", policy.ID)
+
 	check.ConnectedToFleet(ctx, t, startFixture, 5*time.Minute)
 
 	// 3. Upgrade deb to the build version
@@ -180,7 +181,7 @@ func TestDebFleetUpgrade(t *testing.T) {
 	// Fleet will not include the `-SNAPSHOT` in the `GetAgentVersion` result
 	noSnapshotVersion := strings.TrimSuffix(define.Version(), "-SNAPSHOT")
 	require.Eventually(t, func() bool {
-		newVersion, err := fleettools.GetAgentVersion(ctx, info.KibanaClient, policy.ID)
+		newVersion, err := fleettools.GetAgentVersion(ctx, info.KibanaClient, agentID)
 		if err != nil {
 			t.Logf("error getting agent version: %v", err)
 			return false
