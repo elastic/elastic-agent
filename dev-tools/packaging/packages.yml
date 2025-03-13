@@ -312,7 +312,7 @@ shared:
     docker_variant: 'edot-collector'
     name: 'edot-collector'
     extra_vars:
-      dockerfile: 'Dockerfile.edot.tmpl'
+      dockerfile: 'Dockerfile.elastic-agent.tmpl'
       docker_entrypoint: 'docker-entrypoint.edot.tmpl'
       user: '{{ .BeatName }}'
       linux_capabilities: ''
