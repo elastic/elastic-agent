@@ -551,10 +551,24 @@ var agentVersion123SNAPSHOTabcdef = agentVersion{
 	hash:     "abcdef",
 }
 
+var agentVersion123SNAPSHOTabcdefFips = agentVersion{
+	version:  "1.2.3",
+	snapshot: true,
+	hash:     "abcdef",
+	fips:     true,
+}
+
 var agentVersion123SNAPSHOTabcdefRepackaged = agentVersion{
 	version:  "1.2.3-repackaged",
 	snapshot: true,
 	hash:     "abcdef",
+}
+
+var agentVersion123SNAPSHOTabcdefRepackagedFips = agentVersion{
+	version:  "1.2.3-repackaged",
+	snapshot: true,
+	hash:     "abcdef",
+	fips:     true,
 }
 
 var agentVersion123abcdef = agentVersion{
@@ -745,9 +759,10 @@ func TestIsSameVersion(t *testing.T) {
 	type args struct {
 		current    agentVersion
 		newVersion agentVersion
+		metadata   packageMetadata
 	}
 	type want struct {
-		same bool
+		err error
 	}
 
 	tests := []struct {
@@ -756,13 +771,81 @@ func TestIsSameVersion(t *testing.T) {
 		want want
 	}{
 		{
+			name: "different version, snapshot flag and hash, fips to fips",
+			args: args{
+				current:    agentVersion123SNAPSHOTabcdefFips,
+				newVersion: agentVersion123SNAPSHOTabcdefRepackagedFips,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Fips: true,
+						},
+					},
+				},
+			},
+			want: want{
+				err: nil,
+			},
+		},
+		{
+			name: "different version, snapshot flag and hash, fips to non-fips",
+			args: args{
+				current:    agentVersion123SNAPSHOTabcdefFips,
+				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Fips: false,
+						},
+					},
+				},
+			},
+			want: want{
+				err: ErrFipsNotUpgradedToFips,
+			},
+		},
+		{
+			name: "different version, snapshot flag and hash, non-fips to fips",
+			args: args{
+				current:    agentVersion123SNAPSHOTabcdef,
+				newVersion: agentVersion123SNAPSHOTabcdefRepackagedFips,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Fips: true,
+						},
+					},
+				},
+			},
+			want: want{
+				err: ErrFipsNotUpgradedToFips,
+			},
+		},
+		{
+			name: "different version, snapshot flag and hash, non-fips to non-fips",
+			args: args{
+				current:    agentVersion123SNAPSHOTabcdef,
+				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Fips: false,
+						},
+					},
+				},
+			},
+			want: want{
+				err: nil,
+			},
+		},
+		{
 			name: "same version, snapshot flag and hash",
 			args: args{
 				current:    agentVersion123SNAPSHOTabcdef,
 				newVersion: agentVersion123SNAPSHOTabcdef,
 			},
 			want: want{
-				same: true,
+				err: ErrUpgradeSameVersion,
 			},
 		},
 		{
@@ -770,9 +853,16 @@ func TestIsSameVersion(t *testing.T) {
 			args: args{
 				current:    agentVersion123SNAPSHOTabcdef,
 				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Fips: false,
+						},
+					},
+				},
 			},
 			want: want{
-				same: false,
+				err: nil,
 			},
 		},
 		{
@@ -780,9 +870,16 @@ func TestIsSameVersion(t *testing.T) {
 			args: args{
 				current:    agentVersion123SNAPSHOTabcdef,
 				newVersion: agentVersion123abcdef,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Fips: false,
+						},
+					},
+				},
 			},
 			want: want{
-				same: false,
+				err: nil,
 			},
 		},
 		{
@@ -790,19 +887,25 @@ func TestIsSameVersion(t *testing.T) {
 			args: args{
 				current:    agentVersion123SNAPSHOTabcdef,
 				newVersion: agentVersion123SNAPSHOTghijkl,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Fips: false,
+						},
+					},
+				},
 			},
 			want: want{
-				same: false,
+				err: nil,
 			},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			log, _ := loggertest.New(test.name)
-			actualSame := isSameVersion(log, test.args.current, test.args.newVersion)
+			err := checkUpgrade(log, test.args.current, test.args.newVersion, test.args.metadata)
 
-			assert.Equal(t, test.want.same, actualSame, "Unexpected boolean comparison result: isSameVersion(%v, %v, %v) should be %v",
-				log, test.args.current, test.args.newVersion, test.want.same)
+			assert.Equal(t, test.want.err, err, "Unextedted upgrade check result: checkUpgrade(%v, %v, %v, %v) should be %v", log, test.args.current, test.args.newVersion, test.args.metadata, test.want.err)
 		})
 	}
 }

@@ -163,20 +163,26 @@ func (av agentVersion) String() string {
 	return buf.String()
 }
 
-//	func checkUpgrade(currentVersion agentVersion, metadata packageMetadata) error {
-//		// Compare the downloaded version (including git hash) to see if we need to upgrade
-//		// versions are the same if the numbers and hash match which may occur in a SNAPSHOT -> SNAPSHOT upgrage
-//		same, newVersion := isSameVersion(u.log, currentVersion, metadata, version)
-//		if same {
-//			u.log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
-//			return ErrUpgradeSameVersion
-//		}
-//
-//		if !metadata.manifest.Package.Fips && currentVersion.fips {
-//			return ErrFipsNotUpgradedToFips
-//		}
-//	}
-//
+func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, metadata packageMetadata) error {
+	// Compare the downloaded version (including git hash) to see if we need to upgrade
+	// versions are the same if the numbers and hash match which may occur in a SNAPSHOT -> SNAPSHOT upgrage
+	same := isSameVersion(log, currentVersion, newVersion)
+	if same {
+		log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
+		return ErrUpgradeSameVersion
+	}
+
+	if currentVersion.fips && metadata.manifest.Package.Fips {
+		return nil
+	}
+
+	if !currentVersion.fips && !metadata.manifest.Package.Fips {
+		return nil
+	}
+
+	return ErrFipsNotUpgradedToFips
+}
+
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
@@ -240,16 +246,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	newVersion := extractAgentVersion(metadata, version)
-	// Compare the downloaded version (including git hash) to see if we need to upgrade
-	// versions are the same if the numbers and hash match which may occur in a SNAPSHOT -> SNAPSHOT upgrage
-	same := isSameVersion(u.log, currentVersion, newVersion)
-	if same {
-		u.log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
-		return nil, ErrUpgradeSameVersion
-	}
-
-	if !metadata.manifest.Package.Fips && currentVersion.fips {
-		return nil, ErrFipsNotUpgradedToFips
+	if err := checkUpgrade(u.log, currentVersion, newVersion, metadata); err != nil {
+		return nil, fmt.Errorf("cannot upgrade the agent: %w", err)
 	}
 
 	u.log.Infow("Unpacking agent package", "version", newVersion)
