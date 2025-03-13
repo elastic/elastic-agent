@@ -792,8 +792,23 @@ func k8sCheckAgentStatus(ctx context.Context, client klient.Client, stdout *byte
 	namespace string, agentPodName string, containerName string, componentPresence map[string]bool,
 ) error {
 	command := []string{"elastic-agent", "status", "--output=json"}
-
+	stopCheck := errors.New("stop check")
 	checkStatus := func() error {
+		pod := corev1.Pod{}
+		if err := client.Resources(namespace).Get(ctx, agentPodName, namespace, &pod); err != nil {
+			return err
+		}
+
+		for _, container := range pod.Status.ContainerStatuses {
+			if container.Name != containerName {
+				continue
+			}
+
+			if restarts := container.RestartCount; restarts != 0 {
+				return fmt.Errorf("container %q of pod %q has restarted %d times: %w", containerName, agentPodName, restarts, stopCheck)
+			}
+		}
+
 		status := atesting.AgentStatusOutput{} // clear status output
 		stdout.Reset()
 		stderr.Reset()
@@ -832,6 +847,8 @@ func k8sCheckAgentStatus(ctx context.Context, client klient.Client, stdout *byte
 		err := checkStatus()
 		if err == nil {
 			return nil
+		} else if errors.Is(err, stopCheck) {
+			return err
 		}
 		if timeoutCtx.Err() != nil {
 			// timeout waiting for agent to become healthy
