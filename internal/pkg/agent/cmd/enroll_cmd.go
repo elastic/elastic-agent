@@ -11,8 +11,10 @@ import (
 	"fmt"
 	"io"
 	"math/rand/v2"
+	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -54,8 +56,8 @@ const (
 	defaultFleetServerPort         = 8220
 	defaultFleetServerInternalHost = "localhost"
 	defaultFleetServerInternalPort = 8221
-	enrollBackoffInit              = time.Second
-	enrollBackoffMax               = 10 * time.Second
+	enrollBackoffInit              = time.Second * 5
+	enrollBackoffMax               = time.Minute * 10
 )
 
 var (
@@ -69,13 +71,14 @@ type saver interface {
 
 // enrollCmd is an enroll subcommand that interacts between the Kibana API and the Agent.
 type enrollCmd struct {
-	log          *logger.Logger
-	options      *enrollCmdOption
-	client       fleetclient.Sender
-	configStore  saver
-	remoteConfig remote.Config
-	agentProc    *process.Info
-	configPath   string
+	log            *logger.Logger
+	options        *enrollCmdOption
+	client         fleetclient.Sender
+	configStore    saver
+	remoteConfig   remote.Config
+	agentProc      *process.Info
+	configPath     string
+	backoffFactory func(done <-chan struct{}) backoff.Backoff
 
 	// For testability
 	daemonReloadFunc func(context.Context) error
@@ -115,6 +118,8 @@ type enrollCmdOption struct {
 	Key                  string                     `yaml:"key,omitempty"`
 	KeyPassphrasePath    string                     `yaml:"key_passphrase_path,omitempty"`
 	Insecure             bool                       `yaml:"insecure,omitempty"`
+	ID                   string                     `yaml:"id,omitempty"`
+	ReplaceToken         string                     `yaml:"replace_token,omitempty"`
 	EnrollAPIKey         string                     `yaml:"enrollment_key,omitempty"`
 	Staging              string                     `yaml:"staging,omitempty"`
 	ProxyURL             string                     `yaml:"proxy_url,omitempty"`
@@ -176,13 +181,20 @@ func newEnrollCmd(
 	options *enrollCmdOption,
 	configPath string,
 	store saver,
+	backoffFactory func(done <-chan struct{}) backoff.Backoff,
 ) (*enrollCmd, error) {
+	if backoffFactory == nil {
+		backoffFactory = func(done <-chan struct{}) backoff.Backoff {
+			return backoff.NewEqualJitterBackoff(done, enrollBackoffInit, enrollBackoffMax)
+		}
+	}
 	return &enrollCmd{
 		log:              log,
 		options:          options,
 		configStore:      store,
 		configPath:       configPath,
 		daemonReloadFunc: daemonReload,
+		backoffFactory:   backoffFactory,
 	}, nil
 }
 
@@ -431,7 +443,7 @@ func (c *enrollCmd) prepareFleetTLS() error {
 			if c.options.FleetServer.Host == "" {
 				c.options.FleetServer.Host = defaultFleetServerInternalHost
 			}
-			c.options.URL = fmt.Sprintf("http://%s:%d", host, port)
+			c.options.URL = "http://" + net.JoinHostPort(host, strconv.Itoa(int(port)))
 			c.options.Insecure = true
 			return nil
 		}
@@ -451,7 +463,7 @@ func (c *enrollCmd) prepareFleetTLS() error {
 		}
 		c.options.FleetServer.Cert = string(pair.Crt)
 		c.options.FleetServer.CertKey = string(pair.Key)
-		c.options.URL = fmt.Sprintf("https://%s:%d", hostname, port)
+		c.options.URL = "https://" + net.JoinHostPort(hostname, strconv.Itoa(int(port)))
 		c.options.CAs = []string{string(ca.Crt())}
 	}
 	// running with custom Cert and CertKey; URL is required to be set
@@ -463,7 +475,7 @@ func (c *enrollCmd) prepareFleetTLS() error {
 		if c.options.FleetServer.InternalPort != defaultFleetServerInternalPort {
 			c.log.Warnf("Internal endpoint configured to: %d. Changing this value is not supported.", c.options.FleetServer.InternalPort)
 		}
-		c.options.InternalURL = fmt.Sprintf("%s:%d", defaultFleetServerInternalHost, c.options.FleetServer.InternalPort)
+		c.options.InternalURL = net.JoinHostPort(defaultFleetServerInternalHost, strconv.Itoa(int(c.options.FleetServer.InternalPort)))
 	}
 
 	return nil
@@ -529,7 +541,7 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 
 	signal := make(chan struct{})
 	defer close(signal)
-	backExp := backoff.NewExpBackoff(signal, enrollBackoffInit, enrollBackoffMax)
+	backExp := c.backoffFactory(signal)
 
 	for {
 		retry := false
@@ -574,6 +586,8 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 	r := &fleetapi.EnrollRequest{
 		EnrollAPIKey: c.options.EnrollAPIKey,
 		Type:         fleetapi.PermanentEnroll,
+		ID:           c.options.ID,
+		ReplaceToken: c.options.ReplaceToken,
 		Metadata: fleetapi.Metadata{
 			Local:        metadata,
 			UserProvided: c.options.UserProvidedMetadata,
@@ -588,7 +602,7 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 			errors.TypeNetwork)
 	}
 
-	fleetConfig, err := createFleetConfigFromEnroll(resp.Item.AccessAPIKey, c.options.EnrollAPIKey, c.remoteConfig)
+	fleetConfig, err := createFleetConfigFromEnroll(resp.Item.AccessAPIKey, c.options.EnrollAPIKey, c.options.ReplaceToken, c.remoteConfig)
 	if err != nil {
 		return err
 	}
@@ -1023,17 +1037,28 @@ func createFleetServerBootstrapConfig(
 	return cfg, nil
 }
 
-func createFleetConfigFromEnroll(accessAPIKey string, enrollmentToken string, cli remote.Config) (*configuration.FleetAgentConfig, error) {
+func fleetHashToken(token string) (string, error) {
+	enrollmentHashBytes, err := crypto.GeneratePBKDF2FromPassword([]byte(token))
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(enrollmentHashBytes), nil
+}
+
+func createFleetConfigFromEnroll(accessAPIKey string, enrollmentToken string, replaceToken string, cli remote.Config) (*configuration.FleetAgentConfig, error) {
+	var err error
 	cfg := configuration.DefaultFleetAgentConfig()
 	cfg.Enabled = true
 	cfg.AccessAPIKey = accessAPIKey
 	cfg.Client = cli
-	enrollmentHashBytes, err := crypto.GeneratePBKDF2FromPassword([]byte(enrollmentToken))
+	cfg.EnrollmentTokenHash, err = fleetHashToken(enrollmentToken)
 	if err != nil {
 		return nil, errors.New(err, "failed to generate enrollment hash", errors.TypeConfig)
 	}
-	enrollmentTokenHash := base64.StdEncoding.EncodeToString(enrollmentHashBytes)
-	cfg.EnrollmentTokenHash = enrollmentTokenHash
+	cfg.ReplaceTokenHash, err = fleetHashToken(replaceToken)
+	if err != nil {
+		return nil, errors.New(err, "failed to generate replace token hash", errors.TypeConfig)
+	}
 	if err := cfg.Valid(); err != nil {
 		return nil, errors.New(err, "invalid enrollment options", errors.TypeConfig)
 	}

@@ -181,7 +181,7 @@ func TestContainerCMD(t *testing.T) {
 		// the agent logs will be present in the error message
 		// which should help to explain why the agent was not
 		// healthy.
-		err = agentFixture.IsHealthy(ctx, withEnv(env))
+		err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv(env)))
 		return err == nil
 	},
 		5*time.Minute, time.Second,
@@ -265,7 +265,7 @@ func TestContainerCMDWithAVeryLongStatePath(t *testing.T) {
 				// the agent logs will be present in the error message
 				// which should help to explain why the agent was not
 				// healthy.
-				err = agentFixture.IsHealthy(ctx, withEnv(env))
+				err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv(env)))
 				return err == nil
 			},
 				1*time.Minute, time.Second,
@@ -330,7 +330,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 	// We call agentFixture.Prepare to set the workdir
 	require.NoError(t, agentFixture.Prepare(ctx), "failed preparing agent fixture")
 
-	_, outputID := createMockESOutput(t, info)
+	_, outputID := createMockESOutput(t, info, 0, 0, 100, 0)
 	policyID, enrollmentAPIKey := createPolicy(
 		t,
 		ctx,
@@ -369,7 +369,7 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 		// the agent logs will be present in the error message
 		// which should help to explain why the agent was not
 		// healthy.
-		err := agentFixture.IsHealthy(ctx, withEnv(env))
+		err := agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv(env)))
 		return err == nil
 	},
 		2*time.Minute, time.Second,
@@ -390,8 +390,13 @@ func TestContainerCMDEventToStderr(t *testing.T) {
 	}, 3*time.Minute, 10*time.Second, "cannot find events on stderr")
 }
 
-func createMockESOutput(t *testing.T, info *define.Info) (string, string) {
-	mockesURL := startMockES(t)
+// createMockESOutput creates an output configuration pointing to a mockES
+// started in a random port and a cleanup function is registered to close
+// the server at the end of the test.
+// The server will respond with the passed error probabilities. If they add
+// up to zero, all requests are a success.
+func createMockESOutput(t *testing.T, info *define.Info, percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge uint) (string, string) {
+	mockesURL := startMockES(t, percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge)
 	createOutputBody := `
 {
   "id": "mock-es-%[1]s",
@@ -402,7 +407,7 @@ func createMockESOutput(t *testing.T, info *define.Info) (string, string) {
     "%s"
   ],
   "preset": "latency"
-} 
+}
 `
 	// The API will return an error if the output ID/name contains an
 	// UUID substring, so we replace the '-' by '_' to keep the API happy.

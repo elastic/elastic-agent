@@ -45,7 +45,7 @@ func UsedFlavor(topPath, defaultFlavor string) (string, error) {
 		}
 
 		// failed reading flavor, do not break behavior and apply none as widest
-		return "", err
+		return "", fmt.Errorf("failed reading flavor marker file: %w", err)
 	}
 
 	return strings.TrimSpace(string(content)), nil
@@ -55,11 +55,15 @@ func Flavor(detectedFlavor string, registryPath string, flavorsRegistry map[stri
 	if flavorsRegistry == nil {
 		f, err := os.Open(registryPath)
 		if err != nil {
-			return FlavorDefinition{}, err
+			if os.IsNotExist(err) {
+				return FlavorDefinition{}, ErrUnknownFlavor
+			}
+
+			return FlavorDefinition{}, fmt.Errorf("failed opening flavor registry: %w", err)
 		}
 		manifest, err := v1.ParseManifest(f)
 		if err != nil {
-			return FlavorDefinition{}, err
+			return FlavorDefinition{}, fmt.Errorf("failed parsing flavor registry: %w", err)
 		}
 		defer f.Close()
 		flavorsRegistry = manifest.Package.Flavors
@@ -110,12 +114,12 @@ func ApplyFlavor(versionedHome string, flavor FlavorDefinition) error {
 		return nil
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed traversing components directory: %w", err)
 	}
 
 	for _, ftr := range filesToRemove {
 		if removeErr := os.RemoveAll(ftr); !os.IsNotExist(removeErr) {
-			err = removeErr
+			err = fmt.Errorf("failed cleaning components: %w", removeErr)
 		}
 	}
 
@@ -222,7 +226,7 @@ func subpathsForComponent(componentName, sourceComponentsDir string) ([]string, 
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("failed reading spec file for component %q: %w", componentName, err)
 	}
 
 	return component.ParseComponentFiles(content, specFilename, true)

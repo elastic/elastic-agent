@@ -35,9 +35,21 @@ const (
 	// Upgrade group of tests. Used for testing upgrades.
 	Upgrade = "upgrade"
 
+	// UpgradeFlavor group of tests. Used for testing flavored upgrades.
+	UpgradeFlavor = "upgrade-flavor"
+
+	// StandaloneUpgrade group of tests. Used for TestStandaloneUpgrade.
+	StandaloneUpgrade = "standalone-upgrade"
+
 	// Deb group of tests. Used for testing .deb packages install & upgrades
 	Deb = "deb"
 
 	// RPM group of tests. Used for testing .rpm packages install & upgrades
 	RPM = "rpm"
+
+	// InstallUninstall group of tests. Used for testing repeated install & uninstall scenarios
+	InstallUninstall = "install-uninstall"
+
+	// FleetInstall group of tests. Used for the long running fleet-related "TestInstall..." tests.
+	FleetEndpointSecurity = "fleet-endpoint-security"
 )

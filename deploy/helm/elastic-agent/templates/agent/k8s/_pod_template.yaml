@@ -1,7 +1,9 @@
 {{- define "elasticagent.engine.k8s.podTemplate" }}
 {{- $ := index . 0 -}}
 {{- $presetVal := index . 1 -}}
-{{- $agentName := index . 2 }}
+{{- $agentName := index . 2 -}}
+{{- $presetName := index . 3 -}}
+{{- $agentVolumes := (include "elasticagent.preset.render.volumes"  (list $ $presetVal $agentName) | fromYaml) -}}
 apiVersion: v1
 kind: PodTemplate
 template:
@@ -35,33 +37,20 @@ template:
     tolerations:
       {{- . | toYaml | nindent 6 }}
     {{- end }}
+    {{- with ($presetVal).priorityClass }}
+    {{- if (.).name }}
+    priorityClassName: {{ (.).name }}
+    {{- else }}
+    priorityClassName: {{ printf "agent-%s-%s-%s" $presetName $.Release.Name $.Release.Namespace | lower }}
+    {{- end }}
+    {{- end }}
     {{- with ($presetVal).topologySpreadConstraints }}
     topologySpreadConstraints:
       {{- . | toYaml | nindent 6 }}
     {{- end }}
     volumes:
-      {{- $definedAgentStateVolume := false -}}
-      {{- with ($presetVal).extraVolumes }}
+      {{- with ($agentVolumes).volumes }}
       {{- . | toYaml | nindent 6 }}
-      {{- range $idx, $volume := . -}}
-      {{- if eq $definedAgentStateVolume false -}}
-      {{- if eq ($volume).name "agent-data" -}}
-      {{- $definedAgentStateVolume = true}}
-      {{- end -}}
-      {{- end -}}
-      {{- end -}}
-      {{- end }}
-      {{- if eq $definedAgentStateVolume false }}
-      - name: agent-data
-        hostPath:
-          {{- if eq $.Values.agent.fleet.enabled true }}
-          {{/* different state hostPath for managed agents */}}
-          path: /etc/elastic-agent/{{$.Release.Namespace}}/{{$agentName}}-managed/state
-          {{- else }}
-          {{/* different state hostPath for standalone agents */}}
-          path: /etc/elastic-agent/{{$.Release.Namespace}}/{{$agentName}}/state
-          {{- end }}
-          type: DirectoryOrCreate
       {{- end }}
       {{/* standalone mode so config is static */}}
       - name: config
@@ -117,20 +106,8 @@ template:
         {{- end }}
         {{- end }}
         volumeMounts:
-          {{- $definedAgentStateVolumeMount := false -}}
-          {{- with ($presetVal).extraVolumeMounts }}
-          {{- . | toYaml | nindent 10}}
-          {{- range $idx, $volumeMount := . -}}
-          {{- if eq $definedAgentStateVolumeMount false -}}
-          {{- if eq ($volumeMount).name "agent-data" -}}
-          {{- $definedAgentStateVolumeMount = true}}
-          {{- end -}}
-          {{- end -}}
-          {{- end -}}
-          {{- end }}
-          {{- if eq $definedAgentStateVolumeMount false }}
-          - name: agent-data
-            mountPath: /usr/share/elastic-agent/state
+          {{- with ($agentVolumes).volumeMounts }}
+          {{- . | toYaml | nindent 10 }}
           {{- end }}
           - name: config
             mountPath: /etc/elastic-agent/agent.yml

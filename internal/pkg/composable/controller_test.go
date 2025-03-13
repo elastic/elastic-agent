@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/env"
@@ -86,22 +88,17 @@ func TestController(t *testing.T) {
 	var setVars2 []*transpiler.Vars
 	var setVars3 []*transpiler.Vars
 	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case vars := <-c.Watch():
-				if setVars1 == nil {
-					setVars1 = vars
-					c.Observe([]string{"local.vars.key1", "local_dynamic.vars.key1"}) // observed local and local_dynamic
-				} else if setVars2 == nil {
-					setVars2 = vars
-					c.Observe(nil) // no observed (will turn off those providers)
-				} else {
-					setVars3 = vars
-					cancel()
-				}
-			}
+		defer cancel()
+		select {
+		case <-ctx.Done():
+			return
+		case vars := <-c.Watch():
+			// initial vars
+			setVars1 = vars
+			setVars2, err = c.Observe(ctx, []string{"local.vars.key1", "local_dynamic.vars.key1"}) // observed local and local_dynamic
+			require.NoError(t, err)
+			setVars3, err = c.Observe(ctx, nil) // no observed (will turn off those providers)
+			require.NoError(t, err)
 		}
 	}()
 
@@ -147,6 +144,81 @@ func TestController(t *testing.T) {
 	assert.Len(t, vars3map, 0) // should be empty after empty Observe
 }
 
+func TestControllerWithFetchProvider(t *testing.T) {
+	providers := composable.NewProviderRegistry()
+	providers.MustAddContextProvider("custom_fetch", func(_ *logger.Logger, _ *config.Config, _ bool) (corecomp.ContextProvider, error) {
+		// add a delay to ensure that even if it takes time to start the provider that it still gets placed
+		// as a fetch provider
+		<-time.After(1 * time.Second)
+		return &customFetchProvider{}, nil
+	})
+
+	cfg := config.New()
+	log, err := logger.New("", false)
+	require.NoError(t, err)
+	c, err := composable.NewWithProviders(log, cfg, false, providers)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	observed := false
+	setErr := make(chan error, 1)
+	go func() {
+		defer cancel()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case vars := <-c.Watch():
+				if !observed {
+					vars, err = c.Observe(ctx, []string{"custom_fetch.vars.key1"})
+					if err != nil {
+						setErr <- err
+						return
+					}
+					observed = true
+				}
+				if len(vars) > 0 {
+					node, err := vars[0].Replace("${custom_fetch.vars.key1}")
+					if err == nil {
+						// replace occurred so the fetch provider is now present
+						strNode, ok := node.(*transpiler.StrVal)
+						if !ok {
+							setErr <- fmt.Errorf("expected *transpiler.StrVal")
+							return
+						}
+						strVal, ok := strNode.Value().(string)
+						if !ok {
+							setErr <- fmt.Errorf("expected string")
+							return
+						}
+						if strVal != "vars.key1" {
+							setErr <- fmt.Errorf("expected replaced value error: %s != vars.key1", strVal)
+							return
+						}
+						// replacement worked
+						setErr <- nil
+						return
+					}
+				}
+			}
+		}
+	}()
+
+	errCh := make(chan error)
+	go func() {
+		errCh <- c.Run(ctx)
+	}()
+	err = <-errCh
+	if errors.Is(err, context.Canceled) {
+		err = nil
+	}
+	require.NoError(t, err)
+	err = <-setErr
+	assert.NoError(t, err)
+}
+
 func TestProvidersDefaultDisabled(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -162,6 +234,15 @@ func TestProvidersDefaultDisabled(t *testing.T) {
 			},
 			observed: []string{"env.var1", "host.name"}, // has observed but explicitly disabled
 			context:  nil,                               // should have none
+		},
+		{
+			name: "default disabled, local provider without data",
+			cfg: map[string]interface{}{
+				"agent.providers.initial_default": "false",
+				"providers": map[string]any{
+					"local": map[string]any{},
+				},
+			},
 		},
 		{
 			name: "default enabled",
@@ -241,36 +322,47 @@ func TestProvidersDefaultDisabled(t *testing.T) {
 			c, err := composable.New(log, cfg, false)
 			require.NoError(t, err)
 
-			c.Observe(tt.observed)
-
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
 			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 1*time.Second)
 			defer timeoutCancel()
 
+			errCh := make(chan error)
+			go func() {
+				errCh <- c.Run(ctx)
+			}()
+
 			var setVars []*transpiler.Vars
 			go func() {
 				defer cancel()
+
+				observed := false
 				for {
 					select {
 					case <-timeoutCtx.Done():
 						return
 					case vars := <-c.Watch():
 						setVars = vars
+					default:
+						if !observed {
+							vars, err := c.Observe(timeoutCtx, tt.observed)
+							require.NoError(t, err)
+							if vars != nil {
+								setVars = vars
+							}
+							observed = true
+						}
 					}
 				}
 			}()
 
-			errCh := make(chan error)
-			go func() {
-				errCh <- c.Run(ctx)
-			}()
 			err = <-errCh
 			if errors.Is(err, context.Canceled) {
 				err = nil
 			}
 			require.NoError(t, err)
+			require.NotNil(t, setVars)
 
 			if len(tt.context) > 0 {
 				for _, name := range tt.context {
@@ -379,3 +471,52 @@ func TestCancellation(t *testing.T) {
 		}
 	})
 }
+
+func TestDefaultProvider(t *testing.T) {
+	log, err := logger.New("", false)
+	require.NoError(t, err)
+
+	t.Run("default env", func(t *testing.T) {
+		c, err := composable.New(log, nil, false)
+		require.NoError(t, err)
+		assert.Equal(t, "env", c.DefaultProvider())
+	})
+
+	t.Run("no default", func(t *testing.T) {
+		cfg, err := config.NewConfigFrom(map[string]interface{}{
+			"agent.providers.default": "",
+		})
+		require.NoError(t, err)
+		c, err := composable.New(log, cfg, false)
+		require.NoError(t, err)
+		assert.Equal(t, "", c.DefaultProvider())
+	})
+
+	t.Run("custom default", func(t *testing.T) {
+		cfg, err := config.NewConfigFrom(map[string]interface{}{
+			"agent.providers.default": "custom",
+		})
+		require.NoError(t, err)
+		c, err := composable.New(log, cfg, false)
+		require.NoError(t, err)
+		assert.Equal(t, "custom", c.DefaultProvider())
+	})
+}
+
+type customFetchProvider struct{}
+
+func (c *customFetchProvider) Run(ctx context.Context, comm corecomp.ContextProviderComm) error {
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func (c *customFetchProvider) Fetch(key string) (string, bool) {
+	tokens := strings.SplitN(key, ".", 2)
+	if len(tokens) > 0 && tokens[0] != "custom_fetch" {
+		return "", false
+	}
+	return tokens[1], true
+}
+
+// validate it registers as a fetch provider
+var _ corecomp.FetchContextProvider = (*customFetchProvider)(nil)

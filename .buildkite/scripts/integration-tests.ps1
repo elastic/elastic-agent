@@ -19,13 +19,21 @@ if ($PACKAGE_VERSION) {
 }
 $env:TEST_BINARY_NAME = "elastic-agent"
 # Parsing version.go. Will be simplified here: https://github.com/elastic/ingest-dev/issues/4925
-$AGENT_VERSION = (Get-Content version/version.go | Select-String -Pattern 'const defaultBeatVersion =' | ForEach-Object { $_ -replace '.*?"(.*?)".*', '$1' })
-$env:AGENT_VERSION = $AGENT_VERSION + "-SNAPSHOT"
+# $AGENT_VERSION = (Get-Content version/version.go | Select-String -Pattern 'const defaultBeatVersion =' | ForEach-Object { $_ -replace '.*?"(.*?)".*', '$1' })
+# $env:AGENT_VERSION = $AGENT_VERSION + "-SNAPSHOT"
+
+# Remove agent pinning once 9.0.0 is released
+$env:AGENT_VERSION = "9.0.0-SNAPSHOT"
+
 echo "~~~ Agent version: $env:AGENT_VERSION"
 $env:SNAPSHOT = $true
 
 echo "~~~ Building test binaries"
-mage build:testBinaries
+& mage build:testBinaries
+if ($LASTEXITCODE -ne 0) {    
+    Write-Error "Failed to build test binaries"
+    exit 1
+}
 $osInfo = (Get-CimInstance Win32_OperatingSystem).Caption + " " + (Get-CimInstance Win32_OperatingSystem).OSArchitecture -replace " ", "_"
 $root_suffix=""
 if ($TEST_SUDO -eq "true") {
@@ -34,10 +42,12 @@ if ($TEST_SUDO -eq "true") {
 $fully_qualified_group_name="${GROUP_NAME}${root_suffix}_${osInfo}"
 $outputXML = "build/${fully_qualified_group_name}.integration.xml"
 $outputJSON = "build/${fully_qualified_group_name}.integration.out.json"
+$TestsExitCode = 0
 try {
     Get-Ess-Stack -StackVersion $PACKAGE_VERSION
     Write-Output "~~~ Running integration test group: $GROUP_NAME as user: $env:USERNAME"
-    gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags=integration -shuffle=on -timeout=2h0m0s "github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=$GROUP_NAME" "-integration.sudo=$TEST_SUDO"
+    & gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags=integration -shuffle=on -timeout=2h0m0s "github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=$GROUP_NAME" "-integration.sudo=$TEST_SUDO"
+    $TestsExitCode = $LASTEXITCODE    
 } finally {
     ess_down
     
@@ -48,4 +58,8 @@ try {
     } else {
         Write-Output "Cannot generate HTML test report: $outputXML not found"
     }
+}
+
+if ($TestsExitCode -ne 0) {    
+    exit 1
 }
