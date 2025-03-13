@@ -16,9 +16,7 @@ summary: Validate pbkdf2 settings when in FIPS mode
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-description: |
-  Add FIPS mode validation of pbkdf2 settings. Ensure FIPS mode has
-  compliant settings by default.
+#description:
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
