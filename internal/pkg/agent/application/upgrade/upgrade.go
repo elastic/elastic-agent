@@ -191,7 +191,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		version:  release.Version(),
 		snapshot: release.Snapshot(),
 		hash:     release.Commit(),
-		fips:     release.FIPS(), // TODO: this may fail isSameReleaseVersion check, validate this
+		fips:     release.FIPS(),
 	}
 
 	// Compare versions and exit before downloading anything if the upgrade
