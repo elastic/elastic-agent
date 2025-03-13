@@ -524,7 +524,6 @@ require (
 	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap/exp v0.3.0 // indirect
 	golang.org/x/mod v0.23.0 // indirect
 	golang.org/x/oauth2 v0.24.0 // indirect
 	gonum.org/v1/gonum v0.15.1 // indirect
@@ -559,6 +558,38 @@ replace (
 	github.com/dop251/goja => github.com/elastic/goja v0.0.0-20190128172624-dd2ac4456e20
 	// fsnotify and goja are required for beats import
 	github.com/fsnotify/fsnotify => github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3
+	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector
+	github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/geoipprocessor => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/processor/geoipprocessor
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver => /Users/cmackenzie/go/src/github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver
 	// openshift removed all tags from their repo, use the pseudoversion from the release-3.9 branch HEAD
 	// See https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/12d41f40b0d408b0167633d8095160d3343d46ac/go.mod#L38
 	github.com/openshift/api v3.9.0+incompatible => github.com/openshift/api v0.0.0-20180801171038-322a19404e37
