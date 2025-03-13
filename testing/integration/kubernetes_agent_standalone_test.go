@@ -1242,12 +1242,10 @@ func k8sCreateObjects(ctx context.Context, client klient.Client, opts k8sCreateO
 				for idx := range objWithType.Subjects {
 					objWithType.Subjects[idx].Namespace = opts.namespace
 				}
-				continue
 			case *rbacv1.RoleBinding:
 				for idx := range objWithType.Subjects {
 					objWithType.Subjects[idx].Namespace = opts.namespace
 				}
-				continue
 			}
 		}
 		if err := client.Resources().Create(ctx, obj); err != nil {
@@ -1586,7 +1584,7 @@ func k8sStepDeployKustomize(kustomizePath string, containerName string, override
 			}
 		})
 
-		err = k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true}, objects...)
+		err = k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true, namespace: namespace}, objects...)
 		require.NoError(t, err, "failed to create objects")
 	}
 }
