@@ -121,8 +121,8 @@ func TestDocker(t *testing.T) {
 		sizeMap[k] = s
 	}
 
-	require.Less(t, sizeMap["edot-collector"], sizeMap["elastic-agent-slim"])
-	require.Less(t, sizeMap["elastic-agent-slim"], sizeMap["elastic-agent"])
+	require.Less(t, sizeMap["edot-collector"], sizeMap["elastic-agent-slim"], "unexpected size: %v", sizeMap)
+	require.Less(t, sizeMap["elastic-agent-slim"], sizeMap["elastic-agent"], "unexpected size: %v", sizeMap)
 }
 
 // Sub-tests
