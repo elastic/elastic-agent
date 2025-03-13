@@ -114,6 +114,8 @@ func renameHandle(hHandle windows.Handle) error {
 	lpwStream := &wRename[0]
 	rename.FileNameLength = uint32(unsafe.Sizeof(lpwStream))
 
+	// RtlCopyMemory (https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-rtlcopymemory)
+	//   Return value - None
 	_, _, _ = windows.NewLazyDLL("kernel32.dll").NewProc("RtlCopyMemory").Call(
 		uintptr(unsafe.Pointer(&rename.FileName[0])),
 		uintptr(unsafe.Pointer(lpwStream)),
