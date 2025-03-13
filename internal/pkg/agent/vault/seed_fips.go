@@ -12,14 +12,18 @@ import (
 	"io/fs"
 )
 
+const (
+	defaultSaltSize = defaultSaltSizeV2
+)
+
 // getSeedV1 will return an fs.ErrNotExist in FIPS mode.
 func getSeedV1(path string) ([]byte, error) {
 	return nil, fmt.Errorf("seed V1 format is unsupported in FIPS mode: %w", fs.ErrNotExist)
 }
 
 func checkSalt(size int) error {
-	if size < 16 {
-		return fmt.Errorf("expected salt to be at least 16: %w", errors.ErrUnsupported)
+	if size < defaultSaltSizeV2 {
+		return fmt.Errorf("expected salt to be at least %d: %w", defaultSaltSizeV2, errors.ErrUnsupported)
 	}
 	return nil
 }

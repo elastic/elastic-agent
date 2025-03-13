@@ -15,6 +15,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault/aesgcm"
 )
 
+const (
+	defaultSaltSize = saltSizeV1
+)
+
 func getSeedV1(path string) ([]byte, error) {
 	fp := filepath.Join(path, seedFile)
 

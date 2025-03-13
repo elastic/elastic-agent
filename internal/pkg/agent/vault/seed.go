@@ -26,8 +26,8 @@ const (
 )
 
 const (
-	saltSizeV1      = 8
-	defaultSaltSize = 16
+	saltSizeV1        = 8
+	defaultSaltSizeV2 = 16
 )
 
 var (
