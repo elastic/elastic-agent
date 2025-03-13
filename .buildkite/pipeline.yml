@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 
-env:platform-ingest-elastic-agent-ubuntu-2204
+env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
 steps:
@@ -9,7 +9,7 @@ steps:
     command: ".buildkite/scripts/steps/check-ci.sh"
     agents:
       provider: "gcp"
-      image: "family/"
+      image: "family/platform-ingest-elastic-agent-ubuntu-2204"
     retry:
       manual:
         allowed: true
