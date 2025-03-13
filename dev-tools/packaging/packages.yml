@@ -310,7 +310,6 @@ shared:
   - &agent_docker_edot_spec
     <<: *agent_binary_spec_no_components
     docker_variant: 'edot-collector'
-    name: 'edot-collector'
     extra_vars:
       dockerfile: 'Dockerfile.edot.tmpl'
       docker_entrypoint: 'docker-entrypoint.edot.tmpl'

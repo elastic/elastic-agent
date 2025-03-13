@@ -122,8 +122,11 @@ func TestDocker(t *testing.T) {
 		sizeMap[k] = s
 	}
 
-	require.Less(t, sizeMap["edot-collector"], sizeMap["elastic-agent-slim"], "unexpected size: %v", sizeMap)
-	require.Less(t, sizeMap["elastic-agent-slim"], sizeMap["elastic-agent"], "unexpected size: %v", sizeMap)
+	if len(dockers) > 0 {
+		// run only as part of packaging testing
+		require.Less(t, sizeMap["edot-collector"], sizeMap["elastic-agent-slim"], "unexpected size: %v", sizeMap)
+		require.Less(t, sizeMap["elastic-agent-slim"], sizeMap["elastic-agent"], "unexpected size: %v", sizeMap)
+	}
 }
 
 // Sub-tests
