@@ -43,10 +43,17 @@ $fully_qualified_group_name="${GROUP_NAME}${root_suffix}_${osInfo}"
 $outputXML = "build/${fully_qualified_group_name}.integration.xml"
 $outputJSON = "build/${fully_qualified_group_name}.integration.out.json"
 $TestsExitCode = 0
-try {
+try {    
     Get-Ess-Stack -StackVersion $PACKAGE_VERSION
     Write-Output "~~~ Running integration test group: $GROUP_NAME as user: $env:USERNAME"
-    & gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags=integration -shuffle=on -timeout=2h0m0s "github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=$GROUP_NAME" "-integration.sudo=$TEST_SUDO"
+    if ($TEST_SUDO -eq "true") {
+        & gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags=integration -shuffle=on -timeout=2h0m0s "github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=$GROUP_NAME" "-integration.sudo=$TEST_SUDO"
+    } else {
+        $Command = 'gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags=integration -shuffle=on -timeout=2h0m0s "github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=$GROUP_NAME" "-integration.sudo=$TEST_SUDO"'
+        $RunasCmd = "runas /user:StandardUser `"$Command`""
+        Start-Process cmd.exe -ArgumentList "/c $RunasCmd" -NoNewWindow -Wait
+    }
+    
     $TestsExitCode = $LASTEXITCODE    
 } finally {
     ess_down
