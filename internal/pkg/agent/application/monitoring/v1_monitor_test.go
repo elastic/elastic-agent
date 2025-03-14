@@ -738,6 +738,123 @@ func TestMonitoringConfigComponentFields(t *testing.T) {
 	}
 }
 
+func TestMonitoringMetricsDataStreams(t *testing.T) {
+	agentInfo, err := info.NewAgentInfo(context.Background(), false)
+	require.NoError(t, err, "Error creating agent info")
+
+	tcs := []struct {
+		name                string
+		enableMetrics       bool
+		enableLogs          bool
+		componentList       []component.Component
+		expectedBeatStreams int
+		expectedHTTPStreams int
+	}{
+		{
+			name:          "test inputs when both monitoring metrics and logs is true",
+			enableMetrics: true,
+			enableLogs:    true,
+			componentList: []component.Component{
+				{
+					ID: "filestream-default",
+					InputSpec: &component.InputRuntimeSpec{
+						Spec: component.InputSpec{
+							Service: &component.ServiceSpec{
+								Log: &component.ServiceLogSpec{
+									Path: "/tmp/foo",
+								},
+							},
+						},
+					},
+				},
+			},
+			// The reasoning here is that "beat/metrics" input are created for all monitoring beats + componentList
+			// Monitoring beats include "filestream-monitoring" (for logs), "http/metrics" and "beat/metrics" (for metrics)
+			expectedBeatStreams: 4,
+			// "http/metrics" input are created for elastic-agent's /stats and filebeat's /input endpoint
+			expectedHTTPStreams: 3,
+		},
+		{
+			name:          "test inputs when both monitoring metrics is true logs is false",
+			enableMetrics: true,
+			enableLogs:    false,
+			componentList: []component.Component{
+				{
+					ID: "filestream-default",
+					InputSpec: &component.InputRuntimeSpec{
+						Spec: component.InputSpec{
+							Service: &component.ServiceSpec{
+								Log: &component.ServiceLogSpec{
+									Path: "/tmp/foo",
+								},
+							},
+						},
+					},
+				},
+			},
+			// Logs are disabled
+			expectedBeatStreams: 3,
+			// "http/metrics" input are created for elastic-agent's /stats and filebeat's /input endpoint
+			expectedHTTPStreams: 2,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := &monitoringConfig{
+				C: &monitoringcfg.MonitoringConfig{
+					Enabled:        true,
+					MonitorMetrics: tc.enableMetrics,
+					MonitorLogs:    tc.enableLogs,
+					HTTP: &monitoringcfg.MonitoringHTTPConfig{
+						Enabled: false,
+					},
+				},
+			}
+
+			policy := map[string]any{
+				"agent": map[string]any{
+					"monitoring": map[string]any{
+						"metrics": tc.enableMetrics,
+						"logs":    tc.enableLogs,
+					},
+				},
+				"outputs": map[string]any{
+					"default": map[string]any{},
+				},
+			}
+
+			b := &BeatsMonitor{
+				enabled:   true,
+				config:    cfg,
+				agentInfo: agentInfo,
+			}
+
+			monitoringConfig, err := b.MonitoringConfig(policy, tc.componentList, map[string]string{"filestream-default": "filebeat"}, map[string]uint64{})
+			if err != nil {
+				t.Fatalf("cannot render monitoring configuration: %s", err)
+			}
+
+			// The structure of `monitoringConfig` is well know,
+			// so we coerce everything to the correct type. If something does not match
+			// the test will panic.
+			inputsSlice := monitoringConfig["inputs"].([]any)
+			for _, input := range inputsSlice {
+				inputType := input.(map[string]any)["type"]
+				if inputType == "beat/metrics" {
+					// Assert streams are created for given component list plus monitoring beats
+
+					assert.Equal(t, tc.expectedBeatStreams, len(input.(map[string]any)["streams"].([]any)))
+				}
+				if inputType == "http/metrics" {
+					// Assert monitoring beats
+					assert.Equal(t, tc.expectedHTTPStreams, len(input.(map[string]any)["streams"].([]any)))
+				}
+			}
+		})
+	}
+}
+
 type Processor struct {
 	AddFields AddFields `json:"add_fields"`
 }
