@@ -240,7 +240,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	det.SetState(details.StateExtracting)
 
-	metadata, err := u.getPackageMetadata(archivePath) // TODO: can be a free function
+	metadata, err := u.getPackageMetadata(archivePath)
 	if err != nil {
 		return nil, fmt.Errorf("reading metadata for elastic agent version %s package %q: %w", version, archivePath, err)
 	}
