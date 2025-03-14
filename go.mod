@@ -237,6 +237,10 @@ require (
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.5.1 // indirect
 	github.com/elastic/opentelemetry-lib v0.16.1 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
+<<<<<<< HEAD
+=======
+	github.com/elastic/sarama v1.19.1-0.20250304185506-df6449b5c996 // indirect
+>>>>>>> f951cff23 (feat(fips): bump sarama to drop kerberos lib in fips mode (#7225))
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/envoyproxy/go-control-plane v0.13.1 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.1.0 // indirect

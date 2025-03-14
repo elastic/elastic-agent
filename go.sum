@@ -364,6 +364,11 @@ github.com/elastic/opentelemetry-lib v0.16.1 h1:O+E5d6MRjQN5ggRYtaorHcZPzcZHvkz3
 github.com/elastic/opentelemetry-lib v0.16.1/go.mod h1:auZpyxu1jsRUPSYOli6uGbrVZSOFI9ovzzY0Sken3ac=
 github.com/elastic/pkcs8 v1.0.0 h1:HhitlUKxhN288kcNcYkjW6/ouvuwJWd9ioxpjnD9jVA=
 github.com/elastic/pkcs8 v1.0.0/go.mod h1:ipsZToJfq1MxclVTwpG7U/bgeDtf+0HkUiOxebk95+0=
+<<<<<<< HEAD
+=======
+github.com/elastic/sarama v1.19.1-0.20250304185506-df6449b5c996 h1:bgsq8RD7lg4Jcn3QOqmQKhQzoUhD3N+ZKyNDRNo434U=
+github.com/elastic/sarama v1.19.1-0.20250304185506-df6449b5c996/go.mod h1:EEdpKWvuZ46X7OEOENvSH5jEJXosi4fn7xjIeTajf+M=
+>>>>>>> f951cff23 (feat(fips): bump sarama to drop kerberos lib in fips mode (#7225))
 github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153/go.mod h1:/Zj4wYkgs4iZTTu3o/KG3Itv/qCCa8VVMlb3i9OVuzc=
 github.com/emicklei/go-restful v0.0.0-20170410110728-ff4f55a20633/go.mod h1:otzb+WCGbkyDHkqmQmT5YD2WR4BBwUdeQoFo8l/7tVs=
 github.com/emicklei/go-restful v2.9.5+incompatible/go.mod h1:otzb+WCGbkyDHkqmQmT5YD2WR4BBwUdeQoFo8l/7tVs=
