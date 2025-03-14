@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -35,12 +36,11 @@ const (
 
 	// args: pipeline name, application name
 	agentMbEndpointFileFormatWin = `npipe:///elastic-agent`
-	// agentMbEndpointHTTP is used with cloud and exposes metrics on http endpoint
-	agentMbEndpointHTTP = "http://%s:%d"
-	httpPlusPrefix      = "http+"
-	httpPrefix          = "http"
-	fileSchemePrefix    = "file"
-	unixSchemePrefix    = "unix"
+
+	httpPlusPrefix   = "http+"
+	httpPrefix       = "http"
+	fileSchemePrefix = "file"
+	unixSchemePrefix = "unix"
 
 	defaultOutputName          = "default"
 	outputsKey                 = "outputs"
@@ -1134,7 +1134,7 @@ func HttpPlusAgentMonitoringEndpoint(operatingSystem string, cfg *monitoringCfg.
 // AgentMonitoringEndpoint provides an agent monitoring endpoint path.
 func AgentMonitoringEndpoint(operatingSystem string, cfg *monitoringCfg.MonitoringConfig) string {
 	if cfg != nil && cfg.Enabled {
-		return fmt.Sprintf(agentMbEndpointHTTP, cfg.HTTP.Host, cfg.HTTP.Port)
+		return "http://" + net.JoinHostPort(cfg.HTTP.Host, strconv.Itoa(cfg.HTTP.Port))
 	}
 
 	if operatingSystem == windowsOS {
