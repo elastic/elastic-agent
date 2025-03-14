@@ -62,11 +62,21 @@ locals {
   ess_region             = coalesce(var.ess_region, "gcp-us-east1")
   deployment_template_id = coalesce(var.deployment_template_id, "gcp-storage-optimized")
 
-  ess_properties = yamldecode(file("${path.module}/../../pkg/testing/ess/create_deployment_csp_configuration.yaml"))
+  ess_properties = merge(
+    {
+      docker = {
+        integration_server_image = ""
+        elasticsearch_image = ""
+        kibana_image = ""
+      }
 
-  integration_server_docker_image = coalesce(var.integration_server_docker_image, local.ess_properties.docker.integration_server_image)
-  elasticsearch_docker_image = coalesce(var.elasticsearch_docker_image, local.ess_properties.docker.elasticsearch_image)
-  kibana_docker_image = coalesce(var.kibana_docker_image, local.ess_properties.docker.kibana_image)
+    },
+    yamldecode(file("${path.module}/../../pkg/testing/ess/create_deployment_csp_configuration.yaml")))
+
+
+  integration_server_docker_image = coalesce(var.integration_server_docker_image, local.ess_properties.docker.integration_server_image, "docker.elastic.co/cloud-release/elastic-agent-cloud:${var.stack_version}")
+  elasticsearch_docker_image = coalesce(var.elasticsearch_docker_image, local.ess_properties.docker.elasticsearch_image, "docker.elastic.co/cloud-release/elasticsearch-cloud-ess:${var.stack_version}")
+  kibana_docker_image = coalesce(var.kibana_docker_image, local.ess_properties.docker.kibana_image, "docker.elastic.co/cloud-release/kibana-cloud:${var.stack_version}")
 }
 
 # If we have defined a stack version, validate that this version exists on that region and return it.
