@@ -21,12 +21,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-const (
-	saltSize = 8
-)
-
 func (v *FileVault) encrypt(data []byte) ([]byte, error) {
-	key, salt, err := deriveKey(v.seed, nil)
+	key, salt, err := deriveKey(v.seed, v.saltSize, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -38,18 +34,18 @@ func (v *FileVault) encrypt(data []byte) ([]byte, error) {
 }
 
 func (v *FileVault) decrypt(data []byte) ([]byte, error) {
-	if len(data) < saltSize {
+	if len(data) < v.saltSize {
 		return nil, syscall.EINVAL
 	}
-	salt, data := data[:saltSize], data[saltSize:]
-	key, _, err := deriveKey(v.seed, salt)
+	salt, data := data[:v.saltSize], data[v.saltSize:]
+	key, _, err := deriveKey(v.seed, v.saltSize, salt)
 	if err != nil {
 		return nil, err
 	}
 	return aesgcm.Decrypt(key, data)
 }
 
-func deriveKey(pw []byte, salt []byte) ([]byte, []byte, error) {
+func deriveKey(pw []byte, saltSize int, salt []byte) ([]byte, []byte, error) {
 	if salt == nil {
 		salt = make([]byte, saltSize)
 		if _, err := rand.Read(salt); err != nil {
