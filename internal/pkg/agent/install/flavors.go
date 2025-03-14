@@ -118,7 +118,7 @@ func ApplyFlavor(versionedHome string, flavor FlavorDefinition) error {
 	}
 
 	for _, ftr := range filesToRemove {
-		if removeErr := os.RemoveAll(ftr); !os.IsNotExist(removeErr) {
+		if removeErr := os.RemoveAll(ftr); removeErr != nil && !os.IsNotExist(removeErr) {
 			err = fmt.Errorf("failed cleaning components: %w", removeErr)
 		}
 	}
