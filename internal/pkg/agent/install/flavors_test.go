@@ -11,10 +11,11 @@ import (
 	"sort"
 	"testing"
 
-	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
+
+	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 )
 
 var flavorsRegistry = map[string][]string{
