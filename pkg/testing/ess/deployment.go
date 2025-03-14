@@ -384,5 +384,10 @@ func loadCspValues(csp string) (map[string]any, error) {
 		return nil, fmt.Errorf("csp %s not supported", csp)
 	}
 
+	// check for docker overrides
+	if dockerValues, dockerValuesFound := cspValues["docker"]; dockerValuesFound {
+		values["docker"] = dockerValues
+	}
+
 	return values, nil
 }
