@@ -366,8 +366,10 @@ spec:
           access_level: BUILD_AND_READ
         release-eng:
           access_level: BUILD_AND_READ
+        # See https://buildkite.com/docs/pipelines/configure/step-types/trigger-step#permissions
+        # Otherwise even if merge commits in main or any branch will fail
         everyone:
-          access_level: READ_ONLY
+          access_level: BUILD_AND_READ
 
 
 ---
