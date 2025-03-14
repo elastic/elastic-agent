@@ -9,7 +9,7 @@ steps:
     command: ".buildkite/scripts/steps/check-ci.sh"
     agents:
       provider: "gcp"
-      image: "family/core-ubuntu-2204"
+      image: "family/platform-ingest-elastic-agent-ubuntu-2204"
     retry:
       manual:
         allowed: true
@@ -27,7 +27,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
-          image: "family/core-ubuntu-2204"
+          image: "family/platform-ingest-elastic-agent-ubuntu-2204"
         retry:
           automatic:
             limit: 1
@@ -231,7 +231,7 @@ steps:
         command: ".buildkite/scripts/steps/k8s-tests.sh"
         agents:
           provider: "gcp"
-          image: "family/core-ubuntu-2204"
+          image: "family/platform-ingest-elastic-agent-ubuntu-2204"
         matrix:
           setup:
             k8s_version:
@@ -275,7 +275,7 @@ steps:
                 command: ".buildkite/scripts/steps/sync-k8s.sh"
                 agents:
                   provider: "gcp"
-                  image: "family/core-ubuntu-2204"
+                  image: "family/platform-ingest-elastic-agent-ubuntu-2204"
                 env:
                   - GH_VERSION=2.4.0
 
