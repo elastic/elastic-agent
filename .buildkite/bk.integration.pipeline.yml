@@ -277,13 +277,13 @@ steps:
         matrix:
           setup:
             variants:
-              - "basic,wolfi,complete,complete-wolfi,service,cloud"
+            - "basic,wolfi,complete,complete-wolfi,service,cloud"
             version:
-              - v1.27.16
-              - v1.28.9
-              - v1.29.8
-              - v1.30.8
-              - v1.31.0
+            - v1.27.16
+            - v1.28.9
+            - v1.29.8
+            - v1.30.8
+            - v1.31.0
 
   - label: ESS stack cleanup
     depends_on:
