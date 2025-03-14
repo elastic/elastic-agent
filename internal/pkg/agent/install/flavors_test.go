@@ -199,12 +199,12 @@ func TestAllowedSubpathsForFlavor(t *testing.T) {
 			assert.Equal(t, tt.wantSubpaths, subpaths)
 		})
 
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name+"-file", func(t *testing.T) {
 			tmpDir := t.TempDir()
 			manifestFile := filepath.Join(tmpDir, "manifest.yaml")
 			mb, err := yaml.Marshal(manifest)
 			require.NoError(t, err)
-			os.WriteFile(manifestFile, mb, 0o644)
+			require.NoError(t, os.WriteFile(manifestFile, mb, 0o644))
 			defer os.Remove(manifestFile)
 
 			// Create temp dir with spec files
