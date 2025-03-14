@@ -60,6 +60,8 @@ steps:
           provider: "gcp"
           machineType: "c2-standard-16"
           diskSizeGb: 400
+        env:
+          PLATFORMS: "linux/amd64 windows/amd64 darwin/amd64 darwin/arm64"
         command: |
           if [[ -z "$${MANIFEST_URL}" ]]; then
             export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
@@ -82,7 +84,7 @@ steps:
           imagePrefix: "core-ubuntu-2204-aarch64"
         env:
           PLATFORMS: "linux/arm64"
-          PACKAGES: "docker"
+          PACKAGES: "docker,tar.gz,deb,rpm"
         command: |
           echo "Add support for multiarch"
           docker run --privileged --rm tonistiigi/binfmt:master --install all

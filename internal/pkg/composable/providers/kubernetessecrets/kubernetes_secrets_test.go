@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -690,7 +692,7 @@ func Test_Run(t *testing.T) {
 			providerCfg: Config{
 				RefreshInterval: 100 * time.Millisecond,
 				RequestTimeout:  100 * time.Millisecond,
-				TTLDelete:       2 * time.Second,
+				TTLDelete:       10 * time.Second,
 				DisableCache:    false,
 			},
 			expectedSignal: true,
@@ -712,7 +714,7 @@ func Test_Run(t *testing.T) {
 			providerCfg: Config{
 				RefreshInterval: 100 * time.Millisecond,
 				RequestTimeout:  100 * time.Millisecond,
-				TTLDelete:       2 * time.Second,
+				TTLDelete:       10 * time.Second,
 				DisableCache:    false,
 			},
 			expectedSignal: false,
@@ -738,7 +740,7 @@ func Test_Run(t *testing.T) {
 				DisableCache:    false,
 			},
 			expectedSignal: true,
-			waitForSignal:  time.Second,
+			waitForSignal:  2 * time.Second,
 			k8sClient: k8sfake.NewClientset(
 				testDataBuilder.buildK8SSecret("secret_value"),
 			),
@@ -754,7 +756,7 @@ func Test_Run(t *testing.T) {
 			providerCfg: Config{
 				RefreshInterval: 100 * time.Millisecond,
 				RequestTimeout:  100 * time.Millisecond,
-				TTLDelete:       2 * time.Second,
+				TTLDelete:       10 * time.Second,
 				DisableCache:    false,
 			},
 			expectedSignal: false,
@@ -775,7 +777,7 @@ func Test_Run(t *testing.T) {
 			providerCfg: Config{
 				RefreshInterval: 100 * time.Millisecond,
 				RequestTimeout:  100 * time.Millisecond,
-				TTLDelete:       2 * time.Second,
+				TTLDelete:       10 * time.Second,
 				DisableCache:    false,
 			},
 			k8sClient:    nil,
@@ -844,13 +846,11 @@ func Test_Run(t *testing.T) {
 				receivedSignal = true
 			case <-time.After(tc.waitForSignal):
 			}
+			list := p.store.List()
 			cancel()
-
 			wg.Wait()
 
 			require.Equal(t, tc.expectedSignal, receivedSignal)
-
-			list := p.store.List()
 			require.Equal(t, len(tc.postCacheState), len(list))
 
 			cacheMap := make(map[string]secret)
@@ -860,12 +860,12 @@ func Test_Run(t *testing.T) {
 			for k, v := range tc.postCacheState {
 				inCache, exists := cacheMap[k]
 				require.True(t, exists)
-				require.Equal(t, v.s.key, inCache.key)
-				require.Equal(t, v.s.name, inCache.name)
-				require.Equal(t, v.s.namespace, inCache.namespace)
-				require.Equal(t, v.s.key, inCache.key)
-				require.Equal(t, v.s.value, inCache.value)
-				require.Equal(t, v.s.apiExists, inCache.apiExists)
+				assert.Equal(t, v.s.key, inCache.key)
+				assert.Equal(t, v.s.name, inCache.name)
+				assert.Equal(t, v.s.namespace, inCache.namespace)
+				assert.Equal(t, v.s.key, inCache.key)
+				assert.Equal(t, v.s.value, inCache.value)
+				assert.Equal(t, v.s.apiExists, inCache.apiExists)
 			}
 		})
 	}
@@ -935,6 +935,69 @@ func Test_Config(t *testing.T) {
 	}
 }
 
+func Test_FetchFromAPI(t *testing.T) {
+	for _, tc := range []struct {
+		name                    string
+		k8sClient               k8sclient.Interface
+		secretName              string
+		secretNamespace         string
+		secretKey               string
+		expectedValue           string
+		expectedResourceVersion string
+		expectedOK              bool
+	}{
+		{
+			name:      "k8s client is nil",
+			k8sClient: nil,
+		},
+		{
+			name:            "secret not found",
+			k8sClient:       k8sfake.NewClientset(),
+			secretName:      "secret_name",
+			secretNamespace: "secret_namespace",
+			secretKey:       "secret_key",
+		},
+		{
+			name: "key in secret not found",
+			k8sClient: k8sfake.NewClientset(
+				buildK8SSecret("secret_namespace", "secret_name", "secret_key", "secret_value"),
+			),
+			secretName:      "secret_name",
+			secretNamespace: "secret_namespace",
+			secretKey:       "secret_key_not_found",
+		},
+		{
+			name: "key in secret found",
+			k8sClient: k8sfake.NewClientset(
+				buildK8SSecretWithResourceVersion("secret_namespace", "secret_name", "secret_key", "secret_value", "100000"),
+			),
+			secretName:              "secret_name",
+			secretNamespace:         "secret_namespace",
+			secretKey:               "secret_key",
+			expectedValue:           "secret_value",
+			expectedResourceVersion: "100000",
+			expectedOK:              true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			provider := &contextProviderK8SSecrets{
+				logger:    logp.NewLogger("test_k8s_secrets"),
+				config:    defaultConfig(),
+				client:    tc.k8sClient,
+				clientMtx: sync.RWMutex{},
+			}
+
+			val, resourceVersion, ok := provider.fetchFromAPI(ctx, tc.secretName, tc.secretNamespace, tc.secretKey)
+			assert.Equal(t, tc.expectedValue, val)
+			assert.Equal(t, tc.expectedOK, ok)
+			assert.Equal(t, tc.expectedResourceVersion, resourceVersion)
+		})
+	}
+}
+
 type secretTestDataBuilder struct {
 	namespace string
 	name      string
@@ -976,14 +1039,19 @@ func buildCacheEntryKey(e *cacheEntry) string {
 }
 
 func buildK8SSecret(namespace string, name string, key string, value string) *v1.Secret {
+	return buildK8SSecretWithResourceVersion(namespace, name, key, value, "1")
+}
+
+func buildK8SSecretWithResourceVersion(namespace string, name string, key string, value string, resourceVersion string) *v1.Secret {
 	return &v1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: "apps/v1beta1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:            name,
+			Namespace:       namespace,
+			ResourceVersion: resourceVersion,
 		},
 		Data: map[string][]byte{
 			key: []byte(value),

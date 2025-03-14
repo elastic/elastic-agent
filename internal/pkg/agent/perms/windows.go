@@ -11,17 +11,16 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
-	"syscall"
 
 	"github.com/Microsoft/go-winio"
-	"github.com/hectane/go-acl"
-	"github.com/hectane/go-acl/api"
 	"golang.org/x/sys/windows"
 
+	"github.com/elastic/elastic-agent/internal/pkg/acl"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 // FixPermissions fixes the permissions so only SYSTEM and Administrators have access to the files in the install path
+// Note that errors such as ERROR_FILE_NOT_FOUND and ERROR_PATH_NOT_FOUND are explicitly ignored
 func FixPermissions(topPath string, opts ...OptFunc) error {
 	o, err := newOpts(opts...)
 	if err != nil {
@@ -40,7 +39,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 	}
 
 	// https://docs.microsoft.com/en-us/windows/win32/secauthz/access-mask
-	grants := make([]api.ExplicitAccess, 0, 4)
+	grants := make([]acl.ExplicitAccess, 0, 4)
 	grants = append(grants, acl.GrantSid(0xF10F0000, systemSID))         // full control of all acl's
 	grants = append(grants, acl.GrantSid(0xF10F0000, administratorsSID)) // full control of all acl's
 
@@ -79,67 +78,64 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 		return fmt.Errorf("failed to determine Administrator: %w", err)
 	}
 	if isAdmin {
-		// call to `takeOwnership` which sets the ownership information requires the current process
-		// token to have the 'SeRestorePrivilege' or it's unable to adjust the ownership
+		// since we are running as Administrator, we will change the ownership which requires SeRestorePrivilege
 		return winio.RunWithPrivileges([]string{winio.SeRestorePrivilege}, func() error {
-			return filepath.WalkDir(topPath, func(name string, _ fs.DirEntry, err error) error {
-				if err == nil {
+			return filepath.WalkDir(topPath, func(walkPath string, _ fs.DirEntry, err error) error {
+				switch {
+				case err == nil:
 					// first level doesn't inherit
-					inherit := true
-					if topPath == name {
-						inherit = false
-					}
-
-					err = acl.Apply(name, true, inherit, grants...)
-					if err != nil {
-						// Check for Errno = 0 which indicates success
-						// https://pkg.go.dev/golang.org/x/sys/windows#Errno
-						if errors.Is(err, syscall.Errno(0)) {
-							return nil
-						}
-						return err
-					}
-					if userSID != nil && groupSID != nil {
-						err = takeOwnership(name, userSID, groupSID)
-					}
-				} else if errors.Is(err, fs.ErrNotExist) {
+					inherit := topPath != walkPath
+					return applyPermissions(walkPath, true, inherit, userSID, groupSID, grants...)
+				case errors.Is(err, fs.ErrNotExist):
 					return nil
+				default:
+					return err
 				}
-				return err
 			})
 		})
 	}
 
 	// ownership cannot be changed, this will keep the ownership as it currently is but apply the ACL's
-	return filepath.WalkDir(topPath, func(name string, _ fs.DirEntry, err error) error {
-		if err == nil {
+	return filepath.WalkDir(topPath, func(walkPath string, _ fs.DirEntry, err error) error {
+		switch {
+		case err == nil:
 			// first level doesn't inherit
-			inherit := true
-			if topPath == name {
-				inherit = false
-			}
-			err = acl.Apply(name, true, inherit, grants...)
-			// Check for Errno = 0 which indicates success
-			// https://pkg.go.dev/golang.org/x/sys/windows#Errno
-			if errors.Is(err, syscall.Errno(0)) {
-				return nil
-			}
-			return err
-		} else if errors.Is(err, fs.ErrNotExist) {
+			inherit := topPath != walkPath
+			return applyPermissions(walkPath, true, inherit, nil, nil, grants...)
+		case errors.Is(err, fs.ErrNotExist):
 			return nil
+		default:
+			return err
 		}
-		return err
 	})
 }
 
-func takeOwnership(name string, owner *windows.SID, group *windows.SID) error {
-	return api.SetNamedSecurityInfo(
-		name,
-		api.SE_FILE_OBJECT,
-		api.OWNER_SECURITY_INFORMATION|api.GROUP_SECURITY_INFORMATION,
-		owner,
-		group,
-		0,
-		0,
-	)
+// applyPermissions applies the provided access control entries to a path. When the given userSID or groupSID are not nil,
+// it also sets the ownership information which requires the current process token to have the 'SeRestorePrivilege'.
+// If you are not running as Administrator, pass nil for userSID and/or groupSID. Note that windows.ERROR_FILE_NOT_FOUND and
+// windows.ERROR_PATH_NOT_FOUND are explicitly ignored.
+func applyPermissions(path string, replace bool, inherit bool, userSID *windows.SID, groupSID *windows.SID, entries ...acl.ExplicitAccess) error {
+	if err := acl.Apply(path, replace, inherit, entries...); err != nil {
+		return filterNotFoundErrno(fmt.Errorf("apply ACL for %s failed: %w", path, err))
+	}
+	if userSID != nil && groupSID != nil {
+		if err := acl.TakeOwnership(path, userSID, groupSID); err != nil {
+			return filterNotFoundErrno(fmt.Errorf("take ownership for %s failed: %w", path, err))
+		}
+	}
+	return nil
+}
+
+// filterNotFoundErrno returns the given error if it is not an ERROR_FILE_NOT_FOUND or ERROR_PATH_NOT_FOUND
+func filterNotFoundErrno(err error) error {
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, windows.ERROR_FILE_NOT_FOUND):
+		return nil
+	case errors.Is(err, windows.ERROR_PATH_NOT_FOUND):
+		return nil
+	default:
+		return err
+	}
 }
