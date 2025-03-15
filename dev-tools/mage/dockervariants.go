@@ -18,6 +18,8 @@ const (
 	completeWolfi = "complete-wolfi"
 	cloud         = "cloud"
 	service       = "service"
+	edotCollector = "edot-collector"
+	slim          = "slim"
 )
 
 // DockerVariant defines the docker variant to build.
@@ -33,6 +35,8 @@ const (
 	Complete
 	Cloud
 	Service
+	EdotCollector
+	Slim
 )
 
 // String returns the name of the docker variant type.
@@ -54,6 +58,10 @@ func (typ DockerVariant) String() string {
 		return cloud
 	case Service:
 		return service
+	case EdotCollector:
+		return edotCollector
+	case Slim:
+		return slim
 	default:
 		return invalid
 	}
@@ -83,6 +91,10 @@ func (typ *DockerVariant) UnmarshalText(text []byte) error {
 		*typ = Cloud
 	case service:
 		*typ = Service
+	case edotCollector:
+		*typ = EdotCollector
+	case slim:
+		*typ = Slim
 	default:
 		return fmt.Errorf("unknown docker variant: %v", string(text))
 	}

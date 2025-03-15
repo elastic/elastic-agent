@@ -109,7 +109,7 @@ LABEL \
   maintainer="infra@elastic.co" \
   name="{{ .BeatName }}" \
   vendor="{{ .BeatVendor }}" \
-  version="{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}" \
+  version="{{ agent_package_version }}{{if .Snapshot}}-SNAPSHOT{{end}}" \
   release="1" \
   url="{{ .BeatURL }}" \
   summary="{{ .BeatName }}" \
