@@ -115,23 +115,11 @@ type Manager struct {
 	// to the internal run loop.
 	updateChan chan component.Model
 
-	// Component model update is run asynchronously and pings this channel when
-	// finished, so the runtime manager loop knows it's safe to advance to the
-	// next update without ever having to block on the result.
-	updateDoneChan chan struct{}
-
 	// Next component model update that will be applied, in case we get one
 	// while a previous update is still in progress. If we get more than one,
 	// keep only the most recent.
 	// Only access from the main runtime manager goroutine.
 	nextUpdate *component.Model
-
-	// Whether we're already waiting on the results of an update call.
-	// If this is true when the run loop finishes, we need to wait for the
-	// final update result before shutting down, otherwise the shutdown's
-	// update call will conflict.
-	// Only access from the main runtime manager goroutine.
-	updateInProgress bool
 
 	// currentMx protects access to the current map only
 	currentMx sync.RWMutex
@@ -176,22 +164,21 @@ func NewManager(
 	logger.With("address", listenAddr).Infof("GRPC comms socket listening at %s", listenAddr)
 
 	m := &Manager{
-		logger:         logger,
-		baseLogger:     baseLogger,
-		ca:             ca,
-		listenAddr:     listenAddr,
-		isLocal:        ipc.IsLocal(listenAddr),
-		agentInfo:      agentInfo,
-		tracer:         tracer,
-		current:        make(map[string]*componentRuntimeState),
-		subscriptions:  make(map[string][]*Subscription),
-		updateChan:     make(chan component.Model),
-		updateDoneChan: make(chan struct{}),
-		errCh:          make(chan error),
-		monitor:        monitor,
-		grpcConfig:     grpcConfig,
-		serverReady:    make(chan struct{}),
-		doneChan:       make(chan struct{}),
+		logger:        logger,
+		baseLogger:    baseLogger,
+		ca:            ca,
+		listenAddr:    listenAddr,
+		isLocal:       ipc.IsLocal(listenAddr),
+		agentInfo:     agentInfo,
+		tracer:        tracer,
+		current:       make(map[string]*componentRuntimeState),
+		subscriptions: make(map[string][]*Subscription),
+		updateChan:    make(chan component.Model),
+		errCh:         make(chan error),
+		monitor:       monitor,
+		grpcConfig:    grpcConfig,
+		serverReady:   make(chan struct{}),
+		doneChan:      make(chan struct{}),
 	}
 	return m, nil
 }
@@ -282,6 +269,8 @@ func (m *Manager) Run(ctx context.Context) error {
 //   - Close doneChan when the loop ends, so the Coordinator knows not to send
 //     any more updates
 func (m *Manager) runLoop(ctx context.Context) {
+	var updateInProgress bool
+	updateDoneChan := make(chan struct{})
 LOOP:
 	for ctx.Err() == nil {
 		select {
@@ -291,14 +280,14 @@ LOOP:
 			// We got a new component model from m.Update(), mark it as the
 			// next update to apply, overwriting any previous pending value.
 			m.nextUpdate = &model
-		case <-m.updateDoneChan:
+		case <-updateDoneChan:
 			// An update call has finished, we can initiate another when available.
-			m.updateInProgress = false
+			updateInProgress = false
 		}
 
 		// After each select call, check if there's a pending update that
 		// can be applied.
-		if m.nextUpdate != nil && !m.updateInProgress {
+		if m.nextUpdate != nil && !updateInProgress {
 			// There is a component model update available, apply it.
 			go func(model component.Model) {
 				// Run the update with tearDown set to true since this is coming
@@ -315,9 +304,9 @@ LOOP:
 				// we don't select on ctx.Done() in this case because the runtime
 				// manager always reads the results of an update once initiated,
 				// even if it is shutting down.
-				m.updateDoneChan <- struct{}{}
+				updateDoneChan <- struct{}{}
 			}(*m.nextUpdate)
-			m.updateInProgress = true
+			updateInProgress = true
 			m.nextUpdate = nil
 		}
 	}
@@ -326,12 +315,11 @@ LOOP:
 	// it might be stuck trying to send the result to errCh.
 	close(m.doneChan)
 
-	if m.updateInProgress {
+	if updateInProgress {
 		// Wait for the existing update to finish before shutting down,
 		// otherwise the new update call closing everything will
 		// conflict.
-		<-m.updateDoneChan
-		m.updateInProgress = false
+		<-updateDoneChan
 	}
 }
 
