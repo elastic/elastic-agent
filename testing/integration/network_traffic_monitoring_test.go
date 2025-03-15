@@ -9,7 +9,6 @@ package integration
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -24,7 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 )
 
-type MetricsRunner struct {
+type NetworkTrafficRunner struct {
 	suite.Suite
 	info         *define.Info
 	agentFixture *atesting.Fixture
@@ -32,7 +31,7 @@ type MetricsRunner struct {
 	ESHost string
 }
 
-func TestMetricsMonitoringCorrectBinaries(t *testing.T) {
+func TestNetworkTraffic(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Fleet,
 		Stack: &define.Stack{},
@@ -44,10 +43,10 @@ func TestMetricsMonitoringCorrectBinaries(t *testing.T) {
 		},
 	})
 
-	suite.Run(t, &MetricsRunner{info: info})
+	suite.Run(t, &NetworkTrafficRunner{info: info})
 }
 
-func (runner *MetricsRunner) SetupSuite() {
+func (runner *NetworkTrafficRunner) SetupSuite() {
 	fixture, err := define.NewFixtureFromLocalBuild(runner.T(), define.Version())
 	require.NoError(runner.T(), err)
 	runner.agentFixture = fixture
@@ -55,7 +54,7 @@ func (runner *MetricsRunner) SetupSuite() {
 	policyUUID := uuid.Must(uuid.NewV4()).String()
 	basePolicy := kibana.AgentPolicy{
 		Name:        "test-policy-" + policyUUID,
-		Namespace:   "default",
+		Namespace:   runner.info.Namespace,
 		Description: "Test policy " + policyUUID,
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
 			kibana.MonitoringEnabledLogs,
@@ -72,32 +71,22 @@ func (runner *MetricsRunner) SetupSuite() {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
-	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
+	policyResp, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
 
-	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "system", "1.53.1", "system_integration_setup.json", uuid.Must(uuid.NewV4()).String(), policyResp.ID)
+	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "network_traffic", "1.32.1", "network_traffic_package.json", uuid.Must(uuid.NewV4()).String(), policyResp.ID)
 	require.NoError(runner.T(), err)
 
 }
 
-func (runner *MetricsRunner) TestBeatsMetrics() {
+func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 	t := runner.T()
 
-	UnitOutputName := "default"
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*20)
 	defer cancel()
 
 	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
 	require.NoError(t, err, "could not to get agent status")
-
-	componentIds := []string{
-		fmt.Sprintf("system/metrics-%s", UnitOutputName),
-		fmt.Sprintf("log-%s", UnitOutputName),
-		"beat/metrics-monitoring",
-		"elastic-agent",
-		"http/metrics-monitoring",
-		"filestream-monitoring",
-	}
 
 	now := time.Now()
 	var query map[string]any
@@ -117,52 +106,16 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 
 	t.Logf("starting to ES for metrics at %s", now.Format(time.RFC3339Nano))
 	require.Eventually(t, func() bool {
-		for _, cid := range componentIds {
-			query = genESQuery(agentStatus.Info.ID,
-				[][]string{
-					{"match", "component.id", cid},
-					{"exists", "field", "system.process.cpu.total.value"},
-					{"exists", "field", "system.process.memory.size"},
-				})
-			now = time.Now()
-			res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
-			require.NoError(t, err)
-			t.Logf("Fetched metrics for %s, got %d hits", cid, res.Hits.Total.Value)
-			if res.Hits.Total.Value < 1 {
-				return false
-			}
+		query = genESQuery(agentStatus.Info.ID,
+			[][]string{
+				{"exists", "field", "tls.client.server_name"},
+			})
+		now = time.Now()
+		res, err := estools.PerformQueryForRawQuery(ctx, query, "logs-network_traffic.tls*", runner.info.ESClient)
+		require.NoError(t, err)
+		if res.Hits.Total.Value < 1 {
+			return false
 		}
 		return true
-	}, time.Minute*10, time.Second*10, "could not fetch metrics for all known components in default install: %v", componentIds)
-}
-
-func genESQuery(agentID string, requiredFields [][]string) map[string]interface{} {
-	fieldsQ := make([]map[string]interface{}, 0, 2+len(requiredFields))
-	fieldsQ = append(fieldsQ, map[string]interface{}{
-		"match": map[string]interface{}{
-			"agent.id": agentID,
-		},
-	})
-	for _, f := range requiredFields {
-		if len(f) != 3 {
-			continue
-		}
-		fieldsQ = append(fieldsQ,
-			map[string]interface{}{
-				f[0]: map[string]interface{}{
-					f[1]: f[2],
-				},
-			})
-	}
-
-	// see https://github.com/elastic/kibana/blob/main/x-pack/plugins/fleet/server/services/agents/agent_metrics.ts
-	queryRaw := map[string]interface{}{
-		"query": map[string]interface{}{
-			"bool": map[string]interface{}{
-				"must": fieldsQ,
-			},
-		},
-	}
-
-	return queryRaw
+	}, time.Minute*10, time.Second*10, "could not fetch events for network_traffic")
 }
