@@ -13,10 +13,18 @@ require (
 	github.com/docker/docker v27.5.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
+<<<<<<< HEAD
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.1
 	github.com/elastic/elastic-agent-libs v0.18.8
 	github.com/elastic/elastic-agent-system-metrics v0.11.8
+=======
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250311090720-d0d0bce5f75d
+	github.com/elastic/elastic-agent-autodiscover v0.9.0
+	github.com/elastic/elastic-agent-client/v7 v7.17.1
+	github.com/elastic/elastic-agent-libs v0.18.10
+	github.com/elastic/elastic-agent-system-metrics v0.11.9
+>>>>>>> a283180e6 (enhancement(5039): update beats version (#7310))
 	github.com/elastic/elastic-transport-go/v8 v8.6.1
 	github.com/elastic/go-elasticsearch/v8 v8.17.1
 	github.com/elastic/go-licenser v0.4.2
@@ -222,6 +230,12 @@ require (
 	github.com/docker/docker-credential-helpers v0.7.0 // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-metrics v0.0.1 // indirect
+<<<<<<< HEAD
+=======
+	github.com/dop251/goja v0.0.0-20250309171923-bcd7cc6bf64c // indirect
+	github.com/dop251/goja_nodejs v0.0.0-20250309172600-86a40d630cdd // indirect
+	github.com/dustin/go-humanize v1.0.1 // indirect
+>>>>>>> a283180e6 (enhancement(5039): update beats version (#7310))
 	github.com/eapache/go-resiliency v1.7.0 // indirect
 	github.com/eapache/go-xerial-snappy v0.0.0-20230731223053-c322873962e3 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
@@ -557,6 +571,7 @@ require (
 
 replace (
 	github.com/dop251/goja => github.com/elastic/goja v0.0.0-20190128172624-dd2ac4456e20
+	github.com/dop251/goja_nodejs => github.com/dop251/goja_nodejs v0.0.0-20171011081505-adff31b136e6
 	// fsnotify and goja are required for beats import
 	github.com/fsnotify/fsnotify => github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3
 	// openshift removed all tags from their repo, use the pseudoversion from the release-3.9 branch HEAD
