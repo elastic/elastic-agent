@@ -57,6 +57,17 @@ steps:
       env:
         DRA_WORKFLOW: "snapshot"
 
+    - label: ":hammer: Publish helm chart snapshot"
+      trigger: elastic-agent-helm-charts
+      if: build.env("BUILDKITE_BRANCH") != "8.16" && build.env("BUILDKITE_BRANCH") != "8.17"
+      build:
+        branch: "${BUILDKITE_BRANCH}"
+        commit: "${BUILDKITE_COMMIT}"
+        message: "publish helm-chart for elastic-agent in dev (snapshot)"
+        env:
+          SNAPSHOT: "true"
+          HELM_REPO_ENV: "dev"
+
   - group: ":beats: DRA Elastic-Agent Core Staging :beats:"
     key: "dra-core-staging"
     if: build.branch =~ /^[0-9]+\.[0-9x]+\$/ || build.env("RUN_STAGING") == "true" || build.env('VERSION_QUALIFIER') != null
@@ -107,6 +118,17 @@ steps:
         machineType: "c2-standard-16"
       env:
         DRA_WORKFLOW: "staging"
+
+    - label: ":hammer: Publish helm chart staging"
+      trigger: elastic-agent-helm-charts
+      if: build.env("BUILDKITE_BRANCH") != "8.16" && build.env("BUILDKITE_BRANCH") != "8.17"
+      build:
+        branch: "${BUILDKITE_BRANCH}"
+        commit: "${BUILDKITE_COMMIT}"
+        message: "publish helm-chart for elastic-agent in dev (staging)"
+        env:
+          SNAPSHOT: "false"
+          HELM_REPO_ENV: "dev"
 
 notify:
   - slack: "#ingest-notifications"
