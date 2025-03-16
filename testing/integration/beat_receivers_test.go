@@ -220,11 +220,6 @@ func TestAgentMonitoring(t *testing.T) {
 }
 
 func TestMonitoringOTelLogs(t *testing.T) {
-	require.NotPanics(
-		t, func() {
-			_ = logsEADocs.Hits.Hits[0].Source
-		}, "monitoring logs from elastic-agent should exist before proceeding",
-	)
 	// This test compares the docs ingested with self monitoring in otel mode
 	info := define.Require(t, define.Requirements{
 		Group: Default,
@@ -235,6 +230,13 @@ func TestMonitoringOTelLogs(t *testing.T) {
 		},
 		Stack: &define.Stack{},
 	})
+
+	// Not proceed with this test if monitoring logs from elastic-agent do not exist
+	require.NotPanics(
+		t, func() {
+			_ = logsEADocs.Hits.Hits[0].Source
+		}, "monitoring logs from elastic-agent should exist before proceeding",
+	)
 
 	fbReceiverMonitoringIndex := "logs-elastic_agent-monitoringotel"
 
