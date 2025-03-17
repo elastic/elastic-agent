@@ -227,6 +227,7 @@ func TestMonitoringOTelLogs(t *testing.T) {
 		OS: []define.OS{
 			{Type: define.Linux},
 			{Type: define.Darwin},
+			Sudo: true,
 		},
 		Stack: &define.Stack{},
 	})
