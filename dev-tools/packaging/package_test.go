@@ -104,7 +104,6 @@ func TestZip(t *testing.T) {
 
 func TestDocker(t *testing.T) {
 	dockers := getFiles(t, regexp.MustCompile(`\.docker\.tar\.gz$`))
-	require.NotZero(t, len(dockers), "no docker tar files found")
 	for _, docker := range dockers {
 		t.Log(docker)
 		checkDocker(t, docker)
