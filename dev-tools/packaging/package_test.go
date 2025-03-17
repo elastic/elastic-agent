@@ -51,6 +51,7 @@ const (
 var (
 	excludedPathsPattern   = regexp.MustCompile(`node_modules`)
 	configFilePattern      = regexp.MustCompile(`.*beat\.spec.yml$|.*beat\.yml$|apm-server\.yml|elastic-agent\.yml$$`)
+	otelcolScriptPattern   = regexp.MustCompile(`/otelcol$`)
 	manifestFilePattern    = regexp.MustCompile(`manifest.yml`)
 	modulesDirPattern      = regexp.MustCompile(`module/.+`)
 	modulesDDirPattern     = regexp.MustCompile(`modules.d/$`)
@@ -293,7 +294,8 @@ func checkDocker(t *testing.T, file string) {
 	checkDockerEntryPoint(t, p, info)
 	checkDockerLabels(t, p, info, file)
 	checkDockerUser(t, p, info, *rootUserContainer)
-	checkConfigPermissionsWithMode(t, p, configFilePattern, os.FileMode(0644))
+	checkFilePermissions(t, p, configFilePattern, os.FileMode(0644))
+	checkFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
 	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
 	checkModulesPresent(t, "", p)
 	checkModulesDPresent(t, "", p)
@@ -302,11 +304,11 @@ func checkDocker(t *testing.T, file string) {
 
 // Verify that the main configuration file is installed with a 0600 file mode.
 func checkConfigPermissions(t *testing.T, p *packageFile) {
-	checkConfigPermissionsWithMode(t, p, configFilePattern, expectedConfigMode)
+	checkFilePermissions(t, p, configFilePattern, expectedConfigMode)
 }
 
-func checkConfigPermissionsWithMode(t *testing.T, p *packageFile, configPattern *regexp.Regexp, expectedMode os.FileMode) {
-	t.Run(p.Name+" config file permissions", func(t *testing.T) {
+func checkFilePermissions(t *testing.T, p *packageFile, configPattern *regexp.Regexp, expectedMode os.FileMode) {
+	t.Run(p.Name+" file permissions", func(t *testing.T) {
 		for _, entry := range p.Contents {
 			if configPattern.MatchString(entry.File) {
 				mode := entry.Mode.Perm()
