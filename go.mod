@@ -16,8 +16,8 @@ require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250218044933-ef79280d53a2
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.1
-	github.com/elastic/elastic-agent-libs v0.18.8
-	github.com/elastic/elastic-agent-system-metrics v0.11.8
+	github.com/elastic/elastic-agent-libs v0.18.10
+	github.com/elastic/elastic-agent-system-metrics v0.11.9
 	github.com/elastic/elastic-transport-go/v8 v8.6.1
 	github.com/elastic/go-elasticsearch/v8 v8.17.1
 	github.com/elastic/go-licenser v0.4.2
@@ -163,8 +163,8 @@ require (
 	github.com/Azure/azure-event-hubs-go/v3 v3.6.1 // indirect
 	github.com/Azure/azure-pipeline-go v0.2.3 // indirect
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.14.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.7.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.17.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.8.2 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.10.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/messaging/azeventhubs v1.2.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5 v5.7.0 // indirect
@@ -183,7 +183,7 @@ require (
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
-	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2 // indirect
+	github.com/AzureAD/microsoft-authentication-library-for-go v1.3.3 // indirect
 	github.com/BurntSushi/toml v1.4.1-0.20240526193622-a339e1f7089c // indirect
 	github.com/Code-Hex/go-generics-cache v1.5.1 // indirect
 	github.com/DataDog/zstd v1.5.6 // indirect
@@ -658,6 +658,7 @@ require (
 
 replace (
 	github.com/dop251/goja => github.com/elastic/goja v0.0.0-20190128172624-dd2ac4456e20
+	github.com/dop251/goja_nodejs => github.com/dop251/goja_nodejs v0.0.0-20171011081505-adff31b136e6
 	// fsnotify and goja are required for beats import
 	github.com/fsnotify/fsnotify => github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3
 	// v0.0.0-20250317163643-19cd4e80024f is equivalent to the upstream v0.120.0 release with the Prometheus 0.300 dependency update removed, as it introduced unwanted breaking changes that conflict with Beats.
