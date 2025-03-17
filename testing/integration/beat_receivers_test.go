@@ -230,12 +230,12 @@ func TestAgentMonitoring(t *testing.T) {
 			Sudo:  true,
 		})
 
-		// // Not proceed with this test if monitoring logs from elastic-agent do not exist
-		// require.NotPanics(
-		// 	t, func() {
-		// 		_ = logsEADocs.Hits.Hits[0].Source
-		// 	}, "monitoring logs from elastic-agent should exist before proceeding",
-		// )
+		// Not proceed with this test if monitoring logs from elastic-agent do not exist
+		require.NotPanics(
+			t, func() {
+				_ = logsEADocs.Hits.Hits[0].Source
+			}, "monitoring logs from elastic-agent should exist before proceeding",
+		)
 
 		fbReceiverMonitoringIndex := "logs-elastic_agent-monitoringotel"
 
