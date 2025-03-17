@@ -533,7 +533,7 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 		typeKey           = "type"
 		idKey             = "id"
 		useOutputKey      = "use_output"
-		runtimeManagerKey = "runtime"
+		runtimeManagerKey = "_runtime_experimental"
 	)
 
 	// intermediate structure for output to input mapping (this structure allows different input types per output)

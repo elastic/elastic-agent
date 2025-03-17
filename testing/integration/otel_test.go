@@ -22,6 +22,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1031,7 +1033,7 @@ func TestOtelFilestreamInput(t *testing.T) {
   - type: filestream
     id: filestream-e2e
     use_output: default
-    runtime: otel
+    _runtime_experimental: otel
     streams:
       - id: e2e
         data_stream:
