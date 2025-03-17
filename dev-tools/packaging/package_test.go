@@ -49,27 +49,15 @@ const (
 )
 
 var (
-<<<<<<< HEAD
 	excludedPathsPattern   = regexp.MustCompile(`node_modules`)
 	configFilePattern      = regexp.MustCompile(`.*beat\.spec.yml$|.*beat\.yml$|apm-server\.yml|elastic-agent\.yml$$`)
+	otelcolScriptPattern   = regexp.MustCompile(`/otelcol$`)
 	manifestFilePattern    = regexp.MustCompile(`manifest.yml`)
 	modulesDirPattern      = regexp.MustCompile(`module/.+`)
 	modulesDDirPattern     = regexp.MustCompile(`modules.d/$`)
 	modulesDFilePattern    = regexp.MustCompile(`modules.d/.+`)
 	monitorsDFilePattern   = regexp.MustCompile(`monitors.d/.+`)
 	systemdUnitFilePattern = regexp.MustCompile(`/lib/systemd/system/.*\.service`)
-=======
-	excludedPathsPattern    = regexp.MustCompile(`node_modules`)
-	configFilePattern       = regexp.MustCompile(`.*beat\.spec.yml$|.*beat\.yml$|apm-server\.yml|elastic-agent\.yml$$`)
-	otelcolScriptPattern    = regexp.MustCompile(`/otelcol$`)
-	manifestFilePattern     = regexp.MustCompile(`manifest.yml`)
-	modulesDirPattern       = regexp.MustCompile(`module/.+`)
-	modulesDDirPattern      = regexp.MustCompile(`modules.d/$`)
-	modulesDFilePattern     = regexp.MustCompile(`modules.d/.+`)
-	monitorsDFilePattern    = regexp.MustCompile(`monitors.d/.+`)
-	systemdUnitFilePattern  = regexp.MustCompile(`/lib/systemd/system/.*\.service`)
-	hintsInputsDFilePattern = regexp.MustCompile(`usr/share/elastic-agent/hints.inputs.d/.*\.yml`)
->>>>>>> 456bcdad8 (fix(docker): make `otelcol` executable (#7345))
 
 	licenseFiles = []string{"LICENSE.txt", "NOTICE.txt"}
 )
@@ -116,6 +104,7 @@ func TestZip(t *testing.T) {
 
 func TestDocker(t *testing.T) {
 	dockers := getFiles(t, regexp.MustCompile(`\.docker\.tar\.gz$`))
+	require.NotZero(t, len(dockers), "no docker tar files found")
 	for _, docker := range dockers {
 		t.Log(docker)
 		checkDocker(t, docker)
