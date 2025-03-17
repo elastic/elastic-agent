@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"runtime"
 	"testing"
 	"text/template"
 	"time"
@@ -42,24 +43,24 @@ var (
 // will be expanded in the future to compare with beats receivers for
 // elastic-agent monitoring.
 func TestAgentMonitoring(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Linux},
+			{Type: define.Darwin},
+			{Type: define.Windows},
+		},
+		Stack: &define.Stack{},
+		Sudo:  true,
+	})
+
 	// Flow
 	// 1. Create and install policy with just monitoring
 	// 2. Download the policy, add the API key
 	// 3. Install without enrolling in fleet
 	// 4. Make sure logs and metrics for agent monitoring are being received
 	t.Run("verify elastic-agent monitoring functionality", func(t *testing.T) {
-		info := define.Require(t, define.Requirements{
-			Group: Default,
-			Local: true,
-			OS: []define.OS{
-				{Type: define.Windows},
-				{Type: define.Linux},
-				{Type: define.Darwin},
-			},
-			Stack: &define.Stack{},
-			Sudo:  true,
-		})
-
 		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
 		defer cancel()
 
@@ -219,18 +220,11 @@ func TestAgentMonitoring(t *testing.T) {
 	})
 
 	t.Run("compare logs ingested by agent monitoring vs otel monitoring", func(t *testing.T) {
-		info := define.Require(t, define.Requirements{
-			Group: Default,
-			Local: true,
-			OS: []define.OS{
-				{Type: define.Linux},
-				{Type: define.Darwin},
-			},
-			Stack: &define.Stack{},
-			Sudo:  true,
-		})
+		if runtime.GOOS == "windows" {
+			t.Skip("skipping this test on windows for now")
+		}
 
-		// Not proceed with this test if monitoring logs from elastic-agent do not exist
+		// Not proceed with this test if monitoring logs from elastic-agent does not exist
 		require.NotPanics(
 			t, func() {
 				_ = logsEADocs.Hits.Hits[0].Source
@@ -253,6 +247,13 @@ func TestAgentMonitoring(t *testing.T) {
 		require.NoError(t, err, "error creating API key")
 		require.NotEmptyf(t, esApiKey.Encoded, "api key is invalid %q", esApiKey)
 
+		var inputPath string
+		if runtime.GOOS == "linux" {
+			inputPath = "/opt/Elastic/Agent/data/elastic-agent-*/logs"
+		} else if runtime.GOOS == "darwin" {
+			inputPath = "/Library/Elastic/Agent/data/elastic-agent-*/logs"
+		}
+
 		// Start monitoring in otel mode
 		fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 		require.NoError(t, err)
@@ -263,13 +264,9 @@ func TestAgentMonitoring(t *testing.T) {
 		err = fixture.Prepare(ctx)
 		require.NoError(t, err)
 
-		// Get the running dir
-		inputPath, err := fixture.GetRunningDir(ctx)
 		socketEndpoint := utils.SocketURLWithFallback(uuid.Must(uuid.NewV4()).String(), paths.TempDir())
 
 		configTemplateOTel := `
-agent.grpc:
-  port: 6792	
 receivers:
   filebeatreceiver/filestream-monitoring:
     filebeat:
@@ -278,8 +275,8 @@ receivers:
           enabled: true
           id: filestream-monitoring-agent
           paths:
-            - {{.InputPath}}/data/elastic-agent-*/logs/elastic-agent-*.ndjson
-            - {{.InputPath}}/data/elastic-agent-*/logs/elastic-agent-watcher-*.ndjson
+            -  {{.InputPath}}/elastic-agent-*.ndjson 
+            -  {{.InputPath}}/elastic-agent-watcher-*.ndjson
           close:
             on_state_change:
               inactive: 5m	  
@@ -385,7 +382,6 @@ service:
       exporters:
         - elasticsearch/log  
 `
-
 		var configBuffer bytes.Buffer
 		template.Must(template.New("config").Parse(configTemplateOTel)).Execute(&configBuffer,
 			configOptions{
