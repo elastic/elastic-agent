@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source .buildkite/scripts/common2.sh
-
+source .buildkite/scripts/common-integration.sh
 source .buildkite/scripts/steps/ess.sh
 
-OVERRIDE_STACK_VERSION="$(cat .package-version)"
-OVERRIDE_STACK_VERSION=${OVERRIDE_STACK_VERSION}"-SNAPSHOT"
+OVERRIDE_STACK_VERSION="$(getStableEssSnapshotForBranch)-SNAPSHOT"
 
 ess_up $OVERRIDE_STACK_VERSION
 
