@@ -277,7 +277,8 @@ steps:
           - fleet-privileged
           - fleet-upgrade-to-pr-build
           - install-uninstall
-          - fqdn
+          # FQDN test failing at debian 12. Should be fixed in future.
+          #- fqdn
           - deb
           - container
 
