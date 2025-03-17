@@ -249,8 +249,8 @@ func TestToComponents(t *testing.T) {
 				},
 				"inputs": []interface{}{
 					map[string]interface{}{
-						"type":    "filestream",
-						"runtime": 0,
+						"type":                  "filestream",
+						"_runtime_experimental": 0,
 					},
 				},
 			},
@@ -268,8 +268,8 @@ func TestToComponents(t *testing.T) {
 				},
 				"inputs": []interface{}{
 					map[string]interface{}{
-						"type":    "filestream",
-						"runtime": "invalid",
+						"type":                  "filestream",
+						"_runtime_experimental": "invalid",
 					},
 				},
 			},
@@ -949,14 +949,14 @@ func TestToComponents(t *testing.T) {
 						"id":   "filestream-0",
 					},
 					map[string]interface{}{
-						"type":    "filestream",
-						"id":      "filestream-1",
-						"runtime": "process",
+						"type":                  "filestream",
+						"id":                    "filestream-1",
+						"_runtime_experimental": "process",
 					},
 					map[string]interface{}{
-						"type":    "filestream",
-						"id":      "filestream-2",
-						"runtime": "otel",
+						"type":                  "filestream",
+						"id":                    "filestream-2",
+						"_runtime_experimental": "otel",
 					},
 				},
 			},

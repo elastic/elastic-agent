@@ -1008,7 +1008,7 @@ inputs:
   - id: test-input
     type: filestream
     use_output: default
-    runtime: otel
+    _runtime_experimental: otel
   - id: test-other-input
     type: system/metrics
     use_output: default
