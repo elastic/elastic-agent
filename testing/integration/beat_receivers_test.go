@@ -77,7 +77,6 @@ func TestAgentMonitoring(t *testing.T) {
 		NonInteractive: true,
 		Privileged:     true,
 		Force:          true,
-		Develop:        true,
 	}
 
 	// Flow
@@ -175,7 +174,7 @@ func TestAgentMonitoring(t *testing.T) {
 		for _, tc := range tests {
 			require.Eventuallyf(t,
 				func() bool {
-					findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+					findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
 					defer findCancel()
 					mustClauses := []map[string]any{
 						{"match": map[string]any{"data_stream.type": tc.dsType}},
@@ -423,7 +422,7 @@ service:
 		tc := tests[0]
 		require.Eventuallyf(t,
 			func() bool {
-				findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
 				defer findCancel()
 				mustClauses := []map[string]any{
 					{"match": map[string]any{"message": tc.message}},
