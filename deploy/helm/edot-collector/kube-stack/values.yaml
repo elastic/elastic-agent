@@ -16,7 +16,7 @@ crds:
   create: true # Install the OpenTelemetry Operator CRDs.
 defaultCRConfig:
   image:
-    repository: "docker.elastic.co/elastic-agent/elastic-agent"
+    repository: "docker.elastic.co/elastic-agent/elastic-otel-collector"
     tag: "9.1.0"
   targetAllocator:
     enabled: false # Enable/disable the Operator's Target allocator.
@@ -33,9 +33,6 @@ collectors:
   #  Cluster is a K8s deployment EDOT collector focused on gathering telemetry
   #  at the cluster level (Kubernetes Events and cluster metrics).
   cluster:
-    env:
-      - name: ELASTIC_AGENT_OTEL
-        value: '"true"'
     config:
       exporters:
         # [Debug exporter](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/debugexporter/README.md)
@@ -188,8 +185,6 @@ collectors:
       # Work around for open /mounts error: https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/35990
       - name: HOST_PROC_MOUNTINFO
         value: ""
-      - name: ELASTIC_AGENT_OTEL
-        value: '"true"'
     presets:
       logsCollection:
         enabled: true # Enable/disable the collection of node's logs.
@@ -536,8 +531,6 @@ collectors:
     replicas: 2
     enabled: true
     env:
-      - name: ELASTIC_AGENT_OTEL
-        value: '"true"'
       - name: ELASTIC_ENDPOINT
         valueFrom:
           secretKeyRef:
