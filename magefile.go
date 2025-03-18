@@ -32,6 +32,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/mod/modfile"
+	"golang.org/x/mod/module"
+
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/otiai10/copy"
 
@@ -3271,23 +3274,25 @@ func (Otel) Readme() error {
 
 func getOtelDependencies() (*otelDependencies, error) {
 	// read go.mod
-	readFile, err := os.Open("go.mod")
+	goModBytes, err := os.ReadFile("go.mod")
 	if err != nil {
 		return nil, err
 	}
-	defer readFile.Close()
 
-	scanner := bufio.NewScanner(readFile)
+	modFile, err := modfile.Parse("go.mod", goModBytes, nil)
+	if err != nil {
+		return nil, err
+	}
 
-	scanner.Split(bufio.ScanLines)
 	var receivers, extensions, exporters, processors, connectors []*otelDependency
 	// process imports
-	for scanner.Scan() {
-		l := strings.TrimSpace(scanner.Text())
-		dependency := newOtelDependency(l)
+	pathToDep := make(map[string]*otelDependency)
+	for _, req := range modFile.Require {
+		dependency := newOtelDependency(req)
 		if dependency == nil {
 			continue
 		}
+		pathToDep[req.Mod.Path] = dependency
 
 		if dependency.ComponentType == "connector" {
 			connectors = append(connectors, dependency)
@@ -3299,6 +3304,14 @@ func getOtelDependencies() (*otelDependencies, error) {
 			processors = append(processors, dependency)
 		} else if dependency.ComponentType == "receiver" {
 			receivers = append(receivers, dependency)
+		}
+	}
+
+	// take care of replaces
+	for _, rep := range modFile.Replace {
+		otelDep, ok := pathToDep[rep.Old.Path]
+		if ok {
+			otelDep.applyReplace(rep)
 		}
 	}
 
@@ -3316,36 +3329,40 @@ type otelDependency struct {
 	Name          string
 	Version       string
 	Link          string
+	req           *modfile.Require
 }
 
-func newOtelDependency(l string) *otelDependency {
-	if !strings.Contains(l, "go.opentelemetry.io/") &&
-		!strings.Contains(l, "github.com/open-telemetry/") &&
-		!strings.Contains(l, "github.com/elastic/opentelemetry-collector-components/") {
+func newOtelDependency(r *modfile.Require) *otelDependency {
+	if !strings.Contains(r.Mod.Path, "go.opentelemetry.io/") &&
+		!strings.Contains(r.Mod.Path, "github.com/open-telemetry/") &&
+		!strings.Contains(r.Mod.Path, "github.com/elastic/opentelemetry-collector-components/") {
 		return nil
 	}
 
-	if strings.Contains(l, "// indirect") {
+	if r.Indirect {
 		return nil
 	}
 
-	chunks := strings.SplitN(l, " ", 2)
-	if len(chunks) != 2 {
-		return nil
-	}
-	dependencyURI := chunks[0]
-	version := chunks[1]
-
-	componentName := getOtelComponentName(dependencyURI)
-	componentType := getOtelComponentType(dependencyURI)
-	link := getOtelDependencyLink(dependencyURI, version)
+	componentName := getOtelComponentName(r.Mod.Path)
+	componentType := getOtelComponentType(r.Mod.Path)
+	link := getOtelDependencyLink(r.Mod.Path, r.Mod.Version)
 
 	return &otelDependency{
 		ComponentType: componentType,
 		Name:          componentName,
-		Version:       version,
+		Version:       r.Mod.Version,
 		Link:          link,
+		req:           r,
 	}
+}
+
+func (d *otelDependency) applyReplace(rep *modfile.Replace) {
+	if rep == nil || rep.Old != d.req.Mod {
+		return
+	}
+	d.Version = rep.New.Version
+	d.req.Mod = rep.New
+	d.Link = getOtelDependencyLink(rep.New.Path, rep.New.Version)
 }
 
 func getOtelComponentName(dependencyName string) string {
@@ -3371,8 +3388,16 @@ func getOtelComponentType(dependencyName string) string {
 func getOtelDependencyLink(dependencyURI string, version string) string {
 	dependencyRepository := getDependencyRepository(dependencyURI)
 	dependencyPath := strings.TrimPrefix(dependencyURI, dependencyRepository+"/")
+	gitRevision := fmt.Sprintf("%s/%s", dependencyPath, version)
 	repositoryURL := getOtelRepositoryURL(dependencyURI)
-	return fmt.Sprintf("https://%s/blob/%s/%s/%s/README.md", repositoryURL, dependencyPath, version, dependencyPath)
+	// if the version is a pseudo-version pointing to a revision without a tag, we need to extract the revision
+	if module.IsPseudoVersion(version) {
+		revision, err := module.PseudoVersionRev(version)
+		if err == nil { // this should never return an error, as we check it earlier
+			gitRevision = revision
+		}
+	}
+	return fmt.Sprintf("https://%s/blob/%s/%s/README.md", repositoryURL, gitRevision, dependencyPath)
 }
 
 func getDependencyRepository(dependencyURI string) string {

@@ -116,6 +116,7 @@ linters-settings:
       - github.com/dop251/goja_nodejs
       - github.com/fsnotify/fsnotify
       - github.com/openshift/api
+      - github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver
 
   nolintlint:
     # Enable to ensure that nolint directives are all used. Default is true.
