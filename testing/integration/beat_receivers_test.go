@@ -18,6 +18,8 @@ import (
 	"text/template"
 	"time"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -25,7 +27,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/pkg/utils"
-	"gopkg.in/yaml.v2"
 
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
