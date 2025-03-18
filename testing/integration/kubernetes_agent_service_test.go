@@ -44,9 +44,7 @@ func TestKubernetesAgentService(t *testing.T) {
 
 	testSteps := []k8sTestStep{
 		k8sStepCreateNamespace(),
-		k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{
-			agentContainerMemoryLimit: "700Mi",
-		}, func(obj k8s.Object) {
+		k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{}, func(obj k8s.Object) {
 			// update the configmap to only run the connectors input
 			switch objWithType := obj.(type) {
 			case *corev1.ConfigMap:
