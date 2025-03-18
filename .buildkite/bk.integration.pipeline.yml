@@ -277,7 +277,8 @@ steps:
         matrix:
           setup:
             variants:
-            - "basic,wolfi,complete,complete-wolfi,service,elastic-otel-collector-wolfi,elastic-otel-collector"
+            - "basic,slim,complete,service,elastic-otel-collector"
+            - "wolfi,slim-wolfi,complete-wolfi,elastic-otel-collector-wolfi"
             version:
             - v1.27.16
             - v1.28.9

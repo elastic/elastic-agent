@@ -76,6 +76,8 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 			{Type: define.Kubernetes, DockerVariant: "wolfi"},
 			{Type: define.Kubernetes, DockerVariant: "complete"},
 			{Type: define.Kubernetes, DockerVariant: "complete-wolfi"},
+			{Type: define.Kubernetes, DockerVariant: "slim"},
+			{Type: define.Kubernetes, DockerVariant: "slim-wolfi"},
 		},
 		Group: define.Kubernetes,
 	})
@@ -237,6 +239,8 @@ func TestKubernetesAgentHelm(t *testing.T) {
 			// only test the basic and the wolfi container with otel
 			{Type: define.Kubernetes, DockerVariant: "basic"},
 			{Type: define.Kubernetes, DockerVariant: "wolfi"},
+			{Type: define.Kubernetes, DockerVariant: "slim"},
+			{Type: define.Kubernetes, DockerVariant: "slim-wolfi"},
 		},
 		Group: define.Kubernetes,
 	})
