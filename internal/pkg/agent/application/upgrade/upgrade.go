@@ -54,8 +54,11 @@ var agentArtifact = artifact.Artifact{
 	Artifact: "beats/" + agentName,
 }
 
-var ErrWatcherNotStarted = errors.New("watcher did not start in time")
-var ErrUpgradeSameVersion = errors.New("upgrade did not occur because it is the same version")
+var (
+	ErrWatcherNotStarted     = errors.New("watcher did not start in time")
+	ErrUpgradeSameVersion    = errors.New("upgrade did not occur because it is the same version")
+	ErrFipsNotUpgradedToFips = errors.New("cannot upgrade from a fips compliant agent to a non-compliant one")
+)
 
 // Upgrader performs an upgrade
 type Upgrader struct {
@@ -145,6 +148,7 @@ type agentVersion struct {
 	version  string
 	snapshot bool
 	hash     string
+	fips     bool
 }
 
 func (av agentVersion) String() string {
@@ -159,6 +163,26 @@ func (av agentVersion) String() string {
 	return buf.String()
 }
 
+func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, metadata packageMetadata) error {
+	// Compare the downloaded version (including git hash) to see if we need to upgrade
+	// versions are the same if the numbers and hash match which may occur in a SNAPSHOT -> SNAPSHOT upgrage
+	same := isSameVersion(log, currentVersion, newVersion)
+	if same {
+		log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
+		return ErrUpgradeSameVersion
+	}
+
+	if currentVersion.fips && metadata.manifest.Package.Fips {
+		return nil
+	}
+
+	if !currentVersion.fips && !metadata.manifest.Package.Fips {
+		return nil
+	}
+
+	return ErrFipsNotUpgradedToFips
+}
+
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
@@ -167,6 +191,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		version:  release.Version(),
 		snapshot: release.Snapshot(),
 		hash:     release.Commit(),
+		fips:     release.FIPS(),
 	}
 
 	// Compare versions and exit before downloading anything if the upgrade
@@ -220,12 +245,9 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, fmt.Errorf("reading metadata for elastic agent version %s package %q: %w", version, archivePath, err)
 	}
 
-	// Compare the downloaded version (including git hash) to see if we need to upgrade
-	// versions are the same if the numbers and hash match which may occur in a SNAPSHOT -> SNAPSHOT upgrage
-	same, newVersion := isSameVersion(u.log, currentVersion, metadata, version)
-	if same {
-		u.log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
-		return nil, ErrUpgradeSameVersion
+	newVersion := extractAgentVersion(metadata, version)
+	if err := checkUpgrade(u.log, currentVersion, newVersion, metadata); err != nil {
+		return nil, fmt.Errorf("cannot upgrade the agent: %w", err)
 	}
 
 	u.log.Infow("Unpacking agent package", "version", newVersion)
@@ -317,7 +339,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, goerrors.Join(err, rollbackErr)
 	}
 
-	var watcherExecutable = selectWatcherExecutable(paths.Top(), previous, current)
+	watcherExecutable := selectWatcherExecutable(paths.Top(), previous, current)
 
 	var watcherCmd *exec.Cmd
 	if watcherCmd, err = InvokeWatcher(u.log, watcherExecutable); err != nil {
@@ -436,7 +458,7 @@ func (u *Upgrader) sourceURI(retrievedURI string) string {
 	return u.settings.SourceURI
 }
 
-func isSameVersion(log *logger.Logger, current agentVersion, metadata packageMetadata, upgradeVersion string) (bool, agentVersion) {
+func extractAgentVersion(metadata packageMetadata, upgradeVersion string) agentVersion {
 	newVersion := agentVersion{}
 	if metadata.manifest != nil {
 		packageDesc := metadata.manifest.Package
@@ -448,10 +470,12 @@ func isSameVersion(log *logger.Logger, current agentVersion, metadata packageMet
 		newVersion.version, newVersion.snapshot = parsedVersion.ExtractSnapshotFromVersionString()
 	}
 	newVersion.hash = metadata.hash
+	return newVersion
+}
 
+func isSameVersion(log *logger.Logger, current agentVersion, newVersion agentVersion) bool {
 	log.Debugw("Comparing current and new agent version", "current_version", current, "new_version", newVersion)
-
-	return current == newVersion, newVersion
+	return current == newVersion
 }
 
 func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {
@@ -495,7 +519,6 @@ func copyActionStore(log *logger.Logger, newHome string) error {
 }
 
 func copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error {
-
 	log.Infow("Copying run directory", "new_run_path", newRunPath, "old_run_path", oldRunPath)
 
 	if err := os.MkdirAll(newRunPath, runDirMod); err != nil {

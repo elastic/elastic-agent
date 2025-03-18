@@ -868,6 +868,10 @@ collectors:
           api_key: ${env:ELASTIC_API_KEY} # API key for Elasticsearch authentication.
           logs_dynamic_index:
             enabled: true
+          metrics_dynamic_index:
+            enabled: true
+          traces_dynamic_index:
+            enabled: true
           # Enable in order to skip the SSL certificate Check
           # tls:
           #   insecure_skip_verify: true
