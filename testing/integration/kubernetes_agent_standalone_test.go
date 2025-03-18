@@ -204,7 +204,7 @@ func TestKubernetesAgentOtel(t *testing.T) {
 			name: "run agent in otel mode",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepDeployKustomize(agentK8SKustomize, "elastic-otel-collector", k8sKustomizeOverrides{
+				k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{
 					agentContainerExtraEnv: []corev1.EnvVar{},
 					agentContainerArgs:     []string{}, // clear default args
 				}, nil),
