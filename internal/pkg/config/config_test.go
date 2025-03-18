@@ -5,17 +5,16 @@
 package config
 
 import (
-	"github.com/google/go-cmp/cmp"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/elastic/go-ucfg"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/confmap"
 	"gopkg.in/yaml.v2"
-
-	"github.com/elastic/go-ucfg"
 )
 
 func TestInputsResolveNOOP(t *testing.T) {
