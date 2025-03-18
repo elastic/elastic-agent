@@ -38,7 +38,6 @@ import (
 	"github.com/elastic/elastic-agent/testing/installtest"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 
-	"github.com/rcrowley/go-metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -120,8 +119,11 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 	})
 }
 
-func startMockES(t *testing.T) string {
-	registry := metrics.NewRegistry()
+// startMockES starts a MockES on a random port using httptest.NewServer.
+// It registers a cleanup function to close the server when the test finishes.
+// The server will respond with the passed error probabilities. If they add
+// up to zero, all requests are a success.
+func startMockES(t *testing.T, percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge uint) string {
 	uid := uuid.Must(uuid.NewV4())
 	clusterUUID := uuid.Must(uuid.NewV4()).String()
 
@@ -129,8 +131,10 @@ func startMockES(t *testing.T) string {
 	mux.Handle("/", mockes.NewAPIHandler(
 		uid,
 		clusterUUID,
-		registry,
-		time.Now().Add(time.Hour), 0, 0, 0, 100, 0))
+		nil,
+		time.Now().Add(time.Hour),
+		0,
+		percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge))
 
 	s := httptest.NewServer(mux)
 	t.Cleanup(s.Close)
