@@ -979,25 +979,16 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 						{
-							ID:       "filestream-default-filestream-0",
+							ID:       "filestream-default-filestream-2",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "filestream",
-								"id":   "filestream-0",
-							}),
-						},
-						{
-							ID:       "filestream-default-filestream-1",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "filestream",
-								"id":   "filestream-1",
+								"id":   "filestream-2",
 							}),
 						},
 					},
-					RuntimeManager: ProcessRuntimeManager,
+					RuntimeManager: OtelRuntimeManager,
 				},
 				{
 					InputType:  "filestream",
@@ -1017,16 +1008,25 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 						{
-							ID:       "filestream-default-filestream-2",
+							ID:       "filestream-default-filestream-0",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "filestream",
-								"id":   "filestream-2",
+								"id":   "filestream-0",
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-1",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-1",
 							}),
 						},
 					},
-					RuntimeManager: OtelRuntimeManager,
+					RuntimeManager: ProcessRuntimeManager,
 				},
 			},
 		},

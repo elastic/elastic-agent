@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -377,7 +379,12 @@ func (r *RuntimeSpecs) componentsForInputType(
 				)
 			}
 		}
-		for runtimeManager, units := range unitsForRuntimeManager {
+
+		// sort to ensure consistent order
+		runtimeManagers := slices.Collect(maps.Keys(unitsForRuntimeManager))
+		slices.Sort(runtimeManagers)
+		for _, runtimeManager := range runtimeManagers {
+			units := unitsForRuntimeManager[runtimeManager]
 			if len(units) > 0 {
 				// Populate the output units for this component
 				units = append(units, unitForOutput(output, componentID))
