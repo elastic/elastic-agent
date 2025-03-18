@@ -22,8 +22,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1094,20 +1092,23 @@ agent:
 
 	// Make sure find the logs
 	actualHits := &struct{ Hits int }{}
-	require.Eventually(t,
-		func() bool {
+	assert.EventuallyWithT(t,
+		func(ct *assert.CollectT) {
 			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer findCancel()
 
 			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, index, map[string]interface{}{
 				"log.file.path": inputFilePath,
 			})
-			require.NoError(t, err)
+			require.NoError(ct, err)
 
 			actualHits.Hits = docs.Hits.Total.Value
-			return actualHits.Hits == numEvents
+			output, execErr := fixture.ExecStatus(context.Background())
+			require.NoError(ct, execErr)
+			t.Logf("status output: %v", output)
+			assert.Equal(ct, numEvents, actualHits.Hits)
 		},
-		2*time.Minute, 1*time.Second,
+		2*time.Minute, 5*time.Second,
 		"Expected %d logs, got %v", numEvents, actualHits)
 
 	cancel()
