@@ -1465,7 +1465,11 @@ func (c *Coordinator) updateOtelManagerConfig(model *component.Model) error {
 		if err != nil {
 			c.logger.Errorf("failed to generate otel config: %v", err)
 		}
-		c.logger.Warnf("The Otel runtime manager is HIGHLY EXPERIMENTAL and only intended for testing. Use at your own risk.")
+		componentIDs := make([]string, len(model.Components))
+		for _, comp := range model.Components {
+			componentIDs = append(componentIDs, comp.ID)
+		}
+		c.logger.With("component_ids", componentIDs).Warn("The Otel runtime manager is HIGHLY EXPERIMENTAL and only intended for testing. Use at your own risk.")
 	}
 	if componentOtelCfg != nil {
 		err := finalOtelCfg.Merge(componentOtelCfg)
