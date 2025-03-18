@@ -7,6 +7,7 @@
 package vault
 
 import (
+	"encoding/binary"
 	"errors"
 	"os"
 	"path/filepath"
@@ -46,6 +47,31 @@ func TestGetSeedReturnsV1File(t *testing.T) {
 	}
 }
 
+func TestGetSeedFailsV2File(t *testing.T) {
+	dir := t.TempDir()
+	fp := filepath.Join(dir, seedFileV2)
+
+	if _, err := os.Stat(fp); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal(err)
+	}
+	seed, err := aesgcm.NewKey(aesgcm.AES256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := make([]byte, 4)
+	binary.LittleEndian.PutUint32(l, uint32(defaultSaltSizeV2))
+
+	err = os.WriteFile(fp, append(seed, l...), 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, _, err = getSeed(dir)
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("non-FIPS mode must not read v2 seeds. expected error %v to be os.ErrNotExist", err)
+	}
+}
+
 func TestCreateSeedIfNotExists(t *testing.T) {
 	dir := t.TempDir()
 
@@ -64,8 +90,8 @@ func TestCreateSeedIfNotExists(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// V2 file should exist
-	if _, err := os.Stat(fpV2); err != nil {
+	// V2 file should not exist
+	if _, err := os.Stat(fpV2); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal(err)
 	}
 	// V1 file should exist
@@ -73,11 +99,11 @@ func TestCreateSeedIfNotExists(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	diff := cmp.Diff(int(aesgcm.AES256), len(b))
+	diff := cmp.Diff(seedFileSize, len(b))
 	if diff != "" {
 		t.Error(diff)
 	}
-	if saltSize != defaultSaltSize {
-		t.Errorf("expected salt size: %d got: %d", defaultSaltSize, saltSize)
+	if saltSize != saltSizeV1 {
+		t.Errorf("expected salt size: %d got: %d", saltSizeV1, saltSize)
 	}
 }

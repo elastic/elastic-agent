@@ -17,8 +17,9 @@ summary: FIPS Compliant agent file vault
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
 description: |
-  Change elastic file vault implementation to allow variable length salt sizes.
-  Increase default salt size to 16 for FIPS compliance.
+  Change elastic file vault implementation to allow variable length salt sizes
+  only in FIPS enabled agents.  Increase default salt size to 16 for FIPS
+  compliance. Non-FIPS agents are unchanged.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent

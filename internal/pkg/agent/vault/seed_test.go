@@ -6,6 +6,7 @@ package vault
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"os"
@@ -19,22 +20,66 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault/aesgcm"
 )
 
-func TestGetSeed(t *testing.T) {
+func TestGetSeedV1(t *testing.T) {
 	dir := t.TempDir()
 
 	fp := filepath.Join(dir, seedFile)
-	fpV2 := filepath.Join(dir, seedFileV2)
 
 	// check the test prerequisites
 	if _, err := os.Stat(fp); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(fpV2); !errors.Is(err, os.ErrNotExist) {
+
+	// seed is not yet created
+	if _, err := getSeedV1(dir); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal(err)
+	}
+	// should be not found
+	if _, err := os.Stat(fp); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal(err)
+	}
+
+	// create seed manually
+	seed, err := aesgcm.NewKey(aesgcm.AES256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.WriteFile(fp, seed, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(fp); err != nil {
+		t.Fatal(err)
+	}
+
+	b, err := getSeedV1(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if seedFileSize != len(b) {
+		t.Errorf("expected seed file size to be %d, got: %d", seedFileSize, len(b))
+	}
+
+	diff := cmp.Diff(seed, b)
+	if diff != "" {
+		t.Error(diff)
+	}
+}
+
+func TestGetSeedV2(t *testing.T) {
+	dir := t.TempDir()
+
+	fp := filepath.Join(dir, seedFileV2)
+
+	// check the test prerequisites
+	if _, err := os.Stat(fp); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal(err)
 	}
 
 	// seed is not yet created
-	if _, _, err := getSeed(dir); !errors.Is(err, os.ErrNotExist) {
+	if _, _, err := getSeedV2(dir); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal(err)
 	}
 
@@ -42,41 +87,38 @@ func TestGetSeed(t *testing.T) {
 	if _, err := os.Stat(fp); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(fpV2); !errors.Is(err, os.ErrNotExist) {
+
+	// create seed manually
+	seed, err := aesgcm.NewKey(aesgcm.AES256)
+	if err != nil {
 		t.Fatal(err)
 	}
-
-	b, saltSize, err := createSeedIfNotExists(dir)
+	l := make([]byte, 4)
+	binary.LittleEndian.PutUint32(l, uint32(defaultSaltSizeV2))
+	err = os.WriteFile(fp, append(seed, l...), 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// V2 file should exist
-	if _, err := os.Stat(fpV2); err != nil {
+	if _, err := os.Stat(fp); err != nil {
 		t.Fatal(err)
 	}
-	// V1 file is checked as a part of TestCreateSeedIfNotExists
 
-	diff := cmp.Diff(int(aesgcm.AES256), len(b))
-	if diff != "" {
-		t.Error(diff)
-	}
-	if saltSize != defaultSaltSize {
-		t.Errorf("expected salt size: %d got: %d", defaultSaltSize, saltSize)
-	}
-
-	// try get seed
-	gotSeed, gotSaltSize, err := getSeed(dir)
+	b, saltSize, err := getSeedV2(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	diff = cmp.Diff(b, gotSeed)
+	if seedFileSize != len(b) {
+		t.Errorf("expected seed length to be %d, got: %d", seedFileSize, len(b))
+	}
+	if saltSize != defaultSaltSizeV2 {
+		t.Errorf("expected salt size: %d got: %d", defaultSaltSizeV2, saltSize)
+	}
+
+	diff := cmp.Diff(seed, b)
 	if diff != "" {
 		t.Error(diff)
-	}
-	if gotSaltSize != saltSize {
-		t.Errorf("got salt size %d does not match written salt size: %d", gotSaltSize, saltSize)
 	}
 }
 

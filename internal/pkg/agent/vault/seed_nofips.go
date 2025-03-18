@@ -7,33 +7,56 @@
 package vault
 
 import (
-	"fmt"
-	"io/fs"
+	"errors"
 	"os"
 	"path/filepath"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault/aesgcm"
 )
 
-const (
-	defaultSaltSize = saltSizeV1
-)
+// getSeed returns the seed from the v1 .seed file
+// or fs.ErrNotExist if the bytecount does not match
+func getSeed(path string) ([]byte, int, error) {
+	mxSeed.Lock()
+	defer mxSeed.Unlock()
 
-func getSeedV1(path string) ([]byte, error) {
-	fp := filepath.Join(path, seedFile)
-
-	b, err := os.ReadFile(fp)
+	// Non fips only supports V1 seed
+	b, err := getSeedV1(path)
 	if err != nil {
-		return nil, fmt.Errorf("could not read seed file: %w", err)
+		return nil, 0, err
 	}
-
-	// return fs.ErrNotExist if invalid length of bytes returned
-	if len(b) != int(aesgcm.AES256) {
-		return nil, fmt.Errorf("invalid seed length, expected: %v, got: %v: %w", int(aesgcm.AES256), len(b), fs.ErrNotExist)
-	}
-	return b, nil
+	return b, saltSizeV1, nil
 }
 
+// checkSalt is a nop as V2 seeds are disabled for non-FIPS agents
 func checkSalt(_ int) error {
 	return nil
+}
+
+// createSeedIfNotExists returns the seed from the v1 .seed file
+// If the seed file does not exist it will create and write a new v1 seed file.
+func createSeedIfNotExists(path string) ([]byte, int, error) {
+	mxSeed.Lock()
+	defer mxSeed.Unlock()
+
+	pass, err := getSeedV1(path)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, 0, err
+		}
+	}
+	if len(pass) != 0 {
+		return pass, saltSizeV1, nil
+	}
+
+	seed, err := aesgcm.NewKey(aesgcm.AES256)
+	if err != nil {
+		return nil, 0, err
+	}
+	err = os.WriteFile(filepath.Join(path, seedFile), seed, 0600)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return seed, saltSizeV1, nil
 }

@@ -7,6 +7,7 @@
 package vault
 
 import (
+	"encoding/binary"
 	"errors"
 	"os"
 	"path/filepath"
@@ -40,6 +41,38 @@ func TestGetSeedFailsV1File(t *testing.T) {
 	}
 }
 
+func TestGetSeedV2File(t *testing.T) {
+	dir := t.TempDir()
+	fp := filepath.Join(dir, seedFileV2)
+
+	if _, err := os.Stat(fp); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal(err)
+	}
+	seed, err := aesgcm.NewKey(aesgcm.AES256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := make([]byte, 4)
+	binary.LittleEndian.PutUint32(l, uint32(defaultSaltSizeV2))
+
+	err = os.WriteFile(fp, append(seed, l...), 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	b, saltSize, err := getSeed(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saltSize != defaultSaltSizeV2 {
+		t.Errorf("expected salt size to be %d, got: %d", defaultSaltSizeV2, saltSize)
+	}
+	diff := cmp.Diff(seed, b)
+	if diff != "" {
+		t.Error(diff)
+	}
+}
+
 func TestCreateSeedIfNotExists(t *testing.T) {
 	dir := t.TempDir()
 
@@ -67,11 +100,11 @@ func TestCreateSeedIfNotExists(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	diff := cmp.Diff(int(aesgcm.AES256), len(b))
+	diff := cmp.Diff(seedFileSize, len(b))
 	if diff != "" {
 		t.Error(diff)
 	}
-	if saltSize != defaultSaltSize {
-		t.Errorf("expected salt size: %d got: %d", defaultSaltSize, saltSize)
+	if saltSize != defaultSaltSizeV2 {
+		t.Errorf("expected salt size: %d got: %d", defaultSaltSizeV2, saltSize)
 	}
 }
