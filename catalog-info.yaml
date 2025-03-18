@@ -404,6 +404,8 @@ spec:
           access_level: MANAGE_BUILD_AND_READ
         observablt-robots:
           access_level: MANAGE_BUILD_AND_READ  
+        # See https://buildkite.com/docs/pipelines/configure/step-types/trigger-step#permissions
+        # Otherwise even if merge commits in the main or any branch, they will fail
         everyone:
           access_level: BUILD_AND_READ
       env:
