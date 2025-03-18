@@ -1465,7 +1465,7 @@ func (c *Coordinator) updateOtelManagerConfig(model *component.Model) error {
 		if err != nil {
 			c.logger.Errorf("failed to generate otel config: %v", err)
 		}
-		componentIDs := make([]string, len(model.Components))
+		componentIDs := make([]string, 0, len(model.Components))
 		for _, comp := range model.Components {
 			componentIDs = append(componentIDs, comp.ID)
 		}
