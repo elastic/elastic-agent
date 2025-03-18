@@ -9,7 +9,7 @@ steps:
     command: ".buildkite/scripts/steps/check-ci.sh"
     agents:
       provider: "gcp"
-      image: "family/core-ubuntu-2204"
+      image: "family/platform-ingest-elastic-agent-ubuntu-2204"
     retry:
       manual:
         allowed: true
@@ -27,7 +27,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
-          image: "family/core-ubuntu-2204"
+          image: "family/platform-ingest-elastic-agent-ubuntu-2204"
         retry:
           automatic:
             limit: 1
@@ -44,7 +44,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "aws"
-          imagePrefix: "core-ubuntu-2204-aarch64"
+          imagePrefix: "platform-ingest-elastic-agent-ubuntu-2404-aarch64"
           diskSizeGb: 200
           instanceType: "m6g.xlarge"
         retry:
@@ -55,9 +55,7 @@ steps:
 
       - label: "Unit tests - Windows 2022"
         key: "unit-tests-win2022"
-        command: |
-          .\\.buildkite\\scripts\\install-go.ps1
-          .\\.buildkite\\scripts\\steps\\unit-tests.ps1
+        command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -65,7 +63,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
-          image: "family/core-windows-2022"
+          image: "family/platform-ingest-elastic-agent-windows-2022"
           machine_type: "n2-standard-8"
           disk_size: 200
           disk_type: "pd-ssd"
@@ -77,9 +75,7 @@ steps:
 
       - label: "Unit tests - Windows 2016"
         key: "unit-tests-win2016"
-        command: |
-          .\\.buildkite\\scripts\\install-go.ps1
-          .\\.buildkite\\scripts\\steps\\unit-tests.ps1
+        command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -87,7 +83,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
-          image: "family/core-windows-2016"
+          image: "family/platform-ingest-elastic-agent-windows-2016"
           machine_type: "n2-standard-8"
           disk_size: 200
           disk_type: "pd-ssd"
@@ -139,9 +135,7 @@ steps:
     steps:
       - label: "Unit tests - Windows 10"
         key: "unit-tests-win10"
-        command: |
-          .\\.buildkite\\scripts\\install-go.ps1
-          .\\.buildkite\\scripts\\steps\\unit-tests.ps1
+        command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -149,8 +143,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
-          # TODO create own image
-          image: "family/general-windows-10"
+          image: "family/platform-ingest-elastic-agent-windows-10"
           machine_type: "n2-standard-8"
           disk_type: "pd-ssd"
         retry:
@@ -160,9 +153,7 @@ steps:
             allowed: true
       - label: "Unit tests - Windows 11"
         key: "unit-tests-win11"
-        command: |
-          .\\.buildkite\\scripts\\install-go.ps1
-          .\\.buildkite\\scripts\\steps\\unit-tests.ps1
+        command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -170,8 +161,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
-          # TODO create own image
-          image: "family/general-windows-11"
+          image: "family/platform-ingest-elastic-agent-windows-11"
           machine_type: "n2-standard-8"
           disk_type: "pd-ssd"
         retry:
@@ -229,7 +219,7 @@ steps:
         command: ".buildkite/scripts/steps/k8s-tests.sh"
         agents:
           provider: "gcp"
-          image: "family/core-ubuntu-2204"
+          image: "family/platform-ingest-elastic-agent-ubuntu-2204"
         matrix:
           setup:
             k8s_version:
@@ -273,7 +263,7 @@ steps:
                 command: ".buildkite/scripts/steps/sync-k8s.sh"
                 agents:
                   provider: "gcp"
-                  image: "family/core-ubuntu-2204"
+                  image: "family/platform-ingest-elastic-agent-ubuntu-2204"
                 env:
                   - GH_VERSION=2.4.0
 
