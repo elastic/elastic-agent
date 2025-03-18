@@ -73,12 +73,20 @@ var variants = []struct {
 		Image: "docker.elastic.co/beats-ci/elastic-agent-service",
 	},
 	{
-		Name:  "edot-collector",
-		Image: "docker.elastic.co/beats-ci/edot-collector",
+		Name:  "elastic-otel-collector",
+		Image: "docker.elastic.co/beats-ci/elastic-otel-collector",
 	},
 	{
 		Name:  "slim",
 		Image: "docker.elastic.co/beats-ci/elastic-agent-slim",
+	},
+	{
+		Name:  "elastic-otel-collector-wolfi",
+		Image: "docker.elastic.co/beats-ci/elastic-otel-collector-wolfi",
+	},
+	{
+		Name:  "slim-wolfi",
+		Image: "docker.elastic.co/beats-ci/elastic-agent-slim-wolfi",
 	},
 }
 

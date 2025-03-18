@@ -178,8 +178,8 @@ func TestKubernetesAgentOtel(t *testing.T) {
 		Sudo:  false,
 		OS: []define.OS{
 			// only test the basic and the wolfi container with otel
-			{Type: define.Kubernetes, DockerVariant: "basic"},
-			{Type: define.Kubernetes, DockerVariant: "wolfi"},
+			{Type: define.Kubernetes, DockerVariant: "elastic-otel-collector"},
+			{Type: define.Kubernetes, DockerVariant: "elastic-otel-collector-wolfi"},
 		},
 		Group: define.Kubernetes,
 	})
@@ -204,8 +204,8 @@ func TestKubernetesAgentOtel(t *testing.T) {
 			name: "run agent in otel mode",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{
-					agentContainerExtraEnv: []corev1.EnvVar{{Name: "ELASTIC_AGENT_OTEL", Value: "true"}},
+				k8sStepDeployKustomize(agentK8SKustomize, "elastic-otel-collector", k8sKustomizeOverrides{
+					agentContainerExtraEnv: []corev1.EnvVar{},
 					agentContainerArgs:     []string{}, // clear default args
 				}, nil),
 			},

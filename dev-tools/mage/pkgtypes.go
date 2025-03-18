@@ -485,7 +485,10 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 
 // ImageName computes the image name from the spec.
 func (s PackageSpec) ImageName() string {
-	if s.DockerVariant == Basic || s.DockerVariant == EdotCollector {
+	if s.DockerVariant == Basic {
+		return s.Name
+	}
+	if s.DockerVariant == EdotCollector || s.DockerVariant == EdotCollectorWolfi {
 		// no suffix for basic docker variant
 		return s.Name
 	}

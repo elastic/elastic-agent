@@ -124,8 +124,12 @@ func TestDocker(t *testing.T) {
 
 	if len(dockers) > 0 {
 		// run only as part of packaging testing
-		require.Less(t, sizeMap["edot-collector"], sizeMap["elastic-agent-slim"], "unexpected size: %v", sizeMap)
+		require.Less(t, sizeMap["elastic-otel-collector"], sizeMap["elastic-agent-slim"], "unexpected size: %v", sizeMap)
 		require.Less(t, sizeMap["elastic-agent-slim"], sizeMap["elastic-agent"], "unexpected size: %v", sizeMap)
+
+		// run wolfi checks
+		require.Less(t, sizeMap["elastic-otel-collector-wolfi"], sizeMap["elastic-agent-slim-wolfi"], "unexpected size: %v", sizeMap)
+		require.Less(t, sizeMap["elastic-agent-slim-wolfi"], sizeMap["elastic-agent-wolfi"], "unexpected size: %v", sizeMap)
 	}
 }
 
@@ -311,7 +315,7 @@ func checkNpcapNotices(pkg, file string, contents io.Reader) error {
 }
 
 func checkDocker(t *testing.T, file string) (string, int64) {
-	if strings.Contains(file, "edot-collector") {
+	if strings.Contains(file, "elastic-otel-collector") {
 		return checkEdotCollectorDocker(t, file)
 	}
 
