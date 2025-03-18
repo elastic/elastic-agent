@@ -18,8 +18,6 @@ import (
 	"text/template"
 	"time"
 
-	"gopkg.in/yaml.v2"
-
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -27,14 +25,15 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/pkg/utils"
+	"gopkg.in/yaml.v2"
 
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	logsEADocs       estools.Documents
-	logsOTelDocs     estools.Documents
+	agentDocs        map[string]estools.Documents
+	otelDocs         map[string]estools.Documents
 	commonLogMessage = "Determined allowed capabilities"
 )
 
@@ -54,6 +53,32 @@ func TestAgentMonitoring(t *testing.T) {
 		Stack: &define.Stack{},
 		Sudo:  true,
 	})
+
+	agentDocs = make(map[string]estools.Documents)
+	otelDocs = make(map[string]estools.Documents)
+
+	// Tests logs and metrics are present
+	type test struct {
+		dsType      string
+		dsDataset   string
+		dsNamespace string
+		message     string
+	}
+
+	tests := []test{
+		{dsType: "logs", dsDataset: "elastic_agent", dsNamespace: info.Namespace, message: commonLogMessage},
+		{dsType: "metrics", dsDataset: "elastic_agent.elastic_agent", dsNamespace: info.Namespace},
+		{dsType: "metrics", dsDataset: "elastic_agent.filebeat", dsNamespace: info.Namespace},
+		{dsType: "metrics", dsDataset: "elastic_agent.filebeat_input", dsNamespace: info.Namespace},
+		{dsType: "metrics", dsDataset: "elastic_agent.metricbeat", dsNamespace: info.Namespace},
+	}
+
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Privileged:     true,
+		Force:          true,
+		Develop:        true,
+	}
 
 	// Flow
 	// 1. Create and install policy with just monitoring
@@ -128,11 +153,6 @@ func TestAgentMonitoring(t *testing.T) {
 		// 3. Install without enrolling in fleet
 		fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 		require.NoError(t, err)
-		installOpts := atesting.InstallOpts{
-			NonInteractive: true,
-			Privileged:     true,
-			Force:          true,
-		}
 
 		err = fixture.Prepare(ctx)
 		require.NoError(t, err, "error preparing fixture")
@@ -152,107 +172,72 @@ func TestAgentMonitoring(t *testing.T) {
 			return true
 		}, 1*time.Minute, 1*time.Second)
 
-		// 4. Make sure logs and metrics for agent monitoring are being received
-		type test struct {
-			dsType      string
-			dsDataset   string
-			dsNamespace string
-		}
-
-		tests := []test{
-			{dsType: "logs", dsDataset: "elastic_agent", dsNamespace: info.Namespace},
-			{dsType: "metrics", dsDataset: "elastic_agent.elastic_agent", dsNamespace: info.Namespace},
-			{dsType: "metrics", dsDataset: "elastic_agent.filebeat", dsNamespace: info.Namespace},
-			{dsType: "metrics", dsDataset: "elastic_agent.filebeat_input", dsNamespace: info.Namespace},
-			{dsType: "metrics", dsDataset: "elastic_agent.metricbeat", dsNamespace: info.Namespace},
-		}
-
 		for _, tc := range tests {
 			require.Eventuallyf(t,
 				func() bool {
 					findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
 					defer findCancel()
+					mustClauses := []map[string]any{
+						{"match": map[string]any{"data_stream.type": tc.dsType}},
+						{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
+						{"match": map[string]any{"data_stream.namespace": tc.dsNamespace}},
+					}
+
+					// Only add the "message" match if tc.message is not empty
+					// This conditional check will not be required when test for metrics is included
+					if tc.message != "" {
+						mustClauses = append(mustClauses, map[string]any{
+							"match": map[string]any{"message": tc.message},
+						})
+					}
+
 					rawQuery := map[string]any{
 						"query": map[string]any{
 							"bool": map[string]any{
-								"must": []map[string]any{
-									{
-										"match": map[string]any{"data_stream.type": tc.dsType},
-									},
-									{
-										"match": map[string]any{"data_stream.dataset": tc.dsDataset},
-									},
-									{
-										"match": map[string]any{"data_stream.namespace": tc.dsNamespace},
-									},
-								},
+								"must": mustClauses,
 							},
 						},
 					}
+
 					docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
 					require.NoError(t, err)
+					if docs.Hits.Total.Value != 0 {
+						key := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
+						agentDocs[key] = docs
+					}
 					return docs.Hits.Total.Value > 0
 				},
 				2*time.Minute, 5*time.Second,
 				"No documents found for type: %s, dataset: %s, namespace: %s", tc.dsType, tc.dsDataset, tc.dsNamespace)
 		}
-
-		// get self monitoring logs
-		var agentDocs estools.Documents
-		fbMonitoringIndex := "logs-elastic_agent-" + info.Namespace
-		require.Eventually(t,
-			func() bool {
-				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
-				defer findCancel()
-
-				agentDocs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbMonitoringIndex+"*", map[string]interface{}{
-					"message": commonLogMessage,
-				})
-				require.NoError(t, err)
-
-				if agentDocs.Hits.Total.Value != 0 {
-					logsEADocs = agentDocs
-					return true
-				}
-				return false
-			},
-			2*time.Minute, 1*time.Second, "could not find monitoring log")
 	})
 
 	t.Run("compare logs ingested by agent monitoring vs otel monitoring", func(t *testing.T) {
+		// skipping this because the log-path should be handled differently in windows
 		if runtime.GOOS == "windows" {
 			t.Skip("skipping this test on windows for now")
 		}
 
 		// Not proceed with this test if monitoring logs from elastic-agent does not exist
+		monitoringLogIndex := "logs-elastic_agent-" + info.Namespace
 		require.NotPanics(
 			t, func() {
-				_ = logsEADocs.Hits.Hits[0].Source
+				_ = agentDocs[monitoringLogIndex].Hits.Hits[0].Source
 			}, "monitoring logs from elastic-agent should exist before proceeding",
 		)
 
-		fbReceiverMonitoringIndex := "logs-elastic_agent-monitoringotel"
-
 		type configOptions struct {
 			InputPath      string
-			HomeDir        string
 			ESEndpoint     string
 			ESApiKey       string
-			BeatsESApiKey  string
 			SocketEndpoint string
+			Namespace      string
 		}
 		esEndpoint, err := getESHost()
 		require.NoError(t, err, "error getting elasticsearch endpoint")
 		esApiKey, err := createESApiKey(info.ESClient)
 		require.NoError(t, err, "error creating API key")
 		require.NotEmptyf(t, esApiKey.Encoded, "api key is invalid %q", esApiKey)
-
-		var inputPath string
-		if runtime.GOOS == "linux" {
-			inputPath = "/opt/Elastic/Agent/data/elastic-agent-*/logs"
-		} else if runtime.GOOS == "darwin" {
-			inputPath = "/Library/Elastic/Agent/data/elastic-agent-*/logs"
-		}
 
 		// Start monitoring in otel mode
 		fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -264,7 +249,22 @@ func TestAgentMonitoring(t *testing.T) {
 		err = fixture.Prepare(ctx)
 		require.NoError(t, err)
 
-		socketEndpoint := utils.SocketURLWithFallback(uuid.Must(uuid.NewV4()).String(), paths.TempDir())
+		// installs elastic-agent with empty elastic-agent.yml to get its working dir first
+		err = fixture.Configure(ctx, []byte{})
+		require.NoError(t, err)
+
+		output, err := fixture.InstallWithoutEnroll(ctx, &installOpts)
+		require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
+
+		// Ensure elastic-agent is healthy, otherwise we cannot perform retstart operation
+		require.Eventually(t, func() bool {
+			err = fixture.IsHealthy(ctx)
+			if err != nil {
+				t.Logf("waiting for agent healthy: %s", err.Error())
+				return false
+			}
+			return true
+		}, 30*time.Second, 1*time.Second)
 
 		configTemplateOTel := `
 receivers:
@@ -275,8 +275,8 @@ receivers:
           enabled: true
           id: filestream-monitoring-agent
           paths:
-            -  {{.InputPath}}/elastic-agent-*.ndjson 
-            -  {{.InputPath}}/elastic-agent-watcher-*.ndjson
+            -  {{.InputPath}}/data/elastic-agent-*/logs/elastic-agent-*.ndjson 
+            -  {{.InputPath}}/data/elastic-agent-*/logs/elastic-agent-watcher-*.ndjson
           close:
             on_state_change:
               inactive: 5m	  
@@ -290,7 +290,7 @@ receivers:
             - add_fields:
                 fields:
                   dataset: elastic_agent
-                  namespace: monitoringotel
+                  namespace: {{.Namespace}}
                   type: logs
                 target: data_stream
             - add_fields:
@@ -355,7 +355,6 @@ receivers:
       level: info
       selectors:
         - '*'
-    filebeat.config.modules.enabled: false
     http.enabled: true
     http.host: {{ .SocketEndpoint }}
 exporters:
@@ -382,13 +381,17 @@ service:
       exporters:
         - elasticsearch/log  
 `
+		socketEndpoint := utils.SocketURLWithFallback(uuid.Must(uuid.NewV4()).String(), paths.TempDir())
+
+		// configure elastic-agent.yml with new config
 		var configBuffer bytes.Buffer
 		template.Must(template.New("config").Parse(configTemplateOTel)).Execute(&configBuffer,
 			configOptions{
-				InputPath:      inputPath,
+				InputPath:      fixture.WorkDir(),
 				ESEndpoint:     esEndpoint,
 				ESApiKey:       esApiKey.Encoded,
 				SocketEndpoint: socketEndpoint,
+				Namespace:      info.Namespace,
 			})
 		configOTelContents := configBuffer.Bytes()
 		t.Cleanup(func() {
@@ -396,19 +399,16 @@ service:
 				t.Logf("Contents of agent config file:\n%s\n", string(configOTelContents))
 			}
 		})
-
-		installOpts := atesting.InstallOpts{
-			NonInteractive: true,
-			Privileged:     true,
-			Force:          true,
-		}
-
-		// configures, starts and waits for elastic-agent to be healthy
 		err = fixture.Configure(ctx, configOTelContents)
 		require.NoError(t, err)
 
-		output, err := fixture.InstallWithoutEnroll(ctx, &installOpts)
-		require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
+		// Get the timestamp before restarting. Required to separate logs from agent and otel
+		timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+
+		fmt.Println(time.Now())
+		// Restart elastic-agent
+		output, err = fixture.Exec(ctx, []string{"restart"})
+		require.NoErrorf(t, err, "error restarting agent: %s\ncombinedoutput:\n%s", err, string(output))
 
 		require.Eventually(t, func() bool {
 			err = fixture.IsHealthy(ctx)
@@ -419,27 +419,41 @@ service:
 			return true
 		}, 30*time.Second, 1*time.Second)
 
-		var otelDocs estools.Documents
-		require.Eventually(t,
+		// run this only for logs for now
+		tc := tests[0]
+		require.Eventuallyf(t,
 			func() bool {
-				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+				findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer findCancel()
-
-				otelDocs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbReceiverMonitoringIndex+"*", map[string]interface{}{
-					"message": commonLogMessage,
-				})
-				require.NoError(t, err)
-
-				if otelDocs.Hits.Total.Value != 0 {
-					logsOTelDocs = otelDocs
-					return true
+				mustClauses := []map[string]any{
+					{"match": map[string]any{"message": tc.message}},
+					{"range": map[string]interface{}{
+						"@timestamp": map[string]string{
+							"gte": timestamp, // Use captured timestamp
+						},
+					}},
 				}
-				return false
-			},
-			2*time.Minute, 1*time.Second, "could not find otel monitoring log")
 
-		agent := logsEADocs.Hits.Hits[0].Source
-		otel := logsOTelDocs.Hits.Hits[0].Source
+				rawQuery := map[string]any{
+					"query": map[string]any{
+						"bool": map[string]any{
+							"must": mustClauses,
+						},
+					},
+				}
+
+				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, ".ds-"+monitoringLogIndex+"*", info.ESClient)
+				require.NoError(t, err)
+				if docs.Hits.Total.Value != 0 {
+					otelDocs[monitoringLogIndex] = docs
+				}
+				return docs.Hits.Total.Value > 0
+			},
+			2*time.Minute, 5*time.Second,
+			"No documents found in otel mode for type : %s, dataset: %s, namespace: %s", tc.dsType, tc.dsDataset, tc.dsNamespace)
+
+		agent := agentDocs[monitoringLogIndex].Hits.Hits[0].Source
+		otel := otelDocs[monitoringLogIndex].Hits.Hits[0].Source
 		ignoredFields := []string{
 			// Expected to change between agentDocs and OtelDocs
 			"@timestamp",
