@@ -2,12 +2,21 @@
 * @elastic/elastic-agent-control-plane
 
 # Top-level files ownership
+<<<<<<< HEAD
 /catalog-info.yaml @elastic/ingest-eng-prod
 
 # Sub-directories/files ownership. Remember that order matters; the last matching pattern takes the most precedence.
 /.buildkite @elastic/ingest-eng-prod
 /.ci @elastic/ingest-eng-prod
 /.github @elastic/ingest-eng-prod
+=======
+/catalog-info.yaml @elastic/observablt-ci @elastic/observablt-ci-contractors
+
+# Sub-directories/files ownership. Remember that order matters; the last matching pattern takes the most precedence.
+/.buildkite @elastic/observablt-ci @elastic/observablt-ci-contractors
+/.ci @elastic/observablt-ci @elastic/observablt-ci-contractors
+/.github @elastic/observablt-ci @elastic/observablt-ci-contractors
+>>>>>>> 8af30b0f7 (Update CODEOWNERS (#7442))
 /.github/CODEOWNERS @elastic/ingest-tech-lead
 /deploy/helm @elastic/elastic-agent-control-plane
 /deploy/helm/edot-collector @elastic/ingest-otel-data
