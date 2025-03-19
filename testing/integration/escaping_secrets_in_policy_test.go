@@ -108,7 +108,7 @@ func TestEscapingSecretsInPolicy(t *testing.T) {
 	_, err = info.KibanaClient.InstallFleetPackage(ctx, pkgPolicyReq)
 	require.NoError(t, err)
 
-	err = tools.InstallAgentForPolicy(ctx, t, installOpts, fixture, info.KibanaClient, policy.ID)
+	_, err = tools.InstallAgentForPolicy(ctx, t, installOpts, fixture, info.KibanaClient, policy.ID)
 	require.NoError(t, err)
 
 	diagZip, err := fixture.ExecDiagnostics(ctx, "diagnostics", "-p")
