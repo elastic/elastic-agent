@@ -599,7 +599,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 					"agent": map[string]any{
 						"unprivileged": false,
 						"image": map[string]any{
-							"repository": kCtx.agentImageRepo,
+							"repository": "docker.elastic.co/elastic-agent/elastic-agent",
 							"tag":        "8.17.0",
 							"pullPolicy": "IfNotPresent",
 						},
