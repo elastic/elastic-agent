@@ -13,11 +13,20 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
+
+	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 )
 
 var flavorsRegistry = map[string][]string{
 	"basic":   {"agentbeat", "endpoint-security", "pf-host-agent"},
 	"servers": {"agentbeat", "endpoint-security", "pf-host-agent", "cloudbeat", "apm-server", "fleet-server", "pf-elastic-symbolizer", "pf-elastic-collector"},
+}
+
+var manifest = v1.PackageManifest{
+	Package: v1.PackageDesc{
+		Flavors: flavorsRegistry,
+	},
 }
 
 func TestSubpathsForComponent(t *testing.T) {
@@ -176,6 +185,42 @@ func TestAllowedSubpathsForFlavor(t *testing.T) {
 
 			// Test function
 			flavor, err := Flavor(tt.flavor, "", flavorsRegistry)
+			if tt.wantError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorContains)
+				return
+			}
+
+			subpaths, err := allowedSubpathsForFlavor(versionedHome, flavor)
+			assert.NoError(t, err)
+
+			require.NoError(t, err)
+			sort.Strings(tt.wantSubpaths)
+			sort.Strings(subpaths)
+			assert.Equal(t, tt.wantSubpaths, subpaths)
+		})
+
+		t.Run(tt.name+"-file", func(t *testing.T) {
+			tmpDir := t.TempDir()
+			manifestFile := filepath.Join(tmpDir, "manifest.yaml")
+			mb, err := yaml.Marshal(manifest)
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(manifestFile, mb, 0o644))
+			defer os.Remove(manifestFile)
+
+			// Create temp dir with spec files
+			componentsDir := filepath.Join(versionedHome, "components")
+			require.NoError(t, os.MkdirAll(componentsDir, 0755))
+
+			// Write spec files
+			for component, content := range tt.specFiles {
+				specPath := filepath.Join(componentsDir, component+".spec.yml")
+				require.NoError(t, os.WriteFile(specPath, []byte(content), 0644))
+				defer os.Remove(specPath)
+			}
+
+			// Test function
+			flavor, err := Flavor(tt.flavor, manifestFile, nil)
 			if tt.wantError {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorContains)
