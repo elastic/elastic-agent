@@ -260,7 +260,7 @@ steps:
           DOCKER_VARIANTS: "{{matrix.variants}}"
           TARGET_ARCH: "amd64"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64'
+          buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64'
           .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
         artifact_paths:
           - build/**
@@ -276,7 +276,8 @@ steps:
         matrix:
           setup:
             variants:
-            - "basic,wolfi,complete,complete-wolfi,service,cloud"
+            - "basic,slim,complete,service,elastic-otel-collector"
+            - "wolfi,slim-wolfi,complete-wolfi,elastic-otel-collector-wolfi"
             version:
             - v1.27.16
             - v1.28.9

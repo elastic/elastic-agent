@@ -76,6 +76,8 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 			{Type: define.Kubernetes, DockerVariant: "wolfi"},
 			{Type: define.Kubernetes, DockerVariant: "complete"},
 			{Type: define.Kubernetes, DockerVariant: "complete-wolfi"},
+			{Type: define.Kubernetes, DockerVariant: "slim"},
+			{Type: define.Kubernetes, DockerVariant: "slim-wolfi"},
 		},
 		Group: define.Kubernetes,
 	})
@@ -178,8 +180,8 @@ func TestKubernetesAgentOtel(t *testing.T) {
 		Sudo:  false,
 		OS: []define.OS{
 			// only test the basic and the wolfi container with otel
-			{Type: define.Kubernetes, DockerVariant: "basic"},
-			{Type: define.Kubernetes, DockerVariant: "wolfi"},
+			{Type: define.Kubernetes, DockerVariant: "elastic-otel-collector"},
+			{Type: define.Kubernetes, DockerVariant: "elastic-otel-collector-wolfi"},
 		},
 		Group: define.Kubernetes,
 	})
@@ -205,7 +207,7 @@ func TestKubernetesAgentOtel(t *testing.T) {
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
 				k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{
-					agentContainerExtraEnv: []corev1.EnvVar{{Name: "ELASTIC_AGENT_OTEL", Value: "true"}},
+					agentContainerExtraEnv: []corev1.EnvVar{},
 					agentContainerArgs:     []string{}, // clear default args
 				}, nil),
 			},
@@ -237,6 +239,8 @@ func TestKubernetesAgentHelm(t *testing.T) {
 			// only test the basic and the wolfi container with otel
 			{Type: define.Kubernetes, DockerVariant: "basic"},
 			{Type: define.Kubernetes, DockerVariant: "wolfi"},
+			{Type: define.Kubernetes, DockerVariant: "slim"},
+			{Type: define.Kubernetes, DockerVariant: "slim-wolfi"},
 		},
 		Group: define.Kubernetes,
 	})
@@ -595,7 +599,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 					"agent": map[string]any{
 						"unprivileged": false,
 						"image": map[string]any{
-							"repository": kCtx.agentImageRepo,
+							"repository": "docker.elastic.co/elastic-agent/elastic-agent",
 							"tag":        "8.17.0",
 							"pullPolicy": "IfNotPresent",
 						},
