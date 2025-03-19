@@ -101,6 +101,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
+          diskSizeGb: 150
 
       - label: "Packaging: Containers linux/arm64"
         key: packaging-containers-arm64
