@@ -277,7 +277,7 @@ steps:
           - fleet-privileged
           - fleet-upgrade-to-pr-build
           - install-uninstall
-          # FQDN test failing at debian 12. Should be fixed in future.
+          # FQDN test failing at debian 12. Relevant issue https://github.com/elastic/elastic-agent/issues/7476
           #- fqdn
           - deb
           - container
