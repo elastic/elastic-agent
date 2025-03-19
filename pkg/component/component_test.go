@@ -238,6 +238,44 @@ func TestToComponents(t *testing.T) {
 			Err: "invalid 'inputs.0.type', expected a string not a int",
 		},
 		{
+			Name:     "Invalid: input runtime manager type not a string",
+			Platform: linuxAMD64Platform,
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":                  "filestream",
+						"_runtime_experimental": 0,
+					},
+				},
+			},
+			Err: "invalid 'inputs.0.runtime', expected a string, not a int",
+		},
+		{
+			Name:     "Invalid: input runtime manager value",
+			Platform: linuxAMD64Platform,
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":                  "filestream",
+						"_runtime_experimental": "invalid",
+					},
+				},
+			},
+			Err: "invalid 'inputs.0.runtime', valid values are: otel, process",
+		},
+		{
 			Name:     "Invalid: inputs entry duplicate because of missing id",
 			Platform: linuxAMD64Platform,
 			Policy: map[string]interface{}{
@@ -484,6 +522,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 			},
 		},
@@ -533,6 +572,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 			},
 		},
@@ -594,6 +634,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 			},
 		},
@@ -662,6 +703,7 @@ func TestToComponents(t *testing.T) {
 							Err:      fmt.Errorf("decoding error: %w", fmt.Errorf("decoding failed due to the following error(s):\n\n%w", errors.Join(errors.New("'meta' expected a map, got 'slice'")))),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 			},
 		},
@@ -724,6 +766,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 				{
 					InputType:  "cloudbeat",
@@ -750,6 +793,7 @@ func TestToComponents(t *testing.T) {
 							Err:      fmt.Errorf("decoding error: %w", fmt.Errorf("decoding failed due to the following error(s):\n\n%w", errors.Join(errors.New("'meta' expected a map, got 'slice'")))),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 			},
 		},
@@ -885,6 +929,104 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
+				},
+			},
+		},
+		{
+			Name:     "Different runtime managers",
+			Platform: linuxAMD64Platform,
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-0",
+					},
+					map[string]interface{}{
+						"type":                  "filestream",
+						"id":                    "filestream-1",
+						"_runtime_experimental": "process",
+					},
+					map[string]interface{}{
+						"type":                  "filestream",
+						"id":                    "filestream-2",
+						"_runtime_experimental": "otel",
+					},
+				},
+			},
+			Result: []Component{
+				{
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "filestream",
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "elasticsearch",
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-2",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-2",
+							}),
+						},
+					},
+					RuntimeManager: OtelRuntimeManager,
+				},
+				{
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "filestream",
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "elasticsearch",
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-0",
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-1",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-1",
+							}),
+						},
+					},
+					RuntimeManager: ProcessRuntimeManager,
 				},
 			},
 		},
@@ -939,6 +1081,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 			},
 		},
@@ -994,6 +1137,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 			},
 		},
@@ -1049,6 +1193,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 			},
 		},
@@ -1105,6 +1250,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 			},
 		},
@@ -1161,6 +1307,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 			},
 		},
@@ -1274,6 +1421,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 				{
 					InputType:  "filestream",
@@ -1311,6 +1459,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 				{
 					InputType:  "log",
@@ -1347,6 +1496,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 				{
 					InputType:  "log",
@@ -1375,6 +1525,7 @@ func TestToComponents(t *testing.T) {
 							}, "log"),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 				{
 					InputType:  "log",
@@ -1403,6 +1554,7 @@ func TestToComponents(t *testing.T) {
 							}, "log"),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 				{
 					InputType:  "log",
@@ -1431,6 +1583,7 @@ func TestToComponents(t *testing.T) {
 							}, "log"),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 				{
 					InputType:  "apm",
@@ -1459,6 +1612,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 			},
 		},
@@ -1563,6 +1717,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 				{
 					InputType:  "cloudbeat",
@@ -1591,6 +1746,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 				{
 					InputType:  "cloudbeat",
@@ -1619,6 +1775,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 				{
 					InputType:  "cloudbeat",
@@ -1647,6 +1804,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 				{
 					InputType:  "cloudbeat",
@@ -1675,6 +1833,7 @@ func TestToComponents(t *testing.T) {
 							}, "cloudbeat"),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 				{
 					InputType:  "cloudbeat",
@@ -1703,6 +1862,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 				{
 					InputType:  "cloudbeat",
@@ -1731,6 +1891,7 @@ func TestToComponents(t *testing.T) {
 							}, "cloudbeat"),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 				{
 					InputType:  "cloudbeat",
@@ -1759,6 +1920,7 @@ func TestToComponents(t *testing.T) {
 							}, "cloudbeat"),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 				{
 					InputType:  "cloudbeat",
@@ -1787,6 +1949,7 @@ func TestToComponents(t *testing.T) {
 							}, "cloudbeat"),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 				{
 					InputType:  "apm",
@@ -1815,6 +1978,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 			},
 		},
@@ -1878,6 +2042,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 			},
 		},
@@ -1930,6 +2095,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 			},
 			headers: &testHeadersProvider{headers: map[string]string{
@@ -1985,6 +2151,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 			},
 			headers: &testHeadersProvider{headers: map[string]string{
@@ -2044,6 +2211,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 			},
 			headers: &testHeadersProvider{headers: map[string]string{
@@ -2103,6 +2271,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 			},
 			headers: &testHeadersProvider{headers: map[string]string{
@@ -2155,6 +2324,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 			},
 			headers: &testHeadersProvider{headers: map[string]string{
@@ -2207,6 +2377,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 			},
 			headers: &testHeadersProvider{headers: map[string]string{
@@ -2259,6 +2430,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 			},
 			headers: &testHeadersProvider{headers: map[string]string{
@@ -2311,6 +2483,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 					},
+					RuntimeManager: DefaultRuntimeManager,
 				},
 			},
 			headers: &testHeadersProvider{headers: map[string]string{

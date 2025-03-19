@@ -217,6 +217,11 @@ type Coordinator struct {
 
 	otelMgr OTelManager
 	otelCfg *confmap.Conf
+<<<<<<< HEAD
+=======
+	// the final config sent to the manager, contains both config from hybrid mode and from components
+	finalOtelCfg *confmap.Conf
+>>>>>>> 18d8dff3c (Allow switching inputs to the otel runtime manager (#7328))
 
 	caps      capabilities.Capabilities
 	modifiers []ComponentsModifier
@@ -1018,7 +1023,28 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 				return o
 			},
 		},
+<<<<<<< HEAD
 	}
+=======
+		diagnostics.Hook{
+			Name:        "otel-final",
+			Filename:    "otel-final.yaml",
+			Description: "Final otel configuration used by the Elastic Agent. Includes hybrid mode config and component config.",
+			ContentType: "application/yaml",
+			Hook: func(_ context.Context) []byte {
+				if c.finalOtelCfg == nil {
+					return []byte("no active OTel configuration")
+				}
+				o, err := yaml.Marshal(c.finalOtelCfg.ToStringMap())
+				if err != nil {
+					return []byte(fmt.Sprintf("error: failed to convert to yaml: %v", err))
+				}
+				return o
+			},
+		},
+	}
+	return hooks
+>>>>>>> 18d8dff3c (Allow switching inputs to the otel runtime manager (#7328))
 }
 
 // runner performs the actual work of running all the managers.
@@ -1412,10 +1438,92 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 
 	c.logger.Info("Updating running component model")
 	c.logger.With("components", model.Components).Debug("Updating running component model")
+<<<<<<< HEAD
 	c.runtimeMgr.Update(model)
 	return nil
 }
 
+=======
+	return c.updateManagersWithConfig(model)
+}
+
+// updateManagersWithConfig updates runtime managers with the component model and config.
+// Components may be sent to different runtimes depending on various criteria.
+func (c *Coordinator) updateManagersWithConfig(model *component.Model) error {
+	runtimeModel, otelModel := c.splitModelBetweenManagers(model)
+	c.logger.With("components", runtimeModel.Components).Debug("Updating runtime manager model")
+	c.runtimeMgr.Update(*runtimeModel)
+	return c.updateOtelManagerConfig(otelModel)
+}
+
+// updateOtelManagerConfig updates the otel collector configuration for the otel manager. It assembles this configuration
+// from the component model passed in and from the hybrid-mode otel config set on the Coordinator.
+func (c *Coordinator) updateOtelManagerConfig(model *component.Model) error {
+	finalOtelCfg := confmap.New()
+	var componentOtelCfg *confmap.Conf
+	if len(model.Components) > 0 {
+		var err error
+		c.logger.With("components", model.Components).Debug("Updating otel manager model")
+		componentOtelCfg, err = configtranslate.GetOtelConfig(model, c.agentInfo)
+		if err != nil {
+			c.logger.Errorf("failed to generate otel config: %v", err)
+		}
+		componentIDs := make([]string, 0, len(model.Components))
+		for _, comp := range model.Components {
+			componentIDs = append(componentIDs, comp.ID)
+		}
+		c.logger.With("component_ids", componentIDs).Warn("The Otel runtime manager is HIGHLY EXPERIMENTAL and only intended for testing. Use at your own risk.")
+	}
+	if componentOtelCfg != nil {
+		err := finalOtelCfg.Merge(componentOtelCfg)
+		if err != nil {
+			c.logger.Error("failed to merge otel config: %v", err)
+		}
+	}
+
+	if c.otelCfg != nil {
+		err := finalOtelCfg.Merge(c.otelCfg)
+		if err != nil {
+			c.logger.Error("failed to merge otel config: %v", err)
+		}
+	}
+
+	if len(finalOtelCfg.AllKeys()) == 0 {
+		// if the config is empty, we want to send nil to the manager, so it knows to stop the collector
+		finalOtelCfg = nil
+	}
+
+	c.otelMgr.Update(finalOtelCfg)
+	c.finalOtelCfg = finalOtelCfg
+	return nil
+}
+
+// splitModelBetweenManager splits the model components between the runtime manager and the otel manager.
+func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtimeModel *component.Model, otelModel *component.Model) {
+	var otelComponents, runtimeComponents []component.Component
+	for _, comp := range model.Components {
+		switch comp.RuntimeManager {
+		case component.OtelRuntimeManager:
+			otelComponents = append(otelComponents, comp)
+		case component.ProcessRuntimeManager:
+			runtimeComponents = append(runtimeComponents, comp)
+		default:
+			// this should be impossible if we parse the configuration correctly
+			c.logger.Errorf("unknown runtime manager for component: %s, ignoring", comp.RuntimeManager)
+		}
+	}
+	otelModel = &component.Model{
+		Components: otelComponents,
+		// the signed portion of the policy is only used by Defend, so otel doesn't need it for anything
+	}
+	runtimeModel = &component.Model{
+		Components: runtimeComponents,
+		Signed:     model.Signed,
+	}
+	return
+}
+
+>>>>>>> 18d8dff3c (Allow switching inputs to the otel runtime manager (#7328))
 // generateComponentModel regenerates the configuration tree and
 // components from the current AST and vars and returns the result.
 // Called from both the main Coordinator goroutine and from external
