@@ -461,7 +461,7 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, shou
 	}
 
 	// sudo apt-get install the deb
-	cmd := exec.CommandContext(ctx, "sudo", "-E", "apt-get", "install", "-y", f.srcPackage)
+	cmd := exec.CommandContext(ctx, "sudo", "-E", "apt-get", "install", "-y", f.srcPackage) // #nosec G204 -- Need to pass in name of package
 	if installOpts.InstallServers {
 		cmd.Env = append(cmd.Env, "ELASTIC_AGENT_FLAVOR=servers")
 	}
