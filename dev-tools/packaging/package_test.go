@@ -23,11 +23,13 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
+	"sort"
 	"strings"
 	"testing"
 
@@ -65,7 +67,7 @@ var (
 )
 
 var (
-	files             = flag.String("files", "../build/distributions/*/*", "filepath glob containing package files")
+	files             = flag.String("files", "../build/distributions/*", "filepath glob containing package files")
 	modules           = flag.Bool("modules", false, "check modules folder contents")
 	minModules        = flag.Int("min-modules", 4, "minimum number of modules to expect in modules folder")
 	modulesd          = flag.Bool("modules.d", false, "check modules.d folder contents")
@@ -122,14 +124,39 @@ func TestDocker(t *testing.T) {
 		sizeMap[k] = s
 	}
 
-	if len(dockers) > 0 {
-		// run only as part of packaging testing
-		require.Less(t, sizeMap["elastic-otel-collector"], sizeMap["elastic-agent-slim"], "unexpected size: %v", sizeMap)
-		require.Less(t, sizeMap["elastic-agent-slim"], sizeMap["elastic-agent"], "unexpected size: %v", sizeMap)
+	if len(dockers) == 0 {
+		return
+	}
 
-		// run wolfi checks
-		require.Less(t, sizeMap["elastic-otel-collector-wolfi"], sizeMap["elastic-agent-slim-wolfi"], "unexpected size: %v", sizeMap)
-		require.Less(t, sizeMap["elastic-agent-slim-wolfi"], sizeMap["elastic-agent-wolfi"], "unexpected size: %v", sizeMap)
+	// expected variants size order ascending
+	for _, variantsExpectedSizeOrder := range [][]string{
+		{"elastic-otel-collector", "elastic-agent-slim", "elastic-agent"},
+		{"elastic-otel-collector-wolfi", "elastic-agent-slim-wolfi", "elastic-agent-wolfi"},
+	} {
+		var builtVariantsExpectedOrder []string
+		builtVariantSizes := make(map[string]int64)
+
+		// extract the built variants based on expected size order
+		for _, variant := range variantsExpectedSizeOrder {
+			if size, ok := sizeMap[variant]; ok {
+				builtVariantsExpectedOrder = append(builtVariantsExpectedOrder, variant)
+				builtVariantSizes[variant] = size
+			}
+		}
+
+		if len(builtVariantSizes) == 0 {
+			// no built variants found
+			continue
+		}
+
+		// sort the built variants by size
+		variantOrderBySize := slices.Collect(maps.Keys(builtVariantSizes))
+		sort.SliceStable(variantOrderBySize, func(i, j int) bool {
+			return builtVariantSizes[variantOrderBySize[i]] < builtVariantSizes[variantOrderBySize[j]]
+		})
+
+		// ensure the built variants are in the expected size order
+		assert.Equal(t, builtVariantsExpectedOrder, variantOrderBySize, "unexpected variant size ordering")
 	}
 }
 
