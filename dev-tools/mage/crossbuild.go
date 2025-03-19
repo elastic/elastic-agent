@@ -229,7 +229,7 @@ func CrossBuildImage(platform string) (string, error) {
 	case platform == "darwin/arm64" || platform == "darwin/universal":
 		tagSuffix = "darwin-arm64-debian11"
 	case platform == "linux/arm64":
-		tagSuffix = "arm"
+		tagSuffix = "base-arm-debian9"
 	case platform == "linux/armv5" || platform == "linux/armv6":
 		tagSuffix = "armel"
 	case platform == "linux/armv7":
@@ -247,6 +247,10 @@ func CrossBuildImage(platform string) (string, error) {
 	goVersion, err := GoVersion()
 	if err != nil {
 		return "", err
+	}
+
+	if FIPSBuild {
+		tagSuffix += "-fips"
 	}
 
 	return BeatsCrossBuildImage + ":" + goVersion + "-" + tagSuffix, nil
@@ -332,6 +336,7 @@ func (b GolangCrossBuilder) Build() error {
 		"--env", fmt.Sprintf("SNAPSHOT=%v", Snapshot),
 		"--env", fmt.Sprintf("DEV=%v", DevBuild),
 		"--env", fmt.Sprintf("EXTERNAL=%v", ExternalBuild),
+		"--env", fmt.Sprintf("FIPS=%v", FIPSBuild),
 		"-v", repoInfo.RootDir+":"+mountPoint,
 		"-w", workDir,
 		image,
