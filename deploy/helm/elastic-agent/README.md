@@ -5,11 +5,7 @@
 
 # elastic-agent
 
-<<<<<<< HEAD
 ![Version: 8.18.0-beta](https://img.shields.io/badge/Version-8.18.0--beta-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 8.18.0](https://img.shields.io/badge/AppVersion-8.18.0-informational?style=flat-square)
-=======
-![Version: 9.1.0-beta](https://img.shields.io/badge/Version-9.1.0--beta-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 9.1.0](https://img.shields.io/badge/AppVersion-9.1.0-informational?style=flat-square)
->>>>>>> 1595be9ce ([Helm] Allow providing CA certificate of the Fleet Server when running the agent in fleet mode (#7393))
 
 Elastic-Agent Helm Chart
 
@@ -148,13 +144,8 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 ### 6 - Elastic-Agent Configuration
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-<<<<<<< HEAD
 | agent.version | string | `"8.18.0"` | elastic-agent version |
 | agent.image | object | `{"pullPolicy":"IfNotPresent","repository":"docker.elastic.co/elastic-agent/elastic-agent","tag":"8.18.0-SNAPSHOT"}` | image configuration |
-=======
-| agent.version | string | `"9.1.0"` | elastic-agent version |
-| agent.image | object | `{"pullPolicy":"IfNotPresent","repository":"docker.elastic.co/elastic-agent/elastic-agent","tag":"9.1.0-SNAPSHOT"}` | image configuration |
->>>>>>> 1595be9ce ([Helm] Allow providing CA certificate of the Fleet Server when running the agent in fleet mode (#7393))
 | agent.imagePullSecrets | list | `[]` | image pull secrets |
 | agent.engine | string | `"k8s"` | generate kubernetes manifests or [ECK](https://github.com/elastic/cloud-on-k8s) CRDs |
 | agent.unprivileged | bool | `false` | enable unprivileged mode |
