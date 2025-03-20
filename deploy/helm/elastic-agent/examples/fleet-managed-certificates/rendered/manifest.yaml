@@ -22,10 +22,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-8.19.0-beta
+    helm.sh/chart: elastic-agent-9.1.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.0
+    app.kubernetes.io/version: 9.1.0
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -34,10 +34,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-8.19.0-beta
+    helm.sh/chart: elastic-agent-9.1.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.0
+    app.kubernetes.io/version: 9.1.0
 stringData:
 
   agent.yml: |-
@@ -50,6 +50,28 @@ stringData:
       kubernetes_leaderelection:
         enabled: true
         leader_lease: example-pernode
+  fleet.ca : |-
+    -----BEGIN CERTIFICATE-----
+    MIIBaDCCARCgAWIBAgIQNJyw4xhweOFK3/FqGLQF6TAKBggqhkjOPQQDAJAVMRMw
+    EQYDVQQDEwpjbHVzdGVyLWNhMB4XDTI1MDEWODAOMDIyMFoXDTM1IMDEwNjAOMDIy
+    MFowFTETMBEGA1UEAXMKY2x1c3R1Ucil1jYTBZMBMGByqGSM49AgEGCCqGSM49AWEH
+    A0TABPcDLjOSlwAmeHbHFerT+SmTNqxckANmRPItCPRgkp2cq12a1C/ckQEebE1A
+    B7WpiRaUQQkBpmNjcAPVIdfdnbWjQjBAMA4GA1UdDWEB/wQEAwICpDAPBgNVHRMB
+    Af8EBTADAQH/MBOGA1UdDgQWBBTA5SRUKOE90/xKntDXcpZSvlL1JDBDAKBggqhkj0
+    PQQDAGNGADBDAiAFghoM1M53abi968RyR+DwVX3S92aiu7MogtnuKCgPLQIFRRza
+    Ondv3U1X2Qwo2ZELignHs3JLWucWvCIqmbW2+A==
+    -----END CERTIFICATE-----
+  fleet.kibana.ca : |-
+    -----BEGIN CERTIFICATE-----
+    MIIBaDCCARCgAWIBAgIQNJyw4xhweOFK3/FqGLQF6TAKBggqhkjOPQQDAJAVMRMw
+    EQYDVQQDEwpjbHVzdGVyLWNhMB4XDTI1MDEWODAOMDIyMFoXDTM1IMDEwNjAOMDIy
+    MFowFTETMBEGA1UEAXMKY2x1c3R1Ucil1jYTBZMBMGByqGSM49AgEGCCqGSM49AWEH
+    A0TABPcDLjOSlwAmeHbHFerT+SmTNqxckANmRPItCPRgkp2cq12a1C/ckQEebE1A
+    B7WpiRaUQQkBpmNjcAPVIdfdnbWjQjBAMA4GA1UdDWEB/wQEAwICpDAPBgNVHRMB
+    Af8EBTADAQH/MBOGA1UdDgQWBBTA5SRUKOE90/xKntDXcpZSvlL1JDBDAKBggqhkj0
+    PQQDAGNGADBDAiAFghoM1M53abi968RyR+DwVX3S92aiu7MogtnuKCgPLQIFRRza
+    Ondv3U1X2Qwo2ZELignHs3JLWucWvCIqmbW2+B==
+    -----END CERTIFICATE-----
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -212,10 +234,10 @@ kind: ClusterRole
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-8.19.0-beta
+    helm.sh/chart: elastic-agent-9.1.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.0
+    app.kubernetes.io/version: 9.1.0
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
     resources:
@@ -314,10 +336,10 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-8.19.0-beta
+    helm.sh/chart: elastic-agent-9.1.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.0
+    app.kubernetes.io/version: 9.1.0
 subjects:
   - kind: ServiceAccount
     name: agent-pernode-example
@@ -362,10 +384,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-8.19.0-beta
+    helm.sh/chart: elastic-agent-9.1.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.0
+    app.kubernetes.io/version: 9.1.0
 spec:
   selector:
     matchLabels:
@@ -375,7 +397,7 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: cd7c5c4f03cc8377d18ee22cf236428090959fc194ee647bd97a39b79f38c807
+        checksum/config: 509d5f84e4687cb90ad2a381455fde090ef4e6eeb548e789a2de66f441963695
     spec:
       automountServiceAccountToken: true
       containers:
@@ -396,18 +418,21 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
+        - name: FLEET_CA
+          value: /mnt/secrets/elastic-agent/fleet.ca
+        - name: ELASTIC_AGENT_CERT
+          value: /mnt/secrets/elastic-agent/agent-cert.crt
+        - name: ELASTIC_AGENT_CERT_KEY
+          value: /mnt/secrets/elastic-agent/agent-cert.private
+        - name: KIBANA_FLEET_CA
+          value: /mnt/secrets/elastic-agent/fleet.kibana.ca
         - name: FLEET_URL
           value: http://localhost:8220
         - name: FLEET_ENROLLMENT_TOKEN
           value: fleetToken
         - name: FLEET_ENROLL
-<<<<<<< HEAD
-          value: "1"
-        image: docker.elastic.co/elastic-agent/elastic-agent:8.19.0-SNAPSHOT
-=======
           value: "true"
         image: docker.elastic.co/elastic-agent/elastic-agent:9.1.0-SNAPSHOT
->>>>>>> 1595be9ce ([Helm] Allow providing CA certificate of the Fleet Server when running the agent in fleet mode (#7393))
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
@@ -437,6 +462,22 @@ spec:
         - mountPath: /hostfs/etc
           name: etc-full
           readOnly: true
+        - mountPath: /mnt/secrets/elastic-agent/fleet.ca
+          name: config
+          readOnly: true
+          subPath: fleet.ca
+        - mountPath: /mnt/secrets/elastic-agent/agent-cert.crt
+          name: agent-cert
+          readOnly: true
+          subPath: crt
+        - mountPath: /mnt/secrets/elastic-agent/agent-cert.private
+          name: agent-cert
+          readOnly: true
+          subPath: private
+        - mountPath: /mnt/secrets/elastic-agent/fleet.kibana.ca
+          name: config
+          readOnly: true
+          subPath: fleet.kibana.ca
         - mountPath: /usr/share/elastic-agent/state
           name: agent-data
         - mountPath: /etc/elastic-agent/agent.yml
@@ -467,6 +508,10 @@ spec:
       - hostPath:
           path: /var/lib
         name: var-lib
+      - name: agent-cert
+        secret:
+          defaultMode: 292
+          secretName: agent-cert
       - hostPath:
           path: /etc/elastic-agent/default/agent-pernode-example-managed/state
           type: DirectoryOrCreate
