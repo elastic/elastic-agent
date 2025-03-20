@@ -413,13 +413,8 @@ spec:
         - name: FLEET_ENROLLMENT_TOKEN
           value: fleetToken
         - name: FLEET_ENROLL
-<<<<<<< HEAD
-          value: "1"
-        image: docker.elastic.co/elastic-agent/elastic-agent:8.19.0-SNAPSHOT
-=======
           value: "true"
-        image: docker.elastic.co/elastic-agent/elastic-agent:9.1.0-SNAPSHOT
->>>>>>> 1595be9ce ([Helm] Allow providing CA certificate of the Fleet Server when running the agent in fleet mode (#7393))
+        image: docker.elastic.co/elastic-agent/elastic-agent:8.19.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
