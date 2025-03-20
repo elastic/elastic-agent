@@ -49,6 +49,10 @@ for variant in "${docker_variants[@]}"; do
   image_archive="elastic-agent-${variant}-${AGENT_VERSION}-linux-${TARGET_ARCH}.docker.tar.gz"
   if [[ "${variant}" == "basic" ]]; then
     image_archive="elastic-agent-${AGENT_VERSION}-linux-${TARGET_ARCH}.docker.tar.gz"
+  elif [[ "${variant}" == "elastic-otel-collector" ]]; then
+    image_archive="elastic-otel-collector-${AGENT_VERSION}-linux-${TARGET_ARCH}.docker.tar.gz"
+  elif [[ "${variant}" == "elastic-otel-collector-wolfi" ]]; then
+    image_archive="elastic-otel-collector-wolfi-${AGENT_VERSION}-linux-${TARGET_ARCH}.docker.tar.gz"
   fi
   image_archive_path="${DOCKER_IMAGE_ARCHIVES_DIR}/$image_archive"
 

@@ -45,6 +45,7 @@ var diagnosticsFiles = []string{
 	"local-config.yaml",
 	"mutex.pprof.gz",
 	"otel.yaml",
+	"otel-final.yaml",
 	"pre-config.yaml",
 	"local-config.yaml",
 	"state.yaml",
@@ -257,6 +258,11 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 			}})
 	require.NoErrorf(t, err, "Error when installing agent, output: %s", out)
 	check.ConnectedToFleet(ctx, t, fixture, 5*time.Minute)
+
+	// wait until the agent acknowledges the policy change
+	require.Eventually(t, func() bool {
+		return checkinWithAcker.Acked(policyChangeAction.ActionID)
+	}, time.Minute, time.Second)
 
 	t.Log("Gather diagnostics.")
 	diagZip, err := fixture.ExecDiagnostics(ctx)
