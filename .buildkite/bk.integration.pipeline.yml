@@ -262,6 +262,7 @@ steps:
         artifact_paths:
           - build/**
           - build/diagnostics/**
+          - build/*.pod_logs_dump/*
         retry:
           automatic:
             limit: 1
