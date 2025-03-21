@@ -118,12 +118,7 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 	t.Logf("starting to ES for metrics at %s", now.Format(time.RFC3339Nano))
 	require.Eventually(t, func() bool {
 		for _, cid := range componentIds {
-			query = genESQuery(agentStatus.Info.ID,
-				[][]string{
-					{"match", "component.id", cid},
-					{"exists", "field", "system.process.cpu.total.value"},
-					{"exists", "field", "system.process.memory.size"},
-				})
+			query = genESQuery(agentStatus.Info.ID, cid)
 			now = time.Now()
 			res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
 			require.NoError(t, err)
@@ -136,30 +131,34 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 	}, time.Minute*10, time.Second*10, "could not fetch metrics for all known components in default install: %v", componentIds)
 }
 
-func genESQuery(agentID string, requiredFields [][]string) map[string]interface{} {
-	fieldsQ := make([]map[string]interface{}, 0, 2+len(requiredFields))
-	fieldsQ = append(fieldsQ, map[string]interface{}{
-		"match": map[string]interface{}{
-			"agent.id": agentID,
-		},
-	})
-	for _, f := range requiredFields {
-		if len(f) != 3 {
-			continue
-		}
-		fieldsQ = append(fieldsQ,
-			map[string]interface{}{
-				f[0]: map[string]interface{}{
-					f[1]: f[2],
-				},
-			})
-	}
-
+func genESQuery(agentID string, componentID string) map[string]interface{} {
 	// see https://github.com/elastic/kibana/blob/main/x-pack/plugins/fleet/server/services/agents/agent_metrics.ts
 	queryRaw := map[string]interface{}{
 		"query": map[string]interface{}{
 			"bool": map[string]interface{}{
-				"must": fieldsQ,
+				"must": []map[string]interface{}{
+					{
+						"match": map[string]interface{}{
+							"agent.id": agentID,
+						},
+					},
+					{
+						"match": map[string]interface{}{
+							"component.id": componentID,
+						},
+					},
+					// make sure we fetch documents that have the metric field used by fleet monitoring
+					{
+						"exists": map[string]interface{}{
+							"field": "system.process.cpu.total.value",
+						},
+					},
+					{
+						"exists": map[string]interface{}{
+							"field": "system.process.memory.size",
+						},
+					},
+				},
 			},
 		},
 	}
