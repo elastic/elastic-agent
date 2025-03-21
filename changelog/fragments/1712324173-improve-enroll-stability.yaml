@@ -1,5 +1,0 @@
-kind: enhancement
-summary: Make enroll command more stable by handling temporary server errors
-component: elastic-agent
-pr: https://github.com/elastic/elastic-agent/pull/4523
-issue: https://github.com/elastic/elastic-agent/issues/4513

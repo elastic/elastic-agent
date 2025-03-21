@@ -1,3 +1,0 @@
-kind: enhancement
-summary: Reduce Docker image size by performing more steps in the builder image
-component: "elastic-agent"
