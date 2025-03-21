@@ -113,9 +113,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 
 			t.Cleanup(func() {
 				if t.Failed() {
-					if err := k8sDumpAllPodLogs(ctx, kCtx.client, testNamespace, testNamespace, kCtx.logsBasePath); err != nil {
-						t.Logf("failed to dump logs: %s", err)
-					}
+					k8sDumpPods(t, ctx, kCtx.client, t.Name(), testNamespace, kCtx.logsBasePath, kCtx.createdAt)
 				}
 
 				uninstallAction := action.NewUninstall(actionConfig)
