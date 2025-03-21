@@ -70,7 +70,7 @@ func (runner *OsqueryManagerRunner) SetupSuite() {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
-	policyResp, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
+	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
 
 	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "osquery_manager", "1.16.0", "osquery_package.json", uuid.Must(uuid.NewV4()).String(), policyResp.ID)

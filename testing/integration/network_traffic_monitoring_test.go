@@ -71,7 +71,7 @@ func (runner *NetworkTrafficRunner) SetupSuite() {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
-	policyResp, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
+	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
 
 	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "network_traffic", "1.32.1", "network_traffic_package.json", uuid.Must(uuid.NewV4()).String(), policyResp.ID)
