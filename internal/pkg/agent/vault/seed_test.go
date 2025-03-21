@@ -6,6 +6,7 @@ package vault
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"os"
@@ -19,7 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault/aesgcm"
 )
 
-func TestGetSeed(t *testing.T) {
+func TestGetSeedV1(t *testing.T) {
 	dir := t.TempDir()
 
 	fp := filepath.Join(dir, seedFile)
@@ -30,7 +31,55 @@ func TestGetSeed(t *testing.T) {
 	}
 
 	// seed is not yet created
-	if _, err := getSeed(dir); !errors.Is(err, os.ErrNotExist) {
+	if _, err := getSeedV1(dir); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal(err)
+	}
+	// should be not found
+	if _, err := os.Stat(fp); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal(err)
+	}
+
+	// create seed manually
+	seed, err := aesgcm.NewKey(aesgcm.AES256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.WriteFile(fp, seed, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(fp); err != nil {
+		t.Fatal(err)
+	}
+
+	b, err := getSeedV1(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if seedFileSize != len(b) {
+		t.Errorf("expected seed file size to be %d, got: %d", seedFileSize, len(b))
+	}
+
+	diff := cmp.Diff(seed, b)
+	if diff != "" {
+		t.Error(diff)
+	}
+}
+
+func TestGetSeedV2(t *testing.T) {
+	dir := t.TempDir()
+
+	fp := filepath.Join(dir, seedFileV2)
+
+	// check the test prerequisites
+	if _, err := os.Stat(fp); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal(err)
+	}
+
+	// seed is not yet created
+	if _, _, err := getSeedV2(dir); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal(err)
 	}
 
@@ -39,53 +88,35 @@ func TestGetSeed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	b, err := createSeedIfNotExists(dir)
+	// create seed manually
+	seed, err := aesgcm.NewKey(aesgcm.AES256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := make([]byte, 4)
+	binary.LittleEndian.PutUint32(l, uint32(defaultSaltSizeV2))
+	err = os.WriteFile(fp, append(seed, l...), 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// file should exist
 	if _, err := os.Stat(fp); err != nil {
 		t.Fatal(err)
 	}
 
-	diff := cmp.Diff(int(aesgcm.AES256), len(b))
-	if diff != "" {
-		t.Error(diff)
-	}
-
-	// try get seed
-	gotSeed, err := getSeed(dir)
+	b, saltSize, err := getSeedV2(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	diff = cmp.Diff(b, gotSeed)
-	if diff != "" {
-		t.Error(diff)
+	if seedFileSize != len(b) {
+		t.Errorf("expected seed length to be %d, got: %d", seedFileSize, len(b))
 	}
-}
-
-func TestCreateSeedIfNotExists(t *testing.T) {
-	dir := t.TempDir()
-
-	fp := filepath.Join(dir, seedFile)
-
-	if _, err := os.Stat(fp); !errors.Is(err, os.ErrNotExist) {
-		t.Fatal(err)
+	if saltSize != defaultSaltSizeV2 {
+		t.Errorf("expected salt size: %d got: %d", defaultSaltSizeV2, saltSize)
 	}
 
-	b, err := createSeedIfNotExists(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// file should exist
-	if _, err := os.Stat(fp); err != nil {
-		t.Fatal(err)
-	}
-
-	diff := cmp.Diff(int(aesgcm.AES256), len(b))
+	diff := cmp.Diff(seed, b)
 	if diff != "" {
 		t.Error(diff)
 	}
@@ -105,7 +136,7 @@ func TestCreateSeedIfNotExistsRace(t *testing.T) {
 	for i := 0; i < count; i++ {
 		g.Go(func(idx int) func() error {
 			return func() error {
-				seed, err := createSeedIfNotExists(dir)
+				seed, _, err := createSeedIfNotExists(dir)
 				mx.Lock()
 				res[idx] = seed
 				mx.Unlock()
