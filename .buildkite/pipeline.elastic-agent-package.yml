@@ -82,6 +82,7 @@ steps:
           provider: "aws"
           instanceType: "t4g.2xlarge"
           imagePrefix: "core-ubuntu-2204-aarch64"
+          diskSizeGb: 400
         env:
           PLATFORMS: "linux/arm64 darwin/arm64"
           PACKAGES: "docker,tar.gz,deb,rpm"
@@ -147,7 +148,7 @@ steps:
     agents:
       provider: "gcp"
       machineType: "n2-standard-8"
-      diskSizeGb: 250
+      diskSizeGb: 400
     env:
       DRA_PROJECT_ID: "elastic-agent-package"
       DRA_PROJECT_ARTIFACT_ID: "agent-package"
