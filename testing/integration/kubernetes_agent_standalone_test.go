@@ -546,31 +546,6 @@ func k8sCheckAgentStatus(ctx context.Context, client klient.Client, stdout *byte
 	}
 }
 
-<<<<<<< HEAD
-=======
-// k8sGetAgentID returns the agent ID for the given agent pod
-func k8sGetAgentID(ctx context.Context, client klient.Client, stdout *bytes.Buffer, stderr *bytes.Buffer,
-	namespace string, agentPodName string, containerName string) (string, error) {
-	command := []string{"elastic-agent", "status", "--output=json"}
-
-	status := atesting.AgentStatusOutput{} // clear status output
-	stdout.Reset()
-	stderr.Reset()
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	err := client.Resources().ExecInPod(ctx, namespace, agentPodName, containerName, command, stdout, stderr)
-	cancel()
-	if err != nil {
-		return "", err
-	}
-
-	if err := json.Unmarshal(stdout.Bytes(), &status); err != nil {
-		return "", err
-	}
-
-	return status.Info.ID, nil
-}
-
->>>>>>> 79bcfb791 ([ci] capture logs of pods in the test namespace and kube-system (#7341))
 // getAgentComponentState returns the component state for the given component name and a bool indicating if it exists.
 func getAgentComponentState(status atesting.AgentStatusOutput, componentName string) (int, bool) {
 	for _, comp := range status.Components {
@@ -1475,59 +1450,3 @@ func k8sStepHintsRedisDelete() k8sTestStep {
 		require.NoError(t, err, "failed to delete redis k8s objects")
 	}
 }
-<<<<<<< HEAD
-=======
-
-func k8sStepCheckRestrictUpgrade(agentPodLabelSelector string, expectedPodNumber int, containerName string) k8sTestStep {
-	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		perNodePodList := &corev1.PodList{}
-		err := kCtx.client.Resources(namespace).List(ctx, perNodePodList, func(opt *metav1.ListOptions) {
-			opt.LabelSelector = agentPodLabelSelector
-		})
-		require.NoError(t, err, "failed to list pods with selector ", perNodePodList)
-		require.NotEmpty(t, perNodePodList.Items, "no pods found with selector ", perNodePodList)
-		require.Equal(t, expectedPodNumber, len(perNodePodList.Items), "unexpected number of pods found with selector ", perNodePodList)
-		for _, pod := range perNodePodList.Items {
-			var stdout, stderr bytes.Buffer
-
-			command := []string{"elastic-agent", "upgrade", "1.0.0"}
-			ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-			err := kCtx.client.Resources().ExecInPod(ctx, namespace, pod.Name, containerName, command, &stdout, &stderr)
-			cancel()
-			require.Error(t, err)
-			require.Contains(t, stderr.String(), coordinator.ErrNotUpgradable.Error())
-		}
-	}
-}
-
-// GetAgentResponse extends kibana.GetAgentResponse and includes the EnrolledAt field
-type GetAgentResponse struct {
-	kibana.GetAgentResponse `json:",inline"`
-	EnrolledAt              time.Time `json:"enrolled_at"`
-}
-
-// kibanaGetAgent essentially re-implements kibana.GetAgent to extract also GetAgentResponse.EnrolledAt
-func kibanaGetAgent(ctx context.Context, kc *kibana.Client, id string) (*GetAgentResponse, error) {
-	apiURL := fmt.Sprintf("/api/fleet/agents/%s", id)
-	r, err := kc.Connection.SendWithContext(ctx, http.MethodGet, apiURL, nil, nil, nil)
-	if err != nil {
-		return nil, fmt.Errorf("error calling get agent API: %w", err)
-	}
-	defer r.Body.Close()
-	var agentResp struct {
-		Item GetAgentResponse `json:"item"`
-	}
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading response body: %w", err)
-	}
-	if r.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("error calling get agent API: %s", string(b))
-	}
-	err = json.Unmarshal(b, &agentResp)
-	if err != nil {
-		return nil, fmt.Errorf("unmarshalling response json: %w", err)
-	}
-	return &agentResp.Item, nil
-}
->>>>>>> 79bcfb791 ([ci] capture logs of pods in the test namespace and kube-system (#7341))
