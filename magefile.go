@@ -3307,16 +3307,31 @@ func getOtelDependencies() (*otelDependencies, error) {
 			continue
 		}
 
+		var components *[]*otelDependency
 		if dependency.ComponentType == "connector" {
-			connectors = append(connectors, dependency)
+			components = &connectors
 		} else if dependency.ComponentType == "exporter" {
-			exporters = append(exporters, dependency)
+			components = &exporters
 		} else if dependency.ComponentType == "extension" {
-			extensions = append(extensions, dependency)
+			components = &extensions
 		} else if dependency.ComponentType == "processor" {
-			processors = append(processors, dependency)
+			components = &processors
 		} else if dependency.ComponentType == "receiver" {
-			receivers = append(receivers, dependency)
+			components = &receivers
+		} else {
+			continue
+		}
+
+		if strings.Contains(l, " => ") {
+			// If the current line is a replace directive, replace the original dependency
+			for i, existingDependency := range *components {
+				if existingDependency.Name == dependency.Name {
+					(*components)[i] = dependency
+					break
+				}
+			}
+		} else {
+			*components = append(*components, dependency)
 		}
 	}
 
@@ -3351,6 +3366,10 @@ func newOtelDependency(l string) *otelDependency {
 		return nil
 	}
 
+	if strings.Contains(l, " => ") {
+		return parseReplaceDirective(l)
+	}
+
 	chunks := strings.SplitN(l, " ", 2)
 	if len(chunks) != 2 {
 		return nil
@@ -3366,6 +3385,37 @@ func newOtelDependency(l string) *otelDependency {
 		ComponentType: componentType,
 		Name:          componentName,
 		Version:       version,
+		Link:          link,
+	}
+}
+
+func parseReplaceDirective(line string) *otelDependency {
+	originalAndReplacement := strings.Split(line, " => ")
+	if len(originalAndReplacement) != 2 {
+		return nil
+	}
+
+	replacement := originalAndReplacement[1]
+	replacementUriAndVersion := strings.Split(replacement, " ")
+	if len(replacementUriAndVersion) != 2 {
+		return nil
+	}
+
+	dependencyURI := replacementUriAndVersion[0]
+	versionParts := strings.Split(replacementUriAndVersion[1], "-")
+	if len(versionParts) != 3 {
+		return nil
+	}
+	commitSha := versionParts[2]
+
+	componentName := getOtelComponentName(dependencyURI)
+	componentType := getOtelComponentType(dependencyURI)
+	link := getOtelDependencyLink(dependencyURI, commitSha)
+
+	return &otelDependency{
+		ComponentType: componentType,
+		Name:          componentName,
+		Version:       commitSha,
 		Link:          link,
 	}
 }
@@ -3393,8 +3443,12 @@ func getOtelComponentType(dependencyName string) string {
 func getOtelDependencyLink(dependencyURI string, version string) string {
 	dependencyRepository := getDependencyRepository(dependencyURI)
 	dependencyPath := strings.TrimPrefix(dependencyURI, dependencyRepository+"/")
+	if strings.HasPrefix(version, "v") {
+		// If the version is a release tag, prepend it with the component's path as in upstream tags like `receiver/prometheusreceiver/v0.121.0`.
+		version = dependencyPath + "/" + version
+	}
 	repositoryURL := getOtelRepositoryURL(dependencyURI)
-	return fmt.Sprintf("https://%s/blob/%s/%s/%s/README.md", repositoryURL, dependencyPath, version, dependencyPath)
+	return fmt.Sprintf("https://%s/blob/%s/%s/README.md", repositoryURL, version, dependencyPath)
 }
 
 func getDependencyRepository(dependencyURI string) string {
