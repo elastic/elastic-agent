@@ -23,11 +23,13 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
+	"sort"
 	"strings"
 	"testing"
 
@@ -65,7 +67,7 @@ var (
 )
 
 var (
-	files             = flag.String("files", "../build/distributions/*/*", "filepath glob containing package files")
+	files             = flag.String("files", "../build/distributions/*", "filepath glob containing package files")
 	modules           = flag.Bool("modules", false, "check modules folder contents")
 	minModules        = flag.Int("min-modules", 4, "minimum number of modules to expect in modules folder")
 	modulesd          = flag.Bool("modules.d", false, "check modules.d folder contents")
@@ -115,9 +117,46 @@ func TestZip(t *testing.T) {
 
 func TestDocker(t *testing.T) {
 	dockers := getFiles(t, regexp.MustCompile(`\.docker\.tar\.gz$`))
+	sizeMap := make(map[string]int64)
 	for _, docker := range dockers {
 		t.Log(docker)
-		checkDocker(t, docker)
+		k, s := checkDocker(t, docker)
+		sizeMap[k] = s
+	}
+
+	if len(dockers) == 0 {
+		return
+	}
+
+	// expected variants size order ascending
+	for _, variantsExpectedSizeOrder := range [][]string{
+		{"elastic-otel-collector", "elastic-agent-slim", "elastic-agent"},
+		{"elastic-otel-collector-wolfi", "elastic-agent-slim-wolfi", "elastic-agent-wolfi"},
+	} {
+		var builtVariantsExpectedOrder []string
+		builtVariantSizes := make(map[string]int64)
+
+		// extract the built variants based on expected size order
+		for _, variant := range variantsExpectedSizeOrder {
+			if size, ok := sizeMap[variant]; ok {
+				builtVariantsExpectedOrder = append(builtVariantsExpectedOrder, variant)
+				builtVariantSizes[variant] = size
+			}
+		}
+
+		if len(builtVariantSizes) == 0 {
+			// no built variants found
+			continue
+		}
+
+		// sort the built variants by size
+		variantOrderBySize := slices.Collect(maps.Keys(builtVariantSizes))
+		sort.SliceStable(variantOrderBySize, func(i, j int) bool {
+			return builtVariantSizes[variantOrderBySize[i]] < builtVariantSizes[variantOrderBySize[j]]
+		})
+
+		// ensure the built variants are in the expected size order
+		assert.Equal(t, builtVariantsExpectedOrder, variantOrderBySize, "unexpected variant size ordering")
 	}
 }
 
@@ -302,11 +341,15 @@ func checkNpcapNotices(pkg, file string, contents io.Reader) error {
 	return nil
 }
 
-func checkDocker(t *testing.T, file string) {
+func checkDocker(t *testing.T, file string) (string, int64) {
+	if strings.Contains(file, "elastic-otel-collector") {
+		return checkEdotCollectorDocker(t, file)
+	}
+
 	p, info, err := readDocker(file)
 	if err != nil {
 		t.Errorf("error reading file %v: %v", file, err)
-		return
+		return "", -1
 	}
 
 	checkDockerEntryPoint(t, p, info)
@@ -319,6 +362,59 @@ func checkDocker(t *testing.T, file string) {
 	checkModulesDPresent(t, "", p)
 	checkHintsInputsD(t, "hints.inputs.d", hintsInputsDFilePattern, p)
 	checkLicensesPresent(t, "licenses/", p)
+
+	name, err := dockerName(file, info.Config.Labels)
+	if err != nil {
+		t.Errorf("error constructing docker name: %v", err)
+		return "", -1
+	}
+
+	return name, info.Size
+}
+
+func dockerName(file string, labels map[string]string) (string, error) {
+	version, found := labels["version"]
+	if !found {
+		return "", errors.New("version label not found")
+	}
+
+	parts := strings.SplitN(file, "/", -1)
+	if len(parts) == 0 {
+		return "", errors.New("failed to get file name parts")
+	}
+
+	lastPart := parts[len(parts)-1]
+	versionIdx := strings.Index(lastPart, version)
+	if versionIdx < 0 {
+		return "", fmt.Errorf("version not found in nam %q", file)
+	}
+	return lastPart[:versionIdx-1], nil
+}
+
+func checkEdotCollectorDocker(t *testing.T, file string) (string, int64) {
+	p, info, err := readDocker(file)
+	if err != nil {
+		t.Errorf("error reading file %v: %v", file, err)
+		return "", -1
+	}
+
+	checkDockerEntryPoint(t, p, info)
+	checkDockerLabels(t, p, info, file)
+	checkDockerUser(t, p, info, *rootUserContainer)
+	checkFilePermissions(t, p, configFilePattern, os.FileMode(0644))
+	checkFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
+	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
+	checkModulesPresent(t, "", p)
+	checkModulesDPresent(t, "", p)
+	checkLicensesPresent(t, "licenses/", p)
+
+	name, err := dockerName(file, info.Config.Labels)
+	if err != nil {
+		t.Errorf("error constructing docker name: %v", err)
+		return "", -1
+	}
+
+	return name, info.Size
 }
 
 // Verify that the main configuration file is installed with a 0600 file mode.
@@ -863,6 +959,12 @@ func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
 	defer file.Close()
 
 	var info *dockerInfo
+
+	stat, err := file.Stat()
+	if err != nil {
+		return nil, nil, err
+	}
+
 	layers := make(map[string]*packageFile)
 
 	gzipReader, err := gzip.NewReader(file)
@@ -931,6 +1033,7 @@ func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
 		return nil, nil, fmt.Errorf("no files found in docker working directory (%s)", info.Config.WorkingDir)
 	}
 
+	info.Size = stat.Size()
 	return p, info, nil
 }
 
@@ -947,6 +1050,7 @@ type dockerInfo struct {
 		User       string
 		WorkingDir string
 	} `json:"config"`
+	Size int64
 }
 
 func readDockerInfo(r io.Reader) (*dockerInfo, error) {

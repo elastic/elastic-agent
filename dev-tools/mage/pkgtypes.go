@@ -115,6 +115,10 @@ type PackageSpec struct {
 	localPostRmScript      string
 }
 
+// add new prop into package file called expand spc
+// expand spec is checked during packaging and expands to multiple files
+// if expand is not present file is copied normally
+
 // PackageFile represents a file or directory within a package.
 type PackageFile struct {
 	Source        string                  `yaml:"source,omitempty"`   // Regular source file or directory.
@@ -129,6 +133,7 @@ type PackageFile struct {
 	Owner         string                  `yaml:"owner,omitempty"`           // File Owner, for user and group name (rpm only).
 	SkipOnMissing bool                    `yaml:"skip_on_missing,omitempty"` // Prevents build failure if the file is missing.
 	Symlink       bool                    `yaml:"symlink"`                   // Symlink marks file as a symlink pointing from target to source.
+	ExpandSpec    bool                    `yaml:"expand_spec,omitempty"`     // Optional
 }
 
 // OSArchNames defines the names of architectures for use in packages.
@@ -481,9 +486,13 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 // ImageName computes the image name from the spec.
 func (s PackageSpec) ImageName() string {
 	if s.DockerVariant == Basic {
+		return s.Name
+	}
+	if s.DockerVariant == EdotCollector || s.DockerVariant == EdotCollectorWolfi {
 		// no suffix for basic docker variant
 		return s.Name
 	}
+
 	return fmt.Sprintf("%s-%s", s.Name, s.DockerVariant)
 }
 
