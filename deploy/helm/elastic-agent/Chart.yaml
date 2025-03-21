@@ -3,5 +3,5 @@ name: elastic-agent
 description: Elastic-Agent Helm Chart
 kubeVersion: ">= 1.27.0-0"
 type: application
-appVersion: 8.16.6
-version: 8.16.6-beta
+appVersion: 8.16.7
+version: 8.16.7-beta
