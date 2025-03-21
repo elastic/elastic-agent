@@ -30,27 +30,6 @@ type Option struct {
 	BlockSize int
 }
 
-// Validate the options for encoding and decoding values.
-func (o *Option) Validate() error {
-	if o.IVLength == 0 {
-		return errors.New("IVLength must be superior to 0")
-	}
-
-	if o.SaltLength == 0 {
-		return errors.New("SaltLength must be superior to 0")
-	}
-
-	if o.IterationsCount == 0 {
-		return errors.New("IterationsCount must be superior to 0")
-	}
-
-	if o.KeyLength == 0 {
-		return errors.New("KeyLength must be superior to 0")
-	}
-
-	return nil
-}
-
 // DefaultOptions is the default options to use when creating the writer, changing might decrease
 // the efficacity of the encryption.
 var DefaultOptions = &Option{
