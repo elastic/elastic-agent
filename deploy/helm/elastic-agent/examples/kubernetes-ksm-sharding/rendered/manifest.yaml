@@ -284,7 +284,16 @@ metadata:
   name: agent-ksm
   namespace: "default"
 stringData:
+
   agent.yml: |-
+    id: agent-ksm
+    outputs:
+      default:
+        api_key: ${OUTPUT_DEFAULT_API_KEY}
+        hosts:
+        - ${OUTPUT_DEFAULT_URL}
+        type: elasticsearch
+    secret_references: []
     inputs:
       - data_stream:
           namespace: default
@@ -457,12 +466,6 @@ stringData:
           period: 10s
         type: kubernetes/metrics
         use_output: default
-    outputs:
-      default:
-        api_key: ${OUTPUT_DEFAULT_API_KEY}
-        hosts:
-        - ${OUTPUT_DEFAULT_URL}
-        type: elasticsearch
     providers:
       kubernetes:
         enabled: false
@@ -1161,7 +1164,7 @@ spec:
         app.kubernetes.io/version: "2.15.0"
       annotations:
       
-        checksum/config: 80abdbb9b473f2336713dacdae362b6a0982ca46324fbe02e7d20492b8ea8014
+        checksum/config: d86c07ea79de1388d0a81565edd84ba54f07ce89dc2d060514a1c744104e8f90
     spec:
       automountServiceAccountToken: true
       hostNetwork: false
