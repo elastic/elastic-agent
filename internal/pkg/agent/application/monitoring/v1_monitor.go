@@ -415,19 +415,19 @@ func (b *BeatsMonitor) getComponentInfos(components []component.Component, compo
 			componentInfo{
 				ID:             fmt.Sprintf("beat/%s", monitoringMetricsUnitID),
 				BinaryName:     metricBeatName,
-				RuntimeManager: component.DefaultRuntimeManager,
+				RuntimeManager: component.RuntimeManager(b.config.C.RuntimeManager),
 			},
 			componentInfo{
 				ID:             fmt.Sprintf("http/%s", monitoringMetricsUnitID),
 				BinaryName:     metricBeatName,
-				RuntimeManager: component.DefaultRuntimeManager,
+				RuntimeManager: component.RuntimeManager(b.config.C.RuntimeManager),
 			})
 	}
 	if b.config.C.MonitorLogs {
 		componentInfos = append(componentInfos, componentInfo{
 			ID:             monitoringFilesUnitsID,
 			BinaryName:     fileBeatName,
-			RuntimeManager: component.DefaultRuntimeManager,
+			RuntimeManager: component.RuntimeManager(b.config.C.RuntimeManager),
 		})
 	}
 	// sort the components to ensure a consistent order of inputs in the configuration
@@ -445,15 +445,19 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentInfo
 
 	streams = append(streams, b.getServiceComponentFilestreamStreams(componentInfos)...)
 
-	inputs := []interface{}{
-		map[string]interface{}{
-			idKey:        fmt.Sprintf("%s-agent", monitoringFilesUnitsID),
-			"name":       fmt.Sprintf("%s-agent", monitoringFilesUnitsID),
-			"type":       "filestream",
-			useOutputKey: monitoringOutput,
-			"streams":    streams,
-		},
+	input := map[string]interface{}{
+		idKey:        fmt.Sprintf("%s-agent", monitoringFilesUnitsID),
+		"name":       fmt.Sprintf("%s-agent", monitoringFilesUnitsID),
+		"type":       "filestream",
+		useOutputKey: monitoringOutput,
+		"streams":    streams,
 	}
+	// Make sure we don't set anything until the configuration is stable if the otel manager isn't enabled
+	if b.config.C.RuntimeManager != monitoringCfg.DefaultRuntimeManager {
+		input["_runtime_experimental"] = b.config.C.RuntimeManager
+	}
+
+	inputs := []any{input}
 	inputsNode, found := cfg[inputsKey]
 	if !found {
 		return fmt.Errorf("no inputs in config")
@@ -517,6 +521,14 @@ func (b *BeatsMonitor) injectMetricsInput(
 			},
 			"streams": httpStreams,
 		},
+	}
+
+	// Make sure we don't set anything until the configuration is stable if the otel manager isn't enabled
+	if b.config.C.RuntimeManager != monitoringCfg.DefaultRuntimeManager {
+		for _, input := range inputs {
+			inputMap := input.(map[string]interface{})
+			inputMap["_runtime_experimental"] = b.config.C.RuntimeManager
+		}
 	}
 
 	// add system/process metrics for services that can't be monitored via json/beats metrics
