@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
+	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 
 	"github.com/gofrs/uuid/v5"
@@ -187,12 +188,33 @@ func TestRpmFleetUpgrade(t *testing.T) {
 		Sudo:  true,
 	})
 
+	testCases := []struct {
+		name               string
+		upgradeFromVersion *version.ParsedSemVer
+		installingServers  bool
+		expectingServers   bool
+	}{
+		{"legacy installation", version.NewParsedSemVer(8, 17, 3, "", ""), false, true},      // in case of legacy we don't apply flavor, expecting all to be preserved
+		{"9.0 snapshot with basic flavor", upgradetest.Version_9_0_0_SNAPSHOT, false, false}, // TODO: replace with PreviousMinor once 9.1 is released
+		{"9.0 snapshot with basic flavor", upgradetest.Version_9_0_0_SNAPSHOT, true, true},   // TODO: replace with PreviousMinor once 9.1 is released
+	}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("Upgrade DEB from %s - %q", tc.upgradeFromVersion.String(), tc.name), func(t *testing.T) {
+			t.Cleanup(func() {
+				// cleanup after ourselves
+				_ = os.Remove("/var/lib/elastic-agent/.flavor")
+			})
+			testRpmUpgrade(t, tc.upgradeFromVersion, info, tc.installingServers, tc.expectingServers)
+		})
+	}
+}
+
+func testRpmUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info *define.Info, installingServers bool, expectingServers bool) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// start from snapshot of the rpm
-	upgradeFromVersion, err := upgradetest.PreviousMinor()
-	require.NoError(t, err)
 	startFixture, err := atesting.NewFixture(
 		t,
 		upgradeFromVersion.String(),
@@ -229,6 +251,7 @@ func TestRpmFleetUpgrade(t *testing.T) {
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
+		InstallServers: installingServers,
 	}
 
 	// 2. Install the Elastic-Agent with the policy that
@@ -267,4 +290,38 @@ func TestRpmFleetUpgrade(t *testing.T) {
 		t.Logf("Got Agent version %s != %s", newVersion, noSnapshotVersion)
 		return false
 	}, 5*time.Minute, time.Second)
+
+	// 5. verify basic flavor is preserved
+	if expectingServers {
+		// for previous versions full install should be preserved
+		t.Run("check components set", testComponentsPresence(ctx, endFixture,
+			[]componentPresenceDefinition{
+				{"agentbeat", []string{"windows", "linux", "darwin"}},
+				{"endpoint-security", []string{"windows", "linux", "darwin"}},
+				{"pf-host-agent", []string{"linux"}},
+				{"cloudbeat", []string{"linux"}},
+				{"apm-server", []string{"windows", "linux", "darwin"}},
+				{"fleet-server", []string{"windows", "linux", "darwin"}},
+				{"pf-elastic-symbolizer", []string{"linux"}},
+				{"pf-elastic-collector", []string{"linux"}},
+			},
+			[]componentPresenceDefinition{},
+		))
+	} else {
+		// for 9.0+ versions basic install should be preserved
+		t.Run("check components set", testComponentsPresence(ctx, endFixture,
+			[]componentPresenceDefinition{
+				{"agentbeat", []string{"windows", "linux", "darwin"}},
+				{"endpoint-security", []string{"windows", "linux", "darwin"}},
+				{"pf-host-agent", []string{"linux"}},
+			},
+			[]componentPresenceDefinition{
+				{"cloudbeat", []string{"linux"}},
+				{"apm-server", []string{"windows", "linux", "darwin"}},
+				{"fleet-server", []string{"windows", "linux", "darwin"}},
+				{"pf-elastic-symbolizer", []string{"linux"}},
+				{"pf-elastic-collector", []string{"linux"}},
+			},
+		))
+	}
 }
