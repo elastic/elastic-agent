@@ -1,0 +1,176 @@
+version: 8.17.4
+entries:
+    - kind: bug-fix
+      summary: |
+        Add conditions to copy_fields processors to prevent spamming the debug logs
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6730
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/5299
+      timestamp: 1738855375
+      file:
+        name: 1738855375-Add-conditions-to-copy_fields-processors.yaml
+        checksum: ee690b0321486c0a228baf6b13ff0997faa6c214
+    - kind: bug-fix
+      summary: Improve message when audit/uninstall returns 401
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6735
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6711
+      timestamp: 1738867024
+      file:
+        name: 1738867024-Improve-message-when-audit-uninstall-returns-401.yaml
+        checksum: 3aaf29181c972e98c905e21797c0966fbff1a2ee
+    - kind: bug-fix
+      summary: Fix secret_paths redaction along complex paths
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6710
+      issue: []
+      timestamp: 1738874791
+      file:
+        name: 1738874791-Fix-secret_paths-redaction-along-complex-paths.yaml
+        checksum: ffb12c65c425e645d9a7a1625214ff424ec80ced
+    - kind: enhancement
+      summary: Improve kubernetes_secrets provider secret logging
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6841
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6187
+      timestamp: 1739437836
+      file:
+        name: 1739437836-Improve-kubernetes_secrets-provider-secret-logging.yaml
+        checksum: 0c4b850fae555d18f7a8ba5292f668a28483eaf2
+    - kind: feature
+      summary: add MOtel sample configurations
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6630
+      issue: []
+      timestamp: 1739544282
+      file:
+        name: 1739544282-add-MOtel-sample-configurations.yaml
+        checksum: 06334af7feea3aec65ceed7678a960567525869c
+    - kind: bug-fix
+      summary: Make enroll command backoff more conservative
+      description: |
+        The plain enroll command now has an initial delay of 5s and a maximum of 10 minutes. It also has a jitter.
+        Delayed enroll now uses the same backoff behaviour as other requests to Fleet Server.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6983
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6761
+      timestamp: 1740399399
+      file:
+        name: 1740399399-fleet-backoff.yaml
+        checksum: da851e63a60889bb65cf0a4549633ca970ca2687
+    - kind: enhancement
+      summary: Include all metadata that is sent to Fleet in the agent-info.yaml file in diagnostics by default.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7029
+      issue: []
+      timestamp: 1740521494
+      file:
+        name: 1740521494-diagnostics-include-all-metadata-that-is-sent-to-Fleet-by-default.yaml
+        checksum: 7082653011faee93bf1107455c15714d7e432244
+    - kind: enhancement
+      summary: add ApiKey prefix to MOTel host configurations
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7063
+      issue: []
+      timestamp: 1740674973
+      file:
+        name: 1740674973-add-ApiKey-prefix-to-MOTel-host-configurations.yaml
+        checksum: 23aaa12620e5149b642235c310fbf957682d7a7d
+    - kind: bug-fix
+      summary: Fixes an issue where `FixPermissions` on Windows incorrectly returned an error message due to improper handling of Windows API return values.
+      description: Corrects error handling in `FixPermissions` on Windows by properly checking the return value of Win32 APIs calls. The previous implementation incorrectly propagated an unrelated error message.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7059
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6917
+      timestamp: 1740692584
+      file:
+        name: 1740692584-Fixes-Windows-FixPermissions-error-handling.yaml
+        checksum: 85673ab32698cdc5cb4cd033dac94bb456bbf4ca
+    - kind: bug-fix
+      summary: support ipv6 hosts in enroll url
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7036
+      issue: []
+      timestamp: 1740712347
+      file:
+        name: 1740712347-support-ipv6-enroll-url.yaml
+        checksum: 56800ef6f0af0ef0df527f9dad795b5890701b24
+    - kind: bug-fix
+      summary: support ipv6 host in grpc config
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7035
+      issue: []
+      timestamp: 1740712540
+      file:
+        name: 1740712540-support-grpc-ipv6-host.yaml
+        checksum: d5f2d59f6a432562eb7ed207ae500f45cee4a7e5
+    - kind: bug-fix
+      summary: Rotate logger output file when writing to a symbolic link
+      description: "The agent logger rotates files when necessary.  \nElastic Agent now forces a file rotation when unexpectedly writing to a file through a symbolic link.\n"
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/6938
+      issue: []
+      timestamp: 1740772872
+      file:
+        name: 1740772872-mitigate-symlink-following-when-rotating-files.yaml
+        checksum: 288650e2fa6b3a986ffeccca903aa855bdbcdc65
+    - kind: bug-fix
+      summary: Do not fail Windows permission updates on missing files/paths.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7305
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/7301
+      timestamp: 1741622468
+      file:
+        name: 1741622468-Do-not-fail-Windows-permission-updates-on-missing-files-paths..yaml
+        checksum: ddff036dd71bc0e3963dd161e4930d67a491e64a
+    - kind: bug-fix
+      summary: Make `otelcol` executable in the Docker image
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7345
+      issue: []
+      timestamp: 1741775827
+      file:
+        name: 1741775827-docker-otelcol-executable.yaml
+        checksum: e7860d31bb258904374fefa7d66d751e7eea5d16
+    - kind: bug-fix
+      summary: Fix elasticsearch exporter configuration in kube-stack values
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7380
+      issue: []
+      timestamp: 1741865161
+      file:
+        name: 1741865161-fix-otel-kube-stack-config.yaml
+        checksum: 469274d8e4bbe2cf8fd3eb02e6c5220ef1c1bdc8

@@ -1,0 +1,62 @@
+// begin 8.17.4 relnotes
+
+[[release-notes-8.17.4]]
+==  8.17.4
+
+Review important information about the  8.17.4 release.
+
+
+
+
+
+
+
+
+
+[discrete]
+[[new-features-8.17.4]]
+=== New features
+
+The 8.17.4 release adds the following new and notable features.
+
+
+elastic-agent::
+
+* Add Motel Sample Configurations. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6630[#https://github.com/elastic/elastic-agent/pull/6630] 
+
+
+[discrete]
+[[enhancements-8.17.4]]
+=== Enhancements
+
+
+elastic-agent::
+
+* Improve Kubernetes_secrets Provider Secret Logging. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6841[#https://github.com/elastic/elastic-agent/pull/6841] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6187[#https://github.com/elastic/elastic-agent/issues/6187]
+* Include All Metadata That Is Sent To Fleet In The Agent-Info.yaml File In Diagnostics By Default. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7029[#https://github.com/elastic/elastic-agent/pull/7029] 
+* Add Apikey Prefix To Motel Host Configurations. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7063[#https://github.com/elastic/elastic-agent/pull/7063] 
+
+
+
+
+[discrete]
+[[bug-fixes-8.17.4]]
+=== Bug fixes
+
+
+elastic-agent::
+
+* Add Conditions To Copy_fields Processors To Prevent Spamming The Debug Logs
+. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6730[#https://github.com/elastic/elastic-agent/pull/6730] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/5299[#https://github.com/elastic/elastic-agent/issues/5299]
+* Improve Message When Audit/Uninstall Returns 401. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6735[#https://github.com/elastic/elastic-agent/pull/6735] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6711[#https://github.com/elastic/elastic-agent/issues/6711]
+* Fix Secret_paths Redaction Along Complex Paths. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6710[#https://github.com/elastic/elastic-agent/pull/6710] 
+* Make Enroll Command Backoff More Conservative. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6983[#https://github.com/elastic/elastic-agent/pull/6983] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6761[#https://github.com/elastic/elastic-agent/issues/6761]
+* Fixes An Issue Where `Fixpermissions` On Windows Incorrectly Returned An Error Message Due To Improper Handling Of Windows Api Return Values. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7059[#https://github.com/elastic/elastic-agent/pull/7059] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6917[#https://github.com/elastic/elastic-agent/issues/6917]
+* Support Ipv6 Hosts In Enroll Url. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7036[#https://github.com/elastic/elastic-agent/pull/7036] 
+* Support Ipv6 Host In Grpc Config. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7035[#https://github.com/elastic/elastic-agent/pull/7035] 
+* Rotate Logger Output File When Writing To A Symbolic Link. {elastic-agent-pull}https://github.com/elastic/elastic-agent/6938[#https://github.com/elastic/elastic-agent/6938] 
+* Do Not Fail Windows Permission Updates On Missing Files/Paths. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7305[#https://github.com/elastic/elastic-agent/pull/7305] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/7301[#https://github.com/elastic/elastic-agent/issues/7301]
+* Make `Otelcol` Executable In The Docker Image. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7345[#https://github.com/elastic/elastic-agent/pull/7345] 
+* Fix Elasticsearch Exporter Configuration In Kube-Stack Values. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7380[#https://github.com/elastic/elastic-agent/pull/7380] 
+
+// end 8.17.4 relnotes
