@@ -81,6 +81,7 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.AddCommand(basecmd.NewDefaultCommandsWithArgs(args, streams)...)
 	cmd.AddCommand(run)
 
+<<<<<<< HEAD
 	addCommandIfNotNil(cmd, newInstallCommandWithArgs(args, streams))
 	addCommandIfNotNil(cmd, newUninstallCommandWithArgs(args, streams))
 	addCommandIfNotNil(cmd, newUpgradeCommandWithArgs(args, streams))
@@ -95,6 +96,23 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	addCommandIfNotNil(cmd, newComponentCommandWithArgs(args, streams))
 	addCommandIfNotNil(cmd, newLogsCommandWithArgs(args, streams))
 	addCommandIfNotNil(cmd, newOtelCommandWithArgs(args, streams))
+=======
+	cmd.AddCommand(newInstallCommandWithArgs(args, streams))
+	cmd.AddCommand(newUninstallCommandWithArgs(args, streams))
+	cmd.AddCommand(newUpgradeCommandWithArgs(args, streams))
+	cmd.AddCommand(newEnrollCommandWithArgs(args, streams))
+	cmd.AddCommand(newInspectCommandWithArgs(args, streams))
+	cmd.AddCommand(newPrivilegedCommandWithArgs(args, streams))
+	cmd.AddCommand(newUnprivilegedCommandWithArgs(args, streams))
+	cmd.AddCommand(newWatchCommandWithArgs(args, streams))
+	cmd.AddCommand(newContainerCommand(args, streams))
+	cmd.AddCommand(newStatusCommand(args, streams))
+	cmd.AddCommand(newDiagnosticsCommand(args, streams))
+	cmd.AddCommand(newComponentCommandWithArgs(args, streams))
+	cmd.AddCommand(newLogsCommandWithArgs(args, streams))
+	cmd.AddCommand(newOtelCommandWithArgs(args, streams))
+	cmd.AddCommand(newApplyFlavorCommandWithArgs(args, streams))
+>>>>>>> 2167fb2ec (internal/pkg/agent/cmd: remove redundant addCommandIfNotNil func (#7502))
 
 	// windows special hidden sub-command (only added on Windows)
 	reexec := newReExecWindowsCommand(args, streams)
@@ -105,12 +123,4 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.RunE = run.RunE
 
 	return cmd
-}
-
-func addCommandIfNotNil(parent, cmd *cobra.Command) {
-	if cmd == nil || parent == nil {
-		return
-	}
-
-	parent.AddCommand(cmd)
 }
