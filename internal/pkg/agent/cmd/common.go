@@ -81,22 +81,6 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.AddCommand(basecmd.NewDefaultCommandsWithArgs(args, streams)...)
 	cmd.AddCommand(run)
 
-<<<<<<< HEAD
-	addCommandIfNotNil(cmd, newInstallCommandWithArgs(args, streams))
-	addCommandIfNotNil(cmd, newUninstallCommandWithArgs(args, streams))
-	addCommandIfNotNil(cmd, newUpgradeCommandWithArgs(args, streams))
-	addCommandIfNotNil(cmd, newEnrollCommandWithArgs(args, streams))
-	addCommandIfNotNil(cmd, newInspectCommandWithArgs(args, streams))
-	addCommandIfNotNil(cmd, newPrivilegedCommandWithArgs(args, streams))
-	addCommandIfNotNil(cmd, newUnprivilegedCommandWithArgs(args, streams))
-	addCommandIfNotNil(cmd, newWatchCommandWithArgs(args, streams))
-	addCommandIfNotNil(cmd, newContainerCommand(args, streams))
-	addCommandIfNotNil(cmd, newStatusCommand(args, streams))
-	addCommandIfNotNil(cmd, newDiagnosticsCommand(args, streams))
-	addCommandIfNotNil(cmd, newComponentCommandWithArgs(args, streams))
-	addCommandIfNotNil(cmd, newLogsCommandWithArgs(args, streams))
-	addCommandIfNotNil(cmd, newOtelCommandWithArgs(args, streams))
-=======
 	cmd.AddCommand(newInstallCommandWithArgs(args, streams))
 	cmd.AddCommand(newUninstallCommandWithArgs(args, streams))
 	cmd.AddCommand(newUpgradeCommandWithArgs(args, streams))
@@ -111,8 +95,6 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.AddCommand(newComponentCommandWithArgs(args, streams))
 	cmd.AddCommand(newLogsCommandWithArgs(args, streams))
 	cmd.AddCommand(newOtelCommandWithArgs(args, streams))
-	cmd.AddCommand(newApplyFlavorCommandWithArgs(args, streams))
->>>>>>> 2167fb2ec (internal/pkg/agent/cmd: remove redundant addCommandIfNotNil func (#7502))
 
 	// windows special hidden sub-command (only added on Windows)
 	reexec := newReExecWindowsCommand(args, streams)
