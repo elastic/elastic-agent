@@ -400,10 +400,8 @@ spec:
           value: http://localhost:8220
         - name: FLEET_ENROLLMENT_TOKEN
           value: fleetToken
-        - name: FLEET_INSECURE
-          value: "false"
         - name: FLEET_ENROLL
-          value: "1"
+          value: "true"
         image: docker.elastic.co/elastic-agent/elastic-agent:9.0.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent

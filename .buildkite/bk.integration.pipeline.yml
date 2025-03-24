@@ -225,6 +225,63 @@ steps:
         matrix:
           - default
 
+  - group: "Stateful:Debian"
+    key: integration-tests-debian
+    depends_on:
+      - integration-ess
+    steps:
+      - label: "x86_64:non-sudo: {{matrix}}"
+        depends_on: packaging-ubuntu-x86-64
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n1-standard-8"
+          image: "family/platform-ingest-elastic-agent-debian-12"
+        matrix:
+          - default
+
+      - label: "x86_64:sudo: {{matrix}}"
+        depends_on:
+          - packaging-ubuntu-x86-64
+        # due to deb group present in matrix tar.gz and deb packages artifacts are required
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n1-standard-8"
+          image: "family/platform-ingest-elastic-agent-debian-12"
+        matrix:
+          - default
+          - upgrade
+          - upgrade-flavor
+          - standalone-upgrade
+          - fleet
+          - fleet-endpoint-security
+          - fleet-airgapped
+          - fleet-airgapped-privileged
+          - fleet-privileged
+          - fleet-upgrade-to-pr-build
+          - install-uninstall
+          # FQDN test failing at debian 12. Relevant issue https://github.com/elastic/elastic-agent/issues/7476
+          #- fqdn
+          - deb
+          - container
+
   - group: "Stateful(Sudo):RHEL8"
     key: integration-tests-rhel8
     depends_on:
@@ -265,6 +322,7 @@ steps:
         artifact_paths:
           - build/**
           - build/diagnostics/**
+          - build/*.pod_logs_dump/*
         retry:
           automatic:
             limit: 1
