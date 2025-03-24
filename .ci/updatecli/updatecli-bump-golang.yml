@@ -12,7 +12,7 @@ scms:
       repository: '{{ .scm.repository }}'
       token: '{{ requiredEnv "GITHUB_TOKEN" }}'
       commitusingapi: true
-      branch: main
+      branch: '{{ .scm.branch }}'
       force: false
 
 actions:
@@ -122,3 +122,21 @@ targets:
       content: 'go {{ source "latestGoVersion" }}'
       file: go.mod
       matchpattern: 'go \d+.\d+.\d+'
+  update-buildkite-pipeline:
+    name: "Update .buildkite/pipeline.yml"
+    sourceid: latestGoVersion
+    scmid: githubConfig
+    kind: file
+    spec:
+      content: 'golang:{{ source "latestGoVersion" }}'
+      file: .buildkite/pipeline.yml
+      matchpattern: 'golang:\d+.\d+.\d+'
+  update-runner-test-go:
+    name: "Update pkg/testing/runner/runner_test.go"
+    sourceid: latestGoVersion
+    scmid: githubConfig
+    kind: file
+    spec:
+      file: pkg/testing/runner/runner_test.go
+      matchpattern: 'GOVersion:$1"\d+.\d+.\d+"'
+      replacepattern: 'GOVersion:(\s+)"{{ source "latestGoVersion" }}"'
