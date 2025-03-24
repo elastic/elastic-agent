@@ -12,9 +12,6 @@ $PSVersionTable.PSVersion
 go install gotest.tools/gotestsum
 gotestsum --version
 
-echo "~~~ Getting stable stack version"
-mage integration:getStableEssSnapshotForBranch
-$env:OVERRIDE_STACK_VERSION = (Get-Content .override_stack_version -Raw).Trim() + "-SNAPSHOT"
 
 $env:TEST_BINARY_NAME = "elastic-agent"
 # Parsing version.go. Will be simplified here: https://github.com/elastic/ingest-dev/issues/4925
@@ -43,6 +40,10 @@ $outputXML = "build/${fully_qualified_group_name}.integration.xml"
 $outputJSON = "build/${fully_qualified_group_name}.integration.out.json"
 $TestsExitCode = 0
 try {
+    echo "~~~ Getting stable stack version"
+    mage integration:getStableEssSnapshotForBranch
+    $env:OVERRIDE_STACK_VERSION = (Get-Content .override_stack_version -Raw).Trim() + "-SNAPSHOT"
+
     Get-Ess-Stack -StackVersion $env:OVERRIDE_STACK_VERSION
     Write-Output "~~~ Running integration test group: $GROUP_NAME as user: $env:USERNAME"
     & gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags=integration -shuffle=on -timeout=2h0m0s "github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=$GROUP_NAME" "-integration.sudo=$TEST_SUDO"

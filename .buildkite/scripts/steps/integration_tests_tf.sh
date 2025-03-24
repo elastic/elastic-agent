@@ -23,15 +23,15 @@ fi
 echo "~~~ Building test binaries"
 mage build:testBinaries
 
-echo "~~~ Getting stable stack version"
-mage integration:getStableEssSnapshotForBranch
-
-OVERRIDE_STACK_VERSION="$(cat .override_stack_version)-SNAPSHOT"
 # If the step is retried, we start the stack again.
 # BUILDKITE_RETRY_COUNT == "0" for the first run
 # BUILDKITE_RETRY_COUNT > 0 for the retries
 if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
   echo "~~~ The steps is retried, starting the ESS stack again"
+  echo "~~~ Getting stable stack version"
+  mage integration:getStableEssSnapshotForBranch
+
+  OVERRIDE_STACK_VERSION="$(cat .override_stack_version)-SNAPSHOT"
   trap 'ess_down' EXIT
   ess_up $OVERRIDE_STACK_VERSION || echo "Failed to start ESS stack" >&2
 else
