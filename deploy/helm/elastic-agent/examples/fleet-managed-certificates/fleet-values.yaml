@@ -1,0 +1,41 @@
+kubernetes:
+  enabled: true
+system:
+  enabled: true
+agent:
+  fleet:
+    enabled: true
+    url: http://localhost:8220
+    token: fleetToken
+    ca:
+      value: |-
+        -----BEGIN CERTIFICATE-----
+        MIIBaDCCARCgAWIBAgIQNJyw4xhweOFK3/FqGLQF6TAKBggqhkjOPQQDAJAVMRMw
+        EQYDVQQDEwpjbHVzdGVyLWNhMB4XDTI1MDEWODAOMDIyMFoXDTM1IMDEwNjAOMDIy
+        MFowFTETMBEGA1UEAXMKY2x1c3R1Ucil1jYTBZMBMGByqGSM49AgEGCCqGSM49AWEH
+        A0TABPcDLjOSlwAmeHbHFerT+SmTNqxckANmRPItCPRgkp2cq12a1C/ckQEebE1A
+        B7WpiRaUQQkBpmNjcAPVIdfdnbWjQjBAMA4GA1UdDWEB/wQEAwICpDAPBgNVHRMB
+        Af8EBTADAQH/MBOGA1UdDgQWBBTA5SRUKOE90/xKntDXcpZSvlL1JDBDAKBggqhkj0
+        PQQDAGNGADBDAiAFghoM1M53abi968RyR+DwVX3S92aiu7MogtnuKCgPLQIFRRza
+        Ondv3U1X2Qwo2ZELignHs3JLWucWvCIqmbW2+A==
+        -----END CERTIFICATE-----
+    agentCert:
+      valueFromSecret:
+        name: agent-cert
+        key: crt
+    agentCertKey:
+      valueFromSecret:
+        name: agent-cert
+        key: private
+    kibanaCA:
+      value: |-
+        -----BEGIN CERTIFICATE-----
+        MIIBaDCCARCgAWIBAgIQNJyw4xhweOFK3/FqGLQF6TAKBggqhkjOPQQDAJAVMRMw
+        EQYDVQQDEwpjbHVzdGVyLWNhMB4XDTI1MDEWODAOMDIyMFoXDTM1IMDEwNjAOMDIy
+        MFowFTETMBEGA1UEAXMKY2x1c3R1Ucil1jYTBZMBMGByqGSM49AgEGCCqGSM49AWEH
+        A0TABPcDLjOSlwAmeHbHFerT+SmTNqxckANmRPItCPRgkp2cq12a1C/ckQEebE1A
+        B7WpiRaUQQkBpmNjcAPVIdfdnbWjQjBAMA4GA1UdDWEB/wQEAwICpDAPBgNVHRMB
+        Af8EBTADAQH/MBOGA1UdDgQWBBTA5SRUKOE90/xKntDXcpZSvlL1JDBDAKBggqhkj0
+        PQQDAGNGADBDAiAFghoM1M53abi968RyR+DwVX3S92aiu7MogtnuKCgPLQIFRRza
+        Ondv3U1X2Qwo2ZELignHs3JLWucWvCIqmbW2+B==
+        -----END CERTIFICATE-----
