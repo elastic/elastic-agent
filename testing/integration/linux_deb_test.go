@@ -195,11 +195,19 @@ func TestDebFleetUpgrade(t *testing.T) {
 		expectingServers   bool
 	}{
 		{"legacy installation", version.NewParsedSemVer(8, 17, 3, "", ""), false, true},      // in case of legacy we don't apply flavor, expecting all to be preserved
-		{"9.0 snapshot with basic flavor", upgradetest.Version_9_0_0_SNAPSHOT, false, false}, // TODO: install with PreviousMinor once 9.1 is released
-		{"9.0 snapshot with basic flavor", upgradetest.Version_9_0_0_SNAPSHOT, true, true},   // TODO: install with PreviousMinor once 9.1 is released
+		{"9.0 snapshot with basic flavor", upgradetest.Version_9_0_0_SNAPSHOT, false, false}, // TODO: replace with PreviousMinor once 9.1 is released
+		{"9.0 snapshot with basic flavor", upgradetest.Version_9_0_0_SNAPSHOT, true, true},   // TODO: replace with PreviousMinor once 9.1 is released
 	}
 
+	currentVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
+
 	for _, tc := range testCases {
+		if !tc.upgradeFromVersion.Less(*currentVersion) {
+			// allow only upgrades to higher versions
+			continue
+		}
+
 		t.Run(fmt.Sprintf("Upgrade DEB from %s - %q", tc.upgradeFromVersion.String(), tc.name), func(t *testing.T) {
 			t.Cleanup(func() {
 				// cleanup after ourselves

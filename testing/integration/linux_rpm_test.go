@@ -199,7 +199,15 @@ func TestRpmFleetUpgrade(t *testing.T) {
 		{"9.0 snapshot with basic flavor", upgradetest.Version_9_0_0_SNAPSHOT, true, true},   // TODO: replace with PreviousMinor once 9.1 is released
 	}
 
+	currentVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
+
 	for _, tc := range testCases {
+		if !tc.upgradeFromVersion.Less(*currentVersion) {
+			// allow only upgrades to higher versions
+			continue
+		}
+
 		t.Run(fmt.Sprintf("Upgrade DEB from %s - %q", tc.upgradeFromVersion.String(), tc.name), func(t *testing.T) {
 			t.Cleanup(func() {
 				// cleanup after ourselves
