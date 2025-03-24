@@ -755,7 +755,7 @@ func TestExtractVersion(t *testing.T) {
 	}
 }
 
-func TestIsSameVersion(t *testing.T) {
+func TestCheckUpgrade(t *testing.T) {
 	type args struct {
 		current    agentVersion
 		newVersion agentVersion
@@ -801,7 +801,7 @@ func TestIsSameVersion(t *testing.T) {
 				},
 			},
 			want: want{
-				err: ErrFipsNotUpgradedToFips,
+				err: ErrFipsToNonFips,
 			},
 		},
 		{
@@ -818,7 +818,7 @@ func TestIsSameVersion(t *testing.T) {
 				},
 			},
 			want: want{
-				err: ErrFipsNotUpgradedToFips,
+				err: ErrNonFipsToFips,
 			},
 		},
 		{
