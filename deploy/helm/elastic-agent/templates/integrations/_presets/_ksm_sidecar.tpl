@@ -6,10 +6,17 @@
 {{/* set up the kube-state-metrics chart values */}}
 {{- $agentName := "agent-ksm" -}}
 {{- $kubeStateChart := index $.Values "kube-state-metrics" -}}
-{{- $agentContainer := print (include "elasticagent.presets.ksm.sidecar.container" $) | fromYaml }}
+{{- $fleetMutations := dict}}
+{{- if eq $.Values.agent.fleet.enabled true -}}
+{{- include "elasticagent.preset.mutate.fleet" (list $ $fleetMutations) -}}
+{{- end -}}
+{{- $agentContainer := print (include "elasticagent.presets.ksm.sidecar.container" (list $ $fleetMutations)) | fromYaml }}
 {{- $_ := set $kubeStateChart "containers" (list $agentContainer) -}}
 {{- $agentConfigVolume := print (include "elasticagent.presets.ksm.sidecar.volume" (list $ $agentName)) | fromYaml }}
-{{- $_ := set $kubeStateChart "volumes" (list $agentConfigVolume) -}}
+{{- $_ := set $kubeStateChart "volumes" (uniq (concat (dig "volumes" list $kubeStateChart) (list $agentConfigVolume))) -}}
+{{- with ($fleetMutations).extraVolumes -}}
+{{- $_ := set $kubeStateChart "volumes" (uniq (concat (dig "volumes" list $kubeStateChart) .)) -}}
+{{- end -}}
 {{- $_ := set $kubeStateChart "autosharding" (dict "enabled" true)  }}
 {{- with $.Values.agent.imagePullSecrets -}}
 {{- $_ := set $kubeStateChart "imagePullSecrets" . -}}
@@ -26,6 +33,8 @@
 {{- end -}}
 
 {{- define  "elasticagent.presets.ksm.sidecar.container" -}}
+{{- $ := index . 0 -}}
+{{- $fleetMutations := index . 1 -}}
 name: "agent"
 {{- with $.Values.agent.image.pullPolicy }}
 imagePullPolicy: {{ . }}
@@ -58,6 +67,9 @@ volumeMounts:
     mountPath: /etc/elastic-agent/agent.yml
     readOnly: true
     subPath: agent.yml
+  {{- with ($fleetMutations).extraVolumeMounts }}
+  {{- . | toYaml | nindent 2 }}
+  {{- end }}
 env:
   - name: NODE_NAME
     valueFrom:
@@ -74,9 +86,7 @@ env:
 {{- $ouputVal := get $.Values.outputs $.Values.kubernetes.output }}
 {{- (include (printf "elasticagent.output.%s.preset.envvars" ($ouputVal).type) (list $ $outputName $ouputVal)) | nindent 2 }}
 {{- else -}}
-{{- $fleetEnvVars := dict}}
-{{- include "elasticagent.preset.mutate.fleet" (list $ $fleetEnvVars) -}}
-{{- with ($fleetEnvVars).extraEnvs -}}
+{{- with ($fleetMutations).extraEnvs -}}
 {{- . | toYaml | nindent 2 }}
 {{- end -}}
 {{- end -}}
@@ -91,32 +101,32 @@ secret:
   secretName: {{$agentName}}
 {{- end -}}
 
+{{- define  "elasticagent.presets.ksm.sidecar.providers" -}}
+providers:
+  kubernetes:
+    enabled: false
+  kubernetes_leaderelection:
+    enabled: false
+    leader_lease: agent-ksm-sharded
+{{- end -}}
+
 {{- define  "elasticagent.presets.ksm.sidecar.secret" }}
 {{- $ := index . 0 -}}
 {{- $agentName := index . 1 -}}
 {{- $streams := index . 2 -}}
 {{- $outputName := $.Values.kubernetes.output -}}
 {{- $ouputVal := get $.Values.outputs $outputName }}
+{{- $presetVal := dict }}
+{{- $_ := set $presetVal "outputs" (dict $outputName $ouputVal) }}
+{{- with (include "elasticagent.presets.ksm.sidecar.providers" $ | fromYaml).providers }}
+{{- $_ := set $presetVal "providers" . }}
+{{- end }}
+{{- $_ := set $presetVal "_inputs" $streams }}
 apiVersion: v1
 kind: Secret
 metadata:
   name: {{ $agentName }}
   namespace: {{ $.Release.Namespace | quote }}
 stringData:
-  agent.yml: |-
-{{- if eq $.Values.agent.fleet.enabled false }}
-    inputs:
-      {{- $streams | toYaml | nindent 6 }}
-    outputs:
-      {{- include (printf "elasticagent.output.%s.preset.config" $ouputVal.type) (list $ $outputName $ouputVal) | nindent 6 }}
-{{- else }}
-    fleet:
-      enabled: true
-{{- end }}
-    providers:
-      kubernetes:
-        enabled: false
-      kubernetes_leaderelection:
-        enabled: false
-        leader_lease: agent-ksm-sharded
+{{ include "elasticagent.engine.k8s.secretData" (list $ $presetVal $agentName) }}
 {{- end }}
