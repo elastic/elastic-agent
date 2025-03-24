@@ -130,5 +130,5 @@ targets:
     kind: file
     spec:
       file: pkg/testing/runner/runner_test.go
-      matchpattern: 'GOVersion:(\s+)"\d+.\d+.\d+"'
-      replacepattern: 'GOVersion:$1"{{ source "latestGoVersion" }}"'
+      matchpattern: '(GOVersion):(\s+)("\d+.\d+.\d+")'
+      replacepattern: '$1:$2"{{ source "latestGoVersion" }}"'
