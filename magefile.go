@@ -2598,6 +2598,70 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 	return nil
 }
 
+// Writes stable ESS version to .override_stack_version file
+func (Integration) GetStableEssSnapshotForBranch() error {
+	readPackageVersion := func() (string, error) {
+		fmt.Println("Reading from .package-version")
+		content, err := os.ReadFile(".package-version")
+		if err != nil {
+			return "", fmt.Errorf("failed to read .package-version: %v", err)
+		}
+		fmt.Print(string(content))
+		return string(content), nil
+	}
+
+	writeVersion := func(version string) error {
+		err := os.WriteFile(".override_stack_version", []byte(version), 0644)
+		if err != nil {
+			log.Fatalf("Failed to write file: %v", err)
+			return err
+		}
+		return nil
+	}
+
+	baseStackBranch := os.Getenv("BUILDKITE_PULL_REQUEST_BASE_BRANCH")
+	if baseStackBranch == "" {
+		baseStackBranch = os.Getenv("BUILDKITE_BRANCH")
+	}
+
+	if baseStackBranch == "" {
+		version, err := readPackageVersion()
+		if err != nil {
+			return err
+		}
+		writeVersion(version)
+		return nil
+	}
+
+	stableChannelURL := fmt.Sprintf("https://storage.googleapis.com/artifacts-api/channels/%s.json", baseStackBranch)
+	fmt.Printf("Requesting version: %v \n", stableChannelURL)
+	resp, err := http.Get(stableChannelURL)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		fmt.Printf("Couldn't get version from: %v \n", stableChannelURL)
+		version, err := readPackageVersion()
+		if err != nil {
+			return err
+		}
+		writeVersion(version)
+		return nil
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	var result struct {
+		Build string `json:"build"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return fmt.Errorf("failed to parse JSON: %v", err)
+	}
+	writeVersion(strings.TrimSpace(result.Build))
+	return nil
+}
+
 func (Integration) Buildkite() error {
 	goTestFlags := os.Getenv("GOTEST_FLAGS")
 	batches, err := define.DetermineBatches("testing/integration", goTestFlags, "integration")

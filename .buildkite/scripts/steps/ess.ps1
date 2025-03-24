@@ -14,6 +14,8 @@ function ess_up {
       return 1
   }
 
+  Write-Output "~~~ Starting ESS Stack $StackVersion"
+
   $Env:EC_API_KEY = Retry-Command -ScriptBlock {  
     vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod
   }

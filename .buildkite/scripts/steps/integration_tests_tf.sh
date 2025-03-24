@@ -20,11 +20,13 @@ if [ -z "$TEST_SUDO" ]; then
   exit 1
 fi
 
-OVERRIDE_STACK_VERSION="$(getStableEssSnapshotForBranch)-SNAPSHOT"
-
 echo "~~~ Building test binaries"
 mage build:testBinaries
 
+echo "~~~ Getting stable stack version"
+mage integration:getStableEssSnapshotForBranch
+
+OVERRIDE_STACK_VERSION="$(cat .override_stack_version)-SNAPSHOT"
 # If the step is retried, we start the stack again.
 # BUILDKITE_RETRY_COUNT == "0" for the first run
 # BUILDKITE_RETRY_COUNT > 0 for the retries

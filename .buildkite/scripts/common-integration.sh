@@ -51,29 +51,3 @@ google_cloud_auth() {
 
     export GOOGLE_APPLICATION_CREDENTIALS=${secretFileLocation}
 }
-
-# Prints stack version for current or target release branch without '-SNAPSHOT' suffix 
-# example: 
-# BUILDKITE_PULL_REQUEST_BASE_BRANCH=8.x .buildkite/scripts/test.sh
-# 8.19.0-64846b77
-getStableEssSnapshotForBranch() {
-  local baseStackBranch
-  # If Pull request
-  if [ -n "${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-}" ]; then
-    baseStackBranch="${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"    
-  elif [ -n "${BUILDKITE_BRANCH:-}" ]; then
-    baseStackBranch="${BUILDKITE_BRANCH}"
-  else
-    echo "$(cat .package-version)"
-    return
-  fi
-  local stableChannelURL="https://storage.googleapis.com/artifacts-api/channels/${baseStackBranch}.json"
-  if curl --output /dev/null --silent --head --fail "$stableChannelURL"; then
-    echo $(curl -s $stableChannelURL | jq -r .build)
-    return
-  else
-    # Fallback: If stable channels are not available for this branch     
-    echo "$(cat .package-version)"
-    return  
-  fi
-}

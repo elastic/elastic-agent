@@ -4,7 +4,9 @@ set -euo pipefail
 source .buildkite/scripts/common-integration.sh
 source .buildkite/scripts/steps/ess.sh
 
-OVERRIDE_STACK_VERSION="$(getStableEssSnapshotForBranch)-SNAPSHOT"
+echo "~~~ Getting stable stack version"
+mage integration:getStableEssSnapshotForBranch
+OVERRIDE_STACK_VERSION="$(cat .override_stack_version)-SNAPSHOT"
 
 ess_up $OVERRIDE_STACK_VERSION
 

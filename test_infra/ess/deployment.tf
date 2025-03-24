@@ -62,7 +62,9 @@ locals {
   ess_region             = coalesce(var.ess_region, "gcp-us-east1")
   deployment_template_id = coalesce(var.deployment_template_id, "gcp-storage-optimized")
 
-  ess_properties = yamldecode(file("${path.module}/../../pkg/testing/ess/create_deployment_csp_configuration.yaml"))
+  ess_properties = yamldecode(templatefile("${path.module}/../../pkg/testing/ess/create_deployment_csp_configuration.yaml", {
+    OVERRIDE_STACK_VERSION = var.stack_version
+  }))
 
   integration_server_docker_image = coalesce(var.integration_server_docker_image, local.ess_properties.docker.integration_server_image)
   elasticsearch_docker_image = coalesce(var.elasticsearch_docker_image, local.ess_properties.docker.elasticsearch_image)
