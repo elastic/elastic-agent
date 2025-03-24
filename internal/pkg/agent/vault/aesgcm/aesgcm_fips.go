@@ -15,7 +15,7 @@ func getCipherAEAD(block cipher.Block) (cipher.AEAD, error) {
 	return cipher.NewGCMWithRandomNonce(block)
 }
 
-// Encrypt encrypts the data with AES-GCM
+// Encrypt encrypts the data with AES-GCM with random nonce
 func Encrypt(key, data []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -26,13 +26,11 @@ func Encrypt(key, data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// The first parameter is nonce in order to get the ciphertext as concatenation of nonce and encrypted data
 	ciphertext := aesGCM.Seal(nil, nil, data, nil)
 	return ciphertext, nil
 }
 
-// Decrypt decrypts the data with AES-GCM
+// Decrypt decrypts the data with AES-GCM with random nonce
 func Decrypt(key, data []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
