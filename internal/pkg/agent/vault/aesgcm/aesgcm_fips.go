@@ -11,10 +11,6 @@ import (
 	"crypto/cipher"
 )
 
-func getCipherAEAD(block cipher.Block) (cipher.AEAD, error) {
-	return cipher.NewGCMWithRandomNonce(block)
-}
-
 // Encrypt encrypts the data with AES-GCM with random nonce
 func Encrypt(key, data []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
