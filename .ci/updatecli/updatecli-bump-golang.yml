@@ -123,12 +123,3 @@ targets:
       content: 'golang:{{ source "latestGoVersion" }}'
       file: .buildkite/pipeline.yml
       matchpattern: 'golang:\d+.\d+.\d+'
-  update-runner-test-go:
-    name: "Update pkg/testing/runner/runner_test.go"
-    sourceid: latestGoVersion
-    scmid: githubConfig
-    kind: file
-    spec:
-      file: pkg/testing/runner/runner_test.go
-      matchpattern: '(GOVersion):(\s+)("\d+.\d+.\d+")'
-      replacepattern: '$1:$2"{{ source "latestGoVersion" }}"'
