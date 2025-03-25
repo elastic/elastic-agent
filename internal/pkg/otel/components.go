@@ -93,7 +93,9 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			jmxreceiver.NewFactory(),
 			nopreceiver.NewFactory(),
 		}
-		receivers = addExtraReceivers(receivers)
+		// some receivers should only be available when
+		// not in fips mode due to restrictions on crypto usage
+		receivers = addNonFipsReceivers(receivers)
 		factories.Receivers, err = receiver.MakeFactoryMap(receivers...)
 		if err != nil {
 			return otelcol.Factories{}, err
@@ -127,7 +129,9 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			loadbalancingexporter.NewFactory(),
 			otlphttpexporter.NewFactory(),
 		}
-		exporters = addExtraExporters(exporters)
+		// some exporters should only be available when
+		// not in fips mode due to restrictions on crypto usage
+		exporters = addNonFipsExporters(exporters)
 		factories.Exporters, err = exporter.MakeFactoryMap(exporters...)
 		if err != nil {
 			return otelcol.Factories{}, err
