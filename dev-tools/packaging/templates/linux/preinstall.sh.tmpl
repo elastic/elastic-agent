@@ -52,7 +52,7 @@ else
     if [[ "$1" != "2" ]]; then
         if [[ -n "${ELASTIC_AGENT_FLAVOR}" ]]; then
             # Do not modify the file if it already exists
-            echo "using ${ELASTIC_AGENT_FLAVOR} flavor"
+            echo "using \"${ELASTIC_AGENT_FLAVOR}\" flavor from environment"
             echo "${ELASTIC_AGENT_FLAVOR}" > "$flavor_file"
         else
             # Defaults to basic installation
