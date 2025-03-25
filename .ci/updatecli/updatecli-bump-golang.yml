@@ -1,7 +1,6 @@
 # update-cli configuration for automated go updates
 ---
 name: Bump golang-version to latest version
-pipelineid: 'updatecli-bump-golang-{{ .scm.branch }}'
 
 scms:
   githubConfig:
