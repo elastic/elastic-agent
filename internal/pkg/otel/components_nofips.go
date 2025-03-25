@@ -14,7 +14,7 @@ import (
 	"go.opentelemetry.io/collector/receiver"
 )
 
-func addExtraReceivers(receivers []receiver.Factory) []receiver.Factory {
+func addNonFipsReceivers(receivers []receiver.Factory) []receiver.Factory {
 	receivers = append(receivers,
 		kafkareceiver.NewFactory(),
 		prometheusreceiver.NewFactory(),
@@ -23,7 +23,7 @@ func addExtraReceivers(receivers []receiver.Factory) []receiver.Factory {
 	return receivers
 }
 
-func addExtraExporters(exporters []exporter.Factory) []exporter.Factory {
+func addNonFipsExporters(exporters []exporter.Factory) []exporter.Factory {
 	exporters = append(exporters,
 		kafkaexporter.NewFactory(),
 	)
