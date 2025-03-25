@@ -158,7 +158,13 @@ func (p Platform) Platform() string {
 	return p.OS + "/" + p.Arch
 }
 
-var AllPlatforms = []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}, {"darwin", "aarch64"}}
+var AllPlatforms = []Platform{
+	{"linux", "x86_64"},
+	{"linux", "arm64"},
+	{"windows", "x86_64"},
+	{"darwin", "x86_64"},
+	{"darwin", "aarch64"},
+}
 
 // DownloadManifest is going to download the given manifest file and return the ManifestResponse
 func DownloadManifest(ctx context.Context, manifest string) (Build, error) {
