@@ -196,7 +196,7 @@ func TestRpmFleetUpgrade(t *testing.T) {
 	}{
 		{"legacy installation", version.NewParsedSemVer(8, 17, 3, "", ""), false, true},      // in case of legacy we don't apply flavor, expecting all to be preserved
 		{"9.0 snapshot with basic flavor", upgradetest.Version_9_0_0_SNAPSHOT, false, false}, // TODO: replace with PreviousMinor once 9.1 is released
-		{"9.0 snapshot with basic flavor", upgradetest.Version_9_0_0_SNAPSHOT, true, true},   // TODO: replace with PreviousMinor once 9.1 is released
+		{"9.0 snapshot with servers flavor", upgradetest.Version_9_0_0_SNAPSHOT, true, true}, // TODO: replace with PreviousMinor once 9.1 is released
 	}
 
 	currentVersion, err := version.ParseVersion(define.Version())

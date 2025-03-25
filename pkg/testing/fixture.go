@@ -185,7 +185,7 @@ func (f *Fixture) Client() client.Client {
 	return f.c
 }
 
-// Client returns the Elastic Agent communication client.
+// Version returns the Elastic Agent version.
 func (f *Fixture) Version() string {
 	return f.version
 }
