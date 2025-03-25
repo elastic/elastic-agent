@@ -43,6 +43,7 @@ import (
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
 	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
+	"github.com/elastic/elastic-agent/dev-tools/packaging"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/pkg/testing/buildkite"
 	tcommon "github.com/elastic/elastic-agent/pkg/testing/common"
@@ -1071,7 +1072,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, platf
 
 			errGroup, ctx := errgroup.WithContext(context.Background())
 			completedDownloads := &atomic.Int32{}
-			for _, spec := range manifest.ExpectedBinaries {
+			for _, spec := range packaging.ExpectedBinaries {
 				for _, platform := range platforms {
 					if !spec.SupportsPlatform(platform) {
 						fmt.Printf("--- Binary %s does not support %s, download skipped\n", spec.BinaryName, platform)
@@ -1169,7 +1170,7 @@ func removePythonWheels(matches []string, version string) []string {
 	}
 
 	var wheels []string
-	for _, spec := range manifest.ExpectedBinaries {
+	for _, spec := range packaging.ExpectedBinaries {
 		if spec.PythonWheel {
 			wheels = append(wheels, spec.GetPackageName(version, ""))
 		}
@@ -1703,7 +1704,7 @@ func copyFile(src, dst string) error {
 
 func isPlatformIndependentPackage(f string, packageVersion string) bool {
 	fileBaseName := filepath.Base(f)
-	for _, spec := range manifest.ExpectedBinaries {
+	for _, spec := range packaging.ExpectedBinaries {
 		packageName := spec.GetPackageName(packageVersion, "")
 		// as of now only python wheels packages are platform-independent
 		if spec.PythonWheel && (fileBaseName == packageName || fileBaseName == packageName+sha512FileExt) {

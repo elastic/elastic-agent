@@ -15,6 +15,7 @@ import (
 	"github.com/otiai10/copy"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
+	"github.com/elastic/elastic-agent/dev-tools/packaging"
 )
 
 const ComponentSpecFileSuffix = ".spec.yml"
@@ -108,7 +109,7 @@ func ChecksumsWithManifest(requiredPackage string, versionedFlatPath string, ver
 			// Only care about packages that match the required package constraint (os/arch)
 			if strings.Contains(pkgName, requiredPackage) {
 				// Iterate over the external binaries that we care about for packaging agent
-				for _, spec := range manifest.ExpectedBinaries {
+				for _, spec := range packaging.ExpectedBinaries {
 					// If the individual package doesn't match the expected prefix, then continue
 					// FIXME temporarily skip fips packages until elastic-agent FIPS is in place
 					if !strings.HasPrefix(pkgName, spec.BinaryName) || strings.Contains(pkgName, "-fips-") {
@@ -199,7 +200,7 @@ func getComponentVersion(componentName string, requiredPackage string, component
 	// Iterate over all the packages in the component project
 	for pkgName := range componentProject.Packages {
 		// Only care about the external binaries that we want to package
-		for _, spec := range manifest.ExpectedBinaries {
+		for _, spec := range packaging.ExpectedBinaries {
 			// If the given component name doesn't match the external binary component, skip
 			// FIXME temporarily skip fips packages until elastic-agent FIPS is in place
 			if componentName != spec.ProjectName || strings.Contains(pkgName, "-fips-") {
