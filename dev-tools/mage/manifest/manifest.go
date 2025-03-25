@@ -19,7 +19,7 @@ import (
 	"github.com/magefile/mage/mg"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
+	"github.com/elastic/elastic-agent/dev-tools/packaging"
 	"github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -94,78 +94,6 @@ var PlatformPackages = map[string]string{
 	"windows/amd64": "windows-x86_64.zip",
 }
 
-// ExpectedBinaries  is a map of binaries agent needs to their project in the unified-release manager.
-// The project names are those used in the "projects" list in the unified release manifest.
-// See the sample manifests in the testdata directory.
-var ExpectedBinaries = []BinarySpec{
-	{BinaryName: "agentbeat", ProjectName: "beats", Platforms: AllPlatforms, PackageTypes: pkgcommon.AllPackageTypes},
-	{BinaryName: "apm-server", ProjectName: "apm-server", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}}, PackageTypes: pkgcommon.AllPackageTypes},
-	{BinaryName: "cloudbeat", ProjectName: "cloudbeat", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PackageTypes: pkgcommon.AllPackageTypes},
-	{BinaryName: "connectors", ProjectName: "connectors", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PythonWheel: true, PackageTypes: pkgcommon.AllPackageTypes},
-	{BinaryName: "endpoint-security", ProjectName: "endpoint-dev", Platforms: AllPlatforms, PackageTypes: []pkgcommon.PackageType{pkgcommon.RPM, pkgcommon.Deb, pkgcommon.Zip, pkgcommon.TarGz}},
-	{BinaryName: "fleet-server", ProjectName: "fleet-server", Platforms: AllPlatforms, PackageTypes: pkgcommon.AllPackageTypes},
-	{BinaryName: "pf-elastic-collector", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PackageTypes: pkgcommon.AllPackageTypes},
-	{BinaryName: "pf-elastic-symbolizer", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PackageTypes: pkgcommon.AllPackageTypes},
-	{BinaryName: "pf-host-agent", ProjectName: "prodfiler", Platforms: []Platform{{"linux", "x86_64"}, {"linux", "arm64"}}, PackageTypes: pkgcommon.AllPackageTypes},
-}
-
-type BinarySpec struct {
-	BinaryName   string
-	ProjectName  string
-	Platforms    []Platform
-	PythonWheel  bool
-	PackageTypes []pkgcommon.PackageType
-}
-
-func (proj BinarySpec) SupportsPlatform(platform string) bool {
-	for _, p := range proj.Platforms {
-		if p.Platform() == platform {
-			return true
-		}
-	}
-	return false
-}
-
-func (proj BinarySpec) SupportsPackageType(pkgType pkgcommon.PackageType) bool {
-	for _, p := range proj.PackageTypes {
-		if p == pkgType {
-			return true
-		}
-	}
-	return false
-}
-
-func (proj BinarySpec) GetPackageName(version string, platform string) string {
-	if proj.PythonWheel {
-		return fmt.Sprintf("%s-%s.zip", proj.BinaryName, version)
-	}
-	return fmt.Sprintf("%s-%s-%s", proj.BinaryName, version, PlatformPackages[platform])
-}
-
-type Platform struct {
-	OS   string
-	Arch string
-}
-
-// Converts to the format expected on the mage command line "linux", "x86_64" = "linux/amd64"
-func (p Platform) Platform() string {
-	if p.Arch == "x86_64" {
-		p.Arch = "amd64"
-	}
-	if p.Arch == "aarch64" {
-		p.Arch = "arm64"
-	}
-	return p.OS + "/" + p.Arch
-}
-
-var AllPlatforms = []Platform{
-	{"linux", "x86_64"},
-	{"linux", "arm64"},
-	{"windows", "x86_64"},
-	{"darwin", "x86_64"},
-	{"darwin", "aarch64"},
-}
-
 // DownloadManifest is going to download the given manifest file and return the ManifestResponse
 func DownloadManifest(ctx context.Context, manifest string) (Build, error) {
 	manifestUrl, urlError := url.Parse(manifest)
@@ -216,7 +144,7 @@ func DownloadComponents(ctx context.Context, manifest string, platforms []string
 
 	errGrp, downloadsCtx := errgroup.WithContext(ctx)
 	// for project, pkgs := range expectedProjectPkgs() {
-	for _, spec := range ExpectedBinaries {
+	for _, spec := range packaging.ExpectedBinaries {
 		for _, platform := range platforms {
 			targetPath := filepath.Join(dropPath)
 			err := os.MkdirAll(targetPath, 0755)
@@ -257,7 +185,7 @@ func DownloadComponents(ctx context.Context, manifest string, platforms []string
 	return nil
 }
 
-func resolveManifestPackage(project Project, spec BinarySpec, version string, platform string) ([]string, error) {
+func resolveManifestPackage(project Project, spec packaging.BinarySpec, version string, platform string) ([]string, error) {
 	var val Package
 	var ok bool
 

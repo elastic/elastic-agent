@@ -601,17 +601,17 @@ platforms: &all-platforms
     os: darwin
     arch: aarch64
 
-packages: &all-package-types
+packageTypes: &all-package-types
   - &pkg-type-rpm
-    0
+    0 # RPM
   - &pkg-type-deb
-    1
+    1 # Deb
   - &pkg-type-zip
-    2
+    2 # zip
   - &pkg-type-targz
-    3
+    3 # tar.gz
   - &pkg-type-docker
-    4
+    4 # docker
 
 components:
   # general template for new components
