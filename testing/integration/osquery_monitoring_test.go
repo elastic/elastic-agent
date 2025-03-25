@@ -9,6 +9,7 @@ package integration
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -73,7 +74,8 @@ func (runner *OsqueryManagerRunner) SetupSuite() {
 	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
 
-	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "osquery_manager", "1.16.0", "osquery_package.json", uuid.Must(uuid.NewV4()).String(), policyResp.ID)
+	packageFile := filepath.Join("testdata", "osquery_package.json")
+	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "osquery_manager", "1.16.0", packageFile, uuid.Must(uuid.NewV4()).String(), policyResp.ID)
 	require.NoError(runner.T(), err)
 
 }

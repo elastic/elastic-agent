@@ -9,6 +9,7 @@ package integration
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -74,7 +75,8 @@ func (runner *NetworkTrafficRunner) SetupSuite() {
 	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
 
-	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "network_traffic", "1.32.1", "network_traffic_package.json", uuid.Must(uuid.NewV4()).String(), policyResp.ID)
+	packageFile := filepath.Join("testdata", "network_traffic_package.json")
+	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "network_traffic", "1.32.1", packageFile, uuid.Must(uuid.NewV4()).String(), policyResp.ID)
 	require.NoError(runner.T(), err)
 
 }
