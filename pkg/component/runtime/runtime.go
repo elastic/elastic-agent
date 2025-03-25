@@ -80,10 +80,9 @@ type componentRuntimeState struct {
 	logger  *logger.Logger
 	comm    *runtimeComm
 
-	id         string
-	currCompMx sync.RWMutex
-	currComp   component.Component
-	runtime    componentRuntime
+	id       string
+	currComp atomic.Pointer[component.Component]
+	runtime  componentRuntime
 
 	shuttingDown atomic.Bool
 
@@ -105,12 +104,11 @@ func newComponentRuntimeState(m *Manager, logger *logger.Logger, monitor Monitor
 	}
 
 	state := &componentRuntimeState{
-		manager:  m,
-		logger:   logger,
-		comm:     comm,
-		id:       comp.ID,
-		currComp: comp,
-		runtime:  runtime,
+		manager: m,
+		logger:  logger,
+		comm:    comm,
+		id:      comp.ID,
+		runtime: runtime,
 		latestState: ComponentState{
 			State:   client.UnitStateStarting,
 			Message: "Starting",
@@ -118,6 +116,7 @@ func newComponentRuntimeState(m *Manager, logger *logger.Logger, monitor Monitor
 		},
 		actions: make(map[string]func(response *proto.ActionResponse)),
 	}
+	state.currComp.Store(&comp)
 
 	// Start the goroutine that spawns and monitors the component runtime.
 	go state.runLoop()
@@ -160,15 +159,11 @@ func (s *componentRuntimeState) runLoop() {
 }
 
 func (s *componentRuntimeState) getCurrent() component.Component {
-	s.currCompMx.RLock()
-	defer s.currCompMx.RUnlock()
-	return s.currComp
+	return *s.currComp.Load()
 }
 
 func (s *componentRuntimeState) setCurrent(current component.Component) {
-	s.currCompMx.Lock()
-	s.currComp = current
-	s.currCompMx.Unlock()
+	s.currComp.Store(&current)
 }
 
 func (s *componentRuntimeState) getLatest() ComponentState {
