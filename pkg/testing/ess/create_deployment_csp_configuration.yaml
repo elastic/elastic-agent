@@ -12,8 +12,12 @@ aws:
   integrations_server_conf_id: "aws.integrationsserver.c5d"
   elasticsearch_conf_id: "aws.es.datahot.i3"
   elasticsearch_deployment_template_id: "aws-storage-optimized"
+<<<<<<< HEAD
   kibana_instance_configuration_id: "aws.kibana.c5d"
 docker:
   integration_server_image: "docker.elastic.co/cloud-release/elastic-agent-cloud:9.0.0-20c45491-SNAPSHOT"
   elasticsearch_image: "docker.elastic.co/cloud-release/elasticsearch-cloud-ess:9.0.0-20c45491-SNAPSHOT"
   kibana_image: "docker.elastic.co/cloud-release/kibana-cloud:9.0.0-20c45491-SNAPSHOT"
+=======
+  kibana_instance_configuration_id: "aws.kibana.c5d"
+>>>>>>> b3efa7bd6 (Verify that we can opt out of docker image pinning for ESS (#7098))
