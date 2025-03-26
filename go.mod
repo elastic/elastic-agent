@@ -20,11 +20,7 @@ require (
 	github.com/elastic/elastic-transport-go/v8 v8.6.1
 	github.com/elastic/go-elasticsearch/v8 v8.17.1
 	github.com/elastic/go-licenser v0.4.2
-<<<<<<< HEAD
-	github.com/elastic/go-sysinfo v1.15.0
-=======
 	github.com/elastic/go-sysinfo v1.15.2
->>>>>>> 392871af1 (build(deps): bump github.com/elastic/go-sysinfo from 1.15.1 to 1.15.2 (#7556))
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015
 	github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector v0.2.1
