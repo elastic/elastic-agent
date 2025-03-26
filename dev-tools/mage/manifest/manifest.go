@@ -191,13 +191,16 @@ func resolveManifestPackage(project Project, spec packaging.BinarySpec, version 
 
 	// Try the normal/easy case first
 	packageName := spec.GetPackageName(version, platform)
+	if mg.Verbose() {
+		log.Printf(">>>>>>>>>>> Got packagename [%s], looking for exact match", packageName)
+	}
 	val, ok = project.Packages[packageName]
 	if !ok {
 		// If we didn't find it, it may be an Independent Agent Release, where
 		// the opted-in projects will have a patch version one higher than
 		// the rest of the projects, so we need to seek that out
 		if mg.Verbose() {
-			log.Printf(">>>>>>>>>>> Looking for package [%s] of type [%s]", spec.BinaryName, PlatformPackages[platform])
+			log.Printf(">>>>>>>>>>> Couldn't find exact match, looking for package [%s] of type [%s]", spec.BinaryName, PlatformPackages[platform])
 		}
 
 		var foundIt bool

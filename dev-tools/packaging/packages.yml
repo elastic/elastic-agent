@@ -617,7 +617,7 @@ components:
   # general template for new components
 #  - &comp-<anchor name>
 #    projectName: <project name under manifest>
-#    archiveName: <template representing the name of the archive to download/extract>
+#    packageName: <template representing the name of the archive to download/extract>
 #    binaryName: <binary name>
 #    platforms:
 #      - <platform, use anchors for platforms above>
@@ -625,11 +625,13 @@ components:
 #    packageTypes: *all-package-types # package types it should be included in
   - &comp-agentbeat
     projectName: beats
+    packageName: agentbeat-{{.Version}}-{{.Platform}}.{{.Ext}}
     binaryName: agentbeat
     platforms: *all-platforms
     packageTypes: *all-package-types
   - &comp-apm_server
     projectName: apm-server
+    packageName: apm-server-{{.Version}}-{{.Platform}}.{{.Ext}}
     binaryName: apm-server
     platforms:
       - *linux-amd64
@@ -639,6 +641,7 @@ components:
     packageTypes: *all-package-types
   - &comp-cloudbeat
     projectName: cloudbeat
+    packageName: cloudbeat-{{.Version}}-{{.Platform}}.{{.Ext}}
     binaryName: cloudbeat
     platforms:
       - *linux-amd64
@@ -646,6 +649,7 @@ components:
     packageTypes: *all-package-types
   - &comp-connectors
     projectName: connectors
+    packageName: connectors-{{.Version}}.zip
     binaryName: connectors
     platforms:
       - *linux-amd64
@@ -654,16 +658,19 @@ components:
     packageTypes: *all-package-types
   - &comp-endpoint
     projectName: endpoint-dev
+    packageName: endpoint-security-{{.Version}}-{{.Platform}}.{{.Ext}}
     binaryName: endpoint-security
     platforms: *all-platforms
     packageTypes: *all-package-types
   - &comp-fleet-server
     projectName: fleet-server
+    packageName: fleet-server-{{.Version}}-{{.Platform}}.{{.Ext}}
     binaryName: fleet-server
     platforms: *all-platforms
     packageTypes: *all-package-types
   - &comp-pf-elastic-collector
     projectName: prodfiler
+    packageName: pf-elastic-collector-{{.Version}}-{{.Platform}}.{{.Ext}}
     binaryName: pf-elastic-collector
     platforms:
       - *linux-amd64
@@ -671,6 +678,7 @@ components:
     packageTypes: *all-package-types
   - &comp-pf-elastic-collector
     projectName: prodfiler
+    packageName: pf-elastic-symbolizer-{{.Version}}-{{.Platform}}.{{.Ext}}
     binaryName: pf-elastic-symbolizer
     platforms:
       - *linux-amd64
@@ -678,6 +686,7 @@ components:
     packageTypes: *all-package-types
   - &comp-pf-host-agent
     projectName: prodfiler
+    packageName: pf-host-agent-{{.Version}}-{{.Platform}}.{{.Ext}}
     binaryName: pf-host-agent
     platforms:
       - *linux-amd64
