@@ -56,6 +56,11 @@ Validate fleet configuration
 {{- $_ := unset $.Values.agent.presets $presetName}}
 {{- end -}}
 {{- end -}}
+{{/* init any fleet-related values that derive from valueFrom schema */}}
+{{- include "elasticagent.init.valueFrom" (list $ $.Values.agent.fleet.ca "fleet.ca") -}}
+{{- include "elasticagent.init.valueFrom" (list $ $.Values.agent.fleet.agentCert "fleet.agentcert") -}}
+{{- include "elasticagent.init.valueFrom" (list $ $.Values.agent.fleet.agentCertKey "fleet.agentcert.key") -}}
+{{- include "elasticagent.init.valueFrom" (list $ $.Values.agent.fleet.kibanaCA "fleet.kibana.ca") -}}
 {{- end -}}
 {{- end -}}
 
@@ -120,6 +125,18 @@ Validate and initialise the defined agent presets
 {{/* merge the default leader election with the leader election from the preset giving priority to the one from the preset */}}
 {{- $presetLeaderElection := mergeOverwrite dict $defaultLeaderElection ($presetProviders).kubernetes_leaderelection -}}
 {{- $_ := set $presetProviders "kubernetes_leaderelection" $presetLeaderElection -}}
+{{/* set a sensible default to preset.statePersistence if no value is already present in the preset */}}
+{{- if empty ($presetVal).statePersistence -}}
+{{- if eq ($presetMode) "daemonset" -}}
+{{- $_ := set $presetVal "statePersistence" "HostPath" -}}
+{{- else if eq ($presetMode) "deployment" -}}
+{{- $_ := set $presetVal "statePersistence" "EmptyDir" -}}
+{{- else if eq ($presetMode) "statefulset" -}}
+{{- $_ := set $presetVal "statePersistence" "EmptyDir" -}}
+{{- else -}}
+fail printf "Unsupported mode %v for preset %v" ($presetMode) $($presetName)
+{{- end -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 
@@ -157,54 +174,86 @@ Mutate an agent preset based on agent.fleet
 {{- define "elasticagent.preset.mutate.fleet" -}}
 {{- $ := index . 0 -}}
 {{- $preset := index . 1 -}}
-{{- if eq $.Values.agent.fleet.enabled true -}}
-{{- $fleetEnvVars := list -}}
+{{- $extraVolumeMounts := list -}}
+{{- $extraVolumes := list -}}
+{{- $extraEnvs := list -}}
+{{- if ($.Values.agent.fleet.ca)._mountPath -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_CA" "value" ($.Values.agent.fleet.ca)._mountPath) -}}
+{{- end -}}
+{{- if ($.Values.agent.fleet.ca)._volume -}}
+{{- $extraVolumes = append $extraVolumes ($.Values.agent.fleet.ca)._volume -}}
+{{- end -}}
+{{- if ($.Values.agent.fleet.ca)._volumeMount -}}
+{{- $extraVolumeMounts = append $extraVolumeMounts ($.Values.agent.fleet.ca)._volumeMount -}}
+{{- end -}}
+{{- if ($.Values.agent.fleet.agentCert)._mountPath -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "ELASTIC_AGENT_CERT" "value" ($.Values.agent.fleet.agentCert)._mountPath) -}}
+{{- end -}}
+{{- if ($.Values.agent.fleet.agentCert)._volume -}}
+{{- $extraVolumes = append $extraVolumes ($.Values.agent.fleet.agentCert)._volume -}}
+{{- end -}}
+{{- if ($.Values.agent.fleet.agentCert)._volumeMount -}}
+{{- $extraVolumeMounts = append $extraVolumeMounts ($.Values.agent.fleet.agentCert)._volumeMount -}}
+{{- end -}}
+{{- if ($.Values.agent.fleet.agentCertKey)._mountPath -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "ELASTIC_AGENT_CERT_KEY" "value" ($.Values.agent.fleet.agentCertKey)._mountPath) -}}
+{{- end -}}
+{{- if ($.Values.agent.fleet.agentCertKey)._volume -}}
+{{- $extraVolumes = append $extraVolumes ($.Values.agent.fleet.agentCertKey)._volume -}}
+{{- end -}}
+{{- if ($.Values.agent.fleet.agentCertKey)._volumeMount -}}
+{{- $extraVolumeMounts = append $extraVolumeMounts ($.Values.agent.fleet.agentCertKey)._volumeMount -}}
+{{- end -}}
+{{- if ($.Values.agent.fleet.kibanaCA)._mountPath -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "KIBANA_FLEET_CA" "value" ($.Values.agent.fleet.kibanaCA)._mountPath) -}}
+{{- end -}}
+{{- if ($.Values.agent.fleet.kibanaCA)._volume -}}
+{{- $extraVolumes = append $extraVolumes ($.Values.agent.fleet.kibanaCA)._volume -}}
+{{- end -}}
+{{- if ($.Values.agent.fleet.kibanaCA)._volumeMount -}}
+{{- $extraVolumeMounts = append $extraVolumeMounts ($.Values.agent.fleet.kibanaCA)._volumeMount -}}
+{{- end -}}
 {{- if $.Values.agent.fleet.url -}}
-{{- $fleetURL := dict }}
-{{- $_ := set $fleetURL "name" "FLEET_URL" -}}
-{{- $_ := set $fleetURL "value" $.Values.agent.fleet.url -}}
-{{- $fleetEnvVars = append $fleetEnvVars $fleetURL  -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_URL" "value" $.Values.agent.fleet.url) -}}
 {{- end -}}
 {{- if $.Values.agent.fleet.token -}}
-{{- $fleetToken := dict }}
-{{- $_ := set $fleetToken "name" "FLEET_ENROLLMENT_TOKEN" -}}
-{{- $_ := set $fleetToken "value" $.Values.agent.fleet.token -}}
-{{- $fleetEnvVars = append $fleetEnvVars $fleetToken  -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_ENROLLMENT_TOKEN" "value" $.Values.agent.fleet.token) -}}
 {{- end -}}
-{{- $fleetInsecure := dict }}
-{{- $_ := set $fleetInsecure "name" "FLEET_INSECURE" -}}
-{{- $_ := set $fleetInsecure "value" (printf "%t" $.Values.agent.fleet.insecure) -}}
-{{- $fleetEnvVars = append $fleetEnvVars $fleetInsecure  -}}
+{{- if $.Values.agent.fleet.insecure -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_INSECURE" "value" (quote $.Values.agent.fleet.insecure)) -}}
+{{- end -}}
+{{- if $.Values.agent.fleet.force -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_FORCE" "value" (quote $.Values.agent.fleet.force)) -}}
+{{- end -}}
+{{- if $.Values.agent.fleet.tokenName -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_TOKEN_NAME" "value" $.Values.agent.fleet.tokenName) -}}
+{{- end -}}
+{{- if $.Values.agent.fleet.policyName -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_TOKEN_POLICY_NAME" "value" $.Values.agent.fleet.policyName) -}}
+{{- end -}}
 {{- if $.Values.agent.fleet.kibanaHost -}}
-{{- $fleetKibanaHost := dict }}
-{{- $_ := set $fleetKibanaHost "name" "KIBANA_HOST" -}}
-{{- $_ := set $fleetKibanaHost "value" $.Values.agent.fleet.kibanaHost -}}
-{{- $fleetEnvVars = append $fleetEnvVars $fleetKibanaHost  -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "KIBANA_FLEET_HOST" "value" $.Values.agent.fleet.kibanaHost) -}}
 {{- end -}}
 {{- if $.Values.agent.fleet.kibanaUser -}}
-{{- $fleetKibanaUser := dict }}
-{{- $_ := set $fleetKibanaUser "name" "KIBANA_FLEET_USERNAME" -}}
-{{- $_ := set $fleetKibanaUser "value" $.Values.agent.fleet.kibanaUser -}}
-{{- $fleetEnvVars = append $fleetEnvVars $fleetKibanaUser  -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "KIBANA_FLEET_USERNAME" "value" $.Values.agent.fleet.kibanaUser) -}}
 {{- end -}}
 {{- if $.Values.agent.fleet.kibanaPassword -}}
-{{- $fleetKibanaPassword := dict }}
-{{- $_ := set $fleetKibanaPassword "name" "KIBANA_FLEET_PASSWORD" -}}
-{{- $_ := set $fleetKibanaPassword "value" $.Values.agent.fleet.kibanaPassword -}}
-{{- $fleetEnvVars = append $fleetEnvVars $fleetKibanaPassword  -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "KIBANA_FLEET_PASSWORD" "value" $.Values.agent.fleet.kibanaPassword) -}}
 {{- end -}}
-{{- if not (empty $fleetEnvVars) -}}
-{{- $fleetEnroll := dict -}}
-{{- $_ := set $fleetEnroll "name" "FLEET_ENROLL" -}}
-{{- $_ := set $fleetEnroll "value" "1" -}}
-{{- $fleetEnvVars = append $fleetEnvVars $fleetEnroll -}}
-{{- if not (hasKey $preset "extraEnvs") -}}
-{{- $_ := set $preset "extraEnvs" list -}}
+{{- if $.Values.agent.fleet.kibanaServiceToken -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "KIBANA_FLEET_SERVICE_TOKEN" "value" $.Values.agent.fleet.kibanaServiceToken) -}}
 {{- end -}}
-{{- $presetEnvVars := get $preset "extraEnvs" -}}
-{{- $presetEnvVars = uniq (concat $presetEnvVars $fleetEnvVars) -}}
-{{- $_ := set $preset "extraEnvs" $presetEnvVars -}}
+{{- if $.Values.agent.fleet.enabled -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_ENROLL" "value" "true") -}}
 {{- end -}}
+{{- with uniq $extraVolumes -}}
+{{- include "elasticagent.preset.mutate.volumes" (list $preset (dict "extraVolumes" .)) -}}
+{{- end -}}
+{{- with uniq $extraVolumeMounts -}}
+{{- include "elasticagent.preset.mutate.volumemounts" (list $preset (dict "extraVolumeMounts" .)) -}}
+{{- end -}}
+{{- with uniq $extraEnvs -}}
+{{- include "elasticagent.preset.mutate.envs" (list $preset (dict "extraEnvs" .)) -}}
 {{- end -}}
 {{- end -}}
 
@@ -224,6 +273,31 @@ app.kubernetes.io/name: {{ include "elasticagent.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/version: {{ .Values.agent.version}}
 {{- end }}
+
+{{- define "elasticagent.init.valueFrom" -}}
+{{- $ := index . 0 -}}
+{{- $valueFrom := index . 1 -}}
+{{- $id := index . 2 -}}
+{{- if ($valueFrom).value -}}
+{{- $secretKey := $id -}}
+{{- $mountPath := (printf "/mnt/secrets/elastic-agent/%s" $secretKey) -}}
+{{- $_ := set $valueFrom "_mountPath" $mountPath -}}
+{{- $_ := set $valueFrom "_key" $secretKey -}}
+{{/* we don't need to define volume, this will be part of the already existing volumemount with name config */}}
+{{- $_ := set $valueFrom "_volumeMount" (dict "name" "config" "mountPath" $mountPath "readOnly" true "subPath" $secretKey) -}}
+{{- else if (($valueFrom).valueFromSecret).name -}}
+{{/* we don't have to check valueFrom.valueFromSecret.key as values.schema.json enforces it */}}
+{{- $secretName := (($valueFrom).valueFromSecret).name -}}
+{{- $secretKey := (($valueFrom).valueFromSecret).key -}}
+{{- $mountPath := (printf "/mnt/secrets/elastic-agent/%s.%s" $secretName $secretKey) -}}
+{{- $volumeName := $secretName -}}
+{{- $_ := set $valueFrom "_mountPath" $mountPath -}}
+{{- $_ := set $valueFrom "_key" $secretKey -}}
+{{- $_ := set $valueFrom "_volume" (dict "name" $volumeName "secret" (dict "secretName" $secretName "defaultMode" 0444)) -}}
+{{- $_ := set $valueFrom "_volumeMount" (dict "name" $volumeName "mountPath" $mountPath "readOnly" true "subPath" $secretKey) -}}
+{{- end -}}
+{{- end -}}
+
 
 {{- define "elasticagent.preset.mutate.inputs" -}}
 {{- $ := index . 0 -}}
@@ -310,6 +384,15 @@ app.kubernetes.io/version: {{ .Values.agent.version}}
 {{- $_ := set $preset "extraVolumeMounts" $presetVolumeMounts -}}
 {{- end -}}
 
+{{- define "elasticagent.preset.mutate.envs" -}}
+{{- $preset := index . 0 -}}
+{{- $envVars := index . 1 -}}
+{{- $presetEnvVars := dig "extraEnvs" (list) $preset -}}
+{{- $envVarsToAdd := dig "extraEnvs" (list) $envVars}}
+{{- $presetEnvVars = uniq (concat $presetEnvVars $envVarsToAdd) -}}
+{{- $_ := set $preset "extraEnvs" $presetEnvVars -}}
+{{- end -}}
+
 {{- define "elasticagent.preset.mutate.outputs.byname" -}}
 {{- $ := index . 0 -}}
 {{- $preset := index . 1 -}}
@@ -322,4 +405,61 @@ app.kubernetes.io/version: {{ .Values.agent.version}}
 {{- $_ := set $presetOutputs $outputName $outputCopy}}
 {{- end -}}
 {{- $_ := set $preset "outputs" $presetOutputs -}}
+{{- end -}}
+
+{{/*
+Render a yaml with volumes and volumeMounts keys, rendering state volumes and extra volumes and their respective mounts
+*/}}
+{{- define "elasticagent.preset.render.volumes" -}}
+{{- $ := index . 0 -}}
+{{- $presetVal := index . 1 -}}
+{{- $agentName := index . 2 -}}
+volumes:
+{{- $definedAgentStateVolume := false -}}
+  {{- with ($presetVal).extraVolumes }}
+  {{- . | toYaml | nindent 2 }}
+  {{- range $idx, $volume := . -}}
+  {{- if eq $definedAgentStateVolume false -}}
+  {{- if eq ($volume).name "agent-data" -}}
+  {{- $definedAgentStateVolume = true}}
+  {{- end -}}
+  {{- end -}}
+  {{- end -}}
+  {{- end }}
+  {{- if ne ($presetVal).statePersistence "None" }}
+  {{- if eq $definedAgentStateVolume false }}
+  - name: agent-data
+    {{- if eq ($presetVal).statePersistence "HostPath" }}
+    hostPath:
+      {{- if eq $.Values.agent.fleet.enabled true }}
+      {{/* different state hostPath for managed agents */}}
+      path: /etc/elastic-agent/{{$.Release.Namespace}}/{{$agentName}}-managed/state
+      {{- else }}
+      {{/* different state hostPath for standalone agents */}}
+      path: /etc/elastic-agent/{{$.Release.Namespace}}/{{$agentName}}/state
+      {{- end }}
+      type: DirectoryOrCreate
+    {{- else if eq ($presetVal).statePersistence "EmptyDir" }}
+    emptyDir: {}
+    {{- end }}
+  {{- end }}
+  {{- end }}
+volumeMounts:
+  {{- $definedAgentStateVolumeMount := false -}}
+  {{- with ($presetVal).extraVolumeMounts }}
+  {{- . | toYaml | nindent 2}}
+  {{- range $idx, $volumeMount := . -}}
+  {{- if eq $definedAgentStateVolumeMount false -}}
+  {{- if eq ($volumeMount).name "agent-data" -}}
+  {{- $definedAgentStateVolumeMount = true}}
+  {{- end -}}
+  {{- end -}}
+  {{- end -}}
+  {{- end }}
+  {{- if ne ($presetVal).statePersistence "None" }}
+  {{- if eq $definedAgentStateVolumeMount false }}
+  - name: agent-data
+    mountPath: /usr/share/elastic-agent/state
+  {{- end }}
+  {{- end }}
 {{- end -}}

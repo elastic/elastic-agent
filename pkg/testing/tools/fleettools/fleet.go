@@ -8,8 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/gofrs/uuid/v5"
 
@@ -22,117 +20,44 @@ type EnrollParams struct {
 	PolicyID        string `json:"policy_id"`
 }
 
-// GetAgentByPolicyIDAndHostnameFromList get an agent by the local_metadata.host.name property, reading from the agents list
-func GetAgentByPolicyIDAndHostnameFromList(ctx context.Context, client *kibana.Client, policyID, hostname string) (*kibana.AgentExisting, error) {
-	listAgentsResp, err := client.ListAgents(ctx, kibana.ListAgentsRequest{})
-	if err != nil {
-		return nil, err
-	}
-
-	onPolicy := make([]string, 0, len(listAgentsResp.Items))
-	matching := make([]*kibana.AgentExisting, 0, 1)
-	for i, item := range listAgentsResp.Items {
-		agentHostname := item.LocalMetadata.Host.Hostname
-		agentPolicyID := item.PolicyID
-		if agentPolicyID == policyID {
-			onPolicy = append(onPolicy, agentHostname)
-			if strings.EqualFold(agentHostname, hostname) {
-				matching = append(matching, &listAgentsResp.Items[i])
-			}
-		}
-	}
-
-	if len(matching) == 0 {
-		return nil, fmt.Errorf("unable to find agent with hostname [%s] for policy [%s]. Found: %v",
-			hostname, policyID, onPolicy)
-	}
-
-	if len(matching) > 1 {
-		return nil, fmt.Errorf("found %d agents with hostname [%s]; expected to find only one", len(matching), hostname)
-	}
-
-	return matching[0], nil
-}
-
-func GetAgentIDByHostname(ctx context.Context, client *kibana.Client, policyID, hostname string) (string, error) {
-	agent, err := GetAgentByPolicyIDAndHostnameFromList(ctx, client, policyID, hostname)
+func GetAgentStatus(ctx context.Context, client *kibana.Client, agentID string) (string, error) {
+	agent, err := client.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
 	if err != nil {
 		return "", err
 	}
-	return agent.Agent.ID, nil
-}
-
-func GetAgentStatus(ctx context.Context, client *kibana.Client, policyID string) (string, error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return "", err
-	}
-
-	agent, err := GetAgentByPolicyIDAndHostnameFromList(ctx, client, policyID, hostname)
-	if err != nil {
-		return "", err
-	}
-
 	return agent.Status, nil
 }
 
-func GetAgentVersion(ctx context.Context, client *kibana.Client, policyID string) (string, error) {
-	hostname, err := os.Hostname()
+func GetAgentVersion(ctx context.Context, client *kibana.Client, agentID string) (string, error) {
+	agent, err := client.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
 	if err != nil {
 		return "", err
 	}
-
-	agent, err := GetAgentByPolicyIDAndHostnameFromList(ctx, client, policyID, hostname)
-	if err != nil {
-		return "", err
-	}
-
-	return agent.Agent.Version, err
+	return agent.Agent.Version, nil
 }
 
-func UnEnrollAgent(ctx context.Context, client *kibana.Client, policyID string) error {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return err
-	}
-	agentID, err := GetAgentIDByHostname(ctx, client, policyID, hostname)
-	if err != nil {
-		return err
-	}
-
+func UnEnrollAgent(ctx context.Context, client *kibana.Client, agentID string) error {
 	unEnrollAgentReq := kibana.UnEnrollAgentRequest{
 		ID:     agentID,
 		Revoke: true,
 	}
-	_, err = client.UnEnrollAgent(ctx, unEnrollAgentReq)
+	_, err := client.UnEnrollAgent(ctx, unEnrollAgentReq)
 	if err != nil {
 		return fmt.Errorf("unable to unenroll agent with ID [%s]: %w", agentID, err)
 	}
-
 	return nil
 }
 
-func UpgradeAgent(ctx context.Context, client *kibana.Client, policyID, version string, force bool) error {
-	// TODO: fix me: this does not work if FQDN is enabled
-	hostname, err := os.Hostname()
-	if err != nil {
-		return err
-	}
-	agentID, err := GetAgentIDByHostname(ctx, client, policyID, hostname)
-	if err != nil {
-		return err
-	}
-
+func UpgradeAgent(ctx context.Context, client *kibana.Client, agentID, version string, force bool) error {
 	upgradeAgentReq := kibana.UpgradeAgentRequest{
 		ID:      agentID,
 		Version: version,
 		Force:   force,
 	}
-	_, err = client.UpgradeAgent(ctx, upgradeAgentReq)
+	_, err := client.UpgradeAgent(ctx, upgradeAgentReq)
 	if err != nil {
 		return fmt.Errorf("unable to upgrade agent with ID [%s]: %w", agentID, err)
 	}
-
 	return nil
 }
 
