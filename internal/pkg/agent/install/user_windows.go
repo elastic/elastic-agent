@@ -20,8 +20,8 @@ import (
 
 const (
 	// Reference: https://learn.microsoft.com/en-us/windows/security/threat-protection/security-policy-settings/password-must-meet-complexity-requirements
-	passwordMinLength = 32 // Minimum length for better security
-	passwordMaxLength = 64 // Upper limit to avoid policy issues
+	passwordMinLength = 64  // Minimum length for better security
+	passwordMaxLength = 127 // Upper limit to avoid policy issues
 	// Character pools - ensuring a mix of character categories
 	passwordCharsLower   = "abcdefghijklmnopqrstuvwxyz"
 	passwordCharsUpper   = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
