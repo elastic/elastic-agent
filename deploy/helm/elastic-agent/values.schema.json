@@ -341,6 +341,38 @@
                             "description": "Enable Elastic-Agent managed mode.",
                             "default": false
                         },
+                        "ca": {
+                            "$ref": "#/definitions/ValueFrom",
+                            "description": "CA certificate to use when connecting to Fleet."
+                        },
+                        "force": {
+                            "type": "boolean",
+                            "description": "Elastic Agent client certificate to use with Fleet Server during mTLS authentication."
+                        },
+                        "agentCert": {
+                            "$ref": "#/definitions/ValueFrom",
+                            "description": "Elastic Agent client private key to use with Fleet Server during mTLS authentication."
+                        },
+                        "agentCertKey": {
+                            "$ref": "#/definitions/ValueFrom",
+                            "description": "Elastic Agent client private key to use with Fleet Server during mTLS authentication."
+                        },
+                        "kibanaCA" : {
+                            "$ref": "#/definitions/ValueFrom",
+                            "description": "CA certificate to use when connecting to Kibana if the enrollment token is not supplied."
+                        },
+                        "kibanaServiceToken" : {
+                            "type": "string",
+                            "description": "Service token to use when connecting to Kibana if the enrollment token is not supplied."
+                        },
+                        "tokenName": {
+                            "type": "string",
+                            "description": "Token name to use for fetching token from Kibana if the enrollment token is not supplied."
+                        },
+                        "policyName": {
+                            "type": "string",
+                            "description": "Token policy name to use for fetching token from Kibana if the enrollment token is not supplied."
+                        },
                         "url": {
                             "type": "string",
                             "description": "Fleet server URL."
@@ -351,7 +383,7 @@
                         },
                         "insecure": {
                             "type": "boolean",
-                            "description": "Fleet insecure URL."
+                            "description": "Communicate with Fleet with either insecure HTTP or unverified HTTPS."
                         },
                         "kibanaHost": {
                             "type": "string",
@@ -406,6 +438,8 @@
                                 "required": [
                                     "preset",
                                     "url",
+                                    "tokenName",
+                                    "policyName",
                                     "kibanaHost",
                                     "kibanaUser",
                                     "kibanaPassword"
@@ -417,6 +451,14 @@
                                     "url": {
                                         "type": "string",
                                         "format": "uri"
+                                    },
+                                    "tokenName":  {
+                                        "type": "string",
+                                        "minLength": 1
+                                    },
+                                    "policyName":  {
+                                        "type": "string",
+                                        "minLength": 1
                                     },
                                     "kibanaHost": {
                                         "type": "string",
@@ -968,6 +1010,118 @@
                 ]
             }
         },
+        "ValueFrom": {
+            "type": "object",
+            "properties": {
+                "value": {
+                    "type": "string"
+                },
+                "valueFromSecret": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string"
+                        },
+                        "key": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "value": {
+                                "type": "string",
+                                "minLength": 1
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "valueFromSecret": {
+                                "type": "object",
+                                "properties": {
+                                    "key": {
+                                        "type": "string",
+                                        "maxLength": 0
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 0
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "valueFromSecret": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "valueFromSecret": {
+                                "type": "object",
+                                "properties": {
+                                    "key": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    }
+                                }
+                            },
+                            "value": {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        }
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "valueFromSecret": {
+                                "type": "object",
+                                "properties": {
+                                    "key": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "valueFromSecret": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    }
+                                }
+                            },
+                            "value": {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        }
+                    }
+                }
+            ]
+        },
         "AgentPreset": {
             "type": "object",
             "description": "Configuration for an Agent preset.",
@@ -1276,6 +1430,9 @@
                 "clusterRole": {
                     "$ref": "#/definitions/AgentPresetClusterRole"
                 },
+                "priorityClass": {
+                    "$ref": "#/definitions/AgentPriorityClass"
+                },
                 "envFrom": {
                     "type": "array",
                     "items": {
@@ -1355,6 +1512,15 @@
                             }
                         ]
                     ]
+                },
+                "statePersistence": {
+                    "type": "string",
+                    "enum": [
+                        "HostPath",
+                        "EmptyDir",
+                        "None"
+                    ],
+                    "description": "Volume type used for Agent state persistence."
                 },
                 "extraVolumes": {
                     "type": "array",
@@ -1474,6 +1640,94 @@
                 "mode",
                 "serviceAccount",
                 "clusterRole"
+            ]
+        },
+        "AgentPriorityClass": {
+            "type": "object",
+            "properties": {
+                "create": {
+                    "type": "boolean",
+                    "description": "Create the priority class.",
+                    "default": true
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Name of the priority class to use if create is set to false."
+                },
+                "value": {
+                    "type": "integer",
+                    "description": "Value of the priority class."
+                },
+                "preemptionPolicy": {
+                    "type": "string",
+                    "enum": [
+                        "Never",
+                        "PreemptLowerPriority"
+                    ],
+                    "description": "Preemption policy for the priority class."
+                },
+                "globalDefault": {
+                    "type": "boolean",
+                    "description": "Set the priority class as the global default."
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Description of the priority class."
+                }
+            },
+            "examples": [
+                {
+                    "create": true,
+                    "value": 1000000,
+                    "preemptionPolicy": "Never",
+                    "globalDefault": true,
+                    "description": "Elastic Agent priority class"
+                }
+            ],
+            "required": [
+                "create"
+            ],
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "create": {
+                                "const": true
+                            }
+                        }
+                    },
+                    "then": {
+                        "required": [
+                            "value"
+                        ],
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "maxLength": 0
+                            }
+                        }
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "create": {
+                                "const": false
+                            }
+                        }
+                    },
+                    "then": {
+                        "required": [
+                            "name"
+                        ],
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "minLength": 1
+                            }
+                        }
+                    }
+                }
             ]
         },
         "AgentPresetClusterRole": {

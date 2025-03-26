@@ -147,9 +147,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       serviceAccountName: agent-nginx-example
       volumes:
-      - hostPath:
-          path: /etc/elastic-agent/default/agent-nginx-example/state
-          type: DirectoryOrCreate
+      - emptyDir: {}
         name: agent-data
       - name: config
         secret:

@@ -157,9 +157,25 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 | agent.fleet.enabled | bool | `false` | enable elastic-agent managed |
 | agent.fleet.url | string | `""` | Fleet server URL |
 | agent.fleet.token | string | `""` | Fleet enrollment token |
-| agent.fleet.insecure | bool | `false` | Fleet insecure url |
+| agent.fleet.insecure | bool | `false` | Communicate with Fleet with either insecure HTTP or unverified HTTPS |
+| agent.fleet.force | bool | `false` | Enforce enrollment even if agent is already enrolled |
+| agent.fleet.ca.value | string | `""` | Value of the CA certificate for connecting to Fleet |
+| agent.fleet.ca.valueFromSecret.name | string | `""` | Secret name for the CA certificate |
+| agent.fleet.ca.valueFromSecret.key | string | `""` | Secret key for the CA certificate |
+| agent.fleet.agentCert.value | string | `""` | Value of Elastic Agent client certificate for Fleet Server mTLS |
+| agent.fleet.agentCert.valueFromSecret.name | string | `""` | Secret name for the Elastic Agent client certificate |
+| agent.fleet.agentCert.valueFromSecret.key | string | `""` | Key in the secret for the Elastic Agent client certificate |
+| agent.fleet.agentCertKey.value | string | `""` | Value of Elastic Agent client private key for Fleet Server mTLS |
+| agent.fleet.agentCertKey.valueFromSecret.name | string | `""` | Secret name for the Elastic Agent client private key |
+| agent.fleet.agentCertKey.valueFromSecret.key | string | `""` | Key in the secret for the Elastic Agent client private key |
+| agent.fleet.tokenName | string | `""` | Token name to use for fetching token from Kibana if the enrollment token is not supplied |
+| agent.fleet.policyName | string | `""` | Token policy name to use for fetching token from Kibana if the enrollment token is not supplied |
 | agent.fleet.kibanaHost | string | `""` | Kibana host to fallback if enrollment token is not supplied |
 | agent.fleet.kibanaUser | string | `""` | Kibana username to fallback if enrollment token is not supplied |
 | agent.fleet.kibanaPassword | string | `""` | Kibana password to fallback if enrollment token is not supplied |
+| agent.fleet.kibanaCA.value | string | `""` | Value of the CA certificate for Kibana if the enrollment token is not supplied |
+| agent.fleet.kibanaCA.valueFromSecret.name | string | `""` | Secret name for the Kibana CA certificate |
+| agent.fleet.kibanaCA.valueFromSecret.key | string | `""` | Key in the secret for the Kibana CA certificate |
+| agent.fleet.kibanaServiceToken | string | `""` | Service token to use when connecting to Kibana if the enrollment token is not supplied |
 | agent.fleet.preset | string | `"perNode"` | Agent preset to deploy |
 
