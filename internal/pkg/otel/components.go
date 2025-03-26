@@ -16,10 +16,8 @@ import (
 	jmxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver"
 	k8sclusterreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver"
 	k8sobjectsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver"
-	kafkareceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver"
 	kubeletstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver"
 	nginxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver"
-	prometheusreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver"
 	receivercreator "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator"
 	redisreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver"
 	zipkinreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver"
@@ -47,7 +45,6 @@ import (
 	// Exporters:
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter"
 	fileexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter" // for e2e tests
-	kafkaexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter"
 	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter" // for dev
 	"go.opentelemetry.io/collector/exporter/otlpexporter"
@@ -73,7 +70,11 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		factories := otelcol.Factories{}
 
 		// Receivers
+<<<<<<< HEAD
 		factories.Receivers, err = otelcol.MakeFactoryMap(
+=======
+		receivers := []receiver.Factory{
+>>>>>>> 041f827dc (feat(fips): disable otel components pulling in x/crypto deps (#7548))
 			otlpreceiver.NewFactory(),
 			filelogreceiver.NewFactory(),
 			kubeletstatsreceiver.NewFactory(),
@@ -81,7 +82,6 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			hostmetricsreceiver.NewFactory(),
 			httpcheckreceiver.NewFactory(),
 			k8sobjectsreceiver.NewFactory(),
-			prometheusreceiver.NewFactory(),
 			receivercreator.NewFactory(),
 			redisreceiver.NewFactory(),
 			nginxreceiver.NewFactory(),
@@ -90,9 +90,12 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			fbreceiver.NewFactory(),
 			mbreceiver.NewFactory(),
 			jmxreceiver.NewFactory(),
-			kafkareceiver.NewFactory(),
 			nopreceiver.NewFactory(),
-		)
+		}
+		// some receivers should only be available when
+		// not in fips mode due to restrictions on crypto usage
+		receivers = addNonFipsReceivers(receivers)
+		factories.Receivers, err = receiver.MakeFactoryMap(receivers...)
 		if err != nil {
 			return otelcol.Factories{}, err
 		}
@@ -116,15 +119,22 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		}
 
 		// Exporters
+<<<<<<< HEAD
 		factories.Exporters, err = otelcol.MakeFactoryMap(
+=======
+		exporters := []exporter.Factory{
+>>>>>>> 041f827dc (feat(fips): disable otel components pulling in x/crypto deps (#7548))
 			otlpexporter.NewFactory(),
 			debugexporter.NewFactory(),
 			fileexporter.NewFactory(),
 			elasticsearchexporter.NewFactory(),
 			loadbalancingexporter.NewFactory(),
 			otlphttpexporter.NewFactory(),
-			kafkaexporter.NewFactory(),
-		)
+		}
+		// some exporters should only be available when
+		// not in fips mode due to restrictions on crypto usage
+		exporters = addNonFipsExporters(exporters)
+		factories.Exporters, err = exporter.MakeFactoryMap(exporters...)
 		if err != nil {
 			return otelcol.Factories{}, err
 		}
