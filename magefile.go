@@ -1442,7 +1442,7 @@ func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir s
 	draDownloadDir := filepath.Join(downloadDir, build.BuildID)
 	err = os.MkdirAll(draDownloadDir, 0o770)
 	if err != nil {
-		return nil, fmt.Errorf("creating %q directory: %w", err)
+		return nil, fmt.Errorf("creating %q directory: %w", draDownloadDir, err)
 	}
 
 	// sync access to the downloadedArtifacts map
