@@ -31,6 +31,10 @@ func TestRandomPassword(t *testing.T) {
 		hasDigit := false
 		hasSpecial := false
 
+		if strings.ContainsRune(password, 0) {
+			t.Fatalf("password %q contains null character", password)
+		}
+
 		for _, char := range password {
 			switch {
 			case strings.ContainsRune(passwordCharsLower, char):
@@ -42,7 +46,8 @@ func TestRandomPassword(t *testing.T) {
 			case strings.ContainsRune(passwordCharsSpecial, char):
 				hasSpecial = true
 			default:
-				t.Fatalf("password %q contains an invalid character %q", password, string(char))
+				t.Fatalf("password %q contains an invalid character %q (hasLower=%v, hasUpper=%v, hasDigit=%v, hasSpecial=%v)",
+					password, string(char), hasLower, hasUpper, hasDigit, hasSpecial)
 			}
 		}
 
