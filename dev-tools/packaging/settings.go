@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"text/template"
 
 	"github.com/magefile/mage/mg"
 	"gopkg.in/yaml.v3"
@@ -13,16 +14,37 @@ import (
 	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
 )
 
-var PlatformPackages = map[string]string{
-	"darwin/amd64":  "darwin-x86_64.tar.gz",
-	"darwin/arm64":  "darwin-aarch64.tar.gz",
-	"linux/amd64":   "linux-x86_64.tar.gz",
-	"linux/arm64":   "linux-arm64.tar.gz",
-	"windows/amd64": "windows-x86_64.zip",
+type platformAndExt struct {
+	platform string
+	ext      string
+}
+
+var PlatformPackages = map[string]platformAndExt{
+	"darwin/amd64": {
+		platform: "darwin-x86_64",
+		ext:      "tar.gz",
+	},
+	"darwin/arm64": {
+		platform: "darwin-aarch64",
+		ext:      "tar.gz",
+	},
+	"linux/amd64": {
+		platform: "linux-x86_64",
+		ext:      "tar.gz",
+	},
+	"linux/arm64": {
+		platform: "linux-arm64",
+		ext:      "tar.gz",
+	},
+	"windows/amd64": {
+		platform: "windows-x86_64",
+		ext:      "zip",
+	},
 }
 
 type BinarySpec struct {
 	BinaryName   string                  `yaml:"binaryName"`
+	PackageName  string                  `yaml:"packageName"`
 	ProjectName  string                  `yaml:"projectName"`
 	Platforms    []Platform              `yaml:"platforms"`
 	PythonWheel  bool                    `yaml:"pythonWheel"`
@@ -48,10 +70,22 @@ func (proj BinarySpec) SupportsPackageType(pkgType pkgcommon.PackageType) bool {
 }
 
 func (proj BinarySpec) GetPackageName(version string, platform string) string {
-	if proj.PythonWheel {
-		return fmt.Sprintf("%s-%s.zip", proj.BinaryName, version)
+	tmpl, err := template.New("package_name").Parse(proj.PackageName)
+	if err != nil {
+		panic(fmt.Errorf("parsing packageName template for project/binary %s/%s %q: %w", proj.ProjectName, proj.BinaryName, proj.PackageName, err))
 	}
-	return fmt.Sprintf("%s-%s-%s", proj.BinaryName, version, PlatformPackages[platform])
+
+	// look for the platform strings, if not found an empty object is returned and empty values will be used for rendering
+	pltfStrings := PlatformPackages[platform]
+	tmplContext := map[string]string{"Version": version, "Platform": pltfStrings.platform, "Ext": pltfStrings.ext}
+
+	var buf bytes.Buffer
+	err = tmpl.Execute(&buf, tmplContext)
+	if err != nil {
+		panic(fmt.Errorf("rendering packageName template for project/binary %s/%s %q with context %v: %w",
+			proj.ProjectName, proj.BinaryName, proj.PackageName, tmplContext, err))
+	}
+	return buf.String()
 }
 
 // ExpectedBinaries  is a map of binaries agent needs to their project in the unified-release manager.
