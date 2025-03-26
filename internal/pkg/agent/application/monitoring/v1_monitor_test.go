@@ -7,10 +7,14 @@ package monitoring
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,6 +25,89 @@ import (
 	monitoringcfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/component"
 )
+
+func TestMonitoringFull(t *testing.T) {
+	agentInfo, err := info.NewAgentInfo(context.Background(), false)
+	require.NoError(t, err, "Error creating agent info")
+	// set a top path to get consistent logging paths in the output config
+	oldTopPath := paths.Top()
+	paths.SetTop("/opt/Elastic/Agent")
+	t.Cleanup(func() {
+		paths.SetTop(oldTopPath)
+	})
+
+	testMon := BeatsMonitor{
+		enabled: true,
+		config: &monitoringConfig{
+			C: &monitoringcfg.MonitoringConfig{
+				Enabled:        true,
+				MonitorMetrics: true,
+				MonitorLogs:    true,
+				HTTP: &monitoringcfg.MonitoringHTTPConfig{
+					Enabled: true,
+				},
+			},
+		},
+		agentInfo: agentInfo,
+	}
+
+	policy := map[string]any{
+		"agent": map[string]any{
+			"monitoring": map[string]any{
+				"metrics": true,
+				"http": map[string]any{
+					"enabled": false,
+				},
+			},
+		},
+		"outputs": map[string]any{
+			"default": map[string]any{},
+		},
+	}
+
+	// Add a Service component with a set log path to test the special logic for generating monitoring config for them
+	// The rest of the logic is covered by the monitoring components monitoring themselves
+	compList := []component.Component{
+		{
+			ID: "endpoint-default",
+			InputSpec: &component.InputRuntimeSpec{
+				Spec: component.InputSpec{
+					Command: &component.CommandSpec{
+						Name: "endpoint-security",
+					},
+					Service: &component.ServiceSpec{
+						CPort: 7688,
+						Log: &component.ServiceLogSpec{
+							Path: "/var/log/endpoint.log",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	compIdToBinary := map[string]string{
+		"endpoint-default": "endpoint-security",
+		"filebeat-default": "filebeat",
+	}
+	existingPidStateMap := map[string]uint64{
+		"endpoint-default": 1234,
+	}
+
+	expectedConfigFilePath := filepath.Join(".", "testdata", "monitoring_config_full.yaml")
+	expectedConfigBytes, err := os.ReadFile(expectedConfigFilePath)
+	require.NoError(t, err)
+
+	outCfg, err := testMon.MonitoringConfig(policy, compList, compIdToBinary, existingPidStateMap)
+	require.NoError(t, err)
+
+	outCfgBytes, err := yaml.Marshal(outCfg)
+	require.NoError(t, err)
+	outCfgString := string(outCfgBytes)
+	// replace the version with a placeholder
+	outCfgString = strings.Replace(outCfgString, agentInfo.Version(), "placeholder", -1)
+	assert.Equal(t, string(expectedConfigBytes), outCfgString)
+}
 
 func TestMonitoringWithEndpoint(t *testing.T) {
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)
