@@ -7,9 +7,68 @@
 package install
 
 import (
+	"fmt"
 	"strings"
 	"testing"
+	"unicode"
+
+	"github.com/stretchr/testify/assert"
 )
+
+func TestPasswordCharSets(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		charSet string
+		valid   func(rune) error
+	}{
+		{
+			name:    "lowercase characters",
+			charSet: passwordCharsLower,
+			valid: func(r rune) error {
+				if unicode.IsLower(r) {
+					return nil
+				}
+				return fmt.Errorf("character %q is not lowercase", r)
+			},
+		},
+		{
+			name:    "uppercase characters",
+			charSet: passwordCharsUpper,
+			valid: func(r rune) error {
+				if unicode.IsUpper(r) {
+					return nil
+				}
+				return fmt.Errorf("character %q is not uppercase", r)
+			},
+		},
+		{
+			name:    "digit characters",
+			charSet: passwordCharsDigits,
+			valid: func(r rune) error {
+				if unicode.IsDigit(r) {
+					return nil
+				}
+				return fmt.Errorf("character %q is not a digit", r)
+			},
+		},
+		{
+			name:    "special characters",
+			charSet: passwordCharsSpecial,
+			valid: func(r rune) error {
+				if unicode.IsPunct(r) || unicode.IsSymbol(r) {
+					return nil
+				}
+				return fmt.Errorf("character %q is not a special character", r)
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, char := range tc.charSet {
+				assert.NoError(t, tc.valid(char))
+			}
+		})
+	}
+}
 
 // TestRandomPassword tries to ensure that generated passwords meet the windows security constraints.
 func TestRandomPassword(t *testing.T) {
