@@ -50,6 +50,7 @@ env.sh
 *.bck
 
 # agent
+.override_stack_version
 build/
 elastic-agent
 elastic-agent.dev.yml

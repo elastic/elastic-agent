@@ -2,7 +2,6 @@
 set -euo pipefail
 
 function ess_up() {
-  echo "~~~ Staring ESS Stack"  
   local WORKSPACE=$(git rev-parse --show-toplevel)
   local TF_DIR="${WORKSPACE}/test_infra/ess/"
   local STACK_VERSION=$1
@@ -12,6 +11,8 @@ function ess_up() {
     echo "Error: Specify stack version: ess_up [stack_version]" >&2
     return 1
   fi
+
+  echo "~~~ Staring ESS Stack ${STACK_VERSION}"  
 
   export EC_API_KEY=$(retry -t 5 -- vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
   
