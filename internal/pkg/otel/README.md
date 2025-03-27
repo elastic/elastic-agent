@@ -48,6 +48,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [nopreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/nopreceiver/v0.120.0/receiver/nopreceiver/README.md) | v0.120.0 |
 | [otlpreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/otlpreceiver/v0.120.0/receiver/otlpreceiver/README.md) | v0.120.0 |
 | [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusreceiver/v0.120.1/receiver/prometheusreceiver/README.md) | v0.120.1 |
+| [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusreceiver/=&gt; github.com/elastic/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.0.0-20250317163643-19cd4e80024f/receiver/prometheusreceiver/README.md) | =&gt; github.com/elastic/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.0.0-20250317163643-19cd4e80024f |
 | [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.120.1/receiver/receivercreator/README.md) | v0.120.1 |
 | [redisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/redisreceiver/v0.120.1/receiver/redisreceiver/README.md) | v0.120.1 |
 | [zipkinreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zipkinreceiver/v0.120.1/receiver/zipkinreceiver/README.md) | v0.120.1 |
