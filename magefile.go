@@ -1589,9 +1589,12 @@ func appendComponentChecksums(versionedDropPath string, checksums map[string]str
 		}
 
 		componentFile := strings.TrimSuffix(file, devtools.ComponentSpecFileSuffix)
+		if strings.HasPrefix(filepath.Base(versionedDropPath), "windows") {
+			componentFile += ".exe"
+		}
 		hash, err := devtools.GetSHA512Hash(filepath.Join(versionedDropPath, componentFile))
 		if errors.Is(err, os.ErrNotExist) {
-			fmt.Printf(">>> Computing hash for %q failed: file not present %w \n", componentFile, err)
+			fmt.Printf(">>> Computing hash for %q failed: file not present %s \n", componentFile, err)
 			continue
 		} else if err != nil {
 			return err
