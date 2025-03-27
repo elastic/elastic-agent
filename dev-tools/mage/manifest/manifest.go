@@ -159,12 +159,12 @@ func DownloadComponents(ctx context.Context, manifest string, platforms []string
 				continue
 			}
 
-			pkgURL, err := resolveManifestPackage(projects[spec.ProjectName], spec, majorMinorPatchVersion, platform)
+			resolvedPackage, err := ResolveManifestPackage(projects[spec.ProjectName], spec, majorMinorPatchVersion, platform)
 			if err != nil {
 				return err
 			}
 
-			for _, p := range pkgURL {
+			for _, p := range resolvedPackage.URLs {
 				log.Printf(">>>>>>>>> Downloading [%s] [%s] ", spec.BinaryName, p)
 				pkgFilename := path.Base(p)
 				downloadTarget := filepath.Join(targetPath, pkgFilename)
@@ -186,10 +186,15 @@ func DownloadComponents(ctx context.Context, manifest string, platforms []string
 	return nil
 }
 
-func resolveManifestPackage(project Project, spec packaging.BinarySpec, version string, platform string) ([]string, error) {
+type ResolvedPackage struct {
+	Name string
+	URLs []string
+}
+
+func ResolveManifestPackage(project Project, spec packaging.BinarySpec, dependencyVersion string, platform string) (*ResolvedPackage, error) {
 
 	// Try the normal/easy case first
-	packageName := spec.GetPackageName(version, platform)
+	packageName := spec.GetPackageName(dependencyVersion, platform)
 	if mg.Verbose() {
 		log.Printf(">>>>>>>>>>> Got packagename [%s], looking for exact match", packageName)
 	}
@@ -200,7 +205,10 @@ func resolveManifestPackage(project Project, spec packaging.BinarySpec, version 
 			log.Printf(">>>>>>>>>>> Found exact match packageName for [%s, %s]: %s", project.Branch, project.CommitHash, exactMatch)
 		}
 
-		return []string{exactMatch.URL, exactMatch.ShaURL, exactMatch.AscURL}, nil
+		return &ResolvedPackage{
+			Name: packageName,
+			URLs: []string{exactMatch.URL, exactMatch.ShaURL, exactMatch.AscURL},
+		}, nil
 	}
 
 	// If we didn't find it, it may be an Independent Agent Release, where
@@ -208,23 +216,27 @@ func resolveManifestPackage(project Project, spec packaging.BinarySpec, version 
 	// the rest of the projects, so we "relax" the version constraint
 
 	// Find the original version in the filename
-	versionIndex := strings.Index(packageName, version)
+	versionIndex := strings.Index(packageName, dependencyVersion)
 	if versionIndex == -1 {
-		return nil, fmt.Errorf("no exact match and filename %q does not seem to contain version %q to try a fallback", packageName, version)
+		return nil, fmt.Errorf("no exact match and filename %q does not seem to contain dependencyVersion %q to try a fallback", packageName, dependencyVersion)
 	}
-	relaxedVersion, err := relaxVersion(version)
+
+	// TODO move relaxVersion to the version package so we can rewrite the version like so
+	//parseVersion, _ := version.ParseVersion(dependencyVersion)
+	//parseVersion.GetRelaxedPatchRegexp()
+	relaxedVersion, err := relaxVersion(dependencyVersion)
 	if err != nil {
-		return nil, fmt.Errorf("relaxing version %q: %w", version, err)
+		return nil, fmt.Errorf("relaxing dependencyVersion %q: %w", dependencyVersion, err)
 	}
 
 	if mg.Verbose() {
-		log.Printf(">>>>>>>>>>> Couldn't find exact match, relaxing agent version to %s", relaxedVersion)
+		log.Printf(">>>>>>>>>>> Couldn't find exact match, relaxing agent dependencyVersion to %s", relaxedVersion)
 	}
 
 	// locate the original version in the filename and substitute the relaxed version regexp, quoting everything around that
 	relaxedPackageName := regexp.QuoteMeta(packageName[:versionIndex])
 	relaxedPackageName += relaxedVersion
-	relaxedPackageName += regexp.QuoteMeta(packageName[versionIndex+len(version):])
+	relaxedPackageName += regexp.QuoteMeta(packageName[versionIndex+len(dependencyVersion):])
 
 	if mg.Verbose() {
 		log.Printf(">>>>>>>>>>> Attempting to match a filename with %s", relaxedPackageName)
@@ -243,7 +255,10 @@ func resolveManifestPackage(project Project, spec packaging.BinarySpec, version 
 			if mg.Verbose() {
 				log.Printf(">>>>>>>>>>> Found matching packageName for [%s, %s]: %s", project.Branch, project.CommitHash, pkgName)
 			}
-			return []string{pkg.URL, pkg.ShaURL, pkg.AscURL}, nil
+			return &ResolvedPackage{
+				Name: pkgName,
+				URLs: []string{pkg.URL, pkg.ShaURL, pkg.AscURL},
+			}, nil
 		}
 	}
 

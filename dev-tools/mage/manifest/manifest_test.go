@@ -13,6 +13,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/dev-tools/packaging"
 )
 
 var (
@@ -143,7 +145,7 @@ func TestResolveManifestPackage(t *testing.T) {
 				return
 			}
 
-			urlList, err := resolveManifestPackage(projects[tc.projectName], spec, manifestJson.Version, tc.platform)
+			urlList, err := ResolveManifestPackage(projects[tc.projectName], spec, manifestJson.Version, tc.platform)
 			require.NoError(t, err)
 
 			assert.Len(t, urlList, 3)
@@ -154,11 +156,11 @@ func TestResolveManifestPackage(t *testing.T) {
 	}
 }
 
-func findBinarySpec(name string) (BinarySpec, bool) {
-	for _, spec := range ExpectedBinaries {
+func findBinarySpec(name string) (packaging.BinarySpec, bool) {
+	for _, spec := range packaging.ExpectedBinaries {
 		if spec.BinaryName == name {
 			return spec, true
 		}
 	}
-	return BinarySpec{}, false
+	return packaging.BinarySpec{}, false
 }
