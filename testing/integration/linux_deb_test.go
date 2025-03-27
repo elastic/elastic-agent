@@ -9,7 +9,6 @@ package integration
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -141,13 +140,6 @@ func testDebLogIngestFleetManagedWithCheck(ctx context.Context, t *testing.T, ag
 		},
 	}
 
-	// remove flavor to start fresh, in case there is some leftover.
-	_ = os.Remove("/var/lib/elastic-agent/.flavor")
-	t.Cleanup(func() {
-		// cleanup after ourselves
-		_ = os.Remove("/var/lib/elastic-agent/.flavor")
-	})
-
 	// 2. Install the Elastic-Agent with the policy that
 	// was just created.
 	policy, _, err := tools.InstallAgentWithPolicy(
@@ -209,10 +201,6 @@ func TestDebFleetUpgrade(t *testing.T) {
 		}
 
 		t.Run(fmt.Sprintf("Upgrade DEB from %s - %q", tc.upgradeFromVersion.String(), tc.name), func(t *testing.T) {
-			t.Cleanup(func() {
-				// cleanup after ourselves
-				_ = os.Remove("/var/lib/elastic-agent/.flavor")
-			})
 			testDebUpgrade(t, tc.upgradeFromVersion, info, tc.installingServers, tc.expectingServers)
 		})
 	}
