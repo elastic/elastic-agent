@@ -200,7 +200,7 @@ func TestRpmFleetUpgrade(t *testing.T) {
 			continue
 		}
 
-		t.Run(fmt.Sprintf("Upgrade DEB from %s - %q", tc.upgradeFromVersion.String(), tc.name), func(t *testing.T) {
+		t.Run(fmt.Sprintf("Upgrade RPM from %s - %q", tc.upgradeFromVersion.String(), tc.name), func(t *testing.T) {
 			testRpmUpgrade(t, tc.upgradeFromVersion, info, tc.installingServers, tc.expectingServers)
 		})
 	}
