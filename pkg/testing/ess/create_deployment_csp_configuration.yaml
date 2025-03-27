@@ -13,7 +13,3 @@ aws:
   elasticsearch_conf_id: "aws.es.datahot.i3"
   elasticsearch_deployment_template_id: "aws-storage-optimized"
   kibana_instance_configuration_id: "aws.kibana.c5d"
-docker:
-  integration_server_image: "docker.elastic.co/cloud-release/elastic-agent-cloud:8.18.0-99abd29a-SNAPSHOT"
-  elasticsearch_image: "docker.elastic.co/cloud-release/elasticsearch-cloud-ess:8.18.0-99abd29a-SNAPSHOT"
-  kibana_image: "docker.elastic.co/cloud-release/kibana-cloud:8.18.0-99abd29a-SNAPSHOT"
