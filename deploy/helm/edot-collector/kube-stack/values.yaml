@@ -559,7 +559,6 @@ collectors:
         routing:
           default_pipelines: [metrics/otel]
           error_mode: ignore
-          match_once: true
           table:
             - context: metric
               statement: route() where instrumentation_scope.name == "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver" or IsMatch(instrumentation_scope.name, "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal/scraper/*")
@@ -875,6 +874,10 @@ collectors:
             - ${env:ELASTIC_ENDPOINT}
           api_key: ${env:ELASTIC_API_KEY} # API key for Elasticsearch authentication.
           logs_dynamic_index:
+            enabled: true
+          metrics_dynamic_index:
+            enabled: true
+          traces_dynamic_index:
             enabled: true
           # Enable in order to skip the SSL certificate Check
           # tls:

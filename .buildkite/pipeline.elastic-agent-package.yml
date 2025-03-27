@@ -60,6 +60,8 @@ steps:
           provider: "gcp"
           machineType: "c2-standard-16"
           diskSizeGb: 400
+        env:
+          PLATFORMS: "linux/amd64 windows/amd64 darwin/amd64"
         command: |
           if [[ -z "$${MANIFEST_URL}" ]]; then
             export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
@@ -79,11 +81,15 @@ steps:
         agents:
           provider: "aws"
           instanceType: "t4g.2xlarge"
-          imagePrefix: "core-ubuntu-2004-aarch64"
+          imagePrefix: "core-ubuntu-2204-aarch64"
+          diskSizeGb: 400
         env:
-          PLATFORMS: "linux/arm64"
-          PACKAGES: "docker"
+          PLATFORMS: "linux/arm64 darwin/arm64"
+          PACKAGES: "docker,tar.gz,deb,rpm"
         command: |
+          echo "Add support for multiarch"
+          docker run --privileged --rm tonistiigi/binfmt:master --install all
+
           if [[ -z "$${MANIFEST_URL}" ]]; then
             export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
             if [[ -z "$${MANIFEST_URL}" ]]; then
@@ -110,10 +116,10 @@ steps:
       DRA_PROJECT_ARTIFACT_ID: "agent-package"
     command: |
       echo "+++ Restoring Artifacts"
-      buildkite-agent artifact download "build/**/*" . 
+      buildkite-agent artifact download "build/**/*" .
 
-      echo "+++ Changing permissions for the release manager"      
-      sudo chmod -R a+r build/distributions/ 
+      echo "+++ Changing permissions for the release manager"
+      sudo chmod -R a+r build/distributions/
       sudo chown -R :1000 build/distributions/
       ls -lahR build/
 
@@ -142,7 +148,7 @@ steps:
     agents:
       provider: "gcp"
       machineType: "n2-standard-8"
-      diskSizeGb: 250
+      diskSizeGb: 400
     env:
       DRA_PROJECT_ID: "elastic-agent-package"
       DRA_PROJECT_ARTIFACT_ID: "agent-package"

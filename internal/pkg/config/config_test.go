@@ -7,9 +7,9 @@ package config
 import (
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/confmap"
@@ -17,11 +17,6 @@ import (
 
 	"github.com/elastic/go-ucfg"
 )
-
-func TestConfig(t *testing.T) {
-	testToMapStr(t)
-	testLoadFiles(t)
-}
 
 func TestInputsResolveNOOP(t *testing.T) {
 	contents := map[string]interface{}{
@@ -65,18 +60,56 @@ func TestInputsResolveNOOP(t *testing.T) {
 	assert.Equal(t, contents, cfgData)
 }
 
-func testToMapStr(t *testing.T) {
-	m := map[string]interface{}{
-		"hello": map[string]interface{}{
-			"what": "who",
+func TestToMapStr(t *testing.T) {
+	input := map[string]interface{}{
+		"outputs": map[string]interface{}{
+			"default": map[string]interface{}{
+				"type":                        "elasticsearch",
+				"hosts":                       []interface{}{"127.0.0.1:9200"},
+				"ssl.certificate_authorities": "ca.crt",
+				"ssl.ca_trusted_fingerprint":  "fingerprint",
+			},
+		},
+		"inputs": []interface{}{
+			map[string]interface{}{
+				"id":                          "endpoint-0",
+				"type":                        "endpoint",
+				"ssl.certificate_authorities": "ca.crt",
+				"ssl.ca_trusted_fingerprint":  "fingerprint",
+			},
+		},
+	}
+	expected := map[string]interface{}{
+		"outputs": map[string]interface{}{
+			"default": map[string]interface{}{
+				"type":  "elasticsearch",
+				"hosts": []interface{}{"127.0.0.1:9200"},
+				"ssl": map[string]interface{}{
+					"certificate_authorities": "ca.crt",
+					"ca_trusted_fingerprint":  "fingerprint",
+				},
+			},
+		},
+		"inputs": []interface{}{
+			map[string]interface{}{
+				"id":   "endpoint-0",
+				"type": "endpoint",
+				"ssl": map[string]interface{}{
+					"certificate_authorities": "ca.crt",
+					"ca_trusted_fingerprint":  "fingerprint",
+				},
+			},
 		},
 	}
 
-	c := MustNewConfigFrom(m)
-	nm, err := c.ToMapStr()
+	c := MustNewConfigFrom(input)
+	observed, err := c.ToMapStr()
 	require.NoError(t, err)
 
-	assert.True(t, reflect.DeepEqual(m, nm))
+	diff := cmp.Diff(expected, observed)
+	if diff != "" {
+		t.Error(diff)
+	}
 }
 
 func TestCommaParsing(t *testing.T) {
@@ -95,7 +128,7 @@ func TestCommaParsing(t *testing.T) {
 	require.Equal(t, outMap, parsedMap)
 }
 
-func testLoadFiles(t *testing.T) {
+func TestLoadFiles(t *testing.T) {
 	tmp := t.TempDir()
 
 	f1 := filepath.Join(tmp, "1.yml")

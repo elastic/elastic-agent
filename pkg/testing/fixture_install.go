@@ -461,7 +461,11 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, shou
 	}
 
 	// sudo apt-get install the deb
-	out, err := exec.CommandContext(ctx, "sudo", "apt-get", "install", "-y", f.srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
+	cmd := exec.CommandContext(ctx, "sudo", "-E", "apt-get", "install", "-y", f.srcPackage) // #nosec G204 -- Need to pass in name of package
+	if installOpts.InstallServers {
+		cmd.Env = append(cmd.Env, "ELASTIC_AGENT_FLAVOR=servers")
+	}
+	out, err := cmd.CombinedOutput() // #nosec G204 -- Need to pass in name of package
 	if err != nil {
 		return out, fmt.Errorf("apt install failed: %w output:%s", err, string(out))
 	}
@@ -546,7 +550,11 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 	}
 
 	// sudo rpm -iv elastic-agent rpm
-	out, err := exec.CommandContext(ctx, "sudo", "rpm", "-i", "-v", f.srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
+	cmd := exec.CommandContext(ctx, "sudo", "-E", "rpm", "-i", "-v", f.srcPackage) // #nosec G204 -- Need to pass in name of package
+	if installOpts.InstallServers {
+		cmd.Env = append(cmd.Env, "ELASTIC_AGENT_FLAVOR=servers")
+	}
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return out, fmt.Errorf("rpm install failed: %w output:%s", err, string(out))
 	}

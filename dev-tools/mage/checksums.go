@@ -110,7 +110,11 @@ func ChecksumsWithManifest(requiredPackage string, versionedFlatPath string, ver
 				// Iterate over the external binaries that we care about for packaging agent
 				for _, spec := range manifest.ExpectedBinaries {
 					// If the individual package doesn't match the expected prefix, then continue
-					if !strings.HasPrefix(pkgName, spec.BinaryName) {
+					// FIXME temporarily skip fips packages until elastic-agent FIPS is in place
+					if !strings.HasPrefix(pkgName, spec.BinaryName) || strings.Contains(pkgName, "-fips-") {
+						if mg.Verbose() {
+							log.Printf(">>>>>>> Package [%s] skipped", pkgName)
+						}
 						continue
 					}
 
@@ -197,7 +201,8 @@ func getComponentVersion(componentName string, requiredPackage string, component
 		// Only care about the external binaries that we want to package
 		for _, spec := range manifest.ExpectedBinaries {
 			// If the given component name doesn't match the external binary component, skip
-			if componentName != spec.ProjectName {
+			// FIXME temporarily skip fips packages until elastic-agent FIPS is in place
+			if componentName != spec.ProjectName || strings.Contains(pkgName, "-fips-") {
 				continue
 			}
 
