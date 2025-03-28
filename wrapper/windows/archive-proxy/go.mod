@@ -1,4 +1,4 @@
-module github.com/elastic/elastic-agent/hack/windows/archive-proxy
+module github.com/elastic/elastic-agent/wrapper/windows/archive-proxy
 
 go 1.24.1
 

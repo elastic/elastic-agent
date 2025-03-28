@@ -313,7 +313,7 @@ func (Build) WindowsArchiveRootBinary() error {
 	args := devtools.BuildArgs{
 		Name:        outputName,
 		OutputDir:   filepath.Join(buildDir, "windows-archive-root-binary"),
-		InputFiles:  []string{"hack/windows/archive-proxy/main.go"},
+		InputFiles:  []string{"wrapper/windows/archive-proxy/main.go"},
 		CGO:         false,
 		WinMetadata: true,
 		ExtraFlags: []string{
