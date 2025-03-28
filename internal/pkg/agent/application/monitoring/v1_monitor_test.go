@@ -14,8 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
@@ -29,13 +27,6 @@ import (
 func TestMonitoringFull(t *testing.T) {
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)
 	require.NoError(t, err, "Error creating agent info")
-	// set a top path to get consistent logging paths in the output config
-	oldTopPath := paths.Top()
-	paths.SetTop("/opt/Elastic/Agent")
-	t.Cleanup(func() {
-		paths.SetTop(oldTopPath)
-	})
-
 	testMon := BeatsMonitor{
 		enabled: true,
 		config: &monitoringConfig{
@@ -100,6 +91,22 @@ func TestMonitoringFull(t *testing.T) {
 
 	outCfg, err := testMon.MonitoringConfig(policy, compList, compIdToBinary, existingPidStateMap)
 	require.NoError(t, err)
+
+	// Replace paths with placeholders. Log paths are different for each OS and it's annoying to fully account for the
+	// differences in this test. Same thing applies to endpoints.
+	for _, inputCfg := range outCfg["inputs"].([]any) {
+		inputCfgMap := inputCfg.(map[string]interface{})
+		streams := inputCfgMap["streams"].([]interface{})
+		for _, stream := range streams {
+			streamMap := stream.(map[string]interface{})
+			if _, ok := streamMap["paths"]; ok {
+				streamMap["paths"] = []string{"placeholder"}
+			}
+			if _, ok := streamMap["hosts"]; ok {
+				streamMap["hosts"] = []string{"placeholder"}
+			}
+		}
+	}
 
 	outCfgBytes, err := yaml.Marshal(outCfg)
 	require.NoError(t, err)
