@@ -16,52 +16,82 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/core/process"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 // CommitSHA is set by the linker at build time
 var CommitSHA string
 
+// winEventLog is an interface for windows event log
+type winEventLog interface {
+	Error(eid uint32, msg string) error
+	Close() error
+}
+
 // logger prints messages to stdout and the windows event log
 type logger struct {
-	winEventLog interface {
-		Error(eid uint32, msg string) error
-		Close() error
-	}
+	wel winEventLog
 }
 
 // newLogger creates a new logger
 func newLogger() (*logger, error) {
-	err := eventlog.InstallAsEventCreate(paths.ServiceName(), eventlog.Info|eventlog.Warning|eventlog.Error)
-	if err != nil && !strings.Contains(err.Error(), "registry key already exists") {
-		return nil, err
+	isAdmin, err := utils.HasRoot()
+	if err != nil {
+		isAdmin = false
 	}
 
-	eLog, err := eventlog.Open(paths.ServiceName())
-	if err != nil {
-		return nil, err
+	var wel winEventLog
+	if isAdmin {
+		src := paths.ServiceName()
+
+		err := eventlog.InstallAsEventCreate(src, eventlog.Info|eventlog.Warning|eventlog.Error)
+		if err != nil && !strings.Contains(err.Error(), "registry key already exists") {
+			return nil, err
+		}
+
+		eLog, err := eventlog.Open(src)
+		if err != nil {
+			return nil, err
+		}
+		wel = eLog
 	}
 
 	return &logger{
-		winEventLog: eLog,
+		wel: wel,
 	}, nil
 }
 
 // Close closes the event log
 func (l *logger) Close() {
-	_ = l.winEventLog.Close()
+	if l == nil || l.wel == nil {
+		return
+	}
+	_ = l.wel.Close()
 }
 
 // Fatal is equivalent to [fmt.Print] followed by a call to [os.Exit](1).
 func (l *logger) Fatal(v ...any) {
+	if l == nil {
+		return
+	}
 	msg := fmt.Sprint(v...)
-	_ = l.winEventLog.Error(1, msg)
+	if l.wel != nil {
+		_ = l.wel.Error(1, msg)
+	}
+	fmt.Println(msg)
 	os.Exit(1)
 }
 
 // Fatalf is equivalent to [fmt.Printf] followed by a call to [os.Exit](1).
 func (l *logger) Fatalf(format string, v ...any) {
+	if l == nil {
+		return
+	}
 	msg := fmt.Sprintf(format, v...)
-	_ = l.winEventLog.Error(1, msg)
+	if l.wel != nil {
+		_ = l.wel.Error(1, msg)
+	}
+	fmt.Println(msg)
 	os.Exit(1)
 }
 
