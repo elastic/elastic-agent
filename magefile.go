@@ -1072,11 +1072,8 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	mg.Deps(agentBinaryTarget, CrossBuildGoDaemon)
 
 	// compile the elastic-agent.exe proxy binary for the windows archive
-	for _, platform := range platforms {
-		if platform == "windows/amd64" {
-			mg.Deps(Build.WindowsArchiveRootBinary)
-			break
-		}
+	if slices.Contains(platforms, "windows/amd64") {
+		mg.Deps(Build.WindowsArchiveRootBinary)
 	}
 
 	mg.SerialDeps(devtools.Package, TestPackages)
