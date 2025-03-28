@@ -603,15 +603,15 @@ platforms: &all-platforms
 
 packageTypes: &all-package-types
   - &pkg-type-rpm
-    0 # RPM
+    1 # RPM
   - &pkg-type-deb
-    1 # Deb
+    2 # Deb
   - &pkg-type-zip
-    2 # zip
+    3 # zip
   - &pkg-type-targz
-    3 # tar.gz
+    4 # tar.gz
   - &pkg-type-docker
-    4 # docker
+    5 # docker
 
 components:
   # general template for new components
