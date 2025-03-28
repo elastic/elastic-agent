@@ -65,6 +65,7 @@ require (
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.32.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
+<<<<<<< HEAD
 	golang.org/x/net v0.34.0
 	golang.org/x/sync v0.10.0
 	golang.org/x/sys v0.29.0
@@ -74,6 +75,19 @@ require (
 	golang.org/x/tools v0.24.0
 	google.golang.org/grpc v1.67.1
 	google.golang.org/protobuf v1.35.2
+=======
+	golang.org/x/mod v0.23.0
+	golang.org/x/net v0.37.0
+	golang.org/x/sync v0.12.0
+	golang.org/x/sys v0.31.0
+	golang.org/x/term v0.30.0
+	golang.org/x/text v0.23.0
+	golang.org/x/time v0.11.0
+	golang.org/x/tools v0.30.0
+	google.golang.org/api v0.226.0
+	google.golang.org/grpc v1.71.0
+	google.golang.org/protobuf v1.36.5
+>>>>>>> 907125402 (Support replace directives in otel readme mage command (#7456))
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -453,8 +467,13 @@ require (
 	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
+<<<<<<< HEAD
 	golang.org/x/mod v0.21.0 // indirect
 	golang.org/x/oauth2 v0.24.0 // indirect
+=======
+	golang.org/x/oauth2 v0.28.0 // indirect
+	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
+>>>>>>> 907125402 (Support replace directives in otel readme mage command (#7456))
 	gonum.org/v1/gonum v0.15.1 // indirect
 	google.golang.org/api v0.192.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241007155032-5fefd90f89a9 // indirect

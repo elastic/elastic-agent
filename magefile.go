@@ -32,6 +32,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
+
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/otiai10/copy"
 
@@ -3225,7 +3227,7 @@ func (Otel) Readme() error {
 		return fmt.Errorf("failed to parse README template: %w", err)
 	}
 
-	data, err := getOtelDependencies()
+	data, err := otel.GetOtelDependencies("go.mod")
 	if err != nil {
 		return fmt.Errorf("Failed to get OTel dependencies: %w", err)
 	}
@@ -3247,6 +3249,7 @@ func (Otel) Readme() error {
 	return nil
 }
 
+<<<<<<< HEAD
 func getOtelDependencies() (*otelDependencies, error) {
 	// read go.mod
 	readFile, err := os.Open("go.mod")
@@ -3388,6 +3391,8 @@ type otelDependencies struct {
 	Receivers  []*otelDependency
 }
 
+=======
+>>>>>>> 907125402 (Support replace directives in otel readme mage command (#7456))
 type Helm mg.Namespace
 
 // RenderExamples runs the equivalent of `helm template` and `helm lint`
