@@ -1058,6 +1058,10 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 
 		if devtools.ExternalBuild == true {
 
+			if mg.Verbose() {
+				log.Print(">>> Using external builds to collect components")
+			}
+
 			// Only log fatal logs for logs produced. This is the global logger
 			// used by github.com/elastic/elastic-agent/dev-tools/mage/downloads which can only be configured globally like this.
 			//
@@ -1071,17 +1075,29 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 			completedDownloads := &atomic.Int32{}
 			for _, spec := range packaging.ExpectedBinaries {
 				for _, platform := range platforms {
+
 					if !spec.SupportsPlatform(platform) {
-						fmt.Printf("--- Binary %s does not support %s, download skipped\n", spec.BinaryName, platform)
+						log.Printf(">>> Binary %s does not support %s, download skipped\n", spec.BinaryName, platform)
 						continue
 					}
+
+					if mg.Verbose() {
+						log.Printf(">>> Looking for component %s/%s", spec.BinaryName, platform)
+					}
 					for _, pkgType := range packageTypes {
+						if mg.Verbose() {
+							log.Printf(">>> Evaluating pkgType %v for component %s/%s", pkgType, spec.BinaryName, platform)
+						}
 						if !spec.SupportsPackageType(pkgcommon.PackageType(pkgType)) {
+							log.Printf(">>> PkgType %v for component %s/%s not supported. Skipping...", pkgType, spec.BinaryName, platform)
 							continue
 						}
 						targetPath := filepath.Join(archivePath, manifest.PlatformPackages[platform])
 						os.MkdirAll(targetPath, 0o755)
 						packageName := spec.GetPackageName(packageVersion, platform)
+						if mg.Verbose() {
+							log.Printf(">>> Downloading package %s component %s/%s", packageName, spec.BinaryName, platform)
+						}
 						errGroup.Go(downloadBinary(ctx, spec.ProjectName, packageName, spec.BinaryName, platform, packageVersion, targetPath, completedDownloads))
 					}
 				}
