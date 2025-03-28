@@ -11,6 +11,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"golang.org/x/sys/windows"
 )
 
 func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ...string) (*exec.Cmd, error) {
@@ -27,10 +29,14 @@ func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ..
 	return cmd, nil
 }
 
+// killCmd calls Process.Kill
 func killCmd(proc *os.Process) error {
 	return proc.Kill()
 }
 
+// terminateCmd sends the CTRL+C (SIGINT) to the process
 func terminateCmd(proc *os.Process) error {
-	return proc.Kill()
+	// Send the CTRL+C signal that is tread as a SIGINT
+	// https://learn.microsoft.com/en-us/windows/console/ctrl-c-and-ctrl-break-signals
+	return windows.GenerateConsoleCtrlEvent(0, uint32(proc.Pid))
 }
