@@ -34,7 +34,7 @@ func main() {
 		log.Fatalf("Error getting executable absolute path: %v\n", err)
 	}
 
-	// Fabricate the elastic-agent.exe path that reside inside the data/elastic-agent-{commit-short-sha} directory
+	// Fabricate the elastic-agent.exe path that resides inside the data/elastic-agent-{commit-short-sha} directory
 	exeTopPath := filepath.Dir(exeAbsPath)
 	nestedAgentBinaryPath := filepath.Join(exeTopPath, "data", fmt.Sprintf("elastic-agent-%s", CommitSHA), "elastic-agent.exe")
 	if _, err := os.Stat(nestedAgentBinaryPath); err != nil {
