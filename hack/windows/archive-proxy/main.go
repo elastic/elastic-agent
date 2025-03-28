@@ -37,7 +37,7 @@ func main() {
 	exeTopPath := filepath.Dir(exeAbsPath)
 	nestedAgentBinaryPath := filepath.Join(exeTopPath, "data", fmt.Sprintf("elastic-agent-%s", CommitSHA), "elastic-agent.exe")
 	if _, err := os.Stat(nestedAgentBinaryPath); err != nil {
-		log.Fatalf("Unable to stat nested agent binary %q: %v\n", nestedAgentBinaryPath, err)
+		log.Fatalf("Unable to stat inner agent binary at %q: %v\n", nestedAgentBinaryPath, err)
 	}
 
 	// Create the arguments
