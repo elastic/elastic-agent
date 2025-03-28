@@ -288,8 +288,15 @@ func relaxVersion(version string) (string, error) {
 	// check if there's more characters after the patch version
 	remainderIndex := matchIndices[3]
 	if remainderIndex < len(version) {
+		// This is a stricter regexp that allows flexibility ONLY on the patch version (prerelease and build metadata must be the same)
 		// if we have a remainder from the original version, add it escaping it once more
-		relaxedVersion += regexp.QuoteMeta(version[remainderIndex:])
+		// relaxedVersion += regexp.QuoteMeta(version[remainderIndex:])
+
+		// This is a looser regexp that allows anything beyond the major version to change (while still enforcing a valid patch version though)
+		// TODO: check with @dwhyrock why we allow more than just the patch version to change
+		// see TestResolveManifestPackage/Independent_Agent_Staging_8.14_apm-server and TestResolveManifestPackage/Independent_Agent_Staging_8.14_endpoint-dev
+		// Be more relaxed and allow for any character sequence after this
+		relaxedVersion += `.*`
 	}
 	return relaxedVersion, nil
 }

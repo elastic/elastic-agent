@@ -190,8 +190,24 @@ func TestRelaxVersion(t *testing.T) {
 			args: args{
 				version: "1.2.3-SNAPSHOT",
 			},
-			want:    `1\.2\.(?:0|[1-9]\d*)-SNAPSHOT`,
+			want:    `1\.2\.(?:0|[1-9]\d*).*`,
 			wantErr: assert.NoError,
+		},
+		{
+			name: "major-minor-patch-snapshot-buildmeta",
+			args: args{
+				version: "1.2.3-SNAPSHOT+build20250328112233",
+			},
+			want:    `1\.2\.(?:0|[1-9]\d*).*`,
+			wantErr: assert.NoError,
+		},
+		{
+			name: "not a semver",
+			args: args{
+				version: "foobar",
+			},
+			want:    "",
+			wantErr: assert.Error,
 		},
 	}
 	for _, tt := range tests {
