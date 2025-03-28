@@ -7,13 +7,14 @@ package monitoring
 import (
 	"context"
 	"encoding/json"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
