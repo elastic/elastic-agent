@@ -273,17 +273,20 @@ var versionRegExp = regexp.MustCompile(versionRegexp)
 
 func relaxVersion(version string) (string, error) {
 	matchIndices := versionRegExp.FindSubmatchIndex([]byte(version))
-	if len(matchIndices) < 2 {
+	// Matches index pairs are (0,1) for the whole regexp and (2,3) for the patch group
+	// check that we have matched correctly
+	if len(matchIndices) < 4 {
 		return "", fmt.Errorf("failed to match regexp for version [%s]", version)
 	}
-	matches := versionRegExp.FindStringSubmatch(version)
 
-	patchStartIndex := matchIndices[1] - 1
+	// take the starting index of the patch version
+	patchStartIndex := matchIndices[2]
 	// copy everything before the patch version escaping the regexp
 	relaxedVersion := regexp.QuoteMeta(version[:patchStartIndex])
 	// add the patch regexp
 	relaxedVersion += anyPatchVersionRegexp
-	remainderIndex := patchStartIndex + len(matches[1])
+	// check if there's more characters after the patch version
+	remainderIndex := matchIndices[3]
 	if remainderIndex < len(version) {
 		// if we have a remainder from the original version, add it escaping it once more
 		relaxedVersion += regexp.QuoteMeta(version[remainderIndex:])
