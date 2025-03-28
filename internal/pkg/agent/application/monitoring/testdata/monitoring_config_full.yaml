@@ -22,8 +22,7 @@ inputs:
         overwrite_keys: true
         target: ""
     paths:
-    - /opt/Elastic/Agent/data/elastic-agent-placeholder-unknow/logs/elastic-agent-*.ndjson
-    - /opt/Elastic/Agent/data/elastic-agent-placeholder-unknow/logs/elastic-agent-watcher-*.ndjson
+    - placeholder
     processors:
     - drop_event:
         when:
@@ -85,7 +84,7 @@ inputs:
         overwrite_keys: true
         target: ""
     paths:
-    - /var/log/endpoint.log
+    - placeholder
     processors:
     - add_fields:
         fields:
@@ -112,7 +111,7 @@ inputs:
       type: metrics
     failure_threshold: 5
     hosts:
-    - http+unix:///opt/Elastic/Agent/data/tmp/Hk6rvk9TDibMPcDvpl0jkLE-qDsHWVYL.sock
+    - placeholder
     id: metrics-monitoring-metricbeat
     index: metrics-elastic_agent.metricbeat-default
     metricsets:
@@ -151,7 +150,7 @@ inputs:
       type: metrics
     failure_threshold: 5
     hosts:
-    - http+unix:///opt/Elastic/Agent/data/tmp/o2aP56OJCFn3ykwxdcxCyFmFlZVurVZ9.sock
+    - placeholder
     id: metrics-monitoring-filebeat
     index: metrics-elastic_agent.filebeat-default
     metricsets:
@@ -190,7 +189,7 @@ inputs:
       type: metrics
     failure_threshold: 5
     hosts:
-    - http+unix:///opt/Elastic/Agent/data/tmp/xTEtpJ7117ppc6OYvJCaYHbDW8mLjXGe.sock
+    - placeholder
     id: metrics-monitoring-filebeat
     index: metrics-elastic_agent.filebeat-default
     metricsets:
@@ -229,7 +228,7 @@ inputs:
       type: metrics
     failure_threshold: 5
     hosts:
-    - http+unix:///opt/Elastic/Agent/data/tmp/akSPbdqgaHaTY0_J01-dsfYK6JpMz2zn.sock
+    - placeholder
     id: metrics-monitoring-metricbeat
     index: metrics-elastic_agent.metricbeat-default
     metricsets:
@@ -275,7 +274,7 @@ inputs:
       type: metrics
     failure_threshold: 5
     hosts:
-    - http://:0
+    - placeholder
     id: metrics-monitoring-agent
     index: metrics-elastic_agent.elastic_agent-default
     metricsets:
@@ -336,7 +335,7 @@ inputs:
       type: metrics
     failure_threshold: 5
     hosts:
-    - http+unix:///opt/Elastic/Agent/data/tmp/Hk6rvk9TDibMPcDvpl0jkLE-qDsHWVYL.sock
+    - placeholder
     id: metrics-monitoring-metricbeat-1
     index: metrics-elastic_agent.elastic_agent-default
     metricsets:
@@ -391,7 +390,7 @@ inputs:
       type: metrics
     failure_threshold: 5
     hosts:
-    - http+unix:///opt/Elastic/Agent/data/tmp/o2aP56OJCFn3ykwxdcxCyFmFlZVurVZ9.sock
+    - placeholder
     id: metrics-monitoring-filebeat-1
     index: metrics-elastic_agent.elastic_agent-default
     metricsets:
@@ -446,7 +445,7 @@ inputs:
       type: metrics
     failure_threshold: 5
     hosts:
-    - http+unix:///opt/Elastic/Agent/data/tmp/o2aP56OJCFn3ykwxdcxCyFmFlZVurVZ9.sock
+    - placeholder
     id: metrics-monitoring-filebeat-1
     index: metrics-elastic_agent.filebeat_input-default
     json.is_array: true
@@ -502,7 +501,7 @@ inputs:
       type: metrics
     failure_threshold: 5
     hosts:
-    - http+unix:///opt/Elastic/Agent/data/tmp/xTEtpJ7117ppc6OYvJCaYHbDW8mLjXGe.sock
+    - placeholder
     id: metrics-monitoring-filebeat-1
     index: metrics-elastic_agent.elastic_agent-default
     metricsets:
@@ -557,7 +556,7 @@ inputs:
       type: metrics
     failure_threshold: 5
     hosts:
-    - http+unix:///opt/Elastic/Agent/data/tmp/xTEtpJ7117ppc6OYvJCaYHbDW8mLjXGe.sock
+    - placeholder
     id: metrics-monitoring-filebeat-1
     index: metrics-elastic_agent.filebeat_input-default
     json.is_array: true
@@ -613,7 +612,7 @@ inputs:
       type: metrics
     failure_threshold: 5
     hosts:
-    - http+unix:///opt/Elastic/Agent/data/tmp/akSPbdqgaHaTY0_J01-dsfYK6JpMz2zn.sock
+    - placeholder
     id: metrics-monitoring-metricbeat-1
     index: metrics-elastic_agent.elastic_agent-default
     metricsets:
