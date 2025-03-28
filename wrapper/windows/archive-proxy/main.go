@@ -7,105 +7,22 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
-	"golang.org/x/sys/windows/svc/eventlog"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/core/process"
-	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 // CommitSHA is set by the linker at build time
 var CommitSHA string
 
-// winEventLog is an interface for windows event log
-type winEventLog interface {
-	Error(eid uint32, msg string) error
-	Close() error
-}
-
-// logger prints messages to stdout and the windows event log
-type logger struct {
-	wel winEventLog
-}
-
-// newLogger creates a new logger
-func newLogger() (*logger, error) {
-	isAdmin, err := utils.HasRoot()
-	if err != nil {
-		isAdmin = false
-	}
-
-	var wel winEventLog
-	if isAdmin {
-		src := paths.ServiceName()
-
-		err := eventlog.InstallAsEventCreate(src, eventlog.Info|eventlog.Warning|eventlog.Error)
-		if err != nil && !strings.Contains(err.Error(), "registry key already exists") {
-			return nil, err
-		}
-
-		eLog, err := eventlog.Open(src)
-		if err != nil {
-			return nil, err
-		}
-		wel = eLog
-	}
-
-	return &logger{
-		wel: wel,
-	}, nil
-}
-
-// Close closes the event log
-func (l *logger) Close() {
-	if l == nil || l.wel == nil {
-		return
-	}
-	_ = l.wel.Close()
-}
-
-// Fatal is equivalent to [fmt.Print] followed by a call to [os.Exit](1).
-func (l *logger) Fatal(v ...any) {
-	if l == nil {
-		return
-	}
-	msg := fmt.Sprint(v...)
-	if l.wel != nil {
-		_ = l.wel.Error(1, msg)
-	}
-	fmt.Println(msg)
-	os.Exit(1)
-}
-
-// Fatalf is equivalent to [fmt.Printf] followed by a call to [os.Exit](1).
-func (l *logger) Fatalf(format string, v ...any) {
-	if l == nil {
-		return
-	}
-	msg := fmt.Sprintf(format, v...)
-	if l.wel != nil {
-		_ = l.wel.Error(1, msg)
-	}
-	fmt.Println(msg)
-	os.Exit(1)
-}
-
 func main() {
-	log, err := newLogger()
-	if err != nil {
-		fmt.Printf("Error creating logger: %v\n", err)
-		os.Exit(1)
-	}
-	defer log.Close()
-
+	log.SetFlags(0)
 	if CommitSHA == "" {
 		// this should never happen
-		log.Fatal("No commit SHA provided")
+		log.Fatal("No commit SHA provided\n")
 	}
 
 	exePath, err := os.Executable()
