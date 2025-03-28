@@ -15,6 +15,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
+// CommitSHA is set by the linker at build time
 var CommitSHA string
 
 func main() {
