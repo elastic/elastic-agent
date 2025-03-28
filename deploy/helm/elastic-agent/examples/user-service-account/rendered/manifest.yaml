@@ -296,13 +296,13 @@ stringData:
         - data_stream:
             dataset: kubernetes.container_logs
             type: logs
-          id: kubernetes-container-logs-${kubernetes.pod.name}-${kubernetes.container.id}
+          id: kubernetes-container-logs-${kubernetes.namespace}-${kubernetes.pod.name}-${kubernetes.container.name}
           parsers:
           - container:
               format: auto
               stream: all
           paths:
-          - /var/log/containers/*${kubernetes.container.id}.log
+          - /var/log/pods/${kubernetes.namespace}_${kubernetes.pod.name}_${kubernetes.pod.uid}/${kubernetes.container.name}/*.log
           processors:
           - add_fields:
               fields:
@@ -868,7 +868,7 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: 233affcd72143e637a130b5f099c30e194d90042eb00a26512f51c844c65a821
+        checksum/config: 0a02c8b3783f5e072f6eb62d87c3fefb2df9cdaf8efb7dbda9bcc11050246c3d
     spec:
       automountServiceAccountToken: true
       containers:
