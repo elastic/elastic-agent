@@ -294,6 +294,54 @@ func (Build) GenerateConfig() error {
 	return sh.Copy(filepath.Join(buildDir, configFile), filepath.Join(metaDir, configFile))
 }
 
+// WindowsArchiveRootBinary compiles a binary to be placed at the root of the windows elastic-agent archive. This binary
+// is a thin proxy to the actual elastic-agent binary that resides in the data/elastic-agent-{commit-short-sha}
+// directory of the archive.
+func (Build) WindowsArchiveRootBinary() error {
+	fmt.Println("--- Compiling root binary for windows archive")
+	hashShort, err := devtools.CommitHashShort()
+	if err != nil {
+		return fmt.Errorf("error getting commit hash: %w", err)
+	}
+
+	outputName := "elastic-agent-archive-root"
+	if runtime.GOOS != "windows" {
+		// add the .exe extension on non-windows platforms
+		outputName += ".exe"
+	}
+
+	args := devtools.BuildArgs{
+		Name:        outputName,
+		OutputDir:   filepath.Join(buildDir, "windows-archive-root-binary"),
+		InputFiles:  []string{"hack/windows/archive-proxy/main.go"},
+		CGO:         false,
+		WinMetadata: true,
+		ExtraFlags: []string{
+			"-buildmode", "pie", // windows versions inside the support matrix do support position independent code
+			"-trimpath", // Remove all file system paths from the compiled executable, to improve build reproducibility
+		},
+		Vars: map[string]string{
+			"main.CommitSHA": hashShort,
+		},
+		Env: map[string]string{
+			"GOOS":   "windows",
+			"GOARCH": "amd64",
+		},
+		LDFlags: []string{
+			"-s", // Strip all debug symbols from binary (does not affect Go stack traces).
+		},
+	}
+
+	if devtools.FIPSBuild {
+		// there is no actual FIPS relevance for this particular binary
+		// but better safe than sorry
+		args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips")
+		args.CGO = true
+	}
+
+	return devtools.Build(args)
+}
+
 // GolangCrossBuildOSS build the Beat binary inside of the golang-builder.
 // Do not use directly, use crossBuild instead.
 func GolangCrossBuildOSS() error {
@@ -1022,6 +1070,15 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	log.Println("--- Running post packaging ")
 	mg.Deps(Update)
 	mg.Deps(agentBinaryTarget, CrossBuildGoDaemon)
+
+	// compile the elastic-agent.exe proxy binary for the windows archive
+	for _, platform := range platforms {
+		if platform == "windows/amd64" {
+			mg.Deps(Build.WindowsArchiveRootBinary)
+			break
+		}
+	}
+
 	mg.SerialDeps(devtools.Package, TestPackages)
 	return nil
 }
