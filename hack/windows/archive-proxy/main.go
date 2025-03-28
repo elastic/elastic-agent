@@ -26,13 +26,11 @@ func main() {
 	exePath, err := os.Executable()
 	if err != nil {
 		log.Fatalf("Error getting executable path: %v\n", err)
-		return
 	}
 
 	exeAbsPath, err := filepath.Abs(exePath)
 	if err != nil {
 		log.Fatalf("Error getting executable absolute path: %v\n", err)
-		return
 	}
 
 	// Fabricate the elastic-agent.exe path that reside inside the data/elastic-agent-{commit-short-sha} directory
