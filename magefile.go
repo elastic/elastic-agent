@@ -1594,8 +1594,8 @@ func appendComponentChecksums(versionedDropPath string, checksums map[string]str
 		}
 		hash, err := devtools.GetSHA512Hash(filepath.Join(versionedDropPath, componentFile))
 		if errors.Is(err, os.ErrNotExist) {
-			fmt.Printf(">>> Computing hash for %q failed: file not present %s \n", componentFile, err)
-			continue
+			fmt.Printf(">>> Computing hash for %q failed: %s\n", componentFile, err)
+			return fmt.Errorf("cannot generate SHA512 for %q: %s", componentFile, err)
 		} else if err != nil {
 			return err
 		}
