@@ -584,6 +584,115 @@ shared:
         source: '{{ repo.RootDir }}/dev-tools/licenses/ELASTIC-LICENSE-2.0.txt'
         mode: 0644
 
+platforms: &all-platforms
+  - &linux-amd64
+    os: linux
+    arch: x86_64
+  - &linux-arm64
+    os: linux
+    arch: arm64
+  - &windows-amd64
+    os: windows
+    arch: x86_64
+  - &darwin-amd64
+    os: darwin
+    arch: x86_64
+  - &darwin-arm
+    os: darwin
+    arch: aarch64
+
+packageTypes: &all-package-types
+  - &pkg-type-rpm
+    1 # RPM
+  - &pkg-type-deb
+    2 # Deb
+  - &pkg-type-zip
+    3 # zip
+  - &pkg-type-targz
+    4 # tar.gz
+  - &pkg-type-docker
+    5 # docker
+
+components:
+  # general template for new components
+#  - &comp-<anchor name>
+#    projectName: <project name under manifest>
+#    packageName: <template representing the name of the archive to download/extract>
+#    binaryName: <binary name>
+#    platforms:
+#      - <platform, use anchors for platforms above>
+#    pythonWheel: true # true if it's a package that is not platform specific
+#    packageTypes: *all-package-types # package types it should be included in
+  - &comp-agentbeat
+    projectName: beats
+    packageName: agentbeat-{{.Version}}-{{.Platform}}.{{.Ext}}
+    binaryName: agentbeat
+    platforms: *all-platforms
+    packageTypes: *all-package-types
+  - &comp-apm_server
+    projectName: apm-server
+    packageName: apm-server-{{.Version}}-{{.Platform}}.{{.Ext}}
+    binaryName: apm-server
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+      - *windows-amd64
+      - *darwin-amd64
+    packageTypes: *all-package-types
+  - &comp-cloudbeat
+    projectName: cloudbeat
+    packageName: cloudbeat-{{.Version}}-{{.Platform}}.{{.Ext}}
+    binaryName: cloudbeat
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+  - &comp-connectors
+    projectName: connectors
+    packageName: connectors-{{.Version}}.zip
+    binaryName: connectors
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    pythonWheel: true
+    packageTypes: *all-package-types
+  - &comp-endpoint
+    projectName: endpoint-dev
+    packageName: endpoint-security-{{.Version}}-{{.Platform}}.{{.Ext}}
+    binaryName: endpoint-security
+    platforms: *all-platforms
+    packageTypes: *all-package-types
+  - &comp-fleet-server
+    projectName: fleet-server
+    packageName: fleet-server-{{.Version}}-{{.Platform}}.{{.Ext}}
+    binaryName: fleet-server
+    platforms: *all-platforms
+    packageTypes: *all-package-types
+  - &comp-pf-elastic-collector
+    projectName: prodfiler
+    packageName: pf-elastic-collector-{{.Version}}-{{.Platform}}.{{.Ext}}
+    binaryName: pf-elastic-collector
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+  - &comp-pf-elastic-collector
+    projectName: prodfiler
+    packageName: pf-elastic-symbolizer-{{.Version}}-{{.Platform}}.{{.Ext}}
+    binaryName: pf-elastic-symbolizer
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+  - &comp-pf-host-agent
+    projectName: prodfiler
+    packageName: pf-host-agent-{{.Version}}-{{.Platform}}.{{.Ext}}
+    binaryName: pf-host-agent
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+
 # specs is a list of named packaging "flavors".
 specs:
   # Community Beats
