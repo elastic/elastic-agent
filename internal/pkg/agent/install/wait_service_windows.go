@@ -7,9 +7,11 @@
 package install
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 )
@@ -55,6 +57,44 @@ func isStopped(timeout time.Duration, interval time.Duration, service string) er
 			}
 		case <-timer.C:
 			return fmt.Errorf("timed out after %s waiting for service (%s) to stop, last state was: %d", timeout, service, status.State)
+		}
+	}
+}
+
+// EnsureServiceRemoved opens the Windows service manager and checks if the
+// service is removed. It will repeat this check every 'interval'
+// until the 'timeout' is reached.  It returns nil if the service
+// is removed within the timeout period.  An error is returned if
+// the service is not removed before the timeout or if there are
+// errors communicating with the service manager.
+func EnsureServiceRemoved(timeout time.Duration, interval time.Duration, service string) error {
+	m, err := mgr.Connect()
+	if err != nil {
+		return fmt.Errorf("failed to connect to service manager: %w", err)
+	}
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			s, err := m.OpenService(service)
+			switch {
+			case err == nil:
+				// The service is still installed continue waiting
+				_ = s.Close()
+			case errors.Is(err, windows.ERROR_SERVICE_DOES_NOT_EXIST):
+				// The service is no longer installed
+				return nil
+			default:
+				// An unknown error occurred trying to open the service
+				return fmt.Errorf("error opening service (%s): %w", service, err)
+			}
+		case <-timer.C:
+			return fmt.Errorf("timed out after %s waiting for service (%s) to uninstall", timeout, service)
 		}
 	}
 }
