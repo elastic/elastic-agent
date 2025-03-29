@@ -34,6 +34,25 @@ steps:
           manual:
             allowed: true
 
+      - label: "Unit tests - FIPS Ubuntu 22.04"
+        key: "unit-tests-2204-fips"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        env:
+          FIPS: "true"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "gcp"
+          image: "family/platform-ingest-elastic-agent-ubuntu-2204"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+
       - label: "Unit tests - Ubuntu 22.04 ARM64"
         key: "unit-tests-2204-arm64"
         command: ".buildkite/scripts/steps/unit-tests.sh"
@@ -179,6 +198,8 @@ steps:
       provider: "gcp"
     depends_on:
       - step: "unit-tests-2204"
+        allow_failure: true
+      - step: "unit-tests-2204-fips"
         allow_failure: true
       - step: "unit-tests-2204-arm64"
         allow_failure: true
