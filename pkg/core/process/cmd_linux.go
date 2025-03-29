@@ -48,10 +48,12 @@ func isInt32(val int) bool {
 	return val >= 0 && val <= math.MaxInt32
 }
 
+// killCmd calls Process.Kill
 func killCmd(proc *os.Process) error {
 	return proc.Kill()
 }
 
+// terminateCmd sends SIGTERM to the process
 func terminateCmd(proc *os.Process) error {
 	return proc.Signal(syscall.SIGTERM)
 }
