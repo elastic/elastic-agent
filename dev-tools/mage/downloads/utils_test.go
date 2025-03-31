@@ -5,6 +5,9 @@
 package downloads
 
 import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,10 +16,15 @@ import (
 )
 
 func TestDownloadFile(t *testing.T) {
+	s := httptest.NewServer(http.FileServer(http.Dir("./testdata")))
+	t.Cleanup(s.Close)
+
 	var dRequest = downloadRequest{
-		URL:          "https://www.elastic.co/robots.txt",
+		URL: fmt.Sprintf("http://%s/some-file.txt",
+			s.Listener.Addr().String()),
 		DownloadPath: "",
 	}
+
 	err := downloadFile(&dRequest)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, dRequest.UnsanitizedFilePath)
