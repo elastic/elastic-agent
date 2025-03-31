@@ -4,7 +4,7 @@ set -euo pipefail
 local preinstalled_packages_filename="testing/integration/testdata/preinstalled_packages.json"
 
 # preinstall_fleet_packages installs EPM packages needed for integration tests into Fleet.
-func preinstall_fleet_packages() {
+function preinstall_fleet_packages() {
 
   echo "Preinstalling the following EPM packages in Fleet:"
   cat $preinstalled_packages_filename
@@ -14,7 +14,7 @@ func preinstall_fleet_packages() {
 # install_fleet_packages installs the EPM packages defined in the given file into Fleet. The file
 # must define the packages as the request body of the Bulk install packages Fleet API:
 # https://www.elastic.co/docs/api/doc/kibana/v8/operation/operation-bulk-install-packages
-func install_fleet_packages() {
+function install_fleet_packages() {
   local install_api_request_file=$1
   if [ -z "$install_api_request_file" ]; then
     echo "Error: Fleet packages installation request file not specified"
