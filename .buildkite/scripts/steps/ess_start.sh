@@ -10,7 +10,7 @@ OVERRIDE_STACK_VERSION=${OVERRIDE_STACK_VERSION}"-SNAPSHOT"
 
 ess_up $OVERRIDE_STACK_VERSION
 
-# TODO (shaunak): Install EPM packages needed by tests
+preinstall_fleet_packages
 
 echo "ES_HOST: ${ELASTICSEARCH_HOST}"
 buildkite-agent meta-data set "es.host" $ELASTICSEARCH_HOST
