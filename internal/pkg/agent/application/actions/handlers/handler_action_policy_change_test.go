@@ -174,7 +174,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 					Fleet: &configuration.FleetAgentConfig{
 						Server: &configuration.FleetServerConfig{
 							Host: fleetServerHost,
-							Port: uint16(fleetServerPort),
+							Port: uint16(fleetServerPort), //nolint:gosec // ignore overflow error in test
 						},
 						Client: remote.Config{
 							Host:  "http://example.co",
@@ -230,7 +230,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 					Fleet: &configuration.FleetAgentConfig{
 						Server: &configuration.FleetServerConfig{
 							Host: fleetServerHost,
-							Port: uint16(fleetServerPort),
+							Port: uint16(fleetServerPort), //nolint:gosec // ignore overflow error in test
 						},
 						AccessAPIKey: "ignore",
 						Client: remote.Config{
@@ -286,7 +286,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				Fleet: &configuration.FleetAgentConfig{
 					Server: &configuration.FleetServerConfig{
 						Host: fleetServerHost,
-						Port: uint16(fleetServerPort),
+						Port: uint16(fleetServerPort), //nolint:gosec // ignore overflow error in test
 					},
 					AccessAPIKey: "ignore",
 					Client: remote.Config{
@@ -330,7 +330,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				Fleet: &configuration.FleetAgentConfig{
 					Server: &configuration.FleetServerConfig{
 						Host: fleetServerHost,
-						Port: uint16(fleetServerPort),
+						Port: uint16(fleetServerPort), //nolint:gosec // ignore overflow error in test
 					},
 					AccessAPIKey: "ignore",
 					Client: remote.Config{
@@ -385,7 +385,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 					Fleet: &configuration.FleetAgentConfig{
 						Server: &configuration.FleetServerConfig{
 							Host: fleetServerHost,
-							Port: uint16(fleetServerPort),
+							Port: uint16(fleetServerPort), //nolint:gosec // ignore overflow error in test
 						},
 						AccessAPIKey: "ignore",
 						Client: remote.Config{
@@ -442,7 +442,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 					Fleet: &configuration.FleetAgentConfig{
 						Server: &configuration.FleetServerConfig{
 							Host: fleetServerHost,
-							Port: uint16(fleetServerPort),
+							Port: uint16(fleetServerPort), //nolint:gosec // ignore overflow error in test
 						},
 						AccessAPIKey: "ignore",
 						Client: remote.Config{
