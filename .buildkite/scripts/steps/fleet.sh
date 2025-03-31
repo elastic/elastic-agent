@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+local preinstalled_packages_filename="testing/integration/testdata/preinstalled_packages.json"
+
 # preinstall_fleet_packages installs EPM packages needed for integration tests into Fleet.
 func preinstall_fleet_packages() {
-  install_fleet_packages "testing/integration/testdata/preinstalled_packages.json"
+
+  echo "Preinstalling the following EPM packages in Fleet:"
+  cat $preinstalled_packages_filename
+  install_fleet_packages $preinstalled_packages_filename
 }
 
 # install_fleet_packages installs the EPM packages defined in the given file into Fleet. The file
