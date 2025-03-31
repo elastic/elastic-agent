@@ -2,13 +2,15 @@
 set -euo pipefail
 
 source .buildkite/scripts/common2.sh
-
 source .buildkite/scripts/steps/ess.sh
+source .buildkite/scripts/steps/fleet.sh
 
 OVERRIDE_STACK_VERSION="$(cat .package-version)"
 OVERRIDE_STACK_VERSION=${OVERRIDE_STACK_VERSION}"-SNAPSHOT"
 
 ess_up $OVERRIDE_STACK_VERSION
+
+# TODO (shaunak): Install EPM packages needed by tests
 
 echo "ES_HOST: ${ELASTICSEARCH_HOST}"
 buildkite-agent meta-data set "es.host" $ELASTICSEARCH_HOST
