@@ -1,6 +1,7 @@
 module github.com/elastic/elastic-agent
 
 go 1.24.1
+
 require (
 	github.com/Jeffail/gabs/v2 v2.6.0
 	github.com/Microsoft/go-winio v0.6.2
