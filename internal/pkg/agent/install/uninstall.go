@@ -143,6 +143,12 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 		pt.Describe("Successfully uninstalled service")
 	}
 
+	err = EnsureServiceRemoved(30*time.Second, 250*time.Millisecond, paths.ServiceName())
+	if err != nil {
+		// error context already added by EnsureServiceRemoved
+		pt.Describe(err.Error())
+	}
+
 	// remove, if present on platform
 	if paths.ShellWrapperPath() != "" {
 		err = os.Remove(paths.ShellWrapperPath())
