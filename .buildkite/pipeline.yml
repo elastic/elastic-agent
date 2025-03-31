@@ -215,7 +215,7 @@ steps:
       - label: "K8s tests: {{matrix.k8s_version}}"
         env:
           K8S_VERSION: "v{{matrix.k8s_version}}"
-          KIND_VERSION: "v0.24.0"
+          KIND_VERSION: "v0.27.0"
         command: ".buildkite/scripts/steps/k8s-tests.sh"
         agents:
           provider: "gcp"
@@ -223,10 +223,10 @@ steps:
         matrix:
           setup:
             k8s_version:
+              - "1.32.0"
               - "1.31.0"
               - "1.30.0"
               - "1.29.4"
-              - "1.28.9"
         retry:
           manual:
             allowed: true

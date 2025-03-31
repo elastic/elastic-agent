@@ -18,6 +18,11 @@ var arches = []string{define.AMD64, define.ARM64}
 
 // versions defines the list of supported version of Kubernetes.
 var versions = []define.OS{
+	// Kubernetes 1.32
+	{
+		Type:    define.Kubernetes,
+		Version: "1.32.0",
+	},
 	// Kubernetes 1.31
 	{
 		Type:    define.Kubernetes,
@@ -32,11 +37,6 @@ var versions = []define.OS{
 	{
 		Type:    define.Kubernetes,
 		Version: "1.29.4",
-	},
-	// Kubernetes 1.28
-	{
-		Type:    define.Kubernetes,
-		Version: "1.28.9",
 	},
 }
 
