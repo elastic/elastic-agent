@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"strings"
 	"syscall"
 	"unsafe"
 
@@ -20,7 +19,16 @@ import (
 )
 
 const (
-	passwordLength = 127 // maximum length allowed by Windows
+	// Reference: https://learn.microsoft.com/en-us/windows/security/threat-protection/security-policy-settings/password-must-meet-complexity-requirements
+	passwordMinLength = 64  // Minimum length for better security
+	passwordMaxLength = 127 // Upper limit to avoid policy issues
+	// Character pools - ensuring a mix of character categories
+	passwordCharsLower   = "abcdefghijklmnopqrstuvwxyz"
+	passwordCharsUpper   = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	passwordCharsDigits  = "1234567890"
+	passwordCharsSpecial = "'-!\"#$%&()*,./:;?@[]^_`{|}~+<=>" //nolint:gosec // G101: False positive on Potential hardcoded credentials
+	// Combined pool for general randomization
+	passwordAllChars = passwordCharsLower + passwordCharsUpper + passwordCharsDigits + passwordCharsSpecial
 )
 
 var (
@@ -238,19 +246,81 @@ func SetUserPassword(name string, password string) error {
 	return nil
 }
 
-// RandomPassword generates a random password.
+// RandomPassword generates a secure password that meets Windows policy requirements.
 func RandomPassword() (string, error) {
-	runes := []rune("abcdefghijklmnopqrstuvwxyz1234567890!@#$%^&*ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	maxN := big.NewInt(int64(len(runes)))
-	var sb strings.Builder
-	for i := 0; i < passwordLength; i++ {
-		n, err := rand.Int(rand.Reader, maxN)
-		if err != nil {
-			return "", fmt.Errorf("failed to generate random integer: %w", err)
-		}
-		sb.WriteRune(runes[n.Int64()])
+	// Generate a random length within the allowed range
+	length, err := rand.Int(rand.Reader, big.NewInt(passwordMaxLength-passwordMinLength+1))
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random length: %w", err)
 	}
-	return sb.String(), nil
+	passwordLength := int(length.Int64()) + passwordMinLength
+	password := make([]rune, passwordLength)
+
+	// Ensure Windows password constraints are met by guaranteeing at least one character from each category
+	filledPositions := make(map[int]any)
+	for _, chars := range []string{passwordCharsUpper, passwordCharsLower, passwordCharsDigits, passwordCharsSpecial} {
+		// Generate a random position for the character
+		var position int
+		for {
+			posBigInt, err := rand.Int(rand.Reader, big.NewInt(int64(passwordLength)))
+			if err != nil {
+				return "", fmt.Errorf("failed to generate random position: %w", err)
+			}
+			position = int(posBigInt.Int64())
+			if _, filled := filledPositions[position]; filled {
+				// Position already has a missing character, generate a new one
+				continue
+			}
+			break
+		}
+		// Generate a random character from the given characters
+		char, err := randomChar(chars)
+		if err != nil {
+			// err information is added by randomChar
+			return "", err
+		}
+		// Insert the character into the password
+		password[position] = char
+		filledPositions[position] = nil
+	}
+
+	// Fill the remaining positions with random characters
+	for i := 0; i < passwordLength; {
+		// Check if the current position has already been filled
+		if _, filled := filledPositions[i]; filled {
+			// Position already has a character
+			i++
+			continue
+		}
+		// Generate a random character from the combined pool of characters
+		char, err := randomChar(passwordAllChars)
+		if err != nil {
+			// err information is added by randomChar
+			return "", err
+		}
+		// Ensure no consecutive duplicate characters to the left
+		if i > 0 && password[i-1] == char {
+			continue
+		}
+		// Ensure no consecutive duplicate characters to the right
+		if i+1 < passwordLength && password[i+1] == char {
+			continue
+		}
+		// Insert the character into the password
+		password[i] = char
+		i++
+	}
+
+	return string(password), nil
+}
+
+// randomChar selects a random character from a given string.
+func randomChar(charset string) (rune, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+	if err != nil {
+		return 0, fmt.Errorf("failed to generate random character: %w", err)
+	}
+	return rune(charset[n.Int64()]), nil
 }
 
 // LOCALGROUP_INFO_0 structure contains a local group name.
