@@ -308,6 +308,77 @@ shared:
         source: '{{ elastic_beats_dir }}/specs/connectors.spec.yml'
         mode: 0644
 
+<<<<<<< HEAD
+=======
+  - &agent_docker_edot_spec
+    <<: *agent_binary_spec_no_components
+    docker_variant: 'elastic-otel-collector'
+    name: 'elastic-otel-collector'
+    extra_vars:
+      dockerfile: 'Dockerfile.elastic-agent.tmpl'
+      docker_entrypoint: 'docker-entrypoint.edot.tmpl'
+      user: '{{ .BeatName }}'
+      linux_capabilities: ''
+      beats_install_path: "install"
+    files:
+      'elastic-agent.yml':
+        source: 'elastic-agent.docker.yml'
+        mode: 0600
+        config: true
+      'otel.yml':
+        source: 'otel.yml'
+        mode: 0600
+        config: true
+      '.elastic-agent.active.commit':
+        content: >
+          {{ commit }}
+        mode: 0644
+      'data/{{.BeatName}}-{{ commit_short }}/components/agentbeat.spec.yml':
+        source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/agentbeat.spec.yml'
+        expand_spec: true
+
+  - &agent_docker_edot_wolfi_spec
+    <<: *agent_docker_edot_spec
+    docker_variant: 'elastic-otel-collector-wolfi'
+    name: 'elastic-otel-collector-wolfi'
+
+  - &agent_docker_slim_spec
+    <<: *agent_binary_spec_no_components
+    docker_variant: 'slim'
+    extra_vars:
+      dockerfile: 'Dockerfile.elastic-agent.tmpl'
+      docker_entrypoint: 'docker-entrypoint.elastic-agent.tmpl'
+      user: '{{ .BeatName }}'
+      linux_capabilities: ''
+      beats_install_path: "install"
+    files:
+      'elastic-agent.yml':
+        source: 'elastic-agent.docker.yml'
+        mode: 0600
+        config: true
+      'otel.yml':
+        source: 'otel.yml'
+        mode: 0600
+        config: true
+      '.elastic-agent.active.commit':
+        content: >
+          {{ commit }}
+        mode: 0644
+      'hints.inputs.d':
+        source: '{{ repo.RootDir }}/deploy/kubernetes/elastic-agent-standalone/templates.d'
+        mode: 0755
+      'data/{{.BeatName}}-{{ commit_short }}/components/agentbeat.spec.yml':
+        source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/agentbeat.spec.yml'
+        expand_spec: true
+      'data/{{.BeatName}}-{{ commit_short }}/components/pf-host-agent.spec.yml':
+        source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/pf-host-agent.spec.yml'
+        expand_spec: true
+
+  - &agent_docker_slim_wolfi_spec
+    <<: *agent_docker_slim_spec
+    docker_variant: 'slim-wolfi'
+
+>>>>>>> 6b4b0dc69 ([packaging] proxy binary to be for the root dir of windows archive  (#7601))
   # includes nodejs with @elastic/synthetics
   - &agent_docker_complete_spec
     <<: *agent_docker_spec
@@ -876,7 +947,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+            source: ./build/windows-archive-root-binary/elastic-agent-archive-root.exe
           'package.version':
             content: >
               {{ agent_package_version }}
