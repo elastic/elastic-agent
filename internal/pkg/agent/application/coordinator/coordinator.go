@@ -37,6 +37,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/fleet"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -74,6 +75,9 @@ type UpgradeManager interface {
 
 	// Ack is used on startup to check if the agent has upgraded and needs to send an ack for the action
 	Ack(ctx context.Context, acker acker.Acker) error
+
+	// AckAction is used to ack not persisted action.
+	AckAction(ctx context.Context, acker acker.Acker, action fleetapi.Action) error
 
 	// MarkerWatcher returns a watcher for the upgrade marker.
 	MarkerWatcher() upgrade.MarkerWatcher
@@ -204,8 +208,9 @@ type Coordinator struct {
 	agentInfo info.Agent
 	isManaged bool
 
-	cfg   *configuration.Configuration
-	specs component.RuntimeSpecs
+	cfg        *configuration.Configuration
+	specs      component.RuntimeSpecs
+	fleetAcker *fleet.Acker
 
 	reexecMgr  ReExecManager
 	upgradeMgr UpgradeManager
@@ -372,7 +377,7 @@ type UpdateComponentChange struct {
 }
 
 // New creates a new coordinator.
-func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo info.Agent, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capabilities, monitorMgr MonitorManager, isManaged bool, otelMgr OTelManager, modifiers ...ComponentsModifier) *Coordinator {
+func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo info.Agent, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capabilities, monitorMgr MonitorManager, isManaged bool, otelMgr OTelManager, fleetAcker *fleet.Acker, modifiers ...ComponentsModifier) *Coordinator {
 	var fleetState cproto.State
 	var fleetMessage string
 	if !isManaged {
@@ -426,6 +431,8 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		heartbeatChan:              make(chan struct{}),
 		componentPIDTicker:         time.NewTicker(time.Second * 30),
 		componentPidRequiresUpdate: &atomic.Bool{},
+
+		fleetAcker: fleetAcker,
 	}
 	// Setup communication channels for any non-nil components. This pattern
 	// lets us transparently accept nil managers / simulated events during
@@ -585,7 +592,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		if errors.Is(err, upgrade.ErrUpgradeSameVersion) {
 			// Set upgrade state to completed so update no longer shows in-progress.
 			det.SetState(details.StateCompleted)
-			return nil
+			return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
 		}
 		det.Fail(err)
 		return err

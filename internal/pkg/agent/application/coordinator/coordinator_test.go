@@ -1035,7 +1035,7 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 		upgradeManager = &fakeUpgradeManager{}
 	}
 
-	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelMgr)
+	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelMgr, nil)
 	return coord, cfgMgr, varsMgr
 }
 
@@ -1094,6 +1094,10 @@ func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, source
 }
 
 func (f *fakeUpgradeManager) Ack(ctx context.Context, acker acker.Acker) error {
+	return nil
+}
+
+func (f *fakeUpgradeManager) AckAction(ctx context.Context, acker acker.Acker, action fleetapi.Action) error {
 	return nil
 }
 

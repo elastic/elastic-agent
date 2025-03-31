@@ -68,7 +68,11 @@ func (u *mockUpgradeManager) Upgrade(
 		pgpBytes...)
 }
 
-func (u *mockUpgradeManager) Ack(ctx context.Context, acker acker.Acker) error {
+func (u *mockUpgradeManager) Ack(_ context.Context, _ acker.Acker) error {
+	return nil
+}
+
+func (u *mockUpgradeManager) AckAction(_ context.Context, _ acker.Acker, _ fleetapi.Action) error {
 	return nil
 }
 
@@ -110,7 +114,7 @@ func TestUpgradeHandler(t *testing.T) {
 				return nil, nil
 			},
 		},
-		nil, nil, nil, nil, nil, false, nil)
+		nil, nil, nil, nil, nil, false, nil, nil)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 
@@ -169,7 +173,7 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 				return nil, err
 			},
 		},
-		nil, nil, nil, nil, nil, false, nil)
+		nil, nil, nil, nil, nil, false, nil, nil)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 
@@ -230,7 +234,7 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 				return nil, nil
 			},
 		},
-		nil, nil, nil, nil, nil, false, nil)
+		nil, nil, nil, nil, nil, false, nil, nil)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 

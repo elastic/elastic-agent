@@ -25,6 +25,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/composable/providers/kubernetes"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/fleet"
+	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -136,6 +138,7 @@ func New(
 	var composableManaged bool
 	var isManaged bool
 
+	var fleetAcker *fleet.Acker
 	if testingMode {
 		log.Info("Elastic Agent has been started in testing mode and is managed through the control protocol")
 
@@ -182,8 +185,21 @@ func New(
 				InjectProxyEndpointModifier(),
 			)
 
+			client, err := fleetclient.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
+			if err != nil {
+				return nil, nil, nil, errors.New(err,
+					"fail to create API client",
+					errors.TypeNetwork,
+					errors.M(errors.MetaKeyURI, cfg.Fleet.Client.Host))
+			}
+
+			fleetAcker, err = fleet.NewAcker(log, agentInfo, client)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to create acker: %w", err)
+			}
+
 			// TODO: stop using global state
-			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, paths.Top(), upgrader)
+			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, paths.Top(), client, fleetAcker, upgrader)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -197,7 +213,7 @@ func New(
 	}
 
 	otelManager := otelmanager.NewOTelManager(log.Named("otel_manager"))
-	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelManager, compModifiers...)
+	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelManager, fleetAcker, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created

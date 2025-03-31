@@ -27,7 +27,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/fleet"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
-	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/uploader"
 	"github.com/elastic/elastic-agent/internal/pkg/queue"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
@@ -52,6 +51,7 @@ type managedConfigManager struct {
 	coord                *coordinator.Coordinator
 	fleetInitTimeout     time.Duration
 	initialClientSetters []actions.ClientSetter
+	fleetAcker           *fleet.Acker
 
 	ch    chan coordinator.ConfigChange
 	errCh chan error
@@ -66,16 +66,10 @@ func newManagedConfigManager(
 	runtime *runtime.Manager,
 	fleetInitTimeout time.Duration,
 	topPath string,
+	client *remote.Client,
+	fleetAcker *fleet.Acker,
 	clientSetters ...actions.ClientSetter,
 ) (*managedConfigManager, error) {
-	client, err := fleetclient.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
-	if err != nil {
-		return nil, errors.New(err,
-			"fail to create API client",
-			errors.TypeNetwork,
-			errors.M(errors.MetaKeyURI, cfg.Fleet.Client.Host))
-	}
-
 	// Create the state store that will persist the last good policy change on disk.
 	stateStore, err := store.NewStateStoreWithMigration(ctx, log, paths.AgentActionStoreFile(), paths.AgentStateStoreFile())
 	if err != nil {
@@ -106,6 +100,7 @@ func newManagedConfigManager(
 		ch:                   make(chan coordinator.ConfigChange),
 		errCh:                make(chan error),
 		initialClientSetters: clientSetters,
+		fleetAcker:           fleetAcker,
 	}, nil
 }
 
@@ -134,12 +129,8 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	policyChanger := m.initDispatcher(gatewayCancel)
 
 	// Create ackers to enqueue/retry failed acks
-	ack, err := fleet.NewAcker(m.log, m.agentInfo, m.client)
-	if err != nil {
-		return fmt.Errorf("failed to create acker: %w", err)
-	}
-	retrier := retrier.New(ack, m.log)
-	batchedAcker := lazy.NewAcker(ack, m.log, lazy.WithRetrier(retrier))
+	retrier := retrier.New(m.fleetAcker, m.log)
+	batchedAcker := lazy.NewAcker(m.fleetAcker, m.log, lazy.WithRetrier(retrier))
 	actionAcker := store.NewStateStoreActionAcker(batchedAcker, m.stateStore)
 
 	if err := m.coord.AckUpgrade(ctx, actionAcker); err != nil {
@@ -173,12 +164,12 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	// the Fleet Server is running before the Fleet gateway is started.
 	if m.cfg.Fleet.Server != nil {
 		if stateRestored {
-			err = m.waitForFleetServer(ctx)
+			err := m.waitForFleetServer(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to initialize Fleet Server: %w", err)
 			}
 		} else {
-			err = m.initFleetServer(ctx, m.cfg.Fleet.Server)
+			err := m.initFleetServer(ctx, m.cfg.Fleet.Server)
 			if err != nil {
 				return fmt.Errorf("failed to initialize Fleet Server: %w", err)
 			}
@@ -200,7 +191,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	// Not running a Fleet Server so the gateway and acker can be changed based on the configuration change.
 	if m.cfg.Fleet.Server == nil {
 		policyChanger.AddSetter(gateway)
-		policyChanger.AddSetter(ack)
+		policyChanger.AddSetter(m.fleetAcker)
 
 		for _, cs := range m.initialClientSetters {
 			policyChanger.AddSetter(cs)
