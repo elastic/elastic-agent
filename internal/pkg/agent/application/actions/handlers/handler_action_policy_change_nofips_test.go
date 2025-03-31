@@ -31,20 +31,17 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	mockhandlers "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/actions/handlers"
 )
 
+// Test Handler SSL_Passphrase tests encrypted private keys in the policy
+// It was moved from handler_action_policy_change_test.go TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings/policy_with_SSL_config
+// TODO: Move back when FIPS distributions support encrypted private keys
 func Test_Handler_SSL_Passphrase(t *testing.T) {
-	log, _ := logger.New("", false)
-
-	agentInfo := &info.AgentInfo{}
-	nullStore := &storage.NullStore{}
-
 	agentChildEncPassphrase := `reallySecurePassword`
 	passphrasePath := filepath.Join(t.TempDir(), "passphrase")
-	err = os.WriteFile(
+	err := os.WriteFile(
 		passphrasePath,
 		[]byte(agentChildEncPassphrase),
 		0400)
@@ -71,9 +68,6 @@ func Test_Handler_SSL_Passphrase(t *testing.T) {
 		Cert: agentChildPair.Cert,
 		Key:  pem.EncodeToMemory(encPem),
 	}
-
-	wrongRootPair, wrongChildPair, err := certutil.NewRootAndChildCerts()
-	require.NoError(t, err, "failed creating root and child certs")
 
 	statusHandler := func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/status" {
@@ -115,7 +109,6 @@ func Test_Handler_SSL_Passphrase(t *testing.T) {
 	fleetNomTLSServer.StartTLS()
 	defer fleetNomTLSServer.Close()
 
-	trueVar := true
 	tcs := []struct {
 		name                     string
 		originalCfg              *configuration.Configuration

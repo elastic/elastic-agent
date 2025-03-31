@@ -17,6 +17,9 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
+// TestEndpointComponentModifier_EndpointTLSComponentModifier_mTLS_passphrase tests encrypted private keys
+// It was moved from endpoint_component_modifier_test.go TestEndpointComponentModifier
+// TODO: Move back once FIPS distributions support encryped private keys
 func TestEndpointComponentModifier_EndpointTLSComponentModifier_mTLS_passphrase(t *testing.T) {
 	log, obs := loggertest.New("TestEndpointComponentModifier_EndpointTLSComponentModifier_mTLS_passphrase")
 	defer func() {
@@ -45,6 +48,7 @@ func TestEndpointComponentModifier_EndpointTLSComponentModifier_mTLS_passphrase(
 				},
 			},
 		})
+	require.NoError(t, err)
 	compareComponents(t, comps, makeComponent(t, fmt.Sprintf(`{
 			  "fleet": {
 			    "ssl": {
@@ -55,6 +59,9 @@ func TestEndpointComponentModifier_EndpointTLSComponentModifier_mTLS_passphrase(
 			}`, pair.Cert, pair.Key)))
 }
 
+// TestEndpointTLSComponentModifier_cache_miss tests encrypted private keys
+// It was moved from endpoint_component_modifier_test.go
+// TODO: Move back once FIPS distributions support encryped private keys
 func TestEndpointTLSComponentModifier_cache_miss(t *testing.T) {
 	log, obs := loggertest.New("TestEndpointSignedComponentModifier")
 	defer func() {

@@ -25,6 +25,9 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+// Test_Enroll_mTLS tests enrolling with encrypted private keys
+// It was moved from enroll_cmd_test.go TestEnroll
+// TODO: Move back when FIPS distributions support encryped private keys
 func Test_Enroll_mTLS(t *testing.T) {
 	testutils.InitStorage(t)
 	skipCreateSecret := false
