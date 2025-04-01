@@ -51,7 +51,10 @@ if [[ "${pull_request}" == "false" ]]; then
             git remote add forked "git@github.com:${USE_FORKED_REPO}"
             git fetch forked
             git checkout "${USE_FORKED_BRANCH}"
-            export BUILDKITE_PULL_REQUEST="true"
+            echo "Replacing BRANCH assignment in ./.buildkite/scripts/steps/dra-publish.sh"
+            sed -i -e 's/^BRANCH=.*/BRANCH="main"/' ./.buildkite/scripts/steps/dra-publish.sh
+            echo "--- new dra-publish.sh"
+            cat ./.buildkite/scripts/steps/dra-publish.sh
         fi
     fi
     echo "After forked repo/branch statements"
