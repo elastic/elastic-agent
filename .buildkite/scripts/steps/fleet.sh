@@ -10,6 +10,8 @@ function preinstall_fleet_packages() {
 
   install_fleet_packages $preinstalled_packages_filename
   retcode=$?
+
+  echo "Return code in preinstall_fleet_packages: " $retcode
   return $retcode
 }
 
@@ -53,6 +55,7 @@ function install_fleet_packages() {
     -H 'kbn-xsrf: elastic-agent' \
     "${KIBANA_HOST}/api/fleet/epm/packages/_bulk"
   retcode=$?
+  echo "Return code in install_fleet_packages: " $retcode
   if [ $retcode -ne 0 ]; then
     return $retcode
   fi
