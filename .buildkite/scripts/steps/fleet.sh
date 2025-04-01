@@ -48,17 +48,20 @@ function install_fleet_packages() {
   which jq
 
   echo "Installing Fleet packages"
-  curl -v \
+  resp=$(curl \
     --fail-with-body \
     -X "POST" \
     -u "${KIBANA_USERNAME}:${KIBANA_PASSWORD}" \
     -d @"${install_api_request_file}" \
     -H 'Content-Type: application/json' \
     -H 'kbn-xsrf: elastic-agent' \
-    "${KIBANA_HOST}/api/fleet/epm/packages/_bulk"
-  retcode=$?
-  echo "Return code in install_fleet_packages: " $retcode
-  if [ $retcode -ne 0 ]; then
-    return $retcode
+    "${KIBANA_HOST}/api/fleet/epm/packages/_bulk")
+
+  echo "$resp"
+
+  # Parse response body for any errors
+  num_errors=$(echo "$resp" | jq '.items[].statusCode | select(.>=400)' | wc -l)
+  if [ "$num_errors" -gt 0 ]; then
+    return 6
   fi
 }
