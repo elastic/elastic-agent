@@ -327,19 +327,23 @@ func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResu
 
 	// Should we support json too?
 	if fileResult.ContentType == "application/yaml" {
-		unmarshalled := map[string]interface{}{}
+		var unmarshalled any
 		err := yaml.Unmarshal(fileResult.Content, &unmarshalled)
 		if err != nil {
 			// Best effort, output a warning but still include the file
 			fmt.Fprintf(errOut, "[WARNING] Could not redact %s due to unmarshalling error: %s\n", fullFilePath, err)
 		} else {
-			unmarshalled = Redact(unmarshalled, errOut)
-			redacted, err := yaml.Marshal(unmarshalled)
-			if err != nil {
-				// Best effort, output a warning but still include the file
-				fmt.Fprintf(errOut, "[WARNING] Could not redact %s due to marshalling error: %s\n", fullFilePath, err)
-			} else {
-				out = &redacted
+			switch t := unmarshalled.(type) { // could be a plain string, we only redact if this is a proper map
+			case map[string]any:
+				t = Redact(t, errOut)
+				redacted, err := yaml.Marshal(t)
+				if err != nil {
+					// Best effort, output a warning but still include the file
+					fmt.Fprintf(errOut, "[WARNING] Could not redact %s due to marshalling error: %s\n", fullFilePath, err)
+				} else {
+					out = &redacted
+				}
+			default:
 			}
 		}
 	}
@@ -398,7 +402,8 @@ func redactKey(k string) bool {
 		strings.Contains(k, "passphrase") ||
 		strings.Contains(k, "password") ||
 		strings.Contains(k, "token") ||
-		strings.Contains(k, "key")
+		strings.Contains(k, "key") ||
+		strings.Contains(k, "secret")
 }
 
 func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool) error {
@@ -593,7 +598,7 @@ func RedactSecretPaths(mapStr map[string]any, errOut io.Writer) map[string]any {
 		fmt.Fprintln(errOut, "No output redaction: secret_paths attribute is not a list.")
 		return mapStr
 	}
-	cfg := ucfg.MustNewFrom(mapStr)
+	cfg := ucfg.MustNewFrom(mapStr, ucfg.PathSep("."))
 	for _, v := range arr {
 		key, ok := v.(string)
 		if !ok {
@@ -601,11 +606,15 @@ func RedactSecretPaths(mapStr map[string]any, errOut io.Writer) map[string]any {
 			continue
 		}
 
-		if ok, _ := cfg.Has(key, -1, ucfg.PathSep(".")); ok {
+		if ok, err := cfg.Has(key, -1, ucfg.PathSep(".")); err != nil {
+			fmt.Fprintf(errOut, "Error redacting secret path %q: %v.\n", key, err)
+		} else if ok {
 			err := cfg.SetString(key, -1, REDACTED, ucfg.PathSep("."))
 			if err != nil {
 				fmt.Fprintf(errOut, "No output redaction for %q: %v.\n", key, err)
 			}
+		} else {
+			fmt.Fprintf(errOut, "Unable to find secret path %q for redaction.\n", key)
 		}
 	}
 	result, err := config.MustNewConfigFrom(cfg).ToMapStr()

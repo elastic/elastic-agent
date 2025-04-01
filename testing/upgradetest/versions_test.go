@@ -88,6 +88,7 @@ func TestGetUpgradableVersions(t *testing.T) {
 }
 
 func TestPreviousMinor(t *testing.T) {
+	t.Skip("Skipped until there are at least 2 minors available or https://github.com/elastic/elastic-agent/issues/6667 is solved")
 	currentParsed, err := version.ParseVersion(bversion.Agent)
 	require.NoError(t, err)
 

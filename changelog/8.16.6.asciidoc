@@ -1,0 +1,49 @@
+// begin 8.16.6 relnotes
+
+[[release-notes-8.16.6]]
+==  8.16.6
+
+Review important information about the  8.16.6 release.
+
+
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[enhancements-8.16.6]]
+=== Enhancements
+
+
+elastic-agent::
+
+* Include All Metadata That Is Sent To Fleet In The Agent-Info.yaml File In Diagnostics By Default. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7029[#https://github.com/elastic/elastic-agent/pull/7029] 
+
+
+
+
+[discrete]
+[[bug-fixes-8.16.6]]
+=== Bug fixes
+
+
+elastic-agent::
+
+* Add Conditions To Copy_fields Processors To Prevent Spamming The Debug Logs
+. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6730[#https://github.com/elastic/elastic-agent/pull/6730] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/5299[#https://github.com/elastic/elastic-agent/issues/5299]
+* Make Enroll Command Backoff More Conservative. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6983[#https://github.com/elastic/elastic-agent/pull/6983] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6761[#https://github.com/elastic/elastic-agent/issues/6761]
+* Add Missing Null Checks To Ast Methods. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7009[#https://github.com/elastic/elastic-agent/pull/7009] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6999[#https://github.com/elastic/elastic-agent/issues/6999]
+* Fixes An Issue Where `Fixpermissions` On Windows Incorrectly Returned An Error Message Due To Improper Handling Of Windows Api Return Values. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7059[#https://github.com/elastic/elastic-agent/pull/7059] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6917[#https://github.com/elastic/elastic-agent/issues/6917]
+* Support Ipv6 Hosts In Enroll Url. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7036[#https://github.com/elastic/elastic-agent/pull/7036] 
+* Support Ipv6 Host In Grpc Config. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7035[#https://github.com/elastic/elastic-agent/pull/7035] 
+* Rotate Logger Output File When Writing To A Symbolic Link. {elastic-agent-pull}https://github.com/elastic/elastic-agent/6938[#https://github.com/elastic/elastic-agent/6938] 
+* Do Not Fail Windows Permission Updates On Missing Files/Paths. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7305[#https://github.com/elastic/elastic-agent/pull/7305] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/7301[#https://github.com/elastic/elastic-agent/issues/7301]
+* Make `Otelcol` Executable In The Docker Image. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7345[#https://github.com/elastic/elastic-agent/pull/7345] 
+
+// end 8.16.6 relnotes

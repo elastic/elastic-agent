@@ -2,6 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
+//go:build !windows
+
 package manager
 
 import (
@@ -24,38 +26,36 @@ import (
 var (
 	testConfig = map[string]interface{}{
 		"receivers": map[string]interface{}{
-			"otlp": map[string]interface{}{
-				"protocols": map[string]interface{}{
-					"grpc": map[string]interface{}{
-						"endpoint": "0.0.0.0:4317",
-					},
-				},
-			},
+			"nop": map[string]interface{}{},
 		},
 		"processors": map[string]interface{}{
 			"batch": map[string]interface{}{},
 		},
 		"exporters": map[string]interface{}{
-			"otlp": map[string]interface{}{
-				"endpoint": "otelcol:4317",
-			},
+			"debug": map[string]interface{}{},
 		},
 		"service": map[string]interface{}{
+			"telemetry": map[string]interface{}{
+				"metrics": map[string]interface{}{
+					"level":   "none",
+					"readers": []any{},
+				},
+			},
 			"pipelines": map[string]interface{}{
 				"traces": map[string]interface{}{
-					"receivers":  []string{"otlp"},
+					"receivers":  []string{"nop"},
 					"processors": []string{"batch"},
-					"exporters":  []string{"otlp"},
+					"exporters":  []string{"debug"},
 				},
 				"metrics": map[string]interface{}{
-					"receivers":  []string{"otlp"},
+					"receivers":  []string{"nop"},
 					"processors": []string{"batch"},
-					"exporters":  []string{"otlp"},
+					"exporters":  []string{"debug"},
 				},
 				"logs": map[string]interface{}{
-					"receivers":  []string{"otlp"},
+					"receivers":  []string{"nop"},
 					"processors": []string{"batch"},
-					"exporters":  []string{"otlp"},
+					"exporters":  []string{"debug"},
 				},
 			},
 		},
@@ -63,7 +63,6 @@ var (
 )
 
 func TestOTelManager_Run(t *testing.T) {
-	t.Skip("Flaky test") // https://github.com/elastic/elastic-agent/issues/6119
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	l, _ := loggertest.New("otel")
@@ -182,4 +181,59 @@ func TestOTelManager_Run(t *testing.T) {
 	if !errors.Is(runErr, context.Canceled) {
 		t.Errorf("otel manager returned unexpected error: %v", runErr)
 	}
+}
+
+func TestOTelManager_ConfigError(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, _ := loggertest.New("otel")
+	m := NewOTelManager(l)
+
+	go func() {
+		err := m.Run(ctx)
+		assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
+	}()
+
+	// watch is synchronous, so we need to read from it to avoid blocking the manager
+	go func() {
+		for {
+			select {
+			case <-m.Watch():
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	// Errors channel is non-blocking, should be able to send an Update that causes an error multiple
+	// times without it blocking on sending over the errCh.
+	for range 3 {
+		cfg := confmap.New() // invalid config
+		m.Update(cfg)
+
+		// delay between updates to ensure the collector will have to fail
+		<-time.After(100 * time.Millisecond)
+	}
+
+	// because of the retry logic and timing we need to ensure
+	// that this keeps retrying to see the error and only store
+	// an actual error
+	//
+	// a nil error just means that the collector is trying to restart
+	// which clears the error on the restart loop
+	timeoutCh := time.After(time.Second * 5)
+	var err error
+outer:
+	for {
+		select {
+		case e := <-m.Errors():
+			if e != nil {
+				err = e
+				break outer
+			}
+		case <-timeoutCh:
+			break outer
+		}
+	}
+	assert.Error(t, err, "otel manager should have returned an error")
 }

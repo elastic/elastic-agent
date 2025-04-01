@@ -14,6 +14,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/sha512"
+	"debug/buildinfo"
+	"debug/elf"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -21,11 +23,13 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
+	"sort"
 	"strings"
 	"testing"
 
@@ -33,7 +37,6 @@ import (
 	"github.com/cavaliergopher/rpm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
@@ -51,6 +54,7 @@ const (
 var (
 	excludedPathsPattern    = regexp.MustCompile(`node_modules`)
 	configFilePattern       = regexp.MustCompile(`.*beat\.spec.yml$|.*beat\.yml$|apm-server\.yml|elastic-agent\.yml$$`)
+	otelcolScriptPattern    = regexp.MustCompile(`/otelcol$`)
 	manifestFilePattern     = regexp.MustCompile(`manifest.yml`)
 	modulesDirPattern       = regexp.MustCompile(`module/.+`)
 	modulesDDirPattern      = regexp.MustCompile(`modules.d/$`)
@@ -63,13 +67,14 @@ var (
 )
 
 var (
-	files             = flag.String("files", "../build/distributions/*/*", "filepath glob containing package files")
+	files             = flag.String("files", "../build/distributions/*", "filepath glob containing package files")
 	modules           = flag.Bool("modules", false, "check modules folder contents")
 	minModules        = flag.Int("min-modules", 4, "minimum number of modules to expect in modules folder")
 	modulesd          = flag.Bool("modules.d", false, "check modules.d folder contents")
 	monitorsd         = flag.Bool("monitors.d", false, "check monitors.d folder contents")
 	rootOwner         = flag.Bool("root-owner", false, "expect root to own package files")
 	rootUserContainer = flag.Bool("root-user-container", false, "expect root in container user")
+	fips              = flag.Bool("fips", false, "check agent binary for FIPS compliance")
 )
 
 func TestRPM(t *testing.T) {
@@ -91,7 +96,15 @@ func TestTar(t *testing.T) {
 	// Regexp matches *-arch.tar.gz, but not *-arch.docker.tar.gz
 	tars := getFiles(t, regexp.MustCompile(`-\w+\.tar\.gz$`))
 	for _, tar := range tars {
-		checkTar(t, tar)
+		checkTar(t, tar, false)
+	}
+}
+
+func TestFIPSTar(t *testing.T) {
+	// Regexp matches *-arch-fips.tar.gz, but not *-arch.docker.tar.gz
+	tars := getFiles(t, regexp.MustCompile(`-\w+-fips\.tar\.gz$`))
+	for _, tar := range tars {
+		checkTar(t, tar, *fips)
 	}
 }
 
@@ -104,9 +117,46 @@ func TestZip(t *testing.T) {
 
 func TestDocker(t *testing.T) {
 	dockers := getFiles(t, regexp.MustCompile(`\.docker\.tar\.gz$`))
+	sizeMap := make(map[string]int64)
 	for _, docker := range dockers {
 		t.Log(docker)
-		checkDocker(t, docker)
+		k, s := checkDocker(t, docker)
+		sizeMap[k] = s
+	}
+
+	if len(dockers) == 0 {
+		return
+	}
+
+	// expected variants size order ascending
+	for _, variantsExpectedSizeOrder := range [][]string{
+		{"elastic-otel-collector", "elastic-agent-slim", "elastic-agent"},
+		{"elastic-otel-collector-wolfi", "elastic-agent-slim-wolfi", "elastic-agent-wolfi"},
+	} {
+		var builtVariantsExpectedOrder []string
+		builtVariantSizes := make(map[string]int64)
+
+		// extract the built variants based on expected size order
+		for _, variant := range variantsExpectedSizeOrder {
+			if size, ok := sizeMap[variant]; ok {
+				builtVariantsExpectedOrder = append(builtVariantsExpectedOrder, variant)
+				builtVariantSizes[variant] = size
+			}
+		}
+
+		if len(builtVariantSizes) == 0 {
+			// no built variants found
+			continue
+		}
+
+		// sort the built variants by size
+		variantOrderBySize := slices.Collect(maps.Keys(builtVariantSizes))
+		sort.SliceStable(variantOrderBySize, func(i, j int) bool {
+			return builtVariantSizes[variantOrderBySize[i]] < builtVariantSizes[variantOrderBySize[j]]
+		})
+
+		// ensure the built variants are in the expected size order
+		assert.Equal(t, builtVariantsExpectedOrder, variantOrderBySize, "unexpected variant size ordering")
 	}
 }
 
@@ -154,7 +204,7 @@ func checkDeb(t *testing.T, file string, buf *bytes.Buffer) {
 	checkSystemdUnitPermissions(t, p)
 }
 
-func checkTar(t *testing.T, file string) {
+func checkTar(t *testing.T, file string, fipsCheck bool) {
 	p, err := readTar(file)
 	if err != nil {
 		t.Error(err)
@@ -176,6 +226,9 @@ func checkTar(t *testing.T, file string) {
 		require.NoError(t, err, "error extracting tar archive")
 		containingDir := strings.TrimSuffix(path.Base(file), ".tar.gz")
 		checkManifestFileContents(t, filepath.Join(tempExtractionPath, containingDir))
+		if fipsCheck {
+			checkFIPS(t, filepath.Join(tempExtractionPath, containingDir))
+		}
 	})
 
 	checkSha512PackageHash(t, file)
@@ -208,20 +261,7 @@ func checkZip(t *testing.T, file string) {
 
 func checkManifestFileContents(t *testing.T, extractedPackageDir string) {
 	t.Log("Checking file manifest.yaml")
-	manifestReadCloser, err := os.Open(filepath.Join(extractedPackageDir, v1.ManifestFileName))
-	if err != nil {
-		t.Errorf("opening manifest %s : %v", v1.ManifestFileName, err)
-	}
-	defer func(closer io.ReadCloser) {
-		err := closer.Close()
-		assert.NoError(t, err, "error closing manifest file")
-	}(manifestReadCloser)
-
-	var m v1.PackageManifest
-	err = yaml.NewDecoder(manifestReadCloser).Decode(&m)
-	if err != nil {
-		t.Errorf("unmarshaling package manifest: %v", err)
-	}
+	m := parseManifest(t, extractedPackageDir)
 
 	assert.Equal(t, v1.ManifestKind, m.Kind, "manifest specifies wrong kind")
 	assert.Equal(t, v1.VERSION, m.Version, "manifest specifies wrong api version")
@@ -241,6 +281,23 @@ func checkManifestFileContents(t *testing.T, extractedPackageDir string) {
 			}
 		}
 	}
+}
+
+func parseManifest(t *testing.T, dir string) v1.PackageManifest {
+	manifestReadCloser, err := os.Open(filepath.Join(dir, v1.ManifestFileName))
+	if err != nil {
+		t.Errorf("opening manifest %s : %v", v1.ManifestFileName, err)
+	}
+	defer func(closer io.ReadCloser) {
+		err := closer.Close()
+		assert.NoError(t, err, "error closing manifest file")
+	}(manifestReadCloser)
+
+	m, err := v1.ParseManifest(manifestReadCloser)
+	if err != nil {
+		t.Errorf("unmarshaling package manifest: %v", err)
+	}
+	return *m
 }
 
 const (
@@ -284,31 +341,89 @@ func checkNpcapNotices(pkg, file string, contents io.Reader) error {
 	return nil
 }
 
-func checkDocker(t *testing.T, file string) {
+func checkDocker(t *testing.T, file string) (string, int64) {
+	if strings.Contains(file, "elastic-otel-collector") {
+		return checkEdotCollectorDocker(t, file)
+	}
+
 	p, info, err := readDocker(file)
 	if err != nil {
 		t.Errorf("error reading file %v: %v", file, err)
-		return
+		return "", -1
 	}
 
 	checkDockerEntryPoint(t, p, info)
 	checkDockerLabels(t, p, info, file)
 	checkDockerUser(t, p, info, *rootUserContainer)
-	checkConfigPermissionsWithMode(t, p, configFilePattern, os.FileMode(0644))
+	checkFilePermissions(t, p, configFilePattern, os.FileMode(0644))
+	checkFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
 	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
 	checkModulesPresent(t, "", p)
 	checkModulesDPresent(t, "", p)
 	checkHintsInputsD(t, "hints.inputs.d", hintsInputsDFilePattern, p)
 	checkLicensesPresent(t, "licenses/", p)
+
+	name, err := dockerName(file, info.Config.Labels)
+	if err != nil {
+		t.Errorf("error constructing docker name: %v", err)
+		return "", -1
+	}
+
+	return name, info.Size
+}
+
+func dockerName(file string, labels map[string]string) (string, error) {
+	version, found := labels["version"]
+	if !found {
+		return "", errors.New("version label not found")
+	}
+
+	parts := strings.SplitN(file, "/", -1)
+	if len(parts) == 0 {
+		return "", errors.New("failed to get file name parts")
+	}
+
+	lastPart := parts[len(parts)-1]
+	versionIdx := strings.Index(lastPart, version)
+	if versionIdx < 0 {
+		return "", fmt.Errorf("version not found in nam %q", file)
+	}
+	return lastPart[:versionIdx-1], nil
+}
+
+func checkEdotCollectorDocker(t *testing.T, file string) (string, int64) {
+	p, info, err := readDocker(file)
+	if err != nil {
+		t.Errorf("error reading file %v: %v", file, err)
+		return "", -1
+	}
+
+	checkDockerEntryPoint(t, p, info)
+	checkDockerLabels(t, p, info, file)
+	checkDockerUser(t, p, info, *rootUserContainer)
+	checkFilePermissions(t, p, configFilePattern, os.FileMode(0644))
+	checkFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
+	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
+	checkModulesPresent(t, "", p)
+	checkModulesDPresent(t, "", p)
+	checkLicensesPresent(t, "licenses/", p)
+
+	name, err := dockerName(file, info.Config.Labels)
+	if err != nil {
+		t.Errorf("error constructing docker name: %v", err)
+		return "", -1
+	}
+
+	return name, info.Size
 }
 
 // Verify that the main configuration file is installed with a 0600 file mode.
 func checkConfigPermissions(t *testing.T, p *packageFile) {
-	checkConfigPermissionsWithMode(t, p, configFilePattern, expectedConfigMode)
+	checkFilePermissions(t, p, configFilePattern, expectedConfigMode)
 }
 
-func checkConfigPermissionsWithMode(t *testing.T, p *packageFile, configPattern *regexp.Regexp, expectedMode os.FileMode) {
-	t.Run(p.Name+" config file permissions", func(t *testing.T) {
+func checkFilePermissions(t *testing.T, p *packageFile, configPattern *regexp.Regexp, expectedMode os.FileMode) {
+	t.Run(p.Name+" file permissions", func(t *testing.T) {
 		for _, entry := range p.Contents {
 			if configPattern.MatchString(entry.File) {
 				mode := entry.Mode.Perm()
@@ -584,6 +699,55 @@ func checkDockerUser(t *testing.T, p *packageFile, info *dockerInfo, expectRoot 
 	})
 }
 
+func checkFIPS(t *testing.T, extractedPackageDir string) {
+	t.Logf("Checking agent binary in %q for FIPS compliance", extractedPackageDir)
+	m := parseManifest(t, extractedPackageDir)
+	versionedHome := m.Package.VersionedHome
+	require.DirExistsf(t, filepath.Join(extractedPackageDir, versionedHome), " versiondedHome directory %q not found in %q", versionedHome, extractedPackageDir)
+	binaryPath := filepath.Join(extractedPackageDir, versionedHome, "elastic-agent") // TODO eventually we will need to support .exe as well
+	require.FileExistsf(t, binaryPath, "Unable to find elastic-agent executable in versioned home in %q", extractedPackageDir)
+
+	info, err := buildinfo.ReadFile(binaryPath)
+	require.NoError(t, err)
+
+	foundTags := false
+	foundExperiment := false
+	for _, setting := range info.Settings {
+		switch setting.Key {
+		case "-tags":
+			foundTags = true
+			require.Contains(t, setting.Value, "requirefips")
+			continue
+		case "GOEXPERIMENT":
+			foundExperiment = true
+			require.Contains(t, setting.Value, "systemcrypto")
+			continue
+		}
+	}
+
+	require.True(t, foundTags, "Did not find -tags within binary version information")
+	require.True(t, foundExperiment, "Did not find GOEXPERIMENT within binary version information")
+
+	// TODO only elf is supported at the moment, in the future we will need to use macho (darwin) and pe (windows)
+	f, err := elf.Open(binaryPath)
+	require.NoError(t, err, "unable to open ELF file")
+
+	symbols, err := f.Symbols()
+	if err != nil {
+		t.Logf("no symbols present in %q: %v", binaryPath, err)
+		return
+	}
+
+	hasOpenSSL := false
+	for _, symbol := range symbols {
+		if strings.Contains(symbol.Name, "OpenSSL_version") {
+			hasOpenSSL = true
+			break
+		}
+	}
+	require.True(t, hasOpenSSL, "unable to find OpenSSL_version symbol")
+}
+
 // ensureNoBuildIDLinks checks for regressions related to
 // https://github.com/elastic/beats/issues/12956.
 func ensureNoBuildIDLinks(t *testing.T, p *packageFile) {
@@ -795,6 +959,12 @@ func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
 	defer file.Close()
 
 	var info *dockerInfo
+
+	stat, err := file.Stat()
+	if err != nil {
+		return nil, nil, err
+	}
+
 	layers := make(map[string]*packageFile)
 
 	gzipReader, err := gzip.NewReader(file)
@@ -863,6 +1033,7 @@ func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
 		return nil, nil, fmt.Errorf("no files found in docker working directory (%s)", info.Config.WorkingDir)
 	}
 
+	info.Size = stat.Size()
 	return p, info, nil
 }
 
@@ -879,6 +1050,7 @@ type dockerInfo struct {
 		User       string
 		WorkingDir string
 	} `json:"config"`
+	Size int64
 }
 
 func readDockerInfo(r io.Reader) (*dockerInfo, error) {

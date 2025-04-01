@@ -7,6 +7,7 @@
 package vault
 
 import (
+	"crypto/pbkdf2"
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
@@ -15,18 +16,17 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"golang.org/x/crypto/pbkdf2"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault/aesgcm"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
-	saltSize = 8
+	keyLen    int = 32
+	iterCount int = 12022
 )
 
 func (v *FileVault) encrypt(data []byte) ([]byte, error) {
-	key, salt, err := deriveKey(v.seed, nil)
+	key, salt, err := deriveKey(v.seed, v.saltSize, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -38,25 +38,31 @@ func (v *FileVault) encrypt(data []byte) ([]byte, error) {
 }
 
 func (v *FileVault) decrypt(data []byte) ([]byte, error) {
-	if len(data) < saltSize {
+	if len(data) < v.saltSize {
 		return nil, syscall.EINVAL
 	}
-	salt, data := data[:saltSize], data[saltSize:]
-	key, _, err := deriveKey(v.seed, salt)
+	salt, data := data[:v.saltSize], data[v.saltSize:]
+	key, _, err := deriveKey(v.seed, v.saltSize, salt)
 	if err != nil {
 		return nil, err
 	}
 	return aesgcm.Decrypt(key, data)
 }
 
-func deriveKey(pw []byte, salt []byte) ([]byte, []byte, error) {
+func deriveKey(pw []byte, saltSize int, salt []byte) ([]byte, []byte, error) {
 	if salt == nil {
 		salt = make([]byte, saltSize)
 		if _, err := rand.Read(salt); err != nil {
 			return nil, nil, err
 		}
 	}
-	return pbkdf2.Key(pw, salt, 12022, 32, sha256.New), salt, nil
+
+	key, err := pbkdf2.Key(sha256.New, string(pw), salt, iterCount, keyLen)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return key, salt, nil
 }
 
 func tightenPermissions(path string, ownership utils.FileOwner) error {

@@ -32,7 +32,7 @@ func ConnectedToFleet(ctx context.Context, t *testing.T, fixture *integrationtes
 
 	connected := assert.Eventually(t, assertFn, timeout, 5*time.Second,
 		"want fleet state %s, got %s. agent status: %v",
-		cproto.State_HEALTHY, cproto.State(agentStatus.FleetState), agentStatus)
+		cproto.State_HEALTHY, cproto.State(agentStatus.FleetState), agentStatus) //nolint:gosec // G115 always under 32-bit
 
 	if !connected && err != nil {
 		t.Logf("agent isn't connected to fleet-server: last error from agent status command: %v",
@@ -48,10 +48,10 @@ func ConnectedToFleet(ctx context.Context, t *testing.T, fixture *integrationtes
 func FleetAgentStatus(ctx context.Context,
 	t *testing.T,
 	client *kibana.Client,
-	policyID,
+	agentID string,
 	expectedStatus string) func() bool {
 	return func() bool {
-		currentStatus, err := fleettools.GetAgentStatus(ctx, client, policyID)
+		currentStatus, err := fleettools.GetAgentStatus(ctx, client, agentID)
 		if err != nil {
 			t.Errorf("unable to determine agent status: %s", err.Error())
 			return false
@@ -60,8 +60,6 @@ func FleetAgentStatus(ctx context.Context,
 		if currentStatus == expectedStatus {
 			return true
 		}
-
-		t.Logf("Agent fleet status: %s", currentStatus)
 		return false
 	}
 }

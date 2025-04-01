@@ -130,13 +130,17 @@ func TestExternalConfigLoading(t *testing.T) {
 				},
 				"inputs": []interface{}{
 					map[string]interface{}{
-						"type":                  "system/metrics",
-						"data_stream.namespace": "default",
-						"use_output":            "default",
+						"type": "system/metrics",
+						"data_stream": map[string]interface{}{
+							"namespace": "default",
+						},
+						"use_output": "default",
 						"streams": []interface{}{
 							map[string]interface{}{
-								"metricset":           "cpu",
-								"data_stream.dataset": "system.cpu",
+								"metricset": "cpu",
+								"data_stream": map[string]interface{}{
+									"dataset": "system.cpu",
+								},
 							},
 						},
 					},

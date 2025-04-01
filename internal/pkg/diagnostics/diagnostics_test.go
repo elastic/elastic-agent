@@ -117,6 +117,19 @@ i4EFZLWrFRsAAAARYWxleGtAZ3JlbWluLm5lc3QBAg==
 	require.NotContains(t, outWriter.String(), privKey)
 }
 
+func TestRedactPlainString(t *testing.T) {
+	errOut := strings.Builder{}
+	outWriter := strings.Builder{}
+	inputString := "Just a string"
+	res := client.DiagnosticFileResult{Content: []byte(inputString), ContentType: "application/yaml"}
+
+	err := writeRedacted(&errOut, &outWriter, "test/path", res)
+	require.NoError(t, err)
+
+	require.Empty(t, errOut.String())
+	require.Equal(t, outWriter.String(), inputString)
+}
+
 func TestRedactComplexKeys(t *testing.T) {
 	// taken directly from the yaml spec: https://yaml.org/spec/1.1/#c-mapping-key
 	// This test mostly serves to document that part of the YAML library doesn't work properly
@@ -249,15 +262,54 @@ secret_paths:
     - inputs.1.missingKey
     - outputs.default.redactOtherKey
 `,
+	}, {
+		name: "path in nested list",
+		input: []byte(`id: test-policy
+inputs:
+    - type: httpjson
+      data_stream:
+        namespace: default
+      streams:
+        - config_version: "2"
+          request.transforms:
+            - set:
+                target: header.Authorization
+                value: SSWS this-should-be-redacted
+            - set:
+                target: url.params.limit
+                value: "1000"
+secret_paths:
+    - inputs.0.streams.0.request.transforms.0.set.value
+`),
+		expect: `id: test-policy
+inputs:
+    - data_stream:
+        namespace: default
+      streams:
+        - config_version: "2"
+          request:
+            transforms:
+                - set:
+                    target: header.Authorization
+                    value: <REDACTED>
+                - set:
+                    target: url.params.limit
+                    value: "1000"
+      type: httpjson
+secret_paths:
+    - inputs.0.streams.0.request.transforms.0.set.value
+`,
 	}}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			file := client.DiagnosticFileResult{Content: tc.input, ContentType: "application/yaml"}
 			var out bytes.Buffer
-			err := writeRedacted(io.Discard, &out, "testPath", file)
+			var errOut bytes.Buffer
+			err := writeRedacted(&errOut, &out, "testPath", file)
 			require.NoError(t, err)
 
+			t.Logf("Error output: %s", errOut.String())
 			assert.Equal(t, tc.expect, out.String())
 		})
 	}

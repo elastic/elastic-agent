@@ -10,12 +10,13 @@ env:
 steps:
   - group: ":beats: DRA Elastic-Agent Core Snapshot :beats:"
     key: "dra-core-snapshot"
-    if: build.branch == 'main' || build.branch =~ /^[0-9]+\.[0-9x]+\$/ || build.env("RUN_SNAPSHOT") == "true"
+    # don't run snapshot builds with prereleases (non empty VERSION_QUALIFIER) unless forced (RUN_SNAPSHOT=true)
+    if: build.env("RUN_SNAPSHOT") == "true" || (build.env('VERSION_QUALIFIER') == null && (build.branch == 'main' || build.branch =~ /^[0-9]+\.[0-9x]+\$/))
     steps:
-    - label: ":package: Build Elastic-Agent Core Snapshot"
+    - label: ":package: Elastic-Agent Core Snapshot"
       commands:
         - .buildkite/scripts/steps/build-agent-core.sh
-      key: "build-dra-snapshot"
+      key: "build-dra-snapshot-x86"
       artifact_paths:
         - "build/distributions/**/*"
       agents:
@@ -23,6 +24,21 @@ steps:
         machineType: "c2-standard-16"
       env:
         DRA_WORKFLOW: "snapshot"
+        PLATFORMS: "linux/amd64 windows/amd64 darwin/amd64"
+    
+    - label: ":package: linux/arm64 darwin/arm64 Elastic-Agent Core Snapshot"
+      commands:
+        - .buildkite/scripts/steps/build-agent-core.sh
+      key: "build-dra-snapshot-arm"
+      artifact_paths:
+        - "build/distributions/**/*"
+      agents:
+        provider: "aws"
+        instanceType: "c6g.4xlarge"
+        imagePrefix: "core-ubuntu-2204-aarch64"
+      env:
+        DRA_WORKFLOW: "snapshot"
+        PLATFORMS: "linux/arm64 darwin/arm64"
 
     - wait
 
@@ -41,14 +57,26 @@ steps:
       env:
         DRA_WORKFLOW: "snapshot"
 
+    - label: ":hammer: Publish helm chart snapshot"
+      trigger: elastic-agent-helm-charts
+      if: build.env("BUILDKITE_BRANCH") != "8.16" && build.env("BUILDKITE_BRANCH") != "8.17"
+      build:
+        branch: "${BUILDKITE_BRANCH}"
+        commit: "${BUILDKITE_COMMIT}"
+        message: "publish helm-chart for elastic-agent in dev (snapshot)"
+        env:
+          SNAPSHOT: "true"
+          HELM_REPO_ENV: "dev"
+
   - group: ":beats: DRA Elastic-Agent Core Staging :beats:"
     key: "dra-core-staging"
-    if: build.branch =~ /^[0-9]+\.[0-9x]+\$/ || build.env("RUN_STAGING") == "true"
+    if: build.branch =~ /^[0-9]+\.[0-9x]+\$/ || build.env("RUN_STAGING") == "true" || build.env('VERSION_QUALIFIER') != null
     steps:
-    - label: ":package: Build Elastic-Agent Core staging"
-      commands:
-        - .buildkite/scripts/steps/build-agent-core.sh
-      key: "build-dra-staging"
+    - label: ":package: Elastic-Agent Core staging"
+      commands: |
+        source .buildkite/scripts/version_qualifier.sh
+        .buildkite/scripts/steps/build-agent-core.sh
+      key: "build-dra-staging-x86"
       artifact_paths:
         - "build/distributions/**/*"
       agents:
@@ -56,11 +84,28 @@ steps:
         machineType: "c2-standard-16"
       env:
         DRA_WORKFLOW: "staging"
+        PLATFORMS: "linux/amd64 windows/amd64 darwin/amd64"
+
+    - label: ":package: linux/arm64 darwin/arm64 Elastic-Agent Core staging"
+      commands: |
+        source .buildkite/scripts/version_qualifier.sh
+        .buildkite/scripts/steps/build-agent-core.sh
+      key: "build-dra-staging-arm"
+      artifact_paths:
+        - "build/distributions/**/*"
+      agents:
+        provider: "aws"
+        instanceType: "c6g.4xlarge"
+        imagePrefix: "core-ubuntu-2204-aarch64"
+      env:
+        DRA_WORKFLOW: "dra-core-staging"
+        PLATFORMS: "linux/arm64 darwin/arm64"
 
     - wait
 
     - label: ":hammer: DRA Publish Elastic-Agent Core staging"
       command: |
+        source .buildkite/scripts/version_qualifier.sh
         echo "+++ Restoring Artifacts"
         buildkite-agent artifact download "build/**/*" .
         echo "+++ Changing permissions for the release manager"
@@ -73,6 +118,17 @@ steps:
         machineType: "c2-standard-16"
       env:
         DRA_WORKFLOW: "staging"
+
+    - label: ":hammer: Publish helm chart staging"
+      trigger: elastic-agent-helm-charts
+      if: build.env("BUILDKITE_BRANCH") != "8.16" && build.env("BUILDKITE_BRANCH") != "8.17"
+      build:
+        branch: "${BUILDKITE_BRANCH}"
+        commit: "${BUILDKITE_COMMIT}"
+        message: "publish helm-chart for elastic-agent in dev (staging)"
+        env:
+          SNAPSHOT: "false"
+          HELM_REPO_ENV: "dev"
 
 notify:
   - slack: "#ingest-notifications"

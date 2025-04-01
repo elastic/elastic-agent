@@ -50,19 +50,19 @@ var variants = []struct {
 }{
 	{
 		Name:  "basic",
-		Image: "docker.elastic.co/beats/elastic-agent",
+		Image: "docker.elastic.co/elastic-agent/elastic-agent",
 	},
 	{
 		Name:  "wolfi",
-		Image: "docker.elastic.co/beats/elastic-agent-wolfi",
+		Image: "docker.elastic.co/elastic-agent/elastic-agent-wolfi",
 	},
 	{
 		Name:  "complete",
-		Image: "docker.elastic.co/beats/elastic-agent-complete",
+		Image: "docker.elastic.co/elastic-agent/elastic-agent-complete",
 	},
 	{
 		Name:  "complete-wolfi",
-		Image: "docker.elastic.co/beats/elastic-agent-complete-wolfi",
+		Image: "docker.elastic.co/elastic-agent/elastic-agent-complete-wolfi",
 	},
 	{
 		Name:  "cloud",
@@ -71,6 +71,22 @@ var variants = []struct {
 	{
 		Name:  "service",
 		Image: "docker.elastic.co/beats-ci/elastic-agent-service",
+	},
+	{
+		Name:  "elastic-otel-collector",
+		Image: "docker.elastic.co/beats-ci/elastic-otel-collector",
+	},
+	{
+		Name:  "slim",
+		Image: "docker.elastic.co/beats-ci/elastic-agent-slim",
+	},
+	{
+		Name:  "elastic-otel-collector-wolfi",
+		Image: "docker.elastic.co/beats-ci/elastic-otel-collector-wolfi",
+	},
+	{
+		Name:  "slim-wolfi",
+		Image: "docker.elastic.co/beats-ci/elastic-agent-slim-wolfi",
 	},
 }
 

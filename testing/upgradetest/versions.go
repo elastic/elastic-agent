@@ -39,6 +39,8 @@ var (
 	Version_8_13_0_SNAPSHOT = version.NewParsedSemVer(8, 13, 0, "SNAPSHOT", "")
 	// Version_8_14_0_SNAPSHOT is the minimum version for proper unprivileged execution on all platforms
 	Version_8_14_0_SNAPSHOT = version.NewParsedSemVer(8, 14, 0, "SNAPSHOT", "")
+	// Version_8_14_0_SNAPSHOT is the minimum version for proper unprivileged execution on all platforms
+	Version_9_0_0_SNAPSHOT = version.NewParsedSemVer(9, 0, 0, "SNAPSHOT", "")
 
 	// ErrNoSnapshot is returned when a requested snapshot is not on the version list.
 	ErrNoSnapshot = errors.New("failed to find a snapshot on the version list")
@@ -186,6 +188,7 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 	currentMajor := parsedUpgradeToVersion.Major()
 	currentMinor := parsedUpgradeToVersion.Minor()
 
+	skipCurrentMajor := false
 	currentMajorsToFind := reqs.CurrentMajors
 	previousMajorsToFind := reqs.PreviousMajors
 	previousMinorsToFind := reqs.PreviousMinors
@@ -212,7 +215,7 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 			currentMajorsToFind-- // counts as the current major as well
 
 		// current majors
-		case currentMajorsToFind > 0 && version.Major() == currentMajor:
+		case currentMajorsToFind > 0 && version.Major() == currentMajor && !skipCurrentMajor:
 			upgradableVersions = append(upgradableVersions, version.String())
 			currentMajorsToFind--
 
@@ -220,7 +223,10 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 		case previousMajorsToFind > 0 && version.Major() < currentMajor:
 			upgradableVersions = append(upgradableVersions, version.String())
 			currentMajor = version.Major()
+			currentMinor = version.Minor()
 			previousMajorsToFind--
+			previousMinorsToFind-- // count as prev minor as well
+			skipCurrentMajor = true
 
 		// since the list is sorted we can stop here
 		default:
@@ -250,7 +256,13 @@ func PreviousMinor() (*version.ParsedSemVer, error) {
 		// will only contain minors from the previous major (vX-1). Further, since the
 		// version list is sorted in descending order (newer versions first), we can return the
 		// first item from the list as it will be the newest minor of the previous major.
-		return versions[0], nil
+		for _, v := range versions {
+			if v.Less(*current) {
+				return v, nil
+			}
+		}
+
+		return nil, ErrNoPreviousMinor
 	}
 
 	for _, v := range versions {

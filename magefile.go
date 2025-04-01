@@ -32,6 +32,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
+
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/otiai10/copy"
 
@@ -82,6 +84,7 @@ const (
 	metaDir           = "_meta"
 	snapshotEnv       = "SNAPSHOT"
 	devEnv            = "DEV"
+	fipsEnv           = "FIPS"
 	externalArtifacts = "EXTERNAL"
 	platformsEnv      = "PLATFORMS"
 	packagesEnv       = "PACKAGES"
@@ -96,9 +99,10 @@ const (
 	baseURLForStagingDRA = "https://staging.elastic.co/"
 	agentCoreProjectName = "elastic-agent-core"
 
-	helmChartPath     = "./deploy/helm/elastic-agent"
-	helmOtelChartPath = "./deploy/helm/edot-collector/kube-stack"
-	sha512FileExt     = ".sha512"
+	helmChartPath      = "./deploy/helm/elastic-agent"
+	helmOtelChartPath  = "./deploy/helm/edot-collector/kube-stack"
+	helmMOtelChartPath = "./deploy/helm/edot-collector/kube-stack/managed_otlp"
+	sha512FileExt      = ".sha512"
 )
 
 var (
@@ -289,6 +293,54 @@ func (Build) All() {
 func (Build) GenerateConfig() error {
 	mg.Deps(Mkdir(buildDir))
 	return sh.Copy(filepath.Join(buildDir, configFile), filepath.Join(metaDir, configFile))
+}
+
+// WindowsArchiveRootBinary compiles a binary to be placed at the root of the windows elastic-agent archive. This binary
+// is a thin proxy to the actual elastic-agent binary that resides in the data/elastic-agent-{commit-short-sha}
+// directory of the archive.
+func (Build) WindowsArchiveRootBinary() error {
+	fmt.Println("--- Compiling root binary for windows archive")
+	hashShort, err := devtools.CommitHashShort()
+	if err != nil {
+		return fmt.Errorf("error getting commit hash: %w", err)
+	}
+
+	outputName := "elastic-agent-archive-root"
+	if runtime.GOOS != "windows" {
+		// add the .exe extension on non-windows platforms
+		outputName += ".exe"
+	}
+
+	args := devtools.BuildArgs{
+		Name:        outputName,
+		OutputDir:   filepath.Join(buildDir, "windows-archive-root-binary"),
+		InputFiles:  []string{"wrapper/windows/archive-proxy/main.go"},
+		CGO:         false,
+		WinMetadata: true,
+		ExtraFlags: []string{
+			"-buildmode", "pie", // windows versions inside the support matrix do support position independent code
+			"-trimpath", // Remove all file system paths from the compiled executable, to improve build reproducibility
+		},
+		Vars: map[string]string{
+			"main.CommitSHA": hashShort,
+		},
+		Env: map[string]string{
+			"GOOS":   "windows",
+			"GOARCH": "amd64",
+		},
+		LDFlags: []string{
+			"-s", // Strip all debug symbols from binary (does not affect Go stack traces).
+		},
+	}
+
+	if devtools.FIPSBuild {
+		// there is no actual FIPS relevance for this particular binary
+		// but better safe than sorry
+		args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips")
+		args.CGO = true
+	}
+
+	return devtools.Build(args)
 }
 
 // GolangCrossBuildOSS build the Beat binary inside of the golang-builder.
@@ -650,7 +702,7 @@ func commitID() string {
 
 // Update is an alias for executing control protocol, configs, and specs.
 func Update() {
-	mg.SerialDeps(Config, BuildPGP, BuildFleetCfg, Otel.Readme)
+	mg.Deps(Config, BuildPGP, BuildFleetCfg, Otel.Readme)
 }
 
 func EnsureCrossBuildOutputDir() error {
@@ -751,7 +803,7 @@ func BuildFleetCfg() error {
 	out := filepath.Join("internal", "pkg", "agent", "application", "configuration_embed.go")
 
 	fmt.Printf(">> BuildFleetCfg %s to %s\n", in, out)
-	return RunGo("run", goF, "--in", in, "--out", out)
+	return RunGo("run", goF, "--in", in, "--output", out)
 }
 
 // Enroll runs agent which enrolls before running.
@@ -787,6 +839,9 @@ func (Cloud) Image(ctx context.Context) {
 	variant := os.Getenv(dockerVariants)
 	defer os.Setenv(dockerVariants, variant)
 
+	fips := os.Getenv(fipsEnv)
+	defer os.Setenv(fipsEnv, fips)
+
 	os.Setenv(platformsEnv, "linux/amd64")
 	os.Setenv(packagesEnv, "docker")
 	os.Setenv(devEnv, "true")
@@ -800,6 +855,13 @@ func (Cloud) Image(ctx context.Context) {
 		os.Setenv(snapshotEnv, "true")
 		devtools.Snapshot = true
 	}
+
+	fipsVal, err := strconv.ParseBool(fips)
+	if err != nil {
+		fipsVal = false
+	}
+	os.Setenv(fipsEnv, strconv.FormatBool(fipsVal))
+	devtools.FIPSBuild = fipsVal
 
 	devtools.DevBuild = true
 	devtools.Platforms = devtools.Platforms.Filter("linux/amd64")
@@ -1009,6 +1071,12 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	log.Println("--- Running post packaging ")
 	mg.Deps(Update)
 	mg.Deps(agentBinaryTarget, CrossBuildGoDaemon)
+
+	// compile the elastic-agent.exe proxy binary for the windows archive
+	if slices.Contains(platforms, "windows/amd64") {
+		mg.Deps(Build.WindowsArchiveRootBinary)
+	}
+
 	mg.SerialDeps(devtools.Package, TestPackages)
 	return nil
 }
@@ -1576,10 +1644,13 @@ func appendComponentChecksums(versionedDropPath string, checksums map[string]str
 		}
 
 		componentFile := strings.TrimSuffix(file, devtools.ComponentSpecFileSuffix)
+		if strings.HasPrefix(filepath.Base(versionedDropPath), "windows") {
+			componentFile += ".exe"
+		}
 		hash, err := devtools.GetSHA512Hash(filepath.Join(versionedDropPath, componentFile))
 		if errors.Is(err, os.ErrNotExist) {
-			fmt.Printf(">>> Computing hash for %q failed: file not present %w \n", componentFile, err)
-			continue
+			fmt.Printf(">>> Computing hash for %q failed: %s\n", componentFile, err)
+			return fmt.Errorf("cannot generate SHA512 for %q: %s", componentFile, err)
 		} else if err != nil {
 			return err
 		}
@@ -1756,6 +1827,12 @@ func buildVars() map[string]string {
 
 	isSnapshot, _ := os.LookupEnv(snapshotEnv)
 	vars["github.com/elastic/elastic-agent/internal/pkg/release.snapshot"] = isSnapshot
+
+	if fipsFlag, fipsFound := os.LookupEnv(fipsEnv); fipsFound {
+		if fips, err := strconv.ParseBool(fipsFlag); err == nil && fips {
+			vars["github.com/elastic/elastic-agent/internal/pkg/release.fips"] = "true"
+		}
+	}
 
 	if isDevFlag, devFound := os.LookupEnv(devEnv); devFound {
 		if isDev, err := strconv.ParseBool(isDevFlag); err == nil && isDev {
@@ -3246,7 +3323,7 @@ func (Otel) Readme() error {
 		return fmt.Errorf("failed to parse README template: %w", err)
 	}
 
-	data, err := getOtelDependencies()
+	data, err := otel.GetOtelDependencies("go.mod")
 	if err != nil {
 		return fmt.Errorf("Failed to get OTel dependencies: %w", err)
 	}
@@ -3266,147 +3343,6 @@ func (Otel) Readme() error {
 	// check that links are live
 	mg.Deps(devtools.CheckLinksInFileAreLive(readmeOut))
 	return nil
-}
-
-func getOtelDependencies() (*otelDependencies, error) {
-	// read go.mod
-	readFile, err := os.Open("go.mod")
-	if err != nil {
-		return nil, err
-	}
-	defer readFile.Close()
-
-	scanner := bufio.NewScanner(readFile)
-
-	scanner.Split(bufio.ScanLines)
-	var receivers, extensions, exporters, processors, connectors []*otelDependency
-	// process imports
-	for scanner.Scan() {
-		l := strings.TrimSpace(scanner.Text())
-		dependency := newOtelDependency(l)
-		if dependency == nil {
-			continue
-		}
-
-		if dependency.ComponentType == "connector" {
-			connectors = append(connectors, dependency)
-		} else if dependency.ComponentType == "exporter" {
-			exporters = append(exporters, dependency)
-		} else if dependency.ComponentType == "extension" {
-			extensions = append(extensions, dependency)
-		} else if dependency.ComponentType == "processor" {
-			processors = append(processors, dependency)
-		} else if dependency.ComponentType == "receiver" {
-			receivers = append(receivers, dependency)
-		}
-	}
-
-	return &otelDependencies{
-		Connectors: connectors,
-		Exporters:  exporters,
-		Extensions: extensions,
-		Processors: processors,
-		Receivers:  receivers,
-	}, nil
-}
-
-type otelDependency struct {
-	ComponentType string
-	Name          string
-	Version       string
-	Link          string
-}
-
-func newOtelDependency(l string) *otelDependency {
-	if !strings.Contains(l, "go.opentelemetry.io/") &&
-		!strings.Contains(l, "github.com/open-telemetry/") &&
-		!strings.Contains(l, "github.com/elastic/opentelemetry-collector-components/") {
-		return nil
-	}
-
-	if strings.Contains(l, "// indirect") {
-		return nil
-	}
-
-	chunks := strings.SplitN(l, " ", 2)
-	if len(chunks) != 2 {
-		return nil
-	}
-	dependencyURI := chunks[0]
-	version := chunks[1]
-
-	componentName := getOtelComponentName(dependencyURI)
-	componentType := getOtelComponentType(dependencyURI)
-	link := getOtelDependencyLink(dependencyURI, version)
-
-	return &otelDependency{
-		ComponentType: componentType,
-		Name:          componentName,
-		Version:       version,
-		Link:          link,
-	}
-}
-
-func getOtelComponentName(dependencyName string) string {
-	parts := strings.Split(dependencyName, "/")
-	return parts[len(parts)-1]
-}
-
-func getOtelComponentType(dependencyName string) string {
-	if strings.Contains(dependencyName, "/connector/") {
-		return "connector"
-	} else if strings.Contains(dependencyName, "/exporter/") {
-		return "exporter"
-	} else if strings.Contains(dependencyName, "/extension/") {
-		return "extension"
-	} else if strings.Contains(dependencyName, "/processor/") {
-		return "processor"
-	} else if strings.Contains(dependencyName, "/receiver/") {
-		return "receiver"
-	}
-	return ""
-}
-
-func getOtelDependencyLink(dependencyURI string, version string) string {
-	dependencyRepository := getDependencyRepository(dependencyURI)
-	dependencyPath := strings.TrimPrefix(dependencyURI, dependencyRepository+"/")
-	repositoryURL := getOtelRepositoryURL(dependencyURI)
-	return fmt.Sprintf("https://%s/blob/%s/%s/%s/README.md", repositoryURL, dependencyPath, version, dependencyPath)
-}
-
-func getDependencyRepository(dependencyURI string) string {
-	dependencyURIChunks := strings.Split(dependencyURI, "/")
-	if len(dependencyURIChunks) < 2 {
-		return ""
-	}
-	var dependencyRepository string
-	if dependencyURIChunks[0] == "go.opentelemetry.io" {
-		dependencyRepository = dependencyURIChunks[0] + "/" + dependencyURIChunks[1]
-	} else {
-		dependencyRepository = dependencyURIChunks[0] + "/" + dependencyURIChunks[1] + "/" + dependencyURIChunks[2]
-	}
-	return dependencyRepository
-}
-
-func getOtelRepositoryURL(dependencyURI string) string {
-	if strings.HasPrefix(dependencyURI, "go.opentelemetry.io/") {
-		return "github.com/open-telemetry/opentelemetry-collector"
-	} else if strings.HasPrefix(dependencyURI, "github.com/") {
-		parts := strings.SplitN(dependencyURI, "/", 4)
-		hostPart := parts[0]
-		orgPart := parts[1]
-		repoPart := parts[2]
-		return fmt.Sprintf("%s/%s/%s", hostPart, orgPart, repoPart)
-	}
-	return ""
-}
-
-type otelDependencies struct {
-	Connectors []*otelDependency
-	Exporters  []*otelDependency
-	Extensions []*otelDependency
-	Processors []*otelDependency
-	Receivers  []*otelDependency
 }
 
 type Helm mg.Namespace
@@ -3523,6 +3459,9 @@ func (Helm) UpdateAgentVersion() error {
 		filepath.Join(helmOtelChartPath, "values.yaml"): {
 			{"defaultCRConfig.image.tag", agentVersion},
 		},
+		filepath.Join(helmMOtelChartPath, "values.yaml"): {
+			{"defaultCRConfig.image.tag", agentVersion},
+		},
 	} {
 		if err := updateYamlFile(yamlFile, keyVals...); err != nil {
 			return fmt.Errorf("failed to update agent version: %w", err)
@@ -3556,7 +3495,8 @@ func (h Helm) Lint() error {
 func updateYamlFile(path string, keyVal ...struct {
 	key   string
 	value string
-}) error {
+},
+) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
@@ -3601,8 +3541,74 @@ func updateYamlFile(path string, keyVal ...struct {
 	return nil
 }
 
+// BuildDependencies builds the dependencies for the Elastic-Agent Helm chart.
 func (Helm) BuildDependencies() error {
 	return helm.BuildChartDependencies(helmChartPath)
+}
+
+// Package packages the Elastic-Agent Helm chart. Note that you need to set SNAPSHOT="false" to build a production-ready package.
+func (h Helm) Package() error {
+	mg.SerialDeps(h.BuildDependencies)
+
+	agentVersion := bversion.GetParsedAgentPackageVersion()
+	agentCoreVersion := agentVersion.CoreVersion()
+	agentImageTag := agentCoreVersion + "-SNAPSHOT"
+
+	// need to explicitly set SNAPSHOT="false" to produce a production-ready package
+	productionPackage := os.Getenv("SNAPSHOT") == "false"
+
+	agentChartVersion := agentCoreVersion + "-beta"
+	switch {
+	case productionPackage && agentVersion.Major() >= 9:
+		// for 9.0.0 and later versions, elastic-agent Helm chart is GA
+		agentChartVersion = agentCoreVersion
+	case productionPackage && agentVersion.Major() >= 8 && agentVersion.Minor() >= 18:
+		// for 8.18.0 and later versions, elastic-agent Helm chart is GA
+		agentChartVersion = agentCoreVersion
+	}
+
+	for yamlFile, keyVals := range map[string][]struct {
+		key   string
+		value string
+	}{
+		// values file for elastic-agent Helm Chart
+		filepath.Join(helmChartPath, "values.yaml"): {
+			{"agent.version", agentCoreVersion},
+			// always use the SNAPSHOT version for image tag
+			// for the chart that resides in the git repo
+			{"agent.image.tag", agentImageTag},
+		},
+		// Chart.yaml for elastic-agent Helm Chart
+		filepath.Join(helmChartPath, "Chart.yaml"): {
+			{"appVersion", agentCoreVersion},
+			{"version", agentChartVersion},
+		},
+	} {
+		if err := updateYamlFile(yamlFile, keyVals...); err != nil {
+			return fmt.Errorf("failed to update agent version: %w", err)
+		}
+	}
+
+	// lint before packaging
+	if err := h.Lint(); err != nil {
+		return err
+	}
+
+	settings := cli.New() // Helm CLI settings
+	actionConfig := &action.Configuration{}
+
+	err := actionConfig.Init(settings.RESTClientGetter(), "default", "",
+		func(format string, v ...interface{}) {})
+	if err != nil {
+		return fmt.Errorf("failed to init helm action config: %w", err)
+	}
+
+	packageAction := action.NewPackage()
+	_, err = packageAction.Run(helmChartPath, nil)
+	if err != nil {
+		return fmt.Errorf("failed to package helm chart: %w", err)
+	}
+	return nil
 }
 
 func updateYamlNodes(rootNode *yaml.Node, value string, keys ...string) error {

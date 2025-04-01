@@ -928,7 +928,7 @@ func BenchmarkCoordinator_generateComponentModel(b *testing.B) {
 	require.NoError(b, err)
 	vars := make([]*transpiler.Vars, len(varsMaps))
 	for i, vm := range varsMaps {
-		vars[i], err = transpiler.NewVars(fmt.Sprintf("%d", i), vm, mapstr.M{})
+		vars[i], err = transpiler.NewVars(fmt.Sprintf("%d", i), vm, mapstr.M{}, "")
 		require.NoError(b, err)
 	}
 
@@ -1105,12 +1105,12 @@ type testMonitoringManager struct{}
 
 func newTestMonitoringMgr() *testMonitoringManager { return &testMonitoringManager{} }
 
-func (*testMonitoringManager) EnrichArgs(_ string, _ string, args []string) []string { return args }
-func (*testMonitoringManager) Prepare(_ string) error                                { return nil }
-func (*testMonitoringManager) Cleanup(string) error                                  { return nil }
-func (*testMonitoringManager) Enabled() bool                                         { return false }
-func (*testMonitoringManager) Reload(rawConfig *config.Config) error                 { return nil }
-func (*testMonitoringManager) MonitoringConfig(_ map[string]interface{}, _ []component.Component, _ map[string]string, _ map[string]uint64) (map[string]interface{}, error) {
+func (*testMonitoringManager) EnrichArgs(_, _ string, args []string) []string { return args }
+func (*testMonitoringManager) Prepare(string) error                           { return nil }
+func (*testMonitoringManager) Cleanup(string) error                           { return nil }
+func (*testMonitoringManager) Enabled() bool                                  { return false }
+func (*testMonitoringManager) Reload(rawConfig *config.Config) error          { return nil }
+func (*testMonitoringManager) MonitoringConfig(map[string]interface{}, []component.Component, map[string]string, map[string]uint64) (map[string]interface{}, error) {
 	return nil, nil
 }
 
@@ -1188,6 +1188,9 @@ func (l *configChange) Fail(err error) {
 }
 
 type fakeVarsManager struct {
+	varsMx sync.RWMutex
+	vars   []*transpiler.Vars
+
 	varsCh chan []*transpiler.Vars
 	errCh  chan error
 
@@ -1222,17 +1225,27 @@ func (f *fakeVarsManager) Watch() <-chan []*transpiler.Vars {
 	return f.varsCh
 }
 
-func (f *fakeVarsManager) Observe(observed []string) {
+func (f *fakeVarsManager) Observe(ctx context.Context, observed []string) ([]*transpiler.Vars, error) {
 	f.observedMx.Lock()
 	defer f.observedMx.Unlock()
 	f.observed = observed
+	f.varsMx.RLock()
+	defer f.varsMx.RUnlock()
+	return f.vars, nil
 }
 
 func (f *fakeVarsManager) Vars(ctx context.Context, vars []*transpiler.Vars) {
+	f.varsMx.Lock()
+	f.vars = vars
+	f.varsMx.Unlock()
 	select {
 	case <-ctx.Done():
 	case f.varsCh <- vars:
 	}
+}
+
+func (f *fakeVarsManager) DefaultProvider() string {
+	return ""
 }
 
 type fakeOTelManager struct {

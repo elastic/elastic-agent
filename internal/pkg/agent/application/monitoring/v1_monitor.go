@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -35,12 +36,11 @@ const (
 
 	// args: pipeline name, application name
 	agentMbEndpointFileFormatWin = `npipe:///elastic-agent`
-	// agentMbEndpointHTTP is used with cloud and exposes metrics on http endpoint
-	agentMbEndpointHTTP = "http://%s:%d"
-	httpPlusPrefix      = "http+"
-	httpPrefix          = "http"
-	fileSchemePrefix    = "file"
-	unixSchemePrefix    = "unix"
+
+	httpPlusPrefix   = "http+"
+	httpPrefix       = "http"
+	fileSchemePrefix = "file"
+	unixSchemePrefix = "unix"
 
 	defaultOutputName          = "default"
 	outputsKey                 = "outputs"
@@ -304,7 +304,7 @@ func (b *BeatsMonitor) Prepare(unit string) error {
 	return nil
 }
 
-// Cleanup removes
+// Cleanup removes files that were created for monitoring.
 func (b *BeatsMonitor) Cleanup(unit string) error {
 	if !b.Enabled() {
 		return nil
@@ -450,6 +450,13 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 				// possible it's a log message from agent itself (doesn't have component.dataset)
 				map[string]interface{}{
 					"copy_fields": map[string]interface{}{
+						"when": map[string]any{
+							"not": map[string]any{
+								"has_fields": []any{
+									"data_stream.dataset",
+								},
+							},
+						},
 						"fields": []interface{}{
 							map[string]interface{}{
 								"from": "data_stream.dataset_original",
@@ -1127,7 +1134,7 @@ func HttpPlusAgentMonitoringEndpoint(operatingSystem string, cfg *monitoringCfg.
 // AgentMonitoringEndpoint provides an agent monitoring endpoint path.
 func AgentMonitoringEndpoint(operatingSystem string, cfg *monitoringCfg.MonitoringConfig) string {
 	if cfg != nil && cfg.Enabled {
-		return fmt.Sprintf(agentMbEndpointHTTP, cfg.HTTP.Host, cfg.HTTP.Port)
+		return "http://" + net.JoinHostPort(cfg.HTTP.Host, strconv.Itoa(cfg.HTTP.Port))
 	}
 
 	if operatingSystem == windowsOS {

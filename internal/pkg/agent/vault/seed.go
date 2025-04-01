@@ -5,7 +5,7 @@
 package vault
 
 import (
-	"errors"
+	"encoding/binary"
 	"fmt"
 	"io/fs"
 	"os"
@@ -16,62 +16,68 @@ import (
 )
 
 const (
-	seedFile = ".seed"
+	// seedFile is len(aesgcm.AES256) and contains only the random seed
+	// A default salt size of 8 is used with this seed file
+	seedFile     = ".seed"
+	seedFileSize = int(aesgcm.AES256)
+	// seedFileV2 is len(aesgcm.AES256)+4 and contains the random seed followed by a non-zero salt size (little endian uint32)
+	seedFileV2     = ".seedV2"
+	seedFileV2Size = seedFileSize + 4
+)
+
+const (
+	saltSizeV1        = 8
+	defaultSaltSizeV2 = 16
 )
 
 var (
 	mxSeed sync.Mutex
 )
 
-func getSeed(path string) ([]byte, error) {
+// getSeedV1 will read the V1 .seed file
+// Will return fs.ErrNotExists if the bytecount does not match
+func getSeedV1(path string) ([]byte, error) {
 	fp := filepath.Join(path, seedFile)
-
-	mxSeed.Lock()
-	defer mxSeed.Unlock()
 
 	b, err := os.ReadFile(fp)
 	if err != nil {
 		return nil, fmt.Errorf("could not read seed file: %w", err)
 	}
 
-	// return fs.ErrNotExists if invalid length of bytes returned
-	if len(b) != int(aesgcm.AES256) {
-		return nil, fmt.Errorf("invalid seed length, expected: %v, got: %v: %w", int(aesgcm.AES256), len(b), fs.ErrNotExist)
+	// return fs.ErrNotExist if invalid length of bytes returned
+	if len(b) != seedFileSize {
+		return nil, fmt.Errorf("invalid seed length, expected: %v, got: %v: %w", seedFileSize, len(b), fs.ErrNotExist)
 	}
 	return b, nil
 }
 
-func createSeedIfNotExists(path string) ([]byte, error) {
-	fp := filepath.Join(path, seedFile)
-
-	mxSeed.Lock()
-	defer mxSeed.Unlock()
+// getSeedV2 will read a seedV2 file and return the passphrase and saltSize
+// Will return fs.ErrNotExists if the byte count does not match, or saltSize is 0
+// when in FIPS mode will return fs.ErrUnsupported when saltSize is non-zero but less then 16
+func getSeedV2(path string) ([]byte, int, error) {
+	fp := filepath.Join(path, seedFileV2)
 
 	b, err := os.ReadFile(fp)
 	if err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			return nil, err
-		}
+		return nil, 0, fmt.Errorf("could not read seed file: %w", err)
 	}
 
-	if len(b) != 0 {
-		return b, nil
+	// return fs.ErrNotExist if invalid length of bytes returned
+	if len(b) != seedFileV2Size {
+		return nil, 0, fmt.Errorf("invalid seed length, expected: %v, got: %v: %w", seedFileV2Size, len(b), fs.ErrNotExist)
 	}
-
-	seed, err := aesgcm.NewKey(aesgcm.AES256)
-	if err != nil {
-		return nil, err
+	pass := b[0:seedFileSize]
+	saltSize := binary.LittleEndian.Uint32(b[seedFileSize:])
+	if saltSize == 0 {
+		return nil, 0, fmt.Errorf("salt size 0 detected: %w", fs.ErrNotExist)
 	}
-
-	err = os.WriteFile(fp, seed, 0600)
-	if err != nil {
-		return nil, err
+	if err := checkSalt(int(saltSize)); err != nil {
+		return nil, 0, err
 	}
-
-	return seed, nil
+	return pass, int(saltSize), nil
 }
 
-func getOrCreateSeed(path string, readonly bool) ([]byte, error) {
+func getOrCreateSeed(path string, readonly bool) ([]byte, int, error) {
 	if readonly {
 		return getSeed(path)
 	}
