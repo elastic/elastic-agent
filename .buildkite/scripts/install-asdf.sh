@@ -11,7 +11,6 @@ if ! command -v asdf ; then
     echo "source $ASDF_DIR/asdf.sh" >> ~/.bashrc
     source $ASDF_DIR/asdf.sh
     echo "--- Install asdf plugins"
-    asdf plugin update --all
     # See https://github.com/asdf-vm/asdf/issues/276#issuecomment-1135177059
     cat .tool-versions | cut -d' ' -f1 | grep "^[^\#]" | xargs -i asdf plugin add  {}
 fi
