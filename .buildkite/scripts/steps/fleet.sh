@@ -50,4 +50,8 @@ function install_fleet_packages() {
     -H 'Content-Type: application/json' \
     -H 'kbn-xsrf: elastic-agent' \
     "${KIBANA_HOST}/api/fleet/epm/packages/_bulk"
+  retcode=$?
+  if [ $retcode -ne 0 ]; then
+    return $retcode
+  fi
 }
