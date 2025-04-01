@@ -51,6 +51,7 @@ if [[ "${pull_request}" == "false" ]]; then
             git remote add forked "git@github.com:${USE_FORKED_REPO}"
             git fetch forked
             git checkout "${USE_FORKED_BRANCH}"
+            export BUILDKITE_BRANCH="main"
         fi
     fi
     echo "After forked repo/branch statements"
