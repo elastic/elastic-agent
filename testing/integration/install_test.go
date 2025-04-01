@@ -442,7 +442,7 @@ func testComponentsPresence(ctx context.Context, fixture *atesting.Fixture, requ
 			// these are hardcoded paths in packages.yml
 			agentWorkDir = "/var/lib/elastic-agent"
 		}
-		componentsDir, err := aTesting.FindComponentsDir(agentWorkDir)
+		componentsDir, err := aTesting.FindComponentsDir(agentWorkDir, fixture.Version())
 		require.NoError(t, err)
 
 		componentsPaths := func(component string) []string {
