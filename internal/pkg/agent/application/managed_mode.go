@@ -25,7 +25,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/fleet"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/uploader"
 	"github.com/elastic/elastic-agent/internal/pkg/queue"
@@ -52,6 +51,8 @@ type managedConfigManager struct {
 	fleetInitTimeout     time.Duration
 	initialClientSetters []actions.ClientSetter
 	fleetAcker           *fleet.Acker
+	actionAcker          acker.Acker
+	retrier              *retrier.Retrier
 
 	ch    chan coordinator.ConfigChange
 	errCh chan error
@@ -68,14 +69,11 @@ func newManagedConfigManager(
 	topPath string,
 	client *remote.Client,
 	fleetAcker *fleet.Acker,
+	actionAcker acker.Acker,
+	retrier *retrier.Retrier,
+	stateStore *store.StateStore,
 	clientSetters ...actions.ClientSetter,
 ) (*managedConfigManager, error) {
-	// Create the state store that will persist the last good policy change on disk.
-	stateStore, err := store.NewStateStoreWithMigration(ctx, log, paths.AgentActionStoreFile(), paths.AgentStateStoreFile())
-	if err != nil {
-		return nil, errors.New(err, fmt.Sprintf("fail to read state store '%s'", paths.AgentStateStoreFile()))
-	}
-
 	actionQueue, err := queue.NewActionQueue(stateStore.Queue(), stateStore)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize action queue: %w", err)
@@ -101,6 +99,8 @@ func newManagedConfigManager(
 		errCh:                make(chan error),
 		initialClientSetters: clientSetters,
 		fleetAcker:           fleetAcker,
+		actionAcker:          actionAcker,
+		retrier:              retrier,
 	}, nil
 }
 
@@ -129,11 +129,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	policyChanger := m.initDispatcher(gatewayCancel)
 
 	// Create ackers to enqueue/retry failed acks
-	retrier := retrier.New(m.fleetAcker, m.log)
-	batchedAcker := lazy.NewAcker(m.fleetAcker, m.log, lazy.WithRetrier(retrier))
-	actionAcker := store.NewStateStoreActionAcker(batchedAcker, m.stateStore)
-
-	if err := m.coord.AckUpgrade(ctx, actionAcker); err != nil {
+	if err := m.coord.AckUpgrade(ctx, m.actionAcker); err != nil {
 		m.log.Warnf("Failed to ack upgrade: %v", err)
 	}
 
@@ -145,7 +141,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		<-retrierRun
 	}()
 	go func() {
-		retrier.Run(retrierCtx)
+		m.retrier.Run(retrierCtx)
 		close(retrierRun)
 	}()
 
@@ -156,7 +152,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		// persisted action on disk we should be able to ask Fleet to get the latest configuration.
 		// But at the moment this is not possible because the policy change was acked.
 		m.log.Info("restoring current policy from disk")
-		m.dispatcher.Dispatch(ctx, m.coord.SetUpgradeDetails, actionAcker, action)
+		m.dispatcher.Dispatch(ctx, m.coord.SetUpgradeDetails, m.actionAcker, action)
 		stateRestored = true
 	}
 
@@ -180,7 +176,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		m.log,
 		m.agentInfo,
 		m.client,
-		actionAcker,
+		m.actionAcker,
 		m.coord.State,
 		m.stateStore,
 	)
@@ -222,7 +218,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		return gateway.Run(ctx)
 	})
 
-	go runDispatcher(ctx, m.dispatcher, gateway, m.coord.SetUpgradeDetails, actionAcker, dispatchFlushInterval)
+	go runDispatcher(ctx, m.dispatcher, gateway, m.coord.SetUpgradeDetails, m.actionAcker, dispatchFlushInterval)
 
 	<-ctx.Done()
 	return gatewayRunner.Err()

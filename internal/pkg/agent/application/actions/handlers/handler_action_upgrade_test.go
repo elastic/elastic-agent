@@ -194,6 +194,94 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 	}
 }
 
+func TestDuplicateActionsHandled(t *testing.T) {
+
+	// Create a cancellable context that will shut down the coordinator after
+	// the test.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	log, _ := logger.New("", false)
+	upgradeCalledChan := make(chan string)
+
+	agentInfo := &info.AgentInfo{}
+
+	// Create and start the Coordinator
+	c := coordinator.New(
+		log,
+		configuration.DefaultConfiguration(),
+		logger.DefaultLogLevel,
+		agentInfo,
+		component.RuntimeSpecs{},
+		nil,
+		&mockUpgradeManager{
+			UpgradeFn: func(
+				ctx context.Context,
+				version string,
+				sourceURI string,
+				action *fleetapi.ActionUpgrade,
+				details *details.Details,
+				skipVerifyOverride bool,
+				skipDefaultPgp bool,
+				pgpBytes ...string) (reexec.ShutdownCallbackFn, error) {
+
+				defer func() {
+					upgradeCalledChan <- action.ActionID
+				}()
+
+				return nil, nil
+			},
+		},
+		nil, nil, nil, nil, nil, false, nil, nil)
+	//nolint:errcheck // We don't need the termination state of the Coordinator
+	go c.Run(ctx)
+
+	u := NewUpgrade(log, c)
+	a1 := fleetapi.ActionUpgrade{
+		ActionID: "action-8.5-1",
+		Data: fleetapi.ActionUpgradeData{
+			Version: "8.5.0", SourceURI: "http://localhost",
+		},
+	}
+	a2 := fleetapi.ActionUpgrade{
+		ActionID: "action-8.5-2",
+		Data: fleetapi.ActionUpgradeData{
+			Version: "8.5.0", SourceURI: "http://localhost",
+		},
+	}
+
+	checkMsg := func(c <-chan string, expected, errMsg string) error {
+		t.Helper()
+		// Make sure this test does not dead lock or wait for too long
+		// For some reason < 1s sometimes makes the test fail.
+		select {
+		case <-time.Tick(1500 * time.Millisecond):
+			return errors.New("timed out waiting for Upgrade to return")
+		case msg := <-c:
+			require.Equal(t, expected, msg, errMsg)
+		}
+
+		return nil
+	}
+
+	ack := noopacker.New()
+	t.Log("First upgrade action should be processed")
+	u.Handle(ctx, &a1, ack)
+	require.Nil(t, checkMsg(upgradeCalledChan, a1.ActionID, "action was not processed"))
+
+	c.ClearOverrideState() // it's upgrading, normally we would restart
+
+	t.Log("Action with different ID but same version should be propagated to upgrader")
+	u.Handle(ctx, &a2, ack)
+	require.Nil(t, checkMsg(upgradeCalledChan, a2.ActionID, "action was not processed"))
+
+	c.ClearOverrideState() // it's upgrading, normally we would restart
+
+	t.Log("Resending action with same ID action should be skipped")
+	u.Handle(ctx, &a2, ack)
+	require.NotNil(t, checkMsg(upgradeCalledChan, a2.ActionID, "action was not processed"))
+}
+
 func TestUpgradeHandlerNewVersion(t *testing.T) {
 	// Create a cancellable context that will shut down the coordinator after
 	// the test.
@@ -227,9 +315,6 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 				defer func() {
 					upgradeCalledChan <- version
 				}()
-				if version == "8.2.0" {
-					return nil, errors.New("upgrade to 8.2.0 will always fail")
-				}
 
 				return nil, nil
 			},
