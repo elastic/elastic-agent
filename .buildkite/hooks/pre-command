@@ -37,7 +37,7 @@ function release_manager_login {
 }
 
 
-# Upload should not do much with the pre-command.
+# If no upload command then install some tools if they are not already installed
 if [[ ! "$BUILDKITE_COMMAND" =~ .*"upload".* ]]; then
   # shellcheck disable=SC1091
   source .buildkite/scripts/install-asdf.sh
