@@ -596,12 +596,91 @@ func DownloadManifest(ctx context.Context) error {
 		return errAtLeastOnePlatform
 	}
 
-	if e := manifest.DownloadComponents(ctx, devtools.ManifestURL, platforms, dropPath); e != nil {
+	// Enforce that we use the correct elastic-agent packaging, to correctly load component dependencies
+	devtools.UseElasticAgentPackaging()
+
+	// Extract the dependencies from the selected packages
+	mappedDependencies := map[string]packaging.BinarySpec{}
+	for _, pkg := range devtools.Packages {
+		if isSelected(pkg) {
+			if mg.Verbose() {
+				log.Printf("package %s is selected, collecting dependencies", pkg.Spec.Name)
+			}
+
+			for _, component := range pkg.Spec.Components {
+
+				if existingComp, ok := mappedDependencies[component.PackageName]; ok {
+					// sanity check: verify that for the same packageName we have the same component spec
+					if !existingComp.Equal(component) {
+						panic(fmt.Errorf("found component %+v and %+v sharing the same package name %q but they are not equal",
+							existingComp, component, component.PackageName))
+					}
+				} else {
+					mappedDependencies[component.PackageName] = component
+					if mg.Verbose() {
+						log.Printf("Added component %+v to the list of component to download from manifest", component)
+					}
+				}
+			}
+		}
+	}
+	if mg.Verbose() {
+		log.Printf("collected mappedDependencies: %v", mappedDependencies)
+	}
+
+	// collect the dependencies into a slice
+	dependencies := make([]packaging.BinarySpec, 0, len(mappedDependencies))
+	for _, pkg := range mappedDependencies {
+		dependencies = append(dependencies, pkg)
+	}
+
+	if e := manifest.DownloadComponents(ctx, dependencies, devtools.ManifestURL, platforms, dropPath); e != nil {
 		return fmt.Errorf("failed to download the manifest file, %w", e)
 	}
 	log.Printf(">> Completed downloading packages from manifest into drop-in %s", dropPath)
 
 	return nil
+}
+
+func isSelected(pkg devtools.OSPackageArgs) bool {
+
+	// Checks if this package is compatible with the FIPS settings
+	if pkg.Spec.FIPS != devtools.FIPSBuild {
+		log.Printf("Skipping %s/%s package type because FIPS flag doesn't match [pkg=%v, build=%v]", pkg.Spec, pkg.OS, pkg.Spec.FIPS, devtools.FIPSBuild)
+		return false
+	}
+
+	platforms := devtools.Platforms
+	for _, platform := range platforms {
+		if !isPackageSelectedForPlatform(pkg, platform) {
+			continue
+		}
+
+		pkgTypesSelected := 0
+		for _, pkgType := range pkg.Types {
+			if !devtools.IsPackageTypeSelected(pkgType) {
+				log.Printf("Skipping %s package type because it is not selected", pkgType)
+				continue
+			}
+
+			if pkgType == devtools.Docker && !devtools.IsDockerVariantSelected(pkg.Spec.DockerVariant) {
+				log.Printf("Skipping %s docker variant type because it is not selected", pkg.Spec.DockerVariant)
+				continue
+			}
+			pkgTypesSelected++
+		}
+		// if we found at least one package type for one platform the package spec is selected
+		return pkgTypesSelected > 0
+	}
+	return true
+}
+
+func isPackageSelectedForPlatform(pkg devtools.OSPackageArgs, platform devtools.BuildPlatform) bool {
+	if pkg.OS == platform.GOOS() && (pkg.Arch == "" || pkg.Arch == platform.Arch()) {
+		return true
+	}
+
+	return false
 }
 
 // FixDRADockerArtifacts is a workaround for the DRA artifacts produced by the package target. We had to do

@@ -42,12 +42,12 @@ func Package() error {
 			}
 
 			for _, pkgType := range pkg.Types {
-				if !isPackageTypeSelected(pkgType) {
+				if !IsPackageTypeSelected(pkgType) {
 					log.Printf("Skipping %s package type because it is not selected", pkgType)
 					continue
 				}
 
-				if pkgType == Docker && !isDockerVariantSelected(pkg.Spec.DockerVariant) {
+				if pkgType == Docker && !IsDockerVariantSelected(pkg.Spec.DockerVariant) {
 					log.Printf("Skipping %s docker variant type because it is not selected", pkg.Spec.DockerVariant)
 					continue
 				}
@@ -112,9 +112,9 @@ func Package() error {
 	return nil
 }
 
-// isPackageTypeSelected returns true if SelectedPackageTypes is empty or if
+// IsPackageTypeSelected returns true if SelectedPackageTypes is empty or if
 // pkgType is present on SelectedPackageTypes. It returns false otherwise.
-func isPackageTypeSelected(pkgType PackageType) bool {
+func IsPackageTypeSelected(pkgType PackageType) bool {
 	if len(SelectedPackageTypes) == 0 {
 		return true
 	}
@@ -127,9 +127,9 @@ func isPackageTypeSelected(pkgType PackageType) bool {
 	return false
 }
 
-// isDockerVariantSelected returns true if SelectedDockerVariants is empty or if
+// IsDockerVariantSelected returns true if SelectedDockerVariants is empty or if
 // docVariant is present on SelectedDockerVariants. It returns false otherwise.
-func isDockerVariantSelected(docVariant DockerVariant) bool {
+func IsDockerVariantSelected(docVariant DockerVariant) bool {
 	if len(SelectedDockerVariants) == 0 {
 		return true
 	}

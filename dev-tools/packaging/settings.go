@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"slices"
 	"text/template"
 
 	"github.com/magefile/mage/mg"
@@ -109,6 +110,39 @@ func (proj BinarySpec) GetPackageName(version string, platform string) string {
 	}
 	return buf.String()
 }
+
+func (proj BinarySpec) Equal(other BinarySpec) bool {
+	if proj.BinaryName != other.BinaryName {
+		return false
+	}
+
+	if proj.PackageName != other.PackageName {
+		return false
+	}
+
+	if proj.ProjectName != other.ProjectName {
+		return false
+	}
+
+	if !slices.Equal(proj.Platforms, other.Platforms) {
+		return false
+	}
+
+	if proj.PythonWheel != other.PythonWheel {
+		return false
+	}
+
+	if !slices.Equal(proj.PackageTypes, other.PackageTypes) {
+		return false
+	}
+
+	return true
+}
+
+// ExpectedBinaries  is a map of binaries agent needs to their project in the unified-release manager.
+// The project names are those used in the "projects" list in the unified release manifest.
+// See the sample manifests in the testdata directory.
+var ExpectedBinaries []BinarySpec
 
 type Platform struct {
 	OS   string

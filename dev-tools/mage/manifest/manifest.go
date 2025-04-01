@@ -126,7 +126,7 @@ func DownloadManifest(ctx context.Context, manifest string) (Build, error) {
 
 // DownloadComponents is going to download a set of components from the given manifest into the destination
 // dropPath folder in order to later use that folder for packaging
-func DownloadComponents(ctx context.Context, manifest string, platforms []string, dropPath string) error {
+func DownloadComponents(ctx context.Context, expectedBinaries []packaging.BinarySpec, manifest string, platforms []string, dropPath string) error {
 	manifestResponse, err := DownloadManifest(ctx, manifest)
 	if err != nil {
 		return fmt.Errorf("failed to download remote manifest file %w", err)
@@ -145,7 +145,7 @@ func DownloadComponents(ctx context.Context, manifest string, platforms []string
 
 	errGrp, downloadsCtx := errgroup.WithContext(ctx)
 	// for project, pkgs := range expectedProjectPkgs() {
-	for _, spec := range packaging.ExpectedBinaries {
+	for _, spec := range expectedBinaries {
 		for _, platform := range platforms {
 			targetPath := filepath.Join(dropPath)
 			err := os.MkdirAll(targetPath, 0755)
