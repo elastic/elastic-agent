@@ -338,6 +338,8 @@ steps:
             - "basic,slim,complete,service,elastic-otel-collector"
             - "wolfi,slim-wolfi,complete-wolfi,elastic-otel-collector-wolfi"
             version:
+            - v1.27.16
+            - v1.28.9
             - v1.29.8
             - v1.30.8
             - v1.31.0

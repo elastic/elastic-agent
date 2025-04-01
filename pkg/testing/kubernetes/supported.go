@@ -38,6 +38,16 @@ var versions = []define.OS{
 		Type:    define.Kubernetes,
 		Version: "1.29.4",
 	},
+	// Kubernetes 1.28
+	{
+		Type:    define.Kubernetes,
+		Version: "1.28.9",
+	},
+	// Kubernetes 1.27
+	{
+		Type:    define.Kubernetes,
+		Version: "1.27.16",
+	},
 }
 
 // variants defines the list of variants and the image name for that variant.
