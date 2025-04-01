@@ -21,7 +21,7 @@ function install_fleet_packages() {
     return 1
   fi
 
-  if ! [[ -f "$install_api_request_file"]]; then
+  if ! [ -f "$install_api_request_file" ]; then
     echo "Error: Fleet packages installation request file [$install_api_request_file] does not exist"
     return 2
   fi
@@ -45,8 +45,8 @@ function install_fleet_packages() {
   curl -v \
     -X "POST" \
     -u "${KIBANA_USERNAME}:${KIBANA_PASSWORD}" \
-    -d @${install_api_request_file} \
+    -d @"${install_api_request_file}" \
     -H 'Content-Type: application/json' \
     -H 'kbn-xsrf: elastic-agent' \
-    ${KIBANA_HOST}/api/fleet/epm/packages/_bulk
+    "${KIBANA_HOST}/api/fleet/epm/packages/_bulk"
 }
