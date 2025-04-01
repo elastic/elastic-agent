@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
@@ -109,7 +111,14 @@ func waitForState(
 
 func TestComponentUpdateDiff(t *testing.T) {
 
-	err := logp.DevelopmentSetup(logp.ToObserverOutput())
+	observedCore, observedLogs := observer.New(zapcore.DebugLevel)
+	err := logp.ConfigureWithOutputs(logp.Config{
+		Level:      logp.DebugLevel,
+		ToStderr:   false,
+		ToSyslog:   false,
+		ToFiles:    false,
+		ToEventLog: false,
+	}, observedCore)
 	require.NoError(t, err)
 
 	cases := []struct {
@@ -315,15 +324,13 @@ func TestComponentUpdateDiff(t *testing.T) {
 			}
 			testCoord.checkAndLogUpdate(testcase.old)
 
-			obsLogs := logp.ObserverLogs().TakeAll()
+			obsLogs := observedLogs.All()
 			last := obsLogs[len(obsLogs)-1]
 
 			// extract the structured data from the log message
 			testcase.logtest(t, last.Context[0].Interface.(UpdateStats))
 		})
-
 	}
-
 }
 
 func mustNewStruct(t *testing.T, v map[string]interface{}) *structpb.Struct {

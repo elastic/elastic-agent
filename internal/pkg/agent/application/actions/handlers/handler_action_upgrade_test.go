@@ -239,10 +239,18 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 	go c.Run(ctx)
 
 	u := NewUpgrade(log, c)
-	a1 := fleetapi.ActionUpgrade{Data: fleetapi.ActionUpgradeData{
-		Version: "8.2.0", SourceURI: "http://localhost"}}
-	a2 := fleetapi.ActionUpgrade{Data: fleetapi.ActionUpgradeData{
-		Version: "8.5.0", SourceURI: "http://localhost"}}
+	a1 := fleetapi.ActionUpgrade{
+		ActionID: "action-8.2",
+		Data: fleetapi.ActionUpgradeData{
+			Version: "8.2.0", SourceURI: "http://localhost",
+		},
+	}
+	a2 := fleetapi.ActionUpgrade{
+		ActionID: "action-8.5",
+		Data: fleetapi.ActionUpgradeData{
+			Version: "8.5.0", SourceURI: "http://localhost",
+		},
+	}
 	ack := noopacker.New()
 
 	checkMsg := func(c <-chan string, expected, errMsg string) {
