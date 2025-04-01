@@ -266,19 +266,19 @@ func TestDuplicateActionsHandled(t *testing.T) {
 
 	ack := noopacker.New()
 	t.Log("First upgrade action should be processed")
-	u.Handle(ctx, &a1, ack)
+	require.NoError(t, u.Handle(ctx, &a1, ack))
 	require.Nil(t, checkMsg(upgradeCalledChan, a1.ActionID, "action was not processed"))
 
 	c.ClearOverrideState() // it's upgrading, normally we would restart
 
 	t.Log("Action with different ID but same version should be propagated to upgrader")
-	u.Handle(ctx, &a2, ack)
+	require.NoError(t, u.Handle(ctx, &a2, ack))
 	require.Nil(t, checkMsg(upgradeCalledChan, a2.ActionID, "action was not processed"))
 
 	c.ClearOverrideState() // it's upgrading, normally we would restart
 
 	t.Log("Resending action with same ID action should be skipped")
-	u.Handle(ctx, &a2, ack)
+	require.NoError(t, u.Handle(ctx, &a2, ack))
 	require.NotNil(t, checkMsg(upgradeCalledChan, a2.ActionID, "action was not processed"))
 }
 

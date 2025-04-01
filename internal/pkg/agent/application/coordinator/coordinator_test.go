@@ -1176,14 +1176,14 @@ func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, source
 
 func (f *fakeUpgradeManager) Ack(ctx context.Context, acker acker.Acker) error {
 	if acker != nil {
-		acker.Ack(ctx, fleetapi.NewAction(fleetapi.ActionTypeUnknown))
+		return acker.Ack(ctx, fleetapi.NewAction(fleetapi.ActionTypeUnknown))
 	}
 	return nil
 }
 
 func (f *fakeUpgradeManager) AckAction(ctx context.Context, acker acker.Acker, action fleetapi.Action) error {
 	if acker != nil {
-		acker.Ack(ctx, action)
+		return acker.Ack(ctx, action)
 	}
 	return nil
 }
