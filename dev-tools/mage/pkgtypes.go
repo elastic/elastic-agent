@@ -29,6 +29,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
+	"github.com/elastic/elastic-agent/dev-tools/packaging"
 )
 
 const (
@@ -107,6 +108,7 @@ type PackageSpec struct {
 	OutputFile        string                 `yaml:"output_file,omitempty"` // Optional
 	ExtraVars         map[string]string      `yaml:"extra_vars,omitempty"`  // Optional
 	ExtraTags         []string               `yaml:"extra_tags,omitempty"`  // Optional
+	Components        []packaging.BinarySpec `yaml:"components"`            // Optional: Components required for this package
 
 	evalContext            map[string]interface{}
 	packageDir             string

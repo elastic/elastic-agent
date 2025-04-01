@@ -4,6 +4,126 @@
 # Official Beats. The shared section contains YAML anchors that are used to
 # define common parts of the package in order to not repeat ourselves.
 
+# List all the available platforms
+platforms: &all-platforms
+  - &linux-amd64
+    os: linux
+    arch: x86_64
+  - &linux-arm64
+    os: linux
+    arch: arm64
+  - &windows-amd64
+    os: windows
+    arch: x86_64
+  - &darwin-amd64
+    os: darwin
+    arch: x86_64
+  - &darwin-arm64
+    os: darwin
+    arch: aarch64
+
+# List all the package type constants (see dev-tools/mage/pkgcommon/pkgcommon-types.go)
+packageTypes: &all-package-types
+  - &pkg-type-rpm
+      1 # RPM
+  - &pkg-type-deb
+      2 # Deb
+  - &pkg-type-zip
+      3 # zip
+  - &pkg-type-targz
+      4 # tar.gz
+  - &pkg-type-docker
+      5 # docker
+
+# List *all* the components available for packaging in elastic-agent
+components:
+  # general template for new components
+  #  - &comp-<anchor name>
+  #    projectName: <project name under manifest>
+  #    packageName: <template representing the name of the archive to download/extract>
+  #    binaryName: <binary name>
+  #    platforms:
+  #      - <platform, use anchors for platforms above>
+  #    pythonWheel: true # true if it's a package that is not platform specific
+  #    packageTypes: *all-package-types # package types it should be included in
+  - &comp-agentbeat
+    projectName: beats
+    packageName: agentbeat-{{.Version}}-{{.Platform}}.{{.Ext}}
+    binaryName: agentbeat
+    platforms: *all-platforms
+    packageTypes: *all-package-types
+  - &comp-apm_server
+    projectName: apm-server
+    packageName: apm-server-{{.Version}}-{{.Platform}}.{{.Ext}}
+    binaryName: apm-server
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+      - *windows-amd64
+      - *darwin-amd64
+    packageTypes: *all-package-types
+  - &comp-cloudbeat
+    projectName: cloudbeat
+    packageName: cloudbeat-{{.Version}}-{{.Platform}}.{{.Ext}}
+    binaryName: cloudbeat
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+  - &comp-connectors
+    projectName: connectors
+    packageName: connectors-{{.Version}}.zip
+    binaryName: connectors
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    pythonWheel: true
+    packageTypes: *all-package-types
+  - &comp-endpoint
+    projectName: endpoint-dev
+    packageName: endpoint-security-{{.Version}}-{{.Platform}}.{{.Ext}}
+    binaryName: endpoint-security
+    platforms: *all-platforms
+    packageTypes: *all-package-types
+  - &comp-fleet-server
+    projectName: fleet-server
+    packageName: fleet-server-{{.Version}}-{{.Platform}}.{{.Ext}}
+    binaryName: fleet-server
+    platforms: *all-platforms
+    packageTypes: *all-package-types
+  - &comp-pf-elastic-collector
+    projectName: prodfiler
+    packageName: pf-elastic-collector-{{.Version}}-{{.Platform}}.{{.Ext}}
+    binaryName: pf-elastic-collector
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+  - &comp-pf-elastic-symbolizer
+    projectName: prodfiler
+    packageName: pf-elastic-symbolizer-{{.Version}}-{{.Platform}}.{{.Ext}}
+    binaryName: pf-elastic-symbolizer
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+  - &comp-pf-host-agent
+    projectName: prodfiler
+    packageName: pf-host-agent-{{.Version}}-{{.Platform}}.{{.Ext}}
+    binaryName: pf-host-agent
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+  - &comp-agentbeat-fips
+    projectName: beats
+    packageName: agentbeat-fips-{{.Version}}-{{.Platform}}.{{.Ext}}
+    binaryName: agentbeat
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+
 shared:
   - &common
     name: '{{.BeatName}}'
@@ -16,7 +136,38 @@ shared:
     url: '{{.BeatURL}}'
     description: '{{.BeatDescription}}'
 
+  - &common_fips
+    name: '{{.BeatName}}-fips'
+    service_name: '{{.BeatServiceName}}'
+    os: '{{.GOOS}}'
+    arch: '{{.PackageArch}}'
+    vendor: '{{.BeatVendor}}'
+    version: '{{ agent_package_version }}'
+    fips: true
+    license: '{{.BeatLicense}}'
+    url: '{{.BeatURL}}'
+    description: '{{.BeatDescription}}'
+
   # agent specific
+
+  # components included in elastic-agent package specs defined before components support in this YAML
+  - &elastic_agent_components
+    components:
+      - *comp-agentbeat
+      - *comp-apm_server
+      - *comp-cloudbeat
+      - *comp-connectors
+      - *comp-endpoint
+      - *comp-fleet-server
+      - *comp-pf-elastic-collector
+      - *comp-pf-elastic-symbolizer
+      - *comp-pf-host-agent
+
+  # components included in FIPS-compliant elastic-agent package specs
+  - &elastic_agent_fips_components
+    components:
+      - *comp-agentbeat-fips
+
   # Deb/RPM spec for community beats.
   - &deb_rpm_agent_spec
     <<: *common
@@ -170,7 +321,7 @@ shared:
     <<: *agent_darwin_app_bundle_files
     <<: *agent_binary_common_files
 
-  - &agent_components
+  - &agent_unpacked_components_files
     'data/{{.BeatName}}-{{ commit_short }}/components':
       source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/'
       mode: 0755
@@ -178,7 +329,7 @@ shared:
       skip_on_missing: true
 
   # Binary package spec (tar.gz for linux) for community beats.
-  - &agent_binary_spec_no_components
+  - &agent_binary_spec_no_component_files
     <<: *common
     files:
       <<: *agent_binary_files
@@ -186,21 +337,30 @@ shared:
 
   - &agent_binary_spec
     <<: *common
+    <<: *elastic_agent_components
     files:
       <<: *agent_binary_files
       <<: *linux_otel_files
-      <<: *agent_components
+      <<: *agent_unpacked_components_files
 
+  - &agent_binary_fips_spec
+    <<: *common_fips
+    <<: *elastic_agent_fips_components
+    files:
+      <<: *agent_binary_files
+      <<: *agent_unpacked_components_files
 
   - &agent_darwin_binary_spec
     <<: *common
+    <<: *elastic_agent_components
     files:
       <<: *agent_darwin_binary_files
-      <<: *agent_components
+      <<: *agent_unpacked_components_files
 
   # Binary package spec (zip for windows) for community beats.
   - &agent_windows_binary_spec
     <<: *common
+    <<: *elastic_agent_components
     files:
       <<: *agent_binary_files
       'data/{{.BeatName}}-{{ commit_short }}/components':
@@ -308,7 +468,7 @@ shared:
         mode: 0644
 
   - &agent_docker_edot_spec
-    <<: *agent_binary_spec_no_components
+    <<: *agent_binary_spec_no_component_files
     docker_variant: 'elastic-otel-collector'
     name: 'elastic-otel-collector'
     extra_vars:
@@ -340,7 +500,7 @@ shared:
     name: 'elastic-otel-collector-wolfi'
 
   - &agent_docker_slim_spec
-    <<: *agent_binary_spec_no_components
+    <<: *agent_binary_spec_no_component_files
     docker_variant: 'slim'
     extra_vars:
       dockerfile: 'Dockerfile.elastic-agent.tmpl'
@@ -583,115 +743,6 @@ shared:
       /Library/Application Support/{{.BeatVendor}}/{{.BeatName}}/LICENSE.txt:
         source: '{{ repo.RootDir }}/dev-tools/licenses/ELASTIC-LICENSE-2.0.txt'
         mode: 0644
-
-platforms: &all-platforms
-  - &linux-amd64
-    os: linux
-    arch: x86_64
-  - &linux-arm64
-    os: linux
-    arch: arm64
-  - &windows-amd64
-    os: windows
-    arch: x86_64
-  - &darwin-amd64
-    os: darwin
-    arch: x86_64
-  - &darwin-arm64
-    os: darwin
-    arch: aarch64
-
-packageTypes: &all-package-types
-  - &pkg-type-rpm
-    1 # RPM
-  - &pkg-type-deb
-    2 # Deb
-  - &pkg-type-zip
-    3 # zip
-  - &pkg-type-targz
-    4 # tar.gz
-  - &pkg-type-docker
-    5 # docker
-
-components:
-  # general template for new components
-#  - &comp-<anchor name>
-#    projectName: <project name under manifest>
-#    packageName: <template representing the name of the archive to download/extract>
-#    binaryName: <binary name>
-#    platforms:
-#      - <platform, use anchors for platforms above>
-#    pythonWheel: true # true if it's a package that is not platform specific
-#    packageTypes: *all-package-types # package types it should be included in
-  - &comp-agentbeat
-    projectName: beats
-    packageName: agentbeat-{{.Version}}-{{.Platform}}.{{.Ext}}
-    binaryName: agentbeat
-    platforms: *all-platforms
-    packageTypes: *all-package-types
-  - &comp-apm_server
-    projectName: apm-server
-    packageName: apm-server-{{.Version}}-{{.Platform}}.{{.Ext}}
-    binaryName: apm-server
-    platforms:
-      - *linux-amd64
-      - *linux-arm64
-      - *windows-amd64
-      - *darwin-amd64
-    packageTypes: *all-package-types
-  - &comp-cloudbeat
-    projectName: cloudbeat
-    packageName: cloudbeat-{{.Version}}-{{.Platform}}.{{.Ext}}
-    binaryName: cloudbeat
-    platforms:
-      - *linux-amd64
-      - *linux-arm64
-    packageTypes: *all-package-types
-  - &comp-connectors
-    projectName: connectors
-    packageName: connectors-{{.Version}}.zip
-    binaryName: connectors
-    platforms:
-      - *linux-amd64
-      - *linux-arm64
-    pythonWheel: true
-    packageTypes: *all-package-types
-  - &comp-endpoint
-    projectName: endpoint-dev
-    packageName: endpoint-security-{{.Version}}-{{.Platform}}.{{.Ext}}
-    binaryName: endpoint-security
-    platforms: *all-platforms
-    packageTypes: *all-package-types
-  - &comp-fleet-server
-    projectName: fleet-server
-    packageName: fleet-server-{{.Version}}-{{.Platform}}.{{.Ext}}
-    binaryName: fleet-server
-    platforms: *all-platforms
-    packageTypes: *all-package-types
-  - &comp-pf-elastic-collector
-    projectName: prodfiler
-    packageName: pf-elastic-collector-{{.Version}}-{{.Platform}}.{{.Ext}}
-    binaryName: pf-elastic-collector
-    platforms:
-      - *linux-amd64
-      - *linux-arm64
-    packageTypes: *all-package-types
-  - &comp-pf-elastic-collector
-    projectName: prodfiler
-    packageName: pf-elastic-symbolizer-{{.Version}}-{{.Platform}}.{{.Ext}}
-    binaryName: pf-elastic-symbolizer
-    platforms:
-      - *linux-amd64
-      - *linux-arm64
-    packageTypes: *all-package-types
-  - &comp-pf-host-agent
-    projectName: prodfiler
-    packageName: pf-host-agent-{{.Version}}-{{.Platform}}.{{.Ext}}
-    binaryName: pf-host-agent
-    platforms:
-      - *linux-amd64
-      - *linux-arm64
-    packageTypes: *all-package-types
 
 # specs is a list of named packaging "flavors".
 specs:
@@ -1362,6 +1413,13 @@ specs:
             symlink: true
             mode: 0755
 
+    ######## Start FIPS Specs ########
+    - os: linux
+      types: [tgz]
+      spec:
+        <<: *agent_binary_fips_spec
+        <<: *elastic_license_for_binaries
+    ######## End FIPS Specs ########
 
   # Elastic Beat with Elastic License and binary taken from the x-pack dir.
   elastic_beat_agent_demo_binaries:
