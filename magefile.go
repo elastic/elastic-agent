@@ -599,9 +599,24 @@ func DownloadManifest(ctx context.Context) error {
 	// Enforce that we use the correct elastic-agent packaging, to correctly load component dependencies
 	devtools.UseElasticAgentPackaging()
 
+	dependencies, err := ExtractComponentsFromSelectedPkgSpecs(devtools.Packages)
+
+	if err != nil {
+		return fmt.Errorf("failed extracting dependencies: %w", err)
+	}
+
+	if e := manifest.DownloadComponents(ctx, dependencies, devtools.ManifestURL, platforms, dropPath); e != nil {
+		return fmt.Errorf("failed to download the manifest file, %w", e)
+	}
+	log.Printf(">> Completed downloading packages from manifest into drop-in %s", dropPath)
+
+	return nil
+}
+
+func ExtractComponentsFromSelectedPkgSpecs(pkgSpecs []devtools.OSPackageArgs) ([]packaging.BinarySpec, error) {
 	// Extract the dependencies from the selected packages
 	mappedDependencies := map[string]packaging.BinarySpec{}
-	for _, pkg := range devtools.Packages {
+	for _, pkg := range pkgSpecs {
 		if isSelected(pkg) {
 			if mg.Verbose() {
 				log.Printf("package %s is selected, collecting dependencies", pkg.Spec.Name)
@@ -612,8 +627,8 @@ func DownloadManifest(ctx context.Context) error {
 				if existingComp, ok := mappedDependencies[component.PackageName]; ok {
 					// sanity check: verify that for the same packageName we have the same component spec
 					if !existingComp.Equal(component) {
-						panic(fmt.Errorf("found component %+v and %+v sharing the same package name %q but they are not equal",
-							existingComp, component, component.PackageName))
+						return nil, fmt.Errorf("found component %+v and %+v sharing the same package name %q but they are not equal",
+							existingComp, component, component.PackageName)
 					}
 				} else {
 					mappedDependencies[component.PackageName] = component
@@ -633,13 +648,7 @@ func DownloadManifest(ctx context.Context) error {
 	for _, pkg := range mappedDependencies {
 		dependencies = append(dependencies, pkg)
 	}
-
-	if e := manifest.DownloadComponents(ctx, dependencies, devtools.ManifestURL, platforms, dropPath); e != nil {
-		return fmt.Errorf("failed to download the manifest file, %w", e)
-	}
-	log.Printf(">> Completed downloading packages from manifest into drop-in %s", dropPath)
-
-	return nil
+	return dependencies, nil
 }
 
 func isSelected(pkg devtools.OSPackageArgs) bool {
