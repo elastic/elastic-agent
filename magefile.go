@@ -2269,6 +2269,11 @@ func askForStack() (tcommon.Stack, error) {
 		return tcommon.Stack{}, fmt.Errorf("could not read state file: %w", err)
 	}
 
+	if len(state.Stacks) == 0 {
+		fmt.Println("There is no stack, skipping it")
+		return tcommon.Stack{}, nil
+	}
+
 	if len(state.Stacks) == 1 {
 		fmt.Println("There is only one Stack, auto-selecting it")
 		return state.Stacks[0], nil

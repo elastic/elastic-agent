@@ -35,6 +35,10 @@ type StartConfig struct {
 type StartOption func(cfg *StartConfig)
 
 // Start starts a new process
+// If process.WithCmdOptions is not used to overwrite cmd.Stderr,
+// cmd.StderrPipe is called and the io.ReadCloser returned is set
+// to Info.Stderr. If this ReadCloser is not read, then calls to
+// StopWait will never return. See cmd.StderrPipe for more details.an
 func Start(path string, opts ...StartOption) (proc *Info, err error) {
 	// Apply options
 	c := StartConfig{
