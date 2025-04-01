@@ -44,7 +44,8 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "aws"
-          imagePrefix: "platform-ingest-elastic-agent-ubuntu-2404-aarch64"
+          # imagePrefix: "platform-ingest-elastic-agent-ubuntu-2404-aarch64"
+          image: platform-ingest-elastic-agent-ubuntu-2404-aarch64-1740016866
           diskSizeGb: 200
           instanceType: "m6g.xlarge"
         retry:
