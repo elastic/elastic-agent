@@ -36,6 +36,13 @@ function release_manager_login {
   export VAULT_ADDR_SECRET VAULT_ROLE_ID_SECRET VAULT_SECRET
 }
 
+
+# Upload should not do much with the pre-command.
+if [[ ! "$BUILDKITE_COMMAND" =~ .*"upload".* ]]; then
+  # shellcheck disable=SC1091
+  source .buildkite/scripts/install-asdf.sh
+fi
+
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-package" ]]; then
   if [[ "$BUILDKITE_STEP_KEY" == "package_elastic-agent" ]]; then
     docker_login
