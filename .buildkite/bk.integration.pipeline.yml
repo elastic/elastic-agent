@@ -135,7 +135,8 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+          # image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+          image: "platform-ingest-elastic-agent-ubuntu-2404-1740621659"
         matrix:
           - default
 
@@ -155,7 +156,9 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+          # Pinned due to an issue
+          # image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+          image: "platform-ingest-elastic-agent-ubuntu-2404-1740621659"
         matrix:
           - default
           - upgrade
@@ -183,7 +186,9 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "aws"
-          imagePrefix: "platform-ingest-elastic-agent-ubuntu-2404-aarch64"
+          # Pinning image to the previous stable
+          # imagePrefix: "platform-ingest-elastic-agent-ubuntu-2404-aarch64"
+          image: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1740016866"
           instanceType: "m6g.2xlarge"
         retry:
           automatic:
@@ -220,7 +225,8 @@ steps:
             limit: 1
         agents:
           provider: "aws"
-          imagePrefix: "platform-ingest-elastic-agent-ubuntu-2404-aarch64"
+          # imagePrefix: "platform-ingest-elastic-agent-ubuntu-2404-aarch64"
+          image: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1740016866"
           instanceType: "m6g.xlarge"
         matrix:
           - default
@@ -244,7 +250,8 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-debian-12"
+          # image: "family/platform-ingest-elastic-agent-debian-12"
+          image: "platform-ingest-elastic-agent-debian-12-1740621659"
         matrix:
           - default
 
@@ -264,7 +271,8 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-debian-12"
+          # image: "family/platform-ingest-elastic-agent-debian-12"
+          image: "platform-ingest-elastic-agent-debian-12-1740621659"
         matrix:
           - default
           - upgrade
@@ -302,7 +310,8 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-rhel-8"
+          # image: "family/platform-ingest-elastic-agent-rhel-8"
+          image: "platform-ingest-elastic-agent-rhel-8-1740621659"
 
   - group: "Kubernetes"
     key: integration-tests-kubernetes
@@ -330,7 +339,8 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-4"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+          # image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+          image: "platform-ingest-elastic-agent-ubuntu-2404-1740621659"
           diskSizeGb: 80
         matrix:
           setup:
