@@ -315,6 +315,9 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 				defer func() {
 					upgradeCalledChan <- version
 				}()
+				if version == "8.2.0" {
+					return nil, errors.New("upgrade to 8.2.0 will always fail")
+				}
 
 				return nil, nil
 			},
