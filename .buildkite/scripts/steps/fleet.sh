@@ -46,6 +46,7 @@ function install_fleet_packages() {
   fi
 
   resp=$(curl \
+    -v \
     -s \
     --fail-with-body \
     -X "POST" \
