@@ -11,7 +11,6 @@ function preinstall_fleet_packages() {
   install_fleet_packages "$preinstalled_packages_filename"
   retcode=$?
 
-  echo "Return code in preinstall_fleet_packages: " $retcode
   return $retcode
 }
 
