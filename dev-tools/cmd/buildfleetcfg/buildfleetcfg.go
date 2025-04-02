@@ -36,6 +36,7 @@ var tmpl = template.Must(template.New("cfg").Parse(`
 package application
 
 import "github.com/elastic/elastic-agent/pkg/packer"
+import "path/filepath"
 
 // DefaultAgentFleetConfig is the content of the default configuration when we enroll a beat, the elastic-agent.yml
 // will be replaced with this variables.
@@ -47,7 +48,7 @@ func init() {
 	// {{ $f }}
 	{{ end -}}
 	unpacked := packer.MustUnpack("{{ .Pack }}")
-	raw, ok := unpacked["_meta/elastic-agent.fleet.yml"]
+	raw, ok := unpacked[filepath.Join("_meta","elastic-agent.fleet.yml")]
 	if !ok {
 		// ensure we have something loaded.
 		panic("elastic-agent.fleet.yml is not included in the binary")
