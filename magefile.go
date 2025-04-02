@@ -597,7 +597,9 @@ func DownloadManifest(ctx context.Context) error {
 	}
 
 	// Enforce that we use the correct elastic-agent packaging, to correctly load component dependencies
-	devtools.UseElasticAgentPackaging()
+	// Use mg.Deps() to ensure that the function will be called only once per mage invocation.
+	// devtools.Use*Packaging functions are not idempotent as they append in devtools.Packages
+	mg.Deps(devtools.UseElasticAgentPackaging)
 	dependencies, err := ExtractComponentsFromSelectedPkgSpecs(devtools.Packages)
 	if err != nil {
 		return fmt.Errorf("failed extracting dependencies: %w", err)
@@ -1277,7 +1279,11 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 					cmd.Dir = pwd
 					cmd.Stdout = os.Stdout
 					cmd.Stderr = os.Stderr
-					cmd.Env = append(os.Environ(), fmt.Sprintf("PWD=%s", pwd), "AGENT_PACKAGING=on")
+					cmd.Env = append(os.Environ(),
+						fmt.Sprintf("PWD=%s", pwd),
+						"AGENT_PACKAGING=on",
+						fmt.Sprintf("FIPS=%v", devtools.FIPSBuild),
+					)
 					if envVar := selectedPackageTypes(); envVar != "" {
 						cmd.Env = append(cmd.Env, envVar)
 					}

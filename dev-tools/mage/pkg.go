@@ -34,10 +34,25 @@ func Package() error {
 	// platforms := updateWithDarwinUniversal(Platforms)
 	platforms := Platforms
 
+	if mg.Verbose() {
+		packages := make([]string, 0, len(Packages))
+		for _, p := range Packages {
+			packages = append(packages, fmt.Sprintf("spec %s on %s/%s", p.Spec.Name, p.OS, p.Arch))
+		}
+
+		log.Printf("Packaging for platforms %v, packages %v", platforms, packages)
+	}
+
 	tasks := make(map[string][]interface{})
 	for _, target := range platforms {
 		for _, pkg := range Packages {
 			if pkg.OS != target.GOOS() || pkg.Arch != "" && pkg.Arch != target.Arch() {
+				continue
+			}
+
+			// Checks if this package is compatible with the FIPS settings
+			if pkg.Spec.FIPS != FIPSBuild {
+				log.Printf("Skipping %s/%s package type because FIPS flag doesn't match [pkg=%v, build=%v]", pkg.Spec.Name, pkg.OS, pkg.Spec.FIPS, FIPSBuild)
 				continue
 			}
 
@@ -80,7 +95,6 @@ func Package() error {
 				spec.OS = target.GOOS()
 				spec.Arch = packageArch
 				spec.Snapshot = Snapshot
-				spec.FIPS = FIPSBuild
 				spec.evalContext = map[string]interface{}{
 					"GOOS":          target.GOOS(),
 					"GOARCH":        target.GOARCH(),
@@ -99,6 +113,10 @@ func Package() error {
 				}
 
 				spec = spec.Evaluate()
+
+				if mg.Verbose() {
+					log.Printf("Adding task for packaging %s on %s/%s", spec.Name, target.GOOS(), target.Arch())
+				}
 
 				tasks[target.GOOS()+"-"+target.Arch()] = append(tasks[target.GOOS()+"-"+target.Arch()], packageBuilder{target, spec, pkgType}.Build)
 			}
