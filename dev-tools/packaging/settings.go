@@ -44,10 +44,7 @@ var (
 			ext:      "zip",
 		},
 	}
-	// ExpectedBinaries  is a map of binaries agent needs to their project in the unified-release manager.
-	// The project names are those used in the "projects" list in the unified release manifest.
-	// See the sample manifests in the testdata directory.
-	ExpectedBinaries []BinarySpec
+	settings *packagesConfig
 )
 
 func init() {
@@ -57,7 +54,7 @@ func init() {
 		return
 	}
 
-	ExpectedBinaries = packageSettings.Components
+	settings = packageSettings
 }
 
 type platformAndExt struct {
@@ -139,11 +136,6 @@ func (proj BinarySpec) Equal(other BinarySpec) bool {
 	return true
 }
 
-// ExpectedBinaries  is a map of binaries agent needs to their project in the unified-release manager.
-// The project names are those used in the "projects" list in the unified release manifest.
-// See the sample manifests in the testdata directory.
-var ExpectedBinaries []BinarySpec
-
 type Platform struct {
 	OS   string
 	Arch string
@@ -177,4 +169,14 @@ func parsePackageSettings(r io.Reader) (*packagesConfig, error) {
 		log.Printf("Read packages config: %+v", packagesConf)
 	}
 	return packagesConf, nil
+}
+
+// Components returns a *copy* of all the binary specs loaded from packages.yml
+func Components() ([]BinarySpec, error) {
+	if settings == nil {
+		return nil, fmt.Errorf("package settings not loaded")
+	}
+	ret := make([]BinarySpec, len(settings.Components))
+	copy(ret, settings.Components)
+	return ret, nil
 }
