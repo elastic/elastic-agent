@@ -75,6 +75,7 @@ require (
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.119.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.119.0
 	go.uber.org/zap v1.27.0
+<<<<<<< HEAD
 	golang.org/x/crypto v0.33.0
 	golang.org/x/exp v0.0.0-20250215185904-eff6e970281f
 	golang.org/x/net v0.35.0
@@ -83,6 +84,17 @@ require (
 	golang.org/x/term v0.29.0
 	golang.org/x/text v0.22.0
 	golang.org/x/time v0.8.0
+=======
+	golang.org/x/crypto v0.36.0
+	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
+	golang.org/x/mod v0.23.0
+	golang.org/x/net v0.38.0
+	golang.org/x/sync v0.12.0
+	golang.org/x/sys v0.31.0
+	golang.org/x/term v0.30.0
+	golang.org/x/text v0.23.0
+	golang.org/x/time v0.11.0
+>>>>>>> 4e35b1f2a (bump golang.org/x/net to v0.38.0 to fix CVE-2025-22870 and CVE-2025-22872 (#7677))
 	golang.org/x/tools v0.30.0
 	google.golang.org/api v0.214.0
 	google.golang.org/grpc v1.70.0
