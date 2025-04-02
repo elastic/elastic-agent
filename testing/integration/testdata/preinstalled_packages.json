@@ -1,5 +1,6 @@
 {
     "packages": [
         { "name": "endpoint", "version": "9.0.0" },
+        { "name": "system", "version": "1.53.1" }
     ]
 }
