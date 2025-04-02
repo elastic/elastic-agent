@@ -6,9 +6,9 @@ preinstalled_packages_filename="testing/integration/testdata/preinstalled_packag
 # preinstall_fleet_packages installs EPM packages needed for integration tests into Fleet.
 function preinstall_fleet_packages() {
   echo "Preinstalling the following EPM packages in Fleet:"
-  cat $preinstalled_packages_filename
+  cat "$preinstalled_packages_filename"
 
-  install_fleet_packages $preinstalled_packages_filename
+  install_fleet_packages "$preinstalled_packages_filename"
   retcode=$?
 
   echo "Return code in preinstall_fleet_packages: " $retcode
