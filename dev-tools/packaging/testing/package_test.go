@@ -286,7 +286,7 @@ func checkManifestFileContents(t *testing.T, extractedPackageDir string) {
 func parseManifest(t *testing.T, dir string) v1.PackageManifest {
 	manifestReadCloser, err := os.Open(filepath.Join(dir, v1.ManifestFileName))
 	if err != nil {
-		t.Errorf("opening manifest %s : %v", v1.ManifestFileName, err)
+		t.Fatalf("opening manifest %s : %v", v1.ManifestFileName, err)
 	}
 	defer func(closer io.ReadCloser) {
 		err := closer.Close()
@@ -295,7 +295,7 @@ func parseManifest(t *testing.T, dir string) v1.PackageManifest {
 
 	m, err := v1.ParseManifest(manifestReadCloser)
 	if err != nil {
-		t.Errorf("unmarshaling package manifest: %v", err)
+		t.Fatalf("unmarshaling package manifest: %v", err)
 	}
 	return *m
 }
