@@ -6,7 +6,7 @@
         { "name": "fleet_server", "version": "1.5.0" },
         { "name": "network_traffic", "version": "1.33.0" },
         { "name": "osquery_manager", "version": "1.16.0" },
-        { "name": "apache", "version": "1.17.0" },
+        { "name": "apache", "version": "1.30.0" },
         { "name": "log", "version": "2.3.0" }
     ]
 }
