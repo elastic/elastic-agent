@@ -26,6 +26,7 @@ import (
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.elastic.co/apm/v2/apmtest"
 	"go.opentelemetry.io/collector/confmap"
@@ -510,10 +511,7 @@ func TestUpgradeSameErrorAcked(t *testing.T) {
 		upgradeErr:  upgrade.ErrUpgradeSameVersion,
 	}
 
-	acker := &fakeActionAcker{
-		ackedActions: make([]string, 0),
-	}
-
+	acker := &fakeActionAcker{}
 	coord, _, _ := createCoordinator(t, ctx,
 		ManagedCoordinator(true),
 		WithUpgradeManager(upgradeManager),
@@ -536,9 +534,12 @@ func TestUpgradeSameErrorAcked(t *testing.T) {
 	action := fleetapi.NewAction(fleetapi.ActionTypeUpgrade)
 	actionUpgrade, ok := action.(*fleetapi.ActionUpgrade)
 	require.True(t, ok)
+
+	acker.On("Ack", mock.Anything, actionUpgrade).Return(nil)
+
 	require.NoError(t, coord.Upgrade(t.Context(), "9.0", "http://localhost", actionUpgrade, true, true))
 
-	require.True(t, len(acker.ackedActions) > 0)
+	acker.AssertCalled(t, "Ack", mock.Anything, actionUpgrade)
 }
 
 func TestCoordinator_State_ConfigError_Managed(t *testing.T) {
@@ -1092,7 +1093,7 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 
 	acker := o.acker
 	if acker == nil {
-		acker = &fakeActionAcker{ackedActions: make([]string, 0)}
+		acker = &fakeActionAcker{}
 	}
 
 	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelMgr, acker)
@@ -1134,22 +1135,17 @@ func (f *fakeReExecManager) ReExec(callback reexec.ShutdownCallbackFn, _ ...stri
 var _ acker.Acker = &fakeActionAcker{}
 
 type fakeActionAcker struct {
-	expectedAckError    error
-	expectedCommitError error
-	ackedActions        []string
+	mock.Mock
 }
 
-func (f *fakeActionAcker) Ack(_ context.Context, action fleetapi.Action) error {
-	if f.expectedAckError != nil {
-		return f.expectedAckError
-	}
-
-	f.ackedActions = append(f.ackedActions, action.ID())
-	return nil
+func (f *fakeActionAcker) Ack(ctx context.Context, action fleetapi.Action) error {
+	args := f.Called(ctx, action)
+	return args.Error(0)
 }
 
-func (f *fakeActionAcker) Commit(_ context.Context) error {
-	return f.expectedCommitError
+func (f *fakeActionAcker) Commit(ctx context.Context) error {
+	args := f.Called(ctx)
+	return args.Error(0)
 }
 
 type fakeUpgradeManager struct {
