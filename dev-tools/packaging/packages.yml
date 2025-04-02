@@ -597,7 +597,7 @@ platforms: &all-platforms
   - &darwin-amd64
     os: darwin
     arch: x86_64
-  - &darwin-arm
+  - &darwin-arm64
     os: darwin
     arch: aarch64
 
