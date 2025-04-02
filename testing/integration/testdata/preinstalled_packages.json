@@ -1,6 +1,12 @@
 {
     "packages": [
         { "name": "endpoint", "version": "9.0.0" },
-        { "name": "system", "version": "1.67.3" }
+        { "name": "system", "version": "1.67.3" },
+        { "name": "auditd_manager", "version": "1.18.3" },
+        { "name": "fleet_server", "version": "1.5.0" },
+        { "name": "network_traffic", "version": "1.32.1" },
+        { "name": "osquery_manager", "version": "1.16.0" },
+        { "name": "apache", "version": "1.17.0" },
+        { "name": "log", "version": "2.3.0" }
     ]
 }
