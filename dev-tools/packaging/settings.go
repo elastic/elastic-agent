@@ -65,6 +65,7 @@ type platformAndExt struct {
 type BinarySpec struct {
 	BinaryName   string                  `yaml:"binaryName"`
 	PackageName  string                  `yaml:"packageName"`
+	RootDir      string                  `yaml:"rootDir"`
 	ProjectName  string                  `yaml:"projectName"`
 	Platforms    []Platform              `yaml:"platforms"`
 	PythonWheel  bool                    `yaml:"pythonWheel"`
@@ -103,6 +104,29 @@ func (proj BinarySpec) GetPackageName(version string, platform string) string {
 	err = tmpl.Execute(&buf, tmplContext)
 	if err != nil {
 		panic(fmt.Errorf("rendering packageName template for project/binary %s/%s %q with context %v: %w",
+			proj.ProjectName, proj.BinaryName, proj.PackageName, tmplContext, err))
+	}
+	return buf.String()
+}
+
+func (proj BinarySpec) GetRootDir(version string, platform string) string {
+	if proj.RootDir == "" {
+		// shortcut to avoid rendering template when there's no RootDir specified
+		return ""
+	}
+	tmpl, err := template.New("inner_path").Parse(proj.RootDir)
+	if err != nil {
+		panic(fmt.Errorf("parsing innerPath template for project/binary %s/%s %q: %w", proj.ProjectName, proj.BinaryName, proj.RootDir, err))
+	}
+
+	// look for the platform strings, if not found an empty object is returned and empty values will be used for rendering
+	pltfStrings := PlatformPackages[platform]
+	tmplContext := map[string]string{"Version": version, "Platform": pltfStrings.platform, "Ext": pltfStrings.ext}
+
+	var buf bytes.Buffer
+	err = tmpl.Execute(&buf, tmplContext)
+	if err != nil {
+		panic(fmt.Errorf("rendering innerPath template for project/binary %s/%s %q with context %v: %w",
 			proj.ProjectName, proj.BinaryName, proj.PackageName, tmplContext, err))
 	}
 	return buf.String()

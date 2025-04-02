@@ -42,6 +42,7 @@ components:
   #    projectName: <project name under manifest>
   #    packageName: <template representing the name of the archive to download/extract>
   #    binaryName: <binary name>
+  #    rootDir: <template representing directory from the archive root where the binary is located>
   #    platforms:
   #      - <platform, use anchors for platforms above>
   #    pythonWheel: true # true if it's a package that is not platform specific
@@ -49,12 +50,14 @@ components:
   - &comp-agentbeat
     projectName: beats
     packageName: agentbeat-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: agentbeat-{{.Version}}-{{.Platform}}
     binaryName: agentbeat
     platforms: *all-platforms
     packageTypes: *all-package-types
   - &comp-apm_server
     projectName: apm-server
     packageName: apm-server-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: apm-server-{{.Version}}-{{.Platform}}
     binaryName: apm-server
     platforms:
       - *linux-amd64
@@ -65,6 +68,7 @@ components:
   - &comp-cloudbeat
     projectName: cloudbeat
     packageName: cloudbeat-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: cloudbeat-{{.Version}}-{{.Platform}}
     binaryName: cloudbeat
     platforms:
       - *linux-amd64
@@ -73,6 +77,10 @@ components:
   - &comp-connectors
     projectName: connectors
     packageName: connectors-{{.Version}}.zip
+    # FIXME: connectors use only <major>.<minor>.<patch> in the root directory name so the definition should be something like:
+    # rootDir: elasticsearch_connectors-{{beat_version}}
+    # We don't support that yet, so we are not gonna define a rootDir (not a problem since we don't extract the archive
+    # during packaging
     binaryName: connectors
     platforms:
       - *linux-amd64
@@ -82,18 +90,21 @@ components:
   - &comp-endpoint
     projectName: endpoint-dev
     packageName: endpoint-security-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: endpoint-security-{{.Version}}-{{.Platform}}
     binaryName: endpoint-security
     platforms: *all-platforms
     packageTypes: *all-package-types
   - &comp-fleet-server
     projectName: fleet-server
     packageName: fleet-server-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: fleet-server-{{.Version}}-{{.Platform}}
     binaryName: fleet-server
     platforms: *all-platforms
     packageTypes: *all-package-types
   - &comp-pf-elastic-collector
     projectName: prodfiler
     packageName: pf-elastic-collector-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: pf-elastic-collector-{{.Version}}-{{.Platform}}
     binaryName: pf-elastic-collector
     platforms:
       - *linux-amd64
@@ -102,6 +113,7 @@ components:
   - &comp-pf-elastic-symbolizer
     projectName: prodfiler
     packageName: pf-elastic-symbolizer-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: pf-elastic-symbolizer-{{.Version}}-{{.Platform}}
     binaryName: pf-elastic-symbolizer
     platforms:
       - *linux-amd64
@@ -110,6 +122,7 @@ components:
   - &comp-pf-host-agent
     projectName: prodfiler
     packageName: pf-host-agent-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: pf-host-agent-{{.Version}}-{{.Platform}}
     binaryName: pf-host-agent
     platforms:
       - *linux-amd64
@@ -118,6 +131,7 @@ components:
   - &comp-agentbeat-fips
     projectName: beats
     packageName: agentbeat-fips-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: agentbeat-{{.Version}}-{{.Platform}}
     binaryName: agentbeat
     platforms:
       - *linux-amd64
@@ -1467,8 +1481,8 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
+        name: '{{.BeatName}}-core'
         version: '{{ beat_version }}'
-        qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
@@ -1478,8 +1492,8 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
+        name: '{{.BeatName}}-core'
         version: '{{ beat_version }}'
-        qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
@@ -1489,8 +1503,8 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
+        name: '{{.BeatName}}-core'
         version: '{{ beat_version }}'
-        qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
@@ -1500,8 +1514,19 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
+        name: '{{.BeatName}}-core'
         version: '{{ beat_version }}'
-        qualifier: core
+        files:
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
+    - os: linux
+      types: [tgz]
+      spec:
+        <<: *common_fips
+        <<: *elastic_license_for_binaries
+        name: '{{.BeatName}}-core-fips'
+        version: '{{ beat_version }}'
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
