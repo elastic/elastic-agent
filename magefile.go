@@ -598,9 +598,7 @@ func DownloadManifest(ctx context.Context) error {
 
 	// Enforce that we use the correct elastic-agent packaging, to correctly load component dependencies
 	devtools.UseElasticAgentPackaging()
-
 	dependencies, err := ExtractComponentsFromSelectedPkgSpecs(devtools.Packages)
-
 	if err != nil {
 		return fmt.Errorf("failed extracting dependencies: %w", err)
 	}
@@ -1131,8 +1129,20 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 		log.Printf("--- Packaging dependenciesVersion[%s], %+v \n", dependenciesVersion, platforms)
 	}
 
+	log.Println("--- Running packaging function")
+	mg.Deps(agentPackaging)
+
+	dependencies, err := ExtractComponentsFromSelectedPkgSpecs(devtools.Packages)
+	if err != nil {
+		return fmt.Errorf("failed extracting dependencies: %w", err)
+	}
+
+	if mg.Verbose() {
+		log.Printf("dependencies extracted from package specs: %v", dependencies)
+	}
+
 	// download/copy all the necessary dependencies for packaging elastic-agent
-	archivePath, dropPath := collectPackageDependencies(platforms, dependenciesVersion, packageTypes)
+	archivePath, dropPath := collectPackageDependencies(platforms, dependenciesVersion, packageTypes, dependencies)
 
 	// cleanup after build
 	defer os.RemoveAll(archivePath)
@@ -1148,12 +1158,9 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	defer os.RemoveAll(flatPath)
 
 	// extract all dependencies from their archives into flat dir
-	flattenDependencies(platforms, dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse)
+	flattenDependencies(platforms, dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse, dependencies)
 
 	// package agent
-	log.Println("--- Running packaging function")
-	mg.Deps(agentPackaging)
-
 	log.Println("--- Running post packaging ")
 	mg.Deps(Update)
 	mg.Deps(agentBinaryTarget, CrossBuildGoDaemon)
@@ -1172,7 +1179,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 // NOTE: after the build is done the caller must:
 // - delete archivePath and dropPath contents
 // - unset AGENT_DROP_PATH environment variable
-func collectPackageDependencies(platforms []string, packageVersion string, packageTypes []mage.PackageType) (archivePath string, dropPath string) {
+func collectPackageDependencies(platforms []string, packageVersion string, packageTypes []devtools.PackageType, dependencies []packaging.BinarySpec) (archivePath, dropPath string) {
 	dropPath, found := os.LookupEnv(agentDropPath)
 
 	// try not to shadow too many variables
@@ -1184,13 +1191,13 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 		dropPath = filepath.Join("build", "distributions", "elastic-agent-drop")
 		dropPath, err = filepath.Abs(dropPath)
 		if err != nil {
-			panic(err)
+			panic(fmt.Errorf("obtaining absolute path for default drop path: %w", err))
 		}
 
 		if mg.Verbose() {
 			log.Printf(">> Creating drop-in folder %+v \n", dropPath)
 		}
-		archivePath = movePackagesToArchive(dropPath, platforms, packageVersion)
+		archivePath = movePackagesToArchive(dropPath, platforms, packageVersion, dependencies)
 
 		if hasSnapshotEnv() {
 			packageVersion = fmt.Sprintf("%s-SNAPSHOT", packageVersion)
@@ -1215,7 +1222,8 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 
 			errGroup, ctx := errgroup.WithContext(context.Background())
 			completedDownloads := &atomic.Int32{}
-			for _, spec := range packaging.ExpectedBinaries {
+
+			for _, spec := range dependencies {
 				for _, platform := range platforms {
 
 					if !spec.SupportsPlatform(platform) {
@@ -1315,18 +1323,18 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 			}
 		}
 	} else {
-		archivePath = movePackagesToArchive(dropPath, platforms, packageVersion)
+		archivePath = movePackagesToArchive(dropPath, platforms, packageVersion, nil)
 	}
 	return archivePath, dropPath
 }
 
-func removePythonWheels(matches []string, version string) []string {
+func removePythonWheels(matches []string, version string, dependencies []packaging.BinarySpec) []string {
 	if hasSnapshotEnv() {
 		version = fmt.Sprintf("%s-SNAPSHOT", version)
 	}
 
 	var wheels []string
-	for _, spec := range packaging.ExpectedBinaries {
+	for _, spec := range dependencies {
 		if spec.PythonWheel {
 			wheels = append(wheels, spec.GetPackageName(version, ""))
 		}
@@ -1343,7 +1351,7 @@ func removePythonWheels(matches []string, version string) []string {
 
 // flattenDependencies will extract all the required packages collected in archivePath and dropPath in flatPath and
 // regenerate checksums
-func flattenDependencies(platforms []string, dependenciesVersion, archivePath, dropPath, flatPath string, manifestResponse *manifest.Build) {
+func flattenDependencies(platforms []string, dependenciesVersion, archivePath, dropPath, flatPath string, manifestResponse *manifest.Build, dependencies []packaging.BinarySpec) {
 
 	for _, pltf := range platforms {
 
@@ -1373,7 +1381,7 @@ func flattenDependencies(platforms []string, dependenciesVersion, archivePath, d
 
 		// never flatten any python wheels, the packages.yml and docker should handle
 		// those specifically so that the python wheels are installed into the container
-		matches = removePythonWheels(matches, dependenciesVersion)
+		matches = removePythonWheels(matches, dependenciesVersion, dependencies)
 
 		if mg.Verbose() {
 			log.Printf("--- Extracting into the flat dir: %v", matches)
@@ -1403,7 +1411,7 @@ func flattenDependencies(platforms []string, dependenciesVersion, archivePath, d
 		checksums := make(map[string]string)
 		// Operate on the files depending on if we're packaging from a manifest or not
 		if manifestResponse != nil {
-			checksums = devtools.ChecksumsWithManifest(pltf, dependenciesVersion, versionedFlatPath, versionedDropPath, manifestResponse)
+			checksums = devtools.ChecksumsWithManifest(pltf, dependenciesVersion, versionedFlatPath, versionedDropPath, manifestResponse, dependencies)
 		} else {
 			checksums = devtools.ChecksumsWithoutManifest(versionedFlatPath, versionedDropPath, dependenciesVersion)
 		}
@@ -1774,7 +1782,7 @@ func appendComponentChecksums(versionedDropPath string, checksums map[string]str
 }
 
 // movePackagesToArchive Create archive folder and move any pre-existing artifacts into it.
-func movePackagesToArchive(dropPath string, platforms []string, packageVersion string) string {
+func movePackagesToArchive(dropPath string, platforms []string, packageVersion string, dependencies []packaging.BinarySpec) string {
 	archivePath := filepath.Join(dropPath, "archives")
 	os.MkdirAll(archivePath, 0o755)
 
@@ -1796,7 +1804,7 @@ func movePackagesToArchive(dropPath string, platforms []string, packageVersion s
 				log.Printf("--- Evaluating moving dependency %s to archive path %s\n", f, archivePath)
 			}
 			// if the matched file name does not contain the platform suffix and it's not a platform-independent package, skip it
-			if !strings.Contains(f, packageSuffix) && !isPlatformIndependentPackage(f, packageVersion) {
+			if !strings.Contains(f, packageSuffix) && !isPlatformIndependentPackage(f, packageVersion, dependencies) {
 				if mg.Verbose() {
 					log.Printf("--- Skipped moving dependency %s to archive path\n", f)
 				}
@@ -1821,7 +1829,7 @@ func movePackagesToArchive(dropPath string, platforms []string, packageVersion s
 			}
 
 			// Platform-independent packages need to be placed in the archive sub-folders for all platforms, copy instead of moving
-			if isPlatformIndependentPackage(f, packageVersion) {
+			if isPlatformIndependentPackage(f, packageVersion, nil) {
 				if err := copyFile(f, targetPath); err != nil {
 					panic(fmt.Errorf("failed copying file: %w", err))
 				}
@@ -1866,9 +1874,9 @@ func copyFile(src, dst string) error {
 	return nil
 }
 
-func isPlatformIndependentPackage(f string, packageVersion string) bool {
+func isPlatformIndependentPackage(f string, packageVersion string, dependencies []packaging.BinarySpec) bool {
 	fileBaseName := filepath.Base(f)
-	for _, spec := range packaging.ExpectedBinaries {
+	for _, spec := range dependencies {
 		packageName := spec.GetPackageName(packageVersion, "")
 		// as of now only python wheels packages are platform-independent
 		if spec.PythonWheel && (fileBaseName == packageName || fileBaseName == packageName+sha512FileExt) {

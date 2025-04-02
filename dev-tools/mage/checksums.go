@@ -95,14 +95,14 @@ func ChecksumsWithoutManifest(versionedFlatPath string, versionedDropPath string
 }
 
 // This is a helper function for flattenDependencies that's used when building from a manifest
-func ChecksumsWithManifest(platform, dependenciesVersion string, versionedFlatPath string, versionedDropPath string, manifestResponse *manifest.Build) map[string]string {
+func ChecksumsWithManifest(platform, dependenciesVersion, versionedFlatPath, versionedDropPath string, manifestResponse *manifest.Build, dependencies []packaging.BinarySpec) map[string]string {
 	checksums := make(map[string]string)
 	if manifestResponse == nil {
 		return checksums
 	}
 
 	// Iterate over the external binaries that we care about for packaging agent
-	for _, spec := range packaging.ExpectedBinaries {
+	for _, spec := range dependencies {
 
 		if spec.PythonWheel {
 			if mg.Verbose() {
