@@ -124,21 +124,24 @@ func ChecksumsWithManifest(platform, dependenciesVersion, versionedFlatPath, ver
 			continue
 		}
 
-		// Combine the package name w/ the versioned flat path
-		fullPath := filepath.Join(versionedFlatPath, manifestPackage.Name)
+		rootDir := spec.GetRootDir(manifestPackage.ActualVersion, platform)
 
-		// Eliminate the file extensions to get the proper directory
-		// name that we need to copy
-		var dirToCopy string
-		if strings.HasSuffix(fullPath, ".tar.gz") {
-			dirToCopy = fullPath[:strings.LastIndex(fullPath, ".tar.gz")]
-		} else if strings.HasSuffix(fullPath, ".zip") {
-			dirToCopy = fullPath[:strings.LastIndex(fullPath, ".zip")]
-		} else {
-			dirToCopy = fullPath
+		// fallback to extracting directory name from packageName
+		if rootDir == "" {
+			log.Printf("Could not find rootDir for %s/%s. Falling back to fileName %s", spec.ProjectName, spec.BinaryName, manifestPackage.Name)
+			rootDir = manifestPackage.Name
+			if strings.HasSuffix(rootDir, ".tar.gz") {
+				rootDir = strings.TrimSuffix(rootDir, ".tar.gz")
+			} else if strings.HasSuffix(rootDir, ".zip") {
+				rootDir = strings.TrimSuffix(rootDir, ".zip")
+			}
 		}
+
+		// Combine the package name w/ the versioned flat path
+		fullPath := filepath.Join(versionedFlatPath, rootDir)
+
 		if mg.Verbose() {
-			log.Printf(">>>>>>> Calculated directory to copy: [%s]", dirToCopy)
+			log.Printf(">>>>>>> Calculated directory to copy: [%s]", fullPath)
 		}
 
 		// Set copy options
@@ -149,11 +152,11 @@ func ChecksumsWithManifest(platform, dependenciesVersion, versionedFlatPath, ver
 			Sync: true,
 		}
 		if mg.Verbose() {
-			log.Printf("> prepare to copy %s into %s ", dirToCopy, versionedDropPath)
+			log.Printf("> prepare to copy %s into %s ", fullPath, versionedDropPath)
 		}
 
 		// Do the copy
-		err = copy.Copy(dirToCopy, versionedDropPath, options)
+		err = copy.Copy(fullPath, versionedDropPath, options)
 		if err != nil {
 			panic(err)
 		}

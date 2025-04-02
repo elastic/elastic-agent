@@ -187,8 +187,9 @@ func DownloadComponents(ctx context.Context, expectedBinaries []packaging.Binary
 }
 
 type ResolvedPackage struct {
-	Name string
-	URLs []string
+	Name          string
+	ActualVersion string
+	URLs          []string
 }
 
 func ResolveManifestPackage(project Project, spec packaging.BinarySpec, dependencyVersion string, platform string) (*ResolvedPackage, error) {
@@ -206,8 +207,9 @@ func ResolveManifestPackage(project Project, spec packaging.BinarySpec, dependen
 		}
 
 		return &ResolvedPackage{
-			Name: packageName,
-			URLs: []string{exactMatch.URL, exactMatch.ShaURL, exactMatch.AscURL},
+			Name:          packageName,
+			ActualVersion: dependencyVersion,
+			URLs:          []string{exactMatch.URL, exactMatch.ShaURL, exactMatch.AscURL},
 		}, nil
 	}
 
@@ -221,9 +223,6 @@ func ResolveManifestPackage(project Project, spec packaging.BinarySpec, dependen
 		return nil, fmt.Errorf("no exact match and filename %q does not seem to contain dependencyVersion %q to try a fallback", packageName, dependencyVersion)
 	}
 
-	// TODO move relaxVersion to the version package so we can rewrite the version like so
-	//parseVersion, _ := version.ParseVersion(dependencyVersion)
-	//parseVersion.GetRelaxedPatchRegexp()
 	relaxedVersion, err := relaxVersion(dependencyVersion)
 	if err != nil {
 		return nil, fmt.Errorf("relaxing dependencyVersion %q: %w", dependencyVersion, err)
@@ -235,7 +234,7 @@ func ResolveManifestPackage(project Project, spec packaging.BinarySpec, dependen
 
 	// locate the original version in the filename and substitute the relaxed version regexp, quoting everything around that
 	relaxedPackageName := regexp.QuoteMeta(packageName[:versionIndex])
-	relaxedPackageName += relaxedVersion
+	relaxedPackageName += `(?P<version>` + relaxedVersion + `)`
 	relaxedPackageName += regexp.QuoteMeta(packageName[versionIndex+len(dependencyVersion):])
 
 	if mg.Verbose() {
@@ -251,13 +250,14 @@ func ResolveManifestPackage(project Project, spec packaging.BinarySpec, dependen
 		if mg.Verbose() {
 			log.Printf(">>>>>>>>>>> Evaluating filename %s", pkgName)
 		}
-		if relaxedPackageNameRegexp.MatchString(pkgName) {
+		if submatches := relaxedPackageNameRegexp.FindStringSubmatch(pkgName); len(submatches) > 0 {
 			if mg.Verbose() {
 				log.Printf(">>>>>>>>>>> Found matching packageName for [%s, %s]: %s", project.Branch, project.CommitHash, pkgName)
 			}
 			return &ResolvedPackage{
-				Name: pkgName,
-				URLs: []string{pkg.URL, pkg.ShaURL, pkg.AscURL},
+				Name:          pkgName,
+				ActualVersion: submatches[1],
+				URLs:          []string{pkg.URL, pkg.ShaURL, pkg.AscURL},
 			}, nil
 		}
 	}
