@@ -47,6 +47,7 @@ function install_fleet_packages() {
 
   echo "Installing Fleet packages"
   resp=$(curl \
+    -s \
     --fail-with-body \
     -X "POST" \
     -u "${KIBANA_USERNAME}:${KIBANA_PASSWORD}" \
