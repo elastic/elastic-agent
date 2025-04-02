@@ -34,10 +34,6 @@ type endpointPackageTemplateVars struct {
 	Version  string
 }
 
-// endpointPackageVersion below must match the one specified in
-// testing/integration/testdata/preinstalled_packages.json
-const endpointPackageVersion = "9.0.0"
-
 func agentAndEndpointAreHealthy(t *testing.T, ctx context.Context, agentClient client.Client) bool {
 	t.Helper()
 
