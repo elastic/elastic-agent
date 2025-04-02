@@ -45,7 +45,6 @@ function install_fleet_packages() {
     return 5
   fi
 
-  echo "Installing Fleet packages"
   resp=$(curl \
     -s \
     --fail-with-body \
