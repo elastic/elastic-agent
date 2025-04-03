@@ -365,11 +365,12 @@ func testFlattenedDatastreamFleetPolicy(
 	// in Fleet.
 	agentPolicyBuilder := strings.Builder{}
 	err = tmpl.Execute(&agentPolicyBuilder, policyVars{
-		Name:        "Log-Input-" + t.Name() + "-" + time.Now().Format(time.RFC3339),
-		PolicyID:    policy.ID,
-		LogFilePath: logFilePath,
-		Namespace:   dsNamespace,
-		Dataset:     dsDataset,
+		Name:              "Log-Input-" + t.Name() + "-" + time.Now().Format(time.RFC3339),
+		PolicyID:          policy.ID,
+		LogFilePath:       logFilePath,
+		Namespace:         dsNamespace,
+		Dataset:           dsDataset,
+		LogPackageVersion: preinstalledPackages["log"],
 	})
 	if err != nil {
 		t.Fatalf("could not render template: %s", err)
@@ -508,7 +509,7 @@ var policyJSON = `
   "policy_id": "{{.PolicyID}}",
   "package": {
     "name": "log",
-    "version": "2.3.0"
+    "version": "{{.LogPackageVersion}}"
   },
   "name": "{{.Name}}",
   "namespace": "{{.Namespace}}",
@@ -531,11 +532,12 @@ var policyJSON = `
 }`
 
 type policyVars struct {
-	Name        string
-	PolicyID    string
-	LogFilePath string
-	Namespace   string
-	Dataset     string
+	Name              string
+	PolicyID          string
+	LogFilePath       string
+	Namespace         string
+	Dataset           string
+	LogPackageVersion string
 }
 
 type ESDocument struct {
