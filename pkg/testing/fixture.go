@@ -185,6 +185,11 @@ func (f *Fixture) Client() client.Client {
 	return f.c
 }
 
+// Version returns the Elastic Agent version.
+func (f *Fixture) Version() string {
+	return f.version
+}
+
 // Prepare prepares the Elastic Agent for usage.
 //
 // This must be called before `Configure`, `Run`, or `Install` can be called.
@@ -1003,7 +1008,7 @@ func (f *Fixture) prepareComponents(workDir string, components ...UsableComponen
 
 	// now remove all that should not be kept; removal is only
 	// done by removing the spec file, no need to delete the binary
-	componentsDir, err := FindComponentsDir(workDir)
+	componentsDir, err := FindComponentsDir(workDir, "")
 	if err != nil {
 		return err
 	}
@@ -1241,7 +1246,7 @@ func getCacheDir(caller string, name string) (string, error) {
 }
 
 // FindComponentsDir identifies the directory that holds the components.
-func FindComponentsDir(dir string) (string, error) {
+func FindComponentsDir(dir, version string) (string, error) {
 	dataDir := filepath.Join(dir, "data")
 	agentVersions, err := os.ReadDir(dataDir)
 	if err != nil {
@@ -1249,10 +1254,19 @@ func FindComponentsDir(dir string) (string, error) {
 	}
 	var versionDir string
 	for _, fi := range agentVersions {
-		if strings.HasPrefix(fi.Name(), "elastic-agent-") && fi.IsDir() {
-			versionDir = fi.Name()
+		filename := fi.Name()
+		if strings.HasPrefix(filename, "elastic-agent-") && fi.IsDir() {
+			if version != "" && filename[:len(filename)-7] != "elastic-agent-"+version {
+				// version specified but version mismatch. in case of upgrade we have multiple
+				// directories, we don't want first found
+				continue
+			}
+			versionDir = filename
 			break
 		}
+	}
+	if versionDir == "" {
+		return "", fmt.Errorf("failed to find versioned directory for version %q", version)
 	}
 	componentsDir := filepath.Join(dataDir, versionDir, "components")
 	fi, err := os.Stat(componentsDir)
