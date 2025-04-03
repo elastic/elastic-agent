@@ -25,6 +25,7 @@ type Upgrade struct {
 	bkgActions []fleetapi.Action
 	bkgCancel  context.CancelFunc
 	bkgMutex   sync.Mutex
+	ackLock    sync.Mutex
 
 	tamperProtectionFn func() bool // allows to inject the flag for tests, defaults to features.TamperProtection
 }
@@ -91,14 +92,28 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 // ackActions Acks all the actions in bkgActions, and deletes entries from bkgActions.
 // User is responsible for obtaining and releasing bkgMutex lock
 func (h *Upgrade) ackActions(ctx context.Context, ack acker.Acker) {
+	h.ackLock.Lock()
+	defer h.ackLock.Unlock()
 	for _, a := range h.bkgActions {
-		if err := ack.Ack(ctx, a); err != nil {
-			h.log.Errorf("ack of failed upgrade failed: %v", err)
-		}
+		h.ackAction(ctx, ack, a, false)
 	}
 	h.bkgActions = nil
 	if err := ack.Commit(ctx); err != nil {
 		h.log.Errorf("commit of ack for failed upgrade failed: %v", err)
+	}
+}
+
+// ackActions Acks all the actions in bkgActions, and deletes entries from bkgActions.
+// User is responsible for obtaining and releasing bkgMutex lock
+func (h *Upgrade) ackAction(ctx context.Context, ack acker.Acker, action fleetapi.Action, commit bool) {
+	if err := ack.Ack(ctx, action); err != nil {
+		h.log.Errorf("ack of failed upgrade failed: %v", err)
+	}
+
+	if commit {
+		if err := ack.Commit(ctx); err != nil {
+			h.log.Errorf("commit of ack for failed upgrade failed: %v", err)
+		}
 	}
 }
 
@@ -128,7 +143,19 @@ func (h *Upgrade) getAsyncContext(ctx context.Context, action fleetapi.Action, a
 	if upgradeAction.ActionID == bkgAction.ActionID {
 		h.log.Infof("Duplicate upgrade to version %s received",
 			bkgAction.Data.Version)
-		h.bkgActions = append(h.bkgActions, action)
+		return nil, false
+	}
+
+	if upgradeAction.Data.Version == bkgAction.Data.Version &&
+		upgradeAction.Data.SourceURI == bkgAction.Data.SourceURI {
+		// not the same action this one needs to be acked
+		go func() {
+			// kick it off and don't block, lock to prevent race with ackActions from finished upgrade
+			h.ackLock.Lock()
+			defer h.ackLock.Unlock()
+
+			h.ackAction(ctx, ack, upgradeAction, true)
+		}()
 		return nil, false
 	}
 

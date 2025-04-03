@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -195,7 +196,6 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 }
 
 func TestDuplicateActionsHandled(t *testing.T) {
-
 	// Create a cancellable context that will shut down the coordinator after
 	// the test.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -205,6 +205,7 @@ func TestDuplicateActionsHandled(t *testing.T) {
 	upgradeCalledChan := make(chan string)
 
 	agentInfo := &info.AgentInfo{}
+	acker := &fakeAcker{}
 
 	// Create and start the Coordinator
 	c := coordinator.New(
@@ -232,7 +233,7 @@ func TestDuplicateActionsHandled(t *testing.T) {
 				return nil, nil
 			},
 		},
-		nil, nil, nil, nil, nil, false, nil, nil)
+		nil, nil, nil, nil, nil, false, nil, acker)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 
@@ -264,22 +265,26 @@ func TestDuplicateActionsHandled(t *testing.T) {
 		return nil
 	}
 
-	ack := noopacker.New()
+	acker.On("Ack", mock.Anything, mock.Anything).Return(nil)
+	acker.On("Commit", mock.Anything).Return(nil)
+
 	t.Log("First upgrade action should be processed")
-	require.NoError(t, u.Handle(ctx, &a1, ack))
+	require.NoError(t, u.Handle(ctx, &a1, acker))
 	require.Nil(t, checkMsg(upgradeCalledChan, a1.ActionID, "action was not processed"))
-
 	c.ClearOverrideState() // it's upgrading, normally we would restart
 
-	t.Log("Action with different ID but same version should be propagated to upgrader")
-	require.NoError(t, u.Handle(ctx, &a2, ack))
-	require.Nil(t, checkMsg(upgradeCalledChan, a2.ActionID, "action was not processed"))
-
-	c.ClearOverrideState() // it's upgrading, normally we would restart
-
-	t.Log("Resending action with same ID action should be skipped")
-	require.NoError(t, u.Handle(ctx, &a2, ack))
+	t.Log("Action with different ID but same version should not be propagated to upgrader but acked")
+	require.NoError(t, u.Handle(ctx, &a2, acker))
 	require.NotNil(t, checkMsg(upgradeCalledChan, a2.ActionID, "action was not processed"))
+	acker.AssertCalled(t, "Ack", ctx, &a2)
+	acker.AssertCalled(t, "Commit", ctx)
+
+	c.ClearOverrideState() // it's upgrading, normally we would restart
+
+	t.Log("Resending action with same ID should be skipped")
+	require.NoError(t, u.Handle(ctx, &a1, acker))
+	require.NotNil(t, checkMsg(upgradeCalledChan, a1.ActionID, "action was not processed"))
+	acker.AssertNotCalled(t, "Ack", ctx, &a1)
 }
 
 func TestUpgradeHandlerNewVersion(t *testing.T) {
@@ -361,4 +366,18 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 	err2 := u.Handle(ctx, &a2, ack)
 	require.NoError(t, err2)
 	checkMsg(upgradeCalledChan, "8.5.0", "second call to Upgrade must be with version 8.5.0")
+}
+
+type fakeAcker struct {
+	mock.Mock
+}
+
+func (f *fakeAcker) Ack(ctx context.Context, action fleetapi.Action) error {
+	args := f.Called(ctx, action)
+	return args.Error(0)
+}
+
+func (f *fakeAcker) Commit(ctx context.Context) error {
+	args := f.Called(ctx)
+	return args.Error(0)
 }
