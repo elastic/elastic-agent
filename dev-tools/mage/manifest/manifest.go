@@ -216,13 +216,20 @@ func ResolveManifestPackage(project Project, spec packaging.BinarySpec, dependen
 	// If we didn't find it, it may be an Independent Agent Release, where
 	// the opted-in projects will have a patch version one higher than
 	// the rest of the projects, so we "relax" the version constraint
+	return resolveManifestPackageUsingRelaxedVersion(project, spec, dependencyVersion, platform)
+}
 
-	// Find the original version in the filename
+func resolveManifestPackageUsingRelaxedVersion(project Project, spec packaging.BinarySpec, dependencyVersion string, platform string) (*ResolvedPackage, error) {
+	// start with the rendered package name
+	packageName := spec.GetPackageName(dependencyVersion, platform)
+
+	// Find the original version in the rendered filename
 	versionIndex := strings.Index(packageName, dependencyVersion)
 	if versionIndex == -1 {
 		return nil, fmt.Errorf("no exact match and filename %q does not seem to contain dependencyVersion %q to try a fallback", packageName, dependencyVersion)
 	}
 
+	// obtain a regexp from the exact version string that allows for some flexibility on patch version, prerelease and build metadata tokens
 	relaxedVersion, err := relaxVersion(dependencyVersion)
 	if err != nil {
 		return nil, fmt.Errorf("relaxing dependencyVersion %q: %w", dependencyVersion, err)
@@ -262,7 +269,7 @@ func ResolveManifestPackage(project Project, spec packaging.BinarySpec, dependen
 		}
 	}
 
-	return nil, fmt.Errorf("package [%s] not found in project manifest at %s", packageName, project.ExternalArtifactsManifestURL)
+	return nil, fmt.Errorf("package [%s] not found in project manifest at %s using relaxed version %q", packageName, project.ExternalArtifactsManifestURL, relaxedPackageName)
 }
 
 // versionRegexp is taken from https://semver.org/ (see the FAQ section/Is there a suggested regular expression (RegEx) to check a SemVer string?)
