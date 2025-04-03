@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package packaging
+package testing
 
 // This file contains tests that can be run on the generated packages.
 // To run these tests use `go test package_test.go`.
