@@ -13,13 +13,14 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/magefile/mage/mg"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
+	"github.com/elastic/elastic-agent/dev-tools/packaging"
 	"github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -94,6 +95,7 @@ var PlatformPackages = map[string]string{
 	"windows/amd64": "windows-x86_64.zip",
 }
 
+<<<<<<< HEAD
 // ExpectedBinaries  is a map of binaries agent needs to their project in the unified-release manager.
 // The project names are those used in the "projects" list in the unified release manifest.
 // See the sample manifests in the testdata directory.
@@ -161,6 +163,8 @@ func (p Platform) Platform() string {
 
 var AllPlatforms = []Platform{{"linux", "x86_64"}, {"linux", "arm64"}, {"windows", "x86_64"}, {"darwin", "x86_64"}, {"darwin", "aarch64"}}
 
+=======
+>>>>>>> 894ef9385 (Make components in packages configurable (#7602))
 // DownloadManifest is going to download the given manifest file and return the ManifestResponse
 func DownloadManifest(ctx context.Context, manifest string) (Build, error) {
 	manifestUrl, urlError := url.Parse(manifest)
@@ -211,7 +215,7 @@ func DownloadComponents(ctx context.Context, manifest string, platforms []string
 
 	errGrp, downloadsCtx := errgroup.WithContext(ctx)
 	// for project, pkgs := range expectedProjectPkgs() {
-	for _, spec := range ExpectedBinaries {
+	for _, spec := range packaging.ExpectedBinaries {
 		for _, platform := range platforms {
 			targetPath := filepath.Join(dropPath)
 			err := os.MkdirAll(targetPath, 0755)
@@ -225,12 +229,12 @@ func DownloadComponents(ctx context.Context, manifest string, platforms []string
 				continue
 			}
 
-			pkgURL, err := resolveManifestPackage(projects[spec.ProjectName], spec, majorMinorPatchVersion, platform)
+			resolvedPackage, err := ResolveManifestPackage(projects[spec.ProjectName], spec, majorMinorPatchVersion, platform)
 			if err != nil {
 				return err
 			}
 
-			for _, p := range pkgURL {
+			for _, p := range resolvedPackage.URLs {
 				log.Printf(">>>>>>>>> Downloading [%s] [%s] ", spec.BinaryName, p)
 				pkgFilename := path.Base(p)
 				downloadTarget := filepath.Join(targetPath, pkgFilename)
@@ -252,76 +256,114 @@ func DownloadComponents(ctx context.Context, manifest string, platforms []string
 	return nil
 }
 
-func resolveManifestPackage(project Project, spec BinarySpec, version string, platform string) ([]string, error) {
-	var val Package
-	var ok bool
+type ResolvedPackage struct {
+	Name string
+	URLs []string
+}
+
+func ResolveManifestPackage(project Project, spec packaging.BinarySpec, dependencyVersion string, platform string) (*ResolvedPackage, error) {
 
 	// Try the normal/easy case first
-	packageName := spec.GetPackageName(version, platform)
-	val, ok = project.Packages[packageName]
-	if !ok {
-		// If we didn't find it, it may be an Independent Agent Release, where
-		// the opted-in projects will have a patch version one higher than
-		// the rest of the projects, so we need to seek that out
+	packageName := spec.GetPackageName(dependencyVersion, platform)
+	if mg.Verbose() {
+		log.Printf(">>>>>>>>>>> Got packagename [%s], looking for exact match", packageName)
+	}
+
+	if exactMatch, ok := project.Packages[packageName]; ok {
+		// We found the exact filename we are looking for
 		if mg.Verbose() {
-			log.Printf(">>>>>>>>>>> Looking for package [%s] of type [%s]", spec.BinaryName, PlatformPackages[platform])
+			log.Printf(">>>>>>>>>>> Found exact match packageName for [%s, %s]: %s", project.Branch, project.CommitHash, exactMatch)
 		}
 
-		var foundIt bool
-		for pkgName := range project.Packages {
-			if strings.HasPrefix(pkgName, spec.BinaryName) {
-				firstSplit := strings.Split(pkgName, spec.BinaryName+"-")
-				if len(firstSplit) < 2 {
-					continue
-				}
+		return &ResolvedPackage{
+			Name: packageName,
+			URLs: []string{exactMatch.URL, exactMatch.ShaURL, exactMatch.AscURL},
+		}, nil
+	}
 
-				secondHalf := firstSplit[1]
-				// Make sure we're finding one w/ the same required package type
-				if strings.Contains(secondHalf, PlatformPackages[platform]) {
+	// If we didn't find it, it may be an Independent Agent Release, where
+	// the opted-in projects will have a patch version one higher than
+	// the rest of the projects, so we "relax" the version constraint
 
-					// Split again after the version with the required package string
-					secondSplit := strings.Split(secondHalf, "-"+PlatformPackages[platform])
-					if len(secondSplit) < 2 {
-						continue
-					}
+	// Find the original version in the filename
+	versionIndex := strings.Index(packageName, dependencyVersion)
+	if versionIndex == -1 {
+		return nil, fmt.Errorf("no exact match and filename %q does not seem to contain dependencyVersion %q to try a fallback", packageName, dependencyVersion)
+	}
 
-					// The first element after the split should normally be the version
-					pkgVersion := secondSplit[0]
-					if mg.Verbose() {
-						log.Printf(">>>>>>>>>>> Using derived version for package [%s]: %s ", pkgName, pkgVersion)
-					}
-
-					// Create a project/package key with the package, derived version, and required package
-					foundPkgKey := fmt.Sprintf("%s-%s-%s", spec.BinaryName, pkgVersion, PlatformPackages[platform])
-					if mg.Verbose() {
-						log.Printf(">>>>>>>>>>> Looking for project package key: [%s]", foundPkgKey)
-					}
-
-					// Get the package value, if it exists
-					val, ok = project.Packages[foundPkgKey]
-					if !ok {
-						continue
-					}
-
-					if mg.Verbose() {
-						log.Printf(">>>>>>>>>>> Found package key [%s]", foundPkgKey)
-					}
-
-					foundIt = true
-				}
-			}
-		}
-
-		if !foundIt {
-			return nil, fmt.Errorf("package [%s] not found in project manifest at %s", packageName, project.ExternalArtifactsManifestURL)
-		}
+	// TODO move relaxVersion to the version package so we can rewrite the version like so
+	//parseVersion, _ := version.ParseVersion(dependencyVersion)
+	//parseVersion.GetRelaxedPatchRegexp()
+	relaxedVersion, err := relaxVersion(dependencyVersion)
+	if err != nil {
+		return nil, fmt.Errorf("relaxing dependencyVersion %q: %w", dependencyVersion, err)
 	}
 
 	if mg.Verbose() {
-		log.Printf(">>>>>>>>>>> Project branch/commit [%s, %s]", project.Branch, project.CommitHash)
+		log.Printf(">>>>>>>>>>> Couldn't find exact match, relaxing agent dependencyVersion to %s", relaxedVersion)
 	}
 
-	return []string{val.URL, val.ShaURL, val.AscURL}, nil
+	// locate the original version in the filename and substitute the relaxed version regexp, quoting everything around that
+	relaxedPackageName := regexp.QuoteMeta(packageName[:versionIndex])
+	relaxedPackageName += relaxedVersion
+	relaxedPackageName += regexp.QuoteMeta(packageName[versionIndex+len(dependencyVersion):])
+
+	if mg.Verbose() {
+		log.Printf(">>>>>>>>>>> Attempting to match a filename with %s", relaxedPackageName)
+	}
+
+	relaxedPackageNameRegexp, err := regexp.Compile(relaxedPackageName)
+	if err != nil {
+		return nil, fmt.Errorf("compiling relaxed package name regex %q: %w", relaxedPackageName, err)
+	}
+
+	for pkgName, pkg := range project.Packages {
+		if mg.Verbose() {
+			log.Printf(">>>>>>>>>>> Evaluating filename %s", pkgName)
+		}
+		if relaxedPackageNameRegexp.MatchString(pkgName) {
+			if mg.Verbose() {
+				log.Printf(">>>>>>>>>>> Found matching packageName for [%s, %s]: %s", project.Branch, project.CommitHash, pkgName)
+			}
+			return &ResolvedPackage{
+				Name: pkgName,
+				URLs: []string{pkg.URL, pkg.ShaURL, pkg.AscURL},
+			}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("package [%s] not found in project manifest at %s", packageName, project.ExternalArtifactsManifestURL)
+}
+
+// versionRegexp is taken from https://semver.org/ (see the FAQ section/Is there a suggested regular expression (RegEx) to check a SemVer string?)
+const versionRegexp = `^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?:[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`
+const anyPatchVersionRegexp = `(?:0|[1-9]\d*)`
+
+var versionRegExp = regexp.MustCompile(versionRegexp)
+
+func relaxVersion(version string) (string, error) {
+	matchIndices := versionRegExp.FindSubmatchIndex([]byte(version))
+	// Matches index pairs are (0,1) for the whole regexp and (2,3) for the patch group
+	// check that we have matched correctly
+	if len(matchIndices) < 4 {
+		return "", fmt.Errorf("failed to match regexp for version [%s]", version)
+	}
+
+	// take the starting index of the patch version
+	patchStartIndex := matchIndices[2]
+	// copy everything before the patch version escaping the regexp
+	relaxedVersion := regexp.QuoteMeta(version[:patchStartIndex])
+	// add the patch regexp
+	relaxedVersion += anyPatchVersionRegexp
+	// check if there's more characters after the patch version
+	remainderIndex := matchIndices[3]
+	if remainderIndex < len(version) {
+		// This is a looser regexp that allows anything beyond the major version to change (while still enforcing a valid patch version though)
+		// see TestResolveManifestPackage/Independent_Agent_Staging_8.14_apm-server and TestResolveManifestPackage/Independent_Agent_Staging_8.14_endpoint-dev
+		// Be more relaxed and allow for any character sequence after this
+		relaxedVersion += `.*`
+	}
+	return relaxedVersion, nil
 }
 
 func DownloadPackage(ctx context.Context, downloadUrl string, target string) error {

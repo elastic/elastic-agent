@@ -15,6 +15,7 @@ import (
 	"github.com/otiai10/copy"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
+	"github.com/elastic/elastic-agent/dev-tools/packaging"
 )
 
 const ComponentSpecFileSuffix = ".spec.yml"
@@ -94,30 +95,16 @@ func ChecksumsWithoutManifest(versionedFlatPath string, versionedDropPath string
 }
 
 // This is a helper function for flattenDependencies that's used when building from a manifest
-func ChecksumsWithManifest(requiredPackage string, versionedFlatPath string, versionedDropPath string, manifestResponse *manifest.Build) map[string]string {
+func ChecksumsWithManifest(platform, dependenciesVersion string, versionedFlatPath string, versionedDropPath string, manifestResponse *manifest.Build) map[string]string {
 	checksums := make(map[string]string)
 	if manifestResponse == nil {
 		return checksums
 	}
 
-	// Iterate over the component projects in the manifest
-	projects := manifestResponse.Projects
-	for componentName := range projects {
-		// Iterate over the individual package files within each component project
-		for pkgName := range projects[componentName].Packages {
-			// Only care about packages that match the required package constraint (os/arch)
-			if strings.Contains(pkgName, requiredPackage) {
-				// Iterate over the external binaries that we care about for packaging agent
-				for _, spec := range manifest.ExpectedBinaries {
-					// If the individual package doesn't match the expected prefix, then continue
-					// FIXME temporarily skip fips packages until elastic-agent FIPS is in place
-					if !strings.HasPrefix(pkgName, spec.BinaryName) || strings.Contains(pkgName, "-fips-") {
-						if mg.Verbose() {
-							log.Printf(">>>>>>> Package [%s] skipped", pkgName)
-						}
-						continue
-					}
+	// Iterate over the external binaries that we care about for packaging agent
+	for _, spec := range packaging.ExpectedBinaries {
 
+<<<<<<< HEAD
 					if mg.Verbose() {
 						log.Printf(">>>>>>> Package [%s] matches requiredPackage [%s]", pkgName, requiredPackage)
 					}
@@ -202,12 +189,73 @@ func ChecksumsWithManifest(requiredPackage string, versionedFlatPath string, ver
 
 					checksums[specName+ComponentSpecFileSuffix] = checksum
 				}
+=======
+		if spec.PythonWheel {
+			if mg.Verbose() {
+				log.Printf(">>>>>>> Component %s/%s is a Python wheel, skipping", spec.ProjectName, spec.BinaryName)
+>>>>>>> 894ef9385 (Make components in packages configurable (#7602))
 			}
+			continue
 		}
+
+		if !spec.SupportsPlatform(platform) {
+			log.Printf(">>>>>>> Component %s/%s does not support platform %s, skipping", spec.ProjectName, spec.BinaryName, platform)
+			continue
+		}
+
+		manifestPackage, err := manifest.ResolveManifestPackage(manifestResponse.Projects[spec.ProjectName], spec, dependenciesVersion, platform)
+		if err != nil {
+			if mg.Verbose() {
+				log.Printf(">>>>>>> Error resolving package for [%s/%s]", spec.BinaryName, platform)
+			}
+			continue
+		}
+
+		// Combine the package name w/ the versioned flat path
+		fullPath := filepath.Join(versionedFlatPath, manifestPackage.Name)
+
+		// Eliminate the file extensions to get the proper directory
+		// name that we need to copy
+		var dirToCopy string
+		if strings.HasSuffix(fullPath, ".tar.gz") {
+			dirToCopy = fullPath[:strings.LastIndex(fullPath, ".tar.gz")]
+		} else if strings.HasSuffix(fullPath, ".zip") {
+			dirToCopy = fullPath[:strings.LastIndex(fullPath, ".zip")]
+		} else {
+			dirToCopy = fullPath
+		}
+		if mg.Verbose() {
+			log.Printf(">>>>>>> Calculated directory to copy: [%s]", dirToCopy)
+		}
+
+		// Set copy options
+		options := copy.Options{
+			OnSymlink: func(_ string) copy.SymlinkAction {
+				return copy.Shallow
+			},
+			Sync: true,
+		}
+		if mg.Verbose() {
+			log.Printf("> prepare to copy %s into %s ", dirToCopy, versionedDropPath)
+		}
+
+		// Do the copy
+		err = copy.Copy(dirToCopy, versionedDropPath, options)
+		if err != nil {
+			panic(err)
+		}
+
+		checksum, err := CopyComponentSpecs(spec.BinaryName, versionedDropPath)
+		if err != nil {
+			panic(err)
+		}
+
+		checksums[spec.BinaryName+ComponentSpecFileSuffix] = checksum
 	}
 
 	return checksums
 }
+<<<<<<< HEAD
 
 // This function is used when building with a Manifest.  In that manifest, it's possible
 // for projects in an Independent Agent Release to have different versions since the opted-in
@@ -283,3 +331,5 @@ func fixCloudDefendDirPath(dirPath string, componentVersion string, expectedArch
 
 	return fixedDirPath
 }
+=======
+>>>>>>> 894ef9385 (Make components in packages configurable (#7602))
