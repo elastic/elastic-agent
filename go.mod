@@ -53,7 +53,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver v0.121.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver v0.121.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver v0.121.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.121.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.119.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.121.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver v0.121.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.121.0
