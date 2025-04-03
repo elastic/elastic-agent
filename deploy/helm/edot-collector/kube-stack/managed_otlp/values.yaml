@@ -609,7 +609,7 @@ instrumentation:
   nodejs:
     image: docker.elastic.co/observability/elastic-otel-node:1.0.0
   dotnet:
-    image: docker.elastic.co/observability/elastic-otel-dotnet:edge
+    image: docker.elastic.co/observability/elastic-otel-dotnet:1.0.1
   python:
     image: docker.elastic.co/observability/elastic-otel-python:1.0.0
   go:
