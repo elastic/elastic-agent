@@ -149,7 +149,23 @@ components:
       - *linux-amd64
       - *linux-arm64
     packageTypes: *all-package-types
-
+  - &comp-apm_server-fips
+    projectName: apm-server
+    packageName: apm-server-fips-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: apm-server-fips-{{.Version}}-{{.Platform}}
+    binaryName: apm-server
+    platforms:
+      # FIXME: is apm-server-fips not available for linux/amd64? infra PR is pending
+      # - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+  - &comp-fleet-server-fips
+    projectName: fleet-server
+    packageName: fleet-server-fips-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: fleet-server-fips-{{.Version}}-{{.Platform}}
+    binaryName: fleet-server
+    platforms: *all-platforms
+    packageTypes: *all-package-types
 # The shared section contains YAML anchors that are used to
 # define common parts of the package in order to not repeat ourselves.
 shared:
@@ -195,6 +211,8 @@ shared:
   - &elastic_agent_fips_components
     components:
       - *comp-agentbeat-fips
+      - *comp-apm_server-fips
+      - *comp-fleet-server-fips
 
   # Deb/RPM spec for community beats.
   - &deb_rpm_agent_spec
@@ -1447,6 +1465,11 @@ specs:
       spec:
         <<: *agent_binary_fips_spec
         <<: *elastic_license_for_binaries
+        files:
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}
+            symlink: true
+            mode: 0755
     ######## End FIPS Specs ########
 
   # Elastic Beat with Elastic License and binary taken from the x-pack dir.
