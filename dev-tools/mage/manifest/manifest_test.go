@@ -7,12 +7,15 @@ package manifest
 import (
 	_ "embed"
 	"encoding/json"
+	"fmt"
 	"log"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/dev-tools/packaging"
 )
 
 var (
@@ -143,22 +146,77 @@ func TestResolveManifestPackage(t *testing.T) {
 				return
 			}
 
-			urlList, err := resolveManifestPackage(projects[tc.projectName], spec, manifestJson.Version, tc.platform)
+			resolvedPackage, err := ResolveManifestPackage(projects[tc.projectName], spec, manifestJson.Version, tc.platform)
 			require.NoError(t, err)
+			require.NotNil(t, resolvedPackage)
 
-			assert.Len(t, urlList, 3)
-			for _, url := range urlList {
+			assert.Len(t, resolvedPackage.URLs, 3)
+			for _, url := range resolvedPackage.URLs {
 				assert.Contains(t, tc.expectedUrlList, url)
 			}
 		})
 	}
 }
 
-func findBinarySpec(name string) (BinarySpec, bool) {
-	for _, spec := range ExpectedBinaries {
+func findBinarySpec(name string) (packaging.BinarySpec, bool) {
+	for _, spec := range packaging.ExpectedBinaries {
 		if spec.BinaryName == name {
 			return spec, true
 		}
 	}
-	return BinarySpec{}, false
+	return packaging.BinarySpec{}, false
+}
+
+func TestRelaxVersion(t *testing.T) {
+	type args struct {
+		version string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "major-minor-patch",
+			args: args{
+				version: "1.2.3",
+			},
+			want:    `1\.2\.(?:0|[1-9]\d*)`,
+			wantErr: assert.NoError,
+		},
+		{
+			name: "major-minor-patch-snapshot",
+			args: args{
+				version: "1.2.3-SNAPSHOT",
+			},
+			want:    `1\.2\.(?:0|[1-9]\d*).*`,
+			wantErr: assert.NoError,
+		},
+		{
+			name: "major-minor-patch-snapshot-buildmeta",
+			args: args{
+				version: "1.2.3-SNAPSHOT+build20250328112233",
+			},
+			want:    `1\.2\.(?:0|[1-9]\d*).*`,
+			wantErr: assert.NoError,
+		},
+		{
+			name: "not a semver",
+			args: args{
+				version: "foobar",
+			},
+			want:    "",
+			wantErr: assert.Error,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := relaxVersion(tt.args.version)
+			if !tt.wantErr(t, err, fmt.Sprintf("relaxVersion(%v)", tt.args.version)) {
+				return
+			}
+			assert.Equalf(t, tt.want, got, "relaxVersion(%v)", tt.args.version)
+		})
+	}
 }
