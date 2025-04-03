@@ -1,8 +1,7 @@
 ---
 
 # This file contains the package specifications for both Community Beats and
-# Official Beats. The shared section contains YAML anchors that are used to
-# define common parts of the package in order to not repeat ourselves.
+# Official Beats.
 
 # List all the available platforms
 platforms: &all-platforms
@@ -34,6 +33,19 @@ packageTypes: &all-package-types
       4 # tar.gz
   - &pkg-type-docker
       5 # docker
+
+# Settings section contains general compiling and packaging settings
+settings:
+  fips:
+    compile:
+      cgo: true
+      env:
+        GOEXPERIMENT: systemcrypto
+      tags:
+        - requirefips
+      platforms:
+        - *linux-amd64
+        - *linux-arm64
 
 # List *all* the components available for packaging in elastic-agent
 components:
@@ -138,6 +150,8 @@ components:
       - *linux-arm64
     packageTypes: *all-package-types
 
+# The shared section contains YAML anchors that are used to
+# define common parts of the package in order to not repeat ourselves.
 shared:
   - &common
     name: '{{.BeatName}}'

@@ -176,10 +176,24 @@ func (p Platform) Platform() string {
 	return p.OS + "/" + p.Arch
 }
 
+type FIPSConfig struct {
+	Compile struct {
+		CGO       bool              `yaml:"cgo"`
+		Env       map[string]string `yaml:"env"`
+		Tags      []string          `yaml:"tags"`
+		Platforms []Platform        `yaml:"platforms"`
+	} `yaml:"compile"`
+}
+
+type GlobalSettings struct {
+	FIPS FIPSConfig `yaml:"fips"`
+}
+
 type packagesConfig struct {
 	Platforms    []Platform              `yaml:"platforms"`
 	PackageTypes []pkgcommon.PackageType `yaml:"packageTypes"`
 	Components   []BinarySpec            `yaml:"components"`
+	Settings     GlobalSettings          `yaml:"settings"`
 }
 
 func parsePackageSettings(r io.Reader) (*packagesConfig, error) {
@@ -203,4 +217,8 @@ func Components() ([]BinarySpec, error) {
 	ret := make([]BinarySpec, len(settings.Components))
 	copy(ret, settings.Components)
 	return ret, nil
+}
+
+func Settings() GlobalSettings {
+	return settings.Settings
 }
