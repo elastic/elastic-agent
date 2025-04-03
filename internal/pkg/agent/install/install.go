@@ -169,8 +169,7 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 	// ensure that service is removed
 	err = EnsureServiceRemoved(30*time.Second, 250*time.Millisecond, paths.ServiceName())
 	if err != nil {
-		// error context already added by EnsureServiceRemoved
-		pt.Describe(err.Error())
+		pt.Describe(fmt.Sprintf("Failed to ensure service does not exist: %s", err.Error()))
 	}
 	// install service
 	err = InstallService(topPath, ownership, username, groupName, password)

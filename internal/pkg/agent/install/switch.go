@@ -79,8 +79,7 @@ func SwitchExecutingMode(topPath string, pt *progressbar.ProgressBar, username s
 
 	err = EnsureServiceRemoved(30*time.Second, 250*time.Millisecond, paths.ServiceName())
 	if err != nil {
-		// error context already added by EnsureServiceRemoved
-		pt.Describe(err.Error())
+		pt.Describe(fmt.Sprintf("Failed to ensure service was removed: %s", err.Error()))
 	}
 
 	// re-install service
