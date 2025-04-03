@@ -225,10 +225,46 @@
                                     "type": "boolean",
                                     "description": "Enable containers logs stream."
                                 },
-                                "additionalParsersConfig": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object"
+                                "vars": {
+                                    "type": "object",
+                                    "description": "Stream variables.",
+                                    "properties": {
+                                        "enabledDefaultProcessors": {
+                                            "type": "boolean",
+                                            "description": "Enable container logs stream default processors.",
+                                            "default": true
+                                        },
+                                        "symlinks": {
+                                            "type": "boolean",
+                                            "description": "Use Symlinks.",
+                                            "default": true
+                                        },
+                                        "additionalParsersConfig": {
+                                            "type": "array",
+                                            "description": "Additional parsers configuration.",
+                                            "items": {
+                                                "type": "object"
+                                            },
+                                            "default": []
+                                        },
+                                        "containerParserStream": {
+                                            "type": "string",
+                                            "description": "Container parser's stream configuration.",
+                                            "default": "all"
+                                        },
+                                        "containerParserFormat": {
+                                            "type": "string",
+                                            "description": "Container parser's format configuration.",
+                                            "default": "auto"
+                                        },
+                                        "processors": {
+                                            "type": "array",
+                                            "description": "Additional processors to use on the container logs streams. Processors are used to reduce the number of fields in the exported event or to enhance the event with metadata. This executes in the agent before the events are shipped.",
+                                            "items": {
+                                                "type": "object"
+                                            },
+                                            "default": []
+                                        }
                                     }
                                 }
                             },
