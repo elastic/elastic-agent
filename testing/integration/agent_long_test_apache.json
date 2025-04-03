@@ -7,7 +7,7 @@
     "package": {
       "name": "apache",
       "title": "Apache HTTP Server",
-      "version": "1.17.0"
+      "version": "1.30.0"
     },
     "enabled": true,
     "inputs": [

@@ -34,9 +34,6 @@ type endpointPackageTemplateVars struct {
 	Version  string
 }
 
-// TODO: Setup a GitHub Action to update this for each release of https://github.com/elastic/endpoint-package
-const endpointPackageVersion = "8.11.0"
-
 func agentAndEndpointAreHealthy(t *testing.T, ctx context.Context, agentClient client.Client) bool {
 	t.Helper()
 
@@ -105,7 +102,7 @@ func installElasticDefendPackage(t *testing.T, info *define.Info, policyID strin
 		ID:       packagePolicyID,
 		Name:     "Defend-" + packagePolicyID,
 		PolicyID: policyID,
-		Version:  endpointPackageVersion,
+		Version:  preinstalledPackages["endpoint"],
 	})
 	if err != nil {
 		return r, fmt.Errorf("error executing template: %w", err)
