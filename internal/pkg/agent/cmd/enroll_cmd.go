@@ -366,7 +366,11 @@ func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig m
 		return "", err
 	}
 
+	c.log.Infof("creating agent config for Fleet bootstrap from %v", persistentConfig)
+
 	agentConfig := c.createAgentConfig("", persistentConfig, c.options.FleetServer.Headers)
+
+	c.log.Infof("created agent config for Fleet bootstrap: %v", agentConfig)
 
 	//nolint:dupl // duplicate because same params are passed
 	fleetConfig, err := createFleetServerBootstrapConfig(
@@ -1102,9 +1106,10 @@ func getPersistentConfig(pathConfigFile string) (map[string]interface{}, error) 
 	}
 
 	pc := &struct {
-		Headers        map[string]string                      `json:"agent.headers,omitempty" yaml:"agent.headers,omitempty" config:"agent.headers,omitempty"`
-		LogLevel       string                                 `json:"agent.logging.level,omitempty" yaml:"agent.logging.level,omitempty" config:"agent.logging.level,omitempty"`
-		MonitoringHTTP *monitoringConfig.MonitoringHTTPConfig `json:"agent.monitoring.http,omitempty" yaml:"agent.monitoring.http,omitempty" config:"agent.monitoring.http,omitempty"`
+		Headers             map[string]string                      `json:"agent.headers,omitempty" yaml:"agent.headers,omitempty" config:"agent.headers,omitempty"`
+		LogLevel            string                                 `json:"agent.logging.level,omitempty" yaml:"agent.logging.level,omitempty" config:"agent.logging.level,omitempty"`
+		MonitoringHTTP      *monitoringConfig.MonitoringHTTPConfig `json:"agent.monitoring.http,omitempty" yaml:"agent.monitoring.http,omitempty" config:"agent.monitoring.http,omitempty"`
+		MonitoringAPMConfig *monitoringConfig.APMConfig            `json:"agent.monitoring.apm,omitempty" yaml:"agent.monitoring.apm,omitempty" config:"agent.monitoring.apm,omitempty"`
 	}{
 		MonitoringHTTP: monitoringConfig.DefaultConfig().HTTP,
 	}
@@ -1121,6 +1126,9 @@ func getPersistentConfig(pathConfigFile string) (map[string]interface{}, error) 
 		persistentMap["monitoring.http"] = pc.MonitoringHTTP
 	}
 
+	if pc.MonitoringAPMConfig != nil {
+		persistentMap["monitoring.apm"] = pc.MonitoringAPMConfig
+	}
 	return persistentMap, nil
 }
 
