@@ -75,7 +75,7 @@ func (runner *AuditDRunner) SetupSuite() {
 	require.NoError(runner.T(), err)
 
 	packageFile := filepath.Join("testdata", "auditd_package.json")
-	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "auditd_manager", "1.18.3", packageFile, uuid.Must(uuid.NewV4()).String(), policyResp.ID)
+	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "auditd_manager", preinstalledPackages["auditd_manager"], packageFile, uuid.Must(uuid.NewV4()).String(), policyResp.ID)
 	require.NoError(runner.T(), err)
 
 }

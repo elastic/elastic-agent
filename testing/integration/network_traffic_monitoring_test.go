@@ -76,7 +76,7 @@ func (runner *NetworkTrafficRunner) SetupSuite() {
 	require.NoError(runner.T(), err)
 
 	packageFile := filepath.Join("testdata", "network_traffic_package.json")
-	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "network_traffic", "1.32.1", packageFile, uuid.Must(uuid.NewV4()).String(), policyResp.ID)
+	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "network_traffic", preinstalledPackages["network_traffic"], packageFile, uuid.Must(uuid.NewV4()).String(), policyResp.ID)
 	require.NoError(runner.T(), err)
 
 }

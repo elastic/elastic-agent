@@ -75,7 +75,7 @@ func (runner *OsqueryManagerRunner) SetupSuite() {
 	require.NoError(runner.T(), err)
 
 	packageFile := filepath.Join("testdata", "osquery_package.json")
-	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "osquery_manager", "1.16.0", packageFile, uuid.Must(uuid.NewV4()).String(), policyResp.ID)
+	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "osquery_manager", preinstalledPackages["osquery_manager"], packageFile, uuid.Must(uuid.NewV4()).String(), policyResp.ID)
 	require.NoError(runner.T(), err)
 
 }
