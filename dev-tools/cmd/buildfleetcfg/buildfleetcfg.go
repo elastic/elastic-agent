@@ -9,10 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"go/format"
-	"os"
 	"text/template"
-
-	licen "github.com/elastic/elastic-agent/dev-tools/licenses"
 
 	"github.com/elastic/elastic-agent/pkg/packer"
 )
@@ -48,7 +45,7 @@ func init() {
 	// {{ $f }}
 	{{ end -}}
 	unpacked := packer.MustUnpack("{{ .Pack }}")
-	raw, ok := unpacked[filepath.Join("_meta","elastic-agent.fleet.yml")]
+	raw, ok := unpacked[filepath.Join("_meta", "elastic-agent.fleet.yml")]
 	if !ok {
 		// ensure we have something loaded.
 		panic("elastic-agent.fleet.yml is not included in the binary")
@@ -60,33 +57,33 @@ func init() {
 func main() {
 	flag.Parse()
 
-	if len(input) == 0 {
-		fmt.Fprintln(os.Stderr, "Invalid input source")
-		os.Exit(1)
-	}
+	// if len(input) == 0 {
+	// 	fmt.Fprintln(os.Stderr, "Invalid input source")
+	// 	os.Exit(1)
+	// }
 
-	l, err := licen.Find(license)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "problem to retrieve the license, error: %+v", err)
-		os.Exit(1)
-	}
+	// l, err := licen.Find(license)
+	// if err != nil {
+	// 	fmt.Fprintf(os.Stderr, "problem to retrieve the license, error: %+v", err)
+	// 	os.Exit(1)
+	// }
 
-	data, err := gen(input, l)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error while generating the file, err: %+v\n", err)
-		os.Exit(1)
-	}
+	// data, err := gen(input, l)
+	// if err != nil {
+	// 	fmt.Fprintf(os.Stderr, "Error while generating the file, err: %+v\n", err)
+	// 	os.Exit(1)
+	// }
 
-	if output == "-" {
-		os.Stdout.Write(data)
-		return
-	}
+	// if output == "-" {
+	// 	os.Stdout.Write(data)
+	// 	return
+	// }
 
-	err = os.WriteFile(output, data, 0640)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error while writing the file to '%s', err: %+v\n", output, err)
-		os.Exit(1)
-	}
+	// err = os.WriteFile(output, data, 0640)
+	// if err != nil {
+	// 	fmt.Fprintf(os.Stderr, "Error while writing the file to '%s', err: %+v\n", output, err)
+	// 	os.Exit(1)
+	// }
 
 	return
 }
