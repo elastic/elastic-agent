@@ -147,7 +147,9 @@ kubernetes:
       # -- enable containers logs stream [ref](https://www.elastic.co/docs/current/integrations/kubernetes/container-logs)
       # @section -- 2 - Kubernetes integration
       enabled: true
-      additionalParsersConfig: []
+      # -- containers logs stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
     audit_logs:
       # -- enable containers audit logs stream [ref](https://www.elastic.co/docs/current/integrations/kubernetes/audit-logs)
       # @section -- 2 - Kubernetes integration
@@ -358,9 +360,51 @@ agent:
     # -- Fleet enrollment token
     # @section -- 6.1 - Elastic-Agent Managed Configuration
     token: ""
-    # -- Fleet insecure url
+    # -- Communicate with Fleet with either insecure HTTP or unverified HTTPS
     # @section -- 6.1 - Elastic-Agent Managed Configuration
     insecure: false
+    # -- Enforce enrollment even if agent is already enrolled
+    # @section -- 6.1 - Elastic-Agent Managed Configuration
+    force: false
+    ca:
+      # -- Value of the CA certificate for connecting to Fleet
+      # @section -- 6.1 - Elastic-Agent Managed Configuration
+      value: ""
+      valueFromSecret:
+        # -- Secret name for the CA certificate
+        # @section -- 6.1 - Elastic-Agent Managed Configuration
+        name: ""
+        # -- Secret key for the CA certificate
+        # @section -- 6.1 - Elastic-Agent Managed Configuration
+        key: ""
+    agentCert:
+      # -- Value of Elastic Agent client certificate for Fleet Server mTLS
+      # @section -- 6.1 - Elastic-Agent Managed Configuration
+      value: ""
+      valueFromSecret:
+        # -- Secret name for the Elastic Agent client certificate
+        # @section -- 6.1 - Elastic-Agent Managed Configuration
+        name: ""
+        # -- Key in the secret for the Elastic Agent client certificate
+        # @section -- 6.1 - Elastic-Agent Managed Configuration
+        key: ""
+    agentCertKey:
+      # -- Value of Elastic Agent client private key for Fleet Server mTLS
+      # @section -- 6.1 - Elastic-Agent Managed Configuration
+      value: ""
+      valueFromSecret:
+        # -- Secret name for the Elastic Agent client private key
+        # @section -- 6.1 - Elastic-Agent Managed Configuration
+        name: ""
+        # -- Key in the secret for the Elastic Agent client private key
+        # @section -- 6.1 - Elastic-Agent Managed Configuration
+        key: ""
+    # -- Token name to use for fetching token from Kibana if the enrollment token is not supplied
+    # @section -- 6.1 - Elastic-Agent Managed Configuration
+    tokenName: ""
+    # -- Token policy name to use for fetching token from Kibana if the enrollment token is not supplied
+    # @section -- 6.1 - Elastic-Agent Managed Configuration
+    policyName: ""
     # -- Kibana host to fallback if enrollment token is not supplied
     # @section -- 6.1 - Elastic-Agent Managed Configuration
     kibanaHost: ""
@@ -370,6 +414,20 @@ agent:
     # -- Kibana password to fallback if enrollment token is not supplied
     # @section -- 6.1 - Elastic-Agent Managed Configuration
     kibanaPassword: ""
+    kibanaCA:
+      # -- Value of the CA certificate for Kibana if the enrollment token is not supplied
+      # @section -- 6.1 - Elastic-Agent Managed Configuration
+      value: ""
+      valueFromSecret:
+        # -- Secret name for the Kibana CA certificate
+        # @section -- 6.1 - Elastic-Agent Managed Configuration
+        name: ""
+        # -- Key in the secret for the Kibana CA certificate
+        # @section -- 6.1 - Elastic-Agent Managed Configuration
+        key: ""
+    # -- Service token to use when connecting to Kibana if the enrollment token is not supplied
+    # @section -- 6.1 - Elastic-Agent Managed Configuration
+    kibanaServiceToken: ""
     # -- Agent preset to deploy
     # @section -- 6.1 - Elastic-Agent Managed Configuration
     preset: perNode
