@@ -499,7 +499,7 @@ var policyJSON = `
   "policy_id": "{{.PolicyID}}",
   "package": {
     "name": "log",
-    "version": {{.LogPackageVersion}}"
+    "version": "{{.LogPackageVersion}}"
   },
   "name": "{{.Name}}",
   "namespace": "{{.Namespace}}",
