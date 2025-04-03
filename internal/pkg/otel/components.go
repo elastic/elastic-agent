@@ -20,7 +20,6 @@ import (
 	jmxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver"
 	k8sclusterreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver"
 	k8sobjectsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver"
-	kafkareceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver"
 	kubeletstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver"
 	nginxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver"
 	receivercreator "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator"
@@ -92,7 +91,6 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			fbreceiver.NewFactory(),
 			mbreceiver.NewFactory(),
 			jmxreceiver.NewFactory(),
-			kafkareceiver.NewFactory(),
 			nopreceiver.NewFactory(),
 		}
 		// some receivers should only be available when
@@ -123,14 +121,18 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		}
 
 		// Exporters
-		factories.Exporters, err = otelcol.MakeFactoryMap[exporter.Factory](
+		exporters := []exporter.Factory{
 			otlpexporter.NewFactory(),
 			debugexporter.NewFactory(),
 			fileexporter.NewFactory(),
 			elasticsearchexporter.NewFactory(),
 			loadbalancingexporter.NewFactory(),
 			otlphttpexporter.NewFactory(),
-		)
+		}
+		// some exporters should only be available when
+		// not in fips mode due to restrictions on crypto usage
+		exporters = addNonFipsExporters(exporters)
+		factories.Exporters, err = otelcol.MakeFactoryMap(exporters...)
 		if err != nil {
 			return otelcol.Factories{}, err
 		}
