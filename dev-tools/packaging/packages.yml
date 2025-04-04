@@ -157,7 +157,8 @@ components:
     platforms:
       # FIXME: is apm-server-fips not available for linux/amd64? infra PR is pending
       # - *linux-amd64
-      - *linux-arm64
+      # FIXME: is apm-server-fips on linux/arm64 has a different binary name 'apm-server-fips' but 'apm-server.spec.yml' spec file
+      #- *linux-arm64
     packageTypes: *all-package-types
   - &comp-fleet-server-fips
     projectName: fleet-server
