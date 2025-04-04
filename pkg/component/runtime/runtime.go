@@ -7,11 +7,13 @@ package runtime
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/runner"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -173,10 +175,14 @@ func (s *componentRuntimeState) getLatest() ComponentState {
 }
 
 func (s *componentRuntimeState) start() error {
+	fmt.Println("++++++++++++++++++++ TRACE START ", s.id)
+	logp.L().Named("trace-debug").Info("++++++++++++++++++++ TRACE START ", s.id)
 	return s.runtime.Start()
 }
 
 func (s *componentRuntimeState) stop(teardown bool, signed *component.Signed) error {
+	fmt.Println("++++++++++++++++++++ TRACE 05 ", s.id, " Teardow?", teardown)
+	logp.L().Named("trace-debug").Info("++++++++++++++++++++ TRACE 05 ", s.id, " Teardow?", teardown)
 	if !s.shuttingDown.CompareAndSwap(false, true) {
 		// already stopping
 		return nil

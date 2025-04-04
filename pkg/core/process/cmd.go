@@ -8,11 +8,13 @@ package process
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"syscall"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"golang.org/x/sys/windows"
 )
 
@@ -38,6 +40,8 @@ func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ..
 		// https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags
 		CreationFlags: windows.CREATE_NEW_PROCESS_GROUP,
 	}
+	fmt.Println("==================== Creating command with CREATE_NEW_PROCESS_GROUP: ", path, arg[0])
+	logp.L().Named("trace-debug").Info("==================== Creating command with CREATE_NEW_PROCESS_GROUP: ", path, arg[0])
 
 	return cmd, nil
 }
@@ -53,5 +57,9 @@ func terminateCmd(proc *os.Process) error {
 	// it CTLR_C_EVENT is disabled, so the only way to gracefully terminate
 	// the child process is to send a CTRL_BREAK_EVENT.
 	// https://learn.microsoft.com/en-us/windows/console/generateconsolectrlevent
+	fmt.Println("==================== Sending CTRL_BREAK_EVENT to PID:", proc.Pid)
+	logp.L().Named("trace-debug").Info("==================== Sending CTRL_BREAK_EVENT to PID:", proc.Pid)
+	fmt.Println("++++++++++++++++++++ TRACE 00 ", proc.Pid)
+	logp.L().Named("trace-debug").Info("++++++++++++++++++++ TRACE 00 ", proc.Pid)
 	return windows.GenerateConsoleCtrlEvent(windows.CTRL_BREAK_EVENT, uint32(proc.Pid))
 }

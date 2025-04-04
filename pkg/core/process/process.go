@@ -10,6 +10,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
+
+	"github.com/elastic/elastic-agent-libs/logp"
 )
 
 // Info groups information about fresh new process
@@ -110,16 +112,22 @@ func (i *Info) Kill() error {
 
 // Stop stops the process cleanly.
 func (i *Info) Stop() error {
+	fmt.Println("++++++++++++++++++++ TRACE 01", i.PID)
+	logp.L().Named("trace-debug").Info("++++++++++++++++++++ TRACE 01", i.PID)
 	return terminateCmd(i.Process)
 }
 
 // StopWait stops the process and waits for it to exit.
 func (i *Info) StopWait() error {
 	err := i.Stop()
+	fmt.Println("++++++++++++++++++++ TRACE 01.1 - Waiting ", i.PID)
+	logp.L().Named("trace-debug").Info("++++++++++++++++++++ TRACE 01.1 - Waiting ", i.PID)
 	if err != nil {
 		return err
 	}
 	_, err = i.Process.Wait()
+	fmt.Println("++++++++++++++++++++ TRACE 01.1 - Waiting DONE", i.PID)
+	logp.L().Named("trace-debug").Info("++++++++++++++++++++ TRACE 01.1 - Waiting DONE", i.PID)
 	return err
 }
 

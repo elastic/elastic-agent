@@ -7,6 +7,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -356,6 +357,36 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override ap
 	// listen for signals
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
+	//HERE
+	go func() {
+		logger := logp.L().Named("debug-server")
+		print := func(msg ...string) {
+			final := strings.Join(msg, " ")
+			logger.Info(final)
+			fmt.Println("--------------------", final)
+		}
+		mux := http.NewServeMux()
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			print("Request:", r.URL.String(), "Query:", r.URL.RawQuery)
+			terminateQs := r.URL.Query().Get("terminate")
+			terminate, err := strconv.ParseBool(terminateQs)
+			if err != nil {
+				msg := fmt.Sprintf("Invalid query parameter %q: %s", terminateQs, err)
+				print(msg)
+				w.Write([]byte(msg))
+				return
+			}
+
+			if terminate {
+				print("Sending SIGTERM into the channel")
+				signals <- syscall.SIGTERM
+			}
+		})
+
+		print("Starting server on :4000")
+		http.ListenAndServe(":4000", mux)
+	}()
+
 	isRex := false
 	logShutdown := true
 LOOP:
@@ -397,6 +428,8 @@ LOOP:
 	if isRex {
 		rex.ShutdownComplete()
 	}
+	// HERE IT'S BROKEN!
+	// We need to wait for all components to finish exiting before killing them like the savage we've been
 	return logReturn(l, err)
 }
 

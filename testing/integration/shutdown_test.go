@@ -13,13 +13,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/pkg/core/process"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
@@ -45,7 +45,7 @@ func TestGracefullyShutdownComponents(t *testing.T) {
 	f, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err, "cannot create fixture from local build")
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
 	defer cancel()
 
 	// ==================== Prepare
@@ -59,20 +59,37 @@ func TestGracefullyShutdownComponents(t *testing.T) {
 
 	output := strings.Builder{}
 	// We use process.Start to ensure it is sending the correct signal
-	proc, err := process.Start(
-		f.BinaryPath(),
-		process.WithContext(ctx),
-		process.WithCmdOptions(func(c *exec.Cmd) error {
-			c.Stderr = &output
-			c.Stdout = &output
-			return nil
-		}),
-	)
+	// proc, err := process.Start(
+	// 	f.BinaryPath(),
+	// 	process.WithContext(ctx),
+	// 	// process.WithArgs([]string{"-e", "-v"}),
+	// 	process.WithCmdOptions(func(c *exec.Cmd) error {
+	// 		// c.Stderr = &output
+	// 		// c.Stdout = &output
+	// 		// c.Stderr = os.Stdout
+	// 		// c.Stdout = os.Stdout
+	// 		c.Stderr = io.Discard
+	// 		c.Stdout = io.Discard
+	// 		return nil
+	// 	}),
+	// )
+	// if err != nil {
+	// 	t.Errorf("failed to start Elastic-Agent process")
+	// 	t.Logf("Elastic-Agent output: %s", output.String())
+	// }
+
+	cmd, err := f.PrepareAgentCommand(ctx, nil)
 	if err != nil {
-		t.Errorf("failed to start Elastic-Agent process")
-		t.Logf("Elastic-Agent output: %s", output.String())
+		t.Fatal(err)
+	}
+	cmd.Stderr = os.Stdout
+	cmd.Stdout = os.Stdout
+	cmd.SysProcAttr = getProcAttr()
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
 	}
 
+	fmt.Println("============================== Elastic Agent has started")
 	// Wait the Elastic-Agent to be healthy
 	healthOutput := strings.Builder{}
 	require.Eventuallyf(
@@ -90,14 +107,26 @@ func TestGracefullyShutdownComponents(t *testing.T) {
 		"Elastic-Agent did not report healthy. Agent status error: '%s'. Process Output: %s",
 		&healthOutput, output.String())
 
+	fmt.Println("============================== Elastic Agent is healthy")
+	fmt.Println("============================== Sending stop command")
+	t.Log("============================== Sending stop command")
 	// Stop the Elastic-Agent process and wait for it to return
-	if err := proc.StopWait(); err != nil {
-		t.Fatalf(
-			"failed to stop Elastic-Agent process: %s. Process output: %s",
-			err,
-			output.String())
+	// if err := proc.StopWait(); err != nil {
+	// 	t.Fatalf(
+	// 		"failed to stop Elastic-Agent process: %s. Process output: %s",
+	// 		err,
+	// 		output.String())
+	// }
+	if err := stopCmd(cmd); err != nil {
+		t.Fatal(err)
 	}
-
+	fmt.Println("============================== Stop signal sent")
+	if err := cmd.Wait(); err != nil {
+		fmt.Println("============================== Error", err)
+		t.Fatal(err)
+	}
+	fmt.Println("============================== Elastic Agent has stopped")
+	t.Log("============================== Elastic Agent has stopped")
 	assertInLogs(t, f, "elastic-agent", `signal "terminated" received`)
 	assertInLogs(t, f, "filestream-default", `Received signal "terminated", stopping`)
 	assertInLogs(t, f, "filestream-default", "Stopping filebeat")
@@ -212,4 +241,33 @@ func getLogFileNamesFromFixture(t *testing.T, f *atesting.Fixture) (logFiles, ev
 	}
 
 	return logFiles, eventLogFiles
+}
+
+func TestFoo(t *testing.T) {
+	suffix := ""
+	if runtime.GOOS == "windows" {
+		suffix = ".exe"
+	}
+	cmd := exec.Command(filepath.Join("simple", "simple"+suffix))
+	cmd.Stderr = os.Stdout
+	cmd.Stdout = os.Stdout
+
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+
+	// We need to wait for the process to start
+	time.Sleep(time.Second)
+	t.Log("==================== Started")
+	if err := stopCmd(cmd); err != nil {
+		t.Fatal("Stop error:", err)
+	}
+	t.Log("============================== Stop signal sent")
+
+	time.Sleep(2 * time.Second)
+	if err := cmd.Wait(); err != nil {
+		t.Log("============================== Error", err)
+		t.Fatal("Wait failed", err)
+	}
+	t.Log("============================== Process has stopped")
 }
