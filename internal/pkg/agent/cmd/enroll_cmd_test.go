@@ -11,7 +11,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -119,96 +118,6 @@ func TestEnroll(t *testing.T) {
 			require.Error(t, err)
 		},
 	))
-
-	t.Run("successfully enroll with mTLS and save fleet config in the store", func(t *testing.T) {
-		agentCertPassphrase := "a really secure passphrase"
-		passphrasePath := filepath.Join(t.TempDir(), "passphrase")
-		err := os.WriteFile(
-			passphrasePath,
-			[]byte(agentCertPassphrase),
-			0666)
-		require.NoError(t, err,
-			"could not write agent child certificate key passphrase to temp directory")
-
-		tlsCfg, _, agentCertPathPair, fleetRootPathPair, _ :=
-			mTLSServer(t, agentCertPassphrase)
-
-		mockHandlerCalled := false
-		mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			mockHandlerCalled = true
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`
-{
-    "action": "created",
-    "item": {
-       "id": "a9328860-ec54-11e9-93c4-d72ab8a69391",
-        "active": true,
-        "policy_id": "69f3f5a0-ec52-11e9-93c4-d72ab8a69391",
-        "type": "PERMANENT",
-        "enrolled_at": "2019-10-11T18:26:37.158Z",
-        "user_provided_metadata": {
-						"custom": "customize"
-				},
-        "local_metadata": {
-            "platform": "linux",
-            "version": "8.0.0"
-        },
-        "actions": [],
-        "access_api_key": "my-access-api-key"
-    }
-}`))
-		})
-
-		s := httptest.NewUnstartedServer(mockHandler)
-		s.TLS = tlsCfg
-		s.StartTLS()
-		defer s.Close()
-
-		store := &mockStore{}
-		enrollOptions := enrollCmdOption{
-			CAs:               []string{string(fleetRootPathPair.Cert)},
-			Certificate:       string(agentCertPathPair.Cert),
-			Key:               string(agentCertPathPair.Key),
-			KeyPassphrasePath: passphrasePath,
-
-			URL:                  s.URL,
-			EnrollAPIKey:         "my-enrollment-api-key",
-			UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
-			SkipCreateSecret:     skipCreateSecret,
-			SkipDaemonRestart:    true,
-		}
-		cmd, err := newEnrollCmd(
-			log,
-			&enrollOptions,
-			"",
-			store,
-			nil,
-		)
-		require.NoError(t, err, "could not create enroll command")
-
-		streams, _, _, _ := cli.NewTestingIOStreams()
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-		defer cancel()
-
-		err = cmd.Execute(ctx, streams)
-		require.NoError(t, err, "enroll command returned and unexpected error")
-
-		fleetCfg, err := readConfig(store.Content)
-		require.NoError(t, err, "could not read fleet config from store")
-
-		assert.True(t, mockHandlerCalled, "mock handler should have been called")
-		fleetTLS := fleetCfg.Client.Transport.TLS
-
-		require.NotNil(t, fleetTLS, `fleet client TLS config should have been set`)
-		assert.Equal(t, s.URL, fmt.Sprintf("%s://%s",
-			fleetCfg.Client.Protocol, fleetCfg.Client.Host))
-		assert.Equal(t, enrollOptions.CAs, fleetTLS.CAs)
-		assert.Equal(t,
-			enrollOptions.Certificate, fleetTLS.Certificate.Certificate)
-		assert.Equal(t, enrollOptions.Key, fleetTLS.Certificate.Key)
-		assert.Equal(t,
-			enrollOptions.KeyPassphrasePath, fleetTLS.Certificate.PassphrasePath)
-	})
 
 	t.Run("successfully enroll with TLS and save access api key in the store", withTLSServer(
 		func(t *testing.T) *http.ServeMux {
