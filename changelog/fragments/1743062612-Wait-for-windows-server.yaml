@@ -1,0 +1,5 @@
+kind: bug-fix
+summary: Wait for Windows service to be fully removed before re-installing during agent switch
+component: elastic-agent
+pr: https://github.com/elastic/elastic-agent/pull/7589
+issue: https://github.com/elastic/elastic-agent/issues/6970

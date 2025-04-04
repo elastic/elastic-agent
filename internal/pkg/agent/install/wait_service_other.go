@@ -15,3 +15,9 @@ import (
 func isStopped(timeout time.Duration, interval time.Duration, service string) error {
 	return nil
 }
+
+// EnsureServiceRemoved waits until the service has been removed. On non
+// Windows systems this isn't necessary so just return.
+func EnsureServiceRemoved(timeout time.Duration, interval time.Duration, service string) error {
+	return nil
+}

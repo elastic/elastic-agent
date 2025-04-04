@@ -6,6 +6,7 @@ package install
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/kardianos/service"
 	"github.com/schollz/progressbar/v3"
@@ -74,6 +75,11 @@ func SwitchExecutingMode(topPath string, pt *progressbar.ProgressBar, username s
 	if err != nil {
 		// error context already added by UninstallService
 		pt.Describe(err.Error())
+	}
+
+	err = EnsureServiceRemoved(30*time.Second, 250*time.Millisecond, paths.ServiceName())
+	if err != nil {
+		pt.Describe(fmt.Sprintf("Failed to ensure service was removed: %s", err.Error()))
 	}
 
 	// re-install service
