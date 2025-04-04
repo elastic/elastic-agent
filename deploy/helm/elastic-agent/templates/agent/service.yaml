@@ -1,3 +1,4 @@
+{{- include "elasticagent.init" $ -}}
 {{- range $presetName, $presetVal := $.Values.agent.presets -}}
 {{- $presetService := dig "service" dict $presetVal -}}
 {{- $ports := dig "ports" list $presetVal -}}
