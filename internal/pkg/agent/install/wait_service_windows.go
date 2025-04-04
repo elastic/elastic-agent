@@ -72,6 +72,9 @@ func EnsureServiceRemoved(timeout time.Duration, interval time.Duration, service
 	if err != nil {
 		return fmt.Errorf("failed to connect to service manager: %w", err)
 	}
+	defer func() {
+		_ = m.Disconnect()
+	}()
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -82,10 +85,11 @@ func EnsureServiceRemoved(timeout time.Duration, interval time.Duration, service
 		select {
 		case <-ticker.C:
 			s, err := m.OpenService(service)
+			_ = s.Close()
 			switch {
 			case err == nil:
 				// The service is still installed continue waiting
-				_ = s.Close()
+				continue
 			case errors.Is(err, windows.ERROR_SERVICE_DOES_NOT_EXIST):
 				// The service is no longer installed
 				return nil
