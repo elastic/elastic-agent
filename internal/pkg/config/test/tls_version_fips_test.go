@@ -40,7 +40,7 @@ func TestTLSVersions10(t *testing.T) {
 	c, err := l.Load([]string{filepath.Join("..", "testdata", "tls10.yml")})
 	require.NoError(t, err)
 
-	agentCfg, err := configuration.NewFromConfig(c)
+	_, err = configuration.NewFromConfig(c)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "unsupported tls version")
 }
