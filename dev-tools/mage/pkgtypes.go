@@ -430,6 +430,7 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 		s.packageDir = filepath.Clean(mustExpand(s.packageDir))
 	}
 	s.evalContext["PackageDir"] = s.packageDir
+	s.evalContext["fips"] = s.FIPS
 
 	evaluatedFiles := make(map[string]PackageFile, len(s.Files))
 	for target, f := range s.Files {

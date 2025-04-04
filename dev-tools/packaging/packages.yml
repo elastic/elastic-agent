@@ -302,7 +302,7 @@ shared:
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/manifest.yaml:
         mode: 0644
         content: >
-          {{ manifest }}
+          {{ manifest .fips }}
 
   - &linux_otel_files
     'otelcol':
@@ -347,7 +347,7 @@ shared:
     'manifest.yaml':
       mode: 0644
       content: >
-        {{ manifest }}
+        {{ manifest .fips }}
 
   - &agent_binary_files
     '{{.BeatName}}{{.BinaryExt}}':
