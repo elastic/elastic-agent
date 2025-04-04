@@ -347,7 +347,7 @@ agent.download:
     supported_protocols:
       - "TLSv1.3"
     cipher_suites:
-      - "RSA-AES-256-GCM-SHA384"
+      - "TLS-AES-128-GCM-SHA256"
     ca_trusted_fingerprint: "TARD1S-R0S3-TR4V3LS-TH3-WH0L3-UN1V3RS3"
     renegotiation: "never"
     ca_sha256: "6effba339778083ddc39c332b6724a0665462439f6419839c9bb8a7b6639b1cd"
@@ -439,7 +439,7 @@ agent.download:
 				VerificationMode: tlscommon.VerifyFull,
 				Versions:         []tlscommon.TLSVersion{tlscommon.TLSVersionMax},
 				CipherSuites: []tlscommon.CipherSuite{
-					tlscommon.CipherSuite(tls.TLS_RSA_WITH_AES_256_GCM_SHA384),
+					tlscommon.CipherSuite(tls.TLS_AES_128_GCM_SHA256),
 				}, // "RSA-AES-256-GCM-SHA384"
 				CATrustedFingerprint: "TARD1S-R0S3-TR4V3LS-TH3-WH0L3-UN1V3RS3",
 				Renegotiation:        tlscommon.TLSRenegotiationSupport(tls.RenegotiateNever),
