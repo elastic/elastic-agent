@@ -571,6 +571,9 @@ func Package(ctx context.Context) error {
 		dependenciesVersion = beatVersion
 	}
 
+	// add the snapshot suffix if needed
+	dependenciesVersion += devtools.SnapshotSuffix()
+
 	packageAgent(ctx, platforms, dependenciesVersion, manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(CrossBuild), devtools.SelectedPackageTypes)
 	return nil
 }
@@ -1201,9 +1204,9 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 		}
 		archivePath = movePackagesToArchive(dropPath, platforms, packageVersion, dependencies)
 
-		if hasSnapshotEnv() {
-			packageVersion = fmt.Sprintf("%s-SNAPSHOT", packageVersion)
-		}
+		//if hasSnapshotEnv() {
+		//	packageVersion = fmt.Sprintf("%s-SNAPSHOT", packageVersion)
+		//}
 
 		os.Setenv(agentDropPath, dropPath)
 
