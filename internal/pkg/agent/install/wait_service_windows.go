@@ -85,7 +85,9 @@ func EnsureServiceRemoved(timeout time.Duration, interval time.Duration, service
 		select {
 		case <-ticker.C:
 			s, err := m.OpenService(service)
-			_ = s.Close()
+			if s != nil {
+				_ = s.Close()
+			}
 			switch {
 			case err == nil:
 				// The service is still installed continue waiting
