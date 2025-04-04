@@ -55,6 +55,7 @@ components:
   #    packageName: <template representing the name of the archive to download/extract>
   #    binaryName: <binary name>
   #    rootDir: <template representing directory from the archive root where the binary is located>
+  #    fips: <boolean indicating if this components whether FIPS compliant>
   #    platforms:
   #      - <platform, use anchors for platforms above>
   #    pythonWheel: true # true if it's a package that is not platform specific
@@ -140,11 +141,20 @@ components:
       - *linux-amd64
       - *linux-arm64
     packageTypes: *all-package-types
+  # Elastic Agent core component, defined here because it's a dependency when packaging using elastic-agent DRA
+  - &comp-elastic-agent-core
+    projectName: elastic-agent-core
+    packageName: elastic-agent-core-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: elastic-agent-core-{{.Version}}-{{.Platform}}
+    binaryName: elastic-agent
+    platforms: *all-platforms
+    packageTypes: *all-package-types
   - &comp-agentbeat-fips
     projectName: beats
     packageName: agentbeat-fips-{{.Version}}-{{.Platform}}.{{.Ext}}
     rootDir: agentbeat-{{.Version}}-{{.Platform}}
     binaryName: agentbeat
+    fips: true
     platforms:
       - *linux-amd64
       - *linux-arm64
@@ -154,6 +164,7 @@ components:
     packageName: apm-server-fips-{{.Version}}-{{.Platform}}.{{.Ext}}
     rootDir: apm-server-fips-{{.Version}}-{{.Platform}}
     binaryName: apm-server
+    fips: true
     platforms:
       # FIXME: is apm-server-fips not available for linux/amd64? infra PR is pending
       # - *linux-amd64
@@ -165,7 +176,21 @@ components:
     packageName: fleet-server-fips-{{.Version}}-{{.Platform}}.{{.Ext}}
     rootDir: fleet-server-fips-{{.Version}}-{{.Platform}}
     binaryName: fleet-server
-    platforms: *all-platforms
+    fips: true
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+  # Elastic Agent core component (FIPS-compliant version), defined here because it's a dependency when packaging using elastic-agent DRA
+  - &comp-elastic-agent-core-fips
+    projectName: elastic-agent-core
+    packageName: elastic-agent-core-fips-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: elastic-agent-core-{{.Version}}-{{.Platform}}
+    binaryName: elastic-agent
+    fips: true
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
     packageTypes: *all-package-types
 # The shared section contains YAML anchors that are used to
 # define common parts of the package in order to not repeat ourselves.

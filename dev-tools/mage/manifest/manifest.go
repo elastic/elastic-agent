@@ -310,12 +310,12 @@ func DownloadPackage(ctx context.Context, downloadUrl string, target string) err
 	}
 	valid := false
 	for _, manifestHost := range AllowedManifestHosts {
-		if manifestHost == parsedURL.Host {
+		if manifestHost == parsedURL.Hostname() {
 			valid = true
 		}
 	}
 	if !valid {
-		log.Printf("Not allowed %s, valid ones are %+v", parsedURL.Host, AllowedManifestHosts)
+		log.Printf("Not allowed %s, valid ones are %+v", parsedURL.Hostname(), AllowedManifestHosts)
 		return errorNotAllowedManifestURL
 	}
 	cleanUrl := fmt.Sprintf("https://%s%s", parsedURL.Host, parsedURL.Path)

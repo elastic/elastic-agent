@@ -67,6 +67,7 @@ type BinarySpec struct {
 	PackageName  string                  `yaml:"packageName"`
 	RootDir      string                  `yaml:"rootDir"`
 	ProjectName  string                  `yaml:"projectName"`
+	FIPS         bool                    `yaml:"fips"`
 	Platforms    []Platform              `yaml:"platforms"`
 	PythonWheel  bool                    `yaml:"pythonWheel"`
 	PackageTypes []pkgcommon.PackageType `yaml:"packageTypes"`
@@ -141,7 +142,15 @@ func (proj BinarySpec) Equal(other BinarySpec) bool {
 		return false
 	}
 
+	if proj.RootDir != other.RootDir {
+		return false
+	}
+
 	if proj.ProjectName != other.ProjectName {
+		return false
+	}
+
+	if proj.FIPS != other.FIPS {
 		return false
 	}
 
@@ -221,4 +230,34 @@ func Components() ([]BinarySpec, error) {
 
 func Settings() GlobalSettings {
 	return settings.Settings
+}
+
+func FilterComponents(filters ...ComponentFilter) []BinarySpec {
+	ret := make([]BinarySpec, 0, len(settings.Components))
+
+COMPLOOP:
+	for _, c := range settings.Components {
+		for _, filter := range filters {
+			if !filter(c) {
+				// this filter doesn't match, move to the next component
+				continue COMPLOOP
+			}
+		}
+		ret = append(ret, c)
+	}
+	return ret
+}
+
+type ComponentFilter func(BinarySpec) bool
+
+func WithProjectName(projectName string) ComponentFilter {
+	return func(p BinarySpec) bool {
+		return p.ProjectName == projectName
+	}
+}
+
+func WithFIPS(fips bool) ComponentFilter {
+	return func(p BinarySpec) bool {
+		return p.FIPS == fips
+	}
 }
