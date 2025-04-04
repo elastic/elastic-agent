@@ -96,13 +96,13 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		// some receivers should only be available when
 		// not in fips mode due to restrictions on crypto usage
 		receivers = addNonFipsReceivers(receivers)
-		factories.Receivers, err = receiver.MakeFactoryMap(receivers...)
+		factories.Receivers, err = otelcol.MakeFactoryMap(receivers...)
 		if err != nil {
 			return otelcol.Factories{}, err
 		}
 
 		// Processors
-		factories.Processors, err = processor.MakeFactoryMap(
+		factories.Processors, err = otelcol.MakeFactoryMap[processor.Factory](
 			batchprocessor.NewFactory(),
 			resourceprocessor.NewFactory(),
 			attributesprocessor.NewFactory(),
@@ -132,12 +132,12 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		// some exporters should only be available when
 		// not in fips mode due to restrictions on crypto usage
 		exporters = addNonFipsExporters(exporters)
-		factories.Exporters, err = exporter.MakeFactoryMap(exporters...)
+		factories.Exporters, err = otelcol.MakeFactoryMap(exporters...)
 		if err != nil {
 			return otelcol.Factories{}, err
 		}
 
-		factories.Connectors, err = connector.MakeFactoryMap(
+		factories.Connectors, err = otelcol.MakeFactoryMap[connector.Factory](
 			routingconnector.NewFactory(),
 			spanmetricsconnector.NewFactory(),
 			signaltometricsconnector.NewFactory(),
@@ -154,7 +154,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			k8sobserver.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)
-		factories.Extensions, err = extension.MakeFactoryMap(extensions...)
+		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)
 		if err != nil {
 			return otelcol.Factories{}, err
 		}
