@@ -53,6 +53,26 @@ steps:
           manual:
             allowed: true
 
+      - label: "Unit tests - fips140=only Ubuntu 22.04"
+        key: "unit-tests-2204-fips140-only"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        env:
+          FIPS: "true"
+          GODEBUG: "fips140=only"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "gcp"
+          image: "family/platform-ingest-elastic-agent-ubuntu-2204"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+
       - label: "Unit tests - Ubuntu 22.04 ARM64"
         key: "unit-tests-2204-arm64"
         command: ".buildkite/scripts/steps/unit-tests.sh"

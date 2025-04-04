@@ -499,6 +499,14 @@ func (Test) Unit(ctx context.Context) error {
 	return devtools.GoTest(ctx, params)
 }
 
+// FIPSOnlyUnit runs all the unit tests with GODEBUG=fips140=only.
+func (Test) FIPSOnlyUnit(ctx context.Context) error {
+	mg.Deps(Prepare.Env, Build.TestBinaries)
+	params := devtools.DefaultGoTestUnitArgs()
+	params.Env["GODEBUG"] = "fips140=only"
+	return devtools.GoTest(ctx, params)
+}
+
 // Coverage takes the coverages report from running all the tests and display the results in the browser.
 func (Test) Coverage() error {
 	mg.Deps(Prepare.Env, Build.TestBinaries)

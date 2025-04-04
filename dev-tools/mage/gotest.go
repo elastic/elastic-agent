@@ -54,6 +54,7 @@ func makeGoTestArgs(name string) GoTestArgs {
 		OutputFile:      fileName + ".out",
 		JUnitReportFile: fileName + ".xml",
 		Tags:            testTagsFromEnv(),
+		Env:             make(map[string]string),
 	}
 	if TestCoverage {
 		params.CoverageProfileFile = fileName + ".cov"
