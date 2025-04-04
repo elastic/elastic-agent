@@ -9,6 +9,7 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -54,6 +55,9 @@ func NewCA() (*CertificateAuthority, error) {
 
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	publicKey := &privateKey.PublicKey
+
+	ca.SubjectKeyId = generateSubjectKeyID(publicKey)
+
 	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, publicKey, privateKey)
 	if err != nil {
 		log.Println("create ca failed", err)
@@ -96,6 +100,16 @@ func NewCA() (*CertificateAuthority, error) {
 	}, nil
 }
 
+func generateSubjectKeyID(publicKey *rsa.PublicKey) []byte {
+	// SubjectKeyId generated using method 1 in RFC 7093, Section 2:
+	//   1) The keyIdentifier is composed of the leftmost 160-bits of the
+	//   SHA-256 hash of the value of the BIT STRING subjectPublicKey
+	//   (excluding the tag, length, and number of unused bits).
+	publicKeyBytes := x509.MarshalPKCS1PublicKey(publicKey)
+	h := sha256.Sum256(publicKeyBytes)
+	return h[:20]
+}
+
 // GeneratePair generates child certificate
 func (c *CertificateAuthority) GeneratePair() (*Pair, error) {
 	return c.GeneratePairWithName("localhost")
@@ -118,6 +132,8 @@ func (c *CertificateAuthority) GeneratePairWithName(name string) (*Pair, error) 
 	}
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	publicKey := &privateKey.PublicKey
+
+	certTemplate.SubjectKeyId = generateSubjectKeyID(publicKey)
 
 	// Sign the certificate
 	certBytes, err := x509.CreateCertificate(rand.Reader, certTemplate, c.caCert, publicKey, c.privateKey)
