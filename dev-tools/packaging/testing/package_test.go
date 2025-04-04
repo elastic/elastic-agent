@@ -219,7 +219,7 @@ func checkTar(t *testing.T, file string, fipsCheck bool) {
 	checkModulesOwner(t, p, true)
 	checkLicensesPresent(t, "", p)
 
-	t.Run(p.Name+"_check_manifest_file", testManifestFile(file))
+	t.Run(p.Name+"_check_manifest_file", testManifestFile(file, fipsCheck))
 
 	checkSha512PackageHash(t, file)
 }
@@ -238,12 +238,12 @@ func checkZip(t *testing.T, file string) {
 	checkModulesPermissions(t, p)
 	checkLicensesPresent(t, "", p)
 
-	t.Run(p.Name+"_check_manifest_file", testManifestFile(file))
+	t.Run(p.Name+"_check_manifest_file", testManifestFile(file, false))
 
 	checkSha512PackageHash(t, file)
 }
 
-func testManifestFile(file string) func(t *testing.T) {
+func testManifestFile(file string, checkFips bool) func(t *testing.T) {
 	return func(t *testing.T) {
 		tempExtractionPath := t.TempDir()
 		err := mage.Extract(file, tempExtractionPath)
@@ -253,6 +253,9 @@ func testManifestFile(file string) func(t *testing.T) {
 		require.Lenf(t, dirEntries, 1, "archive %q should contain a single directory", file)
 		containingDir := dirEntries[0].Name()
 		checkManifestFileContents(t, filepath.Join(tempExtractionPath, containingDir))
+		if checkFips {
+			checkFIPS(t, filepath.Join(tempExtractionPath, containingDir))
+		}
 	}
 }
 
