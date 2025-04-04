@@ -313,7 +313,7 @@ steps:
       - label: "{{matrix.version}}:amd64:{{matrix.variants}}"
         env:
           K8S_VERSION: "{{matrix.version}}"
-          ASDF_KIND_VERSION: "0.24.0"
+          ASDF_KIND_VERSION: "0.27.0"
           DOCKER_VARIANTS: "{{matrix.variants}}"
           TARGET_ARCH: "amd64"
         command: |
@@ -342,6 +342,7 @@ steps:
             - v1.29.8
             - v1.30.8
             - v1.31.0
+            - v1.32.0
 
   - label: ESS stack cleanup
     depends_on:
