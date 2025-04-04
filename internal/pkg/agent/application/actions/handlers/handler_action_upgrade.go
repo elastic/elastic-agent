@@ -25,7 +25,6 @@ type Upgrade struct {
 	bkgActions []fleetapi.Action
 	bkgCancel  context.CancelFunc
 	bkgMutex   sync.Mutex
-	ackLock    sync.Mutex
 
 	tamperProtectionFn func() bool // allows to inject the flag for tests, defaults to features.TamperProtection
 }
@@ -92,8 +91,6 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 // ackActions Acks all the actions in bkgActions, and deletes entries from bkgActions.
 // User is responsible for obtaining and releasing bkgMutex lock
 func (h *Upgrade) ackActions(ctx context.Context, ack acker.Acker) {
-	h.ackLock.Lock()
-	defer h.ackLock.Unlock()
 	for _, a := range h.bkgActions {
 		h.ackAction(ctx, ack, a, false)
 	}
@@ -151,8 +148,8 @@ func (h *Upgrade) getAsyncContext(ctx context.Context, action fleetapi.Action, a
 		// not the same action this one needs to be acked
 		go func() {
 			// kick it off and don't block, lock to prevent race with ackActions from finished upgrade
-			h.ackLock.Lock()
-			defer h.ackLock.Unlock()
+			h.bkgMutex.Lock()
+			defer h.bkgMutex.Unlock()
 
 			h.ackAction(ctx, ack, upgradeAction, true)
 		}()
