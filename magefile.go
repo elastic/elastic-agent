@@ -1204,10 +1204,6 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 		}
 		archivePath = movePackagesToArchive(dropPath, platforms, packageVersion, dependencies)
 
-		//if hasSnapshotEnv() {
-		//	packageVersion = fmt.Sprintf("%s-SNAPSHOT", packageVersion)
-		//}
-
 		os.Setenv(agentDropPath, dropPath)
 
 		if devtools.ExternalBuild == true {
