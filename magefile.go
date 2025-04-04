@@ -1422,7 +1422,7 @@ func flattenDependencies(platforms []string, dependenciesVersion, archivePath, d
 		if manifestResponse != nil {
 			checksums = devtools.ChecksumsWithManifest(pltf, dependenciesVersion, versionedFlatPath, versionedDropPath, manifestResponse, dependencies)
 		} else {
-			checksums = devtools.ChecksumsWithoutManifest(versionedFlatPath, versionedDropPath, dependenciesVersion)
+			checksums = devtools.ChecksumsWithoutManifest(pltf, dependenciesVersion, versionedFlatPath, versionedDropPath, dependencies)
 		}
 
 		if err := appendComponentChecksums(versionedDropPath, checksums); err != nil {
