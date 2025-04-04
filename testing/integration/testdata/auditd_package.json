@@ -5,7 +5,7 @@
     "namespace": "default",
     "package": {
         "name": "auditd_manager",
-        "version": "1.18.3"
+        "version": "1.19.0"
     },
     "enabled": true,
     "policy_id": "0a4f6c12-446a-401a-b0eb-96afea6ca92d",

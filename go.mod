@@ -17,7 +17,7 @@ require (
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
 	github.com/elastic/elastic-agent-libs v0.19.0
-	github.com/elastic/elastic-agent-system-metrics v0.11.10
+	github.com/elastic/elastic-agent-system-metrics v0.11.11
 	github.com/elastic/elastic-transport-go/v8 v8.6.1
 	github.com/elastic/go-elasticsearch/v8 v8.17.1
 	github.com/elastic/go-licenser v0.4.2
@@ -290,7 +290,7 @@ require (
 	github.com/eclipse/paho.mqtt.golang v1.3.5 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
 	github.com/elastic/go-concert v0.3.0 // indirect
-	github.com/elastic/go-docappender/v2 v2.7.0 // indirect
+	github.com/elastic/go-docappender/v2 v2.8.0 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect
 	github.com/elastic/go-grok v0.3.1 // indirect
 	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect

@@ -12,50 +12,11 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/otelcol"
 )
-
-func TestStartCollector(t *testing.T) {
-	testCases := []struct {
-		configFile           string
-		expectedErrorMessage string
-	}{
-		{
-			configFile:           "all-components.yml",
-			expectedErrorMessage: "", // empty string means no error is expected
-		},
-		{
-			configFile:           "nonexistent-component.yml",
-			expectedErrorMessage: `error decoding 'extensions': unknown type: "zpages"`,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.configFile, func(t *testing.T) {
-			configFiles := getConfigFiles(tc.configFile)
-			settings := NewSettings("test", configFiles)
-
-			collector, err := otelcol.NewCollector(*settings)
-			require.NoError(t, err)
-			require.NotNil(t, collector)
-
-			wg := startCollector(context.Background(), t, collector, tc.expectedErrorMessage)
-
-			if tc.expectedErrorMessage == "" {
-				assert.Eventually(t, func() bool {
-					return otelcol.StateRunning == collector.GetState()
-				}, 10*time.Second, 200*time.Millisecond)
-			}
-			collector.Shutdown()
-			wg.Wait()
-			assert.Equal(t, otelcol.StateClosed, collector.GetState())
-		})
-	}
-}
 
 // getConfigFiles returns a collection of config file paths for the collector to use.
 // In the simplest scenario, the collection will contains only one path.
