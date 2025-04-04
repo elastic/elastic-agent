@@ -55,9 +55,10 @@ steps:
 
       - label: "Unit tests - fips140=only Ubuntu 22.04"
         key: "unit-tests-2204-fips140-only"
-        command: ".buildkite/scripts/steps/fips140-only-tests.sh"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
         env:
           FIPS: "true"
+          GODEBUG: "fips140=only"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"

@@ -30,7 +30,7 @@ import (
 )
 
 func TestEndpointComponentModifier(t *testing.T) {
-	testutils.SkipIfFIPSOnly(t, "generating an encryped priave key for failure testing results in a MD5 violation.")
+	testutils.SkipIfFIPSOnly(t, "generating an encrypted private key for failure testing results in a MD5 violation.")
 	log, obs := loggertest.New("TestEndpointSignedComponentModifier")
 	defer func() {
 		if !t.Failed() {
