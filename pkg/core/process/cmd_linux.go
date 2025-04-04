@@ -14,6 +14,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"syscall"
+
+	"github.com/elastic/elastic-agent-libs/logp"
 )
 
 func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ...string) (*exec.Cmd, error) {
@@ -48,10 +50,16 @@ func isInt32(val int) bool {
 	return val >= 0 && val <= math.MaxInt32
 }
 
+// killCmd calls Process.Kill
 func killCmd(proc *os.Process) error {
 	return proc.Kill()
 }
 
+// terminateCmd sends SIGTERM to the process
 func terminateCmd(proc *os.Process) error {
+	fmt.Println("==================== Sending CTRL_BREAK_EVENT to PID:", proc.Pid)
+	logp.L().Named("trace-debug").Info("==================== Sending CTRL_BREAK_EVENT to PID:", proc.Pid)
+	fmt.Println("++++++++++++++++++++ TRACE 00 ", proc.Pid)
+	logp.L().Named("trace-debug").Info("++++++++++++++++++++ TRACE 00 ", proc.Pid)
 	return proc.Signal(syscall.SIGTERM)
 }

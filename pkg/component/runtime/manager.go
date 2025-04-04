@@ -29,6 +29,7 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -251,6 +252,8 @@ func (m *Manager) Run(ctx context.Context) error {
 	m.runLoop(ctx)
 
 	// Notify components to shutdown and wait for their response
+	fmt.Println("++++++++++++++++++++ TRACE 08")
+	logp.L().Named("trace-debug").Info("++++++++++++++++++++ TRACE 08")
 	m.shutdown()
 
 	// Close the rpc listener and wait for serverLoop to return
@@ -275,6 +278,8 @@ LOOP:
 	for ctx.Err() == nil {
 		select {
 		case <-ctx.Done():
+			fmt.Println("++++++++++++++++++++ TRACE 09")
+			logp.L().Named("trace-debug").Info("++++++++++++++++++++ TRACE 09")
 			break LOOP
 		case model := <-m.updateChan:
 			// We got a new component model from m.Update(), mark it as the
@@ -749,6 +754,8 @@ func (m *Manager) Actions(server proto.ElasticAgent_ActionsServer) error {
 //
 // This returns as soon as possible, work is performed in the background.
 func (m *Manager) update(model component.Model, teardown bool) error {
+	fmt.Println("++++++++++++++++++++ TRACE 06.1")
+	logp.L().Named("trace-debug").Info("++++++++++++++++++++ TRACE 06.1")
 	touched := make(map[string]bool)
 	newComponents := make([]component.Component, 0, len(model.Components))
 	for _, comp := range model.Components {
@@ -783,6 +790,9 @@ func (m *Manager) update(model component.Model, teardown bool) error {
 	stoppedWg.Add(len(stop))
 	for _, existing := range stop {
 		m.logger.Debugf("Stopping component %q", existing.id)
+		// This is the only path to stop a component
+		fmt.Println("++++++++++++++++++++ TRACE 06 ", existing.id)
+		logp.L().Named("trace-debug").Info("++++++++++++++++++++ TRACE 06 ", existing.id)
 		_ = existing.stop(teardown, model.Signed)
 		// stop is async, wait for operation to finish,
 		// otherwise new instance may be started and components
@@ -865,6 +875,8 @@ func (m *Manager) waitForStopped(comp *componentRuntimeState) error {
 func (m *Manager) shutdown() {
 	// don't tear down as this is just a shutdown, so components most likely will come back
 	// on next start of the manager
+	logp.L().Named("trace-debug").Info("++++++++++++++++++++ TRACE 07")
+	fmt.Println("++++++++++++++++++++ TRACE 07")
 	_ = m.update(component.Model{Components: []component.Component{}}, false)
 
 	// wait until all components are removed
@@ -875,6 +887,9 @@ func (m *Manager) shutdown() {
 		if length <= 0 {
 			return
 		}
+		// Probably components get added again?
+		// This does not wait for the components to actually finish
+		// We actually need to ensure all components have actually exited
 		<-time.After(100 * time.Millisecond)
 	}
 }
@@ -908,6 +923,8 @@ func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentSta
 		// shutdown is complete; remove from currComp
 		m.currentMx.Lock()
 		delete(m.current, state.id)
+		fmt.Println("++++++++++++++++++++ TRACE ?? ", state.id)
+		logp.L().Named("trace-debug").Info("++++++++++++++++++++ TRACE ?? ", state.id)
 		m.currentMx.Unlock()
 
 		exit = true

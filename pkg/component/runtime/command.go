@@ -19,6 +19,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -165,6 +166,8 @@ func (c *commandRuntime) Run(ctx context.Context, comm Communicator) error {
 				}
 				t.Reset(checkinPeriod)
 			case actionStop, actionTeardown:
+				fmt.Println("++++++++++++++++++++ TRACE 03, ", c.current.ID, " Action ", as.String())
+				logp.L().Named("trace-debug").Info("++++++++++++++++++++ TRACE 03, ", c.current.ID, " Action ", as.String())
 				if err := c.stop(ctx); err != nil {
 					c.forceCompState(client.UnitStateFailed, fmt.Sprintf("Failed: %s", err))
 				}
@@ -305,6 +308,8 @@ func (c *commandRuntime) Update(comp component.Component) error {
 //
 // Non-blocking and never returns an error.
 func (c *commandRuntime) Stop() error {
+	fmt.Println("++++++++++++++++++++ TRACE 04 ", c.current.ID)
+	logp.L().Named("trace-debug").Info("++++++++++++++++++++ TRACE 04 ", c.current.ID)
 	// clear channel so it's the latest action
 	select {
 	case <-c.actionCh:
@@ -425,6 +430,7 @@ func (c *commandRuntime) stop(ctx context.Context) error {
 	// cleanup reserved resources related to monitoring
 	defer c.monitor.Cleanup(c.current.ID) //nolint:errcheck // this is ok
 	cmdSpec := c.getCommandSpec()
+	c.log.Infof("==================== Stopping %s. Timeout: %s", c.current.ID, cmdSpec.Timeouts.Stop)
 	go func(info *process.Info, timeout time.Duration) {
 		t := time.NewTimer(timeout)
 		defer t.Stop()
@@ -436,7 +442,9 @@ func (c *commandRuntime) stop(ctx context.Context) error {
 			_ = info.Kill()
 		}
 	}(c.proc, cmdSpec.Timeouts.Stop)
-	return c.proc.Stop()
+	fmt.Println("++++++++++++++++++++ TRACE 02 ", c.current.ID)
+	logp.L().Named("trace-debug").Info("++++++++++++++++++++ TRACE 02 ", c.current.ID)
+	return c.proc.StopWait()
 }
 
 func (c *commandRuntime) startWatcher(info *process.Info, comm Communicator) {

@@ -10,6 +10,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
+
+	"github.com/elastic/elastic-agent-libs/logp"
 )
 
 // Info groups information about fresh new process
@@ -35,6 +37,10 @@ type StartConfig struct {
 type StartOption func(cfg *StartConfig)
 
 // Start starts a new process
+// If process.WithCmdOptions is not used to overwrite cmd.Stderr,
+// cmd.StderrPipe is called and the io.ReadCloser returned is set
+// to Info.Stderr. If this ReadCloser is not read, then calls to
+// StopWait will never return. See cmd.StderrPipe for more details.an
 func Start(path string, opts ...StartOption) (proc *Info, err error) {
 	// Apply options
 	c := StartConfig{
@@ -106,16 +112,22 @@ func (i *Info) Kill() error {
 
 // Stop stops the process cleanly.
 func (i *Info) Stop() error {
+	fmt.Println("++++++++++++++++++++ TRACE 01", i.PID)
+	logp.L().Named("trace-debug").Info("++++++++++++++++++++ TRACE 01", i.PID)
 	return terminateCmd(i.Process)
 }
 
 // StopWait stops the process and waits for it to exit.
 func (i *Info) StopWait() error {
 	err := i.Stop()
+	fmt.Println("++++++++++++++++++++ TRACE 01.1 - Waiting ", i.PID)
+	logp.L().Named("trace-debug").Info("++++++++++++++++++++ TRACE 01.1 - Waiting ", i.PID)
 	if err != nil {
 		return err
 	}
 	_, err = i.Process.Wait()
+	fmt.Println("++++++++++++++++++++ TRACE 01.1 - Waiting DONE", i.PID)
+	logp.L().Named("trace-debug").Info("++++++++++++++++++++ TRACE 01.1 - Waiting DONE", i.PID)
 	return err
 }
 
