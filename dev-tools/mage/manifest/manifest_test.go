@@ -138,7 +138,7 @@ func TestResolveManifestPackage(t *testing.T) {
 			projects := manifestJson.Projects
 
 			// Verify the component name is in the list of expected packages.
-			spec, ok := findBinarySpec(tc.binary)
+			spec, ok := findBinarySpec(t, tc.binary)
 			assert.True(t, ok)
 
 			if !spec.SupportsPlatform(tc.platform) {
@@ -158,8 +158,11 @@ func TestResolveManifestPackage(t *testing.T) {
 	}
 }
 
-func findBinarySpec(name string) (packaging.BinarySpec, bool) {
-	for _, spec := range packaging.ExpectedBinaries {
+func findBinarySpec(t *testing.T, name string) (packaging.BinarySpec, bool) {
+	components, err := packaging.Components()
+	require.NoError(t, err, "error loading components from packages.yml")
+
+	for _, spec := range components {
 		if spec.BinaryName == name {
 			return spec, true
 		}

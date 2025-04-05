@@ -42,22 +42,30 @@ func CopyComponentSpecs(componentName, versionedDropPath string) (string, error)
 }
 
 // This is a helper function for flattenDependencies that's used when not packaging from a manifest
-func ChecksumsWithoutManifest(versionedFlatPath string, versionedDropPath string, packageVersion string) map[string]string {
-	globExpr := filepath.Join(versionedFlatPath, fmt.Sprintf("*%s*", packageVersion))
-	if mg.Verbose() {
-		log.Printf("Finding files to copy with %s", globExpr)
-	}
-	files, err := filepath.Glob(globExpr)
-	if err != nil {
-		panic(err)
-	}
-	if mg.Verbose() {
-		log.Printf("Validating checksums for %+v", files)
-		log.Printf("--- Copying into %s: %v", versionedDropPath, files)
-	}
-
+func ChecksumsWithoutManifest(platform string, dependenciesVersion string, versionedFlatPath string, versionedDropPath string, dependencies []packaging.BinarySpec) map[string]string {
 	checksums := make(map[string]string)
-	for _, f := range files {
+
+	for _, dep := range dependencies {
+
+		if dep.PythonWheel {
+			if mg.Verbose() {
+				log.Printf(">>>>>>> Component %s/%s is a Python wheel, skipping", dep.ProjectName, dep.BinaryName)
+			}
+			continue
+		}
+
+		if !dep.SupportsPlatform(platform) {
+			log.Printf(">>>>>>> Component %s/%s does not support platform %s, skipping", dep.ProjectName, dep.BinaryName, platform)
+			continue
+		}
+
+		srcDir := filepath.Join(versionedFlatPath, dep.GetRootDir(dependenciesVersion, platform))
+
+		if mg.Verbose() {
+			log.Printf("Validating checksums for %+v", dep.BinaryName)
+			log.Printf("--- Copying into %s: %v", versionedDropPath, srcDir)
+		}
+
 		options := copy.Options{
 			OnSymlink: func(_ string) copy.SymlinkAction {
 				return copy.Shallow
@@ -65,44 +73,39 @@ func ChecksumsWithoutManifest(versionedFlatPath string, versionedDropPath string
 			Sync: true,
 		}
 		if mg.Verbose() {
-			log.Printf("> prepare to copy %s into %s ", f, versionedDropPath)
+			log.Printf("> prepare to copy %s into %s ", srcDir, versionedDropPath)
 		}
 
-		err = copy.Copy(f, versionedDropPath, options)
+		err := copy.Copy(srcDir, versionedDropPath, options)
 		if err != nil {
-			panic(err)
+			panic(fmt.Errorf("copying dependency %s files from %q to %q: %w", dep.BinaryName, srcDir, versionedDropPath, err))
 		}
 
 		// copy spec file for match
-		specName := filepath.Base(f)
-		idx := strings.Index(specName, "-"+packageVersion)
-		if idx != -1 {
-			specName = specName[:idx]
-		}
 		if mg.Verbose() {
-			log.Printf(">>>> Looking to copy spec file: [%s]", specName)
+			log.Printf(">>>> Looking to copy spec file: [%s]", dep.BinaryName)
 		}
 
-		checksum, err := CopyComponentSpecs(specName, versionedDropPath)
+		checksum, err := CopyComponentSpecs(dep.BinaryName, versionedDropPath)
 		if err != nil {
 			panic(err)
 		}
 
-		checksums[specName+ComponentSpecFileSuffix] = checksum
+		checksums[dep.BinaryName+ComponentSpecFileSuffix] = checksum
 	}
 
 	return checksums
 }
 
 // This is a helper function for flattenDependencies that's used when building from a manifest
-func ChecksumsWithManifest(platform, dependenciesVersion string, versionedFlatPath string, versionedDropPath string, manifestResponse *manifest.Build) map[string]string {
+func ChecksumsWithManifest(platform string, dependenciesVersion string, versionedFlatPath string, versionedDropPath string, manifestResponse *manifest.Build, dependencies []packaging.BinarySpec) map[string]string {
 	checksums := make(map[string]string)
 	if manifestResponse == nil {
 		return checksums
 	}
 
 	// Iterate over the external binaries that we care about for packaging agent
-	for _, spec := range packaging.ExpectedBinaries {
+	for _, spec := range dependencies {
 
 		if spec.PythonWheel {
 			if mg.Verbose() {
@@ -124,21 +127,24 @@ func ChecksumsWithManifest(platform, dependenciesVersion string, versionedFlatPa
 			continue
 		}
 
-		// Combine the package name w/ the versioned flat path
-		fullPath := filepath.Join(versionedFlatPath, manifestPackage.Name)
+		rootDir := spec.GetRootDir(manifestPackage.ActualVersion, platform)
 
-		// Eliminate the file extensions to get the proper directory
-		// name that we need to copy
-		var dirToCopy string
-		if strings.HasSuffix(fullPath, ".tar.gz") {
-			dirToCopy = fullPath[:strings.LastIndex(fullPath, ".tar.gz")]
-		} else if strings.HasSuffix(fullPath, ".zip") {
-			dirToCopy = fullPath[:strings.LastIndex(fullPath, ".zip")]
-		} else {
-			dirToCopy = fullPath
+		// fallback to extracting directory name from packageName
+		if rootDir == "" {
+			log.Printf("Could not find rootDir for %s/%s. Falling back to fileName %s", spec.ProjectName, spec.BinaryName, manifestPackage.Name)
+			rootDir = manifestPackage.Name
+			if strings.HasSuffix(rootDir, ".tar.gz") {
+				rootDir = strings.TrimSuffix(rootDir, ".tar.gz")
+			} else if strings.HasSuffix(rootDir, ".zip") {
+				rootDir = strings.TrimSuffix(rootDir, ".zip")
+			}
 		}
+
+		// Combine the package name w/ the versioned flat path
+		fullPath := filepath.Join(versionedFlatPath, rootDir)
+
 		if mg.Verbose() {
-			log.Printf(">>>>>>> Calculated directory to copy: [%s]", dirToCopy)
+			log.Printf(">>>>>>> Calculated directory to copy: [%s]", fullPath)
 		}
 
 		// Set copy options
@@ -149,11 +155,11 @@ func ChecksumsWithManifest(platform, dependenciesVersion string, versionedFlatPa
 			Sync: true,
 		}
 		if mg.Verbose() {
-			log.Printf("> prepare to copy %s into %s ", dirToCopy, versionedDropPath)
+			log.Printf("> prepare to copy %s into %s ", fullPath, versionedDropPath)
 		}
 
 		// Do the copy
-		err = copy.Copy(dirToCopy, versionedDropPath, options)
+		err = copy.Copy(fullPath, versionedDropPath, options)
 		if err != nil {
 			panic(err)
 		}

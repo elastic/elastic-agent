@@ -25,7 +25,6 @@ import (
 	"io"
 	"maps"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -220,16 +219,7 @@ func checkTar(t *testing.T, file string, fipsCheck bool) {
 	checkModulesOwner(t, p, true)
 	checkLicensesPresent(t, "", p)
 
-	t.Run(p.Name+"_check_manifest_file", func(t *testing.T) {
-		tempExtractionPath := t.TempDir()
-		err = mage.Extract(file, tempExtractionPath)
-		require.NoError(t, err, "error extracting tar archive")
-		containingDir := strings.TrimSuffix(path.Base(file), ".tar.gz")
-		checkManifestFileContents(t, filepath.Join(tempExtractionPath, containingDir))
-		if fipsCheck {
-			checkFIPS(t, filepath.Join(tempExtractionPath, containingDir))
-		}
-	})
+	t.Run(p.Name+"_check_manifest_file", testManifestFile(file, fipsCheck))
 
 	checkSha512PackageHash(t, file)
 }
@@ -248,15 +238,25 @@ func checkZip(t *testing.T, file string) {
 	checkModulesPermissions(t, p)
 	checkLicensesPresent(t, "", p)
 
-	t.Run(p.Name+"_check_manifest_file", func(t *testing.T) {
-		tempExtractionPath := t.TempDir()
-		err = mage.Extract(file, tempExtractionPath)
-		require.NoError(t, err, "error extracting zip archive")
-		containingDir := strings.TrimSuffix(path.Base(file), ".zip")
-		checkManifestFileContents(t, filepath.Join(tempExtractionPath, containingDir))
-	})
+	t.Run(p.Name+"_check_manifest_file", testManifestFile(file, false))
 
 	checkSha512PackageHash(t, file)
+}
+
+func testManifestFile(file string, checkFips bool) func(t *testing.T) {
+	return func(t *testing.T) {
+		tempExtractionPath := t.TempDir()
+		err := mage.Extract(file, tempExtractionPath)
+		require.NoErrorf(t, err, "error extracting archive %q", file)
+		dirEntries, err := os.ReadDir(tempExtractionPath)
+		require.NoErrorf(t, err, "error listing extraction dir %q", tempExtractionPath)
+		require.Lenf(t, dirEntries, 1, "archive %q should contain a single directory", file)
+		containingDir := dirEntries[0].Name()
+		checkManifestFileContents(t, filepath.Join(tempExtractionPath, containingDir))
+		if checkFips {
+			checkFIPS(t, filepath.Join(tempExtractionPath, containingDir))
+		}
+	}
 }
 
 func checkManifestFileContents(t *testing.T, extractedPackageDir string) {
@@ -286,7 +286,7 @@ func checkManifestFileContents(t *testing.T, extractedPackageDir string) {
 func parseManifest(t *testing.T, dir string) v1.PackageManifest {
 	manifestReadCloser, err := os.Open(filepath.Join(dir, v1.ManifestFileName))
 	if err != nil {
-		t.Errorf("opening manifest %s : %v", v1.ManifestFileName, err)
+		t.Fatalf("opening manifest %s : %v", v1.ManifestFileName, err)
 	}
 	defer func(closer io.ReadCloser) {
 		err := closer.Close()
@@ -295,7 +295,7 @@ func parseManifest(t *testing.T, dir string) v1.PackageManifest {
 
 	m, err := v1.ParseManifest(manifestReadCloser)
 	if err != nil {
-		t.Errorf("unmarshaling package manifest: %v", err)
+		t.Fatalf("unmarshaling package manifest: %v", err)
 	}
 	return *m
 }
