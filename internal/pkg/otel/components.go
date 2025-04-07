@@ -75,11 +75,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		factories := otelcol.Factories{}
 
 		// Receivers
-<<<<<<< HEAD
-		factories.Receivers, err = otelcol.MakeFactoryMap[receiver.Factory](
-=======
 		receivers := []receiver.Factory{
->>>>>>> refs/remotes/upstream/main
 			otlpreceiver.NewFactory(),
 			filelogreceiver.NewFactory(),
 			kubeletstatsreceiver.NewFactory(),
@@ -125,11 +121,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		}
 
 		// Exporters
-<<<<<<< HEAD
-		factories.Exporters, err = otelcol.MakeFactoryMap[exporter.Factory](
-=======
 		exporters := []exporter.Factory{
->>>>>>> refs/remotes/upstream/main
 			otlpexporter.NewFactory(),
 			debugexporter.NewFactory(),
 			fileexporter.NewFactory(),
