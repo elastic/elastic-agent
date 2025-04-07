@@ -9,7 +9,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/magefile/mage/mg"
 	"github.com/otiai10/copy"
@@ -41,7 +40,12 @@ func CopyComponentSpecs(componentName, versionedDropPath string) (string, error)
 	return GetSHA512Hash(targetPath)
 }
 
-// This is a helper function for flattenDependencies that's used when not packaging from a manifest
+// ChecksumsWithoutManifest is a helper function for flattenDependencies that's used when not packaging from a manifest.
+// This function will iterate over the dependencies, resolve *exactly* the package name for each dependency and platform using the passed
+// dependenciesVersion, and it will copy the extracted files contained in the rootDir of each dependency from the versionedFlatPath
+// (a directory containing all the extracted dependencies per platform) to the versionedDropPath (a drop path by platform
+// that will be used to compose the package content)
+// ChecksumsWithoutManifest will accumulate the checksums of each component spec that is copied, and return it to the caller.
 func ChecksumsWithoutManifest(platform string, dependenciesVersion string, versionedFlatPath string, versionedDropPath string, dependencies []packaging.BinarySpec) map[string]string {
 	checksums := make(map[string]string)
 
@@ -97,7 +101,13 @@ func ChecksumsWithoutManifest(platform string, dependenciesVersion string, versi
 	return checksums
 }
 
-// This is a helper function for flattenDependencies that's used when building from a manifest
+// ChecksumsWithManifest is a helper function for flattenDependencies that's used when building from a manifest.
+// This function will iterate over the dependencies, resolve the package name for each dependency and platform using the manifest,
+// (there may be some variability there in case the manifest does not include an exact match for the expected filename),
+// and it will copy the extracted files contained in the rootDir of each dependency from the versionedFlatPath
+// (a directory containing all the extracted dependencies per platform) to the versionedDropPath (a drop path by platform
+// that will be used to compose the package content)
+// ChecksumsWithManifest will accumulate the checksums of each component spec that is copied, and return it to the caller.
 func ChecksumsWithManifest(platform string, dependenciesVersion string, versionedFlatPath string, versionedDropPath string, manifestResponse *manifest.Build, dependencies []packaging.BinarySpec) map[string]string {
 	checksums := make(map[string]string)
 	if manifestResponse == nil {
@@ -128,17 +138,6 @@ func ChecksumsWithManifest(platform string, dependenciesVersion string, versione
 		}
 
 		rootDir := spec.GetRootDir(manifestPackage.ActualVersion, platform)
-
-		// fallback to extracting directory name from packageName
-		if rootDir == "" {
-			log.Printf("Could not find rootDir for %s/%s. Falling back to fileName %s", spec.ProjectName, spec.BinaryName, manifestPackage.Name)
-			rootDir = manifestPackage.Name
-			if strings.HasSuffix(rootDir, ".tar.gz") {
-				rootDir = strings.TrimSuffix(rootDir, ".tar.gz")
-			} else if strings.HasSuffix(rootDir, ".zip") {
-				rootDir = strings.TrimSuffix(rootDir, ".zip")
-			}
-		}
 
 		// Combine the package name w/ the versioned flat path
 		fullPath := filepath.Join(versionedFlatPath, rootDir)
