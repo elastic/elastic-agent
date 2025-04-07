@@ -875,6 +875,10 @@ collectors:
           api_key: ${env:ELASTIC_API_KEY} # API key for Elasticsearch authentication.
           logs_dynamic_index:
             enabled: true
+          metrics_dynamic_index:
+            enabled: true
+          traces_dynamic_index:
+            enabled: true
           # Enable in order to skip the SSL certificate Check
           # tls:
           #   insecure_skip_verify: true
@@ -935,12 +939,12 @@ instrumentation:
     type: parentbased_traceidratio # Sampler type
     argument: "1.0" # Sampling rate set to 100% (all traces are sampled).
   java:
-    image: docker.elastic.co/observability/elastic-otel-javaagent:1.0.0
+    image: docker.elastic.co/observability/elastic-otel-javaagent:1.3.0
   nodejs:
-    image: docker.elastic.co/observability/elastic-otel-node:0.4.1
+    image: docker.elastic.co/observability/elastic-otel-node:1.0.0
   dotnet:
-    image: docker.elastic.co/observability/elastic-otel-dotnet:edge
+    image: docker.elastic.co/observability/elastic-otel-dotnet:1.0.1
   python:
-    image: docker.elastic.co/observability/elastic-otel-python:0.3.0
+    image: docker.elastic.co/observability/elastic-otel-python:1.0.0
   go:
-    image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.14.0-alpha
+    image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.21.0

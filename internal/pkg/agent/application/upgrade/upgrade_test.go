@@ -116,7 +116,6 @@ func Test_CopyFile(t *testing.T) {
 }
 
 func TestShutdownCallback(t *testing.T) {
-
 	type testcase struct {
 		name                  string
 		agentHomeDirectory    string
@@ -158,7 +157,6 @@ func TestShutdownCallback(t *testing.T) {
 	}
 
 	for _, tt := range testcases {
-
 		t.Run(tt.name, func(t *testing.T) {
 			l, _ := logger.New(tt.name, false)
 			tmpDir := t.TempDir()
@@ -189,7 +187,6 @@ func TestShutdownCallback(t *testing.T) {
 			require.Equal(t, content, newContent, "contents are not equal")
 		})
 	}
-
 }
 
 func TestIsInProgress(t *testing.T) {
@@ -301,7 +298,7 @@ agent.download:
     supported_protocols:
       - "TLSv1.3"
     cipher_suites:
-      - "RSA-AES-256-GCM-SHA384"
+      - "TLS-AES-128-GCM-SHA256"
     ca_trusted_fingerprint: "TARD1S-R0S3-TR4V3LS-TH3-WH0L3-UN1V3RS3"
     renegotiation: "never"
     ca_sha256: "6effba339778083ddc39c332b6724a0665462439f6419839c9bb8a7b6639b1cd"
@@ -393,7 +390,7 @@ agent.download:
 				VerificationMode: tlscommon.VerifyFull,
 				Versions:         []tlscommon.TLSVersion{tlscommon.TLSVersionMax},
 				CipherSuites: []tlscommon.CipherSuite{
-					tlscommon.CipherSuite(tls.TLS_RSA_WITH_AES_256_GCM_SHA384),
+					tlscommon.CipherSuite(tls.TLS_AES_128_GCM_SHA256),
 				}, // "RSA-AES-256-GCM-SHA384"
 				CATrustedFingerprint: "TARD1S-R0S3-TR4V3LS-TH3-WH0L3-UN1V3RS3",
 				Renegotiation:        tlscommon.TLSRenegotiationSupport(tls.RenegotiateNever),
@@ -505,19 +502,22 @@ func TestUpgraderReload_sourceURL(t *testing.T) {
 agent.download:
   source_uri: "https://this.sourceURI.co/downloads/beats/"
   sourceURI: "https://NOT.sourceURI.co/downloads/beats/"
-`}, {
+`,
+		}, {
 			name:      "only sourceURI",
 			sourceURL: "https://this.sourceURI.co/downloads/beats/",
 			cfg: `
 agent.download:
   sourceURI: "https://this.sourceURI.co/downloads/beats/"
-`}, {
+`,
+		}, {
 			name:      "only source_uri",
 			sourceURL: "https://this.sourceURI.co/downloads/beats/",
 			cfg: `
 agent.download:
   source_uri: "https://this.sourceURI.co/downloads/beats/"
-`},
+`,
+		},
 	}
 
 	for _, tc := range tcs {
@@ -551,10 +551,24 @@ var agentVersion123SNAPSHOTabcdef = agentVersion{
 	hash:     "abcdef",
 }
 
+var agentVersion123SNAPSHOTabcdefFips = agentVersion{
+	version:  "1.2.3",
+	snapshot: true,
+	hash:     "abcdef",
+	fips:     true,
+}
+
 var agentVersion123SNAPSHOTabcdefRepackaged = agentVersion{
 	version:  "1.2.3-repackaged",
 	snapshot: true,
 	hash:     "abcdef",
+}
+
+var agentVersion123SNAPSHOTabcdefRepackagedFips = agentVersion{
+	version:  "1.2.3-repackaged",
+	snapshot: true,
+	hash:     "abcdef",
+	fips:     true,
 }
 
 var agentVersion123abcdef = agentVersion{
@@ -569,14 +583,12 @@ var agentVersion123SNAPSHOTghijkl = agentVersion{
 	hash:     "ghijkl",
 }
 
-func TestIsSameVersion(t *testing.T) {
+func TestExtractVersion(t *testing.T) {
 	type args struct {
-		current  agentVersion
 		metadata packageMetadata
 		version  string
 	}
 	type want struct {
-		same       bool
 		newVersion agentVersion
 	}
 
@@ -588,7 +600,6 @@ func TestIsSameVersion(t *testing.T) {
 		{
 			name: "same version, snapshot flag and hash",
 			args: args{
-				current: agentVersion123SNAPSHOTabcdef,
 				metadata: packageMetadata{
 					manifest: &v1.PackageManifest{
 						Package: v1.PackageDesc{
@@ -603,14 +614,12 @@ func TestIsSameVersion(t *testing.T) {
 				version: "unused",
 			},
 			want: want{
-				same:       true,
 				newVersion: agentVersion123SNAPSHOTabcdef,
 			},
 		},
 		{
 			name: "same hash, snapshot flag, different version",
 			args: args{
-				current: agentVersion123SNAPSHOTabcdef,
 				metadata: packageMetadata{
 					manifest: &v1.PackageManifest{
 						Package: v1.PackageDesc{
@@ -625,14 +634,12 @@ func TestIsSameVersion(t *testing.T) {
 				version: "unused",
 			},
 			want: want{
-				same:       false,
 				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
 			},
 		},
 		{
 			name: "same version and hash, different snapshot flag (SNAPSHOT promotion to release)",
 			args: args{
-				current: agentVersion123SNAPSHOTabcdef,
 				metadata: packageMetadata{
 					manifest: &v1.PackageManifest{
 						Package: v1.PackageDesc{
@@ -647,14 +654,12 @@ func TestIsSameVersion(t *testing.T) {
 				version: "unused",
 			},
 			want: want{
-				same:       false,
 				newVersion: agentVersion123abcdef,
 			},
 		},
 		{
 			name: "same version and snapshot, different hash (SNAPSHOT upgrade)",
 			args: args{
-				current: agentVersion123SNAPSHOTabcdef,
 				metadata: packageMetadata{
 					manifest: &v1.PackageManifest{
 						Package: v1.PackageDesc{
@@ -669,14 +674,12 @@ func TestIsSameVersion(t *testing.T) {
 				version: "unused",
 			},
 			want: want{
-				same:       false,
 				newVersion: agentVersion123SNAPSHOTghijkl,
 			},
 		},
 		{
 			name: "same version, snapshot flag and hash, no manifest",
 			args: args{
-				current: agentVersion123SNAPSHOTabcdef,
 				metadata: packageMetadata{
 					manifest: nil,
 					hash:     "abcdef",
@@ -684,14 +687,12 @@ func TestIsSameVersion(t *testing.T) {
 				version: "1.2.3-SNAPSHOT",
 			},
 			want: want{
-				same:       true,
 				newVersion: agentVersion123SNAPSHOTabcdef,
 			},
 		},
 		{
 			name: "same hash, snapshot flag, different version, no manifest",
 			args: args{
-				current: agentVersion123SNAPSHOTabcdef,
 				metadata: packageMetadata{
 					manifest: nil,
 					hash:     "abcdef",
@@ -699,14 +700,12 @@ func TestIsSameVersion(t *testing.T) {
 				version: "1.2.3-SNAPSHOT.repackaged",
 			},
 			want: want{
-				same:       false,
 				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
 			},
 		},
 		{
 			name: "same version and hash, different snapshot flag, no manifest (SNAPSHOT promotion to release)",
 			args: args{
-				current: agentVersion123SNAPSHOTabcdef,
 				metadata: packageMetadata{
 					manifest: nil,
 					hash:     "abcdef",
@@ -714,14 +713,12 @@ func TestIsSameVersion(t *testing.T) {
 				version: "1.2.3",
 			},
 			want: want{
-				same:       false,
 				newVersion: agentVersion123abcdef,
 			},
 		},
 		{
 			name: "same version and snapshot, different hash (SNAPSHOT upgrade)",
 			args: args{
-				current: agentVersion123SNAPSHOTabcdef,
 				metadata: packageMetadata{
 					manifest: nil,
 					hash:     "ghijkl",
@@ -729,21 +726,18 @@ func TestIsSameVersion(t *testing.T) {
 				version: "1.2.3-SNAPSHOT",
 			},
 			want: want{
-				same:       false,
 				newVersion: agentVersion123SNAPSHOTghijkl,
 			},
 		},
 		{
 			name: "same version and snapshot, no hash (SNAPSHOT upgrade before download)",
 			args: args{
-				current: agentVersion123SNAPSHOTabcdef,
 				metadata: packageMetadata{
 					manifest: nil,
 				},
 				version: "1.2.3-SNAPSHOT",
 			},
 			want: want{
-				same: false,
 				newVersion: agentVersion{
 					version:  "1.2.3",
 					snapshot: true,
@@ -751,15 +745,167 @@ func TestIsSameVersion(t *testing.T) {
 			},
 		},
 	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actualNewVersion := extractAgentVersion(test.args.metadata, test.args.version)
+			assert.Equal(t, test.want.newVersion, actualNewVersion, "Unexpected new version result: extractAgentVersion(%v, %v) should be %v",
+				test.args.metadata, test.args.version, test.want.newVersion)
+		})
+	}
+}
+
+func TestCheckUpgrade(t *testing.T) {
+	type args struct {
+		current    agentVersion
+		newVersion agentVersion
+		metadata   packageMetadata
+	}
+	type want struct {
+		err error
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "different version, snapshot flag and hash, fips to fips",
+			args: args{
+				current:    agentVersion123SNAPSHOTabcdefFips,
+				newVersion: agentVersion123SNAPSHOTabcdefRepackagedFips,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Fips: true,
+						},
+					},
+				},
+			},
+			want: want{
+				err: nil,
+			},
+		},
+		{
+			name: "different version, snapshot flag and hash, fips to non-fips",
+			args: args{
+				current:    agentVersion123SNAPSHOTabcdefFips,
+				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Fips: false,
+						},
+					},
+				},
+			},
+			want: want{
+				err: ErrFipsToNonFips,
+			},
+		},
+		{
+			name: "different version, snapshot flag and hash, non-fips to fips",
+			args: args{
+				current:    agentVersion123SNAPSHOTabcdef,
+				newVersion: agentVersion123SNAPSHOTabcdefRepackagedFips,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Fips: true,
+						},
+					},
+				},
+			},
+			want: want{
+				err: ErrNonFipsToFips,
+			},
+		},
+		{
+			name: "different version, snapshot flag and hash, non-fips to non-fips",
+			args: args{
+				current:    agentVersion123SNAPSHOTabcdef,
+				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Fips: false,
+						},
+					},
+				},
+			},
+			want: want{
+				err: nil,
+			},
+		},
+		{
+			name: "same version, snapshot flag and hash",
+			args: args{
+				current:    agentVersion123SNAPSHOTabcdef,
+				newVersion: agentVersion123SNAPSHOTabcdef,
+			},
+			want: want{
+				err: ErrUpgradeSameVersion,
+			},
+		},
+		{
+			name: "same hash, snapshot flag, different version",
+			args: args{
+				current:    agentVersion123SNAPSHOTabcdef,
+				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Fips: false,
+						},
+					},
+				},
+			},
+			want: want{
+				err: nil,
+			},
+		},
+		{
+			name: "same version and hash, different snapshot flag (SNAPSHOT promotion to release)",
+			args: args{
+				current:    agentVersion123SNAPSHOTabcdef,
+				newVersion: agentVersion123abcdef,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Fips: false,
+						},
+					},
+				},
+			},
+			want: want{
+				err: nil,
+			},
+		},
+		{
+			name: "same version and snapshot, different hash (SNAPSHOT upgrade)",
+			args: args{
+				current:    agentVersion123SNAPSHOTabcdef,
+				newVersion: agentVersion123SNAPSHOTghijkl,
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Fips: false,
+						},
+					},
+				},
+			},
+			want: want{
+				err: nil,
+			},
+		},
+	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			log, _ := loggertest.New(test.name)
-			actualSame, actualNewVersion := isSameVersion(log, test.args.current, test.args.metadata, test.args.version)
+			err := checkUpgrade(log, test.args.current, test.args.newVersion, test.args.metadata)
 
-			assert.Equal(t, test.want.same, actualSame, "Unexpected boolean comparison result: isSameVersion(%v, %v, %v, %v) should be %v",
-				log, test.args.current, test.args.metadata, test.args.version, test.want.same)
-			assert.Equal(t, test.want.newVersion, actualNewVersion, "Unexpected new version result: isSameVersion(%v, %v, %v, %v) should be %v",
-				log, test.args.current, test.args.metadata, test.args.version, test.want.newVersion)
+			assert.Equal(t, test.want.err, err, "Unextedted upgrade check result: checkUpgrade(%v, %v, %v, %v) should be %v", log, test.args.current, test.args.newVersion, test.args.metadata, test.want.err)
 		})
 	}
 }
@@ -828,7 +974,6 @@ func TestWaitForWatcher(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			deadline, ok := t.Deadline()
 			if !ok {
 				deadline = time.Now().Add(5 * time.Second)
@@ -1007,57 +1152,74 @@ func TestIsSameReleaseVersion(t *testing.T) {
 		current agentVersion
 		target  string
 		expect  bool
-	}{{
-		name: "current version is snapshot",
-		current: agentVersion{
-			version:  "1.2.3",
-			snapshot: true,
+	}{
+		{
+			name: "current version is snapshot",
+			current: agentVersion{
+				version:  "1.2.3",
+				snapshot: true,
+			},
+			target: "1.2.3",
+			expect: false,
 		},
-		target: "1.2.3",
-		expect: false,
-	}, {
-		name: "target version is snapshot",
-		current: agentVersion{
-			version: "1.2.3",
+		{
+			name: "target version is snapshot",
+			current: agentVersion{
+				version: "1.2.3",
+			},
+			target: "1.2.3-SNAPSHOT",
+			expect: false,
 		},
-		target: "1.2.3-SNAPSHOT",
-		expect: false,
-	}, {
-		name: "target version is different version",
-		current: agentVersion{
-			version: "1.2.3",
+		{
+			name: "target version is different version",
+			current: agentVersion{
+				version: "1.2.3",
+			},
+			target: "1.2.4",
+			expect: false,
 		},
-		target: "1.2.4",
-		expect: false,
-	}, {
-		name: "target version has same major.minor.patch, different pre-release",
-		current: agentVersion{
-			version: "1.2.3",
+		{
+			name: "target version has same major.minor.patch, different pre-release",
+			current: agentVersion{
+				version: "1.2.3",
+			},
+			target: "1.2.3-custom.info",
+			expect: false,
 		},
-		target: "1.2.3-custom.info",
-		expect: false,
-	}, {
-		name: "target version is same with build",
-		current: agentVersion{
-			version: "1.2.3",
+		{
+			name: "target version is same with build",
+			current: agentVersion{
+				version: "1.2.3",
+			},
+			target: "1.2.3+buildID",
+			expect: false,
 		},
-		target: "1.2.3+buildID",
-		expect: false,
-	}, {
-		name: "target version is same",
-		current: agentVersion{
-			version: "1.2.3",
+		{
+			name: "target version is same",
+			current: agentVersion{
+				version: "1.2.3",
+			},
+			target: "1.2.3",
+			expect: true,
 		},
-		target: "1.2.3",
-		expect: true,
-	}, {
-		name: "target version is invalid",
-		current: agentVersion{
-			version: "1.2.3",
+		{
+			name: "target version is invalid",
+			current: agentVersion{
+				version: "1.2.3",
+			},
+			target: "a.b.c",
+			expect: false,
 		},
-		target: "a.b.c",
-		expect: false,
-	}}
+		{
+			name: "current version is fips",
+			current: agentVersion{
+				version: "1.2.3",
+				fips:    true,
+			},
+			target: "1.2.3",
+			expect: true,
+		},
+	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			log, _ := loggertest.New(tc.name)

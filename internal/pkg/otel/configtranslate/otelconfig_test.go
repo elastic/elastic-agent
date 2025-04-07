@@ -193,6 +193,7 @@ func TestGetOtelConfig(t *testing.T) {
 			"batcher": map[string]any{
 				"enabled":        true,
 				"max_size_items": 1600,
+				"min_size_items": 0,
 			},
 			"mapping": map[string]any{
 				"mode": "bodymap",
@@ -370,6 +371,19 @@ func TestGetOtelConfig(t *testing.T) {
 								"flush": map[string]any{
 									"min_events": uint64(1600),
 									"timeout":    "10s",
+								},
+							},
+						},
+						"logging": map[string]any{
+							"with_fields": map[string]any{
+								"component": map[string]any{
+									"binary":  "filebeat",
+									"dataset": "elastic_agent.filebeat",
+									"type":    "filestream",
+									"id":      "filestream-default",
+								},
+								"log": map[string]any{
+									"source": "filestream-default",
 								},
 							},
 						},
