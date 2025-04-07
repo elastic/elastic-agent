@@ -1582,9 +1582,9 @@ specs:
       arch: arm64
       types: [ docker ]
       spec:
-        <<: *agent_docker_spec
+        <<: *docker_fips_spec
+        <<: *agent_docker_fips_spec
         # The cloud image is always based on Wolfi
-        <<: *docker_wolfi_arm_spec
         <<: *docker_builder_arm_spec
         <<: *agent_docker_cloud_fips_spec
         <<: *elastic_license_for_binaries
