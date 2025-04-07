@@ -578,7 +578,7 @@ func checkMonitorsDPresent(t *testing.T, prefix string, p *packageFile) {
 }
 
 func checkHintsInputsD(t *testing.T, name string, r *regexp.Regexp, p *packageFile) {
-	t.Run(fmt.Sprintf("%s %s contents", p.Name, name), func(t *testing.T) {
+	t.Run(fmt.Sprintf("%s contents", name), func(t *testing.T) {
 		total := 0
 		for _, entry := range p.Contents {
 			if r.MatchString(entry.File) {
