@@ -93,17 +93,10 @@ func TestDeb(t *testing.T) {
 
 func TestTar(t *testing.T) {
 	// Regexp matches *-arch.tar.gz, but not *-arch.docker.tar.gz
-	tars := getFiles(t, regexp.MustCompile(`-\w+\.tar\.gz$`))
-	for _, tar := range tars {
-		checkTar(t, tar, false)
-	}
-}
-
-func TestFIPSTar(t *testing.T) {
-	// Regexp matches *-arch-fips.tar.gz, but not *-arch.docker.tar.gz
-	tars := getFiles(t, regexp.MustCompile(`-\w+-fips\.tar\.gz$`))
-	for _, tar := range tars {
-		checkTar(t, tar, *fips)
+	tarFiles := getFiles(t, regexp.MustCompile(`-\w+\.tar\.gz$`))
+	for _, tarFile := range tarFiles {
+		fipsPackage := strings.Contains(tarFile, "-fips-")
+		checkTar(t, tarFile, fipsPackage)
 	}
 }
 
