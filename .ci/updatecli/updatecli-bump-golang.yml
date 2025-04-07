@@ -142,8 +142,8 @@ targets:
       content: 'go {{ source "gomod" }}'
       file: wrapper/windows/archive-proxy/go.mod
       matchpattern: 'go \d+.\d+'
-  update-buildkite-pipeline:
-    name: "Update .buildkite/pipeline.yml"
+  update-gomod-toolchain-version:
+    name: "Update go.mod toolchain version"
     sourceid: latestGoVersion
     scmid: githubConfig
     kind: file
