@@ -135,7 +135,7 @@ targets:
       matchpattern: 'go \d+.\d+'
   update-wrapper-windows-archive-gomod-minor-version:
     name: "Update wrapper/windows/archive-proxy/go.mod minor version"
-    sourceid: latestGoVersion
+    sourceid: gomod
     scmid: githubConfig
     kind: file
     spec:
