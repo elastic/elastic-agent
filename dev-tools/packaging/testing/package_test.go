@@ -79,7 +79,9 @@ var (
 func TestRPM(t *testing.T) {
 	rpms := getFiles(t, regexp.MustCompile(`\.rpm$`))
 	for _, rpm := range rpms {
-		checkRPM(t, rpm)
+		t.Run(filepath.Base(rpm), func(t *testing.T) {
+			checkRPM(t, rpm)
+		})
 	}
 }
 
@@ -87,7 +89,9 @@ func TestDeb(t *testing.T) {
 	debs := getFiles(t, regexp.MustCompile(`\.deb$`))
 	buf := new(bytes.Buffer)
 	for _, deb := range debs {
-		checkDeb(t, deb, buf)
+		t.Run(filepath.Base(deb), func(t *testing.T) {
+			checkDeb(t, deb, buf)
+		})
 	}
 }
 
@@ -95,15 +99,20 @@ func TestTar(t *testing.T) {
 	// Regexp matches *-arch.tar.gz, but not *-arch.docker.tar.gz
 	tarFiles := getFiles(t, regexp.MustCompile(`-\w+\.tar\.gz$`))
 	for _, tarFile := range tarFiles {
-		fipsPackage := strings.Contains(tarFile, "-fips-")
-		checkTar(t, tarFile, fipsPackage)
+		t.Run(filepath.Base(tarFile), func(t *testing.T) {
+			fipsPackage := strings.Contains(tarFile, "-fips-")
+			checkTar(t, tarFile, fipsPackage)
+		})
+
 	}
 }
 
 func TestZip(t *testing.T) {
 	zips := getFiles(t, regexp.MustCompile(`^\w+\S+.zip$`))
 	for _, zip := range zips {
-		checkZip(t, zip)
+		t.Run(filepath.Base(zip), func(t *testing.T) {
+			checkZip(t, zip)
+		})
 	}
 }
 
@@ -112,9 +121,11 @@ func TestDocker(t *testing.T) {
 	sizeMap := make(map[string]int64)
 	for _, docker := range dockers {
 		fipsPackage := strings.Contains(docker, "-fips-")
-		t.Log(docker)
-		k, s := checkDocker(t, docker, fipsPackage)
-		sizeMap[k] = s
+		t.Run(filepath.Base(docker), func(t *testing.T) {
+			t.Log(docker)
+			k, s := checkDocker(t, docker, fipsPackage)
+			sizeMap[k] = s
+		})
 	}
 
 	if len(dockers) == 0 {
@@ -213,7 +224,7 @@ func checkTar(t *testing.T, file string, fipsCheck bool) {
 	checkModulesOwner(t, p, true)
 	checkLicensesPresent(t, "", p)
 
-	t.Run(p.Name+"_check_manifest_file", testManifestFile(file, fipsCheck))
+	t.Run("check_manifest_file", testManifestFile(file, fipsCheck))
 
 	checkSha512PackageHash(t, file)
 }
@@ -232,7 +243,7 @@ func checkZip(t *testing.T, file string) {
 	checkModulesPermissions(t, p)
 	checkLicensesPresent(t, "", p)
 
-	t.Run(p.Name+"_check_manifest_file", testManifestFile(file, false))
+	t.Run("check_manifest_file", testManifestFile(file, false))
 
 	checkSha512PackageHash(t, file)
 }
@@ -420,7 +431,7 @@ func checkConfigPermissions(t *testing.T, p *packageFile) {
 }
 
 func checkFilePermissions(t *testing.T, p *packageFile, configPattern *regexp.Regexp, expectedMode os.FileMode) {
-	t.Run(p.Name+" file permissions", func(t *testing.T) {
+	t.Run("file permissions", func(t *testing.T) {
 		for _, entry := range p.Contents {
 			if configPattern.MatchString(entry.File) {
 				mode := entry.Mode.Perm()
@@ -449,7 +460,7 @@ func checkOwner(t *testing.T, entry packageEntry, expectRoot bool) {
 }
 
 func checkConfigOwner(t *testing.T, p *packageFile, expectRoot bool) {
-	t.Run(p.Name+" config file owner", func(t *testing.T) {
+	t.Run("config file owner", func(t *testing.T) {
 		for _, entry := range p.Contents {
 			if configFilePattern.MatchString(entry.File) {
 				checkOwner(t, entry, expectRoot)
@@ -466,7 +477,7 @@ func checkManifestPermissions(t *testing.T, p *packageFile) {
 }
 
 func checkManifestPermissionsWithMode(t *testing.T, p *packageFile, expectedMode os.FileMode) {
-	t.Run(p.Name+" manifest file permissions", func(t *testing.T) {
+	t.Run("manifest file permissions", func(t *testing.T) {
 		for _, entry := range p.Contents {
 			if manifestFilePattern.MatchString(entry.File) {
 				mode := entry.Mode.Perm()
@@ -481,7 +492,7 @@ func checkManifestPermissionsWithMode(t *testing.T, p *packageFile, expectedMode
 
 // Verify that the manifest owner is correct.
 func checkManifestOwner(t *testing.T, p *packageFile, expectRoot bool) {
-	t.Run(p.Name+" manifest file owner", func(t *testing.T) {
+	t.Run("manifest file owner", func(t *testing.T) {
 		for _, entry := range p.Contents {
 			if manifestFilePattern.MatchString(entry.File) {
 				checkOwner(t, entry, expectRoot)
@@ -492,7 +503,7 @@ func checkManifestOwner(t *testing.T, p *packageFile, expectRoot bool) {
 
 // Verify the permissions of the modules.d dir and its contents.
 func checkModulesPermissions(t *testing.T, p *packageFile) {
-	t.Run(p.Name+" modules.d file permissions", func(t *testing.T) {
+	t.Run("modules.d file permissions", func(t *testing.T) {
 		for _, entry := range p.Contents {
 			if modulesDFilePattern.MatchString(entry.File) {
 				mode := entry.Mode.Perm()
@@ -513,7 +524,7 @@ func checkModulesPermissions(t *testing.T, p *packageFile) {
 
 // Verify the owner of the modules.d dir and its contents.
 func checkModulesOwner(t *testing.T, p *packageFile, expectRoot bool) {
-	t.Run(p.Name+" modules.d file owner", func(t *testing.T) {
+	t.Run("modules.d file owner", func(t *testing.T) {
 		for _, entry := range p.Contents {
 			if modulesDFilePattern.MatchString(entry.File) || modulesDDirPattern.MatchString(entry.File) {
 				checkOwner(t, entry, expectRoot)
@@ -526,7 +537,7 @@ func checkModulesOwner(t *testing.T, p *packageFile, expectRoot bool) {
 // executable.
 func checkSystemdUnitPermissions(t *testing.T, p *packageFile) {
 	const expectedMode = os.FileMode(0644)
-	t.Run(p.Name+" systemd unit file permissions", func(t *testing.T) {
+	t.Run("systemd unit file permissions", func(t *testing.T) {
 		for _, entry := range p.Contents {
 			if systemdUnitFilePattern.MatchString(entry.File) {
 				mode := entry.Mode.Perm()
@@ -629,7 +640,7 @@ func checkLicensesPresent(t *testing.T, prefix string, p *packageFile) {
 func checkDockerEntryPoint(t *testing.T, p *packageFile, info *dockerInfo) {
 	expectedMode := os.FileMode(0755)
 
-	t.Run(fmt.Sprintf("%s entrypoint", p.Name), func(t *testing.T) {
+	t.Run("entrypoint", func(t *testing.T) {
 		if len(info.Config.Entrypoint) == 0 {
 			t.Fatal("no entrypoint")
 		}
@@ -656,7 +667,7 @@ func checkDockerLabels(t *testing.T, p *packageFile, info *dockerInfo, file stri
 		return
 	}
 
-	t.Run(fmt.Sprintf("%s license labels", p.Name), func(t *testing.T) {
+	t.Run("license labels", func(t *testing.T) {
 		expectedLicense := "Elastic License"
 		ossPrefix := strings.Join([]string{
 			info.Config.Labels["org.label-schema.name"],
@@ -677,7 +688,7 @@ func checkDockerLabels(t *testing.T, p *packageFile, info *dockerInfo, file stri
 		}
 	})
 
-	t.Run(fmt.Sprintf("%s required labels", p.Name), func(t *testing.T) {
+	t.Run("required labels", func(t *testing.T) {
 		// From https://redhat-connect.gitbook.io/partner-guide-for-red-hat-openshift-and-container/program-on-boarding/technical-prerequisites
 		requiredLabels := []string{"name", "vendor", "version", "release", "summary", "description"}
 		for _, label := range requiredLabels {
@@ -689,7 +700,7 @@ func checkDockerLabels(t *testing.T, p *packageFile, info *dockerInfo, file stri
 }
 
 func checkDockerUser(t *testing.T, p *packageFile, info *dockerInfo, expectRoot bool) {
-	t.Run(fmt.Sprintf("%s user", p.Name), func(t *testing.T) {
+	t.Run("user", func(t *testing.T) {
 		if expectRoot != (info.Config.User == rootUser) {
 			t.Errorf("unexpected docker user: %s", info.Config.User)
 		}
