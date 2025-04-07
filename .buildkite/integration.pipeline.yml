@@ -119,7 +119,7 @@ steps:
           diskSizeGb: 200
 
       - label: "Packaging: Containers linux/amd64 FIPS"
-        key: packaging-containers-x86-64
+        key: packaging-containers-x86-64-fips
         env:
           PACKAGES: "docker"
           PLATFORMS: "linux/amd64"
@@ -133,7 +133,7 @@ steps:
           diskSizeGb: 200
 
       - label: "Packaging: Containers linux/arm64 FIPS"
-        key: packaging-containers-arm64
+        key: packaging-containers-arm64-fips
         env:
           PACKAGES: "docker"
           PLATFORMS: "linux/arm64"
