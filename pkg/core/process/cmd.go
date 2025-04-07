@@ -27,7 +27,8 @@ func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ..
 	cmd.Env = append(cmd.Env, env...)
 	cmd.Dir = filepath.Dir(path)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		// Signals are sent to process groups, so to send a signal to a
+		// Signals are sent to process groups, and child process are part of the
+		// parent's prcoess group. So to send a signal to a
 		// child process and not have it also affect ourselves
 		// (the parent process), the child needs to be created in a new
 		// process group.

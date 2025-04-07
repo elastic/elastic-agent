@@ -55,13 +55,13 @@ func TestGetCmdAndTerminateCmd(t *testing.T) {
 	sc := bufio.NewScanner(out)
 
 	if err := cmd.Start(); err != nil {
-		t.Fatalf("cannot start process: %s", err)
+		t.Fatalf("cannot start child process: %s", err)
 	}
 
 	for sc.Scan() {
 		line := sc.Text()
 		if testing.Verbose() {
-			fmt.Println("Process Output:", line)
+			fmt.Println("Child process output:", line)
 		}
 		if strings.Contains(line, "Wait for signal") {
 			break
@@ -82,16 +82,16 @@ func TestGetCmdAndTerminateCmd(t *testing.T) {
 	for sc.Scan() {
 		line := sc.Text()
 		if testing.Verbose() {
-			fmt.Println("Process Output:", line)
+			fmt.Println("Child process output:", line)
 		}
 		if strings.Contains(line, expectedMsg) {
 			break
 		}
 	}
 
-	// Drain the stdout and wait for the prcess to exit.
+	// Drain the stdout and wait for the child process to exit.
 	// Because we called cmd.StderrPipe() we need to drain the
-	// pipe before calling cmd.Wait
+	// pipe before calling cmd.Wait.
 	if testing.Verbose() {
 		for sc.Scan() {
 			line := sc.Text()
