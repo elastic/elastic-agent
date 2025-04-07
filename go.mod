@@ -33,13 +33,8 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.2.1
 	github.com/gofrs/flock v0.12.1
 	github.com/gofrs/uuid/v5 v5.3.1
-<<<<<<< HEAD
-	github.com/google/go-cmp v0.6.0
-	github.com/google/pprof v0.0.0-20240727154555-813a5fbdbec8
-=======
 	github.com/google/go-cmp v0.7.0
 	github.com/google/pprof v0.0.0-20241029153458-d1b30febd7db
->>>>>>> b2c19df3e ([Chore] Update otel components to v0.127.0/v0.121.0 (#7686))
 	github.com/gorilla/mux v1.8.1
 	github.com/jaypipes/ghw v0.12.0
 	github.com/jedib0t/go-pretty/v6 v6.4.6
@@ -294,13 +289,8 @@ require (
 	github.com/eclipse/paho.mqtt.golang v1.3.5 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
 	github.com/elastic/go-concert v0.3.0 // indirect
-<<<<<<< HEAD
-	github.com/elastic/go-docappender/v2 v2.4.0 // indirect
-	github.com/elastic/go-elasticsearch/v7 v7.17.10 // indirect
-=======
 	github.com/elastic/go-docappender/v2 v2.8.0 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect
->>>>>>> b2c19df3e ([Chore] Update otel components to v0.127.0/v0.121.0 (#7686))
 	github.com/elastic/go-grok v0.3.1 // indirect
 	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
 	github.com/elastic/go-seccomp-bpf v1.5.0 // indirect
@@ -364,15 +354,9 @@ require (
 	github.com/google/s2a-go v0.1.8 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-<<<<<<< HEAD
-	github.com/googleapis/enterprise-certificate-proxy v0.3.4 // indirect
-	github.com/googleapis/gax-go/v2 v2.14.0 // indirect
-	github.com/gophercloud/gophercloud v1.14.0 // indirect
-=======
 	github.com/googleapis/enterprise-certificate-proxy v0.3.5 // indirect
 	github.com/googleapis/gax-go/v2 v2.14.1 // indirect
 	github.com/gophercloud/gophercloud v1.14.1 // indirect
->>>>>>> b2c19df3e ([Chore] Update otel components to v0.127.0/v0.121.0 (#7686))
 	github.com/gorilla/handlers v1.5.2 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/gosuri/uitable v0.0.4 // indirect
@@ -418,7 +402,7 @@ require (
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/karrick/godirwalk v1.17.0 // indirect
 	github.com/klauspost/asmfmt v1.3.2 // indirect
-	github.com/klauspost/compress v1.17.11 // indirect
+	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.8 // indirect
 	github.com/knadh/koanf/maps v0.1.1 // indirect
 	github.com/knadh/koanf/providers/confmap v0.1.0 // indirect
@@ -615,12 +599,8 @@ require (
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.59.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.59.0 // indirect
 	go.opentelemetry.io/contrib/propagators/b3 v1.34.0 // indirect
-<<<<<<< HEAD
-	go.opentelemetry.io/otel v1.34.0 // indirect
-=======
 	go.opentelemetry.io/ebpf-profiler v0.0.0-20250212075250-7bf12d3f962f // indirect
 	go.opentelemetry.io/otel v1.35.0 // indirect
->>>>>>> b2c19df3e ([Chore] Update otel components to v0.127.0/v0.121.0 (#7686))
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.10.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.10.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.34.0 // indirect
@@ -633,11 +613,11 @@ require (
 	go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.34.0 // indirect
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.34.0 // indirect
 	go.opentelemetry.io/otel/log v0.10.0 // indirect
-	go.opentelemetry.io/otel/metric v1.34.0 // indirect
-	go.opentelemetry.io/otel/sdk v1.34.0 // indirect
+	go.opentelemetry.io/otel/metric v1.35.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.35.0 // indirect
 	go.opentelemetry.io/otel/sdk/log v0.10.0 // indirect
-	go.opentelemetry.io/otel/sdk/metric v1.34.0 // indirect
-	go.opentelemetry.io/otel/trace v1.34.0 // indirect
+	go.opentelemetry.io/otel/sdk/metric v1.35.0 // indirect
+	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
 	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect
 	go.uber.org/atomic v1.11.0 // indirect
