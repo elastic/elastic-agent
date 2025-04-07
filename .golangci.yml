@@ -117,10 +117,6 @@ linters-settings:
       - github.com/fsnotify/fsnotify
       - github.com/openshift/api
       - github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver
-<<<<<<< HEAD
-
-=======
->>>>>>> b2c19df3e ([Chore] Update otel components to v0.127.0/v0.121.0 (#7686))
   nolintlint:
     # Enable to ensure that nolint directives are all used. Default is true.
     allow-unused: false
