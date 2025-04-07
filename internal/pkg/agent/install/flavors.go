@@ -48,7 +48,7 @@ func UsedFlavor(topPath, defaultFlavor string) (string, error) {
 		return "", fmt.Errorf("failed reading flavor marker file: %w", err)
 	}
 
-	return string(content), nil
+	return strings.TrimSpace(string(content)), nil
 }
 
 func Flavor(detectedFlavor string, registryPath string, flavorsRegistry map[string][]string) (FlavorDefinition, error) {
@@ -118,7 +118,7 @@ func ApplyFlavor(versionedHome string, flavor FlavorDefinition) error {
 	}
 
 	for _, ftr := range filesToRemove {
-		if removeErr := os.RemoveAll(ftr); !os.IsNotExist(removeErr) {
+		if removeErr := os.RemoveAll(ftr); removeErr != nil && !os.IsNotExist(removeErr) {
 			err = fmt.Errorf("failed cleaning components: %w", removeErr)
 		}
 	}

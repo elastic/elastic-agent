@@ -14,6 +14,7 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -105,6 +106,7 @@ type PackageSpec struct {
 	Qualifier         string                 `yaml:"qualifier,omitempty"`   // Optional
 	OutputFile        string                 `yaml:"output_file,omitempty"` // Optional
 	ExtraVars         map[string]string      `yaml:"extra_vars,omitempty"`  // Optional
+	ExtraTags         []string               `yaml:"extra_tags,omitempty"`  // Optional
 
 	evalContext            map[string]interface{}
 	packageDir             string
@@ -112,6 +114,10 @@ type PackageSpec struct {
 	localPostInstallScript string
 	localPostRmScript      string
 }
+
+// add new prop into package file called expand spc
+// expand spec is checked during packaging and expands to multiple files
+// if expand is not present file is copied normally
 
 // PackageFile represents a file or directory within a package.
 type PackageFile struct {
@@ -127,6 +133,7 @@ type PackageFile struct {
 	Owner         string                  `yaml:"owner,omitempty"`           // File Owner, for user and group name (rpm only).
 	SkipOnMissing bool                    `yaml:"skip_on_missing,omitempty"` // Prevents build failure if the file is missing.
 	Symlink       bool                    `yaml:"symlink"`                   // Symlink marks file as a symlink pointing from target to source.
+	ExpandSpec    bool                    `yaml:"expand_spec,omitempty"`     // Optional
 }
 
 // OSArchNames defines the names of architectures for use in packages.
@@ -385,6 +392,12 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 		s.evalContext[k] = mustExpand(v)
 	}
 
+	if s.ExtraTags != nil {
+		for i, tag := range s.ExtraTags {
+			s.ExtraTags[i] = mustExpand(tag)
+		}
+	}
+
 	s.Name = mustExpand(s.Name)
 	s.ServiceName = mustExpand(s.ServiceName)
 	s.OS = mustExpand(s.OS)
@@ -473,9 +486,13 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 // ImageName computes the image name from the spec.
 func (s PackageSpec) ImageName() string {
 	if s.DockerVariant == Basic {
+		return s.Name
+	}
+	if s.DockerVariant == EdotCollector || s.DockerVariant == EdotCollectorWolfi {
 		// no suffix for basic docker variant
 		return s.Name
 	}
+
 	return fmt.Sprintf("%s-%s", s.Name, s.DockerVariant)
 }
 
@@ -963,7 +980,7 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 		}
 
 		if mg.Verbose() {
-			log.Println("Adding", os.FileMode(header.Mode), header.Name) //nolint:gosec // we don't care about an int overflow in a log line
+			log.Println("Adding", os.FileMode(mustConvertToUnit32(header.Mode)), header.Name)
 		}
 		if err := ar.WriteHeader(header); err != nil {
 			return err
@@ -1031,7 +1048,7 @@ func addSymlinkToTar(tmpdir string, ar *tar.Writer, baseDir string, pkgFile Pack
 		header.Typeflag = tar.TypeSymlink
 
 		if mg.Verbose() {
-			log.Println("Adding", os.FileMode(header.Mode), header.Name) //nolint:gosec // we don't care about an int overflow in a log line
+			log.Println("Adding", os.FileMode(mustConvertToUnit32(header.Mode)), header.Name)
 		}
 		if err := ar.WriteHeader(header); err != nil {
 			return err
@@ -1052,4 +1069,11 @@ func PackageDocker(spec PackageSpec) error {
 		return err
 	}
 	return b.Build()
+}
+
+func mustConvertToUnit32(i int64) uint32 {
+	if i > math.MaxUint32 {
+		panic(fmt.Sprintf("%d is bigger than math.MaxUint32", i))
+	}
+	return uint32(i) // #nosec
 }

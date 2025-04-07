@@ -1,0 +1,25 @@
+{{- include "elasticagent.init" $ -}}
+{{- range $presetName, $presetVal := $.Values.agent.presets -}}
+{{- if ($presetVal).priorityClass -}}
+{{- $presetPriorityClass := ($presetVal).priorityClass -}}
+{{- if eq ($presetPriorityClass).create true -}}
+{{/* priority class is not namespace bound so let's try to give it a unique enough name */}}
+{{- $priorityClassName := printf "agent-%s-%s-%s" $presetName $.Release.Name $.Release.Namespace | lower }}
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ $priorityClassName }}
+value: {{ ($presetPriorityClass).value }}
+{{- with ($presetPriorityClass).preemptionPolicy }}
+preemptionPolicy: {{ . }}
+{{- end }}
+{{- with ($presetPriorityClass).globalDefault }}
+globalDefault: {{ . }}
+{{- end }}
+{{- with ($presetPriorityClass).description }}
+description: {{ . }}
+{{- end }}
+---
+{{- end }}
+{{- end }}
+{{- end }}

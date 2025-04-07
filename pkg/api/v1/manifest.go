@@ -11,13 +11,16 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-const ManifestKind = "PackageManifest"
-const ManifestFileName = "manifest.yaml"
+const (
+	ManifestKind     = "PackageManifest"
+	ManifestFileName = "manifest.yaml"
+)
 
 type PackageDesc struct {
 	Version       string              `yaml:"version,omitempty" json:"version,omitempty"`
 	Snapshot      bool                `yaml:"snapshot,omitempty" json:"snapshot,omitempty"`
 	Hash          string              `yaml:"hash,omitempty" json:"hash,omitempty"`
+	Fips          bool                `yaml:"fips,omitempty" json:"fips,omitempty"`
 	VersionedHome string              `yaml:"versioned-home,omitempty" json:"versionedHome,omitempty"`
 	PathMappings  []map[string]string `yaml:"path-mappings,omitempty" json:"pathMappings,omitempty"`
 	Flavors       map[string][]string `yaml:"flavors,omitempty" json:"flavors,omitempty"`

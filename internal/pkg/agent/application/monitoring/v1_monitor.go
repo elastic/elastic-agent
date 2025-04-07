@@ -304,7 +304,7 @@ func (b *BeatsMonitor) Prepare(unit string) error {
 	return nil
 }
 
-// Cleanup removes
+// Cleanup removes files that were created for monitoring.
 func (b *BeatsMonitor) Cleanup(unit string) error {
 	if !b.Enabled() {
 		return nil
@@ -450,6 +450,13 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 				// possible it's a log message from agent itself (doesn't have component.dataset)
 				map[string]interface{}{
 					"copy_fields": map[string]interface{}{
+						"when": map[string]any{
+							"not": map[string]any{
+								"has_fields": []any{
+									"data_stream.dataset",
+								},
+							},
+						},
 						"fields": []interface{}{
 							map[string]interface{}{
 								"from": "data_stream.dataset_original",

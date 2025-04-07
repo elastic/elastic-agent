@@ -46,7 +46,6 @@ linters:
     - asciicheck # simple linter to check that your code does not contain non-ASCII identifiers
     - bodyclose # checks whether HTTP response body is closed successfully
     - durationcheck # check for two durations multiplied together
-    - copyloopvar # checks for unnecessary loop variable copies
     - goimports # Goimports does everything that gofmt does. Additionally it checks unused imports
     - gosec # inspects source code for security problems
     - importas # enforces consistent import aliases
@@ -84,7 +83,7 @@ linters-settings:
     forbid:
       - fmt.Print.* # too much log noise
     # Exclude godoc examples from forbidigo checks.  Default is true.
-    exclude_godoc_examples: true
+    exclude-godoc-examples: true
 
   goimports:
     local-prefixes: github.com/elastic
@@ -127,12 +126,10 @@ linters-settings:
       - github.com/dop251/goja_nodejs
       - github.com/fsnotify/fsnotify
       - github.com/openshift/api
-
+      - github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver
   nolintlint:
     # Enable to ensure that nolint directives are all used. Default is true.
     allow-unused: false
-    # Disable to ensure that nolint directives don't have a leading space. Default is true.
-    allow-leading-space: false
     # Exclude following linters from requiring an explanation.  Default is [].
     allow-no-explanation: []
     # Enable to require an explanation of nonzero length after each nolint directive. Default is false.

@@ -19,8 +19,9 @@ import (
 )
 
 type FileVault struct {
-	path string
-	seed []byte
+	path     string
+	seed     []byte
+	saltSize int
 
 	lockRetryDelay time.Duration
 	lock           *flock.Flock
@@ -74,7 +75,7 @@ func NewFileVault(ctx context.Context, options Options) (v *FileVault, err error
 		err = r.unlockAndJoinErrors(err)
 	}()
 
-	r.seed, err = getOrCreateSeed(path, options.readonly)
+	r.seed, r.saltSize, err = getOrCreateSeed(path, options.readonly)
 	if err != nil {
 		return nil, fmt.Errorf("could not get or create seed for the vault at %s: %w", path, err)
 	}

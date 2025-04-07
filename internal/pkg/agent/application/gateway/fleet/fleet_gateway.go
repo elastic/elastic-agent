@@ -37,21 +37,24 @@ const (
 	fleetStateStarting = "starting"
 )
 
+// Default backoff settings for connecting to Fleet
+var defaultFleetBackoffSettings = backoffSettings{
+	Init: 60 * time.Second,
+	Max:  10 * time.Minute,
+}
+
 // Default Configuration for the Fleet Gateway.
 var defaultGatewaySettings = &fleetGatewaySettings{
 	Duration:                     1 * time.Second,        // time between successful calls
 	Jitter:                       500 * time.Millisecond, // used as a jitter for duration
 	ErrConsecutiveUnauthDuration: 1 * time.Hour,          // time between calls when the agent exceeds unauthorized response limit
-	Backoff: backoffSettings{ // time after a failed call
-		Init: 60 * time.Second,
-		Max:  10 * time.Minute,
-	},
+	Backoff:                      &defaultFleetBackoffSettings,
 }
 
 type fleetGatewaySettings struct {
-	Duration                     time.Duration   `config:"checkin_frequency"`
-	Jitter                       time.Duration   `config:"jitter"`
-	Backoff                      backoffSettings `config:"backoff"`
+	Duration                     time.Duration    `config:"checkin_frequency"`
+	Jitter                       time.Duration    `config:"jitter"`
+	Backoff                      *backoffSettings `config:"backoff"`
 	ErrConsecutiveUnauthDuration time.Duration
 }
 
@@ -136,11 +139,18 @@ func (f *FleetGateway) Actions() <-chan []fleetapi.Action {
 }
 
 func (f *FleetGateway) Run(ctx context.Context) error {
-	backoff := backoff.NewEqualJitterBackoff(
-		ctx.Done(),
-		f.settings.Backoff.Init,
-		f.settings.Backoff.Max,
-	)
+	var requestBackoff backoff.Backoff
+	if f.settings.Backoff == nil {
+		requestBackoff = RequestBackoff(ctx.Done())
+	} else {
+		// this is only used in tests
+		requestBackoff = backoff.NewEqualJitterBackoff(
+			ctx.Done(),
+			f.settings.Backoff.Init,
+			f.settings.Backoff.Max,
+		)
+	}
+
 	f.log.Info("Fleet gateway started")
 	for {
 		select {
@@ -154,7 +164,7 @@ func (f *FleetGateway) Run(ctx context.Context) error {
 			// Execute the checkin call and for any errors returned by the fleet-server API
 			// the function will retry to communicate with fleet-server with an exponential delay and some
 			// jitter to help better distribute the load from a fleet of agents.
-			resp, err := f.doExecute(ctx, backoff)
+			resp, err := f.doExecute(ctx, requestBackoff)
 			if err != nil {
 				continue
 			}
@@ -327,6 +337,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	ecsMeta, err := info.Metadata(ctx, f.log)
 	if err != nil {
 		f.log.Error(errors.New("failed to load metadata", err))
+		return nil, 0, err
 	}
 
 	// retrieve ack token from the store
@@ -427,4 +438,12 @@ func agentStateToString(state agentclient.State) string {
 	}
 	// Unknown states map to degraded.
 	return fleetStateDegraded
+}
+
+func RequestBackoff(done <-chan struct{}) backoff.Backoff {
+	return backoff.NewEqualJitterBackoff(
+		done,
+		defaultFleetBackoffSettings.Init,
+		defaultFleetBackoffSettings.Max,
+	)
 }

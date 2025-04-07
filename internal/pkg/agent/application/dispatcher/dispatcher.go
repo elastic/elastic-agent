@@ -21,7 +21,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-type actionHandlers map[string]actions.Handler
+type actionHandlers map[reflect.Type]actions.Handler
 
 type priorityQueue interface {
 	Add(fleetapi.ScheduledAction, int64)
@@ -83,7 +83,7 @@ func (ad *ActionDispatcher) Register(a fleetapi.Action, handler actions.Handler)
 	k := ad.key(a)
 	_, ok := ad.handlers[k]
 	if ok {
-		return fmt.Errorf("action with type %T is already registered", a)
+		return fmt.Errorf("action with type %s is already registered", k)
 	}
 	ad.handlers[k] = handler
 	return nil
@@ -98,8 +98,8 @@ func (ad *ActionDispatcher) MustRegister(a fleetapi.Action, handler actions.Hand
 	}
 }
 
-func (ad *ActionDispatcher) key(a fleetapi.Action) string {
-	return reflect.TypeOf(a).String()
+func (ad *ActionDispatcher) key(a fleetapi.Action) reflect.Type {
+	return reflect.TypeOf(a)
 }
 
 // Dispatch dispatches an action using pre-registered set of handlers.
@@ -175,7 +175,7 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, detailsSetter details.
 }
 
 func (ad *ActionDispatcher) dispatchAction(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {
-	handler, found := ad.handlers[(ad.key(a))]
+	handler, found := ad.handlers[ad.key(a)]
 	if !found {
 		return ad.def.Handle(ctx, a, acker)
 	}
