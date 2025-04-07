@@ -117,6 +117,7 @@ func TestHTTPReloadEnableBehavior(t *testing.T) {
 }
 
 func TestBasicLivenessConfig(t *testing.T) {
+	_ = logp.DevelopmentSetup()
 	testAPIConfig := api.Config{}
 	testConfig := config.MonitoringConfig{
 		Enabled: true,
@@ -125,9 +126,7 @@ func TestBasicLivenessConfig(t *testing.T) {
 			Port:    0,
 		},
 	}
-	logger, err := logp.NewDevelopmentLogger("")
-	require.NoError(t, err)
-	serverReloader, err := NewServer(logger, testAPIConfig, nil, nil, fakeCoordCfg, "linux", &testConfig)
+	serverReloader, err := NewServer(logp.L(), testAPIConfig, nil, nil, fakeCoordCfg, "linux", &testConfig)
 	require.NoError(t, err)
 
 	t.Logf("starting server...")
@@ -144,6 +143,7 @@ func TestBasicLivenessConfig(t *testing.T) {
 }
 
 func TestPprofEnabled(t *testing.T) {
+	_ = logp.DevelopmentSetup()
 	testAPIConfig := api.Config{}
 	testConfig := config.MonitoringConfig{
 		Enabled: true,
@@ -155,9 +155,7 @@ func TestPprofEnabled(t *testing.T) {
 			Enabled: true,
 		},
 	}
-	logger, err := logp.NewDevelopmentLogger("")
-	require.NoError(t, err)
-	serverReloader, err := NewServer(logger, testAPIConfig, nil, nil, fakeCoordCfg, "linux", &testConfig)
+	serverReloader, err := NewServer(logp.L(), testAPIConfig, nil, nil, fakeCoordCfg, "linux", &testConfig)
 	require.NoError(t, err)
 
 	t.Logf("starting server...")
