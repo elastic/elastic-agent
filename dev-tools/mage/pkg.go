@@ -35,12 +35,12 @@ func Package() error {
 	platforms := Platforms
 
 	if mg.Verbose() {
-		packages := make([]string, 0, len(Packages))
+		debugSelectedPackageSpecsWithPlatform := make([]string, 0, len(Packages))
 		for _, p := range Packages {
-			packages = append(packages, fmt.Sprintf("spec %s on %s/%s", p.Spec.Name, p.OS, p.Arch))
+			debugSelectedPackageSpecsWithPlatform = append(debugSelectedPackageSpecsWithPlatform, fmt.Sprintf("spec %s on %s/%s", p.Spec.Name, p.OS, p.Arch))
 		}
 
-		log.Printf("Packaging for platforms %v, packages %v", platforms, packages)
+		log.Printf("Packaging for platforms %v, packages %v", platforms, debugSelectedPackageSpecsWithPlatform)
 	}
 
 	tasks := make(map[string][]interface{})
