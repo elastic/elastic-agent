@@ -47,7 +47,7 @@ func killCmd(proc *os.Process) error {
 	return proc.Kill()
 }
 
-// terminateCmd sends the CTRL+C (SIGINT) to the process
+// terminateCmd sends the CTRL+BREAK (SIGINT) to the process
 func terminateCmd(proc *os.Process) error {
 	// Because we set CREATE_NEW_PROCESS_GROUP when creating the process,
 	// it CTLR_C_EVENT is disabled, so the only way to gracefully terminate
