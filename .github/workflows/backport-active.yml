@@ -1,0 +1,24 @@
+name: Automatic Backport
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main  # Only run for PRs targeting the main branch
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  backport:
+    # Only run if the PR was merged (not just closed) and has one of the backport labels
+    if: |
+      github.event.pull_request.merged == true && 
+      (contains(github.event.pull_request.labels.*.name, 'backport-active-all') || 
+       contains(github.event.pull_request.labels.*.name, 'backport-active-9') || 
+       contains(github.event.pull_request.labels.*.name, 'backport-active-8'))
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: elastic/oblt-actions/github/backport-active@v1
