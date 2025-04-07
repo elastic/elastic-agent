@@ -253,7 +253,12 @@ func checkZip(t *testing.T, file string) {
 	checkModulesPermissions(t, p)
 	checkLicensesPresent(t, "", p)
 
-	t.Run("check_manifest_file", testManifestFile(file, false))
+	// extract archive in a temporary directory
+	tempExtractionPath := t.TempDir()
+	err = mage.Extract(file, tempExtractionPath)
+	require.NoErrorf(t, err, "error extracting archive %q", file)
+
+	t.Run("check_manifest_file", testManifestFile(tempExtractionPath, false))
 
 	checkSha512PackageHash(t, file)
 }
