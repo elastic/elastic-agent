@@ -28,7 +28,7 @@ steps:
       - label: "Packaging: Ubuntu x86_64 FIPS"
         key: "packaging-ubuntu-x86-64-fips"
         env:
-          PACKAGES: "tar.gz,docker"
+          PACKAGES: "tar.gz"
           PLATFORMS: "linux/amd64"
           FIPS: "true"
         command: ".buildkite/scripts/steps/integration-package.sh"
@@ -61,7 +61,7 @@ steps:
       - label: "Packaging: Ubuntu arm64 FIPS"
         key: "packaging-ubuntu-arm64-fips"
         env:
-          PACKAGES: "tar.gz,docker"
+          PACKAGES: "tar.gz"
           PLATFORMS: "linux/arm64"
           FIPS: "true"
         command: ".buildkite/scripts/steps/integration-package.sh"
@@ -108,6 +108,36 @@ steps:
         env:
           PACKAGES: "docker"
           PLATFORMS: "linux/arm64"
+        command: |
+          .buildkite/scripts/steps/integration-package.sh
+        artifact_paths:
+          - build/distributions/**
+        agents:
+          provider: "aws"
+          instanceType: "c6g.4xlarge"
+          imagePrefix: "core-ubuntu-2204-aarch64"
+          diskSizeGb: 200
+
+      - label: "Packaging: Containers linux/amd64 FIPS"
+        key: packaging-containers-x86-64
+        env:
+          PACKAGES: "docker"
+          PLATFORMS: "linux/amd64"
+          FIPS: "true"
+        command: ".buildkite/scripts/steps/integration-package.sh"
+        artifact_paths:
+          - build/distributions/**
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          diskSizeGb: 200
+
+      - label: "Packaging: Containers linux/arm64 FIPS"
+        key: packaging-containers-arm64
+        env:
+          PACKAGES: "docker"
+          PLATFORMS: "linux/arm64"
+          FIPS: "true"
         command: |
           .buildkite/scripts/steps/integration-package.sh
         artifact_paths:
