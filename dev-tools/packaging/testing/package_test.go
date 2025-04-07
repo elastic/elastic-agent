@@ -73,7 +73,6 @@ var (
 	monitorsd         = flag.Bool("monitors.d", false, "check monitors.d folder contents")
 	rootOwner         = flag.Bool("root-owner", false, "expect root to own package files")
 	rootUserContainer = flag.Bool("root-user-container", false, "expect root in container user")
-	fips              = flag.Bool("fips", false, "check agent binary for FIPS compliance")
 )
 
 func TestRPM(t *testing.T) {
