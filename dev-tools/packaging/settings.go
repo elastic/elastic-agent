@@ -91,6 +91,9 @@ func (proj BinarySpec) SupportsPackageType(pkgType pkgcommon.PackageType) bool {
 	return false
 }
 
+// GetPackageName will return a rendered version of the BinarySpec.packageName attribute (which is a golang template),
+// using version and platform strings provided to create a template context containing 'Version', 'Platform' and 'Ext' values.
+// The string returned will contain the expected filename of the package file for the BinarySpec
 func (proj BinarySpec) GetPackageName(version string, platform string) string {
 	tmpl, err := template.New("package_name").Parse(proj.PackageName)
 	if err != nil {
@@ -110,6 +113,10 @@ func (proj BinarySpec) GetPackageName(version string, platform string) string {
 	return buf.String()
 }
 
+// GetRootDir will return a rendered version of the BinarySpec.rootDir attribute (which is a golang template), using
+// version and platform strings provided to create a template context containing 'Version', 'Platform' and 'Ext' values.
+// The string returned will contain the expected name of the root directory created when extracted the package file for
+// the BinarySpec
 func (proj BinarySpec) GetRootDir(version string, platform string) string {
 	if proj.RootDir == "" {
 		// shortcut to avoid rendering template when there's no RootDir specified
