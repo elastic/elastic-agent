@@ -49,13 +49,13 @@ settings:
 
 # List *all* the components available for packaging in elastic-agent
 components:
-  # general template for new components
+  # general template for new components (all attributes are mandatory)
   #  - &comp-<anchor name>
   #    projectName: <project name under manifest>
   #    packageName: <template representing the name of the archive to download/extract>
   #    binaryName: <binary name>
   #    rootDir: <template representing directory from the archive root where the binary is located>
-  #    fips: <boolean indicating if this components whether FIPS compliant>
+  #    fips: <boolean indicating if this component is FIPS compliant>
   #    platforms:
   #      - <platform, use anchors for platforms above>
   #    pythonWheel: true # true if it's a package that is not platform specific
@@ -90,10 +90,11 @@ components:
   - &comp-connectors
     projectName: connectors
     packageName: connectors-{{.Version}}.zip
-    # FIXME: connectors use only <major>.<minor>.<patch> in the root directory name so the definition should be something like:
-    # rootDir: elasticsearch_connectors-{{beat_version}}
-    # We don't support that yet, so we are not gonna define a rootDir (not a problem since we don't extract the archive
-    # during packaging
+    # FIXME: connectors use only <major>.<minor>.<patch> in the root directory name so the definition should be something
+    # using the beat_version or similar
+    # We don't support that yet, so we are defining a rootDir that will error out if rendered. This isnot a problem since
+    # we don't extract/manipulate the archive during packaging but it has its own special handling in the 'service' docker image
+    rootDir: elasticsearch_connectors-{{beat_version}}
     binaryName: connectors
     platforms:
       - *linux-amd64
