@@ -118,8 +118,9 @@ func TestDocker(t *testing.T) {
 	dockers := getFiles(t, regexp.MustCompile(`\.docker\.tar\.gz$`))
 	sizeMap := make(map[string]int64)
 	for _, docker := range dockers {
+		fipsPackage := strings.Contains(docker, "-fips-")
 		t.Log(docker)
-		k, s := checkDocker(t, docker)
+		k, s := checkDocker(t, docker, fipsPackage)
 		sizeMap[k] = s
 	}
 
@@ -341,7 +342,7 @@ func checkNpcapNotices(pkg, file string, contents io.Reader) error {
 	return nil
 }
 
-func checkDocker(t *testing.T, file string) (string, int64) {
+func checkDocker(t *testing.T, file string, fipsPackage bool) (string, int64) {
 	if strings.Contains(file, "elastic-otel-collector") {
 		return checkEdotCollectorDocker(t, file)
 	}
@@ -356,7 +357,10 @@ func checkDocker(t *testing.T, file string) (string, int64) {
 	checkDockerLabels(t, p, info, file)
 	checkDockerUser(t, p, info, *rootUserContainer)
 	checkFilePermissions(t, p, configFilePattern, os.FileMode(0644))
-	checkFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
+	if !fipsPackage {
+		// FIPS docker image do not contain an otelcol script, run this check only on non FIPS compliant images
+		checkFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
+	}
 	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
 	checkModulesPresent(t, "", p)
 	checkModulesDPresent(t, "", p)
