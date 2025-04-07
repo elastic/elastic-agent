@@ -7,17 +7,19 @@ package monitoring
 import (
 	"crypto/sha256"
 	"fmt"
-	"maps"
 	"math"
 	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
+
+	"golang.org/x/exp/slices"
+
+	"golang.org/x/exp/maps"
 
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -711,7 +713,8 @@ func (b *BeatsMonitor) injectMetricsInput(
 	}
 
 	// ensure consistent ordering
-	unitIDs := slices.Sorted(maps.Keys(componentListWithMonitoring))
+	unitIDs := maps.Keys(componentListWithMonitoring)
+	slices.Sort(unitIDs)
 	for _, unit := range unitIDs {
 		binaryName := componentListWithMonitoring[unit]
 		if !isSupportedMetricsBinary(binaryName) {
