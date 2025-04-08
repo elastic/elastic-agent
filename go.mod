@@ -13,12 +13,8 @@ require (
 	github.com/docker/docker v27.5.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-<<<<<<< HEAD
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20241212201805-58af1537830b
-=======
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250311090720-d0d0bce5f75d
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250404163238-b16c2c085d99
->>>>>>> 1e2a3872a ([Helm]: Add basic resource correctness tests for for Helm chart examples (#7726))
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.1
 	github.com/elastic/elastic-agent-libs v0.18.8
@@ -26,18 +22,13 @@ require (
 	github.com/elastic/elastic-transport-go/v8 v8.6.1
 	github.com/elastic/go-elasticsearch/v8 v8.17.1
 	github.com/elastic/go-licenser v0.4.2
-<<<<<<< HEAD
 	github.com/elastic/go-sysinfo v1.15.2
-	github.com/elastic/go-ucfg v0.8.8
-=======
-	github.com/elastic/go-sysinfo v1.15.3
 	github.com/elastic/go-ucfg v0.8.9-0.20250307075119-2a22403faaea
->>>>>>> 1e2a3872a ([Helm]: Add basic resource correctness tests for for Helm chart examples (#7726))
 	github.com/elastic/mock-es v0.0.0-20241101195702-0a41fa3d30d9
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.2.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.13.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.4.1
-	github.com/fatih/color v1.17.0
+	github.com/fatih/color v1.18.0
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-viper/mapstructure/v2 v2.2.1
 	github.com/gofrs/flock v0.12.1
@@ -70,20 +61,15 @@ require (
 	github.com/rs/zerolog v1.27.0
 	github.com/sajari/regression v1.0.1
 	github.com/schollz/progressbar/v3 v3.13.1
-	github.com/spf13/cobra v1.8.1
+	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
 	github.com/tsg/go-daemon v0.0.0-20200207173439-e704b93fd89b
 	github.com/winlabs/gowin32 v0.0.0-20240930213947-f504d7e14639
 	go.elastic.co/apm/module/apmgorilla/v2 v2.6.0
 	go.elastic.co/apm/module/apmgrpc/v2 v2.6.0
-<<<<<<< HEAD
-	go.elastic.co/apm/v2 v2.6.3
-	go.elastic.co/ecszap v1.0.2
-=======
 	go.elastic.co/apm/v2 v2.7.0
-	go.elastic.co/ecszap v1.0.3
->>>>>>> 1e2a3872a ([Helm]: Add basic resource correctness tests for for Helm chart examples (#7726))
+	go.elastic.co/ecszap v1.0.2
 	go.elastic.co/go-licence-detector v0.7.0
 	go.opentelemetry.io/collector/component/componentstatus v0.120.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.120.0
@@ -97,7 +83,7 @@ require (
 	golang.org/x/sys v0.31.0
 	golang.org/x/term v0.30.0
 	golang.org/x/text v0.23.0
-	golang.org/x/time v0.7.0
+	golang.org/x/time v0.8.0
 	golang.org/x/tools v0.30.0
 	google.golang.org/grpc v1.70.0
 	google.golang.org/protobuf v1.36.5
@@ -106,17 +92,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/gotestsum v1.9.0
 	helm.sh/helm/v3 v3.15.4
-<<<<<<< HEAD
-	k8s.io/api v0.32.0
-	k8s.io/apimachinery v0.32.0
-	k8s.io/cli-runtime v0.30.3
-	k8s.io/client-go v0.32.0
-=======
 	k8s.io/api v0.32.3
 	k8s.io/apimachinery v0.32.3
 	k8s.io/cli-runtime v0.30.3
 	k8s.io/client-go v0.32.3
->>>>>>> 1e2a3872a ([Helm]: Add basic resource correctness tests for for Helm chart examples (#7726))
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.70
 	sigs.k8s.io/e2e-framework v0.4.0
 	sigs.k8s.io/kustomize/api v0.13.5-0.20230601165947-6ce0bf390ce3
@@ -215,11 +194,7 @@ require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Masterminds/semver/v3 v3.3.0 // indirect
-<<<<<<< HEAD
-	github.com/Masterminds/sprig/v3 v3.2.3 // indirect
-=======
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
->>>>>>> 1e2a3872a ([Helm]: Add basic resource correctness tests for for Helm chart examples (#7726))
 	github.com/Masterminds/squirrel v1.5.4 // indirect
 	github.com/PaesslerAG/gval v1.2.2 // indirect
 	github.com/PaesslerAG/jsonpath v0.1.1 // indirect
@@ -282,7 +257,7 @@ require (
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.5 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dennwc/varint v1.0.0 // indirect
@@ -325,19 +300,12 @@ require (
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.4.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.16.1 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
-<<<<<<< HEAD
 	github.com/elastic/sarama v1.19.1-0.20241120141909-c7eabfcee7e5 // indirect
-	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
+	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
 	github.com/envoyproxy/go-control-plane v0.13.1 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.1.0 // indirect
-=======
-	github.com/elastic/sarama v1.19.1-0.20250304185506-df6449b5c996 // indirect
-	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
-	github.com/envoyproxy/go-control-plane/envoy v1.32.4 // indirect
-	github.com/envoyproxy/protoc-gen-validate v1.2.1 // indirect
->>>>>>> 1e2a3872a ([Helm]: Add basic resource correctness tests for for Helm chart examples (#7726))
 	github.com/evanphx/json-patch v5.7.0+incompatible // indirect
-	github.com/evanphx/json-patch/v5 v5.9.0 // indirect
+	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d // indirect
 	github.com/expr-lang/expr v1.16.9 // indirect
 	github.com/fearful-symmetry/gomsr v0.0.1 // indirect
@@ -541,13 +509,8 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.30 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect
-<<<<<<< HEAD
 	github.com/shirou/gopsutil/v4 v4.25.1 // indirect
-	github.com/shopspring/decimal v1.3.1 // indirect
-=======
-	github.com/shirou/gopsutil/v4 v4.25.2 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
->>>>>>> 1e2a3872a ([Helm]: Add basic resource correctness tests for for Helm chart examples (#7726))
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
@@ -576,19 +539,11 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
-<<<<<<< HEAD
-	go.elastic.co/apm/module/apmelasticsearch/v2 v2.6.3 // indirect
-	go.elastic.co/apm/module/apmhttp/v2 v2.6.3 // indirect
-	go.elastic.co/apm/module/apmzap/v2 v2.6.3 // indirect
-	go.elastic.co/fastjson v1.4.0 // indirect
-	go.etcd.io/bbolt v1.3.11 // indirect
-=======
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.0 // indirect
 	go.elastic.co/apm/module/apmhttp/v2 v2.7.0 // indirect
 	go.elastic.co/apm/module/apmzap/v2 v2.7.0 // indirect
 	go.elastic.co/fastjson v1.5.0 // indirect
-	go.etcd.io/bbolt v1.4.0 // indirect
->>>>>>> 1e2a3872a ([Helm]: Add basic resource correctness tests for for Helm chart examples (#7726))
+	go.etcd.io/bbolt v1.3.11 // indirect
 	go.mongodb.org/mongo-driver v1.14.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
@@ -666,7 +621,7 @@ require (
 	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/oauth2 v0.24.0 // indirect
+	golang.org/x/oauth2 v0.25.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	gonum.org/v1/gonum v0.15.1 // indirect
 	google.golang.org/api v0.199.0 // indirect
@@ -677,20 +632,16 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	howett.net/plist v1.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.32.0 // indirect
-	k8s.io/apiserver v0.32.0 // indirect
-	k8s.io/component-base v0.32.0 // indirect
+	k8s.io/apiextensions-apiserver v0.32.1 // indirect
+	k8s.io/apiserver v0.32.1 // indirect
+	k8s.io/component-base v0.32.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f // indirect
 	k8s.io/kubectl v0.30.3 // indirect
 	k8s.io/kubelet v0.31.3 // indirect
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect
 	kernel.org/pub/linux/libs/security/libcap/psx v1.2.70 // indirect
 	oras.land/oras-go v1.2.5 // indirect
-<<<<<<< HEAD
-	sigs.k8s.io/controller-runtime v0.20.1 // indirect
-=======
 	sigs.k8s.io/controller-runtime v0.20.4 // indirect
->>>>>>> 1e2a3872a ([Helm]: Add basic resource correctness tests for for Helm chart examples (#7726))
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.2 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
