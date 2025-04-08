@@ -25,9 +25,19 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	stateStore "github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+<<<<<<< HEAD
+=======
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/fleet"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
+	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
+>>>>>>> 5e6ad5276 (Fix upgrade for same versions (#7635))
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -126,6 +136,7 @@ func New(
 	var composableManaged bool
 	var isManaged bool
 
+	var actionAcker acker.Acker
 	if testingMode {
 		log.Info("Elastic Agent has been started in testing mode and is managed through the control protocol")
 
@@ -167,8 +178,29 @@ func New(
 				InjectProxyEndpointModifier(),
 			)
 
+			client, err := fleetclient.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
+			if err != nil {
+				return nil, nil, nil, errors.New(err,
+					"fail to create API client",
+					errors.TypeNetwork,
+					errors.M(errors.MetaKeyURI, cfg.Fleet.Client.Host))
+			}
+			stateStorage, err := stateStore.NewStateStoreWithMigration(ctx, log, paths.AgentActionStoreFile(), paths.AgentStateStoreFile())
+			if err != nil {
+				return nil, nil, nil, errors.New(err, fmt.Sprintf("fail to read state store '%s'", paths.AgentStateStoreFile()))
+			}
+
+			fleetAcker, err := fleet.NewAcker(log, agentInfo, client)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to create acker: %w", err)
+			}
+
+			retrier := retrier.New(fleetAcker, log)
+			batchedAcker := lazy.NewAcker(fleetAcker, log, lazy.WithRetrier(retrier))
+			actionAcker = stateStore.NewStateStoreActionAcker(batchedAcker, stateStorage)
+
 			// TODO: stop using global state
-			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, paths.Top(), upgrader)
+			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, paths.Top(), client, fleetAcker, actionAcker, retrier, stateStorage, upgrader)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -182,7 +214,12 @@ func New(
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
+<<<<<<< HEAD
 	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, compModifiers...)
+=======
+	otelManager := otelmanager.NewOTelManager(log.Named("otel_manager"))
+	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelManager, actionAcker, compModifiers...)
+>>>>>>> 5e6ad5276 (Fix upgrade for same versions (#7635))
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created
