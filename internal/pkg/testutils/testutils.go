@@ -52,11 +52,6 @@ func NewErrorLogger(t *testing.T) *logger.Logger {
 func SkipIfFIPSOnly(t *testing.T, msg string) {
 	// NOTE: This only checks env var; at the time of writing fips140 can only be set via env
 	// other GODEBUG settings can be set via embedded comments or in go.mod, we may need to account for this in the future.
-	ss := strings.Split(os.Getenv("GODEBUG"), ",")
-	for _, s := range ss {
-		if s == "fips140=only" {
-			t.Skip("GODEBUG=fips140=only detected, skipping test:", msg)
-			return
-		}
-	}
+	s := strings.Split(os.Getenv("GODEBUG"), ",")
+	return strings.Contains(s, "fips140=only")
 }
