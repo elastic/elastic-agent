@@ -525,6 +525,7 @@ collectors:
   #  Gateway is a K8s deployment EDOT collector focused on processing and
   #  forwarding telemetry to an Elasticsearch endpoint.
   gateway:
+    fullnameOverride: "opentelemetry-kube-stack-gateway"
     resources:
       limits:
         cpu: 1500m

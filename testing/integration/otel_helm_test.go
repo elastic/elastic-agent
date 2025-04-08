@@ -84,6 +84,9 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				// - Two Gateway pods to collect, aggregate and forward
 				// telemetry.
 				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 4, "otc-container"),
+				// validate kubeletstats metrics are being
+				// pushed
+				k8sStepCheckDatastreamsHits(info, "metrics", "kubeletstatsreceiver.otel", "default"),
 			},
 		},
 		{
@@ -287,18 +290,20 @@ func k8sStepCheckRunningPods(podLabelSelector string, expectedPodNumber int, con
 func k8sStepCheckDatastreamsHits(info *define.Info, dsType, dataset, namespace string) k8sTestStep {
 	datastream := fmt.Sprintf("%s-%s-%s", dsType, dataset, namespace)
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		var initDocumentHits estools.Hits
-		require.Eventually(t, func() bool {
+		var initDocumentHits int
+		getTotalDocs := func(t *testing.T) int {
 			docs, err := estools.GetLogsForDatastream(ctx, info.ESClient, dsType, dataset, namespace)
 			require.NoError(t, err, "failed to get %s datastream documents", datastream)
-			initDocumentHits = docs.Hits
-			return docs.Hits.Total.Value > 0
+			return docs.Hits.Total.Value
+		}
+
+		require.Eventually(t, func() bool {
+			initDocumentHits = getTotalDocs(t)
+			return initDocumentHits > 0
 		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least one document should be available for %s datastream", datastream))
 
 		require.Eventually(t, func() bool {
-			docs, err := estools.GetLogsForDatastream(ctx, info.ESClient, dsType, dataset, namespace)
-			require.NoError(t, err, "failed to get %s datastream documents", datastream)
-			return docs.Hits.Total.Value > initDocumentHits.Total.Value
+			return getTotalDocs(t) > initDocumentHits
 		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("no new documents for %s datastream", datastream))
 	}
 }
