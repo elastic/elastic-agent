@@ -293,14 +293,14 @@ func TestUpgraderAckAction(t *testing.T) {
 
 	action := fleetapi.NewAction(fleetapi.ActionTypeUpgrade)
 	t.Run("AckAction without acker", func(t *testing.T) {
-		require.Nil(t, u.AckAction(t.Context(), nil, action))
+		require.Nil(t, u.AckAction(context.Background(), nil, action))
 	})
 	t.Run("AckAction with acker", func(t *testing.T) {
 		acker := &fakeAcker{}
 		acker.On("Ack", mock.Anything, action).Return(nil)
 		acker.On("Commit", mock.Anything).Return(nil)
 
-		require.Nil(t, u.AckAction(t.Context(), acker, action))
+		require.Nil(t, u.AckAction(context.Background(), acker, action))
 		acker.AssertCalled(t, "Ack", mock.Anything, action)
 		acker.AssertCalled(t, "Commit", mock.Anything)
 	})
@@ -312,7 +312,7 @@ func TestUpgraderAckAction(t *testing.T) {
 		acker.On("Ack", mock.Anything, action).Return(nil)
 		acker.On("Commit", mock.Anything).Return(errCommit)
 
-		require.ErrorIs(t, u.AckAction(t.Context(), acker, action), errCommit)
+		require.ErrorIs(t, u.AckAction(context.Background(), acker, action), errCommit)
 		acker.AssertCalled(t, "Ack", mock.Anything, action)
 		acker.AssertCalled(t, "Commit", mock.Anything)
 	})
@@ -324,7 +324,7 @@ func TestUpgraderAckAction(t *testing.T) {
 		acker.On("Ack", mock.Anything, action).Return(errAck)
 		acker.On("Commit", mock.Anything).Return(nil)
 
-		require.ErrorIs(t, u.AckAction(t.Context(), acker, action), errAck)
+		require.ErrorIs(t, u.AckAction(context.Background(), acker, action), errAck)
 		acker.AssertCalled(t, "Ack", mock.Anything, action)
 		acker.AssertNotCalled(t, "Commit", mock.Anything)
 	})

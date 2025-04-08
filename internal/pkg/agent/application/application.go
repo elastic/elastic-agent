@@ -29,15 +29,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-<<<<<<< HEAD
-=======
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/fleet"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
-	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
->>>>>>> 5e6ad5276 (Fix upgrade for same versions (#7635))
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -214,12 +210,7 @@ func New(
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
-<<<<<<< HEAD
-	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, compModifiers...)
-=======
-	otelManager := otelmanager.NewOTelManager(log.Named("otel_manager"))
-	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelManager, actionAcker, compModifiers...)
->>>>>>> 5e6ad5276 (Fix upgrade for same versions (#7635))
+	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, actionAcker, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created

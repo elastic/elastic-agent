@@ -12,15 +12,13 @@ import (
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
-<<<<<<< HEAD
-	"google.golang.org/protobuf/types/known/structpb"
-=======
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
->>>>>>> 5e6ad5276 (Fix upgrade for same versions (#7635))
+	"google.golang.org/protobuf/types/known/structpb"
 	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
@@ -465,7 +463,7 @@ func TestUpgradeSameErrorAcked(t *testing.T) {
 
 	acker.On("Ack", mock.Anything, actionUpgrade).Return(nil)
 
-	require.NoError(t, coord.Upgrade(t.Context(), "9.0", "http://localhost", actionUpgrade, true, true))
+	require.NoError(t, coord.Upgrade(ctx, "9.0", "http://localhost", actionUpgrade, true, true))
 
 	acker.AssertCalled(t, "Ack", mock.Anything, actionUpgrade)
 }
@@ -1013,16 +1011,12 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 		upgradeManager = &fakeUpgradeManager{}
 	}
 
-<<<<<<< HEAD
-	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed)
-=======
 	acker := o.acker
 	if acker == nil {
 		acker = &fakeActionAcker{}
 	}
 
-	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelMgr, acker)
->>>>>>> 5e6ad5276 (Fix upgrade for same versions (#7635))
+	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, acker)
 	return coord, cfgMgr, varsMgr
 }
 
