@@ -37,14 +37,6 @@ processors:
     limit_mib: 4000
     spike_limit_mib: 800
   elastictrace:
-  lsminterval:
-    intervals:
-      - duration: 1m
-        statements:
-          - set(resource.attributes["metricset.interval"], "1m")
-      - duration: 10m
-        statements:
-          - set(resource.attributes["metricset.interval"], "10m")
 
 receivers:
   filelog:
@@ -89,34 +81,7 @@ connectors:
       - service.name
       - telemetry.sdk.language
       - telemetry.sdk.name
-  signaltometrics:
-    spans:
-      - name: span.histogram
-        description: Span histogram metric
-        include_resource_attributes:
-          - key: service.name
-          - key: deployment.environment
-        attributes:
-          - key: transaction.type
-        exponential_histogram:
-          max_size: 2
-          value: Microseconds(end_time - start_time)
-    datapoints:
-      - name: datapoint.total
-        description: Count of all datapoints
-        include_resource_attributes:
-          - key: service.name
-          - key: deployment.environment
-        sum:
-          value: "1"
-    logs:
-      - name: logrecord.total
-        description: Count of all log records
-        include_resource_attributes:
-          - key: service.name
-          - key: deployment.environment
-        sum:
-          value: "1"
+  elasticapm:
 
 service:
   extensions:
@@ -159,13 +124,12 @@ service:
         - spanmetrics
 
     metrics/aggregated:
+      receivers:
+        - elasticapm
+      processors:
       exporters:
         - debug
         - otlp
-      processors:
-        - lsminterval
-      receivers:
-        - signaltometrics
 
     traces:
       exporters:
@@ -174,7 +138,7 @@ service:
         - otlp
         - otlphttp
         - spanmetrics
-        - signaltometrics
+        - elasticapm
       processors:
         - attributes
         - batch
