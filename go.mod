@@ -13,12 +13,8 @@ require (
 	github.com/docker/docker v27.5.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-<<<<<<< HEAD
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250310095219-198197d022ad
-=======
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250311090720-d0d0bce5f75d
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250404163238-b16c2c085d99
->>>>>>> 1e2a3872a ([Helm]: Add basic resource correctness tests for for Helm chart examples (#7726))
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.1
 	github.com/elastic/elastic-agent-libs v0.18.9
@@ -26,13 +22,8 @@ require (
 	github.com/elastic/elastic-transport-go/v8 v8.6.1
 	github.com/elastic/go-elasticsearch/v8 v8.17.1
 	github.com/elastic/go-licenser v0.4.2
-<<<<<<< HEAD
 	github.com/elastic/go-sysinfo v1.15.2
-	github.com/elastic/go-ucfg v0.8.8
-=======
-	github.com/elastic/go-sysinfo v1.15.3
 	github.com/elastic/go-ucfg v0.8.9-0.20250307075119-2a22403faaea
->>>>>>> 1e2a3872a ([Helm]: Add basic resource correctness tests for for Helm chart examples (#7726))
 	github.com/elastic/mock-es v0.0.0-20241101195702-0a41fa3d30d9
 	github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector v0.3.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.13.0
