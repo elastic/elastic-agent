@@ -1,9 +1,12 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
+
 package process
 
 import (
 	"bufio"
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -61,7 +64,7 @@ func TestGetCmdAndTerminateCmd(t *testing.T) {
 	for sc.Scan() {
 		line := sc.Text()
 		if testing.Verbose() {
-			fmt.Println("Child process output:", line)
+			t.Log("Child process output:", line)
 		}
 		if strings.Contains(line, "Wait for signal") {
 			break
@@ -82,7 +85,7 @@ func TestGetCmdAndTerminateCmd(t *testing.T) {
 	for sc.Scan() {
 		line := sc.Text()
 		if testing.Verbose() {
-			fmt.Println("Child process output:", line)
+			t.Log("Child process output:", line)
 		}
 		if strings.Contains(line, expectedMsg) {
 			break
@@ -95,11 +98,11 @@ func TestGetCmdAndTerminateCmd(t *testing.T) {
 	if testing.Verbose() {
 		for sc.Scan() {
 			line := sc.Text()
-			fmt.Println("Process Output:", line)
+			t.Log("Process Output:", line)
 		}
 		return
 	} else {
-		io.Copy(io.Discard, out)
+		_, _ = io.Copy(io.Discard, out)
 	}
 
 	// Wait to ensure the child process exits successfully
