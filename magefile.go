@@ -47,6 +47,11 @@ import (
 	tcommon "github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
+<<<<<<< HEAD
+=======
+	"github.com/elastic/elastic-agent/pkg/testing/helm"
+	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
+>>>>>>> 1e2a3872a ([Helm]: Add basic resource correctness tests for for Helm chart examples (#7726))
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/kind"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"
@@ -3328,10 +3333,24 @@ func (Helm) RenderExamples() error {
 		}
 
 		renderedManifestPath := filepath.Join(renderedFolder, "manifest.yaml")
-
 		err = os.WriteFile(renderedManifestPath, []byte(release.Manifest), 0o644)
 		if err != nil {
-			return fmt.Errorf("failed to write rendered manifest: %w", err)
+			return fmt.Errorf("failed to write rendered manifest %q: %w", renderedManifestPath, err)
+		}
+
+		f, err := os.Open(renderedManifestPath)
+		if err != nil {
+			return fmt.Errorf("failed to open rendered manifest %q: %w", renderedManifestPath, err)
+		}
+
+		objs, err := kubernetes.LoadFromYAML(bufio.NewReader(f))
+		_ = f.Close()
+		if err != nil {
+			return fmt.Errorf("failed to load k8s objects from rendered manifest %q: %w", renderedManifestPath, err)
+		}
+
+		if len(objs) == 0 {
+			return fmt.Errorf("rendered manifest %q is empty", renderedManifestPath)
 		}
 	}
 
