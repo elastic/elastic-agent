@@ -12,15 +12,19 @@ import (
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"go.elastic.co/apm/v2/apmtest"
@@ -105,7 +109,14 @@ func waitForState(
 
 func TestComponentUpdateDiff(t *testing.T) {
 
-	err := logp.DevelopmentSetup(logp.ToObserverOutput())
+	observedCore, observedLogs := observer.New(zapcore.DebugLevel)
+	err := logp.ConfigureWithOutputs(logp.Config{
+		Level:      logp.DebugLevel,
+		ToStderr:   false,
+		ToSyslog:   false,
+		ToFiles:    false,
+		ToEventLog: false,
+	}, observedCore)
 	require.NoError(t, err)
 
 	cases := []struct {
@@ -311,15 +322,13 @@ func TestComponentUpdateDiff(t *testing.T) {
 			}
 			testCoord.checkAndLogUpdate(testcase.old)
 
-			obsLogs := logp.ObserverLogs().TakeAll()
+			obsLogs := observedLogs.All()
 			last := obsLogs[len(obsLogs)-1]
 
 			// extract the structured data from the log message
 			testcase.logtest(t, last.Context[0].Interface.(UpdateStats))
 		})
-
 	}
-
 }
 
 func mustNewStruct(t *testing.T, v map[string]interface{}) *structpb.Struct {
@@ -416,6 +425,47 @@ func TestCoordinator_State_ConfigError_NotManaged(t *testing.T) {
 	cancel()
 	err = <-coordCh
 	require.NoError(t, err)
+}
+
+func TestUpgradeSameErrorAcked(t *testing.T) {
+	coordCh := make(chan error)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	upgradeManager := &fakeUpgradeManager{
+		upgradeable: true,
+		upgradeErr:  upgrade.ErrUpgradeSameVersion,
+	}
+
+	acker := &fakeActionAcker{}
+	coord, _, _ := createCoordinator(t, ctx,
+		ManagedCoordinator(true),
+		WithUpgradeManager(upgradeManager),
+		WithActionAcker(acker))
+
+	var coordWait sync.WaitGroup
+	coordWait.Add(1)
+	go func() {
+		coordWait.Done()
+		err := coord.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			// allowed error
+			err = nil
+		}
+		coordCh <- err
+	}()
+
+	coordWait.Wait()
+
+	action := fleetapi.NewAction(fleetapi.ActionTypeUpgrade)
+	actionUpgrade, ok := action.(*fleetapi.ActionUpgrade)
+	require.True(t, ok)
+
+	acker.On("Ack", mock.Anything, actionUpgrade).Return(nil)
+
+	require.NoError(t, coord.Upgrade(ctx, "9.0", "http://localhost", actionUpgrade, true, true))
+
+	acker.AssertCalled(t, "Ack", mock.Anything, actionUpgrade)
 }
 
 func TestCoordinator_State_ConfigError_Managed(t *testing.T) {
@@ -885,6 +935,7 @@ type createCoordinatorOpts struct {
 	managed        bool
 	upgradeManager UpgradeManager
 	compInputSpec  component.InputSpec
+	acker          acker.Acker
 }
 
 type CoordinatorOpt func(o *createCoordinatorOpts)
@@ -898,6 +949,12 @@ func ManagedCoordinator(managed bool) CoordinatorOpt {
 func WithUpgradeManager(upgradeManager UpgradeManager) CoordinatorOpt {
 	return func(o *createCoordinatorOpts) {
 		o.upgradeManager = upgradeManager
+	}
+}
+
+func WithActionAcker(acker acker.Acker) CoordinatorOpt {
+	return func(o *createCoordinatorOpts) {
+		o.acker = acker
 	}
 }
 
@@ -954,7 +1011,12 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 		upgradeManager = &fakeUpgradeManager{}
 	}
 
-	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed)
+	acker := o.acker
+	if acker == nil {
+		acker = &fakeActionAcker{}
+	}
+
+	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, acker)
 	return coord, cfgMgr, varsMgr
 }
 
@@ -990,6 +1052,22 @@ func (f *fakeReExecManager) ReExec(callback reexec.ShutdownCallbackFn, _ ...stri
 	}
 }
 
+var _ acker.Acker = &fakeActionAcker{}
+
+type fakeActionAcker struct {
+	mock.Mock
+}
+
+func (f *fakeActionAcker) Ack(ctx context.Context, action fleetapi.Action) error {
+	args := f.Called(ctx, action)
+	return args.Error(0)
+}
+
+func (f *fakeActionAcker) Commit(ctx context.Context) error {
+	args := f.Called(ctx)
+	return args.Error(0)
+}
+
 type fakeUpgradeManager struct {
 	upgradeable   bool
 	upgradeErr    error // An error to return when Upgrade is called
@@ -1013,6 +1091,16 @@ func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, source
 }
 
 func (f *fakeUpgradeManager) Ack(ctx context.Context, acker acker.Acker) error {
+	if acker != nil {
+		return acker.Ack(ctx, fleetapi.NewAction(fleetapi.ActionTypeUnknown))
+	}
+	return nil
+}
+
+func (f *fakeUpgradeManager) AckAction(ctx context.Context, acker acker.Acker, action fleetapi.Action) error {
+	if acker != nil {
+		return acker.Ack(ctx, action)
+	}
 	return nil
 }
 
