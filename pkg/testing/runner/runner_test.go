@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
@@ -24,11 +25,18 @@ func TestNewRunner_Clean(t *testing.T) {
 	err := os.MkdirAll(stateDir, 0755)
 	require.NoError(t, err)
 
+	goVersion, err := mage.GoVersion()
+	require.NoError(t, err)
+
 	cfg := common.Config{
 		AgentVersion: "8.10.0",
 		StackVersion: "8.10.0-SNAPSHOT",
 		BuildDir:     filepath.Join(tmpdir, "build"),
+<<<<<<< HEAD
 		GOVersion:    "1.20.7",
+=======
+		GOVersion:    goVersion,
+>>>>>>> 6a9d232cb (Dynamically set go version in test (#7737))
 		RepoDir:      filepath.Join(tmpdir, "repo"),
 		StateDir:     stateDir,
 		ExtraEnv:     nil,
