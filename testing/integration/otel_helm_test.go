@@ -20,6 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
@@ -184,6 +185,9 @@ func TestOtelKubeStackHelmEDOTImage(t *testing.T) {
 				// - Two Gateway pods to collect, aggregate and forward
 				// telemetry.
 				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 4, "otc-container"),
+				// validate kubeletstats metrics are being
+				// pushed
+				k8sStepCheckDatastreamsHits(info, "metrics", "kubeletstatsreceiver.otel", "default"),
 			},
 		},
 		{
@@ -275,5 +279,26 @@ func k8sStepCheckRunningPods(podLabelSelector string, expectedPodNumber int, con
 			}
 			return checkedAgentContainers >= expectedPodNumber
 		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least %d agent containers should be checked", expectedPodNumber))
+	}
+}
+
+// k8sStepCheckDatastreams checks the corresponding Elasticsearch datastreams
+// are created and documents being written
+func k8sStepCheckDatastreamsHits(info *define.Info, dsType, dataset, namespace string) k8sTestStep {
+	datastream := fmt.Sprintf("%s-%s-%s", dsType, dataset, namespace)
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		var initDocumentHits estools.Hits
+		require.Eventually(t, func() bool {
+			docs, err := estools.GetLogsForDatastream(ctx, info.ESClient, dsType, dataset, namespace)
+			require.NoError(t, err, "failed to get %s datastream documents", datastream)
+			initDocumentHits = docs.Hits
+			return docs.Hits.Total.Value > 0
+		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least one document should be available for %s datastream", datastream))
+
+		require.Eventually(t, func() bool {
+			docs, err := estools.GetLogsForDatastream(ctx, info.ESClient, dsType, dataset, namespace)
+			require.NoError(t, err, "failed to get %s datastream documents", datastream)
+			return docs.Hits.Total.Value > initDocumentHits.Total.Value
+		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("no new documents for %s datastream", datastream))
 	}
 }
