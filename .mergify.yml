@@ -2,7 +2,7 @@ commands_restrictions:
   backport:
     conditions:
       - or:
-        - sender-permission>=read
+        - sender-permission>=write
         - sender=github-actions[bot]
 queue_rules:
   - name: default
