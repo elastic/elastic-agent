@@ -25,9 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/fleet"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
-	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/uploader"
 	"github.com/elastic/elastic-agent/internal/pkg/queue"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
@@ -52,6 +50,9 @@ type managedConfigManager struct {
 	coord                *coordinator.Coordinator
 	fleetInitTimeout     time.Duration
 	initialClientSetters []actions.ClientSetter
+	fleetAcker           *fleet.Acker
+	actionAcker          acker.Acker
+	retrier              *retrier.Retrier
 
 	ch    chan coordinator.ConfigChange
 	errCh chan error
@@ -66,22 +67,13 @@ func newManagedConfigManager(
 	runtime *runtime.Manager,
 	fleetInitTimeout time.Duration,
 	topPath string,
+	client *remote.Client,
+	fleetAcker *fleet.Acker,
+	actionAcker acker.Acker,
+	retrier *retrier.Retrier,
+	stateStore *store.StateStore,
 	clientSetters ...actions.ClientSetter,
 ) (*managedConfigManager, error) {
-	client, err := fleetclient.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
-	if err != nil {
-		return nil, errors.New(err,
-			"fail to create API client",
-			errors.TypeNetwork,
-			errors.M(errors.MetaKeyURI, cfg.Fleet.Client.Host))
-	}
-
-	// Create the state store that will persist the last good policy change on disk.
-	stateStore, err := store.NewStateStoreWithMigration(ctx, log, paths.AgentActionStoreFile(), paths.AgentStateStoreFile())
-	if err != nil {
-		return nil, errors.New(err, fmt.Sprintf("fail to read state store '%s'", paths.AgentStateStoreFile()))
-	}
-
 	actionQueue, err := queue.NewActionQueue(stateStore.Queue(), stateStore)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize action queue: %w", err)
@@ -106,6 +98,9 @@ func newManagedConfigManager(
 		ch:                   make(chan coordinator.ConfigChange),
 		errCh:                make(chan error),
 		initialClientSetters: clientSetters,
+		fleetAcker:           fleetAcker,
+		actionAcker:          actionAcker,
+		retrier:              retrier,
 	}, nil
 }
 
@@ -134,15 +129,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	policyChanger := m.initDispatcher(gatewayCancel)
 
 	// Create ackers to enqueue/retry failed acks
-	ack, err := fleet.NewAcker(m.log, m.agentInfo, m.client)
-	if err != nil {
-		return fmt.Errorf("failed to create acker: %w", err)
-	}
-	retrier := retrier.New(ack, m.log)
-	batchedAcker := lazy.NewAcker(ack, m.log, lazy.WithRetrier(retrier))
-	actionAcker := store.NewStateStoreActionAcker(batchedAcker, m.stateStore)
-
-	if err := m.coord.AckUpgrade(ctx, actionAcker); err != nil {
+	if err := m.coord.AckUpgrade(ctx, m.actionAcker); err != nil {
 		m.log.Warnf("Failed to ack upgrade: %v", err)
 	}
 
@@ -154,7 +141,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		<-retrierRun
 	}()
 	go func() {
-		retrier.Run(retrierCtx)
+		m.retrier.Run(retrierCtx)
 		close(retrierRun)
 	}()
 
@@ -165,7 +152,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		// persisted action on disk we should be able to ask Fleet to get the latest configuration.
 		// But at the moment this is not possible because the policy change was acked.
 		m.log.Info("restoring current policy from disk")
-		m.dispatcher.Dispatch(ctx, m.coord.SetUpgradeDetails, actionAcker, action)
+		m.dispatcher.Dispatch(ctx, m.coord.SetUpgradeDetails, m.actionAcker, action)
 		stateRestored = true
 	}
 
@@ -173,12 +160,12 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	// the Fleet Server is running before the Fleet gateway is started.
 	if m.cfg.Fleet.Server != nil {
 		if stateRestored {
-			err = m.waitForFleetServer(ctx)
+			err := m.waitForFleetServer(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to initialize Fleet Server: %w", err)
 			}
 		} else {
-			err = m.initFleetServer(ctx, m.cfg.Fleet.Server)
+			err := m.initFleetServer(ctx, m.cfg.Fleet.Server)
 			if err != nil {
 				return fmt.Errorf("failed to initialize Fleet Server: %w", err)
 			}
@@ -189,7 +176,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		m.log,
 		m.agentInfo,
 		m.client,
-		actionAcker,
+		m.actionAcker,
 		m.coord.State,
 		m.stateStore,
 	)
@@ -200,7 +187,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	// Not running a Fleet Server so the gateway and acker can be changed based on the configuration change.
 	if m.cfg.Fleet.Server == nil {
 		policyChanger.AddSetter(gateway)
-		policyChanger.AddSetter(ack)
+		policyChanger.AddSetter(m.fleetAcker)
 
 		for _, cs := range m.initialClientSetters {
 			policyChanger.AddSetter(cs)
@@ -231,7 +218,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		return gateway.Run(ctx)
 	})
 
-	go runDispatcher(ctx, m.dispatcher, gateway, m.coord.SetUpgradeDetails, actionAcker, dispatchFlushInterval)
+	go runDispatcher(ctx, m.dispatcher, gateway, m.coord.SetUpgradeDetails, m.actionAcker, dispatchFlushInterval)
 
 	<-ctx.Done()
 	return gatewayRunner.Err()
