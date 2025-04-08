@@ -349,7 +349,7 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 
 	for _, input := range inputs {
 		if _, ok := input["type"]; !ok {
-			// If input is of type "metricbeat", use modules to create inputs
+			// If inputType contains /metrics, use modules to create inputs
 			if strings.Contains(inputType, "/metrics") {
 				input["module"] = strings.TrimSuffix(inputType, "/metrics")
 			} else {
