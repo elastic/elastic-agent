@@ -32,11 +32,7 @@ func TestNewRunner_Clean(t *testing.T) {
 		AgentVersion: "8.10.0",
 		StackVersion: "8.10.0-SNAPSHOT",
 		BuildDir:     filepath.Join(tmpdir, "build"),
-<<<<<<< HEAD
-		GOVersion:    "1.20.7",
-=======
 		GOVersion:    goVersion,
->>>>>>> 6a9d232cb (Dynamically set go version in test (#7737))
 		RepoDir:      filepath.Join(tmpdir, "repo"),
 		StateDir:     stateDir,
 		ExtraEnv:     nil,
