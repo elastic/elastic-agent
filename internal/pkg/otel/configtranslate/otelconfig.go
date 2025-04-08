@@ -348,14 +348,11 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 	// function. For filebeat, see: https://github.com/elastic/beats/blob/main/x-pack/filebeat/cmd/agent.go
 
 	for _, input := range inputs {
-		if _, ok := input["type"]; !ok {
-			// If inputType contains /metrics, use modules to create inputs
-			if strings.Contains(inputType, "/metrics") {
-				input["module"] = strings.TrimSuffix(inputType, "/metrics")
-			} else {
-				input["type"] = inputType
-
-			}
+		// If inputType contains /metrics, use modules to create inputs
+		if strings.Contains(inputType, "/metrics") {
+			input["module"] = strings.TrimSuffix(inputType, "/metrics")
+		} else if _, ok := input["type"]; !ok {
+			input["type"] = inputType
 		}
 	}
 
