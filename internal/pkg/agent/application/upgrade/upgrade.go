@@ -423,11 +423,7 @@ func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 	// Should handle gracefully
 	// https://github.com/elastic/elastic-agent/issues/1788
 	if marker.Action != nil {
-		if err := acker.Ack(ctx, marker.Action); err != nil {
-			return err
-		}
-
-		if err := acker.Commit(ctx); err != nil {
+		if err := u.AckAction(ctx, acker, marker.Action); err != nil {
 			return err
 		}
 	}
@@ -435,6 +431,22 @@ func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 	marker.Acked = true
 
 	return SaveMarker(marker, false)
+}
+
+func (u *Upgrader) AckAction(ctx context.Context, acker acker.Acker, action fleetapi.Action) error {
+	if acker == nil {
+		return nil
+	}
+
+	if err := acker.Ack(ctx, action); err != nil {
+		return err
+	}
+
+	if err := acker.Commit(ctx); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (u *Upgrader) MarkerWatcher() MarkerWatcher {
