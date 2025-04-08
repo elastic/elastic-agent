@@ -47,11 +47,7 @@ import (
 	tcommon "github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
-<<<<<<< HEAD
-=======
-	"github.com/elastic/elastic-agent/pkg/testing/helm"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
->>>>>>> 1e2a3872a ([Helm]: Add basic resource correctness tests for for Helm chart examples (#7726))
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/kind"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"

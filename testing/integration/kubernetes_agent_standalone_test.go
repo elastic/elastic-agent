@@ -51,11 +51,7 @@ import (
 	aclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
-<<<<<<< HEAD
-=======
-	"github.com/elastic/elastic-agent/pkg/testing/helm"
 	testK8s "github.com/elastic/elastic-agent/pkg/testing/kubernetes"
->>>>>>> 1e2a3872a ([Helm]: Add basic resource correctness tests for for Helm chart examples (#7726))
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 )
 
