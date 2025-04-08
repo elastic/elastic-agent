@@ -1,3 +1,9 @@
+commands_restrictions:
+  backport:
+    conditions:
+      - or:
+        - sender-permission>=read
+        - sender=github-actions[bot]
 queue_rules:
   - name: default
     merge_method: squash
