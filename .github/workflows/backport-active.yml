@@ -1,7 +1,7 @@
-name: Automatic Backport
+name: Backport to active branches
 
 on:
-  pull_request:
+  pull_request_target:
     types: [closed]
     branches:
       - main  # Only run for PRs targeting the main branch
@@ -15,9 +15,7 @@ jobs:
     # Only run if the PR was merged (not just closed) and has one of the backport labels
     if: |
       github.event.pull_request.merged == true && 
-      (contains(github.event.pull_request.labels.*.name, 'backport-active-all') || 
-       contains(github.event.pull_request.labels.*.name, 'backport-active-9') || 
-       contains(github.event.pull_request.labels.*.name, 'backport-active-8'))
+      contains(toJSON(github.event.pull_request.labels.*.name), 'backport-active-')
     runs-on: ubuntu-latest
     
     steps:
