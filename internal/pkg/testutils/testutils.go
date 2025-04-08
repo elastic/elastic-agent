@@ -53,5 +53,7 @@ func SkipIfFIPSOnly(t *testing.T, msg string) {
 	// NOTE: This only checks env var; at the time of writing fips140 can only be set via env
 	// other GODEBUG settings can be set via embedded comments or in go.mod, we may need to account for this in the future.
 	s := os.Getenv("GODEBUG")
-	return strings.Contains(s, "fips140=only")
+	if strings.Contains(s, "fips140=only") {
+		t.Skip("GODEBUG=fips140=only detected, skipping test:", msg)
+	}
 }
