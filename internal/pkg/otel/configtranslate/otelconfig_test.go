@@ -463,6 +463,19 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
+						"logging": map[string]any{
+							"with_fields": map[string]any{
+								"component": map[string]any{
+									"binary":  "metricbeat",
+									"dataset": "elastic_agent.metricbeat",
+									"type":    "beat/metrics",
+									"id":      "beat-metrics-monitoring",
+								},
+								"log": map[string]any{
+									"source": "beat-metrics-monitoring",
+								},
+							},
+						},
 					},
 				},
 				"service": map[string]any{
