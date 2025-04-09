@@ -1319,7 +1319,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 			}
 		}
 	} else {
-		archivePath = movePackagesToArchive(dropPath, platforms, packageVersion, nil)
+		archivePath = movePackagesToArchive(dropPath, platforms, packageVersion, dependencies)
 	}
 	return archivePath, dropPath
 }
@@ -1858,7 +1858,10 @@ func movePackagesToArchive(dropPath string, platforms []string, packageVersion s
 			}
 
 			// Platform-independent packages need to be placed in the archive sub-folders for all platforms, copy instead of moving
-			if isPlatformIndependentPackage(f, packageVersion, nil) {
+			if isPlatformIndependentPackage(f, packageVersion, dependencies) {
+				if mg.Verbose() {
+					log.Printf("copying %s to %s as it is a platform independent package", f, packageVersion)
+				}
 				if err := copyFile(f, targetPath); err != nil {
 					panic(fmt.Errorf("failed copying file: %w", err))
 				}
@@ -1905,12 +1908,27 @@ func copyFile(src, dst string) error {
 
 func isPlatformIndependentPackage(f string, packageVersion string, dependencies []packaging.BinarySpec) bool {
 	fileBaseName := filepath.Base(f)
+	if mg.Verbose() {
+		log.Printf("isPlatformIndependentPackage(%s, %s, %v)", f, packageVersion, dependencies)
+	}
 	for _, spec := range dependencies {
+		if mg.Verbose() {
+			log.Printf("evaluating if %s is a platform independent package", f)
+		}
 		packageName := spec.GetPackageName(packageVersion, "")
 		// as of now only python wheels packages are platform-independent
+		if mg.Verbose() {
+			log.Printf("checking expected package name %s against actual file name %s", packageName, fileBaseName)
+		}
 		if spec.PythonWheel && (fileBaseName == packageName || fileBaseName == packageName+sha512FileExt) {
+			if mg.Verbose() {
+				log.Printf("%s is a platform independent package", f)
+			}
 			return true
 		}
+	}
+	if mg.Verbose() {
+		log.Printf("%s is NOT a platform independent package", f)
 	}
 	return false
 }
