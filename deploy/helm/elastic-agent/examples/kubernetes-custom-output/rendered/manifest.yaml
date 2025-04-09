@@ -60,6 +60,13 @@ stringData:
         hosts:
         - ${OUTPUT_TEST_URL}
         type: elasticsearch
+        ssl.ca_trusted_fingerprint: sha256:2b5b:1e49:8d01:c2ac:fffd:833e:dfee:13a4:2560:d0c2:9d26:eb77:f3d5:8ca3:2069:7783
+        ssl.certificate_authorities:
+        - /mnt/secrets/elastic-agent/test.ssl.certificate_authorities.0
+        - /mnt/secrets/elastic-agent/ca-secret.secret
+        - /mnt/secrets/elastic-agent/ca-secret.secret-another
+        - /mnt/secrets/elastic-agent/test.ssl.certificate_authorities.3
+        ssl.verification_mode: strict
     secret_references: []
     agent:
       monitoring:
@@ -280,6 +287,48 @@ stringData:
       kubernetes_leaderelection:
         enabled: true
         leader_lease: example-clusterwide
+  test.ssl.certificate_authorities.0 : |-
+    -----BEGIN CERTIFICATE-----
+    MIIDSjCCAjKgAwIBAgIRALx9cV4kYFWe1ZtMXLzfX4cwDQYJKoZIhvcNAQELBQAw
+    LzETMBEGA1UECxMKbW9uaXRvcmluZzEYMBYGA1UEAxMPbW9uaXRvcmluZy1odHRw
+    MB4XDTI1MDQwODEyMDAwMFoXDTI2MDQwODEyMDAwMFowLzETMBEGA1UECxMKbW9u
+    aXRvcmluZzEYMBYGA1UEAxMPbW9uaXRvcmluZy1odHRwMIIBIjANBgkqhkiG9w0B
+    AQEFAAOCAQ8AMIIBCgKCAQEAwk7mDcV4hO6WKnz2z2gC+ODb2xF6aP6sB5o3rZ2F
+    R0vbPY9EYI56bxSB3zT5mx0I3XsdKy8JK3AeY32K5CPv7tkHeGqTxJfYKwKXWpO4
+    rN9i3PtZZ3ZX5iPBiGUKuZJH2HQolZt/8OoyH5n3FEs/zNVbrXL6RuMjVzRGyJhR
+    UeYpXib35SKvwWWNHh9fHV1m8WUdJxvEY9ohkry0ENj6tzB9Om+yKq5Scdw3hC5h
+    X1f6+fY7ElZjVQ2lXnyrRHKpLjcDhI9cRm7r1qeKcHQMxz4Rzk3NYOBfMiEn+pns
+    OLqUz9tK0q3VgbIUlFe94CEZ2DDkRpsIqyfRTUutOwIDAQABo2EwXzAOBgNVHQ8B
+    Af8EBAMCAoQwHQYDVR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMA8GA1UdEwEB
+    /wQFMAMBAf8wHQYDVR0OBBYEFDUYT4RsXgjJJz38XfQHTTZVr8gOMA0GCSqGSIb3
+    DQEBCwUAA4IBAQCvIXs1b8Pe4W5PbqQtnAV+wsyq4XqB7kFNTfZBx8eh5RMqG4y8
+    pTRSDM3I+hMI1K2XpMyUM4dyaZPz2yxOZ7UgvxFwLdHDb9uYaXJ38Rm3FxV9Z+Lr
+    ZPbXce2po5WT1em8MyxLgTStbMaXYHlsk09Fj4hF9Gy93bz4iVR7cUbDgkZd7ZPP
+    uN2bDD9kU+1iyqYv44YGbEv0UTKhrT37GkBzZ3H4cGy8sKnuwz7Z0I8v+FZzKN4L
+    Knk2MCWxZQ6t4nnqmkFoK4nSlAmW5Fnj7c2YwPYsZnscEcFlS0YDNmwC8wvDdDHL
+    tD0YrMZxZDh0LAGWAW72rT+mSPCWq5eB2ZtS
+    -----END CERTIFICATE-----
+  test.ssl.certificate_authorities.3 : |-
+    -----BEGIN CERTIFICATE-----
+    MIIDTTCCAjWgAwIBAgIRAJg0u9kzXY5TmEqf9BhJm4owDQYJKoZIhvcNAQELBQAw
+    LzETMBEGA1UECxMKbW9uaXRvcmluZzEYMBYGA1UEAxMPbW9uaXRvcmluZy1odHRw
+    MB4XDTI1MDQwODEyMzAwMFoXDTI2MDQwODEyNDMwMFowLzETMBEGA1UECxMKbW9u
+    aXRvcmluZzEYMBYGA1UEAxMPbW9uaXRvcmluZy1odHRwMIIBIjANBgkqhkiG9w0B
+    AQEFAAOCAQ8AMIIBCgKCAQEAwNjR+3H9uFrkZFezzKHKh8N9pPl4Rka2Jmf6hWyG
+    NdzvX77zqC4uF6zVGCZ9pSkjQaM0TWDjDtb4zK3fUXsc5Kn7uNc/h10GEqap1rLN
+    bMxzpxOFTVn4N9h1RtL7fmrTzZGkY7OxK4IjcVHg0xPSZfQZ4PSy4li4m3wl+IkA
+    MzLTeNRn4u7qZzQyGZrImh3YmXwFv2MUMtnSrZ2uLkxI4TFudwrK4ViPU4J7H0sF
+    5xk1V2LZGz4S3xqpjg6bEN6eWgbJQZT1OafDwzXsbN+cNMX0u7Z1Hd8FuY0yOY+D
+    EoKMxPDC3kZKPZzBqFaRhPYG7oZVLczUOXzkbGMSReWxdQIDAQABo2EwXzAOBgNV
+    HQ8BAf8EBAMCAoQwHQYDVR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMA8GA1Ud
+    EwEB/wQFMAMBAf8wHQYDVR0OBBYEFN1b6UqGtzPXGoNHXVv70TIQ2QkuMA0GCSqG
+    SIb3DQEBCwUAA4IBAQB3bVPlKNeJzw9Xf8OPh6ByEVhKZT/Pl25PtBQ4j2s3ONZB
+    R96QEuKvhZ0MSi0JfrJeQfQayLxKQk5OPOzVGJr8e0SxIrc30HR4Su+8HP0tXvFl
+    RP4xKz4d3fOg6yrxHFu7XYb+wLM25jkY6UDBAxKAwA8e5PTrOh8U3QEXNN6jKlaB
+    /YJvhUVEDiY6xMIWZxq4Z9ZyWpkTXjHycTL0nTkiSE9kFwIzkBBIsFV3BxyQZcGq
+    JQlw/NRukek+5pBgs3O6lFf8iqw2KZ5qFDeSVIksVnGmfxrXLkph0vW3vhmqEVXj
+    ZRDvOBf9WYc3+6xXspMHU1/x2PPax+ZG1Fqg4zy5
+    -----END CERTIFICATE-----
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -302,6 +351,13 @@ stringData:
         hosts:
         - ${OUTPUT_TEST_URL}
         type: elasticsearch
+        ssl.ca_trusted_fingerprint: sha256:2b5b:1e49:8d01:c2ac:fffd:833e:dfee:13a4:2560:d0c2:9d26:eb77:f3d5:8ca3:2069:7783
+        ssl.certificate_authorities:
+        - /mnt/secrets/elastic-agent/test.ssl.certificate_authorities.0
+        - /mnt/secrets/elastic-agent/ca-secret.secret
+        - /mnt/secrets/elastic-agent/ca-secret.secret-another
+        - /mnt/secrets/elastic-agent/test.ssl.certificate_authorities.3
+        ssl.verification_mode: strict
     secret_references: []
     agent:
       monitoring:
@@ -462,6 +518,48 @@ stringData:
       kubernetes_leaderelection:
         enabled: false
         leader_lease: example-pernode
+  test.ssl.certificate_authorities.0 : |-
+    -----BEGIN CERTIFICATE-----
+    MIIDSjCCAjKgAwIBAgIRALx9cV4kYFWe1ZtMXLzfX4cwDQYJKoZIhvcNAQELBQAw
+    LzETMBEGA1UECxMKbW9uaXRvcmluZzEYMBYGA1UEAxMPbW9uaXRvcmluZy1odHRw
+    MB4XDTI1MDQwODEyMDAwMFoXDTI2MDQwODEyMDAwMFowLzETMBEGA1UECxMKbW9u
+    aXRvcmluZzEYMBYGA1UEAxMPbW9uaXRvcmluZy1odHRwMIIBIjANBgkqhkiG9w0B
+    AQEFAAOCAQ8AMIIBCgKCAQEAwk7mDcV4hO6WKnz2z2gC+ODb2xF6aP6sB5o3rZ2F
+    R0vbPY9EYI56bxSB3zT5mx0I3XsdKy8JK3AeY32K5CPv7tkHeGqTxJfYKwKXWpO4
+    rN9i3PtZZ3ZX5iPBiGUKuZJH2HQolZt/8OoyH5n3FEs/zNVbrXL6RuMjVzRGyJhR
+    UeYpXib35SKvwWWNHh9fHV1m8WUdJxvEY9ohkry0ENj6tzB9Om+yKq5Scdw3hC5h
+    X1f6+fY7ElZjVQ2lXnyrRHKpLjcDhI9cRm7r1qeKcHQMxz4Rzk3NYOBfMiEn+pns
+    OLqUz9tK0q3VgbIUlFe94CEZ2DDkRpsIqyfRTUutOwIDAQABo2EwXzAOBgNVHQ8B
+    Af8EBAMCAoQwHQYDVR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMA8GA1UdEwEB
+    /wQFMAMBAf8wHQYDVR0OBBYEFDUYT4RsXgjJJz38XfQHTTZVr8gOMA0GCSqGSIb3
+    DQEBCwUAA4IBAQCvIXs1b8Pe4W5PbqQtnAV+wsyq4XqB7kFNTfZBx8eh5RMqG4y8
+    pTRSDM3I+hMI1K2XpMyUM4dyaZPz2yxOZ7UgvxFwLdHDb9uYaXJ38Rm3FxV9Z+Lr
+    ZPbXce2po5WT1em8MyxLgTStbMaXYHlsk09Fj4hF9Gy93bz4iVR7cUbDgkZd7ZPP
+    uN2bDD9kU+1iyqYv44YGbEv0UTKhrT37GkBzZ3H4cGy8sKnuwz7Z0I8v+FZzKN4L
+    Knk2MCWxZQ6t4nnqmkFoK4nSlAmW5Fnj7c2YwPYsZnscEcFlS0YDNmwC8wvDdDHL
+    tD0YrMZxZDh0LAGWAW72rT+mSPCWq5eB2ZtS
+    -----END CERTIFICATE-----
+  test.ssl.certificate_authorities.3 : |-
+    -----BEGIN CERTIFICATE-----
+    MIIDTTCCAjWgAwIBAgIRAJg0u9kzXY5TmEqf9BhJm4owDQYJKoZIhvcNAQELBQAw
+    LzETMBEGA1UECxMKbW9uaXRvcmluZzEYMBYGA1UEAxMPbW9uaXRvcmluZy1odHRw
+    MB4XDTI1MDQwODEyMzAwMFoXDTI2MDQwODEyNDMwMFowLzETMBEGA1UECxMKbW9u
+    aXRvcmluZzEYMBYGA1UEAxMPbW9uaXRvcmluZy1odHRwMIIBIjANBgkqhkiG9w0B
+    AQEFAAOCAQ8AMIIBCgKCAQEAwNjR+3H9uFrkZFezzKHKh8N9pPl4Rka2Jmf6hWyG
+    NdzvX77zqC4uF6zVGCZ9pSkjQaM0TWDjDtb4zK3fUXsc5Kn7uNc/h10GEqap1rLN
+    bMxzpxOFTVn4N9h1RtL7fmrTzZGkY7OxK4IjcVHg0xPSZfQZ4PSy4li4m3wl+IkA
+    MzLTeNRn4u7qZzQyGZrImh3YmXwFv2MUMtnSrZ2uLkxI4TFudwrK4ViPU4J7H0sF
+    5xk1V2LZGz4S3xqpjg6bEN6eWgbJQZT1OafDwzXsbN+cNMX0u7Z1Hd8FuY0yOY+D
+    EoKMxPDC3kZKPZzBqFaRhPYG7oZVLczUOXzkbGMSReWxdQIDAQABo2EwXzAOBgNV
+    HQ8BAf8EBAMCAoQwHQYDVR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMA8GA1Ud
+    EwEB/wQFMAMBAf8wHQYDVR0OBBYEFN1b6UqGtzPXGoNHXVv70TIQ2QkuMA0GCSqG
+    SIb3DQEBCwUAA4IBAQB3bVPlKNeJzw9Xf8OPh6ByEVhKZT/Pl25PtBQ4j2s3ONZB
+    R96QEuKvhZ0MSi0JfrJeQfQayLxKQk5OPOzVGJr8e0SxIrc30HR4Su+8HP0tXvFl
+    RP4xKz4d3fOg6yrxHFu7XYb+wLM25jkY6UDBAxKAwA8e5PTrOh8U3QEXNN6jKlaB
+    /YJvhUVEDiY6xMIWZxq4Z9ZyWpkTXjHycTL0nTkiSE9kFwIzkBBIsFV3BxyQZcGq
+    JQlw/NRukek+5pBgs3O6lFf8iqw2KZ5qFDeSVIksVnGmfxrXLkph0vW3vhmqEVXj
+    ZRDvOBf9WYc3+6xXspMHU1/x2PPax+ZG1Fqg4zy5
+    -----END CERTIFICATE-----
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -886,7 +984,7 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: f18383bf5543384882a575ac14e8671dedaa0d3adb0aad8c0d7985d92fc0209b
+        checksum/config: e83e759e39d1b355956ea605c2fa0f583b9c7a9c8b7516382bf2c41ea8ee7cfe
     spec:
       automountServiceAccountToken: true
       containers:
@@ -945,6 +1043,22 @@ spec:
         - mountPath: /var/log
           name: varlog
           readOnly: true
+        - mountPath: /mnt/secrets/elastic-agent/test.ssl.certificate_authorities.0
+          name: config
+          readOnly: true
+          subPath: test.ssl.certificate_authorities.0
+        - mountPath: /mnt/secrets/elastic-agent/ca-secret.secret
+          name: ca-secret
+          readOnly: true
+          subPath: secret
+        - mountPath: /mnt/secrets/elastic-agent/ca-secret.secret-another
+          name: ca-secret
+          readOnly: true
+          subPath: secret-another
+        - mountPath: /mnt/secrets/elastic-agent/test.ssl.certificate_authorities.3
+          name: config
+          readOnly: true
+          subPath: test.ssl.certificate_authorities.3
         - mountPath: /usr/share/elastic-agent/state
           name: agent-data
         - mountPath: /etc/elastic-agent/agent.yml
@@ -963,6 +1077,10 @@ spec:
       - hostPath:
           path: /var/log
         name: varlog
+      - name: ca-secret
+        secret:
+          defaultMode: 292
+          secretName: ca-secret
       - hostPath:
           path: /etc/elastic-agent/default/agent-pernode-example/state
           type: DirectoryOrCreate
@@ -1077,7 +1195,7 @@ spec:
       labels:
         name: agent-clusterwide-example
       annotations:
-        checksum/config: c1519a2e5309ae18b80d55aa0325eafb403c7c9c549d967984507948a7bd3efc
+        checksum/config: 54bb0654f742186393a646bf36b019527a1d3d7fa483bb22ec0d1a6d064bca6e
     spec:
       automountServiceAccountToken: true
       containers:
@@ -1130,6 +1248,22 @@ spec:
           runAsGroup: 1000
           runAsUser: 1000
         volumeMounts:
+        - mountPath: /mnt/secrets/elastic-agent/test.ssl.certificate_authorities.0
+          name: config
+          readOnly: true
+          subPath: test.ssl.certificate_authorities.0
+        - mountPath: /mnt/secrets/elastic-agent/ca-secret.secret
+          name: ca-secret
+          readOnly: true
+          subPath: secret
+        - mountPath: /mnt/secrets/elastic-agent/ca-secret.secret-another
+          name: ca-secret
+          readOnly: true
+          subPath: secret-another
+        - mountPath: /mnt/secrets/elastic-agent/test.ssl.certificate_authorities.3
+          name: config
+          readOnly: true
+          subPath: test.ssl.certificate_authorities.3
         - mountPath: /usr/share/elastic-agent/state
           name: agent-data
         - mountPath: /etc/elastic-agent/agent.yml
@@ -1141,6 +1275,10 @@ spec:
         kubernetes.io/os: linux
       serviceAccountName: agent-clusterwide-example
       volumes:
+      - name: ca-secret
+        secret:
+          defaultMode: 292
+          secretName: ca-secret
       - emptyDir: {}
         name: agent-data
       - name: config
