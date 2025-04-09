@@ -1,0 +1,21 @@
+kubernetes:
+  enabled: true
+  output: test
+  namespace: test
+
+outputs:
+  test:
+    type: ESSecretAuthAPI
+    secretName: es-api-secret
+
+agent:
+  unprivileged: true
+  presets:
+    perNode:
+      agent:
+        monitoring:
+          use_output: test
+    clusterWide:
+      agent:
+        monitoring:
+          use_output: test
