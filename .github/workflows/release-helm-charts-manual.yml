@@ -2,7 +2,9 @@
 name: release-helm-charts-manual
 
 on:
-  pull_request:
+  push:
+    branches:
+      - "test/helm-chart-publish-manually"
   workflow_dispatch:
     inputs:
       branch:
