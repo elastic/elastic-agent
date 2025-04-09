@@ -1,7 +1,6 @@
 ---
 
-# This file contains the package specifications for both Community Beats and
-# Official Beats.
+# This file contains the package specifications for Elastic Agent
 
 # List all the available platforms
 platforms: &all-platforms
