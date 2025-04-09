@@ -3,6 +3,7 @@
 {{- $preset := $.Values.agent.presets.perNode -}}
 {{- $inputVal := (include "elasticagent.system.config.metrics.input" $ | fromYamlArray) -}}
 {{- include "elasticagent.preset.mutate.inputs" (list $ $preset $inputVal) -}}
+{{- include "elasticagent.preset.mutate.outputs.byname" (list $ $preset $.Values.system.output) -}}
 {{- end -}}
 {{- end -}}
 
