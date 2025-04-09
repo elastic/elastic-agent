@@ -637,14 +637,11 @@ func ExtractComponentsFromSelectedPkgSpecs(pkgSpecs []devtools.OSPackageArgs) ([
 				} else {
 					mappedDependencies[component.PackageName] = component
 					if mg.Verbose() {
-						log.Printf("Added component %+v to the list of component to download from manifest", component)
+						log.Printf("Added component %s to the list of component to download from manifest", component.PackageName)
 					}
 				}
 			}
 		}
-	}
-	if mg.Verbose() {
-		log.Printf("collected mappedDependencies: %v", mappedDependencies)
 	}
 
 	// collect the dependencies into a slice
@@ -652,6 +649,7 @@ func ExtractComponentsFromSelectedPkgSpecs(pkgSpecs []devtools.OSPackageArgs) ([
 	for _, pkg := range mappedDependencies {
 		dependencies = append(dependencies, pkg)
 	}
+
 	return dependencies, nil
 }
 
@@ -659,7 +657,7 @@ func isSelected(pkg devtools.OSPackageArgs) bool {
 
 	// Checks if this package is compatible with the FIPS settings
 	if pkg.Spec.FIPS != devtools.FIPSBuild {
-		log.Printf("Skipping %s/%s package type because FIPS flag doesn't match [pkg=%v, build=%v]", pkg.Spec, pkg.OS, pkg.Spec.FIPS, devtools.FIPSBuild)
+		log.Printf("Skipping %s/%s package type because FIPS flag doesn't match [pkg=%v, build=%v]", pkg.Spec.Name, pkg.OS, pkg.Spec.FIPS, devtools.FIPSBuild)
 		return false
 	}
 
