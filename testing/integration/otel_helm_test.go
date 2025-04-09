@@ -38,6 +38,9 @@ func TestOtelKubeStackHelm(t *testing.T) {
 			// only test the basic and the wolfi container with otel
 			{Type: define.Kubernetes, DockerVariant: "basic"},
 			{Type: define.Kubernetes, DockerVariant: "wolfi"},
+			// elastic otel collector image
+			{Type: define.Kubernetes, DockerVariant: "elastic-otel-collector"},
+			{Type: define.Kubernetes, DockerVariant: "elastic-otel-collector-wolfi"},
 		},
 		Group: define.Kubernetes,
 	})
@@ -103,111 +106,6 @@ func TestOtelKubeStackHelm(t *testing.T) {
 							// TODO: replace with managed OTLP ingest endpoint/apiKey when available
 							fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_OTLP_ENDPOINT","value":"%s"}`, "https://otlp.ingest:433"),
 							fmt.Sprintf(`collectors.gateway.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, "CHANGEME=="),
-						},
-					},
-				),
-				// - An OpenTelemetry Operator Deployment (1 pod per
-				// cluster)
-				k8sStepCheckRunningPods("app.kubernetes.io/name=opentelemetry-operator", 1, "manager"),
-				// - A Daemonset to collect K8s node's metrics and logs
-				// (1 EDOT collector pod per node)
-				// - A Cluster wide Deployment to collect K8s metrics and
-				// events (1 EDOT collector pod per cluster)
-				// - Two Gateway replicas to collect, aggregate and forward
-				// telemetry.
-				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 4, "otc-container"),
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
-			testNamespace := kCtx.getNamespace(t)
-
-			for _, step := range tc.steps {
-				step(t, ctx, kCtx, testNamespace)
-			}
-		})
-	}
-}
-
-func TestOtelKubeStackHelmEDOTImage(t *testing.T) {
-	info := define.Require(t, define.Requirements{
-		Stack: &define.Stack{},
-		Local: false,
-		Sudo:  false,
-		OS: []define.OS{
-			// only test the basic and the wolfi container with otel
-			{Type: define.Kubernetes, DockerVariant: "elastic-otel-collector"},
-			{Type: define.Kubernetes, DockerVariant: "elastic-otel-collector-wolfi"},
-		},
-		Group: define.Kubernetes,
-	})
-
-	kCtx := k8sGetContext(t, info)
-
-	chartOptions := &action.ChartPathOptions{
-		RepoURL: kubeStackChartURL,
-		Version: kubeStackChartVersion,
-	}
-
-	chartLocation, err := action.NewPull().LocateChart(chartOptions.RepoURL, cli.New())
-	if err != nil {
-		panic(err)
-	}
-
-	testCases := []struct {
-		name  string
-		steps []k8sTestStep
-	}{
-		{
-			name: "managed helm kube-stack operator standalone agent kubernetes privileged",
-			steps: []k8sTestStep{
-				k8sStepCreateNamespace(),
-				k8sStepHelmDeployWithValueOptions(chartLocation, "kube-stack-otel",
-					values.Options{
-						ValueFiles: []string{"../../deploy/helm/edot-collector/kube-stack/values.yaml"},
-						Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
-
-						// override secrets reference with env variables
-						JSONValues: []string{
-							fmt.Sprintf(`collectors.gateway.env[0]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, kCtx.esHost),
-							fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_API_KEY","value":"%s"}`, kCtx.esEncodedAPIKey),
-							`collectors.gateway.env[2]={"name": "OVERWRITE_ENV_VAR", "value": "overwrite"}`, // dummy env var just to overwrite existing env var in values.yaml
-						},
-					},
-				),
-				// - An OpenTelemetry Operator Deployment (1 pod per
-				// cluster)
-				k8sStepCheckRunningPods("app.kubernetes.io/name=opentelemetry-operator", 1, "manager"),
-				// - A Daemonset to collect K8s node's metrics and logs
-				// (1 EDOT collector pod per node)
-				// - A Cluster wide Deployment to collect K8s metrics and
-				// events (1 EDOT collector pod per cluster)
-				// - Two Gateway pods to collect, aggregate and forward
-				// telemetry.
-				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 4, "otc-container"),
-				// validate kubeletstats metrics are being
-				// pushed
-				k8sStepCheckDatastreamsHits(info, "metrics", "kubeletstatsreceiver.otel", "default"),
-			},
-		},
-		{
-			name: "mOTel helm kube-stack operator standalone agent kubernetes privileged",
-			steps: []k8sTestStep{
-				k8sStepCreateNamespace(),
-				k8sStepHelmDeployWithValueOptions(chartLocation, "kube-stack-otel",
-					values.Options{
-						ValueFiles: []string{"../../deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"},
-						Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
-
-						// override secrets reference with env variables
-						JSONValues: []string{
-							// TODO: replace with managed OTLP ingest endpoint/apiKey when available
-							fmt.Sprintf(`collectors.gateway.env[0]={"name":"ELASTIC_OTLP_ENDPOINT","value":"%s"}`, "https://otlp.ingest:433"),
-							fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_API_KEY","value":"%s"}`, "CHANGEME=="),
-							`collectors.gateway.env[2]={"name": "OVERWRITE_ENV_VAR", "value": "overwrite"}`, // dummy env var just to overwrite existing env var in values.yaml
 						},
 					},
 				),
