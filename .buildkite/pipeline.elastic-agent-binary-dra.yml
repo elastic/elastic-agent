@@ -157,7 +157,7 @@ steps:
         imagePrefix: "core-ubuntu-2204-aarch64"
       env:
         DRA_WORKFLOW: "dra-core-staging"
-        PLATFORMS: "linux/arm64 darwin/arm64"
+        PLATFORMS: "linux/arm64"
         FIPS: "true"
 
     - wait
