@@ -3726,12 +3726,16 @@ func (Helm) BuildDependencies() error {
 func (h Helm) Package() error {
 	mg.SerialDeps(h.BuildDependencies)
 
-	agentVersion := bversion.GetParsedAgentPackageVersion()
-	agentCoreVersion := agentVersion.CoreVersion()
-	agentImageTag := agentCoreVersion + "-SNAPSHOT"
-
 	// need to explicitly set SNAPSHOT="false" to produce a production-ready package
 	productionPackage := os.Getenv("SNAPSHOT") == "false"
+
+	agentVersion := bversion.GetParsedAgentPackageVersion()
+	agentCoreVersion := agentVersion.CoreVersion()
+	agentImageTag := agentCoreVersion
+	if !productionPackage {
+		// always use the SNAPSHOT version for image tag if not a production package
+		agentImageTag = agentImageTag + "-SNAPSHOT"
+	}
 
 	agentChartVersion := agentCoreVersion + "-beta"
 	switch {
