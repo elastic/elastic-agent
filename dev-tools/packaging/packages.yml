@@ -95,8 +95,8 @@ components:
     packageName: connectors-{{.Version}}.zip
     # FIXME: connectors use only <major>.<minor>.<patch> in the root directory name so the definition should be something
     # using the beat_version or similar
-    # We don't support that yet, so we are defining a rootDir that will error out if rendered. This isnot a problem since
-    # we don't extract/manipulate the archive during packaging but it has its own special handling in the 'service' docker image
+    # We don't support that yet, so we are defining a rootDir that will error out if rendered. This is not a problem since
+    # we don't extract/manipulate the archive during packaging, it has its own special handling in the 'service' docker image
     rootDir: elasticsearch_connectors-{{beat_version}}
     binaryName: connectors
     fips: false
@@ -177,10 +177,8 @@ components:
     binaryName: apm-server
     fips: true
     platforms:
-      # FIXME: is apm-server-fips not available for linux/amd64? infra PR is pending
-      # - *linux-amd64
-      # FIXME: is apm-server-fips on linux/arm64 has a different binary name 'apm-server-fips' but 'apm-server.spec.yml' spec file
-      #- *linux-arm64
+      - *linux-amd64
+      - *linux-arm64
     packageTypes: *all-package-types
   - &comp-fleet-server-fips
     projectName: fleet-server
