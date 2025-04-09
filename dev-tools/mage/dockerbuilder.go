@@ -227,9 +227,7 @@ func (b *dockerBuilder) dockerBuild() (string, []string, error) {
 	if b.Snapshot {
 		mainTag = mainTag + "-SNAPSHOT"
 	}
-	if b.FIPS {
-		mainTag = mainTag + "-fips"
-	}
+
 	if repository := b.ExtraVars["repository"]; repository != "" {
 		mainTag = fmt.Sprintf("%s/%s", repository, mainTag)
 	}
