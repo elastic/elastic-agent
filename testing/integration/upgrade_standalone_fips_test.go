@@ -13,6 +13,7 @@ import (
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
 // This file contains upgrade tests that pertain to FIPS-compliant Agent artifacts.
@@ -27,16 +28,27 @@ func TestStandaloneUpgradeFIPStoFIPS(t *testing.T) {
 	})
 
 	// Start with a FIPS-compliant Agent artifact
-	// TODO: introduce FIPS option for artifact fetcher
+	fipsArtifactFetcher := atesting.ArtifactFetcher(atesting.WithArtifactFIPSOnly())
 	startFixture, err := atesting.NewFixture(
 		t,
 		startVersion.String(),
-		atesting.WithFetcher(atesting.ArtifactFetcher()),
+		atesting.WithFetcher(fipsArtifactFetcher),
 	)
 	require.NoError(t, err, "error creating previous agent fixture")
 
 	// Upgrade to newer version of Agent
+	endFixture, err := define.NewFixtureFromLocalBuild(t, endVersion)
+	require.NoError(t, err)
+
+	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradetest.WithUnprivileged(unprivileged))
+	assert.NoError(t, err)
 
 	// Check that new (post-upgrade) Agent is also FIPS-compliant
-	// TODO: check if Agent status contains information about FIPS mode
+	client := endFixture.Client()
+	err = client.Connect(ctx)
+	require.NoError(t, err)
+
+	ver, err := client.Version(ctx)
+	require.NoError(t, err)
+	require.True(t, ver.Fips)
 }
