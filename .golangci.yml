@@ -46,7 +46,6 @@ linters:
     - asciicheck # simple linter to check that your code does not contain non-ASCII identifiers
     - bodyclose # checks whether HTTP response body is closed successfully
     - durationcheck # check for two durations multiplied together
-    - exportloopref # checks for pointers to enclosing loop variables
     - goimports # Goimports does everything that gofmt does. Additionally it checks unused imports
     - gosec # inspects source code for security problems
     - importas # enforces consistent import aliases
@@ -54,7 +53,8 @@ linters:
     - noctx # noctx finds sending http request without context.Context
     - unconvert # Remove unnecessary type conversions
     - wastedassign # wastedassign finds wasted assignment statements.
-    - gomodguard # check for blocked dependencies
+    - depguard # check for blocked imports from Go files
+    - gomodguard # check for blocked imports from go.mod
     - gomoddirectives
 
 # all available settings of specific linters
@@ -83,14 +83,14 @@ linters-settings:
     forbid:
       - fmt.Print.* # too much log noise
     # Exclude godoc examples from forbidigo checks.  Default is true.
-    exclude_godoc_examples: true
+    exclude-godoc-examples: true
 
   goimports:
     local-prefixes: github.com/elastic
 
+  # Check for blocked dependencies in go.mod.
   gomodguard:
     blocked:
-      # List of blocked modules.
       modules:
         # Blocked module.
         - github.com/pkg/errors:
@@ -105,6 +105,15 @@ linters-settings:
               - github.com/gofrs/uuid/v5
             reason: "Use one uuid library consistently across the codebase"
 
+  # Check for blocked imports in Go files.
+  depguard:
+    rules:
+      main:
+        list-mode: lax
+        deny:
+          - pkg: "math/rand$"
+            desc: "superseded by math/rand/v2"
+
   gomoddirectives:
     # Forbid local `replace` directives
     replace-local: false
@@ -117,16 +126,10 @@ linters-settings:
       - github.com/dop251/goja_nodejs
       - github.com/fsnotify/fsnotify
       - github.com/openshift/api
-
-  gosimple:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.22.12"
-
+      - github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver
   nolintlint:
     # Enable to ensure that nolint directives are all used. Default is true.
     allow-unused: false
-    # Disable to ensure that nolint directives don't have a leading space. Default is true.
-    allow-leading-space: false
     # Exclude following linters from requiring an explanation.  Default is [].
     allow-no-explanation: []
     # Enable to require an explanation of nonzero length after each nolint directive. Default is false.
@@ -135,18 +138,10 @@ linters-settings:
     require-specific: false
 
   staticcheck:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.22.12"
     checks: ["all"]
 
   stylecheck:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.22.12"
     checks: ["all"]
-
-  unused:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.22.12"
 
   gosec:
     excludes:

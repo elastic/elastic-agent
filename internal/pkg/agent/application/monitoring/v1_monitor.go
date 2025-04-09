@@ -17,6 +17,10 @@ import (
 	"time"
 	"unicode"
 
+	"golang.org/x/exp/slices"
+
+	"golang.org/x/exp/maps"
+
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/utils"
 
@@ -708,7 +712,11 @@ func (b *BeatsMonitor) injectMetricsInput(
 		componentListWithMonitoring[k] = v
 	}
 
-	for unit, binaryName := range componentListWithMonitoring {
+	// ensure consistent ordering
+	unitIDs := maps.Keys(componentListWithMonitoring)
+	slices.Sort(unitIDs)
+	for _, unit := range unitIDs {
+		binaryName := componentListWithMonitoring[unit]
 		if !isSupportedMetricsBinary(binaryName) {
 			continue
 		}

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -68,7 +69,11 @@ func (u *mockUpgradeManager) Upgrade(
 		pgpBytes...)
 }
 
-func (u *mockUpgradeManager) Ack(ctx context.Context, acker acker.Acker) error {
+func (u *mockUpgradeManager) Ack(_ context.Context, _ acker.Acker) error {
+	return nil
+}
+
+func (u *mockUpgradeManager) AckAction(_ context.Context, _ acker.Acker, _ fleetapi.Action) error {
 	return nil
 }
 
@@ -110,7 +115,7 @@ func TestUpgradeHandler(t *testing.T) {
 				return nil, nil
 			},
 		},
-		nil, nil, nil, nil, nil, false)
+		nil, nil, nil, nil, nil, false, nil)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 
@@ -169,7 +174,7 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 				return nil, err
 			},
 		},
-		nil, nil, nil, nil, nil, false)
+		nil, nil, nil, nil, nil, false, nil)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 
@@ -188,6 +193,98 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 		t.Fatal("mockUpgradeManager.Upgrade was not called")
 	case <-upgradeCalledChan:
 	}
+}
+
+func TestDuplicateActionsHandled(t *testing.T) {
+	// Create a cancellable context that will shut down the coordinator after
+	// the test.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	log, _ := logger.New("", false)
+	upgradeCalledChan := make(chan string)
+
+	agentInfo := &info.AgentInfo{}
+	acker := &fakeAcker{}
+
+	// Create and start the Coordinator
+	c := coordinator.New(
+		log,
+		configuration.DefaultConfiguration(),
+		logger.DefaultLogLevel,
+		agentInfo,
+		component.RuntimeSpecs{},
+		nil,
+		&mockUpgradeManager{
+			UpgradeFn: func(
+				ctx context.Context,
+				version string,
+				sourceURI string,
+				action *fleetapi.ActionUpgrade,
+				details *details.Details,
+				skipVerifyOverride bool,
+				skipDefaultPgp bool,
+				pgpBytes ...string) (reexec.ShutdownCallbackFn, error) {
+
+				defer func() {
+					upgradeCalledChan <- action.ActionID
+				}()
+
+				return nil, nil
+			},
+		},
+		nil, nil, nil, nil, nil, false, acker)
+	//nolint:errcheck // We don't need the termination state of the Coordinator
+	go c.Run(ctx)
+
+	u := NewUpgrade(log, c)
+	a1 := fleetapi.ActionUpgrade{
+		ActionID: "action-8.5-1",
+		Data: fleetapi.ActionUpgradeData{
+			Version: "8.5.0", SourceURI: "http://localhost",
+		},
+	}
+	a2 := fleetapi.ActionUpgrade{
+		ActionID: "action-8.5-2",
+		Data: fleetapi.ActionUpgradeData{
+			Version: "8.5.0", SourceURI: "http://localhost",
+		},
+	}
+
+	checkMsg := func(c <-chan string, expected, errMsg string) error {
+		t.Helper()
+		// Make sure this test does not dead lock or wait for too long
+		// For some reason < 1s sometimes makes the test fail.
+		select {
+		case <-time.Tick(1500 * time.Millisecond):
+			return errors.New("timed out waiting for Upgrade to return")
+		case msg := <-c:
+			require.Equal(t, expected, msg, errMsg)
+		}
+
+		return nil
+	}
+
+	acker.On("Ack", mock.Anything, mock.Anything).Return(nil)
+	acker.On("Commit", mock.Anything).Return(nil)
+
+	t.Log("First upgrade action should be processed")
+	require.NoError(t, u.Handle(ctx, &a1, acker))
+	require.Nil(t, checkMsg(upgradeCalledChan, a1.ActionID, "action was not processed"))
+	c.ClearOverrideState() // it's upgrading, normally we would restart
+
+	t.Log("Action with different ID but same version should not be propagated to upgrader but acked")
+	require.NoError(t, u.Handle(ctx, &a2, acker))
+	require.NotNil(t, checkMsg(upgradeCalledChan, a2.ActionID, "action was not processed"))
+	acker.AssertCalled(t, "Ack", ctx, &a2)
+	acker.AssertCalled(t, "Commit", ctx)
+
+	c.ClearOverrideState() // it's upgrading, normally we would restart
+
+	t.Log("Resending action with same ID should be skipped")
+	require.NoError(t, u.Handle(ctx, &a1, acker))
+	require.NotNil(t, checkMsg(upgradeCalledChan, a1.ActionID, "action was not processed"))
+	acker.AssertNotCalled(t, "Ack", ctx, &a1)
 }
 
 func TestUpgradeHandlerNewVersion(t *testing.T) {
@@ -230,15 +327,23 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 				return nil, nil
 			},
 		},
-		nil, nil, nil, nil, nil, false)
+		nil, nil, nil, nil, nil, false, nil)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 
 	u := NewUpgrade(log, c)
-	a1 := fleetapi.ActionUpgrade{Data: fleetapi.ActionUpgradeData{
-		Version: "8.2.0", SourceURI: "http://localhost"}}
-	a2 := fleetapi.ActionUpgrade{Data: fleetapi.ActionUpgradeData{
-		Version: "8.5.0", SourceURI: "http://localhost"}}
+	a1 := fleetapi.ActionUpgrade{
+		ActionID: "action-8.2",
+		Data: fleetapi.ActionUpgradeData{
+			Version: "8.2.0", SourceURI: "http://localhost",
+		},
+	}
+	a2 := fleetapi.ActionUpgrade{
+		ActionID: "action-8.5",
+		Data: fleetapi.ActionUpgradeData{
+			Version: "8.5.0", SourceURI: "http://localhost",
+		},
+	}
 	ack := noopacker.New()
 
 	checkMsg := func(c <-chan string, expected, errMsg string) {
@@ -261,4 +366,18 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 	err2 := u.Handle(ctx, &a2, ack)
 	require.NoError(t, err2)
 	checkMsg(upgradeCalledChan, "8.5.0", "second call to Upgrade must be with version 8.5.0")
+}
+
+type fakeAcker struct {
+	mock.Mock
+}
+
+func (f *fakeAcker) Ack(ctx context.Context, action fleetapi.Action) error {
+	args := f.Called(ctx, action)
+	return args.Error(0)
+}
+
+func (f *fakeAcker) Commit(ctx context.Context) error {
+	args := f.Called(ctx)
+	return args.Error(0)
 }
