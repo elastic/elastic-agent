@@ -30,11 +30,11 @@ const defaultCrossBuildTarget = "golangCrossBuild"
 var Platforms = BuildPlatforms.Defaults()
 
 // SelectedPackageTypes is the list of package types. If empty, all packages types
-// are considered to be selected (see isPackageTypeSelected).
+// are considered to be selected (see IsPackageTypeSelected).
 var SelectedPackageTypes []PackageType
 
 // SelectedDockerVariants is the list of docker variants. If empty, all docker variants
-// are considered to be selected (see isDockerVariantSelected).
+// are considered to be selected (see IsDockerVariantSelected).
 var SelectedDockerVariants []DockerVariant
 
 func init() {
