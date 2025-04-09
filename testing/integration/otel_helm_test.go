@@ -70,7 +70,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 						// override secrets reference with env variables
 						JSONValues: []string{
 							fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, kCtx.esHost),
-							fmt.Sprintf(`collectors.gateway.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, kCtx.esAPIKey),
+							fmt.Sprintf(`collectors.gateway.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, kCtx.esEncodedAPIKey),
 						},
 					},
 				),
@@ -173,7 +173,7 @@ func TestOtelKubeStackHelmEDOTImage(t *testing.T) {
 						// override secrets reference with env variables
 						JSONValues: []string{
 							fmt.Sprintf(`collectors.gateway.env[0]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, kCtx.esHost),
-							fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_API_KEY","value":"%s"}`, kCtx.esAPIKey),
+							fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_API_KEY","value":"%s"}`, kCtx.esEncodedAPIKey),
 							`collectors.gateway.env[2]={"name": "OVERWRITE_ENV_VAR", "value": "overwrite"}`, // dummy env var just to overwrite existing env var in values.yaml
 						},
 					},
@@ -290,7 +290,8 @@ func k8sStepCheckRunningPods(podLabelSelector string, expectedPodNumber int, con
 func k8sStepCheckDatastreamsHits(info *define.Info, dsType, dataset, datastreamNamespace string) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
 		require.Eventually(t, func() bool {
-			docs, err := estools.PerformQueryForRawQuery(ctx, queryK8sNamespaceDataStream(dsType, dataset, datastreamNamespace, namespace), fmt.Sprintf(".ds-%s*", dsType), info.ESClient)
+			query := queryK8sNamespaceDataStream(dsType, dataset, datastreamNamespace, namespace)
+			docs, err := estools.PerformQueryForRawQuery(ctx, query, fmt.Sprintf(".ds-%s*", dsType), info.ESClient)
 			require.NoError(t, err, "failed to get %s dataset documents", dataset)
 			return docs.Hits.Total.Value > 0
 		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least one document should be available for %s dataset", dataset))
