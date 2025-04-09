@@ -28,10 +28,13 @@ Entrypoint for chart initialisation
 */}}
 {{- define "elasticagent.init" -}}
 {{- if not (hasKey $.Values.agent "initialised") -}}
-{{/* init order matters */}}
+{{/* !!! init order matters !!! */}}
 {{- include (printf "elasticagent.engine.%s.init" $.Values.agent.engine) $ -}}
+{{/* initialise inputs to hydrate the correct presets according to what is enabled */}}
 {{- include "elasticagent.init.inputs" $ -}}
+{{/* initialise fleet to remove any irrelevant preset and load the certificate settings */}}
 {{- include "elasticagent.init.fleet" $ -}}
+{{/* initialise presets to set correctly default values in them */}}
 {{- include "elasticagent.init.presets" $ -}}
 {{- $_ := set $.Values.agent "initialised" dict -}}
 {{- end -}}
