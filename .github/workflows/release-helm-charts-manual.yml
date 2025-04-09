@@ -34,7 +34,7 @@ jobs:
       - uses: elastic/oblt-actions/buildkite/run@v1
         with:
           branch: ${{ inputs.branch || '9.0' }}
-          commit: ${{ inputs.commit || 'head' }}
+          commit: ${{ inputs.commit || 'b6262f14acdb6def657de69e5ac170d160e4e105' }}
           pipeline: elastic-agent-helm-charts
           token: ${{ secrets.BUILDKITE_TOKEN }}
           wait-for: true
