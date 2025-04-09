@@ -719,6 +719,9 @@
                 "namespace": {
                     "type": "string",
                     "description": "Namespace to reference an Elasticsearch cluster managed by ECK (optional for ESECKRef type)."
+                },
+                "ssl": {
+                    "$ref": "#/definitions/SSLConfigClient"
                 }
             },
             "required": [
@@ -844,6 +847,33 @@
                     }
                 }
             ]
+        },
+        "SSLConfigClient": {
+            "type": "object",
+            "properties": {
+                "certificateAuthorities": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ValueFrom"
+                    },
+                    "description": "The list of root certificates for verifications (required). If certificate_authorities is empty or not set, the system keystore is used. If certificate_authorities is self-signed, the host system needs to trust that CA cert as well."
+                },
+                "verificationMode": {
+                    "type": "string",
+                    "description": "Controls the verification of server certificates.",
+                    "default": "none",
+                    "enum": [
+                      "full",
+                      "strict",
+                      "certificate",
+                      "none"
+                  ]
+                },
+                "caTrustedFingerprint": {
+                    "type": "string",
+                    "description": "A HEX encoded SHA-256 of a CA certificate. If this certificate is present in the chain during the handshake, it will be added to the certificate_authorities list and the handshake will continue normally."
+                }
+            }
         },
         "KubernetesStreamConfig": {
             "type": "object",
@@ -1061,12 +1091,17 @@
                         "key": {
                             "type": "string"
                         }
-                    }
+                    },
+                    "required": [
+                        "name",
+                        "key"
+                    ]
                 }
             },
             "allOf": [
                 {
                     "if": {
+                        "required": ["value"],
                         "properties": {
                             "value": {
                                 "type": "string",
@@ -1094,6 +1129,7 @@
                 },
                 {
                     "if": {
+                        "required": ["valueFromSecret"],
                         "properties": {
                             "valueFromSecret": {
                                 "type": "object",
@@ -1126,6 +1162,7 @@
                 },
                 {
                     "if": {
+                        "required": ["valueFromSecret"],
                         "properties": {
                             "valueFromSecret": {
                                 "type": "object",
