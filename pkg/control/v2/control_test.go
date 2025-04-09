@@ -6,6 +6,8 @@ package v2
 
 import (
 	"context"
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"testing"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -41,4 +43,18 @@ func TestServerClient_Version(t *testing.T) {
 		Snapshot:  release.Snapshot(),
 		Fips:      release.FIPS(),
 	}, ver)
+}
+
+func newErrorLogger(t *testing.T) *logger.Logger {
+	t.Helper()
+
+	loggerCfg := logger.DefaultLoggingConfig()
+	loggerCfg.Level = logp.ErrorLevel
+
+	eventLoggerCfg := logger.DefaultEventLoggingConfig()
+	eventLoggerCfg.Level = loggerCfg.Level
+
+	log, err := logger.NewFromConfig("", loggerCfg, eventLoggerCfg, false)
+	require.NoError(t, err)
+	return log
 }
