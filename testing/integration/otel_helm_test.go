@@ -287,23 +287,44 @@ func k8sStepCheckRunningPods(podLabelSelector string, expectedPodNumber int, con
 
 // k8sStepCheckDatastreams checks the corresponding Elasticsearch datastreams
 // are created and documents being written
-func k8sStepCheckDatastreamsHits(info *define.Info, dsType, dataset, namespace string) k8sTestStep {
-	datastream := fmt.Sprintf("%s-%s-%s", dsType, dataset, namespace)
+func k8sStepCheckDatastreamsHits(info *define.Info, dsType, dataset, datastreamNamespace string) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		var initDocumentHits int
-		getTotalDocs := func(t *testing.T) int {
-			docs, err := estools.GetLogsForDatastream(ctx, info.ESClient, dsType, dataset, namespace)
-			require.NoError(t, err, "failed to get %s datastream documents", datastream)
-			return docs.Hits.Total.Value
-		}
-
 		require.Eventually(t, func() bool {
-			initDocumentHits = getTotalDocs(t)
-			return initDocumentHits > 0
-		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least one document should be available for %s datastream", datastream))
+			docs, err := estools.PerformQueryForRawQuery(ctx, queryK8sNamespaceDataStream(dsType, dataset, datastreamNamespace, namespace), fmt.Sprintf(".ds-%s*", dsType), info.ESClient)
+			require.NoError(t, err, "failed to get %s dataset documents", dataset)
+			return docs.Hits.Total.Value > 0
+		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least one document should be available for %s dataset", dataset))
+	}
+}
 
-		require.Eventually(t, func() bool {
-			return getTotalDocs(t) > initDocumentHits
-		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("no new documents for %s datastream", datastream))
+func queryK8sNamespaceDataStream(dsType, dataset, datastreamNamespace, k8snamespace string) map[string]any {
+	return map[string]any{
+		"_source": []string{"message"},
+		"query": map[string]any{
+			"bool": map[string]any{
+				"filter": []any{
+					map[string]any{
+						"term": map[string]any{
+							"data_stream.dataset": dataset,
+						},
+					},
+					map[string]any{
+						"term": map[string]any{
+							"data_stream.namespace": datastreamNamespace,
+						},
+					},
+					map[string]any{
+						"term": map[string]any{
+							"data_stream.type": dsType,
+						},
+					},
+					map[string]any{
+						"term": map[string]any{
+							"resource.attributes.k8s.namespace.name": k8snamespace,
+						},
+					},
+				},
+			},
+		},
 	}
 }
