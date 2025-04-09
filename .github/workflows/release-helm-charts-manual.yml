@@ -2,6 +2,7 @@
 name: release-helm-charts-manual
 
 on:
+  pull_request:
   workflow_dispatch:
     inputs:
       branch:
@@ -30,14 +31,14 @@ jobs:
     steps:
       - uses: elastic/oblt-actions/buildkite/run@v1
         with:
-          branch: ${{ inputs.branch }}
-          commit: ${{ inputs.commit }}
+          branch: ${{ inputs.branch || '9.0' }}
+          commit: ${{ inputs.commit || 'head' }}
           pipeline: elastic-agent-helm-charts
           token: ${{ secrets.BUILDKITE_TOKEN }}
           wait-for: true
           env-vars: |
             SNAPSHOT=false
-            HELM_REPO_ENV=${{ inputs.repo-env}}
+            HELM_REPO_ENV=${{ inputs.repo-env || 'dev' }}
 
       - uses: elastic/oblt-actions/slack/send@v1
         if: ${{ failure()  }}
