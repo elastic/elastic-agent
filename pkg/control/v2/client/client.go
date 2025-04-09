@@ -90,6 +90,7 @@ type Version struct {
 	Commit    string    `json:"commit" yaml:"commit"`
 	BuildTime time.Time `json:"build_time" yaml:"build_time"`
 	Snapshot  bool      `json:"snapshot" yaml:"snapshot"`
+	Fips      bool      `json:"fips" yaml:"fips"`
 }
 
 // ComponentVersionInfo is the version information for the component.
