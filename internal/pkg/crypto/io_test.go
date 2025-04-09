@@ -11,9 +11,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 )
 
 func TestIO(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "crypto io does not use NewGCMWithRandomNonce.")
 	t.Run("encode and decode with the right password", func(t *testing.T) {
 		passwd := bytes.Repeat([]byte("hello"), 10)
 		msg := []byte("bonjour la famille")

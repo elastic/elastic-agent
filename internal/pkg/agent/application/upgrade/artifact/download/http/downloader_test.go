@@ -24,7 +24,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
-	"github.com/elastic/elastic-agent/internal/pkg/testutils"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
@@ -37,7 +37,7 @@ import (
 )
 
 func TestDownload(t *testing.T) {
-	testutils.SkipIfFIPSOnly(t, "elastic.co test server generates an OpenPGP key which results in a SHA-1 violation.")
+	fipsutils.SkipIfFIPSOnly(t, "elastic.co test server generates an OpenPGP key which results in a SHA-1 violation.")
 	targetDir, err := os.MkdirTemp(os.TempDir(), "")
 	if err != nil {
 		t.Fatal(err)

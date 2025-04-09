@@ -21,13 +21,13 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
-	"github.com/elastic/elastic-agent/internal/pkg/testutils"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/testing/proxytest"
 )
 
 func TestVerify(t *testing.T) {
-	testutils.SkipIfFIPSOnly(t, "elastic.co test server generates an OpenPGP key which results in a SHA-1 violation.")
+	fipsutils.SkipIfFIPSOnly(t, "elastic.co test server generates an OpenPGP key which results in a SHA-1 violation.")
 	targetDir := t.TempDir()
 
 	log, _ := logger.New("", false)
