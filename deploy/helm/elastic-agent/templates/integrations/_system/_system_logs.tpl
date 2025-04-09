@@ -4,7 +4,11 @@
 {{- $inputVal := (include "elasticagent.system.config.logs.input" $ | fromYaml) -}}
 {{- if ($inputVal).streams }}
 {{- include "elasticagent.preset.mutate.inputs" (list $ $preset (list $inputVal)) -}}
+<<<<<<< HEAD
 {{- include "elasticagent.preset.applyOnce" (list $ $preset "elasticagent.kubernetes.pernode.preset") -}}
+=======
+{{- include "elasticagent.preset.mutate.outputs.byname" (list $ $preset $.Values.system.output) -}}
+>>>>>>> d81101a8f ([Helm] fix preset outputs (#7749))
 {{- end -}}
 {{- end -}}
 {{- end -}}
