@@ -6,20 +6,19 @@ package v2
 
 import (
 	"context"
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"testing"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/server"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	"go.elastic.co/apm/v2/apmtest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
 func TestServerClient_Version(t *testing.T) {
