@@ -705,7 +705,7 @@ func commitID() string {
 
 // Update is an alias for executing control protocol, configs, and specs.
 func Update() {
-	mg.Deps(Config, BuildPGP, BuildFleetCfg, ControlProto, Otel.Readme, devtools.AddLicenseHeaders, devtools.GoImports)
+	mg.Deps(Config, BuildPGP, BuildFleetCfg, Otel.Readme)
 }
 
 func EnsureCrossBuildOutputDir() error {
@@ -756,11 +756,16 @@ func ControlProto() error {
 		return err
 	}
 
-	return sh.RunV(
+	if err := sh.RunV(
 		"protoc",
 		"--go_out=pkg/control/v1/proto", "--go_opt=paths=source_relative",
 		"--go-grpc_out=pkg/control/v1/proto", "--go-grpc_opt=paths=source_relative",
-		"control_v1.proto")
+		"control_v1.proto"); err != nil {
+		return err
+	}
+
+	mg.Deps(devtools.AddLicenseHeaders, devtools.GoImports)
+	return nil
 }
 
 func BuildPGP() error {
