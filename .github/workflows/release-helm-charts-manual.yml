@@ -25,6 +25,7 @@ permissions:
 jobs:
   trigger-release:
     runs-on: ubuntu-latest
+    # See environment definition in https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-github.tf
     environment: helm-charts
     steps:
       - uses: elastic/oblt-actions/buildkite/run@v1
