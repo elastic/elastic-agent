@@ -750,11 +750,16 @@ func ControlProto() error {
 		return err
 	}
 
-	return sh.RunV(
+	if err := sh.RunV(
 		"protoc",
 		"--go_out=pkg/control/v1/proto", "--go_opt=paths=source_relative",
 		"--go-grpc_out=pkg/control/v1/proto", "--go-grpc_opt=paths=source_relative",
-		"control_v1.proto")
+		"control_v1.proto"); err != nil {
+		return err
+	}
+
+	mg.Deps(devtools.AddLicenseHeaders, devtools.GoImports)
+	return nil
 }
 
 func BuildPGP() error {
