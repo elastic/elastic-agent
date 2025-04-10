@@ -99,6 +99,8 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				// validate kubeletstats metrics are being
 				// pushed
 				k8sStepCheckDatastreamsHits(info, "metrics", "kubeletstatsreceiver.otel", "default"),
+				// validate logs are being written
+				k8sStepCheckDatastreamsHits(info, "logs", "generic.otel", "default"),
 				// validates auto-instrumentation and traces
 				// datastream generation
 				k8sStepDeployJavaApp(info, "traces", "generic.otel", "default"),
