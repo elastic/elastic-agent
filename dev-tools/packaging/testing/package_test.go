@@ -25,7 +25,6 @@ import (
 	"io"
 	"maps"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -74,13 +73,14 @@ var (
 	monitorsd         = flag.Bool("monitors.d", false, "check monitors.d folder contents")
 	rootOwner         = flag.Bool("root-owner", false, "expect root to own package files")
 	rootUserContainer = flag.Bool("root-user-container", false, "expect root in container user")
-	fips              = flag.Bool("fips", false, "check agent binary for FIPS compliance")
 )
 
 func TestRPM(t *testing.T) {
 	rpms := getFiles(t, regexp.MustCompile(`\.rpm$`))
 	for _, rpm := range rpms {
-		checkRPM(t, rpm)
+		t.Run(filepath.Base(rpm), func(t *testing.T) {
+			checkRPM(t, rpm)
+		})
 	}
 }
 
@@ -88,30 +88,30 @@ func TestDeb(t *testing.T) {
 	debs := getFiles(t, regexp.MustCompile(`\.deb$`))
 	buf := new(bytes.Buffer)
 	for _, deb := range debs {
-		checkDeb(t, deb, buf)
+		t.Run(filepath.Base(deb), func(t *testing.T) {
+			checkDeb(t, deb, buf)
+		})
 	}
 }
 
 func TestTar(t *testing.T) {
 	// Regexp matches *-arch.tar.gz, but not *-arch.docker.tar.gz
-	tars := getFiles(t, regexp.MustCompile(`-\w+\.tar\.gz$`))
-	for _, tar := range tars {
-		checkTar(t, tar, false)
-	}
-}
+	tarFiles := getFiles(t, regexp.MustCompile(`-\w+\.tar\.gz$`))
+	for _, tarFile := range tarFiles {
+		t.Run(filepath.Base(tarFile), func(t *testing.T) {
+			fipsPackage := strings.Contains(tarFile, "-fips-")
+			checkTar(t, tarFile, fipsPackage)
+		})
 
-func TestFIPSTar(t *testing.T) {
-	// Regexp matches *-arch-fips.tar.gz, but not *-arch.docker.tar.gz
-	tars := getFiles(t, regexp.MustCompile(`-\w+-fips\.tar\.gz$`))
-	for _, tar := range tars {
-		checkTar(t, tar, *fips)
 	}
 }
 
 func TestZip(t *testing.T) {
 	zips := getFiles(t, regexp.MustCompile(`^\w+\S+.zip$`))
 	for _, zip := range zips {
-		checkZip(t, zip)
+		t.Run(filepath.Base(zip), func(t *testing.T) {
+			checkZip(t, zip)
+		})
 	}
 }
 
@@ -119,9 +119,12 @@ func TestDocker(t *testing.T) {
 	dockers := getFiles(t, regexp.MustCompile(`\.docker\.tar\.gz$`))
 	sizeMap := make(map[string]int64)
 	for _, docker := range dockers {
-		t.Log(docker)
-		k, s := checkDocker(t, docker)
-		sizeMap[k] = s
+		fipsPackage := strings.Contains(docker, "-fips-")
+		t.Run(filepath.Base(docker), func(t *testing.T) {
+			t.Log(docker)
+			k, s := checkDocker(t, docker, fipsPackage)
+			sizeMap[k] = s
+		})
 	}
 
 	if len(dockers) == 0 {
@@ -220,18 +223,20 @@ func checkTar(t *testing.T, file string, fipsCheck bool) {
 	checkModulesOwner(t, p, true)
 	checkLicensesPresent(t, "", p)
 
-	t.Run(p.Name+"_check_manifest_file", func(t *testing.T) {
-		tempExtractionPath := t.TempDir()
-		err = mage.Extract(file, tempExtractionPath)
-		require.NoError(t, err, "error extracting tar archive")
-		containingDir := strings.TrimSuffix(path.Base(file), ".tar.gz")
-		checkManifestFileContents(t, filepath.Join(tempExtractionPath, containingDir))
-		if fipsCheck {
-			checkFIPS(t, filepath.Join(tempExtractionPath, containingDir))
-		}
-	})
+	// extract archive in a temporary directory
+	tempExtractionPath := t.TempDir()
+	err = mage.Extract(file, tempExtractionPath)
+	require.NoErrorf(t, err, "error extracting archive %q", file)
+
+	t.Run("check_manifest_file", testManifestFile(tempExtractionPath, fipsCheck))
 
 	checkSha512PackageHash(t, file)
+
+	if fipsCheck {
+		t.Run("FIPS check", func(t *testing.T) {
+			checkFIPS(t, tempExtractionPath)
+		})
+	}
 }
 
 func checkZip(t *testing.T, file string) {
@@ -248,15 +253,24 @@ func checkZip(t *testing.T, file string) {
 	checkModulesPermissions(t, p)
 	checkLicensesPresent(t, "", p)
 
-	t.Run(p.Name+"_check_manifest_file", func(t *testing.T) {
-		tempExtractionPath := t.TempDir()
-		err = mage.Extract(file, tempExtractionPath)
-		require.NoError(t, err, "error extracting zip archive")
-		containingDir := strings.TrimSuffix(path.Base(file), ".zip")
-		checkManifestFileContents(t, filepath.Join(tempExtractionPath, containingDir))
-	})
+	// extract archive in a temporary directory
+	tempExtractionPath := t.TempDir()
+	err = mage.Extract(file, tempExtractionPath)
+	require.NoErrorf(t, err, "error extracting archive %q", file)
+
+	t.Run("check_manifest_file", testManifestFile(tempExtractionPath, false))
 
 	checkSha512PackageHash(t, file)
+}
+
+func testManifestFile(agentPackageRootDir string, checkFips bool) func(t *testing.T) {
+	return func(t *testing.T) {
+		dirEntries, err := os.ReadDir(agentPackageRootDir)
+		require.NoErrorf(t, err, "error listing extraction dir %q", agentPackageRootDir)
+		require.Lenf(t, dirEntries, 1, "archive should contain a single directory: found %v", dirEntries)
+		containingDir := dirEntries[0].Name()
+		checkManifestFileContents(t, filepath.Join(agentPackageRootDir, containingDir))
+	}
 }
 
 func checkManifestFileContents(t *testing.T, extractedPackageDir string) {
@@ -286,7 +300,7 @@ func checkManifestFileContents(t *testing.T, extractedPackageDir string) {
 func parseManifest(t *testing.T, dir string) v1.PackageManifest {
 	manifestReadCloser, err := os.Open(filepath.Join(dir, v1.ManifestFileName))
 	if err != nil {
-		t.Errorf("opening manifest %s : %v", v1.ManifestFileName, err)
+		t.Fatalf("opening manifest %s : %v", v1.ManifestFileName, err)
 	}
 	defer func(closer io.ReadCloser) {
 		err := closer.Close()
@@ -295,7 +309,7 @@ func parseManifest(t *testing.T, dir string) v1.PackageManifest {
 
 	m, err := v1.ParseManifest(manifestReadCloser)
 	if err != nil {
-		t.Errorf("unmarshaling package manifest: %v", err)
+		t.Fatalf("unmarshaling package manifest: %v", err)
 	}
 	return *m
 }
@@ -341,7 +355,7 @@ func checkNpcapNotices(pkg, file string, contents io.Reader) error {
 	return nil
 }
 
-func checkDocker(t *testing.T, file string) (string, int64) {
+func checkDocker(t *testing.T, file string, fipsPackage bool) (string, int64) {
 	if strings.Contains(file, "elastic-otel-collector") {
 		return checkEdotCollectorDocker(t, file)
 	}
@@ -356,7 +370,10 @@ func checkDocker(t *testing.T, file string) (string, int64) {
 	checkDockerLabels(t, p, info, file)
 	checkDockerUser(t, p, info, *rootUserContainer)
 	checkFilePermissions(t, p, configFilePattern, os.FileMode(0644))
-	checkFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
+	if !fipsPackage {
+		// FIPS docker image do not contain an otelcol script, run this check only on non FIPS compliant images
+		checkFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
+	}
 	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
 	checkModulesPresent(t, "", p)
 	checkModulesDPresent(t, "", p)
@@ -423,7 +440,7 @@ func checkConfigPermissions(t *testing.T, p *packageFile) {
 }
 
 func checkFilePermissions(t *testing.T, p *packageFile, configPattern *regexp.Regexp, expectedMode os.FileMode) {
-	t.Run(p.Name+" file permissions", func(t *testing.T) {
+	t.Run("file permissions", func(t *testing.T) {
 		for _, entry := range p.Contents {
 			if configPattern.MatchString(entry.File) {
 				mode := entry.Mode.Perm()
@@ -452,7 +469,7 @@ func checkOwner(t *testing.T, entry packageEntry, expectRoot bool) {
 }
 
 func checkConfigOwner(t *testing.T, p *packageFile, expectRoot bool) {
-	t.Run(p.Name+" config file owner", func(t *testing.T) {
+	t.Run("config file owner", func(t *testing.T) {
 		for _, entry := range p.Contents {
 			if configFilePattern.MatchString(entry.File) {
 				checkOwner(t, entry, expectRoot)
@@ -469,7 +486,7 @@ func checkManifestPermissions(t *testing.T, p *packageFile) {
 }
 
 func checkManifestPermissionsWithMode(t *testing.T, p *packageFile, expectedMode os.FileMode) {
-	t.Run(p.Name+" manifest file permissions", func(t *testing.T) {
+	t.Run("manifest file permissions", func(t *testing.T) {
 		for _, entry := range p.Contents {
 			if manifestFilePattern.MatchString(entry.File) {
 				mode := entry.Mode.Perm()
@@ -484,7 +501,7 @@ func checkManifestPermissionsWithMode(t *testing.T, p *packageFile, expectedMode
 
 // Verify that the manifest owner is correct.
 func checkManifestOwner(t *testing.T, p *packageFile, expectRoot bool) {
-	t.Run(p.Name+" manifest file owner", func(t *testing.T) {
+	t.Run("manifest file owner", func(t *testing.T) {
 		for _, entry := range p.Contents {
 			if manifestFilePattern.MatchString(entry.File) {
 				checkOwner(t, entry, expectRoot)
@@ -495,7 +512,7 @@ func checkManifestOwner(t *testing.T, p *packageFile, expectRoot bool) {
 
 // Verify the permissions of the modules.d dir and its contents.
 func checkModulesPermissions(t *testing.T, p *packageFile) {
-	t.Run(p.Name+" modules.d file permissions", func(t *testing.T) {
+	t.Run("modules.d file permissions", func(t *testing.T) {
 		for _, entry := range p.Contents {
 			if modulesDFilePattern.MatchString(entry.File) {
 				mode := entry.Mode.Perm()
@@ -516,7 +533,7 @@ func checkModulesPermissions(t *testing.T, p *packageFile) {
 
 // Verify the owner of the modules.d dir and its contents.
 func checkModulesOwner(t *testing.T, p *packageFile, expectRoot bool) {
-	t.Run(p.Name+" modules.d file owner", func(t *testing.T) {
+	t.Run("modules.d file owner", func(t *testing.T) {
 		for _, entry := range p.Contents {
 			if modulesDFilePattern.MatchString(entry.File) || modulesDDirPattern.MatchString(entry.File) {
 				checkOwner(t, entry, expectRoot)
@@ -529,7 +546,7 @@ func checkModulesOwner(t *testing.T, p *packageFile, expectRoot bool) {
 // executable.
 func checkSystemdUnitPermissions(t *testing.T, p *packageFile) {
 	const expectedMode = os.FileMode(0644)
-	t.Run(p.Name+" systemd unit file permissions", func(t *testing.T) {
+	t.Run("systemd unit file permissions", func(t *testing.T) {
 		for _, entry := range p.Contents {
 			if systemdUnitFilePattern.MatchString(entry.File) {
 				mode := entry.Mode.Perm()
@@ -565,7 +582,7 @@ func checkMonitorsDPresent(t *testing.T, prefix string, p *packageFile) {
 }
 
 func checkHintsInputsD(t *testing.T, name string, r *regexp.Regexp, p *packageFile) {
-	t.Run(fmt.Sprintf("%s %s contents", p.Name, name), func(t *testing.T) {
+	t.Run(fmt.Sprintf("%s contents", name), func(t *testing.T) {
 		total := 0
 		for _, entry := range p.Contents {
 			if r.MatchString(entry.File) {
@@ -632,7 +649,7 @@ func checkLicensesPresent(t *testing.T, prefix string, p *packageFile) {
 func checkDockerEntryPoint(t *testing.T, p *packageFile, info *dockerInfo) {
 	expectedMode := os.FileMode(0755)
 
-	t.Run(fmt.Sprintf("%s entrypoint", p.Name), func(t *testing.T) {
+	t.Run("entrypoint", func(t *testing.T) {
 		if len(info.Config.Entrypoint) == 0 {
 			t.Fatal("no entrypoint")
 		}
@@ -659,7 +676,7 @@ func checkDockerLabels(t *testing.T, p *packageFile, info *dockerInfo, file stri
 		return
 	}
 
-	t.Run(fmt.Sprintf("%s license labels", p.Name), func(t *testing.T) {
+	t.Run("license labels", func(t *testing.T) {
 		expectedLicense := "Elastic License"
 		ossPrefix := strings.Join([]string{
 			info.Config.Labels["org.label-schema.name"],
@@ -680,7 +697,7 @@ func checkDockerLabels(t *testing.T, p *packageFile, info *dockerInfo, file stri
 		}
 	})
 
-	t.Run(fmt.Sprintf("%s required labels", p.Name), func(t *testing.T) {
+	t.Run("required labels", func(t *testing.T) {
 		// From https://redhat-connect.gitbook.io/partner-guide-for-red-hat-openshift-and-container/program-on-boarding/technical-prerequisites
 		requiredLabels := []string{"name", "vendor", "version", "release", "summary", "description"}
 		for _, label := range requiredLabels {
@@ -692,60 +709,85 @@ func checkDockerLabels(t *testing.T, p *packageFile, info *dockerInfo, file stri
 }
 
 func checkDockerUser(t *testing.T, p *packageFile, info *dockerInfo, expectRoot bool) {
-	t.Run(fmt.Sprintf("%s user", p.Name), func(t *testing.T) {
+	t.Run("user", func(t *testing.T) {
 		if expectRoot != (info.Config.User == rootUser) {
 			t.Errorf("unexpected docker user: %s", info.Config.User)
 		}
 	})
 }
 
-func checkFIPS(t *testing.T, extractedPackageDir string) {
+func checkFIPS(t *testing.T, agentPackageRootDir string) {
+	dirEntries, err := os.ReadDir(agentPackageRootDir)
+	require.NoErrorf(t, err, "error listing extraction dir %q", agentPackageRootDir)
+	require.Lenf(t, dirEntries, 1, "archive should contain a single directory: found %v", dirEntries)
+
+	extractedPackageDir := filepath.Join(agentPackageRootDir, dirEntries[0].Name())
 	t.Logf("Checking agent binary in %q for FIPS compliance", extractedPackageDir)
 	m := parseManifest(t, extractedPackageDir)
 	versionedHome := m.Package.VersionedHome
-	require.DirExistsf(t, filepath.Join(extractedPackageDir, versionedHome), " versiondedHome directory %q not found in %q", versionedHome, extractedPackageDir)
+	versionedHomePath := filepath.Join(extractedPackageDir, versionedHome)
+	require.DirExistsf(t, versionedHomePath, " versiondedHome directory %q not found in %q", versionedHome, extractedPackageDir)
 	binaryPath := filepath.Join(extractedPackageDir, versionedHome, "elastic-agent") // TODO eventually we will need to support .exe as well
 	require.FileExistsf(t, binaryPath, "Unable to find elastic-agent executable in versioned home in %q", extractedPackageDir)
 
-	info, err := buildinfo.ReadFile(binaryPath)
+	binaries := []string{binaryPath}
+	componentsDir := filepath.Join(versionedHomePath, "components")
+	entries, err := filepath.Glob(filepath.Join(componentsDir, "*.spec.yml"))
 	require.NoError(t, err)
-
-	foundTags := false
-	foundExperiment := false
-	for _, setting := range info.Settings {
-		switch setting.Key {
-		case "-tags":
-			foundTags = true
-			require.Contains(t, setting.Value, "requirefips")
-			continue
-		case "GOEXPERIMENT":
-			foundExperiment = true
-			require.Contains(t, setting.Value, "systemcrypto")
-			continue
-		}
+	for _, dirEntry := range entries {
+		componentBinary := strings.TrimSuffix(dirEntry, ".spec.yml")
+		binaries = append(binaries, componentBinary)
 	}
 
-	require.True(t, foundTags, "Did not find -tags within binary version information")
-	require.True(t, foundExperiment, "Did not find GOEXPERIMENT within binary version information")
+	for _, binary := range binaries {
+		binaryRelPath, err := filepath.Rel(agentPackageRootDir, binary)
+		require.NoError(t, err)
+		t.Run(binaryRelPath, func(t *testing.T) {
+			fileInfo, err := os.Stat(binary)
+			require.NoErrorf(t, err, "error collecting info on component %s", binary)
+			require.Truef(t, fileInfo.Mode().IsRegular() && (fileInfo.Mode().Perm()&0111 > 0), "component %s exists and has a spec file but it's not an executable regular file", binary)
 
-	// TODO only elf is supported at the moment, in the future we will need to use macho (darwin) and pe (windows)
-	f, err := elf.Open(binaryPath)
-	require.NoError(t, err, "unable to open ELF file")
+			info, err := buildinfo.ReadFile(binary)
+			require.NoError(t, err)
 
-	symbols, err := f.Symbols()
-	if err != nil {
-		t.Logf("no symbols present in %q: %v", binaryPath, err)
-		return
+			foundTags := false
+			foundExperiment := false
+			for _, setting := range info.Settings {
+				switch setting.Key {
+				case "-tags":
+					foundTags = true
+					require.Contains(t, setting.Value, "requirefips")
+					continue
+				case "GOEXPERIMENT":
+					foundExperiment = true
+					require.Contains(t, setting.Value, "systemcrypto")
+					continue
+				}
+			}
+
+			require.True(t, foundTags, "Did not find -tags within binary version information")
+			require.True(t, foundExperiment, "Did not find GOEXPERIMENT within binary version information")
+
+			// TODO only elf is supported at the moment, in the future we will need to use macho (darwin) and pe (windows)
+			f, err := elf.Open(binary)
+			require.NoError(t, err, "unable to open ELF file")
+
+			symbols, err := f.Symbols()
+			if err != nil {
+				t.Logf("no symbols present in %q: %v", binary, err)
+				return
+			}
+
+			hasOpenSSL := false
+			for _, symbol := range symbols {
+				if strings.Contains(symbol.Name, "OpenSSL_version") {
+					hasOpenSSL = true
+					break
+				}
+			}
+			require.True(t, hasOpenSSL, "unable to find OpenSSL_version symbol")
+		})
 	}
-
-	hasOpenSSL := false
-	for _, symbol := range symbols {
-		if strings.Contains(symbol.Name, "OpenSSL_version") {
-			hasOpenSSL = true
-			break
-		}
-	}
-	require.True(t, hasOpenSSL, "unable to find OpenSSL_version symbol")
 }
 
 // ensureNoBuildIDLinks checks for regressions related to
