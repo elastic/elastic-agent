@@ -50,6 +50,7 @@ import (
 	kafkaexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter"
 	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter" // for dev
+	nopexporter "go.opentelemetry.io/collector/exporter/nopexporter"
 	"go.opentelemetry.io/collector/exporter/otlpexporter"
 	otlphttpexporter "go.opentelemetry.io/collector/exporter/otlphttpexporter"
 
@@ -124,7 +125,9 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			loadbalancingexporter.NewFactory(),
 			otlphttpexporter.NewFactory(),
 			kafkaexporter.NewFactory(),
+			nopexporter.NewFactory(),
 		)
+
 		if err != nil {
 			return otelcol.Factories{}, err
 		}
