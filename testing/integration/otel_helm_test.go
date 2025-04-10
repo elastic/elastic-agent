@@ -233,9 +233,9 @@ spec:
 		require.Eventually(t, func() bool {
 			query := queryK8sNamespaceDataStream(dsType, dataset, datastreamNamespace, namespace)
 			docs, err := estools.PerformQueryForRawQuery(ctx, query, fmt.Sprintf(".ds-%s*", dsType), info.ESClient)
-			require.NoError(t, err, "failed to get %s dataset documents", dataset)
+			require.NoError(t, err, "failed to get %s datastream documents", fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace))
 			return docs.Hits.Total.Value > 0
-		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least one document should be available for %s dataset", dataset))
+		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least one document should be available for %s datastream", fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace)))
 	}
 }
 
@@ -246,9 +246,9 @@ func k8sStepCheckDatastreamsHits(info *define.Info, dsType, dataset, datastreamN
 		require.Eventually(t, func() bool {
 			query := queryK8sNamespaceDataStream(dsType, dataset, datastreamNamespace, namespace)
 			docs, err := estools.PerformQueryForRawQuery(ctx, query, fmt.Sprintf(".ds-%s*", dsType), info.ESClient)
-			require.NoError(t, err, "failed to get %s dataset documents", dataset)
+			require.NoError(t, err, "failed to get %s datastream documents", fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace))
 			return docs.Hits.Total.Value > 0
-		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least one document should be available for %s dataset", dataset))
+		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least one document should be available for %s datastream", fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace)))
 	}
 }
 
