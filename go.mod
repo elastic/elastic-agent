@@ -293,7 +293,7 @@ require (
 	github.com/eclipse/paho.mqtt.golang v1.3.5 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
 	github.com/elastic/go-concert v0.3.0 // indirect
-	github.com/elastic/go-docappender/v2 v2.8.0 // indirect
+	github.com/elastic/go-docappender/v2 v2.9.0 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect
 	github.com/elastic/go-grok v0.3.1 // indirect
 	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
