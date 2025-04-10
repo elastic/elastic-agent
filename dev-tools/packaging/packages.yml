@@ -1547,8 +1547,9 @@ specs:
       spec:
         <<: *common_fips
         <<: *elastic_license_for_binaries
+        name: '{{.BeatName}}'
         version: '{{ beat_version }}'
-        qualifier: core
+        qualifier: 'core-fips'
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
