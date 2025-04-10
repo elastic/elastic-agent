@@ -134,6 +134,7 @@ require (
 	go.opentelemetry.io/collector/connector v0.121.0
 	go.opentelemetry.io/collector/exporter v0.121.0
 	go.opentelemetry.io/collector/exporter/debugexporter v0.121.0
+	go.opentelemetry.io/collector/exporter/nopexporter v0.121.0
 	go.opentelemetry.io/collector/exporter/otlpexporter v0.121.0
 	go.opentelemetry.io/collector/exporter/otlphttpexporter v0.121.0
 	go.opentelemetry.io/collector/extension v1.27.0
