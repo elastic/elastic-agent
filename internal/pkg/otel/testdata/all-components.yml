@@ -9,6 +9,7 @@ exporters:
     endpoint: localhots:4317
   otlphttp:
     endpoint: https://localhost.com:4318
+  nop:
 
 extensions:
   health_check:
@@ -39,6 +40,7 @@ processors:
   elastictrace:
 
 receivers:
+  nop:
   filelog:
     include:
       - /filelog/path
@@ -97,6 +99,7 @@ service:
   pipelines:
     logs:
       exporters:
+        - nop
         - debug
         - elasticsearch
         - file
@@ -112,9 +115,11 @@ service:
       receivers:
         - filelog
         - otlp
+        - nop
 
     metrics:
       exporters:
+        - nop
         - debug
         - otlp
       processors:
@@ -126,6 +131,7 @@ service:
         - resourcedetection
         - transform
       receivers:
+        - nop
         - otlp
         - httpcheck
         - spanmetrics
@@ -141,6 +147,7 @@ service:
 
     traces:
       exporters:
+        - nop
         - debug
         - elasticsearch
         - otlp
@@ -156,6 +163,7 @@ service:
         - transform
         - elastictrace
       receivers:
+        - nop
         - otlp
         - jaeger
         - zipkin
