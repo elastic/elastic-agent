@@ -82,7 +82,8 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
-          image: "family/platform-ingest-elastic-agent-windows-2022"
+          imageProject: elastic-images-qa
+          image: "platform-ingest-elastic-agent-windows-2022-1744217391"
           machine_type: "n2-standard-8"
           disk_size: 200
           disk_type: "pd-ssd"
@@ -102,7 +103,8 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
-          image: "family/platform-ingest-elastic-agent-windows-2016"
+          imageProject: elastic-images-qa
+          image: "platform-ingest-elastic-agent-windows-2016-1744217391"
           machine_type: "n2-standard-8"
           disk_size: 200
           disk_type: "pd-ssd"
