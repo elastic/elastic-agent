@@ -17,6 +17,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault/aesgcm"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 )
 
 func getTestFileVaultPath(t *testing.T) string {
@@ -25,6 +26,7 @@ func getTestFileVaultPath(t *testing.T) string {
 }
 
 func TestFileVault(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "vault does not use NewGCMWithRandomNonce.")
 	vaultPath := getTestFileVaultPath(t)
 
 	ctx, cn := context.WithCancel(context.Background())
@@ -131,6 +133,7 @@ type secret struct {
 }
 
 func TestFileVaultConcurrent(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "vault does not use NewGCMWithRandomNonce.")
 	const (
 		parallel   = 15
 		iterations = 7
