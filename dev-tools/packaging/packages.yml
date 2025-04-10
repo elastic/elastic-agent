@@ -89,6 +89,17 @@ components:
       - *linux-amd64
       - *linux-arm64
     packageTypes: *all-package-types
+  - &comp-cloud-defend
+    projectName: cloud-defend
+    packageName: cloud-defend-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: cloud-defend-{{.Version}}-{{.Arch}}
+    binaryName: cloud-defend
+    fips: false
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes:
+      - *pkg-type-docker
   - &comp-connectors
     projectName: connectors
     packageName: connectors-{{.Version}}.zip
@@ -234,6 +245,7 @@ shared:
       - *comp-agentbeat
       - *comp-apm_server
       - *comp-cloudbeat
+      - *comp-cloud-defend
       - *comp-connectors
       - *comp-endpoint
       - *comp-fleet-server

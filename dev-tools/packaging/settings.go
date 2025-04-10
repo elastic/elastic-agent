@@ -22,25 +22,35 @@ import (
 var (
 	//go:embed packages.yml
 	packageSpecBytes []byte
-	PlatformPackages = map[string]platformAndExt{
+	platformPackages = map[string]platformAndExt{
 		"darwin/amd64": {
 			platform: "darwin-x86_64",
+			os:       "darwin",
+			arch:     "amd64",
 			ext:      "tar.gz",
 		},
 		"darwin/arm64": {
 			platform: "darwin-aarch64",
+			os:       "darwin",
+			arch:     "arm64",
 			ext:      "tar.gz",
 		},
 		"linux/amd64": {
 			platform: "linux-x86_64",
+			os:       "linux",
+			arch:     "amd64",
 			ext:      "tar.gz",
 		},
 		"linux/arm64": {
 			platform: "linux-arm64",
+			os:       "linux",
+			arch:     "arm64",
 			ext:      "tar.gz",
 		},
 		"windows/amd64": {
 			platform: "windows-x86_64",
+			os:       "windows",
+			arch:     "amd64",
 			ext:      "zip",
 		},
 	}
@@ -59,6 +69,8 @@ func init() {
 
 type platformAndExt struct {
 	platform string
+	os       string
+	arch     string
 	ext      string
 }
 
@@ -100,9 +112,7 @@ func (proj BinarySpec) GetPackageName(version string, platform string) string {
 		panic(fmt.Errorf("parsing packageName template for project/binary %s/%s %q: %w", proj.ProjectName, proj.BinaryName, proj.PackageName, err))
 	}
 
-	// look for the platform strings, if not found an empty object is returned and empty values will be used for rendering
-	pltfStrings := PlatformPackages[platform]
-	tmplContext := map[string]string{"Version": version, "Platform": pltfStrings.platform, "Ext": pltfStrings.ext}
+	tmplContext := createTemplateContext(version, platform)
 
 	var buf bytes.Buffer
 	err = tmpl.Execute(&buf, tmplContext)
@@ -111,6 +121,13 @@ func (proj BinarySpec) GetPackageName(version string, platform string) string {
 			proj.ProjectName, proj.BinaryName, proj.PackageName, tmplContext, err))
 	}
 	return buf.String()
+}
+
+func createTemplateContext(version string, platform string) map[string]string {
+	// look for the platform strings, if not found an empty object is returned and empty values will be used for rendering
+	pltfStrings := platformPackages[platform]
+	tmplContext := map[string]string{"Version": version, "Platform": pltfStrings.platform, "Ext": pltfStrings.ext, "OS": pltfStrings.os, "Arch": pltfStrings.arch}
+	return tmplContext
 }
 
 // GetRootDir will return a rendered version of the BinarySpec.rootDir attribute (which is a golang template), using
@@ -122,19 +139,17 @@ func (proj BinarySpec) GetRootDir(version string, platform string) string {
 		// shortcut to avoid rendering template when there's no RootDir specified
 		return ""
 	}
-	tmpl, err := template.New("inner_path").Parse(proj.RootDir)
+	tmpl, err := template.New("rootDir").Parse(proj.RootDir)
 	if err != nil {
-		panic(fmt.Errorf("parsing innerPath template for project/binary %s/%s %q: %w", proj.ProjectName, proj.BinaryName, proj.RootDir, err))
+		panic(fmt.Errorf("parsing rootDir template for project/binary %s/%s %q: %w", proj.ProjectName, proj.BinaryName, proj.RootDir, err))
 	}
 
-	// look for the platform strings, if not found an empty object is returned and empty values will be used for rendering
-	pltfStrings := PlatformPackages[platform]
-	tmplContext := map[string]string{"Version": version, "Platform": pltfStrings.platform, "Ext": pltfStrings.ext}
+	tmplContext := createTemplateContext(version, platform)
 
 	var buf bytes.Buffer
 	err = tmpl.Execute(&buf, tmplContext)
 	if err != nil {
-		panic(fmt.Errorf("rendering innerPath template for project/binary %s/%s %q with context %v: %w",
+		panic(fmt.Errorf("rendering rootDir template for project/binary %s/%s %q with context %v: %w",
 			proj.ProjectName, proj.BinaryName, proj.PackageName, tmplContext, err))
 	}
 	return buf.String()
