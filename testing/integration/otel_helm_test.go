@@ -7,8 +7,10 @@
 package integration
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,6 +24,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	testK8s "github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 )
 
 var (
@@ -68,7 +71,13 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				k8sStepHelmDeployWithValueOptions(chartLocation, "kube-stack-otel",
 					values.Options{
 						ValueFiles: []string{"../../deploy/helm/edot-collector/kube-stack/values.yaml"},
-						Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
+						Values: []string{
+							fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo),
+							fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag),
+							// override cluster wide
+							// endpoint for tests
+							"instrumentation.exporter.endpoint=http://opentelemetry-kube-stack-daemon-collector:4318",
+						},
 
 						// override secrets reference with env variables
 						JSONValues: []string{
@@ -90,6 +99,9 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				// validate kubeletstats metrics are being
 				// pushed
 				k8sStepCheckDatastreamsHits(info, "metrics", "kubeletstatsreceiver.otel", "default"),
+				// validates auto-instrumentation and traces
+				// datastream generation
+				k8sStepDeployJavaApp(info, "traces", "generic.otel", "default"),
 			},
 		},
 		{
@@ -180,6 +192,48 @@ func k8sStepCheckRunningPods(podLabelSelector string, expectedPodNumber int, con
 			}
 			return checkedAgentContainers >= expectedPodNumber
 		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least %d agent containers should be checked", expectedPodNumber))
+	}
+}
+
+func k8sStepDeployJavaApp(info *define.Info, dsType, dataset, datastreamNamespace string) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		objects, err := testK8s.LoadFromYAML(bufio.NewReader(strings.NewReader(fmt.Sprintf(`apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: java-app
+  name: java-app
+  namespace: %s
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: java-app
+  template:
+    metadata:
+      labels:
+        app: java-app
+      annotations:
+        instrumentation.opentelemetry.io/inject-java: "true"
+    spec:
+      containers:
+      - name: java-app
+        image: docker.elastic.co/demos/apm/k8s-webhook-test
+        env:
+        - name: OTEL_INSTRUMENTATION_METHODS_INCLUDE
+          value: "test.Testing[methodB]"
+`, namespace))))
+		require.NoError(t, err, "failed to parse rendered kustomize")
+
+		err = k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true, namespace: namespace}, objects...)
+		require.NoError(t, err, "failed to create objects")
+
+		require.Eventually(t, func() bool {
+			query := queryK8sNamespaceDataStream(dsType, dataset, datastreamNamespace, namespace)
+			docs, err := estools.PerformQueryForRawQuery(ctx, query, fmt.Sprintf(".ds-%s*", dsType), info.ESClient)
+			require.NoError(t, err, "failed to get %s dataset documents", dataset)
+			return docs.Hits.Total.Value > 0
+		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least one document should be available for %s dataset", dataset))
 	}
 }
 
