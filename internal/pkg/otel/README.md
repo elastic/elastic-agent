@@ -60,6 +60,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [fileexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/fileexporter/v0.120.1/exporter/fileexporter/README.md) | v0.120.1 |
 | [kafkaexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/kafkaexporter/v0.120.1/exporter/kafkaexporter/README.md) | v0.120.1 |
 | [loadbalancingexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/loadbalancingexporter/v0.120.1/exporter/loadbalancingexporter/README.md) | v0.120.1 |
+| [nopexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/nopexporter/v0.120.0/exporter/nopexporter/README.md) | v0.120.0 |
 | [otlpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlpexporter/v0.120.0/exporter/otlpexporter/README.md) | v0.120.0 |
 | [otlphttpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlphttpexporter/v0.120.0/exporter/otlphttpexporter/README.md) | v0.120.0 |
 
