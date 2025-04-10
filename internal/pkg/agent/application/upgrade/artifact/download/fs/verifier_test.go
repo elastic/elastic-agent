@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
@@ -36,6 +37,7 @@ var agentSpec = artifact.Artifact{
 }
 
 func TestFetchVerify(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "verifier being tested uses an OpenPGP key which results in a SHA-1 violation.")
 	// See docs/pgp-sign-verify-artifact.md for how to generate a key, export
 	// the public key, sign a file and verify it.
 
@@ -192,6 +194,7 @@ func prepareFetchVerifyTests(
 }
 
 func TestVerify(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "verifier being tested uses an OpenPGP key which results in a SHA-1 violation.")
 	tt := []struct {
 		Name             string
 		RemotePGPUris    []string
