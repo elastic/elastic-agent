@@ -9,6 +9,7 @@ package otel
 import (
 	"go.opentelemetry.io/collector/connector"
 	"go.opentelemetry.io/collector/exporter"
+	"go.opentelemetry.io/collector/exporter/nopexporter"
 	"go.opentelemetry.io/collector/extension"
 	"go.opentelemetry.io/collector/otelcol"
 	"go.opentelemetry.io/collector/processor"
@@ -112,6 +113,7 @@ func components() (otelcol.Factories, error) {
 		elasticsearchexporter.NewFactory(),
 		loadbalancingexporter.NewFactory(),
 		otlphttpexporter.NewFactory(),
+		nopexporter.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
