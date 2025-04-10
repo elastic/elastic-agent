@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -29,6 +30,7 @@ import (
 )
 
 func TestEndpointComponentModifier(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "generating an encrypted private key for failure testing results in a MD5 violation.")
 	log, obs := loggertest.New("TestEndpointSignedComponentModifier")
 	defer func() {
 		if !t.Failed() {
