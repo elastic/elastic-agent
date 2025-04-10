@@ -1647,8 +1647,9 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
-        name: '{{.BeatName}}-core'
         version: '{{ beat_version }}'
+        # this is a way to place 'core' in the correct place for both the archive and the root dir, see defaultRootDir in dev-tools/mage/pkgtypes.go
+        qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
@@ -1658,8 +1659,8 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
-        name: '{{.BeatName}}-core'
         version: '{{ beat_version }}'
+        qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
@@ -1669,8 +1670,8 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
-        name: '{{.BeatName}}-core'
         version: '{{ beat_version }}'
+        qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
@@ -1680,8 +1681,8 @@ specs:
       spec:
         <<: *common
         <<: *elastic_license_for_binaries
-        name: '{{.BeatName}}-core'
         version: '{{ beat_version }}'
+        qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
@@ -1691,8 +1692,8 @@ specs:
       spec:
         <<: *common_fips
         <<: *elastic_license_for_binaries
-        name: '{{.BeatName}}-core-fips'
         version: '{{ beat_version }}'
+        qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
