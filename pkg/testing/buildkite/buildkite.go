@@ -94,7 +94,7 @@ var (
 		Provider:     defaultProvider,
 		ImageProject: defaultImageProject,
 		MachineType:  defaultAMD64MachineType,
-		Image:        "family/platform-ingest-elastic-agent-windows-2022",
+		Image:        "platform-ingest-elastic-agent-windows-2022-1744217391",
 	}
 	bkWindowsAMD64_2022_Core = StepAgent{
 		Provider:     defaultProvider,
