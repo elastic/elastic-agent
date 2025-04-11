@@ -1312,7 +1312,7 @@ type k8sContext struct {
 	esHost string
 	// esAPIKey is the API key of the elasticsearch to use in the test
 	esAPIKey string
-	// esAPIKey is the API key of the elasticsearch to use in the test
+	// esEncodedAPIKey is the encoded API key of the elasticsearch to use in the test
 	esEncodedAPIKey string
 	// enrollParams contains the information needed to enroll an agent with Fleet in the test
 	enrollParams *fleettools.EnrollParams
