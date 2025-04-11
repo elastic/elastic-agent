@@ -41,7 +41,7 @@ func TestStandaloneUpgradeFIPStoFIPS(t *testing.T) {
 	require.NoError(t, err)
 
 	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradetest.WithUnprivileged(unprivileged))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Check that new (post-upgrade) Agent is also FIPS-compliant
 	client := endFixture.Client()
