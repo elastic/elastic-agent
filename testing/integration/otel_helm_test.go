@@ -101,7 +101,10 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				k8sStepCheckDatastreamsHits(info, "metrics", "kubeletstatsreceiver.otel", "default"),
 				// validates auto-instrumentation and traces
 				// datastream generation
-				k8sStepDeployJavaApp(info, "traces", "generic.otel", "default"),
+				func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+					k8sStepDeployJavaApp()(t, ctx, kCtx, namespace)
+					k8sStepCheckDatastreamsHits(info, "traces", "generic.otel", "default")(t, ctx, kCtx, namespace)
+				},
 			},
 		},
 		{
@@ -195,7 +198,7 @@ func k8sStepCheckRunningPods(podLabelSelector string, expectedPodNumber int, con
 	}
 }
 
-func k8sStepDeployJavaApp(info *define.Info, dsType, dataset, datastreamNamespace string) k8sTestStep {
+func k8sStepDeployJavaApp() k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
 		objects, err := testK8s.LoadFromYAML(bufio.NewReader(strings.NewReader(fmt.Sprintf(`apiVersion: apps/v1
 kind: Deployment
@@ -227,13 +230,6 @@ spec:
 
 		err = k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true, namespace: namespace}, objects...)
 		require.NoError(t, err, "failed to create objects")
-
-		require.Eventually(t, func() bool {
-			query := queryK8sNamespaceDataStream(dsType, dataset, datastreamNamespace, namespace)
-			docs, err := estools.PerformQueryForRawQuery(ctx, query, fmt.Sprintf(".ds-%s*", dsType), info.ESClient)
-			require.NoError(t, err, "failed to get %s datastream documents", fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace))
-			return docs.Hits.Total.Value > 0
-		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least one document should be available for %s datastream", fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace)))
 	}
 }
 
