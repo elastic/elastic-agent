@@ -2,10 +2,10 @@
 
 set -eo pipefail
 
-# Prints stack version for current or target release branch without '-SNAPSHOT' suffix 
+# Prints stack version for current or target release branch with '-SNAPSHOT' suffix 
 # example: 
 # BUILDKITE_PULL_REQUEST_BASE_BRANCH=8.x .buildkite/scripts/test.sh
-# 8.19.0-64846b77
+# 8.19.0-64846b77-SNAPSHOT
 getStableEssSnapshotForBranch() {
   set -eo pipefail
 
@@ -25,6 +25,6 @@ getStableEssSnapshotForBranch() {
     cat .package-version
   fi
 }
-STABLE_ESS_VERSION=$(getStableEssSnapshotForBranch)
+STABLE_ESS_VERSION="$(getStableEssSnapshotForBranch)-SNAPSHOT"
 echo "Stable ESS Version: $STABLE_ESS_VERSION"
 buildkite-agent meta-data set "stable.ess.version" $STABLE_ESS_VERSION

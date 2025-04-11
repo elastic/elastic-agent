@@ -42,10 +42,9 @@ $TestsExitCode = 0
 try {
     echo "~~~ Getting stable stack version"
     mage integration:getStableEssSnapshotForBranch
-    $stackVersion = Get-Content .package-version
-    $stableSnapshotVersion = & buildkite-agent meta-data get "stable.ess.version" --default "$defaultVersion"
-    $env:OVERRIDE_STACK_VERSION = "$overrideStackVersion-SNAPSHOT"
-
+    $stackVersion = (Get-Content .package-version).Trim() + "-SNAPSHOT"
+    $stableSnapshotVersion = & buildkite-agent meta-data get "stable.ess.version" --default ""
+    
     Get-Ess-Stack -StackVersion $stackVersion -StableSnapshotVersion $stableSnapshotVersion
     Write-Output "~~~ Running integration test group: $GROUP_NAME as user: $env:USERNAME"
     & gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags=integration -shuffle=on -timeout=2h0m0s "github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=$GROUP_NAME" "-integration.sudo=$TEST_SUDO"
