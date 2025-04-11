@@ -105,6 +105,58 @@ steps:
         artifact_paths:
           - "build/distributions/**/*"
 
+      - label: ":package: Cross Building and package FIPS linux/amd64 elastic-agent"
+        key: package-elastic-agent_fips
+        agents:
+          provider: "gcp"
+          machineType: "c2-standard-16"
+          diskSizeGb: 400
+        env:
+          PLATFORMS: "linux/amd64"
+          FIPS: true
+        command: |
+          if [[ -z "$${MANIFEST_URL}" ]]; then
+            export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
+            if [[ -z "$${MANIFEST_URL}" ]]; then
+              echo ":broken_heart: Missing MANIFEST_URL variable or empty string provided"
+              exit 1
+            fi
+          fi
+          if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
+            export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
+          fi
+          .buildkite/scripts/steps/package.sh
+        artifact_paths:
+          - "build/distributions/**/*"
+      - label: ":package: Package FIPS linux/arm64 elastic-agent"
+        key: package-elastic-agent-arm-fips
+        agents:
+          provider: "aws"
+          instanceType: "t4g.2xlarge"
+          imagePrefix: "core-ubuntu-2204-aarch64"
+          diskSizeGb: 400
+        env:
+          PLATFORMS: "linux/arm64"
+          PACKAGES: "docker,tar.gz"
+        command: |
+          echo "Add support for multiarch"
+          docker run --privileged --rm tonistiigi/binfmt:master --install all
+
+          if [[ -z "$${MANIFEST_URL}" ]]; then
+            export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
+            if [[ -z "$${MANIFEST_URL}" ]]; then
+              echo ":broken_heart: Missing MANIFEST_URL variable or empty string provided"
+              exit 1
+            fi
+          fi
+          if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
+            export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
+          fi
+          .buildkite/scripts/steps/package.sh
+          ls -lahR build/
+        artifact_paths:
+          - "build/distributions/**/*"
+
   - label: ":elastic-stack: Publishing to DRA"
     if: build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == null || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") != "independent-agent-release-staging"
     key: dra-publish

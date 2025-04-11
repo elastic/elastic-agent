@@ -193,7 +193,7 @@ components:
   - &comp-elastic-agent-core-fips
     projectName: elastic-agent-core
     packageName: elastic-agent-core-fips-{{.Version}}-{{.Platform}}.{{.Ext}}
-    rootDir: elastic-agent-core-{{.Version}}-{{.Platform}}
+    rootDir: elastic-agent-core-fips-{{.Version}}-{{.Platform}}
     binaryName: elastic-agent
     fips: true
     platforms:
