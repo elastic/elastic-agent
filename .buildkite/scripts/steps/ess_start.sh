@@ -6,10 +6,10 @@ source .buildkite/scripts/steps/ess.sh
 source .buildkite/scripts/steps/fleet.sh
 
 echo "~~~ Getting stable stack version"
-OVERRIDE_STACK_VERSION=$(buildkite-agent meta-data get "stable.ess.version" --default "$(cat .package-version)")
-OVERRIDE_STACK_VERSION="$OVERRIDE_STACK_VERSION-SNAPSHOT"
+DEFAULT_STACK_VERSION=$(cat .package-version)
+STABLE_STACK_VERSION=$(buildkite-agent meta-data get "stable.ess.version" --default $DEFAULT_STACK_VERSION)
 
-ess_up $OVERRIDE_STACK_VERSION
+ess_up "$DEFAULT_STACK_VERSION-SNAPSHOT" "$STABLE_STACK_VERSION-SNAPSHOT"
 
 preinstall_fleet_packages
 
