@@ -6,15 +6,16 @@
 {{- $ := index . 0 -}}
 {{- $outputName := index . 1 -}}
 {{- $outputVal := deepCopy (index . 2) -}}
-{{- $_ := set $outputVal "type" "elasticsearch" -}}
-{{- $_ := set $outputVal "hosts" (list ($outputVal).url) -}}
-{{- $_ := unset $outputVal "url" -}}
-{{- $_ := unset $outputVal "api_key" -}}
-{{- $_ := unset $outputVal "secretName" -}}
-{{- $_ := unset $outputVal "name" -}}
-{{- $_ := unset $outputVal "namespace" -}}
 {{$outputName}}:
-  {{- $outputVal | toYaml | nindent 2}}
+  hosts:
+  - {{($outputVal).url}}
+  password: {{($outputVal).password}}
+  type: elasticsearch
+  username: {{($outputVal).username}}
+  {{- $outputSSLConfig := dig "ssl" dict $outputVal -}}
+  {{- with (include "elasticagent.output.render.sslconfig" (list $outputSSLConfig $outputName) | fromYaml) }}
+  {{- . | toYaml | nindent 2}}
+  {{- end }}
 {{- end -}}
 
 {{- define "elasticagent.output.ESPlainAuthAPI.preset.envvars" -}}
@@ -25,16 +26,15 @@
 {{- $ := index . 0 -}}
 {{- $outputName := index . 1 -}}
 {{- $outputVal := deepCopy (index . 2) -}}
-{{- $_ := set $outputVal "type" "elasticsearch" -}}
-{{- $_ := set $outputVal "hosts" (list ($outputVal).url) -}}
-{{- $_ := unset $outputVal "url" -}}
-{{- $_ := unset $outputVal "username" -}}
-{{- $_ := unset $outputVal "password" -}}
-{{- $_ := unset $outputVal "secretName" -}}
-{{- $_ := unset $outputVal "name" -}}
-{{- $_ := unset $outputVal "namespace" -}}
 {{$outputName}}:
-  {{- $outputVal | toYaml | nindent 2}}
+  api_key: {{ ($outputVal).api_key }}
+  hosts:
+  - {{($outputVal).url }}
+  type: elasticsearch
+  {{- $outputSSLConfig := dig "ssl" dict $outputVal -}}
+  {{- with (include "elasticagent.output.render.sslconfig" (list $outputSSLConfig $outputName) | fromYaml) }}
+  {{- . | toYaml | nindent 2}}
+  {{- end }}
 {{- end -}}
 
 {{- define "elasticagent.output.ESSecretAuthBasic.preset.envvars" -}}
@@ -62,25 +62,31 @@
 {{- $ := index . 0 -}}
 {{- $outputName := index . 1 -}}
 {{- $outputVal := deepCopy (index . 2) -}}
-{{- $outputVal = omit $outputVal "secretName" "username" "password" "name" "serviceName" "namespace" "api_key" "url" -}}
-{{- $_ := set $outputVal "type" "elasticsearch" -}}
-{{- $_ := set $outputVal "hosts" (list (printf "${OUTPUT_%s_URL}" (upper $outputName))) -}}
-{{- $_ := set $outputVal "username" (printf "${OUTPUT_%s_USER}" (upper $outputName)) -}}
-{{- $_ := set $outputVal "password" (printf "${OUTPUT_%s_PASS}" (upper $outputName)) -}}
 {{$outputName}}:
-  {{- $outputVal | toYaml | nindent 2}}
+  hosts:
+  - {{ printf "${OUTPUT_%s_URL}" (upper $outputName) }}
+  type: elasticsearch
+  username: {{printf "${OUTPUT_%s_USER}" (upper $outputName)}}
+  password: {{printf "${OUTPUT_%s_PASS}" (upper $outputName)}}
+  {{- $outputSSLConfig := dig "ssl" dict $outputVal -}}
+  {{- with (include "elasticagent.output.render.sslconfig" (list $outputSSLConfig $outputName) | fromYaml) }}
+  {{- . | toYaml | nindent 2}}
+  {{- end }}
 {{- end -}}
 
 {{- define "elasticagent.output.ESSecretAuthAPI.preset.config" -}}
 {{- $ := index . 0 -}}
 {{- $outputName := index . 1 -}}
 {{- $outputVal := deepCopy (index . 2) -}}
-{{- $outputVal = omit $outputVal "secretName" "username" "password" "name" "serviceName" "namespace" "api_key" "url" -}}
-{{- $_ := set $outputVal "type" "elasticsearch" -}}
-{{- $_ := set $outputVal "hosts" (list (printf "${OUTPUT_%s_URL}" (upper $outputName))) -}}
-{{- $_ := set $outputVal "api_key" (printf "${OUTPUT_%s_API_KEY}" (upper $outputName)) -}}
 {{$outputName}}:
-  {{- $outputVal | toYaml | nindent 2}}
+  api_key: {{printf "${OUTPUT_%s_API_KEY}" (upper $outputName)}}
+  hosts:
+  - {{ printf "${OUTPUT_%s_URL}" (upper $outputName) }}
+  type: elasticsearch
+  {{- $outputSSLConfig := dig "ssl" dict $outputVal -}}
+  {{- with (include "elasticagent.output.render.sslconfig" (list $outputSSLConfig $outputName) | fromYaml) }}
+  {{- . | toYaml | nindent 2}}
+  {{- end }}
 {{- end -}}
 
 {{- define "elasticagent.output.ESSecretAuthAPI.preset.envvars" -}}
@@ -106,8 +112,10 @@
 {{- if ne $.Values.agent.engine "eck" -}}
 {{- fail (printf "output \"%s\" of ESECKRef type can be used only when agent.engine = eck" $outputName)}}
 {{- end -}}
-{{- $outputVal = omit $outputVal "username" "password" "api_key" "url" "type" "secretName" -}}
-{{ $outputVal | toYaml }}
+name: {{($outputVal).name}}
+{{- with ($outputVal).namespace }}
+namespace: {{.}}
+{{- end }}
 {{- end -}}
 
 {{- define "elasticagent.output.ESECKRef.preset.envvars" -}}
@@ -117,4 +125,58 @@
 {{- fail (printf "output \"%s\" of ESECKRef type can be used only when agent.engine = eck" $outputName)}}
 {{- end -}}
 {{/* no preset env vars for ESECKRef output */}}
+{{- end -}}
+
+{{- define "elasticagent.output.render.sslconfig" -}}
+{{- $outputSSLConfig := index . 0 -}}
+{{- $outputName := index . 1 -}}
+{{- with $outputSSLConfig }}
+{{- with $outputSSLConfig.certificateAuthorities }}
+ssl.certificate_authorities:
+{{- range $idx, $certificateAuthority := . }}
+  -  {{$certificateAuthority._mountPath  | quote}}
+{{- end }}
+{{- end }}
+{{- with $outputSSLConfig.verificationMode }}
+ssl.verification_mode: {{.}}
+{{- end }}
+{{- with $outputSSLConfig.caTrustedFingerprint }}
+ssl.ca_trusted_fingerprint: {{.}}
+{{- end }}
+{{- end }}
+{{- end -}}
+
+{{- define "elasticagent.output.preset.volumemounts" -}}
+{{- $outputVal := . -}}
+{{- $outputSSLConfig := dig "ssl" dict $outputVal -}}
+{{- with $outputSSLConfig -}}
+{{- $volumeMounts := list -}}
+{{- with $outputSSLConfig.certificateAuthorities -}}
+{{- range $idx, $certificateAuthority := . -}}
+{{- $volumeMounts = append $volumeMounts $certificateAuthority._volumeMount -}}
+{{- end -}}
+{{- end -}}
+{{- with $volumeMounts -}}
+{{. | toYaml}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+
+{{- define "elasticagent.output.preset.volumes" -}}
+{{- $outputVal := . -}}
+{{- $outputSSLConfig := dig "ssl" dict $outputVal -}}
+{{- with $outputSSLConfig -}}
+{{- $volumes := list -}}
+{{- with $outputSSLConfig.certificateAuthorities -}}
+{{- range $idx, $certificateAuthority := . -}}
+{{- if $certificateAuthority._volume -}}
+{{- $volumes = append $volumes $certificateAuthority._volume -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- with $volumes -}}
+{{. | toYaml}}
+{{- end -}}
+{{- end -}}
 {{- end -}}

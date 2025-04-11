@@ -337,6 +337,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	ecsMeta, err := info.Metadata(ctx, f.log)
 	if err != nil {
 		f.log.Error(errors.New("failed to load metadata", err))
+		return nil, 0, err
 	}
 
 	// retrieve ack token from the store
