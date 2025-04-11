@@ -6,14 +6,21 @@ env:
   ASDF_MAGE_VERSION: 1.14.0
 
 steps:
+  - label: get Stable ESS Version
+    key: ess-version
+    command: .buildkite/scripts/steps/stable_ess_version.sh
+    agents:
+      image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
+      useCustomGlobalHooks: true
+
   - label: Start ESS stack for integration tests
     key: integration-ess
+    depends_on: ess-version
     env:
       ASDF_TERRAFORM_VERSION: 1.9.2
     command: |
       #!/usr/bin/env bash
       set -euo pipefail
-      asdf install
       source .buildkite/scripts/steps/ess_start.sh
     artifact_paths:
       - test_infra/ess/*.tfstate

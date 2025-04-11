@@ -12,7 +12,7 @@ function ess_up() {
     return 1
   fi
 
-  echo "~~~ Staring ESS Stack ${STACK_VERSION}"  
+  echo "~~~ Starting ESS Stack ${STACK_VERSION}"  
 
   export EC_API_KEY=$(retry -t 5 -- vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
   

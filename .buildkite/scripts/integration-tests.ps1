@@ -42,7 +42,9 @@ $TestsExitCode = 0
 try {
     echo "~~~ Getting stable stack version"
     mage integration:getStableEssSnapshotForBranch
-    $env:OVERRIDE_STACK_VERSION = (Get-Content .override_stack_version -Raw).Trim() + "-SNAPSHOT"
+    $defaultVersion = Get-Content .package-version
+    $overrideStackVersion = & buildkite-agent meta-data get "stable.ess.version" --default "$defaultVersion"
+    $env:OVERRIDE_STACK_VERSION = "$overrideStackVersion-SNAPSHOT"
 
     Get-Ess-Stack -StackVersion $env:OVERRIDE_STACK_VERSION
     Write-Output "~~~ Running integration test group: $GROUP_NAME as user: $env:USERNAME"
