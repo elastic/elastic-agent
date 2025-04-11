@@ -51,10 +51,11 @@ type upgradeOpts struct {
 	// Disable check that enforces different hashed between the to and from version of upgrade
 	disableHashCheck bool
 
-	preInstallHook  func() error
-	postInstallHook func() error
-	preUpgradeHook  func() error
-	postUpgradeHook func() error
+	preInstallHook         func() error
+	postInstallHook        func() error
+	preUpgradeHook         func() error
+	postUpgradeHook        func() error
+	postWatcherSuccessHook func(context.Context, *atesting.Fixture) error
 }
 
 type UpgradeOpt func(opts *upgradeOpts)
@@ -122,6 +123,14 @@ func WithPreUpgradeHook(hook func() error) UpgradeOpt {
 func WithPostUpgradeHook(hook func() error) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.postUpgradeHook = hook
+	}
+}
+
+// WithPostWatcherSuccessHook sets a hook to be called after the upgrade is successful
+// and the upgrade watcher has terminated as well.
+func WithPostWatcherSuccessHook(hook func(context.Context, *atesting.Fixture) error) UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.postWatcherSuccessHook = hook
 	}
 }
 
@@ -432,6 +441,12 @@ func PerformUpgrade(
 		err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged})
 		if err != nil {
 			return fmt.Errorf("post-upgrade installation checks failed: %w", err)
+		}
+	}
+
+	if upgradeOpts.postWatcherSuccessHook != nil {
+		if err := upgradeOpts.postWatcherSuccessHook(ctx, endFixture); err != nil {
+			return fmt.Errorf("post watcher success hook failed: %w", err)
 		}
 	}
 
