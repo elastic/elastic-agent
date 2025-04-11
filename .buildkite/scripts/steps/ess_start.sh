@@ -6,7 +6,7 @@ source .buildkite/scripts/steps/ess.sh
 source .buildkite/scripts/steps/fleet.sh
 
 echo "~~~ Getting stable stack version"
-mage integration:getStableEssSnapshotForBranch
+mage -v integration:getStableEssSnapshotForBranch
 OVERRIDE_STACK_VERSION="$(cat .override_stack_version)-SNAPSHOT"
 
 ess_up $OVERRIDE_STACK_VERSION
