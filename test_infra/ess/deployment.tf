@@ -6,7 +6,7 @@ variable "stack_version" {
 
 variable "stable_snapshot_version" {
   type        = string
-  default     = var.stack_version
+  default     = ""
   description = "stable snapshot version. Overrides docker images versions"
 }
 
@@ -71,9 +71,9 @@ locals {
   ess_properties = merge(
     {
       docker = {
-        integration_server_image = "docker.elastic.co/cloud-release/elastic-agent-cloud:${var.stable_snapshot_version}"
-        elasticsearch_image      = "docker.elastic.co/cloud-release/elasticsearch-cloud-ess:${var.stable_snapshot_version}"
-        kibana_image             = "docker.elastic.co/cloud-release/kibana-cloud:${var.stable_snapshot_version}"
+        integration_server_image = var.stable_snapshot_version == "" ? "" : "docker.elastic.co/cloud-release/elastic-agent-cloud:${var.stable_snapshot_version}"
+        elasticsearch_image      = var.stable_snapshot_version == "" ? "" : "docker.elastic.co/cloud-release/elasticsearch-cloud-ess:${var.stable_snapshot_version}"
+        kibana_image             = var.stable_snapshot_version == "" ? "" : "docker.elastic.co/cloud-release/kibana-cloud:${var.stable_snapshot_version}"
       }
 
     },
