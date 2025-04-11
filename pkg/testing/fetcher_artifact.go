@@ -93,7 +93,7 @@ func (f *artifactFetcher) Fetch(ctx context.Context, operatingSystem string, arc
 	}
 
 	// this remote path cannot have the build metadata in it
-	srcPath := fmt.Sprintf("elastic-agent-%s-%s-%s", prefix, ver.VersionWithPrerelease(), suffix)
+	srcPath := fmt.Sprintf("elastic-agent-%s%s-%s", prefix, ver.VersionWithPrerelease(), suffix)
 	downloadSrc := fmt.Sprintf("%s%s", uri, srcPath)
 
 	return &artifactResult{
