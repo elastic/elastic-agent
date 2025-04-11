@@ -627,8 +627,6 @@ func (b *BeatsMonitor) injectMetricsInput(
 		componentListWithMonitoring[k] = v
 	}
 
-	// beatStreams and streams MUST be []interface{} even if in reality they are []map[string]interface{}:
-	// if those are declared as slices of maps the message "proto: invalid type: []map[string]interface{}" will pop up
 	beatsStreams := b.getBeatsStreams(componentListWithMonitoring, failureThreshold, metricsCollectionIntervalString)
 	httpStreams := b.getHttpStreams(componentListWithMonitoring, failureThreshold, metricsCollectionIntervalString)
 
@@ -675,6 +673,7 @@ func (b *BeatsMonitor) injectMetricsInput(
 }
 
 // getHttpStreams returns stream definitions for http/metrics inputs.
+// Note: The return type must be []any due to protobuf serialization quirks.
 func (b *BeatsMonitor) getHttpStreams(
 	componentIDToBinary map[string]string,
 	failureThreshold *uint,
@@ -715,7 +714,7 @@ func (b *BeatsMonitor) getHttpStreams(
 		}
 
 		endpoints := []interface{}{prefixedEndpoint(utils.SocketURLWithFallback(unit, paths.TempDir()))}
-		name := strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_") // conform with index naming policy
+		name := sanitizeName(binaryName)
 
 		httpStream := map[string]interface{}{
 			idKey: fmt.Sprintf("%s-%s-1", monitoringMetricsUnitID, name),
@@ -769,6 +768,7 @@ func (b *BeatsMonitor) getHttpStreams(
 }
 
 // getBeatsStreams returns stream definitions for beats inputs.
+// Note: The return type must be []any due to protobuf serialization quirks.
 func (b *BeatsMonitor) getBeatsStreams(
 	componentIDToBinary map[string]string,
 	failureThreshold *uint,
@@ -786,7 +786,7 @@ func (b *BeatsMonitor) getBeatsStreams(
 		}
 
 		endpoints := []interface{}{prefixedEndpoint(utils.SocketURLWithFallback(unit, paths.TempDir()))}
-		name := strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_") // conform with index naming policy
+		name := sanitizeName(binaryName)
 		dataset := fmt.Sprintf("elastic_agent.%s", name)
 		indexName := fmt.Sprintf("metrics-elastic_agent.%s-%s", name, monitoringNamespace)
 
@@ -816,6 +816,7 @@ func (b *BeatsMonitor) getBeatsStreams(
 
 // getServiceComponentProcessMetricInputs returns input definitions for collecting process metrics of components
 // running as services.
+// Note: The return type must be []any due to protobuf serialization quirks.
 func (b *BeatsMonitor) getServiceComponentProcessMetricInputs(
 	components []component.Component,
 	existingStateServicePids map[string]uint64,
@@ -893,21 +894,8 @@ func processorsForHttpStream(binaryName, unitID, dataset string, agentInfo info.
 		addEventFieldsProcessor(dataset),
 		addElasticAgentFieldsProcessor(sanitizedName, agentInfo),
 		addAgentFieldsProcessor(agentInfo.AgentID()),
-		map[string]interface{}{
-			"copy_fields": map[string]interface{}{
-				"fields":         httpCopyRules(),
-				"ignore_missing": true,
-				"fail_on_error":  false,
-			},
-		},
-		map[string]interface{}{
-			"drop_fields": map[string]interface{}{
-				"fields": []interface{}{
-					"http",
-				},
-				"ignore_missing": true,
-			},
-		},
+		addCopyFieldsProcessor(httpCopyRules(), true, false),
+		dropFieldsProcessor([]any{"http"}, true),
 		addComponentFieldsProcessor(binaryName, unitID),
 	}
 }
@@ -919,21 +907,8 @@ func processorsForAgentHttpStream(namespace, dataset string, agentInfo info.Agen
 		addEventFieldsProcessor(dataset),
 		addElasticAgentFieldsProcessor(agentName, agentInfo),
 		addAgentFieldsProcessor(agentInfo.AgentID()),
-		map[string]interface{}{
-			"copy_fields": map[string]interface{}{
-				"fields":         httpCopyRules(),
-				"ignore_missing": true,
-				"fail_on_error":  false,
-			},
-		},
-		map[string]interface{}{
-			"drop_fields": map[string]interface{}{
-				"fields": []interface{}{
-					"http",
-				},
-				"ignore_missing": true,
-			},
-		},
+		addCopyFieldsProcessor(httpCopyRules(), true, false),
+		dropFieldsProcessor([]any{"http"}, true),
 		addComponentFieldsProcessor(agentName, agentName),
 	}
 }
@@ -1000,6 +975,27 @@ func addEventFieldsProcessor(dataset string) map[string]any {
 			"fields": map[string]interface{}{
 				"dataset": dataset,
 			},
+		},
+	}
+}
+
+// addCopyRulesProcessor returns a processor that copies fields according to the provided rules.
+func addCopyFieldsProcessor(copyRules []any, ignoreMissing bool, failOnError bool) map[string]any {
+	return map[string]interface{}{
+		"copy_fields": map[string]interface{}{
+			"fields":         copyRules,
+			"ignore_missing": ignoreMissing,
+			"fail_on_error":  failOnError,
+		},
+	}
+}
+
+// dropFieldsProcessor returns a processor which drops the provided fields.
+func dropFieldsProcessor(fields []any, ignoreMissing bool) map[string]any {
+	return map[string]interface{}{
+		"drop_fields": map[string]interface{}{
+			"fields":         fields,
+			"ignore_missing": ignoreMissing,
 		},
 	}
 }
