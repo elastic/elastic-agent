@@ -1,0 +1,43 @@
+// begin 8.17.5 relnotes
+
+[[release-notes-8.17.5]]
+==  8.17.5
+
+Review important information about the  8.17.5 release.
+
+
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[enhancements-8.17.5]]
+=== Enhancements
+
+
+elastic-agent::
+
+* Ensure Consistent Input Order In Self-Monitoring Configuration. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7724[#https://github.com/elastic/elastic-agent/pull/7724] 
+
+
+
+
+[discrete]
+[[bug-fixes-8.17.5]]
+=== Bug fixes
+
+
+elastic-agent::
+
+* Change How Windows Process Handles Are Obtained When Assigning Sub-Processes To Job Objects. {elastic-agent-pull}https://github.com/owner/repo/6825[#https://github.com/owner/repo/6825] 
+* Rework Windows User Password Generation To Meet Security Policy Constraints. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7507[#https://github.com/elastic/elastic-agent/pull/7507] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/7506[#https://github.com/elastic/elastic-agent/issues/7506]
+* Wait For Windows Service To Be Fully Removed Before Re-Installing During Agent Switch. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7589[#https://github.com/elastic/elastic-agent/pull/7589] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6970[#https://github.com/elastic/elastic-agent/issues/6970]
+* Fix Panic During Shutdown In Fleetgateway. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7629[#https://github.com/elastic/elastic-agent/pull/7629] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/7309[#https://github.com/elastic/elastic-agent/issues/7309]
+
+// end 8.17.5 relnotes
