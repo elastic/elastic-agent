@@ -47,6 +47,6 @@ else
   install_asdf
 fi
 
+sudo su $AGENT_USER
 source $AGENT_HOME/.bashrc
 source /opt/buildkite-agent/hooks/pre-command
-source $ASDF_DIR/asdf.sh
