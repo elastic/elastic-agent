@@ -17,6 +17,7 @@ import (
 
 	"github.com/gofrs/flock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
@@ -27,6 +28,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -276,6 +279,52 @@ func TestUpgraderReload(t *testing.T) {
 	require.NoError(t, err, "error reloading config")
 
 	assert.Equal(t, &want, u.settings)
+}
+
+func TestUpgraderAckAction(t *testing.T) {
+	log, _ := loggertest.New("")
+	u := Upgrader{
+		log:      log,
+		settings: artifact.DefaultConfig(),
+	}
+
+	action := fleetapi.NewAction(fleetapi.ActionTypeUpgrade)
+	t.Run("AckAction without acker", func(t *testing.T) {
+		require.Nil(t, u.AckAction(t.Context(), nil, action))
+	})
+	t.Run("AckAction with acker", func(t *testing.T) {
+		acker := &fakeAcker{}
+		acker.On("Ack", mock.Anything, action).Return(nil)
+		acker.On("Commit", mock.Anything).Return(nil)
+
+		require.Nil(t, u.AckAction(t.Context(), acker, action))
+		acker.AssertCalled(t, "Ack", mock.Anything, action)
+		acker.AssertCalled(t, "Commit", mock.Anything)
+	})
+
+	t.Run("AckAction with acker - failing commit", func(t *testing.T) {
+		acker := &fakeAcker{}
+
+		errCommit := errors.New("failed commit")
+		acker.On("Ack", mock.Anything, action).Return(nil)
+		acker.On("Commit", mock.Anything).Return(errCommit)
+
+		require.ErrorIs(t, u.AckAction(t.Context(), acker, action), errCommit)
+		acker.AssertCalled(t, "Ack", mock.Anything, action)
+		acker.AssertCalled(t, "Commit", mock.Anything)
+	})
+
+	t.Run("AckAction with acker - failed ack", func(t *testing.T) {
+		acker := &fakeAcker{}
+
+		errAck := errors.New("ack error")
+		acker.On("Ack", mock.Anything, action).Return(errAck)
+		acker.On("Commit", mock.Anything).Return(nil)
+
+		require.ErrorIs(t, u.AckAction(t.Context(), acker, action), errAck)
+		acker.AssertCalled(t, "Ack", mock.Anything, action)
+		acker.AssertNotCalled(t, "Commit", mock.Anything)
+	})
 }
 
 func prepareTestUpgraderReload() (string, artifact.Config) {
@@ -1226,4 +1275,20 @@ func TestIsSameReleaseVersion(t *testing.T) {
 			assert.Equal(t, tc.expect, isSameReleaseVersion(log, tc.current, tc.target))
 		})
 	}
+}
+
+var _ acker.Acker = &fakeAcker{}
+
+type fakeAcker struct {
+	mock.Mock
+}
+
+func (f *fakeAcker) Ack(ctx context.Context, action fleetapi.Action) error {
+	args := f.Called(ctx, action)
+	return args.Error(0)
+}
+
+func (f *fakeAcker) Commit(ctx context.Context) error {
+	args := f.Called(ctx)
+	return args.Error(0)
 }
