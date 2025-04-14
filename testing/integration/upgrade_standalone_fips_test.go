@@ -31,6 +31,15 @@ func TestStandaloneUpgradeFIPStoFIPS(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
+	// parse the version we are testing
+	currentVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
+
+	// 9.1.0-SNAPSHOT is the minimum version we need for testing upgrading from FIPS to FIPS.
+	if currentVersion.Less(*upgradetest.Version_9_1_0_SNAPSHOT) {
+		t.Skipf("Minimum version for running this test is %q, current version: %q", *upgradetest.Version_9_1_0_SNAPSHOT, currentVersion)
+	}
+
 	// Start with a FIPS-compliant Agent artifact
 	fipsArtifactFetcher := atesting.ArtifactFetcher(atesting.WithArtifactFIPSOnly())
 
