@@ -28,10 +28,15 @@ Entrypoint for chart initialisation
 */}}
 {{- define "elasticagent.init" -}}
 {{- if not (hasKey $.Values.agent "initialised") -}}
-{{/* init order matters */}}
+{{/* !!! init order matters !!! */}}
 {{- include (printf "elasticagent.engine.%s.init" $.Values.agent.engine) $ -}}
+{{/* initialise outputs to load the ssl settings */}}
+{{- include "elasticagent.init.outputs" $ -}}
+{{/* initialise inputs to hydrate the correct presets according to what is enabled */}}
 {{- include "elasticagent.init.inputs" $ -}}
+{{/* initialise fleet to remove any irrelevant preset and load the certificate settings */}}
 {{- include "elasticagent.init.fleet" $ -}}
+{{/* initialise presets to set correctly default values in them */}}
 {{- include "elasticagent.init.presets" $ -}}
 {{- $_ := set $.Values.agent "initialised" dict -}}
 {{- end -}}
@@ -61,6 +66,17 @@ Validate fleet configuration
 {{- include "elasticagent.init.valueFrom" (list $ $.Values.agent.fleet.agentCert "fleet.agentcert") -}}
 {{- include "elasticagent.init.valueFrom" (list $ $.Values.agent.fleet.agentCertKey "fleet.agentcert.key") -}}
 {{- include "elasticagent.init.valueFrom" (list $ $.Values.agent.fleet.kibanaCA "fleet.kibana.ca") -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "elasticagent.init.outputs" -}}
+{{- if eq $.Values.agent.fleet.enabled false -}}
+{{- range $outputName, $outputVal := $.Values.outputs -}}
+{{- $sslCertificateAuthoritiesConfig := dig "ssl" "certificateAuthorities" list $outputVal -}}
+{{- range $idx, $certificateAuthorityConfig := $sslCertificateAuthoritiesConfig -}}
+{{- include "elasticagent.init.valueFrom" (list $ $certificateAuthorityConfig (printf "%s.ssl.certificate_authorities.%d" $outputName $idx)) -}}
+{{- end -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 
@@ -135,6 +151,22 @@ Validate and initialise the defined agent presets
 {{- $_ := set $presetVal "statePersistence" "EmptyDir" -}}
 {{- else -}}
 fail printf "Unsupported mode %v for preset %v" ($presetMode) $($presetName)
+{{- end -}}
+{{- end -}}
+{{- with ($presetVal).outputs -}}
+{{- $presetVolumes := dig "extraVolumes" list $presetVal -}}
+{{- $presetVolumeMounts := dig "extraVolumeMounts" list $presetVal -}}
+{{- range $outputName, $outputVal := . -}}
+{{- $outputVolumes := include "elasticagent.output.preset.volumes" $outputVal | fromYamlArray -}}
+{{- $presetVolumes = uniq (concat $presetVolumes $outputVolumes) -}}
+{{- $outputVolumeMounts := include "elasticagent.output.preset.volumemounts" $outputVal | fromYamlArray -}}
+{{- $presetVolumeMounts = uniq (concat $presetVolumeMounts $outputVolumeMounts) -}}
+{{- end -}}
+{{- with $presetVolumes}}
+{{- $_ := set $presetVal "extraVolumes" $presetVolumes -}}
+{{- end -}}
+{{- with $presetVolumeMounts}}
+{{- $_ := set $presetVal "extraVolumeMounts" $presetVolumeMounts -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}

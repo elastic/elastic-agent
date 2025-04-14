@@ -9,6 +9,16 @@
 {{- $fleetMutations := dict}}
 {{- if eq $.Values.agent.fleet.enabled true -}}
 {{- include "elasticagent.preset.mutate.fleet" (list $ $fleetMutations) -}}
+{{- else -}}
+{{- $kubernetesOutputVal := get $.Values.outputs $.Values.kubernetes.output -}}
+{{- $outputVolumes := include "elasticagent.output.preset.volumes" $kubernetesOutputVal | fromYamlArray -}}
+{{- with $outputVolumes -}}
+{{- $_ := set $fleetMutations "extraVolumes" . -}}
+{{- end -}}
+{{- $outputVolumeMounts := include "elasticagent.output.preset.volumemounts" $kubernetesOutputVal | fromYamlArray -}}
+{{- with $outputVolumeMounts -}}
+{{- $_ := set $fleetMutations "extraVolumeMounts" $outputVolumeMounts -}}
+{{- end -}}
 {{- end -}}
 {{- $agentContainer := print (include "elasticagent.presets.ksm.sidecar.container" (list $ $fleetMutations)) | fromYaml }}
 {{- $_ := set $kubeStateChart "containers" (list $agentContainer) -}}
