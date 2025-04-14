@@ -23,7 +23,7 @@ Review important information about the  8.17.5 release.
 
 elastic-agent::
 
-* Ensure Consistent Input Order In Self-Monitoring Configuration. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7724[#https://github.com/elastic/elastic-agent/pull/7724] 
+* Ensure consistent input order In self-monitoring configuration. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7724[#https://github.com/elastic/elastic-agent/pull/7724] 
 
 
 
@@ -35,9 +35,9 @@ elastic-agent::
 
 elastic-agent::
 
-* Change How Windows Process Handles Are Obtained When Assigning Sub-Processes To Job Objects. {elastic-agent-pull}https://github.com/owner/repo/6825[#https://github.com/owner/repo/6825] 
-* Rework Windows User Password Generation To Meet Security Policy Constraints. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7507[#https://github.com/elastic/elastic-agent/pull/7507] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/7506[#https://github.com/elastic/elastic-agent/issues/7506]
-* Wait For Windows Service To Be Fully Removed Before Re-Installing During Agent Switch. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7589[#https://github.com/elastic/elastic-agent/pull/7589] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6970[#https://github.com/elastic/elastic-agent/issues/6970]
-* Fix Panic During Shutdown In Fleetgateway. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7629[#https://github.com/elastic/elastic-agent/pull/7629] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/7309[#https://github.com/elastic/elastic-agent/issues/7309]
+* Change how Windows process handles are obtained when assigning sub-processes to job objects. {elastic-agent-pull}https://github.com/owner/repo/6825[#https://github.com/owner/repo/6825] 
+* Rework Windows user password generation to meet security policy constraints. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7507[#https://github.com/elastic/elastic-agent/pull/7507] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/7506[#https://github.com/elastic/elastic-agent/issues/7506]
+* Wait for Windows service to be fully removed before re-installing during agent switch. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7589[#https://github.com/elastic/elastic-agent/pull/7589] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6970[#https://github.com/elastic/elastic-agent/issues/6970]
+* Fix panic during shutdown in `Fleetgateway`. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7629[#https://github.com/elastic/elastic-agent/pull/7629] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/7309[#https://github.com/elastic/elastic-agent/issues/7309]
 
 // end 8.17.5 relnotes
