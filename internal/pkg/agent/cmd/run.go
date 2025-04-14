@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
 
 	"go.elastic.co/apm/v2"
@@ -517,7 +518,7 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 			errors.TypeFilesystem,
 			errors.M("path", enrollPath))
 	}
-	var options enrollCmdOption
+	var options enroll.EnrollOptions
 	err = yaml.Unmarshal(contents, &options)
 	if err != nil {
 		return nil, errors.New(

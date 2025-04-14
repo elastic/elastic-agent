@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -27,6 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
@@ -100,7 +102,7 @@ func TestEnroll(t *testing.T) {
 			store := &mockStore{Err: errors.New("fail to save")}
 			cmd, err := newEnrollCmd(
 				log,
-				&enrollCmdOption{
+				&enroll.EnrollOptions{
 					URL:                  url,
 					CAs:                  []string{caFile},
 					EnrollAPIKey:         "my-enrollment-token",
@@ -155,7 +157,7 @@ func TestEnroll(t *testing.T) {
 			store := &mockStore{}
 			cmd, err := newEnrollCmd(
 				log,
-				&enrollCmdOption{
+				&enroll.EnrollOptions{
 					URL:                  url,
 					CAs:                  []string{caFile},
 					EnrollAPIKey:         "my-enrollment-api-key",
@@ -217,7 +219,7 @@ func TestEnroll(t *testing.T) {
 			store := &mockStore{}
 			cmd, err := newEnrollCmd(
 				log,
-				&enrollCmdOption{
+				&enroll.EnrollOptions{
 					URL:                  url,
 					CAs:                  []string{},
 					EnrollAPIKey:         "my-enrollment-api-key",
@@ -282,7 +284,7 @@ func TestEnroll(t *testing.T) {
 			store := &mockStore{}
 			cmd, err := newEnrollCmd(
 				log,
-				&enrollCmdOption{
+				&enroll.EnrollOptions{
 					URL:                  url,
 					CAs:                  []string{},
 					EnrollAPIKey:         "my-enrollment-api-key",
@@ -328,7 +330,7 @@ func TestEnroll(t *testing.T) {
 			store := &mockStore{}
 			cmd, err := newEnrollCmd(
 				log,
-				&enrollCmdOption{
+				&enroll.EnrollOptions{
 					URL:                  url,
 					CAs:                  []string{},
 					EnrollAPIKey:         "my-enrollment-token",
@@ -396,7 +398,7 @@ func TestEnroll(t *testing.T) {
 			store := &mockStore{}
 			cmd, err := newEnrollCmd(
 				log,
-				&enrollCmdOption{
+				&enroll.EnrollOptions{
 					URL:                  url,
 					CAs:                  []string{},
 					EnrollAPIKey:         "my-enrollment-api-key",
@@ -790,4 +792,20 @@ func readConfig(raw []byte) (*configuration.FleetAgentConfig, error) {
 		return nil, err
 	}
 	return cfg.Fleet, nil
+}
+
+func cleanTags(tags []string) []string {
+	var r []string
+	// Create a map to store unique elements
+	seen := make(map[string]bool)
+	for _, str := range tags {
+		tag := strings.TrimSpace(str)
+		if tag != "" {
+			if _, ok := seen[tag]; !ok {
+				seen[tag] = true
+				r = append(r, tag)
+			}
+		}
+	}
+	return r
 }

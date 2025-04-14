@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -81,7 +82,7 @@ func Test_Enroll_mTLS(t *testing.T) {
 	defer s.Close()
 
 	store := &mockStore{}
-	enrollOptions := enrollCmdOption{
+	enrollOptions := enroll.EnrollOptions{
 		CAs:               []string{string(fleetRootPathPair.Cert)},
 		Certificate:       string(agentCertPathPair.Cert),
 		Key:               string(agentCertPathPair.Key),

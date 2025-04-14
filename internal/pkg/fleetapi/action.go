@@ -429,6 +429,80 @@ func (a *ActionSettings) String() string {
 	return s.String()
 }
 
+type ActionMigrate struct {
+	ActionID   string
+	ActionType string
+	Data       ActionMigrateData `json:"data,omitempty"`
+
+	Err error `json:"-" yaml:"-" mapstructure:"-"`
+}
+
+// ID returns the ID of the Action.
+func (a *ActionMigrate) ID() string {
+	return a.ActionID
+}
+
+// Type returns the type of the Action.
+func (a *ActionMigrate) Type() string {
+	return a.ActionType
+}
+
+func (a *ActionMigrate) String() string {
+	var s strings.Builder
+	s.WriteString("id: ")
+	s.WriteString(a.ActionID)
+	s.WriteString(", type: ")
+	s.WriteString(a.ActionType)
+	return s.String()
+}
+
+func (a *ActionMigrate) AckEvent() AckEvent {
+	event := newAckEvent(a.ActionID, a.ActionType)
+	if a.Err != nil {
+		event.Error = a.Err.Error()
+	}
+	return event
+}
+
+type ActionMigrateData struct {
+	// PolicyID: Type of the action.
+	PolicyID string `json:"policy_id" yaml:"policy_id"`
+
+	// TargetURI: URI of Fleet Server in a target cluster.
+	TargetURI string `json:"target_uri" yaml:"target_uri"`
+
+	// EnrollmentToken: Enrollment token used to enroll agent to a new cluster.
+	EnrollmentToken string `json:"enrollment_token" yaml:"enrollment_token"`
+
+	// Settings: An embedded JSON object that holds user-provided settings like TLS.
+	Settings json.RawMessage `json:"settings" yaml:"settings,omitempty"`
+}
+
+type ActionMigrateSettings struct {
+	CaSHA256         string   `json:"ca_sha256,omitempty"`
+	CAs              string   `json:"certificate_authorities,omitempty"`
+	AgentCert        string   `json:"elastic_agent_cert,omitempty"`
+	AgentCertKey     string   `json:"elastic_agent_cert_key,omitempty"`
+	AgentCertLeyPass string   `json:"elastic_agent_cert_key_passphrase,omitempty"`
+	Headers          []string `json:"headers,omitempty"`
+	Insecure         bool     `json:"insecure,omitempty"`
+	ProxyDisabled    bool     `json:"proxy_disabled,omitempty"`
+	ProxyHeaders     []string `json:"proxy_headers,omitempty"`
+	ProxyURL         string   `json:"proxy_url,omitempty"`
+	Staging          string   `json:"staging,omitempty"`
+	Tags             []string `json:"tags,omitempty"`
+	ReplaceToken     string   `json:"replace_token,omitempty"`
+}
+
+func ParseMigrateSettings(raw json.RawMessage) (ActionMigrateSettings, error) {
+	var settings ActionMigrateSettings
+	if err := json.Unmarshal(raw, &settings); err != nil {
+		return settings, fmt.Errorf("failed to parse migrate settings: %w", err)
+	}
+
+	return settings, nil
+}
+
 func (a *ActionSettings) AckEvent() AckEvent {
 	return newAckEvent(a.ActionID, a.ActionType)
 }

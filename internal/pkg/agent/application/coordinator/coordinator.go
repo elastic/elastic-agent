@@ -26,6 +26,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
@@ -37,6 +38,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -541,6 +543,58 @@ func (c *Coordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ..
 	// override the overall state to stopping until the re-execution is complete
 	c.SetOverrideState(agentclient.Stopping, "Re-executing")
 	c.reexecMgr.ReExec(callback, argOverrides...)
+}
+
+func (c *Coordinator) Migrate(ctx context.Context, action *fleetapi.ActionMigrate) error {
+	if !c.isManaged {
+		return errors.New("unmanaged agent, use Enroll instead")
+	}
+
+	// check if agent is FS, fail if so
+	if c.isFleetServer() {
+		err := errors.New("agent runs Fleet server")
+		c.ackMigration(ctx, action, err)
+		return err
+	}
+
+	// Target Fleet server is checked prior to reenroll
+	var originalClient fleetclient.Sender
+	if err := enroll.CheckRemote(ctx, originalClient); err != nil {
+		return err
+	}
+
+	if err := enroll.BackupConfig(); err != nil {
+		return err
+	}
+
+	// construct options
+	_, err := enroll.OptionsFromMigrateAction(action)
+	if err != nil {
+		return err
+	}
+
+	// Agent enrolls to target cluster
+	// Keeping all enrollment options that are not overriden via action
+
+	// If replace-token is present, keep Agent ID
+	// if replace-token is present and there's a conflict in IDs with target cluster -> action failure
+
+	// In case of failure Agent reports failure to source cluster and keeps enrolled there
+
+	// ACK success to source fleet server
+	if err := c.ackMigration(ctx, action, nil); err != nil {
+		c.logger.Infof("failed to ACK success: %v", err)
+	}
+
+	// Best effort: call unenroll on source cluster once done
+	if err := c.unenroll(ctx, originalClient); err != nil {
+		c.logger.Infof("failed to unenroll from original cluster: %v", err)
+
+	}
+
+	// reexec
+
+	return nil
 }
 
 // Upgrade runs the upgrade process.
@@ -1526,6 +1580,15 @@ func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtime
 	return
 }
 
+func (c *Coordinator) isFleetServer() bool {
+	return false
+}
+
+func (c *Coordinator) ackMigration(ctx context.Context, action *fleetapi.ActionMigrate, err error) error {
+
+	return nil
+}
+
 // generateComponentModel regenerates the configuration tree and
 // components from the current AST and vars and returns the result.
 // Called from both the main Coordinator goroutine and from external
@@ -1928,4 +1991,20 @@ func logBasedOnState(l *logger.Logger, state client.UnitState, msg string, args 
 	default:
 		l.With(args...).Info(msg)
 	}
+}
+
+func (c *Coordinator) unenroll(ctx context.Context, client fleetclient.Sender) error {
+	unenrollCmd := fleetapi.NewAuditUnenrollCmd(c.agentInfo, client)
+	unenrollReq := &fleetapi.AuditUnenrollRequest{
+		Reason:    fleetapi.ReasonMigration,
+		Timestamp: time.Now().UTC(),
+	}
+	unenrollResp, err := unenrollCmd.Execute(ctx, unenrollReq)
+	if err != nil {
+		c.logger.Warnf("failed to unenroll agent from original cluster: %v", err)
+		return err
+	}
+
+	unenrollResp.Body.Close()
+	return nil
 }
