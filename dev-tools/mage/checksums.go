@@ -59,7 +59,24 @@ func ChecksumsWithoutManifest(platform string, dependenciesVersion string, versi
 		}
 
 		if !dep.SupportsPlatform(platform) {
-			log.Printf(">>>>>>> Component %s/%s does not support platform %s, skipping", dep.ProjectName, dep.BinaryName, platform)
+			if mg.Verbose() {
+				log.Printf(">>>>>>> Component %s/%s does not support platform %s, skipping", dep.ProjectName, dep.BinaryName, platform)
+			}
+			continue
+		}
+
+		atLeastOnePackageTypeSelected := false
+		for _, pkgType := range dep.PackageTypes {
+			if IsPackageTypeSelected(PackageType(pkgType)) {
+				atLeastOnePackageTypeSelected = true
+				break
+			}
+		}
+
+		if !atLeastOnePackageTypeSelected {
+			if mg.Verbose() {
+				log.Printf(">>>>>>> Component %s/%s supported package types %v do not overlap selected package types %v, skipping", dep.ProjectName, dep.BinaryName, dep.PackageTypes, SelectedPackageTypes)
+			}
 			continue
 		}
 
