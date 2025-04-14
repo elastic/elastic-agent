@@ -19,8 +19,12 @@ function install_asdf() {
   echo "installing asdf $ASDF_VERSION"
   sudo -u $AGENT_USER bash <<EOF
 set -euo pipefail
+
+if [ -d "$ASDF_DIR" ]; then
+  rm -r "$ASDF_DIR"
+fi
+
 cd $AGENT_HOME
-rm -r ${ASDF_DIR}
 retry -t 3 -- git clone https://github.com/asdf-vm/asdf.git ${ASDF_DIR} --branch v${ASDF_VERSION} \\
 && echo 'source $ASDF_DIR/asdf.sh' >> $AGENT_HOME/.bashrc \\
 && source $ASDF_DIR/asdf.sh \\
