@@ -33,7 +33,7 @@ collectors:
   #  Cluster is a K8s deployment EDOT collector focused on gathering telemetry
   #  at the cluster level (Kubernetes Events and cluster metrics).
   cluster:
-    fullnameOverride: "opentelemetry-kube-stack-cluster"
+    fullnameOverride: "opentelemetry-kube-stack-cluster-stats"
     env:
       - name: ELASTIC_AGENT_OTEL
         value: '"true"'
