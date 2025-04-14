@@ -8,9 +8,11 @@ package integration
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
-	"strings"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -200,32 +202,10 @@ func k8sStepCheckRunningPods(podLabelSelector string, expectedPodNumber int, con
 
 func k8sStepDeployJavaApp() k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		objects, err := testK8s.LoadFromYAML(bufio.NewReader(strings.NewReader(fmt.Sprintf(`apiVersion: apps/v1
-kind: Deployment
-metadata:
-  labels:
-    app: java-app
-  name: java-app
-  namespace: %s
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: java-app
-  template:
-    metadata:
-      labels:
-        app: java-app
-      annotations:
-        instrumentation.opentelemetry.io/inject-java: "true"
-    spec:
-      containers:
-      - name: java-app
-        image: docker.elastic.co/demos/apm/k8s-webhook-test
-        env:
-        - name: OTEL_INSTRUMENTATION_METHODS_INCLUDE
-          value: "test.Testing[methodB]"
-`, namespace))))
+		javaApp, err := os.ReadFile(filepath.Join("testdata", "java_app.yaml"))
+		require.NoError(t, err)
+
+		objects, err := testK8s.LoadFromYAML(bufio.NewReader(bytes.NewReader(javaApp)))
 		require.NoError(t, err, "failed to parse rendered kustomize")
 
 		err = k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true, namespace: namespace}, objects...)
