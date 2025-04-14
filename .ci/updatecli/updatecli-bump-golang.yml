@@ -133,6 +133,15 @@ targets:
       content: 'go {{ source "gomod" }}'
       file: go.mod
       matchpattern: 'go \d+.\d+'
+  update-wrapper-windows-archive-gomod-minor-version:
+    name: "Update wrapper/windows/archive-proxy/go.mod minor version"
+    sourceid: gomod
+    scmid: githubConfig
+    kind: file
+    spec:
+      content: 'go {{ source "gomod" }}'
+      file: wrapper/windows/archive-proxy/go.mod
+      matchpattern: 'go \d+.\d+'
   update-gomod-toolchain-version:
     name: "Update go.mod toolchain version"
     sourceid: latestGoVersion

@@ -2,24 +2,23 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package v1_test
+package v2
 
 import (
 	"context"
 	"testing"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/server"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	"go.elastic.co/apm/v2/apmtest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func TestServerClient_Version(t *testing.T) {
@@ -41,6 +40,7 @@ func TestServerClient_Version(t *testing.T) {
 		Commit:    release.Commit(),
 		BuildTime: release.BuildTime(),
 		Snapshot:  release.Snapshot(),
+		Fips:      release.FIPS(),
 	}, ver)
 }
 

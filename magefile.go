@@ -48,6 +48,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
 	"github.com/elastic/elastic-agent/pkg/testing/helm"
+	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/kind"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"
@@ -291,6 +292,54 @@ func (Build) GenerateConfig() error {
 	return sh.Copy(filepath.Join(buildDir, configFile), filepath.Join(metaDir, configFile))
 }
 
+// WindowsArchiveRootBinary compiles a binary to be placed at the root of the windows elastic-agent archive. This binary
+// is a thin proxy to the actual elastic-agent binary that resides in the data/elastic-agent-{commit-short-sha}
+// directory of the archive.
+func (Build) WindowsArchiveRootBinary() error {
+	fmt.Println("--- Compiling root binary for windows archive")
+	hashShort, err := devtools.CommitHashShort()
+	if err != nil {
+		return fmt.Errorf("error getting commit hash: %w", err)
+	}
+
+	outputName := "elastic-agent-archive-root"
+	if runtime.GOOS != "windows" {
+		// add the .exe extension on non-windows platforms
+		outputName += ".exe"
+	}
+
+	args := devtools.BuildArgs{
+		Name:        outputName,
+		OutputDir:   filepath.Join(buildDir, "windows-archive-root-binary"),
+		InputFiles:  []string{"wrapper/windows/archive-proxy/main.go"},
+		CGO:         false,
+		WinMetadata: true,
+		ExtraFlags: []string{
+			"-buildmode", "pie", // windows versions inside the support matrix do support position independent code
+			"-trimpath", // Remove all file system paths from the compiled executable, to improve build reproducibility
+		},
+		Vars: map[string]string{
+			"main.CommitSHA": hashShort,
+		},
+		Env: map[string]string{
+			"GOOS":   "windows",
+			"GOARCH": "amd64",
+		},
+		LDFlags: []string{
+			"-s", // Strip all debug symbols from binary (does not affect Go stack traces).
+		},
+	}
+
+	if devtools.FIPSBuild {
+		// there is no actual FIPS relevance for this particular binary
+		// but better safe than sorry
+		args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips")
+		args.CGO = true
+	}
+
+	return devtools.Build(args)
+}
+
 // GolangCrossBuildOSS build the Beat binary inside of the golang-builder.
 // Do not use directly, use crossBuild instead.
 func GolangCrossBuildOSS() error {
@@ -443,6 +492,14 @@ func (Test) All() {
 func (Test) Unit(ctx context.Context) error {
 	mg.Deps(Prepare.Env, Build.TestBinaries)
 	params := devtools.DefaultGoTestUnitArgs()
+	return devtools.GoTest(ctx, params)
+}
+
+// FIPSOnlyUnit runs all the unit tests with GODEBUG=fips140=only.
+func (Test) FIPSOnlyUnit(ctx context.Context) error {
+	mg.Deps(Prepare.Env, Build.TestBinaries)
+	params := devtools.DefaultGoTestUnitArgs()
+	params.Env["GODEBUG"] = "fips140=only"
 	return devtools.GoTest(ctx, params)
 }
 
@@ -1006,6 +1063,12 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	log.Println("--- Running post packaging ")
 	mg.Deps(Update)
 	mg.Deps(agentBinaryTarget, CrossBuildGoDaemon)
+
+	// compile the elastic-agent.exe proxy binary for the windows archive
+	if slices.Contains(platforms, "windows/amd64") {
+		mg.Deps(Build.WindowsArchiveRootBinary)
+	}
+
 	mg.SerialDeps(devtools.Package, TestPackages)
 	return nil
 }
@@ -3348,10 +3411,24 @@ func (h Helm) RenderExamples() error {
 		}
 
 		renderedManifestPath := filepath.Join(renderedFolder, "manifest.yaml")
-
 		err = os.WriteFile(renderedManifestPath, []byte(release.Manifest), 0o644)
 		if err != nil {
-			return fmt.Errorf("failed to write rendered manifest: %w", err)
+			return fmt.Errorf("failed to write rendered manifest %q: %w", renderedManifestPath, err)
+		}
+
+		f, err := os.Open(renderedManifestPath)
+		if err != nil {
+			return fmt.Errorf("failed to open rendered manifest %q: %w", renderedManifestPath, err)
+		}
+
+		objs, err := kubernetes.LoadFromYAML(bufio.NewReader(f))
+		_ = f.Close()
+		if err != nil {
+			return fmt.Errorf("failed to load k8s objects from rendered manifest %q: %w", renderedManifestPath, err)
+		}
+
+		if len(objs) == 0 {
+			return fmt.Errorf("rendered manifest %q is empty", renderedManifestPath)
 		}
 	}
 
@@ -3476,12 +3553,16 @@ func (Helm) BuildDependencies() error {
 func (h Helm) Package() error {
 	mg.SerialDeps(h.BuildDependencies)
 
-	agentVersion := bversion.GetParsedAgentPackageVersion()
-	agentCoreVersion := agentVersion.CoreVersion()
-	agentImageTag := agentCoreVersion + "-SNAPSHOT"
-
 	// need to explicitly set SNAPSHOT="false" to produce a production-ready package
 	productionPackage := os.Getenv("SNAPSHOT") == "false"
+
+	agentVersion := bversion.GetParsedAgentPackageVersion()
+	agentCoreVersion := agentVersion.CoreVersion()
+	agentImageTag := agentCoreVersion
+	if !productionPackage {
+		// always use the SNAPSHOT version for image tag if not a production package
+		agentImageTag = agentImageTag + "-SNAPSHOT"
+	}
 
 	agentChartVersion := agentCoreVersion + "-beta"
 	switch {
