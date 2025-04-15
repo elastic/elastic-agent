@@ -41,5 +41,9 @@ function asdf_init() {
   fi
 }
 
+asdf_install
+asdf_init
+
+
 
 # source /opt/buildkite-agent/hooks/pre-command
