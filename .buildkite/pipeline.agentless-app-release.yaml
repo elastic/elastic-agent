@@ -1,0 +1,33 @@
+env:
+  VERSION: "${BUILDKITE_COMMIT:0:12}"
+steps:
+  - label: "Mirror Elastic-Agent Snapshot DRA to internal registry"
+    key: "mirror-elastic-agent"
+    command: "./build/ecp-internal-release.sh"
+    agents:
+      image: docker.elastic.co/ci-agent-images/serverless-helm-builder:0.0.2@sha256:d00e8a7a0ab3618cfaacb0a7b1e1b06ee29728eb2b44de602374bd8f6b9b92ac
+
+
+
+  # wait for metadata to be set
+  - wait: ~
+
+  - label: ":grey_question: Promote agentless app release if validation passes"
+    depends_on: "mirror-elastic-agent"
+    command: |
+      export COMMIT_HASH=$$(buildkite-agent meta-data get git-short-commit)
+      if [ $$(buildkite-agent step get "outcome" --step "mirror-elastic-agent") == "passed" ]; then
+          cat <<- YAML | buildkite-agent pipeline upload
+          steps:
+          - label: ":serverless::argo: Run synthetics tests and update agentless to $${COMMIT_HASH} in serverless-gitops"
+            async: true
+            branches: main
+            trigger: gpctl-promote-after-serverless-devenv-synthetics
+            build:
+              env:
+                SERVICE_COMMIT_HASH: $${COMMIT_HASH}
+                SERVICE: agentless
+      YAML
+      fi
+    agents:
+      image: docker.elastic.co/ci-agent-images/serverless-helm-builder:0.0.2@sha256:d00e8a7a0ab3618cfaacb0a7b1e1b06ee29728eb2b44de602374bd8f6b9b92ac
