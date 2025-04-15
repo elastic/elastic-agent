@@ -15,7 +15,7 @@ if [ -d "$ASDF_DIR" ]; then
   rm -rf "$ASDF_DIR"
 fi
 retry -t 3 -- git clone https://github.com/asdf-vm/asdf.git ${ASDF_DIR} --branch v${ASDF_VERSION} 
-echo "source $ASDF_DIR/asdf.sh" >> $AGENT_HOME/.bashrc
+echo 'source $ASDF_DIR/asdf.sh' >> $AGENT_HOME/.bashrc
 source $ASDF_DIR/asdf.sh
 asdf plugin update --all
 asdf plugin-add golang https://github.com/asdf-community/asdf-golang.git
