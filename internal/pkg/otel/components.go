@@ -92,13 +92,25 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			jmxreceiver.NewFactory(),
 			kafkareceiver.NewFactory(),
 			nopreceiver.NewFactory(),
+<<<<<<< HEAD
 		)
+=======
+		}
+		// some receivers should only be available when
+		// not in fips mode due to restrictions on crypto usage
+		receivers = addNonFipsReceivers(receivers)
+		factories.Receivers, err = otelcol.MakeFactoryMap(receivers...)
+>>>>>>> b2c19df3e ([Chore] Update otel components to v0.127.0/v0.121.0 (#7686))
 		if err != nil {
 			return otelcol.Factories{}, err
 		}
 
 		// Processors
+<<<<<<< HEAD
 		factories.Processors, err = otelcol.MakeFactoryMap(
+=======
+		factories.Processors, err = otelcol.MakeFactoryMap[processor.Factory](
+>>>>>>> b2c19df3e ([Chore] Update otel components to v0.127.0/v0.121.0 (#7686))
 			batchprocessor.NewFactory(),
 			resourceprocessor.NewFactory(),
 			attributesprocessor.NewFactory(),
@@ -123,13 +135,25 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			elasticsearchexporter.NewFactory(),
 			loadbalancingexporter.NewFactory(),
 			otlphttpexporter.NewFactory(),
+<<<<<<< HEAD
 			kafkaexporter.NewFactory(),
 		)
+=======
+		}
+		// some exporters should only be available when
+		// not in fips mode due to restrictions on crypto usage
+		exporters = addNonFipsExporters(exporters)
+		factories.Exporters, err = otelcol.MakeFactoryMap(exporters...)
+>>>>>>> b2c19df3e ([Chore] Update otel components to v0.127.0/v0.121.0 (#7686))
 		if err != nil {
 			return otelcol.Factories{}, err
 		}
 
+<<<<<<< HEAD
 		factories.Connectors, err = otelcol.MakeFactoryMap(
+=======
+		factories.Connectors, err = otelcol.MakeFactoryMap[connector.Factory](
+>>>>>>> b2c19df3e ([Chore] Update otel components to v0.127.0/v0.121.0 (#7686))
 			routingconnector.NewFactory(),
 			spanmetricsconnector.NewFactory(),
 			elasticapmconnector.NewFactory(),
@@ -146,7 +170,11 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			k8sobserver.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)
+<<<<<<< HEAD
 		factories.Extensions, err = otelcol.MakeFactoryMap(extensions...)
+=======
+		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)
+>>>>>>> b2c19df3e ([Chore] Update otel components to v0.127.0/v0.121.0 (#7686))
 		if err != nil {
 			return otelcol.Factories{}, err
 		}
