@@ -75,12 +75,14 @@ func TestMonitoringFull(t *testing.T) {
 				},
 			},
 		},
+		{
+			ID: "filebeat-default",
+			InputSpec: &component.InputRuntimeSpec{
+				BinaryName: "filebeat",
+			},
+		},
 	}
 
-	compIdToBinary := map[string]string{
-		"endpoint-default": "endpoint-security",
-		"filebeat-default": "filebeat",
-	}
 	existingPidStateMap := map[string]uint64{
 		"endpoint-default": 1234,
 	}
@@ -89,7 +91,7 @@ func TestMonitoringFull(t *testing.T) {
 	expectedConfigBytes, err := os.ReadFile(expectedConfigFilePath)
 	require.NoError(t, err)
 
-	outCfg, err := testMon.MonitoringConfig(policy, compList, compIdToBinary, existingPidStateMap)
+	outCfg, err := testMon.MonitoringConfig(policy, compList, existingPidStateMap)
 	require.NoError(t, err)
 
 	// Replace paths with placeholders. Log paths are different for each OS and it's annoying to fully account for the
@@ -112,7 +114,7 @@ func TestMonitoringFull(t *testing.T) {
 	require.NoError(t, err)
 	outCfgString := string(outCfgBytes)
 	// replace the version with a placeholder
-	outCfgString = strings.Replace(outCfgString, agentInfo.Version(), "placeholder", -1)
+	outCfgString = strings.ReplaceAll(outCfgString, agentInfo.Version(), "placeholder")
 	assert.Equal(t, string(expectedConfigBytes), outCfgString)
 }
 
@@ -166,17 +168,19 @@ func TestMonitoringWithEndpoint(t *testing.T) {
 				},
 			},
 		},
+		{
+			ID: "filebeat-default",
+			InputSpec: &component.InputRuntimeSpec{
+				BinaryName: "filebeat",
+			},
+		},
 	}
 
-	compIdToBinary := map[string]string{
-		"endpoint-default": "endpoint-security",
-		"filebeat-default": "filebeat",
-	}
 	existingPidStateMap := map[string]uint64{
 		"endpoint-default": 1234,
 	}
 
-	outCfg, err := testMon.MonitoringConfig(policy, compList, compIdToBinary, existingPidStateMap)
+	outCfg, err := testMon.MonitoringConfig(policy, compList, existingPidStateMap)
 	require.NoError(t, err)
 
 	inputCfg := outCfg["inputs"].([]interface{})
@@ -209,6 +213,7 @@ func TestMonitoringConfigMetricsInterval(t *testing.T) {
 
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)
 	require.NoError(t, err, "Error creating agent info")
+	components := []component.Component{{ID: "foobeat", InputSpec: &component.InputRuntimeSpec{BinaryName: "filebeat"}}}
 
 	tcs := []struct {
 		name             string
@@ -308,7 +313,7 @@ func TestMonitoringConfigMetricsInterval(t *testing.T) {
 				operatingSystem: runtime.GOOS,
 				agentInfo:       agentInfo,
 			}
-			got, err := b.MonitoringConfig(tc.policy, nil, map[string]string{"foobeat": "filebeat"}, map[string]uint64{}) // put a componentID/binary mapping to have something in the beats monitoring input
+			got, err := b.MonitoringConfig(tc.policy, components, map[string]uint64{}) // put a componentID/binary mapping to have something in the beats monitoring input
 			assert.NoError(t, err)
 
 			rawInputs, ok := got["inputs"]
@@ -356,6 +361,7 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)
 	require.NoError(t, err, "Error creating agent info")
+	components := []component.Component{{ID: "foobeat", InputSpec: &component.InputRuntimeSpec{BinaryName: "filebeat"}}}
 
 	sampleSevenErrorsStreamThreshold := uint(7)
 	sampleTenErrorsStreamThreshold := uint(10)
@@ -542,7 +548,7 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 				operatingSystem: runtime.GOOS,
 				agentInfo:       agentInfo,
 			}
-			got, err := b.MonitoringConfig(tc.policy, nil, map[string]string{"foobeat": "filebeat"}, map[string]uint64{}) // put a componentID/binary mapping to have something in the beats monitoring input
+			got, err := b.MonitoringConfig(tc.policy, components, map[string]uint64{}) // put a componentID/binary mapping to have something in the beats monitoring input
 			assert.NoError(t, err)
 
 			rawInputs, ok := got["inputs"]
@@ -587,6 +593,7 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 func TestErrorMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)
+	components := []component.Component{{ID: "foobeat", InputSpec: &component.InputRuntimeSpec{BinaryName: "filebeat"}}}
 	require.NoError(t, err, "Error creating agent info")
 
 	tcs := []struct {
@@ -718,7 +725,8 @@ func TestErrorMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 				operatingSystem: runtime.GOOS,
 				agentInfo:       agentInfo,
 			}
-			_, err := b.MonitoringConfig(tc.policy, nil, map[string]string{"foobeat": "filebeat"}, map[string]uint64{}) // put a componentID/binary mapping to have something in the beats monitoring input
+
+			_, err := b.MonitoringConfig(tc.policy, components, map[string]uint64{}) // put a componentID/binary mapping to have something in the beats monitoring input
 			tc.assertError(t, err)
 		})
 	}
@@ -771,7 +779,7 @@ func TestMonitoringConfigComponentFields(t *testing.T) {
 			},
 		},
 	}
-	monitoringConfig, err := b.MonitoringConfig(policy, components, map[string]string{"filestream-default": "filebeat"}, map[string]uint64{})
+	monitoringConfig, err := b.MonitoringConfig(policy, components, map[string]uint64{})
 	if err != nil {
 		t.Fatalf("cannot render monitoring configuration: %s", err)
 	}
