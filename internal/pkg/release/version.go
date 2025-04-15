@@ -20,7 +20,7 @@ const (
 // snapshot is a flag marking build as a snapshot.
 var snapshot = ""
 
-// fips is a flag for marking a FIPS compliant build.
+// fips is a flag for marking a FIPS-capable build.
 var fips = "false"
 
 // complete is an environment variable marking the image as complete.
