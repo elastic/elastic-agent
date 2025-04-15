@@ -23,10 +23,10 @@ function asdf_install() {
   asdf plugin update --all
   asdf plugin-add golang https://github.com/asdf-community/asdf-golang.git
   source $AGENT_HOME/.bashrc
+  popd
 }
 
-function asdf_init() {
-  source $AGENT_HOME/.bashrc  
+function asdf_init() {  
   if [[ -f ".tool-versions" ]]; then
     cut -d' ' -f1 .tool-versions|xargs -i asdf plugin add  {}
   fi
@@ -41,8 +41,8 @@ function asdf_init() {
   fi
 }
 
-asdf_install
-asdf_init
+# asdf_install
+
 
 
 
