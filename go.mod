@@ -15,13 +15,13 @@ require (
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250218044933-ef79280d53a2
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
-	github.com/elastic/elastic-agent-client/v7 v7.17.1
+	github.com/elastic/elastic-agent-client/v7 v7.17.2
 	github.com/elastic/elastic-agent-libs v0.18.10
-	github.com/elastic/elastic-agent-system-metrics v0.11.9
+	github.com/elastic/elastic-agent-system-metrics v0.11.10
 	github.com/elastic/elastic-transport-go/v8 v8.6.1
 	github.com/elastic/go-elasticsearch/v8 v8.17.1
 	github.com/elastic/go-licenser v0.4.2
-	github.com/elastic/go-sysinfo v1.15.1
+	github.com/elastic/go-sysinfo v1.15.2
 	github.com/elastic/go-ucfg v0.8.8
 	github.com/elastic/mock-es v0.0.0-20241101195702-0a41fa3d30d9
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.2.0
@@ -77,6 +77,7 @@ require (
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.36.0
 	golang.org/x/exp v0.0.0-20250215185904-eff6e970281f
+	golang.org/x/mod v0.23.0
 	golang.org/x/net v0.38.0
 	golang.org/x/sync v0.12.0
 	golang.org/x/sys v0.31.0
@@ -131,6 +132,7 @@ require (
 	go.opentelemetry.io/collector/connector v0.120.0
 	go.opentelemetry.io/collector/exporter v0.120.0
 	go.opentelemetry.io/collector/exporter/debugexporter v0.120.0
+	go.opentelemetry.io/collector/exporter/nopexporter v0.120.0
 	go.opentelemetry.io/collector/exporter/otlpexporter v0.120.0
 	go.opentelemetry.io/collector/exporter/otlphttpexporter v0.120.0
 	go.opentelemetry.io/collector/extension v0.120.0
@@ -297,7 +299,7 @@ require (
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/lunes v0.1.0 // indirect
-	github.com/elastic/mito v1.16.0 // indirect
+	github.com/elastic/mito v1.17.1 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.4.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.16.1 // indirect
@@ -624,7 +626,6 @@ require (
 	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/mod v0.23.0 // indirect
 	golang.org/x/oauth2 v0.24.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gonum.org/v1/gonum v0.15.1 // indirect
