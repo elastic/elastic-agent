@@ -405,11 +405,6 @@ require (
 	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
-<<<<<<< HEAD
-	github.com/karrick/godirwalk v1.17.0 // indirect
-=======
-	github.com/kamstrup/intmap v0.5.1 // indirect
->>>>>>> 68645564a (Update helm.sh/helm/v3 to v3.17.3 (#7841))
 	github.com/klauspost/asmfmt v1.3.2 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.8 // indirect
