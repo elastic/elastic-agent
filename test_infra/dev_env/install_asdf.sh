@@ -1,7 +1,3 @@
-#!//usr/bin/env bash
-
-set -euo pipefail
-
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -15,39 +11,35 @@ ASDF_DIR="/opt/buildkite-agent/.asdf"
 # Installation instructions from https://asdf-vm.com/guide/getting-started.html
 ASDF_VERSION="0.14.0"
 
-function install_asdf() {
+function asdf_install() {
   echo "installing asdf $ASDF_VERSION"
-  sudo -u $AGENT_USER bash <<EOF
-set -euo pipefail
-
-if [ -d "$ASDF_DIR" ]; then
-  rm -r "$ASDF_DIR"
-fi
-
-pushd $AGENT_HOME
-retry -t 3 -- git clone https://github.com/asdf-vm/asdf.git ${ASDF_DIR} --branch v${ASDF_VERSION} \\
-&& echo 'source $ASDF_DIR/asdf.sh' >> $AGENT_HOME/.bashrc \\
-&& source $ASDF_DIR/asdf.sh \\
-&& asdf plugin update --all \\
-&& asdf plugin-add golang https://github.com/asdf-community/asdf-golang.git
-popd 
-EOF
+  if [ -d "$ASDF_DIR" ]; then
+    rm -r "$ASDF_DIR"
+  fi
+  pushd $AGENT_HOME
+  retry -t 3 -- git clone https://github.com/asdf-vm/asdf.git ${ASDF_DIR} --branch v${ASDF_VERSION} 
+  echo 'source $ASDF_DIR/asdf.sh' >> $AGENT_HOME/.bashrc
+  source $ASDF_DIR/asdf.sh
+  asdf plugin update --all
+  asdf plugin-add golang https://github.com/asdf-community/asdf-golang.git
+  source $AGENT_HOME/.bashrc
 }
 
-if command -v asdf >/dev/null 2>&1; then
-  INSTALLED_VERSION=$(asdf --version | awk '{print $3}')
-  echo "Installed version: ${INSTALLED_VERSION}"
-  if [[ "$INSTALLED_VERSION" == "$ASDF_VERSION" ]]; then
-      echo "asdf version $ASDF_VERSION is already installed. Skipping installation."      
-  else
-      echo "asdf is installed, but version is $INSTALLED_VERSION (expected $ASDF_VERSION)."
-      install_asdf      
+function asdf_init() {
+  source $AGENT_HOME/.bashrc  
+  if [[ -f ".tool-versions" ]]; then
+    cut -d' ' -f1 .tool-versions|xargs -i asdf plugin add  {}
   fi
-else
-  echo "asdf is not installed"
-  install_asdf
-fi
+  if [[ -f ".go-version" ]]; then
+    export ASDF_GOLANG_VERSION=$(cat .go-version)
+    install_tool_version_if_absent golang $ASDF_GOLANG_VERSION
+    echo "--- loaded .go-version (${ASDF_GOLANG_VERSION})"
+    asdf reshim golang
+    export GOROOT="$(asdf where golang)/go/"
+    export GOPATH=$(go env GOPATH)
+    export PATH="$GOPATH/bin:$PATH"
+  fi
+}
 
-sudo su $AGENT_USER
-source $AGENT_HOME/.bashrc
-source /opt/buildkite-agent/hooks/pre-command
+
+# source /opt/buildkite-agent/hooks/pre-command
