@@ -501,8 +501,8 @@ github.com/elastic/gosigar v0.14.3 h1:xwkKwPia+hSfg9GqrCUKYdId102m9qTJIIr7egmK/u
 github.com/elastic/gosigar v0.14.3/go.mod h1:iXRIGg2tLnu7LBdpqzyQfGDEidKCfWcCMS0WKyPWoMs=
 github.com/elastic/lunes v0.1.0 h1:amRtLPjwkWtzDF/RKzcEPMvSsSseLDLW+bnhfNSLRe4=
 github.com/elastic/lunes v0.1.0/go.mod h1:xGphYIt3XdZRtyWosHQTErsQTd4OP1p9wsbVoHelrd4=
-github.com/elastic/mito v1.17.0 h1:UEEFfQy5WhS6vVvMPMwHvdn5rH24eBJMb2ZOlGBkI5s=
-github.com/elastic/mito v1.17.0/go.mod h1:nG5MoOsgJwVlglhlANiBFmHWqoIjrpbR5vy612wE8yE=
+github.com/elastic/mito v1.18.0 h1:WlNIQMJDlw0fbqh20n97YBCzvXA0MO1gntMAjGWbepI=
+github.com/elastic/mito v1.18.0/go.mod h1:fAVRjgTSaheI4qjWprqxYjFBkqSxCbNo1XQ99LlMOFw=
 github.com/elastic/mock-es v0.0.0-20241101195702-0a41fa3d30d9 h1:wXto1Zck/WqoXIoxEI8+nqoSSohPGp5dWV5zLskldYU=
 github.com/elastic/mock-es v0.0.0-20241101195702-0a41fa3d30d9/go.mod h1:cXqWcLnmu5y4QveTb2hjk7rgzkHMuZsqeXtbJpNAcu0=
 github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.2.0 h1:LABSYBSCK6LU0uWi5mdIgDt/IjX8XTabZQP3Vp911jo=
@@ -1655,6 +1655,8 @@ go.opentelemetry.io/collector/exporter/exporterhelper/xexporterhelper v0.120.0 h
 go.opentelemetry.io/collector/exporter/exporterhelper/xexporterhelper v0.120.0/go.mod h1:1GYlI2dvT0yl+n3KuRI0x+RQr+ppzzGsEUHHY4citk0=
 go.opentelemetry.io/collector/exporter/exportertest v0.120.0 h1:7ABriAYXGxvUdCXxe0LpsrMGQ+BP5z/gadm1gRWbD4o=
 go.opentelemetry.io/collector/exporter/exportertest v0.120.0/go.mod h1:t0hONsvJp5MM1EF1l83voJHcharIPdnpUBP42UhCoCY=
+go.opentelemetry.io/collector/exporter/nopexporter v0.120.0 h1:Tn/7+F1mo4AlBdXKURBsk95IlvO+bjbALblHkxTLsR4=
+go.opentelemetry.io/collector/exporter/nopexporter v0.120.0/go.mod h1:9590kdMGKu1pIlu3hBQ9yJIZUbZsNknww9jy2WAwfuA=
 go.opentelemetry.io/collector/exporter/otlpexporter v0.120.0 h1:oxfHKZHEwN87fycLNt97P1MaijYdR15tsEd4VkZxxss=
 go.opentelemetry.io/collector/exporter/otlpexporter v0.120.0/go.mod h1:pI9POQR3jzhOY3+hNNhjpo/yTUrmHHdqvQqyUEO0pCw=
 go.opentelemetry.io/collector/exporter/otlphttpexporter v0.120.0 h1:sdP4J5iBHrM1Eudpmf3v4/tGKBilIVN+5qZxCI0ZCDo=
