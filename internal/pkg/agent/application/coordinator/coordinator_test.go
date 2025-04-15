@@ -16,6 +16,9 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
+
 	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
@@ -109,7 +112,14 @@ func waitForState(
 
 func TestComponentUpdateDiff(t *testing.T) {
 
-	err := logp.DevelopmentSetup(logp.ToObserverOutput())
+	observedCore, observedLogs := observer.New(zapcore.DebugLevel)
+	err := logp.ConfigureWithOutputs(logp.Config{
+		Level:      logp.DebugLevel,
+		ToStderr:   false,
+		ToSyslog:   false,
+		ToFiles:    false,
+		ToEventLog: false,
+	}, observedCore)
 	require.NoError(t, err)
 
 	cases := []struct {
@@ -315,7 +325,7 @@ func TestComponentUpdateDiff(t *testing.T) {
 			}
 			testCoord.checkAndLogUpdate(testcase.old)
 
-			obsLogs := logp.ObserverLogs().TakeAll()
+			obsLogs := observedLogs.All()
 			last := obsLogs[len(obsLogs)-1]
 
 			// extract the structured data from the log message
@@ -1105,12 +1115,12 @@ type testMonitoringManager struct{}
 
 func newTestMonitoringMgr() *testMonitoringManager { return &testMonitoringManager{} }
 
-func (*testMonitoringManager) EnrichArgs(_ string, _ string, args []string) []string { return args }
-func (*testMonitoringManager) Prepare(_ string) error                                { return nil }
-func (*testMonitoringManager) Cleanup(string) error                                  { return nil }
-func (*testMonitoringManager) Enabled() bool                                         { return false }
-func (*testMonitoringManager) Reload(rawConfig *config.Config) error                 { return nil }
-func (*testMonitoringManager) MonitoringConfig(_ map[string]interface{}, _ []component.Component, _ map[string]string, _ map[string]uint64) (map[string]interface{}, error) {
+func (*testMonitoringManager) EnrichArgs(_, _ string, args []string) []string { return args }
+func (*testMonitoringManager) Prepare(string) error                           { return nil }
+func (*testMonitoringManager) Cleanup(string) error                           { return nil }
+func (*testMonitoringManager) Enabled() bool                                  { return false }
+func (*testMonitoringManager) Reload(rawConfig *config.Config) error          { return nil }
+func (*testMonitoringManager) MonitoringConfig(map[string]interface{}, []component.Component, map[string]uint64) (map[string]interface{}, error) {
 	return nil, nil
 }
 
