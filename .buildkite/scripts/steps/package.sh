@@ -13,13 +13,15 @@ fi
 export AGENT_DROP_PATH=build/elastic-agent-drop
 mkdir -p $AGENT_DROP_PATH
 
-# Download the components from the MANIFEST_URL and then package those downloaded into the $AGENT_DROP_PATH
-mage clean downloadManifest packageUsingDRA
+MAGE_TARGETS=(clean downloadManifest packageUsingDRA)
 if [ "$FIPS" != "true" ]; then
-mage ironbank
+  # Build ironbank only on non-FIPS builds
+  MAGE_TARGETS+=("ironbank")
 fi
-mage fixDRADockerArtifacts
+MAGE_TARGETS+=("fixDRADockerArtifacts")
 
+# Download the components from the MANIFEST_URL and then package those downloaded into the $AGENT_DROP_PATH
+mage "${MAGE_TARGETS[@]}"
 
 echo  "+++ Generate dependencies report"
 BEAT_VERSION_FULL=$(curl -s -XGET "${MANIFEST_URL}" |jq '.version' -r )
