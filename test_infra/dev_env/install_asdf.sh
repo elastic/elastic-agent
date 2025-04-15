@@ -5,14 +5,14 @@ set -euo pipefail
 ### ASDF 
 ###
 # Installation instructions from https://asdf-vm.com/guide/getting-started.html
-AGENT_USER=$(whoami)
-AGENT_HOME="~/"
-ASDF_DIR="~/.asdf"
+AGENT_USER=$USER
+AGENT_HOME=$HOME
+ASDF_DIR="$HOME/.asdf"
 ASDF_VERSION="0.14.0"
 
 echo "installing asdf $ASDF_VERSION"
 if [ -d "$ASDF_DIR" ]; then
-  rm -r "$ASDF_DIR"
+  rm -rf "$ASDF_DIR"
 fi
 pushd $AGENT_HOME
 retry -t 3 -- git clone https://github.com/asdf-vm/asdf.git ${ASDF_DIR} --branch v${ASDF_VERSION} 

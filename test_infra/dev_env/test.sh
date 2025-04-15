@@ -1,4 +1,4 @@
-sudo su buildkite-agent
+#sudo su buildkite-agent
 cd ~
 git clone https://github.com/elastic/elastic-agent.git
 cd elastic-agent

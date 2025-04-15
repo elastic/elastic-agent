@@ -29,6 +29,3 @@ if [[ -f ".go-version" ]]; then
   export GOPATH=$(go env GOPATH)
   export PATH="$GOPATH/bin:$PATH"
 fi
-
-
-init_asdf
