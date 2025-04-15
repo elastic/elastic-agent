@@ -126,6 +126,11 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 		// checkInstallSuccess(t, fixture, topPath, true) // FIXME fails to build if this is uncommented, but the method is part of install_test.go
 		t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 		t.Run("check fleet-server api", testFleetServerInternalAPI())
+		t.Run("check agent healthy and connected to Fleet", func(t *testing.T) {
+			require.Eventuallyf(t, func() bool {
+				return waitForAgentAndFleetHealthy(ctx, t, fixture)
+			}, time.Minute, time.Second, "agent never became healthy or connected to Fleet")
+		})
 
 		// Make sure uninstall from within the topPath fails on Windows
 		if runtime.GOOS == "windows" {
@@ -172,6 +177,11 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 		// checkInstallSuccess(t, fixture, topPath, true) // FIXME fails to build if this is uncommented, but the method is part of install_test.go
 		t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
 		t.Run("check fleet-server api", testFleetServerInternalAPI())
+		t.Run("check agent healthy and connected to Fleet", func(t *testing.T) {
+			require.Eventuallyf(t, func() bool {
+				return waitForAgentAndFleetHealthy(ctx, t, fixture)
+			}, time.Minute, time.Second, "agent never became healthy or connected to Fleet")
+		})
 
 		// Make sure uninstall from within the topPath fails on Windows
 		if runtime.GOOS == "windows" {
