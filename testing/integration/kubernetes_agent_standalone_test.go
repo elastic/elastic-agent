@@ -926,12 +926,9 @@ func k8sDumpPods(t *testing.T, ctx context.Context, client klient.Client, testNa
 	}
 
 	type containerPodState struct {
+		corev1.ContainerStatus `json:",inline"`
 		Namespace              string `json:"namespace"`
-		PodName                string `json:"pod_name"`
-		ContainerName          string `json:"container_name"`
-		RestartCount           int32  `json:"restart_count"`
-		LastTerminationReason  string `json:"last_termination_reason"`
-		LastTerminationMessage string `json:"last_termination_message"`
+		PodName                string `json:"podName"`
 	}
 
 	var statesDump []containerPodState
@@ -943,11 +940,6 @@ func k8sDumpPods(t *testing.T, ctx context.Context, client klient.Client, testNa
 		}
 
 		for _, container := range pod.Spec.Containers {
-			state := containerPodState{
-				Namespace:     podNamespace,
-				PodName:       pod.GetName(),
-				ContainerName: container.Name,
-			}
 			previous := false
 
 			for _, containerStatus := range pod.Status.ContainerStatuses {
@@ -955,7 +947,11 @@ func k8sDumpPods(t *testing.T, ctx context.Context, client klient.Client, testNa
 					continue
 				}
 
-				state.RestartCount = containerStatus.RestartCount
+				statesDump = append(statesDump, containerPodState{
+					containerStatus,
+					podNamespace,
+					pod.GetName(),
+				})
 				if containerStatus.RestartCount == 0 {
 					break
 				}
@@ -966,12 +962,9 @@ func k8sDumpPods(t *testing.T, ctx context.Context, client klient.Client, testNa
 				containerTerminated := containerStatus.LastTerminationState.Terminated
 				if containerTerminated != nil && containerTerminated.FinishedAt.After(testStartTime) {
 					previous = true
-					state.LastTerminationReason = containerTerminated.Reason
-					state.LastTerminationMessage = containerTerminated.Message
 				}
 				break
 			}
-			statesDump = append(statesDump, state)
 
 			var logFileName string
 			if previous {
