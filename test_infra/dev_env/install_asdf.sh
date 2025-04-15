@@ -14,13 +14,12 @@ echo "installing asdf $ASDF_VERSION"
 if [ -d "$ASDF_DIR" ]; then
   rm -rf "$ASDF_DIR"
 fi
-pushd $AGENT_HOME
 retry -t 3 -- git clone https://github.com/asdf-vm/asdf.git ${ASDF_DIR} --branch v${ASDF_VERSION} 
-echo 'source $ASDF_DIR/asdf.sh' >> $AGENT_HOME/.bashrc
+echo "source $ASDF_DIR/asdf.sh" >> $AGENT_HOME/.bashrc
 source $ASDF_DIR/asdf.sh
 asdf plugin update --all
 asdf plugin-add golang https://github.com/asdf-community/asdf-golang.git
 source $AGENT_HOME/.bashrc
-popd
+
 
 # source /opt/buildkite-agent/hooks/pre-command
