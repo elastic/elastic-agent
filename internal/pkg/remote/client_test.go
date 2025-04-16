@@ -481,14 +481,6 @@ func withServer(m func(t *testing.T) *http.ServeMux, test func(t *testing.T, hos
 	}
 }
 
-func withTLSServer(m func(t *testing.T) *http.ServeMux, test func(t *testing.T, host string)) func(t *testing.T) {
-	return func(t *testing.T) {
-		s := httptest.NewTLSServer(m(t))
-		defer s.Close()
-		test(t, s.Listener.Addr().String())
-	}
-}
-
 type debugStack struct {
 	sync.Mutex
 	messages []string
