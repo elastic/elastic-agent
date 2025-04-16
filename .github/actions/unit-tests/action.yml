@@ -1,0 +1,22 @@
+name: unit-tests
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-go@v5
+      with:
+        go-version-file: .go-version
+
+    - name: Install make
+      run: |
+        brew install make
+        export PATH="/usr/local/opt/make/libexec/gnubin:$PATH"
+      shell: bash
+
+    - name: Install mage
+      run: make mage
+      shell: bash
+
+    - name: Run build
+      run: RACE_DETECTOR=true TEST_COVERAGE=true mage unitTest
+      shell: bash
