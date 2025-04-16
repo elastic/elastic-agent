@@ -14,7 +14,6 @@ permissions:
 ## So old builds running for old commits within the same Pull Request are cancelled
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   unit-tests-push:
@@ -22,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-13, macos-14]
+        os: [macos-13, macos-14, macos-14-xlarge, macos-13-xlarge, macos-14-large, macos-13-large ]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
