@@ -18,7 +18,7 @@ summary: Add elastic.agent.fips to local_metadata
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
 description: |
   Add elastic.agent.fips (bool) attribute to local_metadata sent with enroll and checkin requests.
-  The value of this attribute indicates if the agent is a FIPS compliant distribution.
+  The value of this attribute indicates if the agent is a FIPS-capable distribution.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
