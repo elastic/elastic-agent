@@ -994,6 +994,7 @@ func dropPeriodicMetricsLogsProcessor() map[string]any {
 // routed to the elastic-agent logger get sent to the component-specific dataset.
 func useComponentDatasetProcessors() []any {
 	return []any{
+		// copy original dataset so we can drop the dataset field
 		map[string]any{
 			"copy_fields": map[string]any{
 				"fields": []any{
