@@ -5,9 +5,24 @@ ARG GORELEASER_VERSION="latest"
 FROM ghcr.io/goreleaser/goreleaser:${GORELEASER_VERSION} AS goreleaser
 
 FROM ${BASE_IMAGE}
+
+# Install some basic dependencies
+RUN apt-get update \
+ && apt-get install --no-install-recommends -y -q \
+    software-properties-common \
+    curl \
+    gnupg2 \
+    openssh-client \
+ && apt -y autoremove \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
 COPY --from=goreleaser /usr/bin/goreleaser /usr/bin/goreleaser
 
 WORKDIR /src
+
+# Configure workdir to be safe for git operations
+RUN git config --global --add safe.directory /src
 
 ENTRYPOINT ["/usr/bin/goreleaser"]
 

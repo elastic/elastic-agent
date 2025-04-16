@@ -106,6 +106,8 @@ const (
 	helmOtelChartPath  = "./deploy/helm/edot-collector/kube-stack"
 	helmMOtelChartPath = "./deploy/helm/edot-collector/kube-stack/managed_otlp"
 	sha512FileExt      = ".sha512"
+
+	goReleaserCrossbuilderImageName = "docker.elastic.co/observability-ci/golangreleaser-crossbuild"
 )
 
 var (
@@ -170,6 +172,59 @@ type Otel mg.Namespace
 
 // Devmachine namespace contains tasks related to remote development machines.
 type Devmachine mg.Namespace
+
+// GoReleaser namespace contains experimental mage targets for using goreleaser. NOT STABLE, USE AT YOUR OWN RISK!
+type GoReleaser mg.Namespace
+
+func (GoReleaser) MakeCrossBuilder() error {
+	log.Printf("Creating image %s for LOCAL USE ONLY! Do not push this experimental image anywhere", goReleaserCrossbuilderImageName)
+	goVersion, err := devtools.GoVersion()
+	if err != nil {
+		return fmt.Errorf("detecting go version: %w", err)
+	}
+	return sh.Run("docker", "build",
+		"-f", "Dockerfile.goreleaser",
+		"--build-arg", fmt.Sprintf("GO_VERSION=%s", goVersion),
+		"-t", fmt.Sprintf("%s:%s", goReleaserCrossbuilderImageName, goVersion),
+		".",
+	)
+}
+
+func (GoReleaser) Build() error {
+	mg.Deps(GoReleaser.MakeCrossBuilder)
+	goVersion, err := devtools.GoVersion()
+	if err != nil {
+		return fmt.Errorf("detecting go version: %w", err)
+	}
+
+	return sh.Run("docker", "run",
+		// source mounted as volume
+		"-v", ".:/src",
+		fmt.Sprintf("%s:%s", goReleaserCrossbuilderImageName, goVersion),
+		// GoReleaser args
+		"--clean",
+		"--snapshot",
+		"build",
+	)
+}
+
+func (GoReleaser) Package() error {
+	mg.Deps(GoReleaser.MakeCrossBuilder)
+	goVersion, err := devtools.GoVersion()
+	if err != nil {
+		return fmt.Errorf("detecting go version: %w", err)
+	}
+	// TODO transform this into an external packaging, using the docker container to build only
+	return sh.Run("docker", "run",
+		// source mounted as volume
+		"-v", ".:/src",
+		fmt.Sprintf("%s:%s", goReleaserCrossbuilderImageName, goVersion),
+		// GoReleaser args
+		"--clean",
+		"--snapshot",
+		"release",
+	)
+}
 
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
