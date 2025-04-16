@@ -88,7 +88,6 @@ var (
 	Snapshot      bool
 	DevBuild      bool
 	ExternalBuild bool
-	FIPSBuild     bool
 
 	versionQualified bool
 	versionQualifier string
@@ -152,11 +151,6 @@ func initGlobals() {
 	ExternalBuild, err = strconv.ParseBool(EnvOr("EXTERNAL", "false"))
 	if err != nil {
 		panic(fmt.Errorf("failed to parse EXTERNAL env value: %w", err))
-	}
-
-	FIPSBuild, err = strconv.ParseBool(EnvOr("FIPS", "false"))
-	if err != nil {
-		panic(fmt.Errorf("failed to parse FIPS env value: %w", err))
 	}
 
 	versionQualifier, versionQualified = os.LookupEnv("VERSION_QUALIFIER")
@@ -223,7 +217,6 @@ func varMap(args ...map[string]interface{}) map[string]interface{} {
 		"Snapshot":        Snapshot,
 		"DEV":             DevBuild,
 		"EXTERNAL":        ExternalBuild,
-		"FIPS":            FIPSBuild,
 		"Qualifier":       versionQualifier,
 		"CI":              CI,
 	}

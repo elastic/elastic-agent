@@ -182,9 +182,7 @@ func (b *dockerBuilder) dockerBuild() (string, error) {
 	if b.Snapshot {
 		tag = tag + "-SNAPSHOT"
 	}
-	if b.FIPS {
-		tag = tag + "-fips"
-	}
+
 	if repository := b.ExtraVars["repository"]; repository != "" {
 		tag = fmt.Sprintf("%s/%s", repository, tag)
 	}
