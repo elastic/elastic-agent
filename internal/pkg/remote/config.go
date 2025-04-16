@@ -66,3 +66,8 @@ func (c *Config) GetHosts() []string {
 	}
 	return []string{c.Host}
 }
+
+// Validate returns an error if the configuration is invalid; nil, otherwise.
+func (c *Config) Validate() error {
+	return c.Transport.TLS.Validate()
+}
