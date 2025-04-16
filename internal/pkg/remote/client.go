@@ -263,6 +263,10 @@ func newClient(
 	cfg Config,
 	clients ...*requestClient,
 ) (*Client, error) {
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid configuration: %w", err)
+	}
+
 	// Shuffle so all the agents don't access the hosts in the same order
 	rand.Shuffle(len(clients), func(i, j int) {
 		clients[i], clients[j] = clients[j], clients[i]
