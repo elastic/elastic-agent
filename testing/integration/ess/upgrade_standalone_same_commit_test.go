@@ -376,7 +376,7 @@ func generateNewManifestContent(t *testing.T, manifestReader io.Reader, newVersi
 
 	// replace manifest content
 	newManifest, err := mage.GeneratePackageManifest("elastic-agent", newVersion.String(), oldManifest.Package.Snapshot, oldManifest.Package.Hash, oldManifest.Package.Hash[:6])
-	require.NoErrorf(t, err, "GeneratePackageManifest(%v, %v, %v, %v) failed", newVersion.String(), oldManifest.Package.Snapshot, oldManifest.Package.Hash, oldManifest.Package.Hash[:6])
+	require.NoErrorf(t, err, "GeneratePackageManifest(%v, %v, %v, %v, %v) failed", newVersion.String(), oldManifest.Package.Snapshot, oldManifest.Package.Hash, oldManifest.Package.Hash[:6])
 
 	t.Logf("generated new manifest:\n%s", newManifest)
 	return newManifest
