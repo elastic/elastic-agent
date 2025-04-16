@@ -8,7 +8,7 @@ on:
   pull_request:
   push:
     branches:
-      - main
+      - test/gh-runners-macos
 
 permissions:
   contents: read
@@ -22,7 +22,6 @@ concurrency:
 jobs:
   unit-tests-push:
     name: Unit tests ${{ matrix.os }}
-    if: github.event_name == 'push'
     strategy:
       fail-fast: false
       matrix:
@@ -36,7 +35,6 @@ jobs:
 
   unit-tests-pr:
     name: Unit tests macos-15
-    if: github.event_name == 'pull_request'
     runs-on: [macos-15]
     timeout-minutes: 60
     steps:
