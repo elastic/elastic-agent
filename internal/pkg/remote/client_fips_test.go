@@ -70,3 +70,5 @@ func TestClientWithUnsupportedTLSVersions(t *testing.T) {
 		})
 	}
 }
+
+// TODO: add test for non-compliant keypair (RSA with key length < 2048)
