@@ -43,7 +43,6 @@ import (
 	"go.opentelemetry.io/collector/processor/memorylimiterprocessor"
 
 	"github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor"
-	"github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor"
 
 	"github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor"
 
@@ -52,6 +51,7 @@ import (
 	fileexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter" // for e2e tests
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter"
 	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter" // for dev
+	nopexporter "go.opentelemetry.io/collector/exporter/nopexporter"
 	"go.opentelemetry.io/collector/exporter/otlpexporter"
 	otlphttpexporter "go.opentelemetry.io/collector/exporter/otlphttpexporter"
 
@@ -66,7 +66,7 @@ import (
 	routingconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector"
 	spanmetricsconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector"
 
-	"github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector"
+	elasticapmconnector "github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector"
 )
 
 func components(extensionFactories ...extension.Factory) func() (otelcol.Factories, error) {
@@ -113,7 +113,6 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			elasticinframetricsprocessor.NewFactory(),
 			resourcedetectionprocessor.NewFactory(),
 			memorylimiterprocessor.NewFactory(),
-			lsmintervalprocessor.NewFactory(),
 			elastictraceprocessor.NewFactory(),
 		)
 		if err != nil {
@@ -128,6 +127,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			elasticsearchexporter.NewFactory(),
 			loadbalancingexporter.NewFactory(),
 			otlphttpexporter.NewFactory(),
+			nopexporter.NewFactory(),
 		}
 		// some exporters should only be available when
 		// not in fips mode due to restrictions on crypto usage
@@ -140,7 +140,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		factories.Connectors, err = otelcol.MakeFactoryMap[connector.Factory](
 			routingconnector.NewFactory(),
 			spanmetricsconnector.NewFactory(),
-			signaltometricsconnector.NewFactory(),
+			elasticapmconnector.NewFactory(),
 		)
 		if err != nil {
 			return otelcol.Factories{}, err

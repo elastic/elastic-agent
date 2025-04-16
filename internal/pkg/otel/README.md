@@ -61,6 +61,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [fileexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/fileexporter/v0.122.0/exporter/fileexporter/README.md) | v0.122.0 |
 | [kafkaexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/kafkaexporter/v0.122.0/exporter/kafkaexporter/README.md) | v0.122.0 |
 | [loadbalancingexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/loadbalancingexporter/v0.122.0/exporter/loadbalancingexporter/README.md) | v0.122.0 |
+| [nopexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/nopexporter/v0.122.0/exporter/nopexporter/README.md) | v0.122.0 |
 | [otlpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlpexporter/v0.122.0/exporter/otlpexporter/README.md) | v0.122.0 |
 | [otlphttpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlphttpexporter/v0.122.0/exporter/otlphttpexporter/README.md) | v0.122.0 |
 
@@ -75,7 +76,6 @@ This section provides a summary of components included in the Elastic Distributi
 | [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.122.0/processor/filterprocessor/README.md) | v0.122.0 |
 | [geoipprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/geoipprocessor/v0.122.0/processor/geoipprocessor/README.md) | v0.122.0 |
 | [k8sattributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/k8sattributesprocessor/v0.122.0/processor/k8sattributesprocessor/README.md) | v0.122.0 |
-| [lsmintervalprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/lsmintervalprocessor/v0.4.0/processor/lsmintervalprocessor/README.md) | v0.4.0 |
 | [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.122.0/processor/memorylimiterprocessor/README.md) | v0.122.0 |
 | [resourcedetectionprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourcedetectionprocessor/v0.122.0/processor/resourcedetectionprocessor/README.md) | v0.122.0 |
 | [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.122.0/processor/resourceprocessor/README.md) | v0.122.0 |
@@ -95,8 +95,8 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+| [elasticapmconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/elasticapmconnector/v0.2.1/connector/elasticapmconnector/README.md) | v0.2.1 |
 | [routingconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/routingconnector/v0.122.0/connector/routingconnector/README.md) | v0.122.0 |
-| [signaltometricsconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/signaltometricsconnector/v0.3.0/connector/signaltometricsconnector/README.md) | v0.3.0 |
 | [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.122.0/connector/spanmetricsconnector/README.md) | v0.122.0 |
 ## Persistence in OpenTelemetry Collector
 

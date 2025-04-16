@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"slices"
 	"text/template"
 
 	"github.com/magefile/mage/mg"
@@ -43,10 +44,7 @@ var (
 			ext:      "zip",
 		},
 	}
-	// ExpectedBinaries  is a map of binaries agent needs to their project in the unified-release manager.
-	// The project names are those used in the "projects" list in the unified release manifest.
-	// See the sample manifests in the testdata directory.
-	ExpectedBinaries []BinarySpec
+	settings *packagesConfig
 )
 
 func init() {
@@ -56,7 +54,7 @@ func init() {
 		return
 	}
 
-	ExpectedBinaries = packageSettings.Components
+	settings = packageSettings
 }
 
 type platformAndExt struct {
@@ -67,7 +65,9 @@ type platformAndExt struct {
 type BinarySpec struct {
 	BinaryName   string                  `yaml:"binaryName"`
 	PackageName  string                  `yaml:"packageName"`
+	RootDir      string                  `yaml:"rootDir"`
 	ProjectName  string                  `yaml:"projectName"`
+	FIPS         bool                    `yaml:"fips"`
 	Platforms    []Platform              `yaml:"platforms"`
 	PythonWheel  bool                    `yaml:"pythonWheel"`
 	PackageTypes []pkgcommon.PackageType `yaml:"packageTypes"`
@@ -91,6 +91,9 @@ func (proj BinarySpec) SupportsPackageType(pkgType pkgcommon.PackageType) bool {
 	return false
 }
 
+// GetPackageName will return a rendered version of the BinarySpec.packageName attribute (which is a golang template),
+// using version and platform strings provided to create a template context containing 'Version', 'Platform' and 'Ext' values.
+// The string returned will contain the expected filename of the package file for the BinarySpec
 func (proj BinarySpec) GetPackageName(version string, platform string) string {
 	tmpl, err := template.New("package_name").Parse(proj.PackageName)
 	if err != nil {
@@ -110,6 +113,69 @@ func (proj BinarySpec) GetPackageName(version string, platform string) string {
 	return buf.String()
 }
 
+// GetRootDir will return a rendered version of the BinarySpec.rootDir attribute (which is a golang template), using
+// version and platform strings provided to create a template context containing 'Version', 'Platform' and 'Ext' values.
+// The string returned will contain the expected name of the root directory created when extracted the package file for
+// the BinarySpec
+func (proj BinarySpec) GetRootDir(version string, platform string) string {
+	if proj.RootDir == "" {
+		// shortcut to avoid rendering template when there's no RootDir specified
+		return ""
+	}
+	tmpl, err := template.New("inner_path").Parse(proj.RootDir)
+	if err != nil {
+		panic(fmt.Errorf("parsing innerPath template for project/binary %s/%s %q: %w", proj.ProjectName, proj.BinaryName, proj.RootDir, err))
+	}
+
+	// look for the platform strings, if not found an empty object is returned and empty values will be used for rendering
+	pltfStrings := PlatformPackages[platform]
+	tmplContext := map[string]string{"Version": version, "Platform": pltfStrings.platform, "Ext": pltfStrings.ext}
+
+	var buf bytes.Buffer
+	err = tmpl.Execute(&buf, tmplContext)
+	if err != nil {
+		panic(fmt.Errorf("rendering innerPath template for project/binary %s/%s %q with context %v: %w",
+			proj.ProjectName, proj.BinaryName, proj.PackageName, tmplContext, err))
+	}
+	return buf.String()
+}
+
+func (proj BinarySpec) Equal(other BinarySpec) bool {
+	if proj.BinaryName != other.BinaryName {
+		return false
+	}
+
+	if proj.PackageName != other.PackageName {
+		return false
+	}
+
+	if proj.RootDir != other.RootDir {
+		return false
+	}
+
+	if proj.ProjectName != other.ProjectName {
+		return false
+	}
+
+	if proj.FIPS != other.FIPS {
+		return false
+	}
+
+	if !slices.Equal(proj.Platforms, other.Platforms) {
+		return false
+	}
+
+	if proj.PythonWheel != other.PythonWheel {
+		return false
+	}
+
+	if !slices.Equal(proj.PackageTypes, other.PackageTypes) {
+		return false
+	}
+
+	return true
+}
+
 type Platform struct {
 	OS   string
 	Arch string
@@ -126,10 +192,24 @@ func (p Platform) Platform() string {
 	return p.OS + "/" + p.Arch
 }
 
+type FIPSConfig struct {
+	Compile struct {
+		CGO       bool              `yaml:"cgo"`
+		Env       map[string]string `yaml:"env"`
+		Tags      []string          `yaml:"tags"`
+		Platforms []Platform        `yaml:"platforms"`
+	} `yaml:"compile"`
+}
+
+type GlobalSettings struct {
+	FIPS FIPSConfig `yaml:"fips"`
+}
+
 type packagesConfig struct {
 	Platforms    []Platform              `yaml:"platforms"`
 	PackageTypes []pkgcommon.PackageType `yaml:"packageTypes"`
 	Components   []BinarySpec            `yaml:"components"`
+	Settings     GlobalSettings          `yaml:"settings"`
 }
 
 func parsePackageSettings(r io.Reader) (*packagesConfig, error) {
@@ -143,4 +223,54 @@ func parsePackageSettings(r io.Reader) (*packagesConfig, error) {
 		log.Printf("Read packages config: %+v", packagesConf)
 	}
 	return packagesConf, nil
+}
+
+// Components returns a *copy* of all the binary specs loaded from packages.yml
+func Components() ([]BinarySpec, error) {
+	if settings == nil {
+		return nil, fmt.Errorf("package settings not loaded")
+	}
+	ret := make([]BinarySpec, len(settings.Components))
+	copy(ret, settings.Components)
+	return ret, nil
+}
+
+func Settings() GlobalSettings {
+	return settings.Settings
+}
+
+func FilterComponents(components []BinarySpec, filters ...ComponentFilter) []BinarySpec {
+	ret := make([]BinarySpec, 0, len(components))
+
+COMPLOOP:
+	for _, c := range components {
+		for _, filter := range filters {
+			if !filter(c) {
+				// this filter doesn't match, move to the next component
+				continue COMPLOOP
+			}
+		}
+		ret = append(ret, c)
+	}
+	return ret
+}
+
+type ComponentFilter func(BinarySpec) bool
+
+func WithProjectName(projectName string) ComponentFilter {
+	return func(p BinarySpec) bool {
+		return p.ProjectName == projectName
+	}
+}
+
+func WithFIPS(fips bool) ComponentFilter {
+	return func(p BinarySpec) bool {
+		return p.FIPS == fips
+	}
+}
+
+func WithBinaryName(binaryName string) ComponentFilter {
+	return func(p BinarySpec) bool {
+		return p.BinaryName == binaryName
+	}
 }
