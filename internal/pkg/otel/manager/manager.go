@@ -7,7 +7,6 @@ package manager
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/confmap"
@@ -109,7 +108,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				}
 				// pass the error to the errCh so the coordinator, unless it's a cancel error
 				if !errors.Is(err, context.Canceled) {
-					m.logger.Errorf(fmt.Sprintf("Failed to start the collector: %w", err))
+					m.logger.Errorf("Failed to start the collector: %s", err)
 					m.reportErr(ctx, err)
 				}
 			}
