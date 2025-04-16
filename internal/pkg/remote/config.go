@@ -71,13 +71,8 @@ func (c *Config) GetHosts() []string {
 
 // Validate returns an error if the configuration is invalid; nil, otherwise.
 func (c *Config) Validate() error {
-	numNonEmptyHosts := 0
-	for _, host := range c.GetHosts() {
-		if len(strings.TrimSpace(host)) > 0 {
-			numNonEmptyHosts++
-		}
-	}
-	if numNonEmptyHosts < 1 {
+	hosts := c.GetHosts()
+	if len(hosts) == 0 || numNonEmptyStringsInSlice(hosts) < 1 {
 		return errors.New("at least one host must be specified")
 	}
 
@@ -86,4 +81,15 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+func numNonEmptyStringsInSlice(list []string) int {
+	numNonEmptyStrings := 0
+	for _, str := range list {
+		if len(strings.TrimSpace(str)) > 0 {
+			numNonEmptyStrings++
+		}
+	}
+
+	return numNonEmptyStrings
 }
