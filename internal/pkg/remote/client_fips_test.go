@@ -19,36 +19,52 @@ func TestClientWithUnsupportedTLSVersions(t *testing.T) {
 	testLogger, _ := loggertest.New("TestClientWithUnsupportedTLSVersions")
 	const unsupportedErrorMsg = "invalid configuration: unsupported tls version: %s"
 
-	cases := map[tlscommon.TLSVersion]string{
-		tlscommon.TLSVersion10: unsupportedErrorMsg,
-		tlscommon.TLSVersion11: unsupportedErrorMsg,
-		tlscommon.TLSVersion12: "",
-		tlscommon.TLSVersion13: "",
+	cases := map[string]struct {
+		versions       []tlscommon.TLSVersion
+		expectedErrMsg string
+	}{
+		"1.0": {
+			versions:       []tlscommon.TLSVersion{tlscommon.TLSVersion10},
+			expectedErrMsg: fmt.Sprintf(unsupportedErrorMsg, tlscommon.TLSVersion10),
+		},
+		"1.1": {
+			versions:       []tlscommon.TLSVersion{tlscommon.TLSVersion11},
+			expectedErrMsg: fmt.Sprintf(unsupportedErrorMsg, tlscommon.TLSVersion11),
+		},
+		"1.2": {
+			versions:       []tlscommon.TLSVersion{tlscommon.TLSVersion12},
+			expectedErrMsg: "",
+		},
+		"1.3": {
+			versions:       []tlscommon.TLSVersion{tlscommon.TLSVersion13},
+			expectedErrMsg: "",
+		},
+		"1.1,1.2": {
+			versions:       []tlscommon.TLSVersion{tlscommon.TLSVersion11, tlscommon.TLSVersion12},
+			expectedErrMsg: fmt.Sprintf(unsupportedErrorMsg, tlscommon.TLSVersion11),
+		},
 	}
 
-	for ver, expectedErrMsg := range cases {
-		t.Run(ver.String(), func(t *testing.T) {
+	for name, test := range cases {
+		t.Run(name, func(t *testing.T) {
 			tlsEnabled := true
 			config := Config{
 				Transport: httpcommon.HTTPTransportSettings{
 					TLS: &tlscommon.Config{
 						Enabled:  &tlsEnabled,
-						Versions: []tlscommon.TLSVersion{ver},
+						Versions: test.versions,
 					},
 				},
 			}
 
 			client, err := NewWithConfig(testLogger, config, nil)
-			if expectedErrMsg == "" {
+			if test.expectedErrMsg == "" {
 				require.NotNil(t, client)
 				require.NoError(t, err)
 			} else {
-				expectedErrMsg = fmt.Sprintf(expectedErrMsg, ver)
 				require.Nil(t, client)
-				require.Equal(t, expectedErrMsg, err.Error())
+				require.Equal(t, test.expectedErrMsg, err.Error())
 			}
 		})
 	}
 }
-
-// TODO: add test for non-compliant keypair (RSA with key length < 2048)
