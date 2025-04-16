@@ -81,7 +81,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				if err != nil {
 					// failed to create the collector (this is different then
 					// it's failing to run). we do not retry creation on failure
-					// as it will always fail a new configuration is required for
+					// as it will always fail. A new configuration is required for
 					// it not to fail (a new configuration will result in the retry)
 					m.reportErr(ctx, err)
 				} else {
@@ -108,6 +108,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				}
 				// pass the error to the errCh so the coordinator, unless it's a cancel error
 				if !errors.Is(err, context.Canceled) {
+					m.logger.Errorf("Failed to start the collector: %s", err)
 					m.reportErr(ctx, err)
 				}
 			}
@@ -143,7 +144,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 					if err != nil {
 						// failed to create the collector (this is different then
 						// it's failing to run). we do not retry creation on failure
-						// as it will always fail a new configuration is required for
+						// as it will always fail. A new configuration is required for
 						// it not to fail (a new configuration will result in the retry)
 						m.reportErr(ctx, err)
 					} else {
