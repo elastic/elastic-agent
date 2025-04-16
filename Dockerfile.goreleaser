@@ -1,0 +1,13 @@
+ARG GO_VERSION=1.24.1
+ARG BASE_IMAGE=docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-main-debian11
+ARG GORELEASER_VERSION="latest"
+
+FROM ghcr.io/goreleaser/goreleaser:${GORELEASER_VERSION} AS goreleaser
+
+FROM ${BASE_IMAGE}
+COPY --from=goreleaser /usr/bin/goreleaser /usr/bin/goreleaser
+
+WORKDIR /src
+
+ENTRYPOINT ["/usr/bin/goreleaser"]
+

@@ -16,7 +16,21 @@ before:
     # - go generate ./...
 
 builds:
-  - env:
+  - id: elastic-agent
+    binary: elastic-agent
+    flags:
+      - -buildvcs=false
+    goos:
+      - linux
+      - windows
+      # - darwin
+    goarch:
+      - amd64
+      # - arm64
+    ignore:
+      - goarch: arm64
+        goos: windows
+    env:
       - CGO_ENABLED=1
       # complex, templated envs:
       - >-
@@ -44,17 +58,9 @@ builds:
           {{- if eq .Arch "arm64" }}CXX=aarch64-linux-gnu-g++{{- end }}
         {{- end }}
 
-    goos:
-      - linux
-      - windows
-      - darwin
-    id: elastic-agent
-    binary: elastic-agent
-    ignore:
-      - goarch: 386
-
 archives:
-  - format: tar.gz
+  - formats:
+    - tar.gz
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
       {{ .ProjectName }}_
@@ -66,7 +72,8 @@ archives:
     # use zip for windows archives
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
 
 changelog:
   sort: asc
