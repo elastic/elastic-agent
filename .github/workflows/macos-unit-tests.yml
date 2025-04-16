@@ -1,7 +1,4 @@
-name: xpack-auditbeat-macos-unit-tests
-
-env:
-  BEAT: "x-pack/auditbeat"
+name: macos-unit-tests
 
 on:
   workflow_dispatch:
