@@ -8,11 +8,13 @@ package remote
 
 import (
 	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
-	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestClientWithUnsupportedTLSVersions(t *testing.T) {
