@@ -20,10 +20,10 @@ import (
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
-// This file contains upgrade tests that pertain to FIPS-compliant Agent artifacts.
+// This file contains upgrade tests that pertain to FIPS-capable Agent artifacts.
 
-// TestStandaloneUpgradeFIPStoFIPS ensures that upgrading a FIPS-compliant Agent
-// results in the new (post-upgrade) Agent to also be FIPS-compliant.
+// TestStandaloneUpgradeFIPStoFIPS ensures that upgrading a FIPS-capable Agent
+// results in the new (post-upgrade) Agent to also be FIPS-capable.
 func TestStandaloneUpgradeFIPStoFIPS(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: StandaloneUpgrade,
