@@ -423,7 +423,7 @@ type VersionResponse struct {
 	BuildTime string `protobuf:"bytes,3,opt,name=buildTime,proto3" json:"buildTime,omitempty"`
 	// Current running version is a snapshot.
 	Snapshot bool `protobuf:"varint,4,opt,name=snapshot,proto3" json:"snapshot,omitempty"`
-	// Current running version is FIPS-compliant.
+	// Current running version is FIPS-capable.
 	Fips bool `protobuf:"varint,5,opt,name=fips,proto3" json:"fips,omitempty"`
 }
 
