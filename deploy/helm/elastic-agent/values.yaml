@@ -147,7 +147,9 @@ kubernetes:
       # -- enable containers logs stream [ref](https://www.elastic.co/docs/current/integrations/kubernetes/container-logs)
       # @section -- 2 - Kubernetes integration
       enabled: true
-      additionalParsersConfig: []
+      # -- containers logs stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
     audit_logs:
       # -- enable containers audit logs stream [ref](https://www.elastic.co/docs/current/integrations/kubernetes/audit-logs)
       # @section -- 2 - Kubernetes integration
@@ -332,13 +334,13 @@ extraIntegrations: {}
 agent:
   # -- elastic-agent version
   # @section -- 6 - Elastic-Agent Configuration
-  version: 9.0.0
+  version: 9.0.1
   # -- image configuration
   # @section -- 6 - Elastic-Agent Configuration
   image:
     repository: docker.elastic.co/elastic-agent/elastic-agent
     pullPolicy: IfNotPresent
-    tag: "9.0.0-SNAPSHOT"
+    tag: "9.0.1-SNAPSHOT"
   # -- image pull secrets
   # @section -- 6 - Elastic-Agent Configuration
   imagePullSecrets: []

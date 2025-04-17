@@ -48,7 +48,6 @@ This section provides a summary of components included in the Elastic Distributi
 | [nopreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/nopreceiver/v0.119.0/receiver/nopreceiver/README.md) | v0.119.0 |
 | [otlpreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/otlpreceiver/v0.120.0/receiver/otlpreceiver/README.md) | v0.120.0 |
 | [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusreceiver/v0.120.1/receiver/prometheusreceiver/README.md) | v0.120.1 |
-| [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusreceiver/=&gt; github.com/elastic/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.0.0-20250317163643-19cd4e80024f/receiver/prometheusreceiver/README.md) | =&gt; github.com/elastic/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.0.0-20250317163643-19cd4e80024f |
 | [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.120.1/receiver/receivercreator/README.md) | v0.120.1 |
 | [redisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/redisreceiver/v0.120.1/receiver/redisreceiver/README.md) | v0.120.1 |
 | [zipkinreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zipkinreceiver/v0.120.1/receiver/zipkinreceiver/README.md) | v0.120.1 |
@@ -62,6 +61,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [fileexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/fileexporter/v0.120.1/exporter/fileexporter/README.md) | v0.120.1 |
 | [kafkaexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/kafkaexporter/v0.120.1/exporter/kafkaexporter/README.md) | v0.120.1 |
 | [loadbalancingexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/loadbalancingexporter/v0.120.1/exporter/loadbalancingexporter/README.md) | v0.120.1 |
+| [nopexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/nopexporter/v0.120.0/exporter/nopexporter/README.md) | v0.120.0 |
 | [otlpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlpexporter/v0.120.0/exporter/otlpexporter/README.md) | v0.120.0 |
 | [otlphttpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlphttpexporter/v0.120.0/exporter/otlphttpexporter/README.md) | v0.120.0 |
 
