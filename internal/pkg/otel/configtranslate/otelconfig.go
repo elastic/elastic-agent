@@ -414,7 +414,7 @@ func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
 func getBeatConfigFromCommandLineArgs(args []string) map[string]any {
 	beatConfig := make(map[string]any)
 	ignoredPrefixes := []string{
-		"filebeat.config.modules.enabled",   // TODO: figure out if this is necessary
+		"filebeat.config.modules.enabled",   // TODO: figure out if this is necessary, see https://github.com/elastic/ingest-dev/issues/5119
 		"metricbeat.config.modules.enabled", // we pass our own modules via the config, so we can't enable this
 		"setup",                             // only used by beats if output is of type elasticsearch
 		"management",                        // beats receivers don't use the management protocol
