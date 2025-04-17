@@ -6,7 +6,7 @@
 
 testVersions:
   - 9.0.0
-  - 9.0.0-SNAPSHOT
+  - 8.19.0-SNAPSHOT
   - 8.18.0
   - 8.17.5
   - 7.17.29-SNAPSHOT
