@@ -189,19 +189,15 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		serviceUnitExists := false
 		fakeServicePids := map[string]uint64{}
 
-		// The monitoring config depends on a map from component id to
-		// binary name.
-		binaryMapping := make(map[string]string)
 		for _, component := range components {
 			if spec := component.InputSpec; spec != nil {
-				binaryMapping[component.ID] = component.BinaryName()
 				if spec.Spec.Service != nil {
 					serviceUnitExists = true
 					fakeServicePids[component.ID] = 1234
 				}
 			}
 		}
-		monitorCfg, err := monitorFn(cfg, components, binaryMapping, fakeServicePids)
+		monitorCfg, err := monitorFn(cfg, components, fakeServicePids)
 		if err != nil {
 			return fmt.Errorf("failed to get monitoring config: %w", err)
 		}
