@@ -17,31 +17,37 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
-func TestClientWithUnsupportedTLSVersions(t *testing.T) {
+func TestClientWithUnsupportedTLSConfig(t *testing.T) {
 	testLogger, _ := loggertest.New("TestClientWithUnsupportedTLSVersions")
 	const unsupportedErrorMsg = "invalid configuration: unsupported tls version: %s"
 
 	cases := map[string]struct {
+		tlsConfig      tlscommon.Config
 		versions       []tlscommon.TLSVersion
 		expectedErrMsg string
 	}{
-		"1.0": {
+		"TLSv1.0": {
+			tlsConfig:      tlscommon.Config{Versions: []tlscommon.TLSVersion{tlscommon.TLSVersion10}},
 			versions:       []tlscommon.TLSVersion{tlscommon.TLSVersion10},
 			expectedErrMsg: fmt.Sprintf(unsupportedErrorMsg, tlscommon.TLSVersion10),
 		},
-		"1.1": {
+		"TLSv1.1": {
+			tlsConfig:      tlscommon.Config{Versions: []tlscommon.TLSVersion{tlscommon.TLSVersion11}},
 			versions:       []tlscommon.TLSVersion{tlscommon.TLSVersion11},
 			expectedErrMsg: fmt.Sprintf(unsupportedErrorMsg, tlscommon.TLSVersion11),
 		},
-		"1.2": {
+		"TLSv1.2": {
+			tlsConfig:      tlscommon.Config{Versions: []tlscommon.TLSVersion{tlscommon.TLSVersion12}},
 			versions:       []tlscommon.TLSVersion{tlscommon.TLSVersion12},
 			expectedErrMsg: "",
 		},
-		"1.3": {
+		"TLSv1.3": {
+			tlsConfig:      tlscommon.Config{Versions: []tlscommon.TLSVersion{tlscommon.TLSVersion13}},
 			versions:       []tlscommon.TLSVersion{tlscommon.TLSVersion13},
 			expectedErrMsg: "",
 		},
-		"1.1,1.2": {
+		"TLSv1.1,TLSv1.2": {
+			tlsConfig:      tlscommon.Config{Versions: []tlscommon.TLSVersion{tlscommon.TLSVersion11, tlscommon.TLSVersion12}},
 			versions:       []tlscommon.TLSVersion{tlscommon.TLSVersion11, tlscommon.TLSVersion12},
 			expectedErrMsg: fmt.Sprintf(unsupportedErrorMsg, tlscommon.TLSVersion11),
 		},
@@ -50,12 +56,10 @@ func TestClientWithUnsupportedTLSVersions(t *testing.T) {
 	for name, test := range cases {
 		t.Run(name, func(t *testing.T) {
 			tlsEnabled := true
+			test.tlsConfig.Enabled = &tlsEnabled
 			config := Config{
 				Transport: httpcommon.HTTPTransportSettings{
-					TLS: &tlscommon.Config{
-						Enabled:  &tlsEnabled,
-						Versions: test.versions,
-					},
+					TLS: &test.tlsConfig,
 				},
 			}
 
