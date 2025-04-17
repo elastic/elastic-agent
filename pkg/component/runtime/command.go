@@ -380,7 +380,7 @@ func (c *commandRuntime) start(comm Communicator) error {
 	args := c.monitor.EnrichArgs(c.current.ID, c.getSpecBinaryName(), cmdSpec.Args)
 
 	// differentiate data paths
-	dataPath := filepath.Join(paths.Home(), "run", c.current.ID)
+	dataPath := filepath.Join(paths.Run(), c.current.ID)
 	_ = os.MkdirAll(dataPath, 0755)
 	args = append(args, "-E", "path.data="+dataPath)
 
