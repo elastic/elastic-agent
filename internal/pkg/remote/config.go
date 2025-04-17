@@ -5,9 +5,7 @@
 package remote
 
 import (
-	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
@@ -71,25 +69,9 @@ func (c *Config) GetHosts() []string {
 
 // Validate returns an error if the configuration is invalid; nil, otherwise.
 func (c *Config) Validate() error {
-	hosts := c.GetHosts()
-	if len(hosts) == 0 || numNonEmptyStringsInSlice(hosts) < 1 {
-		return errors.New("at least one host must be specified")
-	}
-
 	if c.Transport.TLS != nil {
 		return c.Transport.TLS.Validate()
 	}
 
 	return nil
-}
-
-func numNonEmptyStringsInSlice(list []string) int {
-	numNonEmptyStrings := 0
-	for _, str := range list {
-		if len(strings.TrimSpace(str)) > 0 {
-			numNonEmptyStrings++
-		}
-	}
-
-	return numNonEmptyStrings
 }
