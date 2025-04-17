@@ -308,7 +308,23 @@ func TestGetOtelConfig(t *testing.T) {
 							BinaryName: "agentbeat",
 							Spec: component.InputSpec{
 								Command: &component.CommandSpec{
-									Args: []string{"filebeat"},
+									Args: []string{
+										"filebeat",
+										"-E", "setup.ilm.enabled=false",
+										"-E", "setup.template.enabled=false",
+										"-E", "management.enabled=true",
+										"-E", "management.restart_on_output_change=true",
+										"-E", "logging.level=info",
+										"-E", "logging.to_stderr=true",
+										"-E", "gc_percent=${FILEBEAT_GOGC:100}",
+										"-E", "filebeat.config.modules.enabled=false",
+										"-E", "logging.event_data.to_stderr=true",
+										"-E", "logging.event_data.to_files=false",
+										"-E", "http.enabled=true",
+										"-E", "http.host=localhost:9999",
+										"-E", "http.pprof.enabled=true",
+										"-E", "http.buffer.enabled=true",
+									},
 								},
 							},
 						},
@@ -385,6 +401,13 @@ func TestGetOtelConfig(t *testing.T) {
 								"log": map[string]any{
 									"source": "filestream-default",
 								},
+							},
+						},
+						"http": map[string]any{
+							"enabled": true,
+							"host":    "localhost:9999",
+							"buffer": map[string]any{
+								"enabled": true,
 							},
 						},
 					},
@@ -507,6 +530,85 @@ func TestGetOtelConfig(t *testing.T) {
 			} else {
 				assert.NoError(t, actualError)
 			}
+		})
+	}
+}
+
+func TestGetBeatConfigFromCommandLineArgs(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want map[string]any
+	}{
+		{
+			name: "single valid",
+			args: []string{"-E", "foo.bar=true"},
+			want: map[string]any{
+				"foo": map[string]any{
+					"bar": true,
+				},
+			},
+		},
+		{
+			name: "multiple valid",
+			args: []string{
+				"-E", "foo.bar=1",
+				"-E", "baz.qux=\"value\"",
+			},
+			want: map[string]any{
+				"foo": map[string]any{"bar": 1},
+				"baz": map[string]any{"qux": "value"},
+			},
+		},
+		{
+			name: "ignore setup.* keys",
+			args: []string{"-E", "setup.ilm.enabled=false", "-E", "foo.bar=42"},
+			want: map[string]any{
+				"foo": map[string]any{"bar": 42},
+			},
+		},
+		{
+			name: "ignore logging.* keys",
+			args: []string{"-E", "logging.level=debug", "-E", "foo.bar=2"},
+			want: map[string]any{
+				"foo": map[string]any{"bar": 2},
+			},
+		},
+		{
+			name: "invalid",
+			args: []string{"-E", "notavalidpair", "-E", "foo.bar=true"},
+			want: map[string]any{
+				"foo": map[string]any{"bar": true},
+			},
+		},
+		{
+			name: "boolean value",
+			args: []string{"-E", "http.enabled=true"},
+			want: map[string]any{
+				"http": map[string]any{
+					"enabled": true,
+				},
+			},
+		},
+		{
+			name: "nested",
+			args: []string{"-E", "a.b.c.d=hello"},
+			want: map[string]any{
+				"a": map[string]any{
+					"b": map[string]any{
+						"c": map[string]any{
+							"d": "hello",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := getBeatConfigFromCommandLineArgs(tt.args)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

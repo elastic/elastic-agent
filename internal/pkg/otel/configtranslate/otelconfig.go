@@ -10,6 +10,9 @@ import (
 	"slices"
 	"strings"
 
+	"gopkg.in/yaml.v3"
+
+	koanfmaps "github.com/knadh/koanf/maps"
 	otelcomponent "go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/pipeline"
@@ -213,6 +216,13 @@ func getReceiversConfigForComponent(comp *component.Component, info info.Agent, 
 	if outputQueueConfig != nil {
 		receiverConfig["queue"] = outputQueueConfig
 	}
+
+	// add config from beat command line options
+	cmdLineConfig := getBeatConfigFromCommandLineArgs(comp.InputSpec.Spec.Command.Args)
+	for key, value := range cmdLineConfig {
+		receiverConfig[key] = value
+	}
+
 	return map[string]any{
 		receiverId.String(): receiverConfig,
 	}, nil
@@ -388,4 +398,50 @@ func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
 	// for compatibility with beats, we want bodymap mapping
 	esConfig["mapping"] = map[string]any{"mode": "bodymap"}
 	return esConfig, nil
+}
+
+// getBeatConfigFromCommandLineArgs turns beat configuration from command line args into a map that can be plugged
+// into a beat receiver config.
+// Here's how these args will typically look:
+//   - "filebeat"
+//   - "-E"
+//   - "setup.ilm.enabled=false"
+//   - "-E"
+//   - "setup.template.enabled=false"
+//   - "-E"
+//   - "management.enabled=true"
+//   - "-E"
+func getBeatConfigFromCommandLineArgs(args []string) map[string]any {
+	beatConfig := make(map[string]any)
+	ignoredPrefixes := []string{
+		"filebeat.config.modules.enabled",   // TODO: figure out if this is necessary
+		"metricbeat.config.modules.enabled", // we pass our own modules via the config, so we can't enable this
+		"setup",                             // only used by beats if output is of type elasticsearch
+		"management",                        // beats receivers don't use the management protocol
+		"logging",                           // configured through global options
+		"gc_percent",                        // makes no sense for an otel receiver
+		"http.pprof",                        // otel has a global pprof setting
+	}
+	for _, arg := range args {
+		parts := strings.SplitN(arg, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		option := parts[0]
+		value := parts[1]
+		ignore := false
+		for _, prefix := range ignoredPrefixes {
+			ignore = ignore || strings.HasPrefix(option, prefix)
+		}
+		if ignore {
+			continue
+		}
+		// the values of some of these flags are not strings, and normally beats command-line parsing would convert them
+		// we need to do this ourselves, so "true" becomes a Boolean in our config map
+		var typedValue any
+		_ = yaml.Unmarshal([]byte(value), &typedValue)
+		beatConfig[option] = typedValue
+	}
+	// otel config doesn't accept flattened keys, so we need to unflatten
+	return koanfmaps.Unflatten(beatConfig, ".")
 }
