@@ -6,8 +6,16 @@ env:
   ASDF_MAGE_VERSION: 1.14.0
 
 steps:
+  - label: get Stable ESS Version
+    key: ess-version
+    command: .buildkite/scripts/steps/stable_ess_version.sh
+    agents:
+      image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
+      useCustomGlobalHooks: true
+
   - label: Start ESS stack for integration tests
     key: integration-ess
+    depends_on: ess-version
     env:
       ASDF_TERRAFORM_VERSION: 1.9.2
     command: |
@@ -30,7 +38,7 @@ steps:
         depends_on:
           - packaging-windows
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows' 
           .buildkite/scripts/integration-tests.ps1 {{matrix}} true
         artifact_paths:
           - build/**
@@ -231,7 +239,7 @@ steps:
       - integration-ess
     steps:
       - label: "x86_64:non-sudo: {{matrix}}"
-        depends_on: packaging-ubuntu-x86-64
+        # depends_on: packaging-ubuntu-x86-64
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
@@ -335,15 +343,15 @@ steps:
         matrix:
           setup:
             variants:
-            - "basic,slim,complete,service,elastic-otel-collector"
-            - "wolfi,slim-wolfi,complete-wolfi,elastic-otel-collector-wolfi"
+              - "basic,slim,complete,service,elastic-otel-collector"
+              - "wolfi,slim-wolfi,complete-wolfi,elastic-otel-collector-wolfi"
             version:
-            - v1.27.16
-            - v1.28.9
-            - v1.29.8
-            - v1.30.8
-            - v1.31.0
-            - v1.32.0
+              - v1.27.16
+              - v1.28.9
+              - v1.29.8
+              - v1.30.8
+              - v1.31.0
+              - v1.32.0
 
   - label: ESS stack cleanup
     depends_on:
