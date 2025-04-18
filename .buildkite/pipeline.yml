@@ -34,8 +34,8 @@ steps:
           manual:
             allowed: true
 
-      - label: "Unit tests - FIPS Ubuntu 22.04"
-        key: "unit-tests-2204-fips"
+      - label: "Unit tests - Ubuntu 22.04 with requirefips build tag"
+        key: "unit-tests-2204-fips-tag"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         env:
           FIPS: "true"
@@ -219,7 +219,9 @@ steps:
     depends_on:
       - step: "unit-tests-2204"
         allow_failure: true
-      - step: "unit-tests-2204-fips"
+      - step: "unit-tests-2204-fips-tag"
+        allow_failure: true
+      - step: "unit-tests-2204-fips140-only"
         allow_failure: true
       - step: "unit-tests-2204-arm64"
         allow_failure: true
