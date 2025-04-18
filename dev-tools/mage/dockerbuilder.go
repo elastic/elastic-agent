@@ -18,6 +18,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
+	"github.com/elastic/elastic-agent/pkg/component"
+
 	"github.com/magefile/mage/sh"
 )
 
@@ -103,8 +106,35 @@ func (b *dockerBuilder) exposePorts() []string {
 
 func (b *dockerBuilder) copyFiles() error {
 	for _, f := range b.Files {
+		source := f.Source
+		var checkFn func(string) bool
 		target := filepath.Join(b.beatDir, f.Target)
-		if err := Copy(f.Source, target); err != nil {
+
+		if f.ExpandSpec {
+			specFilename := filepath.Base(source)
+			specContent, err := os.ReadFile(source)
+			if err != nil {
+				if os.IsNotExist(err) {
+					return nil
+				}
+				return fmt.Errorf("failed reading spec file for component %q: %w", specFilename, err)
+			}
+
+			// create filter
+			allowedPaths, err := component.ParseComponentFiles(specContent, specFilename, true)
+			if err != nil {
+				return fmt.Errorf("failed computing component files %q: %w", specFilename, err)
+			}
+			checkFn, err = install.SkipComponentsPathWithSubpathsFn(allowedPaths)
+			if err != nil {
+				return fmt.Errorf("failed compiling skip fn %q: %w", specFilename, err)
+			}
+
+			source = filepath.Dir(source) // change source to components directory
+			target = filepath.Dir(target) // target pointing to spec file
+		}
+
+		if err := CopyWithCheck(source, target, checkFn); err != nil {
 			if f.SkipOnMissing && errors.Is(err, os.ErrNotExist) {
 				continue
 			}
@@ -197,9 +227,7 @@ func (b *dockerBuilder) dockerBuild() (string, []string, error) {
 	if b.Snapshot {
 		mainTag = mainTag + "-SNAPSHOT"
 	}
-	if b.FIPS {
-		mainTag = mainTag + "-fips"
-	}
+
 	if repository := b.ExtraVars["repository"]; repository != "" {
 		mainTag = fmt.Sprintf("%s/%s", repository, mainTag)
 	}

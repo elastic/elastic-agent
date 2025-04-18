@@ -10,14 +10,18 @@ import (
 )
 
 const (
-	undefined     = "undefined"
-	basic         = "basic"
-	ubi           = "ubi"
-	wolfi         = "wolfi"
-	complete      = "complete"
-	completeWolfi = "complete-wolfi"
-	cloud         = "cloud"
-	service       = "service"
+	undefined          = "undefined"
+	basic              = "basic"
+	ubi                = "ubi"
+	wolfi              = "wolfi"
+	complete           = "complete"
+	completeWolfi      = "complete-wolfi"
+	cloud              = "cloud"
+	service            = "service"
+	edotCollector      = "elastic-otel-collector"
+	slim               = "slim"
+	edotCollectorWolfi = "elastic-otel-collector-wolfi"
+	slimWolfi          = "slim-wolfi"
 )
 
 // DockerVariant defines the docker variant to build.
@@ -33,6 +37,10 @@ const (
 	Complete
 	Cloud
 	Service
+	EdotCollector
+	Slim
+	EdotCollectorWolfi
+	SlimWolfi
 )
 
 // String returns the name of the docker variant type.
@@ -54,6 +62,14 @@ func (typ DockerVariant) String() string {
 		return cloud
 	case Service:
 		return service
+	case EdotCollector:
+		return edotCollector
+	case Slim:
+		return slim
+	case EdotCollectorWolfi:
+		return edotCollectorWolfi
+	case SlimWolfi:
+		return slimWolfi
 	default:
 		return invalid
 	}
@@ -83,6 +99,14 @@ func (typ *DockerVariant) UnmarshalText(text []byte) error {
 		*typ = Cloud
 	case service:
 		*typ = Service
+	case edotCollector:
+		*typ = EdotCollector
+	case slim:
+		*typ = Slim
+	case edotCollectorWolfi:
+		*typ = EdotCollectorWolfi
+	case slimWolfi:
+		*typ = SlimWolfi
 	default:
 		return fmt.Errorf("unknown docker variant: %v", string(text))
 	}

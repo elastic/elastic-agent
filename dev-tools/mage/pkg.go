@@ -34,6 +34,15 @@ func Package() error {
 	// platforms := updateWithDarwinUniversal(Platforms)
 	platforms := Platforms
 
+	if mg.Verbose() {
+		debugSelectedPackageSpecsWithPlatform := make([]string, 0, len(Packages))
+		for _, p := range Packages {
+			debugSelectedPackageSpecsWithPlatform = append(debugSelectedPackageSpecsWithPlatform, fmt.Sprintf("spec %s on %s/%s", p.Spec.Name, p.OS, p.Arch))
+		}
+
+		log.Printf("Packaging for platforms %v, packages %v", platforms, debugSelectedPackageSpecsWithPlatform)
+	}
+
 	tasks := make(map[string][]interface{})
 	for _, target := range platforms {
 		for _, pkg := range Packages {
@@ -41,13 +50,19 @@ func Package() error {
 				continue
 			}
 
+			// Checks if this package is compatible with the FIPS settings
+			if pkg.Spec.FIPS != FIPSBuild {
+				log.Printf("Skipping %s/%s package type because FIPS flag doesn't match [pkg=%v, build=%v]", pkg.Spec.Name, pkg.OS, pkg.Spec.FIPS, FIPSBuild)
+				continue
+			}
+
 			for _, pkgType := range pkg.Types {
-				if !isPackageTypeSelected(pkgType) {
+				if !IsPackageTypeSelected(pkgType) {
 					log.Printf("Skipping %s package type because it is not selected", pkgType)
 					continue
 				}
 
-				if pkgType == Docker && !isDockerVariantSelected(pkg.Spec.DockerVariant) {
+				if pkgType == Docker && !IsDockerVariantSelected(pkg.Spec.DockerVariant) {
 					log.Printf("Skipping %s docker variant type because it is not selected", pkg.Spec.DockerVariant)
 					continue
 				}
@@ -80,7 +95,6 @@ func Package() error {
 				spec.OS = target.GOOS()
 				spec.Arch = packageArch
 				spec.Snapshot = Snapshot
-				spec.FIPS = FIPSBuild
 				spec.evalContext = map[string]interface{}{
 					"GOOS":          target.GOOS(),
 					"GOARCH":        target.GOARCH(),
@@ -100,6 +114,10 @@ func Package() error {
 
 				spec = spec.Evaluate()
 
+				if mg.Verbose() {
+					log.Printf("Adding task for packaging %s on %s/%s", spec.Name, target.GOOS(), target.Arch())
+				}
+
 				tasks[target.GOOS()+"-"+target.Arch()] = append(tasks[target.GOOS()+"-"+target.Arch()], packageBuilder{target, spec, pkgType}.Build)
 			}
 		}
@@ -112,9 +130,9 @@ func Package() error {
 	return nil
 }
 
-// isPackageTypeSelected returns true if SelectedPackageTypes is empty or if
+// IsPackageTypeSelected returns true if SelectedPackageTypes is empty or if
 // pkgType is present on SelectedPackageTypes. It returns false otherwise.
-func isPackageTypeSelected(pkgType PackageType) bool {
+func IsPackageTypeSelected(pkgType PackageType) bool {
 	if len(SelectedPackageTypes) == 0 {
 		return true
 	}
@@ -127,9 +145,9 @@ func isPackageTypeSelected(pkgType PackageType) bool {
 	return false
 }
 
-// isDockerVariantSelected returns true if SelectedDockerVariants is empty or if
+// IsDockerVariantSelected returns true if SelectedDockerVariants is empty or if
 // docVariant is present on SelectedDockerVariants. It returns false otherwise.
-func isDockerVariantSelected(docVariant DockerVariant) bool {
+func IsDockerVariantSelected(docVariant DockerVariant) bool {
 	if len(SelectedDockerVariants) == 0 {
 		return true
 	}
@@ -222,7 +240,7 @@ func TestPackages(options ...TestPackagesOption) error {
 		args = append(args, "-v")
 	}
 
-	args = append(args, MustExpand("{{ elastic_beats_dir }}/dev-tools/packaging/package_test.go"))
+	args = append(args, MustExpand("{{ elastic_beats_dir }}/dev-tools/packaging/testing/package_test.go"))
 
 	if params.HasModules {
 		args = append(args, "--modules")
@@ -246,10 +264,6 @@ func TestPackages(options ...TestPackagesOption) error {
 
 	if BeatUser == "root" {
 		args = append(args, "-root-owner")
-	}
-
-	if FIPSBuild {
-		args = append(args, "-fips")
 	}
 
 	args = append(args, "-files", MustExpand("{{.PWD}}/build/distributions/*"))

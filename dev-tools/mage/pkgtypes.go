@@ -29,6 +29,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
+	"github.com/elastic/elastic-agent/dev-tools/packaging"
 )
 
 const (
@@ -40,13 +41,13 @@ const (
 	packageStagingDir = "build/package"
 
 	// defaultBinaryName specifies the output file for zip and tar.gz.
-	defaultBinaryName = "{{.Name}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}{{if .FIPS}}-fips{{end}}"
+	defaultBinaryName = "{{.Name}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}"
 
 	// defaultRootDir is the default name of the root directory contained inside of zip and
 	// tar.gz packages.
 	// NOTE: This uses .BeatName instead of .Name because we wanted the internal
 	// directory to not include "-oss".
-	defaultRootDir = "{{.BeatName}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}{{if .FIPS}}-fips{{end}}"
+	defaultRootDir = "{{.BeatName}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}"
 
 	componentConfigMode os.FileMode = 0600
 
@@ -107,6 +108,7 @@ type PackageSpec struct {
 	OutputFile        string                 `yaml:"output_file,omitempty"` // Optional
 	ExtraVars         map[string]string      `yaml:"extra_vars,omitempty"`  // Optional
 	ExtraTags         []string               `yaml:"extra_tags,omitempty"`  // Optional
+	Components        []packaging.BinarySpec `yaml:"components"`            // Optional: Components required for this package
 
 	evalContext            map[string]interface{}
 	packageDir             string
@@ -114,6 +116,10 @@ type PackageSpec struct {
 	localPostInstallScript string
 	localPostRmScript      string
 }
+
+// add new prop into package file called expand spc
+// expand spec is checked during packaging and expands to multiple files
+// if expand is not present file is copied normally
 
 // PackageFile represents a file or directory within a package.
 type PackageFile struct {
@@ -129,6 +135,7 @@ type PackageFile struct {
 	Owner         string                  `yaml:"owner,omitempty"`           // File Owner, for user and group name (rpm only).
 	SkipOnMissing bool                    `yaml:"skip_on_missing,omitempty"` // Prevents build failure if the file is missing.
 	Symlink       bool                    `yaml:"symlink"`                   // Symlink marks file as a symlink pointing from target to source.
+	ExpandSpec    bool                    `yaml:"expand_spec,omitempty"`     // Optional
 }
 
 // OSArchNames defines the names of architectures for use in packages.
@@ -423,6 +430,7 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 		s.packageDir = filepath.Clean(mustExpand(s.packageDir))
 	}
 	s.evalContext["PackageDir"] = s.packageDir
+	s.evalContext["fips"] = s.FIPS
 
 	evaluatedFiles := make(map[string]PackageFile, len(s.Files))
 	for target, f := range s.Files {
@@ -481,9 +489,13 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 // ImageName computes the image name from the spec.
 func (s PackageSpec) ImageName() string {
 	if s.DockerVariant == Basic {
+		return s.Name
+	}
+	if s.DockerVariant == EdotCollector || s.DockerVariant == EdotCollectorWolfi {
 		// no suffix for basic docker variant
 		return s.Name
 	}
+
 	return fmt.Sprintf("%s-%s", s.Name, s.DockerVariant)
 }
 
@@ -741,7 +753,7 @@ func runFPM(spec PackageSpec, packageType PackageType) error {
 	}
 	defer os.Remove(inputTar)
 
-	outputFile, err := spec.Expand("{{.Name}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.Arch}}{{if .FIPS}}-fips{{end}}")
+	outputFile, err := spec.Expand("{{.Name}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.Arch}}")
 	if err != nil {
 		return err
 	}

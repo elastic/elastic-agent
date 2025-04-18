@@ -4,6 +4,7 @@ set -euo pipefail
 source .buildkite/scripts/common2.sh
 
 source .buildkite/scripts/steps/ess.sh
+source .buildkite/scripts/steps/fleet.sh
 
 # Make sure that all tools are installed
 asdf install
@@ -36,7 +37,8 @@ if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
   echo "~~~ The steps is retried, starting the ESS stack again"
   trap 'ess_down' EXIT
   ess_up $OVERRIDE_STACK_VERSION || echo "Failed to start ESS stack" >&2
-else 
+  preinstall_fleet_packages
+else
   # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data
   echo "~~~ Receiving ESS stack metadata"
   export ELASTICSEARCH_HOST=$(buildkite-agent meta-data get "es.host")
@@ -56,9 +58,14 @@ export BUILDKITE_ANALYTICS_TOKEN
 # Run integration tests
 echo "~~~ Running integration tests"
 
-if [ "$TEST_SUDO" == "true" ]; then
-  sudo -E .buildkite/scripts/buildkite-integration-tests.sh $@
+if [[ "${GROUP_NAME}" == "kubernetes" ]]; then
+  source .buildkite/scripts/install-kubectl.sh
+  .buildkite/scripts/buildkite-k8s-integration-tests.sh $@
 else
-  .buildkite/scripts/buildkite-integration-tests.sh $@
+  if [ "$TEST_SUDO" == "true" ]; then
+    sudo -E .buildkite/scripts/buildkite-integration-tests.sh $@
+  else
+    .buildkite/scripts/buildkite-integration-tests.sh $@
+  fi
 fi
 

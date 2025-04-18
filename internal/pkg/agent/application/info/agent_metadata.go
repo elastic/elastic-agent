@@ -169,7 +169,7 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ECSMeta, error) {
 				Upgradeable:  release.Upgradeable() || (paths.RunningInstalled() && RunningUnderSupervisor()),
 				LogLevel:     i.LogLevel(),
 				Unprivileged: i.unprivileged,
-				FIPS:         release.FIPS(),
+				FIPS:         release.FIPSDistribution(),
 			},
 		},
 		Host: &HostECSMeta{

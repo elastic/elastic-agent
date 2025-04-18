@@ -8,14 +8,13 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/pbkdf2"
 	"crypto/rand"
 	"crypto/sha512"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
-
-	"golang.org/x/crypto/pbkdf2"
 )
 
 // Option is the default options used to generate the encrypt and decrypt writer.
@@ -29,27 +28,6 @@ type Option struct {
 
 	// BlockSize must be a factor of aes.BlockSize
 	BlockSize int
-}
-
-// Validate the options for encoding and decoding values.
-func (o *Option) Validate() error {
-	if o.IVLength == 0 {
-		return errors.New("IVLength must be superior to 0")
-	}
-
-	if o.SaltLength == 0 {
-		return errors.New("SaltLength must be superior to 0")
-	}
-
-	if o.IterationsCount == 0 {
-		return errors.New("IterationsCount must be superior to 0")
-	}
-
-	if o.KeyLength == 0 {
-		return errors.New("KeyLength must be superior to 0")
-	}
-
-	return nil
 }
 
 // DefaultOptions is the default options to use when creating the writer, changing might decrease
@@ -127,12 +105,15 @@ func (w *Writer) Write(b []byte) (int, error) {
 		w.wroteHeader = true
 
 		// Stretch the user provided key.
-		passwordBytes := stretchPassword(
+		passwordBytes, err := stretchPassword(
 			w.password,
 			w.salt,
 			w.option.IterationsCount,
 			w.option.KeyLength,
 		)
+		if err != nil {
+			return 0, fmt.Errorf("failed to stretch password: %w", err)
+		}
 
 		// Select AES-256: because len(passwordBytes) == 32 bytes.
 		block, err := aes.NewCipher(passwordBytes)
@@ -194,7 +175,7 @@ func (w *Writer) writeBlock(b []byte) error {
 	encodedBytes := w.gcm.Seal(nil, iv, b, nil)
 
 	l := make([]byte, 4)
-	binary.LittleEndian.PutUint32(l, uint32(len(encodedBytes)))
+	binary.LittleEndian.PutUint32(l, uint32(len(encodedBytes))) //nolint:gosec // ignoring unsafe type conversion
 	//nolint:errcheck // Ignore the error at this point.
 	w.writer.Write(l)
 
@@ -265,12 +246,15 @@ func (r *Reader) Read(b []byte) (int, error) {
 		salt := buf[vLen : vLen+r.option.SaltLength]
 
 		// Stretch the user provided key.
-		passwordBytes := stretchPassword(
+		passwordBytes, err := stretchPassword(
 			r.password,
 			salt,
 			r.option.IterationsCount,
 			r.option.KeyLength,
 		)
+		if err != nil {
+			return 0, fmt.Errorf("failed to stretch password: %w", err)
+		}
 
 		block, err := aes.NewCipher(passwordBytes)
 		if err != nil {
@@ -372,6 +356,6 @@ func randomBytes(length int) ([]byte, error) {
 	return r, nil
 }
 
-func stretchPassword(password, salt []byte, c, kl int) []byte {
-	return pbkdf2.Key(password, salt, c, kl, sha512.New)
+func stretchPassword(password, salt []byte, c, kl int) ([]byte, error) {
+	return pbkdf2.Key(sha512.New, string(password), salt, c, kl)
 }

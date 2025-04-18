@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -24,17 +26,22 @@ import (
 )
 
 // GenerateMonitoringCfgFn is a function that can inject information into the model generation process.
-type GenerateMonitoringCfgFn func(map[string]interface{}, []Component, map[string]string, map[string]uint64) (map[string]interface{}, error)
+type GenerateMonitoringCfgFn func(map[string]interface{}, []Component, map[string]uint64) (map[string]interface{}, error)
 
 type HeadersProvider interface {
 	Headers() map[string]string
 }
 
+type RuntimeManager string
+
 const (
 	// defaultUnitLogLevel is the default log level that a unit will get if one is not defined.
-	defaultUnitLogLevel = client.UnitLogLevelInfo
-	headersKey          = "headers"
-	elasticsearchType   = "elasticsearch"
+	defaultUnitLogLevel                  = client.UnitLogLevelInfo
+	headersKey                           = "headers"
+	elasticsearchType                    = "elasticsearch"
+	ProcessRuntimeManager                = RuntimeManager("process")
+	OtelRuntimeManager                   = RuntimeManager("otel")
+	DefaultRuntimeManager RuntimeManager = ProcessRuntimeManager
 )
 
 // ErrInputRuntimeCheckFail error is used when an input specification runtime prevention check occurs.
@@ -156,6 +163,8 @@ type Component struct {
 
 	// The logical output type, i.e. the type of output that was requested.
 	OutputType string `yaml:"output_type"`
+
+	RuntimeManager RuntimeManager `yaml:"-"`
 
 	// Units that should be running inside this component.
 	Units []Unit `yaml:"units"`
@@ -293,13 +302,7 @@ func (r *RuntimeSpecs) ToComponents(
 	}
 
 	if monitoringInjector != nil {
-		// The monitoring config depends on a map from component id to
-		// binary name
-		binaryMapping := make(map[string]string)
-		for _, component := range components {
-			binaryMapping[component.ID] = component.BinaryName()
-		}
-		monitoringCfg, err := monitoringInjector(policy, components, binaryMapping, currentServiceCompInts)
+		monitoringCfg, err := monitoringInjector(policy, components, currentServiceCompInts)
 		if err != nil {
 			return nil, fmt.Errorf("failed to inject monitoring: %w", err)
 		}
@@ -360,27 +363,37 @@ func (r *RuntimeSpecs) componentsForInputType(
 			componentErr = ErrOutputNotSupported
 		}
 
-		var units []Unit
+		unitsForRuntimeManager := make(map[RuntimeManager][]Unit)
 		for _, input := range output.inputs[inputType] {
 			if input.enabled {
 				unitID := fmt.Sprintf("%s-%s", componentID, input.id)
-				units = append(units, unitForInput(input, unitID))
+				unitsForRuntimeManager[input.runtimeManager] = append(
+					unitsForRuntimeManager[input.runtimeManager],
+					unitForInput(input, unitID),
+				)
 			}
 		}
 
-		if len(units) > 0 {
-			// Populate the output units for this component
-			units = append(units, unitForOutput(output, componentID))
-			components = append(components, Component{
-				ID:         componentID,
-				Err:        componentErr,
-				InputSpec:  &inputSpec,
-				InputType:  inputType,
-				OutputType: output.outputType,
-				Units:      units,
-				Features:   featureFlags.AsProto(),
-				Component:  componentConfig.AsProto(),
-			})
+		// sort to ensure consistent order
+		runtimeManagers := slices.Collect(maps.Keys(unitsForRuntimeManager))
+		slices.Sort(runtimeManagers)
+		for _, runtimeManager := range runtimeManagers {
+			units := unitsForRuntimeManager[runtimeManager]
+			if len(units) > 0 {
+				// Populate the output units for this component
+				units = append(units, unitForOutput(output, componentID))
+				components = append(components, Component{
+					ID:             componentID,
+					Err:            componentErr,
+					InputSpec:      &inputSpec,
+					InputType:      inputType,
+					OutputType:     output.outputType,
+					Units:          units,
+					RuntimeManager: runtimeManager,
+					Features:       featureFlags.AsProto(),
+					Component:      componentConfig.AsProto(),
+				})
+			}
 		}
 	} else {
 		for _, input := range output.inputs[inputType] {
@@ -399,14 +412,15 @@ func (r *RuntimeSpecs) componentsForInputType(
 				// each component gets its own output, because of unit isolation
 				units = append(units, unitForOutput(output, componentID))
 				components = append(components, Component{
-					ID:         componentID,
-					Err:        componentErr,
-					InputSpec:  &inputSpec,
-					InputType:  inputType,
-					OutputType: output.outputType,
-					Units:      units,
-					Features:   featureFlags.AsProto(),
-					Component:  componentConfig.AsProto(),
+					ID:             componentID,
+					Err:            componentErr,
+					InputSpec:      &inputSpec,
+					InputType:      inputType,
+					OutputType:     output.outputType,
+					Units:          units,
+					RuntimeManager: input.runtimeManager,
+					Features:       featureFlags.AsProto(),
+					Component:      componentConfig.AsProto(),
 				})
 			}
 		}
@@ -514,12 +528,13 @@ func injectInputPolicyID(fleetPolicy map[string]interface{}, inputConfig map[str
 // of components.
 func toIntermediate(policy map[string]interface{}, aliasMapping map[string]string, ll logp.Level, headers HeadersProvider) (map[string]outputI, error) {
 	const (
-		outputsKey   = "outputs"
-		enabledKey   = "enabled"
-		inputsKey    = "inputs"
-		typeKey      = "type"
-		idKey        = "id"
-		useOutputKey = "use_output"
+		outputsKey        = "outputs"
+		enabledKey        = "enabled"
+		inputsKey         = "inputs"
+		typeKey           = "type"
+		idKey             = "id"
+		useOutputKey      = "use_output"
+		runtimeManagerKey = "_runtime_experimental"
 	)
 
 	// intermediate structure for output to input mapping (this structure allows different input types per output)
@@ -660,17 +675,35 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 			return nil, fmt.Errorf("invalid 'inputs.%d.log_level', %w", idx, err)
 		}
 
+		runtimeManager := DefaultRuntimeManager
+		// determine the runtime manager for the input
+		if runtimeManagerRaw, ok := input[runtimeManagerKey]; ok {
+			runtimeManagerStr, ok := runtimeManagerRaw.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid 'inputs.%d.runtime', expected a string, not a %T", idx, runtimeManagerRaw)
+			}
+			runtimeManagerVal := RuntimeManager(runtimeManagerStr)
+			switch runtimeManagerVal {
+			case OtelRuntimeManager, ProcessRuntimeManager:
+			default:
+				return nil, fmt.Errorf("invalid 'inputs.%d.runtime', valid values are: %s, %s", idx, OtelRuntimeManager, ProcessRuntimeManager)
+			}
+			runtimeManager = runtimeManagerVal
+			delete(input, runtimeManagerKey)
+		}
+
 		// Inject the top level fleet policy revision into each input configuration. This
 		// allows individual inputs (like endpoint) to detect policy changes more easily.
 		injectInputPolicyID(policy, input)
 
 		output.inputs[t] = append(output.inputs[t], inputI{
-			idx:       idx,
-			id:        id,
-			enabled:   enabled,
-			logLevel:  logLevel,
-			inputType: t,
-			config:    input,
+			idx:            idx,
+			id:             id,
+			enabled:        enabled,
+			logLevel:       logLevel,
+			inputType:      t,
+			config:         input,
+			runtimeManager: runtimeManager,
 		})
 	}
 	if len(outputsMap) == 0 {
@@ -680,11 +713,12 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 }
 
 type inputI struct {
-	idx       int
-	id        string
-	enabled   bool
-	logLevel  client.UnitLogLevel
-	inputType string // canonical (non-alias) type
+	idx            int
+	id             string
+	enabled        bool
+	logLevel       client.UnitLogLevel
+	inputType      string // canonical (non-alias) type
+	runtimeManager RuntimeManager
 
 	// The raw configuration for this input, with small cleanups:
 	// - the "enabled", "use_output", and "log_level" keys are removed
