@@ -40,6 +40,15 @@ var packageArchMap = map[string]string{
 	"darwin-arm64-targz": "darwin-aarch64.tar.gz",
 }
 
+// GetPackagePrefix returns the prefix right before the version component of the Elastic
+// Agent's artifact name, based on the given parameter values.
+func GetPackagePrefix(fipsOnly bool) string {
+	if fipsOnly {
+		return "fips-"
+	}
+	return ""
+}
+
 // GetPackageSuffix returns the suffix ending for the builds of Elastic Agent based on the
 // operating system and architecture.
 func GetPackageSuffix(operatingSystem string, architecture string, packageFormat string) (string, error) {

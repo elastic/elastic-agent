@@ -7,7 +7,26 @@ package testing
 import (
 	"errors"
 	gtesting "testing"
+
+	"github.com/stretchr/testify/require"
 )
+
+func TestGetPackagePrefix(t *gtesting.T) {
+	tests := map[string]struct {
+		fipsOnly bool
+		expected string
+	}{
+		"fips":    {fipsOnly: true, expected: "fips-"},
+		"no_fips": {fipsOnly: false, expected: ""},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *gtesting.T) {
+			actual := GetPackagePrefix(tc.fipsOnly)
+			require.Equal(t, tc.expected, actual)
+		})
+	}
+}
 
 func TestGetPackageSuffix(t *gtesting.T) {
 	tests := map[string]struct {
