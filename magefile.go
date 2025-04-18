@@ -197,7 +197,7 @@ func (GoReleaser) Build() error {
 		return fmt.Errorf("detecting go version: %w", err)
 	}
 
-	return sh.Run("docker", "run",
+	return sh.Run("docker", "run", "--rm",
 		// source mounted as volume
 		"-v", ".:/src",
 		fmt.Sprintf("%s:%s", goReleaserCrossbuilderImageName, goVersion),
@@ -215,7 +215,7 @@ func (GoReleaser) Package() error {
 		return fmt.Errorf("detecting go version: %w", err)
 	}
 	// TODO transform this into an external packaging, using the docker container to build only
-	return sh.Run("docker", "run",
+	return sh.Run("docker", "run", "--rm",
 		// source mounted as volume
 		"-v", ".:/src",
 		fmt.Sprintf("%s:%s", goReleaserCrossbuilderImageName, goVersion),

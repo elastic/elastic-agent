@@ -12,12 +12,10 @@ before:
   hooks:
     # You may remove this if you don't use go modules.
     - go mod tidy
-    # you may remove this if you don't need go generate
-    # - go generate ./...
 
 builds:
-  - id: elastic-agent
-    binary: elastic-agent
+  - id: elastic-agent-build
+    binary: 'data/elastic-agent-{{ slice .ShortCommit 0 6 }}/elastic-agent'
     flags:
       - -buildvcs=false
     goos:
@@ -57,31 +55,66 @@ builds:
           {{- if eq .Arch "amd64" }}CXX=g++{{- end }}
           {{- if eq .Arch "arm64" }}CXX=aarch64-linux-gnu-g++{{- end }}
         {{- end }}
-
+# FIXME Prebuilt is a pro-only feature
+#  - id: elastic-agent-prebuilt
+#    builder: prebuilt
+#    goos:
+#      - linux
+#      - windows
+#      # - darwin
+#    goarch:
+#      - amd64
+#      # - arm64
+#    ignore:
+#      - goarch: arm64
+#        goos: windows
+#    prebuilt:
+#      # Path must be the template path to the binaries.
+#      # GoReleaser removes the `dist` directory before running, so you will likely
+#      # want to put the binaries elsewhere.
+#      # This field is required when using the `prebuilt` builder.
+#      path: output/{{ .Os }}/{{ .Arch }}/elastic-agent
+#
+#      # Use 'binary' to set the final name of your binary.
+#      # This is the name that will be used in archives et al.
+#      binary: data/elastic-agent-{{ .ShortCommit }}/elastic-agent
 archives:
   - formats:
     - tar.gz
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
       {{ .ProjectName }}_
-      {{- title .Os }}_
+      {{- .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
-      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    wrap_in_directory: true
     # use zip for windows archives
     format_overrides:
       - goos: windows
         formats:
           - zip
-
-changelog:
-  sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^test:"
-
+    files:
+#      - src: commit.txt
+#        dst: .build_hash.txt
+#      - src: commit.txt
+#        dst: .elastic-agent.active.commit
+      - src: dev-tools/licenses/ELASTIC-LICENSE-2.0.txt
+        dst: "LICENSE.txt"
+      - "NOTICE.txt"
+      - src: dev-tools/packaging/files/linux/otelcol.sh
+        dst: "data/elastic-agent-{{ slice .ShortCommit 0 6 }}/otelcol"
+      - src: dev-tools/packaging/files/linux/otelcol.sh
+        dst: "otelcol"
+      - elastic-agent.reference.yml
+      - elastic-agent.yml
+      - otel.yml
+      - src: 'internal/pkg/otel/samples/linux/*'
+        dst: otel_samples
+# Only available in GoReleaser Pro
+#    templated_files:
+#      - src: "README.md.tmpl"
+#        dst: README.md
 release:
   footer: >-
 
