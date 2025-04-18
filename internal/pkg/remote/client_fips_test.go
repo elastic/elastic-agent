@@ -7,14 +7,8 @@
 package remote
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
+	_ "embed"
 	"fmt"
-	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -24,11 +18,15 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
+//go:embed testdata/rsa_1024.cert.pem
+var rsa1024CertPEM string
+
+//go:embed testdata/rsa_1024.key.pem
+var rsa1024KeyPem string
+
 func TestClientWithUnsupportedTLSConfig(t *testing.T) {
 	testLogger, _ := loggertest.New("TestClientWithUnsupportedTLSVersions")
 	const unsupportedErrorMsg = "invalid configuration: unsupported tls version: %s"
-
-	privateKeyPEM, certificatePEM := makeRSA1024KeyCertPair(t)
 
 	cases := map[string]struct {
 		tlsConfig      tlscommon.Config
@@ -60,20 +58,21 @@ func TestClientWithUnsupportedTLSConfig(t *testing.T) {
 			versions:       []tlscommon.TLSVersion{tlscommon.TLSVersion11, tlscommon.TLSVersion12},
 			expectedErrMsg: fmt.Sprintf(unsupportedErrorMsg, tlscommon.TLSVersion11),
 		},
-		"rsa_1024": {
+		"rsa_1024_from_file": {
 			tlsConfig: tlscommon.Config{Certificate: tlscommon.CertificateConfig{
-				Certificate: certificatePEM,
-				Key:         privateKeyPEM,
+				Certificate: "testdata/rsa_1024.cert.pem",
+				Key:         "testdata/rsa_1024.key.pem",
 			}},
+			expectedErrMsg: "certificate is using an RSA key of < 2048 bits",
+		},
+		"rsa_1024_from_string": {
+			tlsConfig: tlscommon.Config{Certificate: tlscommon.CertificateConfig{
+				Certificate: rsa1024CertPEM,
+				Key:         rsa1024KeyPem,
+			}},
+			expectedErrMsg: "certificate is using an RSA key of < 2048 bits",
 		},
 	}
-
-	/* TODO: move block to elastic-agent-libs/transport/tlscommon.CertificateConfig.Validate() as validation for key length */
-	cert, err := tls.X509KeyPair([]byte(certificatePEM), []byte(privateKeyPEM))
-	require.NoError(t, err)
-	privateKey := cert.PrivateKey.(*rsa.PrivateKey)
-	t.Log(privateKey.N.BitLen())
-	/* end block */
 
 	for name, test := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -95,46 +94,4 @@ func TestClientWithUnsupportedTLSConfig(t *testing.T) {
 			}
 		})
 	}
-}
-
-// makeRSA1024KeyCertPair returns a private key and certificate encoded
-// in PEM format, generated from an RSA 1024-bit keypair.
-func makeRSA1024KeyCertPair(t *testing.T) (string, string) {
-	// Generate RSA keypair
-	keyBytes, err := rsa.GenerateKey(rand.Reader, 1024)
-	require.NoError(t, err)
-
-	err = keyBytes.Validate()
-	require.NoError(t, err)
-
-	// Generate certificate from keypair
-	tpl := x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			Country:      []string{"US"},
-			Organization: []string{"Elastic"},
-			Province:     []string{"CA"},
-			CommonName:   "CN",
-		},
-	}
-
-	cert, err := x509.CreateCertificate(rand.Reader, &tpl, &tpl, &keyBytes.PublicKey, keyBytes)
-	require.NoError(t, err)
-
-	// Convert private key to PEM format
-	b, err := x509.MarshalPKCS8PrivateKey(keyBytes)
-	require.NoError(t, err)
-
-	keyPem := pem.EncodeToMemory(&pem.Block{
-		Type:  "PRIVATE KEY",
-		Bytes: b,
-	})
-
-	// Convert certificate to PEM format
-	certPem := pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: cert,
-	})
-
-	return string(keyPem), string(certPem)
 }
