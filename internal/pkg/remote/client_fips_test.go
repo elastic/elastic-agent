@@ -68,7 +68,7 @@ func TestClientWithUnsupportedTLSConfig(t *testing.T) {
 		},
 	}
 
-	/* TODO: move block to elastic-agent-libs/transport/tlscommon */
+	/* TODO: move block to elastic-agent-libs/transport/tlscommon.CertificateConfig.Validate() as validation for key length */
 	cert, err := tls.X509KeyPair([]byte(certificatePEM), []byte(privateKeyPEM))
 	require.NoError(t, err)
 	privateKey := cert.PrivateKey.(*rsa.PrivateKey)
