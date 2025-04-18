@@ -94,8 +94,6 @@ func TestPreviousMinor(t *testing.T) {
 	v, err := PreviousMinor()
 	require.NoError(t, err)
 	t.Logf("previous minor: %s", v.String())
-<<<<<<< HEAD
-=======
 
 	// Special case: the current Agent version is the first release of a new
 	// major (vX.0.x). In this case we expect the previous minor to be the
@@ -114,7 +112,6 @@ func TestPreviousMinor(t *testing.T) {
 		return
 	}
 
->>>>>>> b37ee3221 (fix PreviousMinor and unskip TestPreviousMinor (#7888))
 	assert.Truef(t, currentParsed.Major() == v.Major() && currentParsed.Minor() > v.Minor(), "%s is not previous minor for %s", v, bversion.Agent)
 	assert.Empty(t, v.Prerelease())
 	assert.Empty(t, v.BuildMetadata())
