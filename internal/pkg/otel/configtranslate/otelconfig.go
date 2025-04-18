@@ -380,6 +380,7 @@ func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
 		return nil, err
 	}
 	// we want to use dynamic indexing
+	esConfig["logs_index"] = "" // needs to be empty for logs_dynamic_index
 	esConfig["logs_dynamic_index"] = map[string]any{"enabled": true}
 
 	// we also want to use dynamic log ids
