@@ -1143,7 +1143,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	}
 
 	// download/copy all the necessary dependencies for packaging elastic-agent
-	archivePath, dropPath := collectPackageDependencies(platforms, dependenciesVersion, packageTypes, dependencies)
+	archivePath, dropPath, dependencies := collectPackageDependencies(platforms, dependenciesVersion, packageTypes, dependencies)
 
 	// cleanup after build
 	defer os.RemoveAll(archivePath)
@@ -1180,7 +1180,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 // NOTE: after the build is done the caller must:
 // - delete archivePath and dropPath contents
 // - unset AGENT_DROP_PATH environment variable
-func collectPackageDependencies(platforms []string, packageVersion string, packageTypes []devtools.PackageType, dependencies []packaging.BinarySpec) (archivePath, dropPath string) {
+func collectPackageDependencies(platforms []string, packageVersion string, packageTypes []devtools.PackageType, dependencies []packaging.BinarySpec) (archivePath, dropPath string, d []packaging.BinarySpec) {
 	dropPath, found := os.LookupEnv(agentDropPath)
 
 	// try not to shadow too many variables
@@ -1259,6 +1259,12 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 			}
 		} else {
 			packedBeats := []string{"agentbeat"}
+			// restrict the dependency list only to agentbeat in this case
+			dependencies = packaging.FilterComponents(dependencies, packaging.WithBinaryName("agentbeat"))
+			if mg.Verbose() {
+				log.Printf("Packaging using a beats repository, reducing dependendencies to %v", dependencies)
+			}
+
 			// build from local repo, will assume beats repo is located on the same root level
 			for _, b := range packedBeats {
 				pwd, err := filepath.Abs(filepath.Join("../beats/x-pack", b))
@@ -1326,7 +1332,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 	} else {
 		archivePath = movePackagesToArchive(dropPath, platforms, packageVersion, dependencies)
 	}
-	return archivePath, dropPath
+	return archivePath, dropPath, dependencies
 }
 
 func removePythonWheels(matches []string, version string, dependencies []packaging.BinarySpec) []string {
@@ -1436,7 +1442,11 @@ type branchInfo struct {
 // place them under build/dra/buildID. It accepts one argument that has to be a release branch present in staging DRA
 func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 
-	elasticAgentCoreComponents := packaging.FilterComponents(packaging.WithProjectName(agentCoreProjectName), packaging.WithFIPS(devtools.FIPSBuild))
+	components, err := packaging.Components()
+	if err != nil {
+		return fmt.Errorf("retrieving defined components: %w", err)
+	}
+	elasticAgentCoreComponents := packaging.FilterComponents(components, packaging.WithProjectName(agentCoreProjectName), packaging.WithFIPS(devtools.FIPSBuild))
 
 	if len(elasticAgentCoreComponents) != 1 {
 		return fmt.Errorf(
@@ -1679,8 +1689,11 @@ func downloadDRAArtifacts(ctx context.Context, build *manifest.Build, version st
 }
 
 func useDRAAgentBinaryForPackage(ctx context.Context, manifestURL string, version string) error {
-
-	elasticAgentCoreComponents := packaging.FilterComponents(packaging.WithProjectName(agentCoreProjectName), packaging.WithFIPS(devtools.FIPSBuild))
+	components, err := packaging.Components()
+	if err != nil {
+		return fmt.Errorf("retrieving defined components: %w", err)
+	}
+	elasticAgentCoreComponents := packaging.FilterComponents(components, packaging.WithProjectName(agentCoreProjectName), packaging.WithFIPS(devtools.FIPSBuild))
 
 	if len(elasticAgentCoreComponents) != 1 {
 		return fmt.Errorf(

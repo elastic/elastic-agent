@@ -254,11 +254,11 @@ func Settings() GlobalSettings {
 	return settings.Settings
 }
 
-func FilterComponents(filters ...ComponentFilter) []BinarySpec {
-	ret := make([]BinarySpec, 0, len(settings.Components))
+func FilterComponents(components []BinarySpec, filters ...ComponentFilter) []BinarySpec {
+	ret := make([]BinarySpec, 0, len(components))
 
 COMPLOOP:
-	for _, c := range settings.Components {
+	for _, c := range components {
 		for _, filter := range filters {
 			if !filter(c) {
 				// this filter doesn't match, move to the next component
@@ -281,5 +281,11 @@ func WithProjectName(projectName string) ComponentFilter {
 func WithFIPS(fips bool) ComponentFilter {
 	return func(p BinarySpec) bool {
 		return p.FIPS == fips
+	}
+}
+
+func WithBinaryName(binaryName string) ComponentFilter {
+	return func(p BinarySpec) bool {
+		return p.BinaryName == binaryName
 	}
 }
