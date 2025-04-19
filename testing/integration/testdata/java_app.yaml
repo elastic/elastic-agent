@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: java-app
+  name: java-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: java-app
+  template:
+    metadata:
+      labels:
+        app: java-app
+      annotations:
+        instrumentation.opentelemetry.io/inject-java: "true"
+    spec:
+      containers:
+      - name: java-app
+        image: docker.elastic.co/demos/apm/k8s-webhook-test
+        env:
+        - name: OTEL_INSTRUMENTATION_METHODS_INCLUDE
+          value: "test.Testing[methodB]"
