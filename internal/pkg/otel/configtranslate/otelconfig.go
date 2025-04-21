@@ -77,7 +77,6 @@ func getSupportedComponents(model *component.Model) []*component.Component {
 	var supportedComponents []*component.Component
 
 	for _, comp := range model.Components {
-		comp := comp
 		if IsComponentOtelSupported(&comp) {
 			supportedComponents = append(supportedComponents, &comp)
 		}
@@ -173,6 +172,9 @@ func getReceiversConfigForComponent(comp *component.Component, info info.Agent, 
 	// always safe. We should either ensure this is always the case, or have an explicit mapping.
 	beatName := strings.TrimSuffix(receiverType.String(), "receiver")
 	beatDataPath := filepath.Join(paths.Run(), comp.ID)
+	binaryName := getBeatNameForComponent(comp)
+	dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
+
 	receiverConfig := map[string]any{
 		beatName: map[string]any{
 			"inputs": inputs,
@@ -184,6 +186,20 @@ func getReceiversConfigForComponent(comp *component.Component, info info.Agent, 
 		// just like we do for beats processes, each receiver needs its own data path
 		"path": map[string]any{
 			"data": beatDataPath,
+		},
+		// adds additional context on logs emitted by beatreceivers to uniquely identify per component logs
+		"logging": map[string]any{
+			"with_fields": map[string]any{
+				"component": map[string]interface{}{
+					"id":      comp.ID,
+					"binary":  binaryName,
+					"dataset": dataset,
+					"type":    comp.InputType,
+				},
+				"log": map[string]interface{}{
+					"source": comp.ID,
+				},
+			},
 		},
 	}
 	// add the output queue config if present
