@@ -60,4 +60,6 @@ Keep these in mind as both authors and reviewers of PRs:
 
 * I must not focus on personal preferences or nitpicks. If I understand the code in the PR but simply would've implemented the same solution a different way that's great but it is not feedback that belongs in the PR. Such feedback only serves to slow down progress for little to no gain.
 
+* If I'm making a suggestion, I must provide a rationale for it.  It should be clear to the author of the PR why my suggestion is better than what is already in the PR.
+
 

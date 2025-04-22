@@ -37,14 +37,15 @@ spec:
       name: elastic-agent
       description: Buildkite pipeline for the Elastic Agent project
     spec:
-      branch_configuration: "main 7.* 8.* v7.* v8.*"
+      branch_configuration: "main 7.* 8.* 9.*"
       repository: elastic/elastic-agent
       pipeline_file: ".buildkite/pipeline.yml"
       provider_settings:
         build_pull_request_forks: false
         build_pull_requests: true
-        build_tags: true
+        build_tags: false
         filter_enabled: true
+        # TODO: what's the reason for this filter?
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       schedules:
@@ -57,6 +58,7 @@ spec:
       skip_intermediate_builds: true
       skip_intermediate_builds_branch_filter: "!main !7.* !8.* !9.*"
       env:
+        ELASTIC_PR_COMMENTS_ENABLED: 'true'
         ELASTIC_SLACK_NOTIFICATIONS_ENABLED: "true"
         SLACK_NOTIFICATIONS_CHANNEL: "#ingest-notifications"
         SLACK_NOTIFICATIONS_ALL_BRANCHES: "false"
@@ -136,11 +138,6 @@ spec:
         trigger_mode: none # don't trigger jobs from github activity
       cancel_intermediate_builds: false
       skip_intermediate_builds: false
-      schedules:
-        daily:
-          branch: main
-          cronline: "0 */6 * * *" # every 6 hours
-          message: Test execution of the new pipeline
       teams:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ
@@ -172,9 +169,9 @@ spec:
       repository: elastic/elastic-agent
       pipeline_file: ".buildkite/pipeline.elastic-agent-package.yml"
       env:
-        ELASTIC_SLACK_NOTIFICATIONS_ENABLED: 'true'
+        ELASTIC_SLACK_NOTIFICATIONS_ENABLED: "true"
         SLACK_NOTIFICATIONS_CHANNEL: "#ingest-notifications"
-        SLACK_NOTIFICATIONS_ON_SUCCESS: 'false'
+        SLACK_NOTIFICATIONS_ON_SUCCESS: "false"
         SLACK_NOTIFICATIONS_ALL_BRANCHES: "true"
       provider_settings:
         build_pull_request_forks: false
@@ -193,6 +190,8 @@ spec:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ
         release-eng:
+          access_level: BUILD_AND_READ
+        observablt-robots:
           access_level: BUILD_AND_READ
         endpoint-ci-admin:
           access_level: BUILD_AND_READ
@@ -221,7 +220,7 @@ spec:
       name: elastic-agent-binary-dra
       description: Buildkite pipeline for packaging Elastic Agent core binary and publish it to DRA
     spec:
-      branch_configuration: "main 7.* 8.* v7.* v8.*"
+      branch_configuration: "main 7.* 8.* 9.*"
       pipeline_file: ".buildkite/pipeline.elastic-agent-binary-dra.yml"
       provider_settings:
         build_pull_request_forks: false
@@ -230,6 +229,7 @@ spec:
         build_tags: false
         build_branches: true # enable build for branches. This relies on the filter in .buildkite/pipeline.elastic-agent-binary-dra.yml
         filter_enabled: true
+        # TODO: what's the reason for this filter?
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       repository: elastic/elastic-agent
@@ -316,6 +316,7 @@ spec:
         build_tags: false
         build_branches: false
         filter_enabled: true
+        # TODO: what's the reason for this filter?
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       repository: elastic/elastic-agent
@@ -329,3 +330,177 @@ spec:
           access_level: MANAGE_BUILD_AND_READ
         everyone:
           access_level: BUILD_AND_READ
+
+---
+# yaml-language-server: $schema=https://gist.githubusercontent.com/elasticmachine/988b80dae436cafea07d9a4a460a011d/raw/rre.schema.json
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: buildkite-elastic-agent-helm-charts
+  description: Elastic-agent Helm Charts Pipeline
+  links:
+    - title: Pipeline
+      url: https://buildkite.com/elastic/elastic-agent-helm-charts
+
+spec:
+  type: buildkite-pipeline
+  owner: group:ingest-fp
+  system: platform-ingest
+  implementation:
+    apiVersion: buildkite.elastic.dev/v1
+    kind: Pipeline
+    metadata:
+      name: elastic-agent-helm-charts
+      description: Runs elastic-agent helm charts
+    spec:
+      pipeline_file: ".buildkite/pipeline.elastic-agent-helm-charts.yml"
+      provider_settings:
+        trigger_mode: none # don't trigger jobs from github activity
+      repository: elastic/elastic-agent
+      teams:
+        ingest-fp:
+          access_level: MANAGE_BUILD_AND_READ
+        observablt-robots:
+          access_level: MANAGE_BUILD_AND_READ
+        observablt-robots-automation:
+          access_level: BUILD_AND_READ
+        release-eng:
+          access_level: BUILD_AND_READ
+        # See https://buildkite.com/docs/pipelines/configure/step-types/trigger-step#permissions
+        # Otherwise even if merge commits in main or any branch will fail
+        everyone:
+          access_level: BUILD_AND_READ
+
+
+---
+# yaml-language-server: $schema=https://gist.githubusercontent.com/elasticmachine/988b80dae436cafea07d9a4a460a011d/raw/rre.schema.json
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: beats-agent-serverless-tests
+  description: "Beats serverless tests from elastic-agent repository"
+  links:
+    - title: Pipeline
+      url: https://buildkite.com/elastic/beats-agent-serverless-tests
+
+spec:
+  type: buildkite-pipeline
+  owner: group:ingest-fp
+  system: platform-ingest
+  implementation:
+    apiVersion: buildkite.elastic.dev/v1
+    kind: Pipeline
+    metadata:
+      name: beats-agent-serverless-tests
+      description: "Beats serverless tests from elastic-agent repository"
+    spec:
+      pipeline_file: ".buildkite/serverless.beats.tests.yml"
+      maximum_timeout_in_minutes: 180
+      provider_settings:
+        trigger_mode: none # don't trigger jobs from github activity
+      repository: elastic/elastic-agent
+      teams:
+        ingest-fp:
+          access_level: MANAGE_BUILD_AND_READ
+        observablt-robots:
+          access_level: MANAGE_BUILD_AND_READ  
+        # See https://buildkite.com/docs/pipelines/configure/step-types/trigger-step#permissions
+        # Otherwise even if merge commits in the main or any branch, they will fail
+        everyone:
+          access_level: BUILD_AND_READ
+      env:
+        ELASTIC_SLACK_NOTIFICATIONS_ENABLED: "true"
+        SLACK_NOTIFICATIONS_CHANNEL: "#ingest-notifications"
+        SLACK_NOTIFICATIONS_ON_SUCCESS: "false"
+        SLACK_NOTIFICATIONS_ALL_BRANCHES: "false" # only notify for failures on `main` or \d+.\d+ (release) branches
+
+---
+# yaml-language-server: $schema=https://gist.githubusercontent.com/elasticmachine/988b80dae436cafea07d9a4a460a011d/raw/rre.schema.json
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: agentless-serverless-release
+  description: Initiate agentless serverless release
+  links:
+    - title: Pipeline
+      url: https://buildkite.com/elastic/agentless-serverless-release
+spec:
+  type: buildkite-pipeline
+  owner: group:ingest-fp
+  system: buildkite
+  implementation:
+    apiVersion: buildkite.elastic.dev/v1
+    kind: Pipeline
+    metadata:
+      name: agentless / serverless / release
+      description: Initiate Agentless serverless release
+    spec:
+      env:
+        SLACK_NOTIFICATIONS_CHANNEL: '#agentless-alerts'
+        ELASTIC_SLACK_NOTIFICATIONS_ENABLED: "true"
+        SLACK_NOTIFICATIONS_ON_SUCCESS: "false"
+        SLACK_NOTIFICATIONS_ALL_BRANCHES: "false" # only notify for failures on `main` or \d+.\d+ (release) branches
+      default_branch: main
+      allow_rebuilds: false
+      skip_intermediate_builds: false
+      repository: elastic/elastic-agent
+      pipeline_file: .buildkite/pipeline.agentless-app-release.yaml
+      provider_settings:
+        build_branches: false
+        build_pull_requests: false
+        publish_commit_status: false
+        trigger_mode: none
+        build_tags: false
+        prefix_pull_request_fork_branch_names: false
+        skip_pull_request_builds_for_existing_commits: false
+      teams:
+        agentless-team:
+          access_level: MANAGE_BUILD_AND_READ
+        cloud-tooling:
+          access_level: MANAGE_BUILD_AND_READ
+        everyone:
+          access_level: READ_ONLY
+        ingest-fp:
+          access_level: MANAGE_BUILD_AND_READ
+---
+
+# yaml-language-server: $schema=https://gist.githubusercontent.com/elasticmachine/988b80dae436cafea07d9a4a460a011d/raw/e57ee3bed7a6f73077a3f55a38e76e40ec87a7cf/rre.schema.json
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: agentless-tests
+  description: Tests the service ntegration in a specific environment
+  links:
+    - title: Pipeline
+      url: https://buildkite.com/elastic/agentless-tests
+spec:
+  type: buildkite-pipeline
+  owner: group:ingest-fp
+  system: buildkite
+  implementation:
+    apiVersion: buildkite.elastic.dev/v1
+    kind: Pipeline
+    metadata:
+      name: agentless-tests
+      description: agentless tests
+    spec:
+      env:
+        SLACK_NOTIFICATIONS_CHANNEL: '#agentless-alerts'
+        ELASTIC_SLACK_NOTIFICATIONS_ENABLED: "true"
+        SLACK_NOTIFICATIONS_ON_SUCCESS: "false"
+        SLACK_NOTIFICATIONS_ALL_BRANCHES: "false" # only notify for failures on `main` or \d+.\d+ (release) branches
+      repository: elastic/elastic-agent
+      pipeline_file: .buildkite/pipeline.agentless-tests.yaml
+      branch_configuration: "main"
+      provider_settings:
+        build_pull_requests: false
+        trigger_mode: none
+      teams:
+        agentless-team:
+          access_level: MANAGE_BUILD_AND_READ
+        cloud-tooling:
+          access_level: MANAGE_BUILD_AND_READ
+        ingest-fp:
+          access_level: MANAGE_BUILD_AND_READ
+        everyone:
+          access_level: READ_ONLY

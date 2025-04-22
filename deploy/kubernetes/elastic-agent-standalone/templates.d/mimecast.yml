@@ -1072,7 +1072,8 @@ inputs:
       type: filestream
       use_output: default
       streams:
-        - condition: ${kubernetes.hints.mimecast.container_logs.enabled} == true
+        - id: mimecast-container-logs-${kubernetes.hints.container_id}
+          condition: ${kubernetes.hints.mimecast.container_logs.enabled} == true
           data_stream:
             dataset: mimecast.container_logs
             type: logs

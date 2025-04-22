@@ -11,8 +11,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
@@ -29,6 +31,7 @@ const (
 	flagInstallDevelopment            = "develop"
 	flagInstallNamespace              = "namespace"
 	flagInstallRunUninstallFromBinary = "run-uninstall-from-binary"
+	flagInstallServers                = "install-servers"
 
 	flagInstallCustomUser  = "user"
 	flagInstallCustomGroup = "group"
@@ -47,6 +50,7 @@ would like the Agent to operate.
 		Run: func(c *cobra.Command, _ []string) {
 			if err := installCmd(streams, c); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				logExternal(fmt.Sprintf("%s install failed: %s", paths.BinaryName, err))
 				os.Exit(1)
 			}
 		},
@@ -56,6 +60,7 @@ would like the Agent to operate.
 	cmd.Flags().BoolP("non-interactive", "n", false, "Install Elastic Agent in non-interactive mode which will not prompt on missing parameters but fails instead.")
 	cmd.Flags().String(flagInstallBasePath, paths.DefaultBasePath, "The path where the Elastic Agent will be installed. It must be an absolute path.")
 	cmd.Flags().Bool(flagInstallUnprivileged, false, "Install in unprivileged mode, limiting the access of the Elastic Agent. (beta)")
+	cmd.Flags().Bool(flagInstallServers, false, "Install larger version of agent that includes server components")
 
 	cmd.Flags().Bool(flagInstallRunUninstallFromBinary, false, "Run the uninstall command from this binary instead of using the binary found in the system's path.")
 	_ = cmd.Flags().MarkHidden(flagInstallRunUninstallFromBinary) // Advanced option to force a new agent to override an existing installation, it may orphan installed components.
@@ -80,6 +85,11 @@ would like the Agent to operate.
 
 func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	var err error
+
+	if installServers, _ := cmd.Flags().GetBool(flagInstallServers); isFleetServerFlagProvided(cmd) && !installServers {
+		_ = cmd.Flags().Lookup(flagInstallServers).Value.Set("true") // this can fail only when parsing bool
+		fmt.Fprintf(streams.Out, "fleet-server installation detected, using --%s flag\n", flagInstallServers)
+	}
 
 	err = validateEnrollFlags(cmd)
 	if err != nil {
@@ -244,15 +254,15 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	cfgFile := paths.ConfigFile()
 	if status == install.Installed {
 		// Uninstall the agent
-		progBar.Describe("Uninstalling current Elastic Agent")
+		progBar.Describe(fmt.Sprintf("Uninstalling current %s", paths.ServiceDisplayName()))
 		if !runUninstallBinary {
-			err := execUninstall(streams)
+			err := execUninstall(streams, topPath, paths.BinaryName)
 			if err != nil {
 				progBar.Describe("Uninstall failed")
 				return err
 			}
 		} else {
-			err := install.Uninstall(cmd.Context(), cfgFile, topPath, "", log, progBar)
+			err := install.Uninstall(cmd.Context(), cfgFile, topPath, "", log, progBar, false)
 			if err != nil {
 				progBar.Describe("Uninstall from binary failed")
 				return err
@@ -260,6 +270,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		}
 		progBar.Describe("Successfully uninstalled Elastic Agent")
 	}
+
 	if status != install.PackageInstall {
 		customUser, _ := cmd.Flags().GetString(flagInstallCustomUser)
 		customGroup, _ := cmd.Flags().GetString(flagInstallCustomGroup)
@@ -268,7 +279,12 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			customPass, _ = cmd.Flags().GetString(flagInstallCustomPass)
 		}
 
-		ownership, err = install.Install(cfgFile, topPath, unprivileged, log, progBar, streams, customUser, customGroup, customPass)
+		flavor := install.DefaultFlavor
+		if installServers, _ := cmd.Flags().GetBool(flagInstallServers); installServers {
+			flavor = install.FlavorServers
+		}
+
+		ownership, err = install.Install(cfgFile, topPath, unprivileged, log, progBar, streams, customUser, customGroup, customPass, flavor)
 		if err != nil {
 			return fmt.Errorf("error installing package: %w", err)
 		}
@@ -276,7 +292,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		defer func() {
 			if err != nil {
 				progBar.Describe("Uninstalling")
-				innerErr := install.Uninstall(cmd.Context(), cfgFile, topPath, "", log, progBar)
+				innerErr := install.Uninstall(cmd.Context(), cfgFile, topPath, "", log, progBar, false)
 				if innerErr != nil {
 					progBar.Describe("Failed to Uninstall")
 				} else {
@@ -308,7 +324,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			}()
 		}
 
-		fmt.Fprintln(streams.Out, "Elastic Agent successfully installed, starting enrollment.")
+		fmt.Fprintf(streams.Out, "%s successfully installed, starting enrollment.\n", paths.ServiceDisplayName())
 	}
 
 	if enroll {
@@ -323,7 +339,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			return err
 		}
 
-		progBar.Describe("Enrolling Elastic Agent with Fleet")
+		progBar.Describe(fmt.Sprintf("Enrolling %s with Fleet", paths.ServiceDisplayName()))
 		err = enrollCmd.Start()
 		if err != nil {
 			progBar.Describe("Failed to Enroll")
@@ -343,21 +359,52 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	progBar.Describe("Done")
 	_ = progBar.Finish()
 	_ = progBar.Exit()
-	fmt.Fprint(streams.Out, "\nElastic Agent has been successfully installed.\n")
+	fmt.Fprintf(streams.Out, "\n%s has been successfully installed.\n", paths.ServiceDisplayName())
 	return nil
 }
 
+func isFleetServerFlagProvided(cmd *cobra.Command) bool {
+	var fleetServerFlagPresent bool
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		if fleetServerFlagPresent {
+			return
+		}
+
+		if !strings.HasPrefix(f.Name, "fleet-server-") {
+			return
+		}
+
+		flag := cmd.Flags().Lookup(f.Name)
+		if flag != nil && flag.Changed {
+			fleetServerFlagPresent = true
+		}
+
+	})
+
+	return fleetServerFlagPresent
+}
+
 // execUninstall execs "elastic-agent uninstall --force" from the elastic agent installed on the system (found in PATH)
-func execUninstall(streams *cli.IOStreams) error {
+func execUninstall(streams *cli.IOStreams, topPath string, binName string) error {
 	args := []string{
 		"uninstall",
 		"--force",
 	}
-	execPath, err := exec.LookPath(paths.BinaryName)
+
+	// Using the topPath with binaryName is feasible only because the shell wrapper (linux) does not
+	// do anything complicated aside from calling the agent binary. If this were
+	// to change, the implementation here may need to change as well.
+	binPath := filepath.Join(topPath, binName)
+	fi, err := os.Stat(binPath)
 	if err != nil {
-		return fmt.Errorf("unable to find %s on path: %w", paths.BinaryName, err)
+		return fmt.Errorf("error checking binary path %s: %w", binPath, err)
 	}
-	uninstall := exec.Command(execPath, args...)
+
+	if fi.IsDir() {
+		return fmt.Errorf("expected file, found a directory at %s", binPath)
+	}
+
+	uninstall := exec.Command(binPath, args...)
 	uninstall.Stdout = streams.Out
 	uninstall.Stderr = streams.Err
 	if err := uninstall.Start(); err != nil {

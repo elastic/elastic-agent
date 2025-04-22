@@ -13,6 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/otel/configtranslate"
+
 	"go.opentelemetry.io/collector/component/componentstatus"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -73,6 +75,9 @@ type UpgradeManager interface {
 	// Ack is used on startup to check if the agent has upgraded and needs to send an ack for the action
 	Ack(ctx context.Context, acker acker.Acker) error
 
+	// AckAction is used to ack not persisted action.
+	AckAction(ctx context.Context, acker acker.Acker, action fleetapi.Action) error
+
 	// MarkerWatcher returns a watcher for the upgrade marker.
 	MarkerWatcher() upgrade.MarkerWatcher
 }
@@ -89,9 +94,8 @@ type MonitorManager interface {
 	// args:
 	// - the existing config policy
 	// - a list of the expected running components
-	// - a map of component IDs to binary names
 	// - a map of component IDs to the PIDs of the running components.
-	MonitoringConfig(map[string]interface{}, []component.Component, map[string]string, map[string]uint64) (map[string]interface{}, error)
+	MonitoringConfig(map[string]interface{}, []component.Component, map[string]uint64) (map[string]interface{}, error)
 }
 
 // Runner provides interface to run a manager and receive running errors.
@@ -172,8 +176,11 @@ type ConfigManager interface {
 type VarsManager interface {
 	Runner
 
+	// DefaultProvider returns the default provider that the variable manager is configured to use.
+	DefaultProvider() string
+
 	// Observe instructs the variables to observe.
-	Observe([]string)
+	Observe(context.Context, []string) ([]*transpiler.Vars, error)
 
 	// Watch returns the chanel to watch for variable changes.
 	Watch() <-chan []*transpiler.Vars
@@ -199,8 +206,9 @@ type Coordinator struct {
 	agentInfo info.Agent
 	isManaged bool
 
-	cfg   *configuration.Configuration
-	specs component.RuntimeSpecs
+	cfg        *configuration.Configuration
+	specs      component.RuntimeSpecs
+	fleetAcker acker.Acker
 
 	reexecMgr  ReExecManager
 	upgradeMgr UpgradeManager
@@ -214,6 +222,8 @@ type Coordinator struct {
 
 	otelMgr OTelManager
 	otelCfg *confmap.Conf
+	// the final config sent to the manager, contains both config from hybrid mode and from components
+	finalOtelCfg *confmap.Conf
 
 	caps      capabilities.Capabilities
 	modifiers []ComponentsModifier
@@ -365,7 +375,7 @@ type UpdateComponentChange struct {
 }
 
 // New creates a new coordinator.
-func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo info.Agent, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capabilities, monitorMgr MonitorManager, isManaged bool, otelMgr OTelManager, modifiers ...ComponentsModifier) *Coordinator {
+func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo info.Agent, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capabilities, monitorMgr MonitorManager, isManaged bool, otelMgr OTelManager, fleetAcker acker.Acker, modifiers ...ComponentsModifier) *Coordinator {
 	var fleetState cproto.State
 	var fleetMessage string
 	if !isManaged {
@@ -419,6 +429,8 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		heartbeatChan:              make(chan struct{}),
 		componentPIDTicker:         time.NewTicker(time.Second * 30),
 		componentPidRequiresUpdate: &atomic.Bool{},
+
+		fleetAcker: fleetAcker,
 	}
 	// Setup communication channels for any non-nil components. This pattern
 	// lets us transparently accept nil managers / simulated events during
@@ -575,6 +587,11 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 	if err != nil {
 		c.ClearOverrideState()
+		if errors.Is(err, upgrade.ErrUpgradeSameVersion) {
+			// Set upgrade state to completed so update no longer shows in-progress.
+			det.SetState(details.StateCompleted)
+			return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
+		}
 		det.Fail(err)
 		return err
 	}
@@ -767,27 +784,28 @@ func (c *Coordinator) Run(ctx context.Context) error {
 // information about the state of the Elastic Agent.
 // Called by external goroutines.
 func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
-	return diagnostics.Hooks{
+	hooks := diagnostics.Hooks{
 		{
 			Name:        "agent-info",
 			Filename:    "agent-info.yaml",
 			Description: "current state of the agent information of the running Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
+				meta, err := c.agentInfo.ECSMetadata(c.logger)
+				if err != nil {
+					c.logger.Errorw("Error getting ECS metadata", "error.message", err)
+				}
+
 				output := struct {
-					AgentID      string            `yaml:"agent_id"`
-					Headers      map[string]string `yaml:"headers"`
-					LogLevel     string            `yaml:"log_level"`
-					Snapshot     bool              `yaml:"snapshot"`
-					Version      string            `yaml:"version"`
-					Unprivileged bool              `yaml:"unprivileged"`
+					Headers     map[string]string `yaml:"headers"`
+					LogLevel    string            `yaml:"log_level"`
+					RawLogLevel string            `yaml:"log_level_raw"`
+					Metadata    *info.ECSMeta     `yaml:"metadata"`
 				}{
-					AgentID:      c.agentInfo.AgentID(),
-					Headers:      c.agentInfo.Headers(),
-					LogLevel:     c.agentInfo.LogLevel(),
-					Snapshot:     c.agentInfo.Snapshot(),
-					Version:      c.agentInfo.Version(),
-					Unprivileged: c.agentInfo.Unprivileged(),
+					Headers:     c.agentInfo.Headers(),
+					LogLevel:    c.agentInfo.LogLevel(),
+					RawLogLevel: c.agentInfo.RawLogLevel(),
+					Metadata:    meta,
 				}
 				o, err := yaml.Marshal(output)
 				if err != nil {
@@ -1007,7 +1025,24 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 				return o
 			},
 		},
+		diagnostics.Hook{
+			Name:        "otel-final",
+			Filename:    "otel-final.yaml",
+			Description: "Final otel configuration used by the Elastic Agent. Includes hybrid mode config and component config.",
+			ContentType: "application/yaml",
+			Hook: func(_ context.Context) []byte {
+				if c.finalOtelCfg == nil {
+					return []byte("no active OTel configuration")
+				}
+				o, err := yaml.Marshal(c.finalOtelCfg.ToStringMap())
+				if err != nil {
+					return []byte(fmt.Sprintf("error: failed to convert to yaml: %v", err))
+				}
+				return o
+			},
+		},
 	}
+	return hooks
 }
 
 // runner performs the actual work of running all the managers.
@@ -1219,7 +1254,6 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (err error) {
 	if c.otelMgr != nil {
 		c.otelCfg = cfg.OTel
-		c.otelMgr.Update(cfg.OTel)
 	}
 	return c.processConfigAgent(ctx, cfg)
 }
@@ -1239,7 +1273,11 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 	}
 
 	// pass the observed vars from the AST to the varsMgr
-	c.observeASTVars()
+	err = c.observeASTVars(ctx)
+	if err != nil {
+		// only possible error here is the context being cancelled
+		return err
+	}
 
 	// Disabled for 8.8.0 release in order to limit the surface
 	// https://github.com/elastic/security-team/issues/6501
@@ -1322,25 +1360,32 @@ func (c *Coordinator) generateAST(cfg *config.Config) (err error) {
 // observeASTVars identifies the variables that are referenced in the computed AST and passed to
 // the varsMgr so it knows what providers are being referenced. If a providers is not being
 // referenced then the provider does not need to be running.
-func (c *Coordinator) observeASTVars() {
+func (c *Coordinator) observeASTVars(ctx context.Context) error {
 	if c.varsMgr == nil {
 		// No varsMgr (only happens in testing)
-		return
-	}
-	if c.ast == nil {
-		// No AST; no vars
-		c.varsMgr.Observe(nil)
-		return
-	}
-	inputs, ok := transpiler.Lookup(c.ast, "inputs")
-	if !ok {
-		// No inputs; no vars
-		c.varsMgr.Observe(nil)
-		return
+		return nil
 	}
 	var vars []string
-	vars = inputs.Vars(vars)
-	c.varsMgr.Observe(vars)
+	if c.ast != nil {
+		inputs, ok := transpiler.Lookup(c.ast, "inputs")
+		if ok {
+			vars = inputs.Vars(vars, c.varsMgr.DefaultProvider())
+		}
+		outputs, ok := transpiler.Lookup(c.ast, "outputs")
+		if ok {
+			vars = outputs.Vars(vars, c.varsMgr.DefaultProvider())
+		}
+	}
+	updated, err := c.varsMgr.Observe(ctx, vars)
+	if err != nil {
+		// context cancel
+		return err
+	}
+	if updated != nil {
+		// provided an updated set of vars (observed changed)
+		c.vars = updated
+	}
+	return nil
 }
 
 // processVars updates the transpiler vars in the Coordinator.
@@ -1394,15 +1439,90 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 		c.logger.Debugf("Continue with missing \"signed\" properties: %v", err)
 	}
 
-	model := component.Model{
+	model := &component.Model{
 		Components: c.componentModel,
 		Signed:     signed,
 	}
 
 	c.logger.Info("Updating running component model")
 	c.logger.With("components", model.Components).Debug("Updating running component model")
-	c.runtimeMgr.Update(model)
+	return c.updateManagersWithConfig(model)
+}
+
+// updateManagersWithConfig updates runtime managers with the component model and config.
+// Components may be sent to different runtimes depending on various criteria.
+func (c *Coordinator) updateManagersWithConfig(model *component.Model) error {
+	runtimeModel, otelModel := c.splitModelBetweenManagers(model)
+	c.logger.With("components", runtimeModel.Components).Debug("Updating runtime manager model")
+	c.runtimeMgr.Update(*runtimeModel)
+	return c.updateOtelManagerConfig(otelModel)
+}
+
+// updateOtelManagerConfig updates the otel collector configuration for the otel manager. It assembles this configuration
+// from the component model passed in and from the hybrid-mode otel config set on the Coordinator.
+func (c *Coordinator) updateOtelManagerConfig(model *component.Model) error {
+	finalOtelCfg := confmap.New()
+	var componentOtelCfg *confmap.Conf
+	if len(model.Components) > 0 {
+		var err error
+		c.logger.With("components", model.Components).Debug("Updating otel manager model")
+		componentOtelCfg, err = configtranslate.GetOtelConfig(model, c.agentInfo)
+		if err != nil {
+			c.logger.Errorf("failed to generate otel config: %v", err)
+		}
+		componentIDs := make([]string, 0, len(model.Components))
+		for _, comp := range model.Components {
+			componentIDs = append(componentIDs, comp.ID)
+		}
+		c.logger.With("component_ids", componentIDs).Warn("The Otel runtime manager is HIGHLY EXPERIMENTAL and only intended for testing. Use at your own risk.")
+	}
+	if componentOtelCfg != nil {
+		err := finalOtelCfg.Merge(componentOtelCfg)
+		if err != nil {
+			c.logger.Error("failed to merge otel config: %v", err)
+		}
+	}
+
+	if c.otelCfg != nil {
+		err := finalOtelCfg.Merge(c.otelCfg)
+		if err != nil {
+			c.logger.Error("failed to merge otel config: %v", err)
+		}
+	}
+
+	if len(finalOtelCfg.AllKeys()) == 0 {
+		// if the config is empty, we want to send nil to the manager, so it knows to stop the collector
+		finalOtelCfg = nil
+	}
+
+	c.otelMgr.Update(finalOtelCfg)
+	c.finalOtelCfg = finalOtelCfg
 	return nil
+}
+
+// splitModelBetweenManager splits the model components between the runtime manager and the otel manager.
+func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtimeModel *component.Model, otelModel *component.Model) {
+	var otelComponents, runtimeComponents []component.Component
+	for _, comp := range model.Components {
+		switch comp.RuntimeManager {
+		case component.OtelRuntimeManager:
+			otelComponents = append(otelComponents, comp)
+		case component.ProcessRuntimeManager:
+			runtimeComponents = append(runtimeComponents, comp)
+		default:
+			// this should be impossible if we parse the configuration correctly
+			c.logger.Errorf("unknown runtime manager for component: %s, ignoring", comp.RuntimeManager)
+		}
+	}
+	otelModel = &component.Model{
+		Components: otelComponents,
+		// the signed portion of the policy is only used by Defend, so otel doesn't need it for anything
+	}
+	runtimeModel = &component.Model{
+		Components: runtimeComponents,
+		Signed:     model.Signed,
+	}
+	return
 }
 
 // generateComponentModel regenerates the configuration tree and
@@ -1416,6 +1536,8 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	}()
 
 	ast := c.ast.ShallowClone()
+
+	// perform variable substitution for inputs
 	inputs, ok := transpiler.Lookup(ast, "inputs")
 	if ok {
 		renderedInputs, err := transpiler.RenderInputs(inputs, c.vars)
@@ -1425,6 +1547,20 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		err = transpiler.Insert(ast, renderedInputs, "inputs")
 		if err != nil {
 			return fmt.Errorf("inserting rendered inputs failed: %w", err)
+		}
+	}
+
+	// perform variable substitution for outputs
+	// outputs only support the context variables (dynamic provides are not provide to the outputs)
+	outputs, ok := transpiler.Lookup(ast, "outputs")
+	if ok {
+		renderedOutputs, err := transpiler.RenderOutputs(outputs, c.vars)
+		if err != nil {
+			return fmt.Errorf("rendering outputs failed: %w", err)
+		}
+		err = transpiler.Insert(ast, renderedOutputs, "outputs")
+		if err != nil {
+			return fmt.Errorf("inserting rendered outputs failed: %w", err)
 		}
 	}
 

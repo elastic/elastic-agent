@@ -7,6 +7,8 @@ package authority
 import (
 	"bytes"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -57,7 +59,6 @@ func NewCA() (*CertificateAuthority, error) {
 	publicKey := &privateKey.PublicKey
 
 	ca.SubjectKeyId = generateSubjectKeyID(publicKey)
-
 	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, publicKey, privateKey)
 	if err != nil {
 		log.Println("create ca failed", err)
@@ -100,12 +101,19 @@ func NewCA() (*CertificateAuthority, error) {
 	}, nil
 }
 
-func generateSubjectKeyID(publicKey *rsa.PublicKey) []byte {
+func generateSubjectKeyID(pub crypto.PublicKey) []byte {
 	// SubjectKeyId generated using method 1 in RFC 7093, Section 2:
 	//   1) The keyIdentifier is composed of the leftmost 160-bits of the
 	//   SHA-256 hash of the value of the BIT STRING subjectPublicKey
 	//   (excluding the tag, length, and number of unused bits).
-	publicKeyBytes := x509.MarshalPKCS1PublicKey(publicKey)
+	var publicKeyBytes []byte
+	switch publicKey := pub.(type) {
+	case *rsa.PublicKey:
+		publicKeyBytes = x509.MarshalPKCS1PublicKey(publicKey)
+	case *ecdsa.PublicKey:
+		//nolint:staticcheck // no alternative
+		publicKeyBytes = elliptic.Marshal(publicKey.Curve, publicKey.X, publicKey.Y)
+	}
 	h := sha256.Sum256(publicKeyBytes)
 	return h[:20]
 }

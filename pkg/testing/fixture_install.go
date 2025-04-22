@@ -40,8 +40,10 @@ type CmdOpts interface {
 
 // EnrollOpts specifies the options for the enroll command
 type EnrollOpts struct {
+	ID              string // --id
 	URL             string // --url
 	EnrollmentToken string // --enrollment-token
+	ReplaceToken    string // --replace-token
 
 	// SSL/TLS options
 	CertificateAuthorities []string // --certificate-authorities
@@ -52,11 +54,17 @@ type EnrollOpts struct {
 
 func (e EnrollOpts) toCmdArgs() []string {
 	var args []string
+	if e.ID != "" {
+		args = append(args, "--id", e.ID)
+	}
 	if e.URL != "" {
 		args = append(args, "--url", e.URL)
 	}
 	if e.EnrollmentToken != "" {
 		args = append(args, "--enrollment-token", e.EnrollmentToken)
+	}
+	if e.ReplaceToken != "" {
+		args = append(args, "--replace-token", e.ReplaceToken)
 	}
 
 	if len(e.CertificateAuthorities) > 0 {
@@ -110,6 +118,7 @@ type InstallOpts struct {
 	DelayEnroll    bool   // --delay-enroll
 	Develop        bool   // --develop, not supported for DEB and RPM. Calling Install() sets Namespace to the development namespace so that checking only for a Namespace is sufficient.
 	Namespace      string // --namespace, not supported for DEB and RPM.
+	InstallServers bool   // --install-servers
 
 	Privileged bool // inverse of --unprivileged (as false is the default)
 	Username   string
@@ -153,6 +162,10 @@ func (i *InstallOpts) ToCmdArgs() []string {
 		}
 	}
 
+	if i.InstallServers {
+		args = append(args, "--install-servers")
+	}
+
 	if i.Username != "" {
 		args = append(args, "--user", i.Username)
 	}
@@ -175,20 +188,28 @@ func (i *InstallOpts) ToCmdArgs() []string {
 //   - the combined output of Install command stdout and stderr
 //   - an error if any.
 func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
+	return f.installFunc(ctx, installOpts, true, opts...)
+}
+
+func (f *Fixture) InstallWithoutEnroll(ctx context.Context, installOpts *InstallOpts, opts ...process.CmdOption) ([]byte, error) {
+	return f.installFunc(ctx, installOpts, false, opts...)
+}
+
+func (f *Fixture) installFunc(ctx context.Context, installOpts *InstallOpts, shouldEnroll bool, opts ...process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture install function", f.t.Name())
 
 	// check for running agents before installing, but only if not installed into a namespace whose point is allowing two agents at once.
 	if installOpts != nil && !installOpts.Develop && installOpts.Namespace == "" {
-		assert.Empty(f.t, getElasticAgentProcesses(f.t), "there should be no running agent at beginning of Install()")
+		assert.Empty(f.t, getElasticAgentAndAgentbeatProcesses(f.t), "there should be no running agent at beginning of Install()")
 	}
 
 	switch f.packageFormat {
 	case "targz", "zip":
-		return f.installNoPkgManager(ctx, installOpts, opts)
+		return f.installNoPkgManager(ctx, installOpts, shouldEnroll, opts)
 	case "deb":
-		return f.installDeb(ctx, installOpts, opts)
+		return f.installDeb(ctx, installOpts, shouldEnroll, opts)
 	case "rpm":
-		return f.installRpm(ctx, installOpts, opts)
+		return f.installRpm(ctx, installOpts, shouldEnroll, opts)
 	default:
 		return nil, fmt.Errorf("package format %s isn't supported yet", f.packageFormat)
 	}
@@ -202,14 +223,25 @@ func (f *Fixture) Install(ctx context.Context, installOpts *InstallOpts, opts ..
 // It returns:
 //   - the combined output of Install command stdout and stderr
 //   - an error if any.
-func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallOpts, opts []process.CmdOption) ([]byte, error) {
+func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallOpts, shouldEnroll bool, opts []process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture installNoPkgManager function", f.t.Name())
 	if installOpts == nil {
 		// default options when not provided
 		installOpts = &InstallOpts{}
 	}
 
+	// Removes install params to prevent enrollment
+	removeEnrollParams := func(installOpts *InstallOpts) {
+		installOpts.URL = ""
+		installOpts.EnrollmentToken = ""
+		installOpts.ESHost = ""
+	}
+
 	installArgs := []string{"install"}
+	if !shouldEnroll {
+		removeEnrollParams(installOpts)
+	}
+
 	installArgs = append(installArgs, installOpts.ToCmdArgs()...)
 	out, err := f.Exec(ctx, installArgs, opts...)
 	if err != nil {
@@ -255,19 +287,22 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 
 	f.t.Cleanup(func() {
 		// check for running agents after uninstall had a chance to run
-		processes := getElasticAgentProcesses(f.t)
-
 		// there can be a single agent left when using --develop mode
 		if f.installOpts != nil && f.installOpts.Namespace != "" {
-			assert.LessOrEqualf(f.t, len(processes), 1, "More than one agent left running at the end of the test when second agent in namespace %s was used: %v", f.installOpts.Namespace, processes)
+			// Only consider the main agent process and not sub-processes so that we can detect when
+			// multiple agents are running without needing to know the number of input sub-processes to expect.
+			agentProcesses := getElasticAgentProcesses(f.t)
+			assert.LessOrEqualf(f.t, len(agentProcesses), 1, "More than one agent left running at the end of the test when second agent in namespace %s was used: %v", f.installOpts.Namespace, agentProcesses)
 			// The agent left running has to be the non-development agent. The development agent should be uninstalled first as a convention.
-			if len(processes) > 0 {
-				assert.NotContainsf(f.t, processes[0].Cmdline, paths.InstallDirNameForNamespace(f.installOpts.Namespace),
-					"The agent installed into namespace %s was left running at the end of the test or was not uninstalled first: %v", f.installOpts.Namespace, processes)
+			if len(agentProcesses) > 0 {
+				assert.NotContainsf(f.t, agentProcesses[0].Cmdline, paths.InstallDirNameForNamespace(f.installOpts.Namespace),
+					"The agent installed into namespace %s was left running at the end of the test or was not uninstalled first: %v", f.installOpts.Namespace, agentProcesses)
 			}
 			return
 		}
 
+		// If not using an installation namespace, there should be no elastic-agent or agentbeat processes left running.
+		processes := getElasticAgentAndAgentbeatProcesses(f.t)
 		assert.Empty(f.t, processes, "there should be no running agent at the end of the test")
 	})
 
@@ -377,6 +412,13 @@ func getElasticAgentProcesses(t *gotesting.T) []runningProcess {
 	return getProcesses(t, `.*elastic\-agent.*`)
 }
 
+// Includes both the main elastic-agent process and the agentbeat sub-processes for ensuring
+// that no sub-processes are orphaned from their parent process and left running. This
+// primarily tests that Windows Job Object assignment works.
+func getElasticAgentAndAgentbeatProcesses(t *gotesting.T) []runningProcess {
+	return getProcesses(t, `.*(elastic\-agent|agentbeat).*`)
+}
+
 func getProcesses(t *gotesting.T, regex string) []runningProcess {
 	procStats := agentsystemprocess.Stats{
 		Procs: []string{regex},
@@ -410,7 +452,7 @@ func getProcesses(t *gotesting.T, regex string) []runningProcess {
 // It returns:
 //   - the combined output of Install command stdout and stderr
 //   - an error if any.
-func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts []process.CmdOption) ([]byte, error) {
+func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, shouldEnroll bool, opts []process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture installDeb function", f.t.Name())
 	// Prepare so that the f.srcPackage string is populated
 	err := f.EnsurePrepared(ctx)
@@ -419,7 +461,11 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts
 	}
 
 	// sudo apt-get install the deb
-	out, err := exec.CommandContext(ctx, "sudo", "apt-get", "install", "-y", f.srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
+	cmd := exec.CommandContext(ctx, "sudo", "-E", "apt-get", "install", "-y", f.srcPackage) // #nosec G204 -- Need to pass in name of package
+	if installOpts.InstallServers {
+		cmd.Env = append(cmd.Env, "ELASTIC_AGENT_FLAVOR=servers")
+	}
+	out, err := cmd.CombinedOutput() // #nosec G204 -- Need to pass in name of package
 	if err != nil {
 		return out, fmt.Errorf("apt install failed: %w output:%s", err, string(out))
 	}
@@ -454,6 +500,10 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts
 	out, err = exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
 	if err != nil {
 		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
+	}
+
+	if !shouldEnroll {
+		return nil, nil
 	}
 
 	// apt install doesn't enroll, so need to do that
@@ -491,7 +541,7 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, opts
 // It returns:
 //   - the combined output of Install command stdout and stderr
 //   - an error if any.
-func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, opts []process.CmdOption) ([]byte, error) {
+func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shouldEnroll bool, opts []process.CmdOption) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture installRpm function", f.t.Name())
 	// Prepare so that the f.srcPackage string is populated
 	err := f.EnsurePrepared(ctx)
@@ -500,13 +550,18 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, opts
 	}
 
 	// sudo rpm -iv elastic-agent rpm
-	out, err := exec.CommandContext(ctx, "sudo", "rpm", "-i", "-v", f.srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
+	cmd := exec.CommandContext(ctx, "sudo", "-E", "rpm", "-i", "-v", f.srcPackage) // #nosec G204 -- Need to pass in name of package
+	if installOpts.InstallServers {
+		cmd.Env = append(cmd.Env, "ELASTIC_AGENT_FLAVOR=servers")
+	}
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return out, fmt.Errorf("rpm install failed: %w output:%s", err, string(out))
 	}
 
 	f.t.Cleanup(func() {
 		f.t.Logf("[test %s] Inside fixture installRpm cleanup function", f.t.Name())
+
 		uninstallCtx, uninstallCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer uninstallCancel()
 		// stop elastic-agent, non fatal if error, might have been stopped before this.
@@ -522,12 +577,24 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, opts
 			f.t.Logf("failed to 'sudo rpm -e elastic-agent': %s, output: %s", err, string(out))
 			f.t.FailNow()
 		}
+
+		f.t.Logf("removing installed agent files")
+		out, err = exec.CommandContext(uninstallCtx, "sudo", "rm", "-rf", "/var/lib/elastic-agent", "/var/log/elastic-agent", "/etc/elastic-agent").CombinedOutput()
+		if err != nil {
+			f.t.Log(string(out))
+			f.t.Logf("failed to 'sudo rm -rf /var/lib/elastic-agent /var/log/elastic-agent/ /etc/elastic-agent'")
+			f.t.FailNow()
+		}
 	})
 
 	// start elastic-agent
 	out, err = exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
 	if err != nil {
 		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
+	}
+
+	if !shouldEnroll {
+		return nil, nil
 	}
 
 	// rpm install doesn't enroll, so need to do that
@@ -560,8 +627,9 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, opts
 }
 
 type UninstallOpts struct {
-	Force          bool // --force
-	UninstallToken string
+	Force          bool   // --force
+	UninstallToken string // --uninstall-token
+	SkipFleetAudit bool   // --skip-fleet-audit
 }
 
 func (i UninstallOpts) toCmdArgs() []string {
@@ -572,6 +640,10 @@ func (i UninstallOpts) toCmdArgs() []string {
 
 	if i.UninstallToken != "" {
 		args = append(args, "--uninstall-token", i.UninstallToken)
+	}
+
+	if i.SkipFleetAudit {
+		args = append(args, "--skip-fleet-audit")
 	}
 
 	return args

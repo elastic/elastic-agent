@@ -5,7 +5,7 @@
 
 # elastic-agent
 
-![Version: 0.0.1](https://img.shields.io/badge/Version-0.0.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)
+![Version: 9.1.0-beta](https://img.shields.io/badge/Version-9.1.0--beta-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 9.1.0](https://img.shields.io/badge/AppVersion-9.1.0-informational?style=flat-square)
 
 Elastic-Agent Helm Chart
 
@@ -62,13 +62,14 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| kubernetes.enabled | bool | `false` | enable Kubernetes integration. |
+| kubernetes.enabled | bool | `true` | enable Kubernetes integration. |
 | kubernetes.output | string | `"default"` | name of the output used in kubernetes integration. Note that this output needs to be defined in [outputs](#1-outputs) |
 | kubernetes.namespace | string | `"default"` | kubernetes namespace |
 | kubernetes.hints.enabled | bool | `false` | enable [elastic-agent autodiscovery](https://www.elastic.co/guide/en/fleet/current/elastic-agent-kubernetes-autodiscovery.html) feature |
 | kubernetes.state.enabled | bool | `true` | integration global switch to enable state streams based on kube-state-metrics. Note that setting this to `false` results in overriding and *disabling all* the respective state streams |
-| kubernetes.state.deployKSM | bool | `true` | deploy kube-state-metrics service as a sidecar container to the elastic agent of `ksmSharded` preset. If set to `false`, kube-state-metrics will *not* get deployed and `clusterWide` agent preset will be used for collecting kube-state-metrics. |
-| kubernetes.state.host | string | `"kube-state-metrics:8080"` | host of the kube-state-metrics service. Note that this used only when `deployKSM` is set to `false`. |
+| kubernetes.state.agentAsSidecar.enabled | bool | `false` | enable [ksm autosharding](https://github.com/kubernetes/kube-state-metrics?tab=readme-ov-file#automated-sharding) and deploy elastic-agent as a sidecar container. If `kube-state-metrics.enabled` is set to `false` this has no effect. |
+| kubernetes.state.agentAsSidecar.resources | object | `{"limits":{"memory":"800Mi"},"requests":{"cpu":"100m","memory":"400Mi"}}` | resources of the elastic-agent sidecar if `agentAsSidecar.enabled` is set to `true` |
+| kubernetes.state.host | string | `"kube-state-metrics:8080"` | host of the kube-state-metrics service. This used only when `kube-state-metrics.enabled` is set to `false`. |
 | kubernetes.state.vars | object | `{}` | state streams variables such as `add_metadata`, `hosts`, `period`, `bearer_token_file`. Please note that colliding vars also defined in respective state streams will *not* be overridden. |
 | kubernetes.metrics.enabled | bool | `true` | integration global switch to enable metric streams based on kubelet. Note that setting this to false results in overriding and *disabling all* the respective metric streams |
 | kubernetes.metrics.vars | object | `{}` | metric streams variables such as `add_metadata`, `hosts`, `period`, `bearer_token_file`, `ssl.verification_mode`. Please note that colliding vars also defined in respective metric streams will *not* be overridden. |
@@ -85,6 +86,7 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 | kubernetes.containers.state.enabled | bool | `true` | enable containers state stream (kube-state-metrics) [ref](https://www.elastic.co/guide/en/beats/metricbeat/8.11/metricbeat-metricset-kubernetes-state_container.html) |
 | kubernetes.containers.state.vars | object | `{}` | containers state stream vars |
 | kubernetes.containers.logs.enabled | bool | `true` | enable containers logs stream [ref](https://www.elastic.co/docs/current/integrations/kubernetes/container-logs) |
+| kubernetes.containers.logs.vars | object | `{}` | containers logs stream vars |
 | kubernetes.containers.audit_logs.enabled | bool | `false` | enable containers audit logs stream [ref](https://www.elastic.co/docs/current/integrations/kubernetes/audit-logs) |
 | kubernetes.pods.metrics.enabled | bool | `true` | enable pods metric stream (kubelet) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kubelet#pod) |
 | kubernetes.pods.metrics.vars | object | `{}` | pod metric stream vars |
@@ -143,12 +145,12 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 ### 6 - Elastic-Agent Configuration
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| agent.version | string | `"9.0.0"` | elastic-agent version |
-| agent.image | object | `{"pullPolicy":"IfNotPresent","repository":"docker.elastic.co/beats/elastic-agent","tag":"9.0.0-SNAPSHOT"}` | image configuration |
+| agent.version | string | `"9.1.0"` | elastic-agent version |
+| agent.image | object | `{"pullPolicy":"IfNotPresent","repository":"docker.elastic.co/elastic-agent/elastic-agent","tag":"9.1.0-SNAPSHOT"}` | image configuration |
 | agent.imagePullSecrets | list | `[]` | image pull secrets |
 | agent.engine | string | `"k8s"` | generate kubernetes manifests or [ECK](https://github.com/elastic/cloud-on-k8s) CRDs |
 | agent.unprivileged | bool | `false` | enable unprivileged mode |
-| agent.presets | map[string]{} | `{ "perNode" : {...}, "clusterWide": {...}, "ksmSharded": {...} }` | Map of deployment presets for the Elastic Agent. The key of the map is the name of the preset. See more for the presets required by the built-in Kubernetes integration [here](./values.yaml) |
+| agent.presets | map[string]{} | `{ "perNode" : {...}, "clusterWide": {...}}` | Map of deployment presets for the Elastic Agent. The key of the map is the name of the preset. See more for the presets required by the built-in Kubernetes integration [here](./values.yaml) |
 
 ### 6.1 - Elastic-Agent Managed Configuration
 | Key | Type | Default | Description |
@@ -156,9 +158,25 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 | agent.fleet.enabled | bool | `false` | enable elastic-agent managed |
 | agent.fleet.url | string | `""` | Fleet server URL |
 | agent.fleet.token | string | `""` | Fleet enrollment token |
-| agent.fleet.insecure | bool | `false` | Fleet insecure url |
+| agent.fleet.insecure | bool | `false` | Communicate with Fleet with either insecure HTTP or unverified HTTPS |
+| agent.fleet.force | bool | `false` | Enforce enrollment even if agent is already enrolled |
+| agent.fleet.ca.value | string | `""` | Value of the CA certificate for connecting to Fleet |
+| agent.fleet.ca.valueFromSecret.name | string | `""` | Secret name for the CA certificate |
+| agent.fleet.ca.valueFromSecret.key | string | `""` | Secret key for the CA certificate |
+| agent.fleet.agentCert.value | string | `""` | Value of Elastic Agent client certificate for Fleet Server mTLS |
+| agent.fleet.agentCert.valueFromSecret.name | string | `""` | Secret name for the Elastic Agent client certificate |
+| agent.fleet.agentCert.valueFromSecret.key | string | `""` | Key in the secret for the Elastic Agent client certificate |
+| agent.fleet.agentCertKey.value | string | `""` | Value of Elastic Agent client private key for Fleet Server mTLS |
+| agent.fleet.agentCertKey.valueFromSecret.name | string | `""` | Secret name for the Elastic Agent client private key |
+| agent.fleet.agentCertKey.valueFromSecret.key | string | `""` | Key in the secret for the Elastic Agent client private key |
+| agent.fleet.tokenName | string | `""` | Token name to use for fetching token from Kibana if the enrollment token is not supplied |
+| agent.fleet.policyName | string | `""` | Token policy name to use for fetching token from Kibana if the enrollment token is not supplied |
 | agent.fleet.kibanaHost | string | `""` | Kibana host to fallback if enrollment token is not supplied |
 | agent.fleet.kibanaUser | string | `""` | Kibana username to fallback if enrollment token is not supplied |
 | agent.fleet.kibanaPassword | string | `""` | Kibana password to fallback if enrollment token is not supplied |
+| agent.fleet.kibanaCA.value | string | `""` | Value of the CA certificate for Kibana if the enrollment token is not supplied |
+| agent.fleet.kibanaCA.valueFromSecret.name | string | `""` | Secret name for the Kibana CA certificate |
+| agent.fleet.kibanaCA.valueFromSecret.key | string | `""` | Key in the secret for the Kibana CA certificate |
+| agent.fleet.kibanaServiceToken | string | `""` | Service token to use when connecting to Kibana if the enrollment token is not supplied |
 | agent.fleet.preset | string | `"perNode"` | Agent preset to deploy |
 

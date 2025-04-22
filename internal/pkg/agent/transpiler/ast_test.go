@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/cespare/xxhash/v2"
+
 	"github.com/elastic/elastic-agent-libs/mapstr"
 
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
@@ -882,7 +884,7 @@ func TestApplyDoesNotMutate(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			vars, err := NewVars("", map[string]any{"var": "value"}, mapstr.M{})
+			vars, err := NewVars("", map[string]any{"var": "value"}, mapstr.M{}, "")
 			require.NoError(t, err)
 			applied, err := test.input.Apply(vars)
 			require.NoError(t, err)
@@ -961,8 +963,9 @@ func TestShallowClone(t *testing.T) {
 
 func TestVars(t *testing.T) {
 	tests := map[string]struct {
-		input  map[string]interface{}
-		result []string
+		input           map[string]interface{}
+		result          []string
+		defaultProvider string
 	}{
 		"empty": {
 			input:  map[string]interface{}{},
@@ -1045,6 +1048,66 @@ func TestVars(t *testing.T) {
 			},
 			result: []string{"var1", "var2", "var3", "var1", "var5", "var6", "var1"},
 		},
+		"nested with default": {
+			input: map[string]interface{}{
+				"novars": map[string]interface{}{
+					"list1": []interface{}{
+						map[string]interface{}{
+							"int":   1,
+							"float": 1.1234,
+							"bool":  true,
+							"str":   "value1",
+						},
+					},
+					"list2": []interface{}{
+						map[string]interface{}{
+							"int":   2,
+							"float": 2.3456,
+							"bool":  false,
+							"str":   "value2",
+						},
+					},
+				},
+				"vars1": map[string]interface{}{
+					"list1": []interface{}{
+						map[string]interface{}{
+							"int":   1,
+							"float": 1.1234,
+							"bool":  true,
+							"str":   "${custom.var1|host.var2|'constant'}",
+						},
+					},
+					"list2": []interface{}{
+						map[string]interface{}{
+							"int":   2,
+							"float": 2.3456,
+							"bool":  false,
+							"str":   "${var3|custom.var1|'constant'}",
+						},
+					},
+				},
+				"vars2": map[string]interface{}{
+					"list1": []interface{}{
+						map[string]interface{}{
+							"int":   1,
+							"float": 1.1234,
+							"bool":  true,
+							"str":   "${host.var5|host.var6|'constant'}",
+						},
+					},
+					"list2": []interface{}{
+						map[string]interface{}{
+							"int":   2,
+							"float": 2.3456,
+							"bool":  false,
+							"str":   "${var1}",
+						},
+					},
+				},
+			},
+			result:          []string{"custom.var1", "host.var2", "custom.var3", "custom.var1", "host.var5", "host.var6", "custom.var1"},
+			defaultProvider: "custom",
+		},
 	}
 
 	for name, test := range tests {
@@ -1052,7 +1115,7 @@ func TestVars(t *testing.T) {
 			ast, err := NewAST(test.input)
 			require.NoError(t, err)
 			var vars []string
-			vars = ast.root.Vars(vars)
+			vars = ast.root.Vars(vars, test.defaultProvider)
 			assert.Equal(t, test.result, vars)
 		})
 	}
@@ -1145,8 +1208,59 @@ func TestCondition(t *testing.T) {
 	assert.Nil(t, input2.condition)
 }
 
+// check that all the methods handle nil values correctly
+func TestNullValues(t *testing.T) {
+	cfgMap := map[string]any{
+		"inputs": map[string]any{
+			"dict": map[string]any{
+				"key": nil,
+			},
+			"list": []any{nil},
+		},
+	}
+	ast, err := NewAST(cfgMap)
+	require.NoError(t, err)
+	inputs, ok := Lookup(ast, "inputs")
+	require.True(t, ok)
+
+	assert.NotEmpty(t, inputs.String())
+
+	node, ok := inputs.Find("dict")
+	assert.True(t, ok)
+	assert.NotNil(t, node)
+
+	assert.NotNil(t, inputs.Value())
+
+	assert.NotNil(t, inputs.Clone())
+
+	assert.NotNil(t, inputs.ShallowClone())
+
+	assert.NotEmpty(t, inputs.Hash())
+
+	h := xxhash.New()
+	err = inputs.Hash64With(h)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, h.Sum64())
+
+	assert.Empty(t, inputs.Vars([]string{}, "default"))
+
+	newNode, err := inputs.Apply(nil)
+	assert.NoError(t, err)
+	assert.NotNil(t, newNode)
+
+	assert.Empty(t, inputs.Processors())
+}
+
 func mustMakeVars(mapping map[string]interface{}) *Vars {
-	v, err := NewVars("", mapping, nil)
+	v, err := NewVars("", mapping, nil, "")
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
+func mustMakeVarsWithDefault(mapping map[string]interface{}, defaultProvider string) *Vars {
+	v, err := NewVars("", mapping, nil, defaultProvider)
 	if err != nil {
 		panic(err)
 	}

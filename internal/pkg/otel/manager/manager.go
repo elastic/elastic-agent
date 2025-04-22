@@ -45,7 +45,7 @@ type OTelManager struct {
 func NewOTelManager(logger *logger.Logger) *OTelManager {
 	return &OTelManager{
 		logger:   logger,
-		errCh:    make(chan error),
+		errCh:    make(chan error, 1), // holds at most one error
 		cfgCh:    make(chan *confmap.Conf),
 		statusCh: make(chan *status.AggregateStatus),
 		doneChan: make(chan struct{}),
@@ -81,18 +81,12 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				if err != nil {
 					// failed to create the collector (this is different then
 					// it's failing to run). we do not retry creation on failure
-					// as it will always fail a new configuration is required for
+					// as it will always fail. A new configuration is required for
 					// it not to fail (a new configuration will result in the retry)
-					select {
-					case m.errCh <- err:
-					case <-ctx.Done():
-					}
+					m.reportErr(ctx, err)
 				} else {
 					// all good at the moment (possible that it will fail)
-					select {
-					case m.errCh <- nil:
-					case <-ctx.Done():
-					}
+					m.reportErr(ctx, nil)
 				}
 			} else {
 				// error occurred while running the collector, this occurs in the
@@ -114,10 +108,8 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				}
 				// pass the error to the errCh so the coordinator, unless it's a cancel error
 				if !errors.Is(err, context.Canceled) {
-					select {
-					case m.errCh <- nil:
-					case <-ctx.Done():
-					}
+					m.logger.Errorf("Failed to start the collector: %s", err)
+					m.reportErr(ctx, err)
 				}
 			}
 		case cfg := <-m.cfgCh:
@@ -141,10 +133,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				}
 				// ensure that the coordinator knows that there is no error
 				// as the collector is not running anymore
-				select {
-				case m.errCh <- nil:
-				case <-ctx.Done():
-				}
+				m.reportErr(ctx, nil)
 			} else {
 				// either a new configuration or the first configuration
 				// that results in the collector being started
@@ -155,18 +144,12 @@ func (m *OTelManager) Run(ctx context.Context) error {
 					if err != nil {
 						// failed to create the collector (this is different then
 						// it's failing to run). we do not retry creation on failure
-						// as it will always fail a new configuration is required for
+						// as it will always fail. A new configuration is required for
 						// it not to fail (a new configuration will result in the retry)
-						select {
-						case m.errCh <- err:
-						case <-ctx.Done():
-						}
+						m.reportErr(ctx, err)
 					} else {
 						// all good at the moment (possible that it will fail)
-						select {
-						case m.errCh <- nil:
-						case <-ctx.Done():
-						}
+						m.reportErr(ctx, nil)
 					}
 				} else {
 					// collector is already running so only the configuration
@@ -225,4 +208,22 @@ func (m *OTelManager) startCollector(cfg *confmap.Conf, errCh chan error) (conte
 		errCh <- svc.Run(ctx)
 	}()
 	return cancel, ap, nil
+}
+
+// reportErr reports an error to the service that is controlling this manager
+//
+// the manager can be blocked doing other work like sending this manager a new configuration
+// so we do not want error reporting to be a blocking send over the channel
+//
+// the manager really only needs the most recent error, so if it misses an error it's not a big
+// deal, what matters is that it has the current error for the state of this manager
+func (m *OTelManager) reportErr(ctx context.Context, err error) {
+	select {
+	case <-m.errCh:
+	default:
+	}
+	select {
+	case m.errCh <- err:
+	case <-ctx.Done():
+	}
 }

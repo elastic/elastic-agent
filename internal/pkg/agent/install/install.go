@@ -40,7 +40,7 @@ const (
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
-func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *progressbar.ProgressBar, streams *cli.IOStreams, customUser, customGroup, userPassword string) (utils.FileOwner, error) {
+func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *progressbar.ProgressBar, streams *cli.IOStreams, customUser, customGroup, userPassword string, flavor string) (utils.FileOwner, error) {
 	dir, err := findDirectory()
 	if err != nil {
 		return utils.FileOwner{}, errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
@@ -75,10 +75,27 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 
 	pt.Describe("Copying install files")
 	copyConcurrency := calculateCopyConcurrency(streams)
-	err = copyFiles(copyConcurrency, pathMappings, dir, topPath)
+
+	skipFn := func(relPath string) bool { return false }
+	if flavor != "" {
+		flavorDefinition, err := Flavor(flavor, "", manifest.Package.Flavors)
+		if err != nil {
+			return utils.FileOwner{}, err
+		}
+		skipFn, err = SkipComponentsPathFn(paths.VersionedHome(dir), flavorDefinition)
+		if err != nil {
+			return utils.FileOwner{}, err
+		}
+	}
+
+	err = copyFiles(copyConcurrency, pathMappings, dir, topPath, skipFn)
 	if err != nil {
 		pt.Describe("Error copying files")
 		return utils.FileOwner{}, err
+	}
+
+	if err := markFlavor(topPath, flavor); err != nil {
+		return utils.FileOwner{}, fmt.Errorf("failed marking flavor %q at %q: %w", flavor, topPath, err)
 	}
 
 	pt.Describe("Successfully copied files")
@@ -149,6 +166,12 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 
 	// install service
 	pt.Describe("Installing service")
+	// ensure that service is removed
+	err = EnsureServiceRemoved(30*time.Second, 250*time.Millisecond, paths.ServiceName())
+	if err != nil {
+		pt.Describe(fmt.Sprintf("Failed to ensure service does not exist: %s", err.Error()))
+	}
+	// install service
 	err = InstallService(topPath, ownership, username, groupName, password)
 	if err != nil {
 		pt.Describe("Failed to install service")
@@ -211,7 +234,7 @@ func calculateCopyConcurrency(streams *cli.IOStreams) int {
 	return copyConcurrency
 }
 
-func copyFiles(copyConcurrency int, pathMappings []map[string]string, srcDir string, topPath string) error {
+func copyFiles(copyConcurrency int, pathMappings []map[string]string, srcDir string, topPath string, skipFn func(string) bool) error {
 	// copy source into install path
 
 	// these are needed to keep track of what we already copied
@@ -231,6 +254,18 @@ func copyFiles(copyConcurrency int, pathMappings []map[string]string, srcDir str
 			err := copy.Copy(srcPath, dstPath, copy.Options{
 				OnSymlink: func(_ string) copy.SymlinkAction {
 					return copy.Shallow
+				},
+				Skip: func(srcinfo os.FileInfo, src, dest string) (bool, error) {
+					relPath, err := filepath.Rel(srcDir, src)
+					if err != nil {
+						return false, fmt.Errorf("calculating relative path for %s: %w", src, err)
+					}
+
+					if skipFn != nil && skipFn(relPath) {
+						return true, nil
+					}
+
+					return false, nil
 				},
 				Sync:         true,
 				NumOfWorkers: int64(copyConcurrency),
@@ -281,6 +316,11 @@ func copyFiles(copyConcurrency int, pathMappings []map[string]string, srcDir str
 			if err != nil {
 				return false, fmt.Errorf("calculating relative path for %s: %w", src, err)
 			}
+
+			if skipFn != nil && skipFn(relPath) {
+				return true, nil
+			}
+
 			// check if we already handled this path as part of the mappings: if we did, skip it
 			relPath = filepath.ToSlash(relPath)
 			_, ok := copiedFiles[relPath]

@@ -18,6 +18,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
@@ -27,6 +28,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
 
@@ -42,6 +44,7 @@ func TestCoordinatorExpectedDiagnosticHooks(t *testing.T) {
 		"components-actual",
 		"state",
 		"otel",
+		"otel-final",
 	}
 
 	coord := &Coordinator{}
@@ -57,8 +60,10 @@ func TestDiagnosticLocalConfig(t *testing.T) {
 	// local-config hook correctly returns it.
 	cfg := &configuration.Configuration{
 		Fleet: &configuration.FleetAgentConfig{
-			Enabled:      true,
-			AccessAPIKey: "test-key",
+			Enabled:             true,
+			AccessAPIKey:        "test-key",
+			EnrollmentTokenHash: "test-enroll-hash",
+			ReplaceTokenHash:    "test-replace-hash",
 			Client: remote.Config{
 				Protocol: "test-protocol",
 			},
@@ -119,6 +124,8 @@ agent:
 fleet:
   enabled: true
   access_api_key: "test-key"
+  enrollment_token_hash: "test-enroll-hash"
+  replace_token_hash: "test-replace-hash"
   agent:
   protocol: "test-protocol"
 `
@@ -140,21 +147,62 @@ func TestDiagnosticAgentInfo(t *testing.T) {
 			"header1": "value1",
 			"header2": "value2",
 		},
-		logLevel:     "trace",
-		snapshot:     true,
-		version:      "8.14.0",
-		unprivileged: true,
+		logLevel: "trace",
+		meta: &info.ECSMeta{
+			Elastic: &info.ElasticECSMeta{
+				Agent: &info.AgentECSMeta{
+					BuildOriginal: "8.14.0-SNAPSHOT",
+					ID:            "agent-id",
+					LogLevel:      "trace",
+					Snapshot:      true,
+					Version:       "8.14.0",
+					Unprivileged:  true,
+					Upgradeable:   true,
+				},
+			},
+			Host: &info.HostECSMeta{
+				Arch:     "arm64",
+				Hostname: "Test-Macbook-Pro.local",
+			},
+			OS: &info.SystemECSMeta{
+				Name:     "macos",
+				Platform: "darwin",
+			},
+		},
 	}}
 
 	expected := `
-agent_id: agent-id
 headers:
   header1: value1
   header2: value2
 log_level: trace
-snapshot: true
-version: 8.14.0
-unprivileged: true
+log_level_raw: trace
+metadata:
+  elastic:
+    agent:
+      buildoriginal: "8.14.0-SNAPSHOT"
+      complete: false
+      fips: false
+      id: agent-id
+      loglevel: trace
+      snapshot: true
+      unprivileged: true
+      upgradeable: true
+      version: 8.14.0
+  host:
+    arch: arm64
+    hostname: Test-Macbook-Pro.local
+    name: ""
+    id: ""
+    ip: []
+    mac: []
+  os:
+    family: ""
+    kernel: ""
+    platform: darwin
+    version: ""
+    name: macos
+    fullname: ""
 `
 
 	hook, ok := diagnosticHooksMap(coord)["agent-info"]
@@ -196,7 +244,7 @@ func TestDiagnosticVariables(t *testing.T) {
 		map[string]interface{}{
 			"testvar": "testvalue",
 		},
-		nil)
+		nil, "")
 	require.NoError(t, err)
 
 	expected := `
@@ -602,6 +650,7 @@ type fakeAgentInfo struct {
 	version      string
 	unprivileged bool
 	isStandalone bool
+	meta         *info.ECSMeta
 }
 
 func (a fakeAgentInfo) AgentID() string {
@@ -634,6 +683,10 @@ func (a fakeAgentInfo) Unprivileged() bool {
 
 func (a fakeAgentInfo) IsStandalone() bool {
 	return a.isStandalone
+}
+
+func (a fakeAgentInfo) ECSMetadata(l *logger.Logger) (*info.ECSMeta, error) {
+	return a.meta, nil
 }
 
 func (a fakeAgentInfo) ReloadID(ctx context.Context) error                  { panic("implement me") }

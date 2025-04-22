@@ -20,6 +20,9 @@ const (
 // snapshot is a flag marking build as a snapshot.
 var snapshot = ""
 
+// fips is a flag for marking a FIPS-capable build.
+var fips = "false"
+
 // complete is an environment variable marking the image as complete.
 var complete = "ELASTIC_AGENT_COMPLETE"
 
@@ -77,21 +80,28 @@ func Complete() bool {
 	return ok && isComplete == "true"
 }
 
+func FIPSDistribution() bool {
+	f, err := strconv.ParseBool(fips)
+	return err == nil && f
+}
+
 // VersionInfo is structure used by `version --yaml`.
 type VersionInfo struct {
-	Version   string    `yaml:"version"`
-	Commit    string    `yaml:"commit"`
-	BuildTime time.Time `yaml:"build_time"`
-	Snapshot  bool      `yaml:"snapshot"`
+	Version          string    `yaml:"version"`
+	Commit           string    `yaml:"commit"`
+	BuildTime        time.Time `yaml:"build_time"`
+	Snapshot         bool      `yaml:"snapshot"`
+	FIPSDistribution bool      `yaml:"fips"`
 }
 
 // Info returns current version information.
 func Info() VersionInfo {
 	return VersionInfo{
-		Version:   Version(),
-		Commit:    Commit(),
-		BuildTime: BuildTime(),
-		Snapshot:  Snapshot(),
+		Version:          Version(),
+		Commit:           Commit(),
+		BuildTime:        BuildTime(),
+		Snapshot:         Snapshot(),
+		FIPSDistribution: FIPSDistribution(),
 	}
 }
 
@@ -105,8 +115,12 @@ func (v VersionInfo) String() string {
 	}
 	sb.WriteString(" (build: ")
 	sb.WriteString(v.Commit)
+	if v.FIPSDistribution {
+		sb.WriteString(" fips: true")
+	}
 	sb.WriteString(" at ")
 	sb.WriteString(v.BuildTime.Format("2006-01-02 15:04:05 -0700 MST"))
 	sb.WriteString(")")
+
 	return sb.String()
 }

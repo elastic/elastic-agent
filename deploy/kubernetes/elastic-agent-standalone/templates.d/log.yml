@@ -4,7 +4,8 @@ inputs:
       type: filestream
       use_output: default
       streams:
-        - condition: ${kubernetes.hints.log.container_logs.enabled} == true
+        - id: log-container-logs-${kubernetes.hints.container_id}
+          condition: ${kubernetes.hints.log.container_logs.enabled} == true
           data_stream:
             dataset: log.container_logs
             type: logs

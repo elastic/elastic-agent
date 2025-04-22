@@ -12,6 +12,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-traefik-traefik-access-${kubernetes.hints.container_id}
           parsers:
             - container:
                 format: auto

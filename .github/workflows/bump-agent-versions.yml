@@ -12,11 +12,14 @@ jobs:
     timeout-minutes: 1
     outputs:
       matrix: ${{ steps.generator.outputs.matrix }}
+    permissions:
+      contents: read
     steps:
       - id: generator
         uses: elastic/oblt-actions/elastic/active-branches@v1
         with:
           exclude-branches: "7.17"
+          filter-branches: true
 
   update_versions:
     runs-on: ubuntu-latest
@@ -39,7 +42,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.21
+          go-version-file: 'go.mod'
 
       - name: Set git config
         run: |

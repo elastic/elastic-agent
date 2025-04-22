@@ -55,9 +55,16 @@ func (m actionMode) String() string {
 }
 
 type MonitoringManager interface {
-	EnrichArgs(string, string, []string) []string
-	Prepare(string) error
-	Cleanup(string) error
+	// EnrichArgs enriches arguments provided to application, in
+	// order to enable monitoring of a component.Component identified
+	// by its ID and the binary that provides it. The binary name is
+	// obtained from component.Component.BinaryName for the component.
+	EnrichArgs(id, binary string, args []string) []string
+
+	// Prepare and Cleanup set up and release resources required
+	// for monitoring the component.
+	Prepare(id string) error
+	Cleanup(id string) error
 }
 
 type procState struct {
@@ -380,7 +387,7 @@ func (c *commandRuntime) start(comm Communicator) error {
 	args := c.monitor.EnrichArgs(c.current.ID, c.getSpecBinaryName(), cmdSpec.Args)
 
 	// differentiate data paths
-	dataPath := filepath.Join(paths.Home(), "run", c.current.ID)
+	dataPath := filepath.Join(paths.Run(), c.current.ID)
 	_ = os.MkdirAll(dataPath, 0755)
 	args = append(args, "-E", "path.data="+dataPath)
 

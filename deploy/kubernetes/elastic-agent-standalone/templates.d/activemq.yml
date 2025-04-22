@@ -1,58 +1,4 @@
 inputs:
-    - name: filestream-activemq
-      id: filestream-activemq-${kubernetes.hints.container_id}
-      type: filestream
-      use_output: default
-      streams:
-        - condition: ${kubernetes.hints.activemq.audit.enabled} == true or ${kubernetes.hints.activemq.enabled} == true
-          data_stream:
-            dataset: activemq.audit
-            type: logs
-          exclude_files:
-            - .gz$
-          file_identity:
-            fingerprint: null
-          parsers:
-            - container:
-                format: auto
-                stream: ${kubernetes.hints.activemq.audit.stream|'all'}
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          prospector:
-            scanner:
-                fingerprint:
-                    enabled: true
-                symlinks: true
-          tags:
-            - forwarded
-            - activemq-audit
-        - condition: ${kubernetes.hints.activemq.log.enabled} == true or ${kubernetes.hints.activemq.enabled} == true
-          data_stream:
-            dataset: activemq.log
-            type: logs
-          exclude_files:
-            - .gz$
-          file_identity:
-            fingerprint: null
-          multiline:
-            match: after
-            negate: true
-            pattern: '^\d{4}-\d{2}-\d{2} '
-          parsers:
-            - container:
-                format: auto
-                stream: ${kubernetes.hints.activemq.log.stream|'all'}
-          paths:
-            - /var/log/containers/*${kubernetes.hints.container_id}.log
-          prospector:
-            scanner:
-                fingerprint:
-                    enabled: true
-                symlinks: true
-          tags:
-            - forwarded
-            - activemq-log
-      data_stream.namespace: default
     - name: activemq/metrics-activemq
       id: activemq/metrics-activemq-${kubernetes.hints.container_id}
       type: activemq/metrics
@@ -100,4 +46,60 @@ inputs:
           tags:
             - activemq-topic
           username: ${kubernetes.hints.activemq.topic.username|kubernetes.hints.activemq.username|'admin'}
+      data_stream.namespace: default
+    - name: filestream-activemq
+      id: filestream-activemq-${kubernetes.hints.container_id}
+      type: filestream
+      use_output: default
+      streams:
+        - condition: ${kubernetes.hints.activemq.audit.enabled} == true or ${kubernetes.hints.activemq.enabled} == true
+          data_stream:
+            dataset: activemq.audit
+            type: logs
+          exclude_files:
+            - .gz$
+          file_identity:
+            fingerprint: null
+          id: filestream-activemq-activemq-audit-${kubernetes.hints.container_id}
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.activemq.audit.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                fingerprint:
+                    enabled: true
+                symlinks: true
+          tags:
+            - forwarded
+            - activemq-audit
+        - condition: ${kubernetes.hints.activemq.log.enabled} == true or ${kubernetes.hints.activemq.enabled} == true
+          data_stream:
+            dataset: activemq.log
+            type: logs
+          exclude_files:
+            - .gz$
+          file_identity:
+            fingerprint: null
+          id: filestream-activemq-activemq-log-${kubernetes.hints.container_id}
+          multiline:
+            match: after
+            negate: true
+            pattern: '^\d{4}-\d{2}-\d{2} '
+          parsers:
+            - container:
+                format: auto
+                stream: ${kubernetes.hints.activemq.log.stream|'all'}
+          paths:
+            - /var/log/containers/*${kubernetes.hints.container_id}.log
+          prospector:
+            scanner:
+                fingerprint:
+                    enabled: true
+                symlinks: true
+          tags:
+            - forwarded
+            - activemq-log
       data_stream.namespace: default

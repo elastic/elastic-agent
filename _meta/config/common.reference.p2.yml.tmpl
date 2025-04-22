@@ -36,6 +36,20 @@ inputs:
       - metricsets:
         - filesystem
         data_stream.dataset: system.filesystem
+#     - metricsets:
+#       - process
+#       data_stream.dataset: system.process
+#       # While running in unprivileged mode, process/process_summary metricsets can emit
+#       # partial metrics. Some metrics that require privileged access can be missing.
+#       # On Windows, non-administrator users may not be able to access protected processes, leading 
+#       # to missing details like command line and arguments. On Unix, non-root users can't access 
+#       # procfs without the right permissions. 
+#       # Errors like ERROR_ACCESS_DENIED, EPERM, and EACCESS may result in partial metrics. 
+#       # Enabling the config below will mark the metricset as degraded when this occurs.
+#       # You may want to enable it to identify potential permission-related issues.
+#       # If you're unable to provide the necessary access, you can disable this config to keep
+#       # metricsets healthy.
+#       #degrade_on_partial: false
 
 #   # Collecting log files
 #   - type: filestream
@@ -49,6 +63,17 @@ inputs:
 #           dataset: generic
 #         paths:
 #           - /var/log/*.log
+
+#   # Collecting journald logs, including coredumps.
+#   - type: journald
+#     # Input ID allowing Elastic Agent to track the state of this input. Must be unique.
+#     id: your-journald-input-id
+#     streams:
+#       # Stream ID for this data stream allowing Filebeat to track the state of the ingested data. Must be unique.
+#       # Each journald data stream creates a separate instance of the Filebeat journald input.
+#       - id: your-journald-stream-id
+#         data_stream:
+#           dataset: generic
 
 # management:
 #   # Mode of management, the Elastic Agent support two modes of operation:

@@ -21,10 +21,16 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	stateStore "github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/composable/providers/kubernetes"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/fleet"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
+	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -34,6 +40,9 @@ import (
 	"github.com/elastic/elastic-agent/pkg/limits"
 	"github.com/elastic/elastic-agent/version"
 )
+
+// CfgOverrider allows for application driven overrides of configuration read from disk.
+type CfgOverrider func(cfg *configuration.Configuration)
 
 // New creates a new Agent and bootstrap the required subsystem.
 func New(
@@ -47,6 +56,7 @@ func New(
 	testingMode bool,
 	fleetInitTimeout time.Duration,
 	disableMonitoring bool,
+	override CfgOverrider,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
@@ -96,9 +106,14 @@ func New(
 	if err := info.InjectAgentConfig(rawConfig); err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
+
 	cfg, err := configuration.NewFromConfig(rawConfig)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	if override != nil {
+		override(cfg)
 	}
 
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
@@ -127,6 +142,7 @@ func New(
 	var composableManaged bool
 	var isManaged bool
 
+	var actionAcker acker.Acker
 	if testingMode {
 		log.Info("Elastic Agent has been started in testing mode and is managed through the control protocol")
 
@@ -173,8 +189,29 @@ func New(
 				InjectProxyEndpointModifier(),
 			)
 
+			client, err := fleetclient.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
+			if err != nil {
+				return nil, nil, nil, errors.New(err,
+					"fail to create API client",
+					errors.TypeNetwork,
+					errors.M(errors.MetaKeyURI, cfg.Fleet.Client.Host))
+			}
+			stateStorage, err := stateStore.NewStateStoreWithMigration(ctx, log, paths.AgentActionStoreFile(), paths.AgentStateStoreFile())
+			if err != nil {
+				return nil, nil, nil, errors.New(err, fmt.Sprintf("fail to read state store '%s'", paths.AgentStateStoreFile()))
+			}
+
+			fleetAcker, err := fleet.NewAcker(log, agentInfo, client)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to create acker: %w", err)
+			}
+
+			retrier := retrier.New(fleetAcker, log)
+			batchedAcker := lazy.NewAcker(fleetAcker, log, lazy.WithRetrier(retrier))
+			actionAcker = stateStore.NewStateStoreActionAcker(batchedAcker, stateStorage)
+
 			// TODO: stop using global state
-			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, paths.Top(), upgrader)
+			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, paths.Top(), client, fleetAcker, actionAcker, retrier, stateStorage, upgrader)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -188,7 +225,7 @@ func New(
 	}
 
 	otelManager := otelmanager.NewOTelManager(log.Named("otel_manager"))
-	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelManager, compModifiers...)
+	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelManager, actionAcker, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created

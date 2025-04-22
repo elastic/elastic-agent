@@ -54,7 +54,12 @@ var agentArtifact = artifact.Artifact{
 	Artifact: "beats/" + agentName,
 }
 
-var ErrWatcherNotStarted = errors.New("watcher did not start in time")
+var (
+	ErrWatcherNotStarted  = errors.New("watcher did not start in time")
+	ErrUpgradeSameVersion = errors.New("upgrade did not occur because it is the same version")
+	ErrNonFipsToFips      = errors.New("cannot switch to fips mode when upgrading")
+	ErrFipsToNonFips      = errors.New("cannot switch to non-fips mode when upgrading")
+)
 
 // Upgrader performs an upgrade
 type Upgrader struct {
@@ -144,6 +149,7 @@ type agentVersion struct {
 	version  string
 	snapshot bool
 	hash     string
+	fips     bool
 }
 
 func (av agentVersion) String() string {
@@ -158,9 +164,43 @@ func (av agentVersion) String() string {
 	return buf.String()
 }
 
+func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, metadata packageMetadata) error {
+	// Compare the downloaded version (including git hash) to see if we need to upgrade
+	// versions are the same if the numbers and hash match which may occur in a SNAPSHOT -> SNAPSHOT upgrage
+	same := isSameVersion(log, currentVersion, newVersion)
+	if same {
+		log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
+		return ErrUpgradeSameVersion
+	}
+
+	if currentVersion.fips && !metadata.manifest.Package.Fips {
+		return ErrFipsToNonFips
+	}
+
+	if !currentVersion.fips && metadata.manifest.Package.Fips {
+		return ErrNonFipsToFips
+	}
+
+	return nil
+}
+
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
+
+	currentVersion := agentVersion{
+		version:  release.Version(),
+		snapshot: release.Snapshot(),
+		hash:     release.Commit(),
+		fips:     release.FIPSDistribution(),
+	}
+
+	// Compare versions and exit before downloading anything if the upgrade
+	// is for the same release version that is currently running
+	if isSameReleaseVersion(u.log, currentVersion, version) {
+		u.log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
+		return nil, ErrUpgradeSameVersion
+	}
 
 	// Inform the Upgrade Marker Watcher that we've started upgrading. Note that this
 	// is only possible to do in-memory since, today, the  process that's initiating
@@ -206,21 +246,24 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, fmt.Errorf("reading metadata for elastic agent version %s package %q: %w", version, archivePath, err)
 	}
 
-	currentVersion := agentVersion{
-		version:  release.Version(),
-		snapshot: release.Snapshot(),
-		hash:     release.Commit(),
-	}
-
-	same, newVersion := isSameVersion(u.log, currentVersion, metadata, version)
-	if same {
-		return nil, fmt.Errorf("agent version is already %s", currentVersion)
+	newVersion := extractAgentVersion(metadata, version)
+	if err := checkUpgrade(u.log, currentVersion, newVersion, metadata); err != nil {
+		return nil, fmt.Errorf("cannot upgrade the agent: %w", err)
 	}
 
 	u.log.Infow("Unpacking agent package", "version", newVersion)
 
 	// Nice to have: add check that no archive files end up in the current versioned home
-	unpackRes, err := u.unpack(version, archivePath, paths.Data())
+	// default to no flavor to avoid breaking behavior
+
+	// no default flavor, keep everything in case flavor is not specified
+	// in case of error fallback to keep-all
+	detectedFlavor, err := install.UsedFlavor(paths.Top(), "")
+	if err != nil {
+		u.log.Warnf("error encountered when detecting used flavor with top path %q: %w", paths.Top(), err)
+	}
+	u.log.Debugf("detected used flavor: %q", detectedFlavor)
+	unpackRes, err := u.unpack(version, archivePath, paths.Data(), detectedFlavor)
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +284,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	newRunPath := filepath.Join(newHome, "run")
-	oldRunPath := filepath.Join(paths.Home(), "run")
+	oldRunPath := filepath.Join(paths.Run())
 
 	if err := copyRunDirectory(u.log, oldRunPath, newRunPath); err != nil {
 		return nil, errors.New(err, "failed to copy run directory")
@@ -297,7 +340,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, goerrors.Join(err, rollbackErr)
 	}
 
-	var watcherExecutable = selectWatcherExecutable(paths.Top(), previous, current)
+	watcherExecutable := selectWatcherExecutable(paths.Top(), previous, current)
 
 	var watcherCmd *exec.Cmd
 	if watcherCmd, err = InvokeWatcher(u.log, watcherExecutable); err != nil {
@@ -390,11 +433,7 @@ func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 	// Should handle gracefully
 	// https://github.com/elastic/elastic-agent/issues/1788
 	if marker.Action != nil {
-		if err := acker.Ack(ctx, marker.Action); err != nil {
-			return err
-		}
-
-		if err := acker.Commit(ctx); err != nil {
+		if err := u.AckAction(ctx, acker, marker.Action); err != nil {
 			return err
 		}
 	}
@@ -402,6 +441,22 @@ func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 	marker.Acked = true
 
 	return SaveMarker(marker, false)
+}
+
+func (u *Upgrader) AckAction(ctx context.Context, acker acker.Acker, action fleetapi.Action) error {
+	if acker == nil {
+		return nil
+	}
+
+	if err := acker.Ack(ctx, action); err != nil {
+		return err
+	}
+
+	if err := acker.Commit(ctx); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (u *Upgrader) MarkerWatcher() MarkerWatcher {
@@ -416,7 +471,7 @@ func (u *Upgrader) sourceURI(retrievedURI string) string {
 	return u.settings.SourceURI
 }
 
-func isSameVersion(log *logger.Logger, current agentVersion, metadata packageMetadata, upgradeVersion string) (bool, agentVersion) {
+func extractAgentVersion(metadata packageMetadata, upgradeVersion string) agentVersion {
 	newVersion := agentVersion{}
 	if metadata.manifest != nil {
 		packageDesc := metadata.manifest.Package
@@ -428,10 +483,12 @@ func isSameVersion(log *logger.Logger, current agentVersion, metadata packageMet
 		newVersion.version, newVersion.snapshot = parsedVersion.ExtractSnapshotFromVersionString()
 	}
 	newVersion.hash = metadata.hash
+	return newVersion
+}
 
+func isSameVersion(log *logger.Logger, current agentVersion, newVersion agentVersion) bool {
 	log.Debugw("Comparing current and new agent version", "current_version", current, "new_version", newVersion)
-
-	return current == newVersion, newVersion
+	return current == newVersion
 }
 
 func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {
@@ -475,7 +532,6 @@ func copyActionStore(log *logger.Logger, newHome string) error {
 }
 
 func copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error {
-
 	log.Infow("Copying run directory", "new_run_path", newRunPath, "old_run_path", oldRunPath)
 
 	if err := os.MkdirAll(newRunPath, runDirMod); err != nil {
@@ -625,4 +681,22 @@ func IsInProgress(c client.Client, watcherPIDsFetcher func() ([]int, error)) (bo
 	}
 
 	return state.State == cproto.State_UPGRADING, nil
+}
+
+// isSameReleaseVersion will return true if upgradeVersion and currentVersion are equal using only release numbers and SNAPSHOT prerelease qualifiers.
+// They are not equal if either are a SNAPSHOT, or if the semver numbers (including prerelease and build identifiers) differ.
+func isSameReleaseVersion(log *logger.Logger, current agentVersion, upgradeVersion string) bool {
+	if current.snapshot {
+		return false
+	}
+	target, err := agtversion.ParseVersion(upgradeVersion)
+	if err != nil {
+		log.Warnw("Unable too parse version for released version comparison", upgradeVersion, err)
+		return false
+	}
+	targetVersion, targetSnapshot := target.ExtractSnapshotFromVersionString()
+	if targetSnapshot {
+		return false
+	}
+	return current.version == targetVersion
 }

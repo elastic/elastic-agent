@@ -12,6 +12,7 @@ inputs:
             - .gz$
           file_identity:
             fingerprint: null
+          id: filestream-mysql-mysql-error-${kubernetes.hints.container_id}
           multiline:
             match: after
             negate: true
@@ -40,6 +41,7 @@ inputs:
             - ^# Time:.*
           file_identity:
             fingerprint: null
+          id: filestream-mysql-mysql-slowlog-${kubernetes.hints.container_id}
           multiline:
             match: after
             negate: true

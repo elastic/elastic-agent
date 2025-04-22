@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
@@ -24,6 +26,7 @@ import (
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.elastic.co/apm/v2/apmtest"
 	"go.opentelemetry.io/collector/confmap"
@@ -109,7 +112,14 @@ func waitForState(
 
 func TestComponentUpdateDiff(t *testing.T) {
 
-	err := logp.DevelopmentSetup(logp.ToObserverOutput())
+	observedCore, observedLogs := observer.New(zapcore.DebugLevel)
+	err := logp.ConfigureWithOutputs(logp.Config{
+		Level:      logp.DebugLevel,
+		ToStderr:   false,
+		ToSyslog:   false,
+		ToFiles:    false,
+		ToEventLog: false,
+	}, observedCore)
 	require.NoError(t, err)
 
 	cases := []struct {
@@ -315,15 +325,13 @@ func TestComponentUpdateDiff(t *testing.T) {
 			}
 			testCoord.checkAndLogUpdate(testcase.old)
 
-			obsLogs := logp.ObserverLogs().TakeAll()
+			obsLogs := observedLogs.All()
 			last := obsLogs[len(obsLogs)-1]
 
 			// extract the structured data from the log message
 			testcase.logtest(t, last.Context[0].Interface.(UpdateStats))
 		})
-
 	}
-
 }
 
 func mustNewStruct(t *testing.T, v map[string]interface{}) *structpb.Struct {
@@ -491,6 +499,47 @@ func TestCoordinator_State_ConfigError_NotManaged(t *testing.T) {
 	cancel()
 	err = <-coordCh
 	require.NoError(t, err)
+}
+
+func TestUpgradeSameErrorAcked(t *testing.T) {
+	coordCh := make(chan error)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	upgradeManager := &fakeUpgradeManager{
+		upgradeable: true,
+		upgradeErr:  upgrade.ErrUpgradeSameVersion,
+	}
+
+	acker := &fakeActionAcker{}
+	coord, _, _ := createCoordinator(t, ctx,
+		ManagedCoordinator(true),
+		WithUpgradeManager(upgradeManager),
+		WithActionAcker(acker))
+
+	var coordWait sync.WaitGroup
+	coordWait.Add(1)
+	go func() {
+		coordWait.Done()
+		err := coord.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			// allowed error
+			err = nil
+		}
+		coordCh <- err
+	}()
+
+	coordWait.Wait()
+
+	action := fleetapi.NewAction(fleetapi.ActionTypeUpgrade)
+	actionUpgrade, ok := action.(*fleetapi.ActionUpgrade)
+	require.True(t, ok)
+
+	acker.On("Ack", mock.Anything, actionUpgrade).Return(nil)
+
+	require.NoError(t, coord.Upgrade(t.Context(), "9.0", "http://localhost", actionUpgrade, true, true))
+
+	acker.AssertCalled(t, "Ack", mock.Anything, actionUpgrade)
 }
 
 func TestCoordinator_State_ConfigError_Managed(t *testing.T) {
@@ -928,7 +977,7 @@ func BenchmarkCoordinator_generateComponentModel(b *testing.B) {
 	require.NoError(b, err)
 	vars := make([]*transpiler.Vars, len(varsMaps))
 	for i, vm := range varsMaps {
-		vars[i], err = transpiler.NewVars(fmt.Sprintf("%d", i), vm, mapstr.M{})
+		vars[i], err = transpiler.NewVars(fmt.Sprintf("%d", i), vm, mapstr.M{}, "")
 		require.NoError(b, err)
 	}
 
@@ -965,6 +1014,7 @@ type createCoordinatorOpts struct {
 	managed        bool
 	upgradeManager UpgradeManager
 	compInputSpec  component.InputSpec
+	acker          acker.Acker
 }
 
 type CoordinatorOpt func(o *createCoordinatorOpts)
@@ -978,6 +1028,12 @@ func ManagedCoordinator(managed bool) CoordinatorOpt {
 func WithUpgradeManager(upgradeManager UpgradeManager) CoordinatorOpt {
 	return func(o *createCoordinatorOpts) {
 		o.upgradeManager = upgradeManager
+	}
+}
+
+func WithActionAcker(acker acker.Acker) CoordinatorOpt {
+	return func(o *createCoordinatorOpts) {
+		o.acker = acker
 	}
 }
 
@@ -1035,7 +1091,12 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 		upgradeManager = &fakeUpgradeManager{}
 	}
 
-	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelMgr)
+	acker := o.acker
+	if acker == nil {
+		acker = &fakeActionAcker{}
+	}
+
+	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelMgr, acker)
 	return coord, cfgMgr, varsMgr
 }
 
@@ -1071,6 +1132,22 @@ func (f *fakeReExecManager) ReExec(callback reexec.ShutdownCallbackFn, _ ...stri
 	}
 }
 
+var _ acker.Acker = &fakeActionAcker{}
+
+type fakeActionAcker struct {
+	mock.Mock
+}
+
+func (f *fakeActionAcker) Ack(ctx context.Context, action fleetapi.Action) error {
+	args := f.Called(ctx, action)
+	return args.Error(0)
+}
+
+func (f *fakeActionAcker) Commit(ctx context.Context) error {
+	args := f.Called(ctx)
+	return args.Error(0)
+}
+
 type fakeUpgradeManager struct {
 	upgradeable   bool
 	upgradeErr    error // An error to return when Upgrade is called
@@ -1094,6 +1171,16 @@ func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, source
 }
 
 func (f *fakeUpgradeManager) Ack(ctx context.Context, acker acker.Acker) error {
+	if acker != nil {
+		return acker.Ack(ctx, fleetapi.NewAction(fleetapi.ActionTypeUnknown))
+	}
+	return nil
+}
+
+func (f *fakeUpgradeManager) AckAction(ctx context.Context, acker acker.Acker, action fleetapi.Action) error {
+	if acker != nil {
+		return acker.Ack(ctx, action)
+	}
 	return nil
 }
 
@@ -1105,12 +1192,12 @@ type testMonitoringManager struct{}
 
 func newTestMonitoringMgr() *testMonitoringManager { return &testMonitoringManager{} }
 
-func (*testMonitoringManager) EnrichArgs(_ string, _ string, args []string) []string { return args }
-func (*testMonitoringManager) Prepare(_ string) error                                { return nil }
-func (*testMonitoringManager) Cleanup(string) error                                  { return nil }
-func (*testMonitoringManager) Enabled() bool                                         { return false }
-func (*testMonitoringManager) Reload(rawConfig *config.Config) error                 { return nil }
-func (*testMonitoringManager) MonitoringConfig(_ map[string]interface{}, _ []component.Component, _ map[string]string, _ map[string]uint64) (map[string]interface{}, error) {
+func (*testMonitoringManager) EnrichArgs(_, _ string, args []string) []string { return args }
+func (*testMonitoringManager) Prepare(string) error                           { return nil }
+func (*testMonitoringManager) Cleanup(string) error                           { return nil }
+func (*testMonitoringManager) Enabled() bool                                  { return false }
+func (*testMonitoringManager) Reload(rawConfig *config.Config) error          { return nil }
+func (*testMonitoringManager) MonitoringConfig(map[string]interface{}, []component.Component, map[string]uint64) (map[string]interface{}, error) {
 	return nil, nil
 }
 
@@ -1188,6 +1275,9 @@ func (l *configChange) Fail(err error) {
 }
 
 type fakeVarsManager struct {
+	varsMx sync.RWMutex
+	vars   []*transpiler.Vars
+
 	varsCh chan []*transpiler.Vars
 	errCh  chan error
 
@@ -1222,17 +1312,27 @@ func (f *fakeVarsManager) Watch() <-chan []*transpiler.Vars {
 	return f.varsCh
 }
 
-func (f *fakeVarsManager) Observe(observed []string) {
+func (f *fakeVarsManager) Observe(ctx context.Context, observed []string) ([]*transpiler.Vars, error) {
 	f.observedMx.Lock()
 	defer f.observedMx.Unlock()
 	f.observed = observed
+	f.varsMx.RLock()
+	defer f.varsMx.RUnlock()
+	return f.vars, nil
 }
 
 func (f *fakeVarsManager) Vars(ctx context.Context, vars []*transpiler.Vars) {
+	f.varsMx.Lock()
+	f.vars = vars
+	f.varsMx.Unlock()
 	select {
 	case <-ctx.Done():
 	case f.varsCh <- vars:
 	}
+}
+
+func (f *fakeVarsManager) DefaultProvider() string {
+	return ""
 }
 
 type fakeOTelManager struct {

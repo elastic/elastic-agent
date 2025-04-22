@@ -20,7 +20,9 @@ import (
 	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -34,15 +36,15 @@ type UnpackResult struct {
 }
 
 // unpack unpacks archive correctly, skips root (symlink, config...) unpacks data/*
-func (u *Upgrader) unpack(version, archivePath, dataDir string) (UnpackResult, error) {
+func (u *Upgrader) unpack(version, archivePath, dataDir string, flavor string) (UnpackResult, error) {
 	// unpack must occur in directory that holds the installation directory
 	// or the extraction will be double nested
 	var unpackRes UnpackResult
 	var err error
 	if runtime.GOOS == windows {
-		unpackRes, err = unzip(u.log, archivePath, dataDir)
+		unpackRes, err = unzip(u.log, archivePath, dataDir, flavor)
 	} else {
-		unpackRes, err = untar(u.log, archivePath, dataDir)
+		unpackRes, err = untar(u.log, archivePath, dataDir, flavor)
 	}
 
 	if err != nil {
@@ -76,7 +78,7 @@ func (u *Upgrader) getPackageMetadata(archivePath string) (packageMetadata, erro
 	}
 }
 
-func unzip(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error) {
+func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (UnpackResult, error) {
 	var hash, rootDir string
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
@@ -95,13 +97,19 @@ func unzip(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 	}
 
 	hash = metadata.hash[:hashLen]
-
+	var registry map[string][]string
 	if metadata.manifest != nil {
 		pm.mappings = metadata.manifest.Package.PathMappings
 		versionedHome = filepath.FromSlash(pm.Map(metadata.manifest.Package.VersionedHome))
+		registry = metadata.manifest.Package.Flavors
 	} else {
 		// if at this point we didn't load the manifest, set the versioned to the backup value
 		versionedHome = createVersionedHomeFromHash(hash)
+	}
+
+	skipFn, err := skipFnFromZip(log, r, flavor, fileNamePrefix, createVersionedHomeFromHash(hash), registry)
+	if err != nil {
+		return UnpackResult{}, err
 	}
 
 	unpackFile := func(f *zip.File) (err error) {
@@ -130,6 +138,10 @@ func unzip(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 
 		dstPath := strings.TrimPrefix(mappedPackagePath, "data/")
 		dstPath = filepath.Join(dataDir, dstPath)
+
+		if skipFn(dstPath) {
+			return nil
+		}
 
 		if f.FileInfo().IsDir() {
 			log.Debugw("Unpacking directory", "archive", "zip", "file.path", dstPath)
@@ -194,6 +206,8 @@ func unzip(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 	}, nil
 }
 
+// getPackageMetadataFromZip reads an archive on a path archivePath and parses metadata from manifest file
+// located inside an archive
 func getPackageMetadataFromZip(archivePath string) (packageMetadata, error) {
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
@@ -202,6 +216,65 @@ func getPackageMetadataFromZip(archivePath string) (packageMetadata, error) {
 	defer r.Close()
 	fileNamePrefix := strings.TrimSuffix(filepath.Base(archivePath), ".zip") + "/" // omitting `elastic-agent-{version}-{os}-{arch}/` in filename
 	return getPackageMetadataFromZipReader(r, fileNamePrefix)
+}
+
+func skipFnFromZip(log *logger.Logger, r *zip.ReadCloser, detectedFlavor string, fileNamePrefix string, versionedHome string, registry map[string][]string) (install.SkipFn, error) {
+	acceptAllFn := func(relPath string) bool { return false }
+	if detectedFlavor == "" {
+		// no flavor don't skip anything
+		return acceptAllFn, nil
+	}
+
+	flavor, err := install.Flavor(detectedFlavor, "", registry)
+	if err != nil {
+		if errors.Is(err, install.ErrUnknownFlavor) {
+			// unknown flavor fallback to copy all
+			return acceptAllFn, nil
+		}
+		return nil, err
+	}
+
+	// no flavor loaded
+	if flavor.Name == "" {
+		return acceptAllFn, nil
+	}
+
+	specsInFlavor := install.SpecsForFlavor(flavor) // ignoring error flavor exists, it was loaded before
+
+	// fix versionedHome
+	versionedHome = strings.ReplaceAll(versionedHome, "\\", "/")
+
+	readFile := func(specFilePath string) ([]byte, error) {
+		f, err := r.Open(specFilePath)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+
+		return io.ReadAll(f)
+	}
+
+	var allowedPaths []string
+	for _, spec := range specsInFlavor {
+		specFilePath := path.Join(fileNamePrefix, versionedHome, "components", spec)
+
+		contentBytes, err := readFile(specFilePath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, err
+		}
+
+		paths, err := component.ParseComponentFiles(contentBytes, specFilePath, true)
+		if err != nil {
+			return nil, errors.New("failed to read paths from %q: %v", specFilePath, err)
+		}
+		allowedPaths = append(allowedPaths, paths...)
+
+	}
+
+	return install.SkipComponentsPathWithSubpathsFn(allowedPaths)
 }
 
 func getPackageMetadataFromZipReader(r *zip.ReadCloser, fileNamePrefix string) (packageMetadata, error) {
@@ -241,8 +314,7 @@ func getPackageMetadataFromZipReader(r *zip.ReadCloser, fileNamePrefix string) (
 	return ret, nil
 }
 
-func untar(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error) {
-
+func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (UnpackResult, error) {
 	var versionedHome string
 	var rootDir string
 	var hash string
@@ -256,14 +328,21 @@ func untar(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 	}
 
 	hash = metadata.hash[:hashLen]
+	var registry map[string][]string
 
 	if metadata.manifest != nil {
 		// set the path mappings
 		pm.mappings = metadata.manifest.Package.PathMappings
 		versionedHome = filepath.FromSlash(pm.Map(metadata.manifest.Package.VersionedHome))
+		registry = metadata.manifest.Package.Flavors
 	} else {
 		// set default value of versioned home if it wasn't set by reading the manifest
 		versionedHome = createVersionedHomeFromHash(metadata.hash)
+	}
+
+	skipFn, err := skipFnFromTar(log, archivePath, flavor, registry)
+	if err != nil {
+		return UnpackResult{}, err
 	}
 
 	r, err := os.Open(archivePath)
@@ -313,6 +392,10 @@ func untar(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 
 		// skip everything outside data/
 		if !strings.HasPrefix(fileName, "data/") {
+			continue
+		}
+
+		if skipFn(fileName) {
 			continue
 		}
 
@@ -376,6 +459,103 @@ func untar(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 		Hash:          hash,
 		VersionedHome: versionedHome,
 	}, nil
+}
+
+func skipFnFromTar(log *logger.Logger, archivePath string, flavor string, registry map[string][]string) (install.SkipFn, error) {
+	acceptAllFn := func(relPath string) bool { return false }
+	if flavor == "" {
+		// no flavor don't skip anything
+		return acceptAllFn, nil
+	}
+
+	fileNamePrefix := getFileNamePrefix(archivePath)
+
+	// scan tar archive for spec file and extract allowed paths
+	r, err := os.Open(archivePath)
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("artifact for 'elastic-agent' could not be found at '%s'", archivePath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, archivePath))
+	}
+	defer r.Close()
+
+	zr, err := gzip.NewReader(r)
+	if err != nil {
+		return nil, errors.New("requires gzip-compressed body", err, errors.TypeFilesystem)
+	}
+
+	tr := tar.NewReader(zr)
+
+	var allowedPaths []string
+	flavorDefinition, err := install.Flavor(flavor, "", registry)
+	if err != nil {
+		if errors.Is(err, install.ErrUnknownFlavor) {
+			// unknown flavor fallback to copy all
+			return acceptAllFn, nil
+		}
+		return nil, err
+	}
+
+	// no flavor loaded
+	if flavorDefinition.Name == "" {
+		return acceptAllFn, nil
+	}
+
+	specs, err := specRegistry(flavorDefinition)
+	if err != nil {
+		return nil, err
+	}
+	// go through all the content of a tar archive
+	// if elastic-agent.active.commit file is found, get commit of the version unpacked
+	// otherwise copy everything inside data directory (everything related to new version),
+	// pieces outside of data we already have and should not be overwritten as they are usually configs
+	for {
+		f, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		fileName := strings.TrimPrefix(f.Name, fileNamePrefix)
+
+		// skip everything outside components/ and everything that's not spec file.
+		// checking for spec files ourside of components just to be sure
+		if !strings.Contains(fileName, "/components/") || !strings.HasSuffix(fileName, "spec.yml") {
+			continue
+		}
+
+		if _, specInRegistry := specs[filepath.Base(fileName)]; !specInRegistry {
+			// component not present in a package, skip processing
+			continue
+		}
+
+		fi := f.FileInfo()
+		mode := fi.Mode()
+		switch {
+		case mode.IsRegular():
+			contentBytes, err := io.ReadAll(tr)
+			if err != nil {
+				return nil, errors.New("failed to read %q: %v", fileName, err)
+			}
+			paths, err := component.ParseComponentFiles(contentBytes, fileName, true)
+			if err != nil {
+				return nil, errors.New("failed to read paths from %q: %v", fileName, err)
+			}
+
+			allowedPaths = append(allowedPaths, paths...)
+		}
+	}
+
+	return install.SkipComponentsPathWithSubpathsFn(allowedPaths)
+}
+
+func specRegistry(flavor install.FlavorDefinition) (map[string]struct{}, error) {
+	specs := install.SpecsForFlavor(flavor)
+	registry := make(map[string]struct{})
+	for _, s := range specs {
+		registry[s] = struct{}{}
+	}
+	return registry, nil
 }
 
 func getPackageMetadataFromTar(archivePath string) (packageMetadata, error) {

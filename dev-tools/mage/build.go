@@ -11,12 +11,15 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/josephspurrier/goversioninfo"
 	"github.com/magefile/mage/sh"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+
+	"github.com/elastic/elastic-agent/dev-tools/packaging"
 )
 
 // BuildArgs are the arguments used for the "build" target and they define how
@@ -34,11 +37,45 @@ type BuildArgs struct {
 	WinMetadata bool // Add resource metadata to Windows binaries (like add the version number to the .exe properties).
 }
 
+// buildTagRE is a regexp to match strings like "-tags=abcd"
+// but does not match "-tags= "
+var buildTagRE = regexp.MustCompile(`-tags=([\S]+)?`)
+
+// ParseBuildTags returns the ExtraFlags param where all flags that are go build tags are joined by a comma.
+//
+// For example if given -someflag=val1 -tags=buildtag1 -tags=buildtag2
+// It will return -someflag=val1 -tags=buildtag1,buildtag2
+func (b BuildArgs) ParseBuildTags() []string {
+	flags := make([]string, 0)
+	if len(b.ExtraFlags) == 0 {
+		return flags
+	}
+
+	buildTags := make([]string, 0)
+	for _, flag := range b.ExtraFlags {
+		if buildTagRE.MatchString(flag) {
+			arr := buildTagRE.FindStringSubmatch(flag)
+			if len(arr) != 2 || arr[1] == "" {
+				log.Printf("Unexpected format found for buildargs.ExtraFlags, ignoring value  %q", flag)
+				continue
+			}
+			buildTags = append(buildTags, arr[1])
+		} else {
+			flags = append(flags, flag)
+		}
+	}
+	if len(buildTags) > 0 {
+		flags = append(flags, "-tags="+strings.Join(buildTags, ","))
+	}
+	return flags
+}
+
 // DefaultBuildArgs returns the default BuildArgs for use in builds.
 func DefaultBuildArgs() BuildArgs {
 	args := BuildArgs{
 		Name: BeatName,
 		CGO:  build.Default.CgoEnabled,
+		Env:  map[string]string{},
 		Vars: map[string]string{
 			elasticAgentModulePath + "/version.buildTime": "{{ date }}",
 			elasticAgentModulePath + "/version.commit":    "{{ commit }}",
@@ -51,6 +88,19 @@ func DefaultBuildArgs() BuildArgs {
 
 	if positionIndependentCodeSupported() {
 		args.ExtraFlags = append(args.ExtraFlags, "-buildmode", "pie")
+	}
+
+	if FIPSBuild {
+
+		fipsConfig := packaging.Settings().FIPS
+
+		for _, tag := range fipsConfig.Compile.Tags {
+			args.ExtraFlags = append(args.ExtraFlags, "-tags="+tag)
+		}
+		args.CGO = args.CGO || fipsConfig.Compile.CGO
+		for varName, value := range fipsConfig.Compile.Env {
+			args.Env[varName] = value
+		}
 	}
 
 	if DevBuild {
@@ -151,6 +201,7 @@ func Build(params BuildArgs) error {
 	if params.CGO {
 		cgoEnabled = "1"
 	}
+
 	env["CGO_ENABLED"] = cgoEnabled
 
 	// Spec
@@ -159,7 +210,7 @@ func Build(params BuildArgs) error {
 		"-o",
 		filepath.Join(params.OutputDir, binaryName),
 	}
-	args = append(args, params.ExtraFlags...)
+	args = append(args, params.ParseBuildTags()...)
 
 	// ldflags
 	ldflags := params.LDFlags

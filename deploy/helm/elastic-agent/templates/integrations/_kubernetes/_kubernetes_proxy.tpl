@@ -3,7 +3,7 @@
 {{- $preset := $.Values.agent.presets.perNode -}}
 {{- $inputVal := (include "elasticagent.kubernetes.config.kube_proxy.input" $ | fromYamlArray) -}}
 {{- include "elasticagent.preset.mutate.inputs" (list $ $preset $inputVal) -}}
-{{- include "elasticagent.preset.applyOnce" (list $ $preset "elasticagent.kubernetes.pernode.preset") -}}
+{{- include "elasticagent.preset.mutate.outputs.byname" (list $ $preset $.Values.kubernetes.output) -}}
 {{- end -}}
 {{- end -}}
 
@@ -18,12 +18,12 @@ Config input for kube proxy
     namespace: {{ .Values.kubernetes.namespace }}
   use_output: {{ .Values.kubernetes.output }}
   streams:
-    - id: kubernetes/metrics-kubernetes.proxy
-      data_stream:
-        type: metrics
-        dataset: kubernetes.proxy
-      metricsets:
-        - proxy
+  - id: kubernetes/metrics-kubernetes.proxy
+    data_stream:
+      type: metrics
+      dataset: kubernetes.proxy
+    metricsets:
+      - proxy
 {{- mergeOverwrite $vars .Values.kubernetes.proxy.vars | toYaml | nindent 4 }}
 {{- end -}}
 

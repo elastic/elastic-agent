@@ -48,7 +48,7 @@ const (
 	//ManifestUrlEnvVar is the name fo the environment variable containing the Manifest URL to be used for packaging agent
 	ManifestUrlEnvVar = "MANIFEST_URL"
 	// AgentCommitHashEnvVar allows to override agent commit hash string during packaging
-	AgentCommitHashEnvVar
+	AgentCommitHashEnvVar = "AGENT_COMMIT_HASH_OVERRIDE"
 
 	// Mapped functions
 	agentPackageVersionMappedFunc    = "agent_package_version"
@@ -88,6 +88,7 @@ var (
 	Snapshot      bool
 	DevBuild      bool
 	ExternalBuild bool
+	FIPSBuild     bool
 
 	versionQualified bool
 	versionQualifier string
@@ -112,6 +113,7 @@ var (
 		"title":                          func(s string) string { return cases.Title(language.English, cases.NoLower).String(s) },
 		"tolower":                        strings.ToLower,
 		"contains":                       strings.Contains,
+		"substring":                      Substring,
 		agentPackageVersionMappedFunc:    AgentPackageVersion,
 		agentManifestGeneratorMappedFunc: PackageManifest,
 		snapshotSuffix:                   SnapshotSuffix,
@@ -151,6 +153,11 @@ func initGlobals() {
 	ExternalBuild, err = strconv.ParseBool(EnvOr("EXTERNAL", "false"))
 	if err != nil {
 		panic(fmt.Errorf("failed to parse EXTERNAL env value: %w", err))
+	}
+
+	FIPSBuild, err = strconv.ParseBool(EnvOr("FIPS", "false"))
+	if err != nil {
+		panic(fmt.Errorf("failed to parse FIPS env value: %w", err))
 	}
 
 	versionQualifier, versionQualified = os.LookupEnv("VERSION_QUALIFIER")
@@ -210,6 +217,7 @@ func varMap(args ...map[string]interface{}) map[string]interface{} {
 		"Snapshot":        Snapshot,
 		"DEV":             DevBuild,
 		"EXTERNAL":        ExternalBuild,
+		"FIPS":            FIPSBuild,
 		"Qualifier":       versionQualifier,
 		"CI":              CI,
 	}
@@ -329,7 +337,7 @@ func AgentPackageVersion() (string, error) {
 	return BeatQualifiedVersion()
 }
 
-func PackageManifest() (string, error) {
+func PackageManifest(fips bool) (string, error) {
 
 	packageVersion, err := AgentPackageVersion()
 	if err != nil {
@@ -346,20 +354,27 @@ func PackageManifest() (string, error) {
 		return "", fmt.Errorf("retrieving agent commit hash: %w", err)
 	}
 
-	return GeneratePackageManifest(BeatName, packageVersion, Snapshot, hash, commitHashShort)
+	registry, err := loadFlavorsRegistry()
+	if err != nil {
+		return "", fmt.Errorf("retrieving agent flavors: %w", err)
+	}
+
+	return GeneratePackageManifest(BeatName, packageVersion, Snapshot, hash, commitHashShort, fips, registry)
 }
 
-func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, fullHash, shortHash string) (string, error) {
+func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, fullHash, shortHash string, fips bool, flavorsRegistry map[string][]string) (string, error) {
 	m := v1.NewManifest()
 	m.Package.Version = packageVersion
 	m.Package.Snapshot = snapshot
 	m.Package.Hash = fullHash
+	m.Package.Fips = fips
 
 	versionedHomePath := path.Join("data", fmt.Sprintf("%s-%s", beatName, shortHash))
 	m.Package.VersionedHome = versionedHomePath
 	m.Package.PathMappings = []map[string]string{{}}
 	m.Package.PathMappings[0][versionedHomePath] = fmt.Sprintf("data/%s-%s%s-%s", beatName, m.Package.Version, GenerateSnapshotSuffix(snapshot), shortHash)
 	m.Package.PathMappings[0][v1.ManifestFileName] = fmt.Sprintf("data/%s-%s%s-%s/%s", beatName, m.Package.Version, GenerateSnapshotSuffix(snapshot), shortHash, v1.ManifestFileName)
+	m.Package.Flavors = flavorsRegistry
 	yamlBytes, err := yaml.Marshal(m)
 	if err != nil {
 		return "", fmt.Errorf("marshaling manifest: %w", err)
@@ -370,6 +385,17 @@ func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, ful
 
 func SnapshotSuffix() string {
 	return GenerateSnapshotSuffix(Snapshot)
+}
+
+func Substring(s string, start, length int) string {
+	if start < 0 || start >= len(s) {
+		return ""
+	}
+	end := start + length
+	if end > len(s) {
+		end = len(s)
+	}
+	return s[start:end]
 }
 
 func GenerateSnapshotSuffix(snapshot bool) string {
@@ -461,6 +487,10 @@ var (
 	beatVersionValue string
 	beatVersionErr   error
 	beatVersionOnce  sync.Once
+
+	flavorsRegistry    map[string][]string
+	flavorsRegistryErr error
+	flavorsOnce        sync.Once
 )
 
 // BeatQualifiedVersion returns the Beat's qualified version.  The value can be overwritten by
@@ -492,6 +522,14 @@ func beatVersion() (string, error) {
 	return beatVersionValue, beatVersionErr
 }
 
+func loadFlavorsRegistry() (map[string][]string, error) {
+	flavorsOnce.Do(func() {
+		flavorsRegistry, flavorsRegistryErr = getBuildVariableSources().GetFlavorsRegistry()
+	})
+
+	return flavorsRegistry, flavorsRegistryErr
+}
+
 var (
 	beatDocBranchRegex     = regexp.MustCompile(`(?m)doc-branch:\s*([^\s]+)\r?$`)
 	beatDocSiteBranchRegex = regexp.MustCompile(`(?m)doc-site-branch:\s*([^\s]+)\r?$`)
@@ -521,9 +559,10 @@ var (
 	// DefaultBeatBuildVariableSources contains the default locations build
 	// variables are read from by Elastic Beats.
 	DefaultBeatBuildVariableSources = &BuildVariableSources{
-		BeatVersion: "{{ elastic_beats_dir }}/version/version.go",
-		GoVersion:   "{{ elastic_beats_dir }}/.go-version",
-		DocBranch:   "{{ elastic_beats_dir }}/version/docs/version.asciidoc",
+		BeatVersion:     "{{ elastic_beats_dir }}/version/version.go",
+		GoVersion:       "{{ elastic_beats_dir }}/.go-version",
+		DocBranch:       "{{ elastic_beats_dir }}/version/docs/version.asciidoc",
+		FlavorsRegistry: "{{ elastic_beats_dir }}/_meta/.flavors",
 	}
 
 	buildVariableSources     *BuildVariableSources
@@ -584,6 +623,9 @@ type BuildVariableSources struct {
 
 	// Parses the documentation branch from the DocBranch file.
 	DocBranchParser func(data []byte) (string, error)
+
+	// File containing definition of flavors.
+	FlavorsRegistry string
 }
 
 func (s *BuildVariableSources) expandVar(in string) (string, error) {
@@ -626,6 +668,26 @@ func (s *BuildVariableSources) GetGoVersion() (string, error) {
 		s.GoVersionParser = parseGoVersion
 	}
 	return s.GoVersionParser(data)
+}
+
+// GetFlavorsRegistry reads the flavors file and parses the list of components of it.
+func (s *BuildVariableSources) GetFlavorsRegistry() (map[string][]string, error) {
+	file, err := s.expandVar(s.FlavorsRegistry)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read flavors from file=%v: %w", file, err)
+	}
+
+	registry := make(map[string][]string)
+	if err := yaml.Unmarshal(data, registry); err != nil {
+		return nil, fmt.Errorf("failed to parse flavors: %w", err)
+	}
+
+	return registry, nil
 }
 
 // GetDocBranch reads the DocBranch file and parses the branch from it.

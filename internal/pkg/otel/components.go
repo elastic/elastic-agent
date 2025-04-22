@@ -17,11 +17,15 @@ import (
 	hostmetricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver"
 	httpcheckreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver"
 	jaegerreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver"
+	jmxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver"
 	k8sclusterreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver"
 	k8sobjectsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver"
 	kubeletstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver"
-	prometheusreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver"
+	nginxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver"
+	receivercreator "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator"
+	redisreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver"
 	zipkinreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver"
+	nopreceiver "go.opentelemetry.io/collector/receiver/nopreceiver"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
 
 	fbreceiver "github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
@@ -30,6 +34,7 @@ import (
 	// Processors:
 	attributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor" // for modifying signal attributes
 	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor"
+	geoipprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/geoipprocessor"                 // for adding geographical metadata associated to an IP address
 	k8sattributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor" // for adding k8s metadata
 	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor"
 	resourceprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor"   // for modifying resource attributes
@@ -38,19 +43,21 @@ import (
 	"go.opentelemetry.io/collector/processor/memorylimiterprocessor"
 
 	"github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor"
-	"github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor"
 
 	"github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor"
 
 	// Exporters:
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter"
 	fileexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter" // for e2e tests
-	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter"                           // for dev
+	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter"
+	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter" // for dev
+	nopexporter "go.opentelemetry.io/collector/exporter/nopexporter"
 	"go.opentelemetry.io/collector/exporter/otlpexporter"
 	otlphttpexporter "go.opentelemetry.io/collector/exporter/otlphttpexporter"
 
 	// Extensions
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension"
+	k8sobserver "github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver"
 	pprofextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension"
 	filestorage "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage"
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
@@ -59,7 +66,7 @@ import (
 	routingconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector"
 	spanmetricsconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector"
 
-	"github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector"
+	elasticapmconnector "github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector"
 )
 
 func components(extensionFactories ...extension.Factory) func() (otelcol.Factories, error) {
@@ -68,7 +75,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		factories := otelcol.Factories{}
 
 		// Receivers
-		factories.Receivers, err = receiver.MakeFactoryMap(
+		receivers := []receiver.Factory{
 			otlpreceiver.NewFactory(),
 			filelogreceiver.NewFactory(),
 			kubeletstatsreceiver.NewFactory(),
@@ -76,28 +83,36 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			hostmetricsreceiver.NewFactory(),
 			httpcheckreceiver.NewFactory(),
 			k8sobjectsreceiver.NewFactory(),
-			prometheusreceiver.NewFactory(),
+			receivercreator.NewFactory(),
+			redisreceiver.NewFactory(),
+			nginxreceiver.NewFactory(),
 			jaegerreceiver.NewFactory(),
 			zipkinreceiver.NewFactory(),
 			fbreceiver.NewFactory(),
 			mbreceiver.NewFactory(),
-		)
+			jmxreceiver.NewFactory(),
+			nopreceiver.NewFactory(),
+		}
+		// some receivers should only be available when
+		// not in fips mode due to restrictions on crypto usage
+		receivers = addNonFipsReceivers(receivers)
+		factories.Receivers, err = otelcol.MakeFactoryMap(receivers...)
 		if err != nil {
 			return otelcol.Factories{}, err
 		}
 
 		// Processors
-		factories.Processors, err = processor.MakeFactoryMap(
+		factories.Processors, err = otelcol.MakeFactoryMap[processor.Factory](
 			batchprocessor.NewFactory(),
 			resourceprocessor.NewFactory(),
 			attributesprocessor.NewFactory(),
 			transformprocessor.NewFactory(),
 			filterprocessor.NewFactory(),
+			geoipprocessor.NewFactory(),
 			k8sattributesprocessor.NewFactory(),
 			elasticinframetricsprocessor.NewFactory(),
 			resourcedetectionprocessor.NewFactory(),
 			memorylimiterprocessor.NewFactory(),
-			lsmintervalprocessor.NewFactory(),
 			elastictraceprocessor.NewFactory(),
 		)
 		if err != nil {
@@ -105,21 +120,27 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		}
 
 		// Exporters
-		factories.Exporters, err = exporter.MakeFactoryMap(
+		exporters := []exporter.Factory{
 			otlpexporter.NewFactory(),
 			debugexporter.NewFactory(),
 			fileexporter.NewFactory(),
 			elasticsearchexporter.NewFactory(),
+			loadbalancingexporter.NewFactory(),
 			otlphttpexporter.NewFactory(),
-		)
+			nopexporter.NewFactory(),
+		}
+		// some exporters should only be available when
+		// not in fips mode due to restrictions on crypto usage
+		exporters = addNonFipsExporters(exporters)
+		factories.Exporters, err = otelcol.MakeFactoryMap(exporters...)
 		if err != nil {
 			return otelcol.Factories{}, err
 		}
 
-		factories.Connectors, err = connector.MakeFactoryMap(
+		factories.Connectors, err = otelcol.MakeFactoryMap[connector.Factory](
 			routingconnector.NewFactory(),
 			spanmetricsconnector.NewFactory(),
-			signaltometricsconnector.NewFactory(),
+			elasticapmconnector.NewFactory(),
 		)
 		if err != nil {
 			return otelcol.Factories{}, err
@@ -130,9 +151,10 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			filestorage.NewFactory(),
 			healthcheckextension.NewFactory(),
 			pprofextension.NewFactory(),
+			k8sobserver.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)
-		factories.Extensions, err = extension.MakeFactoryMap(extensions...)
+		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)
 		if err != nil {
 			return otelcol.Factories{}, err
 		}

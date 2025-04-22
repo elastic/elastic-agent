@@ -47,7 +47,7 @@ kubernetes:
   # -- enable Kubernetes integration.
   # @section -- 2 - Kubernetes integration
   # @sectionDescriptionTemplate -- Kubernetes
-  enabled: false
+  enabled: true
   # -- name of the output used in kubernetes integration. Note that this output needs to be defined in
   # [outputs](#1-outputs)
   # @section -- 2 - Kubernetes integration
@@ -64,12 +64,19 @@ kubernetes:
     # results in overriding and *disabling all* the respective state streams
     # @section -- 2 - Kubernetes integration
     enabled: true
-    # -- deploy kube-state-metrics service as a sidecar container to the elastic agent of `ksmSharded` preset.
-    # If set to `false`, kube-state-metrics will *not* get deployed and `clusterWide` agent preset will be used for
-    # collecting kube-state-metrics.
-    # @section -- 2 - Kubernetes integration
-    deployKSM: true
-    # -- host of the kube-state-metrics service. Note that this used only when `deployKSM` is set to `false`.
+    agentAsSidecar:
+      # -- enable [ksm autosharding](https://github.com/kubernetes/kube-state-metrics?tab=readme-ov-file#automated-sharding) and deploy elastic-agent as a sidecar container. If `kube-state-metrics.enabled` is set to `false` this has no effect.
+      # @section -- 2 - Kubernetes integration
+      enabled: false
+      # -- resources of the elastic-agent sidecar if `agentAsSidecar.enabled` is set to `true`
+      # @section -- 2 - Kubernetes integration
+      resources:
+        limits:
+          memory: 800Mi
+        requests:
+          cpu: 100m
+          memory: 400Mi
+    # -- host of the kube-state-metrics service. This used only when `kube-state-metrics.enabled` is set to `false`.
     # @section -- 2 - Kubernetes integration
     host: "kube-state-metrics:8080"
     # -- state streams variables such as `add_metadata`, `hosts`, `period`, `bearer_token_file`. Please note
@@ -140,7 +147,9 @@ kubernetes:
       # -- enable containers logs stream [ref](https://www.elastic.co/docs/current/integrations/kubernetes/container-logs)
       # @section -- 2 - Kubernetes integration
       enabled: true
-      additionalParsersConfig: []
+      # -- containers logs stream vars
+      # @section -- 2 - Kubernetes integration
+      vars: {}
     audit_logs:
       # -- enable containers audit logs stream [ref](https://www.elastic.co/docs/current/integrations/kubernetes/audit-logs)
       # @section -- 2 - Kubernetes integration
@@ -325,15 +334,15 @@ extraIntegrations: {}
 agent:
   # -- elastic-agent version
   # @section -- 6 - Elastic-Agent Configuration
-  version: 9.0.0
+  version: 9.1.0
   # -- image configuration
   # @section -- 6 - Elastic-Agent Configuration
   image:
-    repository: docker.elastic.co/beats/elastic-agent
+    repository: docker.elastic.co/elastic-agent/elastic-agent
     pullPolicy: IfNotPresent
-    tag: "9.0.0-SNAPSHOT"
+    tag: "9.1.0-SNAPSHOT"
   # -- image pull secrets
-  # @section -- 3 - Elastic-Agent Configuration
+  # @section -- 6 - Elastic-Agent Configuration
   imagePullSecrets: []
   # -- generate kubernetes manifests or [ECK](https://github.com/elastic/cloud-on-k8s) CRDs
   # @section -- 6 - Elastic-Agent Configuration
@@ -351,9 +360,51 @@ agent:
     # -- Fleet enrollment token
     # @section -- 6.1 - Elastic-Agent Managed Configuration
     token: ""
-    # -- Fleet insecure url
+    # -- Communicate with Fleet with either insecure HTTP or unverified HTTPS
     # @section -- 6.1 - Elastic-Agent Managed Configuration
     insecure: false
+    # -- Enforce enrollment even if agent is already enrolled
+    # @section -- 6.1 - Elastic-Agent Managed Configuration
+    force: false
+    ca:
+      # -- Value of the CA certificate for connecting to Fleet
+      # @section -- 6.1 - Elastic-Agent Managed Configuration
+      value: ""
+      valueFromSecret:
+        # -- Secret name for the CA certificate
+        # @section -- 6.1 - Elastic-Agent Managed Configuration
+        name: ""
+        # -- Secret key for the CA certificate
+        # @section -- 6.1 - Elastic-Agent Managed Configuration
+        key: ""
+    agentCert:
+      # -- Value of Elastic Agent client certificate for Fleet Server mTLS
+      # @section -- 6.1 - Elastic-Agent Managed Configuration
+      value: ""
+      valueFromSecret:
+        # -- Secret name for the Elastic Agent client certificate
+        # @section -- 6.1 - Elastic-Agent Managed Configuration
+        name: ""
+        # -- Key in the secret for the Elastic Agent client certificate
+        # @section -- 6.1 - Elastic-Agent Managed Configuration
+        key: ""
+    agentCertKey:
+      # -- Value of Elastic Agent client private key for Fleet Server mTLS
+      # @section -- 6.1 - Elastic-Agent Managed Configuration
+      value: ""
+      valueFromSecret:
+        # -- Secret name for the Elastic Agent client private key
+        # @section -- 6.1 - Elastic-Agent Managed Configuration
+        name: ""
+        # -- Key in the secret for the Elastic Agent client private key
+        # @section -- 6.1 - Elastic-Agent Managed Configuration
+        key: ""
+    # -- Token name to use for fetching token from Kibana if the enrollment token is not supplied
+    # @section -- 6.1 - Elastic-Agent Managed Configuration
+    tokenName: ""
+    # -- Token policy name to use for fetching token from Kibana if the enrollment token is not supplied
+    # @section -- 6.1 - Elastic-Agent Managed Configuration
+    policyName: ""
     # -- Kibana host to fallback if enrollment token is not supplied
     # @section -- 6.1 - Elastic-Agent Managed Configuration
     kibanaHost: ""
@@ -363,6 +414,20 @@ agent:
     # -- Kibana password to fallback if enrollment token is not supplied
     # @section -- 6.1 - Elastic-Agent Managed Configuration
     kibanaPassword: ""
+    kibanaCA:
+      # -- Value of the CA certificate for Kibana if the enrollment token is not supplied
+      # @section -- 6.1 - Elastic-Agent Managed Configuration
+      value: ""
+      valueFromSecret:
+        # -- Secret name for the Kibana CA certificate
+        # @section -- 6.1 - Elastic-Agent Managed Configuration
+        name: ""
+        # -- Key in the secret for the Kibana CA certificate
+        # @section -- 6.1 - Elastic-Agent Managed Configuration
+        key: ""
+    # -- Service token to use when connecting to Kibana if the enrollment token is not supplied
+    # @section -- 6.1 - Elastic-Agent Managed Configuration
+    kibanaServiceToken: ""
     # -- Agent preset to deploy
     # @section -- 6.1 - Elastic-Agent Managed Configuration
     preset: perNode
@@ -370,7 +435,7 @@ agent:
   # required by the built-in Kubernetes integration [here](./values.yaml)
   # @notationType -- map[string]{}
   # @section -- 6 - Elastic-Agent Configuration
-  # @default -- `{ "perNode" : {...}, "clusterWide": {...}, "ksmSharded": {...} }`
+  # @default -- `{ "perNode" : {...}, "clusterWide": {...}}`
   presets:
     #  examplePreset:
     #    mode: [deployment, statefulset, daemonset]
@@ -389,6 +454,7 @@ agent:
     #    tolerations: []
     #    topologySpreadConstraints: []
     #    extraEnv: []
+    #    statePersistence: [HostPath, EmptyDir, None]
     #    extraVolumes: []
     #    extraVolumeMounts: []
     #    https://github.com/elastic/elastic-agent/blob/main/_meta/elastic-agent.yml
@@ -411,10 +477,8 @@ agent:
           memory: 400Mi
       nodeSelector:
         kubernetes.io/os: linux
-      extraVolumes:
-        # override the default agent-data volume and make it an emptyDir
-        - name: agent-data
-          emptyDir: {}
+      statePersistence: EmptyDir
+      extraVolumes: []
       extraEnvs:
         - name: ELASTIC_NETINFO
           value: "false"
@@ -438,6 +502,7 @@ agent:
         create: true
       clusterRole:
         create: true
+      hostNetwork: true
       resources:
         limits:
           memory: 1000Mi
@@ -446,6 +511,7 @@ agent:
           memory: 400Mi
       nodeSelector:
         kubernetes.io/os: linux
+      statePersistence: HostPath
       extraEnvs:
         - name: ELASTIC_NETINFO
           value: "false"
@@ -460,35 +526,7 @@ agent:
         kubernetes:
           node: ${NODE_NAME}
           scope: node
-    ksmSharded:
-      ## required by the built-in kubernetes integration
-      mode: statefulset
-      serviceAccount:
-        create: true
-      clusterRole:
-        create: true
-      resources:
-        limits:
-          memory: 800Mi
-        requests:
-          cpu: 100m
-          memory: 400Mi
-      extraVolumes:
-        # override the default agent-data volume and make it an emptyDir
-        - name: agent-data
-          emptyDir: {}
-      nodeSelector:
-        kubernetes.io/os: linux
-      extraEnvs:
-        - name: ELASTIC_NETINFO
-          value: "false"
-      agent:
-        monitoring:
-          namespace: default
-          use_output: default
-          enabled: true
-          logs: true
-          metrics: true
-      providers:
-        kubernetes:
-          enabled: false
+kube-state-metrics:
+  enabled: true
+  fullnameOverride: "kube-state-metrics"
+  replicas: 1

@@ -7,9 +7,7 @@ package vault
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -19,6 +17,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault/aesgcm"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 )
 
 func getTestFileVaultPath(t *testing.T) string {
@@ -26,62 +25,8 @@ func getTestFileVaultPath(t *testing.T) string {
 	return filepath.Join(dir, "vault")
 }
 
-func TestFileVaultRekey(t *testing.T) {
-	const key = "foo"
-
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
-
-	vaultPath := getTestFileVaultPath(t)
-	options, err := ApplyOptions(WithVaultPath(vaultPath))
-	if err != nil {
-		t.Fatal(err)
-	}
-	v, err := NewFileVault(ctx, options)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer v.Close()
-
-	err = v.Set(ctx, key, []byte("bar"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Read seed file value
-	seedPath := filepath.Join(vaultPath, ".seed")
-	seedBytes, err := os.ReadFile(seedPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	diff := cmp.Diff(int(aesgcm.AES256), len(seedBytes))
-	if diff != "" {
-		t.Fatal(diff)
-	}
-
-	// Remove the .seed file.
-	// This will cause the vault seed to be reinitialized for the new vault instance
-	err = os.Remove(seedPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// The vault with the new seed
-	v2, err := NewFileVault(ctx, options)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer v2.Close()
-
-	// The key should be not found
-	_, err = v2.Get(ctx, key)
-	if !errors.Is(err, os.ErrNotExist) {
-		t.Fatal(err)
-	}
-}
-
 func TestFileVault(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "vault does not use NewGCMWithRandomNonce.")
 	vaultPath := getTestFileVaultPath(t)
 
 	ctx, cn := context.WithCancel(context.Background())
@@ -188,6 +133,7 @@ type secret struct {
 }
 
 func TestFileVaultConcurrent(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "vault does not use NewGCMWithRandomNonce.")
 	const (
 		parallel   = 15
 		iterations = 7

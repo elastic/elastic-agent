@@ -55,7 +55,7 @@ func (a *agentInfo) AgentID() string {
 }
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
-func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar) error {
+func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar, skipFleetAudit bool) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("unable to get current working directory")
@@ -166,12 +166,18 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	}
 	pt.Describe("Removed install directory")
 
-	if notifyFleet && !localFleet {
-		notifyFleetAuditUninstall(ctx, log, pt, cfg, &agentID) //nolint:errcheck // ignore the error as we can't act on it
-	}
-
+	notifyFleetIfNeeded(ctx, log, pt, cfg, agentID, notifyFleet, localFleet, skipFleetAudit, notifyFleetAuditUninstall)
 	return nil
 }
+
+// Injecting notifyFleetAuditUninstall for easier unit testing
+func notifyFleetIfNeeded(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, agentID agentInfo, notifyFleet, localFleet, skipFleetAudit bool, notifyFleetAuditUninstall NotifyFleetAuditUninstall) {
+	if notifyFleet && !localFleet && !skipFleetAudit {
+		notifyFleetAuditUninstall(ctx, log, pt, cfg, &agentID) //nolint:errcheck // ignore the error as we can't act on it)
+	}
+}
+
+type NotifyFleetAuditUninstall func(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai fleetapi.AgentInfo) error
 
 // notifyFleetAuditUninstall will attempt to notify fleet-server of the agent's uninstall.
 //
@@ -198,6 +204,9 @@ func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progre
 			// Do not retry if it was a context error, or an error with the request.
 			if errors.Is(err, context.Canceled) {
 				return ctx.Err()
+			} else if errors.Is(err, fleetclient.ErrInvalidAPIKey) {
+				pt.Describe("API key is invalid (normal if already unenrolled), notification dropped.")
+				return nil
 			} else if errors.As(err, &reqErr) {
 				pt.Describe(fmt.Sprintf("notify Fleet: encountered unretryable error: %v", err))
 				return err
