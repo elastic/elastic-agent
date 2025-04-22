@@ -29,17 +29,11 @@ import (
 //go:embed testdata/root.crt
 var rootCertPEM []byte
 
-//go:embed testdata/root.key
-var rootKeyPEM []byte // RSA key with length = 2048 bits
-
 //go:embed testdata/server.crt
 var serverCertPEM []byte
 
 //go:embed testdata/server.key
 var serverKeyPEM []byte // RSA key with length = 2048 bits
-
-//go:embed testdata/agent_insecure.crt
-var agentCertPEM []byte
 
 //go:embed testdata/agent_insecure.key
 var agentInsecureKeyPEM []byte // RSA key with length = 1024 bits
