@@ -2,8 +2,8 @@
 set -euo pipefail
 
 source .buildkite/scripts/common-integration.sh
-
 source .buildkite/scripts/steps/ess.sh
+source .buildkite/scripts/steps/stable_ess_version.sh
 
 # Make sure that all tools are installed
 asdf install
@@ -29,11 +29,11 @@ mage build:testBinaries
 if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
   echo "~~~ The steps is retried, starting the ESS stack again"
   echo "~~~ Getting stable stack version"
-  mage integration:getStableEssSnapshotForBranch
+  DEFAULT_STACK_VERSION="$(cat .package-version)-SNAPSHOT"
+  STABLE_ESS_VERSION="$(getStableEssSnapshotForBranch)-SNAPSHOT"
 
-  OVERRIDE_STACK_VERSION="$(cat .override_stack_version)-SNAPSHOT"
   trap 'ess_down' EXIT
-  ess_up $OVERRIDE_STACK_VERSION || echo "Failed to start ESS stack" >&2
+  ess_up $DEFAULT_STACK_VERSION $STABLE_ESS_VERSION || echo "Failed to start ESS stack" >&2
 else
   # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data
   echo "~~~ Receiving ESS stack metadata"
