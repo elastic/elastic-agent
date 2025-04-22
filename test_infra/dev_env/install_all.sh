@@ -2,7 +2,8 @@
 set -euo pipefail
 
 #
-# Installs mise and tools listed in .tool-versions
+# Install mise and tools listed in .tool-versions
+# run 
 #
 MISE_VERSION="v2025.4.4" 
 if ! command -v mise &> /dev/null; then
@@ -15,6 +16,6 @@ fi
 # Install tools from .tool-versions
 mise install 
 # Add mise activation to .bashrc (makes tools available directly)
-echo 'eval "$(~/mise activate bash)"' >> ~/.bashrc
+
 # Activate mise for current session
-eval "$(mise activate bash --shims)"
+eval "$(mise activate bash --shims)
