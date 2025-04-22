@@ -371,7 +371,7 @@ func checkDocker(t *testing.T, file string, fipsPackage bool) (string, int64) {
 	checkDockerUser(t, p, info, *rootUserContainer)
 	checkFilePermissions(t, p, configFilePattern, os.FileMode(0644))
 	if !fipsPackage {
-		// FIPS docker image do not contain an otelcol script, run this check only on non FIPS compliant images
+		// FIPS docker image do not contain an otelcol script, run this check only on non FIPS-capable images
 		checkFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
 	}
 	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
