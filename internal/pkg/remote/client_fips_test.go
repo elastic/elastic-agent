@@ -26,8 +26,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
-//go:embed testdata/root.crt
-var rootCertPEM []byte
+//go:embed testdata/ca.crt
+var caCertPEM []byte
 
 //go:embed testdata/server.crt
 var serverCertPEM []byte
@@ -133,7 +133,7 @@ func TestClientWithCertificate(t *testing.T) {
 				Host: server.URL,
 				Transport: httpcommon.HTTPTransportSettings{
 					TLS: &tlscommon.Config{
-						CAs: []string{string(rootCertPEM)},
+						CAs: []string{string(caCertPEM)},
 						Certificate: tlscommon.CertificateConfig{
 							Certificate: string(test.clientCertificate),
 							Key:         string(test.clientKey),
@@ -167,8 +167,8 @@ func TestClientWithCertificate(t *testing.T) {
 
 func startTLSServer(t *testing.T) (*httptest.Server, *strings.Builder) {
 	// Configure server and start it
-	rootCertPool := x509.NewCertPool()
-	rootCertPool.AppendCertsFromPEM(rootCertPEM)
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCertPEM)
 
 	// Create HTTPS server
 	const successResp = `{"message":"hello"}`
@@ -181,9 +181,9 @@ func startTLSServer(t *testing.T) (*httptest.Server, *strings.Builder) {
 	require.NoError(t, err)
 
 	server.TLS = &tls.Config{
-		RootCAs:      rootCertPool,
+		RootCAs:      caCertPool,
 		Certificates: []tls.Certificate{serverCert},
-		ClientCAs:    rootCertPool,
+		ClientCAs:    caCertPool,
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 	}
 
