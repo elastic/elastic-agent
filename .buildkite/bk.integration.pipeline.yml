@@ -41,7 +41,7 @@ steps:
         depends_on:
           - packaging-windows
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows' 
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} true
         artifact_paths:
           - build/**
@@ -242,7 +242,7 @@ steps:
       - integration-ess
     steps:
       - label: "x86_64:non-sudo: {{matrix}}"
-        # depends_on: packaging-ubuntu-x86-64
+        depends_on: packaging-ubuntu-x86-64
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
