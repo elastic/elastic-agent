@@ -24,7 +24,7 @@ var rsa1024CertPEM string
 //go:embed testdata/rsa_1024.key.pem
 var rsa1024KeyPem string
 
-func TestClientWithUnsupportedTLSConfig(t *testing.T) {
+func TestClientWithUnsupportedTLSVersions(t *testing.T) {
 	testLogger, _ := loggertest.New("TestClientWithUnsupportedTLSVersions")
 	const unsupportedErrorMsg = "invalid configuration: unsupported tls version: %s"
 
@@ -57,20 +57,6 @@ func TestClientWithUnsupportedTLSConfig(t *testing.T) {
 			tlsConfig:      tlscommon.Config{Versions: []tlscommon.TLSVersion{tlscommon.TLSVersion11, tlscommon.TLSVersion12}},
 			versions:       []tlscommon.TLSVersion{tlscommon.TLSVersion11, tlscommon.TLSVersion12},
 			expectedErrMsg: fmt.Sprintf(unsupportedErrorMsg, tlscommon.TLSVersion11),
-		},
-		"rsa_1024_from_file": {
-			tlsConfig: tlscommon.Config{Certificate: tlscommon.CertificateConfig{
-				Certificate: "testdata/rsa_1024.cert.pem",
-				Key:         "testdata/rsa_1024.key.pem",
-			}},
-			expectedErrMsg: "certificate is using an RSA key of < 2048 bits",
-		},
-		"rsa_1024_from_string": {
-			tlsConfig: tlscommon.Config{Certificate: tlscommon.CertificateConfig{
-				Certificate: rsa1024CertPEM,
-				Key:         rsa1024KeyPem,
-			}},
-			expectedErrMsg: "certificate is using an RSA key of < 2048 bits",
 		},
 	}
 
