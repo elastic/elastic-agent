@@ -7,9 +7,17 @@
 package remote
 
 import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
 	_ "embed"
 	"fmt"
+	"log"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -18,11 +26,23 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
-//go:embed testdata/rsa_1024.cert.pem
-var rsa1024CertPEM string
+//go:embed testdata/root.crt
+var rootCertPEM []byte
 
-//go:embed testdata/rsa_1024.key.pem
-var rsa1024KeyPem string
+//go:embed testdata/root.key
+var rootKeyPEM []byte // RSA key with length = 2048 bits
+
+//go:embed testdata/server.crt
+var serverCertPEM []byte
+
+//go:embed testdata/server.key
+var serverKeyPEM []byte // RSA key with length = 2048 bits
+
+//go:embed testdata/agent.crt
+var agentCertPEM []byte
+
+//go:embed testdata/agent.key
+var agentKeyPEM []byte // RSA key with length = 1024 bits
 
 func TestClientWithUnsupportedTLSVersions(t *testing.T) {
 	testLogger, _ := loggertest.New("TestClientWithUnsupportedTLSVersions")
@@ -80,4 +100,61 @@ func TestClientWithUnsupportedTLSVersions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClientWithInsecureCertificate(t *testing.T) {
+	rootCertPool := x509.NewCertPool()
+	rootCertPool.AppendCertsFromPEM(rootCertPEM)
+
+	// Create HTTPS server
+	const successResp = `{"message":"hello"}`
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, successResp)
+	}))
+
+	serverCert, err := tls.X509KeyPair(serverCertPEM, serverKeyPEM)
+	require.NoError(t, err)
+
+	server.TLS = &tls.Config{
+		RootCAs:      rootCertPool,
+		Certificates: []tls.Certificate{serverCert},
+		ClientCAs:    rootCertPool,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+	}
+
+	var serverLog strings.Builder
+	server.Config.ErrorLog = log.New(&serverLog, "", 0)
+
+	server.StartTLS()
+	defer server.Close()
+
+	// Create client with a certificate that uses a RSA keypair with
+	// < 2048 bits of key length.
+	testLogger, _ := loggertest.New("downloader")
+	config := Config{
+		Host: server.URL,
+		Transport: httpcommon.HTTPTransportSettings{
+			TLS: &tlscommon.Config{
+				CAs: []string{string(rootCertPEM)},
+				Certificate: tlscommon.CertificateConfig{
+					Certificate: string(agentCertPEM),
+					Key:         string(agentKeyPEM),
+				},
+			},
+		},
+	}
+	client, err := NewWithConfig(testLogger, config, nil)
+
+	// Use client to call fake API on HTTPS server, expecting the call to fail
+	// with a TLS validation error due to FIPS requirements.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, nil)
+
+	require.Nil(t, resp)
+	require.Error(t, err)
+	require.Contains(t, serverLog.String(), "no FIPS compatible certificate chains found")
+	require.Contains(t, err.Error(), "invalid key length")
 }
