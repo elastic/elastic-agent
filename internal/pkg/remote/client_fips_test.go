@@ -38,10 +38,10 @@ var serverCertPEM []byte
 //go:embed testdata/server.key
 var serverKeyPEM []byte // RSA key with length = 2048 bits
 
-//go:embed testdata/agent.crt
+//go:embed testdata/agent_insecure.crt
 var agentCertPEM []byte
 
-//go:embed testdata/agent.key
+//go:embed testdata/agent_insecure.key
 var agentKeyPEM []byte // RSA key with length = 1024 bits
 
 func TestClientWithUnsupportedTLSVersions(t *testing.T) {
