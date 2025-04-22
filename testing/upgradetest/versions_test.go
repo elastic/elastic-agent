@@ -88,7 +88,6 @@ func TestGetUpgradableVersions(t *testing.T) {
 }
 
 func TestPreviousMinor(t *testing.T) {
-	t.Skip("Skipped until there are at least 2 minors available or https://github.com/elastic/elastic-agent/issues/6667 is solved")
 	currentParsed, err := version.ParseVersion(bversion.Agent)
 	require.NoError(t, err)
 
@@ -97,9 +96,9 @@ func TestPreviousMinor(t *testing.T) {
 	t.Logf("previous minor: %s", v.String())
 
 	// Special case: the current Agent version is the first release of a new
-	// major (vX.0.0). In this case we expect the previous minor to be the
+	// major (vX.0.x). In this case we expect the previous minor to be the
 	// latest minor of the previous major.
-	if currentParsed.Minor() == 0 && currentParsed.Patch() == 0 {
+	if currentParsed.Minor() == 0 {
 		require.Equal(t, currentParsed.Major()-1, v.Major())
 
 		// The list of versions returned by GetUpgradableVersions will not contain any

@@ -4,6 +4,7 @@ set -euo pipefail
 source .buildkite/scripts/common-integration.sh
 source .buildkite/scripts/steps/ess.sh
 source .buildkite/scripts/steps/stable_ess_version.sh
+source .buildkite/scripts/steps/fleet.sh
 
 # Make sure that all tools are installed
 asdf install
@@ -34,6 +35,7 @@ if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
 
   trap 'ess_down' EXIT
   ess_up $DEFAULT_STACK_VERSION $STABLE_ESS_VERSION || echo "Failed to start ESS stack" >&2
+  preinstall_fleet_packages
 else
   # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data
   echo "~~~ Receiving ESS stack metadata"

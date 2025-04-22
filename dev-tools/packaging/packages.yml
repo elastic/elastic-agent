@@ -54,7 +54,7 @@ components:
   #    packageName: <template representing the name of the archive to download/extract>
   #    binaryName: <binary name>
   #    rootDir: <template representing directory from the archive root where the binary is located>
-  #    fips: <boolean indicating if this component is FIPS compliant>
+  #    fips: <boolean indicating if this component is FIPS-capable>
   #    platforms:
   #      - <platform, use anchors for platforms above>
   #    pythonWheel: true # true if it's a package that is not platform specific
@@ -189,11 +189,11 @@ components:
       - *linux-amd64
       - *linux-arm64
     packageTypes: *all-package-types
-  # Elastic Agent core component (FIPS-compliant version), defined here because it's a dependency when packaging using elastic-agent DRA
+  # Elastic Agent core component (FIPS-capable version), defined here because it's a dependency when packaging using elastic-agent DRA
   - &comp-elastic-agent-core-fips
     projectName: elastic-agent-core
     packageName: elastic-agent-core-fips-{{.Version}}-{{.Platform}}.{{.Ext}}
-    rootDir: elastic-agent-core-{{.Version}}-{{.Platform}}
+    rootDir: elastic-agent-core-fips-{{.Version}}-{{.Platform}}
     binaryName: elastic-agent
     fips: true
     platforms:
@@ -241,7 +241,7 @@ shared:
       - *comp-pf-elastic-symbolizer
       - *comp-pf-host-agent
 
-  # components included in FIPS-compliant elastic-agent package specs
+  # components included in FIPS-capable elastic-agent package specs
   - &elastic_agent_fips_components
     components:
       - *comp-agentbeat-fips

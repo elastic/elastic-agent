@@ -248,9 +248,9 @@ func PreviousMinor() (*version.ParsedSemVer, error) {
 		return nil, fmt.Errorf("failed to parse the current version %s: %w", define.Version(), err)
 	}
 
-	// Special case: if we are in the first release of a new major (so vX.0.0), we should
+	// Special case: if we are in the first release (or a patch release of the first release) of a new major (so vX.0.x), we should
 	// return the latest release from the previous major.
-	if current.Minor() == 0 && current.Patch() == 0 {
+	if current.Minor() == 0 {
 		// Since the current version is the first release of a new major (vX.0.0), there
 		// will be no minor versions in the versions list from the same major (vX). The list
 		// will only contain minors from the previous major (vX-1). Further, since the
