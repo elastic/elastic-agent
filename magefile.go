@@ -26,12 +26,13 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/otiai10/copy"
@@ -48,6 +49,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
 	"github.com/elastic/elastic-agent/pkg/testing/helm"
+	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/kind"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/ogc"
@@ -752,11 +754,16 @@ func ControlProto() error {
 		return err
 	}
 
-	return sh.RunV(
+	if err := sh.RunV(
 		"protoc",
 		"--go_out=pkg/control/v1/proto", "--go_opt=paths=source_relative",
 		"--go-grpc_out=pkg/control/v1/proto", "--go-grpc_opt=paths=source_relative",
-		"control_v1.proto")
+		"control_v1.proto"); err != nil {
+		return err
+	}
+
+	mg.Deps(devtools.AddLicenseHeaders, devtools.GoImports)
+	return nil
 }
 
 func BuildPGP() error {
@@ -3319,7 +3326,7 @@ func (Otel) Readme() error {
 		return fmt.Errorf("failed to parse README template: %w", err)
 	}
 
-	data, err := getOtelDependencies()
+	data, err := otel.GetOtelDependencies("go.mod")
 	if err != nil {
 		return fmt.Errorf("Failed to get OTel dependencies: %w", err)
 	}
@@ -3339,151 +3346,6 @@ func (Otel) Readme() error {
 	// check that links are live
 	mg.Deps(devtools.CheckLinksInFileAreLive(readmeOut))
 	return nil
-}
-
-func getOtelDependencies() (*otelDependencies, error) {
-	// read go.mod
-	readFile, err := os.Open("go.mod")
-	if err != nil {
-		return nil, err
-	}
-	defer readFile.Close()
-
-	scanner := bufio.NewScanner(readFile)
-
-	scanner.Split(bufio.ScanLines)
-	var receivers, extensions, exporters, processors, connectors []*otelDependency
-	// process imports
-	for scanner.Scan() {
-		l := strings.TrimSpace(scanner.Text())
-		dependency := newOtelDependency(l)
-		if dependency == nil {
-			continue
-		}
-
-		if dependency.ComponentType == "connector" {
-			connectors = append(connectors, dependency)
-		} else if dependency.ComponentType == "exporter" {
-			exporters = append(exporters, dependency)
-		} else if dependency.ComponentType == "extension" {
-			extensions = append(extensions, dependency)
-		} else if dependency.ComponentType == "processor" {
-			processors = append(processors, dependency)
-		} else if dependency.ComponentType == "receiver" {
-			receivers = append(receivers, dependency)
-		}
-	}
-
-	for _, list := range [][]*otelDependency{connectors, exporters, extensions, processors, receivers} {
-		sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
-	}
-
-	return &otelDependencies{
-		Connectors: connectors,
-		Exporters:  exporters,
-		Extensions: extensions,
-		Processors: processors,
-		Receivers:  receivers,
-	}, nil
-}
-
-type otelDependency struct {
-	ComponentType string
-	Name          string
-	Version       string
-	Link          string
-}
-
-func newOtelDependency(l string) *otelDependency {
-	if !strings.Contains(l, "go.opentelemetry.io/") &&
-		!strings.Contains(l, "github.com/open-telemetry/") &&
-		!strings.Contains(l, "github.com/elastic/opentelemetry-collector-components/") {
-		return nil
-	}
-
-	if strings.Contains(l, "// indirect") {
-		return nil
-	}
-
-	chunks := strings.SplitN(l, " ", 2)
-	if len(chunks) != 2 {
-		return nil
-	}
-	dependencyURI := chunks[0]
-	version := chunks[1]
-
-	componentName := getOtelComponentName(dependencyURI)
-	componentType := getOtelComponentType(dependencyURI)
-	link := getOtelDependencyLink(dependencyURI, version)
-
-	return &otelDependency{
-		ComponentType: componentType,
-		Name:          componentName,
-		Version:       version,
-		Link:          link,
-	}
-}
-
-func getOtelComponentName(dependencyName string) string {
-	parts := strings.Split(dependencyName, "/")
-	return parts[len(parts)-1]
-}
-
-func getOtelComponentType(dependencyName string) string {
-	if strings.Contains(dependencyName, "/connector/") {
-		return "connector"
-	} else if strings.Contains(dependencyName, "/exporter/") {
-		return "exporter"
-	} else if strings.Contains(dependencyName, "/extension/") {
-		return "extension"
-	} else if strings.Contains(dependencyName, "/processor/") {
-		return "processor"
-	} else if strings.Contains(dependencyName, "/receiver/") {
-		return "receiver"
-	}
-	return ""
-}
-
-func getOtelDependencyLink(dependencyURI string, version string) string {
-	dependencyRepository := getDependencyRepository(dependencyURI)
-	dependencyPath := strings.TrimPrefix(dependencyURI, dependencyRepository+"/")
-	repositoryURL := getOtelRepositoryURL(dependencyURI)
-	return fmt.Sprintf("https://%s/blob/%s/%s/%s/README.md", repositoryURL, dependencyPath, version, dependencyPath)
-}
-
-func getDependencyRepository(dependencyURI string) string {
-	dependencyURIChunks := strings.Split(dependencyURI, "/")
-	if len(dependencyURIChunks) < 2 {
-		return ""
-	}
-	var dependencyRepository string
-	if dependencyURIChunks[0] == "go.opentelemetry.io" {
-		dependencyRepository = dependencyURIChunks[0] + "/" + dependencyURIChunks[1]
-	} else {
-		dependencyRepository = dependencyURIChunks[0] + "/" + dependencyURIChunks[1] + "/" + dependencyURIChunks[2]
-	}
-	return dependencyRepository
-}
-
-func getOtelRepositoryURL(dependencyURI string) string {
-	if strings.HasPrefix(dependencyURI, "go.opentelemetry.io/") {
-		return "github.com/open-telemetry/opentelemetry-collector"
-	} else if strings.HasPrefix(dependencyURI, "github.com/") {
-		parts := strings.SplitN(dependencyURI, "/", 4)
-		hostPart := parts[0]
-		orgPart := parts[1]
-		repoPart := parts[2]
-		return fmt.Sprintf("%s/%s/%s", hostPart, orgPart, repoPart)
-	}
-	return ""
-}
-
-type otelDependencies struct {
-	Connectors []*otelDependency
-	Exporters  []*otelDependency
-	Extensions []*otelDependency
-	Processors []*otelDependency
-	Receivers  []*otelDependency
 }
 
 type Helm mg.Namespace
@@ -3563,10 +3425,24 @@ func (h Helm) RenderExamples() error {
 		}
 
 		renderedManifestPath := filepath.Join(renderedFolder, "manifest.yaml")
-
 		err = os.WriteFile(renderedManifestPath, []byte(release.Manifest), 0o644)
 		if err != nil {
-			return fmt.Errorf("failed to write rendered manifest: %w", err)
+			return fmt.Errorf("failed to write rendered manifest %q: %w", renderedManifestPath, err)
+		}
+
+		f, err := os.Open(renderedManifestPath)
+		if err != nil {
+			return fmt.Errorf("failed to open rendered manifest %q: %w", renderedManifestPath, err)
+		}
+
+		objs, err := kubernetes.LoadFromYAML(bufio.NewReader(f))
+		_ = f.Close()
+		if err != nil {
+			return fmt.Errorf("failed to load k8s objects from rendered manifest %q: %w", renderedManifestPath, err)
+		}
+
+		if len(objs) == 0 {
+			return fmt.Errorf("rendered manifest %q is empty", renderedManifestPath)
 		}
 	}
 
@@ -3691,12 +3567,16 @@ func (Helm) BuildDependencies() error {
 func (h Helm) Package() error {
 	mg.SerialDeps(h.BuildDependencies)
 
-	agentVersion := bversion.GetParsedAgentPackageVersion()
-	agentCoreVersion := agentVersion.CoreVersion()
-	agentImageTag := agentCoreVersion + "-SNAPSHOT"
-
 	// need to explicitly set SNAPSHOT="false" to produce a production-ready package
 	productionPackage := os.Getenv("SNAPSHOT") == "false"
+
+	agentVersion := bversion.GetParsedAgentPackageVersion()
+	agentCoreVersion := agentVersion.CoreVersion()
+	agentImageTag := agentCoreVersion
+	if !productionPackage {
+		// always use the SNAPSHOT version for image tag if not a production package
+		agentImageTag = agentImageTag + "-SNAPSHOT"
+	}
 
 	agentChartVersion := agentCoreVersion + "-beta"
 	switch {
