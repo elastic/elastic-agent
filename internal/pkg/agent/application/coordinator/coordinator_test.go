@@ -1192,12 +1192,12 @@ type testMonitoringManager struct{}
 
 func newTestMonitoringMgr() *testMonitoringManager { return &testMonitoringManager{} }
 
-func (*testMonitoringManager) EnrichArgs(_ string, _ string, args []string) []string { return args }
-func (*testMonitoringManager) Prepare(_ string) error                                { return nil }
-func (*testMonitoringManager) Cleanup(string) error                                  { return nil }
-func (*testMonitoringManager) Enabled() bool                                         { return false }
-func (*testMonitoringManager) Reload(rawConfig *config.Config) error                 { return nil }
-func (*testMonitoringManager) MonitoringConfig(_ map[string]interface{}, _ []component.Component, _ map[string]string, _ map[string]uint64) (map[string]interface{}, error) {
+func (*testMonitoringManager) EnrichArgs(_, _ string, args []string) []string { return args }
+func (*testMonitoringManager) Prepare(string) error                           { return nil }
+func (*testMonitoringManager) Cleanup(string) error                           { return nil }
+func (*testMonitoringManager) Enabled() bool                                  { return false }
+func (*testMonitoringManager) Reload(rawConfig *config.Config) error          { return nil }
+func (*testMonitoringManager) MonitoringConfig(map[string]interface{}, []component.Component, map[string]uint64) (map[string]interface{}, error) {
 	return nil, nil
 }
 
