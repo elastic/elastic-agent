@@ -57,7 +57,6 @@ func NewCA() (*CertificateAuthority, error) {
 
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	publicKey := &privateKey.PublicKey
-
 	ca.SubjectKeyId = generateSubjectKeyID(publicKey)
 	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, publicKey, privateKey)
 	if err != nil {
