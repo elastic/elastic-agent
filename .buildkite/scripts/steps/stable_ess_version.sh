@@ -25,6 +25,4 @@ getStableEssSnapshotForBranch() {
     cat .package-version
   fi
 }
-STABLE_ESS_VERSION="$(getStableEssSnapshotForBranch)-SNAPSHOT"
-echo "Stable ESS Version: $STABLE_ESS_VERSION"
-buildkite-agent meta-data set "stable.ess.version" $STABLE_ESS_VERSION
+# 
