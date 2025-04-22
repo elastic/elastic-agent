@@ -42,7 +42,16 @@ var serverKeyPEM []byte // RSA key with length = 2048 bits
 var agentCertPEM []byte
 
 //go:embed testdata/agent_insecure.key
-var agentKeyPEM []byte // RSA key with length = 1024 bits
+var agentInsecureKeyPEM []byte // RSA key with length = 1024 bits
+
+//go:embed testdata/agent_insecure.crt
+var agentInsecureCertPEM []byte
+
+//go:embed testdata/agent_secure.key
+var agentSecureKeyPEM []byte // RSA key with length = 2048 bits
+
+//go:embed testdata/agent_secure.crt
+var agentSecureCertPEM []byte
 
 func TestClientWithUnsupportedTLSVersions(t *testing.T) {
 	testLogger, _ := loggertest.New("TestClientWithUnsupportedTLSVersions")
@@ -102,7 +111,72 @@ func TestClientWithUnsupportedTLSVersions(t *testing.T) {
 	}
 }
 
-func TestClientWithInsecureCertificate(t *testing.T) {
+func TestClientWithCertificate(t *testing.T) {
+	cases := map[string]struct {
+		clientCertificate    []byte
+		clientKey            []byte
+		expectedHandshakeErr string
+		expectedServerLog    string
+	}{
+		"insecure_key": {
+			clientCertificate:    agentInsecureCertPEM,
+			clientKey:            agentInsecureKeyPEM,
+			expectedHandshakeErr: "invalid key length",
+			expectedServerLog:    "no FIPS compatible certificate chains found",
+		},
+		"secure_key": {
+			clientCertificate:    agentSecureCertPEM,
+			clientKey:            agentSecureKeyPEM,
+			expectedHandshakeErr: "",
+			expectedServerLog:    "",
+		},
+	}
+
+	for name, test := range cases {
+		t.Run(name, func(t *testing.T) {
+			server, serverLog := startTLSServer(t)
+
+			// Create client and have it present a certificate during the
+			// TLS handshake with the server
+			testLogger, _ := loggertest.New("TestClientWithCertificate")
+			config := Config{
+				Host: server.URL,
+				Transport: httpcommon.HTTPTransportSettings{
+					TLS: &tlscommon.Config{
+						CAs: []string{string(rootCertPEM)},
+						Certificate: tlscommon.CertificateConfig{
+							Certificate: string(test.clientCertificate),
+							Key:         string(test.clientKey),
+						},
+					},
+				},
+			}
+			client, err := NewWithConfig(testLogger, config, nil)
+
+			// Use client to call fake API on HTTPS server
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+
+			resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, nil)
+
+			if test.expectedHandshakeErr == "" {
+				require.NotNil(t, resp)
+				require.NoError(t, err)
+			} else {
+				require.Nil(t, resp)
+				require.Error(t, err)
+				require.Contains(t, err.Error(), test.expectedHandshakeErr)
+			}
+
+			require.Eventually(t, func() bool {
+				return strings.Contains(serverLog.String(), test.expectedServerLog)
+			}, 100*time.Millisecond, 10*time.Millisecond)
+		})
+	}
+}
+
+func startTLSServer(t *testing.T) (*httptest.Server, *strings.Builder) {
+	// Configure server and start it
 	rootCertPool := x509.NewCertPool()
 	rootCertPool.AppendCertsFromPEM(rootCertPEM)
 
@@ -127,34 +201,6 @@ func TestClientWithInsecureCertificate(t *testing.T) {
 	server.Config.ErrorLog = log.New(&serverLog, "", 0)
 
 	server.StartTLS()
-	defer server.Close()
 
-	// Create client with a certificate that uses a RSA keypair with
-	// < 2048 bits of key length.
-	testLogger, _ := loggertest.New("downloader")
-	config := Config{
-		Host: server.URL,
-		Transport: httpcommon.HTTPTransportSettings{
-			TLS: &tlscommon.Config{
-				CAs: []string{string(rootCertPEM)},
-				Certificate: tlscommon.CertificateConfig{
-					Certificate: string(agentCertPEM),
-					Key:         string(agentKeyPEM),
-				},
-			},
-		},
-	}
-	client, err := NewWithConfig(testLogger, config, nil)
-
-	// Use client to call fake API on HTTPS server, expecting the call to fail
-	// with a TLS validation error due to FIPS requirements.
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	resp, err := client.Send(ctx, http.MethodGet, "/echo-hello", nil, nil, nil)
-
-	require.Nil(t, resp)
-	require.Error(t, err)
-	require.Contains(t, serverLog.String(), "no FIPS compatible certificate chains found")
-	require.Contains(t, err.Error(), "invalid key length")
+	return server, &serverLog
 }
