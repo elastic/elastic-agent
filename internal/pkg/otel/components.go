@@ -5,8 +5,10 @@
 package otel
 
 import (
+	"go.opentelemetry.io/collector/connector"
 	"go.opentelemetry.io/collector/extension"
 	"go.opentelemetry.io/collector/otelcol"
+	"go.opentelemetry.io/collector/processor"
 
 	// Receivers:
 	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
@@ -50,6 +52,7 @@ import (
 	kafkaexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter"
 	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter" // for dev
+	nopexporter "go.opentelemetry.io/collector/exporter/nopexporter"
 	"go.opentelemetry.io/collector/exporter/otlpexporter"
 	otlphttpexporter "go.opentelemetry.io/collector/exporter/otlphttpexporter"
 
@@ -98,7 +101,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		}
 
 		// Processors
-		factories.Processors, err = otelcol.MakeFactoryMap(
+		factories.Processors, err = otelcol.MakeFactoryMap[processor.Factory](
 			batchprocessor.NewFactory(),
 			resourceprocessor.NewFactory(),
 			attributesprocessor.NewFactory(),
@@ -124,12 +127,14 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			loadbalancingexporter.NewFactory(),
 			otlphttpexporter.NewFactory(),
 			kafkaexporter.NewFactory(),
+			nopexporter.NewFactory(),
 		)
+
 		if err != nil {
 			return otelcol.Factories{}, err
 		}
 
-		factories.Connectors, err = otelcol.MakeFactoryMap(
+		factories.Connectors, err = otelcol.MakeFactoryMap[connector.Factory](
 			routingconnector.NewFactory(),
 			spanmetricsconnector.NewFactory(),
 			elasticapmconnector.NewFactory(),
@@ -146,7 +151,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			k8sobserver.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)
-		factories.Extensions, err = otelcol.MakeFactoryMap(extensions...)
+		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)
 		if err != nil {
 			return otelcol.Factories{}, err
 		}
