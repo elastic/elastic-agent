@@ -331,7 +331,7 @@ func (b GolangCrossBuilder) Build() error {
 	if Local {
 		beatsPath, err := filepath.Abs(filepath.Join("../beats"))
 		if err != nil {
-			return fmt.Errorf("Error while reading local beats: %w", err)
+			return fmt.Errorf("error while reading local beats: %w", err)
 		}
 		args = append(args, "-v", fmt.Sprintf("%s:%s", beatsPath, beatsPath))
 	}
