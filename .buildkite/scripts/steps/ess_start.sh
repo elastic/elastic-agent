@@ -8,7 +8,7 @@ source .buildkite/scripts/steps/fleet.sh
 echo "~~~ Getting stable stack version"
 DEFAULT_STACK_VERSION="$(cat .package-version)-SNAPSHOT"
 STABLE_ESS_VERSION="$(getStableEssSnapshotForBranch)-SNAPSHOT"
-ess_up $DEFAULT_STACK_VERSION $STABLE_STACK_VERSION
+ess_up $DEFAULT_STACK_VERSION $STABLE_ESS_VERSION
 echo "ES_HOST: ${ELASTICSEARCH_HOST}"
 
 preinstall_fleet_packages
