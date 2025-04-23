@@ -30,7 +30,7 @@ extract_sha() {
         git pull
     )
 
-    go install github.com/mikefarah/yq/v3@v3.0.0-20201202084205-8846255d1c37
+    go install github.com/mikefarah/yq/v4@v4.45.1
 
     # Extract first matching SHA for the environment pattern
     sha=$(yq eval ".services.agentless-controller.versions | to_entries | .[] | select(.key | test(\"^${env}.*\")) | .value" serverless-gitops/services/agentless-controller/versions.yaml | head -1)
