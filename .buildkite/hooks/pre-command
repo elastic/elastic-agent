@@ -24,7 +24,7 @@ CI_DRA_ROLE_PATH="kv/ci-shared/release/dra-role"
 function docker_login {
   DOCKER_USERNAME_SECRET=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
   DOCKER_PASSWORD_SECRET=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
-  docker login -u "${DOCKER_USERNAME_SECRET}" -p "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}" 2>/dev/null
+  retry 3 docker login -u "${DOCKER_USERNAME_SECRET}" -p "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}"
   unset DOCKER_USERNAME_SECRET DOCKER_PASSWORD_SECRET
 }
 
