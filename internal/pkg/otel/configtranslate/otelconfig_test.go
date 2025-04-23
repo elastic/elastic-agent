@@ -215,7 +215,6 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 			"num_workers":       1,
 			"api_key":           "",
-			"logs_index":        "filebeat-9.0.0",
 			"timeout":           90 * time.Second,
 			"idle_conn_timeout": 3 * time.Second,
 		},
