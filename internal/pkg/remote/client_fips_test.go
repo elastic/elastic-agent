@@ -35,17 +35,17 @@ var serverCertPEM []byte
 //go:embed testdata/server.key
 var serverKeyPEM []byte // RSA key with length = 2048 bits
 
-//go:embed testdata/agent_insecure.key
-var agentInsecureKeyPEM []byte // RSA key with length = 1024 bits
+//go:embed testdata/fips_invalid.key
+var fipsInvalidKeyPEM []byte // RSA key with length = 1024 bits
 
-//go:embed testdata/agent_insecure.crt
-var agentInsecureCertPEM []byte
+//go:embed testdata/fips_invalid.crt
+var fipsInvalidCertPEM []byte
 
-//go:embed testdata/agent_secure.key
-var agentSecureKeyPEM []byte // RSA key with length = 2048 bits
+//go:embed testdata/fips_valid.key
+var fipsValidKeyPEM []byte // RSA key with length = 2048 bits
 
-//go:embed testdata/agent_secure.crt
-var agentSecureCertPEM []byte
+//go:embed testdata/fips_valid.crt
+var fipsValidCertPEM []byte
 
 func TestClientWithUnsupportedTLSVersions(t *testing.T) {
 	testLogger, _ := loggertest.New("TestClientWithUnsupportedTLSVersions")
@@ -109,14 +109,14 @@ func TestClientWithCertificate(t *testing.T) {
 		expectedServerLog    string
 	}{
 		"insecure_key": {
-			clientCertificate:    agentInsecureCertPEM,
-			clientKey:            agentInsecureKeyPEM,
+			clientCertificate:    fipsInvalidCertPEM,
+			clientKey:            fipsInvalidKeyPEM,
 			expectedHandshakeErr: "invalid key length",
 			expectedServerLog:    "no FIPS compatible certificate chains found",
 		},
 		"secure_key": {
-			clientCertificate:    agentSecureCertPEM,
-			clientKey:            agentSecureKeyPEM,
+			clientCertificate:    fipsValidCertPEM,
+			clientKey:            fipsValidKeyPEM,
 			expectedHandshakeErr: "",
 			expectedServerLog:    "",
 		},
