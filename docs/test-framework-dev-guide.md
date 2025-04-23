@@ -292,9 +292,9 @@ until it reports a failure.
 
 - `TEST_RUN_UNTIL_FAILURE=true mage integration:single [testName]`
 
-### Running tests with local changes in beats
+### Running integration tests with local changes in beats (for otel receivers)
 
-If you've made local changes to Beats and want to run the Agent's integration tests against those changes, follow these steps:
+If you've made local changes to Beats-OTeL and want to run the Agent's integration tests against those changes, follow these steps:
 1. Update go.mod and add a replace directive as follows (change the path to match your local machine):
 ```
 replace github.com/elastic/beats/v7 => /Users/vihasmakwana/Desktop/Vihas/elastic/beats
