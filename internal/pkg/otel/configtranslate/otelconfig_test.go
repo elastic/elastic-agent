@@ -195,6 +195,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"max_size_items": 1600,
 				"min_size_items": 0,
 			},
+			"logs_index": "",
 			"mapping": map[string]any{
 				"mode": "bodymap",
 			},
