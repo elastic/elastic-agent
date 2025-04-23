@@ -292,6 +292,22 @@ until it reports a failure.
 
 - `TEST_RUN_UNTIL_FAILURE=true mage integration:single [testName]`
 
+### Running tests with local changes in beats
+
+If you've made local changes to Beats and want to run the Agent's integration tests against those changes, follow these steps:
+1. Update go.mod and add a replace directive as follows (change the path to match your local machine):
+```
+replace github.com/elastic/beats/v7 => /Users/vihasmakwana/Desktop/Vihas/elastic/beats
+```
+2. Package the Agent with `LOCAL=true`:
+```sh
+  LOCAL=true PLATFORMS=darwin/arm64 mage package
+```
+3. Run integration tests as per [the instructions](#running-the-tests)
+
+**_NOTE:_**: Make sure you add an absolute path in replace
+**_NOTE:_**: Old agent might be cached at `.agent-testing` directory. Run `mage integration:clean` to clean it.
+
 ## Writing tests
 
 Write integration and E2E tests by adding them to the `testing/integration`
