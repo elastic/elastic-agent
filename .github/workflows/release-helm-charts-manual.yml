@@ -1,0 +1,47 @@
+---
+name: release-helm-charts-manual
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch the commit belongs to'
+        required: true
+        type: string
+      commit:
+        description: 'Commit to be released'
+        required: true
+        type: string
+      repo-env:
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+  
+permissions:
+  contents: read
+
+jobs:
+  trigger-release:
+    runs-on: ubuntu-latest
+    # See environment definition in https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-github.tf
+    environment: helmcharts
+    steps:
+      - uses: elastic/oblt-actions/buildkite/run@v1
+        with:
+          branch: ${{ inputs.branch }}
+          commit: ${{ inputs.commit }}
+          pipeline: elastic-agent-helm-charts
+          token: ${{ secrets.BUILDKITE_TOKEN }}
+          wait-for: true
+          env-vars: |
+            SNAPSHOT=false
+            HELM_REPO_ENV=${{ inputs.repo-env}}
+
+      - uses: elastic/oblt-actions/slack/send@v1
+        if: ${{ failure()  }}
+        with:
+          bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel-id: "#ingest-notifications"
+          message: "Helm charts for Elastic Agent version ${{ github.ref_name }} have not been published."
