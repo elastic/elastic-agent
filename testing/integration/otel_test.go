@@ -979,8 +979,6 @@ service:
 	require.True(t, err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded), "Retrieved unexpected error: %s", err.Error())
 }
 
-<<<<<<< HEAD
-=======
 func TestOtelFilestreamInput(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Default,
@@ -1242,7 +1240,6 @@ agent.monitoring:
 	cmd.Wait()
 }
 
->>>>>>> 0ba890a56 (Add support for more input types in otelmanager (#7233))
 func TestOtelMBReceiverE2E(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Default,
