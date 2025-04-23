@@ -94,9 +94,8 @@ type MonitorManager interface {
 	// args:
 	// - the existing config policy
 	// - a list of the expected running components
-	// - a map of component IDs to binary names
 	// - a map of component IDs to the PIDs of the running components.
-	MonitoringConfig(map[string]interface{}, []component.Component, map[string]string, map[string]uint64) (map[string]interface{}, error)
+	MonitoringConfig(map[string]interface{}, []component.Component, map[string]uint64) (map[string]interface{}, error)
 }
 
 // Runner provides interface to run a manager and receive running errors.
