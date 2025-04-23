@@ -21,8 +21,8 @@ jobs:
           token: ${{ secrets.BUILDKITE_TOKEN }}
           wait-for: true
           env-vars: |
-            SNAPSHOT="false"
-            HELM_REPO_ENV="prod"
+            SNAPSHOT=false
+            HELM_REPO_ENV=prod
 
       - uses: elastic/oblt-actions/slack/send@v1
         if: ${{ failure()  }}
@@ -43,5 +43,5 @@ jobs:
           token: ${{ secrets.BUILDKITE_TOKEN }}
           wait-for: true
           env-vars: |
-            SNAPSHOT="true"
-            HELM_REPO_ENV="dev"
+            SNAPSHOT=true
+            HELM_REPO_ENV=dev
