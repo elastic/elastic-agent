@@ -36,8 +36,8 @@ jobs:
           token: ${{ secrets.BUILDKITE_TOKEN }}
           wait-for: true
           env-vars: |
-            SNAPSHOT=false
-            HELM_REPO_ENV=${{ inputs.repo-env}}
+            SNAPSHOT=${{ inputs.repo-env == 'dev' }}
+            HELM_REPO_ENV=${{ inputs.repo-env }}
 
       - uses: elastic/oblt-actions/slack/send@v1
         if: ${{ failure()  }}
