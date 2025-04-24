@@ -89,7 +89,6 @@ var (
 	DevBuild      bool
 	ExternalBuild bool
 	FIPSBuild     bool
-	Local         bool
 
 	versionQualified bool
 	versionQualifier string
@@ -163,11 +162,6 @@ func initGlobals() {
 
 	versionQualifier, versionQualified = os.LookupEnv("VERSION_QUALIFIER")
 
-	Local, err = strconv.ParseBool(EnvOr("LOCAL", "false"))
-	if err != nil {
-		panic(fmt.Errorf("failed to parse LOCAL env value: %w", err))
-	}
-
 	agentPackageVersion = EnvOr(agentPackageVersionEnvVar, "")
 
 	ManifestURL = EnvOr(ManifestUrlEnvVar, "")
@@ -226,7 +220,6 @@ func varMap(args ...map[string]interface{}) map[string]interface{} {
 		"FIPS":            FIPSBuild,
 		"Qualifier":       versionQualifier,
 		"CI":              CI,
-		"LOCAL":           Local,
 	}
 
 	// Add the extra args to the map.
@@ -260,7 +253,6 @@ VersionQualifier = {{.Qualifier}}
 PLATFORMS        = {{.PLATFORMS}}
 PACKAGES         = {{.PACKAGES}}
 CI               = {{.CI}}
-Local			 = {{.LOCAL}}
 
 ## Functions
 
