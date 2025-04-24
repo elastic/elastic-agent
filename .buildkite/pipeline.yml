@@ -3,13 +3,21 @@
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
+
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1744855248"
+  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1744855248"
+  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1744855248"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1744855248"
+  IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-1744855248"
+  IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1744855248"
+
 steps:
   - label: "check-ci"
     key: "check-ci"
     command: ".buildkite/scripts/steps/check-ci.sh"
     agents:
       provider: "gcp"
-      image: "family/platform-ingest-elastic-agent-ubuntu-2204"
+      image: "${IMAGE_UBUNTU_2204_X86_64}"
     retry:
       manual:
         allowed: true
@@ -27,13 +35,55 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2204"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
         retry:
           automatic:
             limit: 1
           manual:
             allowed: true
 
+<<<<<<< HEAD
+=======
+      - label: "Unit tests - Ubuntu 22.04 with requirefips build tag"
+        key: "unit-tests-2204-fips-tag"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        env:
+          FIPS: "true"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+
+      - label: "Unit tests - fips140=only Ubuntu 22.04"
+        key: "unit-tests-2204-fips140-only"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        env:
+          FIPS: "true"
+          GODEBUG: "fips140=only"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+
+>>>>>>> 1f7703312 (pinned version (#7958))
       - label: "Unit tests - Ubuntu 22.04 ARM64"
         key: "unit-tests-2204-arm64"
         command: ".buildkite/scripts/steps/unit-tests.sh"
@@ -44,7 +94,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "aws"
-          imagePrefix: "platform-ingest-elastic-agent-ubuntu-2404-aarch64"
+          image: "${IMAGE_UBUNTU_2204_ARM_64}"
           diskSizeGb: 200
           instanceType: "m6g.xlarge"
         retry:
@@ -63,7 +113,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
-          image: "family/platform-ingest-elastic-agent-windows-2022"
+          image: "${IMAGE_WIN_2022}"
           machine_type: "n2-standard-8"
           disk_size: 200
           disk_type: "pd-ssd"
@@ -83,7 +133,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
-          image: "family/platform-ingest-elastic-agent-windows-2016"
+          image: "${IMAGE_WIN_2016}"
           machine_type: "n2-standard-8"
           disk_size: 200
           disk_type: "pd-ssd"
@@ -143,7 +193,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
-          image: "family/platform-ingest-elastic-agent-windows-10"
+          image: "${IMAGE_WIN_10}"
           machine_type: "n2-standard-8"
           disk_type: "pd-ssd"
         retry:
@@ -151,6 +201,7 @@ steps:
             limit: 1
           manual:
             allowed: true
+
       - label: "Unit tests - Windows 11"
         key: "unit-tests-win11"
         command: .buildkite/scripts/steps/unit-tests.ps1
@@ -161,7 +212,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
-          image: "family/platform-ingest-elastic-agent-windows-11"
+          image: "${IMAGE_WIN_11}"
           machine_type: "n2-standard-8"
           disk_type: "pd-ssd"
         retry:
@@ -219,7 +270,7 @@ steps:
         command: ".buildkite/scripts/steps/k8s-tests.sh"
         agents:
           provider: "gcp"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2204"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
         matrix:
           setup:
             k8s_version:
@@ -263,7 +314,7 @@ steps:
                 command: ".buildkite/scripts/steps/sync-k8s.sh"
                 agents:
                   provider: "gcp"
-                  image: "family/platform-ingest-elastic-agent-ubuntu-2204"
+                  image: "${IMAGE_UBUNTU_2204_X86_64}"
                 env:
                   - GH_VERSION=2.4.0
 
