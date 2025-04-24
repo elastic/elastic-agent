@@ -23,6 +23,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
@@ -103,27 +104,52 @@ func TestClientWithUnsupportedTLSVersions(t *testing.T) {
 
 func TestClientWithCertificate(t *testing.T) {
 	cases := map[string]struct {
+		goDebugFIPS140       fipsutils.GoDebugFIPS140Value
 		clientCertificate    []byte
 		clientKey            []byte
 		expectedHandshakeErr string
 		expectedServerLog    string
 	}{
-		"insecure_key": {
+		"insecure_key_fips140on": {
+			goDebugFIPS140:       fipsutils.GoDebugFIPS140On,
 			clientCertificate:    fipsInvalidCertPEM,
 			clientKey:            fipsInvalidKeyPEM,
 			expectedHandshakeErr: "invalid key length",
 			expectedServerLog:    "no FIPS compatible certificate chains found",
 		},
-		"secure_key": {
+		"secure_key_fips140on": {
+			goDebugFIPS140:       fipsutils.GoDebugFIPS140On,
 			clientCertificate:    fipsValidCertPEM,
 			clientKey:            fipsValidKeyPEM,
 			expectedHandshakeErr: "",
+			expectedServerLog:    "",
+		},
+		"insecure_key_fips140only": {
+			goDebugFIPS140:       fipsutils.GoDebugFIPS140Only,
+			clientCertificate:    fipsInvalidCertPEM,
+			clientKey:            fipsInvalidKeyPEM,
+			expectedHandshakeErr: "EOF",
+			expectedServerLog:    "",
+		},
+		"secure_key_fips140only": {
+			goDebugFIPS140:       fipsutils.GoDebugFIPS140Only,
+			clientCertificate:    fipsValidCertPEM,
+			clientKey:            fipsValidKeyPEM,
+			expectedHandshakeErr: "EOF",
 			expectedServerLog:    "",
 		},
 	}
 
 	for name, test := range cases {
 		t.Run(name, func(t *testing.T) {
+			goDebugFIPS140 := fipsutils.GoDebugFIPS140()
+			if goDebugFIPS140 != test.goDebugFIPS140 {
+				t.Skipf(
+					`skipping test because test wants GODEBUG=fips140=%s but actual value is "%s"`,
+					test.goDebugFIPS140, goDebugFIPS140,
+				)
+			}
+
 			server, serverLog := startTLSServer(t)
 
 			// Create client and have it present a certificate during the
