@@ -7,6 +7,7 @@ package mage
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 
@@ -85,6 +86,8 @@ func CheckLinksInFileAreLive(filename string) func() error {
 	return func() error {
 		fmt.Printf(">> check: Checking for invalid links in %q\n", filename)
 		mg.Deps(InstallGoLinkCheck)
+		out, _ := exec.Command("ls").Output()
+		fmt.Println(">> check: Checking for invalid links in %s\n", out)
 
 		linkcheck := gotool.LinkCheck
 		return linkcheck(
