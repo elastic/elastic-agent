@@ -3,7 +3,7 @@ env:
 steps:
   - label: "Mirror Elastic-Agent Snapshot DRA to internal registry"
     key: "mirror-elastic-agent"
-    command: "./build/ecp-internal-release.sh"
+    command: ".buildkite/scripts/steps/ecp-internal-release.sh"
     agents:
       image: docker.elastic.co/ci-agent-images/serverless-helm-builder:0.0.2@sha256:d00e8a7a0ab3618cfaacb0a7b1e1b06ee29728eb2b44de602374bd8f6b9b92ac
 
