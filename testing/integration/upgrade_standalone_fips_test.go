@@ -40,7 +40,7 @@ func TestStandaloneUpgradeFIPStoFIPS(t *testing.T) {
 		t.Skipf("Minimum version for running this test is %q, current version: %q", *upgradetest.Version_9_1_0_SNAPSHOT, currentVersion)
 	}
 
-	// Start with a FIPS-compliant Agent artifact
+	// Start with a FIPS-capable Agent artifact
 	fipsArtifactFetcher := atesting.ArtifactFetcher(atesting.WithArtifactFIPSOnly())
 
 	versionList, err := upgradetest.GetUpgradableVersions()
@@ -48,7 +48,7 @@ func TestStandaloneUpgradeFIPStoFIPS(t *testing.T) {
 	endVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
-	// Check that new (post-upgrade) Agent is also FIPS-compliant
+	// Check that new (post-upgrade) Agent is also FIPS-capable
 	postWatcherSuccessHook := func(ctx context.Context, endFixture *atesting.Fixture) error {
 		client := endFixture.Client()
 		err := client.Connect(ctx)
@@ -62,7 +62,7 @@ func TestStandaloneUpgradeFIPStoFIPS(t *testing.T) {
 		}
 
 		if !ver.Fips {
-			return errors.New("expected upgraded Agent to be FIPS-compliant")
+			return errors.New("expected upgraded Agent to be FIPS-capable")
 		}
 
 		return nil
