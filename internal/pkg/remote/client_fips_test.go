@@ -110,28 +110,28 @@ func TestClientWithCertificate(t *testing.T) {
 		expectedHandshakeErr string
 		expectedServerLog    string
 	}{
-		"insecure_key_fips140on": {
+		"fips_invalid_key_fips140on": {
 			goDebugFIPS140:       fipsutils.GoDebugFIPS140On,
 			clientCertificate:    fipsInvalidCertPEM,
 			clientKey:            fipsInvalidKeyPEM,
 			expectedHandshakeErr: "invalid key length",
 			expectedServerLog:    "no FIPS compatible certificate chains found",
 		},
-		"secure_key_fips140on": {
+		"fips_valid_key_fips140on": {
 			goDebugFIPS140:       fipsutils.GoDebugFIPS140On,
 			clientCertificate:    fipsValidCertPEM,
 			clientKey:            fipsValidKeyPEM,
 			expectedHandshakeErr: "",
 			expectedServerLog:    "",
 		},
-		"insecure_key_fips140only": {
+		"fips_invalid_key_fips140only": {
 			goDebugFIPS140:       fipsutils.GoDebugFIPS140Only,
 			clientCertificate:    fipsInvalidCertPEM,
 			clientKey:            fipsInvalidKeyPEM,
 			expectedHandshakeErr: "EOF",
 			expectedServerLog:    "",
 		},
-		"secure_key_fips140only": {
+		"fips_valid_key_fips140only": {
 			goDebugFIPS140:       fipsutils.GoDebugFIPS140Only,
 			clientCertificate:    fipsValidCertPEM,
 			clientKey:            fipsValidKeyPEM,
