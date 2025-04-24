@@ -87,7 +87,7 @@ func CheckLinksInFileAreLive(filename string) func() error {
 		fmt.Printf(">> check: Checking for invalid links in %q\n", filename)
 		mg.Deps(InstallGoLinkCheck)
 		out, _ := exec.Command("ls").Output()
-		fmt.Println(">> check: Checking for invalid links in %s\n", out)
+		fmt.Printf(">> check: Checking for invalid links in %s\n", out)
 
 		linkcheck := gotool.LinkCheck
 		return linkcheck(
