@@ -191,9 +191,9 @@ func TestGetOtelConfig(t *testing.T) {
 	expectedESConfig := map[string]any{
 		"elasticsearch/_agent-component/default": map[string]any{
 			"batcher": map[string]any{
-				"enabled":        true,
-				"max_size_items": 1600,
-				"min_size_items": 0,
+				"enabled":  true,
+				"max_size": 1600,
+				"min_size": 0,
 			},
 			"logs_index": "",
 			"mapping": map[string]any{
