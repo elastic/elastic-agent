@@ -38,14 +38,19 @@ if ($TEST_SUDO -eq "true") {
 $fully_qualified_group_name="${GROUP_NAME}${root_suffix}_${osInfo}"
 $outputXML = "build/${fully_qualified_group_name}.integration.xml"
 $outputJSON = "build/${fully_qualified_group_name}.integration.out.json"
+
+Write-Output "~~~ Getting stable stack version"
+$stackVersion = (Get-Content .package-version).Trim() + "-SNAPSHOT"
+# Stable ESS version is set in the ess_start.sh step
+$stableSnapshotVersion = & buildkite-agent meta-data get "stable.ess.version" --default ""
+Get-Ess-Stack -StackVersion $stackVersion -StableSnapshotVersion $stableSnapshotVersion
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Failed to get ESS stack"
+    exit 1
+}
+
 $TestsExitCode = 0
 try {
-    Write-Output "~~~ Getting stable stack version"    
-    $stackVersion = (Get-Content .package-version).Trim() + "-SNAPSHOT"
-    # Stable ESS version is set in the ess_start.sh step
-    $stableSnapshotVersion = & buildkite-agent meta-data get "stable.ess.version" --default ""
-    
-    Get-Ess-Stack -StackVersion $stackVersion -StableSnapshotVersion $stableSnapshotVersion
     Write-Output "~~~ Running integration test group: $GROUP_NAME as user: $env:USERNAME"
     & gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags=integration -shuffle=on -timeout=2h0m0s "github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=$GROUP_NAME" "-integration.sudo=$TEST_SUDO"
     $TestsExitCode = $LASTEXITCODE    
