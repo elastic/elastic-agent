@@ -19,8 +19,6 @@ steps:
     command: ".buildkite/scripts/steps/run-agentless-tests.sh"
     agents:
       image: "docker.elastic.co/ci-agent-images/quality-gate-seedling:0.0.4@sha256:b15aa65183fd9ac4b3ad2b01287ee8c47382a74450485b012bade5331fefeae9"
-    env:
-      SERVICE_VERSION: "${BUILDKITE_COMMIT:0:12}"
 
 notify:
   - slack: "${TEAM_CHANNEL}"
