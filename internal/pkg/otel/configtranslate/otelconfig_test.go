@@ -171,6 +171,7 @@ func TestGetOtelConfig(t *testing.T) {
 		"preset":           "balanced",
 		"queue.mem.events": 3200,
 	}
+
 	defaultProcessors := func(streamId, dataset string) []any {
 		return []any{
 			mapstr.M{
@@ -281,8 +282,9 @@ func TestGetOtelConfig(t *testing.T) {
 				"exporters": map[string]any{
 					"elasticsearch/_agent-component/default": map[string]any{
 						"batcher": map[string]any{
-							"enabled":        true,
-							"max_size_items": 1600,
+							"enabled":  true,
+							"max_size": 1600,
+							"min_size": 0,
 						},
 						"mapping": map[string]any{
 							"mode": "bodymap",
