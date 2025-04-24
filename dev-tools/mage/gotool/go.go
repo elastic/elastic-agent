@@ -37,7 +37,7 @@ func runGoInstall(opts ...ArgOpt) error {
 
 func (goInstall) Package(pkg string) ArgOpt { return posArg(pkg) }
 func (goInstall) Vendored() ArgOpt          { return flagArg("-mod", "vendor") }
-func (goInstall) BIN() ArgOpt               { return envArgIf("GOBIN", "$PWD/bin") }
+func (goInstall) BIN() ArgOpt               { return envArgIf("GOBIN", fmt.Sprintf("%s/bin", os.Getenv("PWD"))) }
 
 type goTest func(opts ...ArgOpt) error
 
