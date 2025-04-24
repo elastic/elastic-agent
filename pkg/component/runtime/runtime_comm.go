@@ -419,7 +419,7 @@ func genServerName() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return strings.Replace(u.String(), "-", "", -1), nil
+	return strings.ReplaceAll(u.String(), "-", ""), nil
 }
 
 func sendExpectedChunked(server proto.ElasticAgent_CheckinV2Server, msg *proto.CheckinExpected, chunkingAllowed bool, maxSize int) error {
