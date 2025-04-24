@@ -40,9 +40,9 @@ $outputXML = "build/${fully_qualified_group_name}.integration.xml"
 $outputJSON = "build/${fully_qualified_group_name}.integration.out.json"
 $TestsExitCode = 0
 try {
-    echo "~~~ Getting stable stack version"
-    mage integration:getStableEssSnapshotForBranch
+    Write-Output "~~~ Getting stable stack version"    
     $stackVersion = (Get-Content .package-version).Trim() + "-SNAPSHOT"
+    # Stable ESS version is set in the ess_start.sh step
     $stableSnapshotVersion = & buildkite-agent meta-data get "stable.ess.version" --default ""
     
     Get-Ess-Stack -StackVersion $stackVersion -StableSnapshotVersion $stableSnapshotVersion

@@ -3,7 +3,6 @@ set -euo pipefail
 
 source .buildkite/scripts/common-integration.sh
 source .buildkite/scripts/steps/ess.sh
-source .buildkite/scripts/steps/stable_ess_version.sh
 source .buildkite/scripts/steps/fleet.sh
 
 # Make sure that all tools are installed
@@ -31,7 +30,8 @@ if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
   echo "~~~ The steps is retried, starting the ESS stack again"
   echo "~~~ Getting stable stack version"
   DEFAULT_STACK_VERSION="$(cat .package-version)-SNAPSHOT"
-  STABLE_ESS_VERSION="$(getStableEssSnapshotForBranch)-SNAPSHOT"
+  # Stable ESS version is set in the ess_start.sh step
+  STABLE_ESS_VERSION=$(buildkite-agent meta-data get "stable.ess.version")
 
   trap 'ess_down' EXIT
   ess_up $DEFAULT_STACK_VERSION $STABLE_ESS_VERSION || echo "Failed to start ESS stack" >&2

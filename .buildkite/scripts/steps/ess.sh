@@ -5,7 +5,7 @@ function ess_up() {
   local WORKSPACE=$(git rev-parse --show-toplevel)
   local TF_DIR="${WORKSPACE}/test_infra/ess/"
   local STACK_VERSION=$1
-  local STABLE_SNAPSHOT_VERSION=$2
+  local STABLE_SNAPSHOT_VERSION=${2:?"Error: Specify stable stack version: ess_up <stack_version> <stable_snapshot_version>"}
   local ESS_REGION=${3:-"gcp-us-west2"}
     
   if [ -z "$STACK_VERSION" ]; then
