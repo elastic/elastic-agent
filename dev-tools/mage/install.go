@@ -35,6 +35,7 @@ func InstallGoLicenser() error {
 // InstallGoLinkCheck target installs the link check tool
 func InstallGoLinkCheck() error {
 	return gotool.Install(
+		gotool.Install.BIN(),
 		gotool.Install.Package(GoLinkCheckImportPath),
 	)
 }
