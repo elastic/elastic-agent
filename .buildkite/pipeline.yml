@@ -42,48 +42,6 @@ steps:
           manual:
             allowed: true
 
-<<<<<<< HEAD
-=======
-      - label: "Unit tests - Ubuntu 22.04 with requirefips build tag"
-        key: "unit-tests-2204-fips-tag"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        env:
-          FIPS: "true"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          image: "${IMAGE_UBUNTU_2204_X86_64}"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-
-      - label: "Unit tests - fips140=only Ubuntu 22.04"
-        key: "unit-tests-2204-fips140-only"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        env:
-          FIPS: "true"
-          GODEBUG: "fips140=only"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          image: "${IMAGE_UBUNTU_2204_X86_64}"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-
->>>>>>> 1f7703312 (pinned version (#7958))
       - label: "Unit tests - Ubuntu 22.04 ARM64"
         key: "unit-tests-2204-arm64"
         command: ".buildkite/scripts/steps/unit-tests.sh"
