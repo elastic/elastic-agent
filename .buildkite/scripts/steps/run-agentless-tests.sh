@@ -23,13 +23,13 @@ source "${_SELF}/../common.sh"
 setup_extract_sha() {
     # Ensure repo is available - redirect output to /dev/null
     if [ ! -d "serverless-gitops" ]; then
-        git clone --depth 1 git@github.com:elastic/serverless-gitops.git > /dev/null 2>&1
+        git clone --depth 1 git@github.com:elastic/serverless-gitops.git
     else
-        (cd serverless-gitops && git pull > /dev/null 2>&1)
+        (cd serverless-gitops && git pull)
     fi
 
     # Install yq for YAML parsing
-    go install github.com/mikefarah/yq/v4@v4.45.1 > /dev/null 2>&1
+    go install github.com/mikefarah/yq/v4@v4.45.1
 }
 
 extract_sha() {
