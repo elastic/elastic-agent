@@ -118,38 +118,6 @@ steps:
           imagePrefix: "core-ubuntu-2204-aarch64"
           diskSizeGb: 200
 
-<<<<<<< HEAD
-=======
-      - label: "Packaging: Containers linux/amd64 FIPS"
-        key: packaging-containers-x86-64-fips
-        env:
-          PACKAGES: "docker"
-          PLATFORMS: "linux/amd64"
-          FIPS: "true"
-        command: ".buildkite/scripts/steps/integration-package.sh"
-        artifact_paths:
-          - build/distributions/**
-        agents:
-          provider: "gcp"
-          machineType: "n2-standard-8"
-          diskSizeGb: 200
-
-      - label: "Packaging: Containers linux/arm64 FIPS"
-        key: packaging-containers-arm64-fips
-        env:
-          PACKAGES: "docker"
-          PLATFORMS: "linux/arm64"
-          FIPS: "true"
-        command: |
-          .buildkite/scripts/steps/integration-package.sh
-        artifact_paths:
-          - build/distributions/**
-        agents:
-          provider: "aws"
-          instanceType: "c6g.4xlarge"
-          imagePrefix: "core-ubuntu-2204-aarch64"
-          diskSizeGb: 200
-
   - label: "Serverless integration test"
     key: "serverless-integration-tests"
     depends_on:
@@ -175,7 +143,6 @@ steps:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Serverless integration test"
 
->>>>>>> 07d931684 (Revert "[ci] migrate serverless integration tests to buildkite (#7919)" (#7986))
   - label: "Extended runtime leak tests"
     key: "extended-integration-tests"
     depends_on:
