@@ -1,10 +1,11 @@
 function ess_up {
   param (
       [string]$StackVersion,
+      [string]$StableSnapshotVersion,
       [string]$EssRegion = "gcp-us-west2"
   )
 
-  Write-Output "~~~ Starting ESS Stack"
+  Write-Output "~~~ Starting ESS. Version: $StackVersion. Stable snapshot: $StableSnapshotVersion"
   
   $Workspace = & git rev-parse --show-toplevel
   $TfDir = Join-Path -Path $Workspace -ChildPath "test_infra/ess/"
@@ -31,6 +32,7 @@ function ess_up {
   & terraform init
   & terraform apply -auto-approve `
       -var="stack_version=$StackVersion" `
+      -var="stable_snapshot_version=$StableSnapshotVersion" `
       -var="ess_region=$EssRegion" `
       -var="creator=$BuildkiteBuildCreator" `
       -var="buildkite_id=$BuildkiteBuildNumber" `
@@ -110,12 +112,13 @@ function Retry-Command {
 
 function Get-Ess-Stack {
   param (
-      [string]$StackVersion
+      [string]$StackVersion,
+      [string]$StableSnapshotVersion
   )
   
   if ($Env:BUILDKITE_RETRY_COUNT -gt 0) {
       Write-Output "The step is retried, starting the ESS stack again"        
-      ess_up $StackVersion
+      ess_up $StackVersion $StableSnapshotVersion
       Write-Output "ESS stack is up. ES_HOST: $Env:ELASTICSEARCH_HOST"
   } else {
       # For the first run, we retrieve ESS stack metadata
@@ -127,5 +130,6 @@ function Get-Ess-Stack {
       $Env:KIBANA_USERNAME = & buildkite-agent meta-data get "kibana.username"
       $Env:KIBANA_PASSWORD = & buildkite-agent meta-data get "kibana.pwd"
       Write-Output "Received ESS stack data from previous step. ES_HOST: $Env:ELASTICSEARCH_HOST"
+      exit 1
   }
 }

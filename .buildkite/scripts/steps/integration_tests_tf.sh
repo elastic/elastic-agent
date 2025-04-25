@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source .buildkite/scripts/common2.sh
+source .buildkite/scripts/common-integration.sh
 
 # Make sure that all tools are installed
 asdf install
@@ -45,8 +45,13 @@ mage build:testBinaries
 if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
   if [ "$STACK_TYPE" == "ess" ]; then
     echo "~~~ The steps is retried, starting the ESS stack again"
+    echo "~~~ Getting stable stack version"
+    DEFAULT_STACK_VERSION="$(cat .package-version)-SNAPSHOT"
+    # Stable ESS version is set in the ess_start.sh step
+    STABLE_ESS_VERSION=$(buildkite-agent meta-data get "stable.ess.version")
+
     trap 'ess_down' EXIT
-    ess_up $OVERRIDE_STACK_VERSION || echo "Failed to start ESS stack" >&2
+    ess_up $DEFAULT_STACK_VERSION $STABLE_ESS_VERSION || echo "Failed to start ESS stack" >&2
     preinstall_fleet_packages
   else
     echo "~~~ The steps is retried, starting the Serverless project again"
@@ -63,6 +68,8 @@ else
     export KIBANA_HOST=$(buildkite-agent meta-data get "kibana.host")
     export KIBANA_USERNAME=$(buildkite-agent meta-data get "kibana.username")
     export KIBANA_PASSWORD=$(buildkite-agent meta-data get "kibana.pwd")
+    echo $ELASTICSEARCH_HOST
+    exit 1
   else
     # For the first run, we start the serverless project in the serverless_start.sh step and it sets the meta-data
     echo "~~~ Receiving Serverless project metadata"
