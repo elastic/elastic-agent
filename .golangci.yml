@@ -53,7 +53,6 @@ linters:
         - github.com/dop251/goja_nodejs
         - github.com/fsnotify/fsnotify
         - github.com/openshift/api
-        - github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver
       replace-local: false
     gomodguard:
       blocked:

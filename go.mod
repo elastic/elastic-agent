@@ -13,12 +13,12 @@ require (
 	github.com/docker/docker v27.5.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250218044933-ef79280d53a2
-	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250404163238-b16c2c085d99
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250423112141-6fd122401512
+	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
-	github.com/elastic/elastic-agent-libs v0.18.10
-	github.com/elastic/elastic-agent-system-metrics v0.11.10
+	github.com/elastic/elastic-agent-libs v0.19.2
+	github.com/elastic/elastic-agent-system-metrics v0.11.11
 	github.com/elastic/elastic-transport-go/v8 v8.6.1
 	github.com/elastic/go-elasticsearch/v8 v8.17.1
 	github.com/elastic/go-licenser v0.4.2
@@ -53,7 +53,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver v0.121.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver v0.121.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver v0.121.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.120.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.121.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.121.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver v0.121.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.121.0
@@ -73,7 +73,7 @@ require (
 	go.elastic.co/ecszap v1.0.2
 	go.elastic.co/go-licence-detector v0.7.0
 	go.opentelemetry.io/collector/component/componentstatus v0.121.0
-	go.opentelemetry.io/collector/pipeline v0.121.0
+	go.opentelemetry.io/collector/pipeline v0.122.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.121.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.121.0
 	go.uber.org/zap v1.27.0
@@ -139,7 +139,7 @@ require (
 	go.opentelemetry.io/collector/exporter/otlphttpexporter v0.121.0
 	go.opentelemetry.io/collector/extension v1.27.0
 	go.opentelemetry.io/collector/extension/memorylimiterextension v0.121.0
-	go.opentelemetry.io/collector/featuregate v1.27.0
+	go.opentelemetry.io/collector/featuregate v1.28.0
 	go.opentelemetry.io/collector/otelcol v0.121.0
 	go.opentelemetry.io/collector/processor v0.121.0
 	go.opentelemetry.io/collector/processor/batchprocessor v0.121.0
@@ -171,11 +171,11 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.17.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.8.2 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.10.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/messaging/azeventhubs v1.3.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/messaging/azeventhubs v1.3.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5 v5.7.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4 v4.8.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v4 v4.3.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.5.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.0 // indirect
 	github.com/Azure/azure-storage-blob-go v0.15.0 // indirect
 	github.com/Azure/go-amqp v1.3.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
@@ -188,7 +188,7 @@ require (
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
-	github.com/AzureAD/microsoft-authentication-library-for-go v1.3.3 // indirect
+	github.com/AzureAD/microsoft-authentication-library-for-go v1.4.0 // indirect
 	github.com/BurntSushi/toml v1.4.1-0.20240526193622-a339e1f7089c // indirect
 	github.com/Code-Hex/go-generics-cache v1.5.1 // indirect
 	github.com/DataDog/zstd v1.5.6 // indirect
@@ -303,12 +303,12 @@ require (
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/lunes v0.1.0 // indirect
-	github.com/elastic/mito v1.17.1 // indirect
+	github.com/elastic/mito v1.18.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.4.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.16.1 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
-	github.com/elastic/sarama v1.19.1-0.20241120141909-c7eabfcee7e5 // indirect
+	github.com/elastic/sarama v1.19.1-0.20250304185506-df6449b5c996 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.32.4 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.2.1 // indirect
@@ -346,7 +346,7 @@ require (
 	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
-	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
+	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
@@ -504,10 +504,10 @@ require (
 	github.com/prometheus-community/windows_exporter v0.27.2 // indirect
 	github.com/prometheus/client_golang v1.21.1 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
-	github.com/prometheus/common v0.63.0 // indirect
+	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/common/sigv4 v0.1.0 // indirect
 	github.com/prometheus/procfs v0.16.0 // indirect
-	github.com/prometheus/prometheus v0.54.1 // indirect
+	github.com/prometheus/prometheus v0.300.1 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
 	github.com/redis/go-redis/v9 v9.7.3 // indirect
 	github.com/relvacode/iso8601 v1.6.0 // indirect
@@ -564,18 +564,18 @@ require (
 	go.opentelemetry.io/collector/config/configgrpc v0.121.0 // indirect
 	go.opentelemetry.io/collector/config/confighttp v0.121.0 // indirect
 	go.opentelemetry.io/collector/config/confignet v1.27.0 // indirect
-	go.opentelemetry.io/collector/config/configopaque v1.27.0 // indirect
+	go.opentelemetry.io/collector/config/configopaque v1.28.0 // indirect
 	go.opentelemetry.io/collector/config/configretry v1.27.0 // indirect
 	go.opentelemetry.io/collector/config/configtelemetry v0.121.0 // indirect
 	go.opentelemetry.io/collector/config/configtls v1.27.0 // indirect
 	go.opentelemetry.io/collector/confmap/xconfmap v0.121.0 // indirect
 	go.opentelemetry.io/collector/connector/connectortest v0.121.0 // indirect
 	go.opentelemetry.io/collector/connector/xconnector v0.121.0 // indirect
-	go.opentelemetry.io/collector/consumer v1.27.0 // indirect
+	go.opentelemetry.io/collector/consumer v1.28.0 // indirect
 	go.opentelemetry.io/collector/consumer/consumererror v0.121.0 // indirect
 	go.opentelemetry.io/collector/consumer/consumererror/xconsumererror v0.121.0 // indirect
-	go.opentelemetry.io/collector/consumer/consumertest v0.121.0 // indirect
-	go.opentelemetry.io/collector/consumer/xconsumer v0.121.0 // indirect
+	go.opentelemetry.io/collector/consumer/consumertest v0.122.0 // indirect
+	go.opentelemetry.io/collector/consumer/xconsumer v0.122.0 // indirect
 	go.opentelemetry.io/collector/exporter/exporterhelper/xexporterhelper v0.121.0 // indirect
 	go.opentelemetry.io/collector/exporter/exportertest v0.121.0 // indirect
 	go.opentelemetry.io/collector/exporter/xexporter v0.121.0 // indirect
@@ -588,9 +588,9 @@ require (
 	go.opentelemetry.io/collector/internal/memorylimiter v0.121.0 // indirect
 	go.opentelemetry.io/collector/internal/sharedcomponent v0.121.0 // indirect
 	go.opentelemetry.io/collector/internal/telemetry v0.121.0 // indirect
-	go.opentelemetry.io/collector/pdata v1.27.0 // indirect
-	go.opentelemetry.io/collector/pdata/pprofile v0.121.0 // indirect
-	go.opentelemetry.io/collector/pdata/testdata v0.121.0 // indirect
+	go.opentelemetry.io/collector/pdata v1.28.0 // indirect
+	go.opentelemetry.io/collector/pdata/pprofile v0.122.0 // indirect
+	go.opentelemetry.io/collector/pdata/testdata v0.122.0 // indirect
 	go.opentelemetry.io/collector/pipeline/xpipeline v0.121.0 // indirect
 	go.opentelemetry.io/collector/processor/processorhelper/xprocessorhelper v0.121.0 // indirect
 	go.opentelemetry.io/collector/processor/processortest v0.121.0 // indirect
@@ -630,7 +630,9 @@ require (
 	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
 	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect
 	go.uber.org/atomic v1.11.0 // indirect
+	go.uber.org/mock v0.5.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
+	go.uber.org/zap/exp v0.3.0 // indirect
 	golang.org/x/oauth2 v0.25.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gonum.org/v1/gonum v0.15.1 // indirect
@@ -667,8 +669,6 @@ replace (
 	github.com/dop251/goja_nodejs => github.com/dop251/goja_nodejs v0.0.0-20171011081505-adff31b136e6
 	// fsnotify and goja are required for beats import
 	github.com/fsnotify/fsnotify => github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3
-	// v0.0.0-20250317163643-19cd4e80024f is equivalent to the upstream v0.120.0 release with the Prometheus 0.300 dependency update removed, as it introduced unwanted breaking changes that conflict with Beats.
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver => github.com/elastic/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.0.0-20250317163643-19cd4e80024f
 	// openshift removed all tags from their repo, use the pseudoversion from the release-3.9 branch HEAD
 	// See https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/12d41f40b0d408b0167633d8095160d3343d46ac/go.mod#L38
 	github.com/openshift/api v3.9.0+incompatible => github.com/openshift/api v0.0.0-20180801171038-322a19404e37
