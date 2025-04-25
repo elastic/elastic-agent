@@ -5,6 +5,13 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   ASDF_MAGE_VERSION: 1.14.0
 
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1744855248"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1744855248"
+  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1744855248"
+  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1744855248"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1744855248"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1744855248"
+
 steps:
   - label: Start ESS stack for integration tests
     key: integration-ess
@@ -20,6 +27,77 @@ steps:
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
+
+  - label: Start Serverless project
+    key: integration-serverless
+    env:
+      ASDF_TERRAFORM_VERSION: 1.9.2
+    command: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      source .buildkite/scripts/steps/serverless_start.sh
+    artifact_paths:
+      - test_infra/serverless/*.tfstate
+      - test_infra/serverless/*.lock.hcl
+    agents:
+      image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
+      useCustomGlobalHooks: true
+
+  - group: "Serverless"
+    key: serverless-integration-tests
+    depends_on:
+      - integration-serverless
+    steps:
+      - label: "Windows:2022:amd64:sudo"
+        depends_on:
+          - packaging-windows
+        command: |
+          #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
+          .buildkite/scripts/integration-tests.ps1 fleet true TestLogIngestionFleetManaged serverless
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        agents:
+          provider: "gcp"
+          machineType: "n1-standard-8"
+          image: "${IMAGE_WIN_2022}"
+        retry:
+          automatic:
+            limit: 1
+      - label: "Windows:2025:amd64:sudo"
+        depends_on:
+          - packaging-windows
+        command: |
+          #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
+          .buildkite/scripts/integration-tests.ps1 fleet true TestLogIngestionFleetManaged serverless
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n1-standard-8"
+          image: "${IMAGE_WIN_2025}"
+      - label: "Ubuntu:2404:amd64:sudo"
+        depends_on: packaging-ubuntu-x86-64
+        command: |
+          #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
+          .buildkite/scripts/steps/integration_tests_tf.sh fleet true TestLogIngestionFleetManaged serverless
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n1-standard-8"
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
 
   - group: "Stateful: Windows"
     key: integration-tests-win
@@ -38,7 +116,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-windows-2022"
+          image: "${IMAGE_WIN_2022}"
         retry:
           automatic:
             limit: 1
@@ -64,7 +142,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-windows-2022"
+          image: "${IMAGE_WIN_2022}"
         retry:
           automatic:
             limit: 1
@@ -83,7 +161,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-windows-2025"
+          image: "${IMAGE_WIN_2025}"
         retry:
           automatic:
             limit: 1
@@ -112,7 +190,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-windows-2025"
+          image: "${IMAGE_WIN_2025}"
         matrix:
           - default
 
@@ -135,7 +213,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
         matrix:
           - default
 
@@ -155,7 +233,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
         matrix:
           - default
           - upgrade
@@ -183,7 +261,7 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "aws"
-          imagePrefix: "platform-ingest-elastic-agent-ubuntu-2404-aarch64"
+          image: "${IMAGE_UBUNTU_2404_ARM_64}"
           instanceType: "m6g.2xlarge"
         retry:
           automatic:
@@ -220,7 +298,7 @@ steps:
             limit: 1
         agents:
           provider: "aws"
-          imagePrefix: "platform-ingest-elastic-agent-ubuntu-2404-aarch64"
+          image: "${IMAGE_UBUNTU_2404_ARM_64}"
           instanceType: "m6g.xlarge"
         matrix:
           - default
@@ -244,7 +322,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-debian-12"
+          image: "${IMAGE_DEBIAN_12}"
         matrix:
           - default
 
@@ -264,7 +342,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-debian-12"
+          image: "${IMAGE_DEBIAN_12}"
         matrix:
           - default
           - upgrade
@@ -302,7 +380,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-rhel-8"
+          image: "${IMAGE_RHEL_8}"
 
   - group: "Kubernetes"
     key: integration-tests-kubernetes
@@ -330,7 +408,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-4"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
           diskSizeGb: 80
         matrix:
           setup:
@@ -356,6 +434,18 @@ steps:
       buildkite-agent artifact download "test_infra/ess/**" . --step "integration-ess"
       ls -lah test_infra/ess
       .buildkite/scripts/steps/ess_down.sh
+    agents:
+      image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
+      useCustomGlobalHooks: true
+
+  - label: Serverless cleanup
+    depends_on:
+      - serverless-integration-tests
+    allow_dependency_failure: true
+    command: |
+      buildkite-agent artifact download "test_infra/serverless/**" . --step "integration-serverless"
+      ls -lah test_infra/serverless
+      .buildkite/scripts/steps/serverless_down.sh
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true

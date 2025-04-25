@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
@@ -41,6 +42,7 @@ func TestStateStore(t *testing.T) {
 }
 
 func createAgentVaultAndSecret(t *testing.T, ctx context.Context, tempDir string) string {
+	fipsutils.SkipIfFIPSOnly(t, "vault does not use NewGCMWithRandomNonce.")
 	vaultPath := filepath.Join(tempDir, "vault")
 
 	err := os.MkdirAll(vaultPath, 0o750)
