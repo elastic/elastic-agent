@@ -35,7 +35,7 @@ type exporterConfigTranslationFunc func(*config.C) (map[string]any, error)
 
 var (
 	OtelSupportedOutputTypes         = []string{"elasticsearch"}
-	OtelSupportedInputTypes          = []string{"filestream"}
+	OtelSupportedInputTypes          = []string{"filestream", "http/metrics", "beat/metrics"}
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
 		otelcomponent.MustNewType("elasticsearch"): translateEsOutputToExporter,
 	}
@@ -176,9 +176,6 @@ func getReceiversConfigForComponent(comp *component.Component, info info.Agent, 
 	dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
 
 	receiverConfig := map[string]any{
-		beatName: map[string]any{
-			"inputs": inputs,
-		},
 		// the output needs to be otelconsumer
 		"output": map[string]any{
 			"otelconsumer": map[string]any{},
@@ -201,6 +198,16 @@ func getReceiversConfigForComponent(comp *component.Component, info info.Agent, 
 				},
 			},
 		},
+	}
+	switch beatName {
+	case "filebeat":
+		receiverConfig[beatName] = map[string]any{
+			"inputs": inputs,
+		}
+	case "metricbeat":
+		receiverConfig[beatName] = map[string]any{
+			"modules": inputs,
+		}
 	}
 	// add the output queue config if present
 	if outputQueueConfig != nil {
@@ -341,7 +348,10 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 	// function. For filebeat, see: https://github.com/elastic/beats/blob/main/x-pack/filebeat/cmd/agent.go
 
 	for _, input := range inputs {
-		if _, ok := input["type"]; !ok {
+		// If inputType contains /metrics, use modules to create inputs
+		if strings.Contains(inputType, "/metrics") {
+			input["module"] = strings.TrimSuffix(inputType, "/metrics")
+		} else if _, ok := input["type"]; !ok {
 			input["type"] = inputType
 		}
 	}
