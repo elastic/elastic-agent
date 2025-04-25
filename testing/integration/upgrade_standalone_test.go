@@ -40,17 +40,27 @@ func TestStandaloneUpgrade(t *testing.T) {
 			unprivilegedAvailable = true
 		}
 		t.Run(fmt.Sprintf("Upgrade %s to %s (privileged)", startVersion, define.Version()), func(t *testing.T) {
-			testStandaloneUpgrade(t, startVersion, define.Version(), atesting.ArtifactFetcher(), upgradetest.WithUnprivileged(false))
+			testStandaloneUpgradeSuccess(t, startVersion, define.Version(), atesting.ArtifactFetcher(), upgradetest.WithUnprivileged(false))
 		})
 		if unprivilegedAvailable {
 			t.Run(fmt.Sprintf("Upgrade %s to %s (unprivileged)", startVersion, define.Version()), func(t *testing.T) {
-				testStandaloneUpgrade(t, startVersion, define.Version(), atesting.ArtifactFetcher(), upgradetest.WithUnprivileged(true))
+				testStandaloneUpgradeSuccess(t, startVersion, define.Version(), atesting.ArtifactFetcher(), upgradetest.WithUnprivileged(true))
 			})
 		}
 	}
 }
 
-func testStandaloneUpgrade(t *testing.T, startVersion *version.ParsedSemVer, endVersion string, fetcher atesting.Fetcher, upgradeOpts ...upgradetest.UpgradeOpt) {
+func testStandaloneUpgradeSucceeded(t *testing.T, startVersion *version.ParsedSemVer, endVersion string, fetcher atesting.Fetcher, upgradeOpts ...upgradetest.UpgradeOpt) {
+	assert.NoError(t, testStandaloneUpgrade(t, startVersion, endVersion, fetcher, upgradeOpts...))
+}
+
+func testStandaloneUpgradeFailed(t *testing.T, startVersion *version.ParsedSemVer, endVersion string, fetcher atesting.Fetcher, expectedErr error, upgradeOpts ...upgradetest.UpgradeOpt) {
+	err := testStandaloneUpgrade(t, startVersion, endVersion, fetcher, upgradeOpts...)
+	assert.NotNil(t, err)
+	assert.ErrorIs(t, err, expectedErr)
+}
+
+func testStandaloneUpgrade(t *testing.T, startVersion *version.ParsedSemVer, endVersion string, fetcher atesting.Fetcher, upgradeOpts ...upgradetest.UpgradeOpt) error {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
@@ -73,6 +83,5 @@ func testStandaloneUpgrade(t *testing.T, startVersion *version.ParsedSemVer, end
 		return
 	}
 
-	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradeOpts...)
-	assert.NoError(t, err)
+	return upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradeOpts...)
 }
