@@ -401,6 +401,8 @@ exporters:
   elasticsearch:
     api_key: {{.ESApiKey}}
     endpoint: {{.ESEndpoint}}
+    mapping:
+      mode: none
 
 processors:
   resource/add-test-id:
