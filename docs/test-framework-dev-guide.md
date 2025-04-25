@@ -299,9 +299,9 @@ If you've made local changes to Beats-OTeL and want to run the Agent's integrati
 ```
 replace github.com/elastic/beats/v7 => /Users/vihasmakwana/Desktop/Vihas/elastic/beats
 ```
-2. Package the Agent with `LOCAL=true`:
+2. Package the Agent with `EXTERNAL=true`:
 ```sh
-  LOCAL=true PLATFORMS=darwin/arm64 mage package
+  EXTERNAL=true PLATFORMS=darwin/arm64 mage package
 ```
 3. Run integration tests as per [the instructions](#running-the-tests)
 
