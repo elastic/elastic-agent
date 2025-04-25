@@ -49,7 +49,7 @@ $outputJSON = "build/${fully_qualified_group_name}.integration.out.json"
 Write-Output "~~~ Getting stable stack version"
 $stackVersion = (Get-Content .package-version).Trim() + "-SNAPSHOT"
 # Stable ESS version is set in the ess_start.sh step
-$stableSnapshotVersion = & buildkite-agent meta-data get "stable.ess.version" --default ""
+$stableSnapshotVersion = & buildkite-agent meta-data get "stable.ess.version"
 if ($STACK_TYPE -eq "ess") {
     Get-Ess-Stack -StackVersion $stackVersion -StableSnapshotVersion $stableSnapshotVersion
 }
