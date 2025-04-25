@@ -54,7 +54,6 @@ if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
     ess_up $DEFAULT_STACK_VERSION $STABLE_ESS_VERSION || echo "Failed to start ESS stack" >&2
     preinstall_fleet_packages
   else
-    exit 1
     echo "~~~ The steps is retried, starting the Serverless project again"
     trap 'serverless_down' EXIT
     serverless_up || echo "Failed to start Serverless observability object" >&2
@@ -69,6 +68,8 @@ else
     export KIBANA_HOST=$(buildkite-agent meta-data get "kibana.host")
     export KIBANA_USERNAME=$(buildkite-agent meta-data get "kibana.username")
     export KIBANA_PASSWORD=$(buildkite-agent meta-data get "kibana.pwd")
+    echo $ELASTICSEARCH_HOST
+    exit 1
   else
     # For the first run, we start the serverless project in the serverless_start.sh step and it sets the meta-data
     echo "~~~ Receiving Serverless project metadata"
