@@ -73,7 +73,7 @@ ENV BEAT_SETUID_AS={{ .user }}
 {{- if contains .from "ubi-minimal" }}
 RUN for iter in {1..10}; do \
         microdnf update -y && \
-        microdnf install -y tar gzip findutils shadow-utils ca-certificates gawk libcap xz && \
+        microdnf install -y tar gzip findutils shadow-utils ca-certificates gawk libcap xz systemd && \
         microdnf clean all && \
         exit_code=0 && break || exit_code=$? && echo "microdnf error: retry $iter in 10s" && sleep 10; done; (exit $exit_code)
 {{- end }}
@@ -81,7 +81,7 @@ RUN for iter in {1..10}; do \
 {{- if contains .from "wolfi" }}
 RUN for iter in {1..10}; do \
         apk fix && \
-        apk add --no-cache ca-certificates curl gawk shadow bash && \
+        apk add --no-cache ca-certificates curl gawk shadow bash systemd && \
         exit_code=0 && break || exit_code=$? && echo "apk error: retry $iter in 10s" && sleep 10; \
     done; \
     (exit $exit_code)
