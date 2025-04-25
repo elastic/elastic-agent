@@ -17,8 +17,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -550,7 +550,7 @@ func doEnroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 	store := storage.NewReplaceOnSuccessStore(
 		pathConfigFile,
-		application.DefaultAgentFleetConfig,
+		info.DefaultAgentFleetConfig,
 		encStore,
 		storeOpts...,
 	)

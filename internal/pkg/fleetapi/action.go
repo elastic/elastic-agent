@@ -465,9 +465,6 @@ func (a *ActionMigrate) AckEvent() AckEvent {
 }
 
 type ActionMigrateData struct {
-	// PolicyID: Type of the action.
-	PolicyID string `json:"policy_id" yaml:"policy_id"`
-
 	// TargetURI: URI of Fleet Server in a target cluster.
 	TargetURI string `json:"target_uri" yaml:"target_uri"`
 

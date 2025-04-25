@@ -25,11 +25,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
-	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client/wait"
@@ -61,9 +58,9 @@ type saver interface {
 
 // enrollCmd is an enroll subcommand that interacts between the Kibana API and the Agent.
 type enrollCmd struct {
-	log            *logger.Logger
-	options        *enroll.EnrollOptions
-	client         fleetclient.Sender
+	log     *logger.Logger
+	options *enroll.EnrollOptions
+	//	client         fleetclient.Sender
 	configStore    saver
 	remoteConfig   remote.Config
 	agentProc      *process.Info
@@ -149,7 +146,7 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		}
 	}
 
-	persistentConfig, err := getPersistentConfig(c.configPath)
+	persistentConfig, err := enroll.LoadPersistentConfig(c.configPath)
 	if err != nil {
 		return err
 	}
@@ -168,7 +165,7 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		}
 	}
 
-	c.remoteConfig, err = c.options.RemoteConfig()
+	c.remoteConfig, err = c.options.RemoteConfig(true)
 	if err != nil {
 		return errors.New(
 			err, "Error",
@@ -181,14 +178,6 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		// Note that when running fleet-server the enroll request will be sent to :8220,
 		// however when the agent is running afterward requests will be sent to :8221
 		c.remoteConfig.Transport.Proxy.Disable = true
-	}
-
-	c.client, err = fleetclient.NewWithConfig(c.log, c.remoteConfig)
-	if err != nil {
-		return errors.New(
-			err, "Error",
-			errors.TypeNetwork,
-			errors.M(errors.MetaKeyURI, c.options.URL))
 	}
 
 	if c.options.DelayEnroll {
@@ -212,7 +201,6 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 	err = enroll.EnrollWithBackoff(ctx, c.log,
 		persistentConfig,
 		enrollDelay,
-		c.client,
 		*c.options,
 		c.configStore,
 		c.backoffFactory)
@@ -667,42 +655,6 @@ func getCompUnitFromStatus(state *client.AgentState, name string) *client.Compon
 		}
 	}
 	return nil
-}
-
-func getPersistentConfig(pathConfigFile string) (map[string]interface{}, error) {
-	persistentMap := make(map[string]interface{})
-	rawConfig, err := config.LoadFile(pathConfigFile)
-	if os.IsNotExist(err) {
-		return persistentMap, nil
-	}
-	if err != nil {
-		return nil, errors.New(err,
-			fmt.Sprintf("could not read configuration file %s", pathConfigFile),
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, pathConfigFile))
-	}
-
-	pc := &struct {
-		Headers        map[string]string                      `json:"agent.headers,omitempty" yaml:"agent.headers,omitempty" config:"agent.headers,omitempty"`
-		LogLevel       string                                 `json:"agent.logging.level,omitempty" yaml:"agent.logging.level,omitempty" config:"agent.logging.level,omitempty"`
-		MonitoringHTTP *monitoringConfig.MonitoringHTTPConfig `json:"agent.monitoring.http,omitempty" yaml:"agent.monitoring.http,omitempty" config:"agent.monitoring.http,omitempty"`
-	}{
-		MonitoringHTTP: monitoringConfig.DefaultConfig().HTTP,
-	}
-
-	if err := rawConfig.UnpackTo(&pc); err != nil {
-		return nil, err
-	}
-
-	if pc.LogLevel != "" {
-		persistentMap["logging.level"] = pc.LogLevel
-	}
-
-	if pc.MonitoringHTTP != nil {
-		persistentMap["monitoring.http"] = pc.MonitoringHTTP
-	}
-
-	return persistentMap, nil
 }
 
 func expBackoffWithContext(ctx context.Context, init, max time.Duration) backoff.Backoff {

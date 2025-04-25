@@ -51,6 +51,7 @@ func (e *AuditUnenrollRequest) Validate() error {
 	}
 	switch e.Reason {
 	case ReasonUninstall:
+	case ReasonMigration:
 	default:
 		return &ReqError{fmt.Errorf("unsupported reason: %s", e.Reason)}
 	}

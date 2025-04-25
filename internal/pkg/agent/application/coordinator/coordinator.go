@@ -13,6 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
+	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/configtranslate"
 
 	"go.opentelemetry.io/collector/component/componentstatus"
@@ -28,16 +30,19 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+	fleetapiClient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -46,8 +51,13 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/limits"
+	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
+
+const fleetServer = "fleet-server"
+
+var ErrNotManaged = errors.New("unmanaged agent")
 
 // ErrNotUpgradable error is returned when upgrade cannot be performed.
 var ErrNotUpgradable = errors.New(
@@ -58,6 +68,7 @@ var ErrNotUpgradable = errors.New(
 // attempted at the same time.
 var ErrUpgradeInProgress = errors.New("upgrade already in progress")
 
+var enrollDelay = 1 * time.Second // max delay to start enrollment
 // ReExecManager provides an interface to perform re-execution of the entire agent.
 type ReExecManager interface {
 	ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string)
@@ -545,54 +556,100 @@ func (c *Coordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ..
 	c.reexecMgr.ReExec(callback, argOverrides...)
 }
 
-func (c *Coordinator) Migrate(ctx context.Context, action *fleetapi.ActionMigrate) error {
+// Migrate migrates agent to a new cluster and ACKs success to the old one.
+// In case of failure no ack is performed and error is returned.
+func (c *Coordinator) Migrate(ctx context.Context, action *fleetapi.ActionMigrate, backoffFactory func(done <-chan struct{}) backoff.Backoff) error {
 	if !c.isManaged {
-		return errors.New("unmanaged agent, use Enroll instead")
+		return ErrNotManaged
 	}
 
 	// check if agent is FS, fail if so
 	if c.isFleetServer() {
-		err := errors.New("agent runs Fleet server")
-		c.ackMigration(ctx, action, err)
-		return err
+		return errors.New("unsupported action: agent runs Fleet server")
 	}
 
-	// Target Fleet server is checked prior to reenroll
-	var originalClient fleetclient.Sender
-	if err := enroll.CheckRemote(ctx, originalClient); err != nil {
-		return err
+	// Keeping all enrollment options that are not overriden via action
+	options, err := c.computeEnrollOptions(ctx, paths.ConfigFile(), paths.AgentConfigFile())
+	if err != nil {
+		return fmt.Errorf("failed to compute enroll options: %w", err)
 	}
 
-	if err := enroll.BackupConfig(); err != nil {
-		return err
-	}
-
-	// construct options
-	_, err := enroll.OptionsFromMigrateAction(action)
+	persistentConfig, err := enroll.LoadPersistentConfig(paths.ConfigFile())
 	if err != nil {
 		return err
 	}
 
+	originalRemoteConfig, err := options.RemoteConfig(false)
+	if err != nil {
+		return fmt.Errorf("failed to construct original remote config: %w", err)
+	}
+
+	originalClient, err := fleetapiClient.NewAuthWithConfig(
+		c.logger, options.EnrollAPIKey, originalRemoteConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create original fleet client: %w", err)
+	}
+
+	// merge with options coming from action
+	options, err = enroll.MergeOptionsWithMigrateAction(action, options)
+
+	newRemoteConfig, err := options.RemoteConfig(true)
+	if err != nil {
+		return fmt.Errorf("failed to construct new remote config: %w", err)
+	}
+	newFleetClient, err := fleetapiClient.NewAuthWithConfig(
+		c.logger, options.EnrollAPIKey, newRemoteConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create new fleet client: %w", err)
+	}
+
+	// Target is checked prior to enroll
+	if err := enroll.CheckRemote(ctx, newFleetClient); err != nil {
+		return err
+	}
+
+	// Backing up config
+	if err := enroll.BackupConfig(); err != nil {
+		return err
+	}
+
+	encStore, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile())
+	if err != nil {
+		return fmt.Errorf("failed to create encrypted disk store: %w", err)
+	}
+	store := storage.NewReplaceOnSuccessStore(
+		paths.ConfigFile(),
+		info.DefaultAgentFleetConfig,
+		encStore,
+	)
+
 	// Agent enrolls to target cluster
-	// Keeping all enrollment options that are not overriden via action
+	err = enroll.EnrollWithBackoff(ctx, c.logger,
+		persistentConfig,
+		enrollDelay,
+		options,
+		store,
+		backoffFactory,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to enroll: %w", err)
+	}
 
-	// If replace-token is present, keep Agent ID
-	// if replace-token is present and there's a conflict in IDs with target cluster -> action failure
-
-	// In case of failure Agent reports failure to source cluster and keeps enrolled there
+	if err := enroll.CleanBackupConfig(); err != nil {
+		// when backup is present, it will be restored on next start.
+		// do not ack success
+		return fmt.Errorf("failed to clean backup config: %w", err)
+	}
 
 	// ACK success to source fleet server
-	if err := c.ackMigration(ctx, action, nil); err != nil {
+	if err := c.ackMigration(ctx, action, c.fleetAcker); err != nil {
 		c.logger.Infof("failed to ACK success: %v", err)
 	}
 
 	// Best effort: call unenroll on source cluster once done
 	if err := c.unenroll(ctx, originalClient); err != nil {
 		c.logger.Infof("failed to unenroll from original cluster: %v", err)
-
 	}
-
-	// reexec
 
 	return nil
 }
@@ -1581,12 +1638,49 @@ func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtime
 }
 
 func (c *Coordinator) isFleetServer() bool {
+	for _, s := range c.state.Components {
+		if s.Component.InputType == fleetServer {
+			return true
+		}
+	}
 	return false
 }
 
-func (c *Coordinator) ackMigration(ctx context.Context, action *fleetapi.ActionMigrate, err error) error {
+func (c *Coordinator) ackMigration(ctx context.Context, action *fleetapi.ActionMigrate, acker acker.Acker) error {
+	if err := acker.Ack(ctx, action); err != nil {
+		return fmt.Errorf("failed to ack migrate action: %w", err)
+	}
+
+	if err := acker.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit migrate action: %w", err)
+	}
 
 	return nil
+}
+
+func (c *Coordinator) computeEnrollOptions(ctx context.Context, cfgPath string, cfgFleetPath string) (enroll.EnrollOptions, error) {
+	var options enroll.EnrollOptions
+	isRoot, err := utils.HasRoot()
+	if err != nil {
+		return options, fmt.Errorf("failed to detect root: %w", err)
+	}
+	rawCfg, err := operations.LoadFullAgentConfig(ctx, c.logger, cfgPath, false, !isRoot)
+	if err != nil {
+		return options, fmt.Errorf("failed to load agent config: %w", err)
+	}
+
+	store, err := storage.NewEncryptedDiskStore(ctx, cfgFleetPath)
+	if err != nil {
+		return options, fmt.Errorf("error instantiating encrypted disk store: %w", err)
+	}
+
+	cfg, err := mergeFleetConfig(ctx, rawCfg, store)
+	if err != nil {
+		return options, fmt.Errorf("failed to merge agent fleet config: %w", err)
+	}
+
+	options = enroll.FromFleetConfig(cfg.Fleet)
+	return options, nil
 }
 
 // generateComponentModel regenerates the configuration tree and
@@ -2007,4 +2101,38 @@ func (c *Coordinator) unenroll(ctx context.Context, client fleetclient.Sender) e
 
 	unenrollResp.Body.Close()
 	return nil
+}
+
+func mergeFleetConfig(ctx context.Context, rawConfig *config.Config, store storage.Storage) (*configuration.Configuration, error) {
+	reader, err := store.Load()
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize config store: %w", err)
+	}
+
+	config, err := config.NewConfigFrom(reader)
+	if err != nil {
+		return nil, fmt.Errorf("fail to read configuration for the elastic-agent: %w", err)
+	}
+
+	// merge local configuration and configuration persisted from fleet.
+	err = rawConfig.Merge(config)
+	if err != nil {
+		return nil, fmt.Errorf("fail to merge configuration for the elastic-agent: %w", err)
+	}
+
+	cfg, err := configuration.NewFromConfig(rawConfig)
+	if err != nil {
+		return nil, fmt.Errorf("fail to unpack configuration: %w", err)
+	}
+
+	// Fix up fleet.agent.id otherwise the fleet.agent.id is empty string
+	if cfg.Settings != nil && cfg.Fleet != nil && cfg.Fleet.Info != nil && cfg.Fleet.Info.ID == "" {
+		cfg.Fleet.Info.ID = cfg.Settings.ID
+	}
+
+	if err := cfg.Fleet.Valid(); err != nil {
+		return nil, fmt.Errorf("fleet configuration is invalid: %w", err)
+	}
+
+	return cfg, nil
 }

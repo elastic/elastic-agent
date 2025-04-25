@@ -8,8 +8,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -17,7 +21,8 @@ import (
 )
 
 type MigrateCoordinator interface {
-	Migrate(_ context.Context, _ *fleetapi.ActionMigrate) error
+	Migrate(_ context.Context, _ *fleetapi.ActionMigrate, _ func(done <-chan struct{}) backoff.Backoff) error
+	ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string)
 }
 
 // Settings handles settings change coming from fleet and updates log level.
@@ -25,6 +30,7 @@ type Migrate struct {
 	log       *logger.Logger
 	agentInfo info.Agent
 	coord     MigrateCoordinator
+	ch        chan coordinator.ConfigChange
 
 	tamperProtectionFn func() bool // allows to inject the flag for tests, defaults to features.TamperProtection
 }
@@ -55,25 +61,38 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 	if h.tamperProtectionFn() {
 		// tamper protected agents are unsupported, fail fast
 		err := errors.New("unsupported action: tamper protected agent")
-		action.Err = err
-
-		if err := ack.Ack(ctx, action); err != nil {
-			h.log.Errorw("failed to ack migrate action",
-				"error.message", err,
-				"action", action)
-		}
-
-		if err := ack.Commit(ctx); err != nil {
-			h.log.Errorw("failed to commit migrate action",
-				"error.message", err,
-				"action", action)
-		}
+		h.ackFailure(ctx, err, action, ack)
 		return err
 	}
 
-	if err := h.coord.Migrate(ctx, action); err != nil {
+	if err := h.coord.Migrate(ctx, action, fleetgateway.RequestBackoff); err != nil {
+		if err == coordinator.ErrNotManaged {
+			return errors.New("unmanaged agent, use Enroll instead")
+		}
+
+		// ack failure
+		h.ackFailure(ctx, err, action, ack)
 		return fmt.Errorf("migration of agent to a new cluster failed: %w", err)
+
 	}
 
+	// reexec and load new config
+	h.coord.ReExec(nil)
 	return nil
+}
+
+func (h *Migrate) ackFailure(ctx context.Context, err error, action *fleetapi.ActionMigrate, acker acker.Acker) {
+	action.Err = err
+
+	if err := acker.Ack(ctx, action); err != nil {
+		h.log.Errorw("failed to ack migrate action",
+			"error.message", err,
+			"action", action)
+	}
+
+	if err := acker.Commit(ctx); err != nil {
+		h.log.Errorw("failed to commit migrate action",
+			"error.message", err,
+			"action", action)
+	}
 }

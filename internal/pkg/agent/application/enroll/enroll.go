@@ -11,19 +11,24 @@ import (
 	"fmt"
 	"io"
 	"math/rand/v2"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/otiai10/copy"
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
+	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/crypto"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
@@ -40,6 +45,9 @@ const (
 	defaultFleetServerPort         = 8220
 	defaultFleetServerInternalHost = "localhost"
 	defaultFleetServerInternalPort = 8221
+	statusPath                     = "/api/status"
+	apiStatusTimeout               = 15 * time.Second
+	backupSuffix                   = ".enroll.bak"
 )
 
 type saver interface {
@@ -47,15 +55,66 @@ type saver interface {
 }
 
 func CheckRemote(ctx context.Context, c fleetclient.Sender) error {
+	ctx, cancel := context.WithTimeout(ctx, apiStatusTimeout)
+	defer cancel()
+
+	// TODO: a HEAD should be enough as we need to test only the connectivity part
+	resp, err := c.Send(ctx, http.MethodGet, "/api/status", nil, nil, nil)
+	if err != nil {
+		return fmt.Errorf("fail to communicate with Fleet Server API client hosts: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("fleet server ping returned a bad status code: %d", resp.StatusCode)
+	}
+
+	// discard body for proper cancellation and connection reuse
+	_, _ = io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+
 	return nil
 }
+
+// BackupConfig creates a backup of currently used fleet config
 func BackupConfig() error {
+	configFile := paths.AgentConfigFile()
+	backup := configFile + backupSuffix
+
+	err := copy.Copy(configFile, backup, copy.Options{
+		PermissionControl: copy.AddPermission(0600),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to backup config file %s -> %s: %w", configFile, backup, err)
+	}
+
 	return nil
 }
 
 // RestoreConfig restores from backup if needed and signals restore was performed
-func RestoreConfig() (bool, error) {
-	return false, nil
+func RestoreConfig() error {
+	configFile := paths.AgentConfigFile()
+	backup := configFile + backupSuffix
+
+	// check backup exists
+	if _, err := os.Stat(backup); os.IsNotExist(err) {
+		return nil
+	}
+
+	if err := file.SafeFileRotate(configFile, backup); err != nil {
+		return fmt.Errorf("failed to safe rotate backup config file: %w", err)
+	}
+
+	return nil
+}
+
+// CleanBackupConfig removes backup config file
+func CleanBackupConfig() error {
+	backup := paths.AgentConfigFile() + backupSuffix
+	if err := os.RemoveAll(backup); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	return nil
 }
 
 func EnrollWithBackoff(
@@ -63,7 +122,6 @@ func EnrollWithBackoff(
 	log *logger.Logger,
 	persistentConfig map[string]interface{},
 	enrollDelay time.Duration,
-	client fleetclient.Sender,
 	options EnrollOptions,
 	configStore saver,
 	backoffFactory func(done <-chan struct{}) backoff.Backoff,
@@ -75,8 +133,24 @@ func EnrollWithBackoff(
 	}
 	delay(ctx, enrollDelay)
 
+	remoteConfig, err := options.RemoteConfig(true)
+	if err != nil {
+		return errors.New(
+			err, "Error",
+			errors.TypeConfig,
+			errors.M(errors.MetaKeyURI, options.URL))
+	}
+
+	client, err := fleetclient.NewWithConfig(log, remoteConfig)
+	if err != nil {
+		return errors.New(
+			err, "Error",
+			errors.TypeNetwork,
+			errors.M(errors.MetaKeyURI, options.URL))
+	}
+
 	log.Infof("Starting enrollment to URL: %s", client.URI())
-	err := enroll(ctx, log, persistentConfig, client, options, configStore)
+	err = enroll(ctx, log, persistentConfig, client, options, configStore)
 	if err == nil {
 		return nil
 	}
@@ -153,7 +227,7 @@ func enroll(
 			errors.TypeNetwork)
 	}
 
-	remoteConfig, err := options.RemoteConfig()
+	remoteConfig, err := options.RemoteConfig(true)
 	if err != nil {
 		return errors.New(err,
 			"fail to create remote fleet-server config",
@@ -379,6 +453,42 @@ func SafelyStoreAgentInfo(s saver, reader io.Reader) error {
 
 	close(signal)
 	return err
+}
+
+func LoadPersistentConfig(pathConfigFile string) (map[string]interface{}, error) {
+	persistentMap := make(map[string]interface{})
+	rawConfig, err := config.LoadFile(pathConfigFile)
+	if os.IsNotExist(err) {
+		return persistentMap, nil
+	}
+	if err != nil {
+		return nil, errors.New(err,
+			fmt.Sprintf("could not read configuration file %s", pathConfigFile),
+			errors.TypeFilesystem,
+			errors.M(errors.MetaKeyPath, pathConfigFile))
+	}
+
+	pc := &struct {
+		Headers        map[string]string                      `json:"agent.headers,omitempty" yaml:"agent.headers,omitempty" config:"agent.headers,omitempty"`
+		LogLevel       string                                 `json:"agent.logging.level,omitempty" yaml:"agent.logging.level,omitempty" config:"agent.logging.level,omitempty"`
+		MonitoringHTTP *monitoringConfig.MonitoringHTTPConfig `json:"agent.monitoring.http,omitempty" yaml:"agent.monitoring.http,omitempty" config:"agent.monitoring.http,omitempty"`
+	}{
+		MonitoringHTTP: monitoringConfig.DefaultConfig().HTTP,
+	}
+
+	if err := rawConfig.UnpackTo(&pc); err != nil {
+		return nil, err
+	}
+
+	if pc.LogLevel != "" {
+		persistentMap["logging.level"] = pc.LogLevel
+	}
+
+	if pc.MonitoringHTTP != nil {
+		persistentMap["monitoring.http"] = pc.MonitoringHTTP
+	}
+
+	return persistentMap, nil
 }
 
 func delay(ctx context.Context, d time.Duration) {

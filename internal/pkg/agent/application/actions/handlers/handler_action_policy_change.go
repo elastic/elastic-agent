@@ -10,7 +10,6 @@ import (
 	goerrors "errors"
 	"fmt"
 	"io"
-	"net/http"
 	"sort"
 	"time"
 
@@ -21,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -171,28 +171,7 @@ func testFleetConfig(ctx context.Context, log *logger.Logger, clientConfig remot
 				clientConfig.Hosts, clientConfig.Host)))
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, apiStatusTimeout)
-	defer cancel()
-
-	// TODO: a HEAD should be enough as we need to test only the connectivity part
-	resp, err := fleetClient.Send(ctx, http.MethodGet, "/api/status", nil, nil, nil)
-	if err != nil {
-		return errors.New(
-			err, "fail to communicate with Fleet Server API client hosts",
-			errors.TypeNetwork, errors.M("hosts", clientConfig.Hosts))
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return errors.New(
-			err, fmt.Sprintf("fleet server ping returned a bad status code: %d", resp.StatusCode),
-			errors.TypeNetwork, errors.M("hosts", clientConfig.Hosts))
-	}
-
-	// discard body for proper cancellation and connection reuse
-	_, _ = io.Copy(io.Discard, resp.Body)
-	resp.Body.Close()
-
-	return nil
+	return enroll.CheckRemote(ctx, fleetClient)
 }
 
 // updateFleetConfig copies the relevant Fleet client settings from policyConfig on agentConfig. The destination struct is modified in-place

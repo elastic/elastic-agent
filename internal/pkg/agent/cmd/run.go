@@ -164,6 +164,11 @@ func logReturn(l *logger.Logger, err error) error {
 }
 
 func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override application.CfgOverrider, stop chan bool, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
+	err := enroll.RestoreConfig()
+	if err != nil {
+		return err
+	}
+
 	cfg, err := loadConfig(ctx, override)
 	if err != nil {
 		return err
@@ -200,7 +205,6 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override ap
 	if err != nil {
 		return logReturn(l, errors.New(err, "failed to perform delayed enrollment"))
 	}
-	pathConfigFile := paths.AgentConfigFile()
 
 	// agent ID needs to stay empty in bootstrap mode
 	createAgentID := true
@@ -238,7 +242,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override ap
 		return logReturn(l, errors.New(err,
 			"could not load agent info",
 			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, pathConfigFile)))
+			errors.M(errors.MetaKeyPath, paths.AgentConfigFile())))
 	}
 
 	// Ensure that the log level now matches what is configured in the agentInfo.
@@ -540,7 +544,7 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	}
 	store := storage.NewReplaceOnSuccessStore(
 		pathConfigFile,
-		application.DefaultAgentFleetConfig,
+		info.DefaultAgentFleetConfig,
 		encStore,
 	)
 	c, err := newEnrollCmd(
