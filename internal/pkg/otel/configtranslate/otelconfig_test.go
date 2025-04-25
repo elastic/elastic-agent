@@ -282,7 +282,7 @@ func TestGetOtelConfig(t *testing.T) {
 		return map[string]any{
 			"http": map[string]any{
 				"enabled": true,
-				"host":    "localhost:9999",
+				"host":    "localhost",
 			},
 		}
 	}
@@ -399,7 +399,7 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 						"http": map[string]any{
 							"enabled": true,
-							"host":    "localhost:9999",
+							"host":    "localhost",
 						},
 					},
 				},
@@ -492,7 +492,7 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 						"http": map[string]any{
 							"enabled": true,
-							"host":    "localhost:9999",
+							"host":    "localhost",
 						},
 					},
 				},
