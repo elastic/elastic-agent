@@ -16,6 +16,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 )
 
 // InitStorage prepares storage for testing.
@@ -23,6 +24,7 @@ import (
 func InitStorage(t *testing.T) {
 	storage.DisableEncryptionDarwin()
 	if runtime.GOOS != "darwin" {
+		fipsutils.SkipIfFIPSOnly(t, "secret storage does not use NewGCMWithRandomNonce.")
 		err := secret.CreateAgentSecret(context.Background())
 		if err != nil {
 			t.Fatal(err)

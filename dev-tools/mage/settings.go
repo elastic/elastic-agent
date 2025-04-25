@@ -337,7 +337,7 @@ func AgentPackageVersion() (string, error) {
 	return BeatQualifiedVersion()
 }
 
-func PackageManifest() (string, error) {
+func PackageManifest(fips bool) (string, error) {
 
 	packageVersion, err := AgentPackageVersion()
 	if err != nil {
@@ -359,14 +359,15 @@ func PackageManifest() (string, error) {
 		return "", fmt.Errorf("retrieving agent flavors: %w", err)
 	}
 
-	return GeneratePackageManifest(BeatName, packageVersion, Snapshot, hash, commitHashShort, registry)
+	return GeneratePackageManifest(BeatName, packageVersion, Snapshot, hash, commitHashShort, fips, registry)
 }
 
-func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, fullHash, shortHash string, flavorsRegistry map[string][]string) (string, error) {
+func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, fullHash, shortHash string, fips bool, flavorsRegistry map[string][]string) (string, error) {
 	m := v1.NewManifest()
 	m.Package.Version = packageVersion
 	m.Package.Snapshot = snapshot
 	m.Package.Hash = fullHash
+	m.Package.Fips = fips
 
 	versionedHomePath := path.Join("data", fmt.Sprintf("%s-%s", beatName, shortHash))
 	m.Package.VersionedHome = versionedHomePath

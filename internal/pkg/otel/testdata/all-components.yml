@@ -9,6 +9,7 @@ exporters:
     endpoint: localhots:4317
   otlphttp:
     endpoint: https://localhost.com:4318
+  nop:
 
 extensions:
   health_check:
@@ -37,16 +38,9 @@ processors:
     limit_mib: 4000
     spike_limit_mib: 800
   elastictrace:
-  lsminterval:
-    intervals:
-      - duration: 1m
-        statements:
-          - set(resource.attributes["metricset.interval"], "1m")
-      - duration: 10m
-        statements:
-          - set(resource.attributes["metricset.interval"], "10m")
 
 receivers:
+  nop:
   filelog:
     include:
       - /filelog/path
@@ -96,34 +90,7 @@ connectors:
       - service.name
       - telemetry.sdk.language
       - telemetry.sdk.name
-  signaltometrics:
-    spans:
-      - name: span.histogram
-        description: Span histogram metric
-        include_resource_attributes:
-          - key: service.name
-          - key: deployment.environment
-        attributes:
-          - key: transaction.type
-        exponential_histogram:
-          max_size: 2
-          value: Microseconds(end_time - start_time)
-    datapoints:
-      - name: datapoint.total
-        description: Count of all datapoints
-        include_resource_attributes:
-          - key: service.name
-          - key: deployment.environment
-        sum:
-          value: "1"
-    logs:
-      - name: logrecord.total
-        description: Count of all log records
-        include_resource_attributes:
-          - key: service.name
-          - key: deployment.environment
-        sum:
-          value: "1"
+  elasticapm:
 
 service:
   extensions:
@@ -132,6 +99,7 @@ service:
   pipelines:
     logs:
       exporters:
+        - nop
         - debug
         - elasticsearch
         - file
@@ -147,9 +115,11 @@ service:
       receivers:
         - filelog
         - otlp
+        - nop
 
     metrics:
       exporters:
+        - nop
         - debug
         - otlp
       processors:
@@ -161,28 +131,29 @@ service:
         - resourcedetection
         - transform
       receivers:
+        - nop
         - otlp
         - httpcheck
         - spanmetrics
         - prometheus
 
     metrics/aggregated:
+      receivers:
+        - elasticapm
+      processors:
       exporters:
         - debug
         - otlp
-      processors:
-        - lsminterval
-      receivers:
-        - signaltometrics
 
     traces:
       exporters:
+        - nop
         - debug
         - elasticsearch
         - otlp
         - otlphttp
         - spanmetrics
-        - signaltometrics
+        - elasticapm
       processors:
         - attributes
         - batch
@@ -192,6 +163,7 @@ service:
         - transform
         - elastictrace
       receivers:
+        - nop
         - otlp
         - jaeger
         - zipkin

@@ -83,7 +83,7 @@ between, and it can be very specific or not very specific.
 - `TEST_PLATFORMS="linux/amd64/ubuntu/20.04 mage integration:test` to execute tests only on Ubuntu 20.04 ARM64.
 - `TEST_PLATFORMS="windows/amd64/2022 mage integration:test` to execute tests only on Windows Server 2022.
 - `TEST_PLATFORMS="linux/amd64 windows/amd64/2022 mage integration:test` to execute tests on Linux AMD64 and Windows Server 2022.
-- `TEST_PLATFORMS="kubernetes/arm64/1.31.0/wolfi" mage integration:kubernetes` to execute kubernetes tests on Kubernetes version 1.31.0 with wolfi docker variant.
+- `TEST_PLATFORMS="kubernetes/arm64/1.32.0/wolfi" mage integration:kubernetes` to execute kubernetes tests on Kubernetes version 1.32.0 with wolfi docker variant.
 
 > **_NOTE:_**  This only filters down the tests based on the platform. It will not execute a tests on a platform unless
 > the test defines as supporting it.
@@ -291,6 +291,22 @@ suite has this ability built into it. Using the `TEST_RUN_UNTIL_FAILURE=true` wi
 until it reports a failure.
 
 - `TEST_RUN_UNTIL_FAILURE=true mage integration:single [testName]`
+
+### Running integration tests with local changes in beats (for otel receivers)
+
+If you've made local changes to Beats-OTeL and want to run the Agent's integration tests against those changes, follow these steps:
+1. Update go.mod and add a replace directive as follows (change the path to match your local machine):
+```
+replace github.com/elastic/beats/v7 => /Users/vihasmakwana/Desktop/Vihas/elastic/beats
+```
+2. Package the Agent with `EXTERNAL=true`:
+```sh
+  EXTERNAL=true PLATFORMS=darwin/arm64 mage package
+```
+3. Run integration tests as per [the instructions](#running-the-tests)
+
+**_NOTE:_**: Make sure you add an absolute path in replace
+**_NOTE:_**: Old agent might be cached at `.agent-testing` directory. Run `mage integration:clean` to clean it.
 
 ## Writing tests
 
