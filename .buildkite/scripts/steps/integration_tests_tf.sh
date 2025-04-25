@@ -2,14 +2,16 @@
 set -euo pipefail
 
 source .buildkite/scripts/common-integration.sh
-source .buildkite/scripts/steps/ess.sh
-source .buildkite/scripts/steps/fleet.sh
 
 # Make sure that all tools are installed
 asdf install
 
 GROUP_NAME=$1
 TEST_SUDO=$2
+# NOTE: This argument is not used in this script, but is declared to show that it can be set
+# and passed down to downstream scripts where it may be used.
+TEST_NAME_PATTERN=${3:-""}
+STACK_TYPE=${4:-"ess"}
 if [ -z "$GROUP_NAME" ]; then
   echo "Error: Specify the group name: integration_tests_tf.sh [group_name]" >&2
   exit 1
@@ -20,6 +22,20 @@ if [ -z "$TEST_SUDO" ]; then
   exit 1
 fi
 
+# Load correct stack script
+if [ "$STACK_TYPE" == "ess" ]; then
+  source .buildkite/scripts/steps/ess.sh
+  source .buildkite/scripts/steps/fleet.sh
+else
+  source .buildkite/scripts/steps/serverless.sh
+fi
+
+# Override the agent package version using a string with format <major>.<minor>.<patch>
+# There is a time when the snapshot is not built yet, so we cannot use the latest version automatically
+# This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
+OVERRIDE_STACK_VERSION="$(cat .package-version)"
+OVERRIDE_STACK_VERSION=${OVERRIDE_STACK_VERSION}"-SNAPSHOT"
+
 echo "~~~ Building test binaries"
 mage build:testBinaries
 
@@ -27,24 +43,41 @@ mage build:testBinaries
 # BUILDKITE_RETRY_COUNT == "0" for the first run
 # BUILDKITE_RETRY_COUNT > 0 for the retries
 if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
-  echo "~~~ The steps is retried, starting the ESS stack again"
-  echo "~~~ Getting stable stack version"
-  DEFAULT_STACK_VERSION="$(cat .package-version)-SNAPSHOT"
-  # Stable ESS version is set in the ess_start.sh step
-  STABLE_ESS_VERSION=$(buildkite-agent meta-data get "stable.ess.version")
+  if [ "$STACK_TYPE" == "ess" ]; then
+    echo "~~~ The steps is retried, starting the ESS stack again"
+    echo "~~~ Getting stable stack version"
+    DEFAULT_STACK_VERSION="$(cat .package-version)-SNAPSHOT"
+    # Stable ESS version is set in the ess_start.sh step
+    STABLE_ESS_VERSION=$(buildkite-agent meta-data get "stable.ess.version")
 
-  trap 'ess_down' EXIT
-  ess_up $DEFAULT_STACK_VERSION $STABLE_ESS_VERSION || echo "Failed to start ESS stack" >&2
-  preinstall_fleet_packages
+    trap 'ess_down' EXIT
+    ess_up $DEFAULT_STACK_VERSION $STABLE_ESS_VERSION || echo "Failed to start ESS stack" >&2
+    preinstall_fleet_packages
+  else
+    echo "~~~ The steps is retried, starting the Serverless project again"
+    trap 'serverless_down' EXIT
+    serverless_up || echo "Failed to start Serverless observability object" >&2
+  fi
 else
-  # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data
-  echo "~~~ Receiving ESS stack metadata"
-  export ELASTICSEARCH_HOST=$(buildkite-agent meta-data get "es.host")
-  export ELASTICSEARCH_USERNAME=$(buildkite-agent meta-data get "es.username")
-  export ELASTICSEARCH_PASSWORD=$(buildkite-agent meta-data get "es.pwd")
-  export KIBANA_HOST=$(buildkite-agent meta-data get "kibana.host")
-  export KIBANA_USERNAME=$(buildkite-agent meta-data get "kibana.username")
-  export KIBANA_PASSWORD=$(buildkite-agent meta-data get "kibana.pwd")
+  if [ "$STACK_TYPE" == "ess" ]; then
+    # For the first run, we start the stack in the ess_start.sh step and it sets the meta-data
+    echo "~~~ Receiving ESS stack metadata"
+    export ELASTICSEARCH_HOST=$(buildkite-agent meta-data get "es.host")
+    export ELASTICSEARCH_USERNAME=$(buildkite-agent meta-data get "es.username")
+    export ELASTICSEARCH_PASSWORD=$(buildkite-agent meta-data get "es.pwd")
+    export KIBANA_HOST=$(buildkite-agent meta-data get "kibana.host")
+    export KIBANA_USERNAME=$(buildkite-agent meta-data get "kibana.username")
+    export KIBANA_PASSWORD=$(buildkite-agent meta-data get "kibana.pwd")
+  else
+    # For the first run, we start the serverless project in the serverless_start.sh step and it sets the meta-data
+    echo "~~~ Receiving Serverless project metadata"
+    export ELASTICSEARCH_HOST=$(buildkite-agent meta-data get "serverless.es.host")
+    export ELASTICSEARCH_USERNAME=$(buildkite-agent meta-data get "serverless.es.username")
+    export ELASTICSEARCH_PASSWORD=$(buildkite-agent meta-data get "serverless.es.pwd")
+    export KIBANA_HOST=$(buildkite-agent meta-data get "serverless.kibana.host")
+    export KIBANA_USERNAME=$(buildkite-agent meta-data get "serverless.kibana.username")
+    export KIBANA_PASSWORD=$(buildkite-agent meta-data get "serverless.kibana.pwd")
+  fi
 fi
 
 # TODO: move to common.sh when it's refactored
