@@ -61,6 +61,12 @@ var (
 	ErrFipsToNonFips      = errors.New("cannot switch to non-fips mode when upgrading")
 )
 
+func init() {
+	if release.FIPSDistribution() {
+		agentArtifact.Cmd += "-fips"
+	}
+}
+
 // Upgrader performs an upgrade
 type Upgrader struct {
 	log            *logger.Logger
