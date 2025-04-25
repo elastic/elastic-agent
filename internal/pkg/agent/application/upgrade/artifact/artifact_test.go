@@ -5,9 +5,11 @@
 package artifact
 
 import (
-	agtversion "github.com/elastic/elastic-agent/pkg/version"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 func TestGetArtifactName(t *testing.T) {
