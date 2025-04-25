@@ -11,7 +11,8 @@ $PSVersionTable.PSVersion
 
 if ($STACK_TYPE -eq "ess") {
     . "$PWD\.buildkite\scripts\steps\ess.ps1"
-} else {
+}
+else {
     . "$PWD\.buildkite\scripts\steps\serverless.ps1"
 }
 
@@ -37,11 +38,11 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 $osInfo = (Get-CimInstance Win32_OperatingSystem).Caption + " " + (Get-CimInstance Win32_OperatingSystem).OSArchitecture -replace " ", "_"
-$root_suffix=""
+$root_suffix = ""
 if ($TEST_SUDO -eq "true") {
-    $root_suffix="_sudo"
+    $root_suffix = "_sudo"
 }
-$fully_qualified_group_name="${GROUP_NAME}${root_suffix}_${osInfo}"
+$fully_qualified_group_name = "${GROUP_NAME}${root_suffix}_${osInfo}"
 $outputXML = "build/${fully_qualified_group_name}.integration.xml"
 $outputJSON = "build/${fully_qualified_group_name}.integration.out.json"
 
@@ -51,7 +52,8 @@ $stackVersion = (Get-Content .package-version).Trim() + "-SNAPSHOT"
 $stableSnapshotVersion = & buildkite-agent meta-data get "stable.ess.version" --default ""
 if ($STACK_TYPE -eq "ess") {
     Get-Ess-Stack -StackVersion $stackVersion -StableSnapshotVersion $stableSnapshotVersion
-} else {
+}
+else {
     Get-Serverless-Project
 }
 
@@ -63,17 +65,19 @@ if ($LASTEXITCODE -ne 0) {
 $TestsExitCode = 0
 try {    
     Write-Output "~~~ Running integration test group: $GROUP_NAME as user: $env:USERNAME"
-    $gotestArgs = @("-tags=integration", "-shuffle=on", "-timeout=2h0m0s")
-    if ($TEST_NAME_PATTERN -ne "") {
-        $gotestArgs += "-run=${TEST_NAME_PATTERN}"
-    }
-    $gotestArgs += @("github.com/elastic/elastic-agent/testing/integration", "-v", "-args", "-integration.groups=$GROUP_NAME", "-integration.sudo=$TEST_SUDO")
-    & gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- @gotestArgs
-    $TestsExitCode = $LASTEXITCODE
-} finally {
+    # $gotestArgs = @("-tags=integration", "-shuffle=on", "-timeout=2h0m0s")
+    # if ($TEST_NAME_PATTERN -ne "") {
+    #     $gotestArgs += "-run=${TEST_NAME_PATTERN}"
+    # }
+    # & gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- @gotestArgs
+    # $gotestArgs += @("github.com/elastic/elastic-agent/testing/integration", "-v", "-args", "-integration.groups=$GROUP_NAME", "-integration.sudo=$TEST_SUDO")
+    $TestsExitCode = 1
+}
+finally {
     if ($STACK_TYPE -eq "ess") {
         ess_down
-    } else {
+    }
+    else {
         serverless_down
     }
 
@@ -81,7 +85,8 @@ try {
         # Install junit2html if not installed
         go install github.com/alexec/junit2html@latest
         Get-Content $outputXML | junit2html > "build/TEST-report.html"
-    } else {
+    }
+    else {
         Write-Output "Cannot generate HTML test report: $outputXML not found"
     }
 }

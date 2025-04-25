@@ -11,7 +11,7 @@ ess_up $DEFAULT_STACK_VERSION $STABLE_ESS_VERSION
 
 preinstall_fleet_packages
 
-if [ "${CI:=false}" == 'true' ]; then  
+if [ "${CI:=false}" == 'true' ]; then
   buildkite-agent meta-data set "es.host" $ELASTICSEARCH_HOST
   buildkite-agent meta-data set "es.username" $ELASTICSEARCH_USERNAME
   buildkite-agent meta-data set "es.pwd" $ELASTICSEARCH_PASSWORD

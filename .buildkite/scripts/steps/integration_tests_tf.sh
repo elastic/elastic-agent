@@ -54,6 +54,7 @@ if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
     ess_up $DEFAULT_STACK_VERSION $STABLE_ESS_VERSION || echo "Failed to start ESS stack" >&2
     preinstall_fleet_packages
   else
+    exit 1
     echo "~~~ The steps is retried, starting the Serverless project again"
     trap 'serverless_down' EXIT
     serverless_up || echo "Failed to start Serverless observability object" >&2

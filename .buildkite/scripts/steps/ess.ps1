@@ -130,5 +130,6 @@ function Get-Ess-Stack {
       $Env:KIBANA_USERNAME = & buildkite-agent meta-data get "kibana.username"
       $Env:KIBANA_PASSWORD = & buildkite-agent meta-data get "kibana.pwd"
       Write-Output "Received ESS stack data from previous step. ES_HOST: $Env:ELASTICSEARCH_HOST"
+      exit 1
   }
 }
