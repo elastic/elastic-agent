@@ -1,19 +1,13 @@
 param (
     [string]$GROUP_NAME,
-    [string]$TEST_SUDO,
-    [string]$TEST_NAME_PATTERN = "",
-    [string]$STACK_TYPE = "ess"
+    [string]$TEST_SUDO
 )
 
 echo "~~~ Preparing environment"
 
 $PSVersionTable.PSVersion
 
-if ($STACK_TYPE -eq "ess") {
-    . "$PWD\.buildkite\scripts\steps\ess.ps1"
-} else {
-    . "$PWD\.buildkite\scripts\steps\serverless.ps1"
-}
+. "$PWD\.buildkite\scripts\steps\ess.ps1"
 
 go install gotest.tools/gotestsum
 gotestsum --version
@@ -32,7 +26,7 @@ $env:SNAPSHOT = $true
 
 echo "~~~ Building test binaries"
 & mage build:testBinaries
-if ($LASTEXITCODE -ne 0) {
+if ($LASTEXITCODE -ne 0) {    
     Write-Error "Failed to build test binaries"
     exit 1
 }
@@ -63,20 +57,11 @@ if ($LASTEXITCODE -ne 0) {
 $TestsExitCode = 0
 try {    
     Write-Output "~~~ Running integration test group: $GROUP_NAME as user: $env:USERNAME"
-    $gotestArgs = @("-tags=integration", "-shuffle=on", "-timeout=2h0m0s")
-    if ($TEST_NAME_PATTERN -ne "") {
-        $gotestArgs += "-run=${TEST_NAME_PATTERN}"
-    }
-    $gotestArgs += @("github.com/elastic/elastic-agent/testing/integration", "-v", "-args", "-integration.groups=$GROUP_NAME", "-integration.sudo=$TEST_SUDO")
-    & gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- @gotestArgs
-    $TestsExitCode = $LASTEXITCODE
+    & gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags=integration -shuffle=on -timeout=2h0m0s "github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=$GROUP_NAME" "-integration.sudo=$TEST_SUDO"
+    $TestsExitCode = $LASTEXITCODE    
 } finally {
-    if ($STACK_TYPE -eq "ess") {
-        ess_down
-    } else {
-        serverless_down
-    }
-
+    ess_down
+    
     if (Test-Path $outputXML) {
         # Install junit2html if not installed
         go install github.com/alexec/junit2html@latest
@@ -86,6 +71,6 @@ try {
     }
 }
 
-if ($TestsExitCode -ne 0) {
+if ($TestsExitCode -ne 0) {    
     exit 1
 }
