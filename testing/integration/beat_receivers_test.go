@@ -17,13 +17,14 @@ import (
 
 	"gopkg.in/yaml.v2"
 
+	"github.com/gofrs/uuid/v5"
+	"github.com/stretchr/testify/require"
+
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
-	"github.com/gofrs/uuid/v5"
-	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -308,22 +309,19 @@ func TestAgentMonitoring(t *testing.T) {
 			// Expected to change between agentDocs and OtelDocs
 			"@timestamp",
 			"agent.ephemeral_id",
+			// agent.id is different because it's the id of the underlying beat
 			"agent.id",
+			// agent.version is different because we force version 9.0.0 in CI
 			"agent.version",
+			// elastic_agent.id is different because we currently start a new agent in the second subtest
+			// this should be fixed in the future
+			"elastic_agent.id",
 			"data_stream.namespace",
 			"log.file.inode",
 			"log.file.fingerprint",
 			"log.file.path",
 			"log.offset",
-
-			// needs investigation
-			"event.agent_id_status",
 			"event.ingested",
-
-			// elastic_agent * fields are hardcoded in processor list for now which is why they differ
-			"elastic_agent.id",
-			"elastic_agent.snapshot",
-			"elastic_agent.version",
 		}
 
 		AssertMapsEqual(t, agent, otel, ignoredFields, "expected documents to be equal")
