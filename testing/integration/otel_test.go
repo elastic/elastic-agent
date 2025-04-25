@@ -1114,7 +1114,6 @@ agent:
 	cancel()
 }
 
-<<<<<<< HEAD
 func TestOTelHTTPMetricsInput(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Default,
@@ -1241,8 +1240,6 @@ agent.monitoring:
 	cmd.Wait()
 }
 
-=======
->>>>>>> upstream/9.0
 func TestOtelMBReceiverE2E(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Default,
