@@ -4,6 +4,7 @@
 {{- $inputVal := (include "elasticagent.system.config.logs.input" $ | fromYaml) -}}
 {{- if ($inputVal).streams }}
 {{- include "elasticagent.preset.mutate.inputs" (list $ $preset (list $inputVal)) -}}
+{{- include "elasticagent.preset.mutate.outputs.byname" (list $ $preset $.Values.system.output) -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}

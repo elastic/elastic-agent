@@ -1,0 +1,25 @@
+# This pipeline serves as the entry point for your service's quality gates definitions. When
+# properly configured, it will be invoked automatically as part of the automated
+# promotion process once a new version was rolled out in one of the various cloud stages.
+#
+# The updated environment is provided via ENVIRONMENT variable. The seedling
+# step will branch and execute pipeline snippets at the following location:
+# .buildkite/pipeline.tests-qa.yaml
+# .buildkite/pipeline.tests-staging.yaml
+# .buildkite/pipeline.tests-production.yaml
+#
+# Docs: https://docs.elastic.dev/serverless/qualitygates
+
+env:
+  ENVIRONMENT: ${ENVIRONMENT?}
+  TEAM_CHANNEL: "#agentless-alerts"
+
+steps:
+  - label: ":pipeline::grey_question::seedling: Trigger service tests for ${ENVIRONMENT}"
+    command: ".buildkite/scripts/steps/run-agentless-tests.sh"
+    agents:
+      image: "docker.elastic.co/ci-agent-images/quality-gate-seedling:0.0.4@sha256:b15aa65183fd9ac4b3ad2b01287ee8c47382a74450485b012bade5331fefeae9"
+
+notify:
+  - slack: "${TEAM_CHANNEL}"
+    if: build.branch == "main" && build.state == "failed"

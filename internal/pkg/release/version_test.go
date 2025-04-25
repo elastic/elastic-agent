@@ -75,10 +75,10 @@ func TestVersion(t *testing.T) {
 
 func Test_VersionInfo_WithFIPS(t *testing.T) {
 	info := Info()
-	info.FIPS = false
-	assert.NotContains(t, info.String(), "fips:", "found fips indicator")
-	info.FIPS = true
-	assert.Contains(t, info.String(), "fips: true", "did not find fips indicator")
+	info.FIPSDistribution = false
+	assert.NotContains(t, info.String(), "fips-distribution:", "found fips indicator")
+	info.FIPSDistribution = true
+	assert.Contains(t, info.String(), "fips-distribution: true", "did not find fips indicator")
 }
 
 func TestFIPS(t *testing.T) {
@@ -88,9 +88,9 @@ func TestFIPS(t *testing.T) {
 	})
 
 	fips = ""
-	assert.False(t, FIPS(), "expected FIPS indicator to be false")
+	assert.False(t, FIPSDistribution(), "expected FIPS indicator to be false")
 	fips = "false"
-	assert.False(t, FIPS(), "expected FIPS indicator to be false")
+	assert.False(t, FIPSDistribution(), "expected FIPS indicator to be false")
 	fips = "true"
-	assert.True(t, FIPS(), "expected FIPS indicator to be true")
+	assert.True(t, FIPSDistribution(), "expected FIPS indicator to be true")
 }

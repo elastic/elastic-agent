@@ -24,11 +24,17 @@ func TestAgentPathsPermissions(t *testing.T) {
 
 	err := filepath.WalkDir("/usr/share/elastic-agent", func(walkPath string, d fs.DirEntry, err error) error {
 		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
 			return fmt.Errorf("failed to walk path %s: %w", walkPath, err)
 		}
 
 		info, err := d.Info()
 		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
 			return fmt.Errorf("failed to get info of path %s: %w", walkPath, err)
 		}
 

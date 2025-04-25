@@ -9,12 +9,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/magefile/mage/mg"
 	"github.com/otiai10/copy"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
+	"github.com/elastic/elastic-agent/dev-tools/packaging"
 )
 
 const ComponentSpecFileSuffix = ".spec.yml"
@@ -40,23 +40,36 @@ func CopyComponentSpecs(componentName, versionedDropPath string) (string, error)
 	return GetSHA512Hash(targetPath)
 }
 
-// This is a helper function for flattenDependencies that's used when not packaging from a manifest
-func ChecksumsWithoutManifest(versionedFlatPath string, versionedDropPath string, packageVersion string) map[string]string {
-	globExpr := filepath.Join(versionedFlatPath, fmt.Sprintf("*%s*", packageVersion))
-	if mg.Verbose() {
-		log.Printf("Finding files to copy with %s", globExpr)
-	}
-	files, err := filepath.Glob(globExpr)
-	if err != nil {
-		panic(err)
-	}
-	if mg.Verbose() {
-		log.Printf("Validating checksums for %+v", files)
-		log.Printf("--- Copying into %s: %v", versionedDropPath, files)
-	}
-
+// ChecksumsWithoutManifest is a helper function for flattenDependencies that's used when not packaging from a manifest.
+// This function will iterate over the dependencies, resolve *exactly* the package name for each dependency and platform using the passed
+// dependenciesVersion, and it will copy the extracted files contained in the rootDir of each dependency from the versionedFlatPath
+// (a directory containing all the extracted dependencies per platform) to the versionedDropPath (a drop path by platform
+// that will be used to compose the package content)
+// ChecksumsWithoutManifest will accumulate the checksums of each component spec that is copied, and return it to the caller.
+func ChecksumsWithoutManifest(platform string, dependenciesVersion string, versionedFlatPath string, versionedDropPath string, dependencies []packaging.BinarySpec) map[string]string {
 	checksums := make(map[string]string)
-	for _, f := range files {
+
+	for _, dep := range dependencies {
+
+		if dep.PythonWheel {
+			if mg.Verbose() {
+				log.Printf(">>>>>>> Component %s/%s is a Python wheel, skipping", dep.ProjectName, dep.BinaryName)
+			}
+			continue
+		}
+
+		if !dep.SupportsPlatform(platform) {
+			log.Printf(">>>>>>> Component %s/%s does not support platform %s, skipping", dep.ProjectName, dep.BinaryName, platform)
+			continue
+		}
+
+		srcDir := filepath.Join(versionedFlatPath, dep.GetRootDir(dependenciesVersion, platform))
+
+		if mg.Verbose() {
+			log.Printf("Validating checksums for %+v", dep.BinaryName)
+			log.Printf("--- Copying into %s: %v", versionedDropPath, srcDir)
+		}
+
 		options := copy.Options{
 			OnSymlink: func(_ string) copy.SymlinkAction {
 				return copy.Shallow
@@ -64,187 +77,99 @@ func ChecksumsWithoutManifest(versionedFlatPath string, versionedDropPath string
 			Sync: true,
 		}
 		if mg.Verbose() {
-			log.Printf("> prepare to copy %s into %s ", f, versionedDropPath)
+			log.Printf("> prepare to copy %s into %s ", srcDir, versionedDropPath)
 		}
 
-		err = copy.Copy(f, versionedDropPath, options)
+		err := copy.Copy(srcDir, versionedDropPath, options)
 		if err != nil {
-			panic(err)
+			panic(fmt.Errorf("copying dependency %s files from %q to %q: %w", dep.BinaryName, srcDir, versionedDropPath, err))
 		}
 
 		// copy spec file for match
-		specName := filepath.Base(f)
-		idx := strings.Index(specName, "-"+packageVersion)
-		if idx != -1 {
-			specName = specName[:idx]
-		}
 		if mg.Verbose() {
-			log.Printf(">>>> Looking to copy spec file: [%s]", specName)
+			log.Printf(">>>> Looking to copy spec file: [%s]", dep.BinaryName)
 		}
 
-		checksum, err := CopyComponentSpecs(specName, versionedDropPath)
+		checksum, err := CopyComponentSpecs(dep.BinaryName, versionedDropPath)
 		if err != nil {
 			panic(err)
 		}
 
-		checksums[specName+ComponentSpecFileSuffix] = checksum
+		checksums[dep.BinaryName+ComponentSpecFileSuffix] = checksum
 	}
 
 	return checksums
 }
 
-// This is a helper function for flattenDependencies that's used when building from a manifest
-func ChecksumsWithManifest(requiredPackage string, versionedFlatPath string, versionedDropPath string, manifestResponse *manifest.Build) map[string]string {
+// ChecksumsWithManifest is a helper function for flattenDependencies that's used when building from a manifest.
+// This function will iterate over the dependencies, resolve the package name for each dependency and platform using the manifest,
+// (there may be some variability there in case the manifest does not include an exact match for the expected filename),
+// and it will copy the extracted files contained in the rootDir of each dependency from the versionedFlatPath
+// (a directory containing all the extracted dependencies per platform) to the versionedDropPath (a drop path by platform
+// that will be used to compose the package content)
+// ChecksumsWithManifest will accumulate the checksums of each component spec that is copied, and return it to the caller.
+func ChecksumsWithManifest(platform string, dependenciesVersion string, versionedFlatPath string, versionedDropPath string, manifestResponse *manifest.Build, dependencies []packaging.BinarySpec) map[string]string {
 	checksums := make(map[string]string)
 	if manifestResponse == nil {
 		return checksums
 	}
 
-	// Iterate over the component projects in the manifest
-	projects := manifestResponse.Projects
-	for componentName := range projects {
-		// Iterate over the individual package files within each component project
-		for pkgName := range projects[componentName].Packages {
-			// Only care about packages that match the required package constraint (os/arch)
-			if strings.Contains(pkgName, requiredPackage) {
-				// Iterate over the external binaries that we care about for packaging agent
-				for _, spec := range manifest.ExpectedBinaries {
-					// If the individual package doesn't match the expected prefix, then continue
-					// FIXME temporarily skip fips packages until elastic-agent FIPS is in place
-					if !strings.HasPrefix(pkgName, spec.BinaryName) || strings.Contains(pkgName, "-fips-") {
-						if mg.Verbose() {
-							log.Printf(">>>>>>> Package [%s] skipped", pkgName)
-						}
-						continue
-					}
+	// Iterate over the external binaries that we care about for packaging agent
+	for _, spec := range dependencies {
 
-					if mg.Verbose() {
-						log.Printf(">>>>>>> Package [%s] matches requiredPackage [%s]", pkgName, requiredPackage)
-					}
-
-					// Get the version from the component based on the version in the package name
-					// This is useful in the case where it's an Independent Agent Release, where
-					// the opted-in projects will be one patch version ahead of the rest of the
-					// opted-out/previously-released projects
-					componentVersion := getComponentVersion(componentName, requiredPackage, projects[componentName])
-					if mg.Verbose() {
-						log.Printf(">>>>>>> Component [%s]/[%s] version is [%s]", componentName, requiredPackage, componentVersion)
-					}
-
-					// Combine the package name w/ the versioned flat path
-					fullPath := filepath.Join(versionedFlatPath, pkgName)
-
-					// Eliminate the file extensions to get the proper directory
-					// name that we need to copy
-					var dirToCopy string
-					if strings.HasSuffix(fullPath, ".tar.gz") {
-						dirToCopy = fullPath[:strings.LastIndex(fullPath, ".tar.gz")]
-					} else if strings.HasSuffix(fullPath, ".zip") {
-						dirToCopy = fullPath[:strings.LastIndex(fullPath, ".zip")]
-					} else {
-						dirToCopy = fullPath
-					}
-					if mg.Verbose() {
-						log.Printf(">>>>>>> Calculated directory to copy: [%s]", dirToCopy)
-					}
-
-					// Set copy options
-					options := copy.Options{
-						OnSymlink: func(_ string) copy.SymlinkAction {
-							return copy.Shallow
-						},
-						Sync: true,
-					}
-					if mg.Verbose() {
-						log.Printf("> prepare to copy %s into %s ", dirToCopy, versionedDropPath)
-					}
-
-					// Do the copy
-					err := copy.Copy(dirToCopy, versionedDropPath, options)
-					if err != nil {
-						panic(err)
-					}
-
-					// copy spec file for match
-					specName := filepath.Base(dirToCopy)
-					idx := strings.Index(specName, "-"+componentVersion)
-					if idx != -1 {
-						specName = specName[:idx]
-					}
-					if mg.Verbose() {
-						log.Printf(">>>> Looking to copy spec file: [%s]", specName)
-					}
-
-					checksum, err := CopyComponentSpecs(specName, versionedDropPath)
-					if err != nil {
-						panic(err)
-					}
-
-					checksums[specName+ComponentSpecFileSuffix] = checksum
-				}
+		if spec.PythonWheel {
+			if mg.Verbose() {
+				log.Printf(">>>>>>> Component %s/%s is a Python wheel, skipping", spec.ProjectName, spec.BinaryName)
 			}
+			continue
 		}
+
+		if !spec.SupportsPlatform(platform) {
+			log.Printf(">>>>>>> Component %s/%s does not support platform %s, skipping", spec.ProjectName, spec.BinaryName, platform)
+			continue
+		}
+
+		manifestPackage, err := manifest.ResolveManifestPackage(manifestResponse.Projects[spec.ProjectName], spec, dependenciesVersion, platform)
+		if err != nil {
+			if mg.Verbose() {
+				log.Printf(">>>>>>> Error resolving package for [%s/%s]", spec.BinaryName, platform)
+			}
+			continue
+		}
+
+		rootDir := spec.GetRootDir(manifestPackage.ActualVersion, platform)
+
+		// Combine the package name w/ the versioned flat path
+		fullPath := filepath.Join(versionedFlatPath, rootDir)
+
+		if mg.Verbose() {
+			log.Printf(">>>>>>> Calculated directory to copy: [%s]", fullPath)
+		}
+
+		// Set copy options
+		options := copy.Options{
+			OnSymlink: func(_ string) copy.SymlinkAction {
+				return copy.Shallow
+			},
+			Sync: true,
+		}
+		if mg.Verbose() {
+			log.Printf("> prepare to copy %s into %s ", fullPath, versionedDropPath)
+		}
+
+		// Do the copy
+		err = copy.Copy(fullPath, versionedDropPath, options)
+		if err != nil {
+			panic(err)
+		}
+
+		checksum, err := CopyComponentSpecs(spec.BinaryName, versionedDropPath)
+		if err != nil {
+			panic(err)
+		}
+
+		checksums[spec.BinaryName+ComponentSpecFileSuffix] = checksum
 	}
 
 	return checksums
-}
-
-// This function is used when building with a Manifest.  In that manifest, it's possible
-// for projects in an Independent Agent Release to have different versions since the opted-in
-// ones will be one patch version higher than the opted-out/previously released projects.
-// This function tries to find the versions from the package name
-func getComponentVersion(componentName string, requiredPackage string, componentProject manifest.Project) string {
-	var componentVersion string
-	var foundIt bool
-	// Iterate over all the packages in the component project
-	for pkgName := range componentProject.Packages {
-		// Only care about the external binaries that we want to package
-		for _, spec := range manifest.ExpectedBinaries {
-			// If the given component name doesn't match the external binary component, skip
-			// FIXME temporarily skip fips packages until elastic-agent FIPS is in place
-			if componentName != spec.ProjectName || strings.Contains(pkgName, "-fips-") {
-				continue
-			}
-
-			// Split the package name on the binary name prefix plus a dash
-			firstSplit := strings.Split(pkgName, spec.BinaryName+"-")
-			if len(firstSplit) < 2 {
-				continue
-			}
-
-			// Get the second part of the first split
-			secondHalf := firstSplit[1]
-			if len(secondHalf) < 2 {
-				continue
-			}
-
-			// Make sure the second half matches the required package
-			if strings.Contains(secondHalf, requiredPackage) {
-				// ignore packages with names where this splitting doesn't results in proper version
-				if strings.Contains(secondHalf, "docker-image") {
-					continue
-				}
-				if strings.Contains(secondHalf, "oss-") {
-					continue
-				}
-
-				// The component version should be the first entry after splitting w/ the requiredPackage
-				componentVersion = strings.Split(secondHalf, "-"+requiredPackage)[0]
-				foundIt = true
-				// break out of inner loop
-				break
-			}
-		}
-		if foundIt {
-			// break out of outer loop
-			break
-		}
-	}
-
-	if componentVersion == "" {
-		errMsg := fmt.Sprintf("Unable to determine component version for [%s]", componentName)
-		panic(errMsg)
-	}
-
-	return componentVersion
 }

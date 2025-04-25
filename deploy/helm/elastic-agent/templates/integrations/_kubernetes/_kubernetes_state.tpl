@@ -3,6 +3,7 @@
 {{/* in standablone mode kube-state-metrics will be collected by the clusterWide preset */}}
 {{- with (include "elasticagent.kubernetes.config.state.input" $ | fromYamlArray) -}}
 {{- include "elasticagent.preset.mutate.inputs" (list $ $.Values.agent.presets.clusterWide .) -}}
+{{- include "elasticagent.preset.mutate.outputs.byname" (list $ $.Values.agent.presets.clusterWide $.Values.kubernetes.output) -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}

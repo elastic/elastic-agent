@@ -28,6 +28,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 )
 
 func Test_checkForUnprivilegedVault(t *testing.T) {
@@ -115,6 +116,7 @@ func Test_checkForUnprivilegedVault(t *testing.T) {
 }
 
 func initFileVault(t *testing.T, ctx context.Context, testVaultPath string, keys map[string][]byte) {
+	fipsutils.SkipIfFIPSOnly(t, "file vault does not use NewGCMWithRandomNonce.")
 	opts, err := vault.ApplyOptions(vault.WithVaultPath(testVaultPath))
 	require.NoError(t, err)
 	newFileVault, err := vault.NewFileVault(ctx, opts)
