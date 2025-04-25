@@ -24,13 +24,17 @@ extract_sha() {
     local env=$1
     local sha
 
-    # Ensure repo is available
-    git clone --depth 1 git@github.com:elastic/serverless-gitops.git || (
-        cd serverless-gitops
-        git pull
-    )
 
-    go install github.com/mikefarah/yq/v4@v4.45.1
+
+    # Ensure repo is available - redirect output to /dev/null
+    if [ ! -d "serverless-gitops" ]; then
+        git clone --depth 1 git@github.com:elastic/serverless-gitops.git > /dev/null 2>&1
+    else
+        (cd serverless-gitops && git pull > /dev/null 2>&1)
+    fi
+
+
+    go install github.com/mikefarah/yq/v4@v4.45.1 > /dev/null 2>&1
 
     # Extract first matching SHA for the environment pattern
     sha=$(yq eval ".services.agentless-controller.versions | to_entries | .[] | select(.key | test(\"^${env}.*\")) | .value" serverless-gitops/services/agentless-controller/versions.yaml | head -1)
