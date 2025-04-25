@@ -9,8 +9,8 @@ env:
   IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1744855248"
   IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1744855248"
   IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1744855248"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1744855248"
-  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1744855248"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1745338778"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1745338778"
 
 steps:
   - label: Start ESS stack for integration tests
@@ -61,6 +61,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
+          ImageProject: "elastic-images-qa"
           image: "${IMAGE_WIN_2022}"
         retry:
           automatic:
@@ -81,7 +82,9 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
+          ImageProject: "elastic-images-qa"
           image: "${IMAGE_WIN_2025}"
+
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-ubuntu-x86-64
         command: |
@@ -116,6 +119,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
+          ImageProject: "elastic-images-qa"
           image: "${IMAGE_WIN_2022}"
         retry:
           automatic:
@@ -142,6 +146,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
+          ImageProject: "elastic-images-qa"
           image: "${IMAGE_WIN_2022}"
         retry:
           automatic:
@@ -161,6 +166,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
+          ImageProject: "elastic-images-qa"
           image: "${IMAGE_WIN_2025}"
         retry:
           automatic:
@@ -190,6 +196,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
+          ImageProject: "elastic-images-qa"
           image: "${IMAGE_WIN_2025}"
         matrix:
           - default
