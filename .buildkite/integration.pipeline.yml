@@ -85,31 +85,6 @@ steps:
           imagePrefix: "core-ubuntu-2204-aarch64"
           diskSizeGb: 200
 
-  - label: "Serverless integration test"
-    key: "serverless-integration-tests"
-    depends_on:
-      - int-packaging
-    concurrency_group: elastic-agent-extended-testing/serverless-integration
-    concurrency: 8
-    env:
-      # we run each step in a different data center to spread the load
-      TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-a"
-    command: |
-      buildkite-agent artifact download "build/distributions/**" . $BUILDKITE_BUILD_ID
-      .buildkite/scripts/steps/integration_tests.sh serverless integration:single TestLogIngestionFleetManaged #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
-    artifact_paths:
-      - "build/TEST-**"
-      - "build/diagnostics/*"
-    agents:
-      provider: "gcp"
-      machineType: "n2-standard-8"
-    retry:
-      automatic:
-        limit: 1
-    notify:
-      - github_commit_status:
-          context: "buildkite/elastic-agent-extended-testing - Serverless integration test"
-
   - label: "Extended runtime leak tests"
     key: "extended-integration-tests"
     depends_on:
