@@ -17,19 +17,20 @@ receivers:
         metrics:
           system.memory.utilization:
             enabled: true
-      process:
-        mute_process_exe_error: true
-        mute_process_io_error: true
-        mute_process_user_error: true
-        metrics:
-          process.threads:
-            enabled: true
-          process.open_file_descriptors:
-            enabled: true
-          process.memory.utilization:
-            enabled: true
-          process.disk.operations:
-            enabled: true
+      # process scraper is disabled for now: https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/39423
+      #process:
+      #  mute_process_exe_error: true
+      #  mute_process_io_error: true
+      #  mute_process_user_error: true
+      #  metrics:
+      #    process.threads:
+      #      enabled: true
+      #    process.open_file_descriptors:
+      #      enabled: true
+      #    process.memory.utilization:
+      #      enabled: true
+      #    process.disk.operations:
+      #      enabled: true
       network:
       processes:
       load:
