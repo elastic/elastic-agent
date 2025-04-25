@@ -61,8 +61,8 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          ImageProject: "elastic-images-qa"
-          image: "${IMAGE_WIN_2022}"
+          imageProject: elastic-images-qa
+          image: "family/platform-ingest-elastic-agent-windows-2022-1745585455"
         retry:
           automatic:
             limit: 1
@@ -82,8 +82,8 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          ImageProject: "elastic-images-qa"
-          image: "${IMAGE_WIN_2025}"
+          imageProject: elastic-images-qa
+          image: "family/platform-ingest-elastic-agent-windows-20258-1745585455"
 
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-ubuntu-x86-64
@@ -119,8 +119,8 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          ImageProject: "elastic-images-qa"
-          image: "${IMAGE_WIN_2022}"
+          imageProject: elastic-images-qa
+          image: "family/platform-ingest-elastic-agent-windows-2022-1745585455"
         retry:
           automatic:
             limit: 1
@@ -146,8 +146,8 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          ImageProject: "elastic-images-qa"
-          image: "${IMAGE_WIN_2022}"
+          imageProject: elastic-images-qa
+          image: "family/platform-ingest-elastic-agent-windows-2022-1745585455"
         retry:
           automatic:
             limit: 1
@@ -166,8 +166,8 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          ImageProject: "elastic-images-qa"
-          image: "${IMAGE_WIN_2025}"
+          imageProject: elastic-images-qa
+          image: "family/platform-ingest-elastic-agent-windows-2025-1745585455"
         retry:
           automatic:
             limit: 1
@@ -196,8 +196,8 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          ImageProject: "elastic-images-qa"
-          image: "${IMAGE_WIN_2025}"
+          imageProject: elastic-images-qa
+          image: "family/platform-ingest-elastic-agent-windows-2025-1745585455"
         matrix:
           - default
 
