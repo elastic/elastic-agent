@@ -19,6 +19,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 )
 
 func TestAgentIDStandaloneWorks(t *testing.T) {
@@ -26,6 +27,7 @@ func TestAgentIDStandaloneWorks(t *testing.T) {
 		// vault requres extra perms on mac
 		t.Skip()
 	}
+	fipsutils.SkipIfFIPSOnly(t, "secret storage does not use NewGCMWithRandomNonce.")
 	// create a new encrypted disk store
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()

@@ -30,11 +30,11 @@ const defaultCrossBuildTarget = "golangCrossBuild"
 var Platforms = BuildPlatforms.Defaults()
 
 // SelectedPackageTypes is the list of package types. If empty, all packages types
-// are considered to be selected (see isPackageTypeSelected).
+// are considered to be selected (see IsPackageTypeSelected).
 var SelectedPackageTypes []PackageType
 
 // SelectedDockerVariants is the list of docker variants. If empty, all docker variants
-// are considered to be selected (see isDockerVariantSelected).
+// are considered to be selected (see IsDockerVariantSelected).
 var SelectedDockerVariants []DockerVariant
 
 func init() {
@@ -326,6 +326,14 @@ func (b GolangCrossBuilder) Build() error {
 		// Mount $GOPATH/pkg/mod into the container, read-only.
 		hostDir := filepath.Join(build.Default.GOPATH, "pkg", "mod")
 		args = append(args, "-v", hostDir+":/go/pkg/mod:ro")
+	}
+
+	if !ExternalBuild {
+		beatsPath, err := filepath.Abs(filepath.Join("../beats"))
+		if err != nil {
+			return fmt.Errorf("error while reading local beats: %w", err)
+		}
+		args = append(args, "-v", fmt.Sprintf("%s:%s", beatsPath, beatsPath))
 	}
 
 	args = append(args,

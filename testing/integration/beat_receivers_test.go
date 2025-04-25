@@ -371,7 +371,7 @@ exporters:
       enabled: true
     batcher:
       enabled: true
-      flush_timeout: 0s
+      flush_timeout: 0.5s
     mapping:
       mode: bodymap	  
 service:

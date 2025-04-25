@@ -16,7 +16,7 @@ crds:
   create: true # Install the OpenTelemetry Operator CRDs.
 defaultCRConfig:
   image:
-    repository: "docker.elastic.co/beats/elastic-agent"
+    repository: "docker.elastic.co/elastic-agent/elastic-agent"
     tag: "9.1.0"
   targetAllocator:
     enabled: false # Enable/disable the Operator's Target allocator.
@@ -374,19 +374,20 @@ collectors:
               metrics:
                 system.memory.utilization:
                   enabled: true
-            process:
-              mute_process_exe_error: true
-              mute_process_io_error: true
-              mute_process_user_error: true
-              metrics:
-                process.threads:
-                  enabled: true
-                process.open_file_descriptors:
-                  enabled: true
-                process.memory.utilization:
-                  enabled: true
-                process.disk.operations:
-                  enabled: true
+            # process scraper is disabled for now: https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/39423
+            #process:
+            #  mute_process_exe_error: true
+            #  mute_process_io_error: true
+            #  mute_process_user_error: true
+            #  metrics:
+            #    process.threads:
+            #      enabled: true
+            #    process.open_file_descriptors:
+            #      enabled: true
+            #    process.memory.utilization:
+            #      enabled: true
+            #    process.disk.operations:
+            #      enabled: true
             network: {}
             processes: {}
             load: {}
@@ -605,12 +606,12 @@ instrumentation:
     type: parentbased_traceidratio # Sampler type
     argument: "1.0" # Sampling rate set to 100% (all traces are sampled).
   java:
-    image: docker.elastic.co/observability/elastic-otel-javaagent:1.0.0
+    image: docker.elastic.co/observability/elastic-otel-javaagent:1.3.0
   nodejs:
-    image: docker.elastic.co/observability/elastic-otel-node:0.4.1
+    image: docker.elastic.co/observability/elastic-otel-node:1.0.0
   dotnet:
-    image: docker.elastic.co/observability/elastic-otel-dotnet:edge
+    image: docker.elastic.co/observability/elastic-otel-dotnet:1.0.1
   python:
-    image: docker.elastic.co/observability/elastic-otel-python:0.3.0
+    image: docker.elastic.co/observability/elastic-otel-python:1.0.0
   go:
-    image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.14.0-alpha
+    image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.21.0
