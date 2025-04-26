@@ -123,8 +123,14 @@ func TestStandaloneUpgradeFIPStoNonFIPS(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, startVersion := range versionList {
-		upgradeOpts := []upgradetest.UpgradeOpt{
-			upgradetest.WithPostWatcherSuccessHook(postWatcherSuccessHook),
+		// 9.1.0-SNAPSHOT is the minimum version we need for testing upgrading from FIPS
+		if startVersion.Less(*upgradetest.Version_9_1_0_SNAPSHOT) {
+			t.Logf(
+				"Minimum start version of FIPS-capable Agent for running this test is %q, current start version: %q",
+				*upgradetest.Version_9_1_0_SNAPSHOT,
+				startVersion,
+			)
+			continue
 		}
 
 		unprivilegedAvailable := false
