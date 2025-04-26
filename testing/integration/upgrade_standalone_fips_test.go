@@ -138,11 +138,11 @@ func TestStandaloneUpgradeFIPStoNonFIPS(t *testing.T) {
 			unprivilegedAvailable = true
 		}
 		t.Run(fmt.Sprintf("Upgrade %s to %s (privileged)", startVersion, define.Version()), func(t *testing.T) {
-			upgradeOpts = append(upgradeOpts, upgradetest.WithUnprivileged(false))
+			upgradeOpts := []upgradetest.UpgradeOpt{upgradetest.WithUnprivileged(false)}
 			testStandaloneUpgradeFailed(t, startVersion, define.Version(), fipsArtifactFetcher, upgrade.ErrFipsToNonFips, upgradeOpts...)
 		})
 		if unprivilegedAvailable {
-			upgradeOpts = append(upgradeOpts, upgradetest.WithUnprivileged(true))
+			upgradeOpts := []upgradetest.UpgradeOpt{upgradetest.WithUnprivileged(true)}
 			t.Run(fmt.Sprintf("Upgrade %s to %s (unprivileged)", startVersion, define.Version()), func(t *testing.T) {
 				testStandaloneUpgradeFailed(t, startVersion, define.Version(), fipsArtifactFetcher, upgrade.ErrFipsToNonFips, upgradeOpts...)
 			})
