@@ -80,7 +80,7 @@ func testStandaloneUpgrade(t *testing.T, startVersion *version.ParsedSemVer, end
 	require.NoError(t, err)
 	if startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
 		t.Skipf("both start and end versions have the same hash %q, skipping...", startVersionInfo.Binary.Commit)
-		return
+		return nil
 	}
 
 	return upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradeOpts...)
