@@ -122,26 +122,6 @@ func TestStandaloneUpgradeFIPStoNonFIPS(t *testing.T) {
 	endVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
-	// Check that new (post-upgrade) Agent is also FIPS-capable
-	postWatcherSuccessHook := func(ctx context.Context, endFixture *atesting.Fixture) error {
-		client := endFixture.Client()
-		err := client.Connect(ctx)
-		if err != nil {
-			return err
-		}
-
-		ver, err := client.Version(ctx)
-		if err != nil {
-			return err
-		}
-
-		if !ver.Fips {
-			return errors.New("expected upgraded Agent to be FIPS-capable")
-		}
-
-		return nil
-	}
-
 	for _, startVersion := range versionList {
 		upgradeOpts := []upgradetest.UpgradeOpt{
 			upgradetest.WithPostWatcherSuccessHook(postWatcherSuccessHook),
