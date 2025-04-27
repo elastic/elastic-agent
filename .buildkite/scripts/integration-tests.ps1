@@ -9,8 +9,7 @@ $PSVersionTable.PSVersion
 
 . "$PWD\.buildkite\scripts\steps\ess.ps1"
 
-go install gotest.tools/gotestsum
-gotestsum --version
+make gotestsum
 
 # Read package version from .package-version file
 $PACKAGE_VERSION = Get-Content .package-version -ErrorAction SilentlyContinue

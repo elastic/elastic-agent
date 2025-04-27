@@ -14,7 +14,7 @@ import (
 	_ "github.com/tsg/go-daemon"
 	_ "golang.org/x/tools/cmd/goimports"
 	_ "golang.org/x/tools/cmd/stringer"
-	_ "gotest.tools/gotestsum/cmd"
+	_ "github.com/v1v/gotestsum/cmd"
 
 	_ "go.elastic.co/go-licence-detector"
 
