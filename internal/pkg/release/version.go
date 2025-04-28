@@ -116,7 +116,7 @@ func (v VersionInfo) String() string {
 	sb.WriteString(" (build: ")
 	sb.WriteString(v.Commit)
 	if v.FIPSDistribution {
-		sb.WriteString(" fips: true")
+		sb.WriteString(" fips-distribution: true")
 	}
 	sb.WriteString(" at ")
 	sb.WriteString(v.BuildTime.Format("2006-01-02 15:04:05 -0700 MST"))
