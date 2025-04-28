@@ -62,7 +62,7 @@ steps:
           provider: "gcp"
           machineType: "n1-standard-8"
           imageProject: elastic-images-qa
-          image: "family/platform-ingest-elastic-agent-windows-2022-1745585455"
+          image: "platform-ingest-elastic-agent-windows-2022-1745585455"
         retry:
           automatic:
             limit: 1
@@ -83,7 +83,7 @@ steps:
           provider: "gcp"
           machineType: "n1-standard-8"
           imageProject: elastic-images-qa
-          image: "family/platform-ingest-elastic-agent-windows-20258-1745585455"
+          image: "platform-ingest-elastic-agent-windows-20258-1745585455"
 
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-ubuntu-x86-64
@@ -120,7 +120,7 @@ steps:
           provider: "gcp"
           machineType: "n1-standard-8"
           imageProject: elastic-images-qa
-          image: "family/platform-ingest-elastic-agent-windows-2022-1745585455"
+          image: "platform-ingest-elastic-agent-windows-2022-1745585455"
         retry:
           automatic:
             limit: 1
@@ -147,7 +147,7 @@ steps:
           provider: "gcp"
           machineType: "n1-standard-8"
           imageProject: elastic-images-qa
-          image: "family/platform-ingest-elastic-agent-windows-2022-1745585455"
+          image: "platform-ingest-elastic-agent-windows-2022-1745585455"
         retry:
           automatic:
             limit: 1
@@ -167,7 +167,7 @@ steps:
           provider: "gcp"
           machineType: "n1-standard-8"
           imageProject: elastic-images-qa
-          image: "family/platform-ingest-elastic-agent-windows-2025-1745585455"
+          image: "platform-ingest-elastic-agent-windows-2025-1745585455"
         retry:
           automatic:
             limit: 1
@@ -197,7 +197,7 @@ steps:
           provider: "gcp"
           machineType: "n1-standard-8"
           imageProject: elastic-images-qa
-          image: "family/platform-ingest-elastic-agent-windows-2025-1745585455"
+          image: "platform-ingest-elastic-agent-windows-2025-1745585455"
         matrix:
           - default
 
