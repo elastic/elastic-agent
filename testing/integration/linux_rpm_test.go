@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
+	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 
 	"github.com/gofrs/uuid/v5"
@@ -50,6 +51,74 @@ func TestRpmLogIngestFleetManaged(t *testing.T) {
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("rpm"))
 	require.NoError(t, err)
 
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+		InstallServers: false,
+	}
+
+	testRpmLogIngestFleetManagedWithCheck(ctx, t, agentFixture, info, installOpts,
+		testComponentsPresence(ctx, agentFixture,
+			[]componentPresenceDefinition{
+				{"agentbeat", []string{"windows", "linux", "darwin"}},
+				{"endpoint-security", []string{"windows", "linux", "darwin"}},
+				{"pf-host-agent", []string{"linux"}},
+			},
+			[]componentPresenceDefinition{
+				{"cloudbeat", []string{"linux"}},
+				{"apm-server", []string{"windows", "linux", "darwin"}},
+				{"fleet-server", []string{"windows", "linux", "darwin"}},
+				{"pf-elastic-symbolizer", []string{"linux"}},
+				{"pf-elastic-collector", []string{"linux"}},
+			},
+		),
+	)
+}
+
+func TestRpmInstallsServers(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Deb,
+		Stack: &define.Stack{},
+		OS: []define.OS{
+			{
+				Type:   define.Linux,
+				Distro: "rhel",
+			},
+		},
+		Local: false,
+		Sudo:  true,
+	})
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("rpm"))
+	require.NoError(t, err)
+
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+		InstallServers: true,
+	}
+
+	testRpmLogIngestFleetManagedWithCheck(ctx, t, agentFixture, info, installOpts,
+		testComponentsPresence(ctx, agentFixture,
+			[]componentPresenceDefinition{
+				{"agentbeat", []string{"windows", "linux", "darwin"}},
+				{"endpoint-security", []string{"windows", "linux", "darwin"}},
+				{"pf-host-agent", []string{"linux"}},
+				{"cloudbeat", []string{"linux"}},
+				{"apm-server", []string{"windows", "linux", "darwin"}},
+				{"fleet-server", []string{"windows", "linux", "darwin"}},
+				{"pf-elastic-symbolizer", []string{"linux"}},
+				{"pf-elastic-collector", []string{"linux"}},
+			},
+			[]componentPresenceDefinition{},
+		),
+	)
+}
+
+func testRpmLogIngestFleetManagedWithCheck(ctx context.Context, t *testing.T, agentFixture *atesting.Fixture, info *define.Info, installOpts atesting.InstallOpts, componentCheck func(t *testing.T)) {
 	// 1. Create a policy in Fleet with monitoring enabled.
 	// To ensure there are no conflicts with previous test runs against
 	// the same ESS stack, we add the current time at the end of the policy
@@ -71,14 +140,9 @@ func TestRpmLogIngestFleetManaged(t *testing.T) {
 		},
 	}
 
-	installOpts := atesting.InstallOpts{
-		NonInteractive: true,
-		Force:          true,
-	}
-
 	// 2. Install the Elastic-Agent with the policy that
 	// was just created.
-	policy, err := tools.InstallAgentWithPolicy(
+	policy, _, err := tools.InstallAgentWithPolicy(
 		ctx,
 		t,
 		installOpts,
@@ -88,6 +152,10 @@ func TestRpmLogIngestFleetManaged(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("created policy: %s", policy.ID)
 	check.ConnectedToFleet(ctx, t, agentFixture, 5*time.Minute)
+
+	if componentCheck != nil {
+		t.Run("check components set", componentCheck)
+	}
 
 	t.Run("Monitoring logs are shipped", func(t *testing.T) {
 		testMonitoringLogsAreShipped(t, ctx, info, agentFixture, policy)
@@ -112,12 +180,37 @@ func TestRpmFleetUpgrade(t *testing.T) {
 		Sudo:  true,
 	})
 
+	testCases := []struct {
+		name               string
+		upgradeFromVersion *version.ParsedSemVer
+		installingServers  bool
+		expectingServers   bool
+	}{
+		{"legacy installation", version.NewParsedSemVer(8, 17, 3, "", ""), false, true},      // in case of legacy we don't apply flavor, expecting all to be preserved
+		{"9.0 snapshot with basic flavor", upgradetest.Version_9_0_0_SNAPSHOT, false, false}, // TODO: replace with PreviousMinor once 9.1 is released
+		{"9.0 snapshot with servers flavor", upgradetest.Version_9_0_0_SNAPSHOT, true, true}, // TODO: replace with PreviousMinor once 9.1 is released
+	}
+
+	currentVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
+
+	for _, tc := range testCases {
+		if !tc.upgradeFromVersion.Less(*currentVersion) {
+			// allow only upgrades to higher versions
+			continue
+		}
+
+		t.Run(fmt.Sprintf("Upgrade RPM from %s - %q", tc.upgradeFromVersion.String(), tc.name), func(t *testing.T) {
+			testRpmUpgrade(t, tc.upgradeFromVersion, info, tc.installingServers, tc.expectingServers)
+		})
+	}
+}
+
+func testRpmUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info *define.Info, installingServers bool, expectingServers bool) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	// start from snapshot of the rpm
-	upgradeFromVersion, err := upgradetest.PreviousMinor()
-	require.NoError(t, err)
 	startFixture, err := atesting.NewFixture(
 		t,
 		upgradeFromVersion.String(),
@@ -154,11 +247,12 @@ func TestRpmFleetUpgrade(t *testing.T) {
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
+		InstallServers: installingServers,
 	}
 
 	// 2. Install the Elastic-Agent with the policy that
 	// was just created.
-	policy, err := tools.InstallAgentWithPolicy(
+	policy, agentID, err := tools.InstallAgentWithPolicy(
 		ctx,
 		t,
 		installOpts,
@@ -167,6 +261,7 @@ func TestRpmFleetUpgrade(t *testing.T) {
 		createPolicyReq)
 	require.NoError(t, err)
 	t.Logf("created policy: %s", policy.ID)
+
 	check.ConnectedToFleet(ctx, t, startFixture, 5*time.Minute)
 
 	// 3. Upgrade rpm to the build version
@@ -180,7 +275,7 @@ func TestRpmFleetUpgrade(t *testing.T) {
 	noSnapshotVersion := strings.TrimSuffix(define.Version(), "-SNAPSHOT")
 	require.Eventually(t, func() bool {
 		t.Log("Getting Agent version...")
-		newVersion, err := fleettools.GetAgentVersion(ctx, info.KibanaClient, policy.ID)
+		newVersion, err := fleettools.GetAgentVersion(ctx, info.KibanaClient, agentID)
 		if err != nil {
 			t.Logf("error getting agent version: %v", err)
 			return false
@@ -191,4 +286,38 @@ func TestRpmFleetUpgrade(t *testing.T) {
 		t.Logf("Got Agent version %s != %s", newVersion, noSnapshotVersion)
 		return false
 	}, 5*time.Minute, time.Second)
+
+	// 5. verify basic flavor is preserved
+	if expectingServers {
+		// for previous versions full install should be preserved
+		t.Run("check components set", testComponentsPresence(ctx, endFixture,
+			[]componentPresenceDefinition{
+				{"agentbeat", []string{"windows", "linux", "darwin"}},
+				{"endpoint-security", []string{"windows", "linux", "darwin"}},
+				{"pf-host-agent", []string{"linux"}},
+				{"cloudbeat", []string{"linux"}},
+				{"apm-server", []string{"windows", "linux", "darwin"}},
+				{"fleet-server", []string{"windows", "linux", "darwin"}},
+				{"pf-elastic-symbolizer", []string{"linux"}},
+				{"pf-elastic-collector", []string{"linux"}},
+			},
+			[]componentPresenceDefinition{},
+		))
+	} else {
+		// for 9.0+ versions basic install should be preserved
+		t.Run("check components set", testComponentsPresence(ctx, endFixture,
+			[]componentPresenceDefinition{
+				{"agentbeat", []string{"windows", "linux", "darwin"}},
+				{"endpoint-security", []string{"windows", "linux", "darwin"}},
+				{"pf-host-agent", []string{"linux"}},
+			},
+			[]componentPresenceDefinition{
+				{"cloudbeat", []string{"linux"}},
+				{"apm-server", []string{"windows", "linux", "darwin"}},
+				{"fleet-server", []string{"windows", "linux", "darwin"}},
+				{"pf-elastic-symbolizer", []string{"linux"}},
+				{"pf-elastic-collector", []string{"linux"}},
+			},
+		))
+	}
 }

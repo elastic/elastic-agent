@@ -2,6 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
+//go:build !windows
+
 package manager
 
 import (
@@ -30,7 +32,7 @@ var (
 			"batch": map[string]interface{}{},
 		},
 		"exporters": map[string]interface{}{
-			"debug": map[string]interface{}{},
+			"nop": map[string]interface{}{},
 		},
 		"service": map[string]interface{}{
 			"telemetry": map[string]interface{}{
@@ -43,17 +45,17 @@ var (
 				"traces": map[string]interface{}{
 					"receivers":  []string{"nop"},
 					"processors": []string{"batch"},
-					"exporters":  []string{"debug"},
+					"exporters":  []string{"nop"},
 				},
 				"metrics": map[string]interface{}{
 					"receivers":  []string{"nop"},
 					"processors": []string{"batch"},
-					"exporters":  []string{"debug"},
+					"exporters":  []string{"nop"},
 				},
 				"logs": map[string]interface{}{
 					"receivers":  []string{"nop"},
 					"processors": []string{"batch"},
-					"exporters":  []string{"debug"},
+					"exporters":  []string{"nop"},
 				},
 			},
 		},

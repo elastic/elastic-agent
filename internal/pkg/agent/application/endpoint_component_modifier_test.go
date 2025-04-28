@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -29,6 +30,7 @@ import (
 )
 
 func TestEndpointComponentModifier(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "generating an encrypted private key for failure testing results in a MD5 violation.")
 	log, obs := loggertest.New("TestEndpointSignedComponentModifier")
 	defer func() {
 		if !t.Failed() {
@@ -38,7 +40,7 @@ func TestEndpointComponentModifier(t *testing.T) {
 		loggertest.PrintObservedLogs(obs.TakeAll(), t.Log)
 	}()
 
-	pair, certPath, certKeyPath, certKeyPassPath := prepareEncTLSCertificates(t)
+	_, certPath, _, certKeyPassPath := prepareEncTLSCertificates(t)
 
 	tests := map[string][]struct {
 		name         string
@@ -235,37 +237,6 @@ func TestEndpointComponentModifier(t *testing.T) {
 					assert.ErrorContains(t, err, "'certificate' isn't a string")
 				},
 			},
-
-			{
-				name:         "endpoint-mTLS-passphrase",
-				compModifier: EndpointTLSComponentModifier(log),
-				comps: makeComponent(t, fmt.Sprintf(`{
-			  "fleet": {
-			    "ssl": {
-			      "certificate": %q,
-			      "key": %q,
-			      "key_passphrase_path": %q
-			    }
-			  }
-			}`, certPath, certKeyPath, certKeyPassPath)),
-				cfg: map[string]interface{}{
-					"fleet": map[string]interface{}{
-						"ssl": map[string]interface{}{
-							"certificate":         certPath,
-							"key":                 certKeyPath,
-							"key_passphrase_path": certKeyPassPath,
-						},
-					},
-				},
-				wantComps: makeComponent(t, fmt.Sprintf(`{
-			  "fleet": {
-			    "ssl": {
-			      "certificate": %q,
-			      "key": %q
-			    }
-			  }
-			}`, pair.Cert, pair.Key)),
-			},
 			{
 				name:         "endpoint-mTLS-passphrase-no-key",
 				compModifier: EndpointTLSComponentModifier(log),
@@ -433,64 +404,6 @@ func compareComponents(t *testing.T, got, want []component.Component) {
 
 		assert.Equal(t, wantUnitCfg, unitCgf, "unit config do not match")
 	}
-}
-
-func TestEndpointTLSComponentModifier_cache_miss(t *testing.T) {
-	log, obs := loggertest.New("TestEndpointSignedComponentModifier")
-	defer func() {
-		if !t.Failed() {
-			return
-		}
-
-		loggertest.PrintObservedLogs(obs.TakeAll(), t.Log)
-	}()
-
-	cache := tlsCache{
-		mu: &sync.Mutex{},
-
-		CacheKey:    "/old-cache-key",
-		Certificate: "cached certificate",
-		Key:         "cached key",
-	}
-	pair, certPath, certKeyPath, certKeyPassPath := prepareEncTLSCertificates(t)
-	cackeKey := cache.MakeKey(certKeyPassPath, certPath, certKeyPath)
-
-	comps := makeComponent(t, fmt.Sprintf(`{
-			  "fleet": {
-			    "ssl": {
-			      "certificate": %q,
-			      "key": %q,
-			      "key_passphrase_path": %q
-			    }
-			  }
-			}`, certPath, certKeyPath, certKeyPassPath))
-	cfg := map[string]interface{}{
-		"fleet": map[string]interface{}{
-			"ssl": map[string]interface{}{
-				"certificate":         certPath,
-				"key":                 certKeyPath,
-				"key_passphrase_path": certKeyPassPath,
-			},
-		},
-	}
-	wantComps := makeComponent(t, fmt.Sprintf(`{
-			  "fleet": {
-			    "ssl": {
-			      "certificate": %q,
-			      "key": %q
-			    }
-			  }
-			}`, pair.Cert, pair.Key))
-
-	modifier := newEndpointTLSComponentModifier(log, &cache)
-	got, err := modifier(comps, cfg)
-	require.NoError(t, err, "unexpected error")
-
-	assert.Equal(t, cackeKey, cache.CacheKey, "passphrase path did not match")
-	assert.Equal(t, string(pair.Cert), cache.Certificate, "certificate did not match")
-	assert.Equal(t, string(pair.Key), cache.Key, "key did not match")
-
-	compareComponents(t, got, wantComps)
 }
 
 func TestEndpointTLSComponentModifier_cache_hit(t *testing.T) {

@@ -48,6 +48,7 @@ func TestECSMetadata(t *testing.T) {
 	assert.Equal(t, release.Upgradeable() || (paths.RunningInstalled() && RunningUnderSupervisor()), metadata.Elastic.Agent.Upgradeable)
 	assert.Equal(t, agentInfo.logLevel, metadata.Elastic.Agent.LogLevel)
 	assert.Equal(t, agentInfo.unprivileged, metadata.Elastic.Agent.Unprivileged)
+	assert.Equal(t, release.FIPSDistribution(), metadata.Elastic.Agent.FIPS)
 
 	assert.Equal(t, info.Architecture, metadata.Host.Arch)
 	assert.Equal(t, hostname, metadata.Host.Hostname)

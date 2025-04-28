@@ -5,6 +5,13 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   ASDF_MAGE_VERSION: 1.14.0
 
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1744855248"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1744855248"
+  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1744855248"
+  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1744855248"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1744855248"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1744855248"
+
 steps:
   - label: Start ESS stack for integration tests
     key: integration-ess
@@ -27,6 +34,8 @@ steps:
       - integration-ess
     steps:
       - label: "Win2022:sudo:{{matrix}}"
+        depends_on:
+          - packaging-windows
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} true
@@ -36,7 +45,10 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-windows-2022"
+          image: "${IMAGE_WIN_2022}"
+        retry:
+          automatic:
+            limit: 1
         matrix:
           - default
           - fleet
@@ -48,6 +60,8 @@ steps:
           - install-uninstall
 
       - label: "Win2022:non-sudo:{{matrix}}"
+        depends_on:
+          - packaging-windows
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} false
@@ -57,11 +71,16 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-windows-2022"
+          image: "${IMAGE_WIN_2022}"
+        retry:
+          automatic:
+            limit: 1
         matrix:
           - default
 
       - label: "Win2025:sudo:{{matrix}}"
+        depends_on:
+          - packaging-windows
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} true
@@ -71,7 +90,10 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-windows-2025"
+          image: "${IMAGE_WIN_2025}"
+        retry:
+          automatic:
+            limit: 1
         matrix:
           - default
           - fleet
@@ -83,16 +105,21 @@ steps:
           - install-uninstall
 
       - label: "Win2025:non-sudo:{{matrix}}"
+        depends_on:
+          - packaging-windows
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} false
         artifact_paths:
           - build/**
           - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-windows-2025"
+          image: "${IMAGE_WIN_2025}"
         matrix:
           - default
 
@@ -102,32 +129,40 @@ steps:
       - integration-ess
     steps:
       - label: "x86_64:non-sudo: {{matrix}}"
-        # only packaging-ubuntu-x86-64 artifact dependency is required
+        depends_on: packaging-ubuntu-x86-64
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
           - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
         matrix:
           - default
 
       - label: "x86_64:sudo: {{matrix}}"
+        depends_on:
+          - packaging-ubuntu-x86-64
         # due to deb group present in matrix tar.gz and deb packages artifacts are required
         command: |
-          buildkite-agent artifact download build/distributions/** .
+          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
           - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
         matrix:
           - default
           - upgrade
@@ -145,7 +180,8 @@ steps:
           - container
 
       - label: "arm:sudo: {{matrix}}"
-        skip: true
+        depends_on:
+          - packaging-ubuntu-arm64
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
@@ -154,8 +190,88 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "aws"
-          imagePrefix: "platform-ingest-beats-ubuntu-2404-aarch64"
+          image: "${IMAGE_UBUNTU_2404_ARM_64}"
           instanceType: "m6g.2xlarge"
+        retry:
+          automatic:
+            limit: 1
+        matrix:
+          - default
+          - upgrade
+          - upgrade-flavor
+          - standalone-upgrade
+          - fleet
+          # ARM tests are enabled for only selected groups in order to save resources
+          # - fleet-endpoint-security
+          # - fleet-airgapped
+          # - fleet-airgapped-privileged
+          # - fleet-privileged
+          # - fleet-upgrade-to-pr-build
+          # - install-uninstall
+          # - fqdn
+          # - deb
+          # - container
+
+      - label: "arm:non-sudo: {{matrix}}"
+        skip: true
+        depends_on:
+          - packaging-ubuntu-arm64
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64'
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "aws"
+          image: "${IMAGE_UBUNTU_2404_ARM_64}"
+          instanceType: "m6g.xlarge"
+        matrix:
+          - default
+
+  - group: "Stateful:Debian"
+    key: integration-tests-debian
+    depends_on:
+      - integration-ess
+    steps:
+      - label: "x86_64:non-sudo: {{matrix}}"
+        depends_on: packaging-ubuntu-x86-64
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n1-standard-8"
+          image: "${IMAGE_DEBIAN_12}"
+        matrix:
+          - default
+
+      - label: "x86_64:sudo: {{matrix}}"
+        depends_on:
+          - packaging-ubuntu-x86-64
+        # due to deb group present in matrix tar.gz and deb packages artifacts are required
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n1-standard-8"
+          image: "${IMAGE_DEBIAN_12}"
         matrix:
           - default
           - upgrade
@@ -168,24 +284,10 @@ steps:
           - fleet-privileged
           - fleet-upgrade-to-pr-build
           - install-uninstall
-          - fqdn
+          # FQDN test failing at debian 12. Relevant issue https://github.com/elastic/elastic-agent/issues/7476
+          #- fqdn
           - deb
           - container
-
-      - label: "arm:non-sudo: {{matrix}}"
-        skip: true
-        command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64'
-          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
-        artifact_paths:
-          - build/**
-          - build/diagnostics/**
-        agents:
-          provider: "aws"
-          imagePrefix: "platform-ingest-beats-ubuntu-2404-aarch64"
-          instanceType: "m6g.xlarge"
-        matrix:
-          - default
 
   - group: "Stateful(Sudo):RHEL8"
     key: integration-tests-rhel8
@@ -193,22 +295,69 @@ steps:
       - integration-ess
     steps:
       - label: "x86_64:sudo:rpm"
+        depends_on:
+          - packaging-ubuntu-x86-64
         command: |
-          buildkite-agent artifact download build/distributions/** .
+          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64
           .buildkite/scripts/steps/integration_tests_tf.sh rpm true
         artifact_paths:
           - build/**
           - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
         agents:
           provider: "gcp"
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-rhel-8"
+          image: "${IMAGE_RHEL_8}"
+
+  - group: "Kubernetes"
+    key: integration-tests-kubernetes
+    depends_on:
+      - integration-ess
+      - packaging-containers-x86-64
+    steps:
+      - label: "{{matrix.version}}:amd64:{{matrix.variants}}"
+        env:
+          K8S_VERSION: "{{matrix.version}}"
+          ASDF_KIND_VERSION: "0.27.0"
+          DOCKER_VARIANTS: "{{matrix.variants}}"
+          TARGET_ARCH: "amd64"
+          AGENT_VERSION: "9.0.0-SNAPSHOT" # Remove agent pinning once 9.0.0 is released
+        command: |
+          buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64'
+          .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+          - build/*.pod_logs_dump/*
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n1-standard-4"
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
+          diskSizeGb: 80
+        matrix:
+          setup:
+            variants:
+            - "basic,slim,complete,service,elastic-otel-collector"
+            - "wolfi,slim-wolfi,complete-wolfi,elastic-otel-collector-wolfi"
+            version:
+            - v1.27.16
+            - v1.28.9
+            - v1.29.8
+            - v1.30.8
+            - v1.31.0
+            - v1.32.0
 
   - label: ESS stack cleanup
     depends_on:
       - integration-tests-ubuntu
       - integration-tests-win
       - integration-tests-rhel8
+      - integration-tests-kubernetes
     allow_dependency_failure: true
     command: |
       buildkite-agent artifact download "test_infra/ess/**" . --step "integration-ess"
@@ -225,6 +374,7 @@ steps:
       - integration-tests-ubuntu
       - integration-tests-win
       - integration-tests-rhel8
+      - integration-tests-kubernetes
     allow_dependency_failure: true
     command: |
       buildkite-agent artifact download "build/*.xml" .

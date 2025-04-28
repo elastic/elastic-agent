@@ -54,12 +54,15 @@ steps:
   - group: ":Packaging Artefacts"
     key: "package"
     steps:
-      - label: ":package: Cross Building and package elastic-agent"
+      - label: ":package: FIPS={{matrix.fips}} Cross Building and package elastic-agent"
         key: package_elastic-agent
         agents:
           provider: "gcp"
           machineType: "c2-standard-16"
           diskSizeGb: 400
+        env:
+          PLATFORMS: "linux/amd64 windows/amd64 darwin/amd64"
+          FIPS: "{{matrix.fips}}"
         command: |
           if [[ -z "$${MANIFEST_URL}" ]]; then
             export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
@@ -74,15 +77,22 @@ steps:
           .buildkite/scripts/steps/package.sh
         artifact_paths:
           - "build/distributions/**/*"
-      - label: ":package: Package ARM elastic-agent"
+        matrix:
+          setup:
+            fips:
+              - false
+              - true
+      - label: ":package: FIPS={{matrix.fips}} Package ARM elastic-agent"
         key: package_elastic-agent-arm
         agents:
           provider: "aws"
           instanceType: "t4g.2xlarge"
           imagePrefix: "core-ubuntu-2204-aarch64"
+          diskSizeGb: 400
         env:
-          PLATFORMS: "linux/arm64"
-          PACKAGES: "docker"
+          PLATFORMS: "linux/arm64 darwin/arm64"
+          PACKAGES: "docker,tar.gz,deb,rpm"
+          FIPS: "{{matrix.fips}}"
         command: |
           echo "Add support for multiarch"
           docker run --privileged --rm tonistiigi/binfmt:master --install all
@@ -101,6 +111,11 @@ steps:
           ls -lahR build/
         artifact_paths:
           - "build/distributions/**/*"
+        matrix:
+          setup:
+            fips:
+              - false
+              - true
 
   - label: ":elastic-stack: Publishing to DRA"
     if: build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == null || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") != "independent-agent-release-staging"
@@ -145,7 +160,7 @@ steps:
     agents:
       provider: "gcp"
       machineType: "n2-standard-8"
-      diskSizeGb: 250
+      diskSizeGb: 400
     env:
       DRA_PROJECT_ID: "elastic-agent-package"
       DRA_PROJECT_ARTIFACT_ID: "agent-package"

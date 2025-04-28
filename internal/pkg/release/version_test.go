@@ -72,3 +72,25 @@ func TestVersion(t *testing.T) {
 		assert.Equal(t, expectedVersion, actualVersion)
 	})
 }
+
+func Test_VersionInfo_WithFIPS(t *testing.T) {
+	info := Info()
+	info.FIPSDistribution = false
+	assert.NotContains(t, info.String(), "fips-distribution:", "found fips indicator")
+	info.FIPSDistribution = true
+	assert.Contains(t, info.String(), "fips-distribution: true", "did not find fips indicator")
+}
+
+func TestFIPS(t *testing.T) {
+	oldFips := fips
+	t.Cleanup(func() {
+		fips = oldFips
+	})
+
+	fips = ""
+	assert.False(t, FIPSDistribution(), "expected FIPS indicator to be false")
+	fips = "false"
+	assert.False(t, FIPSDistribution(), "expected FIPS indicator to be false")
+	fips = "true"
+	assert.True(t, FIPSDistribution(), "expected FIPS indicator to be true")
+}
