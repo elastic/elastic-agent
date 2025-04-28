@@ -33,6 +33,7 @@ collectors:
   #  Cluster is a K8s deployment EDOT collector focused on gathering telemetry
   #  at the cluster level (Kubernetes Events and cluster metrics).
   cluster:
+    fullnameOverride: "opentelemetry-kube-stack-cluster-stats"
     env:
       - name: ELASTIC_AGENT_OTEL
         value: '"true"'
@@ -184,6 +185,7 @@ collectors:
   #  node level and exposing an OTLP endpoint for data ingestion.
   #  Auto-instrumentation SDKs will use this endpoint.
   daemon:
+    fullnameOverride: "opentelemetry-kube-stack-daemon"
     env:
       # Work around for open /mounts error: https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/35990
       - name: HOST_PROC_MOUNTINFO
@@ -525,6 +527,7 @@ collectors:
   #  Gateway is a K8s deployment EDOT collector focused on processing and
   #  forwarding telemetry to an Elasticsearch endpoint.
   gateway:
+    fullnameOverride: "opentelemetry-kube-stack-gateway"
     resources:
       limits:
         cpu: 1500m
