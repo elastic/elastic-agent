@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
@@ -112,13 +113,13 @@ func TestClientWithCertificate(t *testing.T) {
 		"fips_invalid_key_fips140only": {
 			clientCertificate:    fipsInvalidCertPEM,
 			clientKey:            fipsInvalidKeyPEM,
-			expectedHandshakeErr: "EOF",
-			expectedServerLog:    "",
+			expectedHandshakeErr: "use of keys smaller than 2048 bits is not allowed in FIPS 140-only mode",
+			expectedServerLog:    "no FIPS compatible certificate chains found",
 		},
 		"fips_valid_key_fips140only": {
 			clientCertificate:    fipsValidCertPEM,
 			clientKey:            fipsValidKeyPEM,
-			expectedHandshakeErr: "EOF",
+			expectedHandshakeErr: "",
 			expectedServerLog:    "",
 		},
 	}
@@ -167,9 +168,13 @@ func TestClientWithCertificate(t *testing.T) {
 				require.Contains(t, err.Error(), test.expectedHandshakeErr)
 			}
 
-			require.Eventually(t, func() bool {
-				return strings.Contains(serverLog.String(), test.expectedServerLog)
-			}, 100*time.Millisecond, 10*time.Millisecond)
+			require.Eventually(
+				t,
+				func() bool {
+					return assert.Contains(t, serverLog.String(), test.expectedServerLog)
+				},
+				100*time.Millisecond, 10*time.Millisecond,
+			)
 		})
 	}
 }
