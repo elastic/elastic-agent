@@ -1,6 +1,6 @@
 - id: infosec-precommit
   name: PreCommit from InfoSec for Secret Scanning
-  description: This hook detects whehter a secret is being committed
+  description: This hook detects whether a secret is being committed
   entry: pre-commit
   language: script
   stages:
