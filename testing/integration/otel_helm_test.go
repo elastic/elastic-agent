@@ -43,12 +43,9 @@ func TestOtelKubeStackHelm(t *testing.T) {
 			// only test the basic and the wolfi container with otel
 			{Type: define.Kubernetes, DockerVariant: "basic"},
 			{Type: define.Kubernetes, DockerVariant: "wolfi"},
-<<<<<<< HEAD
-=======
 			// elastic otel collector image
 			{Type: define.Kubernetes, DockerVariant: "elastic-otel-collector"},
 			{Type: define.Kubernetes, DockerVariant: "elastic-otel-collector-wolfi"},
->>>>>>> 8ec022980 (Set fullnameOverride and validate Otel kube-stack deployment datastreams are being written (metrics, traces) (#7754))
 		},
 		Group: define.Kubernetes,
 	})
@@ -76,9 +73,6 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				k8sStepHelmDeployWithValueOptions(chartLocation, "kube-stack-otel",
 					values.Options{
 						ValueFiles: []string{"../../deploy/helm/edot-collector/kube-stack/values.yaml"},
-<<<<<<< HEAD
-						Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
-=======
 						Values: []string{
 							fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo),
 							fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag),
@@ -86,16 +80,10 @@ func TestOtelKubeStackHelm(t *testing.T) {
 							// endpoint for tests
 							"instrumentation.exporter.endpoint=http://opentelemetry-kube-stack-daemon-collector:4318",
 						},
->>>>>>> 8ec022980 (Set fullnameOverride and validate Otel kube-stack deployment datastreams are being written (metrics, traces) (#7754))
-
 						// override secrets reference with env variables
 						JSONValues: []string{
 							fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, kCtx.esHost),
-<<<<<<< HEAD
-							fmt.Sprintf(`collectors.gateway.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, kCtx.esAPIKey),
-=======
 							fmt.Sprintf(`collectors.gateway.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, kCtx.esEncodedAPIKey),
->>>>>>> 8ec022980 (Set fullnameOverride and validate Otel kube-stack deployment datastreams are being written (metrics, traces) (#7754))
 						},
 					},
 				),
@@ -109,8 +97,6 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				// - Two Gateway pods to collect, aggregate and forward
 				// telemetry.
 				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 4, "otc-container"),
-<<<<<<< HEAD
-=======
 				// validate kubeletstats metrics are being
 				// pushed
 				k8sStepCheckDatastreamsHits(info, "metrics", "kubeletstatsreceiver.otel", "default"),
@@ -120,7 +106,6 @@ func TestOtelKubeStackHelm(t *testing.T) {
 					k8sStepDeployJavaApp()(t, ctx, kCtx, namespace)
 					k8sStepCheckDatastreamsHits(info, "traces", "generic.otel", "default")(t, ctx, kCtx, namespace)
 				},
->>>>>>> 8ec022980 (Set fullnameOverride and validate Otel kube-stack deployment datastreams are being written (metrics, traces) (#7754))
 			},
 		},
 		{

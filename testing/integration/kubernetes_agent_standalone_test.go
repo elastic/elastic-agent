@@ -27,11 +27,7 @@ import (
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 
-<<<<<<< HEAD
-=======
-	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
->>>>>>> 8ec022980 (Set fullnameOverride and validate Otel kube-stack deployment datastreams are being written (metrics, traces) (#7754))
 	"github.com/elastic/go-elasticsearch/v8"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -550,32 +546,6 @@ func k8sCheckAgentStatus(ctx context.Context, client klient.Client, stdout *byte
 	}
 }
 
-<<<<<<< HEAD
-=======
-// k8sGetAgentID returns the agent ID for the given agent pod
-func k8sGetAgentID(ctx context.Context, client klient.Client, stdout *bytes.Buffer, stderr *bytes.Buffer,
-	namespace string, agentPodName string, containerName string,
-) (string, error) {
-	command := []string{"elastic-agent", "status", "--output=json"}
-
-	status := atesting.AgentStatusOutput{} // clear status output
-	stdout.Reset()
-	stderr.Reset()
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	err := client.Resources().ExecInPod(ctx, namespace, agentPodName, containerName, command, stdout, stderr)
-	cancel()
-	if err != nil {
-		return "", err
-	}
-
-	if err := json.Unmarshal(stdout.Bytes(), &status); err != nil {
-		return "", err
-	}
-
-	return status.Info.ID, nil
-}
-
->>>>>>> 8ec022980 (Set fullnameOverride and validate Otel kube-stack deployment datastreams are being written (metrics, traces) (#7754))
 // getAgentComponentState returns the component state for the given component name and a bool indicating if it exists.
 func getAgentComponentState(status atesting.AgentStatusOutput, componentName string) (int, bool) {
 	for _, comp := range status.Components {
