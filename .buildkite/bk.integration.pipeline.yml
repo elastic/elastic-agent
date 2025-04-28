@@ -101,7 +101,7 @@ steps:
           provider: "gcp"
           machineType: "n1-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
-
+ 
   - group: "Stateful: Windows"
     key: integration-tests-win
     depends_on:
@@ -441,18 +441,6 @@ steps:
       buildkite-agent artifact download "test_infra/ess/**" . --step "integration-ess"
       ls -lah test_infra/ess
       .buildkite/scripts/steps/ess_down.sh
-    agents:
-      image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
-      useCustomGlobalHooks: true
-
-  - label: Serverless cleanup
-    depends_on:
-      - serverless-integration-tests
-    allow_dependency_failure: true
-    command: |
-      buildkite-agent artifact download "test_infra/serverless/**" . --step "integration-serverless"
-      ls -lah test_infra/serverless
-      .buildkite/scripts/steps/serverless_down.sh
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
