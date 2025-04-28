@@ -36,10 +36,9 @@ func TestStandaloneUpgradeFIPStoFIPS(t *testing.T) {
 	currentVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
-	// FIPS-capability was introduced to Agent in 8.19.0 and 9.1.0, so we need
-	// to end the upgrade at either 8.19.0 or 9.1.0 or newer.
-	if currentVersion.Less(*upgradetest.Version_8_19_0_SNAPSHOT) ||
-		currentVersion.Equal(*upgradetest.Version_9_0_0_SNAPSHOT) {
+	// We need to end the upgrade at a FIPS-capable version.
+	// We need to start the upgrade from a FIPS-capable version
+	if !isFIPSCapableVersion(currentVersion) {
 		t.Skipf(
 			"Minimum end version of FIPS-capable Agent for running this test is either %q or %q, current start version: %q",
 			*upgradetest.Version_8_19_0_SNAPSHOT,
@@ -77,10 +76,8 @@ func TestStandaloneUpgradeFIPStoFIPS(t *testing.T) {
 	}
 
 	for _, startVersion := range versionList {
-		// FIPS-capability was introduced to Agent in 8.19.0 and 9.1.0, so we need
-		// to start the upgrade from either 8.19.0 or 9.1.0 or newer.
-		if startVersion.Less(*upgradetest.Version_8_19_0_SNAPSHOT) ||
-			startVersion.Equal(*upgradetest.Version_9_0_0_SNAPSHOT) {
+		// We need to start the upgrade from a FIPS-capable version
+		if !isFIPSCapableVersion(startVersion) {
 			t.Logf(
 				"Minimum start version of FIPS-capable Agent for running this test is either %q or %q, current start version: %q",
 				*upgradetest.Version_8_19_0_SNAPSHOT,
@@ -129,10 +126,8 @@ func TestStandaloneUpgradeFIPStoNonFIPS(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, startVersion := range versionList {
-		// FIPS-capability was introduced to Agent in 8.19.0 and 9.1.0, so we need
-		// to start the upgrade from either 8.19.0 or 9.1.0 or newer.
-		if startVersion.Less(*upgradetest.Version_8_19_0_SNAPSHOT) ||
-			startVersion.Equal(*upgradetest.Version_9_0_0_SNAPSHOT) {
+		// We need to start the upgrade from a FIPS-capable version
+		if !isFIPSCapableVersion(startVersion) {
 			t.Logf(
 				"Minimum start version of FIPS-capable Agent for running this test is either %q or %q, current start version: %q",
 				*upgradetest.Version_8_19_0_SNAPSHOT,
@@ -157,4 +152,20 @@ func TestStandaloneUpgradeFIPStoNonFIPS(t *testing.T) {
 			})
 		}
 	}
+}
+
+func isFIPSCapableVersion(t testing.T, ver version.ParsedSemVer) bool {
+	// Versions prior to 8.19.0-SNAPSHOT are not FIPS-capable
+	if ver.Less(*upgradetest.Version_8_19_0_SNAPSHOT) {
+		return false
+	}
+
+	// The 9.0.x versions are not FIPS-capable
+	if ver.Major() == upgradetest.Version_9_0_0_SNAPSHOT.Major() &&
+		ver.Minor() == upgradetest.Version_9_0_0_SNAPSHOT.Minor() {
+		return false
+	}
+
+	// All versions starting with 9.1.0-SNAPSHOT are FIPS-capable
+	return true
 }
