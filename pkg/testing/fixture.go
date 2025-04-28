@@ -1276,6 +1276,45 @@ func FindComponentsDir(dir, version string) (string, error) {
 	return componentsDir, nil
 }
 
+// FindRunDir identifies the directory that holds the run folder.
+func FindRunDir(fixture *Fixture) (string, error) {
+	agentWorkDir := fixture.WorkDir()
+	if pf := fixture.PackageFormat(); pf == "deb" || pf == "rpm" {
+		// these are hardcoded paths in packages.yml
+		agentWorkDir = "/var/lib/elastic-agent"
+	}
+
+	version := fixture.Version()
+
+	dataDir := filepath.Join(agentWorkDir, "data")
+	agentVersions, err := os.ReadDir(dataDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to read contents of the data directory %s: %w", dataDir, err)
+	}
+	var versionDir string
+	for _, fi := range agentVersions {
+		filename := fi.Name()
+		if strings.HasPrefix(filename, "elastic-agent-") && fi.IsDir() {
+			if version != "" && filename[:len(filename)-7] != "elastic-agent-"+version {
+				// version specified but version mismatch. in case of upgrade we have multiple
+				// directories, we don't want first found
+				continue
+			}
+			versionDir = filename
+			break
+		}
+	}
+	if versionDir == "" {
+		return "", fmt.Errorf("failed to find versioned directory for version %q", version)
+	}
+	runDir := filepath.Join(dataDir, versionDir, "run")
+	fi, err := os.Stat(runDir)
+	if (err != nil && !os.IsExist(err)) || !fi.IsDir() {
+		return "", fmt.Errorf("failed to find run directory at %s: %w", runDir, err)
+	}
+	return runDir, nil
+}
+
 // writeSpecFile writes the specification to a specification file at the defined destination.
 func writeSpecFile(dest string, spec *component.Spec) error {
 	data, err := yaml.Marshal(spec)
