@@ -41,8 +41,11 @@ var (
 	Version_8_14_0_SNAPSHOT = version.NewParsedSemVer(8, 14, 0, "SNAPSHOT", "")
 	// Version_8_14_0_SNAPSHOT is the minimum version for proper unprivileged execution on all platforms
 	Version_9_0_0_SNAPSHOT = version.NewParsedSemVer(9, 0, 0, "SNAPSHOT", "")
-	// Version_9_1_0_SNAPSHOT is the minimum version for testing upgrades from FIPS-enabled artifacts to FIPS-enabled
-	// Artifacts
+
+	// Version 8_19_0_SNAPSHOT is a FIPS-capable artifact.
+	Version_8_19_0_SNAPSHOT = version.NewParsedSemVer(8, 19, 0, "SNAPSHOT", "")
+
+	// Version_9_1_0_SNAPSHOT is a FIPS-capable artifact.
 	Version_9_1_0_SNAPSHOT = version.NewParsedSemVer(9, 1, 0, "SNAPSHOT", "")
 
 	// ErrNoSnapshot is returned when a requested snapshot is not on the version list.
