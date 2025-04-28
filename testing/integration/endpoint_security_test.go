@@ -169,7 +169,7 @@ func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageF
 
 	opts := atesting.InstallOpts{}
 	t.Log("Install and enroll the first agent")
-	tools.InstallAgentForPolicyWithToken(ctx, t, opts, startFixture, info.KibanaClient, policyResp.ID, enrollKeyResp)
+	tools.InstallAgentForPolicyWithToken(ctx, t, opts, startFixture, info.KibanaClient, enrollKeyResp)
 
 	t.Cleanup(func() {
 		_, err := os.Stat("/opt/Elastic/Endpoint/elastic-endpoint")
