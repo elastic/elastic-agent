@@ -73,24 +73,14 @@ This section provides a summary of components included in the Elastic Distributi
 | [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.122.0/processor/batchprocessor/README.md) | v0.122.0 |
 | [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.13.0/processor/elasticinframetricsprocessor/README.md) | v0.13.0 |
 | [elastictraceprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elastictraceprocessor/v0.3.0/processor/elastictraceprocessor/README.md) | v0.3.0 |
-<<<<<<< HEAD
-| [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.121.0/processor/filterprocessor/README.md) | v0.121.0 |
-| [geoipprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/geoipprocessor/v0.121.0/processor/geoipprocessor/README.md) | v0.121.0 |
-| [k8sattributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/k8sattributesprocessor/v0.121.0/processor/k8sattributesprocessor/README.md) | v0.121.0 |
-| [lsmintervalprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/lsmintervalprocessor/v0.4.0/processor/lsmintervalprocessor/README.md) | v0.4.0 |
-| [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.121.0/processor/memorylimiterprocessor/README.md) | v0.121.0 |
-| [resourcedetectionprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourcedetectionprocessor/v0.121.0/processor/resourcedetectionprocessor/README.md) | v0.121.0 |
-| [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.121.0/processor/resourceprocessor/README.md) | v0.121.0 |
-| [transformprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/transformprocessor/v0.121.0/processor/transformprocessor/README.md) | v0.121.0 |
-=======
 | [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.122.0/processor/filterprocessor/README.md) | v0.122.0 |
 | [geoipprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/geoipprocessor/v0.122.0/processor/geoipprocessor/README.md) | v0.122.0 |
 | [k8sattributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/k8sattributesprocessor/v0.122.0/processor/k8sattributesprocessor/README.md) | v0.122.0 |
+| [lsmintervalprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/lsmintervalprocessor/v0.4.0/processor/lsmintervalprocessor/README.md) | v0.4.0 |
 | [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.122.0/processor/memorylimiterprocessor/README.md) | v0.122.0 |
 | [resourcedetectionprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourcedetectionprocessor/v0.122.0/processor/resourcedetectionprocessor/README.md) | v0.122.0 |
 | [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.122.0/processor/resourceprocessor/README.md) | v0.122.0 |
 | [transformprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/transformprocessor/v0.122.0/processor/transformprocessor/README.md) | v0.122.0 |
->>>>>>> fb3a5755f (chore: update OTel components to v0.122.0 (#7725))
 
 ### Extensions
 
@@ -106,15 +96,9 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-<<<<<<< HEAD
-| [routingconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/routingconnector/v0.121.0/connector/routingconnector/README.md) | v0.121.0 |
-| [signaltometricsconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/signaltometricsconnector/v0.3.0/connector/signaltometricsconnector/README.md) | v0.3.0 |
-| [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.121.0/connector/spanmetricsconnector/README.md) | v0.121.0 |
-=======
-| [elasticapmconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/elasticapmconnector/v0.2.1/connector/elasticapmconnector/README.md) | v0.2.1 |
 | [routingconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/routingconnector/v0.122.0/connector/routingconnector/README.md) | v0.122.0 |
+| [signaltometricsconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/signaltometricsconnector/v0.3.0/connector/signaltometricsconnector/README.md) | v0.3.0 |
 | [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.122.0/connector/spanmetricsconnector/README.md) | v0.122.0 |
->>>>>>> fb3a5755f (chore: update OTel components to v0.122.0 (#7725))
 ## Persistence in OpenTelemetry Collector
 
 By default, the OpenTelemetry Collector is stateless, which means it doesn't store offsets on disk while reading files. As a result, if you restart the collector, it won't retain the last read offset, potentially leading to data duplication or loss. However, we have configured persistence in the settings provided with the Elastic Agent package.
