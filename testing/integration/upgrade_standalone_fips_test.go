@@ -36,10 +36,13 @@ func TestStandaloneUpgradeFIPStoFIPS(t *testing.T) {
 	currentVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
-	// 9.1.0-SNAPSHOT is the minimum version we need for testing upgrading from FIPS to FIPS.
-	if currentVersion.Less(*upgradetest.Version_9_1_0_SNAPSHOT) {
+	// FIPS-capability was introduced to Agent in 8.19.0 and 9.1.0, so we need
+	// to end the upgrade at either 8.19.0 or 9.1.0 or newer.
+	if currentVersion.Less(*upgradetest.Version_8_19_0_SNAPSHOT) ||
+		currentVersion.Equal(*upgradetest.Version_9_0_0_SNAPSHOT) {
 		t.Skipf(
-			"Minimum end version of FIPS-capable Agent for running this test is %q, current version: %q",
+			"Minimum end version of FIPS-capable Agent for running this test is either %q or %q, current start version: %q",
+			*upgradetest.Version_8_19_0_SNAPSHOT,
 			*upgradetest.Version_9_1_0_SNAPSHOT,
 			currentVersion,
 		)
@@ -74,10 +77,13 @@ func TestStandaloneUpgradeFIPStoFIPS(t *testing.T) {
 	}
 
 	for _, startVersion := range versionList {
-		// 9.1.0-SNAPSHOT is the minimum version we need for testing upgrading from FIPS
-		if startVersion.Less(*upgradetest.Version_9_1_0_SNAPSHOT) {
+		// FIPS-capability was introduced to Agent in 8.19.0 and 9.1.0, so we need
+		// to start the upgrade from either 8.19.0 or 9.1.0 or newer.
+		if startVersion.Less(*upgradetest.Version_8_19_0_SNAPSHOT) ||
+			startVersion.Equal(*upgradetest.Version_9_0_0_SNAPSHOT) {
 			t.Logf(
-				"Minimum start version of FIPS-capable Agent for running this test is %q, current start version: %q",
+				"Minimum start version of FIPS-capable Agent for running this test is either %q or %q, current start version: %q",
+				*upgradetest.Version_8_19_0_SNAPSHOT,
 				*upgradetest.Version_9_1_0_SNAPSHOT,
 				startVersion,
 			)
@@ -123,10 +129,13 @@ func TestStandaloneUpgradeFIPStoNonFIPS(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, startVersion := range versionList {
-		// 9.1.0-SNAPSHOT is the minimum version we need for testing upgrading from FIPS
-		if startVersion.Less(*upgradetest.Version_9_1_0_SNAPSHOT) {
+		// FIPS-capability was introduced to Agent in 8.19.0 and 9.1.0, so we need
+		// to start the upgrade from either 8.19.0 or 9.1.0 or newer.
+		if startVersion.Less(*upgradetest.Version_8_19_0_SNAPSHOT) ||
+			startVersion.Equal(*upgradetest.Version_9_0_0_SNAPSHOT) {
 			t.Logf(
-				"Minimum start version of FIPS-capable Agent for running this test is %q, current start version: %q",
+				"Minimum start version of FIPS-capable Agent for running this test is either %q or %q, current start version: %q",
+				*upgradetest.Version_8_19_0_SNAPSHOT,
 				*upgradetest.Version_9_1_0_SNAPSHOT,
 				startVersion,
 			)
