@@ -12,9 +12,9 @@ package tools
 import (
 	_ "github.com/magefile/mage"
 	_ "github.com/tsg/go-daemon"
+	_ "github.com/v1v/gotestsum/cmd"
 	_ "golang.org/x/tools/cmd/goimports"
 	_ "golang.org/x/tools/cmd/stringer"
-	_ "github.com/v1v/gotestsum/cmd"
 
 	_ "go.elastic.co/go-licence-detector"
 
