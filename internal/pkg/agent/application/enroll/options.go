@@ -166,6 +166,10 @@ func FromFleetConfig(cfg *configuration.FleetAgentConfig) EnrollOptions {
 		ProxyHeaders:  cfg.Client.Transport.Proxy.Headers,
 	}
 
+	if len(cfg.Client.Hosts) > 0 {
+		options.URL = cfg.Client.Hosts[0]
+	}
+
 	if cfg.Client.Transport.TLS != nil {
 		options.CAs = cfg.Client.Transport.TLS.CAs
 		options.CASha256 = cfg.Client.Transport.TLS.CASha256

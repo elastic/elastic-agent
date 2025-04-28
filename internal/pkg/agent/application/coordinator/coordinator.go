@@ -13,7 +13,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/configtranslate"
 
@@ -51,7 +50,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/limits"
-	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
 
@@ -1660,11 +1658,7 @@ func (c *Coordinator) ackMigration(ctx context.Context, action *fleetapi.ActionM
 
 func (c *Coordinator) computeEnrollOptions(ctx context.Context, cfgPath string, cfgFleetPath string) (enroll.EnrollOptions, error) {
 	var options enroll.EnrollOptions
-	isRoot, err := utils.HasRoot()
-	if err != nil {
-		return options, fmt.Errorf("failed to detect root: %w", err)
-	}
-	rawCfg, err := operations.LoadFullAgentConfig(ctx, c.logger, cfgPath, false, !isRoot)
+	rawCfg, err := config.LoadFile(cfgPath)
 	if err != nil {
 		return options, fmt.Errorf("failed to load agent config: %w", err)
 	}

@@ -349,7 +349,8 @@ func TestFromFleetConfig(t *testing.T) {
 				Client: remote.Config{
 					Protocol: "httpx", //should be ignored
 					Path:     "path",  // should be ignored
-					Host:     "https://localhost",
+					Host:     "https://localhost.ignored",
+					Hosts:    []string{"https://localhost"},
 					Transport: httpcommon.HTTPTransportSettings{
 						Proxy: httpcommon.HTTPClientProxySettings{
 							URL:     &httpcommon.ProxyURI{Path: "proxy.url"},
