@@ -43,12 +43,7 @@ Write-Output "~~~ Getting stable stack version"
 $stackVersion = (Get-Content .package-version).Trim() + "-SNAPSHOT"
 # Stable ESS version is set in the ess_start.sh step
 $stableSnapshotVersion = & buildkite-agent meta-data get "stable.ess.version"
-if ($STACK_TYPE -eq "ess") {
-    Get-Ess-Stack -StackVersion $stackVersion -StableSnapshotVersion $stableSnapshotVersion
-} else {
-    Get-Serverless-Project
-}
-
+Get-Ess-Stack -StackVersion $stackVersion -StableSnapshotVersion $stableSnapshotVersion
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Failed to get ESS stack"
     exit 1
