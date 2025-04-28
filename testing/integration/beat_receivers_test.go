@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 	"text/template"
@@ -266,126 +268,13 @@ func TestAgentMonitoring(t *testing.T) {
 			return true
 		}, 30*time.Second, 1*time.Second)
 
-		configTemplateOTel := `
-receivers:
-  filebeatreceiver/filestream-monitoring:
-    filebeat:
-      inputs:
-        - type: filestream
-          enabled: true
-          id: filestream-monitoring-agent
-          paths:
-            -  {{.InputPath}}/data/elastic-agent-*/logs/elastic-agent-*.ndjson 
-            -  {{.InputPath}}/data/elastic-agent-*/logs/elastic-agent-watcher-*.ndjson
-          close:
-            on_state_change:
-              inactive: 5m	  
-          parsers:
-            - ndjson:
-                add_error_key: true
-                message_key: message
-                overwrite_keys: true
-                target: ""
-          processors:
-            - add_fields:
-                fields:
-                  dataset: elastic_agent
-                  namespace: {{.Namespace}}
-                  type: logs
-                target: data_stream
-            - add_fields:
-                fields:
-                  dataset: elastic_agent
-                target: event
-            - add_fields:
-                fields:
-                  id: 0ddca301-e7c0-4eac-8432-7dd05bc9cb06
-                  snapshot: false
-                  version: 8.19.0
-                target: elastic_agent
-            - add_fields:
-                fields:
-                  id: 0879f47d-df41-464d-8462-bc2b8fef45bf
-                target: agent
-            - drop_event:
-                when:
-                  regexp:
-                    component.id: .*-monitoring$
-            - drop_event:
-                when:
-                  regexp:
-                    message: ^Non-zero metrics in the last
-            - copy_fields:
-                fields:
-                  - from: data_stream.dataset
-                    to: data_stream.dataset_original
-            - drop_fields:
-                fields:
-                  - data_stream.dataset
-            - copy_fields:
-                fail_on_error: false
-                fields:
-                  - from: component.dataset
-                    to: data_stream.dataset
-                ignore_missing: true
-            - copy_fields:
-                fail_on_error: false
-                fields:
-                  - from: data_stream.dataset_original
-                    to: data_stream.dataset
-            - drop_fields:
-                fields:
-                  - data_stream.dataset_original
-                  - event.dataset
-            - copy_fields:
-                fields:
-                  - from: data_stream.dataset
-                    to: event.dataset
-            - drop_fields:
-                fields:
-                  - ecs.version
-                ignore_missing: true
-    output:
-      otelconsumer:
-    queue:
-      mem:
-        flush:
-          timeout: 0s
-    logging:
-      level: info
-      selectors:
-        - '*'
-    http.enabled: true
-    http.host: {{ .SocketEndpoint }}
-exporters:
-  debug:
-    use_internal_logger: false
-    verbosity: detailed
-  elasticsearch/log:
-    endpoints:
-      - {{.ESEndpoint}}
-    compression: none
-    api_key: {{.ESApiKey}}
-    logs_dynamic_index:
-      enabled: true
-    batcher:
-      enabled: true
-      flush_timeout: 0.5s
-    mapping:
-      mode: bodymap	  
-service:
-  pipelines:
-    logs:
-      receivers:
-        - filebeatreceiver/filestream-monitoring
-      exporters:
-        - elasticsearch/log  
-`
 		socketEndpoint := utils.SocketURLWithFallback(uuid.Must(uuid.NewV4()).String(), paths.TempDir())
 
+		configTemplateOtel, err := os.ReadFile(filepath.Join("testdata", "templates", "monitoring-otel.tmpl"))
+		require.NoError(t, err)
 		// configure elastic-agent.yml with new config
 		var configBuffer bytes.Buffer
-		template.Must(template.New("config").Parse(configTemplateOTel)).Execute(&configBuffer,
+		template.Must(template.New("config").Parse(string(configTemplateOtel))).Execute(&configBuffer,
 			configOptions{
 				InputPath:      fixture.WorkDir(),
 				ESEndpoint:     esEndpoint,

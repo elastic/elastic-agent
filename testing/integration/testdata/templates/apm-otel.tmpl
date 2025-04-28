@@ -1,0 +1,41 @@
+receivers:
+  filelog:
+    include: [ %s ]
+    operators:
+      - type: regex_parser
+        regex: '^(?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (?P<sev>[A-Z]*) (?P<msg>.*)$'
+        timestamp:
+          parse_from: attributes.time
+          layout: '%%Y-%%m-%%d %%H:%%M:%%S'
+        severity:
+          parse_from: attributes.sev
+
+processors:
+  resource:
+    attributes:
+    # APM Server will use service.name for data stream name: logs-apm.app.<service_name>-default
+    - key: service.name
+      action: insert
+      value: elastic-otel-test
+    - key: host.test-id
+      action: insert
+      value: %s
+
+exporters:
+  debug:
+    verbosity: detailed
+    sampling_initial: 10000
+    sampling_thereafter: 10000
+  otlp/elastic:
+      endpoint: "127.0.0.1:8200"
+      tls:
+        insecure: true
+
+service:
+  pipelines:
+    logs:
+      receivers: [filelog]
+      processors: [resource]
+      exporters:
+        - debug
+        - otlp/elastic

@@ -1,0 +1,27 @@
+inputs:
+  - type: http/metrics
+    id: http-metrics-test
+    use_output: default
+    _runtime_experimental: otel
+    streams:
+    - metricsets: 
+       - json
+      path: "/stats"
+      hosts:
+        - http://localhost:6790
+      period: 5s
+      data_stream:
+        dataset: e2e
+      namespace: "json_namespace"
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [{{.ESEndpoint}}]
+    api_key: "{{.ESApiKey}}"
+    preset: "balanced"
+agent.monitoring:
+  metrics: false
+  logs: false
+  http:
+    enabled: true
+    port: 6790

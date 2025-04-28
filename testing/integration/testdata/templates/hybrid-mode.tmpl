@@ -1,0 +1,73 @@
+agent.logging.level: info
+agent.logging.to_stderr: true
+inputs:
+  - id: filestream-filebeat
+    type: filestream
+    paths:
+      - {{.InputPath}}
+    prospector.scanner.fingerprint.enabled: false
+    file_identity.native: ~
+    use_output: default
+    queue.mem.flush.timeout: 0s
+    path.home: {{.HomeDir}}/filebeat
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [{{.ESEndpoint}}]
+    api_key: {{.BeatsESApiKey}}
+    compression_level: 0
+receivers:
+  filebeatreceiver:
+    filebeat:
+      inputs:
+        - type: filestream
+          id: filestream-fbreceiver
+          enabled: true
+          paths:
+            - {{.InputPath}}
+          prospector.scanner.fingerprint.enabled: false
+          file_identity.native: ~
+    processors:
+      - add_host_metadata: ~
+      - add_cloud_metadata: ~
+      - add_fields:
+          fields:
+            dataset: generic
+            namespace: default
+            type: logs
+          target: data_stream
+      - add_fields:
+          fields:
+            dataset: generic
+          target: event
+    output:
+      otelconsumer:
+    logging:
+      level: info
+      selectors:
+        - '*'
+    path.home: {{.HomeDir}}/fbreceiver
+    queue.mem.flush.timeout: 0s
+exporters:
+  debug:
+    use_internal_logger: false
+    verbosity: detailed
+  elasticsearch/log:
+    endpoints:
+      - {{.ESEndpoint}}
+    compression: none
+    api_key: {{.ESApiKey}}
+    logs_index: {{.FBReceiverIndex}}
+    batcher:
+      enabled: true
+      flush_timeout: 1s
+    mapping:
+      mode: bodymap
+service:
+  pipelines:
+    logs:
+      receivers:
+        - filebeatreceiver
+      exporters:
+        - elasticsearch/log
+        - debug

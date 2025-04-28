@@ -1,0 +1,23 @@
+inputs:
+  - type: filestream
+    id: filestream-e2e
+    use_output: default
+    _runtime_experimental: otel
+    streams:
+      - id: e2e
+        data_stream:
+          dataset: e2e
+        paths:
+          - {{.InputPath}}
+        prospector.scanner.fingerprint.enabled: false
+        file_identity.native: ~
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [{{.ESEndpoint}}]
+    api_key: "{{.ESApiKey}}"
+    preset: "balanced"
+agent:
+  monitoring:
+    metrics: false
+    logs: false
