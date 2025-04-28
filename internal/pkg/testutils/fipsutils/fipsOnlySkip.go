@@ -14,8 +14,8 @@ type GoDebugFIPS140Value string
 
 const (
 	GoDebugFIPS140NotSet GoDebugFIPS140Value = ""
-	GoDebugFIPS140On                         = "on"
-	GoDebugFIPS140Only                       = "only"
+	GoDebugFIPS140On     GoDebugFIPS140Value = "on"
+	GoDebugFIPS140Only   GoDebugFIPS140Value = "only"
 )
 
 // SkipIfFIPSOnly will mark the passed test as skipped if GODEBUG=fips140=only is detected.
