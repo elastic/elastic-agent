@@ -63,12 +63,16 @@ func TestAgentMonitoring(t *testing.T) {
 		dsType      string
 		dsDataset   string
 		dsNamespace string
-		message     string
+		query       map[string]any
 	}
 
 	tests := []test{
-		{dsType: "logs", dsDataset: "elastic_agent", dsNamespace: info.Namespace, message: commonLogMessage},
-		{dsType: "metrics", dsDataset: "elastic_agent.elastic_agent", dsNamespace: info.Namespace},
+		{dsType: "logs", dsDataset: "elastic_agent", dsNamespace: info.Namespace, query: map[string]any{
+			"message": commonLogMessage,
+		}},
+		{dsType: "metrics", dsDataset: "elastic_agent.elastic_agent", dsNamespace: info.Namespace, query: map[string]any{
+			"component.id": "elastic-agent", //we check only one component to avoid complexity
+		}},
 		{dsType: "metrics", dsDataset: "elastic_agent.filebeat", dsNamespace: info.Namespace},
 		{dsType: "metrics", dsDataset: "elastic_agent.filebeat_input", dsNamespace: info.Namespace},
 		{dsType: "metrics", dsDataset: "elastic_agent.metricbeat", dsNamespace: info.Namespace},
@@ -78,6 +82,7 @@ func TestAgentMonitoring(t *testing.T) {
 		NonInteractive: true,
 		Privileged:     true,
 		Force:          true,
+		Develop:        true,
 	}
 
 	// Flow
@@ -185,9 +190,9 @@ func TestAgentMonitoring(t *testing.T) {
 
 					// Only add the "message" match if tc.message is not empty
 					// This conditional check will not be required when test for metrics is included
-					if tc.message != "" {
+					if tc.query != nil {
 						mustClauses = append(mustClauses, map[string]any{
-							"match": map[string]any{"message": tc.message},
+							"match": tc.query,
 						})
 					}
 
@@ -256,7 +261,7 @@ func TestAgentMonitoring(t *testing.T) {
 		output, err := fixture.InstallWithoutEnroll(ctx, &installOpts)
 		require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
 
-		// Ensure elastic-agent is healthy, otherwise we cannot perform retstart operation
+		// Ensure elastic-agent is healthy, otherwise we cannot perform restart operation
 		require.Eventually(t, func() bool {
 			err = fixture.IsHealthy(ctx)
 			if err != nil {
@@ -266,7 +271,111 @@ func TestAgentMonitoring(t *testing.T) {
 			return true
 		}, 30*time.Second, 1*time.Second)
 
-		configTemplateOTel := `
+		socketEndpoint := utils.SocketURLWithFallback(uuid.Must(uuid.NewV4()).String(), paths.TempDir())
+
+		// configure elastic-agent.yml with new config
+		var configBuffer bytes.Buffer
+		template.Must(template.New("config").Parse(configTemplateOTel)).Execute(&configBuffer,
+			configOptions{
+				InputPath:      fixture.WorkDir(),
+				ESEndpoint:     esEndpoint,
+				ESApiKey:       esApiKey.Encoded,
+				SocketEndpoint: socketEndpoint,
+				Namespace:      info.Namespace,
+			})
+		configOTelContents := configBuffer.Bytes()
+		t.Cleanup(func() {
+			if t.Failed() {
+				t.Logf("Contents of agent config file:\n%s\n", string(configOTelContents))
+			}
+		})
+		err = fixture.Configure(ctx, configOTelContents)
+		require.NoError(t, err)
+
+		// Get the timestamp before restarting. Required to separate logs from agent and otel
+		timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+
+		// Restart elastic-agent
+		output, err = fixture.Exec(ctx, []string{"restart"})
+		require.NoErrorf(t, err, "error restarting agent: %s\ncombinedoutput:\n%s", err, string(output))
+
+		require.Eventually(t, func() bool {
+			err = fixture.IsHealthy(ctx)
+			if err != nil {
+				t.Logf("waiting for agent healthy: %s", err.Error())
+				return false
+			}
+			return true
+		}, 30*time.Second, 1*time.Second)
+
+		// run this only for logs for now
+		tc := tests[0]
+		require.Eventuallyf(t,
+			func() bool {
+				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+				defer findCancel()
+				mustClauses := []map[string]any{
+					{"match": map[string]any{"message": tc.message}},
+					{"range": map[string]interface{}{
+						"@timestamp": map[string]string{
+							"gte": timestamp, // Use captured timestamp
+						},
+					}},
+				}
+
+				rawQuery := map[string]any{
+					"query": map[string]any{
+						"bool": map[string]any{
+							"must": mustClauses,
+						},
+					},
+				}
+
+				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, ".ds-"+monitoringLogIndex+"*", info.ESClient)
+				require.NoError(t, err)
+				if docs.Hits.Total.Value != 0 {
+					otelDocs[monitoringLogIndex] = docs
+				}
+				return docs.Hits.Total.Value > 0
+			},
+			2*time.Minute, 5*time.Second,
+			"No documents found in otel mode for type : %s, dataset: %s, namespace: %s", tc.dsType, tc.dsDataset, tc.dsNamespace)
+
+		agent := agentDocs[monitoringLogIndex].Hits.Hits[0].Source
+		otel := otelDocs[monitoringLogIndex].Hits.Hits[0].Source
+		ignoredFields := []string{
+			// Expected to change between agentDocs and OtelDocs
+			"@timestamp",
+			"agent.ephemeral_id",
+			"agent.id",
+			"agent.version",
+			"data_stream.namespace",
+			"log.file.inode",
+			"log.file.fingerprint",
+			"log.file.path",
+			"log.offset",
+
+			// needs investigation
+			"event.agent_id_status",
+			"event.ingested",
+
+			// elastic_agent * fields are hardcoded in processor list for now which is why they differ
+			"elastic_agent.id",
+			"elastic_agent.snapshot",
+			"elastic_agent.version",
+		}
+
+		AssertMapsEqual(t, agent, otel, ignoredFields, "expected documents to be equal")
+	})
+
+}
+
+var configTemplateOTel = `
+agent.monitoring:
+  http:
+    enabled: true
+    host: localhost
+    port: 6800
 receivers:
   filebeatreceiver/filestream-monitoring:
     filebeat:
@@ -357,6 +466,21 @@ receivers:
         - '*'
     http.enabled: true
     http.host: {{ .SocketEndpoint }}
+  metricbeatreceiver/http-metrics-monitoring:
+   metricbeat:
+    modules:
+      - failure_threshold: 5
+        hosts:
+          - http://localhost:6800
+        id: metrics-monitoring-agent
+        index: metrics-elastic_agent.elastic_agent-default
+        metricsets:
+          - json
+        module: http
+        enabled: true 
+        namespace: agent
+        path: /stats
+        period: 60s
 exporters:
   debug:
     use_internal_logger: false
@@ -379,104 +503,5 @@ service:
       receivers:
         - filebeatreceiver/filestream-monitoring
       exporters:
-        - elasticsearch/log  
+        - elasticsearch/log
 `
-		socketEndpoint := utils.SocketURLWithFallback(uuid.Must(uuid.NewV4()).String(), paths.TempDir())
-
-		// configure elastic-agent.yml with new config
-		var configBuffer bytes.Buffer
-		template.Must(template.New("config").Parse(configTemplateOTel)).Execute(&configBuffer,
-			configOptions{
-				InputPath:      fixture.WorkDir(),
-				ESEndpoint:     esEndpoint,
-				ESApiKey:       esApiKey.Encoded,
-				SocketEndpoint: socketEndpoint,
-				Namespace:      info.Namespace,
-			})
-		configOTelContents := configBuffer.Bytes()
-		t.Cleanup(func() {
-			if t.Failed() {
-				t.Logf("Contents of agent config file:\n%s\n", string(configOTelContents))
-			}
-		})
-		err = fixture.Configure(ctx, configOTelContents)
-		require.NoError(t, err)
-
-		// Get the timestamp before restarting. Required to separate logs from agent and otel
-		timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
-
-		fmt.Println(time.Now())
-		// Restart elastic-agent
-		output, err = fixture.Exec(ctx, []string{"restart"})
-		require.NoErrorf(t, err, "error restarting agent: %s\ncombinedoutput:\n%s", err, string(output))
-
-		require.Eventually(t, func() bool {
-			err = fixture.IsHealthy(ctx)
-			if err != nil {
-				t.Logf("waiting for agent healthy: %s", err.Error())
-				return false
-			}
-			return true
-		}, 30*time.Second, 1*time.Second)
-
-		// run this only for logs for now
-		tc := tests[0]
-		require.Eventuallyf(t,
-			func() bool {
-				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
-				defer findCancel()
-				mustClauses := []map[string]any{
-					{"match": map[string]any{"message": tc.message}},
-					{"range": map[string]interface{}{
-						"@timestamp": map[string]string{
-							"gte": timestamp, // Use captured timestamp
-						},
-					}},
-				}
-
-				rawQuery := map[string]any{
-					"query": map[string]any{
-						"bool": map[string]any{
-							"must": mustClauses,
-						},
-					},
-				}
-
-				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, ".ds-"+monitoringLogIndex+"*", info.ESClient)
-				require.NoError(t, err)
-				if docs.Hits.Total.Value != 0 {
-					otelDocs[monitoringLogIndex] = docs
-				}
-				return docs.Hits.Total.Value > 0
-			},
-			2*time.Minute, 5*time.Second,
-			"No documents found in otel mode for type : %s, dataset: %s, namespace: %s", tc.dsType, tc.dsDataset, tc.dsNamespace)
-
-		agent := agentDocs[monitoringLogIndex].Hits.Hits[0].Source
-		otel := otelDocs[monitoringLogIndex].Hits.Hits[0].Source
-		ignoredFields := []string{
-			// Expected to change between agentDocs and OtelDocs
-			"@timestamp",
-			"agent.ephemeral_id",
-			"agent.id",
-			"agent.version",
-			"data_stream.namespace",
-			"log.file.inode",
-			"log.file.fingerprint",
-			"log.file.path",
-			"log.offset",
-
-			// needs investigation
-			"event.agent_id_status",
-			"event.ingested",
-
-			// elastic_agent * fields are hardcoded in processor list for now which is why they differ
-			"elastic_agent.id",
-			"elastic_agent.snapshot",
-			"elastic_agent.version",
-		}
-
-		AssertMapsEqual(t, agent, otel, ignoredFields, "expected documents to be equal")
-	})
-
-}
