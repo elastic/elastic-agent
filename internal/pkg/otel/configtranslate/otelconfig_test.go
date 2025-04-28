@@ -191,10 +191,11 @@ func TestGetOtelConfig(t *testing.T) {
 	expectedESConfig := map[string]any{
 		"elasticsearch/_agent-component/default": map[string]any{
 			"batcher": map[string]any{
-				"enabled":        true,
-				"max_size_items": 1600,
-				"min_size_items": 0,
+				"enabled":  true,
+				"max_size": 1600,
+				"min_size": 0,
 			},
+			"logs_index": "",
 			"mapping": map[string]any{
 				"mode": "bodymap",
 			},
@@ -215,7 +216,6 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 			"num_workers":       1,
 			"api_key":           "",
-			"logs_index":        "filebeat-9.0.0",
 			"timeout":           90 * time.Second,
 			"idle_conn_timeout": 3 * time.Second,
 		},
