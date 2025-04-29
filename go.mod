@@ -277,8 +277,15 @@ require (
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/lunes v0.1.0 // indirect
+<<<<<<< HEAD
 	github.com/elastic/mito v1.18.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.13.0 // indirect
+=======
+	github.com/elastic/mito v1.19.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
+	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.4.0 // indirect
+	github.com/elastic/opentelemetry-lib v0.17.1 // indirect
+>>>>>>> 4ce2723b2 (build(deps): bump github.com/elastic/mito from 1.18.0 to 1.19.0 (#8011))
 	github.com/elastic/pkcs8 v1.0.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
 	github.com/envoyproxy/go-control-plane v0.13.1 // indirect
