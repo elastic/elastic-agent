@@ -292,7 +292,6 @@ until it reports a failure.
 
 - `TEST_RUN_UNTIL_FAILURE=true mage integration:single [testName]`
 
-<<<<<<< HEAD
 =======
 ### Running integration tests with local changes in beats (for otel receivers)
 
@@ -310,7 +309,6 @@ EXTERNAL=true PLATFORMS=darwin/arm64 mage package
 **_NOTE:_**: Make sure you add an absolute path in replace
 **_NOTE:_**: Old agent might be cached at `.agent-testing` directory. Run `mage integration:clean` to clean it.
 
->>>>>>> 71ff59d7d (docs: fix OTel casing (#8015))
 ## Writing tests
 
 Write integration and E2E tests by adding them to the `testing/integration`
