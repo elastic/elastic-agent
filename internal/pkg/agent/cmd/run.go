@@ -207,10 +207,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override ap
 	}
 
 	// agent ID needs to stay empty in bootstrap mode
-	createAgentID := true
-	if cfg.Fleet != nil && cfg.Fleet.Server != nil && cfg.Fleet.Server.Bootstrap {
-		createAgentID = false
-	}
+	createAgentID := cfg.Fleet == nil || cfg.Fleet.Server == nil || cfg.Fleet.Server.Bootstrap
 
 	// Ensure we have the agent secret created.
 	// The secret is not created here if it exists already from the previous enrollment.

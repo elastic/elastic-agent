@@ -10,10 +10,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_CheckRemote(t *testing.T) {

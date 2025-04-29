@@ -31,10 +31,7 @@ import (
 // TODO: Move back when FIPS distributions support encryped private keys
 func Test_Enroll_mTLS(t *testing.T) {
 	testutils.InitStorage(t)
-	skipCreateSecret := false
-	if runtime.GOOS == "darwin" {
-		skipCreateSecret = true
-	}
+	skipCreateSecret := runtime.GOOS == "darwin"
 
 	log, _ := logger.New("tst", false)
 
