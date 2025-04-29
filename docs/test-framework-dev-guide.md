@@ -98,7 +98,7 @@ environment variable. This variable can take multiple groups with a space betwee
 - `TEST_GROUPS="default upgrade-standalone" mage integration:test` to execute only tests in the "default" or
 "upgrade-standalone" group.
 
-#### Passing additional go test flags
+#### Passing additional go test flagsliek re
 
 When running the tests we can pass additional go test flag using the env variable `GOTEST_FLAGS`.
 
@@ -292,8 +292,6 @@ until it reports a failure.
 
 - `TEST_RUN_UNTIL_FAILURE=true mage integration:single [testName]`
 
-<<<<<<< HEAD
-=======
 ### Running integration tests with local changes in beats (for otel receivers)
 
 If you've made local changes to Beats-OTel and want to run the Agent's integration tests against those changes, follow these steps:
@@ -310,7 +308,6 @@ EXTERNAL=true PLATFORMS=darwin/arm64 mage package
 **_NOTE:_**: Make sure you add an absolute path in replace
 **_NOTE:_**: Old agent might be cached at `.agent-testing` directory. Run `mage integration:clean` to clean it.
 
->>>>>>> 71ff59d7d (docs: fix OTel casing (#8015))
 ## Writing tests
 
 Write integration and E2E tests by adding them to the `testing/integration`
