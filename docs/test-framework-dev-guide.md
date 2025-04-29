@@ -294,14 +294,14 @@ until it reports a failure.
 
 ### Running integration tests with local changes in beats (for otel receivers)
 
-If you've made local changes to Beats-OTeL and want to run the Agent's integration tests against those changes, follow these steps:
+If you've made local changes to Beats-OTel and want to run the Agent's integration tests against those changes, follow these steps:
 1. Update go.mod and add a replace directive as follows (change the path to match your local machine):
 ```
 replace github.com/elastic/beats/v7 => /Users/vihasmakwana/Desktop/Vihas/elastic/beats
 ```
 2. Package the Agent with `EXTERNAL=true`:
 ```sh
-  EXTERNAL=true PLATFORMS=darwin/arm64 mage package
+EXTERNAL=true PLATFORMS=darwin/arm64 mage package
 ```
 3. Run integration tests as per [the instructions](#running-the-tests)
 
@@ -333,6 +333,42 @@ are defined the more instances will be provisioned to complete all tests. A bala
 groups is better than a ton of groups each executing a small set of tests, as the time to set up an instance can
 out weight the benefits of creating another group.
 
+<<<<<<< HEAD
+=======
+#### Creating a new test group and Buildkite integration tests
+
+  When creating a new test group, it is important to add the new group to the job in the `.buildkite/bk.integration.pipeline.yml` file. This will ensure that the new group is executed in the CI pipeline.
+
+  Add the new group to the `matrix` in the corresponding steps. The matrix is a list of all test groups that are executed in the step.
+  Example:
+
+  ```yaml
+  - label: "x86_64:sudo: {{matrix}}"
+        command: |
+          ...
+        artifact_paths:
+          - build/**
+        agents:
+          provider: "gcp"
+          machineType: "n1-standard-8"
+          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+        plugins:
+          - test-collector#v1.10.1:
+              files: "build/TEST-*.xml"
+              format: "junit"
+              branches: "main"
+              debug: true
+        matrix:
+          - default
+          - container
+          - fleet-upgrade-to-pr-build
+          - upgrade
+          - fleet
+  ```
+
+  This requirement is temporary and will be removed once the Buildkite pipeline is updated to automatically detect new test groups.
+
+>>>>>>> 71ff59d7d (docs: fix OTel casing (#8015))
 ### Test namespaces
 
 Every test has access to its own unique namespace (a string value). This namespace can
