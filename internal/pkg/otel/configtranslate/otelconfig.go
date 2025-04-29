@@ -117,16 +117,11 @@ func getExporterID(exporterType otelcomponent.Type, outputName string) otelcompo
 
 // getCollectorConfigForComponent returns the Otel collector config required to run the given component.
 // This function returns a full, valid configuration that can then be merged with configurations for other components.
-<<<<<<< HEAD
-func getCollectorConfigForComponent(comp *component.Component, info info.Agent) (*confmap.Conf, error) {
-=======
 func getCollectorConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
 	beatMonitoringConfigGetter BeatMonitoringConfigGetter,
 ) (*confmap.Conf, error) {
-
->>>>>>> 2e1d7a764 (Enable self-monitoring metrics for beats receivers (#7924))
 	exportersConfig, outputQueueConfig, err := getExportersConfigForComponent(comp)
 	if err != nil {
 		return nil, err
