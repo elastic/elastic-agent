@@ -98,7 +98,7 @@ environment variable. This variable can take multiple groups with a space betwee
 - `TEST_GROUPS="default upgrade-standalone" mage integration:test` to execute only tests in the "default" or
 "upgrade-standalone" group.
 
-#### Passing additional go test flagsliek re
+#### Passing additional go test flags
 
 When running the tests we can pass additional go test flag using the env variable `GOTEST_FLAGS`.
 
