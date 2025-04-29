@@ -309,73 +309,71 @@ func TestAgentMonitoring(t *testing.T) {
 		}, 30*time.Second, 1*time.Second)
 
 		// run this only for logs for now
-		tc := tests[0]
-		require.Eventuallyf(t,
-			func() bool {
-				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
-				defer findCancel()
-				mustClauses := []map[string]any{
-					{"match": map[string]any{"message": tc.message}},
-					{"range": map[string]interface{}{
-						"@timestamp": map[string]string{
-							"gte": timestamp, // Use captured timestamp
+		for i := 0; i < 2; i++ {
+			tc := tests[i]
+			key := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
+			require.Eventuallyf(t,
+				func() bool {
+					findCtx, findCancel := context.WithTimeout(ctx, 20*time.Second)
+					defer findCancel()
+					mustClauses := []map[string]any{
+						{"match": tc.query},
+						{"range": map[string]interface{}{
+							"@timestamp": map[string]string{
+								"gte": timestamp, // Use captured timestamp
+							},
+						}},
+					}
+
+					rawQuery := map[string]any{
+						"query": map[string]any{
+							"bool": map[string]any{
+								"must": mustClauses,
+							},
 						},
-					}},
-				}
+					}
+					docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, ".ds-"+key+"*", info.ESClient)
+					require.NoError(t, err)
+					if docs.Hits.Total.Value != 0 {
+						otelDocs[key] = docs
+					}
+					return docs.Hits.Total.Value > 0
+				},
+				2*time.Minute, 5*time.Second,
+				"No documents found in otel mode for type : %s, dataset: %s, namespace: %s", tc.dsType, tc.dsDataset, tc.dsNamespace)
 
-				rawQuery := map[string]any{
-					"query": map[string]any{
-						"bool": map[string]any{
-							"must": mustClauses,
-						},
-					},
-				}
+			agent := agentDocs[key].Hits.Hits[0].Source
+			otel := otelDocs[key].Hits.Hits[0].Source
+			ignoredFields := []string{
+				// Expected to change between agentDocs and OtelDocs
+				"@timestamp",
+				"agent.ephemeral_id",
+				"agent.id",
+				"agent.version",
+				"event.duration",
 
-				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, ".ds-"+monitoringLogIndex+"*", info.ESClient)
-				require.NoError(t, err)
-				if docs.Hits.Total.Value != 0 {
-					otelDocs[monitoringLogIndex] = docs
-				}
-				return docs.Hits.Total.Value > 0
-			},
-			2*time.Minute, 5*time.Second,
-			"No documents found in otel mode for type : %s, dataset: %s, namespace: %s", tc.dsType, tc.dsDataset, tc.dsNamespace)
+				// for filestream-monitoring
+				"log.file.inode",
+				"log.file.fingerprint",
+				"log.file.path",
+				"log.offset",
 
-		agent := agentDocs[monitoringLogIndex].Hits.Hits[0].Source
-		otel := otelDocs[monitoringLogIndex].Hits.Hits[0].Source
-		ignoredFields := []string{
-			// Expected to change between agentDocs and OtelDocs
-			"@timestamp",
-			"agent.ephemeral_id",
-			"agent.id",
-			"agent.version",
-			"data_stream.namespace",
-			"log.file.inode",
-			"log.file.fingerprint",
-			"log.file.path",
-			"log.offset",
+				// needs investigation
+				"event.agent_id_status",
+				"event.ingested",
 
-			// needs investigation
-			"event.agent_id_status",
-			"event.ingested",
+				// elastic_agent * fields are hardcoded in processor list for now which is why they differ
+				"elastic_agent.id",
+				"elastic_agent.snapshot",
+				"elastic_agent.version",
+			}
 
-			// elastic_agent * fields are hardcoded in processor list for now which is why they differ
-			"elastic_agent.id",
-			"elastic_agent.snapshot",
-			"elastic_agent.version",
+			AssertMapsEqual(t, agent, otel, ignoredFields, "expected documents to be equal")
 		}
-
-		AssertMapsEqual(t, agent, otel, ignoredFields, "expected documents to be equal")
 	})
-
 }
 
 var configTemplateOTel = `
-agent.monitoring:
-  http:
-    enabled: true
-    host: localhost
-    port: 6800
 receivers:
   filebeatreceiver/filestream-monitoring:
     filebeat:
@@ -467,13 +465,12 @@ receivers:
     http.enabled: true
     http.host: {{ .SocketEndpoint }}
   metricbeatreceiver/http-metrics-monitoring:
-   metricbeat:
-    modules:
+    metricbeat:
+      modules:
       - failure_threshold: 5
         hosts:
-          - http://localhost:6800
+          - http://localhost:6791
         id: metrics-monitoring-agent
-        index: metrics-elastic_agent.elastic_agent-default
         metricsets:
           - json
         module: http
@@ -481,6 +478,85 @@ receivers:
         namespace: agent
         path: /stats
         period: 60s
+        processors:
+            - add_fields:
+                fields:
+                    input_id: metrics-monitoring-agent
+                target: '@metadata'
+            - add_fields:
+                fields:
+                    dataset: elastic_agent.elastic_agent
+                    namespace: {{.Namespace}}
+                    type: metrics
+                target: data_stream
+            - add_fields:
+                fields:
+                    dataset: elastic_agent.elastic_agent
+                target: event
+            - add_fields:
+                fields:
+                    stream_id: metrics-monitoring-agent
+                target: '@metadata'
+            - add_fields:
+                fields:
+                    id: f9787136-2d04-4999-a504-848c2e25d90e
+                    snapshot: false
+                    version: 9.0.0
+                target: elastic_agent
+            - add_fields:
+                fields:
+                    id: f9787136-2d04-4999-a504-848c2e25d90e
+                target: agent
+            - add_fields:
+                fields:
+                    dataset: elastic_agent.elastic_agent
+                target: event
+            - add_fields:
+                fields:
+                    id: f9787136-2d04-4999-a504-848c2e25d90e
+                    process: elastic-agent
+                    snapshot: false
+                    version: 9.0.0
+                target: elastic_agent
+            - add_fields:
+                fields:
+                    id: f9787136-2d04-4999-a504-848c2e25d90e
+                target: agent
+            - copy_fields:
+                fail_on_error: false
+                fields:
+                    - from: http.agent.beat.cpu
+                      to: system.process.cpu
+                    - from: http.agent.beat.memstats.memory_sys
+                      to: system.process.memory.size
+                    - from: http.agent.beat.handles
+                      to: system.process.fd
+                    - from: http.agent.beat.cgroup
+                      to: system.process.cgroup
+                    - from: http.agent.apm-server
+                      to: apm-server
+                    - from: http.filebeat_input
+                      to: filebeat_input
+                ignore_missing: true
+            - drop_fields:
+                fields:
+                    - http
+                ignore_missing: true
+            - add_fields:
+                fields:
+                    binary: elastic-agent
+                    id: elastic-agent
+                target: component
+    output:
+      otelconsumer:
+    queue:
+      mem:
+        flush:
+          timeout: 0s
+    logging:
+      level: info
+      selectors:
+        - '*' 
 exporters:
   debug:
     use_internal_logger: false
@@ -502,6 +578,7 @@ service:
     logs:
       receivers:
         - filebeatreceiver/filestream-monitoring
+        - metricbeatreceiver/http-metrics-monitoring
       exporters:
         - elasticsearch/log
 `
