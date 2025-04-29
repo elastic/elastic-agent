@@ -41,6 +41,10 @@ func TestDebLogIngestFleetManaged(t *testing.T) {
 				Type:   define.Linux,
 				Distro: "ubuntu",
 			},
+			{
+				Type:   define.Linux,
+				Distro: "debian",
+			},
 		},
 		Local: false,
 		Sudo:  true,
@@ -84,6 +88,10 @@ func TestDebInstallsServers(t *testing.T) {
 			{
 				Type:   define.Linux,
 				Distro: "ubuntu",
+			},
+			{
+				Type:   define.Linux,
+				Distro: "debian",
 			},
 		},
 		Local: false,
@@ -176,6 +184,10 @@ func TestDebFleetUpgrade(t *testing.T) {
 			{
 				Type:   define.Linux,
 				Distro: "ubuntu",
+			},
+			{
+				Type:   define.Linux,
+				Distro: "debian",
 			},
 		},
 		Local: false,
