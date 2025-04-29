@@ -643,9 +643,7 @@ func TestMBOtelAgentMetricsInput(t *testing.T) {
 		Group: Default,
 		Local: true,
 		OS: []define.OS{
-			// Disabled on Windows for now:
-			// error getting metricbeatreceiver creator:1 error: metricset 'system/load' not found
-			// {Type: define.Windows},
+			{Type: define.Windows},
 			{Type: define.Linux},
 			{Type: define.Darwin},
 		},
@@ -662,6 +660,7 @@ func TestMBOtelAgentMetricsInput(t *testing.T) {
 		BeatsESApiKey   string
 		FBReceiverIndex string
 		Namespace       string
+		OS              string
 	}
 	esEndpoint, err := getESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
@@ -845,6 +844,7 @@ receivers:
                         system:
                             fsstat:
                                 mount_point: ^/(sys|cgroup|proc|dev|etc|host|lib|snap)($|/)
+        {{if ne .OS "windows"}}
         - data_stream:
             dataset: system.load
             type: metrics
@@ -883,6 +883,7 @@ receivers:
                 fields:
                     id: 890e2380-61fb-4cf6-b28e-ba31161224de
                 target: agent
+        {{end}}
         - data_stream:
             dataset: system.memory
             type: metrics
@@ -1183,6 +1184,7 @@ service:
 				ESApiKey:      esApiKey.Encoded,
 				BeatsESApiKey: string(beatsApiKey),
 				Namespace:     info.Namespace,
+				OS:            runtime.GOOS,
 			}))
 	configContents := configBuffer.Bytes()
 	t.Cleanup(func() {
