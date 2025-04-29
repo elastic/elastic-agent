@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/go-elasticsearch/v8"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -864,7 +865,8 @@ func k8sCheckAgentStatus(ctx context.Context, client klient.Client, stdout *byte
 
 // k8sGetAgentID returns the agent ID for the given agent pod
 func k8sGetAgentID(ctx context.Context, client klient.Client, stdout *bytes.Buffer, stderr *bytes.Buffer,
-	namespace string, agentPodName string, containerName string) (string, error) {
+	namespace string, agentPodName string, containerName string,
+) (string, error) {
 	command := []string{"elastic-agent", "status", "--output=json"}
 
 	status := atesting.AgentStatusOutput{} // clear status output
@@ -925,12 +927,9 @@ func k8sDumpPods(t *testing.T, ctx context.Context, client klient.Client, testNa
 	}
 
 	type containerPodState struct {
+		corev1.ContainerStatus `json:",inline"`
 		Namespace              string `json:"namespace"`
-		PodName                string `json:"pod_name"`
-		ContainerName          string `json:"container_name"`
-		RestartCount           int32  `json:"restart_count"`
-		LastTerminationReason  string `json:"last_termination_reason"`
-		LastTerminationMessage string `json:"last_termination_message"`
+		PodName                string `json:"podName"`
 	}
 
 	var statesDump []containerPodState
@@ -942,11 +941,6 @@ func k8sDumpPods(t *testing.T, ctx context.Context, client klient.Client, testNa
 		}
 
 		for _, container := range pod.Spec.Containers {
-			state := containerPodState{
-				Namespace:     podNamespace,
-				PodName:       pod.GetName(),
-				ContainerName: container.Name,
-			}
 			previous := false
 
 			for _, containerStatus := range pod.Status.ContainerStatuses {
@@ -954,7 +948,11 @@ func k8sDumpPods(t *testing.T, ctx context.Context, client klient.Client, testNa
 					continue
 				}
 
-				state.RestartCount = containerStatus.RestartCount
+				statesDump = append(statesDump, containerPodState{
+					containerStatus,
+					podNamespace,
+					pod.GetName(),
+				})
 				if containerStatus.RestartCount == 0 {
 					break
 				}
@@ -965,12 +963,9 @@ func k8sDumpPods(t *testing.T, ctx context.Context, client klient.Client, testNa
 				containerTerminated := containerStatus.LastTerminationState.Terminated
 				if containerTerminated != nil && containerTerminated.FinishedAt.After(testStartTime) {
 					previous = true
-					state.LastTerminationReason = containerTerminated.Reason
-					state.LastTerminationMessage = containerTerminated.Message
 				}
 				break
 			}
-			statesDump = append(statesDump, state)
 
 			var logFileName string
 			if previous {
@@ -1004,7 +999,7 @@ func k8sDumpPods(t *testing.T, ctx context.Context, client klient.Client, testNa
 			header := &tar.Header{
 				Name:       logFileName,
 				Size:       int64(len(b)),
-				Mode:       0600,
+				Mode:       0o600,
 				ModTime:    time.Now(),
 				AccessTime: time.Now(),
 				ChangeTime: time.Now(),
@@ -1031,7 +1026,7 @@ func k8sDumpPods(t *testing.T, ctx context.Context, client klient.Client, testNa
 	header := &tar.Header{
 		Name:       statesDumpFile,
 		Size:       int64(len(b)),
-		Mode:       0600,
+		Mode:       0o600,
 		ModTime:    time.Now(),
 		AccessTime: time.Now(),
 		ChangeTime: time.Now(),
@@ -1109,35 +1104,8 @@ func k8sRenderKustomize(kustomizePath string) ([]byte, error) {
 }
 
 // generateESAPIKey generates an API key for the given Elasticsearch.
-func generateESAPIKey(esClient *elasticsearch.Client, keyName string) (string, error) {
-	apiKeyReqBody := fmt.Sprintf(`{
-		"name": "%s",
-		"expiration": "1d"
-	}`, keyName)
-
-	resp, err := esClient.Security.CreateAPIKey(strings.NewReader(apiKeyReqBody))
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	response := make(map[string]interface{})
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	if err != nil {
-		return "", err
-	}
-
-	keyToken := response["api_key"].(string)
-	if keyToken == "" {
-		return "", fmt.Errorf("key token is empty")
-	}
-
-	keyID := response["id"].(string)
-	if keyID == "" {
-		return "", fmt.Errorf("key ID is empty")
-	}
-
-	return fmt.Sprintf("%s:%s", keyID, keyToken), nil
+func generateESAPIKey(esClient *elasticsearch.Client, keyName string) (estools.APIKeyResponse, error) {
+	return estools.CreateAPIKey(context.Background(), esClient, estools.APIKeyRequest{Name: keyName, Expiration: "1d"})
 }
 
 // k8sDeleteOpts contains options for deleting k8s objects
@@ -1337,6 +1305,8 @@ type k8sContext struct {
 	esHost string
 	// esAPIKey is the API key of the elasticsearch to use in the test
 	esAPIKey string
+	// esEncodedAPIKey is the encoded API key of the elasticsearch to use in the test
+	esEncodedAPIKey string
 	// enrollParams contains the information needed to enroll an agent with Fleet in the test
 	enrollParams *fleettools.EnrollParams
 	// createdAt is the time when the k8sContext was created
@@ -1422,16 +1392,17 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 	require.NoError(t, err, "failed to create fleet enroll params")
 
 	return k8sContext{
-		client:         client,
-		clientSet:      clientSet,
-		agentImage:     agentImage,
-		agentImageRepo: agentImageRepo,
-		agentImageTag:  agentImageTag,
-		logsBasePath:   testLogsBasePath,
-		esHost:         esHost,
-		esAPIKey:       esAPIKey,
-		enrollParams:   enrollParams,
-		createdAt:      time.Now(),
+		client:          client,
+		clientSet:       clientSet,
+		agentImage:      agentImage,
+		agentImageRepo:  agentImageRepo,
+		agentImageTag:   agentImageTag,
+		logsBasePath:    testLogsBasePath,
+		esHost:          esHost,
+		esAPIKey:        esAPIKey.APIKey,
+		esEncodedAPIKey: esAPIKey.Encoded,
+		enrollParams:    enrollParams,
+		createdAt:       time.Now(),
 	}
 }
 

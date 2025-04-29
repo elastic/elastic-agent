@@ -14,6 +14,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault/aesgcm"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 )
 
 func getTestVaultPath(t *testing.T) string {
@@ -29,6 +30,7 @@ func getTestOptions(t *testing.T) []vault.OptionFunc {
 }
 
 func TestCreate(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "secret storage does not use NewGCMWithRandomNonce.")
 	opts := getTestOptions(t)
 
 	ctx, cn := context.WithCancel(context.Background())

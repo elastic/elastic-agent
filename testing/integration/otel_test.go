@@ -401,6 +401,8 @@ exporters:
   elasticsearch:
     api_key: {{.ESApiKey}}
     endpoint: {{.ESEndpoint}}
+    mapping:
+      mode: none
 
 processors:
   resource/add-test-id:
@@ -1114,6 +1116,132 @@ agent:
 	cancel()
 }
 
+func TestOTelHTTPMetricsInput(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	// Create the otel configuration file
+	type otelConfigOptions struct {
+		InputPath  string
+		ESEndpoint string
+		ESApiKey   string
+	}
+	esEndpoint, err := getESHost()
+	require.NoError(t, err, "error getting elasticsearch endpoint")
+	esApiKey, err := createESApiKey(info.ESClient)
+	require.NoError(t, err, "error creating API key")
+	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	configTemplate := `
+inputs:
+  - type: http/metrics
+    id: http-metrics-test
+    use_output: default
+    _runtime_experimental: otel
+    streams:
+    - metricsets: 
+       - json
+      path: "/stats"
+      hosts:
+        - http://localhost:6790
+      period: 5s
+      data_stream:
+        dataset: e2e
+      namespace: "json_namespace"
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [{{.ESEndpoint}}]
+    api_key: "{{.ESApiKey}}"
+    preset: "balanced"
+agent.monitoring:
+  metrics: false
+  logs: false
+  http:
+    enabled: true
+    port: 6790
+`
+	index := ".ds-metrics-e2e-*"
+	var configBuffer bytes.Buffer
+
+	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+		otelConfigOptions{
+			ESEndpoint: esEndpoint,
+			ESApiKey:   esApiKey.Encoded,
+		})
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err, "cannot prepare Elastic-Agent command: %w", err)
+
+	output := strings.Builder{}
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	err = cmd.Start()
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 30*time.Second, 1*time.Second)
+
+	// Make sure find the logs
+	actualHits := &struct{ Hits int }{}
+	assert.Eventually(t,
+		func() bool {
+			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer findCancel()
+
+			query := map[string]interface{}{
+				"query": map[string]interface{}{
+					"exists": map[string]interface{}{
+						"field": "http.json_namespace.beat.cpu.system.ticks",
+					},
+				},
+			}
+
+			docs, err := estools.PerformQueryForRawQuery(findCtx, query, index, info.ESClient)
+			require.NoError(t, err)
+
+			actualHits.Hits = docs.Hits.Total.Value
+			actualHits.Hits = docs.Hits.Total.Value
+			return actualHits.Hits >= 1
+		},
+		2*time.Minute, 5*time.Second,
+		"Expected at least %d logs, got %v", 1, actualHits.Hits)
+
+	cancel()
+	cmd.Wait()
+}
+
 func TestOtelMBReceiverE2E(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Default,
@@ -1500,7 +1628,7 @@ func TestFBOtelRestartE2E(t *testing.T) {
 	// It starts a filebeat receiver, waits for some logs and then stops it.
 	// It then restarts the collector for the remaining of the test.
 	// At the end it asserts that the unique number of logs in ES is equal to the number of
-	// lines in the input file. It is likely that there are duplicates due to the restart.
+	// lines in the input file.
 	info := define.Require(t, define.Requirements{
 		Group: Default,
 		Local: true,
@@ -1530,7 +1658,8 @@ func TestFBOtelRestartE2E(t *testing.T) {
 	esApiKey, err := createESApiKey(info.ESClient)
 	require.NoError(t, err, "error creating API key")
 	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
-	index := "logs-integration-default"
+	// Use a unique index to avoid conflicts with other parallel runners
+	index := strings.ToLower("logs-generic-default-" + randStr(8))
 	otelConfigTemplate := `receivers:
   filebeatreceiver:
     filebeat:
@@ -1568,6 +1697,8 @@ exporters:
       flush_timeout: 1s
     mapping:
       mode: bodymap
+    logs_dynamic_id:
+      enabled: true
 service:
   pipelines:
     logs:
@@ -1618,14 +1749,14 @@ service:
 			}
 
 			_, err = inputFile.Write([]byte(fmt.Sprintf(`{"id": "%d", "message": "%d"}`, i, i)))
-			require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+			assert.NoErrorf(t, err, "failed to write line %d to temp file", i)
 			_, err = inputFile.Write([]byte("\n"))
-			require.NoErrorf(t, err, "failed to write newline to temp file")
+			assert.NoError(t, err, "failed to write newline to temp file")
 			inputLinesCounter.Add(1)
 			time.Sleep(100 * time.Millisecond)
 		}
 		err = inputFile.Close()
-		require.NoError(t, err, "failed to close input file")
+		assert.NoError(t, err, "failed to close input file")
 	}()
 
 	t.Cleanup(func() {
@@ -1645,7 +1776,9 @@ service:
 	go func() {
 		err = fixture.RunOtelWithClient(fCtx)
 		cancel()
-		require.True(t, errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled), "unexpected error: %v", err)
+		assert.Conditionf(t, func() bool {
+			return err == nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)
+		}, "unexpected error: %v", err)
 		close(stoppedCh)
 	}()
 
@@ -1706,9 +1839,7 @@ service:
 				require.True(t, found, "expected message field in document %q", hit.Source)
 				msg, ok := message.(string)
 				require.True(t, ok, "expected message field to be a string, got %T", message)
-				if _, found := uniqueIngestedLogs[msg]; found {
-					t.Logf("log line %q was ingested more than once", message)
-				}
+				require.NotContainsf(t, uniqueIngestedLogs, msg, "found duplicated log message %q", msg)
 				uniqueIngestedLogs[msg] = struct{}{}
 			}
 			actualHits.UniqueHits = len(uniqueIngestedLogs)
