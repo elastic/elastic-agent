@@ -292,7 +292,6 @@ until it reports a failure.
 
 - `TEST_RUN_UNTIL_FAILURE=true mage integration:single [testName]`
 
-=======
 ### Running integration tests with local changes in beats (for otel receivers)
 
 If you've made local changes to Beats-OTel and want to run the Agent's integration tests against those changes, follow these steps:
