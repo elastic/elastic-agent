@@ -45,7 +45,7 @@ var (
 	// ErrNoSnapshot is returned when a requested snapshot is not on the version list.
 	ErrNoSnapshot = errors.New("failed to find a snapshot on the version list")
 	// ErrNoPreviousMinor is returned when a requested previous minor is not on the version list.
-	ErrNoPreviousMinor = errors.New("failed to find a previous minor on the version list")
+	ErrNoPreviousMinor = "failed to find a previous minor for %q in version list %q"
 )
 
 type VersionsFetcher interface {
@@ -262,7 +262,7 @@ func PreviousMinor() (*version.ParsedSemVer, error) {
 			}
 		}
 
-		return nil, ErrNoPreviousMinor
+		return nil, fmt.Errorf(ErrNoPreviousMinor, current, versions)
 	}
 
 	for _, v := range versions {
@@ -273,7 +273,7 @@ func PreviousMinor() (*version.ParsedSemVer, error) {
 			return v, nil
 		}
 	}
-	return nil, ErrNoPreviousMinor
+	return nil, fmt.Errorf(ErrNoPreviousMinor, current, versions)
 }
 
 // EnsureSnapshot ensures that the version string is a snapshot version.
