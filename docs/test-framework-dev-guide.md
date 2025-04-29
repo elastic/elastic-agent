@@ -294,14 +294,14 @@ until it reports a failure.
 
 ### Running integration tests with local changes in beats (for otel receivers)
 
-If you've made local changes to Beats-OTeL and want to run the Agent's integration tests against those changes, follow these steps:
+If you've made local changes to Beats-OTel and want to run the Agent's integration tests against those changes, follow these steps:
 1. Update go.mod and add a replace directive as follows (change the path to match your local machine):
 ```
 replace github.com/elastic/beats/v7 => /Users/vihasmakwana/Desktop/Vihas/elastic/beats
 ```
 2. Package the Agent with `EXTERNAL=true`:
 ```sh
-  EXTERNAL=true PLATFORMS=darwin/arm64 mage package
+EXTERNAL=true PLATFORMS=darwin/arm64 mage package
 ```
 3. Run integration tests as per [the instructions](#running-the-tests)
 
