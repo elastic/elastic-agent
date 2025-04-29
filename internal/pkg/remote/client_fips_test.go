@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -103,6 +104,23 @@ func TestClientWithUnsupportedTLSVersions(t *testing.T) {
 	}
 }
 
+type serverLog struct {
+	log strings.Builder
+	mu  sync.Mutex
+}
+
+func (s *serverLog) Write(data []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.log.Write(data)
+}
+
+func (s *serverLog) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.log.String()
+}
+
 func TestClientWithCertificate(t *testing.T) {
 	cases := map[string]struct {
 		clientCertificate    []byte
@@ -179,7 +197,7 @@ func TestClientWithCertificate(t *testing.T) {
 	}
 }
 
-func startTLSServer(t *testing.T) (*httptest.Server, *strings.Builder) {
+func startTLSServer(t *testing.T) (*httptest.Server, *serverLog) {
 	// Configure server and start it
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCertPEM)
@@ -201,10 +219,10 @@ func startTLSServer(t *testing.T) (*httptest.Server, *strings.Builder) {
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 	}
 
-	var serverLog strings.Builder
-	server.Config.ErrorLog = log.New(&serverLog, "", 0)
+	logger := new(serverLog)
+	server.Config.ErrorLog = log.New(logger, "", 0)
 
 	server.StartTLS()
 
-	return server, &serverLog
+	return server, logger
 }
