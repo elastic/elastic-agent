@@ -694,7 +694,7 @@ func isTrue(val string) bool {
 func performGET(cfg setupConfig, client *kibana.Client, path string, response interface{}, writer io.Writer, msg string) error {
 	var lastErr error
 	for i := 0; i < cfg.Kibana.RetryMaxCount; i++ {
-		code, result, err := client.Connection.Request("GET", path, nil, nil, nil)
+		code, result, err := client.Request("GET", path, nil, nil, nil)
 		if err != nil || code != 200 {
 			if err != nil {
 				err = fmt.Errorf("http GET request to %s%s fails: %w. Response: %s",
