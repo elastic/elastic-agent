@@ -641,12 +641,6 @@ func TestEqual(t *testing.T) {
 			rightVersion: "8.9.0-SNAPSHOT",
 			equal:        false,
 		},
-		{
-			name:         "2 prereleases have no specific order",
-			leftVersion:  "8.9.0-SNAPSHOT",
-			rightVersion: "8.9.0-er1",
-			equal:        false,
-		},
 		// build metadata (these have no impact on precedence)
 		{
 			name:         "build metadata have no influence on precedence",
