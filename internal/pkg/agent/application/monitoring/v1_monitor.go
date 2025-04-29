@@ -7,6 +7,7 @@ package monitoring
 import (
 	"crypto/sha256"
 	"fmt"
+	"maps"
 	"math"
 	"net"
 	"net/url"
@@ -21,6 +22,8 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/utils"
+
+	koanfmaps "github.com/knadh/koanf/maps"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -91,10 +94,11 @@ type BeatsMonitor struct {
 // the Component struct here because we also want to generate configurations for the monitoring components themselves,
 // but without generating the full Component for them.
 type componentInfo struct {
-	ID         string
-	BinaryName string
-	InputSpec  *component.InputRuntimeSpec
-	Pid        uint64
+	ID             string
+	BinaryName     string
+	InputSpec      *component.InputRuntimeSpec
+	Pid            uint64
+	RuntimeManager component.RuntimeManager
 }
 
 type monitoringConfig struct {
@@ -237,43 +241,64 @@ func (b *BeatsMonitor) MonitoringConfig(
 // EnrichArgs enriches arguments provided to application, in order to enable
 // monitoring
 func (b *BeatsMonitor) EnrichArgs(unit, binary string, args []string) []string {
+	configMap := b.ComponentMonitoringConfig(unit, binary)
+	flattenedMap, _ := koanfmaps.Flatten(configMap, nil, ".")
+
+	appendix := make([]string, 0, 20)
+	keys := slices.Sorted(maps.Keys(flattenedMap))
+	for _, key := range keys {
+		value := flattenedMap[key]
+		appendix = append(appendix, "-E", fmt.Sprintf("%s=%v", key, value))
+	}
+
+	return append(args, appendix...)
+}
+
+// ComponentMonitoringConfig returns config for enabling monitoring in the component application.
+// To be able to monitor a process implementing a component, we need to tell it if and how it should expose its telemetry.
+// Other than enabling features, we set the unix domain socket name on which the application should start its
+// monitoring http server.
+func (b *BeatsMonitor) ComponentMonitoringConfig(unitID, binary string) map[string]any {
 	if !b.enabled {
 		// even if monitoring is disabled enrich args.
 		// the only way to skip it is by disabling monitoring by feature flag
-		return args
+		return nil
 	}
 
 	// only beats understand these flags
 	if !isSupportedBeatsBinary(binary) {
-		return args
+		return nil
 	}
 
-	appendix := make([]string, 0, 20)
-	endpoint := utils.SocketURLWithFallback(unit, paths.TempDir())
+	configMap := make(map[string]any)
+	endpoint := utils.SocketURLWithFallback(unitID, paths.TempDir())
 	if endpoint != "" {
-		appendix = append(appendix,
-			"-E", "http.enabled=true",
-			"-E", "http.host="+endpoint,
-		)
+		httpConfigMap := map[string]any{
+			"enabled": true,
+			"host":    endpoint,
+		}
 		if b.config.C.Pprof != nil && b.config.C.Pprof.Enabled {
-			appendix = append(appendix,
-				"-E", "http.pprof.enabled=true",
-			)
+			httpConfigMap["pprof"] = map[string]any{
+				"enabled": true,
+			}
 		}
-		if b.config.C.HTTP.Buffer != nil && b.config.C.HTTP.Buffer.Enabled {
-			appendix = append(appendix,
-				"-E", "http.buffer.enabled=true",
-			)
+		if b.config.C.HTTP != nil && b.config.C.HTTP.Buffer != nil && b.config.C.HTTP.Buffer.Enabled {
+			httpConfigMap["buffer"] = map[string]any{
+				"enabled": true,
+			}
 		}
+		configMap["http"] = httpConfigMap
 	}
 
 	if !b.config.C.LogMetrics {
-		appendix = append(appendix,
-			"-E", "logging.metrics.enabled=false",
-		)
+		configMap["logging"] = map[string]any{
+			"metrics": map[string]any{
+				"enabled": false,
+			},
+		}
 	}
 
-	return append(args, appendix...)
+	return configMap
 }
 
 // Prepare executes steps in order for monitoring to work correctly
@@ -374,9 +399,10 @@ func (b *BeatsMonitor) getComponentInfos(components []component.Component, compo
 	componentInfos := make([]componentInfo, 0, len(components))
 	for _, comp := range components {
 		compInfo := componentInfo{
-			ID:         comp.ID,
-			BinaryName: comp.BinaryName(),
-			InputSpec:  comp.InputSpec,
+			ID:             comp.ID,
+			BinaryName:     comp.BinaryName(),
+			InputSpec:      comp.InputSpec,
+			RuntimeManager: comp.RuntimeManager,
 		}
 		if pid, ok := componentIDPidMap[comp.ID]; ok {
 			compInfo.Pid = pid
@@ -386,18 +412,21 @@ func (b *BeatsMonitor) getComponentInfos(components []component.Component, compo
 	if b.config.C.MonitorMetrics {
 		componentInfos = append(componentInfos,
 			componentInfo{
-				ID:         fmt.Sprintf("beat/%s", monitoringMetricsUnitID),
-				BinaryName: metricBeatName,
+				ID:             fmt.Sprintf("beat/%s", monitoringMetricsUnitID),
+				BinaryName:     metricBeatName,
+				RuntimeManager: component.DefaultRuntimeManager,
 			},
 			componentInfo{
-				ID:         fmt.Sprintf("http/%s", monitoringMetricsUnitID),
-				BinaryName: metricBeatName,
+				ID:             fmt.Sprintf("http/%s", monitoringMetricsUnitID),
+				BinaryName:     metricBeatName,
+				RuntimeManager: component.DefaultRuntimeManager,
 			})
 	}
 	if b.config.C.MonitorLogs {
 		componentInfos = append(componentInfos, componentInfo{
-			ID:         monitoringFilesUnitsID,
-			BinaryName: fileBeatName,
+			ID:             monitoringFilesUnitsID,
+			BinaryName:     fileBeatName,
+			RuntimeManager: component.DefaultRuntimeManager,
 		})
 	}
 	// sort the components to ensure a consistent order of inputs in the configuration
@@ -642,7 +671,7 @@ func (b *BeatsMonitor) getHttpStreams(
 			"namespace":  "agent",
 			"period":     metricsCollectionIntervalString,
 			"index":      indexName,
-			"processors": processorsForHttpStream(binaryName, compInfo.ID, dataset, b.agentInfo),
+			"processors": processorsForHttpStream(binaryName, compInfo.ID, dataset, b.agentInfo, compInfo.RuntimeManager),
 		}
 		if failureThreshold != nil {
 			httpStream[failureThresholdKey] = *failureThreshold
@@ -650,7 +679,8 @@ func (b *BeatsMonitor) getHttpStreams(
 		httpStreams = append(httpStreams, httpStream)
 
 		// specifically for filebeat, we include input metrics
-		if strings.EqualFold(name, "filebeat") {
+		// disabled for filebeat receiver until https://github.com/elastic/beats/issues/43418 is resolved
+		if strings.EqualFold(name, "filebeat") && compInfo.RuntimeManager != component.OtelRuntimeManager {
 			fbDataStreamName := "filebeat_input"
 			fbDataset := fmt.Sprintf("elastic_agent.%s", fbDataStreamName)
 			fbIndexName := fmt.Sprintf("metrics-elastic_agent.%s-%s", fbDataStreamName, monitoringNamespace)
@@ -668,7 +698,7 @@ func (b *BeatsMonitor) getHttpStreams(
 				"json.is_array": true,
 				"period":        metricsCollectionIntervalString,
 				"index":         fbIndexName,
-				"processors":    processorsForHttpStream(binaryName, compInfo.ID, fbDataset, b.agentInfo),
+				"processors":    processorsForHttpStream(binaryName, compInfo.ID, fbDataset, b.agentInfo, compInfo.RuntimeManager),
 			}
 			if failureThreshold != nil {
 				fbStream[failureThresholdKey] = *failureThreshold
@@ -690,7 +720,6 @@ func (b *BeatsMonitor) getBeatsStreams(
 	monitoringNamespace := b.monitoringNamespace()
 	beatsStreams := make([]any, 0, len(componentInfos))
 
-	// ensure consistent ordering
 	for _, compInfo := range componentInfos {
 		binaryName := compInfo.BinaryName
 		if !isSupportedBeatsBinary(binaryName) {
@@ -713,7 +742,7 @@ func (b *BeatsMonitor) getBeatsStreams(
 			"hosts":      endpoints,
 			"period":     metricsCollectionIntervalString,
 			"index":      indexName,
-			"processors": processorsForBeatsStream(binaryName, compInfo.ID, monitoringNamespace, dataset, b.agentInfo),
+			"processors": processorsForBeatsStream(binaryName, compInfo.ID, monitoringNamespace, dataset, b.agentInfo, compInfo.RuntimeManager),
 		}
 
 		if failureThreshold != nil {
@@ -835,25 +864,49 @@ func processorsForProcessMetrics(binaryName, unitID, namespace, dataset string, 
 }
 
 // processorsForBeatsStream returns the processors used for metric streams in the beats input.
-func processorsForBeatsStream(binaryName, unitID, namespace, dataset string, agentInfo info.Agent) []any {
-	return []any{
+func processorsForBeatsStream(
+	binaryName, unitID, namespace, dataset string,
+	agentInfo info.Agent,
+	runtimeManager component.RuntimeManager,
+) []any {
+	processors := []any{
 		addDataStreamFieldsProcessor(dataset, namespace),
 		addEventFieldsProcessor(dataset),
 		addElasticAgentFieldsProcessor(binaryName, agentInfo),
 		addAgentFieldsProcessor(agentInfo.AgentID()),
 		addComponentFieldsProcessor(binaryName, unitID),
 	}
+	if runtimeManager == component.OtelRuntimeManager { // we don't want process metrics for beats receivers
+		fieldsToDrop := []any{
+			"beat.stats.cgroup",
+			"beat.stats.cpu",
+			"beat.stats.handles",
+			"beat.stats.memstats",
+			"beat.stats.runtime",
+		}
+		processors = append(processors, map[string]interface{}{
+			"drop_fields": map[string]interface{}{
+				"fields":         fieldsToDrop,
+				"ignore_missing": true,
+			},
+		})
+	}
+	return processors
 }
 
 // processorsForBeatsStream returns the processors used for metric streams in the beats input.
-func processorsForHttpStream(binaryName, unitID, dataset string, agentInfo info.Agent) []any {
+func processorsForHttpStream(binaryName, unitID, dataset string, agentInfo info.Agent, runtimeManager component.RuntimeManager) []any {
 	sanitizedName := sanitizeName(binaryName)
+	fieldsToDrop := []any{"http"}
+	if runtimeManager == component.OtelRuntimeManager { // we don't want process metrics for beats receivers
+		fieldsToDrop = append(fieldsToDrop, "system")
+	}
 	return []interface{}{
 		addEventFieldsProcessor(dataset),
 		addElasticAgentFieldsProcessor(sanitizedName, agentInfo),
 		addAgentFieldsProcessor(agentInfo.AgentID()),
 		addCopyFieldsProcessor(httpCopyRules(), true, false),
-		dropFieldsProcessor([]any{"http"}, true),
+		dropFieldsProcessor(fieldsToDrop, true),
 		addComponentFieldsProcessor(binaryName, unitID),
 	}
 }
