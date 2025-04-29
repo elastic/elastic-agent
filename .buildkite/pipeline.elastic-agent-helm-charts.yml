@@ -7,6 +7,8 @@ steps:
   - label: ":elastic-stack: Create helm chart"
     command: |
       .buildkite/scripts/steps/helm-charts.sh
+    artifact_paths:
+      - "elastic-agent-*.tgz"
     plugins:
       - elastic/oblt-google-auth#v1.2.0:
           lifetime: 1800 # seconds

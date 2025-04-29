@@ -13,6 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/otel/configtranslate"
+
 	"go.opentelemetry.io/collector/component/componentstatus"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -92,9 +94,8 @@ type MonitorManager interface {
 	// args:
 	// - the existing config policy
 	// - a list of the expected running components
-	// - a map of component IDs to binary names
 	// - a map of component IDs to the PIDs of the running components.
-	MonitoringConfig(map[string]interface{}, []component.Component, map[string]string, map[string]uint64) (map[string]interface{}, error)
+	MonitoringConfig(map[string]interface{}, []component.Component, map[string]uint64) (map[string]interface{}, error)
 }
 
 // Runner provides interface to run a manager and receive running errors.
@@ -221,6 +222,8 @@ type Coordinator struct {
 
 	otelMgr OTelManager
 	otelCfg *confmap.Conf
+	// the final config sent to the manager, contains both config from hybrid mode and from components
+	finalOtelCfg *confmap.Conf
 
 	caps      capabilities.Capabilities
 	modifiers []ComponentsModifier
@@ -781,7 +784,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 // information about the state of the Elastic Agent.
 // Called by external goroutines.
 func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
-	return diagnostics.Hooks{
+	hooks := diagnostics.Hooks{
 		{
 			Name:        "agent-info",
 			Filename:    "agent-info.yaml",
@@ -1022,7 +1025,24 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 				return o
 			},
 		},
+		diagnostics.Hook{
+			Name:        "otel-final",
+			Filename:    "otel-final.yaml",
+			Description: "Final otel configuration used by the Elastic Agent. Includes hybrid mode config and component config.",
+			ContentType: "application/yaml",
+			Hook: func(_ context.Context) []byte {
+				if c.finalOtelCfg == nil {
+					return []byte("no active OTel configuration")
+				}
+				o, err := yaml.Marshal(c.finalOtelCfg.ToStringMap())
+				if err != nil {
+					return []byte(fmt.Sprintf("error: failed to convert to yaml: %v", err))
+				}
+				return o
+			},
+		},
 	}
+	return hooks
 }
 
 // runner performs the actual work of running all the managers.
@@ -1234,7 +1254,6 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (err error) {
 	if c.otelMgr != nil {
 		c.otelCfg = cfg.OTel
-		c.otelMgr.Update(cfg.OTel)
 	}
 	return c.processConfigAgent(ctx, cfg)
 }
@@ -1420,15 +1439,90 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 		c.logger.Debugf("Continue with missing \"signed\" properties: %v", err)
 	}
 
-	model := component.Model{
+	model := &component.Model{
 		Components: c.componentModel,
 		Signed:     signed,
 	}
 
 	c.logger.Info("Updating running component model")
 	c.logger.With("components", model.Components).Debug("Updating running component model")
-	c.runtimeMgr.Update(model)
+	return c.updateManagersWithConfig(model)
+}
+
+// updateManagersWithConfig updates runtime managers with the component model and config.
+// Components may be sent to different runtimes depending on various criteria.
+func (c *Coordinator) updateManagersWithConfig(model *component.Model) error {
+	runtimeModel, otelModel := c.splitModelBetweenManagers(model)
+	c.logger.With("components", runtimeModel.Components).Debug("Updating runtime manager model")
+	c.runtimeMgr.Update(*runtimeModel)
+	return c.updateOtelManagerConfig(otelModel)
+}
+
+// updateOtelManagerConfig updates the otel collector configuration for the otel manager. It assembles this configuration
+// from the component model passed in and from the hybrid-mode otel config set on the Coordinator.
+func (c *Coordinator) updateOtelManagerConfig(model *component.Model) error {
+	finalOtelCfg := confmap.New()
+	var componentOtelCfg *confmap.Conf
+	if len(model.Components) > 0 {
+		var err error
+		c.logger.With("components", model.Components).Debug("Updating otel manager model")
+		componentOtelCfg, err = configtranslate.GetOtelConfig(model, c.agentInfo)
+		if err != nil {
+			c.logger.Errorf("failed to generate otel config: %v", err)
+		}
+		componentIDs := make([]string, 0, len(model.Components))
+		for _, comp := range model.Components {
+			componentIDs = append(componentIDs, comp.ID)
+		}
+		c.logger.With("component_ids", componentIDs).Warn("The Otel runtime manager is HIGHLY EXPERIMENTAL and only intended for testing. Use at your own risk.")
+	}
+	if componentOtelCfg != nil {
+		err := finalOtelCfg.Merge(componentOtelCfg)
+		if err != nil {
+			c.logger.Error("failed to merge otel config: %v", err)
+		}
+	}
+
+	if c.otelCfg != nil {
+		err := finalOtelCfg.Merge(c.otelCfg)
+		if err != nil {
+			c.logger.Error("failed to merge otel config: %v", err)
+		}
+	}
+
+	if len(finalOtelCfg.AllKeys()) == 0 {
+		// if the config is empty, we want to send nil to the manager, so it knows to stop the collector
+		finalOtelCfg = nil
+	}
+
+	c.otelMgr.Update(finalOtelCfg)
+	c.finalOtelCfg = finalOtelCfg
 	return nil
+}
+
+// splitModelBetweenManager splits the model components between the runtime manager and the otel manager.
+func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtimeModel *component.Model, otelModel *component.Model) {
+	var otelComponents, runtimeComponents []component.Component
+	for _, comp := range model.Components {
+		switch comp.RuntimeManager {
+		case component.OtelRuntimeManager:
+			otelComponents = append(otelComponents, comp)
+		case component.ProcessRuntimeManager:
+			runtimeComponents = append(runtimeComponents, comp)
+		default:
+			// this should be impossible if we parse the configuration correctly
+			c.logger.Errorf("unknown runtime manager for component: %s, ignoring", comp.RuntimeManager)
+		}
+	}
+	otelModel = &component.Model{
+		Components: otelComponents,
+		// the signed portion of the policy is only used by Defend, so otel doesn't need it for anything
+	}
+	runtimeModel = &component.Model{
+		Components: runtimeComponents,
+		Signed:     model.Signed,
+	}
+	return
 }
 
 // generateComponentModel regenerates the configuration tree and
