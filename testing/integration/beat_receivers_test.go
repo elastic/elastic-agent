@@ -38,6 +38,76 @@ var (
 	commonLogMessage = "Determined allowed capabilities"
 )
 
+// test logs and metrics are present
+type test struct {
+	dsType        string
+	dsDataset     string
+	dsNamespace   string
+	query         map[string]any // query to perform when searching for documents
+	ignoredFields []string       // fields to ignore when asserting document equivalence
+}
+
+func getTestList(infoNamespace string) []test {
+	tests := []test{
+		{
+			dsType:      "logs",
+			dsDataset:   "elastic_agent",
+			dsNamespace: infoNamespace,
+			query: map[string]any{
+				"message": commonLogMessage, // we get a common document based on log message
+			},
+			ignoredFields: []string{
+				// Expected to change between agentDocs and OtelDocs
+				"@timestamp",
+				"agent.ephemeral_id",
+				"agent.id",
+				"agent.version",
+				"event.duration",
+
+				// for filestream-monitoring
+				"log.file.inode",
+				"log.file.fingerprint",
+				"log.file.path",
+				"log.offset",
+
+				// needs investigation
+				"event.agent_id_status",
+				"event.ingested",
+
+				// elastic_agent * fields are hardcoded in processor list for now which is why they differ
+				"elastic_agent.id",
+				"elastic_agent.snapshot",
+				"elastic_agent.version",
+			},
+		},
+		{
+			dsType:      "metrics",
+			dsDataset:   "elastic_agent.elastic_agent",
+			dsNamespace: infoNamespace,
+			query: map[string]any{
+				"component.id": "elastic-agent", // we get only one component to avoid complexity
+			},
+			ignoredFields: []string{
+				// Expected to change between agentDocs and OtelDocs
+				"@timestamp",
+				"agent.ephemeral_id",
+				"agent.id",
+				"agent.version",
+				"event.duration",
+
+				// elastic_agent * fields are hardcoded in processor list for now which is why they differ
+				"elastic_agent.id",
+				"elastic_agent.snapshot",
+				"elastic_agent.version",
+			},
+		},
+		{dsType: "metrics", dsDataset: "elastic_agent.filebeat", dsNamespace: infoNamespace},
+		{dsType: "metrics", dsDataset: "elastic_agent.filebeat_input", dsNamespace: infoNamespace},
+		{dsType: "metrics", dsDataset: "elastic_agent.metricbeat", dsNamespace: infoNamespace},
+	}
+	return tests
+}
+
 // TestAgentMonitoring is a test to provide a baseline for what
 // elastic-agent monitoring looks like with classic monitoring.  It
 // will be expanded in the future to compare with beats receivers for
@@ -58,32 +128,14 @@ func TestAgentMonitoring(t *testing.T) {
 	agentDocs = make(map[string]estools.Documents)
 	otelDocs = make(map[string]estools.Documents)
 
-	// Tests logs and metrics are present
-	type test struct {
-		dsType      string
-		dsDataset   string
-		dsNamespace string
-		query       map[string]any
-	}
-
-	tests := []test{
-		{dsType: "logs", dsDataset: "elastic_agent", dsNamespace: info.Namespace, query: map[string]any{
-			"message": commonLogMessage,
-		}},
-		{dsType: "metrics", dsDataset: "elastic_agent.elastic_agent", dsNamespace: info.Namespace, query: map[string]any{
-			"component.id": "elastic-agent", //we check only one component to avoid complexity
-		}},
-		{dsType: "metrics", dsDataset: "elastic_agent.filebeat", dsNamespace: info.Namespace},
-		{dsType: "metrics", dsDataset: "elastic_agent.filebeat_input", dsNamespace: info.Namespace},
-		{dsType: "metrics", dsDataset: "elastic_agent.metricbeat", dsNamespace: info.Namespace},
-	}
-
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Privileged:     true,
 		Force:          true,
 		Develop:        true,
 	}
+
+	tests := getTestList(info.Namespace)
 
 	// Flow
 	// 1. Create and install policy with just monitoring
@@ -188,8 +240,7 @@ func TestAgentMonitoring(t *testing.T) {
 						{"match": map[string]any{"data_stream.namespace": tc.dsNamespace}},
 					}
 
-					// Only add the "message" match if tc.message is not empty
-					// This conditional check will not be required when test for metrics is included
+					// Only add query if tc.query is not nil
 					if tc.query != nil {
 						mustClauses = append(mustClauses, map[string]any{
 							"match": tc.query,
@@ -217,7 +268,7 @@ func TestAgentMonitoring(t *testing.T) {
 		}
 	})
 
-	t.Run("compare logs ingested by agent monitoring vs otel monitoring", func(t *testing.T) {
+	t.Run("compare documents ingested by agent monitoring vs otel monitoring", func(t *testing.T) {
 		// skipping this because the log-path should be handled differently in windows
 		if runtime.GOOS == "windows" {
 			t.Skip("skipping this test on windows for now")
@@ -308,7 +359,7 @@ func TestAgentMonitoring(t *testing.T) {
 			return true
 		}, 30*time.Second, 1*time.Second)
 
-		// run this only for logs for now
+		// run this for first two indexes only (for now)
 		for i := 0; i < 2; i++ {
 			tc := tests[i]
 			key := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
@@ -344,37 +395,43 @@ func TestAgentMonitoring(t *testing.T) {
 
 			agent := agentDocs[key].Hits.Hits[0].Source
 			otel := otelDocs[key].Hits.Hits[0].Source
-			ignoredFields := []string{
-				// Expected to change between agentDocs and OtelDocs
-				"@timestamp",
-				"agent.ephemeral_id",
-				"agent.id",
-				"agent.version",
-				"event.duration",
 
-				// for filestream-monitoring
-				"log.file.inode",
-				"log.file.fingerprint",
-				"log.file.path",
-				"log.offset",
-
-				// needs investigation
-				"event.agent_id_status",
-				"event.ingested",
-
-				// elastic_agent * fields are hardcoded in processor list for now which is why they differ
-				"elastic_agent.id",
-				"elastic_agent.snapshot",
-				"elastic_agent.version",
-			}
-
-			AssertMapsEqual(t, agent, otel, ignoredFields, "expected documents to be equal")
+			AssertMapsEqual(t, agent, otel, tc.ignoredFields, "expected documents to be equal")
 		}
 	})
 }
 
 var configTemplateOTel = `
-receivers:
+receivers:` +
+	filestreamMonitoring +
+	httpMetricMonitoring +
+	`exporters:
+  debug:
+    use_internal_logger: false
+    verbosity: detailed
+  elasticsearch/log:
+    endpoints:
+      - {{.ESEndpoint}}
+    compression: none
+    api_key: {{.ESApiKey}}
+    logs_dynamic_index:
+      enabled: true
+    batcher:
+      enabled: true
+      flush_timeout: 0.5s
+    mapping:
+      mode: bodymap	  
+service:
+  pipelines:
+    logs:
+      receivers:
+        - filebeatreceiver/filestream-monitoring
+        - metricbeatreceiver/http-metrics-monitoring
+      exporters:
+        - elasticsearch/log
+`
+
+var filestreamMonitoring = `
   filebeatreceiver/filestream-monitoring:
     filebeat:
       inputs:
@@ -464,6 +521,9 @@ receivers:
         - '*'
     http.enabled: true
     http.host: {{ .SocketEndpoint }}
+`
+
+var httpMetricMonitoring = `
   metricbeatreceiver/http-metrics-monitoring:
     metricbeat:
       modules:
@@ -557,28 +617,4 @@ receivers:
       level: info
       selectors:
         - '*' 
-exporters:
-  debug:
-    use_internal_logger: false
-    verbosity: detailed
-  elasticsearch/log:
-    endpoints:
-      - {{.ESEndpoint}}
-    compression: none
-    api_key: {{.ESApiKey}}
-    logs_dynamic_index:
-      enabled: true
-    batcher:
-      enabled: true
-      flush_timeout: 0.5s
-    mapping:
-      mode: bodymap	  
-service:
-  pipelines:
-    logs:
-      receivers:
-        - filebeatreceiver/filestream-monitoring
-        - metricbeatreceiver/http-metrics-monitoring
-      exporters:
-        - elasticsearch/log
 `
