@@ -71,30 +71,6 @@ type enrollCmd struct {
 	daemonReloadFunc func(context.Context) error
 }
 
-// enrollCmdFleetServerOption define all the supported enrollment options for bootstrapping with Fleet Server.
-type enrollCmdFleetServerOption struct {
-	ConnStr               string
-	ElasticsearchCA       string
-	ElasticsearchCASHA256 string
-	ElasticsearchInsecure bool
-	ElasticsearchCert     string
-	ElasticsearchCertKey  string
-	ServiceToken          string
-	ServiceTokenPath      string
-	PolicyID              string
-	Host                  string
-	Port                  uint16
-	InternalPort          uint16
-	Cert                  string
-	CertKey               string
-	CertKeyPassphrasePath string
-	ClientAuth            string
-	Insecure              bool
-	SpawnAgent            bool
-	Headers               map[string]string
-	Timeout               time.Duration
-}
-
 // newEnrollCmd creates a new enrollment with the given store.
 func newEnrollCmd(
 	log *logger.Logger,

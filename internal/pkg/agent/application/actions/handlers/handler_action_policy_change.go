@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"sort"
-	"time"
 
 	"gopkg.in/yaml.v2"
 
@@ -31,10 +30,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-)
-
-const (
-	apiStatusTimeout = 15 * time.Second
 )
 
 // PolicyChangeHandler is a handler for POLICY_CHANGE action.

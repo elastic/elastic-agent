@@ -31,7 +31,6 @@ type Migrate struct {
 	log       *logger.Logger
 	agentInfo info.Agent
 	coord     migrateCoordinator
-	ch        chan coordinator.ConfigChange
 
 	tamperProtectionFn func() bool // allows to inject the flag for tests, defaults to features.TamperProtection
 }
@@ -70,7 +69,7 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 	}
 
 	if err := h.coord.Migrate(ctx, action, fleetgateway.RequestBackoff); err != nil {
-		if err == coordinator.ErrNotManaged {
+		if errors.Is(err, coordinator.ErrNotManaged) {
 			return errors.New("unmanaged agent, use Enroll instead")
 		}
 

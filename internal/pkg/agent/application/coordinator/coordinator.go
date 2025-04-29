@@ -42,7 +42,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	fleetapiClient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
-	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -565,7 +564,7 @@ func (c *Coordinator) Migrate(ctx context.Context, action *fleetapi.ActionMigrat
 		return errors.New("unsupported action: agent runs Fleet server")
 	}
 
-	// Keeping all enrollment options that are not overriden via action
+	// Keeping all enrollment options that are not overridden via action
 	options, err := c.computeEnrollOptions(ctx, paths.ConfigFile(), paths.AgentConfigFile())
 	if err != nil {
 		return fmt.Errorf("failed to compute enroll options: %w", err)
@@ -589,6 +588,9 @@ func (c *Coordinator) Migrate(ctx context.Context, action *fleetapi.ActionMigrat
 
 	// merge with options coming from action
 	options, err = enroll.MergeOptionsWithMigrateAction(action, options)
+	if err != nil {
+		return fmt.Errorf("failed to merge options with migrate action: %w", err)
+	}
 
 	newRemoteConfig, err := options.RemoteConfig(true)
 	if err != nil {
@@ -2080,7 +2082,7 @@ func logBasedOnState(l *logger.Logger, state client.UnitState, msg string, args 
 	}
 }
 
-func (c *Coordinator) unenroll(ctx context.Context, client fleetclient.Sender) error {
+func (c *Coordinator) unenroll(ctx context.Context, client fleetapiClient.Sender) error {
 	unenrollCmd := fleetapi.NewAuditUnenrollCmd(c.agentInfo, client)
 	unenrollReq := &fleetapi.AuditUnenrollRequest{
 		Reason:    fleetapi.ReasonMigration,
