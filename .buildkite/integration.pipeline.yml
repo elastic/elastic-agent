@@ -201,3 +201,8 @@ steps:
     depends_on:
       - int-packaging
     command: "buildkite-agent pipeline upload .buildkite/bk.integration.pipeline.yml"
+
+  - label: "Triggering custom ECH integration tests"
+    depends_on:
+      - int-packaging
+    command: "buildkite-agent pipeline upload .buildkite/bk.fips-integration.pipeline.yml"
