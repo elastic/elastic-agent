@@ -20,16 +20,17 @@ import (
 	"github.com/elastic/elastic-agent/pkg/features"
 )
 
-type MigrateCoordinator interface {
+type migrateCoordinator interface {
 	Migrate(_ context.Context, _ *fleetapi.ActionMigrate, _ func(done <-chan struct{}) backoff.Backoff) error
 	ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string)
+	State() coordinator.State
 }
 
 // Settings handles settings change coming from fleet and updates log level.
 type Migrate struct {
 	log       *logger.Logger
 	agentInfo info.Agent
-	coord     MigrateCoordinator
+	coord     migrateCoordinator
 	ch        chan coordinator.ConfigChange
 
 	tamperProtectionFn func() bool // allows to inject the flag for tests, defaults to features.TamperProtection
@@ -39,7 +40,7 @@ type Migrate struct {
 func NewMigrate(
 	log *logger.Logger,
 	agentInfo info.Agent,
-	coord MigrateCoordinator,
+	coord migrateCoordinator,
 ) *Migrate {
 	return &Migrate{
 		log:                log,
@@ -59,10 +60,13 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 	}
 
 	if h.tamperProtectionFn() {
-		// tamper protected agents are unsupported, fail fast
-		err := errors.New("unsupported action: tamper protected agent")
-		h.ackFailure(ctx, err, action, ack)
-		return err
+		state := h.coord.State()
+		if ucs := findMatchingUnitsByActionType(state, a.Type()); len(ucs) > 0 {
+			// tamper protected agents are unsupported, fail fast
+			err := errors.New("unsupported action: tamper protected agent")
+			h.ackFailure(ctx, err, action, ack)
+			return err
+		}
 	}
 
 	if err := h.coord.Migrate(ctx, action, fleetgateway.RequestBackoff); err != nil {
