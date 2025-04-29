@@ -277,6 +277,16 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 		}
 	}
+
+	getBeatMonitoringConfig := func(_, _ string) map[string]any {
+		return map[string]any{
+			"http": map[string]any{
+				"enabled": true,
+				"host":    "localhost",
+			},
+		}
+	}
+
 	tests := []struct {
 		name           string
 		model          *component.Model
@@ -387,6 +397,10 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
+						"http": map[string]any{
+							"enabled": true,
+							"host":    "localhost",
+						},
 					},
 				},
 				"service": map[string]any{
@@ -476,6 +490,10 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
+						"http": map[string]any{
+							"enabled": true,
+							"host":    "localhost",
+						},
 					},
 				},
 				"service": map[string]any{
@@ -491,7 +509,7 @@ func TestGetOtelConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actualConf, actualError := GetOtelConfig(tt.model, agentInfo)
+			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, getBeatMonitoringConfig)
 			if actualConf == nil || tt.expectedConfig == nil {
 				assert.Equal(t, tt.expectedConfig, actualConf)
 			} else { // this gives a nicer diff

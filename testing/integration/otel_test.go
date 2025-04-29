@@ -1018,9 +1018,10 @@ func TestOtelFilestreamInput(t *testing.T) {
 
 	// Create the otel configuration file
 	type otelConfigOptions struct {
-		InputPath  string
-		ESEndpoint string
-		ESApiKey   string
+		InputPath       string
+		ESEndpoint      string
+		ESApiKey        string
+		ESApiKeyEncoded string
 	}
 	esEndpoint, err := getESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
@@ -1044,21 +1045,30 @@ outputs:
   default:
     type: elasticsearch
     hosts: [{{.ESEndpoint}}]
+    api_key: "{{.ESApiKeyEncoded}}"
+    preset: "balanced"
+  monitoring:
+    type: elasticsearch
+    hosts: [{{.ESEndpoint}}]
     api_key: "{{.ESApiKey}}"
     preset: "balanced"
 agent:
   monitoring:
-    metrics: false
+    metrics: true
     logs: false
+    use_output: monitoring
 `
 	index := ".ds-logs-e2e-*"
 	var configBuffer bytes.Buffer
+	decodedApiKey, err := base64.StdEncoding.DecodeString(esApiKey.Encoded)
+	require.NoError(t, err)
 	require.NoError(t,
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 			otelConfigOptions{
-				InputPath:  inputFilePath,
-				ESEndpoint: esEndpoint,
-				ESApiKey:   esApiKey.Encoded,
+				InputPath:       inputFilePath,
+				ESEndpoint:      esEndpoint,
+				ESApiKey:        string(decodedApiKey),
+				ESApiKeyEncoded: esApiKey.Encoded,
 			}))
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
@@ -1111,6 +1121,27 @@ agent:
 		2*time.Minute, 5*time.Second,
 		"Expected %d logs, got %v", numEvents, actualHits)
 
+	metricsIndex := ".ds-metrics-elastic_agent*"
+	// Check metrics from self-monitoring
+	assert.EventuallyWithT(t,
+		func(ct *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer findCancel()
+
+			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, metricsIndex, map[string]interface{}{
+				"component.id": "filestream-default",
+			})
+			require.NoError(ct, err)
+
+			actualHits.Hits = docs.Hits.Total.Value
+			output, execErr := fixture.ExecStatus(context.Background())
+			require.NoError(ct, execErr)
+			t.Logf("status output: %v", output)
+			assert.Greater(ct, actualHits.Hits, 0)
+		},
+		2*time.Minute, 5*time.Second,
+		"Expected %d metrics events, got %v", numEvents, actualHits)
+
 	cancel()
 }
 
@@ -1147,7 +1178,7 @@ inputs:
     use_output: default
     _runtime_experimental: otel
     streams:
-    - metricsets: 
+    - metricsets:
        - json
       path: "/stats"
       hosts:
