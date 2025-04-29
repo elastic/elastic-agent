@@ -12,6 +12,7 @@ env:
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1745338778"
   IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1745338778"
 
+
 steps:
   - label: Start ESS stack for integration tests
     key: integration-ess
