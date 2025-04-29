@@ -8,9 +8,14 @@ import (
 	"context"
 	"testing"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	mockinfo "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/info"
 	"github.com/stretchr/testify/mock"
@@ -37,7 +42,9 @@ func TestActionMigratelHandler(t *testing.T) {
 	})
 
 	t.Run("tamper protected agent", func(t *testing.T) {
-		action := &fleetapi.ActionMigrate{}
+		action := &fleetapi.ActionMigrate{
+			ActionType: "MIGRATE",
+		}
 
 		ack := &fakeAcker{}
 		ack.On("Ack", t.Context(), action).Return(nil)
@@ -46,6 +53,28 @@ func TestActionMigratelHandler(t *testing.T) {
 		coord := &fakeMigrateCoordinator{}
 		coord.On("Migrate", mock.Anything, mock.Anything).Return(nil)
 		coord.On("ReExec", mock.Anything, mock.Anything)
+		coord.On("State").Return(coordinator.State{
+			Components: []runtime.ComponentComponentState{
+				runtime.ComponentComponentState{
+					Component: component.Component{
+						InputSpec: &component.InputRuntimeSpec{
+							Spec: component.InputSpec{
+								ProxiedActions: []string{"MIGRATE"},
+							},
+						},
+						InputType: "tampered-input",
+						Units: []component.Unit{
+							component.Unit{
+								Type: client.UnitTypeInput,
+								Config: &proto.UnitExpectedConfig{
+									Type: "tampered-input",
+								},
+							},
+						},
+					},
+				},
+			},
+		})
 
 		h := NewMigrate(log, mockAgentInfo, coord)
 		h.tamperProtectionFn = func() bool { return true }
@@ -92,4 +121,9 @@ func (f *fakeMigrateCoordinator) Migrate(ctx context.Context, a *fleetapi.Action
 
 func (f *fakeMigrateCoordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string) {
 	f.Called(callback, argOverrides)
+}
+
+func (f *fakeMigrateCoordinator) State() coordinator.State {
+	args := f.Called()
+	return args.Get(0).(coordinator.State)
 }
