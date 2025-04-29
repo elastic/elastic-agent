@@ -97,9 +97,9 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				// - Two Gateway pods to collect, aggregate and forward
 				// telemetry.
 				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 4, "otc-container"),
-				// validate kubeletstats metrics are being
-				// pushed
+				// validate k8s metrics are being pushed
 				k8sStepCheckDatastreamsHits(info, "metrics", "kubeletstatsreceiver.otel", "default"),
+				k8sStepCheckDatastreamsHits(info, "metrics", "k8sclusterreceiver.otel", "default"),
 				// validates auto-instrumentation and traces
 				// datastream generation
 				func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
