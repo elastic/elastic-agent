@@ -1,0 +1,175 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+
+env:
+  DOCKER_REGISTRY: "docker.elastic.co"
+  VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
+  ASDF_MAGE_VERSION: 1.14.0
+  FIPS: "true"
+  CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
+  CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/observability-ci/elastic-agent-fips"
+
+  IMAGE_UBUNTU_FIPS: "platform-ingest-fleet-server-ubuntu-2204-fips"
+
+steps:
+  - label: Build and push custom elastic-agent image
+    key: integration-fips-cloud-image
+    env:
+      ASDF_TERRAFORM_VERSION: 1.9.2
+    command: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      mage cloud:image
+      mage cloud:push
+    agents:
+      image: "${IMAGE_UBUNTU_FIPS}"
+
+  - label: Start ESS stack for integration tests
+    key: integration-fips-ess
+    depends_on:
+      - integration-fips-cloud-image
+    env:
+      ASDF_TERRAFORM_VERSION: 1.9.2
+      TF_VAR_integration_server_docker_image: "${CI_ELASTIC_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
+    command: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      source .buildkite/scripts/steps/ess_start.sh
+    artifact_paths:
+      - test_infra/ess/*.tfstate
+      - test_infra/ess/*.lock.hcl
+    agents:
+      image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
+      useCustomGlobalHooks: true
+
+  - group: "Stateful:Ubuntu"
+    key: integration-tests-ubuntu-fips
+    depends_on:
+      - integration-fips-ess
+    steps:
+      - label: "fips:non-sudo: {{matrix}}"
+        depends_on:
+          - packaging-ubuntu-x86-64-fips
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64-fips'
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n1-standard-8"
+          image: "${IMAGE_UBUNTU_FIPS}"
+        matrix:
+          - default
+
+      - label: "fips:sudo: {{matrix}}"
+        depends_on:
+          - packaging-ubuntu-x86-64-fips
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64-fips
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n1-standard-8"
+          image: "${IMAGE_UBUNTU_FIPS}"
+        matrix:
+          - default
+          #- upgrade
+          #- upgrade-flavor
+          #- standalone-upgrade
+          #- fleet
+          #- fleet-endpoint-security
+          #- fleet-airgapped
+          #- fleet-airgapped-privileged
+          #- fleet-privileged
+          #- fleet-upgrade-to-pr-build
+          #- install-uninstall
+          #- fqdn
+          #- deb
+          #- container
+
+  #- group: "Kubernetes"
+  #  key: integration-tests-kubernetes
+  #  depends_on:
+  #    - integration-ess
+  #    - packaging-containers-x86-64
+  #  steps:
+  #    - label: "{{matrix.version}}:amd64:{{matrix.variants}}"
+  #      env:
+  #        K8S_VERSION: "{{matrix.version}}"
+  #        ASDF_KIND_VERSION: "0.27.0"
+  #        DOCKER_VARIANTS: "{{matrix.variants}}"
+  #        TARGET_ARCH: "amd64"
+  #        AGENT_VERSION: "9.0.0-SNAPSHOT" # Remove agent pinning once 9.0.0 is released
+  #      command: |
+  #        buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64'
+  #        .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
+  #      artifact_paths:
+  #        - build/**
+  #        - build/diagnostics/**
+  #        - build/*.pod_logs_dump/*
+  #      retry:
+  #        automatic:
+  #          limit: 1
+  #      agents:
+  #        provider: "gcp"
+  #        machineType: "n1-standard-4"
+  #        image: "${IMAGE_UBUNTU_FIPS}"
+  #        diskSizeGb: 80
+  #      matrix:
+  #        setup:
+  #          variants:
+  #          - "basic,slim,complete,service,elastic-otel-collector"
+  #          - "wolfi,slim-wolfi,complete-wolfi,elastic-otel-collector-wolfi"
+  #          version:
+  #          - v1.27.16
+  #          - v1.28.9
+  #          - v1.29.8
+  #          - v1.30.8
+  #          - v1.31.0
+  #          - v1.32.0
+
+  - label: ESS stack cleanup
+    depends_on:
+      - integration-tests-ubuntu
+      - integration-tests-win
+      - integration-tests-rhel8
+      - integration-tests-kubernetes
+    allow_dependency_failure: true
+    command: |
+      buildkite-agent artifact download "test_infra/ess/**" . --step "integration-ess"
+      ls -lah test_infra/ess
+      .buildkite/scripts/steps/ess_down.sh
+    agents:
+      image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
+      useCustomGlobalHooks: true
+
+  - label: Aggregate test reports
+    # Warning: The key has a hook in pre-command
+    key: aggregate-reports-fips
+    depends_on:
+      - integration-tests-ubuntu-fips
+      #- integration-tests-kubernetes
+    allow_dependency_failure: true
+    command: |
+      buildkite-agent artifact download "build/*.xml" .
+    agents:
+      image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
+      useCustomGlobalHooks: true
+    soft_fail:
+      - exit_status: "*"
+    plugins:
+      - test-collector#v1.10.1:
+          files: "build/*.xml"
+          format: "junit"
+          branches: "main"
+          debug: true
