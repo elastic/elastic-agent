@@ -23,7 +23,8 @@ func TestFIPSAgentConnectingToFIPSFleetServerInECH(t *testing.T) {
 	})
 
 	// Re-use ECH API key used by integration tests to spin up a deployment
-	// in ECH.
+	// in ECH. Deployment must use an image of Integration Server that has
+	// FIPS-capable artifacts.
 	for _, envVar := range os.Environ() {
 		t.Log(envVar)
 	}
