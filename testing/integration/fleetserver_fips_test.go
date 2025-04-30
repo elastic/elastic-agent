@@ -6,7 +6,12 @@
 
 package integration
 
-import "os"
+import (
+	"os"
+	"testing"
+
+	"github.com/elastic/elastic-agent/pkg/testing/define"
+)
 
 // This test has nothing to do with the locally-built Agent artifact! It merely
 // orchestrates resources in ECH (Elastic Cloud - Hosted). The purpose of this test
