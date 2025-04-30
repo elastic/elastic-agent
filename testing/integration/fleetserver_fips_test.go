@@ -6,6 +6,8 @@
 
 package integration
 
+import "os"
+
 // This test has nothing to do with the locally-built Agent artifact! It merely
 // orchestrates resources in ECH (Elastic Cloud - Hosted). The purpose of this test
 // is to ensure that a FIPS-capable Elastic Agent running in the ECH FRH (FedRamp High)
@@ -21,7 +23,12 @@ func TestFIPSAgentConnectingToFIPSFleetServerInECH(t *testing.T) {
 	})
 
 	// Re-use ECH API key used by integration tests to spin up a deployment
-	// in ECH. The deployment must contain an Integrations Server, which includes
+	// in ECH.
+	for _, envVar := range os.Environ() {
+		t.Log(envVar)
+	}
+
+	//The deployment must contain an Integrations Server, which includes
 	// an Agent running with a local Fleet Server. Note that we want to use a
 	// FIPS-capable build of Elastic Agent (with Fleet Server) for this deployment.
 	// Further, the Fleet Server must be configured with FIPS-compliant TLS (TLSv1.2
