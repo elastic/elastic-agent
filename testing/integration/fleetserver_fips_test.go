@@ -2,42 +2,44 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build integration
+//go:build integration && frh
 
 package integration
 
 import (
-	"os"
 	"testing"
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
-// This test has nothing to do with the locally-built Agent artifact! It merely
-// orchestrates resources in ECH (Elastic Cloud - Hosted). The purpose of this test
-// is to ensure that a FIPS-capable Elastic Agent running in the ECH FRH (FedRamp High)
-// environment is able to successfully connect to it's own local Fleet Server instance
-// (which, by definition should also be FIPS-capable and running in the ECH FRH environment).
+// IMPORTANT: This file has build tags of integration && frh. This means the tests in
+// this file will NOT be run along with other integration tests (which use deployments
+// in the ESS production CFT region). The tests in this file need to be run using
+// deployments in an ECH FRH (FedRamp High) region. This region can be specified using
+// the following environment variables:
+// TEST_INTEG_AUTH_ESS_FRH_URL (default: https://api.staging.elastic-gov.com/)
+// TEST_INTEG_AUTH_ESS_FRH_REGION (default: us-gov-east-1)
+// TEST_INTEG_AUTH_ESS_FRH_APIKEY
 
-func TestFIPSAgentConnectingToFIPSFleetServerInECH(t *testing.T) {
+// TestFIPSAgentConnectingToFIPSFleetServerInECHFRH ensures that a FIPS-capable Elastic Agent
+// running in an ECH FRH (FedRamp High) environment is able to successfully connect to its
+// own local Fleet Server instance (which, by definition should also be FIPS-capable and
+// running in the ECH FRH environment).
+// NOTE: This test has nothing to do with the locally-built Agent artifact! It merely
+// orchestrates resources in ECH (Elastic Cloud - Hosted).
+
+func TestFIPSAgentConnectingToFIPSFleetServerInECHFRH(t *testing.T) {
 	_ = define.Require(t, define.Requirements{
 		Group: Fleet,
-		Stack: &define.Stack{},
+		Stack: nil,
 		Sudo:  false,
 		Local: true,
 	})
 
-	// Re-use ECH API key used by integration tests to spin up a deployment
-	// in ECH. Deployment must use an image of Integration Server that has
-	// FIPS-capable artifacts.
-	for _, envVar := range os.Environ() {
-		t.Log(envVar)
-	}
-
-	//The deployment must contain an Integrations Server, which includes
-	// an Agent running with a local Fleet Server. Note that we want to use a
-	// FIPS-capable build of Elastic Agent (with Fleet Server) for this deployment.
-	// Further, the Fleet Server must be configured with FIPS-compliant TLS (TLSv1.2
+	// Connect to ECH FRH environment and spin up deployment. The deployment must
+	// contain an Integrations Server, which includes an Agent running with a local
+	// Fleet Server. Note that we will need to use a FIPS-capable build of Elastic Agent
+	// (with Fleet Server) for this deployment. Further, the Fleet Server must be configured with FIPS-compliant TLS (TLSv1.2
 	// and TLSv1.3 and appropriate ciphers).
 
 	// Once the deployment is completely spun up, ensure that the Agent in the
