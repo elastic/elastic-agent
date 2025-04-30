@@ -284,8 +284,8 @@ func testRpmUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info
 	newRunDir, err := atesting.FindRunDir(endFixture)
 	require.NoError(t, err, "failed at getting run dir")
 	require.NotEqual(t, runDir, newRunDir, "the run dirs from upgrade should not match")
-	newRunMigrationMarket := filepath.Join(newRunDir, migrationMarkerFile)
-	require.FileExistsf(t, newRunMigrationMarket, "%q is missing", newRunMigrationMarket)
+	newRunMigrationMarker := filepath.Join(newRunDir, migrationMarkerFile)
+	require.FileExistsf(t, newRunMigrationMarker, "%q is missing", newRunMigrationMarker)
 
 	// 4. Wait for version in Fleet to match
 	// Fleet will not include the `-SNAPSHOT` in the `GetAgentVersion` result
