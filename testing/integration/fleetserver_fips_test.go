@@ -20,7 +20,7 @@ import (
 // (which, by definition should also be FIPS-capable and running in the ECH FRH environment).
 
 func TestFIPSAgentConnectingToFIPSFleetServerInECH(t *testing.T) {
-	info := define.Require(t, define.Requirements{
+	_ = define.Require(t, define.Requirements{
 		Group: Fleet,
 		Stack: &define.Stack{},
 		Sudo:  false,
