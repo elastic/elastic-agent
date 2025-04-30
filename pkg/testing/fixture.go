@@ -1245,8 +1245,8 @@ func getCacheDir(caller string, name string) (string, error) {
 	return cacheDir, nil
 }
 
-// FindComponentsDir identifies the directory that holds the components.
-func FindComponentsDir(dir, version string) (string, error) {
+// findAgentDataVersionDir identifies the directory that holds the agent data of the given version.
+func findAgentDataVersionDir(dir, version string) (string, error) {
 	dataDir := filepath.Join(dir, "data")
 	agentVersions, err := os.ReadDir(dataDir)
 	if err != nil {
@@ -1256,6 +1256,7 @@ func FindComponentsDir(dir, version string) (string, error) {
 	for _, fi := range agentVersions {
 		filename := fi.Name()
 		if strings.HasPrefix(filename, "elastic-agent-") && fi.IsDir() {
+			// Below we exclude the hash suffix (7 characters) of the directory to check the version
 			if version != "" && filename[:len(filename)-7] != "elastic-agent-"+version {
 				// version specified but version mismatch. in case of upgrade we have multiple
 				// directories, we don't want first found
@@ -1268,7 +1269,16 @@ func FindComponentsDir(dir, version string) (string, error) {
 	if versionDir == "" {
 		return "", fmt.Errorf("failed to find versioned directory for version %q", version)
 	}
-	componentsDir := filepath.Join(dataDir, versionDir, "components")
+	return filepath.Join(dataDir, versionDir), nil
+}
+
+// FindComponentsDir identifies the directory that holds the components.
+func FindComponentsDir(dir, version string) (string, error) {
+	versionDir, err := findAgentDataVersionDir(dir, version)
+	if err != nil {
+		return "", err
+	}
+	componentsDir := filepath.Join(versionDir, "components")
 	fi, err := os.Stat(componentsDir)
 	if (err != nil && !os.IsExist(err)) || !fi.IsDir() {
 		return "", fmt.Errorf("failed to find components directory at %s: %w", componentsDir, err)
@@ -1285,29 +1295,11 @@ func FindRunDir(fixture *Fixture) (string, error) {
 	}
 
 	version := fixture.Version()
-
-	dataDir := filepath.Join(agentWorkDir, "data")
-	agentVersions, err := os.ReadDir(dataDir)
+	versionDir, err := findAgentDataVersionDir(agentWorkDir, version)
 	if err != nil {
-		return "", fmt.Errorf("failed to read contents of the data directory %s: %w", dataDir, err)
+		return "", err
 	}
-	var versionDir string
-	for _, fi := range agentVersions {
-		filename := fi.Name()
-		if strings.HasPrefix(filename, "elastic-agent-") && fi.IsDir() {
-			if version != "" && filename[:len(filename)-7] != "elastic-agent-"+version {
-				// version specified but version mismatch. in case of upgrade we have multiple
-				// directories, we don't want first found
-				continue
-			}
-			versionDir = filename
-			break
-		}
-	}
-	if versionDir == "" {
-		return "", fmt.Errorf("failed to find versioned directory for version %q", version)
-	}
-	runDir := filepath.Join(dataDir, versionDir, "run")
+	runDir := filepath.Join(versionDir, "run")
 	fi, err := os.Stat(runDir)
 	if (err != nil && !os.IsExist(err)) || !fi.IsDir() {
 		return "", fmt.Errorf("failed to find run directory at %s: %w", runDir, err)
