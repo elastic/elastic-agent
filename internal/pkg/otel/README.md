@@ -95,7 +95,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| [elasticapmconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/elasticapmconnector/v0.2.1/connector/elasticapmconnector/README.md) | v0.2.1 |
+| [elasticapmconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/elasticapmconnector/v0.3.0/connector/elasticapmconnector/README.md) | v0.3.0 |
 | [routingconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/routingconnector/v0.122.0/connector/routingconnector/README.md) | v0.122.0 |
 | [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.122.0/connector/spanmetricsconnector/README.md) | v0.122.0 |
 ## Persistence in OpenTelemetry Collector
