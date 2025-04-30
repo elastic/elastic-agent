@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -127,7 +129,7 @@ func TestOTelManager_Run(t *testing.T) {
 				return true
 			}
 			latest := getLatestStatus()
-			if latest == nil || latest.Event.Status() != componentstatus.StatusOK {
+			if latest == nil || latest.Status() != componentstatus.StatusOK {
 				return false
 			}
 			return true
@@ -143,7 +145,7 @@ func TestOTelManager_Run(t *testing.T) {
 			if !errors.Is(runErr, context.Canceled) {
 				t.Fatalf("otel manager never got healthy and the otel manager returned unexpected error: %v (latest status: %+v) (latest err: %v)", runErr, lastStatus, lastErr)
 			}
-			t.Fatalf("otel collector never got healthy: %+v (latest err: %v)", lastStatus, lastErr)
+			t.Fatalf("otel collector never got healthy: %s (latest err: %v)", statusToYaml(lastStatus), lastErr)
 		}
 		latestErr := getLatestErr()
 		require.NoError(t, latestErr, "runtime errored")
@@ -236,4 +238,37 @@ outer:
 		}
 	}
 	assert.Error(t, err, "otel manager should have returned an error")
+}
+
+func statusToYaml(s *status.AggregateStatus) string {
+	printable := toSerializableStatus(s)
+	yamlBytes, _ := yaml.Marshal(printable)
+	return string(yamlBytes)
+}
+
+type serializableStatus struct {
+	Status             string
+	Error              error
+	Timestamp          time.Time
+	ComponentStatusMap map[string]serializableStatus
+}
+
+// converts the status.AggregateStatus to a serializable form. The normal status is structured in a way where
+// serialization based on reflection doesn't give the right result.
+func toSerializableStatus(s *status.AggregateStatus) *serializableStatus {
+	if s == nil {
+		return nil
+	}
+
+	outputComponentStatusMap := make(map[string]serializableStatus, len(s.ComponentStatusMap))
+	for k, v := range s.ComponentStatusMap {
+		outputComponentStatusMap[k] = *toSerializableStatus(v)
+	}
+	outputStruct := &serializableStatus{
+		Status:             s.Status().String(),
+		Error:              s.Err(),
+		Timestamp:          s.Timestamp(),
+		ComponentStatusMap: outputComponentStatusMap,
+	}
+	return outputStruct
 }
