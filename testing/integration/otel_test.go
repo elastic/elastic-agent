@@ -698,6 +698,15 @@ func createESApiKey(esClient *elasticsearch.Client) (estools.APIKeyResponse, err
 	return estools.CreateAPIKey(context.Background(), esClient, estools.APIKeyRequest{Name: "test-api-key", Expiration: "1d"})
 }
 
+// getDecodedApiKey returns a decoded API key appropriate for use in beats configurations.
+func getDecodedApiKey(keyResponse estools.APIKeyResponse) (string, error) {
+	decoded, err := base64.StdEncoding.DecodeString(keyResponse.Encoded)
+	if err != nil {
+		return "", err
+	}
+	return string(decoded), nil
+}
+
 func linesTrackMap(lines []string) map[string]bool {
 	mm := make(map[string]bool)
 	for _, l := range lines {
@@ -1020,16 +1029,17 @@ func TestOtelFilestreamInput(t *testing.T) {
 
 	// Create the otel configuration file
 	type otelConfigOptions struct {
-		InputPath       string
-		ESEndpoint      string
-		ESApiKey        string
-		ESApiKeyEncoded string
+		InputPath  string
+		ESEndpoint string
+		ESApiKey   string
 	}
 	esEndpoint, err := getESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
 	esApiKey, err := createESApiKey(info.ESClient)
 	require.NoError(t, err, "error creating API key")
 	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	decodedApiKey, err := getDecodedApiKey(esApiKey)
+	require.NoError(t, err)
 	configTemplate := `inputs:
   - type: filestream
     id: filestream-e2e
@@ -1047,7 +1057,7 @@ outputs:
   default:
     type: elasticsearch
     hosts: [{{.ESEndpoint}}]
-    api_key: "{{.ESApiKeyEncoded}}"
+    api_key: "{{.ESApiKey}}"
     preset: "balanced"
   monitoring:
     type: elasticsearch
@@ -1062,15 +1072,12 @@ agent:
 `
 	index := ".ds-logs-e2e-*"
 	var configBuffer bytes.Buffer
-	decodedApiKey, err := base64.StdEncoding.DecodeString(esApiKey.Encoded)
-	require.NoError(t, err)
 	require.NoError(t,
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 			otelConfigOptions{
-				InputPath:       inputFilePath,
-				ESEndpoint:      esEndpoint,
-				ESApiKey:        string(decodedApiKey),
-				ESApiKeyEncoded: esApiKey.Encoded,
+				InputPath:  inputFilePath,
+				ESEndpoint: esEndpoint,
+				ESApiKey:   decodedApiKey,
 			}))
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
@@ -1173,6 +1180,8 @@ func TestOTelHTTPMetricsInput(t *testing.T) {
 	esApiKey, err := createESApiKey(info.ESClient)
 	require.NoError(t, err, "error creating API key")
 	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	decodedApiKey, err := getDecodedApiKey(esApiKey)
+	require.NoError(t, err)
 	configTemplate := `
 inputs:
   - type: http/metrics
@@ -1208,7 +1217,7 @@ agent.monitoring:
 	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 		otelConfigOptions{
 			ESEndpoint: esEndpoint,
-			ESApiKey:   esApiKey.Encoded,
+			ESApiKey:   decodedApiKey,
 		})
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
@@ -1532,7 +1541,7 @@ service:
         - debug
 `
 
-	beatsApiKey, err := base64.StdEncoding.DecodeString(esApiKey.Encoded)
+	beatsApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err, "error decoding api key")
 
 	var configBuffer bytes.Buffer
