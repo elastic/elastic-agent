@@ -214,8 +214,11 @@ func TestGetOtelConfig(t *testing.T) {
 				"enabled": true,
 			},
 			"num_workers":       1,
+<<<<<<< HEAD
 			"api_key":           "",
 			"logs_index":        "filebeat-9.0.0",
+=======
+>>>>>>> f807fccca (Bump beats dependency version to 20250429215007-4c1bf91fe423 (#8041))
 			"timeout":           90 * time.Second,
 			"idle_conn_timeout": 3 * time.Second,
 		},
