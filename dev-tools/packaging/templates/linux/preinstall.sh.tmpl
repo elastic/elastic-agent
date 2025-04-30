@@ -47,7 +47,7 @@ if test -L "$symlink"; then
         if [ -d "$old_run_path" ]; then
             echo "found $old_run_path, copy to $new_agent_dir"
             mkdir -p "$new_run_path"
-            cp -rf "$old_run_path/." "$new_run_path/"
+            cp -rfp "$old_run_path/." "$new_run_path/"
         else
             echo "didn't find $old_run_path"
         fi
