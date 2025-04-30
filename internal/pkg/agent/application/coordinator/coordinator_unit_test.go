@@ -49,6 +49,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -1476,6 +1477,7 @@ func TestCoordinator_FleetServer_SkipsMigration(t *testing.T) {
 }
 
 func TestCoordinator_InitiatesMigration(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "vault does not use NewGCMWithRandomNonce.")
 	cfgPath := paths.Config()
 	defer paths.SetConfig(cfgPath)
 
