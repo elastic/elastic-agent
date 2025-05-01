@@ -26,6 +26,7 @@ type httpDoer interface {
 
 type artifactFetcher struct {
 	snapshotOnly bool
+	fipsOnly     bool
 
 	doer httpDoer
 }
@@ -36,6 +37,13 @@ type artifactFetcherOpt func(f *artifactFetcher)
 func WithArtifactSnapshotOnly() artifactFetcherOpt {
 	return func(f *artifactFetcher) {
 		f.snapshotOnly = true
+	}
+}
+
+// WithArtifactFIPSOnly sets the ArtifactFetcher to only pull a FIPS-compliant build.
+func WithArtifactFIPSOnly() artifactFetcherOpt {
+	return func(f *artifactFetcher) {
+		f.fipsOnly = true
 	}
 }
 
