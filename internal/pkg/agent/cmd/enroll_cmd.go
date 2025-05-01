@@ -543,6 +543,7 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 	defer close(signal)
 	backExp := c.backoffFactory(signal)
 
+RETRYLOOP:
 	for {
 		switch {
 		case errors.Is(err, fleetapi.ErrTooManyRequests):
@@ -552,7 +553,7 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 		case errors.Is(err, fleetapi.ErrTemporaryServerError):
 			c.log.Warnf("Remote server failed to handle the request(%s), will retry in a moment.", err.Error())
 		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded), err == nil:
-			break
+			break RETRYLOOP
 		case err != nil:
 			c.log.Warnf("Enrollment failed: %s, will retry in a moment.", err.Error())
 		}
