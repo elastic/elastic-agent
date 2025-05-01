@@ -551,10 +551,10 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 			c.log.Warn("Remote server is not ready to accept connections(Connection Refused), will retry in a moment.")
 		case errors.Is(err, fleetapi.ErrTemporaryServerError):
 			c.log.Warnf("Remote server failed to handle the request(%s), will retry in a moment.", err.Error())
-		case err != nil:
-			c.log.Warnf("Enrollment failed: %s", err.Error())
-		case err == nil:
+		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded), err == nil:
 			break
+		case err != nil:
+			c.log.Warnf("Enrollment failed: %s, will retry in a moment.", err.Error())
 		}
 		backExp.Wait()
 		c.log.Infof("Retrying enrollment to URL: %s", c.client.URI())
