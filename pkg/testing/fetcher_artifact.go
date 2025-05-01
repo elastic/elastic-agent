@@ -68,6 +68,7 @@ func (f *artifactFetcher) Name() string {
 
 // Fetch fetches the Elastic Agent and places the resulting binary at the path.
 func (f *artifactFetcher) Fetch(ctx context.Context, operatingSystem string, architecture string, version string, packageFormat string) (FetcherResult, error) {
+	prefix := GetPackagePrefix(f.fipsOnly)
 	suffix, err := GetPackageSuffix(operatingSystem, architecture, packageFormat)
 	if err != nil {
 		return nil, err
@@ -92,7 +93,7 @@ func (f *artifactFetcher) Fetch(ctx context.Context, operatingSystem string, arc
 	}
 
 	// this remote path cannot have the build metadata in it
-	srcPath := fmt.Sprintf("elastic-agent-%s-%s", ver.VersionWithPrerelease(), suffix)
+	srcPath := fmt.Sprintf("elastic-agent-%s%s-%s", prefix, ver.VersionWithPrerelease(), suffix)
 	downloadSrc := fmt.Sprintf("%s%s", uri, srcPath)
 
 	return &artifactResult{
