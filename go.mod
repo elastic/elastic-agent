@@ -16,13 +16,8 @@ require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20241212201805-58af1537830b
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250404163238-b16c2c085d99
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
-<<<<<<< HEAD
-	github.com/elastic/elastic-agent-client/v7 v7.17.1
-	github.com/elastic/elastic-agent-libs v0.18.8
-=======
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
-	github.com/elastic/elastic-agent-libs v0.18.12
->>>>>>> a7fcba2b0 (build(deps): bump github.com/elastic/elastic-agent-client/v7 from 7.17.1 to 7.17.2 (#7625))
+	github.com/elastic/elastic-agent-libs v0.18.8
 	github.com/elastic/elastic-agent-system-metrics v0.11.10
 	github.com/elastic/elastic-transport-go/v8 v8.6.1
 	github.com/elastic/go-elasticsearch/v8 v8.17.1

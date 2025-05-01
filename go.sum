@@ -461,17 +461,10 @@ github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250404163238-b16c2c085d99 h1:P01/ETv
 github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250404163238-b16c2c085d99/go.mod h1:FJO+gRXdRWaZsmtn9SQZbZytRxvoJy9go7l8L6Fp68E=
 github.com/elastic/elastic-agent-autodiscover v0.9.0 h1:+iWIKh0u3e8I+CJa3FfWe9h0JojNasPgYIA47gpuuns=
 github.com/elastic/elastic-agent-autodiscover v0.9.0/go.mod h1:5iUxLHhVdaGSWYTveSwfJEY4RqPXTG13LPiFoxcpFd4=
-<<<<<<< HEAD
-github.com/elastic/elastic-agent-client/v7 v7.17.1 h1:ORCDXzFs1JyhI5neWbTAPWCwaFi+BtKojSLiCpaAbf0=
-github.com/elastic/elastic-agent-client/v7 v7.17.1/go.mod h1:jzDEz8agLzinQEbEgLOuVM3wl6SoMybHnarQBTN1wYM=
-github.com/elastic/elastic-agent-libs v0.18.8 h1:YCokiu33g0A5Glz+iizexgrv86ftItK7ono4RfNRdRw=
-github.com/elastic/elastic-agent-libs v0.18.8/go.mod h1:Repx7BMzE1v/gTipPogNIQeEnSGwOWGBC63h7h9c5aM=
-=======
 github.com/elastic/elastic-agent-client/v7 v7.17.2 h1:Cl2TeABqWZgW40t5fchGWT/sRk4MDDLWA0d8iHHOxLA=
 github.com/elastic/elastic-agent-client/v7 v7.17.2/go.mod h1:5irRFqp6HLqtu1S+OeY0jg8x7K6PLL+DW+PwVk1vJnk=
-github.com/elastic/elastic-agent-libs v0.18.12 h1:jy6iEo2gKllXg0wBb90QCNr4L54a0eSRRm8ZeXyhsdQ=
-github.com/elastic/elastic-agent-libs v0.18.12/go.mod h1:Repx7BMzE1v/gTipPogNIQeEnSGwOWGBC63h7h9c5aM=
->>>>>>> a7fcba2b0 (build(deps): bump github.com/elastic/elastic-agent-client/v7 from 7.17.1 to 7.17.2 (#7625))
+github.com/elastic/elastic-agent-libs v0.18.8 h1:YCokiu33g0A5Glz+iizexgrv86ftItK7ono4RfNRdRw=
+github.com/elastic/elastic-agent-libs v0.18.8/go.mod h1:Repx7BMzE1v/gTipPogNIQeEnSGwOWGBC63h7h9c5aM=
 github.com/elastic/elastic-agent-system-metrics v0.11.10 h1:51u6roLaI0WhX1wbU4hPaervODegOxNFLcLouDAAi8A=
 github.com/elastic/elastic-agent-system-metrics v0.11.10/go.mod h1:BlS6Fm/l/umAa9xKy7GxsSYtCfu/iqg551PULKSeCQM=
 github.com/elastic/elastic-transport-go/v8 v8.6.1 h1:h2jQRqH6eLGiBSN4eZbQnJLtL4bC5b4lfVFRjw2R4e4=
