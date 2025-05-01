@@ -11,12 +11,14 @@
 kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
-summary: Retry enrollment for all errors
+summary: Retry enrollment requests on any error
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-#description:
+description: |
+  If any error is encountered during an attempted enrollment, the elastic-agent
+  will backoff and retry.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
@@ -25,7 +27,7 @@ component: elastic-agent
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
 # NOTE: the tooling supports backports, so it's able to fill the original PR number instead of the backport PR number.
 # Please provide it if you are adding a fragment for a different PR.
-#pr: https://github.com/owner/repo/1234
+pr: https://github.com/elastic/elastic-agent/pull/8056
 
 # Issue URL; optional; the GitHub issue related to this changeset (either closes or is part of).
 # If not present is automatically filled by the tooling with the issue linked to the PR number.
