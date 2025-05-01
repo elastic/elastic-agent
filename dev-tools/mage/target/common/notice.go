@@ -170,7 +170,8 @@ func getDependentModules(additionalTags ...string) ([]string, error) {
 
 	output, err := cmd.Output()
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) { // double pointer is necessary because Error() is defined on *exec.ExitError receiver
 			fmt.Println(string(exitErr.Stderr))
 		}
 		return nil, err
