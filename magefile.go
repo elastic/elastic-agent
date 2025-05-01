@@ -1001,7 +1001,19 @@ func (Cloud) Push() error {
 		tag = fmt.Sprintf("%s-%s-%d", version, commit, time)
 	}
 
+	fips := os.Getenv(fipsEnv)
+	defer os.Setenv(fipsEnv, fips)
+	fipsVal, err := strconv.ParseBool(fips)
+	if err != nil {
+		fipsVal = false
+	}
+	os.Setenv(fipsEnv, strconv.FormatBool(fipsVal))
+	devtools.FIPSBuild = fipsVal
+
 	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s", version)
+	if fipsVal {
+		sourceCloudImageName = fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-fips-cloud:%s", version)
+	}
 	var targetCloudImageName string
 	if customImage, isPresent := os.LookupEnv("CI_ELASTIC_AGENT_DOCKER_IMAGE"); isPresent && len(customImage) > 0 {
 		targetCloudImageName = fmt.Sprintf("%s:%s", customImage, tag)
