@@ -7,8 +7,12 @@
 package integration
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -20,7 +24,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	testK8s "github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 )
 
 var (
@@ -37,6 +43,9 @@ func TestOtelKubeStackHelm(t *testing.T) {
 			// only test the basic and the wolfi container with otel
 			{Type: define.Kubernetes, DockerVariant: "basic"},
 			{Type: define.Kubernetes, DockerVariant: "wolfi"},
+			// elastic otel collector image
+			{Type: define.Kubernetes, DockerVariant: "elastic-otel-collector"},
+			{Type: define.Kubernetes, DockerVariant: "elastic-otel-collector-wolfi"},
 		},
 		Group: define.Kubernetes,
 	})
@@ -64,12 +73,18 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				k8sStepHelmDeployWithValueOptions(chartLocation, "kube-stack-otel",
 					values.Options{
 						ValueFiles: []string{"../../deploy/helm/edot-collector/kube-stack/values.yaml"},
-						Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
+						Values: []string{
+							fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo),
+							fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag),
+							// override cluster wide
+							// endpoint for tests
+							"instrumentation.exporter.endpoint=http://opentelemetry-kube-stack-daemon-collector:4318",
+						},
 
 						// override secrets reference with env variables
 						JSONValues: []string{
 							fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, kCtx.esHost),
-							fmt.Sprintf(`collectors.gateway.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, kCtx.esAPIKey),
+							fmt.Sprintf(`collectors.gateway.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, kCtx.esEncodedAPIKey),
 						},
 					},
 				),
@@ -83,6 +98,15 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				// - Two Gateway pods to collect, aggregate and forward
 				// telemetry.
 				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 4, "otc-container"),
+				// validate k8s metrics are being pushed
+				k8sStepCheckDatastreamsHits(info, "metrics", "kubeletstatsreceiver.otel", "default"),
+				k8sStepCheckDatastreamsHits(info, "metrics", "k8sclusterreceiver.otel", "default"),
+				// validates auto-instrumentation and traces
+				// datastream generation
+				func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+					k8sStepDeployJavaApp()(t, ctx, kCtx, namespace)
+					k8sStepCheckDatastreamsHits(info, "traces", "generic.otel", "default")(t, ctx, kCtx, namespace)
+				},
 			},
 		},
 		{
@@ -173,5 +197,63 @@ func k8sStepCheckRunningPods(podLabelSelector string, expectedPodNumber int, con
 			}
 			return checkedAgentContainers >= expectedPodNumber
 		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least %d agent containers should be checked", expectedPodNumber))
+	}
+}
+
+func k8sStepDeployJavaApp() k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		javaApp, err := os.ReadFile(filepath.Join("testdata", "java_app.yaml"))
+		require.NoError(t, err)
+
+		objects, err := testK8s.LoadFromYAML(bufio.NewReader(bytes.NewReader(javaApp)))
+		require.NoError(t, err, "failed to parse rendered kustomize")
+
+		err = k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true, namespace: namespace}, objects...)
+		require.NoError(t, err, "failed to create objects")
+	}
+}
+
+// k8sStepCheckDatastreams checks the corresponding Elasticsearch datastreams
+// are created and documents being written
+func k8sStepCheckDatastreamsHits(info *define.Info, dsType, dataset, datastreamNamespace string) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		require.Eventually(t, func() bool {
+			query := queryK8sNamespaceDataStream(dsType, dataset, datastreamNamespace, namespace)
+			docs, err := estools.PerformQueryForRawQuery(ctx, query, fmt.Sprintf(".ds-%s*", dsType), info.ESClient)
+			require.NoError(t, err, "failed to get %s datastream documents", fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace))
+			return docs.Hits.Total.Value > 0
+		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least one document should be available for %s datastream", fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace)))
+	}
+}
+
+func queryK8sNamespaceDataStream(dsType, dataset, datastreamNamespace, k8snamespace string) map[string]any {
+	return map[string]any{
+		"_source": []string{"message"},
+		"query": map[string]any{
+			"bool": map[string]any{
+				"filter": []any{
+					map[string]any{
+						"term": map[string]any{
+							"data_stream.dataset": dataset,
+						},
+					},
+					map[string]any{
+						"term": map[string]any{
+							"data_stream.namespace": datastreamNamespace,
+						},
+					},
+					map[string]any{
+						"term": map[string]any{
+							"data_stream.type": dsType,
+						},
+					},
+					map[string]any{
+						"term": map[string]any{
+							"resource.attributes.k8s.namespace.name": k8snamespace,
+						},
+					},
+				},
+			},
+		},
 	}
 }

@@ -17,7 +17,7 @@ crds:
 defaultCRConfig:
   image:
     repository: "docker.elastic.co/elastic-agent/elastic-agent"
-    tag: "8.18.0"
+    tag: "8.18.1"
   targetAllocator:
     enabled: false # Enable/disable the Operator's Target allocator.
     # Refer to: https://github.com/open-telemetry/opentelemetry-operator/tree/main/cmd/otel-allocator
@@ -33,6 +33,7 @@ collectors:
   #  Cluster is a K8s deployment EDOT collector focused on gathering telemetry
   #  at the cluster level (Kubernetes Events and cluster metrics).
   cluster:
+    fullnameOverride: "opentelemetry-kube-stack-cluster-stats"
     env:
       - name: ELASTIC_AGENT_OTEL
         value: '"true"'
@@ -184,6 +185,7 @@ collectors:
   #  node level and exposing an OTLP endpoint for data ingestion.
   #  Auto-instrumentation SDKs will use this endpoint.
   daemon:
+    fullnameOverride: "opentelemetry-kube-stack-daemon"
     env:
       # Work around for open /mounts error: https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/35990
       - name: HOST_PROC_MOUNTINFO
@@ -525,6 +527,7 @@ collectors:
   #  Gateway is a K8s deployment EDOT collector focused on processing and
   #  forwarding telemetry to an Elasticsearch endpoint.
   gateway:
+    fullnameOverride: "opentelemetry-kube-stack-gateway"
     resources:
       limits:
         cpu: 1500m
@@ -671,12 +674,12 @@ instrumentation:
     type: parentbased_traceidratio # Sampler type
     argument: "1.0" # Sampling rate set to 100% (all traces are sampled).
   java:
-    image: docker.elastic.co/observability/elastic-otel-javaagent:1.0.0
+    image: docker.elastic.co/observability/elastic-otel-javaagent:1.3.0
   nodejs:
-    image: docker.elastic.co/observability/elastic-otel-node:0.4.1
+    image: docker.elastic.co/observability/elastic-otel-node:1.0.0
   dotnet:
-    image: docker.elastic.co/observability/elastic-otel-dotnet:edge
+    image: docker.elastic.co/observability/elastic-otel-dotnet:1.0.1
   python:
-    image: docker.elastic.co/observability/elastic-otel-python:0.3.0
+    image: docker.elastic.co/observability/elastic-otel-python:1.0.0
   go:
-    image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.14.0-alpha
+    image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.21.0

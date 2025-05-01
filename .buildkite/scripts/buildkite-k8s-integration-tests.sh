@@ -41,6 +41,9 @@ chmod +x ./testsBinary
 
 export TEST_DEFINE_PREFIX="${CLUSTER_NAME}"
 
+go install gotest.tools/gotestsum
+gotestsum --version
+
 TESTS_EXIT_STATUS=0
 for variant in "${docker_variants[@]}"; do
   echo "~~~ k8s Integration tests for variant: ${variant}"

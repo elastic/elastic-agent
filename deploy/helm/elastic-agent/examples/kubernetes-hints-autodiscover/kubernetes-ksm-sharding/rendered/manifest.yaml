@@ -4,7 +4,7 @@ apiVersion: v1
 kind: ServiceAccount
 automountServiceAccountToken: true
 metadata:
-  labels:    
+  labels:
     helm.sh/chart: kube-state-metrics-5.30.1
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
@@ -22,10 +22,10 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-8.18.0-beta
+    helm.sh/chart: elastic-agent-8.18.1-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.18.0
+    app.kubernetes.io/version: 8.18.1
 ---
 # Source: elastic-agent/templates/agent/service-account.yaml
 apiVersion: v1
@@ -34,10 +34,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-8.18.0-beta
+    helm.sh/chart: elastic-agent-8.18.1-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.18.0
+    app.kubernetes.io/version: 8.18.1
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -46,10 +46,10 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-8.18.0-beta
+    helm.sh/chart: elastic-agent-8.18.1-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.18.0
+    app.kubernetes.io/version: 8.18.1
 stringData:
 
   agent.yml: |-
@@ -102,10 +102,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-8.18.0-beta
+    helm.sh/chart: elastic-agent-8.18.1-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.18.0
+    app.kubernetes.io/version: 8.18.1
 stringData:
 
   agent.yml: |-
@@ -477,7 +477,7 @@ stringData:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  labels:    
+  labels:
     helm.sh/chart: kube-state-metrics-5.30.1
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
@@ -634,10 +634,10 @@ kind: ClusterRole
 metadata:
   name: agent-clusterWide-example-default
   labels:
-    helm.sh/chart: elastic-agent-8.18.0-beta
+    helm.sh/chart: elastic-agent-8.18.1-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.18.0
+    app.kubernetes.io/version: 8.18.1
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
     resources:
@@ -714,10 +714,10 @@ kind: ClusterRole
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-8.18.0-beta
+    helm.sh/chart: elastic-agent-8.18.1-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.18.0
+    app.kubernetes.io/version: 8.18.1
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
     resources:
@@ -792,7 +792,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  labels:    
+  labels:
     helm.sh/chart: kube-state-metrics-5.30.1
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
@@ -816,10 +816,10 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-clusterWide-example-default
   labels:
-    helm.sh/chart: elastic-agent-8.18.0-beta
+    helm.sh/chart: elastic-agent-8.18.1-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.18.0
+    app.kubernetes.io/version: 8.18.1
 subjects:
   - kind: ServiceAccount
     name: agent-clusterwide-example
@@ -835,10 +835,10 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-8.18.0-beta
+    helm.sh/chart: elastic-agent-8.18.1-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.18.0
+    app.kubernetes.io/version: 8.18.1
 subjects:
   - kind: ServiceAccount
     name: agent-pernode-example
@@ -854,7 +854,7 @@ kind: Role
 metadata:
   name: stsdiscovery-kube-state-metrics
   namespace: default
-  labels:    
+  labels:
     helm.sh/chart: kube-state-metrics-5.30.1
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
@@ -886,7 +886,7 @@ kind: RoleBinding
 metadata:
   name: stsdiscovery-kube-state-metrics
   namespace: default
-  labels:    
+  labels:
     helm.sh/chart: kube-state-metrics-5.30.1
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
@@ -909,7 +909,7 @@ kind: Service
 metadata:
   name: kube-state-metrics
   namespace: default
-  labels:    
+  labels:
     helm.sh/chart: kube-state-metrics-5.30.1
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
@@ -926,9 +926,9 @@ spec:
     protocol: TCP
     port: 8080
     targetPort: 8080
-  
+
   clusterIP: None
-  selector:    
+  selector:
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
 ---
@@ -939,10 +939,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-8.18.0-beta
+    helm.sh/chart: elastic-agent-8.18.1-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.18.0
+    app.kubernetes.io/version: 8.18.1
 spec:
   selector:
     matchLabels:
@@ -983,7 +983,7 @@ spec:
             secretKeyRef:
               key: api_key
               name: es-api-secret
-        image: docker.elastic.co/elastic-agent/elastic-agent:8.18.0-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:8.18.1-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
@@ -1045,10 +1045,10 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-8.18.0-beta
+    helm.sh/chart: elastic-agent-8.18.1-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.18.0
+    app.kubernetes.io/version: 8.18.1
 spec:
   selector:
     matchLabels:
@@ -1089,7 +1089,7 @@ spec:
             secretKeyRef:
               key: api_key
               name: es-api-secret
-        image: docker.elastic.co/elastic-agent/elastic-agent:8.18.0-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:8.18.1-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
@@ -1135,7 +1135,7 @@ kind: StatefulSet
 metadata:
   name: kube-state-metrics
   namespace: default
-  labels:    
+  labels:
     helm.sh/chart: kube-state-metrics-5.30.1
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
@@ -1145,7 +1145,7 @@ metadata:
     app.kubernetes.io/version: "2.15.0"
 spec:
   selector:
-    matchLabels:      
+    matchLabels:
       app.kubernetes.io/name: kube-state-metrics
       app.kubernetes.io/instance: example
   replicas: 1
@@ -1154,7 +1154,7 @@ spec:
   volumeClaimTemplates: []
   template:
     metadata:
-      labels:        
+      labels:
         helm.sh/chart: kube-state-metrics-5.30.1
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/component: metrics
@@ -1163,7 +1163,7 @@ spec:
         app.kubernetes.io/instance: example
         app.kubernetes.io/version: "2.15.0"
       annotations:
-      
+
         checksum/config: d86c07ea79de1388d0a81565edd84ba54f07ce89dc2d060514a1c744104e8f90
     spec:
       automountServiceAccountToken: true
@@ -1187,7 +1187,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        
+
         args:
         - --port=8080
         - --resources=certificatesigningrequests,configmaps,cronjobs,daemonsets,deployments,endpoints,horizontalpodautoscalers,ingresses,jobs,leases,limitranges,mutatingwebhookconfigurations,namespaces,networkpolicies,nodes,persistentvolumeclaims,persistentvolumes,poddisruptionbudgets,pods,replicasets,replicationcontrollers,resourcequotas,secrets,services,statefulsets,storageclasses,validatingwebhookconfigurations,volumeattachments
@@ -1253,7 +1253,7 @@ spec:
             secretKeyRef:
               key: api_key
               name: es-api-secret
-        image: docker.elastic.co/elastic-agent/elastic-agent:8.18.0-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:8.18.1-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
