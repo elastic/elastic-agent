@@ -121,7 +121,7 @@ var (
 )
 
 func init() {
-	common.RegisterCheckDeps(Update, Check.All)
+	common.RegisterCheckDeps(Update, Check.All, Otel.Readme)
 	test.RegisterDeps(UnitTest)
 	devtools.BeatLicense = "Elastic License 2.0"
 	devtools.BeatDescription = "Elastic Agent - single, unified way to add monitoring for logs, metrics, and other types of data to a host."
@@ -649,7 +649,7 @@ func commitID() string {
 
 // Update is an alias for executing control protocol, configs, and specs.
 func Update() {
-	mg.SerialDeps(Config, BuildPGP, BuildFleetCfg, Otel.Readme)
+	mg.Deps(Config, BuildPGP, BuildFleetCfg)
 }
 
 func EnsureCrossBuildOutputDir() error {
