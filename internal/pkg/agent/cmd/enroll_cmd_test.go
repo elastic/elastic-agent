@@ -424,6 +424,79 @@ func TestEnroll(t *testing.T) {
 			assert.Equal(t, host, config.Client.Host)
 		},
 	))
+
+	t.Run("headers are sent to server", withServer(
+		func(t *testing.T) *http.ServeMux {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
+				if r.Header.Get("X-Test-Header") != "Test-Value" {
+					w.WriteHeader(http.StatusInternalServerError)
+					_, _ = w.Write([]byte(`
+{
+		"statusCode": 500,
+		"error": "Missing required X-Test-Header header"
+}`))
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`
+{
+    "action": "created",
+    "item": {
+        "id": "a9328860-ec54-11e9-93c4-d72ab8a69391",
+        "active": true,
+        "policy_id": "69f3f5a0-ec52-11e9-93c4-d72ab8a69391",
+        "type": "PERMANENT",
+        "enrolled_at": "2019-10-11T18:26:37.158Z",
+        "user_provided_metadata": {
+						"custom": "customize"
+				},
+        "local_metadata": {
+            "platform": "linux",
+            "version": "8.0.0"
+        },
+        "actions": [],
+        "access_api_key": "my-access-api-key"
+    }
+}`))
+			})
+			return mux
+		}, func(t *testing.T, host string) {
+			url := "http://" + host
+			store := &mockStore{}
+			cmd, err := newEnrollCmd(
+				log,
+				&enrollCmdOption{
+					URL:                  url,
+					CAs:                  []string{},
+					EnrollAPIKey:         "my-enrollment-api-key",
+					Insecure:             true,
+					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
+					SkipCreateSecret:     skipCreateSecret,
+					SkipDaemonRestart:    true,
+					Headers: map[string]string{
+						"X-Test-Header": "Test-Value",
+					},
+				},
+				"",
+				store,
+				nil,
+			)
+			require.NoError(t, err)
+
+			streams, _, _, _ := cli.NewTestingIOStreams()
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			defer cancel()
+			err = cmd.Execute(ctx, streams)
+			require.NoError(t, err, "enroll command should return no error")
+
+			assert.True(t, store.Called, "the store should have been called")
+			config, err := readConfig(store.Content)
+			require.NoError(t, err)
+			assert.Equal(t, "my-access-api-key", config.AccessAPIKey)
+			assert.Equal(t, host, config.Client.Host)
+		},
+	))
 }
 
 func TestValidateArgs(t *testing.T) {

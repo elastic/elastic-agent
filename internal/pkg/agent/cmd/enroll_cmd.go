@@ -145,6 +145,7 @@ func (e *enrollCmdOption) remoteConfig() (remote.Config, error) {
 	if cfg.Protocol == remote.ProtocolHTTP && !e.Insecure {
 		return remote.Config{}, fmt.Errorf("connection to fleet-server is insecure, strongly recommended to use a secure connection (override with --insecure)")
 	}
+	cfg.Headers = e.Headers
 
 	var tlsCfg tlscommon.Config
 
