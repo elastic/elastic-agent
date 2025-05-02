@@ -9,7 +9,6 @@ package integration
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -115,7 +114,7 @@ func TestAgentMonitoring(t *testing.T) {
 		apiKeyResponse, err := createESApiKey(info.ESClient)
 		require.NoError(t, err, "failed to get api key")
 		require.True(t, len(apiKeyResponse.Encoded) > 1, "api key is invalid %q", apiKeyResponse)
-		apiKey, err := base64.StdEncoding.DecodeString(apiKeyResponse.Encoded)
+		apiKey, err := getDecodedApiKey(apiKeyResponse)
 		require.NoError(t, err, "error decoding api key")
 
 		type PolicyOutputs struct {

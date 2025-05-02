@@ -597,6 +597,15 @@ func createESApiKey(esClient *elasticsearch.Client) (estools.APIKeyResponse, err
 	return estools.CreateAPIKey(context.Background(), esClient, estools.APIKeyRequest{Name: "test-api-key", Expiration: "1d"})
 }
 
+// getDecodedApiKey returns a decoded API key appropriate for use in beats configurations.
+func getDecodedApiKey(keyResponse estools.APIKeyResponse) (string, error) {
+	decoded, err := base64.StdEncoding.DecodeString(keyResponse.Encoded)
+	if err != nil {
+		return "", err
+	}
+	return string(decoded), nil
+}
+
 func linesTrackMap(lines []string) map[string]bool {
 	mm := make(map[string]bool)
 	for _, l := range lines {
@@ -873,14 +882,14 @@ func TestOtelFilestreamInput(t *testing.T) {
 	configTemplate, err := os.ReadFile(filepath.Join("testdata", "templates", "filestream-input.tmpl"))
 	require.NoError(t, err)
 
-	index := ".ds-logs-e2e-*"
+  index := ".ds-logs-e2e-*"
 	var configBuffer bytes.Buffer
 	require.NoError(t,
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 			otelConfigOptions{
 				InputPath:  inputFilePath,
 				ESEndpoint: esEndpoint,
-				ESApiKey:   esApiKey.Encoded,
+				ESApiKey:   decodedApiKey,
 			}))
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
@@ -933,6 +942,27 @@ func TestOtelFilestreamInput(t *testing.T) {
 		2*time.Minute, 5*time.Second,
 		"Expected %d logs, got %v", numEvents, actualHits)
 
+	metricsIndex := ".ds-metrics-elastic_agent*"
+	// Check metrics from self-monitoring
+	assert.EventuallyWithT(t,
+		func(ct *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer findCancel()
+
+			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, metricsIndex, map[string]interface{}{
+				"component.id": "filestream-default",
+			})
+			require.NoError(ct, err)
+
+			actualHits.Hits = docs.Hits.Total.Value
+			output, execErr := fixture.ExecStatus(context.Background())
+			require.NoError(ct, execErr)
+			t.Logf("status output: %v", output)
+			assert.Greater(ct, actualHits.Hits, 0)
+		},
+		2*time.Minute, 5*time.Second,
+		"Expected %d metrics events, got %v", numEvents, actualHits)
+
 	cancel()
 }
 
@@ -964,13 +994,14 @@ func TestOTelHTTPMetricsInput(t *testing.T) {
 	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
 	configTemplate, err := os.ReadFile(filepath.Join("testdata", "templates", "metricbeat-input.tmpl"))
 	require.NoError(t, err)
+
 	index := ".ds-metrics-e2e-*"
 	var configBuffer bytes.Buffer
 
 	template.Must(template.New("config").Parse(string(configTemplate))).Execute(&configBuffer,
 		otelConfigOptions{
 			ESEndpoint: esEndpoint,
-			ESApiKey:   esApiKey.Encoded,
+			ESApiKey:   decodedApiKey,
 		})
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
@@ -1186,7 +1217,7 @@ func TestHybridAgentE2E(t *testing.T) {
 	configTemplate, err := os.ReadFile(filepath.Join("testdata", "templates", "hybrid-mode.tmpl"))
 	require.NoError(t, err)
 
-	beatsApiKey, err := base64.StdEncoding.DecodeString(esApiKey.Encoded)
+	beatsApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err, "error decoding api key")
 
 	var configBuffer bytes.Buffer
