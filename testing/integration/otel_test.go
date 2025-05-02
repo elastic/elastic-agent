@@ -882,10 +882,13 @@ func TestOtelFilestreamInput(t *testing.T) {
 	configTemplate, err := os.ReadFile(filepath.Join("testdata", "templates", "filestream-input.tmpl"))
 	require.NoError(t, err)
 
-  index := ".ds-logs-e2e-*"
+	decodedApiKey, err := getDecodedApiKey(esApiKey)
+	require.NoError(t, err)
+	index := ".ds-logs-e2e-*"
 	var configBuffer bytes.Buffer
+
 	require.NoError(t,
-		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+		template.Must(template.New("config").Parse(string(configTemplate))).Execute(&configBuffer,
 			otelConfigOptions{
 				InputPath:  inputFilePath,
 				ESEndpoint: esEndpoint,
@@ -995,6 +998,8 @@ func TestOTelHTTPMetricsInput(t *testing.T) {
 	configTemplate, err := os.ReadFile(filepath.Join("testdata", "templates", "metricbeat-input.tmpl"))
 	require.NoError(t, err)
 
+	decodedApiKey, err := getDecodedApiKey(esApiKey)
+	require.NoError(t, err)
 	index := ".ds-metrics-e2e-*"
 	var configBuffer bytes.Buffer
 
