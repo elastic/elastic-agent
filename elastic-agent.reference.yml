@@ -47,10 +47,10 @@ inputs:
 #       data_stream.dataset: system.process
 #       # While running in unprivileged mode, process/process_summary metricsets can emit
 #       # partial metrics. Some metrics that require privileged access can be missing.
-#       # On Windows, non-administrator users may not be able to access protected processes, leading 
-#       # to missing details like command line and arguments. On Unix, non-root users can't access 
-#       # procfs without the right permissions. 
-#       # Errors like ERROR_ACCESS_DENIED, EPERM, and EACCESS may result in partial metrics. 
+#       # On Windows, non-administrator users may not be able to access protected processes, leading
+#       # to missing details like command line and arguments. On Unix, non-root users can't access
+#       # procfs without the right permissions.
+#       # Errors like ERROR_ACCESS_DENIED, EPERM, and EACCESS may result in partial metrics.
 #       # Enabling the config below will mark the metricset as degraded when this occurs.
 #       # You may want to enable it to identify potential permission-related issues.
 #       # If you're unable to provide the necessary access, you can disable this config to keep
@@ -124,6 +124,13 @@ inputs:
 #   # retry_sleep_init_duration is the duration to sleep for before the first retry attempt. This
 #   # duration will increase for subsequent retry attempts in a randomized exponential backoff manner.
 #   retry_sleep_init_duration: 30s
+
+# agent.upgrade
+#   # rollback settings
+#   rollback:
+#       # duration in which an upgraded Agent may be asked to rollback to
+#       # the previous version of Agent on disk.
+#       window: 168h
 
 # agent.process:
 #   # timeout for creating new processes. when process is not successfully created by this timeout
