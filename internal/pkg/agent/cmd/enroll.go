@@ -506,6 +506,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		UserProvidedMetadata: make(map[string]interface{}),
 		Staging:              staging,
 		FixPermissions:       fixPermissions,
+		Headers:              mapFromEnvList(fHeaders),
 		ProxyURL:             proxyURL,
 		ProxyDisabled:        proxyDisabled,
 		ProxyHeaders:         mapFromEnvList(proxyHeaders),
