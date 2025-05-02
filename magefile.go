@@ -649,11 +649,7 @@ func commitID() string {
 
 // Update is an alias for executing control protocol, configs, and specs.
 func Update() {
-<<<<<<< HEAD
-	mg.SerialDeps(Config, BuildPGP, BuildFleetCfg, Otel.Readme)
-=======
 	mg.Deps(Config, BuildPGP, BuildFleetCfg)
->>>>>>> 82344c2d9 (ci: disable link-patrol check (#8063))
 }
 
 func EnsureCrossBuildOutputDir() error {
