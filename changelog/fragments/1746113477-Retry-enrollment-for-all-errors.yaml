@@ -11,14 +11,14 @@
 kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
-summary: Retry enrollment requests on any error
+summary: Retry enrollment requests on any network error
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
 description: |
-  If any error is encountered during an attempted enrollment, the elastic-agent
-  will backoff and retry.
+  If any network error is encountered during an attempted enrollment, the
+  elastic-agent will backoff and retry.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
