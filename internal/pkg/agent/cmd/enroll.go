@@ -81,7 +81,7 @@ func addEnrollFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("fleet-server-cert-key", "", "", "Private key for the certificate used by Fleet Server for exposed HTTPS endpoint")
 	cmd.Flags().StringP("fleet-server-cert-key-passphrase", "", "", "Path for private key passphrase file used to decrypt Fleet Server certificate key")
 	cmd.Flags().StringP("fleet-server-client-auth", "", "none", "Fleet Server mTLS client authentication for connecting Elastic Agents. Must be one of [none, optional, required]")
-	cmd.Flags().StringSliceP("header", "", []string{}, "Headers used by Fleet Server when communicating with Elasticsearch")
+	cmd.Flags().StringSliceP("header", "", []string{}, "Headers used by Agent to communicate with Fleet Server, and when a bootstrapped Fleet Server communicates with Elasticsearch")
 	cmd.Flags().BoolP("fleet-server-insecure-http", "", false, "Expose Fleet Server over HTTP (not recommended; insecure)")
 	cmd.Flags().StringP("certificate-authorities", "a", "", "Comma-separated list of root certificates for server verification used by Elastic Agent and Fleet Server")
 	cmd.Flags().StringP("ca-sha256", "p", "", "Comma-separated list of certificate authority hash pins for server verification used by Elastic Agent and Fleet Server")
