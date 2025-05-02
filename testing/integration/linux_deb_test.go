@@ -9,7 +9,9 @@ package integration
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -38,6 +40,10 @@ func TestDebLogIngestFleetManaged(t *testing.T) {
 				Type:   define.Linux,
 				Distro: "ubuntu",
 			},
+			{
+				Type:   define.Linux,
+				Distro: "debian",
+			},
 		},
 		Local: false,
 		Sudo:  true,
@@ -49,6 +55,82 @@ func TestDebLogIngestFleetManaged(t *testing.T) {
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("deb"))
 	require.NoError(t, err)
 
+<<<<<<< HEAD
+=======
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+		InstallServers: false,
+	}
+
+	testDebLogIngestFleetManagedWithCheck(ctx, t, agentFixture, info, installOpts,
+		testComponentsPresence(ctx, agentFixture,
+			[]componentPresenceDefinition{
+				{"agentbeat", []string{"windows", "linux", "darwin"}},
+				{"endpoint-security", []string{"windows", "linux", "darwin"}},
+				{"pf-host-agent", []string{"linux"}},
+			},
+			[]componentPresenceDefinition{
+				{"cloudbeat", []string{"linux"}},
+				{"apm-server", []string{"windows", "linux", "darwin"}},
+				{"fleet-server", []string{"windows", "linux", "darwin"}},
+				{"pf-elastic-symbolizer", []string{"linux"}},
+				{"pf-elastic-collector", []string{"linux"}},
+			},
+		),
+	)
+}
+
+func TestDebInstallsServers(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Deb,
+		Stack: &define.Stack{},
+		OS: []define.OS{
+			{
+				Type:   define.Linux,
+				Distro: "ubuntu",
+			},
+			{
+				Type:   define.Linux,
+				Distro: "debian",
+			},
+		},
+		Local: false,
+		Sudo:  true,
+	})
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("deb"))
+	require.NoError(t, err)
+
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+		InstallServers: true,
+	}
+
+	testDebLogIngestFleetManagedWithCheck(ctx, t, agentFixture, info, installOpts,
+		testComponentsPresence(ctx, agentFixture,
+			[]componentPresenceDefinition{
+				{"agentbeat", []string{"windows", "linux", "darwin"}},
+				{"endpoint-security", []string{"windows", "linux", "darwin"}},
+				{"pf-host-agent", []string{"linux"}},
+				{"cloudbeat", []string{"linux"}},
+				{"apm-server", []string{"windows", "linux", "darwin"}},
+				{"fleet-server", []string{"windows", "linux", "darwin"}},
+				{"pf-elastic-symbolizer", []string{"linux"}},
+				{"pf-elastic-collector", []string{"linux"}},
+			},
+			[]componentPresenceDefinition{},
+		),
+	)
+}
+
+func testDebLogIngestFleetManagedWithCheck(ctx context.Context, t *testing.T, agentFixture *atesting.Fixture, info *define.Info, installOpts atesting.InstallOpts, componentCheck func(t *testing.T)) {
+
+>>>>>>> 815c264cd ([deb/rpm] copy run folder from old agent installation (#7999))
 	// 1. Create a policy in Fleet with monitoring enabled.
 	// To ensure there are no conflicts with previous test runs against
 	// the same ESS stack, we add the current time at the end of the policy
@@ -105,6 +187,10 @@ func TestDebFleetUpgrade(t *testing.T) {
 			{
 				Type:   define.Linux,
 				Distro: "ubuntu",
+			},
+			{
+				Type:   define.Linux,
+				Distro: "debian",
 			},
 		},
 		Local: false,
@@ -169,6 +255,15 @@ func TestDebFleetUpgrade(t *testing.T) {
 
 	check.ConnectedToFleet(ctx, t, startFixture, 5*time.Minute)
 
+	const migrationMarkerFile = "migration_marker.file"
+	runDir, err := atesting.FindRunDir(startFixture)
+	require.NoError(t, err, "failed at getting run dir")
+
+	runMigrationMarker := filepath.Join(runDir, migrationMarkerFile)
+	f, err := os.Create(runMigrationMarker)
+	require.NoErrorf(t, err, "failed to create %q file", runMigrationMarker)
+	_ = f.Close()
+
 	// 3. Upgrade deb to the build version
 	srcPackage, err := endFixture.SrcPackage(ctx)
 	require.NoError(t, err)
@@ -176,6 +271,12 @@ func TestDebFleetUpgrade(t *testing.T) {
 	cmd.Env = append(cmd.Env, "DEBIAN_FRONTEND=noninteractive")
 	out, err := cmd.CombinedOutput() // #nosec G204 -- Need to pass in name of package
 	require.NoError(t, err, string(out))
+
+	newRunDir, err := atesting.FindRunDir(endFixture)
+	require.NoError(t, err, "failed at getting run dir")
+	require.NotEqual(t, runDir, newRunDir, "the run dirs from upgrade should not match")
+	newRunMigrationMarker := filepath.Join(newRunDir, migrationMarkerFile)
+	require.FileExistsf(t, newRunMigrationMarker, "%q is missing", newRunMigrationMarker)
 
 	// 4. Wait for version in Fleet to match
 	// Fleet will not include the `-SNAPSHOT` in the `GetAgentVersion` result
