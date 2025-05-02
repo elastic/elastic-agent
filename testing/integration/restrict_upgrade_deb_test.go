@@ -28,6 +28,10 @@ func TestRestrictUpgradeDeb(t *testing.T) {
 				Type:   define.Linux,
 				Distro: "ubuntu",
 			},
+			{
+				Type:   define.Linux,
+				Distro: "debian",
+			},
 		},
 	})
 	t.Run("when agent is deployed via deb, a user should not be able to upgrade the agent using the cli", func(t *testing.T) {
