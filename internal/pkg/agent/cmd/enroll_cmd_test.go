@@ -114,7 +114,9 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			err = cmd.Execute(context.Background(), streams)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+			defer cancel()
+			err = cmd.Execute(ctx, streams)
 			require.Error(t, err)
 		},
 	))
@@ -170,7 +172,7 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 			defer cancel()
 
 			if err := cmd.Execute(ctx, streams); err != nil {
@@ -233,7 +235,7 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 			defer cancel()
 
 			if err := cmd.Execute(ctx, streams); err != nil {
@@ -298,7 +300,7 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 			defer cancel()
 			err = cmd.Execute(ctx, streams)
 			require.NoError(t, err, "enroll command should return no error")
@@ -343,7 +345,9 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			err = cmd.Execute(context.Background(), streams)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+			defer cancel()
+			err = cmd.Execute(ctx, streams)
 			require.Error(t, err)
 			require.False(t, store.Called)
 		},
@@ -412,7 +416,7 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 			defer cancel()
 			err = cmd.Execute(ctx, streams)
 			require.NoError(t, err, "enroll command should return no error")
@@ -439,7 +443,7 @@ func TestValidateArgs(t *testing.T) {
 		require.NoError(t, err)
 		args := buildEnrollmentFlags(cmd, url, enrolmentToken)
 		require.NotNil(t, args)
-		require.Equal(t, len(args), 11)
+		require.Len(t, args, 13)
 		require.Contains(t, args, "--tag")
 		require.Contains(t, args, "windows")
 		require.Contains(t, args, "production")
@@ -448,6 +452,7 @@ func TestValidateArgs(t *testing.T) {
 		require.Contains(t, args, url)
 		require.Contains(t, args, "--fleet-server-client-auth")
 		require.Contains(t, args, "none")
+		require.Contains(t, args, "--enroll-timeout")
 		cleanedTags := cleanTags(args)
 		require.Contains(t, cleanedTags, "windows")
 		require.Contains(t, cleanedTags, "production")
@@ -467,8 +472,8 @@ func TestValidateArgs(t *testing.T) {
 		require.Contains(t, cleanedTags, "windows")
 		require.Contains(t, cleanedTags, "production")
 		// Validate that we remove the duplicates
-		require.Equal(t, len(args), 12)
-		require.Equal(t, len(cleanedTags), 9)
+		require.Len(t, args, 14)
+		require.Len(t, cleanedTags, 11)
 	})
 
 	t.Run("valid tag and empty tag", func(t *testing.T) {

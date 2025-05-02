@@ -555,18 +555,11 @@ RETRYLOOP:
 		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded), err == nil:
 			break RETRYLOOP
 		case err != nil:
-			var agentError errors.Error
-			if errors.As(err, &agentError) {
-				// Network errors should be retried, all other errors are not.
-				if agentError.Type() == errors.TypeNetwork {
-					c.log.Warnf("Network error detected: %s, will retry in a moment.", err.Error())
-					break
-				}
-			}
-			c.log.Warnf("Enrollment failed: %s", err.Error())
-			break RETRYLOOP
+			c.log.Warnf("Error detected: %s, will retry in a moment.", err.Error())
 		}
-		backExp.Wait()
+		if !backExp.Wait() {
+			break
+		}
 		c.log.Infof("Retrying enrollment to URL: %s", c.client.URI())
 		err = c.enroll(ctx, persistentConfig)
 	}

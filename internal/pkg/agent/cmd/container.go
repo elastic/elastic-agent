@@ -517,6 +517,10 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 		args = append(args, "--daemon-timeout")
 		args = append(args, cfg.Fleet.DaemonTimeout.String())
 	}
+	if cfg.Fleet.EnrollTimeout != 0 {
+		args = append(args, "--enroll-timeout")
+		args = append(args, cfg.Fleet.EnrollTimeout.String())
+	}
 	if cfg.Fleet.Cert != "" {
 		args = append(args, "--elastic-agent-cert", cfg.Fleet.Cert)
 	}
