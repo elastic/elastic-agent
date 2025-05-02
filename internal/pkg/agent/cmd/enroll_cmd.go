@@ -602,7 +602,7 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 
 	resp, err := cmd.Execute(ctx, r)
 	if err != nil {
-		return fmt.Errorf("failed to execute fleet-server: %w", err)
+		return fmt.Errorf("failed to execute request to fleet-server: %w", err)
 	}
 
 	fleetConfig, err := createFleetConfigFromEnroll(resp.Item.AccessAPIKey, c.options.EnrollAPIKey, c.options.ReplaceToken, c.remoteConfig)
