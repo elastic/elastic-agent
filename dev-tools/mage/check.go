@@ -77,7 +77,6 @@ func CheckLicenseHeaders() error {
 		licenser.Check(),
 		licenser.License("Elasticv2"),
 	)
-
 }
 
 // CheckLinksInFileAreLive checks if all links in a file are live.
@@ -93,9 +92,6 @@ func CheckLinksInFileAreLive(filename string) func() error {
 		//linkcheck := gotool.LinkCheck
 		//return linkcheck(
 		//	linkcheck.Path(filename),
-		//	linkcheck.MaxRetries(10),
-		//	linkcheck.MaxBackoff(10),
-		//	linkcheck.StartBackoff(10),
 		//)
 	}
 }
