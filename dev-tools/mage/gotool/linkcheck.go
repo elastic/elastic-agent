@@ -27,3 +27,15 @@ func runGoLinkCheck(opts ...ArgOpt) error {
 }
 
 func (goLinkCheck) Path(path string) ArgOpt { return flagArgIf("-f", path) }
+
+func (goLinkCheck) MaxRetries(retries uint) ArgOpt {
+	return flagArgIf("--max-retries", fmt.Sprintf("%d", retries))
+}
+
+func (goLinkCheck) MaxBackoff(seconds uint) ArgOpt {
+	return flagArgIf("--max-backoff", fmt.Sprintf("%ds", seconds))
+}
+
+func (goLinkCheck) StartBackoff(seconds uint) ArgOpt {
+	return flagArgIf("--start-backoff", fmt.Sprintf("%ds", seconds))
+}
