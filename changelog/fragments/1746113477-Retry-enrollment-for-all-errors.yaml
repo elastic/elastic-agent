@@ -19,7 +19,7 @@ summary: Retry enrollment requests on any error
 description: |
   If any error is encountered during an attempted enrollment, the elastic-agent
   will backoff and retry. Add a new --enrollement-timeout flag and
-  FLEET_ENROLLMENT_TIMEOUT env var to set how long it tries for, default 10m.
+  FLEET_ENROLL_TIMEOUT env var to set how long it tries for, default 10m.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
