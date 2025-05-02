@@ -30,6 +30,9 @@ func TestStandaloneUpgradeFIPStoFIPS(t *testing.T) {
 		Group: StandaloneUpgrade,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
 	})
 
 	// parse the version we are testing
@@ -115,6 +118,9 @@ func TestStandaloneUpgradeFIPStoNonFIPS(t *testing.T) {
 		Group: StandaloneUpgrade,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
 	})
 
 	// Start with a FIPS-capable Agent artifact
