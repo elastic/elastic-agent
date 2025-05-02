@@ -184,6 +184,11 @@ func (f *Fixture) Client() client.Client {
 	return f.c
 }
 
+// Version returns the Elastic Agent version.
+func (f *Fixture) Version() string {
+	return f.version
+}
+
 // Prepare prepares the Elastic Agent for usage.
 //
 // This must be called before `Configure`, `Run`, or `Install` can be called.
@@ -917,7 +922,7 @@ func (f *Fixture) prepareComponents(workDir string, components ...UsableComponen
 
 	// now remove all that should not be kept; removal is only
 	// done by removing the spec file, no need to delete the binary
-	componentsDir, err := FindComponentsDir(workDir)
+	componentsDir, err := FindComponentsDir(workDir, "")
 	if err != nil {
 		return err
 	}
@@ -1154,13 +1159,8 @@ func getCacheDir(caller string, name string) (string, error) {
 	return cacheDir, nil
 }
 
-<<<<<<< HEAD
-// FindComponentsDir identifies the directory that holds the components.
-func FindComponentsDir(dir string) (string, error) {
-=======
 // findAgentDataVersionDir identifies the directory that holds the agent data of the given version.
 func findAgentDataVersionDir(dir, version string) (string, error) {
->>>>>>> 815c264cd ([deb/rpm] copy run folder from old agent installation (#7999))
 	dataDir := filepath.Join(dir, "data")
 	agentVersions, err := os.ReadDir(dataDir)
 	if err != nil {
@@ -1168,14 +1168,6 @@ func findAgentDataVersionDir(dir, version string) (string, error) {
 	}
 	var versionDir string
 	for _, fi := range agentVersions {
-<<<<<<< HEAD
-		if strings.HasPrefix(fi.Name(), "elastic-agent-") && fi.IsDir() {
-			versionDir = fi.Name()
-			break
-		}
-	}
-	componentsDir := filepath.Join(dataDir, versionDir, "components")
-=======
 		filename := fi.Name()
 		if strings.HasPrefix(filename, "elastic-agent-") && fi.IsDir() {
 			// Below we exclude the hash suffix (7 characters) of the directory to check the version
@@ -1201,7 +1193,6 @@ func FindComponentsDir(dir, version string) (string, error) {
 		return "", err
 	}
 	componentsDir := filepath.Join(versionDir, "components")
->>>>>>> 815c264cd ([deb/rpm] copy run folder from old agent installation (#7999))
 	fi, err := os.Stat(componentsDir)
 	if (err != nil && !os.IsExist(err)) || !fi.IsDir() {
 		return "", fmt.Errorf("failed to find components directory at %s: %w", componentsDir, err)

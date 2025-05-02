@@ -429,7 +429,7 @@ func TestOtelAPMIngestion(t *testing.T) {
 	err = fixture.EnsurePrepared(ctx)
 	require.NoError(t, err)
 
-	componentsDir, err := aTesting.FindComponentsDir(agentWorkDir)
+	componentsDir, err := aTesting.FindComponentsDir(agentWorkDir, "")
 	require.NoError(t, err)
 
 	// start apm default config just configure ES output

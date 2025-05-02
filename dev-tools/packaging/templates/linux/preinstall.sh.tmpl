@@ -53,23 +53,4 @@ if test -L "$symlink"; then
     fi
 else
     echo "no previous installation found"
-<<<<<<< HEAD
-=======
-
-    # create dir in case it does not exist
-    mkdir -p "$new_agent_dir"
-
-    # 2 is upgrade for Fedora, do not upgrade file when upgrading and file exists
-    if [[ "$1" != "2" ]]; then
-        if [[ -n "${ELASTIC_AGENT_FLAVOR}" ]]; then
-            # Do not modify the file if it already exists
-            echo "using \"${ELASTIC_AGENT_FLAVOR}\" flavor from environment"
-            echo "${ELASTIC_AGENT_FLAVOR}" > "$flavor_file"
-        else
-            # Defaults to basic installation
-            echo "defaulting to basic flavor"
-            echo "basic" > "$flavor_file"
-        fi
-    fi
->>>>>>> 815c264cd ([deb/rpm] copy run folder from old agent installation (#7999))
 fi
