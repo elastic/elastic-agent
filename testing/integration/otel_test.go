@@ -1645,19 +1645,20 @@ service:
 func AssertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg string) {
 	t.Helper()
 
-	flatM1 := m1.Flatten()
-	flatM2 := m2.Flatten()
 	for _, f := range ignoredFields {
-		hasKeyM1, _ := flatM1.HasKey(f)
-		hasKeyM2, _ := flatM2.HasKey(f)
+		hasKeyM1, _ := m1.HasKey(f)
+		hasKeyM2, _ := m2.HasKey(f)
 
 		if !hasKeyM1 && !hasKeyM2 {
 			assert.Failf(t, msg, "ignored field %q does not exist in either map, please remove it from the ignored fields", f)
 		}
 
-		flatM1.Delete(f)
-		flatM2.Delete(f)
+		m1.Delete(f)
+		m2.Delete(f)
 	}
+
+	flatM1 := m1.Flatten()
+	flatM2 := m2.Flatten()
 	require.Equal(t, "", cmp.Diff(flatM1, flatM2), "expected maps to be equal")
 }
 

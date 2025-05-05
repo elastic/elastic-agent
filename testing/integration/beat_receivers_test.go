@@ -83,8 +83,9 @@ func getTestList(infoNamespace string) []test {
 			dsDataset:   "elastic_agent.elastic_agent",
 			dsNamespace: infoNamespace,
 			query: map[string]any{
-				"component.id": "elastic-agent", // metric-elastic_agent.elastic_agent-* stores cpu metric coming in from EA and all running beats
-				// here we only compare elastic-agent self metrics for simplicity
+				// metric-elastic_agent.elastic_agent-* stores cpu metrics emitted by EA AND all running beats
+				// here, we only compare elastic-agent self metrics for simplicity
+				"component.id": "elastic-agent",
 			},
 			ignoredFields: []string{
 				// Expected to change between agentDocs and OtelDocs
@@ -94,6 +95,9 @@ func getTestList(infoNamespace string) []test {
 				"agent.version",
 				"event.duration",
 				"event.ingested",
+
+				//all cpu related metrics are dropped
+				"system.process.cpu",
 
 				// elastic_agent * fields are hardcoded in processor list for now which is why they differ
 				"elastic_agent.id",
@@ -116,6 +120,20 @@ func getTestList(infoNamespace string) []test {
 				"agent.version",
 				"event.duration",
 				"event.ingested",
+
+				// beat related fields
+				"beat.stats.beat.uuid",
+				"beat.id",
+				"beat.elasticsearch.cluster.id", // ignore this field because beatreceiver uses otelconsumer as output
+				"beat.stats.runtime.goroutines",
+				"beat.stats.uptime.ms",
+
+				// these sub metrics vary between documents
+				"beat.stats.cpu",
+				"beat.stats.libbeat",
+				"beat.stats.memstats",
+				"beat.stats.system.load",
+				"beat.stats.info",
 
 				// elastic_agent * fields are hardcoded in processor list for now which is why they differ
 				"elastic_agent.id",
@@ -381,7 +399,7 @@ func TestAgentMonitoring(t *testing.T) {
 		}, 30*time.Second, 1*time.Second)
 
 		// run this for first two indexes only (for now)
-		for i := 0; i < 2; i++ {
+		for i := 0; i < 3; i++ {
 			tc := tests[i]
 			key := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
 			require.Eventuallyf(t,
@@ -426,6 +444,7 @@ var configTemplateOTel = `
 receivers:` +
 	filestreamMonitoring +
 	httpMetricMonitoring +
+	beatMetricMonitoring +
 	`exporters:
   debug:
     use_internal_logger: false
@@ -448,6 +467,7 @@ service:
       receivers:
         - filebeatreceiver/filestream-monitoring
         - metricbeatreceiver/http-metrics-monitoring
+        - metricbeatreceiver/beat-metrics-monitoring
       exporters:
         - elasticsearch/log
 `
@@ -628,6 +648,7 @@ var httpMetricMonitoring = `
                     binary: elastic-agent
                     id: elastic-agent
                 target: component
+            - add_host_metadata: ~
     output:
       otelconsumer:
     queue:
@@ -658,18 +679,18 @@ var beatMetricMonitoring = `
         processors:
             - add_fields:
                 fields:
+                    input_id: metrics-monitoring-beats
+                target: '@metadata'		
+            - add_fields:
+                fields:
                     dataset: elastic_agent.filebeat
-                    namespace: default
+                    namespace: {{.Namespace}}
                     type: metrics
                 target: data_stream
             - add_fields:
                 fields:
                     dataset: elastic_agent.filebeat
                 target: event
-            - add_fields:
-                fields:
-                    stream_id: metrics-monitoring-filebeat
-                target: '@metadata'
             - add_fields:
                 fields:
                     id: f9787136-2d04-4999-a504-848c2e25d90e
@@ -680,12 +701,6 @@ var beatMetricMonitoring = `
                 fields:
                     id: f9787136-2d04-4999-a504-848c2e25d90e
                 target: agent
-            - add_fields:
-                fields:
-                    dataset: elastic_agent.filebeat
-                    namespace: default
-                    type: metrics
-                target: data_stream
             - add_fields:
                 fields:
                     dataset: elastic_agent.filebeat
