@@ -1283,6 +1283,12 @@ func TestAgentMetricsInput(t *testing.T) {
 		Stack: &define.Stack{},
 	})
 
+	metricsets := []string{"cpu", "memory", "network", "filesystem"}
+
+	// docs ingested, indexed by metricset name
+	agentDocs = make(map[string]estools.Documents)
+	otelDocs = make(map[string]estools.Documents)
+
 	t.Run("agent metrics", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
@@ -1405,7 +1411,6 @@ outputs:
 			},
 		}
 
-		metricsets := []string{"cpu", "memory", "network", "filesystem"}
 		for _, mset := range metricsets {
 			index := fmt.Sprintf(".ds-metrics-system.%s-%s*", mset, info.Namespace)
 			require.Eventuallyf(t,
@@ -1416,6 +1421,9 @@ outputs:
 					docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, index, info.ESClient)
 					require.NoError(t, err)
 
+					if docs.Hits.Total.Value != 0 {
+						agentDocs[mset] = docs
+					}
 					return docs.Hits.Total.Value > 0
 				},
 				30*time.Second, 1*time.Second,
@@ -2026,7 +2034,6 @@ service:
 			},
 		}
 
-		metricsets := []string{"cpu", "memory", "network", "filesystem"}
 		for _, mset := range metricsets {
 			index := fmt.Sprintf(".ds-metrics-system.%s-%s*", mset, info.Namespace)
 			require.Eventuallyf(t,
@@ -2037,6 +2044,10 @@ service:
 					docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, index, info.ESClient)
 					require.NoError(t, err)
 
+					if docs.Hits.Total.Value != 0 {
+						otelDocs[mset] = docs
+					}
+
 					return docs.Hits.Total.Value > 0
 				},
 				30*time.Second, 1*time.Second,
@@ -2045,5 +2056,47 @@ service:
 
 		cancel()
 		cmd.Wait()
+	})
+
+	t.Run("compare documents ingested", func(t *testing.T) {
+		require.Greater(t, len(agentDocs), 0, "expected to find documents ingested by agent metrics input")
+		require.Greater(t, len(otelDocs), 0, "expected to find documents ingested by otel metrics input")
+
+		for _, mset := range metricsets {
+			require.Greater(t, len(agentDocs[mset].Hits.Hits), 0, "expected to find agent documents for metricset %s", mset)
+			require.Greater(t, len(otelDocs[mset].Hits.Hits), 0, "expected to find otel documents metricset %s", mset)
+
+			agent := agentDocs[mset].Hits.Hits[0].Source
+			otel := otelDocs[mset].Hits.Hits[0].Source
+			ignoredFields := []string{
+				// Expected to change between agent metrics input and otel metrics input
+				"@timestamp",
+				"agent.ephemeral_id",
+				"agent.id",
+				"agent.version",
+				"data_stream.namespace",
+				"event.duration",
+
+				// elastic_agent * fields are hardcoded in processor list for now which is why they differ
+				"elastic_agent.id",
+				"elastic_agent.snapshot",
+				"elastic_agent.version",
+
+				// metrics are not deterministic
+				"host.cpu.usage",
+				"system.cpu.idle.norm.pct",
+				"system.cpu.idle.pct",
+				"system.cpu.iowait.norm.pct",
+				"system.cpu.iowait.pct",
+				"system.cpu.irq.norm.pct",
+				"system.cpu.irq.pct",
+				"system.cpu.nice.norm.pct",
+				"system.cpu.nice.pct",
+				"system.cpu.softirq.norm.pct",
+				"system.cpu.softirq.pct",
+			}
+
+			AssertMapsEqual(t, agent, otel, ignoredFields, "expected documents to be equal for "+mset)
+		}
 	})
 }
