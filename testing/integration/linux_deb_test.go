@@ -9,7 +9,9 @@ package integration
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -38,6 +40,10 @@ func TestDebLogIngestFleetManaged(t *testing.T) {
 			{
 				Type:   define.Linux,
 				Distro: "ubuntu",
+			},
+			{
+				Type:   define.Linux,
+				Distro: "debian",
 			},
 		},
 		Local: false,
@@ -82,6 +88,10 @@ func TestDebInstallsServers(t *testing.T) {
 			{
 				Type:   define.Linux,
 				Distro: "ubuntu",
+			},
+			{
+				Type:   define.Linux,
+				Distro: "debian",
 			},
 		},
 		Local: false,
@@ -175,6 +185,10 @@ func TestDebFleetUpgrade(t *testing.T) {
 				Type:   define.Linux,
 				Distro: "ubuntu",
 			},
+			{
+				Type:   define.Linux,
+				Distro: "debian",
+			},
 		},
 		Local: false,
 		Sudo:  true,
@@ -264,6 +278,15 @@ func testDebUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info
 
 	check.ConnectedToFleet(ctx, t, startFixture, 5*time.Minute)
 
+	const migrationMarkerFile = "migration_marker.file"
+	runDir, err := atesting.FindRunDir(startFixture)
+	require.NoError(t, err, "failed at getting run dir")
+
+	runMigrationMarker := filepath.Join(runDir, migrationMarkerFile)
+	f, err := os.Create(runMigrationMarker)
+	require.NoErrorf(t, err, "failed to create %q file", runMigrationMarker)
+	_ = f.Close()
+
 	// 3. Upgrade deb to the build version
 	srcPackage, err := endFixture.SrcPackage(ctx)
 	require.NoError(t, err)
@@ -271,6 +294,12 @@ func testDebUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info
 	cmd.Env = append(cmd.Env, "DEBIAN_FRONTEND=noninteractive")
 	out, err := cmd.CombinedOutput() // #nosec G204 -- Need to pass in name of package
 	require.NoError(t, err, string(out))
+
+	newRunDir, err := atesting.FindRunDir(endFixture)
+	require.NoError(t, err, "failed at getting run dir")
+	require.NotEqual(t, runDir, newRunDir, "the run dirs from upgrade should not match")
+	newRunMigrationMarker := filepath.Join(newRunDir, migrationMarkerFile)
+	require.FileExistsf(t, newRunMigrationMarker, "%q is missing", newRunMigrationMarker)
 
 	// 4. Wait for version in Fleet to match
 	// Fleet will not include the `-SNAPSHOT` in the `GetAgentVersion` result
