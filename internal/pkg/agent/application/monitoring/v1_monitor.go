@@ -203,7 +203,6 @@ func (b *BeatsMonitor) MonitoringConfig(
 							}
 							uintPolicyValue := uint(parsedPolicyValue)
 							failureThreshold = &uintPolicyValue
-						case nil: // no change
 						default:
 							return nil, fmt.Errorf("unsupported type for policy failure threshold: %T", policyFailureThresholdRaw)
 						}
