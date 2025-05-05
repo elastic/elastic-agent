@@ -40,6 +40,16 @@ if test -L "$symlink"; then
         else
             echo "didn't find $enc_path"
         fi
+
+        old_run_path="$old_agent_dir/run"
+        new_run_path="$new_agent_dir/run"
+        if [ -d "$old_run_path" ]; then
+            echo "found $old_run_path, copy to $new_agent_dir"
+            mkdir -p "$new_run_path"
+            cp -rfp "$old_run_path/." "$new_run_path/"
+        else
+            echo "didn't find $old_run_path"
+        fi
     fi
 else
     echo "no previous installation found"
