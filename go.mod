@@ -13,7 +13,7 @@ require (
 	github.com/docker/docker v27.5.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250429215007-4c1bf91fe423
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250504204236-6a467e25d3a5
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
@@ -164,6 +164,7 @@ require (
 	code.cloudfoundry.org/gofileutils v0.0.0-20170111115228-4d0c80011a0f // indirect
 	code.cloudfoundry.org/rfc5424 v0.0.0-20180905210152-236a6d29298a // indirect
 	dario.cat/mergo v1.0.1 // indirect
+	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24 // indirect
 	github.com/Azure/azure-amqp-common-go/v4 v4.2.0 // indirect
 	github.com/Azure/azure-event-hubs-go/v3 v3.6.1 // indirect
@@ -338,7 +339,7 @@ require (
 	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/go-resty/resty/v2 v2.13.1 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
-	github.com/go-sql-driver/mysql v1.6.0 // indirect
+	github.com/go-sql-driver/mysql v1.8.1 // indirect
 	github.com/go-zookeeper/zk v1.0.4 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gocarina/gocsv v0.0.0-20170324095351-ffef3ffc77be // indirect
@@ -403,8 +404,7 @@ require (
 	github.com/jcmturner/gokrb5/v8 v8.4.4 // indirect
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/jmoiron/sqlx v1.3.5 // indirect
-	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
+	github.com/jmoiron/sqlx v1.4.0 // indirect
 	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
