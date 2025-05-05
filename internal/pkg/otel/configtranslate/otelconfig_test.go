@@ -163,13 +163,64 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 		},
 	}
-	esOutputConfig := map[string]any{
-		"type":     "elasticsearch",
-		"hosts":    []any{"localhost:9200"},
-		"username": "elastic",
-		"password": "password",
+	beatMetricsConfig := map[string]any{
+		"id":         "test",
+		"use_output": "default",
+		"type":       "beat/metrics",
+		"streams": []any{
+			map[string]any{
+				"id": "test-1",
+				"data_stream": map[string]any{
+					"dataset": "generic-1",
+				},
+				"hosts":      "http://localhost:5066",
+				"metricsets": []interface{}{"stats"},
+				"period":     "60s",
+			},
+		},
 	}
-	defaultProcessors := func(streamId, dataset string) []any {
+	esOutputConfig := map[string]any{
+		"type":             "elasticsearch",
+		"hosts":            []any{"localhost:9200"},
+		"username":         "elastic",
+		"password":         "password",
+		"preset":           "balanced",
+		"queue.mem.events": 3200,
+	}
+
+	expectedESConfig := map[string]any{
+		"elasticsearch/_agent-component/default": map[string]any{
+			"batcher": map[string]any{
+				"enabled":  true,
+				"max_size": 1600,
+				"min_size": 0,
+			},
+			"mapping": map[string]any{
+				"mode": "bodymap",
+			},
+			"endpoints": []string{"http://localhost:9200"},
+			"password":  "password",
+			"user":      "elastic",
+			"retry": map[string]any{
+				"enabled":          true,
+				"initial_interval": 1 * time.Second,
+				"max_interval":     1 * time.Minute,
+				"max_retries":      3,
+			},
+			"logs_dynamic_index": map[string]any{
+				"enabled": true,
+			},
+			"logs_dynamic_id": map[string]any{
+				"enabled": true,
+			},
+			"num_workers":       1,
+			"logs_index":        "filebeat-9.0.0",
+			"timeout":           90 * time.Second,
+			"idle_conn_timeout": 3 * time.Second,
+		},
+	}
+
+	defaultProcessors := func(streamId, dataset string, namespace string) []any {
 		return []any{
 			mapstr.M{
 				"add_fields": mapstr.M{
@@ -184,7 +235,7 @@ func TestGetOtelConfig(t *testing.T) {
 					"fields": mapstr.M{
 						"dataset":   dataset,
 						"namespace": "default",
-						"type":      "logs",
+						"type":      namespace,
 					},
 					"target": "data_stream",
 				},
@@ -225,6 +276,16 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 		}
 	}
+
+	getBeatMonitoringConfig := func(_, _ string) map[string]any {
+		return map[string]any{
+			"http": map[string]any{
+				"enabled": true,
+				"host":    "localhost",
+			},
+		}
+	}
+
 	tests := []struct {
 		name           string
 		model          *component.Model
@@ -276,40 +337,7 @@ func TestGetOtelConfig(t *testing.T) {
 				},
 			},
 			expectedConfig: confmap.NewFromStringMap(map[string]any{
-				"exporters": map[string]any{
-					"elasticsearch/_agent-component/default": map[string]any{
-						"batcher": map[string]any{
-							"enabled":        true,
-							"max_size_items": 1600,
-						},
-						"mapping": map[string]any{
-							"mode": "bodymap",
-						},
-						"endpoints": []string{"http://localhost:9200"},
-						"password":  "password",
-						"user":      "elastic",
-						"retry": map[string]any{
-							"enabled":          true,
-							"initial_interval": 1 * time.Second,
-							"max_interval":     1 * time.Minute,
-							"max_retries":      3,
-						},
-						"logs_dynamic_index": map[string]any{
-							"enabled": true,
-						},
-						"logs_dynamic_id": map[string]any{
-							"enabled": true,
-						},
-						"num_workers":       0,
-						"api_key":           "",
-						"logs_index":        "filebeat-9.0.0",
-						"timeout":           90 * time.Second,
-						"idle_conn_timeout": 3 * time.Second,
-						"metrics_dynamic_index": map[string]any{
-							"enabled": true,
-						},
-					},
-				},
+				"exporters": expectedESConfig,
 				"receivers": map[string]any{
 					"filebeatreceiver/_agent-component/filestream-default": map[string]any{
 						"filebeat": map[string]any{
@@ -324,7 +352,7 @@ func TestGetOtelConfig(t *testing.T) {
 										"/var/log/*.log",
 									},
 									"index":      "logs-generic-1-default",
-									"processors": defaultProcessors("test-1", "generic-1"),
+									"processors": defaultProcessors("test-1", "generic-1", "logs"),
 								},
 								{
 									"id":   "test-2",
@@ -336,7 +364,7 @@ func TestGetOtelConfig(t *testing.T) {
 										"/var/log/*.log",
 									},
 									"index":      "logs-generic-2-default",
-									"processors": defaultProcessors("test-2", "generic-2"),
+									"processors": defaultProcessors("test-2", "generic-2", "logs"),
 								},
 							},
 						},
@@ -345,6 +373,32 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 						"path": map[string]any{
 							"data": filepath.Join(paths.Run(), "filestream-default"),
+						},
+						"queue": map[string]any{
+							"mem": map[string]any{
+								"events": uint64(3200),
+								"flush": map[string]any{
+									"min_events": uint64(1600),
+									"timeout":    "10s",
+								},
+							},
+						},
+						"logging": map[string]any{
+							"with_fields": map[string]any{
+								"component": map[string]any{
+									"binary":  "filebeat",
+									"dataset": "elastic_agent.filebeat",
+									"type":    "filestream",
+									"id":      "filestream-default",
+								},
+								"log": map[string]any{
+									"source": "filestream-default",
+								},
+							},
+						},
+						"http": map[string]any{
+							"enabled": true,
+							"host":    "localhost",
 						},
 					},
 				},
@@ -358,10 +412,103 @@ func TestGetOtelConfig(t *testing.T) {
 				},
 			}),
 		},
+		{
+			name: "beat/metrics",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "beat-metrics-monitoring",
+						InputType:  "beat/metrics",
+						OutputType: "elasticsearch",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "agentbeat",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"metricbeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "beat/metrics-monitoring",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(beatMetricsConfig),
+							},
+							{
+								ID:     "beat/metrics-default",
+								Type:   client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(esOutputConfig),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": expectedESConfig,
+				"receivers": map[string]any{
+					"metricbeatreceiver/_agent-component/beat-metrics-monitoring": map[string]any{
+						"metricbeat": map[string]any{
+							"modules": []map[string]any{
+								{
+									"data_stream": map[string]any{"dataset": "generic-1"},
+									"hosts":       "http://localhost:5066",
+									"id":          "test-1",
+									"index":       "metrics-generic-1-default",
+									"metricsets":  []interface{}{"stats"},
+									"period":      "60s",
+									"processors":  defaultProcessors("test-1", "generic-1", "metrics"),
+									"module":      "beat",
+								},
+							},
+						},
+						"output": map[string]any{
+							"otelconsumer": map[string]any{},
+						},
+						"path": map[string]any{
+							"data": filepath.Join(paths.Run(), "beat-metrics-monitoring"),
+						},
+						"queue": map[string]any{
+							"mem": map[string]any{
+								"events": uint64(3200),
+								"flush": map[string]any{
+									"min_events": uint64(1600),
+									"timeout":    "10s",
+								},
+							},
+						},
+						"logging": map[string]any{
+							"with_fields": map[string]any{
+								"component": map[string]any{
+									"binary":  "metricbeat",
+									"dataset": "elastic_agent.metricbeat",
+									"type":    "beat/metrics",
+									"id":      "beat-metrics-monitoring",
+								},
+								"log": map[string]any{
+									"source": "beat-metrics-monitoring",
+								},
+							},
+						},
+						"http": map[string]any{
+							"enabled": true,
+							"host":    "localhost",
+						},
+					},
+				},
+				"service": map[string]any{
+					"pipelines": map[string]any{
+						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
+							"exporters": []string{"elasticsearch/_agent-component/default"},
+							"receivers": []string{"metricbeatreceiver/_agent-component/beat-metrics-monitoring"},
+						},
+					},
+				},
+			}),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actualConf, actualError := GetOtelConfig(tt.model, agentInfo)
+			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, getBeatMonitoringConfig)
 			if actualConf == nil || tt.expectedConfig == nil {
 				assert.Equal(t, tt.expectedConfig, actualConf)
 			} else { // this gives a nicer diff

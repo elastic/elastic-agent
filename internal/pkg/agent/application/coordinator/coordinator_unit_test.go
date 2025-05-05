@@ -983,6 +983,7 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 	specs, err := component.NewRuntimeSpecs(platform, []component.InputRuntimeSpec{componentSpec})
 	require.NoError(t, err)
 
+	monitoringMgr := newTestMonitoringMgr()
 	coord := &Coordinator{
 		logger:           logger,
 		agentInfo:        &info.AgentInfo{},
@@ -990,12 +991,12 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 		managerChans: managerChans{
 			configManagerUpdate: configChan,
 		},
-		runtimeMgr:                 runtimeManager,
-		otelMgr:                    otelManager,
-		runComponentsInOtelManager: true,
-		specs:                      specs,
-		vars:                       emptyVars(t),
-		componentPIDTicker:         time.NewTicker(time.Second * 30),
+		monitorMgr:         monitoringMgr,
+		runtimeMgr:         runtimeManager,
+		otelMgr:            otelManager,
+		specs:              specs,
+		vars:               emptyVars(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
 
 	// Create a policy with one input and one output (no otel configuration)
@@ -1009,6 +1010,7 @@ inputs:
   - id: test-input
     type: filestream
     use_output: default
+    _runtime_experimental: otel
   - id: test-other-input
     type: system/metrics
     use_output: default

@@ -40,7 +40,7 @@ try {
     gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags=integration -shuffle=on -timeout=2h0m0s "github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=$GROUP_NAME" "-integration.sudo=$TEST_SUDO"
 } finally {
     ess_down
-    
+
     if (Test-Path $outputXML) {
         # Install junit2html if not installed
         go install github.com/alexec/junit2html@latest

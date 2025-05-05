@@ -94,9 +94,11 @@ type MonitorManager interface {
 	// args:
 	// - the existing config policy
 	// - a list of the expected running components
-	// - a map of component IDs to binary names
 	// - a map of component IDs to the PIDs of the running components.
-	MonitoringConfig(map[string]interface{}, []component.Component, map[string]string, map[string]uint64) (map[string]interface{}, error)
+	MonitoringConfig(map[string]interface{}, []component.Component, map[string]uint64) (map[string]interface{}, error)
+
+	// ComponentMonitoringConfig returns monitoring configuration for the component application, if applicable.
+	ComponentMonitoringConfig(unitID, binary string) map[string]any
 }
 
 // Runner provides interface to run a manager and receive running errors.
@@ -225,10 +227,6 @@ type Coordinator struct {
 	otelCfg *confmap.Conf
 	// the final config sent to the manager, contains both config from hybrid mode and from components
 	finalOtelCfg *confmap.Conf
-
-	// This variable controls whether we run supported components in the Otel manager instead of the runtime manager.
-	// It's a temporary measure until we decide exactly how we want to control where specific components run.
-	runComponentsInOtelManager bool
 
 	caps      capabilities.Capabilities
 	modifiers []ComponentsModifier
@@ -396,22 +394,21 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		LogLevel:     logLevel,
 	}
 	c := &Coordinator{
-		logger:                     logger,
-		cfg:                        cfg,
-		agentInfo:                  agentInfo,
-		isManaged:                  isManaged,
-		specs:                      specs,
-		reexecMgr:                  reexecMgr,
-		upgradeMgr:                 upgradeMgr,
-		monitorMgr:                 monitorMgr,
-		runtimeMgr:                 runtimeMgr,
-		configMgr:                  configMgr,
-		varsMgr:                    varsMgr,
-		otelMgr:                    otelMgr,
-		runComponentsInOtelManager: false, // change this to run supported components in the Otel manager
-		caps:                       caps,
-		modifiers:                  modifiers,
-		state:                      state,
+		logger:     logger,
+		cfg:        cfg,
+		agentInfo:  agentInfo,
+		isManaged:  isManaged,
+		specs:      specs,
+		reexecMgr:  reexecMgr,
+		upgradeMgr: upgradeMgr,
+		monitorMgr: monitorMgr,
+		runtimeMgr: runtimeMgr,
+		configMgr:  configMgr,
+		varsMgr:    varsMgr,
+		otelMgr:    otelMgr,
+		caps:       caps,
+		modifiers:  modifiers,
+		state:      state,
 		// Note: the uses of a buffered input channel in our broadcaster (the
 		// third parameter to broadcaster.New) means that it is possible for
 		// immediately adjacent writes/reads not to match, e.g.:
@@ -1031,9 +1028,7 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 				return o
 			},
 		},
-	}
-	if c.runComponentsInOtelManager {
-		otelComponentHook := diagnostics.Hook{
+		diagnostics.Hook{
 			Name:        "otel-final",
 			Filename:    "otel-final.yaml",
 			Description: "Final otel configuration used by the Elastic Agent. Includes hybrid mode config and component config.",
@@ -1048,8 +1043,7 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 				}
 				return o
 			},
-		}
-		hooks = append(hooks, otelComponentHook)
+		},
 	}
 	return hooks
 }
@@ -1475,10 +1469,15 @@ func (c *Coordinator) updateOtelManagerConfig(model *component.Model) error {
 	if len(model.Components) > 0 {
 		var err error
 		c.logger.With("components", model.Components).Debug("Updating otel manager model")
-		componentOtelCfg, err = configtranslate.GetOtelConfig(model, c.agentInfo)
+		componentOtelCfg, err = configtranslate.GetOtelConfig(model, c.agentInfo, c.monitorMgr.ComponentMonitoringConfig)
 		if err != nil {
 			c.logger.Errorf("failed to generate otel config: %v", err)
 		}
+		componentIDs := make([]string, 0, len(model.Components))
+		for _, comp := range model.Components {
+			componentIDs = append(componentIDs, comp.ID)
+		}
+		c.logger.With("component_ids", componentIDs).Warn("The Otel runtime manager is HIGHLY EXPERIMENTAL and only intended for testing. Use at your own risk.")
 	}
 	if componentOtelCfg != nil {
 		err := finalOtelCfg.Merge(componentOtelCfg)
@@ -1506,18 +1505,16 @@ func (c *Coordinator) updateOtelManagerConfig(model *component.Model) error {
 
 // splitModelBetweenManager splits the model components between the runtime manager and the otel manager.
 func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtimeModel *component.Model, otelModel *component.Model) {
-	if !c.runComponentsInOtelManager {
-		// Runtime manager gets all the components, this is the default
-		otelModel = &component.Model{}
-		runtimeModel = model
-		return
-	}
 	var otelComponents, runtimeComponents []component.Component
 	for _, comp := range model.Components {
-		if configtranslate.IsComponentOtelSupported(&comp) {
+		switch comp.RuntimeManager {
+		case component.OtelRuntimeManager:
 			otelComponents = append(otelComponents, comp)
-		} else {
+		case component.ProcessRuntimeManager:
 			runtimeComponents = append(runtimeComponents, comp)
+		default:
+			// this should be impossible if we parse the configuration correctly
+			c.logger.Errorf("unknown runtime manager for component: %s, ignoring", comp.RuntimeManager)
 		}
 	}
 	otelModel = &component.Model{
