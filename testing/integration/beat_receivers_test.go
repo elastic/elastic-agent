@@ -648,7 +648,6 @@ var httpMetricMonitoring = `
                     binary: elastic-agent
                     id: elastic-agent
                 target: component
-            - add_host_metadata: ~
     output:
       otelconsumer:
     queue:
