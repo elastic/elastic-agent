@@ -127,6 +127,46 @@ func getTestList(infoNamespace string) []test {
 				// beat related fields
 				"beat.stats.beat.uuid",
 				"beat.id",
+				"beat.stats.runtime.goroutines",
+				"beat.stats.uptime.ms",
+				"beat.stats.cgroup.memory.mem.usage.bytes",
+				"beat.stats.handles.open",
+
+				// these sub metrics vary between documents
+				"beat.stats.cpu",
+				"beat.stats.libbeat",
+				"beat.stats.memstats",
+				"beat.stats.system.load",
+				"beat.stats.info",
+
+				// needs investigation
+				"beat.stats.beat.version",
+
+				// elastic_agent * fields are hardcoded in processor list for now which is why they differ
+				"elastic_agent.id",
+				"elastic_agent.snapshot",
+				"elastic_agent.version",
+			},
+		},
+		{
+			dsType:      "metrics",
+			dsDataset:   "elastic_agent.metricbeat",
+			dsNamespace: infoNamespace
+			query: map[string]any{
+				"component.id": "http/metrics-monitoring",
+			},
+			ignoredFields: []string{
+				// Expected to change between agentDocs and OtelDocs
+				"@timestamp",
+				"agent.ephemeral_id",
+				"agent.id",
+				"agent.version",
+				"event.duration",
+				"event.ingested",
+
+				// beat related fields
+				"beat.stats.beat.uuid",
+				"beat.id",
 				"beat.elasticsearch.cluster.id", // ignore this field because beatreceiver uses otelconsumer as output
 				"beat.stats.runtime.goroutines",
 				"beat.stats.uptime.ms",
@@ -144,7 +184,6 @@ func getTestList(infoNamespace string) []test {
 				"elastic_agent.version",
 			},
 		},
-		{dsType: "metrics", dsDataset: "elastic_agent.metricbeat", dsNamespace: infoNamespace},
 		{dsType: "metrics", dsDataset: "elastic_agent.filebeat_input", dsNamespace: infoNamespace}, // fix coming in by https://github.com/elastic/beats/issues/44153
 	}
 	return tests
@@ -662,6 +701,7 @@ var httpMetricMonitoring = `
 `
 
 // monitors filebeat
+// and metricbeat
 var beatMetricMonitoring = `
   metricbeatreceiver/beat-metrics-monitoring:
     metricbeat:
