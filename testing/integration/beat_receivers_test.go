@@ -17,8 +17,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/elastic/elastic-agent/pkg/control/v
 	"gopkg.in/yaml.v2"
+
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
@@ -121,11 +122,14 @@ func TestAgentMonitoring(t *testing.T) {
 		Outputs           map[string]PolicyOutputs `yaml:"outputs"`
 		Fleet             map[string]any           `yaml:"fleet"`
 		OutputPermissions map[string]any           `yaml:"output_permissions"`
-		Agent             map[string]any           `yaml:"agent"`
-		Inputs            []map[string]any         `yaml:"inputs"`
-		Signed            map[string]any           `yaml:"signed"`
-		SecretReferences  []map[string]any         `yaml:"secret_references"`
-		Namespaces        []map[string]any         `yaml:"namespaces"`
+		Agent             struct {
+			Monitoring map[string]any `yaml:"monitoring"`
+			Rest       map[string]any `yaml:",inline"`
+		} `yaml:"agent"`
+		Inputs           []map[string]any `yaml:"inputs"`
+		Signed           map[string]any   `yaml:"signed"`
+		SecretReferences []map[string]any `yaml:"secret_references"`
+		Namespaces       []map[string]any `yaml:"namespaces"`
 	}
 
 	policy := PolicyStruct{}
@@ -144,6 +148,12 @@ func TestAgentMonitoring(t *testing.T) {
 	t.Run("verify elastic-agent monitoring functionality", func(t *testing.T) {
 		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
 		t.Cleanup(cancel)
+
+		// beats processes and beats receivers should use a different namespace to ensure each test looks only at the
+		// right data
+		actualNamespace := fmt.Sprintf("%s-%s", info.Namespace, "process")
+		policy.Agent.Monitoring["namespace"] = actualNamespace
+
 		updatedPolicyBytes, err := yaml.Marshal(policy)
 		require.NoErrorf(t, err, "error marshalling policy, struct was %v", policy)
 		t.Cleanup(func() {
@@ -182,7 +192,7 @@ func TestAgentMonitoring(t *testing.T) {
 					mustClauses := []map[string]any{
 						{"match": map[string]any{"data_stream.type": tc.dsType}},
 						{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
-						{"match": map[string]any{"data_stream.namespace": tc.dsNamespace}},
+						{"match": map[string]any{"data_stream.namespace": actualNamespace}},
 					}
 
 					// Only add the "message" match if tc.message is not empty
@@ -231,11 +241,13 @@ func TestAgentMonitoring(t *testing.T) {
 		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
 		t.Cleanup(cancel)
 
+		// beats processes and beats receivers should use a different namespace to ensure each test looks only at the
+		// right data
+		actualNamespace := fmt.Sprintf("%s-%s", info.Namespace, "otel")
+		policy.Agent.Monitoring["namespace"] = actualNamespace
+
 		// switch monitoring to the otel runtime
-		monitoring := policy.Agent["monitoring"]
-		monitoringMap := monitoring.(map[any]any)
-		monitoringMap["_runtime_experimental"] = "otel"
-		policy.Agent["monitoring"] = monitoringMap
+		policy.Agent.Monitoring["_runtime_experimental"] = "otel"
 
 		updatedPolicyBytes, err := yaml.Marshal(policy)
 		require.NoErrorf(t, err, "error marshalling policy, struct was %v", policy)
@@ -255,11 +267,6 @@ func TestAgentMonitoring(t *testing.T) {
 		err = fixture.Configure(ctx, updatedPolicyBytes)
 		require.NoError(t, err, "error configuring fixture")
 
-		// Get the timestamp before starting. Required to separate logs from agent and otel.
-		timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
-
-		fmt.Println(time.Now())
-
 		output, err := fixture.InstallWithoutEnroll(ctx, &installOpts)
 		require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
 
@@ -273,11 +280,12 @@ func TestAgentMonitoring(t *testing.T) {
 
 			// we should have filebeatreceiver and metricbeatreceiver running
 			otelCollectorStatus := status.Collector
-			assert.Equal(collect, cproto.CollectorComponentStatus_StatusOK, otelCollectorStatus.Status)
+			assert.Equal(collect, int(cproto.CollectorComponentStatus_StatusOK), otelCollectorStatus.Status)
 			pipelineStatusMap := otelCollectorStatus.ComponentStatusMap
 
 			// we should have 3 pipelines running: filestream for logs, http metrics and beats metrics
 			assert.Equal(collect, 3, len(pipelineStatusMap))
+
 			fileStreamPipeline := "pipeline:logs/_agent-component/filestream-monitoring"
 			httpMetricsPipeline := "pipeline:logs/_agent-component/http/metrics-monitoring"
 			beatsMetricsPipeline := "pipeline:logs/_agent-component/beat/metrics-monitoring"
@@ -286,9 +294,9 @@ func TestAgentMonitoring(t *testing.T) {
 			assert.Contains(collect, pipelineStatusMap, beatsMetricsPipeline)
 
 			// and they should be healthy
-			assert.Equal(collect, cproto.CollectorComponentStatus_StatusOK, pipelineStatusMap[fileStreamPipeline].Status)
-			assert.Equal(collect, cproto.CollectorComponentStatus_StatusOK, pipelineStatusMap[httpMetricsPipeline].Status)
-			assert.Equal(collect, cproto.CollectorComponentStatus_StatusOK, pipelineStatusMap[beatsMetricsPipeline].Status)
+			assert.Equal(collect, int(cproto.CollectorComponentStatus_StatusOK), pipelineStatusMap[fileStreamPipeline].Status)
+			assert.Equal(collect, int(cproto.CollectorComponentStatus_StatusOK), pipelineStatusMap[httpMetricsPipeline].Status)
+			assert.Equal(collect, int(cproto.CollectorComponentStatus_StatusOK), pipelineStatusMap[beatsMetricsPipeline].Status)
 
 			return
 		}, 1*time.Minute, 1*time.Second)
@@ -301,11 +309,9 @@ func TestAgentMonitoring(t *testing.T) {
 				defer findCancel()
 				mustClauses := []map[string]any{
 					{"match": map[string]any{"message": tc.message}},
-					{"range": map[string]interface{}{
-						"@timestamp": map[string]string{
-							"gte": timestamp, // Use captured timestamp
-						},
-					}},
+					{"match": map[string]any{"data_stream.type": tc.dsType}},
+					{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
+					{"match": map[string]any{"data_stream.namespace": actualNamespace}},
 				}
 
 				rawQuery := map[string]any{
