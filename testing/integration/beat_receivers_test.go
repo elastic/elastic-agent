@@ -98,6 +98,9 @@ func getTestList(infoNamespace string) []test {
 
 				//all cpu related metrics are dropped
 				"system.process.cpu",
+				"system.process.cgroup.memory.mem.usage.bytes",
+				"system.process.fd.open",
+				"system.process.memory.size",
 
 				// elastic_agent * fields are hardcoded in processor list for now which is why they differ
 				"elastic_agent.id",
@@ -322,11 +325,12 @@ func TestAgentMonitoring(t *testing.T) {
 		)
 
 		type configOptions struct {
-			InputPath      string
-			ESEndpoint     string
-			ESApiKey       string
-			SocketEndpoint string
-			Namespace      string
+			InputPath       string
+			ESEndpoint      string
+			ESApiKey        string
+			SocketEndpoint1 string
+			SocketEndpoint2 string
+			Namespace       string
 		}
 		esEndpoint, err := getESHost()
 		require.NoError(t, err, "error getting elasticsearch endpoint")
@@ -361,17 +365,20 @@ func TestAgentMonitoring(t *testing.T) {
 			return true
 		}, 30*time.Second, 1*time.Second)
 
-		socketEndpoint := utils.SocketURLWithFallback(uuid.Must(uuid.NewV4()).String(), paths.TempDir())
+		// create sockets for beats to expose its internal metrics
+		socketEndpoint1 := utils.SocketURLWithFallback(uuid.Must(uuid.NewV4()).String(), paths.TempDir())
+		socketEndpoint2 := utils.SocketURLWithFallback(uuid.Must(uuid.NewV4()).String(), paths.TempDir())
 
 		// configure elastic-agent.yml with new config
 		var configBuffer bytes.Buffer
 		template.Must(template.New("config").Parse(configTemplateOTel)).Execute(&configBuffer,
 			configOptions{
-				InputPath:      fixture.WorkDir(),
-				ESEndpoint:     esEndpoint,
-				ESApiKey:       esApiKey.Encoded,
-				SocketEndpoint: socketEndpoint,
-				Namespace:      info.Namespace,
+				InputPath:       fixture.WorkDir(),
+				ESEndpoint:      esEndpoint,
+				ESApiKey:        esApiKey.Encoded,
+				SocketEndpoint1: socketEndpoint1,
+				SocketEndpoint2: socketEndpoint2,
+				Namespace:       info.Namespace,
 			})
 		configOTelContents := configBuffer.Bytes()
 		t.Cleanup(func() {
@@ -561,7 +568,7 @@ var filestreamMonitoring = `
       selectors:
         - '*'
     http.enabled: true
-    http.host: {{ .SocketEndpoint }}
+    http.host: {{ .SocketEndpoint1 }}
 `
 
 var httpMetricMonitoring = `
@@ -582,10 +589,6 @@ var httpMetricMonitoring = `
         processors:
             - add_fields:
                 fields:
-                    input_id: metrics-monitoring-agent
-                target: '@metadata'
-            - add_fields:
-                fields:
                     dataset: elastic_agent.elastic_agent
                     namespace: {{.Namespace}}
                     type: metrics
@@ -594,10 +597,6 @@ var httpMetricMonitoring = `
                 fields:
                     dataset: elastic_agent.elastic_agent
                 target: event
-            - add_fields:
-                fields:
-                    stream_id: metrics-monitoring-agent
-                target: '@metadata'
             - add_fields:
                 fields:
                     id: f9787136-2d04-4999-a504-848c2e25d90e
@@ -658,6 +657,8 @@ var httpMetricMonitoring = `
       level: info
       selectors:
         - '*' 
+    http.enabled: true
+    http.host: {{ .SocketEndpoint2 }}		
 `
 
 // monitors filebeat
@@ -667,7 +668,7 @@ var beatMetricMonitoring = `
       modules:
       - failure_threshold: 5
         hosts:
-          - http+{{ .SocketEndpoint }}
+          - http+{{ .SocketEndpoint1 }}
         id: metrics-monitoring-filebeat
         metricsets:
           - stats
@@ -675,11 +676,7 @@ var beatMetricMonitoring = `
         enabled: true 
         namespace: agent
         period: 60s
-        processors:
-            - add_fields:
-                fields:
-                    input_id: metrics-monitoring-beats
-                target: '@metadata'		
+        processors:	
             - add_fields:
                 fields:
                     dataset: elastic_agent.filebeat
@@ -720,6 +717,56 @@ var beatMetricMonitoring = `
                     binary: filebeat
                     id: filestream-monitoring
                 target: component
+      - failure_threshold: 5
+        hosts:
+        - http+{{ .SocketEndpoint1 }}
+        id: metrics-monitoring-metricbeat
+        metricsets:
+        - stats
+        module: beat
+        enabled: true
+        period: 60s
+        processors:
+        - add_fields:
+           fields:
+             dataset: elastic_agent.metricbeat
+             namespace: {{.Namespace}}
+             type: metrics
+           target: data_stream
+        - add_fields:
+           fields:
+            dataset: elastic_agent.metricbeat
+           target: event
+        - add_fields:
+           fields:
+             id: f9787136-2d04-4999-a504-848c2e25d90e
+             snapshot: false
+             version: 9.0.0
+           target: elastic_agent
+        - add_fields:
+           fields:
+            id: f9787136-2d04-4999-a504-848c2e25d90e
+           target: agent
+        - add_fields:
+           fields:
+             dataset: elastic_agent.metricbeat
+           target: event
+        - add_fields:
+           fields:
+             id: f9787136-2d04-4999-a504-848c2e25d90e
+             process: metricbeat
+             snapshot: false
+             version: 9.0.0
+           target: elastic_agent
+        - add_fields:
+           fields:
+            id: f9787136-2d04-4999-a504-848c2e25d90e
+           target: agent
+        - add_fields:
+           fields:
+             binary: metricbeat
+             id: http/metrics-monitoring
+           target: component				
     output:
       otelconsumer:
     queue:
