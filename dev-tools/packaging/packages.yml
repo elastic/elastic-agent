@@ -225,6 +225,7 @@ shared:
   - &docker_ubuntu_spec
     docker_variant: 'basic'
     extra_vars:
+<<<<<<< HEAD
       from: '--platform=linux/amd64 ubuntu:20.04'
   - &docker_ubuntu_arm_spec
     docker_variant: 'basic'
@@ -235,10 +236,13 @@ shared:
     docker_variant: 'ubi'
     extra_vars:
       from: '--platform=linux/amd64 docker.elastic.co/ubi9/ubi-minimal'
+=======
+      from: '--platform=linux/amd64 redhat/ubi9-minimal'
+>>>>>>> 56f5d9053 (docker: use the official Red Hat images (#7817))
   - &docker_ubi_arm_spec
     docker_variant: 'ubi'
     extra_vars:
-      from: '--platform=linux/arm64 docker.elastic.co/ubi9/ubi-minimal'
+      from: '--platform=linux/arm64 redhat/ubi9-minimal'
 
   - &docker_wolfi_spec
     docker_variant: 'wolfi'
