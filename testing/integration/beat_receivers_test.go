@@ -15,6 +15,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
+	"github.com/elastic/elastic-agent/pkg/control/v
 	"gopkg.in/yaml.v2"
 
 	"github.com/gofrs/uuid/v5"
@@ -260,14 +263,34 @@ func TestAgentMonitoring(t *testing.T) {
 		output, err := fixture.InstallWithoutEnroll(ctx, &installOpts)
 		require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
 
-		// Ensure elastic-agent is healthy, otherwise we cannot perform restart operation
-		require.Eventually(t, func() bool {
-			err = fixture.IsHealthy(ctx)
-			if err != nil {
-				t.Logf("waiting for agent healthy: %s", err.Error())
-				return false
-			}
-			return true
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			status, statusErr := fixture.ExecStatus(ctx)
+			assert.NoError(collect, statusErr)
+			// agent should be healthy
+			assert.Equal(collect, int(cproto.State_HEALTHY), status.State)
+			// we should have no normal components running
+			assert.Zero(collect, len(status.Components))
+
+			// we should have filebeatreceiver and metricbeatreceiver running
+			otelCollectorStatus := status.Collector
+			assert.Equal(collect, cproto.CollectorComponentStatus_StatusOK, otelCollectorStatus.Status)
+			pipelineStatusMap := otelCollectorStatus.ComponentStatusMap
+
+			// we should have 3 pipelines running: filestream for logs, http metrics and beats metrics
+			assert.Equal(collect, 3, len(pipelineStatusMap))
+			fileStreamPipeline := "pipeline:logs/_agent-component/filestream-monitoring"
+			httpMetricsPipeline := "pipeline:logs/_agent-component/http/metrics-monitoring"
+			beatsMetricsPipeline := "pipeline:logs/_agent-component/beat/metrics-monitoring"
+			assert.Contains(collect, pipelineStatusMap, fileStreamPipeline)
+			assert.Contains(collect, pipelineStatusMap, httpMetricsPipeline)
+			assert.Contains(collect, pipelineStatusMap, beatsMetricsPipeline)
+
+			// and they should be healthy
+			assert.Equal(collect, cproto.CollectorComponentStatus_StatusOK, pipelineStatusMap[fileStreamPipeline].Status)
+			assert.Equal(collect, cproto.CollectorComponentStatus_StatusOK, pipelineStatusMap[httpMetricsPipeline].Status)
+			assert.Equal(collect, cproto.CollectorComponentStatus_StatusOK, pipelineStatusMap[beatsMetricsPipeline].Status)
+
+			return
 		}, 1*time.Minute, 1*time.Second)
 
 		// run this only for logs for now
