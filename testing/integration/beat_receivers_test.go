@@ -9,7 +9,6 @@ package integration
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -170,7 +169,7 @@ func TestAgentMonitoring(t *testing.T) {
 		apiKeyResponse, err := createESApiKey(info.ESClient)
 		require.NoError(t, err, "failed to get api key")
 		require.True(t, len(apiKeyResponse.Encoded) > 1, "api key is invalid %q", apiKeyResponse)
-		apiKey, err := base64.StdEncoding.DecodeString(apiKeyResponse.Encoded)
+		apiKey, err := getDecodedApiKey(apiKeyResponse)
 		require.NoError(t, err, "error decoding api key")
 
 		type PolicyOutputs struct {
@@ -439,11 +438,11 @@ var filestreamMonitoring = `
           enabled: true
           id: filestream-monitoring-agent
           paths:
-            -  {{.InputPath}}/data/elastic-agent-*/logs/elastic-agent-*.ndjson 
+            -  {{.InputPath}}/data/elastic-agent-*/logs/elastic-agent-*.ndjson
             -  {{.InputPath}}/data/elastic-agent-*/logs/elastic-agent-watcher-*.ndjson
           close:
             on_state_change:
-              inactive: 5m	  
+              inactive: 5m
           parsers:
             - ndjson:
                 add_error_key: true
