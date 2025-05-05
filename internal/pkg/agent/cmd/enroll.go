@@ -96,7 +96,7 @@ func addEnrollFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSliceP("proxy-header", "", []string{}, "Proxy headers used with CONNECT request: when bootstrapping Fleet Server, it's the proxy used by Fleet Server to connect to Elasticsearch; when enrolling the Elastic Agent to Fleet Server, it's the proxy used by the Elastic Agent to connect to Fleet Server")
 	cmd.Flags().BoolP("delay-enroll", "", false, "Delays enrollment to occur on first start of the Elastic Agent service")
 	cmd.Flags().DurationP("daemon-timeout", "", 0, "Timeout waiting for Elastic Agent daemon")
-	cmd.Flags().DurationP("enroll-timeout", "", 10*time.Minute, "Timeout waiting for Elastic Agent enroll command.")
+	cmd.Flags().DurationP("enroll-timeout", "", 10*time.Minute, "Timeout waiting for Elastic Agent enroll command. A negative value disables the timeout.")
 	cmd.Flags().DurationP("fleet-server-timeout", "", 0, "When bootstrapping Fleet Server, timeout waiting for Fleet Server to be ready to start enrollment")
 	cmd.Flags().Bool("skip-daemon-reload", false, "Skip daemon reload after enrolling")
 	cmd.Flags().StringSliceP("tag", "", []string{}, "User-set tags")
@@ -481,8 +481,13 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	key, _ := cmd.Flags().GetString("elastic-agent-cert-key")
 	keyPassphrase, _ := cmd.Flags().GetString("elastic-agent-cert-key-passphrase")
 
-	ctx, cancel := context.WithTimeout(handleSignal(context.Background()), enrollTimeout)
-	defer cancel()
+	ctx := handelSignal(context.Background())
+
+	if enrollTimeout > 0 {
+		eCtx, cancel := context.WithTimeout(ctx, enrollTimeout)
+		defer cancel()
+		ctx = eCtx
+	}
 
 	// On MacOS Ventura and above, fixing the permissions on enrollment during installation fails with the error:
 	//  Error: failed to fix permissions: chown /Library/Elastic/Agent/data/elastic-agent-c13f91/elastic-agent.app: operation not permitted
