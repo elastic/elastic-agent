@@ -61,9 +61,9 @@ func getTestList(infoNamespace string) []test {
 				"agent.ephemeral_id",
 				"agent.id",
 				"agent.version",
-				"event.duration",
+				"event.ingested",
 
-				// for filestream-monitoring
+				// log fields are expected to differ
 				"log.file.inode",
 				"log.file.fingerprint",
 				"log.file.path",
@@ -71,7 +71,6 @@ func getTestList(infoNamespace string) []test {
 
 				// needs investigation
 				"event.agent_id_status",
-				"event.ingested",
 
 				// elastic_agent * fields are hardcoded in processor list for now which is why they differ
 				"elastic_agent.id",
@@ -84,7 +83,8 @@ func getTestList(infoNamespace string) []test {
 			dsDataset:   "elastic_agent.elastic_agent",
 			dsNamespace: infoNamespace,
 			query: map[string]any{
-				"component.id": "elastic-agent", // we get only one component to avoid complexity
+				"component.id": "elastic-agent", // metric-elastic_agent.elastic_agent-* stores cpu metric coming in from EA and all running beats
+				// here we only compare elastic-agent self metrics for simplicity
 			},
 			ignoredFields: []string{
 				// Expected to change between agentDocs and OtelDocs
@@ -93,6 +93,7 @@ func getTestList(infoNamespace string) []test {
 				"agent.id",
 				"agent.version",
 				"event.duration",
+				"event.ingested",
 
 				// elastic_agent * fields are hardcoded in processor list for now which is why they differ
 				"elastic_agent.id",
@@ -100,9 +101,30 @@ func getTestList(infoNamespace string) []test {
 				"elastic_agent.version",
 			},
 		},
-		{dsType: "metrics", dsDataset: "elastic_agent.filebeat", dsNamespace: infoNamespace},
-		{dsType: "metrics", dsDataset: "elastic_agent.filebeat_input", dsNamespace: infoNamespace},
+		{
+			dsType:      "metrics",
+			dsDataset:   "elastic_agent.filebeat",
+			dsNamespace: infoNamespace,
+			query: map[string]any{
+				"component.id": "filestream-monitoring",
+			},
+			ignoredFields: []string{
+				// Expected to change between agentDocs and OtelDocs
+				"@timestamp",
+				"agent.ephemeral_id",
+				"agent.id",
+				"agent.version",
+				"event.duration",
+				"event.ingested",
+
+				// elastic_agent * fields are hardcoded in processor list for now which is why they differ
+				"elastic_agent.id",
+				"elastic_agent.snapshot",
+				"elastic_agent.version",
+			},
+		},
 		{dsType: "metrics", dsDataset: "elastic_agent.metricbeat", dsNamespace: infoNamespace},
+		{dsType: "metrics", dsDataset: "elastic_agent.filebeat_input", dsNamespace: infoNamespace}, // fix coming in by https://github.com/elastic/beats/issues/44153
 	}
 	return tests
 }
@@ -605,6 +627,84 @@ var httpMetricMonitoring = `
                 fields:
                     binary: elastic-agent
                     id: elastic-agent
+                target: component
+    output:
+      otelconsumer:
+    queue:
+      mem:
+        flush:
+          timeout: 0s
+    logging:
+      level: info
+      selectors:
+        - '*' 
+`
+
+// monitors filebeat
+var beatMetricMonitoring = `
+  metricbeatreceiver/beat-metrics-monitoring:
+    metricbeat:
+      modules:
+      - failure_threshold: 5
+        hosts:
+          - http+{{ .SocketEndpoint }}
+        id: metrics-monitoring-filebeat
+        metricsets:
+          - stats
+        module: beat
+        enabled: true 
+        namespace: agent
+        period: 60s
+        processors:
+            - add_fields:
+                fields:
+                    dataset: elastic_agent.filebeat
+                    namespace: default
+                    type: metrics
+                target: data_stream
+            - add_fields:
+                fields:
+                    dataset: elastic_agent.filebeat
+                target: event
+            - add_fields:
+                fields:
+                    stream_id: metrics-monitoring-filebeat
+                target: '@metadata'
+            - add_fields:
+                fields:
+                    id: f9787136-2d04-4999-a504-848c2e25d90e
+                    snapshot: false
+                    version: 9.0.0
+                target: elastic_agent
+            - add_fields:
+                fields:
+                    id: f9787136-2d04-4999-a504-848c2e25d90e
+                target: agent
+            - add_fields:
+                fields:
+                    dataset: elastic_agent.filebeat
+                    namespace: default
+                    type: metrics
+                target: data_stream
+            - add_fields:
+                fields:
+                    dataset: elastic_agent.filebeat
+                target: event
+            - add_fields:
+                fields:
+                    id: f9787136-2d04-4999-a504-848c2e25d90e
+                    process: filebeat
+                    snapshot: false
+                    version: 9.0.0
+                target: elastic_agent
+            - add_fields:
+                fields:
+                    id: f9787136-2d04-4999-a504-848c2e25d90e
+                target: agent
+            - add_fields:
+                fields:
+                    binary: filebeat
+                    id: filestream-monitoring
                 target: component
     output:
       otelconsumer:
