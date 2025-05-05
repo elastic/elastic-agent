@@ -917,7 +917,7 @@ exporters:
     batcher:
       enabled: true
       flush_timeout: 1s
-      min_size_items: {{.MinItems}}
+      min_size: {{.MinItems}}
     mapping:
       mode: bodymap
 service:
@@ -1337,7 +1337,7 @@ exporters:
     batcher:
       enabled: true
       flush_timeout: 1s
-      min_size_items: {{.MinItems}}
+      min_size: {{.MinItems}}
     mapping:
       mode: bodymap
 service:
