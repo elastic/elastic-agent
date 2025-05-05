@@ -481,7 +481,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	key, _ := cmd.Flags().GetString("elastic-agent-cert-key")
 	keyPassphrase, _ := cmd.Flags().GetString("elastic-agent-cert-key-passphrase")
 
-	ctx := handelSignal(context.Background())
+	ctx := handleSignal(context.Background())
 
 	if enrollTimeout > 0 {
 		eCtx, cancel := context.WithTimeout(ctx, enrollTimeout)
