@@ -1,0 +1,74 @@
+// begin 9.0.1 relnotes
+
+[[release-notes-9.0.1]]
+==  9.0.1
+
+Review important information about the  9.0.1 release.
+
+
+
+[discrete]
+[[breaking-changes-9.0.1]]
+=== Breaking changes
+
+Breaking changes can prevent your application from optimal operation and
+performance. Before you upgrade, review the breaking changes, then mitigate the
+impact to your application.
+
+// TODO: add details and impact
+
+elastic-agent::
+
+[discrete]
+[[breaking-https://github.com/elastic/elastic-agent/pull/7894]]
+.[Otel] Disable Process Scraper Of Hostmetrics Receiver. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7894[#https://github.com/elastic/elastic-agent/pull/7894] 
+[%collapsible]
+====
+The process scraper collects metrics for all available processes of a host without an easy way to limit
+this to only report top N process for example. This results in quite big amount of timeseries.
+Since this is not quite critical for any of the available UIs or dashboards we decide to disable
+it temporarily until we find a better solution. Users that specifically need these metrics
+can also enable it back manually.
+Related to https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/39423.
+
+====
+
+
+
+
+
+[discrete]
+[[new-features-9.0.1]]
+=== New features
+
+The 9.0.1 release adds the following new and notable features.
+
+
+elastic-agent::
+
+* Add Nopexporter To Edot Collector.  
+* Set Collectors Fullnameoverride For Edot Kube-Stack Values. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7754[#https://github.com/elastic/elastic-agent/pull/7754] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/7381[#https://github.com/elastic/elastic-agent/issues/7381]
+
+
+[discrete]
+[[enhancements-9.0.1]]
+=== Enhancements
+
+
+elastic-agent::
+
+* Update Otel Components To V0.121.0.  
+
+
+
+
+[discrete]
+[[bug-fixes-9.0.1]]
+=== Bug fixes
+
+
+elastic-agent::
+
+* Fix Managed Otlp Helm Config To Use Current Image Repo.  
+
+// end 9.0.1 relnotes
