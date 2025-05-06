@@ -40,11 +40,11 @@ func TestStandaloneUpgrade(t *testing.T) {
 			unprivilegedAvailable = true
 		}
 		t.Run(fmt.Sprintf("Upgrade %s to %s (privileged)", startVersion, define.Version()), func(t *testing.T) {
-			testStandaloneUpgradeSucceeded(t, startVersion, define.Version(), atesting.ArtifactFetcher(), upgradetest.WithUnprivileged(false))
+			testStandaloneUpgrade(t, startVersion, define.Version(), atesting.ArtifactFetcher(), upgradetest.WithUnprivileged(false))
 		})
 		if unprivilegedAvailable {
 			t.Run(fmt.Sprintf("Upgrade %s to %s (unprivileged)", startVersion, define.Version()), func(t *testing.T) {
-				testStandaloneUpgradeSucceeded(t, startVersion, define.Version(), atesting.ArtifactFetcher(), upgradetest.WithUnprivileged(true))
+				testStandaloneUpgrade(t, startVersion, define.Version(), atesting.ArtifactFetcher(), upgradetest.WithUnprivileged(true))
 			})
 		}
 	}
