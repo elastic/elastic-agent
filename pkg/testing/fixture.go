@@ -214,10 +214,19 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	}
 	f.srcPackage = src
 	filename := filepath.Base(src)
+
+	// Determine name of extracted Agent artifact directory from
+	// the artifact filename.
 	name, _, err := splitFileType(filename)
 	if err != nil {
 		return err
 	}
+
+	// If the name has "-fips" in it, remove that part because
+	// the extracted directory does not have that in it, even though
+	// the artifact filename does.
+	name = strings.Replace(name, "-fips", "", 1)
+
 	extractDir := createTempDir(f.t)
 	finalDir := filepath.Join(extractDir, name)
 	err = ExtractArtifact(f.t, src, extractDir)
