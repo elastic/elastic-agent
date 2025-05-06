@@ -558,7 +558,7 @@ RETRYLOOP:
 			c.log.Warnf("Error detected: %s, will retry in a moment.", err.Error())
 		}
 		if !backExp.Wait() {
-			break
+			break RETRYLOOP
 		}
 		c.log.Infof("Retrying enrollment to URL: %s", c.client.URI())
 		err = c.enroll(ctx, persistentConfig)
