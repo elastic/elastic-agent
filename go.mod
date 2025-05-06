@@ -1,10 +1,6 @@
 module github.com/elastic/elastic-agent
 
-<<<<<<< HEAD
-go 1.23.8
-=======
 go 1.24.2
->>>>>>> 17f03a30d ([Automation] Bump Golang version to 1.24.2 (#7736))
 
 require (
 	github.com/Jeffail/gabs/v2 v2.6.0
