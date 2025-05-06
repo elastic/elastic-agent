@@ -2064,7 +2064,7 @@ service:
 
 		for _, mset := range metricsets {
 			require.Greater(t, len(agentDocs[mset].Hits.Hits), 0, "expected to find agent documents for metricset %s", mset)
-			require.Greater(t, len(otelDocs[mset].Hits.Hits), 0, "expected to find otel documents metricset %s", mset)
+			require.Greater(t, len(otelDocs[mset].Hits.Hits), 0, "expected to find otel documents for metricset %s", mset)
 
 			agent := agentDocs[mset].Hits.Hits[0].Source
 			otel := otelDocs[mset].Hits.Hits[0].Source
@@ -2076,6 +2076,7 @@ service:
 				"agent.version",
 				"data_stream.namespace",
 				"event.duration",
+				"beat.elasticsearch.cluster.id",
 
 				// elastic_agent * fields are hardcoded in processor list for now which is why they differ
 				"elastic_agent.id",

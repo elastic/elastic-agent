@@ -1658,7 +1658,7 @@ func AssertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg 
 		flatM1.Delete(f)
 		flatM2.Delete(f)
 	}
-	require.Equal(t, "", cmp.Diff(flatM1, flatM2), "expected maps to be equal")
+	assert.Equal(t, "", cmp.Diff(flatM1, flatM2), "expected maps to be equal: "+msg)
 }
 
 func TestFBOtelRestartE2E(t *testing.T) {
