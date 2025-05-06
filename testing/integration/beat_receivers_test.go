@@ -268,7 +268,7 @@ func TestAgentMonitoring(t *testing.T) {
 		require.NoError(t, err, "error configuring fixture")
 
 		output, err := fixture.InstallWithoutEnroll(ctx, &installOpts)
-		require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
+		require.NoErrorf(t, err, "error install without enroll: %s\ncombinedoutput:\n%s", err, string(output))
 
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
 			status, statusErr := fixture.ExecStatus(ctx)
