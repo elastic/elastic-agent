@@ -128,8 +128,7 @@ inputs:
 # agent.upgrade
 #   # rollback settings
 #   rollback:
-#       # duration in which an upgraded Agent may be asked to rollback to
-#       # the previous version of Agent on disk.
+#       # duration in which an upgraded Agent may be manually rolled back.
 #       window: 168h
 
 # agent.process:
