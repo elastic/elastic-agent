@@ -110,17 +110,12 @@ func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool,
 
 	// Start at the build version as we want to test the retry
 	// logic that is in the build.
-	fixtureOpts := make([]atesting.FixtureOpt, 0)
-	if fips {
-		fixtureOpts = append(fixtureOpts, atesting.WithFetcher())
-	}
-
 	var startFixture *testing.Fixture
 	var err error
 	if fips {
-		startFixture, err = define.NewFixtureFromLocalFIPSBuild(t, define.Version(), fixtureOpts...)
+		startFixture, err = define.NewFixtureFromLocalFIPSBuild(t, define.Version())
 	} else {
-		startFixture, err = define.NewFixtureFromLocalBuild(t, define.Version(), fixtureOpts...)
+		startFixture, err = define.NewFixtureFromLocalBuild(t, define.Version())
 	}
 	require.NoError(t, err)
 	err = startFixture.Prepare(ctx)
