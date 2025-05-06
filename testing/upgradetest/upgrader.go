@@ -55,7 +55,7 @@ type UpgradeOpts struct {
 	postInstallHook        func() error
 	preUpgradeHook         func() error
 	postUpgradeHook        func() error
-	postWatcherSuccessHook func(context.Context, *atesting.Fixture) error
+	PostWatcherSuccessHook func(context.Context, *atesting.Fixture) error
 }
 
 type UpgradeOpt func(opts *UpgradeOpts)
@@ -130,7 +130,7 @@ func WithPostUpgradeHook(hook func() error) UpgradeOpt {
 // and the upgrade watcher has terminated as well.
 func WithPostWatcherSuccessHook(hook func(context.Context, *atesting.Fixture) error) UpgradeOpt {
 	return func(opts *UpgradeOpts) {
-		opts.postWatcherSuccessHook = hook
+		opts.PostWatcherSuccessHook = hook
 	}
 }
 
@@ -444,8 +444,8 @@ func PerformUpgrade(
 		}
 	}
 
-	if upgradeOpts.postWatcherSuccessHook != nil {
-		if err := upgradeOpts.postWatcherSuccessHook(ctx, endFixture); err != nil {
+	if upgradeOpts.PostWatcherSuccessHook != nil {
+		if err := upgradeOpts.PostWatcherSuccessHook(ctx, endFixture); err != nil {
 			return fmt.Errorf("post watcher success hook failed: %w", err)
 		}
 	}

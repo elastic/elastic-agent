@@ -110,7 +110,7 @@ func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool,
 
 	// Start at the build version as we want to test the retry
 	// logic that is in the build.
-	var startFixture *testing.Fixture
+	var startFixture *atesting.Fixture
 	var err error
 	if fips {
 		startFixture, err = define.NewFixtureFromLocalFIPSBuild(t, define.Version())
@@ -521,10 +521,9 @@ func testUpgradeFleetManagedElasticAgent(
 	err = upgradetest.CheckHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary)
 	assert.NoError(t, err)
 
-	if upgradeOpts.postWatcherSuccessHook != nil {
-		if err := upgradeOpts.postWatcherSuccessHook(ctx, endFixture); err != nil {
-			return fmt.Errorf("post watcher success hook failed: %w", err)
-		}
+	if upgradeOpts.PostWatcherSuccessHook != nil {
+		err = upgradeOpts.PostWatcherSuccessHook(ctx, endFixture)
+		require.NoError(t, err)
 	}
 }
 
