@@ -151,7 +151,7 @@ func getTestList(infoNamespace string) []test {
 		{
 			dsType:      "metrics",
 			dsDataset:   "elastic_agent.metricbeat",
-			dsNamespace: infoNamespace
+			dsNamespace: infoNamespace,
 			query: map[string]any{
 				"component.id": "http/metrics-monitoring",
 			},
