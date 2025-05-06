@@ -22,6 +22,12 @@ if [ "$TEST_SUDO" == "true" ]; then
   source .buildkite/hooks/pre-command || echo "No pre-command hook found"
 fi
 
+INTEGRATION_TEST_ARGS="-integration.groups=${GROUP_NAME} -integration.sudo=${TEST_SUDO}"
+if [[ "${FIPS:-false}" == "true" ]]; then
+    echo "FIPS testing detected"
+    INTEGRATION_TEST_ARGS+=" -integration.fips=true"
+fi
+
 # Make sure that all tools are installed
 asdf install
 
@@ -51,7 +57,16 @@ outputJSON="build/${fully_qualified_group_name}.integration.out.json"
 echo "~~~ Integration tests: ${GROUP_NAME}"
 
 set +e
-TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args -integration.groups="${GROUP_NAME}" -integration.sudo="${TEST_SUDO}"
+TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true \
+  gotestsum --no-color -f standard-quiet \
+  --junitfile "${outputXML}" \
+  --jsonfile "${outputJSON}" \
+  -- \
+    -tags integration -test.shuffle on -test.timeout 2h0m0s \
+    github.com/elastic/elastic-agent/testing/integration \
+    -v \
+    -args "${INTEGRATION_TEST_ARGS}"
+
 TESTS_EXIT_STATUS=$?
 set -e
 
