@@ -391,7 +391,7 @@ func ensureServiceToken(streams *cli.IOStreams, cfg *setupConfig) error {
 	if err != nil {
 		return err
 	}
-	code, r, err := client.Connection.Request("POST", "/api/fleet/service_tokens", nil, nil, nil)
+	code, r, err := client.Request("POST", "/api/fleet/service_tokens", nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("request to get security token from Kibana failed: %w", err)
 	}
@@ -698,14 +698,14 @@ func isTrue(val string) bool {
 func performGET(cfg setupConfig, client *kibana.Client, path string, response interface{}, writer io.Writer, msg string) error {
 	var lastErr error
 	for i := 0; i < cfg.Kibana.RetryMaxCount; i++ {
-		code, result, err := client.Connection.Request("GET", path, nil, nil, nil)
+		code, result, err := client.Request("GET", path, nil, nil, nil)
 		if err != nil || code != 200 {
 			if err != nil {
 				err = fmt.Errorf("http GET request to %s%s fails: %w. Response: %s",
-					client.Connection.URL, path, err, truncateString(result))
+					client.URL, path, err, truncateString(result))
 			} else {
 				err = fmt.Errorf("http GET request to %s%s fails. StatusCode: %d Response: %s",
-					client.Connection.URL, path, code, truncateString(result))
+					client.URL, path, code, truncateString(result))
 			}
 			fmt.Fprintf(writer, "%s failed: %s\n", msg, err)
 			<-time.After(cfg.Kibana.RetrySleepDuration)
@@ -726,7 +726,7 @@ func truncateString(b []byte) string {
 		runes = append(runes[:maxLength], []rune("... (truncated)")...)
 	}
 
-	return strings.Replace(string(runes), "\n", " ", -1)
+	return strings.ReplaceAll(string(runes), "\n", " ")
 }
 
 // runLegacyAPMServer extracts the bundled apm-server from elastic-agent

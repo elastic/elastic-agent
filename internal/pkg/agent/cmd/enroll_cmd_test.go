@@ -57,10 +57,7 @@ func (m *mockStore) Save(in io.Reader) error {
 
 func TestEnroll(t *testing.T) {
 	testutils.InitStorage(t)
-	skipCreateSecret := false
-	if runtime.GOOS == "darwin" {
-		skipCreateSecret = true
-	}
+	skipCreateSecret := runtime.GOOS == "darwin"
 
 	log, _ := logger.New("tst", false)
 
