@@ -7,8 +7,6 @@
 package integration
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"testing"
 
@@ -33,6 +31,7 @@ func TestStandaloneUpgradeFIPStoFIPS(t *testing.T) {
 		OS: []define.OS{
 			{Type: define.Linux},
 		},
+		// FIPS: true // TODO: uncomment when https://github.com/elastic/elastic-agent/pull/8083 is merged
 	})
 
 	// parse the version we are testing
@@ -59,24 +58,7 @@ func TestStandaloneUpgradeFIPStoFIPS(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check that new (post-upgrade) Agent is also FIPS-capable
-	postWatcherSuccessHook := func(ctx context.Context, endFixture *atesting.Fixture) error {
-		client := endFixture.Client()
-		err := client.Connect(ctx)
-		if err != nil {
-			return err
-		}
-
-		ver, err := client.Version(ctx)
-		if err != nil {
-			return err
-		}
-
-		if !ver.Fips {
-			return errors.New("expected upgraded Agent to be FIPS-capable")
-		}
-
-		return nil
-	}
+	postWatcherSuccessHook := upgradetest.PostUpgradeAgentIsFIPSCapable
 
 	for _, startVersion := range versionList {
 		// We need to start the upgrade from a FIPS-capable version
