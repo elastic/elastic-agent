@@ -32,7 +32,7 @@ steps:
       - integration-fips-cloud-image
     env:
       ASDF_TERRAFORM_VERSION: 1.9.2
-      TF_VAR_integration_server_docker_image: "${CI_ELASTIC_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
+      TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
     command: |
       #!/usr/bin/env bash
       set -euo pipefail
