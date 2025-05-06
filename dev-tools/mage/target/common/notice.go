@@ -151,10 +151,7 @@ func Notice() (err error) {
 // Equivalent to running the following on the command line:
 // go list -deps -f "{{with .Module}}{{if not .Main}}{{.Path}}{{end}}{{end}}" -tags "linux,darwin,windows,{additionalTags...}"
 func getDependentModules(additionalTags ...string) ([]string, error) {
-	tags := []string{"linux", "darwin", "windows"}
-	if len(additionalTags) > 0 {
-		tags = append(tags, additionalTags...)
-	}
+	tags := []string{"linux", "darwin", "windows", additionalTags...}
 
 	cmdArgs := []string{
 		"list",
