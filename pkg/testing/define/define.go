@@ -83,31 +83,13 @@ func Version() string {
 // NewFixtureFromLocalBuild returns a new Elastic Agent testing fixture with a LocalFetcher and
 // the agent logging to the test logger.
 func NewFixtureFromLocalBuild(t *testing.T, version string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
-	buildsDir := os.Getenv("AGENT_BUILD_DIR")
-	if buildsDir == "" {
-		projectDir, err := findProjectRoot()
-		if err != nil {
-			return nil, err
-		}
-		buildsDir = filepath.Join(projectDir, "build", "distributions")
-	}
-
-	return NewFixtureWithBinary(t, version, "elastic-agent", buildsDir, false, opts...)
+	return NewFixtureWithBinary(t, version, "elastic-agent", buildsDir(), false, opts...)
 }
 
 // NewFixtureFromLocalFIPSBuild returns a new FIPS-capable Elastic Agent testing fixture with a LocalFetcher
 // and the agent logging to the test logger.
 func NewFixtureFromLocalFIPSBuild(t *testing.T, version string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
-	buildsDir := os.Getenv("AGENT_BUILD_DIR")
-	if buildsDir == "" {
-		projectDir, err := findProjectRoot()
-		if err != nil {
-			return nil, err
-		}
-		buildsDir = filepath.Join(projectDir, "build", "distributions")
-	}
-
-	return NewFixtureWithBinary(t, version, "elastic-agent", buildsDir, true, opts...)
+	return NewFixtureWithBinary(t, version, "elastic-agent", buildsDir(), true, opts...)
 }
 
 // NewFixtureWithBinary returns a new Elastic Agent testing fixture with a LocalFetcher and
@@ -316,4 +298,17 @@ func getKibanaClient() (*kibana.Client, error) {
 		return nil, fmt.Errorf("failed to create kibana client: %w", err)
 	}
 	return c, nil
+}
+
+func buildsDir() string {
+	buildsDir := os.Getenv("AGENT_BUILD_DIR")
+	if buildsDir == "" {
+		projectDir, err := findProjectRoot()
+		if err != nil {
+			return nil, err
+		}
+		buildsDir = filepath.Join(projectDir, "build", "distributions")
+	}
+
+	return buildsDir
 }
