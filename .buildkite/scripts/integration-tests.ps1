@@ -9,6 +9,8 @@ $PSVersionTable.PSVersion
 
 . "$PWD\.buildkite\scripts\steps\ess.ps1"
 
+# TODO: make is not available on Windows yet
+#       hence we cannot use make install-gotestsum
 go install gotest.tools/gotestsum
 gotestsum --version
 
