@@ -18,7 +18,7 @@ summary: Adds a new configuration setting, `agent.upgrade.rollback.window`
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
 description: |
   The value of the `agent.upgrade.rollback.window` setting determines the period after upgrading
-  Elastic Agent when a rollback to the previous version can be requested. This is an optional
+  Elastic Agent when a rollback to the previous version can be triggered. This is an optional
   setting, with a default value of `168h` (7 days). The value can be any string that is parseable
   by https://pkg.go.dev/time#ParseDuration.
 
