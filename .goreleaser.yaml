@@ -3,7 +3,7 @@
 
 # The lines below are called `modelines`. See `:help modeline`
 # Feel free to remove those if you don't want/need to use them.
-# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# yaml-language-server: $schema=https://goreleaser.com/static/schema-pro.json
 # vim: set ts=2 sw=2 tw=0 fo=cnqoj
 
 version: 2
@@ -101,19 +101,20 @@ archives:
 #        dst: .elastic-agent.active.commit
       - src: dev-tools/licenses/ELASTIC-LICENSE-2.0.txt
         dst: "LICENSE.txt"
-      - "NOTICE.txt"
+      - src: "NOTICE.txt"
       - src: dev-tools/packaging/files/linux/otelcol.sh
         dst: "data/elastic-agent-{{ slice .ShortCommit 0 6 }}/otelcol"
       - src: dev-tools/packaging/files/linux/otelcol.sh
         dst: "otelcol"
-      - elastic-agent.reference.yml
-      - elastic-agent.yml
-      - otel.yml
+      - src: elastic-agent.reference.yml
+      - dst: elastic-agent.yml
+      - src: otel.yml
+        dst: otel.yml
       - src: 'internal/pkg/otel/samples/linux/*'
         dst: otel_samples
-# Only available in GoReleaser Pro
+# Only available in GoReleaser Pro (doesn't render yet though)
 #    templated_files:
-#      - src: "README.md.tmpl"
+#      - src: "dev-tools/packaging/templates/common/README.md.tmpl"
 #        dst: README.md
 release:
   footer: >-

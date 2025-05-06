@@ -202,6 +202,7 @@ func (GoReleaser) Build() error {
 		"-v", ".:/src",
 		fmt.Sprintf("%s:%s", goReleaserCrossbuilderImageName, goVersion),
 		// GoReleaser args
+		"--verbose",
 		"--clean",
 		"--snapshot",
 		"build",
@@ -220,6 +221,7 @@ func (GoReleaser) Package() error {
 		"-v", ".:/src",
 		fmt.Sprintf("%s:%s", goReleaserCrossbuilderImageName, goVersion),
 		// GoReleaser args
+		"--verbose",
 		"--clean",
 		"--snapshot",
 		"release",
