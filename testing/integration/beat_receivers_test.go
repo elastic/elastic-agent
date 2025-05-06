@@ -1925,13 +1925,10 @@ receivers:
       selectors:
         - '*'
     processors:
-      - add_host_metadata:
-          when:
-            not:
-              contains:
-                tags: forwarded
+      - add_host_metadata: ~
       - add_docker_metadata: ~
       - add_kubernetes_metadata: ~
+      - add_cloud_metadata: ~
 exporters:
   debug:
     use_internal_logger: false
