@@ -92,7 +92,7 @@ func TestOtelFileProcessing(t *testing.T) {
 		InputPath  string
 		OutputPath string
 	}
-	otelConfigTemplate, err := os.ReadFile(filepath.Join("testdata", "templates", "filebeat-otel.tmpl"))
+	otelConfigTemplate, err := os.ReadFile(filepath.Join("testdata", "templates", "filelog-otel.tmpl"))
 	require.NoError(t, err)
 	otelConfigPath := filepath.Join(tmpDir, "otel.yml")
 	var otelConfigBuffer bytes.Buffer
@@ -205,7 +205,7 @@ func TestOtelHybridFileProcessing(t *testing.T) {
 		InputPath  string
 		OutputPath string
 	}
-	otelConfigTemplate, err := os.ReadFile(filepath.Join("testdata", "templates", "filebeat-otel.tmpl"))
+	otelConfigTemplate, err := os.ReadFile(filepath.Join("testdata", "templates", "filelog-otel.tmpl"))
 	require.NoError(t, err)
 	var otelConfigBuffer bytes.Buffer
 	require.NoError(t,
