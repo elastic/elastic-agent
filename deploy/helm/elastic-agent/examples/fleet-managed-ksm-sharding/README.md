@@ -22,7 +22,7 @@ In this example we will perform two Helm chart installations, one installing ela
       --set kubernetes.state.agentAsSidecar.enabled=true \
       -n kube-system
     ```
-3. In the associated policy from the previous steps install the Kubernetes integration and **enable only** the "Collect Kubernetes metrics from kube-state-metrics". Update the `Host` destination in all data streams to `localhost:8080` instead of the default `kube-state-metrics:8080`.
+3. In the associated policy from the previous steps install the Kubernetes integration and **enable only** the "Collect Kubernetes metrics from kube-state-metrics" input. For all associated data streams, update the **Host** destination to `localhost:8080` (instead of the default `kube-state-metrics:8080`), and disable the **Leader Election** option.
 4. Follow again [this guide](https://www.elastic.co/guide/en/fleet/current/install-fleet-managed-elastic-agent.html#elastic-agent-installation-steps) to set up a different agent policy and enroll an agent to it. Extract again the Fleet URL (`--url=$NEW_FLEET_URL`) and Enrollment token (`--enrollment-token=$NEW_FLEET_TOKEN`).
 5. Install elastic-agent as a Daemonset without kube-state-metrics.
     ```console
