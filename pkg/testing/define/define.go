@@ -18,6 +18,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/gofrs/uuid/v5"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -83,13 +85,13 @@ func Version() string {
 // NewFixtureFromLocalBuild returns a new Elastic Agent testing fixture with a LocalFetcher and
 // the agent logging to the test logger.
 func NewFixtureFromLocalBuild(t *testing.T, version string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
-	return NewFixtureWithBinary(t, version, "elastic-agent", buildsDir(), false, opts...)
+	return NewFixtureWithBinary(t, version, "elastic-agent", buildsDir(t), false, opts...)
 }
 
 // NewFixtureFromLocalFIPSBuild returns a new FIPS-capable Elastic Agent testing fixture with a LocalFetcher
 // and the agent logging to the test logger.
 func NewFixtureFromLocalFIPSBuild(t *testing.T, version string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
-	return NewFixtureWithBinary(t, version, "elastic-agent", buildsDir(), true, opts...)
+	return NewFixtureWithBinary(t, version, "elastic-agent", buildsDir(t), true, opts...)
 }
 
 // NewFixtureWithBinary returns a new Elastic Agent testing fixture with a LocalFetcher and
@@ -300,13 +302,13 @@ func getKibanaClient() (*kibana.Client, error) {
 	return c, nil
 }
 
-func buildsDir() string {
+func buildsDir(t *testing.T) string {
+	t.Helper()
+
 	buildsDir := os.Getenv("AGENT_BUILD_DIR")
 	if buildsDir == "" {
 		projectDir, err := findProjectRoot()
-		if err != nil {
-			return nil, err
-		}
+		require.NoError(t, err)
 		buildsDir = filepath.Join(projectDir, "build", "distributions")
 	}
 
