@@ -51,7 +51,7 @@ func TestFleetManagedUpgradeUnprivileged(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
-	testFleetManagedUpgrade(t, info, true)
+	testFleetManagedUpgrade(t, info, true, false)
 }
 
 // TestFleetManagedUpgradePrivileged tests that the build under test can retrieve an action from
@@ -65,16 +65,63 @@ func TestFleetManagedUpgradePrivileged(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
-	testFleetManagedUpgrade(t, info, false)
+	testFleetManagedUpgrade(t, info, false, false)
 }
 
-func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool) {
+// TestFleetManagedUpgradeUnprivilegedFIPS tests that the build under test can retrieve an action from
+// Fleet and perform the upgrade as an unprivileged FIPS-capable Elastic Agent. It does not need to test
+// all the combinations of versions as the standalone tests already perform those tests and
+// would be redundant.
+func TestFleetManagedUpgradeUnprivilegedFIPS(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Fleet,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+		// FIPS: true // TODO: uncomment when https://github.com/elastic/elastic-agent/pull/8083 is merged
+	})
+	postWatcherSuccessHook := upgradetest.PostUpgradeAgentIsFIPSCapable
+	upgradeOpts := []upgradetest.UpgradeOpt{upgradetest.WithPostWatcherSuccessHook(postWatcherSuccessHook)}
+	testFleetManagedUpgrade(t, info, true, true, upgradeOpts...)
+}
+
+// TestFleetManagedUpgradePrivileged tests that the build under test can retrieve an action from
+// Fleet and perform the upgrade as a privileged FIPS-capable Elastic Agent. It does not need to test all
+// the combinations of  versions as the standalone tests already perform those tests and
+// would be redundant.
+func TestFleetManagedUpgradePrivilegedFIPS(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: FleetPrivileged,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+		// FIPS: true // TODO: uncomment when https://github.com/elastic/elastic-agent/pull/8083 is merged
+	})
+
+	// Check that new (post-upgrade) Agent is also FIPS-capable
+	postWatcherSuccessHook := upgradetest.PostUpgradeAgentIsFIPSCapable
+	upgradeOpts := []upgradetest.UpgradeOpt{upgradetest.WithPostWatcherSuccessHook(postWatcherSuccessHook)}
+	testFleetManagedUpgrade(t, info, false, true, upgradeOpts...)
+}
+
+func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool, fips bool, upgradeOpts ...upgradetest.UpgradeOpts) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
 	// Start at the build version as we want to test the retry
 	// logic that is in the build.
-	startFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	fixtureOpts := make([]atesting.FixtureOpt, 0)
+	if fips {
+		fixtureOpts = append(fixtureOpts, atesting.WithFetcher())
+	}
+
+	var startFixture *testing.Fixture
+	var err error
+	if fips {
+		startFixture, err = define.NewFixtureFromLocalFIPSBuild(t, define.Version(), fixtureOpts...)
+	} else {
+		startFixture, err = define.NewFixtureFromLocalBuild(t, define.Version(), fixtureOpts...)
+	}
 	require.NoError(t, err)
 	err = startFixture.Prepare(ctx)
 	require.NoError(t, err)
@@ -105,7 +152,7 @@ func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool)
 	t.Logf("Testing Elastic Agent upgrade from %s to %s with Fleet...",
 		define.Version(), endVersionInfo.Binary.String())
 
-	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture, defaultPolicy(), unprivileged)
+	testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture, defaultPolicy(), unprivileged, upgradeOpts...)
 }
 
 func TestFleetAirGappedUpgradeUnprivileged(t *testing.T) {
@@ -348,7 +395,15 @@ func testUpgradeFleetManagedElasticAgent(
 	startFixture *atesting.Fixture,
 	endFixture *atesting.Fixture,
 	policy kibana.AgentPolicy,
-	unprivileged bool) {
+	unprivileged bool,
+	opts ...upgradetest.UpgradeOpt,
+) {
+
+	// use the passed in options to perform the upgrade
+	var upgradeOpts upgradetest.UpgradeOpts
+	for _, o := range opts {
+		o(&upgradeOpts)
+	}
 
 	kibClient := info.KibanaClient
 
@@ -470,6 +525,12 @@ func testUpgradeFleetManagedElasticAgent(
 	// version, otherwise it's possible that it was rolled back to the original version
 	err = upgradetest.CheckHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary)
 	assert.NoError(t, err)
+
+	if upgradeOpts.postWatcherSuccessHook != nil {
+		if err := upgradeOpts.postWatcherSuccessHook(ctx, endFixture); err != nil {
+			return fmt.Errorf("post watcher success hook failed: %w", err)
+		}
+	}
 }
 
 func defaultPolicy() kibana.AgentPolicy {
