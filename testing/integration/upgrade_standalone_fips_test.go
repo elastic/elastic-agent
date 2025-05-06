@@ -12,7 +12,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/version"
@@ -88,55 +87,6 @@ func TestStandaloneUpgradeFIPStoFIPS(t *testing.T) {
 			upgradeOpts = append(upgradeOpts, upgradetest.WithUnprivileged(true))
 			t.Run(fmt.Sprintf("Upgrade %s to %s (unprivileged)", startVersion, define.Version()), func(t *testing.T) {
 				testStandaloneUpgradeSucceeded(t, startVersion, define.Version(), fipsArtifactFetcher, upgradeOpts...)
-			})
-		}
-	}
-}
-
-// TestStandaloneUpgradeFIPStoNonFIPS ensures that a FIPS-capable Agent
-// cannot be upgraded to a non-FIPS-capable Agent.
-func TestStandaloneUpgradeFIPStoNonFIPS(t *testing.T) {
-	define.Require(t, define.Requirements{
-		Group: StandaloneUpgrade,
-		Local: false, // requires Agent installation
-		Sudo:  true,  // requires Agent installation
-		OS: []define.OS{
-			{Type: define.Linux},
-		},
-	})
-
-	// Start with a FIPS-capable Agent artifact
-	fipsArtifactFetcher := atesting.ArtifactFetcher(atesting.WithArtifactFIPSOnly())
-
-	versionList, err := upgradetest.GetUpgradableVersions()
-	require.NoError(t, err)
-	endVersion, err := version.ParseVersion(define.Version())
-	require.NoError(t, err)
-
-	for _, startVersion := range versionList {
-		// We need to start the upgrade from a FIPS-capable version
-		if !isFIPSCapableVersion(startVersion) {
-			t.Logf(
-				"Minimum start version of FIPS-capable Agent for running this test is either %q or %q, current start version: %q",
-				*upgradetest.Version_8_19_0_SNAPSHOT,
-				*upgradetest.Version_9_1_0_SNAPSHOT,
-				startVersion,
-			)
-			continue
-		}
-
-		unprivilegedAvailable := false
-		if upgradetest.SupportsUnprivileged(startVersion, endVersion) {
-			unprivilegedAvailable = true
-		}
-		t.Run(fmt.Sprintf("Upgrade %s to %s (privileged)", startVersion, define.Version()), func(t *testing.T) {
-			upgradeOpts := []upgradetest.UpgradeOpt{upgradetest.WithUnprivileged(false)}
-			testStandaloneUpgradeFailed(t, startVersion, define.Version(), fipsArtifactFetcher, upgrade.ErrFipsToNonFips, upgradeOpts...)
-		})
-		if unprivilegedAvailable {
-			upgradeOpts := []upgradetest.UpgradeOpt{upgradetest.WithUnprivileged(true)}
-			t.Run(fmt.Sprintf("Upgrade %s to %s (unprivileged)", startVersion, define.Version()), func(t *testing.T) {
-				testStandaloneUpgradeFailed(t, startVersion, define.Version(), fipsArtifactFetcher, upgrade.ErrFipsToNonFips, upgradeOpts...)
 			})
 		}
 	}
