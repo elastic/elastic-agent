@@ -293,10 +293,8 @@ func TestAgentMonitoring(t *testing.T) {
 			assert.Contains(collect, pipelineStatusMap, httpMetricsPipeline)
 			assert.Contains(collect, pipelineStatusMap, beatsMetricsPipeline)
 
-			// and they should be healthy
-			assert.Equal(collect, int(cproto.CollectorComponentStatus_StatusOK), pipelineStatusMap[fileStreamPipeline].Status)
-			assert.Equal(collect, int(cproto.CollectorComponentStatus_StatusOK), pipelineStatusMap[httpMetricsPipeline].Status)
-			assert.Equal(collect, int(cproto.CollectorComponentStatus_StatusOK), pipelineStatusMap[beatsMetricsPipeline].Status)
+			// and all the components should be healthy
+			assertCollectorComponentsHealthy(collect, otelCollectorStatus)
 
 			return
 		}, 1*time.Minute, 1*time.Second)
@@ -356,4 +354,12 @@ func TestAgentMonitoring(t *testing.T) {
 		AssertMapsEqual(t, agent, otel, ignoredFields, "expected documents to be equal")
 	})
 
+}
+
+func assertCollectorComponentsHealthy(t *assert.CollectT, status *atesting.AgentStatusCollectorOutput) {
+	assert.Equal(t, int(cproto.CollectorComponentStatus_StatusOK), status.Status, "component status should be ok")
+	assert.Equal(t, "", status.Error, "component status should not have an error")
+	for _, componentStatus := range status.ComponentStatusMap {
+		assertCollectorComponentsHealthy(t, componentStatus)
+	}
 }
