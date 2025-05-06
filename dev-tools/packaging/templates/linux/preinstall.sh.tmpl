@@ -4,54 +4,56 @@ set -e
 
 endpoint_active=false
 
-if systemctl --quiet is-active ElasticEndpoint; then
-    endpoint_active=true
-    cleanup_state=$(mktemp)
-    temp_vault=$(mktemp -d)
+handle_endpoint() {
+	if systemctl --quiet is-active ElasticEndpoint; then
+		endpoint_active=true
+		cleanup_state=$(mktemp)
+		temp_vault=$(mktemp -d)
 
-    cleanup() {
-        rm -f "$cleanup_state"
-        rm -rf "$temp_vault"
-    }
+		cleanup() {
+			rm -f "$cleanup_state"
+			rm -rf "$temp_vault"
+		}
 
-    # restore endpoint and vault if installation fails
-    restore_endpoint() {
-        if [ -f "$cleanup_state" ]; then
-            # Check if we need to restore the vault
-            if grep -q "vault_removed" "$cleanup_state"; then
-                echo "Installation failed, restoring vault directory"
-                if [ -d "$temp_vault/vault" ]; then
-                    mkdir -p "/opt/Elastic/Endpoint/state"
-                    cp -r "$temp_vault/vault" "/opt/Elastic/Endpoint/state/"
-                fi
-            fi
-            # Check if we need to restart the service
-            if grep -q "stopped" "$cleanup_state"; then
-                echo "Installation failed, restarting ElasticEndpoint"
-                systemctl --quiet start ElasticEndpoint
-            fi
-            rm -f "$cleanup_state"
-        fi
-    }
+		# restore endpoint and vault if installation fails
+		restore_endpoint() {
+			if [ -f "$cleanup_state" ]; then
+				# Check if we need to restore the vault
+				if grep -q "vault_removed" "$cleanup_state"; then
+					echo "Installation failed, restoring vault directory"
+					if [ -d "$temp_vault/vault" ]; then
+						mkdir -p "/opt/Elastic/Endpoint/state"
+						cp -r "$temp_vault/vault" "/opt/Elastic/Endpoint/state/"
+					fi
+				fi
+				# Check if we need to restart the service
+				if grep -q "stopped" "$cleanup_state"; then
+					echo "Installation failed, restarting ElasticEndpoint"
+					systemctl --quiet start ElasticEndpoint
+				fi
+				rm -f "$cleanup_state"
+			fi
+		}
 
-    trap cleanup EXIT
-    trap restore_endpoint ERR
+		trap cleanup EXIT
+		trap restore_endpoint ERR
 
-    echo "stopping ElasticEndpoint service"
-    systemctl --quiet stop ElasticEndpoint
-    echo "stopped" > "$cleanup_state"
+		echo "stopping ElasticEndpoint service"
+		systemctl --quiet stop ElasticEndpoint
+		echo "stopped" >"$cleanup_state"
 
-    # Back up and remove the vault directory if it exists
-    if [ -d "/opt/Elastic/Endpoint/state/vault" ]; then
-        echo "backing up Endpoint vault directory"
-        cp -r "/opt/Elastic/Endpoint/state/vault" "$temp_vault/"
+		# Back up and remove the vault directory if it exists
+		if [ -d "/opt/Elastic/Endpoint/state/vault" ]; then
+			echo "backing up Endpoint vault directory"
+			cp -r "/opt/Elastic/Endpoint/state/vault" "$temp_vault/"
 
-        echo "removing Endpoint vault directory"
-        rm -rf "/opt/Elastic/Endpoint/state/vault"
+			echo "removing Endpoint vault directory"
+			rm -rf "/opt/Elastic/Endpoint/state/vault"
 
-        echo "vault_removed" >> "$cleanup_state"
-    fi
-fi
+			echo "vault_removed" >>"$cleanup_state"
+		fi
+	fi
+}
 
 commit_hash="{{ commit_short }}"
 version_dir="{{agent_package_version}}{{snapshot_suffix}}"
@@ -60,30 +62,33 @@ flavor_file="/var/lib/elastic-agent/.flavor"
 new_agent_dir="/var/lib/elastic-agent/data/elastic-agent-$version_dir-$commit_hash"
 old_agent_dir=""
 
+echo "NEW AGENT DIR $new_agent_dir"
+
 # upon upgrade we migrate the current symlink to an upgrade symlink as the previous
 # installed version will remove the symlink
 if test -L "$symlink"; then
-    resolved_symlink="$(readlink -- "$symlink")"
-    if ! [ -z "$resolved_symlink" ]; then
-        old_agent_dir="$( dirname "$resolved_symlink" )"
-        echo "previous installation directory $old_agent_dir"
-    else
-        echo "unable to read existing symlink"
-    fi
+	resolved_symlink="$(readlink -- "$symlink")"
+	if ! [ -z "$resolved_symlink" ]; then
+		old_agent_dir="$(dirname "$resolved_symlink")"
+    echo "OLD AGENT DIR $old_agent_dir"
+		echo "previous installation directory $old_agent_dir"
+	else
+		echo "unable to read existing symlink"
+	fi
 
-    # copy the state files if there was a previous agent install
-    if ! [ -z "$old_agent_dir" ] && ! [ "$old_agent_dir" -ef "$new_agent_dir" ]; then
-        yml_path="$old_agent_dir/state.yml"
-        enc_path="$old_agent_dir/state.enc"
-        echo "migrate state from $old_agent_dir to $new_agent_dir"
+	# copy the state files if there was a previous agent install
+	if ! [ -z "$old_agent_dir" ] && ! [ "$old_agent_dir" -ef "$new_agent_dir" ]; then
+		yml_path="$old_agent_dir/state.yml"
+		enc_path="$old_agent_dir/state.enc"
+		echo "migrate state from $old_agent_dir to $new_agent_dir"
 
-        if test -f "$yml_path"; then
-            echo "found "$yml_path", copy to "$new_agent_dir"."
-            mkdir -p "$new_agent_dir"
-            cp "$yml_path" "$new_agent_dir"
-        else
-            echo "didn't find $yml_path"
-        fi
+		if test -f "$yml_path"; then
+			echo "found "$yml_path", copy to "$new_agent_dir"."
+			mkdir -p "$new_agent_dir"
+			cp "$yml_path" "$new_agent_dir"
+		else
+			echo "didn't find $yml_path"
+		fi
 
         if test -f "$enc_path"; then
             echo "found "$enc_path", copy to "$new_agent_dir"."
@@ -104,7 +109,7 @@ if test -L "$symlink"; then
         fi
     fi
 else
-    echo "no previous installation found"
+	echo "no previous installation found"
 
     # create dir in case it does not exist
     mkdir -p "$new_agent_dir"
@@ -123,6 +128,12 @@ else
     fi
 fi
 
+echo "BEFORE ENDPOINT HANDLE"
+if ! [ -z "$old_agent_dir" ] && ! [ "$old_agent_dir" -ef "$new_agent_dir" ]; then
+  echo "HANDLING ENDPOINT"
+	handle_endpoint
+fi
+
 if [ "$endpoint_active" = true ]; then
-    trap - ERR
+	trap - ERR
 fi

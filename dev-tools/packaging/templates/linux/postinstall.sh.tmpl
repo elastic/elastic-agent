@@ -13,6 +13,23 @@ if test -L "$symlink"; then
     unlink "$symlink"
 fi
 
+SERVICE_NAME="ElasticEndpoint"
+
+echo "CHECKING IF ENDPOINT IS INSTALLED AND/OR ACTIVE"
+if systemctl list-unit-files --type=service | grep -q "^${SERVICE_NAME}.service"; then
+    # Service is present
+    if ! systemctl is-active --quiet "$SERVICE_NAME"; then
+        echo "$SERVICE_NAME is installed but not running"
+        echo "Starting $SERVICE_NAME"
+        sudo systemctl start ElasticEndpoint
+    else
+        echo "$SERVICE_NAME is running"
+    fi
+else
+    echo "$SERVICE_NAME is not installed"
+fi
+
+
 # create symlink to the new agent
 echo "create symlink "$symlink" to "$new_agent_dir/elastic-agent""
 ln -s "$new_agent_dir/elastic-agent" "$symlink"
