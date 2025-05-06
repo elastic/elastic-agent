@@ -177,7 +177,7 @@ func TestEnroll(t *testing.T) {
 				if err != nil {
 					return false
 				}
-				return host == cfg.Client.Host && "my-access-api-key" == cfg.AccessAPIKey
+				return cfg.Client.Host == host && cfg.AccessAPIKey == "my-access-api-key"
 			})).Return(nil).Once()
 
 			cmd, err := newEnrollCmd(
@@ -247,7 +247,7 @@ func TestEnroll(t *testing.T) {
 				if err != nil {
 					return false
 				}
-				return host == cfg.Client.Host && "my-access-api-key" == cfg.AccessAPIKey
+				return cfg.Client.Host == host && cfg.AccessAPIKey == "my-access-api-key"
 			})).Return(nil).Once()
 			cmd, err := newEnrollCmd(
 				log,
@@ -317,7 +317,7 @@ func TestEnroll(t *testing.T) {
 				if err != nil {
 					return false
 				}
-				return host == cfg.Client.Host && "my-access-api-key" == cfg.AccessAPIKey
+				return cfg.Client.Host == host && cfg.AccessAPIKey == "my-access-api-key"
 			})).Return(nil).Once()
 			cmd, err := newEnrollCmd(
 				log,
@@ -440,7 +440,7 @@ func TestEnroll(t *testing.T) {
 				if err != nil {
 					return false
 				}
-				return host == cfg.Client.Host && "my-access-api-key" == cfg.AccessAPIKey
+				return cfg.Client.Host == host && cfg.AccessAPIKey == "my-access-api-key"
 			})).Return(nil).Once()
 			cmd, err := newEnrollCmd(
 				log,
