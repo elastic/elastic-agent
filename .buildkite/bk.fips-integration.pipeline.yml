@@ -6,7 +6,7 @@ env:
   ASDF_MAGE_VERSION: 1.14.0
   FIPS: "true"
   CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
-  CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/observability-ci/elastic-agent-fips"
+  CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud"
 
   IMAGE_UBUNTU_FIPS: "platform-ingest-fleet-server-ubuntu-2204-fips" # image may only be in aws?
   IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1744855248"

@@ -72,7 +72,7 @@ if [[ "$BUILDKITE_STEP_KEY" == *"aggregate-reports"* ]]; then
   export BUILDKITE_ANALYTICS_TOKEN
 fi
 
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-binary-dra" ]]; then
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-binary-dra" || ("$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == "integration-fips-cloud-image") ]]; then
   if command -v docker &>/dev/null; then
     docker_login
   else
