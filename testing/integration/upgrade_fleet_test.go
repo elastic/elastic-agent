@@ -104,7 +104,7 @@ func TestFleetManagedUpgradePrivilegedFIPS(t *testing.T) {
 	testFleetManagedUpgrade(t, info, false, true, upgradeOpts...)
 }
 
-func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool, fips bool, upgradeOpts ...upgradetest.UpgradeOpts) {
+func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool, fips bool, upgradeOpts ...upgradetest.UpgradeOpt) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
