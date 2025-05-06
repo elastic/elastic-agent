@@ -50,17 +50,7 @@ func TestStandaloneUpgrade(t *testing.T) {
 	}
 }
 
-func testStandaloneUpgradeSucceeded(t *testing.T, startVersion *version.ParsedSemVer, endVersion string, fetcher atesting.Fetcher, upgradeOpts ...upgradetest.UpgradeOpt) {
-	assert.NoError(t, testStandaloneUpgrade(t, startVersion, endVersion, fetcher, upgradeOpts...))
-}
-
-func testStandaloneUpgradeFailed(t *testing.T, startVersion *version.ParsedSemVer, endVersion string, fetcher atesting.Fetcher, expectedErr error, upgradeOpts ...upgradetest.UpgradeOpt) {
-	err := testStandaloneUpgrade(t, startVersion, endVersion, fetcher, upgradeOpts...)
-	assert.NotNil(t, err)
-	assert.ErrorIs(t, err, expectedErr)
-}
-
-func testStandaloneUpgrade(t *testing.T, startVersion *version.ParsedSemVer, endVersion string, fetcher atesting.Fetcher, upgradeOpts ...upgradetest.UpgradeOpt) error {
+func testStandaloneUpgrade(t *testing.T, startVersion *version.ParsedSemVer, endVersion string, fetcher atesting.Fetcher, upgradeOpts ...upgradetest.UpgradeOpt) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
@@ -80,8 +70,9 @@ func testStandaloneUpgrade(t *testing.T, startVersion *version.ParsedSemVer, end
 	require.NoError(t, err)
 	if startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
 		t.Skipf("both start and end versions have the same hash %q, skipping...", startVersionInfo.Binary.Commit)
-		return nil
+		return
 	}
 
-	return upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradeOpts...)
+	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradeOpts...)
+	assert.NoError(t, err)
 }
