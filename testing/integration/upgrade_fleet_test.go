@@ -112,12 +112,16 @@ func TestFleetManagedUpgradePrivilegedFIPS(t *testing.T) {
 		Group: FleetPrivileged,
 		Stack: &define.Stack{},
 		OS: []define.OS{
-			define.Linux,
+			{Type: define.Linux},
 		},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 		FIPS:  true,
 	})
+
+	// parse the version we are testing
+	currentVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
 
 	// We need to start the upgrade from a FIPS-capable version
 	if !isFIPSCapableVersion(currentVersion) {
