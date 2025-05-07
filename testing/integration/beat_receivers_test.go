@@ -9,16 +9,10 @@ package integration
 import (
 	"bytes"
 	"context"
-	"fmt"
-	"io"
-	"net/http"
 	"testing"
 	"text/template"
 	"time"
 
-	"gopkg.in/yaml.v2"
-
-	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -123,61 +117,47 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
 		defer cancel()
 
-		// 1. Create and install policy with just monitoring
-		createPolicyReq := kibana.AgentPolicy{
-			Name:        fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String()),
-			Namespace:   info.Namespace,
-			Description: fmt.Sprintf("%s policy", t.Name()),
-			MonitoringEnabled: []kibana.MonitoringEnabledOption{
-				kibana.MonitoringEnabledLogs,
-				kibana.MonitoringEnabledMetrics,
-			},
+		type configOptions struct {
+			InputPath              string
+			ESEndpoint             string
+			ESApiKey               string
+			FilebeatSocketEndpoint string
+			MetricbeatBeatEndpoint string
+			MetricbeatHttpEndpoint string
+			Namespace              string
 		}
-		policyResponse, err := info.KibanaClient.CreatePolicy(ctx, createPolicyReq)
-		require.NoError(t, err, "error creating policy")
 
-		// 2. Download the policy, add the API key
-		downloadURL := fmt.Sprintf("/api/fleet/agent_policies/%s/download", policyResponse.ID)
-		resp, err := info.KibanaClient.Connection.SendWithContext(ctx, http.MethodGet, downloadURL, nil, nil, nil)
-		require.NoError(t, err, "error downloading policy")
-		policy, err := io.ReadAll(resp.Body)
-		require.NoError(t, err, "error reading policy response")
-		defer resp.Body.Close()
+		classicMonitoringTemplate := `
+outputs:
+  default:
+    type: elasticsearch
+    hosts: {{.ESEndpoint}}
+    api_key: {{.ESApiKey }}
+    preset: balanced
 
+agent.monitoring:
+  enabled: true
+  logs: true
+  metrics: true
+  use_output: default
+  namespace: {{ .Namespace }}
+`
+		// Get elasticsearch endpoint and api_key
+		esEndpoint, err := getESHost()
 		apiKeyResponse, err := createESApiKey(info.ESClient)
 		require.NoError(t, err, "failed to get api key")
 		require.True(t, len(apiKeyResponse.Encoded) > 1, "api key is invalid %q", apiKeyResponse)
 		apiKey, err := getDecodedApiKey(apiKeyResponse)
 		require.NoError(t, err, "error decoding api key")
 
-		type PolicyOutputs struct {
-			Type   string   `yaml:"type"`
-			Hosts  []string `yaml:"hosts"`
-			Preset string   `yaml:"preset"`
-			ApiKey string   `yaml:"api_key"`
-		}
-		type PolicyStruct struct {
-			ID                string                   `yaml:"id"`
-			Revision          int                      `yaml:"revision"`
-			Outputs           map[string]PolicyOutputs `yaml:"outputs"`
-			Fleet             map[string]any           `yaml:"fleet"`
-			OutputPermissions map[string]any           `yaml:"output_permissions"`
-			Agent             map[string]any           `yaml:"agent"`
-			Inputs            []map[string]any         `yaml:"inputs"`
-			Signed            map[string]any           `yaml:"signed"`
-			SecretReferences  []map[string]any         `yaml:"secret_references"`
-			Namespaces        []map[string]any         `yaml:"namespaces"`
-		}
-
-		y := PolicyStruct{}
-		err = yaml.Unmarshal(policy, &y)
-		require.NoError(t, err, "error unmarshalling policy")
-		d, prs := y.Outputs["default"]
-		require.True(t, prs, "default must be in outputs")
-		d.ApiKey = string(apiKey)
-		y.Outputs["default"] = d
-		policyBytes, err := yaml.Marshal(y)
-		require.NoErrorf(t, err, "error marshalling policy, struct was %v", y)
+		// Parse template
+		var classicMonitoring bytes.Buffer
+		template.Must(template.New("config").Parse(classicMonitoringTemplate)).Execute(&classicMonitoring,
+			configOptions{
+				ESEndpoint: esEndpoint,
+				ESApiKey:   apiKey,
+				Namespace:  info.Namespace,
+			})
 
 		// 3. Install without enrolling in fleet
 		classicFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -186,7 +166,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		err = classicFixture.Prepare(ctx)
 		require.NoError(t, err, "error preparing fixture")
 
-		err = classicFixture.Configure(ctx, policyBytes)
+		err = classicFixture.Configure(ctx, classicMonitoring.Bytes())
 		require.NoError(t, err, "error configuring fixture")
 
 		output, err := classicFixture.InstallWithoutEnroll(ctx, &installOpts)
@@ -208,23 +188,18 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 				func() bool {
 					findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
 					defer findCancel()
-					mustClauses := []map[string]any{
-						{"match": map[string]any{"data_stream.type": tc.dsType}},
-						{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
-						{"match": map[string]any{"data_stream.namespace": tc.dsNamespace}},
-						tc.query,
-					}
 
 					rawQuery := map[string]any{
 						"query": map[string]any{
 							"bool": map[string]any{
-								"must":   mustClauses,
+								"must":   tc.query,
 								"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestamp}}},
 							},
 						},
 					}
 
-					docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
+					index := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
+					docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, ".ds-"+index+"*", info.ESClient)
 					require.NoError(t, err)
 					if docs.Hits.Total.Value != 0 {
 						key := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
@@ -632,20 +607,10 @@ agent:
   logging:
     level: debug
 `
-		type configOptions struct {
-			InputPath              string
-			ESEndpoint             string
-			ESApiKey               string
-			FilebeatSocketEndpoint string
-			MetricbeatBeatEndpoint string
-			MetricbeatHttpEndpoint string
-			Namespace              string
-		}
+
 		filebeatSocketEndpoint := utils.SocketURLWithFallback(uuid.Must(uuid.NewV4()).String(), paths.TempDir())
 		metricbeatBeatEndpoint := utils.SocketURLWithFallback(uuid.Must(uuid.NewV4()).String(), paths.TempDir())
 		metricbeatHttpEndpoint := utils.SocketURLWithFallback(uuid.Must(uuid.NewV4()).String(), paths.TempDir())
-		esEndpoint, err := getESHost()
-		require.NoError(t, err, "error getting elasticsearch endpoint")
 
 		var configBuffer bytes.Buffer
 		template.Must(template.New("config").Parse(configTemplateOTel)).Execute(&configBuffer,
@@ -673,17 +638,11 @@ agent:
 				func() bool {
 					findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
 					defer findCancel()
-					mustClauses := []map[string]any{
-						{"match": map[string]any{"data_stream.type": tc.dsType}},
-						{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
-						{"match": map[string]any{"data_stream.namespace": tc.dsNamespace}},
-						tc.query,
-					}
 
 					rawQuery := map[string]any{
 						"query": map[string]any{
 							"bool": map[string]any{
-								"must":   mustClauses,
+								"must":   tc.query,
 								"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestampBeatReceiver}}},
 							},
 						},
@@ -692,7 +651,8 @@ agent:
 						},
 					}
 
-					docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
+					index := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
+					docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, ".ds-"+index+"*", info.ESClient)
 					require.NoError(t, err)
 					if docs.Hits.Total.Value != 0 {
 						key := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
