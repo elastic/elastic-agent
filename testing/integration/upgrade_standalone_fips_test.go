@@ -38,10 +38,9 @@ func TestStandaloneUpgradeFIPStoFIPS(t *testing.T) {
 	require.NoError(t, err)
 
 	// We need to end the upgrade at a FIPS-capable version.
-	// We need to start the upgrade from a FIPS-capable version
 	if !isFIPSCapableVersion(currentVersion) {
 		t.Skipf(
-			"Minimum end version of FIPS-capable Agent for running this test is either %q or %q, current start version: %q",
+			"Minimum end version of FIPS-capable Agent for running this test is either %q or %q, current end version: %q",
 			*upgradetest.Version_8_19_0_SNAPSHOT,
 			*upgradetest.Version_9_1_0_SNAPSHOT,
 			currentVersion,
