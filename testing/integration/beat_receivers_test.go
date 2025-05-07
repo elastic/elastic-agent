@@ -280,7 +280,9 @@ func TestAgentMonitoring(t *testing.T) {
 
 			// we should have filebeatreceiver and metricbeatreceiver running
 			otelCollectorStatus := status.Collector
-			assert.NotNil(t, otelCollectorStatus)
+			if !assert.NotNil(t, otelCollectorStatus) {
+				return
+			}
 			assert.Equal(collect, int(cproto.CollectorComponentStatus_StatusOK), otelCollectorStatus.Status)
 			pipelineStatusMap := otelCollectorStatus.ComponentStatusMap
 
