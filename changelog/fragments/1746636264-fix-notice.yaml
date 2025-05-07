@@ -17,8 +17,9 @@ summary: NOTICE.txt now contains only those modules that are used by the Elastic
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
 description: |
-  The NOTICE.txt file now contains only those modules that the Elastic Agent binaries for various platforms directly
-  or indirectly depends on. Modules used for development tooling are now excluded from NOTICE.txt.
+  Only those modules that the Elastic Agent binaries for various platforms directly
+  or indirectly depend on are now included in the NOTICE.txt file . Modules used for development
+  tooling are now excluded from NOTICE.txt.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
