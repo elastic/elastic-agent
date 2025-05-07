@@ -39,6 +39,7 @@ func TestMonitoringFull(t *testing.T) {
 				HTTP: &monitoringcfg.MonitoringHTTPConfig{
 					Enabled: true,
 				},
+				RuntimeManager: monitoringcfg.DefaultRuntimeManager,
 			},
 		},
 		agentInfo: agentInfo,
@@ -863,6 +864,7 @@ func TestMonitoringConfigForBeatsReceivers(t *testing.T) {
 			HTTP: &monitoringcfg.MonitoringHTTPConfig{
 				Enabled: false,
 			},
+			RuntimeManager: monitoringcfg.DefaultRuntimeManager,
 		},
 	}
 
@@ -914,7 +916,9 @@ func TestMonitoringConfigForBeatsReceivers(t *testing.T) {
 	// Verify that if we're using filebeat receiver, there's no filebeat input
 	var monitoringCfg struct {
 		Inputs []struct {
-			Streams []struct {
+			ID             string
+			RuntimeManager string `mapstructure:"_runtime_experimental"`
+			Streams        []struct {
 				Path string `mapstructure:"path"`
 			}
 		}
@@ -931,7 +935,72 @@ func TestMonitoringConfigForBeatsReceivers(t *testing.T) {
 			}
 		}
 	}
-	assert.Len(t, streamsForInputMetrics, 2) // we have two filebeats running: filestream-process and monitoring
+	assert.Len(t, streamsForInputMetrics, 2)
+}
+
+func TestMonitoringWithOtelRuntime(t *testing.T) {
+	agentInfo, err := info.NewAgentInfo(context.Background(), false)
+	require.NoError(t, err, "Error creating agent info")
+
+	cfg := &monitoringConfig{
+		C: &monitoringcfg.MonitoringConfig{
+			Enabled:        true,
+			MonitorLogs:    true,
+			MonitorMetrics: true,
+			Namespace:      "test",
+			HTTP: &monitoringcfg.MonitoringHTTPConfig{
+				Enabled: false,
+			},
+			RuntimeManager: monitoringcfg.OtelRuntimeManager,
+		},
+	}
+
+	policy := map[string]any{
+		"agent": map[string]any{
+			"monitoring": map[string]any{
+				"metrics": true,
+				"logs":    false,
+			},
+		},
+		"outputs": map[string]any{
+			"default": map[string]any{},
+		},
+	}
+
+	b := &BeatsMonitor{
+		enabled:   true,
+		config:    cfg,
+		agentInfo: agentInfo,
+	}
+
+	components := []component.Component{
+		{
+			ID: "filestream-receiver",
+			InputSpec: &component.InputRuntimeSpec{
+				Spec: component.InputSpec{
+					Command: &component.CommandSpec{
+						Name: "filebeat",
+					},
+				},
+			},
+			RuntimeManager: component.OtelRuntimeManager,
+		},
+	}
+	monitoringCfgMap, err := b.MonitoringConfig(policy, components, map[string]uint64{})
+	require.NoError(t, err)
+
+	// Verify that if we're using filebeat receiver, there's no filebeat input
+	var monitoringCfg struct {
+		Inputs []struct {
+			ID             string
+			RuntimeManager string `mapstructure:"_runtime_experimental"`
+		}
+	}
+	err = mapstructure.Decode(monitoringCfgMap, &monitoringCfg)
+	require.NoError(t, err)
+	for _, input := range monitoringCfg.Inputs {
+		assert.Equal(t, monitoringcfg.OtelRuntimeManager, input.RuntimeManager)
+	}
 }
 
 func TestEnrichArgs(t *testing.T) {
