@@ -78,7 +78,7 @@ func TestFleetManagedUpgradeUnprivilegedFIPS(t *testing.T) {
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
-		// FIPS: true // TODO: uncomment when https://github.com/elastic/elastic-agent/pull/8083 is merged
+		FIPS:  true,
 	})
 	postWatcherSuccessHook := upgradetest.PostUpgradeAgentIsFIPSCapable
 	upgradeOpts := []upgradetest.UpgradeOpt{upgradetest.WithPostWatcherSuccessHook(postWatcherSuccessHook)}
@@ -95,7 +95,7 @@ func TestFleetManagedUpgradePrivilegedFIPS(t *testing.T) {
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
-		// FIPS: true // TODO: uncomment when https://github.com/elastic/elastic-agent/pull/8083 is merged
+		FIPS:  true,
 	})
 
 	// Check that new (post-upgrade) Agent is also FIPS-capable

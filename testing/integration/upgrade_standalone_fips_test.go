@@ -30,7 +30,7 @@ func TestStandaloneUpgradeFIPStoFIPS(t *testing.T) {
 		OS: []define.OS{
 			{Type: define.Linux},
 		},
-		// FIPS: true // TODO: uncomment when https://github.com/elastic/elastic-agent/pull/8083 is merged
+		FIPS: true,
 	})
 
 	// parse the version we are testing
