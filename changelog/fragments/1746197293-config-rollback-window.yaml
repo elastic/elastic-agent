@@ -11,12 +11,16 @@
 kind: feature
 
 # Change summary; a 80ish characters long description of the change.
-summary: set collectors fullnameOverride for edot kube-stack values
+summary: Adds a new configuration setting, `agent.upgrade.rollback.window`
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-#description:
+description: |
+  The value of the `agent.upgrade.rollback.window` setting determines the period after upgrading
+  Elastic Agent when a rollback to the previous version can be triggered. This is an optional
+  setting, with a default value of `168h` (7 days). The value can be any string that is parseable
+  by https://pkg.go.dev/time#ParseDuration.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
@@ -25,8 +29,8 @@ component: elastic-agent
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
 # NOTE: the tooling supports backports, so it's able to fill the original PR number instead of the backport PR number.
 # Please provide it if you are adding a fragment for a different PR.
-pr: https://github.com/elastic/elastic-agent/pull/7754
+pr: https://github.com/elastic/elastic-agent/pull/8065
 
 # Issue URL; optional; the GitHub issue related to this changeset (either closes or is part of).
 # If not present is automatically filled by the tooling with the issue linked to the PR number.
-issue: https://github.com/elastic/elastic-agent/issues/7381
+issue: https://github.com/elastic/elastic-agent/issues/6881

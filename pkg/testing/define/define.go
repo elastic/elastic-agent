@@ -155,6 +155,10 @@ func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Inf
 		t.Skipf("sudo requirement %t not matching sudo filter %t. Skipping", req.Sudo, *SudoFilter.value)
 	}
 
+	if FipsFilter.value != nil && req.FIPS != *FipsFilter.value {
+		t.Skipf("FIPS requirement %t not matching FIPS filter %t. Skipping.", req.FIPS, *FipsFilter.value)
+	}
+
 	// record autodiscover after filtering by group and sudo and before validating against the actual environment
 	if AutoDiscover {
 		discoverTest(t, req)
