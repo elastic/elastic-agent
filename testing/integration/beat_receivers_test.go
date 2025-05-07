@@ -2059,42 +2059,85 @@ service:
 		require.Greater(t, len(agentDocs), 0, "expected to find documents ingested by agent metrics input")
 		require.Greater(t, len(otelDocs), 0, "expected to find documents ingested by otel metrics input")
 
-		for _, mset := range metricsets {
-			require.Greater(t, len(agentDocs[mset].Hits.Hits), 0, "expected to find agent documents for metricset %s", mset)
-			require.Greater(t, len(otelDocs[mset].Hits.Hits), 0, "expected to find otel documents for metricset %s", mset)
+		testCases := []struct {
+			name          string
+			ignoredFields []string
+		}{
+			{
+				name: "cpu",
+				ignoredFields: []string{
+					"host.cpu.usage",
+					"system.cpu.system.norm.pct",
+					"system.cpu.system.pct",
+					"system.cpu.total.norm.pct",
+					"system.cpu.total.pct",
+					"system.cpu.user.norm.pct",
+					"system.cpu.user.pct",
+					"system.cpu.idle.norm.pct",
+					"system.cpu.idle.pct",
+					"system.cpu.iowait.norm.pct",
+					"system.cpu.iowait.pct",
+					"system.cpu.irq.norm.pct",
+					"system.cpu.irq.pct",
+					"system.cpu.nice.norm.pct",
+					"system.cpu.nice.pct",
+					"system.cpu.softirq.norm.pct",
+					"system.cpu.softirq.pct",
+				},
+			},
+			{
+				name: "memory",
+				ignoredFields: []string{
+					"system.memory.actual.free",
+					"system.memory.actual.used.bytes",
+					"system.memory.actual.used.pct",
+					"system.memory.free",
+					"system.memory.swap.free",
+					"system.memory.swap.total",
+					"system.memory.swap.used.bytes",
+					"system.memory.swap.used.pct",
+					"system.memory.total",
+					"system.memory.used.bytes",
+					"system.memory.used.pct",
+				},
+			},
+			{
+				name:          "network",
+				ignoredFields: []string{},
+			},
+			{
+				name: "filesystem",
+				ignoredFields: []string{
+					"metricset.period",
+					"system.filesystem.available",
+					"system.filesystem.free",
+					"system.filesystem.used.bytes",
+				},
+			},
+		}
 
-			agent := agentDocs[mset].Hits.Hits[0].Source
-			otel := otelDocs[mset].Hits.Hits[0].Source
-			ignoredFields := []string{
-				// Expected to change between agent metrics input and otel metrics input
-				"@timestamp",
-				"agent.ephemeral_id",
-				"agent.id",
-				"agent.version",
-				"data_stream.namespace",
-				"event.duration",
-				"beat.elasticsearch.cluster.id",
+		commonIgnoredFields := []string{
+			// Expected to change between agent metrics input and otel metrics input
+			"@timestamp",
+			"agent.ephemeral_id",
+			"agent.id",
+			"agent.version",
+			"data_stream.namespace",
+			"event.ingested",
+		}
 
-				// elastic_agent * fields are hardcoded in processor list for now which is why they differ
-				"elastic_agent.id",
-				"elastic_agent.snapshot",
-				"elastic_agent.version",
+		require.Equal(t, len(metricsets), len(testCases), "expected to have a test case for each metricset")
+		for _, tt := range testCases {
+			t.Run(tt.name, func(t *testing.T) {
+				require.Greater(t, len(agentDocs[tt.name].Hits.Hits), 0, "expected to find agent documents for metricset %s", tt.name)
+				require.Greater(t, len(otelDocs[tt.name].Hits.Hits), 0, "expected to find otel documents for metricset %s", tt.name)
 
-				// metrics are not deterministic
-				"host.cpu.usage",
-				"system.cpu.idle.norm.pct",
-				"system.cpu.idle.pct",
-				"system.cpu.iowait.norm.pct",
-				"system.cpu.iowait.pct",
-				"system.cpu.irq.norm.pct",
-				"system.cpu.irq.pct",
-				"system.cpu.nice.norm.pct",
-				"system.cpu.nice.pct",
-				"system.cpu.softirq.norm.pct",
-				"system.cpu.softirq.pct",
-			}
+				agent := agentDocs[tt.name].Hits.Hits[0].Source
+				otel := otelDocs[tt.name].Hits.Hits[0].Source
+				ignoredFields := append(tt.ignoredFields, commonIgnoredFields...)
+				AssertMapsEqual(t, agent, otel, ignoredFields, "expected documents to be equal for "+tt.name)
+			})
 
-			AssertMapsEqual(t, agent, otel, ignoredFields, "expected documents to be equal for "+mset)
 		}
 	})
 }
