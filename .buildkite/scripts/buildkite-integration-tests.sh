@@ -25,7 +25,7 @@ fi
 INTEGRATION_TEST_ARGS="-integration.groups=${GROUP_NAME} -integration.sudo=${TEST_SUDO}"
 if [[ "${FIPS:-false}" == "true" ]]; then
     echo "FIPS testing detected"
-    INTEGRATION_TEST_ARGS+=" -integration.fips=true"
+    #INTEGRATION_TEST_ARGS+=" -integration.fips=true" # FIXME re-enable once adding this filter picks up tests
 fi
 
 # Make sure that all tools are installed
