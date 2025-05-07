@@ -78,7 +78,10 @@ func TestFleetManagedUpgradeUnprivilegedFIPS(t *testing.T) {
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
-		FIPS:  true,
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+		FIPS: true,
 	})
 	postWatcherSuccessHook := upgradetest.PostUpgradeAgentIsFIPSCapable
 	upgradeOpts := []upgradetest.UpgradeOpt{upgradetest.WithPostWatcherSuccessHook(postWatcherSuccessHook)}
@@ -93,6 +96,9 @@ func TestFleetManagedUpgradePrivilegedFIPS(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: FleetPrivileged,
 		Stack: &define.Stack{},
+		OS: []define.OS{
+			define.Linux,
+		},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 		FIPS:  true,
