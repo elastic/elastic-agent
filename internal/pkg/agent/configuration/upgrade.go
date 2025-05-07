@@ -12,11 +12,16 @@ const (
 
 	// interval between checks for new (upgraded) Agent returning an error status.
 	defaultStatusCheckInterval = 30 * time.Second
+
+	// period during which an upgraded Agent can be asked to rollback to the previous
+	// Agent version on disk.
+	defaultRollbackWindowDuration = 7 * 24 * time.Hour // 7 days
 )
 
 // UpgradeConfig is the configuration related to Agent upgrades.
 type UpgradeConfig struct {
-	Watcher *UpgradeWatcherConfig `yaml:"watcher" config:"watcher" json:"watcher"`
+	Watcher  *UpgradeWatcherConfig  `yaml:"watcher" config:"watcher" json:"watcher"`
+	Rollback *UpgradeRollbackConfig `yaml:"rollback" config:"rollback" json:"rollback"`
 }
 
 type UpgradeWatcherConfig struct {
@@ -27,6 +32,10 @@ type UpgradeWatcherCheckConfig struct {
 	Interval time.Duration `yaml:"interval" config:"interval" json:"interval"`
 }
 
+type UpgradeRollbackConfig struct {
+	Window time.Duration `yaml:"window" config:"window" json:"window"`
+}
+
 func DefaultUpgradeConfig() *UpgradeConfig {
 	return &UpgradeConfig{
 		Watcher: &UpgradeWatcherConfig{
@@ -34,6 +43,9 @@ func DefaultUpgradeConfig() *UpgradeConfig {
 			ErrorCheck: UpgradeWatcherCheckConfig{
 				Interval: defaultStatusCheckInterval,
 			},
+		},
+		Rollback: &UpgradeRollbackConfig{
+			Window: defaultRollbackWindowDuration,
 		},
 	}
 }
