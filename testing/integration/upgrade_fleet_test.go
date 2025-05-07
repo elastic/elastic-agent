@@ -83,6 +83,21 @@ func TestFleetManagedUpgradeUnprivilegedFIPS(t *testing.T) {
 		},
 		FIPS: true,
 	})
+
+	// parse the version we are testing
+	currentVersion, err := version.ParseVersion(define.Version())
+	require.NoError(t, err)
+
+	// We need to start the upgrade from a FIPS-capable version
+	if !isFIPSCapableVersion(currentVersion) {
+		t.Skipf(
+			"Minimum start version of FIPS-capable Agent for running this test is either %q or %q, current start version: %q",
+			*upgradetest.Version_8_19_0_SNAPSHOT,
+			*upgradetest.Version_9_1_0_SNAPSHOT,
+			currentVersion,
+		)
+	}
+
 	postWatcherSuccessHook := upgradetest.PostUpgradeAgentIsFIPSCapable
 	upgradeOpts := []upgradetest.UpgradeOpt{upgradetest.WithPostWatcherSuccessHook(postWatcherSuccessHook)}
 	testFleetManagedUpgrade(t, info, true, true, upgradeOpts...)
@@ -103,6 +118,16 @@ func TestFleetManagedUpgradePrivilegedFIPS(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 		FIPS:  true,
 	})
+
+	// We need to start the upgrade from a FIPS-capable version
+	if !isFIPSCapableVersion(currentVersion) {
+		t.Skipf(
+			"Minimum start version of FIPS-capable Agent for running this test is either %q or %q, current start version: %q",
+			*upgradetest.Version_8_19_0_SNAPSHOT,
+			*upgradetest.Version_9_1_0_SNAPSHOT,
+			currentVersion,
+		)
+	}
 
 	// Check that new (post-upgrade) Agent is also FIPS-capable
 	postWatcherSuccessHook := upgradetest.PostUpgradeAgentIsFIPSCapable
