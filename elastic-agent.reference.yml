@@ -125,6 +125,12 @@ inputs:
 #   # duration will increase for subsequent retry attempts in a randomized exponential backoff manner.
 #   retry_sleep_init_duration: 30s
 
+# agent.upgrade
+#   # rollback settings
+#   rollback:
+#       # duration in which an upgraded Agent may be manually rolled back.
+#       window: 168h
+
 # agent.process:
 #   # timeout for creating new processes. when process is not successfully created by this timeout
 #   # start operation is considered a failure
