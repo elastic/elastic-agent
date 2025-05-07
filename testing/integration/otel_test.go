@@ -735,261 +735,6 @@ func mapAtLeastOneTrue(mm map[string]bool) bool {
 	return false
 }
 
-func TestFileBeatReceiver(t *testing.T) {
-	define.Require(t, define.Requirements{
-		Group: Default,
-		Local: true,
-		OS: []define.OS{
-			{Type: define.Windows},
-			{Type: define.Linux},
-			{Type: define.Darwin},
-		},
-	})
-
-	type otelConfigOptions struct {
-		Message string
-		Output  string
-		HomeDir string
-	}
-	testMessage := "supercalifragilisticexpialidocious"
-	tmpDir := t.TempDir()
-	exporterOutputPath := filepath.Join(tmpDir, "output.json")
-	t.Cleanup(func() {
-		if t.Failed() {
-			contents, err := os.ReadFile(exporterOutputPath)
-			if err != nil {
-				t.Logf("No exporter output file")
-				return
-			}
-			t.Logf("Contents of exporter output file:\n%s\n", string(contents))
-		}
-	})
-	otelConfigPath := filepath.Join(tmpDir, "otel.yml")
-	otelConfigTemplate := `receivers:
-  filebeatreceiver:
-    filebeat:
-      inputs:
-        - type: benchmark
-          enabled: true
-          count: 1
-          message: {{.Message}}
-    output:
-      otelconsumer:
-    logging:
-      level: info
-      selectors:
-        - '*'
-    path.home: {{.HomeDir}}
-exporters:
-  file/no_rotation:
-    path: {{.Output}}
-service:
-  pipelines:
-    logs:
-      receivers: [filebeatreceiver]
-      exporters: [file/no_rotation]
-`
-
-	var otelConfigBuffer bytes.Buffer
-	require.NoError(t,
-		template.Must(template.New("otelConfig").Parse(otelConfigTemplate)).Execute(&otelConfigBuffer,
-			otelConfigOptions{
-				Message: testMessage,
-				Output:  exporterOutputPath,
-				HomeDir: tmpDir,
-			}))
-	require.NoError(t, os.WriteFile(otelConfigPath, otelConfigBuffer.Bytes(), 0o600))
-	t.Cleanup(func() {
-		if t.Failed() {
-			contents, err := os.ReadFile(otelConfigPath)
-			if err != nil {
-				t.Logf("no otel config file")
-				return
-			}
-			t.Logf("Contents of otel config file:\n%s\n", string(contents))
-		}
-	})
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", otelConfigPath}))
-	require.NoError(t, err)
-
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
-	defer cancel()
-	err = fixture.Prepare(ctx, fakeComponent)
-	require.NoError(t, err)
-
-	var fixtureWg sync.WaitGroup
-	fixtureWg.Add(1)
-	go func() {
-		defer fixtureWg.Done()
-		err = fixture.RunOtelWithClient(ctx)
-	}()
-
-	require.Eventually(t,
-		func() bool {
-			content, err := os.ReadFile(exporterOutputPath)
-			if err != nil || len(content) == 0 {
-				return false
-			}
-			return bytes.Contains(content, []byte(testMessage))
-		},
-		3*time.Minute, 1*time.Second,
-		fmt.Sprintf("there should be exported logs by now"))
-
-	cancel()
-	fixtureWg.Wait()
-	require.True(t, err == nil || err == context.Canceled || err == context.DeadlineExceeded, "Retrieved unexpected error: %s", err.Error())
-}
-
-func TestOtelFBReceiverE2E(t *testing.T) {
-	info := define.Require(t, define.Requirements{
-		Group: Default,
-		Local: true,
-		OS: []define.OS{
-			{Type: define.Windows},
-			{Type: define.Linux},
-			{Type: define.Darwin},
-		},
-		Stack: &define.Stack{},
-	})
-	tmpDir := t.TempDir()
-	numEvents := 50
-	// Create the data file to ingest
-	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
-	require.NoError(t, err, "failed to create temp file to hold data to ingest")
-	inputFilePath := inputFile.Name()
-	for i := 0; i < numEvents; i++ {
-		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
-		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
-	}
-	err = inputFile.Close()
-	require.NoError(t, err, "failed to close data temp file")
-	t.Cleanup(func() {
-		if t.Failed() {
-			contents, err := os.ReadFile(inputFilePath)
-			if err != nil {
-				t.Logf("no data file to import at %s", inputFilePath)
-				return
-			}
-			t.Logf("contents of import file:\n%s\n", string(contents))
-		}
-	})
-
-	// Create the otel configuration file
-	type otelConfigOptions struct {
-		InputPath  string
-		HomeDir    string
-		ESEndpoint string
-		ESApiKey   string
-		Index      string
-		MinItems   int
-	}
-	esEndpoint, err := getESHost()
-	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
-	index := "logs-integration-default"
-	otelConfigTemplate := `receivers:
-  filebeatreceiver:
-    filebeat:
-      inputs:
-        - type: filestream
-          id: filestream-end-to-end
-          enabled: true
-          paths:
-            - {{.InputPath}}
-          prospector.scanner.fingerprint.enabled: false
-          file_identity.native: ~
-    output:
-      otelconsumer:
-    logging:
-      level: info
-      selectors:
-        - '*'
-    path.home: {{.HomeDir}}
-    queue.mem.flush.timeout: 0s
-exporters:
-  elasticsearch/log:
-    endpoints:
-      - {{.ESEndpoint}}
-    api_key: {{.ESApiKey}}
-    logs_index: {{.Index}}
-    batcher:
-      enabled: true
-      flush_timeout: 1s
-      min_size: {{.MinItems}}
-    mapping:
-      mode: bodymap
-service:
-  pipelines:
-    logs:
-      receivers:
-        - filebeatreceiver
-      exporters:
-        - elasticsearch/log
-`
-	otelConfigPath := filepath.Join(tmpDir, "otel.yml")
-	var otelConfigBuffer bytes.Buffer
-	require.NoError(t,
-		template.Must(template.New("otelConfig").Parse(otelConfigTemplate)).Execute(&otelConfigBuffer,
-			otelConfigOptions{
-				InputPath:  inputFilePath,
-				HomeDir:    tmpDir,
-				ESEndpoint: esEndpoint,
-				ESApiKey:   esApiKey.Encoded,
-				Index:      index,
-				MinItems:   numEvents,
-			}))
-	require.NoError(t, os.WriteFile(otelConfigPath, otelConfigBuffer.Bytes(), 0o600))
-	t.Cleanup(func() {
-		if t.Failed() {
-			contents, err := os.ReadFile(otelConfigPath)
-			if err != nil {
-				t.Logf("No otel configuration file at %s", otelConfigPath)
-				return
-			}
-			t.Logf("Contents of otel config file:\n%s\n", string(contents))
-		}
-	})
-	// Now we can actually create the fixture and run it
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", otelConfigPath}))
-	require.NoError(t, err)
-
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
-	defer cancel()
-	err = fixture.Prepare(ctx, fakeComponent)
-	require.NoError(t, err)
-
-	var fixtureWg sync.WaitGroup
-	fixtureWg.Add(1)
-	go func() {
-		defer fixtureWg.Done()
-		err = fixture.RunOtelWithClient(ctx)
-	}()
-
-	// Make sure find the logs
-	actualHits := &struct{ Hits int }{}
-	require.Eventually(t,
-		func() bool {
-			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer findCancel()
-
-			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]interface{}{
-				"log.file.path": inputFilePath,
-			})
-			require.NoError(t, err)
-
-			actualHits.Hits = docs.Hits.Total.Value
-			return actualHits.Hits == numEvents
-		},
-		2*time.Minute, 1*time.Second,
-		"Expected %d logs, got %v", numEvents, actualHits)
-
-	cancel()
-	fixtureWg.Wait()
-	require.True(t, err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded), "Retrieved unexpected error: %s", err.Error())
-}
-
 func TestOtelFilestreamInput(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Default,
@@ -1032,6 +777,7 @@ func TestOtelFilestreamInput(t *testing.T) {
 		InputPath  string
 		ESEndpoint string
 		ESApiKey   string
+		Namespace  string
 	}
 	esEndpoint, err := getESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
@@ -1040,19 +786,35 @@ func TestOtelFilestreamInput(t *testing.T) {
 	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
 	decodedApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err)
-	configTemplate := `inputs:
+	configTemplate := `
+agent.grpc:
+  port: 6794
+inputs:
   - type: filestream
     id: filestream-e2e
     use_output: default
     _runtime_experimental: otel
     streams:
-      - id: e2e
+      - id: e2e-otel
         data_stream:
           dataset: e2e
+          namespace: {{ .Namespace }}"otel"
         paths:
           - {{.InputPath}}
         prospector.scanner.fingerprint.enabled: false
         file_identity.native: ~
+  - type: filestream
+    id: e2e-classic
+    use_output: default
+    streams:
+      - id: e2e-classic
+        data_stream:
+          dataset: e2e
+          namespace: {{ .Namespace }}
+        paths:
+          - {{.InputPath}}
+        prospector.scanner.fingerprint.enabled: false
+        file_identity.native: ~		
 outputs:
   default:
     type: elasticsearch
@@ -1070,7 +832,6 @@ agent:
     logs: false
     use_output: monitoring
 `
-	index := ".ds-logs-e2e-*"
 	var configBuffer bytes.Buffer
 	require.NoError(t,
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
@@ -1078,6 +839,7 @@ agent:
 				InputPath:  inputFilePath,
 				ESEndpoint: esEndpoint,
 				ESApiKey:   decodedApiKey,
+				Namespace:  info.Namespace,
 			}))
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
@@ -1109,27 +871,47 @@ agent:
 		}
 	})
 
-	// Make sure find the logs
-	actualHits := &struct{ Hits int }{}
-	assert.EventuallyWithT(t,
-		func(ct *assert.CollectT) {
+	var agentDocs estools.Documents
+	var otelDocs estools.Documents
+
+	// Make sure to find the logs
+	// and assert document equivalency for docs ingested by both classic and otel mode
+	require.Eventually(t,
+		func() bool {
 			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer findCancel()
 
-			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, index, map[string]interface{}{
+			agentDocs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-e2e-"+info.Namespace+"*", map[string]interface{}{
 				"log.file.path": inputFilePath,
 			})
-			require.NoError(ct, err)
 
-			actualHits.Hits = docs.Hits.Total.Value
-			output, execErr := fixture.ExecStatus(context.Background())
-			require.NoError(ct, execErr)
-			t.Logf("status output: %v", output)
-			assert.Equal(ct, numEvents, actualHits.Hits)
+			otelDocs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-e2e-"+info.Namespace+"otel"+"*", map[string]interface{}{
+				"log.file.path": inputFilePath,
+			})
+
+			return (agentDocs.Hits.Total.Value >= numEvents) && (otelDocs.Hits.Total.Value >= numEvents)
 		},
-		2*time.Minute, 5*time.Second,
-		"Expected %d logs, got %v", numEvents, actualHits)
+		1*time.Minute, 1*time.Second,
+		"Expected documents to be indexed by classic agent and otel mode")
 
+	doc1 := agentDocs.Hits.Hits[0].Source
+	doc2 := otelDocs.Hits.Hits[0].Source
+	ignoredFields := []string{
+		// Expected to change between filebeat and fbreceiver
+		"@timestamp",
+		"agent.ephemeral_id",
+		"agent.id",
+		"agent.version",
+
+		// Missing from fbreceiver doc
+		"elastic_agent.id",
+		"elastic_agent.snapshot",
+		"elastic_agent.version",
+	}
+
+	AssertMapsEqual(t, doc1, doc2, ignoredFields, "expected documents to be equal")
+
+	actualHits := &struct{ Hits int }{}
 	metricsIndex := ".ds-metrics-elastic_agent*"
 	// Check metrics from self-monitoring
 	assert.EventuallyWithT(t,
@@ -1407,239 +1189,6 @@ service:
 	cancel()
 	fixtureWg.Wait()
 	require.True(t, err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded), "Retrieved unexpected error: %s", err.Error())
-}
-
-func TestHybridAgentE2E(t *testing.T) {
-	// This test is a hybrid agent test that ingests a single log with
-	// filebeat and fbreceiver. It then compares the final documents in
-	// Elasticsearch to ensure they have no meaningful differences.
-	info := define.Require(t, define.Requirements{
-		Group: Default,
-		Local: true,
-		OS: []define.OS{
-			{Type: define.Windows},
-			{Type: define.Linux},
-			{Type: define.Darwin},
-		},
-		Stack: &define.Stack{},
-	})
-	tmpDir := t.TempDir()
-	numEvents := 1
-	fbIndex := "logs-generic-default"
-	fbReceiverIndex := "logs-generic-default"
-
-	inputFile, err := os.CreateTemp(tmpDir, "input-*.log")
-	require.NoError(t, err, "failed to create input log file")
-	inputFilePath := inputFile.Name()
-	for i := 0; i < numEvents; i++ {
-		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d", i)))
-		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
-		_, err = inputFile.Write([]byte("\n"))
-		require.NoErrorf(t, err, "failed to write newline to input file")
-		time.Sleep(100 * time.Millisecond)
-	}
-	err = inputFile.Close()
-	require.NoError(t, err, "failed to close data input file")
-
-	t.Cleanup(func() {
-		if t.Failed() {
-			contents, err := os.ReadFile(inputFilePath)
-			if err != nil {
-				t.Logf("no data file to import at %s", inputFilePath)
-				return
-			}
-			t.Logf("contents of input file: %s\n", string(contents))
-		}
-	})
-
-	type configOptions struct {
-		InputPath       string
-		HomeDir         string
-		ESEndpoint      string
-		ESApiKey        string
-		BeatsESApiKey   string
-		FBReceiverIndex string
-	}
-	esEndpoint, err := getESHost()
-	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
-
-	configTemplate := `agent.logging.level: info
-agent.logging.to_stderr: true
-inputs:
-  - id: filestream-filebeat
-    type: filestream
-    paths:
-      - {{.InputPath}}
-    prospector.scanner.fingerprint.enabled: false
-    file_identity.native: ~
-    use_output: default
-    queue.mem.flush.timeout: 0s
-    path.home: {{.HomeDir}}/filebeat
-outputs:
-  default:
-    type: elasticsearch
-    hosts: [{{.ESEndpoint}}]
-    api_key: {{.BeatsESApiKey}}
-    compression_level: 0
-receivers:
-  filebeatreceiver:
-    filebeat:
-      inputs:
-        - type: filestream
-          id: filestream-fbreceiver
-          enabled: true
-          paths:
-            - {{.InputPath}}
-          prospector.scanner.fingerprint.enabled: false
-          file_identity.native: ~
-    processors:
-      - add_host_metadata: ~
-      - add_cloud_metadata: ~
-      - add_fields:
-          fields:
-            dataset: generic
-            namespace: default
-            type: logs
-          target: data_stream
-      - add_fields:
-          fields:
-            dataset: generic
-          target: event
-    output:
-      otelconsumer:
-    logging:
-      level: info
-      selectors:
-        - '*'
-    path.home: {{.HomeDir}}/fbreceiver
-    queue.mem.flush.timeout: 0s
-exporters:
-  debug:
-    use_internal_logger: false
-    verbosity: detailed
-  elasticsearch/log:
-    endpoints:
-      - {{.ESEndpoint}}
-    compression: none
-    api_key: {{.ESApiKey}}
-    logs_index: {{.FBReceiverIndex}}
-    batcher:
-      enabled: true
-      flush_timeout: 1s
-    mapping:
-      mode: bodymap
-service:
-  pipelines:
-    logs:
-      receivers:
-        - filebeatreceiver
-      exporters:
-        - elasticsearch/log
-        - debug
-`
-
-	beatsApiKey, err := getDecodedApiKey(esApiKey)
-	require.NoError(t, err, "error decoding api key")
-
-	var configBuffer bytes.Buffer
-	require.NoError(t,
-		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
-			configOptions{
-				InputPath:       inputFilePath,
-				HomeDir:         tmpDir,
-				ESEndpoint:      esEndpoint,
-				ESApiKey:        esApiKey.Encoded,
-				BeatsESApiKey:   string(beatsApiKey),
-				FBReceiverIndex: fbReceiverIndex,
-			}))
-	configContents := configBuffer.Bytes()
-	t.Cleanup(func() {
-		if t.Failed() {
-			t.Logf("Contents of agent config file:\n%s\n", string(configContents))
-		}
-	})
-
-	// Now we can actually create the fixture and run it
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-	require.NoError(t, err)
-
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
-	defer cancel()
-
-	err = fixture.Prepare(ctx)
-	require.NoError(t, err)
-	err = fixture.Configure(ctx, configContents)
-	require.NoError(t, err)
-
-	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
-	require.NoError(t, err)
-	cmd.WaitDelay = 1 * time.Second
-
-	var output strings.Builder
-	cmd.Stderr = &output
-	cmd.Stdout = &output
-
-	err = cmd.Start()
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		if t.Failed() {
-			t.Log("Elastic-Agent output:")
-			t.Log(output.String())
-		}
-	})
-
-	require.Eventually(t, func() bool {
-		err = fixture.IsHealthy(ctx)
-		if err != nil {
-			t.Logf("waiting for agent healthy: %s", err.Error())
-			return false
-		}
-		return true
-	}, 1*time.Minute, 1*time.Second)
-
-	var docs estools.Documents
-	actualHits := &struct {
-		Hits int
-	}{}
-	require.Eventually(t,
-		func() bool {
-			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer findCancel()
-
-			docs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbIndex+"*", map[string]interface{}{
-				"log.file.path": inputFilePath,
-			})
-			require.NoError(t, err)
-
-			actualHits.Hits = docs.Hits.Total.Value
-
-			return actualHits.Hits == numEvents*2 // filebeat + fbreceiver
-		},
-		1*time.Minute, 1*time.Second,
-		"Expected %d logs in elasticsearch, got: %v", numEvents, actualHits)
-
-	doc1 := docs.Hits.Hits[0].Source
-	doc2 := docs.Hits.Hits[1].Source
-	ignoredFields := []string{
-		// Expected to change between filebeat and fbreceiver
-		"@timestamp",
-		"agent.ephemeral_id",
-		"agent.id",
-		"agent.version",
-
-		// Missing from fbreceiver doc
-		"elastic_agent.id",
-		"elastic_agent.snapshot",
-		"elastic_agent.version",
-	}
-
-	AssertMapsEqual(t, doc1, doc2, ignoredFields, "expected documents to be equal")
-	cancel()
-	cmd.Wait()
 }
 
 func AssertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg string) {
