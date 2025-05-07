@@ -11,14 +11,14 @@
 kind: other
 
 # Change summary; a 80ish characters long description of the change.
-summary: `NOTICE.txt` now contains only those modules that are used by the Elastic Agent binaries.
+summary: NOTICE.txt now contains only those modules that are used by the Elastic Agent binaries.
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
 description: |
-  The `NOTICE.txt` file now contains only those modules that the Elastic Agent binaries for various platforms directly
-  or indirectly depends on. Modules used for development tooling are now excluded from `NOTICE.txt`.
+  The NOTICE.txt file now contains only those modules that the Elastic Agent binaries for various platforms directly
+  or indirectly depends on. Modules used for development tooling are now excluded from NOTICE.txt.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
