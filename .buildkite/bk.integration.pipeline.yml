@@ -77,7 +77,7 @@ steps:
         command: |
           #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
-          .buildkite/scripts/serverless-integration-tests.sh fleet true TestLogIngestionFleetManaged
+          sudo -E .buildkite/scripts/serverless-integration-tests.sh fleet true TestLogIngestionFleetManaged
         artifact_paths:
           - build/**
           - build/diagnostics/**
