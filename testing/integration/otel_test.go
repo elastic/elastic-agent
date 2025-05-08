@@ -798,7 +798,7 @@ inputs:
       - id: e2e-otel
         data_stream:
           dataset: e2e
-          namespace: {{ .Namespace }}"otel"
+          namespace: otel{{ .Namespace }} 
         paths:
           - {{.InputPath}}
         prospector.scanner.fingerprint.enabled: false
@@ -881,17 +881,18 @@ agent:
 			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer findCancel()
 
-			agentDocs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-e2e-"+info.Namespace+"*", map[string]interface{}{
+			agentDocs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-logs-e2e-"+info.Namespace+"*", map[string]interface{}{
 				"log.file.path": inputFilePath,
 			})
 
-			otelDocs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-e2e-"+info.Namespace+"otel"+"*", map[string]interface{}{
+			otelDocs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-logs-e2e-otel"+info.Namespace+"*", map[string]interface{}{
 				"log.file.path": inputFilePath,
 			})
 
-			return (agentDocs.Hits.Total.Value >= numEvents) && (otelDocs.Hits.Total.Value >= numEvents)
+			fmt.Println(agentDocs.Hits.Total.Value, otelDocs.Hits.Total.Value, "inside require eventually")
+			return (agentDocs.Hits.Total.Value == numEvents) && (otelDocs.Hits.Total.Value == numEvents)
 		},
-		1*time.Minute, 1*time.Second,
+		2*time.Minute, 1*time.Second,
 		"Expected documents to be indexed by classic agent and otel mode")
 
 	doc1 := agentDocs.Hits.Hits[0].Source
@@ -902,6 +903,9 @@ agent:
 		"agent.ephemeral_id",
 		"agent.id",
 		"agent.version",
+		// we send data to different namespace
+		"data_stream.namespace",
+		"log.offset",
 
 		// Missing from fbreceiver doc
 		"elastic_agent.id",
