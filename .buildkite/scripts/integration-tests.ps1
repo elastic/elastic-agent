@@ -19,8 +19,8 @@ if ($PACKAGE_VERSION) {
 }
 $env:TEST_BINARY_NAME = "elastic-agent"
 # Parsing version.go. Will be simplified here: https://github.com/elastic/ingest-dev/issues/4925
-# $AGENT_VERSION = (Get-Content version/version.go | Select-String -Pattern 'const defaultBeatVersion =' | ForEach-Object { $_ -replace '.*?"(.*?)".*', '$1' })
-# $env:AGENT_VERSION = $AGENT_VERSION + "-SNAPSHOT"
+$AGENT_VERSION = (Get-Content version/version.go | Select-String -Pattern 'const defaultBeatVersion =' | ForEach-Object { $_ -replace '.*?"(.*?)".*', '$1' })
+$env:AGENT_VERSION = $AGENT_VERSION + "-SNAPSHOT"
 
 echo "~~~ Agent version: $env:AGENT_VERSION"
 $env:SNAPSHOT = $true
