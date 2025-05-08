@@ -190,7 +190,10 @@ func (m *OTelManager) startCollector(cfg *confmap.Conf, errCh chan error) (conte
 	ap := agentprovider.NewProvider(cfg)
 
 	// enable otel internal logs to include component identifying fields
-	featuregate.GlobalRegistry().Set("telemetry.newPipelineTelemetry", true)
+	err := featuregate.GlobalRegistry().Set("telemetry.newPipelineTelemetry", true)
+	if err != nil {
+		m.logger.Errorf("could not enable new pipeline telemetry: %v", err)
+	}
 
 	// NewForceExtensionConverterFactory is used to ensure that the agent_status extension is always enabled.
 	// It is required for the Elastic Agent to extract the status out of the OTel collector.
