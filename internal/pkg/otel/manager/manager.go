@@ -10,6 +10,7 @@ import (
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/confmap"
+	"go.opentelemetry.io/collector/featuregate"
 	"go.opentelemetry.io/collector/otelcol"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -187,6 +188,9 @@ func (m *OTelManager) Watch() <-chan *status.AggregateStatus {
 func (m *OTelManager) startCollector(cfg *confmap.Conf, errCh chan error) (context.CancelFunc, *agentprovider.Provider, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	ap := agentprovider.NewProvider(cfg)
+
+	// enable otel internal logs to include component identifying fields
+	featuregate.GlobalRegistry().Set("telemetry.newPipelineTelemetry", true)
 
 	// NewForceExtensionConverterFactory is used to ensure that the agent_status extension is always enabled.
 	// It is required for the Elastic Agent to extract the status out of the OTel collector.
