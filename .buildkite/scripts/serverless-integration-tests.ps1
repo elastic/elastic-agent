@@ -1,13 +1,23 @@
 param (
     [string]$GROUP_NAME,
-    [string]$TEST_SUDO
+    [string]$TEST_SUDO,
+    [string]$TEST_NAME_PATTERN = ""
 )
 
-echo "~~~ Preparing environment"
-
-$PSVersionTable.PSVersion
-
-. "$PWD\.buildkite\scripts\steps\ess.ps1"
+$Env:ELASTICSEARCH_HOST = Retry-Command -ScriptBlock {
+  vault kv get -field=es_host kv/ci-shared/observability-ingest/elastic-agent-serverless-staging-to-be-deleted
+}
+$Env:ELASTICSEARCH_USERNAME = Retry-Command -ScriptBlock {
+  vault kv get -field=es_username kv/ci-shared/observability-ingest/elastic-agent-serverless-staging-to-be-deleted
+}
+$Env:ELASTICSEARCH_PASSWORD = Retry-Command -ScriptBlock {
+  vault kv get -field=es_password kv/ci-shared/observability-ingest/elastic-agent-serverless-staging-to-be-deleted
+}
+$Env:KIBANA_HOST = Retry-Command -ScriptBlock {
+  vault kv get -field=kibana_endpoint kv/ci-shared/observability-ingest/elastic-agent-serverless-staging-to-be-deleted
+}
+$Env:KIBANA_USERNAME = $Env:ELASTICSEARCH_USERNAME
+$Env:KIBANA_PASSWORD = $Env:ELASTICSEARCH_PASSWORD
 
 go install gotest.tools/gotestsum
 gotestsum --version
@@ -44,13 +54,15 @@ $outputXML = "build/${fully_qualified_group_name}.integration.xml"
 $outputJSON = "build/${fully_qualified_group_name}.integration.out.json"
 $TestsExitCode = 0
 try {
-    Get-Ess-Stack -StackVersion $PACKAGE_VERSION
     Write-Output "~~~ Running integration test group: $GROUP_NAME as user: $env:USERNAME"
-    & gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags=integration -shuffle=on -timeout=2h0m0s "github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=$GROUP_NAME" "-integration.sudo=$TEST_SUDO"
+    $gotestArgs = @("-tags=integration", "-shuffle=on", "-timeout=2h0m0s")
+    if ($TEST_NAME_PATTERN -ne "") {
+        $gotestArgs += "-run=${TEST_NAME_PATTERN}"
+    }
+    $gotestArgs += @("github.com/elastic/elastic-agent/testing/integration", "-v", "-args", "-integration.groups=$GROUP_NAME", "-integration.sudo=$TEST_SUDO")
+    & gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- @gotestArgs
     $TestsExitCode = $LASTEXITCODE
 } finally {
-    ess_down
-
     if (Test-Path $outputXML) {
         # Install junit2html if not installed
         go install github.com/alexec/junit2html@latest
