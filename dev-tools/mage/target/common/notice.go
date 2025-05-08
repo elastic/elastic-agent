@@ -28,9 +28,21 @@ func runCommand(cmd string, args ...string) error {
 	return nil
 }
 
-// Notice Generates NOTICE.txt.
+// Notice Generates NOTICE.txt and NOTICE-fips.txt
 func Notice() (err error) {
-	fmt.Println("Generating NOTICE")
+	if err := notice("NOTICE.txt"); err != nil {
+		return fmt.Errorf("failed to generate NOTICE.txt: %w", err)
+	}
+	if err := notice("NOTICE-fips.txt", "requirefips"); err != nil {
+		return fmt.Errorf("failed to generate NOTICE-fips.txt: %w", err)
+	}
+	return nil
+}
+
+// notice generates a notice file with the name outputFilename.
+// see getDependentModules for use of additionalTags.
+func notice(outputFilename string, additionalTags ...string) error {
+	fmt.Printf("Generating %s...\n", outputFilename)
 	if err := runCommand("go", "mod", "tidy"); err != nil {
 		return err
 	}
@@ -38,7 +50,7 @@ func Notice() (err error) {
 		return err
 	}
 
-	modules, err := getDependentModules()
+	modules, err := getDependentModules(additionalTags...)
 	if err != nil {
 		return fmt.Errorf("unable to fetch list of dependent modules: %w", err)
 	}
@@ -52,7 +64,7 @@ func Notice() (err error) {
 	// -rules dev-tools/notice/rules.json \
 	// -overrides dev-tools/notice/overrides.json \
 	// -noticeTemplate dev-tools/notice/NOTICE.txt.tmpl \
-	// -noticeOut NOTICE.txt \
+	// -noticeOut {outputFilename} \
 	// -depsOut ""
 	listCmdArgs := []string{"list", "-m", "-json"}
 	listCmdArgs = append(listCmdArgs, modules...)
@@ -62,7 +74,7 @@ func Notice() (err error) {
 		"-rules", "dev-tools/notice/rules.json",
 		"-overrides", "dev-tools/notice/overrides.json",
 		"-noticeTemplate", "dev-tools/notice/NOTICE.txt.tmpl",
-		"-noticeOut", "NOTICE.txt",
+		"-noticeOut", outputFilename,
 		"-depsOut", "")
 
 	fmt.Printf(">> %s | %s\n", strings.Join(listCmd.Args, " "), strings.Join(licDetectCmd.Args, " "))
@@ -96,12 +108,11 @@ func Notice() (err error) {
 		return err
 	}
 
-	// cat dev-tools/notice/NOTICE.txt.append >> NOTICE.txt
-	fmt.Printf(">> %s\n", "cat dev-tools/notice/NOTICE.txt.append >> NOTICE.txt")
+	// cat dev-tools/notice/NOTICE.txt.append >> outputFilename
 	const (
-		infn  = "dev-tools/notice/NOTICE.txt.append"
-		outfn = "NOTICE.txt"
+		infn = "dev-tools/notice/NOTICE.txt.append"
 	)
+	fmt.Printf(">> cat %s >> %s\n", infn, outputFilename)
 
 	f, err := os.Open(infn)
 	if err != nil {
@@ -109,9 +120,9 @@ func Notice() (err error) {
 	}
 	defer f.Close()
 
-	out, err := os.OpenFile(outfn, os.O_WRONLY|os.O_APPEND, 0644)
+	out, err := os.OpenFile(outputFilename, os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to open file %s: %w", outfn, err)
+		return fmt.Errorf("failed to open file %s: %w", outputFilename, err)
 	}
 
 	defer func() {
@@ -122,23 +133,23 @@ func Notice() (err error) {
 	}()
 
 	if _, err := io.Copy(out, f); err != nil {
-		return fmt.Errorf("failed to append file %s: %w", outfn, err)
+		return fmt.Errorf("failed to append file %s: %w", outputFilename, err)
 	}
 
-	// dos2unix NOTICE.txt
-	fmt.Printf(">> %s\n", "dos2unix NOTICE.txt")
+	// dos2unix {outputFilename}
+	fmt.Printf(">> dos2unix %s\n", outputFilename)
 
-	content, err := os.ReadFile(outfn)
+	content, err := os.ReadFile(outputFilename)
 	if err != nil {
-		return fmt.Errorf("failed to read entire file %s: %w", outfn, err)
+		return fmt.Errorf("failed to read entire file %s: %w", outputFilename, err)
 	}
 
 	// Convert Windows-style line endings to Unix-style
 	newContent := strings.ReplaceAll(string(content), "\r\n", "\n")
 
-	err = os.WriteFile(outfn, []byte(newContent), 0644)
+	err = os.WriteFile(outputFilename, []byte(newContent), 0644)
 	if err != nil {
-		return fmt.Errorf("failed to rewrite file using Unix-style line endings %s: %w", outfn, err)
+		return fmt.Errorf("failed to rewrite file using Unix-style line endings %s: %w", outputFilename, err)
 	}
 
 	return nil
