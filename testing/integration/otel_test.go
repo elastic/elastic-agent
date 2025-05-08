@@ -157,6 +157,9 @@ func TestOtelFileProcessing(t *testing.T) {
 	require.True(t, err == nil || err == context.Canceled || err == context.DeadlineExceeded, "Retrieved unexpected error: %s", err.Error())
 }
 
+//go:embed testdata/templates/filelog-otel.tmpl
+var hybridModeConfig string
+
 func TestOtelHybridFileProcessing(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: Default,
@@ -211,7 +214,7 @@ func TestOtelHybridFileProcessing(t *testing.T) {
 
 	var otelConfigBuffer bytes.Buffer
 	require.NoError(t,
-		template.Must(template.New("otelConfig").Parse(otelConfigTemplate)).Execute(&otelConfigBuffer,
+		template.Must(template.New("otelConfig").Parse(hybridModeConfig)).Execute(&otelConfigBuffer,
 			otelConfigOptions{
 				InputPath:  inputFilePath,
 				OutputPath: outputFilePath,
