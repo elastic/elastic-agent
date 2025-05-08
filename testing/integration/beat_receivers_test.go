@@ -1230,6 +1230,7 @@ service:
 			// Expected to change between agent metrics input and otel metrics input
 			"@timestamp",
 			"agent.id",
+			"agent.version",
 			"agent.ephemeral_id",
 			"elastic_agent.id",
 			"elastic_agent.snapshot",
