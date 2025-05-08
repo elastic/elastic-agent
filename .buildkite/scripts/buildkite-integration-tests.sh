@@ -22,7 +22,7 @@ if [ "$TEST_SUDO" == "true" ]; then
   source .buildkite/hooks/pre-command || echo "No pre-command hook found"
 fi
 
-INTEGRATION_TEST_ARGS="-integration.groups=${GROUP_NAME} -integration.sudo=${TEST_SUDO}"
+INTEGRATION_TEST_ARGS="-integration.groups=\"${GROUP_NAME}\" -integration.sudo=\"${TEST_SUDO}\""
 if [[ "${FIPS:-false}" == "true" ]]; then
     echo "FIPS testing detected"
     #INTEGRATION_TEST_ARGS+=" -integration.fips=true" # FIXME re-enable once adding this filter picks up tests
