@@ -1175,6 +1175,8 @@ service:
 					"system.cpu.nice.pct",
 					"system.cpu.softirq.norm.pct",
 					"system.cpu.softirq.pct",
+					"system.cpu.steal.norm.pct",
+					"system.cpu.steal.pct",
 				},
 			},
 			{
@@ -1191,6 +1193,7 @@ service:
 					"system.memory.total",
 					"system.memory.used.bytes",
 					"system.memory.used.pct",
+					"system.memory.cached",
 				},
 			},
 			{
@@ -1210,6 +1213,14 @@ service:
 					"system.filesystem.available",
 					"system.filesystem.free",
 					"system.filesystem.used.bytes",
+					"system.filesystem.files",
+					"system.filesystem.free_files",
+					"system.filesystem.mount_point",
+					"system.filesystem.options",
+					"system.filesystem.total",
+					"system.filesystem.type",
+					"system.filesystem.used.pct",
+					"system.filesystem.device_name",
 				},
 			},
 		}
@@ -1217,6 +1228,7 @@ service:
 		commonIgnoredFields := []string{
 			// Expected to change between agent metrics input and otel metrics input
 			"@timestamp",
+			"agent.id",
 			"agent.ephemeral_id",
 			"elastic_agent.id",
 			"elastic_agent.snapshot",
