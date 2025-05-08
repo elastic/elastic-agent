@@ -15,6 +15,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/elastic/elastic-agent/dev-tools/notice"
+
 	"github.com/magefile/mage/sh"
 )
 
@@ -30,18 +32,18 @@ func runCommand(cmd string, args ...string) error {
 
 // Notice Generates NOTICE.txt and NOTICE-fips.txt
 func Notice() (err error) {
-	if err := notice("NOTICE.txt"); err != nil {
-		return fmt.Errorf("failed to generate NOTICE.txt: %w", err)
+	if err := generateNotice(notice.NoticeFilename); err != nil {
+		return fmt.Errorf("failed to generate %s: %w", notice.NoticeFilename, err)
 	}
-	if err := notice("NOTICE-fips.txt", "requirefips"); err != nil {
-		return fmt.Errorf("failed to generate NOTICE-fips.txt: %w", err)
+	if err := generateNotice(notice.FIPSNoticeFilename, "requirefips"); err != nil {
+		return fmt.Errorf("failed to generate %s: %w", notice.FIPSNoticeFilename, err)
 	}
 	return nil
 }
 
-// notice generates a notice file with the name outputFilename.
+// generateNotice generates a generateNotice file with the name outputFilename.
 // see getDependentModules for use of additionalTags.
-func notice(outputFilename string, additionalTags ...string) error {
+func generateNotice(outputFilename string, additionalTags ...string) error {
 	fmt.Printf("Generating %s...\n", outputFilename)
 	if err := runCommand("go", "mod", "tidy"); err != nil {
 		return err
