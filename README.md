@@ -261,9 +261,3 @@ of waiting for a CI failure.
 ### Generating the `NOTICE.txt` and `NOTICE-fips.txt` when updating/adding dependencies
 To do so, just run `mage notice`, this is also part of the `make
 check-ci` and is the same check our CI will do.
-
-At some point we will migrate it to mage (see discussion on
-https://github.com/elastic/elastic-agent/pull/1108 and on
-https://github.com/elastic/elastic-agent/issues/1107). However until
-we have the mage automation sorted out, it has been removed to avoid
-confusion.
