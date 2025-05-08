@@ -11,8 +11,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"runtime"
 	"testing"
 	"time"

@@ -9,6 +9,7 @@ package integration
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -39,6 +40,9 @@ const apmProcessingContent = `2023-06-19 05:20:50 ERROR This is a test error mes
 2023-06-20 12:50:00 DEBUG This is a test debug message 2
 2023-06-20 12:51:00 DEBUG This is a test debug message 3
 2023-06-20 12:52:00 DEBUG This is a test debug message 4`
+
+//go:embed testdata/templates/filelog-otel.tmpl
+var fileProcessingConfig string
 
 func TestOtelFileProcessing(t *testing.T) {
 	define.Require(t, define.Requirements{
@@ -92,12 +96,11 @@ func TestOtelFileProcessing(t *testing.T) {
 		InputPath  string
 		OutputPath string
 	}
-	otelConfigTemplate, err := os.ReadFile(filepath.Join("testdata", "templates", "filelog-otel.tmpl"))
-	require.NoError(t, err)
+
 	otelConfigPath := filepath.Join(tmpDir, "otel.yml")
 	var otelConfigBuffer bytes.Buffer
 	require.NoError(t,
-		template.Must(template.New("otelConfig").Parse(string(otelConfigTemplate))).Execute(&otelConfigBuffer,
+		template.Must(template.New("otelConfig").Parse(fileProcessingConfig)).Execute(&otelConfigBuffer,
 			otelConfigOptions{
 				InputPath:  inputFilePath,
 				OutputPath: outputFilePath,
@@ -205,11 +208,10 @@ func TestOtelHybridFileProcessing(t *testing.T) {
 		InputPath  string
 		OutputPath string
 	}
-	otelConfigTemplate, err := os.ReadFile(filepath.Join("testdata", "templates", "filelog-otel.tmpl"))
-	require.NoError(t, err)
+
 	var otelConfigBuffer bytes.Buffer
 	require.NoError(t,
-		template.Must(template.New("otelConfig").Parse(string(otelConfigTemplate))).Execute(&otelConfigBuffer,
+		template.Must(template.New("otelConfig").Parse(otelConfigTemplate)).Execute(&otelConfigBuffer,
 			otelConfigOptions{
 				InputPath:  inputFilePath,
 				OutputPath: outputFilePath,
@@ -321,8 +323,8 @@ service:
 	require.Contains(t, string(out), `service::pipelines::logs: references processor "nonexistingprocessor" which is not configured`)
 }
 
-var logsIngestionConfigTemplate = `
-`
+//go:embed testdata/templates/log-ingestion.tmpl
+var logsIngestionConfig string
 
 func TestOtelLogsIngestion(t *testing.T) {
 	info := define.Require(t, define.Requirements{
@@ -352,10 +354,6 @@ func TestOtelLogsIngestion(t *testing.T) {
 	require.NoError(t, err, "failed to get api key")
 	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
 
-	logsIngestionConfigBytes, err := os.ReadFile(filepath.Join("testdata", "templates", "log-ingestion.tmpl"))
-	require.NoError(t, err)
-
-	logsIngestionConfig := string(logsIngestionConfigBytes)
 	logsIngestionConfig = strings.ReplaceAll(logsIngestionConfig, "{{.ESApiKey}}", esApiKey.Encoded)
 	logsIngestionConfig = strings.ReplaceAll(logsIngestionConfig, "{{.ESEndpoint}}", esHost)
 	logsIngestionConfig = strings.ReplaceAll(logsIngestionConfig, "{{.InputFilePath}}", inputFilePath)
@@ -419,6 +417,9 @@ func TestOtelLogsIngestion(t *testing.T) {
 	require.True(t, err == nil || err == context.Canceled || err == context.DeadlineExceeded, "Retrieved unexpected error: %s", err.Error())
 }
 
+//go:embed testdata/templates/apm-otel.tmpl
+var apmOtelConfig string
+
 func TestOtelAPMIngestion(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Default,
@@ -442,8 +443,7 @@ func TestOtelAPMIngestion(t *testing.T) {
 	tempDir := t.TempDir()
 	cfgFilePath := filepath.Join(tempDir, "otel.yml")
 	fileName := "content.log"
-	apmOtelConfig, err := os.ReadFile(filepath.Join("testdata", "templates", "apm-otel.tmpl"))
-	apmConfig := fmt.Sprintf(string(apmOtelConfig), filepath.Join(tempDir, fileName), testId)
+	apmConfig := fmt.Sprintf(apmOtelConfig, filepath.Join(tempDir, fileName), testId)
 	require.NoError(t, os.WriteFile(cfgFilePath, []byte(apmConfig), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(tempDir, fileName), []byte{}, 0o600))
 
@@ -634,6 +634,9 @@ func mapAtLeastOneTrue(mm map[string]bool) bool {
 	return false
 }
 
+//go:embed testdata/templates/fbreceiver-fileexporter.tmpl
+var fbreceiverConfig string
+
 func TestFileBeatReceiver(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: Default,
@@ -665,12 +668,9 @@ func TestFileBeatReceiver(t *testing.T) {
 	})
 	otelConfigPath := filepath.Join(tmpDir, "otel.yml")
 
-	otelConfigTemplate, err := os.ReadFile(filepath.Join("testdata", "templates", "fbreceiver-fileexporter.tmpl"))
-	require.NoError(t, err)
-
 	var otelConfigBuffer bytes.Buffer
 	require.NoError(t,
-		template.Must(template.New("otelConfig").Parse(string(otelConfigTemplate))).Execute(&otelConfigBuffer,
+		template.Must(template.New("otelConfig").Parse(fbreceiverConfig)).Execute(&otelConfigBuffer,
 			otelConfigOptions{
 				Message: testMessage,
 				Output:  exporterOutputPath,
@@ -717,6 +717,9 @@ func TestFileBeatReceiver(t *testing.T) {
 	fixtureWg.Wait()
 	require.True(t, err == nil || err == context.Canceled || err == context.DeadlineExceeded, "Retrieved unexpected error: %s", err.Error())
 }
+
+//go:embed testdata/templates/fbreceiver-elasticsearch.tmpl
+var fbreceiverE2EConfig string
 
 func TestOtelFBReceiverE2E(t *testing.T) {
 	info := define.Require(t, define.Requirements{
@@ -767,12 +770,11 @@ func TestOtelFBReceiverE2E(t *testing.T) {
 	require.NoError(t, err, "error creating API key")
 	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
 	index := "logs-integration-default"
-	otelConfigTemplate, err := os.ReadFile(filepath.Join("testdata", "templates", "fbreceiver-elasticsearch.tmpl"))
 
 	otelConfigPath := filepath.Join(tmpDir, "otel.yml")
 	var otelConfigBuffer bytes.Buffer
 	require.NoError(t,
-		template.Must(template.New("otelConfig").Parse(string(otelConfigTemplate))).Execute(&otelConfigBuffer,
+		template.Must(template.New("otelConfig").Parse(fbreceiverE2EConfig)).Execute(&otelConfigBuffer,
 			otelConfigOptions{
 				InputPath:  inputFilePath,
 				HomeDir:    tmpDir,
@@ -831,6 +833,9 @@ func TestOtelFBReceiverE2E(t *testing.T) {
 	require.True(t, err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded), "Retrieved unexpected error: %s", err.Error())
 }
 
+//go:embed testdata/templates/filestream-input.tmpl
+var filestreamOtelConfig string
+
 func TestOtelFilestreamInput(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Default,
@@ -879,8 +884,6 @@ func TestOtelFilestreamInput(t *testing.T) {
 	esApiKey, err := createESApiKey(info.ESClient)
 	require.NoError(t, err, "error creating API key")
 	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
-	configTemplate, err := os.ReadFile(filepath.Join("testdata", "templates", "filestream-input.tmpl"))
-	require.NoError(t, err)
 
 	decodedApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err)
@@ -888,7 +891,7 @@ func TestOtelFilestreamInput(t *testing.T) {
 	var configBuffer bytes.Buffer
 
 	require.NoError(t,
-		template.Must(template.New("config").Parse(string(configTemplate))).Execute(&configBuffer,
+		template.Must(template.New("config").Parse(filestreamOtelConfig)).Execute(&configBuffer,
 			otelConfigOptions{
 				InputPath:  inputFilePath,
 				ESEndpoint: esEndpoint,
@@ -969,6 +972,9 @@ func TestOtelFilestreamInput(t *testing.T) {
 	cancel()
 }
 
+//go:embed testdata/templates/metricbeat-input.tmpl
+var metricbeatOtelConfig string
+
 func TestOTelHTTPMetricsInput(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Default,
@@ -995,15 +1001,13 @@ func TestOTelHTTPMetricsInput(t *testing.T) {
 	esApiKey, err := createESApiKey(info.ESClient)
 	require.NoError(t, err, "error creating API key")
 	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
-	configTemplate, err := os.ReadFile(filepath.Join("testdata", "templates", "metricbeat-input.tmpl"))
-	require.NoError(t, err)
 
 	decodedApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err)
 	index := ".ds-metrics-e2e-*"
 	var configBuffer bytes.Buffer
 
-	template.Must(template.New("config").Parse(string(configTemplate))).Execute(&configBuffer,
+	template.Must(template.New("config").Parse(metricbeatOtelConfig)).Execute(&configBuffer,
 		otelConfigOptions{
 			ESEndpoint: esEndpoint,
 			ESApiKey:   decodedApiKey,
@@ -1071,6 +1075,9 @@ func TestOTelHTTPMetricsInput(t *testing.T) {
 	cmd.Wait()
 }
 
+//go:embed testdata/templates/mbreceiver-elasticsearch.tmpl
+var mbreceiverE2EConfig string
+
 func TestOtelMBReceiverE2E(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Default,
@@ -1098,13 +1105,11 @@ func TestOtelMBReceiverE2E(t *testing.T) {
 	require.NoError(t, err, "error creating API key")
 	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
 	index := "logs-integration-default"
-	otelConfigTemplate, err := os.ReadFile(filepath.Join("testdata", "templates", "mbreceiver-elasticsearch.tmpl"))
-	require.NoError(t, err)
 
 	otelConfigPath := filepath.Join(tmpDir, "otel.yml")
 	var otelConfigBuffer bytes.Buffer
 	require.NoError(t,
-		template.Must(template.New("otelConfig").Parse(string(otelConfigTemplate))).Execute(&otelConfigBuffer,
+		template.Must(template.New("otelConfig").Parse(mbreceiverE2EConfig)).Execute(&otelConfigBuffer,
 			otelConfigOptions{
 				HomeDir:    tmpDir,
 				ESEndpoint: esEndpoint,
@@ -1161,6 +1166,9 @@ func TestOtelMBReceiverE2E(t *testing.T) {
 	fixtureWg.Wait()
 	require.True(t, err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded), "Retrieved unexpected error: %s", err.Error())
 }
+
+//go:embed testdata/templates/hybrid-mode.tmpl
+var hybridE2EConfig string
 
 func TestHybridAgentE2E(t *testing.T) {
 	// This test is a hybrid agent test that ingests a single log with
@@ -1219,15 +1227,12 @@ func TestHybridAgentE2E(t *testing.T) {
 	require.NoError(t, err, "error creating API key")
 	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
 
-	configTemplate, err := os.ReadFile(filepath.Join("testdata", "templates", "hybrid-mode.tmpl"))
-	require.NoError(t, err)
-
 	beatsApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err, "error decoding api key")
 
 	var configBuffer bytes.Buffer
 	require.NoError(t,
-		template.Must(template.New("config").Parse(string(configTemplate))).Execute(&configBuffer,
+		template.Must(template.New("config").Parse(hybridE2EConfig)).Execute(&configBuffer,
 			configOptions{
 				InputPath:       inputFilePath,
 				HomeDir:         tmpDir,
@@ -1342,6 +1347,9 @@ func AssertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg 
 	require.Equal(t, "", cmp.Diff(flatM1, flatM2), "expected maps to be equal")
 }
 
+//go:embed testdata/templates/fbreceiver-restart.tmpl
+var fbOtelRestartE2EConfig string
+
 func TestFBOtelRestartE2E(t *testing.T) {
 	// This test ensures that filebeatreceiver is able to deliver logs even
 	// in advent of a collector restart.
@@ -1380,13 +1388,10 @@ func TestFBOtelRestartE2E(t *testing.T) {
 	require.NoError(t, err, "error creating API key")
 	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
 	index := strings.ToLower("logs-generic-default-" + randStr(8))
-	otelConfigTemplate, err := os.ReadFile(filepath.Join("testdata", "templates", "fbreceiver-restart.tmpl"))
-	require.NoError(t, err)
-
 	otelConfigPath := filepath.Join(tmpDir, "otel.yml")
 	var otelConfigBuffer bytes.Buffer
 	require.NoError(t,
-		template.Must(template.New("otelConfig").Parse(string(otelConfigTemplate))).Execute(&otelConfigBuffer,
+		template.Must(template.New("otelConfig").Parse(fbOtelRestartE2EConfig)).Execute(&otelConfigBuffer,
 			otelConfigOptions{
 				InputPath:  inputFilePath,
 				HomeDir:    tmpDir,
