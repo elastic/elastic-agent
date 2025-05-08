@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
@@ -36,6 +37,15 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
+
+type mockSaver struct {
+	mock.Mock
+}
+
+func (m *mockSaver) Save(in io.Reader) error {
+	args := m.Called(in)
+	return args.Error(0)
+}
 
 type mockStore struct {
 	Err     error
@@ -57,14 +67,11 @@ func (m *mockStore) Save(in io.Reader) error {
 
 func TestEnroll(t *testing.T) {
 	testutils.InitStorage(t)
-	skipCreateSecret := false
-	if runtime.GOOS == "darwin" {
-		skipCreateSecret = true
-	}
+	skipCreateSecret := runtime.GOOS == "darwin"
 
 	log, _ := logger.New("tst", false)
 
-	t.Run("fail to save is propagated", withTLSServer(
+	t.Run("fail to save is retried", withTLSServer(
 		func(t *testing.T) *http.ServeMux {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
@@ -97,7 +104,9 @@ func TestEnroll(t *testing.T) {
 			defer os.Remove(caFile)
 
 			url := "https://" + host
-			store := &mockStore{Err: errors.New("fail to save")}
+			store := &mockSaver{}
+			failCall := store.On("Save", mock.Anything).Return(errors.New("fail to save")).Once()
+			store.On("Save", mock.Anything).Return(nil).NotBefore(failCall).Once()
 			cmd, err := newEnrollCmd(
 				log,
 				&enrollCmdOption{
@@ -106,6 +115,7 @@ func TestEnroll(t *testing.T) {
 					EnrollAPIKey:         "my-enrollment-token",
 					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
 					SkipCreateSecret:     skipCreateSecret,
+					SkipDaemonRestart:    true,
 				},
 				"",
 				store,
@@ -114,8 +124,11 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			err = cmd.Execute(context.Background(), streams)
-			require.Error(t, err)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+			defer cancel()
+			err = cmd.Execute(ctx, streams)
+			require.NoError(t, err)
+			store.AssertExpectations(t)
 		},
 	))
 
@@ -152,7 +165,21 @@ func TestEnroll(t *testing.T) {
 			defer os.Remove(caFile)
 
 			url := "https://" + host
-			store := &mockStore{}
+
+			store := &mockSaver{}
+			store.On("Save", mock.MatchedBy(func(in io.Reader) bool {
+				buf := new(bytes.Buffer)
+				_, err := io.Copy(buf, in)
+				if err != nil {
+					return false
+				}
+				cfg, err := readConfig(buf.Bytes())
+				if err != nil {
+					return false
+				}
+				return cfg.Client.Host == host && cfg.AccessAPIKey == "my-access-api-key"
+			})).Return(nil).Once()
+
 			cmd, err := newEnrollCmd(
 				log,
 				&enrollCmdOption{
@@ -170,18 +197,13 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 			defer cancel()
 
 			if err := cmd.Execute(ctx, streams); err != nil {
 				t.Fatalf("enroll command returned and unexpected error: %v", err)
 			}
-
-			config, err := readConfig(store.Content)
-			require.NoError(t, err)
-
-			assert.Equal(t, "my-access-api-key", config.AccessAPIKey)
-			assert.Equal(t, host, config.Client.Host)
+			store.AssertExpectations(t)
 		},
 	))
 
@@ -214,7 +236,19 @@ func TestEnroll(t *testing.T) {
 			return mux
 		}, func(t *testing.T, host string) {
 			url := "http://" + host + "/"
-			store := &mockStore{}
+			store := &mockSaver{}
+			store.On("Save", mock.MatchedBy(func(in io.Reader) bool {
+				buf := new(bytes.Buffer)
+				_, err := io.Copy(buf, in)
+				if err != nil {
+					return false
+				}
+				cfg, err := readConfig(buf.Bytes())
+				if err != nil {
+					return false
+				}
+				return cfg.Client.Host == host && cfg.AccessAPIKey == "my-access-api-key"
+			})).Return(nil).Once()
 			cmd, err := newEnrollCmd(
 				log,
 				&enrollCmdOption{
@@ -233,20 +267,13 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 			defer cancel()
 
 			if err := cmd.Execute(ctx, streams); err != nil {
 				t.Fatalf("enroll command returned and unexpected error: %v", err)
 			}
-
-			assert.True(t, store.Called)
-			config, err := readConfig(store.Content)
-			require.NoError(t, err, "readConfig returned an error")
-			assert.Equal(t, "my-access-api-key", config.AccessAPIKey,
-				"The stored 'Access API Key' must be the same returned by Fleet-Server")
-			assert.Equal(t, host, config.Client.Host,
-				"The stored Fleet-Server host must match the one used during enrol")
+			store.AssertExpectations(t)
 		},
 	))
 
@@ -279,7 +306,19 @@ func TestEnroll(t *testing.T) {
 			return mux
 		}, func(t *testing.T, host string) {
 			url := "http://" + host
-			store := &mockStore{}
+			store := &mockSaver{}
+			store.On("Save", mock.MatchedBy(func(in io.Reader) bool {
+				buf := new(bytes.Buffer)
+				_, err := io.Copy(buf, in)
+				if err != nil {
+					return false
+				}
+				cfg, err := readConfig(buf.Bytes())
+				if err != nil {
+					return false
+				}
+				return cfg.Client.Host == host && cfg.AccessAPIKey == "my-access-api-key"
+			})).Return(nil).Once()
 			cmd, err := newEnrollCmd(
 				log,
 				&enrollCmdOption{
@@ -298,20 +337,15 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 			defer cancel()
 			err = cmd.Execute(ctx, streams)
 			require.NoError(t, err, "enroll command should return no error")
-
-			assert.True(t, store.Called)
-			config, err := readConfig(store.Content)
-			require.NoError(t, err)
-			assert.Equal(t, "my-access-api-key", config.AccessAPIKey)
-			assert.Equal(t, host, config.Client.Host)
+			store.AssertExpectations(t)
 		},
 	))
 
-	t.Run("fail to enroll without TLS", withServer(
+	t.Run("fail to enroll without TLS times out", withServer(
 		func(t *testing.T) *http.ServeMux {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
@@ -325,7 +359,7 @@ func TestEnroll(t *testing.T) {
 			return mux
 		}, func(t *testing.T, host string) {
 			url := "http://" + host
-			store := &mockStore{}
+			store := &mockSaver{}
 			cmd, err := newEnrollCmd(
 				log,
 				&enrollCmdOption{
@@ -343,9 +377,11 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			err = cmd.Execute(context.Background(), streams)
-			require.Error(t, err)
-			require.False(t, store.Called)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+			defer cancel()
+			err = cmd.Execute(ctx, streams)
+			require.ErrorIs(t, err, context.DeadlineExceeded)
+			store.AssertExpectations(t)
 		},
 	))
 
@@ -393,7 +429,19 @@ func TestEnroll(t *testing.T) {
 			return mux
 		}, func(t *testing.T, host string) {
 			url := "http://" + host
-			store := &mockStore{}
+			store := &mockSaver{}
+			store.On("Save", mock.MatchedBy(func(in io.Reader) bool {
+				buf := new(bytes.Buffer)
+				_, err := io.Copy(buf, in)
+				if err != nil {
+					return false
+				}
+				cfg, err := readConfig(buf.Bytes())
+				if err != nil {
+					return false
+				}
+				return cfg.Client.Host == host && cfg.AccessAPIKey == "my-access-api-key"
+			})).Return(nil).Once()
 			cmd, err := newEnrollCmd(
 				log,
 				&enrollCmdOption{
@@ -412,16 +460,11 @@ func TestEnroll(t *testing.T) {
 			require.NoError(t, err)
 
 			streams, _, _, _ := cli.NewTestingIOStreams()
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 			defer cancel()
 			err = cmd.Execute(ctx, streams)
 			require.NoError(t, err, "enroll command should return no error")
-
-			assert.True(t, store.Called, "the store should have been called")
-			config, err := readConfig(store.Content)
-			require.NoError(t, err)
-			assert.Equal(t, "my-access-api-key", config.AccessAPIKey)
-			assert.Equal(t, host, config.Client.Host)
+			store.AssertExpectations(t)
 		},
 	))
 }
@@ -439,7 +482,7 @@ func TestValidateArgs(t *testing.T) {
 		require.NoError(t, err)
 		args := buildEnrollmentFlags(cmd, url, enrolmentToken)
 		require.NotNil(t, args)
-		require.Equal(t, len(args), 11)
+		require.Len(t, args, 13)
 		require.Contains(t, args, "--tag")
 		require.Contains(t, args, "windows")
 		require.Contains(t, args, "production")
@@ -448,6 +491,7 @@ func TestValidateArgs(t *testing.T) {
 		require.Contains(t, args, url)
 		require.Contains(t, args, "--fleet-server-client-auth")
 		require.Contains(t, args, "none")
+		require.Contains(t, args, "--enroll-timeout")
 		cleanedTags := cleanTags(args)
 		require.Contains(t, cleanedTags, "windows")
 		require.Contains(t, cleanedTags, "production")
@@ -467,8 +511,8 @@ func TestValidateArgs(t *testing.T) {
 		require.Contains(t, cleanedTags, "windows")
 		require.Contains(t, cleanedTags, "production")
 		// Validate that we remove the duplicates
-		require.Equal(t, len(args), 12)
-		require.Equal(t, len(cleanedTags), 9)
+		require.Len(t, args, 14)
+		require.Len(t, cleanedTags, 11)
 	})
 
 	t.Run("valid tag and empty tag", func(t *testing.T) {
@@ -524,6 +568,24 @@ func TestValidateArgs(t *testing.T) {
 		require.Contains(t, args, "/path/to/cert")
 		require.Contains(t, args, "--elastic-agent-cert-key")
 		require.Contains(t, args, "/path/to/key")
+	})
+
+	t.Run("enroll-timeout value is passed", func(t *testing.T) {
+		cmd := newEnrollCommandWithArgs([]string{}, streams)
+		err := cmd.Flags().Set("enroll-timeout", "1m")
+		require.NoError(t, err)
+		args := buildEnrollmentFlags(cmd, url, enrolmentToken)
+		require.Contains(t, args, "--enroll-timeout")
+		require.Contains(t, args, "1m0s")
+	})
+
+	t.Run("negative enroll-timeout value is passed", func(t *testing.T) {
+		cmd := newEnrollCommandWithArgs([]string{}, streams)
+		err := cmd.Flags().Set("enroll-timeout", "-1s")
+		require.NoError(t, err)
+		args := buildEnrollmentFlags(cmd, url, enrolmentToken)
+		require.Contains(t, args, "--enroll-timeout")
+		require.Contains(t, args, "-1s")
 	})
 }
 
