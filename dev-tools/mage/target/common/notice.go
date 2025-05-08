@@ -110,7 +110,7 @@ func generateNotice(outputFilename string, additionalTags ...string) error {
 		return err
 	}
 
-	// cat dev-tools/notice/NOTICE.txt.append >> outputFilename
+	// cat dev-tools/notice/NOTICE.txt.append >> {outputFilename}
 	const (
 		infn = "dev-tools/notice/NOTICE.txt.append"
 	)
