@@ -65,7 +65,7 @@ TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true 
     -tags integration -test.shuffle on -test.timeout 2h0m0s \
     github.com/elastic/elastic-agent/testing/integration \
     -v \
-    -args "${INTEGRATION_TEST_ARGS}"
+    -args -integration.groups="${GROUP_NAME}" -integration.sudo="${TEST_SUDO}"
 
 TESTS_EXIT_STATUS=$?
 set -e
