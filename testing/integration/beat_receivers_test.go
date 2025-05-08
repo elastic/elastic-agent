@@ -1194,8 +1194,14 @@ service:
 				},
 			},
 			{
-				name:          "network",
-				ignoredFields: []string{},
+				name: "network",
+				ignoredFields: []string{
+					"system.network.in.bytes",
+					"system.network.in.packets",
+					"system.network.name",
+					"system.network.out.bytes",
+					"system.network.out.packets",
+				},
 			},
 			{
 				name: "filesystem",
@@ -1212,10 +1218,12 @@ service:
 			// Expected to change between agent metrics input and otel metrics input
 			"@timestamp",
 			"agent.ephemeral_id",
-			"agent.id",
-			"agent.version",
+			"elastic_agent.id",
+			"elastic_agent.snapshot",
+			"elastic_agent.version",
 			"data_stream.namespace",
 			"event.ingested",
+			"event.duration",
 		}
 
 		require.Equal(t, len(metricsets), len(testCases), "expected to have a test case for each metricset")
