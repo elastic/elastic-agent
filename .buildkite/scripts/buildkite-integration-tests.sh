@@ -22,12 +22,6 @@ if [ "$TEST_SUDO" == "true" ]; then
   source .buildkite/hooks/pre-command || echo "No pre-command hook found"
 fi
 
-INTEGRATION_TEST_ARGS="-integration.groups=${GROUP_NAME} -integration.sudo=${TEST_SUDO}"
-if [[ "${FIPS:-false}" == "true" ]]; then
-    echo "FIPS testing detected"
-    #INTEGRATION_TEST_ARGS+=" -integration.fips=true" # FIXME re-enable once adding this filter picks up tests
-fi
-
 # Make sure that all tools are installed
 asdf install
 
@@ -65,7 +59,7 @@ TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true 
     -tags integration -test.shuffle on -test.timeout 2h0m0s \
     github.com/elastic/elastic-agent/testing/integration \
     -v \
-    -args -integration.groups="${GROUP_NAME}" -integration.sudo="${TEST_SUDO}"
+    -args -integration.groups="${GROUP_NAME}" -integration.sudo="${TEST_SUDO}" -integration.fips="${FIPS:-false}"
 
 TESTS_EXIT_STATUS=$?
 set -e
