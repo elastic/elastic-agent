@@ -42,7 +42,7 @@ func TestFIPSAgentConnectingToFIPSFleetServerInECHFRH(t *testing.T) {
 	})
 
 	// Check that the Fleet Server in the deployment is healthy
-	fleetServerHost := os.Getenv("FLEETSERVER_HOST")
+	fleetServerHost := os.Getenv("INTEGRATIONS_SERVER_HOST")
 	statusUrl, err := url.JoinPath(fleetServerHost, "/api/status")
 	require.NoError(t, err)
 
