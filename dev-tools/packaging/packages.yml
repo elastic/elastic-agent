@@ -435,6 +435,10 @@ shared:
     files:
       <<: *agent_binary_files
       <<: *agent_unpacked_components_files
+      NOTICE.txt:
+        source: '{{ repo.RootDir }}/NOTICE-fips.txt'
+        mode: 0644
+
 
   - &agent_darwin_binary_spec
     <<: *common
