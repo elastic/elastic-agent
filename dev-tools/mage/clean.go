@@ -12,6 +12,7 @@ import (
 // The values may contain variables and will be expanded at the time of use.
 var DefaultCleanPaths = []string{
 	"build",
+	".agent-testing",
 	"docker-compose.yml.lock",
 	"{{.BeatName}}",
 	"{{.BeatName}}.exe",
