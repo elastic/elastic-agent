@@ -50,6 +50,7 @@ var (
 	GroupsFilter        stringArrayFlag
 	PlatformsFilter     stringArrayFlag
 	SudoFilter          optionalBoolFlag
+	FipsFilter          optionalBoolFlag
 	AutoDiscover        bool
 	AutoDiscoveryOutput string
 )
@@ -59,6 +60,7 @@ func RegisterFlags(prefix string, set *flag.FlagSet) {
 	set.Var(&GroupsFilter, prefix+"groups", "test groups, comma-separated")
 	set.Var(&PlatformsFilter, prefix+"platforms", "test platforms, comma-separated")
 	set.Var(&SudoFilter, prefix+"sudo", "Filter tests by sudo requirements")
+	set.Var(&FipsFilter, prefix+"fips", "Filter tests by FIPS requirement")
 	set.BoolVar(&AutoDiscover, prefix+"autodiscover", false, "Auto discover tests (should be used together with -dry-run). Output will be a file that can be set with -autodiscoveryoutput")
 	set.StringVar(&AutoDiscoveryOutput, prefix+"autodiscoveryoutput", "discovered_tests.yaml", "Set the file location where the structured output for the discovered tests will be stored")
 }
