@@ -338,16 +338,11 @@ steps:
         matrix:
           setup:
             variants:
-<<<<<<< HEAD
             - "basic,wolfi,complete,complete-wolfi,service,cloud"
-=======
-            - "basic,slim,complete,service,elastic-otel-collector"
-            - "wolfi,slim-wolfi,complete-wolfi,elastic-otel-collector-wolfi"
 
             # See the Kubernetes Compatible Versions for Elastic Agent in the Elastic
             # Support Matrix (https://www.elastic.co/support/matrix#matrix_kubernetes) for
             # the rationale on why these specific versions are chosen.
->>>>>>> 78d5d2ee4 ([k8s tests] Add versions + comments explaining why (#8104))
             version:
               - v1.27.16
               - v1.28.15
