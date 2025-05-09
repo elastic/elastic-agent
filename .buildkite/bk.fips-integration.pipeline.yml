@@ -8,8 +8,10 @@ env:
   CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
   CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud"
 
-  IMAGE_UBUNTU_FIPS: "platform-ingest-fleet-server-ubuntu-2204-fips" # image may only be in aws?
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1744855248"
   IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1744855248"
+  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-fleet-server-ubuntu-2204-fips"
+  IMAGE_UBUNTU_ARM64_FIPS: "" # TODO We need an ARM image as well
 
 steps:
   - label: Build and push custom elastic-agent image
@@ -49,7 +51,7 @@ steps:
     depends_on:
       - integration-fips-ess
     steps:
-      - label: "fips:non-sudo:{{matrix}}"
+      - label: "fips:x86_64:non-sudo:{{matrix}}"
         depends_on:
           - packaging-ubuntu-x86-64-fips
         command: |
@@ -62,26 +64,18 @@ steps:
           automatic:
             limit: 1
         agents:
-          provider: "gcp"
-          machineType: "n1-standard-8"
-          image: "${IMAGE_UBUNTU_2404_X86_64}"
+          provider: "aws"
+          imagePrefix: "${IMAGE_UBUNTU_X84_64_FIPS}"
+          instanceType: "m5.2xlarge"
         matrix:
           - default
           - upgrade
           - upgrade-flavor
           - standalone-upgrade
           - fleet
-          - fleet-endpoint-security
-          - fleet-airgapped
-          - fleet-airgapped-privileged
-          - fleet-privileged
-          - fleet-upgrade-to-pr-build
-          - install-uninstall
-          - fqdn
-          - deb
-          - container
+          # FIPS tests don't have other groups enabled in order to save resources
 
-      - label: "fips:sudo:{{matrix}}"
+      - label: "fips:x86_64:sudo:{{matrix}}"
         depends_on:
           - packaging-ubuntu-x86-64-fips
         command: |
@@ -94,24 +88,61 @@ steps:
           automatic:
             limit: 1
         agents:
-          provider: "gcp"
-          machineType: "n1-standard-8"
-          image: "${IMAGE_UBUNTU_2404_X86_64}"
+          provider: "aws"
+          imagePrefix: "${IMAGE_UBUNTU_X84_64_FIPS}"
+          instanceType: "m5.2xlarge"
         matrix:
           - default
           - upgrade
           - upgrade-flavor
           - standalone-upgrade
           - fleet
-          - fleet-endpoint-security
-          - fleet-airgapped
-          - fleet-airgapped-privileged
-          - fleet-privileged
-          - fleet-upgrade-to-pr-build
-          - install-uninstall
-          - fqdn
-          - deb
-          - container
+
+      - label: "fips:arm64:non-sudo:{{matrix}}"
+        depends_on:
+          - packaging-ubuntu-arm64-fips
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64-fips'
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "aws"
+          image: "${IMAGE_UBUNTU_2404_ARM_64}"
+          instanceType: "m6g.2xlarge"
+        matrix:
+          - default
+          - upgrade
+          - upgrade-flavor
+          - standalone-upgrade
+          - fleet
+
+      - label: "fips:arm64:sudo:{{matrix}}"
+        depends_on:
+          - packaging-ubuntu-arm64-fips
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-arm64-fips
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "aws"
+          image: "${IMAGE_UBUNTU_2404_ARM_64}"
+          instanceType: "m6g.2xlarge"
+        matrix:
+          - default
+          - upgrade
+          - upgrade-flavor
+          - standalone-upgrade
+          - fleet
 
   - group: "fips:Kubernetes"
     key: integration-tests-kubernetes-fips
@@ -125,7 +156,7 @@ steps:
           ASDF_KIND_VERSION: "0.27.0"
           DOCKER_VARIANTS: "fips"
           TARGET_ARCH: "amd64"
-          AGENT_VERSION: "9.0.0-SNAPSHOT" # Remove agent pinning once 9.0.0 is released
+          AGENT_VERSION: "9.1.0-SNAPSHOT" # Set to 9.1.0 as it is the first release in 9.x that supports FIPS
         command: |
           buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64-fips'
           .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
@@ -137,9 +168,9 @@ steps:
           automatic:
             limit: 1
         agents:
-          provider: "gcp"
-          machineType: "n1-standard-4"
-          image: "${IMAGE_UBUNTU_2404_X86_64}"
+          provider: "aws"
+          imagePrefix: "${IMAGE_UBUNTU_X84_64_FIPS}"
+          instanceType: "m5.2xlarge"
           diskSizeGb: 80
         matrix:
           setup:
