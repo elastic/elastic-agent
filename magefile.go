@@ -1001,6 +1001,7 @@ func (Cloud) Push() error {
 		tag = fmt.Sprintf("%s-%s-%d", version, commit, time)
 	}
 
+	// Need to get the FIPS env var flag to see if we are using the normal source cloud image name, or the FIPS variant
 	fips := os.Getenv(fipsEnv)
 	defer os.Setenv(fipsEnv, fips)
 	fipsVal, err := strconv.ParseBool(fips)
