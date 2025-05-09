@@ -76,8 +76,6 @@ func TestFIPSAgentConnectingToFIPSFleetServerInECHFRH(t *testing.T) {
 	for _, item := range agents.Items {
 		if item.PolicyID == cloudAgentPolicyID {
 			agentStatus = item.Status
-			// FIXME: needs https://github.com/elastic/elastic-agent-libs/pull/320
-			// to be merged and a new elastic-agent-libs to be released.
 			//agentIsFIPS = item.LocalMetadata.Elastic.Agent.FIPS
 		}
 	}
