@@ -17,6 +17,14 @@ RUN for iter in {1..10}; do \
 
 COPY beat {{ $beatHome }}
 
+{{- if (and (contains .buildFrom "redhat/ubi") (contains .buildFrom "-minimal")) }}
+RUN for iter in {1..10}; do \
+        microdnf update -y && \
+        microdnf install -y findutils && \
+        microdnf clean all && \
+        exit_code=0 && break || exit_code=$? && echo "microdnf error: retry $iter in 10s" && sleep 10; done; (exit $exit_code)
+{{- end }}
+
 RUN true && \
     # ECE needs to create config here under non-1000 user
     chmod 0777 {{ $beatHome}} && \
@@ -70,7 +78,7 @@ FROM {{ .from }}
 
 ENV BEAT_SETUID_AS={{ .user }}
 
-{{- if contains .from "ubi-minimal" }}
+{{- if (and (contains .from "redhat/ubi") (contains .from "-minimal")) }}
 RUN for iter in {1..10}; do \
         microdnf update -y && \
         microdnf install -y tar gzip findutils shadow-utils ca-certificates gawk libcap xz systemd && \
@@ -183,7 +191,7 @@ RUN apk add --no-cache git make python-3.11 py3.11-pip && \
     chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/connectors
 {{- end }}
 
-{{- if (and (eq .Variant "complete") (contains .from "ubi-minimal"))  }}
+{{- if (and (eq .Variant "complete") (and (contains .from "redhat/ubi") (contains .from "-minimal") ))  }}
 USER root
 ENV NODE_PATH={{ $beatHome }}/.node
 RUN echo \
