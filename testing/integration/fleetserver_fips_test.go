@@ -41,9 +41,6 @@ func TestFIPSAgentConnectingToFIPSFleetServerInECHFRH(t *testing.T) {
 		FIPS: true,
 	})
 
-	// Further, the Fleet Server must be configured with FIPS-compliant TLS (TLSv1.2
-	// and TLSv1.3 and appropriate ciphers).
-
 	// Check that the Fleet Server in the deployment is healthy
 	fleetServerHost := os.Getenv("FLEETSERVER_HOST")
 	statusUrl, err := url.JoinPath(fleetServerHost, "/api/status")
