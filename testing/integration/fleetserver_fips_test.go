@@ -2,47 +2,88 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build integration && frh
+//go:build integration
 
 package integration
 
 import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/url"
+	"os"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
-// IMPORTANT: This file has build tags of integration && frh. This means the tests in
-// this file will NOT be run along with other integration tests (which use deployments
-// in the ESS production CFT region). The tests in this file need to be run using
-// deployments in an ECH FRH (FedRamp High) region. This region can be specified using
-// the following environment variables:
-// TEST_INTEG_AUTH_ESS_FRH_URL (default: https://api.staging.elastic-gov.com/)
-// TEST_INTEG_AUTH_ESS_FRH_REGION (default: us-gov-east-1)
-// TEST_INTEG_AUTH_ESS_FRH_APIKEY
+const cloudAgentPolicyID = "policy-elastic-agent-on-cloud"
 
 // TestFIPSAgentConnectingToFIPSFleetServerInECHFRH ensures that a FIPS-capable Elastic Agent
 // running in an ECH FRH (FedRamp High) environment is able to successfully connect to its
 // own local Fleet Server instance (which, by definition should also be FIPS-capable and
 // running in the ECH FRH environment).
-// NOTE: This test has nothing to do with the locally-built Agent artifact! It merely
-// orchestrates resources in ECH (Elastic Cloud - Hosted).
-
 func TestFIPSAgentConnectingToFIPSFleetServerInECHFRH(t *testing.T) {
-	_ = define.Require(t, define.Requirements{
+	info := define.Require(t, define.Requirements{
 		Group: Fleet,
-		Stack: nil,
+		Stack: &define.Stack{},
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
 		Sudo:  false,
 		Local: true,
+
+		// Ensures the test will run in a FIPS-configured environment against a
+		// deployment in ECH that's running a FIPS-capable integrations server.
+		FIPS: true,
 	})
 
-	// Connect to ECH FRH environment and spin up deployment. The deployment must
-	// contain an Integrations Server, which includes an Agent running with a local
-	// Fleet Server. Note that we will need to use a FIPS-capable build of Elastic Agent
-	// (with Fleet Server) for this deployment. Further, the Fleet Server must be configured with FIPS-compliant TLS (TLSv1.2
+	// Further, the Fleet Server must be configured with FIPS-compliant TLS (TLSv1.2
 	// and TLSv1.3 and appropriate ciphers).
 
-	// Once the deployment is completely spun up, ensure that the Agent in the
-	// deployment is healthy and connected to Fleet. This will prove that a FIPS-capable
-	// Agent is able to connect to a FIPS-capable Fleet Server, with both running in ECH.
+	// Check that the Fleet Server in the deployment is healthy
+	fleetServerHost := os.Getenv("FLEETSERVER_HOST")
+	statusUrl, err := url.JoinPath(fleetServerHost, "/api/status")
+	require.NoError(t, err)
+
+	resp, err := http.Get(statusUrl)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	var body struct {
+		Name   string `json:"name"`
+		Status string `json:"status"`
+	}
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&body)
+	require.NoError(t, err)
+
+	require.Equal(t, "HEALTHY", body.Status)
+
+	// Get all Agents
+	ctx, cancel := context.WithTimeout(5*time.Second, context.Background())
+	defer cancel()
+	agents, err := info.KibanaClient.ListAgents(ctx)
+	require.NoError(t, err)
+
+	// Find Fleet Server's own Agent and get its status and whether it's
+	// FIPS-capable
+	var agentStatus string
+	var agentIsFIPS bool
+	for _, item := range agents.Items {
+		if item.PolicyID == cloudAgentPolicyID {
+			agentStatus = item.Status
+			// TODO: requires change in elastic-agent-libs
+			//agentIsFIPS = item.LocalMetadata.Elastic.Agent.FIPS
+		}
+	}
+
+	// Check that this Agent is online (i.e. healthy) and is FIPS-capable. This
+	// will prove that a FIPS-capable Agent is able to connect to a FIPS-capable
+	// Fleet Server, with both running in ECH.
+	require.Equal(t, "online", agentStatus)
+	require.Equal(t, true, agentIsFIPS)
 }
