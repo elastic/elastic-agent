@@ -205,11 +205,7 @@ RUN apk add --no-cache git make python-3.11 py3.11-pip && \
     chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/connectors
 {{- end }}
 
-<<<<<<< HEAD
-{{- if (and (eq .Variant "complete") (contains .from "ubuntu"))  }}
-=======
 {{- if (and (eq .Variant "complete") (and (contains .from "redhat/ubi") (contains .from "-minimal") ))  }}
->>>>>>> 56f5d9053 (docker: use the official Red Hat images (#7817))
 USER root
 ENV NODE_PATH={{ $beatHome }}/.node
 RUN echo \
