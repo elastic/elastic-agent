@@ -267,6 +267,7 @@ func TestPackages(options ...TestPackagesOption) error {
 	}
 
 	args = append(args, "-files", MustExpand("{{.PWD}}/build/distributions/*"))
+	args = append(args, "--source-root", MustExpand("{{.PWD}}"))
 
 	if out, err := goTest(args...); err != nil {
 		if mg.Verbose() {
