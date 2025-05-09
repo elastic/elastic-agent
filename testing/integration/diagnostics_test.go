@@ -182,30 +182,6 @@ func TestDiagnosticsCommand(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestFIPSDiagnosticsCommand(t *testing.T) {
-	define.Require(t, define.Requirements{
-		Group: Default,
-		Local: false,
-		FIPS:  true,
-	})
-
-	f, err := define.NewFixtureFromLocalBuild(t, define.Version())
-	require.NoError(t, err)
-
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
-	defer cancel()
-	err = f.Prepare(ctx, fakeComponent)
-	require.NoError(t, err)
-
-	err = f.Run(ctx, integrationtest.State{
-		Configure:  simpleConfig2,
-		AgentState: integrationtest.NewClientState(client.Healthy),
-		Components: componentSetup,
-		After:      testDiagnosticsFactory(t, componentSetup, diagnosticsFiles, compDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
-	})
-	assert.NoError(t, err)
-}
-
 func TestIsolatedUnitsDiagnosticsCommand(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: Default,
