@@ -1200,10 +1200,15 @@ service:
 			{
 				name: "network",
 				ignoredFields: []string{
+					"host.network.egress.bytes",
+					"host.network.egress.packets",
+					"system.network.in.dropped",
 					"system.network.in.bytes",
 					"system.network.in.packets",
 					"system.network.name",
 					"system.network.out.bytes",
+					"system.network.out.dropped",
+					"system.network.out.errors",
 					"system.network.out.packets",
 				},
 			},
