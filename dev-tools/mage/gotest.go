@@ -229,7 +229,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 	// The additional arguments given via GoTestArgs are applied to `go test` only. Callers can not
 	// modify any of the gotestsum arguments.
 
-	gotestsumArgs := []string{"--no-color"}
+	gotestsumArgs := []string{"--no-color", "--junitfile-hide-skipped-tests"}
 	if mg.Verbose() {
 		gotestsumArgs = append(gotestsumArgs, "-f", "standard-verbose")
 	} else {
