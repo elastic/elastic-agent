@@ -178,7 +178,7 @@ func GoTestIntegrationForModule(ctx context.Context) error {
 // InstallGoTestTools installs additional tools that are required to run unit and integration tests.
 func InstallGoTestTools() error {
 	return gotool.Install(
-		gotool.Install.Package("gotest.tools/gotestsum"),
+		gotool.Install.Package("github.com/v1v/gotestsum"),
 	)
 }
 
@@ -229,7 +229,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 	// The additional arguments given via GoTestArgs are applied to `go test` only. Callers can not
 	// modify any of the gotestsum arguments.
 
-	gotestsumArgs := []string{"--no-color"}
+	gotestsumArgs := []string{"--no-color", "--junitfile-hide-skipped-tests"}
 	if mg.Verbose() {
 		gotestsumArgs = append(gotestsumArgs, "-f", "standard-verbose")
 	} else {

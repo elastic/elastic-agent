@@ -11,6 +11,13 @@ mage:
 	@go install github.com/magefile/mage
 	@-mage -clean
 
+## gotestsum : Sets gotestsum
+.PHONY: gotestsum
+gotestsum:
+	@echo Installing gotestsum
+	go install github.com/v1v/gotestsum@v0.0.2
+	@-gotestsum --version
+
 ## help : Show this help.
 help: Makefile
 	@printf "Usage: make [target] [VARIABLE=value]\nTargets:\n"
