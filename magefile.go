@@ -335,7 +335,7 @@ func (Build) WindowsArchiveRootBinary() error {
 	if devtools.FIPSBuild {
 		// there is no actual FIPS relevance for this particular binary
 		// but better safe than sorry
-		args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips")
+		args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips,ms_tls13kdf")
 		args.CGO = true
 	}
 
