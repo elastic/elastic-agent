@@ -144,6 +144,10 @@ func (psv ParsedSemVer) IndependentBuildID() string {
 	return ""
 }
 
+func (psv ParsedSemVer) Equal(other ParsedSemVer) bool {
+	return !psv.Less(other) && !other.Less(psv)
+}
+
 func (psv ParsedSemVer) Less(other ParsedSemVer) bool {
 	// compare major version
 	if psv.major != other.major {
