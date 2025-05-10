@@ -712,6 +712,7 @@ func checkFIPS(t *testing.T, agentPackageRootDir string) {
 				case "-tags":
 					foundTags = true
 					require.Contains(t, setting.Value, "requirefips")
+					require.Contains(t, setting.Value, "ms_tls13kdf")
 					continue
 				case "GOEXPERIMENT":
 					foundExperiment = true
