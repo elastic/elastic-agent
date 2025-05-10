@@ -17,6 +17,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
@@ -61,9 +62,9 @@ func TestFIPSAgentConnectingToFIPSFleetServerInECHFRH(t *testing.T) {
 	require.Equal(t, "HEALTHY", body.Status)
 
 	// Get all Agents
-	ctx, cancel := context.WithTimeout(5*time.Second, context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	agents, err := info.KibanaClient.ListAgents(ctx)
+	agents, err := info.KibanaClient.ListAgents(ctx, kibana.ListAgentsRequest{})
 	require.NoError(t, err)
 
 	// Find Fleet Server's own Agent and get its status and whether it's
