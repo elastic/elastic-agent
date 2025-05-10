@@ -91,13 +91,14 @@ func (p *statefulProvisioner) Create(ctx context.Context, request common.StackRe
 		return common.Stack{}, err
 	}
 	return common.Stack{
-		ID:            request.ID,
-		Provisioner:   p.Name(),
-		Version:       request.Version,
-		Elasticsearch: resp.ElasticsearchEndpoint,
-		Kibana:        resp.KibanaEndpoint,
-		Username:      resp.Username,
-		Password:      resp.Password,
+		ID:                 request.ID,
+		Provisioner:        p.Name(),
+		Version:            request.Version,
+		Elasticsearch:      resp.ElasticsearchEndpoint,
+		Kibana:             resp.KibanaEndpoint,
+		IntegrationsServer: resp.IntegrationsServerEndpoint,
+		Username:           resp.Username,
+		Password:           resp.Password,
 		Internal: map[string]interface{}{
 			"deployment_id": resp.ID,
 		},

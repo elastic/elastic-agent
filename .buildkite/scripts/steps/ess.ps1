@@ -42,6 +42,7 @@ function ess_up {
   $Env:KIBANA_HOST = & terraform output -raw kibana_endpoint
   $Env:KIBANA_USERNAME = $Env:ELASTICSEARCH_USERNAME
   $Env:KIBANA_PASSWORD = $Env:ELASTICSEARCH_PASSWORD
+  $Env:INTEGRATIONS_SERVER_HOST = & terraform output -raw integrations_server_endpoint
   Pop-Location
 }
 
