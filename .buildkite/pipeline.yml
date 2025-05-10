@@ -254,7 +254,7 @@ steps:
     artifact_paths:
       - "build/TEST-go-unit.cov"
     agents:
-      image: "golang:1.24.2"
+      image: "golang:1.24.3"
     depends_on:
       - unit-tests
       - extended-windows
