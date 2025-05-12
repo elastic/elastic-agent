@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source .buildkite/scripts/common2.sh
+source .buildkite/scripts/common-integration.sh
 
 source .buildkite/scripts/steps/ess.sh
 source .buildkite/scripts/steps/fleet.sh
@@ -24,8 +24,8 @@ fi
 # Override the agent package version using a string with format <major>.<minor>.<patch>
 # There is a time when the snapshot is not built yet, so we cannot use the latest version automatically
 # This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
-OVERRIDE_STACK_VERSION="$(cat .package-version)"
-OVERRIDE_STACK_VERSION=${OVERRIDE_STACK_VERSION}"-SNAPSHOT"
+DEFAULT_STACK_VERSION="$(cat .package-version)-SNAPSHOT"
+STABLE_SNAPSHOT_VERSION="$(cat .stable_snapshot_version)-SNAPSHOT"
 
 echo "~~~ Building test binaries"
 mage build:testBinaries
@@ -36,7 +36,7 @@ mage build:testBinaries
 if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
   echo "~~~ The steps is retried, starting the ESS stack again"
   trap 'ess_down' EXIT
-  ess_up $OVERRIDE_STACK_VERSION || echo "Failed to start ESS stack" >&2
+  ess_up $DEFAULT_STACK_VERSION $STABLE_SNAPSHOT_VERSION || echo "Failed to start ESS stack" >&2
   preinstall_fleet_packages
 else
   # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data

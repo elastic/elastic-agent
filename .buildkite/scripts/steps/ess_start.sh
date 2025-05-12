@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source .buildkite/scripts/common2.sh
+source .buildkite/scripts/common-integration.sh
 source .buildkite/scripts/steps/ess.sh
 source .buildkite/scripts/steps/fleet.sh
 
-OVERRIDE_STACK_VERSION="$(cat .package-version)"
-OVERRIDE_STACK_VERSION=${OVERRIDE_STACK_VERSION}"-SNAPSHOT"
-
-ess_up $OVERRIDE_STACK_VERSION
+DEFAULT_STACK_VERSION="$(cat .package-version)-SNAPSHOT"
+STABLE_SNAPSHOT_VERSION="$(cat .stable_snapshot_version)-SNAPSHOT"
+ess_up $DEFAULT_STACK_VERSION $STABLE_SNAPSHOT_VERSION
 
 preinstall_fleet_packages
 

@@ -13,10 +13,9 @@ go install gotest.tools/gotestsum
 gotestsum --version
 
 # Read package version from .package-version file
-$PACKAGE_VERSION = Get-Content .package-version -ErrorAction SilentlyContinue
-if ($PACKAGE_VERSION) {
-    $PACKAGE_VERSION = "${PACKAGE_VERSION}-SNAPSHOT"
-}
+$stackVersion = (Get-Content .package-version).Trim() + "-SNAPSHOT"
+$stableSnapshotVersion = (Get-Content .stable_snapshot_version).Trim() + "-SNAPSHOT"
+
 $env:TEST_BINARY_NAME = "elastic-agent"
 # Parsing version.go. Will be simplified here: https://github.com/elastic/ingest-dev/issues/4925
 $AGENT_VERSION = (Get-Content version/version.go | Select-String -Pattern 'const defaultBeatVersion =' | ForEach-Object { $_ -replace '.*?"(.*?)".*', '$1' })
@@ -41,7 +40,7 @@ $outputXML = "build/${fully_qualified_group_name}.integration.xml"
 $outputJSON = "build/${fully_qualified_group_name}.integration.out.json"
 $TestsExitCode = 0
 try {
-    Get-Ess-Stack -StackVersion $PACKAGE_VERSION
+    Get-Ess-Stack -StackVersion $stackVersion -StableSnapshotVersion $stableSnapshotVersion
     Write-Output "~~~ Running integration test group: $GROUP_NAME as user: $env:USERNAME"
     & gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags=integration -shuffle=on -timeout=2h0m0s "github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=$GROUP_NAME" "-integration.sudo=$TEST_SUDO"
     $TestsExitCode = $LASTEXITCODE
