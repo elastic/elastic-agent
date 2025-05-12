@@ -231,11 +231,11 @@ shared:
   - &docker_ubi_spec
     docker_variant: 'basic'
     extra_vars:
-      from: '--platform=linux/amd64 docker.elastic.co/ubi9/ubi-minimal'
+      from: '--platform=linux/amd64 redhat/ubi9-minimal'
   - &docker_ubi_arm_spec
     docker_variant: 'basic'
     extra_vars:
-      from: '--platform=linux/arm64 docker.elastic.co/ubi9/ubi-minimal'
+      from: '--platform=linux/arm64 redhat/ubi9-minimal'
 
   - &docker_wolfi_spec
     docker_variant: 'wolfi'
