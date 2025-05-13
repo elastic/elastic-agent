@@ -15,9 +15,12 @@ fi
 
 SERVICE_NAME="ElasticEndpoint"
 
-echo "CHECKING IF ENDPOINT IS INSTALLED AND/OR ACTIVE"
+echo "Checking if ElasticEndpoint is installed"
 if systemctl list-unit-files --type=service | grep -q "^${SERVICE_NAME}.service"; then
     # Service is present
+    echo "ElasticEndpoint is installed"
+    echo "Checking ElasticEndpoint version"
+    /opt/Elastic/Endpoint/elastic-endpoint version
     if ! systemctl is-active --quiet "$SERVICE_NAME"; then
         echo "$SERVICE_NAME is installed but not running"
         echo "Starting $SERVICE_NAME"

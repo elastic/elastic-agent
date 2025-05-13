@@ -42,6 +42,10 @@ handle_endpoint() {
 		systemctl --quiet stop ElasticEndpoint
 		echo "stopped" >"$cleanup_state"
 
+    echo "Moving logs"
+    cp "/opt/Elastic/Endpoint/state/log/endpoint-000000.log" "/tmp/"
+    echo "Moved logs $(ls /tmp | grep endpoint)"
+
 		# Back up and remove the vault directory if it exists
 		if [ -d "/opt/Elastic/Endpoint/state/vault" ]; then
 			echo "backing up Endpoint vault directory"
