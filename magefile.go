@@ -2396,6 +2396,43 @@ func (Integration) UpdatePackageVersion(ctx context.Context) error {
 	return nil
 }
 
+// UpdateStableSnapshot updates the .stable-snapsot-version file that contains the latest tested snapshot version for integration tests
+func (Integration) UpdateStableSnapshot(ctx context.Context, branch string) error {
+	const stableSnapshotFilename = ".stable-snapshot-version"
+	stableChannelURL := fmt.Sprintf("https://storage.googleapis.com/artifacts-api/channels/%s.json", branch)
+
+	resp, err := http.Get(stableChannelURL)
+	if err != nil || resp.StatusCode != http.StatusOK {				
+		return nil
+	}
+	defer resp.Body.Close()
+  body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	var result struct {
+		Build string `json:"build"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return fmt.Errorf("failed to parse JSON: %v", err)
+	}
+	
+	latestVersion := strings.TrimSpace(result.Build)
+	
+	file, err := os.OpenFile(stableSnapshotFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+	if err != nil {
+		return fmt.Errorf("failed to open %s for write: %w", stableSnapshotFilename, err)
+	}
+	defer file.Close()
+	_, err = file.WriteString(latestVersion)
+	if err != nil {
+		return fmt.Errorf("failed to write the version file %s: %w", stableSnapshotFilename, err)
+	}
+	fmt.Println(latestVersion)
+	return nil
+}
+
 var (
 	stateDir  = ".integration-cache"
 	stateFile = "state.yml"
