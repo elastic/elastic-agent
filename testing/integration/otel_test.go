@@ -1282,6 +1282,144 @@ agent.monitoring:
 	cmd.Wait()
 }
 
+func TestOTelSystemMetricsInput(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Default,
+		Local: true,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	// Create the otel configuration file
+	type otelConfigOptions struct {
+		InputPath  string
+		ESEndpoint string
+		ESApiKey   string
+		Namespace  string
+	}
+	esEndpoint, err := getESHost()
+	require.NoError(t, err, "error getting elasticsearch endpoint")
+	esApiKey, err := createESApiKey(info.ESClient)
+	require.NoError(t, err, "error creating API key")
+	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	decodedApiKey, err := getDecodedApiKey(esApiKey)
+	require.NoError(t, err)
+	configTemplate := `agent.logging.level: info
+agent.logging.to_stderr: true
+inputs:
+  # Collecting system metrics
+  - type: system/metrics
+    id: unique-system-metrics-input
+    data_stream.namespace: {{.Namespace}}
+    use_output: default
+    _runtime_experimental: otel
+    streams:
+      - metricsets:
+        - cpu
+        data_stream.dataset: system.cpu
+      - metricsets:
+        - memory
+        data_stream.dataset: system.memory
+      - metricsets:
+        - network
+        data_stream.dataset: system.network
+      - metricsets:
+        - filesystem
+        data_stream.dataset: system.filesystem
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [{{.ESEndpoint}}]
+    api_key: "{{.ESApiKey}}"
+    preset: "balanced"
+`
+	var configBuffer bytes.Buffer
+
+	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+		otelConfigOptions{
+			ESEndpoint: esEndpoint,
+			ESApiKey:   decodedApiKey,
+			Namespace:  info.Namespace,
+		})
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err, "cannot prepare Elastic-Agent command: %w", err)
+
+	output := strings.Builder{}
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	startedAt := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	err = cmd.Start()
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 30*time.Second, 1*time.Second)
+
+	mustClauses := []map[string]any{
+		{"range": map[string]any{
+			"@timestamp": map[string]string{
+				"gte": startedAt,
+			},
+		}},
+	}
+
+	rawQuery := map[string]any{
+		"query": map[string]any{
+			"bool": map[string]any{
+				"must": mustClauses,
+			},
+		},
+	}
+
+	metricsets := []string{"cpu", "memory", "network", "filesystem"}
+	for _, mset := range metricsets {
+		index := fmt.Sprintf(".ds-metrics-system.%s-%s*", mset, info.Namespace)
+		require.Eventuallyf(t,
+			func() bool {
+				findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer findCancel()
+
+				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, index, info.ESClient)
+				require.NoError(t, err)
+				return docs.Hits.Total.Value > 0
+			},
+			30*time.Second, 1*time.Second,
+			"Expected to find at least one document for metricset %s in index %s, got 0", mset, index)
+	}
+
+	cancel()
+	cmd.Wait()
+}
+
 func TestOtelMBReceiverE2E(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Default,
