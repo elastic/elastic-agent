@@ -323,7 +323,6 @@ steps:
           ASDF_KIND_VERSION: "0.27.0"
           DOCKER_VARIANTS: "{{matrix.variants}}"
           TARGET_ARCH: "amd64"
-          AGENT_VERSION: "9.0.0-SNAPSHOT" # Remove agent pinning once 9.0.0 is released
         command: |
           buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64'
           .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
@@ -344,13 +343,18 @@ steps:
             variants:
             - "basic,slim,complete,service,elastic-otel-collector"
             - "wolfi,slim-wolfi,complete-wolfi,elastic-otel-collector-wolfi"
+
+            # See the Kubernetes Compatible Versions for Elastic Agent in the Elastic
+            # Support Matrix (https://www.elastic.co/support/matrix#matrix_kubernetes) for
+            # the rationale on why these specific versions are chosen.
             version:
-            - v1.27.16
-            - v1.28.9
-            - v1.29.8
-            - v1.30.8
-            - v1.31.0
-            - v1.32.0
+              - v1.27.16
+              - v1.28.15
+              - v1.29.14
+              - v1.30.0
+              - v1.31.0
+              - v1.32.0
+              - v1.33.0
 
   - label: ESS stack cleanup
     depends_on:
