@@ -31,6 +31,8 @@ steps:
       - integration-ess
     steps:
       - label: "Win2022:sudo:{{matrix}}"
+        depends_on:
+          - packaging-windows
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} true
@@ -336,8 +338,8 @@ steps:
         matrix:
           setup:
             variants:
-              - "basic,slim,complete,service,elastic-otel-collector"
-              - "wolfi,slim-wolfi,complete-wolfi,elastic-otel-collector-wolfi"
+            - "basic,slim,complete,service,elastic-otel-collector"
+            - "wolfi,slim-wolfi,complete-wolfi,elastic-otel-collector-wolfi"
 
             # See the Kubernetes Compatible Versions for Elastic Agent in the Elastic
             # Support Matrix (https://www.elastic.co/support/matrix#matrix_kubernetes) for
