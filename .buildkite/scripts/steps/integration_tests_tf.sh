@@ -25,7 +25,7 @@ fi
 # There is a time when the snapshot is not built yet, so we cannot use the latest version automatically
 # This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
 DEFAULT_STACK_VERSION="$(cat .package-version)-SNAPSHOT"
-STABLE_SNAPSHOT_VERSION="$(cat .stable_snapshot_version)-SNAPSHOT"
+STABLE_SNAPSHOT_VERSION="$(cat .stable-snapshot-version)-SNAPSHOT"
 
 echo "~~~ Building test binaries"
 mage build:testBinaries

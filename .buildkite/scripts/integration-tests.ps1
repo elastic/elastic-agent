@@ -14,7 +14,7 @@ gotestsum --version
 
 # Read package version from .package-version file
 $stackVersion = (Get-Content .package-version).Trim() + "-SNAPSHOT"
-$stableSnapshotVersion = (Get-Content .stable_snapshot_version).Trim() + "-SNAPSHOT"
+$stableSnapshotVersion = (Get-Content .stable-snapshot-version).Trim() + "-SNAPSHOT"
 
 $env:TEST_BINARY_NAME = "elastic-agent"
 # Parsing version.go. Will be simplified here: https://github.com/elastic/ingest-dev/issues/4925

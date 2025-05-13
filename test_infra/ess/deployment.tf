@@ -7,7 +7,7 @@ variable "stack_version" {
 variable "stable_snapshot_version" {
   type        = string
   default     = ""
-  description = "stable snapshot version. Overrides docker images versions. Usually is taken from the .stable_snapshot_version file"
+  description = "stable snapshot version. Overrides docker images versions. Usually is taken from the .stable-snapshot-version file"
 }
 
 variable "ess_region" {

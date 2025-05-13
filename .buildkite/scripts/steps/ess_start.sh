@@ -6,7 +6,7 @@ source .buildkite/scripts/steps/ess.sh
 source .buildkite/scripts/steps/fleet.sh
 
 DEFAULT_STACK_VERSION="$(cat .package-version)-SNAPSHOT"
-STABLE_SNAPSHOT_VERSION="$(cat .stable_snapshot_version)-SNAPSHOT"
+STABLE_SNAPSHOT_VERSION="$(cat .stable-snapshot-version)-SNAPSHOT"
 ess_up $DEFAULT_STACK_VERSION $STABLE_SNAPSHOT_VERSION
 
 preinstall_fleet_packages
