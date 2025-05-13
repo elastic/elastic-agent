@@ -2402,11 +2402,11 @@ func (Integration) UpdateStableSnapshot(ctx context.Context, branch string) erro
 	stableChannelURL := fmt.Sprintf("https://storage.googleapis.com/artifacts-api/channels/%s.json", branch)
 
 	resp, err := http.Get(stableChannelURL)
-	if err != nil || resp.StatusCode != http.StatusOK {				
+	if err != nil || resp.StatusCode != http.StatusOK {
 		return nil
 	}
 	defer resp.Body.Close()
-  body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read response body: %v", err)
 	}
@@ -2417,9 +2417,9 @@ func (Integration) UpdateStableSnapshot(ctx context.Context, branch string) erro
 	if err := json.Unmarshal(body, &result); err != nil {
 		return fmt.Errorf("failed to parse JSON: %v", err)
 	}
-	
+
 	latestVersion := strings.TrimSpace(result.Build)
-	
+
 	file, err := os.OpenFile(stableSnapshotFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
 		return fmt.Errorf("failed to open %s for write: %w", stableSnapshotFilename, err)
