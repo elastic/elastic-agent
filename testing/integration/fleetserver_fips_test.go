@@ -74,7 +74,7 @@ func TestFIPSAgentConnectingToFIPSFleetServerInECHFRH(t *testing.T) {
 	for _, item := range agents.Items {
 		if item.PolicyID == cloudAgentPolicyID {
 			agentStatus = item.Status
-			//agentIsFIPS = item.LocalMetadata.Elastic.Agent.FIPS
+			agentIsFIPS = item.LocalMetadata.Elastic.Agent.FIPS
 		}
 	}
 
