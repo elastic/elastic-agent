@@ -40,6 +40,7 @@ function ess_up() {
   export KIBANA_HOST=$(terraform output -raw kibana_endpoint)
   export KIBANA_USERNAME=$ELASTICSEARCH_USERNAME
   export KIBANA_PASSWORD=$ELASTICSEARCH_PASSWORD
+  export INTEGRATIONS_SERVER_HOST=$(terraform output -raw integrations_server_endpoint)
   popd
 }
 

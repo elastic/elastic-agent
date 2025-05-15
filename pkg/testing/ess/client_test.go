@@ -35,6 +35,7 @@ func TestClient_CreateAndShutdownDeployment(t *testing.T) {
 	require.NotEmpty(t, resp.ID)
 	require.NotEmpty(t, resp.ElasticsearchEndpoint)
 	require.NotEmpty(t, resp.KibanaEndpoint)
+	require.NotEmpty(t, resp.IntegrationsServerEndpoint)
 	require.NotEmpty(t, resp.Username)
 	require.NotEmpty(t, resp.Password)
 
