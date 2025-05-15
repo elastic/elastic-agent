@@ -4,12 +4,12 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
 
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1744855248"
-  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1744855248"
-  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1744855248"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1744855248"
-  IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-1744855248"
-  IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1744855248"
+  IMAGE_UBUNTU_2204_X86_64: "family/platform-ingest-elastic-agent-ubuntu-2204"
+  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64"
+  IMAGE_WIN_2016: "family/platform-ingest-elastic-agent-windows-2016"
+  IMAGE_WIN_2022: "family/platform-ingest-elastic-agent-windows-2022"
+  IMAGE_WIN_10: "family/platform-ingest-elastic-agent-windows-10"
+  IMAGE_WIN_11: "family/platform-ingest-elastic-agent-windows-11"
 
 steps:
   - label: "check-ci"
@@ -52,7 +52,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "aws"
-          image: "${IMAGE_UBUNTU_2204_ARM_64}"
+          imagePrefix: "${IMAGE_UBUNTU_2204_ARM_64}"
           diskSizeGb: 200
           instanceType: "m6g.xlarge"
         retry:
