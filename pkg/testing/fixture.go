@@ -50,6 +50,7 @@ type Fixture struct {
 	binaryName      string
 	runLength       time.Duration
 	additionalArgs  []string
+	fipsArtifact    bool
 
 	srcPackage string
 	workDir    string
@@ -142,6 +143,12 @@ func WithRunLength(run time.Duration) FixtureOpt {
 func WithAdditionalArgs(args []string) FixtureOpt {
 	return func(f *Fixture) {
 		f.additionalArgs = args
+	}
+}
+
+func WithFIPSArtifact() FixtureOpt {
+	return func(f *Fixture) {
+		f.fipsArtifact = true
 	}
 }
 
