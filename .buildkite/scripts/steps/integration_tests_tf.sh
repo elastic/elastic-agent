@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source .buildkite/scripts/common2.sh
+source .buildkite/scripts/common-integration.sh
 
 source .buildkite/scripts/steps/ess.sh
 source .buildkite/scripts/steps/fleet.sh
@@ -34,10 +34,21 @@ mage build:testBinaries
 # BUILDKITE_RETRY_COUNT == "0" for the first run
 # BUILDKITE_RETRY_COUNT > 0 for the retries
 if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
-  echo "~~~ The steps is retried, starting the ESS stack again"
-  trap 'ess_down' EXIT
-  ess_up $OVERRIDE_STACK_VERSION || echo "Failed to start ESS stack" >&2
-  preinstall_fleet_packages
+  if [ "$STACK_TYPE" == "ess" ]; then
+    echo "~~~ The steps is retried, starting the ESS stack again"
+    echo "~~~ Getting stable stack version"
+    DEFAULT_STACK_VERSION="$(cat .package-version)-SNAPSHOT"
+    # Stable ESS version is set in the ess_start.sh step
+    STABLE_ESS_VERSION=$(buildkite-agent meta-data get "stable.ess.version")
+
+    trap 'ess_down' EXIT
+    ess_up $DEFAULT_STACK_VERSION $STABLE_ESS_VERSION || echo "Failed to start ESS stack" >&2
+    preinstall_fleet_packages
+  else
+    echo "~~~ The steps is retried, starting the Serverless project again"
+    trap 'serverless_down' EXIT
+    serverless_up || echo "Failed to start Serverless observability object" >&2
+  fi
 else
   # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data
   echo "~~~ Receiving ESS stack metadata"
