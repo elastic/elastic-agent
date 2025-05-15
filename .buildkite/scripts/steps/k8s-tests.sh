@@ -13,10 +13,6 @@ nodes:
   kubeadmConfigPatches:
   - |
     kind: ClusterConfiguration
-    apiServer:
-      extraArgs:
-      - name: anonymous-auth
-        value: "true"
     scheduler:
       extraArgs:
         bind-address: "0.0.0.0"
