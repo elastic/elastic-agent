@@ -41,8 +41,7 @@ chmod +x ./testsBinary
 
 export TEST_DEFINE_PREFIX="${CLUSTER_NAME}"
 
-go install gotest.tools/gotestsum
-gotestsum --version
+make gotestsum
 
 TESTS_EXIT_STATUS=0
 for variant in "${docker_variants[@]}"; do

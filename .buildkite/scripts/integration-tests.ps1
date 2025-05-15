@@ -9,7 +9,9 @@ $PSVersionTable.PSVersion
 
 . "$PWD\.buildkite\scripts\steps\ess.ps1"
 
-go install gotest.tools/gotestsum
+# Make is not installed in the windows images yet
+# make gotestsum
+go install github.com/v1v/gotestsum@v0.0.2
 gotestsum --version
 
 # Read package version from .package-version file
