@@ -1,18 +1,24 @@
 function ess_up {
   param (
       [string]$StackVersion,
+      [string]$StableSnapshotVersion,
       [string]$EssRegion = "gcp-us-west2"
   )
-
-  Write-Output "~~~ Starting ESS Stack"
-  
+ 
   $Workspace = & git rev-parse --show-toplevel
   $TfDir = Join-Path -Path $Workspace -ChildPath "test_infra/ess/"
 
   if (-not $StackVersion) {
-      Write-Error "Error: Specify stack version: ess_up [stack_version]"
+      Write-Error "Error: Specify stack version: ess_up [stack_version] [stable_snapshot_version]"
       return 1
   }
+
+  if (-not $StableSnapshotVersion) {
+      Write-Error "Error: Specify stable snapshot version: ess_up [stack_version] [stable_snapshot_version]"
+      return 1
+  }
+
+  Write-Output "~~~ Starting ESS Stack: $StackVersion. Stable snapshot: $StableSnapshotVersion"
 
   $Env:EC_API_KEY = Retry-Command -ScriptBlock {  
     vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod
@@ -31,6 +37,7 @@ function ess_up {
   & terraform init
   & terraform apply -auto-approve `
       -var="stack_version=$StackVersion" `
+      -var="stable_snapshot_version=$StableSnapshotVersion" `
       -var="ess_region=$EssRegion" `
       -var="creator=$BuildkiteBuildCreator" `
       -var="buildkite_id=$BuildkiteBuildNumber" `
@@ -110,12 +117,13 @@ function Retry-Command {
 
 function Get-Ess-Stack {
   param (
-      [string]$StackVersion
+      [string]$StackVersion,
+      [string]$StableSnapshotVersion
   )
   
   if ($Env:BUILDKITE_RETRY_COUNT -gt 0) {
       Write-Output "The step is retried, starting the ESS stack again"        
-      ess_up $StackVersion
+      ess_up $StackVersion $StableSnapshotVersion
       Write-Output "ESS stack is up. ES_HOST: $Env:ELASTICSEARCH_HOST"
   } else {
       # For the first run, we retrieve ESS stack metadata
