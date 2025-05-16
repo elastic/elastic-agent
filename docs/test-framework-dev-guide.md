@@ -436,6 +436,10 @@ If you encounter any errors mentioning `ogc`, try running `mage integration:clea
 re-running whatever `mage integration:*` target you were trying to run originally when you
 encountered the error.
 
+### Tests seemingly using a stale Elastic Agent package
+
+If your integration tests seem to be using a stale or outdated version of Elastic Agent, it might be due to a cached copy in the .agent-testing directory. To fix this, run `mage clean` to remove cached artifacts, then rebuild the agent with `mage package`, and finally run the integration tests again.
+
 ### Using a different agent version from the stack version
 
 The agent version is used as a fallback for the stack version to use in integration tests
