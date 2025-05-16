@@ -5,12 +5,12 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   ASDF_MAGE_VERSION: 1.14.0
 
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1744855248"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1744855248"
-  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1744855248"
-  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1744855248"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1744855248"
-  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1744855248"
+  IMAGE_UBUNTU_2404_X86_64: "family/platform-ingest-elastic-agent-ubuntu-2404"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64"
+  IMAGE_RHEL_8: "family/platform-ingest-elastic-agent-rhel-8"
+  IMAGE_DEBIAN_12: "family/platform-ingest-elastic-agent-debian-12"
+  IMAGE_WIN_2022: "family/platform-ingest-elastic-agent-windows-2022"
+  IMAGE_WIN_2025: "family/platform-ingest-elastic-agent-windows-2025"
 
 steps:
   - label: Start ESS stack for integration tests
@@ -188,7 +188,7 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "aws"
-          image: "${IMAGE_UBUNTU_2404_ARM_64}"
+          imagePrefix: "${IMAGE_UBUNTU_2404_ARM_64}"
           instanceType: "m6g.2xlarge"
         retry:
           automatic:
@@ -224,7 +224,7 @@ steps:
             limit: 1
         agents:
           provider: "aws"
-          image: "${IMAGE_UBUNTU_2404_ARM_64}"
+          imagePrefix: "${IMAGE_UBUNTU_2404_ARM_64}"
           instanceType: "m6g.xlarge"
         matrix:
           - default
@@ -339,13 +339,18 @@ steps:
           setup:
             variants:
             - "basic,wolfi,complete,complete-wolfi,service,cloud"
+
+            # See the Kubernetes Compatible Versions for Elastic Agent in the Elastic
+            # Support Matrix (https://www.elastic.co/support/matrix#matrix_kubernetes) for
+            # the rationale on why these specific versions are chosen.
             version:
-            - v1.27.16
-            - v1.28.9
-            - v1.29.8
-            - v1.30.8
-            - v1.31.0
-            - v1.32.0
+              - v1.27.16
+              - v1.28.15
+              - v1.29.14
+              - v1.30.0
+              - v1.31.0
+              - v1.32.0
+              - v1.33.0
 
   - label: ESS stack cleanup
     depends_on:
