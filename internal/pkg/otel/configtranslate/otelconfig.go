@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strings"
 
+	koanfmaps "github.com/knadh/koanf/maps"
+
 	otelcomponent "go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/pipeline"
@@ -31,6 +33,8 @@ import (
 // user-provided configuration
 const OtelNamePrefix = "_agent-component/"
 
+// BeatMonitoringConfigGetter is a function that returns the monitoring configuration for a beat receiver.
+type BeatMonitoringConfigGetter func(unitID, binary string) map[string]any
 type exporterConfigTranslationFunc func(*config.C) (map[string]any, error)
 
 var (
@@ -44,7 +48,11 @@ var (
 // GetOtelConfig returns the Otel collector configuration for the given component model.
 // All added component and pipelines names are prefixed with OtelNamePrefix.
 // Unsupported components are quietly ignored.
-func GetOtelConfig(model *component.Model, info info.Agent) (*confmap.Conf, error) {
+func GetOtelConfig(
+	model *component.Model,
+	info info.Agent,
+	beatMonitoringConfigGetter BeatMonitoringConfigGetter,
+) (*confmap.Conf, error) {
 	components := getSupportedComponents(model)
 	if len(components) == 0 {
 		return nil, nil
@@ -52,7 +60,7 @@ func GetOtelConfig(model *component.Model, info info.Agent) (*confmap.Conf, erro
 	otelConfig := confmap.New() // base config, nothing here for now
 
 	for _, comp := range components {
-		componentConfig, compErr := getCollectorConfigForComponent(comp, info)
+		componentConfig, compErr := getCollectorConfigForComponent(comp, info, beatMonitoringConfigGetter)
 		if compErr != nil {
 			return nil, compErr
 		}
@@ -109,12 +117,16 @@ func getExporterID(exporterType otelcomponent.Type, outputName string) otelcompo
 
 // getCollectorConfigForComponent returns the Otel collector config required to run the given component.
 // This function returns a full, valid configuration that can then be merged with configurations for other components.
-func getCollectorConfigForComponent(comp *component.Component, info info.Agent) (*confmap.Conf, error) {
+func getCollectorConfigForComponent(
+	comp *component.Component,
+	info info.Agent,
+	beatMonitoringConfigGetter BeatMonitoringConfigGetter,
+) (*confmap.Conf, error) {
 	exportersConfig, outputQueueConfig, err := getExportersConfigForComponent(comp)
 	if err != nil {
 		return nil, err
 	}
-	receiversConfig, err := getReceiversConfigForComponent(comp, info, outputQueueConfig)
+	receiversConfig, err := getReceiversConfigForComponent(comp, info, outputQueueConfig, beatMonitoringConfigGetter)
 
 	if err != nil {
 		return nil, err
@@ -142,7 +154,12 @@ func getCollectorConfigForComponent(comp *component.Component, info info.Agent) 
 
 // getReceiversConfigForComponent returns the receivers configuration for a component. Usually this will be a single
 // receiver, but in principle it could be more.
-func getReceiversConfigForComponent(comp *component.Component, info info.Agent, outputQueueConfig map[string]any) (map[string]any, error) {
+func getReceiversConfigForComponent(
+	comp *component.Component,
+	info info.Agent,
+	outputQueueConfig map[string]any,
+	beatMonitoringConfigGetter BeatMonitoringConfigGetter,
+) (map[string]any, error) {
 	receiverType, err := getReceiverTypeForComponent(comp)
 	if err != nil {
 		return nil, err
@@ -212,6 +229,11 @@ func getReceiversConfigForComponent(comp *component.Component, info info.Agent, 
 	if outputQueueConfig != nil {
 		receiverConfig["queue"] = outputQueueConfig
 	}
+
+	// add monitoring config if necessary
+	monitoringConfig := beatMonitoringConfigGetter(comp.ID, beatName)
+	koanfmaps.Merge(monitoringConfig, receiverConfig)
+
 	return map[string]any{
 		receiverId.String(): receiverConfig,
 	}, nil
@@ -379,6 +401,7 @@ func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
 		return nil, err
 	}
 	// we want to use dynamic indexing
+	esConfig["logs_index"] = "" // needs to be empty for logs_dynamic_index
 	esConfig["logs_dynamic_index"] = map[string]any{"enabled": true}
 
 	// we also want to use dynamic log ids

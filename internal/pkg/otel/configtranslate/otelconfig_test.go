@@ -191,10 +191,11 @@ func TestGetOtelConfig(t *testing.T) {
 	expectedESConfig := map[string]any{
 		"elasticsearch/_agent-component/default": map[string]any{
 			"batcher": map[string]any{
-				"enabled":        true,
-				"max_size_items": 1600,
-				"min_size_items": 0,
+				"enabled":  true,
+				"max_size": 1600,
+				"min_size": 0,
 			},
+			"logs_index": "",
 			"mapping": map[string]any{
 				"mode": "bodymap",
 			},
@@ -214,8 +215,6 @@ func TestGetOtelConfig(t *testing.T) {
 				"enabled": true,
 			},
 			"num_workers":       1,
-			"api_key":           "",
-			"logs_index":        "filebeat-9.0.0",
 			"timeout":           90 * time.Second,
 			"idle_conn_timeout": 3 * time.Second,
 		},
@@ -277,6 +276,16 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 		}
 	}
+
+	getBeatMonitoringConfig := func(_, _ string) map[string]any {
+		return map[string]any{
+			"http": map[string]any{
+				"enabled": true,
+				"host":    "localhost",
+			},
+		}
+	}
+
 	tests := []struct {
 		name           string
 		model          *component.Model
@@ -387,6 +396,10 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
+						"http": map[string]any{
+							"enabled": true,
+							"host":    "localhost",
+						},
 					},
 				},
 				"service": map[string]any{
@@ -476,6 +489,10 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
+						"http": map[string]any{
+							"enabled": true,
+							"host":    "localhost",
+						},
 					},
 				},
 				"service": map[string]any{
@@ -491,7 +508,7 @@ func TestGetOtelConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actualConf, actualError := GetOtelConfig(tt.model, agentInfo)
+			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, getBeatMonitoringConfig)
 			if actualConf == nil || tt.expectedConfig == nil {
 				assert.Equal(t, tt.expectedConfig, actualConf)
 			} else { // this gives a nicer diff

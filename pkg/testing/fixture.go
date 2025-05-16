@@ -185,6 +185,11 @@ func (f *Fixture) Client() client.Client {
 	return f.c
 }
 
+// Version returns the Elastic Agent version.
+func (f *Fixture) Version() string {
+	return f.version
+}
+
 // Prepare prepares the Elastic Agent for usage.
 //
 // This must be called before `Configure`, `Run`, or `Install` can be called.
@@ -209,10 +214,19 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	}
 	f.srcPackage = src
 	filename := filepath.Base(src)
+
+	// Determine name of extracted Agent artifact directory from
+	// the artifact filename.
 	name, _, err := splitFileType(filename)
 	if err != nil {
 		return err
 	}
+
+	// If the name has "-fips" in it, remove that part because
+	// the extracted directory does not have that in it, even though
+	// the artifact filename does.
+	name = strings.Replace(name, "-fips", "", 1)
+
 	extractDir := createTempDir(f.t)
 	finalDir := filepath.Join(extractDir, name)
 	err = ExtractArtifact(f.t, src, extractDir)
@@ -1003,7 +1017,7 @@ func (f *Fixture) prepareComponents(workDir string, components ...UsableComponen
 
 	// now remove all that should not be kept; removal is only
 	// done by removing the spec file, no need to delete the binary
-	componentsDir, err := FindComponentsDir(workDir)
+	componentsDir, err := FindComponentsDir(workDir, "")
 	if err != nil {
 		return err
 	}
@@ -1240,8 +1254,8 @@ func getCacheDir(caller string, name string) (string, error) {
 	return cacheDir, nil
 }
 
-// FindComponentsDir identifies the directory that holds the components.
-func FindComponentsDir(dir string) (string, error) {
+// findAgentDataVersionDir identifies the directory that holds the agent data of the given version.
+func findAgentDataVersionDir(dir, version string) (string, error) {
 	dataDir := filepath.Join(dir, "data")
 	agentVersions, err := os.ReadDir(dataDir)
 	if err != nil {
@@ -1249,17 +1263,57 @@ func FindComponentsDir(dir string) (string, error) {
 	}
 	var versionDir string
 	for _, fi := range agentVersions {
-		if strings.HasPrefix(fi.Name(), "elastic-agent-") && fi.IsDir() {
-			versionDir = fi.Name()
+		filename := fi.Name()
+		if strings.HasPrefix(filename, "elastic-agent-") && fi.IsDir() {
+			// Below we exclude the hash suffix (7 characters) of the directory to check the version
+			if version != "" && filename[:len(filename)-7] != "elastic-agent-"+version {
+				// version specified but version mismatch. in case of upgrade we have multiple
+				// directories, we don't want first found
+				continue
+			}
+			versionDir = filename
 			break
 		}
 	}
-	componentsDir := filepath.Join(dataDir, versionDir, "components")
+	if versionDir == "" {
+		return "", fmt.Errorf("failed to find versioned directory for version %q", version)
+	}
+	return filepath.Join(dataDir, versionDir), nil
+}
+
+// FindComponentsDir identifies the directory that holds the components.
+func FindComponentsDir(dir, version string) (string, error) {
+	versionDir, err := findAgentDataVersionDir(dir, version)
+	if err != nil {
+		return "", err
+	}
+	componentsDir := filepath.Join(versionDir, "components")
 	fi, err := os.Stat(componentsDir)
 	if (err != nil && !os.IsExist(err)) || !fi.IsDir() {
 		return "", fmt.Errorf("failed to find components directory at %s: %w", componentsDir, err)
 	}
 	return componentsDir, nil
+}
+
+// FindRunDir identifies the directory that holds the run folder.
+func FindRunDir(fixture *Fixture) (string, error) {
+	agentWorkDir := fixture.WorkDir()
+	if pf := fixture.PackageFormat(); pf == "deb" || pf == "rpm" {
+		// these are hardcoded paths in packages.yml
+		agentWorkDir = "/var/lib/elastic-agent"
+	}
+
+	version := fixture.Version()
+	versionDir, err := findAgentDataVersionDir(agentWorkDir, version)
+	if err != nil {
+		return "", err
+	}
+	runDir := filepath.Join(versionDir, "run")
+	fi, err := os.Stat(runDir)
+	if (err != nil && !os.IsExist(err)) || !fi.IsDir() {
+		return "", fmt.Errorf("failed to find run directory at %s: %w", runDir, err)
+	}
+	return runDir, nil
 }
 
 // writeSpecFile writes the specification to a specification file at the defined destination.

@@ -3,13 +3,21 @@
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
+
+  IMAGE_UBUNTU_2204_X86_64: "family/platform-ingest-elastic-agent-ubuntu-2204"
+  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64"
+  IMAGE_WIN_2016: "family/platform-ingest-elastic-agent-windows-2016"
+  IMAGE_WIN_2022: "family/platform-ingest-elastic-agent-windows-2022"
+  IMAGE_WIN_10: "family/platform-ingest-elastic-agent-windows-10"
+  IMAGE_WIN_11: "family/platform-ingest-elastic-agent-windows-11"
+
 steps:
   - label: "check-ci"
     key: "check-ci"
     command: ".buildkite/scripts/steps/check-ci.sh"
     agents:
       provider: "gcp"
-      image: "family/platform-ingest-elastic-agent-ubuntu-2204"
+      image: "${IMAGE_UBUNTU_2204_X86_64}"
     retry:
       manual:
         allowed: true
@@ -27,15 +35,15 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2204"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
         retry:
           automatic:
             limit: 1
           manual:
             allowed: true
 
-      - label: "Unit tests - FIPS Ubuntu 22.04"
-        key: "unit-tests-2204-fips"
+      - label: "Unit tests - Ubuntu 22.04 with requirefips build tag"
+        key: "unit-tests-2204-fips-tag"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         env:
           FIPS: "true"
@@ -46,7 +54,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2204"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
         retry:
           automatic:
             limit: 1
@@ -66,7 +74,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2204"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
         retry:
           automatic:
             limit: 1
@@ -83,7 +91,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "aws"
-          imagePrefix: "platform-ingest-elastic-agent-ubuntu-2404-aarch64"
+          imagePrefix: "${IMAGE_UBUNTU_2204_ARM_64}"
           diskSizeGb: 200
           instanceType: "m6g.xlarge"
         retry:
@@ -102,7 +110,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
-          image: "family/platform-ingest-elastic-agent-windows-2022"
+          image: "${IMAGE_WIN_2022}"
           machine_type: "n2-standard-8"
           disk_size: 200
           disk_type: "pd-ssd"
@@ -122,7 +130,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
-          image: "family/platform-ingest-elastic-agent-windows-2016"
+          image: "${IMAGE_WIN_2016}"
           machine_type: "n2-standard-8"
           disk_size: 200
           disk_type: "pd-ssd"
@@ -182,7 +190,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
-          image: "family/platform-ingest-elastic-agent-windows-10"
+          image: "${IMAGE_WIN_10}"
           machine_type: "n2-standard-8"
           disk_type: "pd-ssd"
         retry:
@@ -190,6 +198,7 @@ steps:
             limit: 1
           manual:
             allowed: true
+
       - label: "Unit tests - Windows 11"
         key: "unit-tests-win11"
         command: .buildkite/scripts/steps/unit-tests.ps1
@@ -200,7 +209,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
-          image: "family/platform-ingest-elastic-agent-windows-11"
+          image: "${IMAGE_WIN_11}"
           machine_type: "n2-standard-8"
           disk_type: "pd-ssd"
         retry:
@@ -219,7 +228,9 @@ steps:
     depends_on:
       - step: "unit-tests-2204"
         allow_failure: true
-      - step: "unit-tests-2204-fips"
+      - step: "unit-tests-2204-fips-tag"
+        allow_failure: true
+      - step: "unit-tests-2204-fips140-only"
         allow_failure: true
       - step: "unit-tests-2204-arm64"
         allow_failure: true
@@ -243,7 +254,7 @@ steps:
     artifact_paths:
       - "build/TEST-go-unit.cov"
     agents:
-      image: "golang:1.24.0"
+      image: "golang:1.24.2"
     depends_on:
       - unit-tests
       - extended-windows
@@ -260,7 +271,7 @@ steps:
         command: ".buildkite/scripts/steps/k8s-tests.sh"
         agents:
           provider: "gcp"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2204"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
         matrix:
           setup:
             k8s_version:
@@ -305,7 +316,7 @@ steps:
                 command: ".buildkite/scripts/steps/sync-k8s.sh"
                 agents:
                   provider: "gcp"
-                  image: "family/platform-ingest-elastic-agent-ubuntu-2204"
+                  image: "${IMAGE_UBUNTU_2204_X86_64}"
                 env:
                   - GH_VERSION=2.4.0
 

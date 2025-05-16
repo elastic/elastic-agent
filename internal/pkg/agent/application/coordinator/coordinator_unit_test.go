@@ -983,6 +983,7 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 	specs, err := component.NewRuntimeSpecs(platform, []component.InputRuntimeSpec{componentSpec})
 	require.NoError(t, err)
 
+	monitoringMgr := newTestMonitoringMgr()
 	coord := &Coordinator{
 		logger:           logger,
 		agentInfo:        &info.AgentInfo{},
@@ -990,6 +991,7 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 		managerChans: managerChans{
 			configManagerUpdate: configChan,
 		},
+		monitorMgr:         monitoringMgr,
 		runtimeMgr:         runtimeManager,
 		otelMgr:            otelManager,
 		specs:              specs,
