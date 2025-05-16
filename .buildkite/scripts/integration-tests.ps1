@@ -9,6 +9,8 @@ $PSVersionTable.PSVersion
 
 . "$PWD\.buildkite\scripts\steps\ess.ps1"
 
+# TODO: make is not available on Windows yet
+#       hence we cannot use make install-gotestsum
 go install gotest.tools/gotestsum
 gotestsum --version
 
@@ -43,7 +45,7 @@ $TestsExitCode = 0
 try {
     Get-Ess-Stack -StackVersion $PACKAGE_VERSION
     Write-Output "~~~ Running integration test group: $GROUP_NAME as user: $env:USERNAME"
-    & gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags=integration -shuffle=on -timeout=2h0m0s "github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=$GROUP_NAME" "-integration.sudo=$TEST_SUDO"
+    & gotestsum --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags=integration -shuffle=on -timeout=2h0m0s "github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=$GROUP_NAME" "-integration.sudo=$TEST_SUDO"
     $TestsExitCode = $LASTEXITCODE
 } finally {
     ess_down
