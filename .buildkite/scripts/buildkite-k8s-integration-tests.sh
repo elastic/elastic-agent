@@ -23,14 +23,19 @@ nodes:
   kubeadmConfigPatches:
   - |
     kind: ClusterConfiguration
+    apiVersion: kubeadm.k8s.io/v1beta4
     scheduler:
       extraArgs:
-        bind-address: "0.0.0.0"
-        secure-port: "10259"
+      - name: bind-address
+        value: 0.0.0.0
+      - name: secure-port
+        value: "10259"
     controllerManager:
       extraArgs:
-        bind-address: "0.0.0.0"
-        secure-port: "10257"
+      - name: bind-address
+        value: 0.0.0.0
+      - name: secure-port
+        value: "10257"
 EOF
 
 IFS=',' read -r -a docker_variants <<< "${DOCKER_VARIANTS}"
