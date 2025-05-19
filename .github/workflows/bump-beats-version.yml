@@ -61,6 +61,7 @@ jobs:
       run: updatecli apply --config .ci/updatecli/update-beats.yml --values .ci/updatecli/values.d/scm.yml
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        BRANCH_NAME: ${{ matrix.branch }}
 
     - if: ${{ failure()  }}
       uses: slackapi/slack-github-action@485a9d42d3a73031f12ec201c457e2162c45d02d # v2.0.0
