@@ -378,17 +378,16 @@ func TestAgentMetricsInput(t *testing.T) {
 
 	metricsets := []string{"cpu", "memory", "network", "filesystem"}
 
-	// docs ingested, indexed by metricset name
 	agentDocs = make(map[string]estools.Documents)
 	otelDocs = make(map[string]estools.Documents)
 
 	type configOptions struct {
-		HomeDir                 string
-		ESEndpoint              string
-		BeatsESApiKey           string
-		FBReceiverIndex         string
-		Namespace               string
-		RuntimeExperimentalOTel bool
+		HomeDir             string
+		ESEndpoint          string
+		BeatsESApiKey       string
+		FBReceiverIndex     string
+		Namespace           string
+		RuntimeExperimental string
 	}
 	configTemplate := `agent.logging.level: info
 agent.logging.to_stderr: true
@@ -398,8 +397,8 @@ inputs:
     id: unique-system-metrics-input
     data_stream.namespace: {{.Namespace}}
     use_output: default
-    {{if eq .RuntimeExperimentalOTel true}}
-    _runtime_experimental: "otel"
+    {{if ne .RuntimeExperimental "" }}
+    _runtime_experimental: {{.RuntimeExperimental}}
     {{end}}
     streams:
       - metricsets:
@@ -430,209 +429,129 @@ outputs:
 	beatsApiKey, err := base64.StdEncoding.DecodeString(esApiKey.Encoded)
 	require.NoError(t, err, "error decoding api key")
 
-	t.Run("agent metrics", func(t *testing.T) {
-		tmpDir := t.TempDir()
+	tableTests := []struct {
+		name                string
+		runtimeExperimental string
+	}{
+		{name: "agent"},
+		{name: "otel", runtimeExperimental: "otel"},
+	}
 
-		timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	// map of testcase -> metricset -> documents
+	esDocs := make(map[string]map[string]estools.Documents)
 
-		var configBuffer bytes.Buffer
-		require.NoError(t,
-			template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
-				configOptions{
-					HomeDir:       tmpDir,
-					ESEndpoint:    esEndpoint,
-					BeatsESApiKey: string(beatsApiKey),
-					Namespace:     info.Namespace,
-				}))
-		configContents := configBuffer.Bytes()
-		t.Cleanup(func() {
-			if t.Failed() {
-				t.Log("Contents of agent config file:\n")
-				println(string(configContents))
+	for _, tt := range tableTests {
+		t.Run(tt.name, func(t *testing.T) {
+			startedAt := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+			tmpDir := t.TempDir()
+
+			if _, ok := esDocs[tt.name]; !ok {
+				esDocs[tt.name] = make(map[string]estools.Documents)
 			}
+
+			var configBuffer bytes.Buffer
+			require.NoError(t,
+				template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+					configOptions{
+						HomeDir:             tmpDir,
+						ESEndpoint:          esEndpoint,
+						BeatsESApiKey:       string(beatsApiKey),
+						Namespace:           info.Namespace,
+						RuntimeExperimental: tt.runtimeExperimental,
+					}))
+			configContents := configBuffer.Bytes()
+			t.Cleanup(func() {
+				if t.Failed() {
+					t.Log("Contents of agent config file:\n")
+					println(string(configContents))
+				}
+			})
+
+			fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+			require.NoError(t, err)
+
+			ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+			defer cancel()
+
+			err = fixture.Prepare(ctx)
+			require.NoError(t, err)
+			err = fixture.Configure(ctx, configContents)
+			require.NoError(t, err)
+
+			cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+			require.NoError(t, err)
+			cmd.WaitDelay = 1 * time.Second
+
+			var output strings.Builder
+			cmd.Stderr = &output
+			cmd.Stdout = &output
+
+			err = cmd.Start()
+			require.NoError(t, err)
+
+			t.Cleanup(func() {
+				if t.Failed() {
+					t.Log("Elastic-Agent output:")
+					t.Log(output.String())
+				}
+			})
+
+			require.Eventually(t, func() bool {
+				err = fixture.IsHealthy(ctx)
+				if err != nil {
+					t.Logf("waiting for agent healthy: %s", err.Error())
+					return false
+				}
+				return true
+			}, 1*time.Minute, 1*time.Second)
+
+			mustClauses := []map[string]any{
+				{"range": map[string]any{
+					"@timestamp": map[string]string{
+						"gte": startedAt,
+					},
+				}},
+			}
+
+			rawQuery := map[string]any{
+				"query": map[string]any{
+					"bool": map[string]any{
+						"must": mustClauses,
+					},
+				},
+			}
+
+			for _, mset := range metricsets {
+				index := fmt.Sprintf(".ds-metrics-system.%s-%s*", mset, info.Namespace)
+				require.EventuallyWithTf(t,
+					func(ct *assert.CollectT) {
+						findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
+						defer findCancel()
+
+						docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, index, info.ESClient)
+						require.NoError(ct, err)
+
+						if docs.Hits.Total.Value != 0 {
+							esDocs[tt.name][mset] = docs
+						}
+						require.Greater(ct, docs.Hits.Total.Value, 0, "docs count")
+					},
+					30*time.Second, 1*time.Second,
+					"Expected to find at least one document for metricset %s in index %s and runtime %q, got 0", mset, tt.runtimeExperimental, index)
+			}
+
+			cancel()
+			cmd.Wait()
 		})
+	}
 
-		fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-		require.NoError(t, err)
+	t.Run("compare documents", func(t *testing.T) {
+		require.Greater(t, len(esDocs), 0, "expected to find documents ingested")
+		require.Greater(t, len(esDocs["agent"]), 0, "expected to find documents ingested by normal agent metrics input")
+		require.Greater(t, len(esDocs["otel"]), 0, "expected to find documents ingested by beat receivers")
 
-		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
-		defer cancel()
-
-		err = fixture.Prepare(ctx)
-		require.NoError(t, err)
-		err = fixture.Configure(ctx, configContents)
-		require.NoError(t, err)
-
-		cmd, err := fixture.PrepareAgentCommand(ctx, nil)
-		require.NoError(t, err)
-		cmd.WaitDelay = 1 * time.Second
-
-		var output strings.Builder
-		cmd.Stderr = &output
-		cmd.Stdout = &output
-
-		err = cmd.Start()
-		require.NoError(t, err)
-
-		t.Cleanup(func() {
-			if t.Failed() {
-				t.Log("Elastic-Agent output:")
-				t.Log(output.String())
-			}
-		})
-
-		require.Eventually(t, func() bool {
-			err = fixture.IsHealthy(ctx)
-			if err != nil {
-				t.Logf("waiting for agent healthy: %s", err.Error())
-				return false
-			}
-			return true
-		}, 1*time.Minute, 1*time.Second)
-
-		mustClauses := []map[string]any{
-			{"range": map[string]any{
-				"@timestamp": map[string]string{
-					"gte": timestamp,
-				},
-			}},
-		}
-
-		rawQuery := map[string]any{
-			"query": map[string]any{
-				"bool": map[string]any{
-					"must": mustClauses,
-				},
-			},
-		}
-
-		for _, mset := range metricsets {
-			index := fmt.Sprintf(".ds-metrics-system.%s-%s*", mset, info.Namespace)
-			require.EventuallyWithTf(t,
-				func(ct *assert.CollectT) {
-					findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
-					defer findCancel()
-
-					docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, index, info.ESClient)
-					require.NoError(ct, err)
-
-					if docs.Hits.Total.Value != 0 {
-						agentDocs[mset] = docs
-					}
-					require.Greater(ct, docs.Hits.Total.Value, 0, "docs count")
-				},
-				30*time.Second, 1*time.Second,
-				"Expected to find at least one document for metricset %s in index %s, got 0", mset, index)
-		}
-
-		cancel()
-		cmd.Wait()
-	})
-
-	t.Run("otel metrics", func(t *testing.T) {
-		tmpDir := t.TempDir()
-
-		timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
-
-		var configBuffer bytes.Buffer
-		require.NoError(t,
-			template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
-				configOptions{
-					HomeDir:                 tmpDir,
-					ESEndpoint:              esEndpoint,
-					BeatsESApiKey:           string(beatsApiKey),
-					Namespace:               info.Namespace,
-					RuntimeExperimentalOTel: true,
-				}))
-		configContents := configBuffer.Bytes()
-		t.Cleanup(func() {
-			if t.Failed() {
-				t.Log("Contents of agent config file:\n")
-				println(string(configContents))
-			}
-		})
-
-		fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-		require.NoError(t, err)
-
-		ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
-		defer cancel()
-
-		err = fixture.Prepare(ctx)
-		require.NoError(t, err)
-		err = fixture.Configure(ctx, configContents)
-		require.NoError(t, err)
-
-		cmd, err := fixture.PrepareAgentCommand(ctx, nil)
-		require.NoError(t, err)
-		cmd.WaitDelay = 1 * time.Second
-
-		var output strings.Builder
-		cmd.Stderr = &output
-		cmd.Stdout = &output
-
-		err = cmd.Start()
-		require.NoError(t, err)
-
-		t.Cleanup(func() {
-			if t.Failed() {
-				t.Log("Elastic-Agent output:")
-				t.Log(output.String())
-			}
-		})
-
-		require.Eventually(t, func() bool {
-			err = fixture.IsHealthy(ctx)
-			if err != nil {
-				t.Logf("waiting for agent healthy: %s", err.Error())
-				return false
-			}
-			return true
-		}, 1*time.Minute, 1*time.Second)
-
-		mustClauses := []map[string]any{
-			{"range": map[string]any{
-				"@timestamp": map[string]string{
-					"gte": timestamp,
-				},
-			}},
-		}
-
-		rawQuery := map[string]any{
-			"query": map[string]any{
-				"bool": map[string]any{
-					"must": mustClauses,
-				},
-			},
-		}
-
-		for _, mset := range metricsets {
-			index := fmt.Sprintf(".ds-metrics-system.%s-%s*", mset, info.Namespace)
-			require.EventuallyWithTf(t,
-				func(ct *assert.CollectT) {
-					findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
-					defer findCancel()
-
-					docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, index, info.ESClient)
-					require.NoError(ct, err)
-
-					if docs.Hits.Total.Value != 0 {
-						otelDocs[mset] = docs
-					}
-
-					require.Greater(ct, docs.Hits.Total.Value, 0, "docs count")
-				},
-				30*time.Second, 1*time.Second,
-				"Expected to find at least one document for metricset %s in index %s, got 0", mset, index)
-		}
-
-		cancel()
-		cmd.Wait()
-	})
-
-	t.Run("compare documents ingested", func(t *testing.T) {
-		require.Greater(t, len(agentDocs), 0, "expected to find documents ingested by agent metrics input")
-		require.Greater(t, len(otelDocs), 0, "expected to find documents ingested by otel metrics input")
+		agentDocs = esDocs["agent"]
+		otelDocs = esDocs["otel"]
 
 		testCases := []struct {
 			name          string
