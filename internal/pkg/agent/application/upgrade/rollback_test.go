@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -326,6 +327,24 @@ func TestRollback(t *testing.T) {
 			tt.checkAfterRollback(t, testTop)
 		})
 	}
+}
+
+func TestInvokeCmd(t *testing.T) {
+	agentExecutable := "elastic-agent"
+	rollbackWindow := 2*time.Hour + 15*time.Minute
+	cmd := invokeCmd(agentExecutable, rollbackWindow)
+
+	// Expected command:
+	// elastic-agent watch --path.config /some/path --path.home /some/path --rollback.window 8100s
+	require.Len(t, cmd.Args, 8)
+	require.Equal(t, agentExecutable, cmd.Args[0])
+	require.Equal(t, "watch", cmd.Args[1])
+	require.Equal(t, "--path.config", cmd.Args[2])
+	require.NotEmpty(t, cmd.Args[3])
+	require.Equal(t, "--path.home", cmd.Args[4])
+	require.NotEmpty(t, cmd.Args[5])
+	require.Equal(t, "--rollback.window", cmd.Args[6])
+	require.Equal(t, "8100s", cmd.Args[7])
 }
 
 // checkFilesAfterCleanup is a convenience function to check the file structure within topDir.
