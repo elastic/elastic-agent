@@ -25,7 +25,7 @@ func invokeCmd(agentExecutable string, rollbackWindow time.Duration) *exec.Cmd {
 	cmd := exec.Command(agentExecutable, watcherSubcommand,
 		"--path.config", paths.Config(),
 		"--path.home", paths.Top(),
-		"--rollback.window", fmt.Sprintf("%fs", rollbackWindow.Seconds()),
+		"--rollback.window", fmt.Sprintf("%.fs", rollbackWindow.Seconds()),
 	)
 	return cmd
 }
