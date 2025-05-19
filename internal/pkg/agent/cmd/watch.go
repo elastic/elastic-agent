@@ -33,8 +33,9 @@ import (
 )
 
 const (
-	watcherName     = "elastic-agent-watcher"
-	watcherLockFile = "watcher.lock"
+	watcherName        = "elastic-agent-watcher"
+	watcherLockFile    = "watcher.lock"
+	flagRollbackWindow = "rollback-window"
 )
 
 func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -42,7 +43,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 		Use:   "watch",
 		Short: "Watch the Elastic Agent for failures and initiate rollback",
 		Long:  `This command watches Elastic Agent for failures and initiates rollback if necessary.`,
-		Run: func(_ *cobra.Command, _ []string) {
+		Run: func(c *cobra.Command, _ []string) {
 			cfg := getConfig(streams)
 			log, err := configuredLogger(cfg, watcherName)
 			if err != nil {
@@ -53,13 +54,15 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 			// Make sure to flush any buffered logs before we're done.
 			defer log.Sync() //nolint:errcheck // flushing buffered logs is best effort.
 
-			if err := watchCmd(log, paths.Top(), cfg.Settings.Upgrade.Watcher, new(upgradeAgentWatcher), new(upgradeInstallationModifier)); err != nil {
+			if err := watchCmd(c, log, paths.Top(), cfg.Settings.Upgrade.Watcher, new(upgradeAgentWatcher), new(upgradeInstallationModifier)); err != nil {
 				log.Errorw("Watch command failed", "error.message", err)
 				fmt.Fprintf(streams.Err, "Watch command failed: %v\n%s\n", err, troubleshootMessage())
 				os.Exit(4)
 			}
 		},
 	}
+
+	cmd.Flags().DurationP(flagRollbackWindow, "", configuration.DefaultRollbackWindowDuration, "Duration in which Agent may be manually rolled back")
 
 	return cmd
 }
@@ -73,7 +76,7 @@ type installationModifier interface {
 	Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string) error
 }
 
-func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcherConfig, watcher agentWatcher, installModifier installationModifier) error {
+func watchCmd(cmd *cobra.Command, log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcherConfig, watcher agentWatcher, installModifier installationModifier) error {
 	log.Infow("Upgrade Watcher started", "process.pid", os.Getpid(), "agent.version", version.GetAgentPackageVersion(), "config", cfg)
 	dataDir := paths.DataFrom(topDir)
 	marker, err := upgrade.LoadMarker(dataDir)
@@ -102,6 +105,12 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		_ = locker.Unlock()
 	}()
 
+	rollbackWindow, err := cmd.Flags().GetDuration(flagRollbackWindow)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve %s flag value while watching the agent upgrade: %w", flagRollbackWindow, err)
+	}
+	_ = rollbackWindow // TODO: use rollbackWindow when https://github.com/elastic/elastic-agent/issues/6884 is implemented
+
 	isWithinGrace, tilGrace := gracePeriod(marker, cfg.GracePeriod)
 	if isTerminalState(marker) || !isWithinGrace {
 		stateString := ""
@@ -109,6 +118,7 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 			stateString = string(marker.Details.State)
 		}
 		log.Infof("not within grace [updatedOn %v] %v or agent have been rolled back [state: %s]", marker.UpdatedOn.String(), time.Since(marker.UpdatedOn).String(), stateString)
+
 		// if it is started outside of upgrade loop
 		// if we're not within grace and marker is still there it might mean
 		// that cleanup was not performed ok, cleanup everything except current version

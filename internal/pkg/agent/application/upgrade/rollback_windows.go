@@ -7,6 +7,7 @@
 package upgrade
 
 import (
+	"fmt"
 	"os/exec"
 	"time"
 
@@ -19,11 +20,12 @@ const (
 	afterRestartDelay = 20 * time.Second
 )
 
-func invokeCmd(agentExecutable string) *exec.Cmd {
+func invokeCmd(agentExecutable string, rollbackWindow time.Duration) *exec.Cmd {
 	// #nosec G204 -- user cannot inject any parameters to this command
 	cmd := exec.Command(agentExecutable, watcherSubcommand,
 		"--path.config", paths.Config(),
 		"--path.home", paths.Top(),
+		"--rollback.window", fmt.Sprintf("%ds", rollbackWindow.Seconds()),
 	)
 	return cmd
 }
