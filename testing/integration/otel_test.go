@@ -1350,7 +1350,7 @@ outputs:
 			Namespace:  info.Namespace,
 		})
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
@@ -1403,14 +1403,14 @@ outputs:
 	metricsets := []string{"cpu", "memory", "network", "filesystem"}
 	for _, mset := range metricsets {
 		index := fmt.Sprintf(".ds-metrics-system.%s-%s*", mset, info.Namespace)
-		require.Eventuallyf(t,
-			func() bool {
-				findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		require.EventuallyWithTf(t,
+			func(ct *assert.CollectT) {
+				findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 				defer findCancel()
 
 				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, index, info.ESClient)
-				require.NoError(t, err)
-				return docs.Hits.Total.Value > 0
+				assert.NoError(t, err)
+				assert.Greater(t, docs.Hits.Total.Value, 0, "docs count")
 			},
 			30*time.Second, 1*time.Second,
 			"Expected to find at least one document for metricset %s in index %s, got 0", mset, index)
