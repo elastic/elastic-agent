@@ -19,6 +19,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -78,12 +79,13 @@ func TestDownloadWithRetries(t *testing.T) {
 	expectedDownloadPath := "https://artifacts.elastic.co/downloads/beats/elastic-agent"
 	testLogger, obs := loggertest.New("TestDownloadWithRetries")
 
-	settings := artifact.Config{
+	downloadSettings := artifact.Config{
 		RetrySleepInitDuration: 20 * time.Millisecond,
 		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
 			Timeout: 2 * time.Second,
 		},
 	}
+	upgradeSettings := configuration.UpgradeConfig{}
 
 	// Successful immediately (no retries)
 	t.Run("successful_immediately", func(t *testing.T) {
@@ -91,16 +93,16 @@ func TestDownloadWithRetries(t *testing.T) {
 			return &mockDownloader{expectedDownloadPath, nil}, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		u, err := NewUpgrader(testLogger, &downloadSettings, &upgradeSettings, &info.AgentInfo{})
 		require.NoError(t, err)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
 
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
-		minRetryDeadline := time.Now().Add(settings.Timeout)
+		minRetryDeadline := time.Now().Add(downloadSettings.Timeout)
 
-		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &downloadSettings, upgradeDetails)
 		require.NoError(t, err)
 		require.Equal(t, expectedDownloadPath, path)
 
@@ -141,16 +143,16 @@ func TestDownloadWithRetries(t *testing.T) {
 			return nil, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		u, err := NewUpgrader(testLogger, &downloadSettings, &upgradeSettings, &info.AgentInfo{})
 		require.NoError(t, err)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
 
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
-		minRetryDeadline := time.Now().Add(settings.Timeout)
+		minRetryDeadline := time.Now().Add(downloadSettings.Timeout)
 
-		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &downloadSettings, upgradeDetails)
 		require.NoError(t, err)
 		require.Equal(t, expectedDownloadPath, path)
 
@@ -196,16 +198,16 @@ func TestDownloadWithRetries(t *testing.T) {
 			return nil, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		u, err := NewUpgrader(testLogger, &downloadSettings, &upgradeSettings, &info.AgentInfo{})
 		require.NoError(t, err)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
 
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
-		minRetryDeadline := time.Now().Add(settings.Timeout)
+		minRetryDeadline := time.Now().Add(downloadSettings.Timeout)
 
-		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &downloadSettings, upgradeDetails)
 		require.NoError(t, err)
 		require.Equal(t, expectedDownloadPath, path)
 
@@ -231,7 +233,7 @@ func TestDownloadWithRetries(t *testing.T) {
 
 	// Download timeout expired (before all retries are exhausted)
 	t.Run("download_timeout_expired", func(t *testing.T) {
-		testCaseSettings := settings
+		testCaseSettings := downloadSettings
 		testCaseSettings.Timeout = 500 * time.Millisecond
 		testCaseSettings.RetrySleepInitDuration = 10 * time.Millisecond
 		// exponential backoff with 10ms init and 500ms timeout should fit at least 3 attempts.
@@ -241,7 +243,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return &mockDownloader{"", errors.New("download failed")}, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		u, err := NewUpgrader(testLogger, &downloadSettings, &upgradeSettings, &info.AgentInfo{})
 		require.NoError(t, err)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
