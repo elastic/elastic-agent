@@ -13,9 +13,9 @@ const (
 	// interval between checks for new (upgraded) Agent returning an error status.
 	defaultStatusCheckInterval = 30 * time.Second
 
-	// period during which an upgraded Agent can be asked to rollback to the previous
-	// Agent version on disk.
-	defaultRollbackWindowDuration = 7 * 24 * time.Hour // 7 days
+	// DefaultRollbackWindowDuration is the period during which an upgraded Agent can be asked to
+	// rollback to the previous Agent version on disk.
+	DefaultRollbackWindowDuration = 7 * 24 * time.Hour // 7 days
 )
 
 // UpgradeConfig is the configuration related to Agent upgrades.
@@ -45,7 +45,7 @@ func DefaultUpgradeConfig() *UpgradeConfig {
 			},
 		},
 		Rollback: &UpgradeRollbackConfig{
-			Window: defaultRollbackWindowDuration,
+			Window: DefaultRollbackWindowDuration,
 		},
 	}
 }
