@@ -7,12 +7,16 @@
 package integration
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
 	"runtime"
+	"strings"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -355,6 +359,388 @@ func TestAgentMonitoring(t *testing.T) {
 		AssertMapsEqual(t, agent, otel, ignoredFields, "expected documents to be equal")
 	})
 
+}
+
+// TestAgentMetricsInput is a test that compares documents ingested by
+// agent metrics input and otel metrics input and asserts that they are
+// equivalent.
+func TestAgentMetricsInput(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	metricsets := []string{"cpu", "memory", "network", "filesystem"}
+
+	// docs ingested, indexed by metricset name
+	agentDocs = make(map[string]estools.Documents)
+	otelDocs = make(map[string]estools.Documents)
+
+	type configOptions struct {
+		HomeDir                 string
+		ESEndpoint              string
+		BeatsESApiKey           string
+		FBReceiverIndex         string
+		Namespace               string
+		RuntimeExperimentalOTel bool
+	}
+	configTemplate := `agent.logging.level: info
+agent.logging.to_stderr: true
+inputs:
+  # Collecting system metrics
+  - type: system/metrics
+    id: unique-system-metrics-input
+    data_stream.namespace: {{.Namespace}}
+    use_output: default
+    {{if eq .RuntimeExperimentalOTel true}}
+    _runtime_experimental: "otel"
+    {{end}}
+    streams:
+      - metricsets:
+        - cpu
+        data_stream.dataset: system.cpu
+      - metricsets:
+        - memory
+        data_stream.dataset: system.memory
+      - metricsets:
+        - network
+        data_stream.dataset: system.network
+      - metricsets:
+        - filesystem
+        data_stream.dataset: system.filesystem
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [{{.ESEndpoint}}]
+    api_key: {{.BeatsESApiKey}}
+`
+
+	esEndpoint, err := getESHost()
+	require.NoError(t, err, "error getting elasticsearch endpoint")
+	esApiKey, err := createESApiKey(info.ESClient)
+	require.NoError(t, err, "error creating API key")
+	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+
+	beatsApiKey, err := base64.StdEncoding.DecodeString(esApiKey.Encoded)
+	require.NoError(t, err, "error decoding api key")
+
+	t.Run("agent metrics", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+
+		var configBuffer bytes.Buffer
+		require.NoError(t,
+			template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+				configOptions{
+					HomeDir:       tmpDir,
+					ESEndpoint:    esEndpoint,
+					BeatsESApiKey: string(beatsApiKey),
+					Namespace:     info.Namespace,
+				}))
+		configContents := configBuffer.Bytes()
+		t.Cleanup(func() {
+			if t.Failed() {
+				t.Log("Contents of agent config file:\n")
+				println(string(configContents))
+			}
+		})
+
+		fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+		require.NoError(t, err)
+
+		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+		defer cancel()
+
+		err = fixture.Prepare(ctx)
+		require.NoError(t, err)
+		err = fixture.Configure(ctx, configContents)
+		require.NoError(t, err)
+
+		cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+		require.NoError(t, err)
+		cmd.WaitDelay = 1 * time.Second
+
+		var output strings.Builder
+		cmd.Stderr = &output
+		cmd.Stdout = &output
+
+		err = cmd.Start()
+		require.NoError(t, err)
+
+		t.Cleanup(func() {
+			if t.Failed() {
+				t.Log("Elastic-Agent output:")
+				t.Log(output.String())
+			}
+		})
+
+		require.Eventually(t, func() bool {
+			err = fixture.IsHealthy(ctx)
+			if err != nil {
+				t.Logf("waiting for agent healthy: %s", err.Error())
+				return false
+			}
+			return true
+		}, 1*time.Minute, 1*time.Second)
+
+		mustClauses := []map[string]any{
+			{"range": map[string]any{
+				"@timestamp": map[string]string{
+					"gte": timestamp,
+				},
+			}},
+		}
+
+		rawQuery := map[string]any{
+			"query": map[string]any{
+				"bool": map[string]any{
+					"must": mustClauses,
+				},
+			},
+		}
+
+		for _, mset := range metricsets {
+			index := fmt.Sprintf(".ds-metrics-system.%s-%s*", mset, info.Namespace)
+			require.EventuallyWithTf(t,
+				func(ct *assert.CollectT) {
+					findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
+					defer findCancel()
+
+					docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, index, info.ESClient)
+					require.NoError(ct, err)
+
+					if docs.Hits.Total.Value != 0 {
+						agentDocs[mset] = docs
+					}
+					require.Greater(ct, docs.Hits.Total.Value, 0, "docs count")
+				},
+				30*time.Second, 1*time.Second,
+				"Expected to find at least one document for metricset %s in index %s, got 0", mset, index)
+		}
+
+		cancel()
+		cmd.Wait()
+	})
+
+	t.Run("otel metrics", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+
+		var configBuffer bytes.Buffer
+		require.NoError(t,
+			template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+				configOptions{
+					HomeDir:                 tmpDir,
+					ESEndpoint:              esEndpoint,
+					BeatsESApiKey:           string(beatsApiKey),
+					Namespace:               info.Namespace,
+					RuntimeExperimentalOTel: true,
+				}))
+		configContents := configBuffer.Bytes()
+		t.Cleanup(func() {
+			if t.Failed() {
+				t.Log("Contents of agent config file:\n")
+				println(string(configContents))
+			}
+		})
+
+		fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+		require.NoError(t, err)
+
+		ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+		defer cancel()
+
+		err = fixture.Prepare(ctx)
+		require.NoError(t, err)
+		err = fixture.Configure(ctx, configContents)
+		require.NoError(t, err)
+
+		cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+		require.NoError(t, err)
+		cmd.WaitDelay = 1 * time.Second
+
+		var output strings.Builder
+		cmd.Stderr = &output
+		cmd.Stdout = &output
+
+		err = cmd.Start()
+		require.NoError(t, err)
+
+		t.Cleanup(func() {
+			if t.Failed() {
+				t.Log("Elastic-Agent output:")
+				t.Log(output.String())
+			}
+		})
+
+		require.Eventually(t, func() bool {
+			err = fixture.IsHealthy(ctx)
+			if err != nil {
+				t.Logf("waiting for agent healthy: %s", err.Error())
+				return false
+			}
+			return true
+		}, 1*time.Minute, 1*time.Second)
+
+		mustClauses := []map[string]any{
+			{"range": map[string]any{
+				"@timestamp": map[string]string{
+					"gte": timestamp,
+				},
+			}},
+		}
+
+		rawQuery := map[string]any{
+			"query": map[string]any{
+				"bool": map[string]any{
+					"must": mustClauses,
+				},
+			},
+		}
+
+		for _, mset := range metricsets {
+			index := fmt.Sprintf(".ds-metrics-system.%s-%s*", mset, info.Namespace)
+			require.EventuallyWithTf(t,
+				func(ct *assert.CollectT) {
+					findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
+					defer findCancel()
+
+					docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, index, info.ESClient)
+					require.NoError(ct, err)
+
+					if docs.Hits.Total.Value != 0 {
+						otelDocs[mset] = docs
+					}
+
+					require.Greater(ct, docs.Hits.Total.Value, 0, "docs count")
+				},
+				30*time.Second, 1*time.Second,
+				"Expected to find at least one document for metricset %s in index %s, got 0", mset, index)
+		}
+
+		cancel()
+		cmd.Wait()
+	})
+
+	t.Run("compare documents ingested", func(t *testing.T) {
+		require.Greater(t, len(agentDocs), 0, "expected to find documents ingested by agent metrics input")
+		require.Greater(t, len(otelDocs), 0, "expected to find documents ingested by otel metrics input")
+
+		testCases := []struct {
+			name          string
+			ignoredFields []string
+		}{
+			{
+				name: "cpu",
+				ignoredFields: []string{
+					"host.cpu.usage",
+					"system.cpu.system.norm.pct",
+					"system.cpu.system.pct",
+					"system.cpu.total.norm.pct",
+					"system.cpu.total.pct",
+					"system.cpu.user.norm.pct",
+					"system.cpu.user.pct",
+					"system.cpu.idle.norm.pct",
+					"system.cpu.idle.pct",
+					"system.cpu.iowait.norm.pct",
+					"system.cpu.iowait.pct",
+					"system.cpu.irq.norm.pct",
+					"system.cpu.irq.pct",
+					"system.cpu.nice.norm.pct",
+					"system.cpu.nice.pct",
+					"system.cpu.softirq.norm.pct",
+					"system.cpu.softirq.pct",
+					"system.cpu.steal.norm.pct",
+					"system.cpu.steal.pct",
+				},
+			},
+			{
+				name: "memory",
+				ignoredFields: []string{
+					"system.memory.actual.free",
+					"system.memory.actual.used.bytes",
+					"system.memory.actual.used.pct",
+					"system.memory.free",
+					"system.memory.swap.free",
+					"system.memory.swap.total",
+					"system.memory.swap.used.bytes",
+					"system.memory.swap.used.pct",
+					"system.memory.total",
+					"system.memory.used.bytes",
+					"system.memory.used.pct",
+					"system.memory.cached",
+				},
+			},
+			{
+				name: "network",
+				ignoredFields: []string{
+					"host.network.egress.bytes",
+					"host.network.egress.packets",
+					"system.network.in.dropped",
+					"system.network.in.bytes",
+					"system.network.in.packets",
+					"system.network.name",
+					"system.network.out.bytes",
+					"system.network.out.dropped",
+					"system.network.out.errors",
+					"system.network.out.packets",
+				},
+			},
+			{
+				name: "filesystem",
+				ignoredFields: []string{
+					"metricset.period",
+					"system.filesystem.available",
+					"system.filesystem.free",
+					"system.filesystem.used.bytes",
+					"system.filesystem.files",
+					"system.filesystem.free_files",
+					"system.filesystem.mount_point",
+					"system.filesystem.options",
+					"system.filesystem.total",
+					"system.filesystem.type",
+					"system.filesystem.used.pct",
+					"system.filesystem.device_name",
+				},
+			},
+		}
+
+		commonIgnoredFields := []string{
+			// Expected to change between agent metrics input and otel metrics input
+			"@timestamp",
+			"agent.id",
+			"agent.version",
+			"agent.ephemeral_id",
+			"elastic_agent.id",
+			"elastic_agent.snapshot",
+			"elastic_agent.version",
+			"data_stream.namespace",
+			"event.ingested",
+			"event.duration",
+		}
+
+		require.Equal(t, len(metricsets), len(testCases), "expected to have a test case for each metricset")
+		for _, tt := range testCases {
+			t.Run(tt.name, func(t *testing.T) {
+				require.Greater(t, len(agentDocs[tt.name].Hits.Hits), 0, "expected to find agent documents for metricset %s", tt.name)
+				require.Greater(t, len(otelDocs[tt.name].Hits.Hits), 0, "expected to find otel documents for metricset %s", tt.name)
+
+				agent := agentDocs[tt.name].Hits.Hits[0].Source
+				otel := otelDocs[tt.name].Hits.Hits[0].Source
+				ignoredFields := append(tt.ignoredFields, commonIgnoredFields...)
+				AssertMapsEqual(t, agent, otel, ignoredFields, "expected documents to be equal for "+tt.name)
+			})
+
+		}
+	})
 }
 
 func assertCollectorComponentsHealthy(t *assert.CollectT, status *atesting.AgentStatusCollectorOutput) {

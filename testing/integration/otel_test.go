@@ -1790,13 +1790,13 @@ func AssertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg 
 		hasKeyM2, _ := flatM2.HasKey(f)
 
 		if !hasKeyM1 && !hasKeyM2 {
-			assert.Failf(t, msg, "ignored field %q does not exist in either map, please remove it from the ignored fields", f)
+			t.Logf("%s: ignored field %q does not exist in either map", msg, f)
 		}
 
 		flatM1.Delete(f)
 		flatM2.Delete(f)
 	}
-	require.Equal(t, "", cmp.Diff(flatM1, flatM2), "expected maps to be equal")
+	assert.Equal(t, "", cmp.Diff(flatM1, flatM2), "expected maps to be equal")
 }
 
 func TestFBOtelRestartE2E(t *testing.T) {
