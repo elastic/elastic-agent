@@ -1,0 +1,85 @@
+name: update-beats
+
+on:
+  workflow_dispatch:
+  schedule:
+  - cron: '0 0 * * 1-5'
+
+permissions:
+  contents: read
+
+jobs:
+  filter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    outputs:
+      matrix: ${{ steps.generator.outputs.matrix }}
+    permissions:
+      contents: read
+    steps:
+    - id: generator
+      uses: elastic/oblt-actions/elastic/active-branches@v1
+      with:
+        exclude-branches: "7.17,8.17,8.18,9.0"
+        filter-branches: true
+
+  update-beats:
+    permissions:
+      contents: write
+      pull-requests: write
+    needs:
+    - filter
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.filter.outputs.matrix) }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ matrix.branch }}
+
+    - name: Install Updatecli in the runner
+      uses: updatecli/updatecli-action@ae3030ce1710c6496214fb1f8fd3bd9437b2a69d # 2.82.0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
+
+    - name: Set git config
+      run: |
+        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git config --global user.name "github-actions[bot]"
+
+    - name: Install mage
+      uses: magefile/mage-action@v3
+      with:
+        version: v1.13.0
+        install-only: true
+
+    - name: Run Updatecli in Apply mode
+      run: updatecli apply --config .ci/updatecli/update-beats.yml --values .ci/updatecli/values.d/scm.yml
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - if: ${{ failure()  }}
+      uses: slackapi/slack-github-action@485a9d42d3a73031f12ec201c457e2162c45d02d # v2.0.0
+      with:
+        method: chat.postMessage
+        token: ${{ secrets.SLACK_BOT_TOKEN }}
+        payload: |
+          {
+            "channel": "#ingest-notifications",
+            "text": "${{ env.SLACK_MESSAGE }}",
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "${{ env.SLACK_MESSAGE }}"
+                }
+              }
+            ]
+          }
+      env:
+        SLACK_MESSAGE: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@agent-team` please look what's going on <${{ env.JOB_URL }}|here>"
