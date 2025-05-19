@@ -378,9 +378,6 @@ func TestAgentMetricsInput(t *testing.T) {
 
 	metricsets := []string{"cpu", "memory", "network", "filesystem"}
 
-	agentDocs = make(map[string]estools.Documents)
-	otelDocs = make(map[string]estools.Documents)
-
 	type configOptions struct {
 		HomeDir             string
 		ESEndpoint          string
