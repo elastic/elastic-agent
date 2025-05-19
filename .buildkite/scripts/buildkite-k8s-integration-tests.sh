@@ -23,7 +23,6 @@ nodes:
   kubeadmConfigPatches:
   - |
     kind: ClusterConfiguration
-    apiVersion: kubeadm.k8s.io/v1beta4
     scheduler:
       extraArgs:
       - name: bind-address
