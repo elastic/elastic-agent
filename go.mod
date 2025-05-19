@@ -90,13 +90,8 @@ require (
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
-<<<<<<< HEAD
-	gotest.tools/gotestsum v1.9.0
-	helm.sh/helm/v3 v3.15.4
-=======
 	gotest.tools/gotestsum v1.12.2
-	helm.sh/helm/v3 v3.17.3
->>>>>>> 05289da6b (ci(test): skip skipped tests from the Test JUnit output (#8084))
+	helm.sh/helm/v3 v3.15.4
 	k8s.io/api v0.32.3
 	k8s.io/apimachinery v0.32.3
 	k8s.io/cli-runtime v0.30.3
