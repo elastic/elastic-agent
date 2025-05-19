@@ -82,12 +82,21 @@ require (
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
+<<<<<<< HEAD
 	gotest.tools/gotestsum v1.9.0
 	helm.sh/helm/v3 v3.15.4
 	k8s.io/api v0.31.3
 	k8s.io/apimachinery v0.31.3
 	k8s.io/cli-runtime v0.30.3
 	k8s.io/client-go v0.31.3
+=======
+	gotest.tools/gotestsum v1.12.2
+	helm.sh/helm/v3 v3.17.3
+	k8s.io/api v0.32.3
+	k8s.io/apimachinery v0.32.3
+	k8s.io/cli-runtime v0.32.2
+	k8s.io/client-go v0.32.3
+>>>>>>> 05289da6b (ci(test): skip skipped tests from the Test JUnit output (#8084))
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.70
 	sigs.k8s.io/e2e-framework v0.4.0
 	sigs.k8s.io/kustomize/api v0.13.5-0.20230601165947-6ce0bf390ce3
@@ -226,6 +235,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.10 // indirect
 	github.com/aws/smithy-go v1.22.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/bitfield/gotestdox v0.2.2 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.8.1 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect

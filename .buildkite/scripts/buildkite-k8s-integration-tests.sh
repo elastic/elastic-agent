@@ -41,8 +41,7 @@ chmod +x ./testsBinary
 
 export TEST_DEFINE_PREFIX="${CLUSTER_NAME}"
 
-go install gotest.tools/gotestsum
-gotestsum --version
+make install-gotestsum
 
 TESTS_EXIT_STATUS=0
 for variant in "${docker_variants[@]}"; do
@@ -96,7 +95,7 @@ EOF
   pod_logs_base="${PWD}/build/${fully_qualified_group_name}.pod_logs_dump"
 
   set +e
-  K8S_TESTS_POD_LOGS_BASE="${pod_logs_base}" AGENT_IMAGE="${image}" DOCKER_VARIANT="${variant}" gotestsum --hide-summary=skipped --format testname --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags kubernetes,integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args -integration.groups="${group_name}" -integration.sudo="false"
+  K8S_TESTS_POD_LOGS_BASE="${pod_logs_base}" AGENT_IMAGE="${image}" DOCKER_VARIANT="${variant}" gotestsum --hide-summary=skipped --format testname --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags kubernetes,integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args -integration.groups="${group_name}" -integration.sudo="false"
   exit_status=$?
   set -e
 
