@@ -9,43 +9,44 @@ env:
   IMAGE_UBUNTU_2204_ARM_64: "test-platform-ingest-elastic-agent-ubuntu-2204-aarch64-1747388695"
 #  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64"
   IMAGE_WIN_2016: "family/platform-ingest-elastic-agent-windows-2016"
-  IMAGE_WIN_2022: "family/platform-ingest-elastic-agent-windows-2022"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1747657358"
+#  IMAGE_WIN_2022: "family/platform-ingest-elastic-agent-windows-2022"
   IMAGE_WIN_10: "family/platform-ingest-elastic-agent-windows-10"
   IMAGE_WIN_11: "family/platform-ingest-elastic-agent-windows-11"
 
 steps:
-  - label: "check-ci"
-    key: "check-ci"
-    command: ".buildkite/scripts/steps/check-ci.sh"
-    agents:
-      provider: "gcp"
-      imageProject: elastic-images-qa
-      image: "${IMAGE_UBUNTU_2204_X86_64}"
-    retry:
-      manual:
-        allowed: true
-
-  - group: "Unit tests"
-    key: "unit-tests"
-    steps:
-      - label: "Unit tests - Ubuntu 22.04"
-        key: "unit-tests-2204"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          imageProject: elastic-images-qa
-          image: "${IMAGE_UBUNTU_2204_X86_64}"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-
+#  - label: "check-ci"
+#    key: "check-ci"
+#    command: ".buildkite/scripts/steps/check-ci.sh"
+#    agents:
+#      provider: "gcp"
+#      imageProject: elastic-images-qa
+#      image: "${IMAGE_UBUNTU_2204_X86_64}"
+#    retry:
+#      manual:
+#        allowed: true
+#
+#  - group: "Unit tests"
+#    key: "unit-tests"
+#    steps:
+#      - label: "Unit tests - Ubuntu 22.04"
+#        key: "unit-tests-2204"
+#        command: ".buildkite/scripts/steps/unit-tests.sh"
+#        artifact_paths:
+#          - "build/TEST-*.html"
+#          - "build/TEST-*.xml"
+#          - "build/diagnostics/*"
+#          - "coverage-*.out"
+#        agents:
+#          provider: "gcp"
+#          imageProject: elastic-images-qa
+#          image: "${IMAGE_UBUNTU_2204_X86_64}"
+#        retry:
+#          automatic:
+#            limit: 1
+#          manual:
+#            allowed: true
+#
 #      - label: "Unit tests - Ubuntu 22.04 with requirefips build tag"
 #        key: "unit-tests-2204-fips-tag"
 #        command: ".buildkite/scripts/steps/unit-tests.sh"
@@ -64,50 +65,13 @@ steps:
 #            limit: 1
 #          manual:
 #            allowed: true
-
-      - label: "Unit tests - fips140=only Ubuntu 22.04"
-        key: "unit-tests-2204-fips140-only"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        env:
-          FIPS: "true"
-          GODEBUG: "fips140=only"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          imageProject: elastic-images-qa
-          image: "${IMAGE_UBUNTU_2204_X86_64}"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-
-      - label: "Unit tests - Ubuntu 22.04 ARM64"
-        key: "unit-tests-2204-arm64"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "aws"
-          image: "${IMAGE_UBUNTU_2204_ARM_64}"
-          diskSizeGb: 200
-          instanceType: "m6g.xlarge"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-
-#      - label: "Unit tests - Windows 2022"
-#        key: "unit-tests-win2022"
-#        command: .buildkite/scripts/steps/unit-tests.ps1
+#
+#      - label: "Unit tests - fips140=only Ubuntu 22.04"
+#        key: "unit-tests-2204-fips140-only"
+#        command: ".buildkite/scripts/steps/unit-tests.sh"
+#        env:
+#          FIPS: "true"
+#          GODEBUG: "fips140=only"
 #        artifact_paths:
 #          - "build/TEST-*.html"
 #          - "build/TEST-*.xml"
@@ -115,15 +79,53 @@ steps:
 #          - "coverage-*.out"
 #        agents:
 #          provider: "gcp"
-#          image: "${IMAGE_WIN_2022}"
-#          machine_type: "n2-standard-8"
-#          disk_size: 200
-#          disk_type: "pd-ssd"
+#          imageProject: elastic-images-qa
+#          image: "${IMAGE_UBUNTU_2204_X86_64}"
 #        retry:
 #          automatic:
 #            limit: 1
 #          manual:
 #            allowed: true
+#
+#      - label: "Unit tests - Ubuntu 22.04 ARM64"
+#        key: "unit-tests-2204-arm64"
+#        command: ".buildkite/scripts/steps/unit-tests.sh"
+#        artifact_paths:
+#          - "build/TEST-*.html"
+#          - "build/TEST-*.xml"
+#          - "build/diagnostics/*"
+#          - "coverage-*.out"
+#        agents:
+#          provider: "aws"
+#          image: "${IMAGE_UBUNTU_2204_ARM_64}"
+#          diskSizeGb: 200
+#          instanceType: "m6g.xlarge"
+#        retry:
+#          automatic:
+#            limit: 1
+#          manual:
+#            allowed: true
+#
+      - label: "Unit tests - Windows 2022"
+        key: "unit-tests-win2022"
+        command: .buildkite/scripts/steps/unit-tests.ps1
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_WIN_2022}"
+          imageProject: elastic-images-qa
+          machine_type: "n2-standard-8"
+          disk_size: 200
+          disk_type: "pd-ssd"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
 #
 #      - label: "Unit tests - Windows 2016"
 #        key: "unit-tests-win2016"
