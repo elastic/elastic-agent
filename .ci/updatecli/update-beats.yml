@@ -30,7 +30,7 @@ actions:
         Update `elastic/beats` to the latest version on branch `{{ requiredEnv "BRANCH_NAME" }}`.
 
         *Changeset*
-        * https://github.com/elastic/beats/commit/{{ source "beats" }}
+        * https://github.com/elastic/beats/compare/{{ source "gomod" }}...{{ source "beats" }}
 
 sources:
   beats:
@@ -43,6 +43,16 @@ sources:
     - findsubmatch:
         pattern: ^(.{12}).*
         captureindex: 1
+  gomod:
+    kind: golang/gomod
+    spec:
+      module: github.com/elastic/beats/v7
+    transformers:
+    # the commit hash is the last 12 chars
+    - findsubmatch:
+        pattern: .*(.{12})$
+        captureindex: 1
+
 
 conditions:
   is-already-updated:
@@ -51,7 +61,7 @@ conditions:
     disablesourceinput: true
     scmid: default
     spec:
-      command: grep {{ source "beats" }} go.mod && exit 1 || exit 0
+      command: '[ ${{ source "beats"}} != {{ source "gomod" }} ]'
     failwhen: false
 
 targets:
