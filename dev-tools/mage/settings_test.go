@@ -160,7 +160,7 @@ func TestGeneratePackageManifest_AgentVersion(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GeneratePackageManifest(tt.args.beatName, tt.args.packageVersion, tt.args.snapshot, tt.args.fullHash, tt.args.shortHash)
+			got, err := GeneratePackageManifest(tt.args.beatName, tt.args.packageVersion, tt.args.snapshot, tt.args.fullHash, tt.args.shortHash, false, nil)
 			if !tt.wantErr(t, err, fmt.Sprintf("GeneratePackageManifest(%v, %v, %v, %v, %v)", tt.args.beatName, tt.args.packageVersion, tt.args.snapshot, tt.args.fullHash, tt.args.shortHash)) {
 				return
 			}
