@@ -16,11 +16,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
+
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/version"
-	"github.com/elastic/elastic-agent/testing/upgradetest"
-
-	"github.com/gofrs/uuid/v5"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 
@@ -188,9 +187,9 @@ func TestRpmFleetUpgrade(t *testing.T) {
 		installingServers  bool
 		expectingServers   bool
 	}{
-		{"legacy installation", version.NewParsedSemVer(8, 17, 3, "", ""), false, true},      // in case of legacy we don't apply flavor, expecting all to be preserved
-		{"9.0 snapshot with basic flavor", upgradetest.Version_9_0_0_SNAPSHOT, false, false}, // TODO: replace with PreviousMinor once 9.1 is released
-		{"9.0 snapshot with servers flavor", upgradetest.Version_9_0_0_SNAPSHOT, true, true}, // TODO: replace with PreviousMinor once 9.1 is released
+		{"legacy installation", version.NewParsedSemVer(8, 17, 3, "", ""), false, true},   // in case of legacy we don't apply flavor, expecting all to be preserved
+		{"9.0 with basic flavor", version.NewParsedSemVer(9, 0, 0, "", ""), false, false}, // TODO: 9.0.0 is the first version to support installing servers. when 9.1.0 is released, this can be replaced by upgradetest.PreviousMinor()
+		{"9.0 with servers flavor", version.NewParsedSemVer(9, 0, 0, "", ""), true, true}, // TODO: 9.0.0 is the first version to support installing servers. when 9.1.0 is released, this can be replaced by upgradetest.PreviousMinor()
 	}
 
 	currentVersion, err := version.ParseVersion(define.Version())
