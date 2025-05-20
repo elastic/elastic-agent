@@ -16,7 +16,7 @@ scms:
 
 actions:
   default:
-    title: '[Automation] Update elastic/beats to {{ source "beats" }}'
+    title: '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Update elastic/beats to {{ source "beats" }}'
     kind: github/pullrequest
     scmid: default
     spec:
