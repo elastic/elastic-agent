@@ -600,6 +600,8 @@ outputs:
 				ignoredFields: []string{
 					"host.network.egress.bytes",
 					"host.network.egress.packets",
+					"host.network.ingress.bytes",
+					"host.network.ingress.packets",
 					"system.network.in.dropped",
 					"system.network.in.bytes",
 					"system.network.in.packets",
