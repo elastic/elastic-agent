@@ -534,7 +534,7 @@ outputs:
 						require.Greater(ct, docs.Hits.Total.Value, 0, "docs count")
 					},
 					30*time.Second, 1*time.Second,
-					"Expected to find at least one document for metricset %s in index %s and runtime %q, got 0", mset, tt.runtimeExperimental, index)
+					"Expected to find at least one document for metricset %s in index %s and runtime %q, got 0", mset, index, tt.runtimeExperimental)
 			}
 
 			cancel()
