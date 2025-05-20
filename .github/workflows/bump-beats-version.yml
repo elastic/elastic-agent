@@ -46,11 +46,6 @@ jobs:
       with:
         go-version-file: 'go.mod'
 
-    - name: Set git config
-      run: |
-        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        git config --global user.name "github-actions[bot]"
-
     - name: Install mage
       uses: magefile/mage-action@v3
       with:
