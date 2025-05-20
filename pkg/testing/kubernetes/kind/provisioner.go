@@ -39,19 +39,14 @@ nodes:
   kubeadmConfigPatches:
   - |
     kind: ClusterConfiguration
-    apiVersion: kubeadm.k8s.io/v1beta4
     scheduler:
       extraArgs:
-      - name: bind-address
-        value: 0.0.0.0
-      - name: secure-port
-        value: "10259"
+        bind-address: "0.0.0.0"
+        secure-port: "10259"
     controllerManager:
       extraArgs:
-      - name: bind-address
-        value: 0.0.0.0
-      - name: secure-port
-        value: "10257"
+        bind-address: "0.0.0.0"
+        secure-port: "10257"
 `
 
 func NewProvisioner() common.InstanceProvisioner {
