@@ -38,9 +38,6 @@ jobs:
       with:
         ref: ${{ matrix.branch }}
 
-    - name: Install Updatecli in the runner
-      uses: updatecli/updatecli-action@ae3030ce1710c6496214fb1f8fd3bd9437b2a69d # 2.82.0
-
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
@@ -53,7 +50,9 @@ jobs:
         install-only: true
 
     - name: Run Updatecli in Apply mode
-      run: updatecli apply --config .ci/updatecli/update-beats.yml --values .ci/updatecli/values.d/scm.yml
+      uses: elastic/oblt-actions/updatecli/run@v1
+      with:
+        command: apply --config .ci/updatecli/update-beats.yml --values .ci/updatecli/values.d/scm.yml
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         BRANCH_NAME: ${{ matrix.branch }}
