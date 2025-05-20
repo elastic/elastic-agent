@@ -583,7 +583,10 @@ func Package(ctx context.Context) error {
 	}
 
 	// add the snapshot suffix if needed
-	dependenciesVersion += devtools.SnapshotSuffix()
+	if devtools.Snapshot {
+		// TODO find a better way
+		dependenciesVersion += "-SNAPSHOT"
+	}
 
 	packageAgent(ctx, platforms, dependenciesVersion, manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(CrossBuild), devtools.SelectedPackageTypes)
 	return nil
