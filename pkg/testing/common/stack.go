@@ -29,6 +29,10 @@ type Stack struct {
 	// Kibana is the URL to communication with kibana.
 	Kibana string `yaml:"kibana"`
 
+	// IntegrationsServer is the URL to communicate with integrations server
+	// (i.e. fleet server).
+	IntegrationsServer string `yaml:"integrations_server"`
+
 	// Username is the username.
 	Username string `yaml:"username"`
 
