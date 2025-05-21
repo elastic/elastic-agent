@@ -353,8 +353,13 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	watcherExecutable := selectWatcherExecutable(paths.Top(), previous, current)
 
+	rollbackWindow := u.upgradeSettings.Rollback.Window
+	if !isRollbackWindowFeatureAvailable(parsedVersion) {
+		rollbackWindow = 0
+	}
+
 	var watcherCmd *exec.Cmd
-	if watcherCmd, err = InvokeWatcher(u.log, watcherExecutable, u.upgradeSettings.Rollback.Window); err != nil {
+	if watcherCmd, err = InvokeWatcher(u.log, watcherExecutable, rollbackWindow); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
 		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
 		return nil, goerrors.Join(err, rollbackErr)

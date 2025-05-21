@@ -24,6 +24,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils"
+	"github.com/elastic/elastic-agent/pkg/version"
 )
 
 const (
@@ -32,6 +33,9 @@ const (
 	restartBackoffInit = 5 * time.Second
 	restartBackoffMax  = 90 * time.Second
 )
+
+// Rollback window feature is only available starting with version >= 9.1.0-SNAPSHOT.
+var rollbackWindowMinVersion = version.NewParsedSemVer(9, 1, 0, "SNAPSHOT", "")
 
 // Rollback rollbacks to previous version which was functioning before upgrade.
 func Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string) error {
@@ -240,10 +244,20 @@ func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) erro
 }
 
 func makeBaseWatchCmd(agentExecutable string, rollbackWindow time.Duration) *exec.Cmd {
-	// #nosec G204 -- user cannot inject any parameters to this command
-	return exec.Command(agentExecutable, watcherSubcommand,
+	cmdArgs := []string{
+		watcherSubcommand,
 		"--path.config", paths.Config(),
 		"--path.home", paths.Top(),
-		"--rollback.window", fmt.Sprintf("%.fs", rollbackWindow.Seconds()),
-	)
+	}
+
+	if rollbackWindow > 0 {
+		cmdArgs = append(cmdArgs, "--rollback.window", fmt.Sprintf("%.fs", rollbackWindow.Seconds()))
+	}
+
+	// #nosec G204 -- user cannot inject any parameters to this command
+	return exec.Command(agentExecutable, cmdArgs...)
+}
+
+func isRollbackWindowFeatureAvailable(watcherVersion *version.ParsedSemVer) bool {
+	return !watcherVersion.Less(*rollbackWindowMinVersion)
 }
