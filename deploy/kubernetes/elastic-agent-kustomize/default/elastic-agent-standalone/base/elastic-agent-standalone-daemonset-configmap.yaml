@@ -566,16 +566,16 @@ data:
             condition: ${kubernetes.labels.component} == 'kube-scheduler'
             # On Openshift condition should be adjusted:
             # condition: ${kubernetes.labels.app} == 'openshift-kube-scheduler'
-          - data_stream:
-              dataset: kubernetes.proxy
-              type: metrics
-            metricsets:
-              - proxy
-            hosts:
-              - 'localhost:10249'
-              # On Openshift port should be adjusted:
-              # - 'localhost:29101'
-            period: 10s
+          #- data_stream:
+          #    dataset: kubernetes.proxy
+          #    type: metrics
+          #  metricsets:
+          #    - proxy
+          #  hosts:
+          #    - 'localhost:10249'
+          #    # On Openshift port should be adjusted:
+          #    # - 'localhost:29101'
+          #  period: 10s
           - data_stream:
               dataset: kubernetes.container
               type: metrics

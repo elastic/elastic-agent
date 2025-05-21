@@ -1,9 +1,74 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+OC_PROJECT="default"
+
+createKindCluster() {
+  echo "~~~ Create kind cluster '${CLUSTER_NAME}'"
+  kind create cluster --image  "kindest/node:${K8S_VERSION}" --name "${CLUSTER_NAME}" --wait 60s --config - <<EOF
+  kind: Cluster
+  apiVersion: kind.x-k8s.io/v1alpha4
+  nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+    - |
+      kind: ClusterConfiguration
+      scheduler:
+        extraArgs:
+          bind-address: "0.0.0.0"
+          secure-port: "10259"
+      controllerManager:
+        extraArgs:
+          bind-address: "0.0.0.0"
+          secure-port: "10257"
+EOF
+}
+
+kindLoadImage() {
+  local image="$1"
+  echo "Loading Docker image ${image} to kind cluster ${CLUSTER_NAME}"
+  kind load docker-image --name "${CLUSTER_NAME}" "$image"
+}
+
+createOpenShiftCluster() {
+  echo "~~~ Create openshift cluster '${CLUSTER_NAME}'"
+  # TODO: create openshift cluster here
+  # Allow all workloads to run with the privileged context
+  oc adm policy add-scc-to-group privileged system:authenticated
+  # Allow all workloads to pull images from the default project in the internal registry
+  oc policy add-role-to-group system:image-puller system:authenticated \
+    --namespace=$OC_PROJECT
+}
+
+openshiftLoadImage() {
+  echo "Loading Docker image ${image} to openshift cluster ${CLUSTER_NAME}"
+  OC_REGISTRY=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
+  OC_REGISTRY_USER="$(oc whoami)"
+  INTERNAL_IMAGE="elastic-agent-${variant}:test"
+  OC_IMAGE="$OC_REGISTRY/$OC_PROJECT/$INTERNAL_IMAGE"
+  docker tag "$image" "$OC_IMAGE"
+  oc whoami -t | docker login -u "$OC_REGISTRY_USER" --password-stdin "$OC_REGISTRY"
+  docker push "$OC_IMAGE"
+  image=$OC_IMAGE # intentionally setting the global variable here
+}
+
 : "${K8S_VERSION:?Error: Specify Kubernetes version via K8S_VERSION env variable}"
 : "${TARGET_ARCH:?Error: Specify target architecture via ARCH env variable}"
 : "${DOCKER_IMAGE_ARCHIVES_DIR:=build/distributions}"
+: "${K8S_DISTRIBUTION:=kind}"
+
+case ${K8S_DISTRIBUTION} in
+  kind)
+    echo "~~~ Using kind for Kubernetes cluster"
+    ;;
+  openshift)
+    echo "~~~ Using OpenShift for Kubernetes cluster"
+    ;;
+  *)
+    echo "~~~ Unknown K8S_DISTRIBUTION: ${K8S_DISTRIBUTION}"
+    exit 1
+    ;;
+esac
 
 DOCKER_VARIANTS="${DOCKER_VARIANTS:-basic,wolfi,complete,complete-wolfi,service,cloud}"
 CLUSTER_NAME="${K8S_VERSION}-kubernetes"
@@ -14,24 +79,14 @@ if [[ -z "${AGENT_VERSION:-}" ]]; then
   AGENT_VERSION="${AGENT_VERSION}-SNAPSHOT"
 fi
 
-echo "~~~ Create kind cluster '${CLUSTER_NAME}'"
-kind create cluster --image  "kindest/node:${K8S_VERSION}" --name "${CLUSTER_NAME}" --wait 60s --config - <<EOF
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-nodes:
-- role: control-plane
-  kubeadmConfigPatches:
-  - |
-    kind: ClusterConfiguration
-    scheduler:
-      extraArgs:
-        bind-address: "0.0.0.0"
-        secure-port: "10259"
-    controllerManager:
-      extraArgs:
-        bind-address: "0.0.0.0"
-        secure-port: "10257"
-EOF
+case ${K8S_DISTRIBUTION} in
+  kind)
+    createKindCluster
+    ;;
+  openshift)
+    createOpenShiftCluster
+    ;;
+esac
 
 IFS=',' read -r -a docker_variants <<< "${DOCKER_VARIANTS}"
 
@@ -87,8 +142,14 @@ COPY testsBinary /usr/share/elastic-agent/k8s-inner-tests
 EOF
 
   # load image to kind cluster
-  echo "Loading Docker image ${image} to kind cluster ${CLUSTER_NAME}"
-  kind load docker-image --name "${CLUSTER_NAME}" "$image"
+  case ${K8S_DISTRIBUTION} in
+    kind)
+      kindLoadImage "${image}"
+      ;;
+    openshift)
+      openshiftLoadImage "${image}"
+      ;;
+  esac
 
   # Run integration tests
   echo "Running k8s integration tests for ${variant}"
@@ -99,7 +160,7 @@ EOF
   pod_logs_base="${PWD}/build/${fully_qualified_group_name}.pod_logs_dump"
 
   set +e
-  K8S_TESTS_POD_LOGS_BASE="${pod_logs_base}" AGENT_IMAGE="${image}" DOCKER_VARIANT="${variant}" gotestsum --hide-summary=skipped --format testname --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags kubernetes,integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args -integration.groups="${group_name}" -integration.sudo="false"
+  K8S_TESTS_POD_LOGS_BASE="${pod_logs_base}" AGENT_IMAGE="${image}" DOCKER_VARIANT="${variant}" gotestsum --hide-summary=skipped --format testname --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags kubernetes,integration -test.shuffle on -test.timeout 2h0m0s -test.run "${TEST_REGEX}" github.com/elastic/elastic-agent/testing/integration -v -args -integration.groups="${group_name}" -integration.sudo="false"
   exit_status=$?
   set -e
 
