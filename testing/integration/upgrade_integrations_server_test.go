@@ -22,19 +22,20 @@ import (
 	"github.com/elastic/elastic-agent/pkg/version"
 )
 
-// TestUpgradeIntegrationServer attempts to upgrade the integration server in ECH and
-// ensures that the upgrade succeeds.
-func TestUpgradeIntegrationServer(t *testing.T) {
+// TestUpgradeIntegrationsServer attempts to upgrade the Integrations Server (i.e. Elastic Agent
+// running it's own Fleet Server) in ECH and ensures that the upgrade succeeds.
+func TestUpgradeIntegrationsServer(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: Upgrade,
 		Local: true,  // only orchestrates ECH resources
 		Sudo:  false, // only orchestrates ECH resources
+		FIPS:  true,  // ensures test runs against FRH ECH region
 	})
 
 	// Default ECH region is gcp-us-west2 which is the CFT region.
 	echRegion := os.Getenv("TEST_INTEG_AUTH_ESS_REGION")
 	if echRegion == "" {
-		echRegion = "gcp-us-west2"
+		require.Fail(t, "ECH FRH region not configured via the TEST_INTEG_AUTH_ESS_REGION environment variable")
 	}
 
 	echApiKey, ok, err := ess.GetESSAPIKey()
@@ -59,16 +60,24 @@ func TestUpgradeIntegrationServer(t *testing.T) {
 	// Create ECH deployment with start version
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	prov.Create(ctx, common.StackRequest{
+	deployment, err := prov.Create(ctx, common.StackRequest{
 		ID:      "it-upgrade-integrations-server",
 		Version: startVersion.String(),
 	})
+	require.NoError(t, err)
 
-	// Check that integrations server is healthy before upgrade
+	// Check that Integrations Server is healthy before upgrade
+	// https://www.elastic.co/docs/api/doc/cloud/operation/operation-get-deployment
+	// TODO
+	_ = deployment.ID
 
 	// Upgrade deployment to end version
+	// TODO: err = prov.Upgrade(deployment.ID, endVersion)
+	require.NoError(t, err)
 
-	// Check that integrations server is healthy after upgrade
+	// Check that Integrations Server is healthy after upgrade
+	// https://www.elastic.co/docs/api/doc/cloud/operation/operation-get-deployment
+	// TODO
 }
 
 // getRandomStackVersionsPair returns an ordered pair of versions, where the first return value is less than the second. The
