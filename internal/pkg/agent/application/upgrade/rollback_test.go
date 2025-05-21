@@ -329,10 +329,10 @@ func TestRollback(t *testing.T) {
 	}
 }
 
-func TestInvokeCmd(t *testing.T) {
+func TestMakeBaseWatchCmd(t *testing.T) {
 	agentExecutable := "elastic-agent"
 	rollbackWindow := 2*time.Hour + 15*time.Minute
-	cmd := invokeCmd(agentExecutable, rollbackWindow)
+	cmd := makeBaseWatchCmd(agentExecutable, rollbackWindow)
 
 	// Expected command:
 	// elastic-agent watch --path.config /some/path --path.home /some/path --rollback.window 8100s

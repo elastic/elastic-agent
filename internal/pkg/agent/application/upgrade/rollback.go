@@ -150,7 +150,7 @@ func InvokeWatcher(log *logger.Logger, agentExecutable string, rollbackWindow ti
 		return nil, nil
 	}
 
-	cmd := invokeCmd(agentExecutable, rollbackWindow)
+	cmd := makeOSWatchCmd(makeBaseWatchCmd(agentExecutable, rollbackWindow))
 	log.Infow("Starting upgrade watcher", "path", cmd.Path, "args", cmd.Args, "env", cmd.Env, "dir", cmd.Dir)
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start Upgrade Watcher: %w", err)
@@ -237,4 +237,13 @@ func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) erro
 
 	close(signal)
 	return nil
+}
+
+func makeBaseWatchCmd(agentExecutable string, rollbackWindow time.Duration) *exec.Cmd {
+	// #nosec G204 -- user cannot inject any parameters to this command
+	return exec.Command(agentExecutable, watcherSubcommand,
+		"--path.config", paths.Config(),
+		"--path.home", paths.Top(),
+		"--rollback.window", fmt.Sprintf("%.fs", rollbackWindow.Seconds()),
+	)
 }
