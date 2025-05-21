@@ -156,8 +156,6 @@ steps:
     depends_on:
       - integration-fips-ess
       - packaging-containers-x86-64-fips
-    env:
-      FIPS: "true"
     steps:
       - label: "fips:{{matrix.version}}:amd64"
         env:
@@ -166,6 +164,7 @@ steps:
           DOCKER_VARIANTS: "fips"
           TARGET_ARCH: "amd64"
           AGENT_VERSION: "9.1.0-SNAPSHOT" # Set to 9.1.0 as it is the first release in 9.x that supports FIPS
+          FIPS: "true"
         command: |
           buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64-fips'
           .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
