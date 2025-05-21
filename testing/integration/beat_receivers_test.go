@@ -12,8 +12,10 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"text/template"
@@ -29,6 +31,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -550,88 +553,7 @@ outputs:
 		agentDocs = esDocs["agent"]
 		otelDocs = esDocs["otel"]
 
-		testCases := []struct {
-			name          string
-			ignoredFields []string
-		}{
-			{
-				name: "cpu",
-				ignoredFields: []string{
-					"host.cpu.usage",
-					"system.cpu.system.norm.pct",
-					"system.cpu.system.pct",
-					"system.cpu.total.norm.pct",
-					"system.cpu.total.pct",
-					"system.cpu.user.norm.pct",
-					"system.cpu.user.pct",
-					"system.cpu.idle.norm.pct",
-					"system.cpu.idle.pct",
-					"system.cpu.iowait.norm.pct",
-					"system.cpu.iowait.pct",
-					"system.cpu.irq.norm.pct",
-					"system.cpu.irq.pct",
-					"system.cpu.nice.norm.pct",
-					"system.cpu.nice.pct",
-					"system.cpu.softirq.norm.pct",
-					"system.cpu.softirq.pct",
-					"system.cpu.steal.norm.pct",
-					"system.cpu.steal.pct",
-				},
-			},
-			{
-				name: "memory",
-				ignoredFields: []string{
-					"system.memory.actual.free",
-					"system.memory.actual.used.bytes",
-					"system.memory.actual.used.pct",
-					"system.memory.free",
-					"system.memory.swap.free",
-					"system.memory.swap.total",
-					"system.memory.swap.used.bytes",
-					"system.memory.swap.used.pct",
-					"system.memory.total",
-					"system.memory.used.bytes",
-					"system.memory.used.pct",
-					"system.memory.cached",
-				},
-			},
-			{
-				name: "network",
-				ignoredFields: []string{
-					"host.network.egress.bytes",
-					"host.network.egress.packets",
-					"host.network.ingress.bytes",
-					"host.network.ingress.packets",
-					"system.network.in.dropped",
-					"system.network.in.bytes",
-					"system.network.in.packets",
-					"system.network.name",
-					"system.network.out.bytes",
-					"system.network.out.dropped",
-					"system.network.out.errors",
-					"system.network.out.packets",
-				},
-			},
-			{
-				name: "filesystem",
-				ignoredFields: []string{
-					"metricset.period",
-					"system.filesystem.available",
-					"system.filesystem.free",
-					"system.filesystem.used.bytes",
-					"system.filesystem.files",
-					"system.filesystem.free_files",
-					"system.filesystem.mount_point",
-					"system.filesystem.options",
-					"system.filesystem.total",
-					"system.filesystem.type",
-					"system.filesystem.used.pct",
-					"system.filesystem.device_name",
-				},
-			},
-		}
-
-		commonIgnoredFields := []string{
+		ignoredFields := []string{
 			// Expected to change between agent metrics input and otel metrics input
 			"@timestamp",
 			"agent.id",
@@ -645,16 +567,34 @@ outputs:
 			"event.duration",
 		}
 
-		require.Equal(t, len(metricsets), len(testCases), "expected to have a test case for each metricset")
-		for _, tt := range testCases {
-			t.Run(tt.name, func(t *testing.T) {
-				require.Greater(t, len(agentDocs[tt.name].Hits.Hits), 0, "expected to find agent documents for metricset %s", tt.name)
-				require.Greater(t, len(otelDocs[tt.name].Hits.Hits), 0, "expected to find otel documents for metricset %s", tt.name)
+		// Remove non-deterministic fields from system metrics
+		stripNondeterministicSystemMetrics := func(m mapstr.M, mset string) {
+			for k := range m {
+				systemPrefix := fmt.Sprintf("system.%s.", mset)
+				if strings.HasPrefix(k, systemPrefix) || k == "host.cpu.usage" {
+					m[k] = nil
+				}
+			}
+		}
 
-				agent := agentDocs[tt.name].Hits.Hits[0].Source
-				otel := otelDocs[tt.name].Hits.Hits[0].Source
-				ignoredFields := append(tt.ignoredFields, commonIgnoredFields...)
-				AssertMapsEqual(t, agent, otel, ignoredFields, "expected documents to be equal for "+tt.name)
+		for _, mset := range metricsets {
+			t.Run(mset, func(t *testing.T) {
+				require.Greater(t, len(agentDocs[mset].Hits.Hits), 0, "expected to find agent documents for metricset %s", mset)
+				require.Greater(t, len(otelDocs[mset].Hits.Hits), 0, "expected to find otel documents for metricset %s", mset)
+
+				agentDoc := mapstr.M(agentDocs[mset].Hits.Hits[0].Source).Flatten()
+				otelDoc := mapstr.M(otelDocs[mset].Hits.Hits[0].Source).Flatten()
+
+				agentKeys := slices.Collect(maps.Keys(agentDoc))
+				otelKeys := slices.Collect(maps.Keys(otelDoc))
+				slices.Sort(agentKeys)
+				slices.Sort(otelKeys)
+				require.Equal(t, agentKeys, otelKeys, "expected to have the same keys in agent and otel documents for metricset %s", mset)
+
+				stripNondeterministicSystemMetrics(agentDoc, mset)
+				stripNondeterministicSystemMetrics(otelDoc, mset)
+
+				AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for metricset "+mset)
 			})
 
 		}
