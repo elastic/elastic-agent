@@ -379,7 +379,7 @@ func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, ful
 	}
 	m.Package.PathMappings[0][versionedHomePath] = fmt.Sprintf("data/%s-%s-%s", beatName, versionWithSnapshotFlag, shortHash)
 	m.Package.PathMappings[0][v1.ManifestFileName] = fmt.Sprintf("data/%s-%s-%s/%s", beatName, versionWithSnapshotFlag, shortHash, v1.ManifestFileName)
-	m.Package.Flavors = flavorsRegistry	
+	m.Package.Flavors = flavorsRegistry
 	yamlBytes, err := yaml.Marshal(m)
 	if err != nil {
 		return "", fmt.Errorf("marshaling manifest: %w", err)
