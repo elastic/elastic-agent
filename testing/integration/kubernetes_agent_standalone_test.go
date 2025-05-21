@@ -284,7 +284,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						"image": map[string]any{
 							"repository": kCtx.agentImageRepo,
 							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
 						},
 						"presets": map[string]any{
 							"clusterWide": map[string]any{
@@ -328,7 +327,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						"image": map[string]any{
 							"repository": kCtx.agentImageRepo,
 							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
 						},
 					},
 					"outputs": map[string]any{
@@ -358,7 +356,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						"image": map[string]any{
 							"repository": kCtx.agentImageRepo,
 							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
 						},
 						"fleet": map[string]any{
 							"enabled": true,
@@ -382,7 +379,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						"image": map[string]any{
 							"repository": kCtx.agentImageRepo,
 							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
 						},
 						"fleet": map[string]any{
 							"enabled": true,
@@ -419,7 +415,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 							"image": map[string]any{
 								"repository": kCtx.agentImageRepo,
 								"tag":        kCtx.agentImageTag,
-								"pullPolicy": "Never",
 							},
 							"fleet": map[string]any{
 								"enabled": true,
@@ -454,7 +449,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 							"image": map[string]any{
 								"repository": kCtx.agentImageRepo,
 								"tag":        kCtx.agentImageTag,
-								"pullPolicy": "Never",
 							},
 							"fleet": map[string]any{
 								"enabled": true,
@@ -495,7 +489,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						"image": map[string]any{
 							"repository": kCtx.agentImageRepo,
 							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
 						},
 						"fleet": map[string]any{
 							"enabled": true,
@@ -529,7 +522,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 							"image": map[string]any{
 								"repository": kCtx.agentImageRepo,
 								"tag":        kCtx.agentImageTag,
-								"pullPolicy": "Never",
 							},
 							"fleet": map[string]any{
 								"enabled": true,
@@ -564,7 +556,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 							"image": map[string]any{
 								"repository": kCtx.agentImageRepo,
 								"tag":        kCtx.agentImageTag,
-								"pullPolicy": "Never",
 							},
 							"fleet": map[string]any{
 								"enabled": true,
@@ -634,7 +625,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 							"image": map[string]any{
 								"repository": kCtx.agentImageRepo,
 								"tag":        kCtx.agentImageTag,
-								"pullPolicy": "Never",
 							},
 							"fleet": map[string]any{
 								"enabled": true,
@@ -673,7 +663,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						"image": map[string]any{
 							"repository": kCtx.agentImageRepo,
 							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
 						},
 						"fleet": map[string]any{
 							"enabled": true,
@@ -697,7 +686,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						"image": map[string]any{
 							"repository": kCtx.agentImageRepo,
 							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
 						},
 					},
 					"kubernetes": map[string]any{
@@ -742,7 +730,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						"image": map[string]any{
 							"repository": kCtx.agentImageRepo,
 							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
 						},
 					},
 					"kubernetes": map[string]any{
@@ -1490,9 +1477,6 @@ func k8sStepDeployKustomize(kustomizePath string, containerName string, override
 			func(container *corev1.Container) {
 				// set agent image
 				container.Image = kCtx.agentImage
-				// set ImagePullPolicy to "Never" to avoid pulling the image
-				// as the image is already loaded by the kubernetes provisioner
-				container.ImagePullPolicy = "Never"
 
 				if overrides.agentContainerMemoryLimit != "" {
 					container.Resources.Limits = corev1.ResourceList{
