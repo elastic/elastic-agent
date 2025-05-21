@@ -7,7 +7,9 @@ package mage
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
+	"text/template"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -53,119 +55,124 @@ func TestAgentPackageVersion(t *testing.T) {
 }
 
 func TestGeneratePackageManifest_AgentVersion(t *testing.T) {
-	// manifest format string. argument are expected in order:
-	// 1: packageVersion
-	// 2: snapshot
-	// 3: fullHash
-	// 4: shortHash
-	// 5: version string combining packageVersion and snapshot flag
-	const manifestFormat = `
+
+	const manifestTemplateString = `
     version: co.elastic.agent/v1
     kind: PackageManifest
     package:
-        version: %[1]s
-        hash: %[3]s
-        snapshot: %[2]t
-        versioned-home: data/elastic-agent-%[4]s
+        version: {{ .PackageVersion }}
+        hash: {{ .FullHash }}
+        {{- if .Snapshot }}
+        snapshot: {{ .Snapshot }}
+        {{- end }}
+        versioned-home: data/elastic-agent-{{ .ShortHash }}
         path-mappings:
-            - data/elastic-agent-%[4]s: data/elastic-agent-%[5]s-%[4]s
-              manifest.yaml: data/elastic-agent-%[5]s-%[4]s/manifest.yaml
+            - data/elastic-agent-{{ .ShortHash }}: data/elastic-agent-{{ .PackageVersionWithSnapshot }}-{{ .ShortHash }}
+              manifest.yaml: data/elastic-agent-{{ .PackageVersionWithSnapshot }}-{{ .ShortHash }}/manifest.yaml
 `
 
+	manifestTemplate, err := template.New("expectedManifest").Parse(manifestTemplateString)
+	require.NoError(t, err, "manifest template parsing failed")
+
 	type args struct {
-		beatName       string
-		packageVersion string
-		snapshot       bool
-		fullHash       string
-		shortHash      string
+		beatName                   string
+		PackageVersion             string
+		Snapshot                   bool
+		FullHash                   string
+		ShortHash                  string
+		PackageVersionWithSnapshot string
 	}
 	tests := []struct {
 		name    string
 		args    args
-		want    string
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
-			name: "simple major.minor.patch version, no snapshot",
+			name: "simple major.minor.patch version, no Snapshot",
 			args: args{
-				beatName:       "elastic-agent",
-				packageVersion: "1.2.3",
-				snapshot:       false,
-				fullHash:       "abcdefghijkl",
-				shortHash:      "abcdef",
+				beatName:                   "elastic-agent",
+				PackageVersion:             "1.2.3",
+				Snapshot:                   false,
+				FullHash:                   "abcdefghijkl",
+				ShortHash:                  "abcdef",
+				PackageVersionWithSnapshot: "1.2.3",
 			},
-			want:    "1.2.3",
 			wantErr: assert.NoError,
 		},
 		{
-			name: "simple major.minor.patch version, snapshot",
+			name: "simple major.minor.patch version, Snapshot",
 			args: args{
-				beatName:       "elastic-agent",
-				packageVersion: "1.2.3",
-				snapshot:       true,
-				fullHash:       "abcdefghijkl",
-				shortHash:      "abcdef",
+				beatName:                   "elastic-agent",
+				PackageVersion:             "1.2.3",
+				Snapshot:                   true,
+				FullHash:                   "abcdefghijkl",
+				ShortHash:                  "abcdef",
+				PackageVersionWithSnapshot: "1.2.3-SNAPSHOT",
 			},
-			want:    "1.2.3-SNAPSHOT",
 			wantErr: assert.NoError,
 		},
 		{
-			name: "major.minor.patch version with build metadata, no snapshot",
+			name: "major.minor.patch version with build metadata, no Snapshot",
 			args: args{
-				beatName:       "elastic-agent",
-				packageVersion: "1.2.3+build20240329010101",
-				snapshot:       false,
-				fullHash:       "abcdefghijkl",
-				shortHash:      "abcdef",
+				beatName:                   "elastic-agent",
+				PackageVersion:             "1.2.3+build20240329010101",
+				Snapshot:                   false,
+				FullHash:                   "abcdefghijkl",
+				ShortHash:                  "abcdef",
+				PackageVersionWithSnapshot: "1.2.3+build20240329010101",
 			},
-			want:    "1.2.3+build20240329010101",
+
 			wantErr: assert.NoError,
 		},
 		{
-			name: "major.minor.patch version with build metadata, snapshot",
+			name: "major.minor.patch version with build metadata, Snapshot",
 			args: args{
-				beatName:       "elastic-agent",
-				packageVersion: "1.2.3+build20240329010101",
-				snapshot:       true,
-				fullHash:       "abcdefghijkl",
-				shortHash:      "abcdef",
+				beatName:                   "elastic-agent",
+				PackageVersion:             "1.2.3+build20240329010101",
+				Snapshot:                   true,
+				FullHash:                   "abcdefghijkl",
+				ShortHash:                  "abcdef",
+				PackageVersionWithSnapshot: "1.2.3-SNAPSHOT+build20240329010101",
 			},
-			want:    "1.2.3-SNAPSHOT+build20240329010101",
+
 			wantErr: assert.NoError,
 		},
 		{
-			name: "major.minor.patch version with prerelease and build metadata, no snapshot",
+			name: "major.minor.patch version with prerelease and build metadata, no Snapshot",
 			args: args{
-				beatName:       "elastic-agent",
-				packageVersion: "1.2.3-prerelease+build20240329010101",
-				snapshot:       false,
-				fullHash:       "abcdefghijkl",
-				shortHash:      "abcdef",
+				beatName:                   "elastic-agent",
+				PackageVersion:             "1.2.3-prerelease+build20240329010101",
+				Snapshot:                   false,
+				FullHash:                   "abcdefghijkl",
+				ShortHash:                  "abcdef",
+				PackageVersionWithSnapshot: "1.2.3-prerelease+build20240329010101",
 			},
-			want:    "1.2.3-prerelease+build20240329010101",
+
 			wantErr: assert.NoError,
 		},
 		{
-			name: "major.minor.patch version with prerelease and build metadata, snapshot",
+			name: "major.minor.patch version with prerelease and build metadata, Snapshot",
 			args: args{
-				beatName:       "elastic-agent",
-				packageVersion: "1.2.3-prerelease+build20240329010101",
-				snapshot:       true,
-				fullHash:       "abcdefghijkl",
-				shortHash:      "abcdef",
+				beatName:                   "elastic-agent",
+				PackageVersion:             "1.2.3-prerelease+build20240329010101",
+				Snapshot:                   true,
+				FullHash:                   "abcdefghijkl",
+				ShortHash:                  "abcdef",
+				PackageVersionWithSnapshot: "1.2.3-SNAPSHOT.prerelease+build20240329010101",
 			},
-			want:    "1.2.3-SNAPSHOT.prerelease+build20240329010101",
 			wantErr: assert.NoError,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GeneratePackageManifest(tt.args.beatName, tt.args.packageVersion, tt.args.snapshot, tt.args.fullHash, tt.args.shortHash, false, nil)
-			if !tt.wantErr(t, err, fmt.Sprintf("GeneratePackageManifest(%v, %v, %v, %v, %v)", tt.args.beatName, tt.args.packageVersion, tt.args.snapshot, tt.args.fullHash, tt.args.shortHash)) {
+			got, err := GeneratePackageManifest(tt.args.beatName, tt.args.PackageVersion, tt.args.Snapshot, tt.args.FullHash, tt.args.ShortHash, false, nil)
+			if !tt.wantErr(t, err, fmt.Sprintf("GeneratePackageManifest(%v, %v, %v, %v, %v)", tt.args.beatName, tt.args.PackageVersion, tt.args.Snapshot, tt.args.FullHash, tt.args.ShortHash)) {
 				return
 			}
-			expectedYaml := fmt.Sprintf(manifestFormat, tt.args.packageVersion, tt.args.snapshot, tt.args.fullHash, tt.args.shortHash, tt.want)
-			assert.YAMLEqf(t, expectedYaml, got, "GeneratePackageManifest(%v, %v, %v, %v, %v)", tt.args.beatName, tt.args.packageVersion, tt.args.snapshot, tt.args.fullHash, tt.args.shortHash)
+			buf := new(strings.Builder)
+			err = manifestTemplate.Execute(buf, tt.args)
+			require.NoError(t, err, "Error rendering expected YAML template")
+			assert.YAMLEqf(t, buf.String(), got, "GeneratePackageManifest(%v, %v, %v, %v, %v)", tt.args.beatName, tt.args.PackageVersion, tt.args.Snapshot, tt.args.FullHash, tt.args.ShortHash)
 		})
 	}
 }
