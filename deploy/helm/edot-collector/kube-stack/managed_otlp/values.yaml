@@ -580,6 +580,7 @@ collectors:
           endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
           headers:
             Authorization: ApiKey ${env:ELASTIC_API_KEY}
+          timeout: 15s
       service:
         pipelines:
           metrics:
