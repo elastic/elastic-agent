@@ -1,0 +1,101 @@
+receivers:
+  # Receives data from other Collectors in Agent mode
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317 # Listen on all interfaces
+      http:
+        endpoint: 0.0.0.0:4318 # Listen on all interfaces
+
+connectors:
+  # Routing connector splits infra metrics from other metrics and routes them to ECS-based pipeline
+  # Other metrics are exported in OTel-native format to Elasticsearch
+  routing:
+    default_pipelines: [metrics/otel]
+    error_mode: ignore
+    table:
+      - context: metric
+        statement: route() where instrumentation_scope.name == "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver" or IsMatch(instrumentation_scope.name, "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal/scraper/*")
+        pipelines: [metrics/infra/ecs, metrics/otel]
+  elasticapm: {} # Elastic APM Connector
+
+processors:
+  elasticinframetrics:
+    add_system_metrics: true
+    add_k8s_metrics: true
+    drop_original: true
+  attributes/dataset:
+    actions:
+      - key: event.dataset
+        from_attribute: data_stream.dataset
+        action: upsert
+  resource/process:
+    attributes:
+      - key: process.executable.name
+        action: delete
+      - key: process.executable.path
+        action: delete
+  batch:
+    send_batch_size: 1000
+    timeout: 1s
+    send_batch_max_size: 1500
+  batch/metrics:
+    send_batch_max_size: 0 # Explicitly set to 0 to avoid splitting metrics requests
+    timeout: 1s
+  elastictrace: {} # Elastic Trace Processor
+
+exporters:
+  debug: {}
+  elasticsearch/otel:
+    endpoints:
+      - ${ELASTIC_ENDPOINT} # Will be populated from environment variable
+    api_key: ${ELASTIC_API_KEY} # Will be populated from environment variable
+    logs_dynamic_index:
+      enabled: true
+    metrics_dynamic_index:
+      enabled: true
+    traces_dynamic_index:
+      enabled: true
+    # tls:
+    #   insecure_skip_verify: true
+    mapping:
+      mode: otel
+  elasticsearch/ecs:
+    endpoints:
+      - ${ELASTIC_ENDPOINT} # Will be populated from environment variable
+    api_key: ${ELASTIC_API_KEY} # Will be populated from environment variable
+    mapping:
+      mode: ecs
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      exporters: [routing]
+    metrics/infra/ecs:
+      receivers: [routing]
+      processors:
+        - elasticinframetrics
+        - attributes/dataset
+        - resource/process
+        - batch/metrics
+      exporters: [debug, elasticsearch/ecs]
+    metrics/otel:
+      receivers: [routing]
+      processors: [batch]
+      exporters: [debug, elasticsearch/otel]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug, elasticapm, elasticsearch/otel]
+    traces:
+      receivers: [otlp]
+      processors: [batch, elastictrace]
+      exporters: [debug, elasticapm, elasticsearch/otel]
+    metrics/aggregated-otel-metrics:
+      receivers:
+        - elasticapm
+      processors: [] # No processors defined in the original for this pipeline
+      exporters:
+        - debug
+        - elasticsearch/otel
