@@ -567,12 +567,17 @@ outputs:
 			"event.duration",
 		}
 
-		// Remove non-deterministic fields from system metrics
-		stripNondeterministicSystemMetrics := func(m mapstr.M, mset string) {
+		stripNondeterministicMetrics := func(m mapstr.M, mset string) {
+			// These metrics are not deterministic and will change from run to run
+			prefixes := []string{
+				fmt.Sprintf("system.%s", mset),
+				fmt.Sprintf("host.%s.", mset),
+			}
 			for k := range m {
-				systemPrefix := fmt.Sprintf("system.%s.", mset)
-				if strings.HasPrefix(k, systemPrefix) || k == "host.cpu.usage" {
-					m[k] = nil
+				for _, prefix := range prefixes {
+					if strings.HasPrefix(k, prefix) {
+						m[k] = nil
+					}
 				}
 			}
 		}
@@ -591,8 +596,8 @@ outputs:
 				slices.Sort(otelKeys)
 				require.Equal(t, agentKeys, otelKeys, "expected to have the same keys in agent and otel documents for metricset %s", mset)
 
-				stripNondeterministicSystemMetrics(agentDoc, mset)
-				stripNondeterministicSystemMetrics(otelDoc, mset)
+				stripNondeterministicMetrics(agentDoc, mset)
+				stripNondeterministicMetrics(otelDoc, mset)
 
 				AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for metricset "+mset)
 			})
