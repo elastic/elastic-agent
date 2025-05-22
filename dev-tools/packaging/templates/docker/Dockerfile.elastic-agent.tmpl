@@ -81,7 +81,7 @@ ENV BEAT_SETUID_AS={{ .user }}
 {{- if (and (contains .from "redhat/ubi") (contains .from "-minimal")) }}
 RUN for iter in {1..10}; do \
         microdnf update -y && \
-        microdnf install -y tar gzip findutils shadow-utils ca-certificates gawk libcap xz systemd && \
+        microdnf install -y tar gzip findutils shadow-utils ca-certificates gawk libcap xz && \
         microdnf clean all && \
         exit_code=0 && break || exit_code=$? && echo "microdnf error: retry $iter in 10s" && sleep 10; done; (exit $exit_code)
 {{- end }}
@@ -89,10 +89,20 @@ RUN for iter in {1..10}; do \
 {{- if contains .from "wolfi" }}
 RUN for iter in {1..10}; do \
         apk fix && \
-        apk add --no-cache ca-certificates curl gawk shadow bash systemd && \
+        apk add --no-cache ca-certificates curl gawk shadow bash && \
         exit_code=0 && break || exit_code=$? && echo "apk error: retry $iter in 10s" && sleep 10; \
     done; \
     (exit $exit_code)
+{{- end }}
+
+{{- if (not (contains .from "wolfi")) }}
+  {{- if (or (contains .Variant "") (contains .Variant "ubi") (contains .Variant "complete") (contains .Variant "collector")) }}
+  RUN for iter in {1..10}; do \
+          microdnf update -y && \
+          microdnf install -y systemd && \
+          microdnf clean all && \
+          exit_code=0 && break || exit_code=$? && echo "microdnf error: retry $iter in 10s" && sleep 10; done; (exit $exit_code)
+  {{- end }}
 {{- end }}
 
 LABEL \
@@ -247,7 +257,7 @@ RUN for iter in {1..10}; do \
         microdnf -y install fontconfig freetype cairo glib2 gtk3 pango xorg-x11-fonts-misc xorg-x11-fonts-Type1 \
         at-spi2-atk atk at-spi2-core alsa-lib cups-libs dbus-libs libdrm mesa-libEGL mesa-libgbm nspr nss libX11 \
         libX11-xcb libxcb libXcomposite libXdamage libXext libXfixes libXrandr libxkbcommon libxshmfence glib2 \
-        dbus-glib libicu mesa-libGL unzip iptables systemd && \
+        dbus-glib libicu mesa-libGL unzip iptables && \
         mkdir -p /usr/share/fonts/google-noto && \
         curl -LO https://noto-website-2.storage.googleapis.com/pkgs/NotoSansCJKjp-hinted.zip && \
         unzip NotoSansCJKjp-hinted.zip -d /usr/share/fonts/google-noto && \
