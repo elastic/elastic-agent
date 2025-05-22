@@ -56,6 +56,7 @@ openshiftLoadImage() {
 : "${TARGET_ARCH:?Error: Specify target architecture via ARCH env variable}"
 : "${DOCKER_IMAGE_ARCHIVES_DIR:=build/distributions}"
 : "${K8S_DISTRIBUTION:=kind}"
+: "${TEST_REGEX:=.*}"
 
 case ${K8S_DISTRIBUTION} in
   kind)
