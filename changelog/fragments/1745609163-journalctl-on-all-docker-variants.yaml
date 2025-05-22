@@ -11,7 +11,7 @@
 kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
-summary: Ship journalctl on all Docker image variants
+summary: Ship journalctl on the following Docker images variants: basic, complete, ubi and otel collector
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
