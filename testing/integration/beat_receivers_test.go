@@ -571,7 +571,7 @@ outputs:
 			// These metrics are not deterministic and will change from run to run
 			prefixes := []string{
 				fmt.Sprintf("system.%s", mset),
-				fmt.Sprintf("host.%s.", mset),
+				fmt.Sprintf("host.%s", mset),
 			}
 			for k := range m {
 				for _, prefix := range prefixes {
