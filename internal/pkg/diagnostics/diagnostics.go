@@ -507,7 +507,12 @@ func zipLogsWithPath(pathsHome, commitName string, collectServices, excludeEvent
 			return nil
 		}
 
-		return saveLogs(name, path, zw)
+		// Add the file to the zip.
+		// Ignore files that don't exist to account for races with log rotation.
+		if err := saveLogs(name, path, zw); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+		return nil
 	})
 }
 
