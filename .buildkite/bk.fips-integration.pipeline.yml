@@ -8,32 +8,34 @@ env:
   CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud"
 
   IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1744855248"
-  IMAGE_UBUNTU_X86_64_FIPS: "test-platform-ingest-fleet-server-ubuntu-2204-fips-1747841109"
-  IMAGE_UBUNTU_ARM64_FIPS: "test-platform-ingest-fleet-server-ubuntu-2204-fips-aarch64-1747841109"
+  IMAGE_UBUNTU_X86_64_FIPS: "test-platform-ingest-fleet-server-ubuntu-2204-fips"
+  IMAGE_UBUNTU_ARM64_FIPS: "test-platform-ingest-fleet-server-ubuntu-2204-fips-aarch64"
 
 steps:
-  - label: Build and push custom elastic-agent image
-    key: integration-fips-cloud-image
-    env:
-      ASDF_TERRAFORM_VERSION: 1.9.2
-      FIPS: "true"
-    command: |
-      #!/usr/bin/env bash
-      set -euo pipefail
-      mage cloud:image
-      mage cloud:push
-    agents:
-      provider: "gcp"
-      machineType: "n1-standard-8"
-      image: "${IMAGE_UBUNTU_2404_X86_64}"
+  # - label: Build and push custom elastic-agent image
+  #   key: integration-fips-cloud-image
+  #   env:
+  #     ASDF_TERRAFORM_VERSION: 1.9.2
+  #     FIPS: "true"
+  #   command: |
+  #     #!/usr/bin/env bash
+  #     set -euo pipefail
+  #     mage cloud:image
+  #     mage cloud:push
+  #   agents:
+  #     provider: "gcp"
+  #     machineType: "n1-standard-8"
+  #     image: "${IMAGE_UBUNTU_2404_X86_64}"
 
   - label: Start ESS stack for FIPS integration tests
     key: integration-fips-ess
-    depends_on:
-      - integration-fips-cloud-image
+    # depends_on:
+    #   - integration-fips-cloud-image
     env:
       ASDF_TERRAFORM_VERSION: 1.9.2
-      TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
+      # TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
+      TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:git-7380e1c46b55"
+
     command: |
       #!/usr/bin/env bash
       set -euo pipefail
