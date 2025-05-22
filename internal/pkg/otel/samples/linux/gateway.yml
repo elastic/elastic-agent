@@ -82,7 +82,7 @@ service:
       exporters: [debug, elasticsearch/ecs]
     metrics/otel:
       receivers: [routing]
-      processors: [batch]
+      processors: [batch/metrics]
       exporters: [debug, elasticsearch/otel]
     logs:
       receivers: [otlp]
