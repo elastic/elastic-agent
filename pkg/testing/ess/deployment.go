@@ -36,8 +36,9 @@ type CreateDeploymentRequest struct {
 type CreateDeploymentResponse struct {
 	ID string `json:"id"`
 
-	ElasticsearchEndpoint string
-	KibanaEndpoint        string
+	ElasticsearchEndpoint      string
+	KibanaEndpoint             string
+	IntegrationsServerEndpoint string
 
 	Username string
 	Password string
@@ -170,6 +171,13 @@ func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentReque
 					} `json:"metadata"`
 				} `json:"info"`
 			} `json:"kibana"`
+			IntegrationsServer []struct {
+				Info struct {
+					Metadata struct {
+						ServiceUrl string `json:"service_url"`
+					} `json:"metadata"`
+				} `json:"info"`
+			} `json:"integrations_server"`
 		} `json:"resources"`
 	}
 
@@ -179,6 +187,7 @@ func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentReque
 
 	r.ElasticsearchEndpoint = getRespBody.Resources.Elasticsearch[0].Info.Metadata.ServiceUrl
 	r.KibanaEndpoint = getRespBody.Resources.Kibana[0].Info.Metadata.ServiceUrl
+	r.IntegrationsServerEndpoint = getRespBody.Resources.IntegrationsServer[0].Info.Metadata.ServiceUrl
 
 	return &r, nil
 }
