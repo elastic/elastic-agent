@@ -95,8 +95,10 @@ RUN for iter in {1..10}; do \
     (exit $exit_code)
 {{- end }}
 
+# Add Systemd only to: elastic-agent, elastic-agent-complete, ubi, and otel collector.
+# Systemd is not add to any of the wolfi or slim images/variants
 {{- if (not (contains .from "wolfi")) }}
-  {{- if (or (contains .Variant "") (contains .Variant "ubi") (contains .Variant "complete") (contains .Variant "collector")) }}
+  {{- if (or (contains .Variant "basic") (contains .Variant "ubi") (contains .Variant "elastic-otel-collector") (contains .Variant "complete"))  }}
   RUN for iter in {1..10}; do \
           microdnf update -y && \
           microdnf install -y systemd && \
