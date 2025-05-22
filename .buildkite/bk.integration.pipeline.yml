@@ -5,6 +5,8 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   ASDF_MAGE_VERSION: 1.14.0
 
+  # The following images are defined here and their values will be updated by updatecli
+  # Please do not change them manually.
   IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1744855248"
   IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1744855248"
   IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1744855248"
