@@ -16,8 +16,7 @@ summary: Ship journalctl on the following Docker images variants: basic, complet
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-description: |
-  Filebeat's Journald input requires journalctl, so the systemd package is added to all docker image variants.
+#description: 
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
