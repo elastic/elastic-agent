@@ -8,8 +8,8 @@ env:
   CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud"
 
   IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1744855248"
-  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-fleet-server-ubuntu-2204-fips"
-  IMAGE_UBUNTU_ARM64_FIPS: "test-platform-ingest-fleet-server-ubuntu-2204-fips-aarch64-1747830486"
+  IMAGE_UBUNTU_X86_64_FIPS: "test-platform-ingest-fleet-server-ubuntu-2204-fips-1747841109"
+  IMAGE_UBUNTU_ARM64_FIPS: "test-platform-ingest-fleet-server-ubuntu-2204-fips-aarch64-1747841109"
 
 steps:
   - label: Build and push custom elastic-agent image
@@ -51,12 +51,12 @@ steps:
       - integration-fips-ess
     steps:
       - label: "fips:x86_64:non-sudo:{{matrix}}"
-        depends_on:
-          - packaging-ubuntu-x86-64-fips
+        # depends_on:
+        #   - packaging-ubuntu-x86-64-fips
         env:
           FIPS: "true"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64-fips'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64-fips' --build 0196f391-5329-4931-b446-07c76cd6d11f
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
@@ -77,12 +77,12 @@ steps:
           # FIPS tests don't have other groups enabled in order to save resources
 
       - label: "fips:x86_64:sudo:{{matrix}}"
-        depends_on:
-          - packaging-ubuntu-x86-64-fips
+        # depends_on:
+        #   - packaging-ubuntu-x86-64-fips
         env:
           FIPS: "true"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64-fips
+          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64-fips --build 0196f391-5329-4931-b446-07c76cd6d11f
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
@@ -102,12 +102,12 @@ steps:
           - fleet
 
       - label: "fips:arm64:non-sudo:{{matrix}}"
-        depends_on:
-          - packaging-ubuntu-arm64-fips
+        # depends_on:
+        #   - packaging-ubuntu-arm64-fips
         env:
           FIPS: "true"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64-fips'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64-fips' --build 0196f391-5329-4931-b446-07c76cd6d11f
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
@@ -127,12 +127,12 @@ steps:
           - fleet
 
       - label: "fips:arm64:sudo:{{matrix}}"
-        depends_on:
-          - packaging-ubuntu-arm64-fips
+        # depends_on:
+        #   - packaging-ubuntu-arm64-fips
         env:
           FIPS: "true"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-arm64-fips
+          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-arm64-fips --build 0196f391-5329-4931-b446-07c76cd6d11f
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
@@ -155,7 +155,7 @@ steps:
     key: integration-tests-kubernetes-fips
     depends_on:
       - integration-fips-ess
-      - packaging-containers-x86-64-fips
+      # - packaging-containers-x86-64-fips
     steps:
       - label: "fips:{{matrix.version}}:amd64"
         env:
@@ -166,7 +166,7 @@ steps:
           AGENT_VERSION: "9.1.0-SNAPSHOT" # Set to 9.1.0 as it is the first release in 9.x that supports FIPS
           FIPS: "true"
         command: |
-          buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64-fips'
+          buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64-fips' --build 0196f391-5329-4931-b446-07c76cd6d11f
           .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
         artifact_paths:
           - build/**
@@ -183,12 +183,12 @@ steps:
         matrix:
           setup:
             version:
-            - v1.27.16
-            - v1.28.9
-            - v1.29.8
-            - v1.30.8
-            - v1.31.0
-            - v1.32.0
+              - v1.27.16
+              - v1.28.9
+              - v1.29.8
+              - v1.30.8
+              - v1.31.0
+              - v1.32.0
 
   - label: ESS FIPS stack cleanup
     depends_on:
@@ -196,7 +196,7 @@ steps:
       - integration-tests-kubernetes-fips
     allow_dependency_failure: true
     command: |
-      buildkite-agent artifact download "test_infra/ess/**" . --step "integration-fips-ess"
+      buildkite-agent artifact download "test_infra/ess/**" . --step "integration-fips-ess" --build 0196f391-5329-4931-b446-07c76cd6d11f
       ls -lah test_infra/ess
       .buildkite/scripts/steps/ess_down.sh
     agents:
