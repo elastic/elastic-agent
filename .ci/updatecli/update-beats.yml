@@ -61,7 +61,7 @@ conditions:
     disablesourceinput: true
     scmid: default
     spec:
-      command: '[ ${{ source "beats"}} != {{ source "gomod" }} ]'
+      command: '[ {{ source "beats" }} != {{ source "gomod" }} ]'
     failwhen: false
 
 targets:
