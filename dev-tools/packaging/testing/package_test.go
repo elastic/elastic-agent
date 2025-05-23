@@ -38,6 +38,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage"
+	"github.com/elastic/elastic-agent/dev-tools/notice"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 )
 
@@ -67,6 +68,7 @@ var (
 
 var (
 	files             = flag.String("files", "../build/distributions/*", "filepath glob containing package files")
+	sourceRoot        = flag.String("source-root", "../", "path to root directory of Agent repository")
 	modules           = flag.Bool("modules", false, "check modules folder contents")
 	minModules        = flag.Int("min-modules", 4, "minimum number of modules to expect in modules folder")
 	modulesd          = flag.Bool("modules.d", false, "check modules.d folder contents")
@@ -229,6 +231,7 @@ func checkTar(t *testing.T, file string, fipsCheck bool) {
 	require.NoErrorf(t, err, "error extracting archive %q", file)
 
 	t.Run("check_manifest_file", testManifestFile(tempExtractionPath, fipsCheck))
+	t.Run("check_notice_file", testNoticeFile(tempExtractionPath, fipsCheck))
 
 	checkSha512PackageHash(t, file)
 
@@ -259,18 +262,29 @@ func checkZip(t *testing.T, file string) {
 	require.NoErrorf(t, err, "error extracting archive %q", file)
 
 	t.Run("check_manifest_file", testManifestFile(tempExtractionPath, false))
+	t.Run("check_notice_file", testNoticeFile(tempExtractionPath, false))
 
 	checkSha512PackageHash(t, file)
 }
 
 func testManifestFile(agentPackageRootDir string, checkFips bool) func(t *testing.T) {
 	return func(t *testing.T) {
-		dirEntries, err := os.ReadDir(agentPackageRootDir)
-		require.NoErrorf(t, err, "error listing extraction dir %q", agentPackageRootDir)
-		require.Lenf(t, dirEntries, 1, "archive should contain a single directory: found %v", dirEntries)
-		containingDir := dirEntries[0].Name()
-		checkManifestFileContents(t, filepath.Join(agentPackageRootDir, containingDir))
+		checkManifestFileContents(t, getExtractedPackageDir(agentPackageRootDir, t))
 	}
+}
+
+func testNoticeFile(agentPackageRootDir string, checkFips bool) func(t *testing.T) {
+	return func(t *testing.T) {
+		checkNoticeFileContents(t, getExtractedPackageDir(agentPackageRootDir, t), checkFips)
+	}
+}
+
+func getExtractedPackageDir(agentPackageRootDir string, t *testing.T) string {
+	dirEntries, err := os.ReadDir(agentPackageRootDir)
+	require.NoErrorf(t, err, "error listing extraction dir %q", agentPackageRootDir)
+	require.Lenf(t, dirEntries, 1, "archive should contain a single directory: found %v", dirEntries)
+
+	return filepath.Join(agentPackageRootDir, dirEntries[0].Name())
 }
 
 func checkManifestFileContents(t *testing.T, extractedPackageDir string) {
@@ -312,6 +326,47 @@ func parseManifest(t *testing.T, dir string) v1.PackageManifest {
 		t.Fatalf("unmarshaling package manifest: %v", err)
 	}
 	return *m
+}
+
+func checkNoticeFileContents(t *testing.T, extractedPackageDir string, checkFips bool) {
+	t.Logf("Checking package file NOTICE.txt; checkFips = %t", checkFips)
+
+	// Hash the source NOTICE file
+	sourceNoticeFile := filepath.Join(*sourceRoot, notice.NoticeFilename)
+	if checkFips {
+		sourceNoticeFile = filepath.Join(*sourceRoot, notice.FIPSNoticeFilename)
+	}
+	sourceNoticeFile, err := filepath.Abs(sourceNoticeFile)
+	require.NoError(t, err)
+
+	sourceNoticeFileHash, err := fileHash(sourceNoticeFile)
+	require.NoError(t, err)
+
+	// Hash the NOTICE file in the package
+	packageNoticeFile := filepath.Join(extractedPackageDir, "NOTICE.txt")
+	packageNoticeFileHash, err := fileHash(packageNoticeFile)
+	require.NoError(t, err)
+
+	// Compare the two hashes; they should be equal
+	require.Equalf(
+		t, sourceNoticeFileHash, packageNoticeFileHash,
+		"Contents of NOTICE.txt file in package are not the same as contents of %s", sourceNoticeFile,
+	)
+}
+
+func fileHash(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	h := sha512.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return nil, err
+	}
+
+	return h.Sum(nil), nil
 }
 
 const (
@@ -717,11 +772,7 @@ func checkDockerUser(t *testing.T, p *packageFile, info *dockerInfo, expectRoot 
 }
 
 func checkFIPS(t *testing.T, agentPackageRootDir string) {
-	dirEntries, err := os.ReadDir(agentPackageRootDir)
-	require.NoErrorf(t, err, "error listing extraction dir %q", agentPackageRootDir)
-	require.Lenf(t, dirEntries, 1, "archive should contain a single directory: found %v", dirEntries)
-
-	extractedPackageDir := filepath.Join(agentPackageRootDir, dirEntries[0].Name())
+	extractedPackageDir := getExtractedPackageDir(agentPackageRootDir, t)
 	t.Logf("Checking agent binary in %q for FIPS compliance", extractedPackageDir)
 	m := parseManifest(t, extractedPackageDir)
 	versionedHome := m.Package.VersionedHome
@@ -757,6 +808,7 @@ func checkFIPS(t *testing.T, agentPackageRootDir string) {
 				case "-tags":
 					foundTags = true
 					require.Contains(t, setting.Value, "requirefips")
+					require.Contains(t, setting.Value, "ms_tls13kdf")
 					continue
 				case "GOEXPERIMENT":
 					foundExperiment = true
