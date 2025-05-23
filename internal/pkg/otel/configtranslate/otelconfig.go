@@ -38,8 +38,15 @@ type BeatMonitoringConfigGetter func(unitID, binary string) map[string]any
 type exporterConfigTranslationFunc func(*config.C) (map[string]any, error)
 
 var (
-	OtelSupportedOutputTypes         = []string{"elasticsearch"}
-	OtelSupportedInputTypes          = []string{"filestream", "http/metrics", "beat/metrics"}
+	OtelSupportedOutputTypes = []string{"elasticsearch"}
+	OtelSupportedInputTypes  = []string{
+		// non-metric input
+		"httpjson",
+		"filestream",
+
+		// metric input
+		"http/metrics",
+		"beat/metrics"}
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
 		otelcomponent.MustNewType("elasticsearch"): translateEsOutputToExporter,
 	}
