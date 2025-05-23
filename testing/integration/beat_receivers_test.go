@@ -23,9 +23,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestClassicAndReceiverAgentMonitoring is a test to elastic-agent
-// monitoring with classic beats as separate processes vs beats
-// receivers in the same process
+// TestClassicAndReceiverAgentMonitoring is a test to compare documents ingested by
+// elastic-agent monitoring classic mode vs otel mode
 func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Default,
@@ -100,12 +99,12 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	}
 
 	// Flow
-	// 1. Start elastic agent monitoring in classic mode
+	// 1. Start elastic agent monitoring in classic mode (configure, install and wait for elastic-agent healthy)
 	// 2. Assert monitoring logs and metrics are available on ES
 	// 3. Uninstall
 
 	// 4. Start elastic agent monitoring in otel mode
-	// 5. Assert monitoring logs and metrics are available on ES
+	// 5. Assert monitoring logs and metrics are available on ES (for otel mode)
 	// 6. Uninstall
 
 	// 7. Compare both documents are equivalent
@@ -201,15 +200,15 @@ agent.monitoring:
 					}
 					return docs.Hits.Total.Value > 0
 				},
-				5*time.Minute, 5*time.Second,
+				2*time.Minute, 5*time.Second,
 				"agent monitoring classic no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestamp, tc.dsType, tc.dsDataset, tc.dsNamespace, tc.query)
 		}
 
-		// 5. Uninstall
+		// 3. Uninstall
 		combinedOutput, err := classicFixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 		require.NoErrorf(t, err, "error uninstalling classic agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
 
-		// 6. Install without enroll and blank elastic-agent.yml, to get working directory
+		// 4. Start elastic agent monitoring in otel mode
 		receiverMonitoringTemplate := `
 outputs:
   default:
@@ -243,48 +242,40 @@ agent.monitoring:
 		require.NoError(t, err)
 		combinedOutput, err = beatReceiverFixture.InstallWithoutEnroll(ctx, &installOpts)
 		require.NoErrorf(t, err, "error install without enroll: %s\ncombinedoutput:\n%s", err, string(combinedOutput))
+		// store timestamp to query docs greater than this value
+		timestampBeatReceiver := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
-		require.Eventually(t, func() bool {
-			err = beatReceiverFixture.IsHealthy(ctx)
-			if err != nil {
-				t.Logf("waiting for agent healthy: %s", err.Error())
-				return false
-			}
-			return true
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			status, statusErr := beatReceiverFixture.ExecStatus(ctx)
+			assert.NoError(collect, statusErr)
+			// agent should be healthy
+			assert.Equal(collect, int(cproto.State_HEALTHY), status.State)
+			// we should have no normal components running
+			assert.Zero(collect, len(status.Components))
+
+			// we should have filebeatreceiver and metricbeatreceiver running
+			otelCollectorStatus := status.Collector
+			require.NotNil(collect, otelCollectorStatus)
+			assert.Equal(collect, int(cproto.CollectorComponentStatus_StatusOK), otelCollectorStatus.Status)
+			pipelineStatusMap := otelCollectorStatus.ComponentStatusMap
+
+			// we should have 3 pipelines running: filestream for logs, http metrics and beats metrics
+			assert.Equal(collect, 3, len(pipelineStatusMap))
+
+			fileStreamPipeline := "pipeline:logs/_agent-component/filestream-monitoring"
+			httpMetricsPipeline := "pipeline:logs/_agent-component/http/metrics-monitoring"
+			beatsMetricsPipeline := "pipeline:logs/_agent-component/beat/metrics-monitoring"
+			assert.Contains(collect, pipelineStatusMap, fileStreamPipeline)
+			assert.Contains(collect, pipelineStatusMap, httpMetricsPipeline)
+			assert.Contains(collect, pipelineStatusMap, beatsMetricsPipeline)
+
+			// and all the components should be healthy
+			assertCollectorComponentsHealthy(collect, otelCollectorStatus)
+
+			return
 		}, 1*time.Minute, 1*time.Second)
 
-		// require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		// 	status, statusErr := beatReceiverFixture.ExecStatus(ctx)
-		// 	assert.NoError(collect, statusErr)
-		// 	// agent should be healthy
-		// 	assert.Equal(collect, int(cproto.State_HEALTHY), status.State)
-		// 	// we should have no normal components running
-		// 	assert.Zero(collect, len(status.Components))
-
-		// 	// we should have filebeatreceiver and metricbeatreceiver running
-		// 	otelCollectorStatus := status.Collector
-		// 	require.NotNil(collect, otelCollectorStatus)
-		// 	assert.Equal(collect, int(cproto.CollectorComponentStatus_StatusOK), otelCollectorStatus.Status)
-		// 	pipelineStatusMap := otelCollectorStatus.ComponentStatusMap
-
-		// 	// we should have 3 pipelines running: filestream for logs, http metrics and beats metrics
-		// 	assert.Equal(collect, 3, len(pipelineStatusMap))
-
-		// 	fileStreamPipeline := "pipeline:logs/_agent-component/filestream-monitoring"
-		// 	httpMetricsPipeline := "pipeline:logs/_agent-component/http/metrics-monitoring"
-		// 	beatsMetricsPipeline := "pipeline:logs/_agent-component/beat/metrics-monitoring"
-		// 	assert.Contains(collect, pipelineStatusMap, fileStreamPipeline)
-		// 	assert.Contains(collect, pipelineStatusMap, httpMetricsPipeline)
-		// 	assert.Contains(collect, pipelineStatusMap, beatsMetricsPipeline)
-
-		// 	// and all the components should be healthy
-		// 	assertCollectorComponentsHealthy(collect, otelCollectorStatus)
-
-		// 	return
-		// }, 1*time.Minute, 1*time.Second)
-
-		// 9. make sure logs and metrics for agent monitoring are being received
-		timestampBeatReceiver := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+		// 5. Assert monitoring logs and metrics are available on ES (for otel mode)
 		for _, tc := range tests {
 			require.Eventuallyf(t,
 				func() bool {
@@ -312,7 +303,7 @@ agent.monitoring:
 					}
 					return docs.Hits.Total.Value > 0
 				},
-				5*time.Minute, 5*time.Second,
+				2*time.Minute, 5*time.Second,
 				"agent monitoring beats receivers no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestampBeatReceiver, tc.dsType, tc.dsDataset, tc.dsNamespace, tc.query)
 		}
 
