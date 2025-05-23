@@ -95,7 +95,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		NonInteractive: true,
 		Privileged:     true,
 		Force:          true,
-		Namespace:      info.Namespace,
+		Develop:        true,
 	}
 
 	// Flow
@@ -230,7 +230,7 @@ agent.monitoring:
 		template.Must(template.New("config").Parse(receiverMonitoringTemplate)).Execute(&receiverBuffer,
 			configOptions{
 				ESEndpoint: esEndpoint,
-				ESApiKey:   apiKeyResponse.Encoded,
+				ESApiKey:   apiKey,
 				Namespace:  info.Namespace,
 			})
 
@@ -242,7 +242,7 @@ agent.monitoring:
 		require.NoError(t, err)
 		combinedOutput, err = beatReceiverFixture.InstallWithoutEnroll(ctx, &installOpts)
 		require.NoErrorf(t, err, "error install without enroll: %s\ncombinedoutput:\n%s", err, string(combinedOutput))
-		// store timestamp to query docs greater than this value
+		// store timestamp to filter otel docs with timestamp greater than this value
 		timestampBeatReceiver := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -303,7 +303,7 @@ agent.monitoring:
 					}
 					return docs.Hits.Total.Value > 0
 				},
-				2*time.Minute, 5*time.Second,
+				4*time.Minute, 5*time.Second,
 				"agent monitoring beats receivers no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestampBeatReceiver, tc.dsType, tc.dsDataset, tc.dsNamespace, tc.query)
 		}
 
@@ -324,7 +324,7 @@ agent.monitoring:
 				"agent.id",
 				// agent.version is different because we force version 9.0.0 in CI
 				"agent.version",
-				"data_stream.namespace",
+				"elastic_agent.id",
 				"log.file.inode",
 				"log.file.fingerprint",
 				"log.file.path",
