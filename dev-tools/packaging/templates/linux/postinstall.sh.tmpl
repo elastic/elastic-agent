@@ -38,7 +38,6 @@ if systemctl list-unit-files --type=service | grep -q "^${SERVICE_NAME}.service"
         ls -li /opt/Elastic/Endpoint/elastic-endpoint
     else
         echo "$SERVICE_NAME should not be running, but it is"
-        exit 1
     fi
 else
     echo "$SERVICE_NAME is not installed"
