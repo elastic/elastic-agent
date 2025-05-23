@@ -670,25 +670,27 @@ func (b *BeatsMonitor) getHttpStreams(
 		endpoints := []interface{}{prefixedEndpoint(utils.SocketURLWithFallback(compInfo.ID, paths.TempDir()))}
 		name := sanitizeName(binaryName)
 
-		httpStream := map[string]interface{}{
-			idKey: fmt.Sprintf("%s-%s-1", monitoringMetricsUnitID, name),
-			"data_stream": map[string]interface{}{
-				"type":      "metrics",
-				"dataset":   dataset,
-				"namespace": monitoringNamespace,
-			},
-			"metricsets": []interface{}{"json"},
-			"hosts":      endpoints,
-			"path":       "/stats",
-			"namespace":  "agent",
-			"period":     metricsCollectionIntervalString,
-			"index":      indexName,
-			"processors": processorsForHttpStream(binaryName, compInfo.ID, dataset, b.agentInfo, compInfo.RuntimeManager),
+		if compInfo.RuntimeManager != component.OtelRuntimeManager {
+			httpStream := map[string]interface{}{
+				idKey: fmt.Sprintf("%s-%s-1", monitoringMetricsUnitID, name),
+				"data_stream": map[string]interface{}{
+					"type":      "metrics",
+					"dataset":   dataset,
+					"namespace": monitoringNamespace,
+				},
+				"metricsets": []interface{}{"json"},
+				"hosts":      endpoints,
+				"path":       "/stats",
+				"namespace":  "agent",
+				"period":     metricsCollectionIntervalString,
+				"index":      indexName,
+				"processors": processorsForHttpStream(binaryName, compInfo.ID, dataset, b.agentInfo, compInfo.RuntimeManager),
+			}
+			if failureThreshold != nil {
+				httpStream[failureThresholdKey] = *failureThreshold
+			}
+			httpStreams = append(httpStreams, httpStream)
 		}
-		if failureThreshold != nil {
-			httpStream[failureThresholdKey] = *failureThreshold
-		}
-		httpStreams = append(httpStreams, httpStream)
 
 		// specifically for filebeat, we include input metrics
 		// disabled for filebeat receiver until https://github.com/elastic/beats/issues/43418 is resolved

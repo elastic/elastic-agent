@@ -1664,18 +1664,22 @@ func AssertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg 
 func AssertMapstrKeysEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg string) {
 
 	t.Helper()
+	// Delete all ignored fields.
+	for _, f := range ignoredFields {
+		_ = m1.Delete(f)
+		_ = m2.Delete(f)
+	}
+
 	flatM1 := m1.Flatten()
+	flatM2 := m2.Flatten()
+
 	for k := range flatM1 {
 		flatM1[k] = ""
 	}
-	flatM2 := m2.Flatten()
 	for k := range flatM2 {
 		flatM2[k] = ""
 	}
-	for _, f := range ignoredFields {
-		_ = flatM1.Delete(f)
-		_ = flatM2.Delete(f)
-	}
+
 	require.Zero(t, cmp.Diff(flatM1, flatM2), "expected keys of maps to be equal")
 }
 
