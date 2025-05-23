@@ -307,11 +307,11 @@ agent.monitoring:
 				"agent monitoring beats receivers no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestampBeatReceiver, tc.dsType, tc.dsDataset, tc.dsNamespace, tc.query)
 		}
 
-		// 10. Uninstall
+		// 6. Uninstall
 		combinedOutput, err = beatReceiverFixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 		require.NoErrorf(t, err, "error uninstalling beat receiver agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
 
-		// 11. Compare classic vs beat receiver events
+		// 7. Compare both documents are equivalent
 		for _, tc := range tests[:3] {
 			key := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
 			agent := agentDocs[key].Hits.Hits[0].Source
