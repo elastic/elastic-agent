@@ -14,13 +14,12 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/testing/estools"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
-	"github.com/elastic/elastic-agent/pkg/utils"
 
-	"github.com/gofrs/uuid/v5"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -97,36 +96,32 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		NonInteractive: true,
 		Privileged:     true,
 		Force:          true,
-		Develop:        true,
+		Namespace:      info.Namespace,
 	}
 
 	// Flow
-	// 1. create and install policy with just monitoring
-	// 2. download the policy, add the API key
-	// 3. install without enrolling in fleet
-	// 4. make sure logs and metrics for agent monitoring are being received
-	// 5. Uninstall
+	// 1. Start elastic agent monitoring in classic mode
+	// 2. Assert monitoring logs and metrics are available on ES
+	// 3. Uninstall
 
-	// 5. restart with blank policy (stop collecting)
-	// 6. configure with beats receiver policy
-	// 7. restart with beats receiver policy
-	// 8. make sure logs and metrics for agent monitoring are being received
-	// 9. compare monitoring logs and metrics
+	// 4. Start elastic agent monitoring in otel mode
+	// 5. Assert monitoring logs and metrics are available on ES
+	// 6. Uninstall
+
+	// 7. Compare both documents are equivalent
 
 	t.Run("verify elastic-agent monitoring functionality", func(t *testing.T) {
 		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
-		defer cancel()
+		t.Cleanup(cancel)
 
 		type configOptions struct {
-			InputPath              string
-			ESEndpoint             string
-			ESApiKey               string
-			FilebeatSocketEndpoint string
-			MetricbeatBeatEndpoint string
-			MetricbeatHttpEndpoint string
-			Namespace              string
+			InputPath  string
+			ESEndpoint string
+			ESApiKey   string
+			Namespace  string
 		}
 
+		// 1. Start elastic agent monitoring in classic mode
 		classicMonitoringTemplate := `
 outputs:
   default:
@@ -159,7 +154,6 @@ agent.monitoring:
 				Namespace:  info.Namespace,
 			})
 
-		// 3. Install without enrolling in fleet
 		classicFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 		require.NoError(t, err)
 
@@ -182,7 +176,7 @@ agent.monitoring:
 			return true
 		}, 1*time.Minute, 1*time.Second)
 
-		// 4. make sure logs and metrics for agent monitoring are being received
+		// 2. Assert monitoring logs and metrics are available on ES
 		for _, tc := range tests {
 			require.Eventuallyf(t,
 				func() bool {
@@ -216,14 +210,40 @@ agent.monitoring:
 		require.NoErrorf(t, err, "error uninstalling classic agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
 
 		// 6. Install without enroll and blank elastic-agent.yml, to get working directory
+		receiverMonitoringTemplate := `
+outputs:
+  default:
+    type: elasticsearch
+    hosts: {{.ESEndpoint}}
+    api_key: {{.ESApiKey }}
+    preset: balanced
+
+agent.monitoring:
+  enabled: true
+  logs: true
+  metrics: true
+  use_output: default
+  namespace: {{ .Namespace }}
+  _runtime_experimental: otel
+`
+
+		var receiverBuffer bytes.Buffer
+		template.Must(template.New("config").Parse(receiverMonitoringTemplate)).Execute(&receiverBuffer,
+			configOptions{
+				ESEndpoint: esEndpoint,
+				ESApiKey:   apiKeyResponse.Encoded,
+				Namespace:  info.Namespace,
+			})
+
 		beatReceiverFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 		require.NoError(t, err)
 		err = beatReceiverFixture.Prepare(ctx)
 		require.NoError(t, err)
-		err = beatReceiverFixture.Configure(ctx, []byte{})
+		err = beatReceiverFixture.Configure(ctx, receiverBuffer.Bytes())
 		require.NoError(t, err)
 		combinedOutput, err = beatReceiverFixture.InstallWithoutEnroll(ctx, &installOpts)
 		require.NoErrorf(t, err, "error install without enroll: %s\ncombinedoutput:\n%s", err, string(combinedOutput))
+
 		require.Eventually(t, func() bool {
 			err = beatReceiverFixture.IsHealthy(ctx)
 			if err != nil {
@@ -231,405 +251,37 @@ agent.monitoring:
 				return false
 			}
 			return true
-		}, 30*time.Second, 1*time.Second)
+		}, 1*time.Minute, 1*time.Second)
 
-		configTemplateOTel := `
-receivers:
-  filebeatreceiver/filestream-monitoring:
-    filebeat:
-      inputs:
-        - type: filestream
-          enabled: true
-          id: filestream-monitoring-agent
-          paths:
-            - '{{.InputPath}}/data/elastic-agent-*/logs/elastic-agent-*.ndjson'
-            - '{{.InputPath}}/data/elastic-agent-*/logs/elastic-agent-watcher-*.ndjson'
-          close:
-            on_state_change:
-              inactive: 5m
-          parsers:
-            - ndjson:
-                add_error_key: true
-                message_key: message
-                overwrite_keys: true
-                target: ""
-          processors:
-            - add_fields:
-                fields:
-                  dataset: elastic_agent
-                  namespace: {{.Namespace}}
-                  type: logs
-                target: data_stream
-            - add_fields:
-                fields:
-                  dataset: elastic_agent
-                target: event
-            - add_fields:
-                fields:
-                  id: 0ddca301-e7c0-4eac-8432-7dd05bc9cb06
-                  snapshot: false
-                  version: 8.19.0
-                target: elastic_agent
-            - add_fields:
-                fields:
-                  id: 0879f47d-df41-464d-8462-bc2b8fef45bf
-                target: agent
-            - drop_event:
-                when:
-                  regexp:
-                    component.id: .*-monitoring$
-            - drop_event:
-                when:
-                  regexp:
-                    message: ^Non-zero metrics in the last
-            - copy_fields:
-                fields:
-                  - from: data_stream.dataset
-                    to: data_stream.dataset_original
-            - drop_fields:
-                fields:
-                  - data_stream.dataset
-            - copy_fields:
-                fail_on_error: false
-                fields:
-                  - from: component.dataset
-                    to: data_stream.dataset
-                ignore_missing: true
-            - copy_fields:
-                fail_on_error: false
-                fields:
-                  - from: data_stream.dataset_original
-                    to: data_stream.dataset
-            - drop_fields:
-                fields:
-                  - data_stream.dataset_original
-                  - event.dataset
-            - copy_fields:
-                fields:
-                  - from: data_stream.dataset
-                    to: event.dataset
-            - drop_fields:
-                fields:
-                  - ecs.version
-                ignore_missing: true
-    output:
-      otelconsumer:
-    queue:
-      mem:
-        flush:
-          timeout: 0s
-    logging:
-      level: info
-      selectors:
-        - '*'
-    http.enabled: true
-    http.host: '{{ .FilebeatSocketEndpoint }}'
-  metricbeatreceiver/beat-monitoring:
-    metricbeat:
-      modules:
-        - failure_threshold: 5
-          hosts:
-            - http+{{ .FilebeatSocketEndpoint }}
-          metricsets:
-            - stats
-          module: beat
-          enabled: true
-          period: 60s
-          processors:
-            - add_fields:
-                fields:
-                  dataset: elastic_agent.filebeat
-                  namespace: {{.Namespace}}
-                  type: metrics
-                target: data_stream
-            - add_fields:
-                fields:
-                  dataset: elastic_agent.filebeat
-                target: event
-            - add_fields:
-                fields:
-                  id: f9787136-2d04-4999-a504-848c2e25d90e
-                  process: filebeat
-                  snapshot: false
-                  version: 9.0.0
-                target: elastic_agent
-            - add_fields:
-                fields:
-                  id: f9787136-2d04-4999-a504-848c2e25d90e
-                target: agent
-            - add_fields:
-                fields:
-                  binary: filebeat
-                  id: filestream-monitoring
-                target: component
-        - failure_threshold: 5
-          hosts:
-            - http+{{ .MetricbeatBeatEndpoint }}
-          id: metrics-monitoring-metricbeat
-          metricsets:
-            - stats
-          module: beat
-          enabled: true
-          period: 60s
-          processors:
-            - add_fields:
-                fields:
-                  dataset: elastic_agent.metricbeat
-                  namespace: {{.Namespace}}
-                  type: metrics
-                target: data_stream
-            - add_fields:
-                fields:
-                  dataset: elastic_agent.metricbeat
-                target: event
-            - add_fields:
-                fields:
-                  stream_id: metrics-monitoring-metricbeat
-                target: '@metadata'
-            - add_fields:
-                fields:
-                  id: f9787136-2d04-4999-a504-848c2e25d90e
-                  process: metricbeat
-                  snapshot: false
-                  version: 9.0.0
-                target: elastic_agent
-            - add_fields:
-                fields:
-                  id: f9787136-2d04-4999-a504-848c2e25d90e
-                target: agent
-            - add_fields:
-                fields:
-                  binary: metricbeat
-                  id: beat/metrics-monitoring
-                target: component
-    output:
-      otelconsumer:
-    queue:
-      mem:
-        flush:
-          timeout: 0s
-    logging:
-      level: info
-      selectors:
-        - '*'
-    http.enabled: true
-    http.host: '{{ .MetricbeatBeatEndpoint }}'
-  metricbeatreceiver/http-monitoring:
-    metricbeat:
-      modules:
-        - failure_threshold: 5
-          hosts:
-            - http://localhost:6791
-          id: metrics-monitoring-agent
-          index: metrics-elastic_agent.elastic_agent-{{ .Namespace }}
-          metricsets:
-            - json
-          module: http
-          enabled: true
-          namespace: agent
-          path: /stats
-          period: 60s
-          processors:
-            - add_fields:
-                fields:
-                  input_id: metrics-monitoring-agent
-                target: '@metadata'
-            - add_fields:
-                fields:
-                  dataset: elastic_agent.elastic_agent
-                  namespace: {{.Namespace}}
-                  type: metrics
-                target: data_stream
-            - add_fields:
-                fields:
-                  dataset: elastic_agent.elastic_agent
-                target: event
-            - add_fields:
-                fields:
-                  stream_id: metrics-monitoring-agent
-                target: '@metadata'
-            - add_fields:
-                fields:
-                  id: f9787136-2d04-4999-a504-848c2e25d90e
-                  snapshot: false
-                  version: 9.0.0
-                target: elastic_agent
-            - add_fields:
-                fields:
-                  id: f9787136-2d04-4999-a504-848c2e25d90e
-                target: agent
-            - copy_fields:
-                fail_on_error: false
-                fields:
-                  - from: http.agent.beat.cpu
-                    to: system.process.cpu
-                  - from: http.agent.beat.memstats.memory_sys
-                    to: system.process.memory.size
-                  - from: http.agent.beat.handles
-                    to: system.process.fd
-                  - from: http.agent.beat.cgroup
-                    to: system.process.cgroup
-                  - from: http.agent.apm-server
-                    to: apm-server
-                  - from: http.filebeat_input
-                    to: filebeat_input
-                ignore_missing: true
-            - drop_fields:
-                fields:
-                  - http
-                ignore_missing: true
-            - add_fields:
-                fields:
-                  binary: elastic-agent
-                  id: elastic-agent
-                target: component
-        - failure_threshold: 5
-          hosts:
-            - http+{{ .FilebeatSocketEndpoint }}
-          id: metrics-monitoring-filebeat-1
-          index: metrics-elastic_agent.filebeat_input-{{ .Namespace }}
-          json:
-            is_array: true
-          metricsets:
-            - json
-          module: http
-          enabled: true
-          namespace: filebeat_input
-          path: /inputs/
-          period: 60s
-          processors:
-            - add_fields:
-                fields:
-                  input_id: metrics-monitoring-agent
-                target: '@metadata'
-            - add_fields:
-                fields:
-                  dataset: elastic_agent.filebeat_input
-                  namespace: {{.Namespace}}
-                  type: metrics
-                target: data_stream
-            - add_fields:
-                fields:
-                  dataset: elastic_agent.filebeat_input
-                target: event
-            - add_fields:
-                fields:
-                  stream_id: metrics-monitoring-filebeat-1
-                target: '@metadata'
-            - add_fields:
-                fields:
-                  id: f9787136-2d04-4999-a504-848c2e25d90e
-                  snapshot: false
-                  version: 9.0.0
-                target: elastic_agent
-            - add_fields:
-                fields:
-                  id: f9787136-2d04-4999-a504-848c2e25d90e
-                target: agent
-            - add_fields:
-                fields:
-                  id: f9787136-2d04-4999-a504-848c2e25d90e
-                  process: filebeat
-                  snapshot: false
-                  version: 9.0.0
-                target: elastic_agent
-            - copy_fields:
-                fail_on_error: false
-                fields:
-                  - from: http.agent.beat.cpu
-                    to: system.process.cpu
-                  - from: http.agent.beat.memstats.memory_sys
-                    to: system.process.memory.size
-                  - from: http.agent.beat.handles
-                    to: system.process.fd
-                  - from: http.agent.beat.cgroup
-                    to: system.process.cgroup
-                  - from: http.agent.apm-server
-                    to: apm-server
-                  - from: http.filebeat_input
-                    to: filebeat_input
-                ignore_missing: true
-            - drop_fields:
-                fields:
-                  - http
-                ignore_missing: true
-            - add_fields:
-                fields:
-                  binary: filebeat
-                  id: filestream-monitoring
-                target: component
-    output:
-      otelconsumer:
-    queue:
-      mem:
-        flush:
-          timeout: 0s
-    logging:
-      level: debug
-      selectors:
-        - '*'
-    http.enabled: true
-    http.host: '{{ .MetricbeatHttpEndpoint }}'
-exporters:
-  debug:
-    use_internal_logger: false
-    verbosity: detailed
-  elasticsearch/log:
-    endpoints:
-      - {{.ESEndpoint}}
-    compression: none
-    api_key: {{.ESApiKey}}
-    logs_dynamic_index:
-      enabled: true
-    batcher:
-      enabled: true
-      flush_timeout: 0.5s
-    mapping:
-      mode: bodymap
-service:
-  telemetry:
-    logs:
-      level: "DEBUG"
-  pipelines:
-    logs:
-      receivers:
-        - filebeatreceiver/filestream-monitoring
-        - metricbeatreceiver/beat-monitoring
-        - metricbeatreceiver/http-monitoring
-      exporters:
-        - elasticsearch/log
-        - debug
-agent:
-  monitoring:
-    enabled: true
-    logs: false
-    metrics: false
-  logging:
-    level: debug
-`
+		// require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		// 	status, statusErr := beatReceiverFixture.ExecStatus(ctx)
+		// 	assert.NoError(collect, statusErr)
+		// 	// agent should be healthy
+		// 	assert.Equal(collect, int(cproto.State_HEALTHY), status.State)
+		// 	// we should have no normal components running
+		// 	assert.Zero(collect, len(status.Components))
 
-		filebeatSocketEndpoint := utils.SocketURLWithFallback(uuid.Must(uuid.NewV4()).String(), paths.TempDir())
-		metricbeatBeatEndpoint := utils.SocketURLWithFallback(uuid.Must(uuid.NewV4()).String(), paths.TempDir())
-		metricbeatHttpEndpoint := utils.SocketURLWithFallback(uuid.Must(uuid.NewV4()).String(), paths.TempDir())
+		// 	// we should have filebeatreceiver and metricbeatreceiver running
+		// 	otelCollectorStatus := status.Collector
+		// 	require.NotNil(collect, otelCollectorStatus)
+		// 	assert.Equal(collect, int(cproto.CollectorComponentStatus_StatusOK), otelCollectorStatus.Status)
+		// 	pipelineStatusMap := otelCollectorStatus.ComponentStatusMap
 
-		var configBuffer bytes.Buffer
-		template.Must(template.New("config").Parse(configTemplateOTel)).Execute(&configBuffer,
-			configOptions{
-				InputPath:              beatReceiverFixture.WorkDir(),
-				ESEndpoint:             esEndpoint,
-				ESApiKey:               apiKeyResponse.Encoded,
-				FilebeatSocketEndpoint: filebeatSocketEndpoint,
-				MetricbeatBeatEndpoint: metricbeatBeatEndpoint,
-				MetricbeatHttpEndpoint: metricbeatHttpEndpoint,
-				Namespace:              info.Namespace,
-			})
-		configOTelContents := configBuffer.Bytes()
-		err = beatReceiverFixture.Configure(ctx, configOTelContents)
-		require.NoError(t, err)
+		// 	// we should have 3 pipelines running: filestream for logs, http metrics and beats metrics
+		// 	assert.Equal(collect, 3, len(pipelineStatusMap))
 
-		// 8. restart with beats receiver policy
-		combinedOutput, err = beatReceiverFixture.Exec(ctx, []string{"restart"})
-		require.NoErrorf(t, err, "error restarting agent: %s\ncombinedoutput:\n%s", err, string(combinedOutput))
+		// 	fileStreamPipeline := "pipeline:logs/_agent-component/filestream-monitoring"
+		// 	httpMetricsPipeline := "pipeline:logs/_agent-component/http/metrics-monitoring"
+		// 	beatsMetricsPipeline := "pipeline:logs/_agent-component/beat/metrics-monitoring"
+		// 	assert.Contains(collect, pipelineStatusMap, fileStreamPipeline)
+		// 	assert.Contains(collect, pipelineStatusMap, httpMetricsPipeline)
+		// 	assert.Contains(collect, pipelineStatusMap, beatsMetricsPipeline)
+
+		// 	// and all the components should be healthy
+		// 	assertCollectorComponentsHealthy(collect, otelCollectorStatus)
+
+		// 	return
+		// }, 1*time.Minute, 1*time.Second)
 
 		// 9. make sure logs and metrics for agent monitoring are being received
 		timestampBeatReceiver := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
@@ -677,22 +329,16 @@ agent:
 				// Expected to change between agentDocs and OtelDocs
 				"@timestamp",
 				"agent.ephemeral_id",
+				// agent.id is different because it's the id of the underlying beat
 				"agent.id",
+				// agent.version is different because we force version 9.0.0 in CI
 				"agent.version",
 				"data_stream.namespace",
 				"log.file.inode",
 				"log.file.fingerprint",
 				"log.file.path",
 				"log.offset",
-
-				// needs investigation
-				"event.agent_id_status",
 				"event.ingested",
-
-				// elastic_agent * fields are hardcoded in processor list for now which is why they differ
-				"elastic_agent.id",
-				"elastic_agent.snapshot",
-				"elastic_agent.version",
 			}
 			switch tc.onlyCompareKeys {
 			case true:
@@ -702,4 +348,12 @@ agent:
 			}
 		}
 	})
+}
+
+func assertCollectorComponentsHealthy(t *assert.CollectT, status *atesting.AgentStatusCollectorOutput) {
+	assert.Equal(t, int(cproto.CollectorComponentStatus_StatusOK), status.Status, "component status should be ok")
+	assert.Equal(t, "", status.Error, "component status should not have an error")
+	for _, componentStatus := range status.ComponentStatusMap {
+		assertCollectorComponentsHealthy(t, componentStatus)
+	}
 }

@@ -11,6 +11,14 @@ mage:
 	@go install github.com/magefile/mage
 	@-mage -clean
 
+
+## install-gotestsum : Install gotestsum
+.PHONY: install-gotestsum
+install-gotestsum:
+	@echo Installing gotestsum
+	go install gotest.tools/gotestsum
+	@-gotestsum --version
+
 ## help : Show this help.
 help: Makefile
 	@printf "Usage: make [target] [VARIABLE=value]\nTargets:\n"
@@ -18,7 +26,7 @@ help: Makefile
 	@printf "Variables:\n"
 	@grep -E "^[A-Za-z0-9_]*\?=" $< | awk 'BEGIN {FS = "\\?="}; { printf "  \033[36m%-25s\033[0m  Default values: %s\n", $$1, $$2}'
 
-## notice : Generates the NOTICE file.
+## notice : Generates the NOTICE.txt and NOTICE-fips.txt files.
 .PHONY: notice
 notice:
 	@mage notice

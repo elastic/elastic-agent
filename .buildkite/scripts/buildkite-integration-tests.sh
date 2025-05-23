@@ -27,15 +27,12 @@ asdf install
 
 echo "~~~ Running integration tests as $USER"
 
-go install gotest.tools/gotestsum
-gotestsum --version
+make install-gotestsum
 
 # Parsing version.go. Will be simplified here: https://github.com/elastic/ingest-dev/issues/4925
-#AGENT_VERSION=$(grep "const defaultBeatVersion =" version/version.go | cut -d\" -f2)
-#AGENT_VERSION="${AGENT_VERSION}-SNAPSHOT"
+AGENT_VERSION=$(grep "const defaultBeatVersion =" version/version.go | cut -d\" -f2)
+AGENT_VERSION="${AGENT_VERSION}-SNAPSHOT"
 
-# Remove agent pinning once 9.0.0 is released
-AGENT_VERSION=9.0.0-SNAPSHOT
 export AGENT_VERSION
 echo "~~~ Agent version: ${AGENT_VERSION}"
 
@@ -51,7 +48,7 @@ outputJSON="build/${fully_qualified_group_name}.integration.out.json"
 echo "~~~ Integration tests: ${GROUP_NAME}"
 
 set +e
-TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args -integration.groups="${GROUP_NAME}" -integration.sudo="${TEST_SUDO}"
+TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true gotestsum --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args -integration.groups="${GROUP_NAME}" -integration.sudo="${TEST_SUDO}"
 TESTS_EXIT_STATUS=$?
 set -e
 
