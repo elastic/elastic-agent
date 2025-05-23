@@ -22,8 +22,8 @@ actions:
     spec:
       automerge: false
       labels:
-      - dependencies
-      - backport-skip
+      - automation
+      - skip-changelog
       - "Team:Elastic-Agent-Control-Plane"
       description: |-
         ### What
