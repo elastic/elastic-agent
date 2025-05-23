@@ -5,54 +5,34 @@ set -e
 endpoint_active=false
 
 handle_endpoint() {
-  echo "Checking if ElasticEndpoint is an available service"
+  echo "Checking if ElasticEndpoint is an active service"
 	if systemctl --quiet is-active ElasticEndpoint; then
 		endpoint_active=true
-		cleanup_state=$(mktemp)
-		temp_vault=$(mktemp -d)
 
-		cleanup() {
-			rm -f "$cleanup_state"
-			rm -rf "$temp_vault"
-		}
-
-		# restore endpoint and vault if installation fails
+		# restore endpoint and vault by restarting the service
 		restore_endpoint() {
-			if [ -f "$cleanup_state" ]; then
-				# Check if we need to restore the vault
-				if grep -q "vault_removed" "$cleanup_state"; then
-					echo "Installation failed, restoring vault directory"
-					if [ -d "$temp_vault/vault" ]; then
-						mkdir -p "/opt/Elastic/Endpoint/state"
-						cp -r "$temp_vault/vault" "/opt/Elastic/Endpoint/state/"
-					fi
-				fi
-				# Check if we need to restart the service
-				if grep -q "stopped" "$cleanup_state"; then
-					echo "Installation failed, restarting ElasticEndpoint"
-					systemctl --quiet start ElasticEndpoint
-				fi
-				rm -f "$cleanup_state"
-			fi
+      echo "Restore ElasticEndpoint"
+      if ! systemctl --quiet is-active ElasticEndpoint; then
+        echo "Starting ElasticEndpoint"
+        systemctl --quiet start ElasticEndpoint
+      else
+        echo "ElasticEndpoint is already running"
+      fi
 		}
 
-		trap cleanup EXIT
 		trap restore_endpoint ERR
 
-		echo "stopping ElasticEndpoint service"
-		systemctl --quiet stop ElasticEndpoint
-		echo "stopped" >"$cleanup_state"
-
-## TODO: Just stop endpoint and start it if need to recover
-		# Back up and remove the vault directory if it exists
+		# Remove the vault directory if it exists
 		if [ -d "/opt/Elastic/Endpoint/state/vault" ]; then
-			echo "backing up Endpoint vault directory"
-			cp -r "/opt/Elastic/Endpoint/state/vault" "$temp_vault/"
+      echo "ElasticEndpoint is tamper protected"
+      echo "Removing ElasticEndpoint vault"
 
-			echo "removing Endpoint vault directory"
 			rm -rf "/opt/Elastic/Endpoint/state/vault"
 
-			echo "vault_removed" >>"$cleanup_state"
+      echo "Stopping ElasticEndpoint"
+		  systemctl --quiet stop ElasticEndpoint
+    else
+      echo "ElasticEndpoint tamper protection is not enabled"
 		fi
 	fi
 }
