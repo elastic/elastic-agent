@@ -314,7 +314,7 @@ func writeErrorResult(zw *zip.Writer, path string, errBody string) error {
 	if err != nil {
 		return fmt.Errorf("error writing header for error.txt file for component: %w", err)
 	}
-	_, err = w.Write([]byte(fmt.Sprintf("%s\n", errBody)))
+	_, err = fmt.Fprintf(w, "%s\n", errBody)
 	if err != nil {
 		return fmt.Errorf("error writing error.txt file for component: %w", err)
 	}
