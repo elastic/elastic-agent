@@ -296,19 +296,19 @@ shared:
       /etc/init.d/{{.BeatServiceName}}:
         template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/{{.PackageType}}/elastic-agent.init.sh.tmpl'
         mode: 0755
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version_with_snapshot}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}:
         source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
         mode: 0755
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/package.version:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version_with_snapshot}}-{{ commit_short }}/package.version:
         content: >
           {{ agent_package_version }}
         mode: 0644
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version_with_snapshot}}-{{ commit_short }}/components:
         source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/'
         mode: 0755
         config_mode: 0644
         skip_on_missing: true
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/manifest.yaml:
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version_with_snapshot}}-{{ commit_short }}/manifest.yaml:
         mode: 0644
         content: >
           {{ manifest .fips }}

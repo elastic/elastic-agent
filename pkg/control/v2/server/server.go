@@ -125,7 +125,7 @@ func (s *Server) Stop() {
 // Version returns the currently running version.
 func (s *Server) Version(_ context.Context, _ *cproto.Empty) (*cproto.VersionResponse, error) {
 	return &cproto.VersionResponse{
-		Version:   release.Version(),
+		Version:   release.VersionWithSnapshot(),
 		Commit:    release.Commit(),
 		BuildTime: release.BuildTime().Format(control.TimeFormat()),
 		Snapshot:  release.Snapshot(),
