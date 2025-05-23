@@ -670,7 +670,8 @@ func (b *BeatsMonitor) getHttpStreams(
 		endpoints := []interface{}{prefixedEndpoint(utils.SocketURLWithFallback(compInfo.ID, paths.TempDir()))}
 		name := sanitizeName(binaryName)
 
-		if compInfo.RuntimeManager != component.OtelRuntimeManager {
+		// Do not create http streams if runtime-manager is otel and binary is of beat type
+		if compInfo.RuntimeManager != component.OtelRuntimeManager || !strings.HasSuffix(binaryName, "beat") {
 			httpStream := map[string]interface{}{
 				idKey: fmt.Sprintf("%s-%s-1", monitoringMetricsUnitID, name),
 				"data_stream": map[string]interface{}{
