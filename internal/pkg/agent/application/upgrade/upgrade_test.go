@@ -271,21 +271,21 @@ func TestUpgraderReload(t *testing.T) {
 
 	log, _ := loggertest.New("")
 	u := Upgrader{
-		log:      log,
-		settings: artifact.DefaultConfig(),
+		log:              log,
+		downloadSettings: artifact.DefaultConfig(),
 	}
 
 	err := u.Reload(config.MustNewConfigFrom(cfgyaml))
 	require.NoError(t, err, "error reloading config")
 
-	assert.Equal(t, &want, u.settings)
+	assert.Equal(t, &want, u.downloadSettings)
 }
 
 func TestUpgraderAckAction(t *testing.T) {
 	log, _ := loggertest.New("")
 	u := Upgrader{
-		log:      log,
-		settings: artifact.DefaultConfig(),
+		log:              log,
+		downloadSettings: artifact.DefaultConfig(),
 	}
 
 	action := fleetapi.NewAction(fleetapi.ActionTypeUpgrade)
@@ -574,8 +574,8 @@ agent.download:
 			log, _ := loggertest.New("")
 
 			u := Upgrader{
-				log:      log,
-				settings: artifact.DefaultConfig(),
+				log:              log,
+				downloadSettings: artifact.DefaultConfig(),
 			}
 
 			cfg, err := config.NewConfigFrom(tc.cfg)
@@ -584,11 +584,11 @@ agent.download:
 			err = u.Reload(cfg)
 			require.NoError(t, err, "error reloading config")
 
-			assert.Equal(t, tc.sourceURL, u.settings.SourceURI)
+			assert.Equal(t, tc.sourceURL, u.downloadSettings.SourceURI)
 			if tc.proxyURL != "" {
-				require.NotNilf(t, u.settings.Proxy.URL,
+				require.NotNilf(t, u.downloadSettings.Proxy.URL,
 					"ProxyURI should not be nil, want %s", tc.proxyURL)
-				assert.Equal(t, tc.proxyURL, u.settings.Proxy.URL.String())
+				assert.Equal(t, tc.proxyURL, u.downloadSettings.Proxy.URL.String())
 			}
 		})
 	}

@@ -28,7 +28,7 @@ func TestParseUpgradeConfig(t *testing.T) {
 					},
 				},
 				Rollback: &UpgradeRollbackConfig{
-					Window: defaultRollbackWindowDuration,
+					Window: DefaultRollbackWindowDuration,
 				},
 			},
 		},
@@ -46,7 +46,7 @@ func TestParseUpgradeConfig(t *testing.T) {
 					},
 				},
 				Rollback: &UpgradeRollbackConfig{
-					Window: defaultRollbackWindowDuration,
+					Window: DefaultRollbackWindowDuration,
 				},
 			},
 		},
@@ -66,7 +66,7 @@ func TestParseUpgradeConfig(t *testing.T) {
 					},
 				},
 				Rollback: &UpgradeRollbackConfig{
-					Window: defaultRollbackWindowDuration,
+					Window: DefaultRollbackWindowDuration,
 				},
 			},
 		},
