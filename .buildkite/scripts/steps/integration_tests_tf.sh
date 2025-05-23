@@ -47,6 +47,7 @@ else
   export KIBANA_HOST=$(buildkite-agent meta-data get "kibana.host")
   export KIBANA_USERNAME=$(buildkite-agent meta-data get "kibana.username")
   export KIBANA_PASSWORD=$(buildkite-agent meta-data get "kibana.pwd")
+  export INTEGRATIONS_SERVER_HOST=$(buildkite-agent meta-data get "integrations_server.host")
 fi
 
 # TODO: move to common.sh when it's refactored
