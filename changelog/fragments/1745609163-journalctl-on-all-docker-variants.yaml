@@ -12,7 +12,7 @@ kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
 summary: |
-  Ship journalctl on the following Docker images variants: basic, complete, ubi and otel collector
+  Ship journalctl in the elastic-agent, elastic-agent-complete, and elastic-otel-collector UBI based Docker images to enable reading journald logs. It is omitted from elastic-agent-slim and all Wolfi based images.
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
