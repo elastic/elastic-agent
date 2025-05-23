@@ -5,6 +5,7 @@ set -e
 endpoint_active=false
 
 handle_endpoint() {
+  echo "Checking if ElasticEndpoint is an available service"
 	if systemctl --quiet is-active ElasticEndpoint; then
 		endpoint_active=true
 		cleanup_state=$(mktemp)
@@ -42,10 +43,7 @@ handle_endpoint() {
 		systemctl --quiet stop ElasticEndpoint
 		echo "stopped" >"$cleanup_state"
 
-    echo "Moving logs"
-    cp "/opt/Elastic/Endpoint/state/log/endpoint-000000.log" "/tmp/"
-    echo "Moved logs $(ls /tmp | grep endpoint)"
-
+## TODO: Just stop endpoint and start it if need to recover
 		# Back up and remove the vault directory if it exists
 		if [ -d "/opt/Elastic/Endpoint/state/vault" ]; then
 			echo "backing up Endpoint vault directory"
@@ -58,6 +56,8 @@ handle_endpoint() {
 		fi
 	fi
 }
+
+handle_endpoint
 
 commit_hash="{{ commit_short }}"
 version_dir="{{agent_package_version}}{{snapshot_suffix}}"
@@ -130,12 +130,6 @@ else
             echo "basic" > "$flavor_file"
         fi
     fi
-fi
-
-echo "BEFORE ENDPOINT HANDLE"
-if ! [ -z "$old_agent_dir" ] && ! [ "$old_agent_dir" -ef "$new_agent_dir" ]; then
-  echo "HANDLING ENDPOINT"
-	handle_endpoint
 fi
 
 if [ "$endpoint_active" = true ]; then

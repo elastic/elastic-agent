@@ -6,6 +6,7 @@ commit_hash="{{ commit_short }}"
 version_dir="{{agent_package_version}}{{snapshot_suffix}}"
 symlink="/usr/share/elastic-agent/bin/elastic-agent"
 new_agent_dir="/var/lib/elastic-agent/data/elastic-agent-$version_dir-$commit_hash"
+new_endpoint_component_bin="$new_agent_dir/components/endpoint-security"
 
 # delete $symlink if exists
 if test -L "$symlink"; then
@@ -17,16 +18,27 @@ SERVICE_NAME="ElasticEndpoint"
 
 echo "Checking if ElasticEndpoint is installed"
 if systemctl list-unit-files --type=service | grep -q "^${SERVICE_NAME}.service"; then
+
+    installed_endpoint_version="$(/opt/Elastic/Endpoint/elastic-endpoint version)"
+    archive_endpoint_version="$("$new_endpoint_component_bin" version)"
+
     # Service is present
     echo "ElasticEndpoint is installed"
-    echo "Checking ElasticEndpoint version"
-    /opt/Elastic/Endpoint/elastic-endpoint version
     if ! systemctl is-active --quiet "$SERVICE_NAME"; then
         echo "$SERVICE_NAME is installed but not running"
-        echo "Starting $SERVICE_NAME"
-        sudo systemctl start ElasticEndpoint
+        if [[ "$installed_endpoint_version" == "$archive_endpoint_version" ]]; then
+            echo "New endpoint version is the same as the one that's already
+            installed"
+            echo "Starting $SERVICE_NAME"
+            sudo systemctl start ElasticEndpoint
+        else
+            echo "New endpoint version is different than the one that's already
+            installed"
+        fi
+        ls -li /opt/Elastic/Endpoint/elastic-endpoint
     else
-        echo "$SERVICE_NAME is running"
+        echo "$SERVICE_NAME should not be running, but it is"
+        exit 1
     fi
 else
     echo "$SERVICE_NAME is not installed"
