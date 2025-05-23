@@ -791,7 +791,7 @@ agent.grpc:
   port: 6794
 inputs:
   - type: filestream
-    id: filestream-e2e
+    id: filestream-e2e-otel
     use_output: default
     _runtime_experimental: otel
     streams:
@@ -804,7 +804,7 @@ inputs:
         prospector.scanner.fingerprint.enabled: false
         file_identity.native: ~
   - type: filestream
-    id: e2e-classic
+    id: filestream-e2e-classic
     use_output: default
     streams:
       - id: e2e-classic
@@ -885,11 +885,11 @@ agent:
 				"log.file.path": inputFilePath,
 			})
 
+			// Note: OTel docs are sent to namespace = "otel" + info.Namespace
 			otelDocs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-logs-e2e-otel"+info.Namespace+"*", map[string]interface{}{
 				"log.file.path": inputFilePath,
 			})
 
-			fmt.Println(agentDocs.Hits.Total.Value, otelDocs.Hits.Total.Value, "inside require eventually")
 			return (agentDocs.Hits.Total.Value == numEvents) && (otelDocs.Hits.Total.Value == numEvents)
 		},
 		2*time.Minute, 1*time.Second,
@@ -906,6 +906,7 @@ agent:
 		// we send data to different namespace
 		"data_stream.namespace",
 		"log.offset",
+		"message",
 
 		// Missing from fbreceiver doc
 		"elastic_agent.id",
@@ -937,6 +938,151 @@ agent:
 		2*time.Minute, 5*time.Second,
 		"Expected %d metrics events, got %v", numEvents, actualHits)
 
+	cancel()
+}
+
+func TestOTelHTTPJSONInput(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	// Create the otel configuration file
+	type otelConfigOptions struct {
+		ESEndpoint string
+		ESApiKey   string
+		Namespace  string
+	}
+	esEndpoint, err := getESHost()
+	require.NoError(t, err, "error getting elasticsearch endpoint")
+	esApiKey, err := createESApiKey(info.ESClient)
+	require.NoError(t, err, "error creating API key")
+	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	decodedApiKey, err := getDecodedApiKey(esApiKey)
+	require.NoError(t, err)
+	configTemplate := `
+agent.grpc:
+  port: 6799
+inputs:
+  - type: httpjson
+    id: httpjson-e2e-otel
+    use_output: default
+    _runtime_experimental: otel
+    streams:
+      - id: e2e-otel
+        data_stream:
+          dataset: e2e
+          namespace: otel{{ .Namespace }} 
+        request.url: https://api.ipify.org/?format=json
+  - type: httpjson
+    id: httpjson-e2e-classic
+    use_output: default
+    _runtime_experimental: otel
+    streams:
+      - id: e2e-classic
+        data_stream:
+          dataset: e2e
+          namespace: {{ .Namespace }} 
+        request.url: https://api.ipify.org/?format=json	
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [{{.ESEndpoint}}]
+    api_key: "{{.ESApiKey}}"
+    preset: "balanced"
+agent.monitoring:
+  enabled: false
+`
+	var configBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			otelConfigOptions{
+				ESEndpoint: esEndpoint,
+				ESApiKey:   decodedApiKey,
+				Namespace:  info.Namespace,
+			}))
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err, "cannot prepare Elastic-Agent command: %w", err)
+
+	output := strings.Builder{}
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	err = cmd.Start()
+	require.NoError(t, err)
+
+	// Make sure the Elastic-Agent process is not running before
+	// exiting the test
+	t.Cleanup(func() {
+		// Ignore the error because we cancelled the context,
+		// and that always returns an error
+		_ = cmd.Wait()
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	var agentDocs estools.Documents
+	var otelDocs estools.Documents
+
+	// Make sure to find the logs
+	// and assert document equivalency for docs ingested by both classic and otel mode
+	require.Eventually(t,
+		func() bool {
+			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer findCancel()
+
+			agentDocs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-logs-e2e-"+info.Namespace+"*", map[string]interface{}{
+				"data_stream.namespace": info.Namespace,
+			})
+
+			// Note: OTel docs are sent to namespace = "otel" + info.Namespace
+			otelDocs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-logs-e2e-otel"+info.Namespace+"*", map[string]interface{}{
+				"data_stream.namespace": "otel" + info.Namespace,
+			})
+
+			return (agentDocs.Hits.Total.Value > 0) && (otelDocs.Hits.Total.Value > 0)
+		},
+		2*time.Minute, 1*time.Second,
+		"Expected documents to be indexed by classic agent and otel mode")
+
+	doc1 := agentDocs.Hits.Hits[0].Source
+	doc2 := otelDocs.Hits.Hits[0].Source
+	ignoredFields := []string{
+		// Expected to change between filebeat and fbreceiver
+		"@timestamp",
+		"agent.ephemeral_id",
+		"agent.id",
+		"agent.version",
+		// we send data to different namespace
+		"data_stream.namespace",
+		"event.created",
+
+		// Missing from fbreceiver doc
+		"elastic_agent.id",
+		"elastic_agent.snapshot",
+		"elastic_agent.version",
+	}
+
+	AssertMapsEqual(t, doc1, doc2, ignoredFields, "expected documents to be equal")
 	cancel()
 }
 
