@@ -1,0 +1,39 @@
+// begin 8.17.7 relnotes
+
+[[release-notes-8.17.7]]
+==  8.17.7
+
+Review important information about the  8.17.7 release.
+
+[discrete]
+[[security-updates-8.17.7]]
+=== Security updates
+
+
+elastic-agent::
+
+* Upgrade To Go 1.24.3. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8109[#https://github.com/elastic/elastic-agent/pull/8109] 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[bug-fixes-8.17.7]]
+=== Bug fixes
+
+
+elastic-agent::
+
+* Preserve Agent Run State On Deb And Rpm Upgrades. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7999[#https://github.com/elastic/elastic-agent/pull/7999] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/3832[#https://github.com/elastic/elastic-agent/issues/3832]
+
+// end 8.17.7 relnotes
