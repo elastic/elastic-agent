@@ -112,10 +112,23 @@ archives:
         dst: otel.yml
       - src: 'internal/pkg/otel/samples/linux/*'
         dst: otel_samples
-# Only available in GoReleaser Pro (doesn't render yet though)
-#    templated_files:
-#      - src: "dev-tools/packaging/templates/common/README.md.tmpl"
-#        dst: README.md
+    templated_files:
+      - src: "dev-tools/packaging/templates/common/README.md.tmpl"
+        dst: README.md
+    # Before and after hooks for each archive.
+    # Skipped if archive format is binary.
+    # If multiple formats are set, hooks will be executed for each format.
+    # Extra template fields available: `.Format`.
+    # This feature is only available in GoReleaser Pro.
+    hooks:
+      before:
+        - cmd: "{{.Env.GOPATH}}/bin/mage -v goreleaser:collectComponents"
+          env:
+            - "SNAPSHOT={{.IsSnapshot}}"
+            - "EXTERNAL=true"
+            - "PACKAGES={{.ArtifactExt}}"
+#            - "PLATFORMS={{ .Os }}/{{ .Arch }}"
+            - "PLATFORMS=linux/amd64,windows/amd64"
 release:
   footer: >-
 

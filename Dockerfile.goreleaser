@@ -21,6 +21,8 @@ RUN apt-get update \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
+RUN go install github.com/magefile/mage@v1.15.0
+
 COPY --from=goreleaser /usr/bin/goreleaser /usr/bin/goreleaser
 
 WORKDIR /src

@@ -228,6 +228,71 @@ func (GoReleaser) Package() error {
 	)
 }
 
+func (GoReleaser) CollectComponents(ctx context.Context) error {
+	start := time.Now()
+	defer func() { fmt.Println("package ran for", time.Since(start)) }()
+
+	platforms := devtools.Platforms.Names()
+	if len(platforms) == 0 {
+		panic("elastic-agent package is expected to build at least one platform package")
+	}
+
+	var err error
+	var manifestResponse *manifest.Build
+	if devtools.PackagingFromManifest {
+		manifestResponse, _, err = downloadManifestAndSetVersion(ctx, devtools.ManifestURL)
+		if err != nil {
+			return fmt.Errorf("failed downloading manifest: %w", err)
+		}
+	}
+
+	var dependenciesVersion string
+	if beatVersion, found := os.LookupEnv("BEAT_VERSION"); !found {
+		dependenciesVersion = bversion.GetDefaultVersion()
+	} else {
+		dependenciesVersion = beatVersion
+	}
+
+	// add the snapshot suffix if needed
+	dependenciesVersion += devtools.SnapshotSuffix()
+
+	log.Println("--- Running packaging function")
+	mg.Deps(devtools.UseElasticAgentPackaging)
+
+	dependencies, err := ExtractComponentsFromSelectedPkgSpecs(devtools.Packages)
+	if err != nil {
+		return fmt.Errorf("failed extracting dependencies: %w", err)
+	}
+
+	if mg.Verbose() {
+		log.Printf("dependencies extracted from package specs: %v", dependencies)
+	}
+
+	// download/copy all the necessary dependencies for packaging elastic-agent
+	archivePath, dropPath, dependencies := collectPackageDependencies(platforms, dependenciesVersion, devtools.SelectedPackageTypes, dependencies)
+
+	//// cleanup after build
+	//defer os.RemoveAll(archivePath)
+	//defer os.RemoveAll(dropPath)
+	//defer os.Unsetenv(agentDropPath)
+
+	// create flat dir
+	flatPath := filepath.Join(dropPath, ".elastic-agent_flat")
+
+	if mg.Verbose() {
+		log.Printf("Drop path: %s", dropPath)
+		log.Printf("Archive path: %s", archivePath)
+		log.Printf("Flat path: %s", flatPath)
+	}
+
+	os.MkdirAll(flatPath, 0o755)
+	defer os.RemoveAll(flatPath)
+
+	// extract all dependencies from their archives into flat dir
+	flattenDependencies(platforms, dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse, dependencies)
+	return nil
+}
+
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
 	err := sh.RunV("go", "mod", "tidy", "-v")
