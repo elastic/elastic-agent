@@ -68,7 +68,7 @@ steps:
             limit: 1
         agents:
           provider: "aws"
-          imagePrefix: "${IMAGE_UBUNTU_X86_64_FIPS}"
+          image: "${IMAGE_UBUNTU_X86_64_FIPS}"
           instanceType: "m5.2xlarge"
         matrix:
           - default
@@ -94,7 +94,7 @@ steps:
             limit: 1
         agents:
           provider: "aws"
-          imagePrefix: "${IMAGE_UBUNTU_X86_64_FIPS}"
+          image: "${IMAGE_UBUNTU_X86_64_FIPS}"
           instanceType: "m5.2xlarge"
         matrix:
           - default
@@ -179,7 +179,7 @@ steps:
             limit: 1
         agents:
           provider: "aws"
-          imagePrefix: "${IMAGE_UBUNTU_X86_64_FIPS}"
+          image: "${IMAGE_UBUNTU_X86_64_FIPS}"
           instanceType: "m5.2xlarge"
           diskSizeGb: 80
         matrix:
