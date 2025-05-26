@@ -346,7 +346,6 @@ func TestAgentMonitoring(t *testing.T) {
 			"elastic_agent.id",
 			"data_stream.namespace",
 			"log.file.inode",
-			"log.file.fingerprint",
 			"log.file.path",
 			"log.offset",
 			"event.ingested",
