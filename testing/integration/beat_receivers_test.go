@@ -553,8 +553,8 @@ outputs:
 		agentDocs = esDocs["agent"]
 		otelDocs = esDocs["otel"]
 
+		// Fields that are present in both agent and otel documents, but are expected to change
 		ignoredFields := []string{
-			// Expected to change between agent metrics input and otel metrics input
 			"@timestamp",
 			"agent.id",
 			"agent.version",
@@ -565,21 +565,36 @@ outputs:
 			"data_stream.namespace",
 			"event.ingested",
 			"event.duration",
-
-			// certain network fields are sometimes missing, depends on
-			// network activity during the test
-			"host.network.egress.*",
-			"host.network.ingress.*",
-			"system.network.in.*",
-			"system.network.out.*",
 		}
 
-		stripNondeterministicMetrics := func(m mapstr.M, mset string) {
-			// These metrics are not deterministic and will change from run to run
+		// Fields that are randomly missing in the agent and otel documents based on the test environment.
+		flakyFields := []string{
+			// depends on network activity during the test
+			"host.network.egress.bytes",
+			"host.network.egress.packets",
+			"host.network.ingress.bytes",
+			"host.network.ingress.packets",
+			"system.network.in.bytes",
+			"system.network.in.packets",
+			"system.network.in.dropped",
+			"system.network.in.errors",
+			"system.network.out.bytes",
+			"system.network.out.dropped",
+			"system.network.out.errors",
+			"system.network.out.packets",
+		}
+
+		stripNondeterminism := func(m mapstr.M, mset string) {
+			for _, field := range flakyFields {
+				m.Delete(field)
+			}
+
+			// These metrics will change from run to run
 			prefixes := []string{
 				fmt.Sprintf("system.%s", mset),
 				fmt.Sprintf("host.%s", mset),
 			}
+
 			for k := range m {
 				for _, prefix := range prefixes {
 					if strings.HasPrefix(k, prefix) {
@@ -603,8 +618,8 @@ outputs:
 				slices.Sort(otelKeys)
 				assert.Equal(t, agentKeys, otelKeys, "expected to have the same keys in agent and otel documents for metricset %s", mset)
 
-				stripNondeterministicMetrics(agentDoc, mset)
-				stripNondeterministicMetrics(otelDoc, mset)
+				stripNondeterminism(agentDoc, mset)
+				stripNondeterminism(otelDoc, mset)
 
 				AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for metricset "+mset)
 			})
