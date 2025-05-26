@@ -1648,6 +1648,21 @@ func AssertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg 
 	flatM1 := m1.Flatten()
 	flatM2 := m2.Flatten()
 	for _, f := range ignoredFields {
+		// look for glob patterns
+		if strings.Contains(f, "*") {
+			for k := range flatM1 {
+				matched, err := filepath.Match(f, k)
+				if err != nil {
+					assert.Failf(t, msg, "invalid glob pattern %q: %v", f, err)
+					continue
+				}
+				if matched {
+					flatM1.Delete(k)
+				}
+			}
+			return
+		}
+
 		hasKeyM1, _ := flatM1.HasKey(f)
 		hasKeyM2, _ := flatM2.HasKey(f)
 

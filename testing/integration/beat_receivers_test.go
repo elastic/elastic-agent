@@ -565,6 +565,13 @@ outputs:
 			"data_stream.namespace",
 			"event.ingested",
 			"event.duration",
+
+			// certain network fields are sometimes missing, depends on
+			// network activity during the test
+			"host.network.egress.*",
+			"host.network.ingress.*",
+			"system.network.in.*",
+			"system.network.out.*",
 		}
 
 		stripNondeterministicMetrics := func(m mapstr.M, mset string) {
@@ -594,7 +601,7 @@ outputs:
 				otelKeys := slices.Collect(maps.Keys(otelDoc))
 				slices.Sort(agentKeys)
 				slices.Sort(otelKeys)
-				require.Equal(t, agentKeys, otelKeys, "expected to have the same keys in agent and otel documents for metricset %s", mset)
+				assert.Equal(t, agentKeys, otelKeys, "expected to have the same keys in agent and otel documents for metricset %s", mset)
 
 				stripNondeterministicMetrics(agentDoc, mset)
 				stripNondeterministicMetrics(otelDoc, mset)
