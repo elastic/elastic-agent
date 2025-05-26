@@ -12,11 +12,9 @@ function ess_up() {
     echo "Error: Specify stack version: ess_up [stack_version]" >&2
     return 1
   fi
-
-  export EC_API_KEY=$(retry -t 5 -- vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
   
   if [[ -z "${EC_API_KEY}" ]]; then
-    echo "Error: Failed to get EC API key from vault" >&2
+    echo "Error: Failed to get EC API key from OIDC" >&2
     exit 1
   fi
 
@@ -48,9 +46,6 @@ function ess_down() {
   echo "~~~ Tearing down the ESS Stack"  
   local WORKSPACE=$(git rev-parse --show-toplevel)
   local TF_DIR="${WORKSPACE}/test_infra/ess/"
-  if [ -z "${EC_API_KEY:-}" ]; then
-    export EC_API_KEY=$(retry -t 5 -- vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)    
-  fi
   
   pushd "${TF_DIR}"
   terraform init
