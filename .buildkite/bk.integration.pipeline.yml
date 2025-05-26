@@ -12,7 +12,6 @@ env:
   IMAGE_WIN_2022: "family/platform-ingest-elastic-agent-windows-2022"
   IMAGE_WIN_2025: "family/platform-ingest-elastic-agent-windows-2025"
 
-
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
 common:

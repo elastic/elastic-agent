@@ -4,6 +4,23 @@ env:
   DOCKER_REGISTRY: "docker.elastic.co"
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
 
+# This section is used to define the plugins that will be used in the pipeline.
+# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
+common:
+  - google_oidc_plugin: &google_oidc_plugin
+      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-gcp-oidc.tf
+      # This plugin authenticates to Google Cloud using the OIDC token.
+      elastic/oblt-google-auth#v1.2.0:
+        lifetime: 10800 # seconds
+        project-id: "elastic-observability-ci"
+        project-number: "911195782929"
+  - google_secrets_plugin: &google_secrets_plugin
+      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-gcp-oidc.tf
+      # This plugin reads the secrets
+      avaly/gcp-secret-manager#v1.2.0:
+        env:
+          API_KEY_TOKEN: elastic-cloud-observability-team-qa-api-key
+
 steps:
   - group: "Integration tests: packaging"
     key: "int-packaging"
@@ -166,6 +183,9 @@ steps:
     agents:
       provider: "gcp"
       machineType: "n2-standard-8"
+    plugins:
+      - *google_oidc_plugin
+      - *google_secrets_plugin
     retry:
       automatic:
         limit: 1
@@ -190,6 +210,9 @@ steps:
     agents:
       provider: "gcp"
       machineType: "n2-standard-8"
+    plugins:
+      - *google_oidc_plugin
+      - *google_secrets_plugin
     retry:
       automatic:
         limit: 1
