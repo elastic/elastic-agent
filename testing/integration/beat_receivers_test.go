@@ -560,8 +560,6 @@ outputs:
 			"agent.version",
 			"agent.ephemeral_id",
 			"elastic_agent.id",
-			"elastic_agent.snapshot",
-			"elastic_agent.version",
 			"data_stream.namespace",
 			"event.ingested",
 			"event.duration",
