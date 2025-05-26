@@ -66,6 +66,8 @@ import (
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
 	// mage:import
 	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/integtest/notests"
+	// mage:import update
+	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/update"
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
 
@@ -2486,6 +2488,7 @@ func listStacks() (string, error) {
 		t.AppendRows([]table.Row{
 			{"Elasticsearch URL", stack.Elasticsearch},
 			{"Kibana", stack.Kibana},
+			{"Integrations Server", stack.IntegrationsServer},
 			{"Username", stack.Username},
 			{"Password", stack.Password},
 		})
@@ -2578,6 +2581,8 @@ func generateEnvFile(stack tcommon.Stack) error {
 	fmt.Fprintf(f, "export KIBANA_HOST=\"%s\"\n", stack.Kibana)
 	fmt.Fprintf(f, "export KIBANA_USERNAME=\"%s\"\n", stack.Username)
 	fmt.Fprintf(f, "export KIBANA_PASSWORD=\"%s\"\n", stack.Password)
+
+	fmt.Fprintf(f, "export INTEGRATIONS_SERVER_HOST=\"%s\"\n", stack.IntegrationsServer)
 
 	return nil
 }
