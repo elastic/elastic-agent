@@ -136,14 +136,14 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		t.Cleanup(cancel)
 
 		type configOptions struct {
-			InputPath  string
 			ESEndpoint string
 			ESApiKey   string
 			Namespace  string
+			RuntimeExp string
 		}
 
 		// 1. Start elastic agent monitoring in classic mode
-		classicMonitoringTemplate := `
+		monitoringTemplate := `
 outputs:
   default:
     type: elasticsearch
@@ -157,6 +157,7 @@ agent.monitoring:
   metrics: true
   use_output: default
   namespace: {{ .Namespace }}
+  _runtime_experimental: {{.RuntimeExp}}
 `
 		// Get elasticsearch endpoint and api_key
 		esEndpoint, err := getESHost()
@@ -168,11 +169,12 @@ agent.monitoring:
 
 		// Parse template
 		var classicMonitoring bytes.Buffer
-		template.Must(template.New("config").Parse(classicMonitoringTemplate)).Execute(&classicMonitoring,
+		template.Must(template.New("config").Parse(monitoringTemplate)).Execute(&classicMonitoring,
 			configOptions{
 				ESEndpoint: esEndpoint,
 				ESApiKey:   apiKey,
 				Namespace:  info.Namespace,
+				RuntimeExp: "process",
 			})
 
 		classicFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -230,30 +232,14 @@ agent.monitoring:
 		combinedOutput, err := classicFixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 		require.NoErrorf(t, err, "error uninstalling classic agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
 
-		// 4. Start elastic agent monitoring in otel mode
-		receiverMonitoringTemplate := `
-outputs:
-  default:
-    type: elasticsearch
-    hosts: {{.ESEndpoint}}
-    api_key: {{.ESApiKey }}
-    preset: balanced
-
-agent.monitoring:
-  enabled: true
-  logs: true
-  metrics: true
-  use_output: default
-  namespace: {{ .Namespace }}
-  _runtime_experimental: otel
-`
-
+		// 4. Install agent monitoring with otel runtime
 		var receiverBuffer bytes.Buffer
-		template.Must(template.New("config").Parse(receiverMonitoringTemplate)).Execute(&receiverBuffer,
+		template.Must(template.New("config").Parse(monitoringTemplate)).Execute(&receiverBuffer,
 			configOptions{
 				ESEndpoint: esEndpoint,
 				ESApiKey:   apiKey,
 				Namespace:  info.Namespace,
+				RuntimeExp: "otel",
 			})
 
 		beatReceiverFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
