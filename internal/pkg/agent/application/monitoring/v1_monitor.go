@@ -1262,7 +1262,7 @@ func httpCopyRules() []interface{} {
 			"to":   "system.process.memory.size",
 		},
 
-		// I should be able to see fd usage. Am I keeping too many files open?
+		// I should be able to see fd usage. Am I keep too many files open?
 		map[string]interface{}{
 			"from": "http.agent.beat.handles",
 			"to":   "system.process.fd",

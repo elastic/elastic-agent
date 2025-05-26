@@ -653,7 +653,7 @@ inputs:
           binary: filebeat
           id: filestream-monitoring
         target: component
-- data_stream:
+  - data_stream:
       dataset: elastic_agent.elastic_agent
       namespace: default
       type: metrics
