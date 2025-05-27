@@ -19,7 +19,7 @@ common:
       # This plugin reads the secrets
       avaly/gcp-secret-manager#v1.2.0:
         env:
-          API_KEY_TOKEN: elastic-cloud-observability-team-qa-api-key
+          EC_API_KEY: elastic-cloud-observability-team-qa-api-key
 
 steps:
   - group: "Integration tests: packaging"
