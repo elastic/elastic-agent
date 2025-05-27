@@ -1,3 +1,0 @@
-kind: security
-summary: Add Wolfi docker image to packaging, the cloud image is now based on Wolfi
-component: "elastic-agent"
