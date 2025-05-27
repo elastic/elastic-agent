@@ -5,15 +5,24 @@
 package upgrade
 
 import (
+	"bufio"
+	"context"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 func TestSaveAndLoadMarker_NoLoss(t *testing.T) {
@@ -259,4 +268,213 @@ desired_outcome: true
 			require.NoError(t, err, "Failed to clean up marker file")
 		})
 	}
+}
+
+func Test_markUpgradeLocking(t *testing.T) {
+
+	type dataDirHookFunc func(t *testing.T, dataDir string)
+
+	type args struct {
+		agent          agentInstall
+		previousAgent  agentInstall
+		action         *fleetapi.ActionUpgrade
+		upgradeDetails *details.Details
+		desiredOutcome UpgradeOutcome
+	}
+
+	newAgent456 := agentInstall{
+		parsedVersion: agtversion.NewParsedSemVer(4, 5, 6, "", ""),
+		version:       "4.5.6",
+		hash:          "newagt",
+		versionedHome: "elastic-agent-4.5.6-newagt",
+	}
+
+	prevAgent123 := agentInstall{
+		parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+		version:       "1.2.3",
+		hash:          "oldagt",
+		versionedHome: "elastic-agent-1.2.3-oldagt",
+	}
+
+	tests := []struct {
+		name                       string
+		args                       args
+		beforeUpdateMarkerCreation dataDirHookFunc
+		afterUpdateMarkerCreation  dataDirHookFunc
+		wantErr                    assert.ErrorAssertionFunc
+	}{
+		{
+			name: "Lock file is created when writing update marker",
+			args: args{
+				agent:          newAgent456,
+				previousAgent:  prevAgent123,
+				action:         nil,
+				upgradeDetails: nil,
+			},
+			afterUpdateMarkerCreation: func(t *testing.T, dataDir string) {
+				assert.FileExists(t, markerFilePath(dataDir), "Update marker file must exist")
+				assert.FileExists(t, markerFilePath(dataDir)+".lock", "Update marker lock file must exist")
+				// verify we managed to write the actual update marker
+				updateMarker, err := LoadMarker(dataDir)
+				require.NoError(t, err, "loading update marker should not fail")
+				checkUpgradeMarker(t, updateMarker, prevAgent123, newAgent456)
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Update marker is re-lockable after writing",
+			args: args{
+				agent:          newAgent456,
+				previousAgent:  prevAgent123,
+				action:         nil,
+				upgradeDetails: nil,
+			},
+			afterUpdateMarkerCreation: func(t *testing.T, dataDir string) {
+				assert.FileExists(t, markerFilePath(dataDir), "Update marker file must exist")
+				assert.FileExists(t, markerFilePath(dataDir)+".lock", "Update marker lock file must exist")
+				fileLock, err := lockMarkerFile(markerFilePath(dataDir))
+				require.NoError(t, err, "re-locking update marker after initial write should not fail")
+				t.Cleanup(func() {
+					errUnlock := fileLock.Unlock()
+					assert.NoError(t, errUnlock, "re-unlocking update marker file should not fail")
+				})
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Update marker creation fails if marker is already locked by the same process",
+			args: args{
+				agent:          newAgent456,
+				previousAgent:  prevAgent123,
+				action:         nil,
+				upgradeDetails: nil,
+			},
+			beforeUpdateMarkerCreation: func(t *testing.T, dataDir string) {
+				// write some fake data in update marker file
+				updateMarkerFilePath := markerFilePath(dataDir)
+				err := os.WriteFile(updateMarkerFilePath, []byte("this: is not a real update marker"), 0o664)
+				require.NoError(t, err, "error creating fake update marker")
+
+				// lock the fake update marker
+				fileLock, err := lockMarkerFile(updateMarkerFilePath)
+				require.NoError(t, err, "locking fake update marker should not fail")
+
+				t.Cleanup(func() {
+					errUnlock := fileLock.Unlock()
+					assert.NoError(t, errUnlock, "unlocking fake update marker should not fail")
+				})
+			},
+			afterUpdateMarkerCreation: func(t *testing.T, dataDir string) {
+				// verify we managed to write the actual update marker
+				_, err := LoadMarker(dataDir)
+				assert.Error(t, err, "loading update marker should fail")
+			},
+			wantErr: assert.Error,
+		},
+		{
+			name: "Update marker creation should fail if marker is already locked by another process", args: args{
+			agent:          newAgent456,
+			previousAgent:  prevAgent123,
+			action:         nil,
+			upgradeDetails: nil,
+		},
+			beforeUpdateMarkerCreation: func(t *testing.T, dataDir string) {
+				// write some fake data in update marker file
+				updateMarkerFilePath := markerFilePath(dataDir)
+				err := os.WriteFile(updateMarkerFilePath, []byte("this: is not a real update marker"), 0o664)
+				require.NoError(t, err, "error creating fake update marker")
+
+				// lock the fake update marker using an external process
+				lockFilePath := updateMarkerFilePath + ".lock"
+				cmdCancel, lockFileCmd := createFileLockerCmd(t, lockFilePath)
+
+				fileLockerStdErr, err := lockFileCmd.StderrPipe()
+				require.NoError(t, err, "Error getting stderr pipe from filelocker")
+
+				fileLockedCh := make(chan struct{})
+
+				// consume stderr to check for locking
+				go func() {
+					scanner := bufio.NewScanner(fileLockerStdErr)
+					for scanner.Scan() {
+						line := scanner.Text()
+						if strings.Contains(line, "Acquired lock on file") {
+							fileLockedCh <- struct{}{}
+						}
+					}
+				}()
+
+				err = lockFileCmd.Start()
+				require.NoError(t, err, "running filelocker should not fail")
+
+				t.Cleanup(func() {
+					cmdCancel()
+					_ = lockFileCmd.Wait()
+				})
+
+				select {
+				case <-fileLockedCh:
+					// file was locked from the external process: all good
+					t.Log("external filelocker acquired the lock!")
+				case <-time.After(30 * time.Second):
+					t.Fatalf("timed out waiting for file locker to lock the file")
+				}
+			},
+			afterUpdateMarkerCreation: func(t *testing.T, dataDir string) {
+				// verify we can't read the actual update marker since it's still locked
+				_, err := LoadMarker(dataDir)
+				require.Error(t, err, "loading update marker should fail")
+			},
+			wantErr: assert.Error,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDataDir := t.TempDir()
+			logger, _ := loggertest.New(t.Name())
+			if tt.beforeUpdateMarkerCreation != nil {
+				tt.beforeUpdateMarkerCreation(t, tmpDataDir)
+			}
+			tt.wantErr(t, markUpgrade(logger, tmpDataDir, tt.args.agent, tt.args.previousAgent, tt.args.action, tt.args.upgradeDetails, tt.args.desiredOutcome), fmt.Sprintf("markUpgrade(%v, %v, %v, %v, %v, %v, %v)", logger, tmpDataDir, tt.args.agent, tt.args.previousAgent, tt.args.action, tt.args.upgradeDetails, tt.args.desiredOutcome))
+			if tt.afterUpdateMarkerCreation != nil {
+				tt.afterUpdateMarkerCreation(t, tmpDataDir)
+			}
+		})
+	}
+}
+
+func createFileLockerCmd(t *testing.T, lockFilePath string) (context.CancelFunc, *exec.Cmd) {
+	executableName := "filelocker"
+	if runtime.GOOS == "windows" {
+		executableName += ".exe"
+	}
+	filelockerExecutablePath := filepath.Join("test", "filelocker", executableName)
+	require.FileExistsf(
+		t,
+		filelockerExecutablePath,
+		"filelocker executable %s should exist. Please ensure that mage build:testbinaries has been executed.",
+		filelockerExecutablePath,
+	)
+
+	cmdCtx, cmdCancel := context.WithCancel(t.Context())
+	lockFileCmd := exec.CommandContext(cmdCtx, filelockerExecutablePath, "-lockfile", lockFilePath)
+	return cmdCancel, lockFileCmd
+}
+
+func checkUpgradeMarker(t *testing.T, updateMarker *UpdateMarker, prevAgent agentInstall, newAgent agentInstall) {
+	t.Helper()
+	require.NotNil(t, updateMarker, "update marker should not be nil")
+
+	// Previous version assertions
+	assert.Equal(t, updateMarker.PrevVersion, prevAgent.version, "Previous agent version mismatch")
+	assert.Equal(t, updateMarker.PrevVersionedHome, prevAgent.versionedHome, "Previous agent versionedHome mismatch")
+	assert.Equal(t, updateMarker.PrevHash, prevAgent.hash, "Previous agent hash mismatch")
+
+	// New version assertions
+	assert.Equal(t, updateMarker.Version, newAgent.version, "New agent version mismatch")
+	assert.Equal(t, updateMarker.VersionedHome, newAgent.versionedHome, "New agent versionedHome mismatch")
+	assert.Equal(t, updateMarker.Hash, newAgent.hash, "New agent hash mismatch")
+
+	// Check that there is an updated timestamp
+	assert.NotZero(t, updateMarker.UpdatedOn, "updated on timestamp should not be zero")
 }
