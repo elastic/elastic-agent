@@ -557,7 +557,6 @@ outputs:
 		ignoredFields := []string{
 			"@timestamp",
 			"agent.id",
-			"agent.version",
 			"agent.ephemeral_id",
 			"elastic_agent.id",
 			"data_stream.namespace",
