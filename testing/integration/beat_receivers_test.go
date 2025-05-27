@@ -9,6 +9,7 @@ package integration
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"testing"
 	"text/template"
 	"time"
@@ -63,7 +64,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 			dsType:          "metrics",
 			dsDataset:       "elastic_agent.filebeat",
 			dsNamespace:     info.Namespace,
-			query:           map[string]any{"exists": map[string]any{"field": "beat.stats.system.cpu.cores"}},
+			query:           map[string]any{"exists": map[string]any{"field": "beat.stats.libbeat.output.events.active"}},
 			onlyCompareKeys: true,
 			ignoreFields: []string{
 				// all process related metrics are dropped for beatreceivers
@@ -73,16 +74,14 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 				"beat.stats.memstats",
 				"beat.stats.runtime",
 				"beat.elasticsearch.cluster.id",
-				"beat.stats.libbeat.config.reloads",
-				"beat.stats.libbeat.config.running",
-				"beat.stats.libbeat.config.starts",
-				"beat.stats.libbeat.config.stops"},
+				"beat.stats.libbeat.config",
+			},
 		},
 		{
 			dsType:          "metrics",
 			dsDataset:       "elastic_agent.metricbeat",
 			dsNamespace:     info.Namespace,
-			query:           map[string]any{"exists": map[string]any{"field": "beat.stats.system.cpu.cores"}},
+			query:           map[string]any{"exists": map[string]any{"field": "beat.stats.libbeat.output.events.active"}},
 			onlyCompareKeys: true,
 			ignoreFields: []string{
 				//  all process related metrics are dropped for beatreceivers
@@ -92,10 +91,8 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 				"beat.stats.memstats",
 				"beat.stats.runtime",
 				"beat.elasticsearch.cluster.id",
-				"beat.stats.libbeat.config.reloads",
-				"beat.stats.libbeat.config.running",
-				"beat.stats.libbeat.config.starts",
-				"beat.stats.libbeat.config.stops"},
+				"beat.stats.libbeat.config",
+			},
 		},
 		{
 			dsType:          "metrics",
@@ -340,9 +337,9 @@ agent.monitoring:
 		}
 		switch tc.onlyCompareKeys {
 		case true:
-			AssertMapstrKeysEqual(t, agent, otel, append(ignoredFields, tc.ignoreFields...), "expected document keys to be equal")
+			AssertMapstrKeysEqual(t, agent, otel, append(ignoredFields, tc.ignoreFields...), fmt.Sprintf("expected document keys to be equal for dataset: %s", key))
 		case false:
-			AssertMapsEqual(t, agent, otel, ignoredFields, "expected documents to be equal")
+			AssertMapsEqual(t, agent, otel, ignoredFields, fmt.Sprintf("expected document to be equal for dataset: %s", key))
 		}
 	}
 }
