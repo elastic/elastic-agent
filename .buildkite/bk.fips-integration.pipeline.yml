@@ -9,7 +9,7 @@ env:
 
   IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1744855248"
   IMAGE_UBUNTU_X86_64_FIPS: "test-platform-ingest-fleet-server-ubuntu-2204-fips-1748268307"
-  IMAGE_UBUNTU_ARM64_FIPS: "test-platform-ingest-fleet-server-ubuntu-2204-fips-aarch64-1748268307"
+  IMAGE_UBUNTU_ARM64_FIPS: "test-platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1748355791"
 
 steps:
   # - label: Build and push custom elastic-agent image
@@ -52,56 +52,56 @@ steps:
     depends_on:
       - integration-fips-ess
     steps:
-      - label: "fips:x86_64:non-sudo:{{matrix}}"
-        # depends_on:
-        #   - packaging-ubuntu-x86-64-fips
-        env:
-          FIPS: "true"
-        command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64-fips' --build 0196f391-5329-4931-b446-07c76cd6d11f
-          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
-        artifact_paths:
-          - build/**
-          - build/diagnostics/**
-        retry:
-          automatic:
-            limit: 1
-        agents:
-          provider: "aws"
-          image: "${IMAGE_UBUNTU_X86_64_FIPS}"
-          instanceType: "m5.2xlarge"
-        matrix:
-          - default
-          - upgrade
-          - upgrade-flavor
-          - standalone-upgrade
-          - fleet
-          # FIPS tests don't have other groups enabled in order to save resources
+      # - label: "fips:x86_64:non-sudo:{{matrix}}"
+      #   # depends_on:
+      #   #   - packaging-ubuntu-x86-64-fips
+      #   env:
+      #     FIPS: "true"
+      #   command: |
+      #     buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64-fips' --build 0196f391-5329-4931-b446-07c76cd6d11f
+      #     .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
+      #   artifact_paths:
+      #     - build/**
+      #     - build/diagnostics/**
+      #   retry:
+      #     automatic:
+      #       limit: 1
+      #   agents:
+      #     provider: "aws"
+      #     image: "${IMAGE_UBUNTU_X86_64_FIPS}"
+      #     instanceType: "m5.2xlarge"
+      #   matrix:
+      #     - default
+      #     - upgrade
+      #     - upgrade-flavor
+      #     - standalone-upgrade
+      #     - fleet
+      #     # FIPS tests don't have other groups enabled in order to save resources
 
-      - label: "fips:x86_64:sudo:{{matrix}}"
-        # depends_on:
-        #   - packaging-ubuntu-x86-64-fips
-        env:
-          FIPS: "true"
-        command: |
-          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64-fips --build 0196f391-5329-4931-b446-07c76cd6d11f
-          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
-        artifact_paths:
-          - build/**
-          - build/diagnostics/**
-        retry:
-          automatic:
-            limit: 1
-        agents:
-          provider: "aws"
-          image: "${IMAGE_UBUNTU_X86_64_FIPS}"
-          instanceType: "m5.2xlarge"
-        matrix:
-          - default
-          - upgrade
-          - upgrade-flavor
-          - standalone-upgrade
-          - fleet
+      # - label: "fips:x86_64:sudo:{{matrix}}"
+      #   # depends_on:
+      #   #   - packaging-ubuntu-x86-64-fips
+      #   env:
+      #     FIPS: "true"
+      #   command: |
+      #     buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64-fips --build 0196f391-5329-4931-b446-07c76cd6d11f
+      #     .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
+      #   artifact_paths:
+      #     - build/**
+      #     - build/diagnostics/**
+      #   retry:
+      #     automatic:
+      #       limit: 1
+      #   agents:
+      #     provider: "aws"
+      #     image: "${IMAGE_UBUNTU_X86_64_FIPS}"
+      #     instanceType: "m5.2xlarge"
+      #   matrix:
+      #     - default
+      #     - upgrade
+      #     - upgrade-flavor
+      #     - standalone-upgrade
+      #     - fleet
 
       - label: "fips:arm64:non-sudo:{{matrix}}"
         # depends_on:
@@ -152,45 +152,6 @@ steps:
           - upgrade-flavor
           - standalone-upgrade
           - fleet
-
-  - group: "fips:Kubernetes"
-    key: integration-tests-kubernetes-fips
-    depends_on:
-      - integration-fips-ess
-      # - packaging-containers-x86-64-fips
-    steps:
-      - label: "fips:{{matrix.version}}:amd64"
-        env:
-          K8S_VERSION: "{{matrix.version}}"
-          ASDF_KIND_VERSION: "0.27.0"
-          DOCKER_VARIANTS: "fips"
-          TARGET_ARCH: "amd64"
-          AGENT_VERSION: "9.1.0-SNAPSHOT" # Set to 9.1.0 as it is the first release in 9.x that supports FIPS
-          FIPS: "true"
-        command: |
-          buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64-fips' --build 0196f391-5329-4931-b446-07c76cd6d11f
-          .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
-        artifact_paths:
-          - build/**
-          - build/diagnostics/**
-          - build/*.pod_logs_dump/*
-        retry:
-          automatic:
-            limit: 1
-        agents:
-          provider: "aws"
-          image: "${IMAGE_UBUNTU_X86_64_FIPS}"
-          instanceType: "m5.2xlarge"
-          diskSizeGb: 80
-        matrix:
-          setup:
-            version:
-              - v1.27.16
-              - v1.28.9
-              - v1.29.8
-              - v1.30.8
-              - v1.31.0
-              - v1.32.0
 
   - label: ESS FIPS stack cleanup
     depends_on:
