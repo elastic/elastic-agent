@@ -30,11 +30,10 @@ func readMarkerFile(markerFile string) ([]byte, error) {
 	readFn := func() error {
 		fileLock, err := lockMarkerFile(markerFile)
 		if err != nil {
-			return nil, fmt.Errorf("locking update marker file %q for reading: %w", markerFile, err)
+			return fmt.Errorf("locking update marker file %q for reading: %w", markerFile, err)
 		}
 		defer fileLock.Unlock()
 
-		var err error
 		markerFileBytes, err = os.ReadFile(markerFile)
 		if errors.Is(err, os.ErrNotExist) {
 			// marker doesn't exist, nothing to do
@@ -60,7 +59,7 @@ func writeMarkerFile(markerFile string, markerBytes []byte, shouldFsync bool) er
 	writeFn := func() error {
 		fileLock, err := lockMarkerFile(markerFile)
 		if err != nil {
-			return nil, fmt.Errorf("locking update marker file %q for reading: %w", markerFile, err)
+			return fmt.Errorf("locking update marker file %q for reading: %w", markerFile, err)
 		}
 		defer fileLock.Unlock()
 		return writeMarkerFileCommon(markerFile, markerBytes, shouldFsync)
