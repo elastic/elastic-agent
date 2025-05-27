@@ -299,11 +299,11 @@ func Test_markUpgradeLocking(t *testing.T) {
 	}{
 		{
 			name: "Lock file is created when writing update marker", args: args{
-			agent:          newAgent456,
-			previousAgent:  prevAgent123,
-			action:         nil,
-			upgradeDetails: nil,
-		},
+				agent:          newAgent456,
+				previousAgent:  prevAgent123,
+				action:         nil,
+				upgradeDetails: nil,
+			},
 			afterUpdateMarkerCreation: func(t *testing.T, dataDir string) {
 				assert.FileExists(t, markerFilePath(dataDir), "Update marker file must exist")
 				assert.FileExists(t, markerFilePath(dataDir)+".lock", "Update marker lock file must exist")
@@ -316,11 +316,11 @@ func Test_markUpgradeLocking(t *testing.T) {
 		},
 		{
 			name: "Update marker is re-lockable after writing", args: args{
-			agent:          newAgent456,
-			previousAgent:  prevAgent123,
-			action:         nil,
-			upgradeDetails: nil,
-		},
+				agent:          newAgent456,
+				previousAgent:  prevAgent123,
+				action:         nil,
+				upgradeDetails: nil,
+			},
 			afterUpdateMarkerCreation: func(t *testing.T, dataDir string) {
 				assert.FileExists(t, markerFilePath(dataDir), "Update marker file must exist")
 				assert.FileExists(t, markerFilePath(dataDir)+".lock", "Update marker lock file must exist")
@@ -335,11 +335,11 @@ func Test_markUpgradeLocking(t *testing.T) {
 		},
 		{
 			name: "Update marker creation should not fail if marker is already locked by the same process", args: args{
-			agent:          newAgent456,
-			previousAgent:  prevAgent123,
-			action:         nil,
-			upgradeDetails: nil,
-		},
+				agent:          newAgent456,
+				previousAgent:  prevAgent123,
+				action:         nil,
+				upgradeDetails: nil,
+			},
 			beforeUpdateMarkerCreation: func(t *testing.T, dataDir string) {
 				// write some fake data in update marker file
 				updateMarkerFilePath := markerFilePath(dataDir)
