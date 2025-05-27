@@ -609,14 +609,14 @@ outputs:
 				agentDoc := mapstr.M(agentDocs[mset].Hits.Hits[0].Source).Flatten()
 				otelDoc := mapstr.M(otelDocs[mset].Hits.Hits[0].Source).Flatten()
 
+				stripNondeterminism(agentDoc, mset)
+				stripNondeterminism(otelDoc, mset)
+
 				agentKeys := slices.Collect(maps.Keys(agentDoc))
 				otelKeys := slices.Collect(maps.Keys(otelDoc))
 				slices.Sort(agentKeys)
 				slices.Sort(otelKeys)
 				assert.Equal(t, agentKeys, otelKeys, "expected to have the same keys in agent and otel documents for metricset %s", mset)
-
-				stripNondeterminism(agentDoc, mset)
-				stripNondeterminism(otelDoc, mset)
 
 				AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for metricset "+mset)
 			})
