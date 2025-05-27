@@ -22,8 +22,8 @@ actions:
     spec:
       automerge: false
       labels:
-      - dependencies
-      - backport-skip
+      - automation
+      - skip-changelog
       - "Team:Elastic-Agent-Control-Plane"
       description: |-
         ### What
@@ -61,7 +61,7 @@ conditions:
     disablesourceinput: true
     scmid: default
     spec:
-      command: '[ ${{ source "beats"}} != {{ source "gomod" }} ]'
+      command: '[ {{ source "beats" }} != {{ source "gomod" }} ]'
     failwhen: false
 
 targets:
