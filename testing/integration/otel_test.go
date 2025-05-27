@@ -821,16 +821,11 @@ outputs:
     hosts: [{{.ESEndpoint}}]
     api_key: "{{.ESApiKey}}"
     preset: "balanced"
-  monitoring:
-    type: elasticsearch
-    hosts: [{{.ESEndpoint}}]
-    api_key: "{{.ESApiKey}}"
-    preset: "balanced"
 agent:
   monitoring:
     metrics: true
     logs: false
-    use_output: monitoring
+    use_output: default
 `
 	var configBuffer bytes.Buffer
 	require.NoError(t,
@@ -907,11 +902,6 @@ agent:
 		"data_stream.namespace",
 		"log.offset",
 		"message",
-
-		// Missing from fbreceiver doc
-		"elastic_agent.id",
-		"elastic_agent.snapshot",
-		"elastic_agent.version",
 	}
 
 	AssertMapsEqual(t, doc1, doc2, ignoredFields, "expected documents to be equal")
@@ -1075,11 +1065,6 @@ agent.monitoring:
 		// we send data to different namespace
 		"data_stream.namespace",
 		"event.created",
-
-		// Missing from fbreceiver doc
-		"elastic_agent.id",
-		"elastic_agent.snapshot",
-		"elastic_agent.version",
 	}
 
 	AssertMapsEqual(t, doc1, doc2, ignoredFields, "expected documents to be equal")
