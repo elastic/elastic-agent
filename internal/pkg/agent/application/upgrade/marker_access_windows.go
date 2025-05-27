@@ -28,6 +28,12 @@ const minMarkerAccessRetries = 5
 func readMarkerFile(markerFile string) ([]byte, error) {
 	var markerFileBytes []byte
 	readFn := func() error {
+		fileLock, err := lockMarkerFile(markerFile)
+		if err != nil {
+			return nil, fmt.Errorf("locking update marker file %q for reading: %w", markerFile, err)
+		}
+		defer fileLock.Unlock()
+
 		var err error
 		markerFileBytes, err = os.ReadFile(markerFile)
 		if errors.Is(err, os.ErrNotExist) {
@@ -52,6 +58,11 @@ func readMarkerFile(markerFile string) ([]byte, error) {
 // which could fail on Windows.
 func writeMarkerFile(markerFile string, markerBytes []byte, shouldFsync bool) error {
 	writeFn := func() error {
+		fileLock, err := lockMarkerFile(markerFile)
+		if err != nil {
+			return nil, fmt.Errorf("locking update marker file %q for reading: %w", markerFile, err)
+		}
+		defer fileLock.Unlock()
 		return writeMarkerFileCommon(markerFile, markerBytes, shouldFsync)
 	}
 
