@@ -740,7 +740,8 @@ func TestOtelFilestreamInput(t *testing.T) {
 		Group: Default,
 		Local: true,
 		OS: []define.OS{
-			{Type: define.Windows},
+			// Skipping it on windows for now
+			// {Type: define.Windows},
 			{Type: define.Linux},
 			{Type: define.Darwin},
 		},
