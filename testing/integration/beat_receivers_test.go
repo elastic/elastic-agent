@@ -572,6 +572,7 @@ outputs:
 			"host.network.ingress.bytes",
 			"host.network.ingress.packets",
 			"system.network.in.bytes",
+			"system.network.name",
 			"system.network.in.packets",
 			"system.network.in.dropped",
 			"system.network.in.errors",
@@ -608,6 +609,13 @@ outputs:
 
 				agentDoc := mapstr.M(agentDocs[mset].Hits.Hits[0].Source).Flatten()
 				otelDoc := mapstr.M(otelDocs[mset].Hits.Hits[0].Source).Flatten()
+
+				t.Cleanup(func() {
+					if t.Failed() {
+						t.Logf("agent document for metricset %s:\n%s", mset, agentDoc.StringToPrint())
+						t.Logf("otel document for metricset %s:\n%s", mset, otelDoc.StringToPrint())
+					}
+				})
 
 				stripNondeterminism(agentDoc, mset)
 				stripNondeterminism(otelDoc, mset)
