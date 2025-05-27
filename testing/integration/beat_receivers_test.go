@@ -336,6 +336,7 @@ agent.monitoring:
 			"log.file.fingerprint",
 			"log.file.path",
 			"log.offset",
+			"event.ingested":
 		}
 		switch tc.onlyCompareKeys {
 		case true:
