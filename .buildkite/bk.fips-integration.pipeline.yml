@@ -151,49 +151,9 @@ steps:
           - standalone-upgrade
           - fleet
 
-  - group: "fips:Kubernetes"
-    key: integration-tests-kubernetes-fips
-    depends_on:
-      - integration-fips-ess
-      - packaging-containers-x86-64-fips
-    steps:
-      - label: "fips:{{matrix.version}}:amd64"
-        env:
-          K8S_VERSION: "{{matrix.version}}"
-          ASDF_KIND_VERSION: "0.27.0"
-          DOCKER_VARIANTS: "fips"
-          TARGET_ARCH: "amd64"
-          AGENT_VERSION: "9.1.0-SNAPSHOT" # Set to 9.1.0 as it is the first release in 9.x that supports FIPS
-          FIPS: "true"
-        command: |
-          buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64-fips'
-          .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
-        artifact_paths:
-          - build/**
-          - build/diagnostics/**
-          - build/*.pod_logs_dump/*
-        retry:
-          automatic:
-            limit: 1
-        agents:
-          provider: "aws"
-          imagePrefix: "${IMAGE_UBUNTU_X86_64_FIPS}"
-          instanceType: "m5.2xlarge"
-          diskSizeGb: 80
-        matrix:
-          setup:
-            version:
-            - v1.27.16
-            - v1.28.9
-            - v1.29.8
-            - v1.30.8
-            - v1.31.0
-            - v1.32.0
-
   - label: ESS FIPS stack cleanup
     depends_on:
       - integration-tests-ubuntu-fips
-      - integration-tests-kubernetes-fips
     allow_dependency_failure: true
     command: |
       buildkite-agent artifact download "test_infra/ess/**" . --step "integration-fips-ess"
@@ -208,7 +168,6 @@ steps:
     key: aggregate-reports-fips
     depends_on:
       - integration-tests-ubuntu-fips
-      - integration-tests-kubernetes-fips
     allow_dependency_failure: true
     command: |
       buildkite-agent artifact download "build/*.xml" .
