@@ -131,19 +131,18 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 
 	// 7. Compare both documents are equivalent
 
-	t.Run("verify elastic-agent monitoring functionality", func(t *testing.T) {
-		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
-		t.Cleanup(cancel)
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	t.Cleanup(cancel)
 
-		type configOptions struct {
-			ESEndpoint string
-			ESApiKey   string
-			Namespace  string
-			RuntimeExp string
-		}
+	type configOptions struct {
+		ESEndpoint string
+		ESApiKey   string
+		Namespace  string
+		RuntimeExp string
+	}
 
-		// 1. Start elastic agent monitoring in classic mode
-		monitoringTemplate := `
+	// 1. Start elastic agent monitoring in classic mode
+	monitoringTemplate := `
 outputs:
   default:
     type: elasticsearch
@@ -159,194 +158,192 @@ agent.monitoring:
   namespace: {{ .Namespace }}
   _runtime_experimental: {{.RuntimeExp}}
 `
-		// Get elasticsearch endpoint and api_key
-		esEndpoint, err := getESHost()
-		apiKeyResponse, err := createESApiKey(info.ESClient)
-		require.NoError(t, err, "failed to get api key")
-		require.True(t, len(apiKeyResponse.Encoded) > 1, "api key is invalid %q", apiKeyResponse)
-		apiKey, err := getDecodedApiKey(apiKeyResponse)
-		require.NoError(t, err, "error decoding api key")
+	// Get elasticsearch endpoint and api_key
+	esEndpoint, err := getESHost()
+	apiKeyResponse, err := createESApiKey(info.ESClient)
+	require.NoError(t, err, "failed to get api key")
+	require.True(t, len(apiKeyResponse.Encoded) > 1, "api key is invalid %q", apiKeyResponse)
+	apiKey, err := getDecodedApiKey(apiKeyResponse)
+	require.NoError(t, err, "error decoding api key")
 
-		// Parse template
-		var classicMonitoring bytes.Buffer
-		template.Must(template.New("config").Parse(monitoringTemplate)).Execute(&classicMonitoring,
-			configOptions{
-				ESEndpoint: esEndpoint,
-				ESApiKey:   apiKey,
-				Namespace:  info.Namespace,
-				RuntimeExp: "process",
-			})
+	// Parse template
+	var classicMonitoring bytes.Buffer
+	template.Must(template.New("config").Parse(monitoringTemplate)).Execute(&classicMonitoring,
+		configOptions{
+			ESEndpoint: esEndpoint,
+			ESApiKey:   apiKey,
+			Namespace:  info.Namespace,
+			RuntimeExp: "process",
+		})
 
-		classicFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-		require.NoError(t, err)
+	classicFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
 
-		err = classicFixture.Prepare(ctx)
-		require.NoError(t, err, "error preparing fixture")
+	err = classicFixture.Prepare(ctx)
+	require.NoError(t, err, "error preparing fixture")
 
-		err = classicFixture.Configure(ctx, classicMonitoring.Bytes())
-		require.NoError(t, err, "error configuring fixture")
+	err = classicFixture.Configure(ctx, classicMonitoring.Bytes())
+	require.NoError(t, err, "error configuring fixture")
 
-		output, err := classicFixture.InstallWithoutEnroll(ctx, &installOpts)
-		require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
-		timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	output, err := classicFixture.InstallWithoutEnroll(ctx, &installOpts)
+	require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
+	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
-		require.Eventually(t, func() bool {
-			err = classicFixture.IsHealthy(ctx)
-			if err != nil {
-				t.Logf("waiting for agent healthy: %s", err.Error())
-				return false
-			}
-			return true
-		}, 1*time.Minute, 1*time.Second)
-
-		// 2. Assert monitoring logs and metrics are available on ES
-		for _, tc := range tests {
-			require.Eventuallyf(t,
-				func() bool {
-					findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
-					defer findCancel()
-
-					rawQuery := map[string]any{
-						"query": map[string]any{
-							"bool": map[string]any{
-								"must":   tc.query,
-								"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestamp}}},
-							},
-						},
-					}
-
-					index := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
-					docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, ".ds-"+index+"*", info.ESClient)
-					require.NoError(t, err)
-					if docs.Hits.Total.Value != 0 {
-						key := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
-						agentDocs[key] = docs
-					}
-					return docs.Hits.Total.Value > 0
-				},
-				2*time.Minute, 5*time.Second,
-				"agent monitoring classic no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestamp, tc.dsType, tc.dsDataset, tc.dsNamespace, tc.query)
+	require.Eventually(t, func() bool {
+		err = classicFixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
 		}
+		return true
+	}, 1*time.Minute, 1*time.Second)
 
-		// 3. Uninstall
-		combinedOutput, err := classicFixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
-		require.NoErrorf(t, err, "error uninstalling classic agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
+	// 2. Assert monitoring logs and metrics are available on ES
+	for _, tc := range tests {
+		require.Eventuallyf(t,
+			func() bool {
+				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+				defer findCancel()
 
-		// 4. Install agent monitoring with otel runtime
-		var receiverBuffer bytes.Buffer
-		template.Must(template.New("config").Parse(monitoringTemplate)).Execute(&receiverBuffer,
-			configOptions{
-				ESEndpoint: esEndpoint,
-				ESApiKey:   apiKey,
-				Namespace:  info.Namespace,
-				RuntimeExp: "otel",
-			})
-
-		beatReceiverFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-		require.NoError(t, err)
-		err = beatReceiverFixture.Prepare(ctx)
-		require.NoError(t, err)
-		err = beatReceiverFixture.Configure(ctx, receiverBuffer.Bytes())
-		require.NoError(t, err)
-		combinedOutput, err = beatReceiverFixture.InstallWithoutEnroll(ctx, &installOpts)
-		require.NoErrorf(t, err, "error install without enroll: %s\ncombinedoutput:\n%s", err, string(combinedOutput))
-		// store timestamp to filter otel docs with timestamp greater than this value
-		timestampBeatReceiver := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
-
-		require.EventuallyWithT(t, func(collect *assert.CollectT) {
-			status, statusErr := beatReceiverFixture.ExecStatus(ctx)
-			assert.NoError(collect, statusErr)
-			// agent should be healthy
-			assert.Equal(collect, int(cproto.State_HEALTHY), status.State)
-			// we should have no normal components running
-			assert.Zero(collect, len(status.Components))
-
-			// we should have filebeatreceiver and metricbeatreceiver running
-			otelCollectorStatus := status.Collector
-			require.NotNil(collect, otelCollectorStatus)
-			assert.Equal(collect, int(cproto.CollectorComponentStatus_StatusOK), otelCollectorStatus.Status)
-			pipelineStatusMap := otelCollectorStatus.ComponentStatusMap
-
-			// we should have 3 pipelines running: filestream for logs, http metrics and beats metrics
-			assert.Equal(collect, 3, len(pipelineStatusMap))
-
-			fileStreamPipeline := "pipeline:logs/_agent-component/filestream-monitoring"
-			httpMetricsPipeline := "pipeline:logs/_agent-component/http/metrics-monitoring"
-			beatsMetricsPipeline := "pipeline:logs/_agent-component/beat/metrics-monitoring"
-			assert.Contains(collect, pipelineStatusMap, fileStreamPipeline)
-			assert.Contains(collect, pipelineStatusMap, httpMetricsPipeline)
-			assert.Contains(collect, pipelineStatusMap, beatsMetricsPipeline)
-
-			// and all the components should be healthy
-			assertCollectorComponentsHealthy(collect, otelCollectorStatus)
-
-			return
-		}, 1*time.Minute, 1*time.Second)
-
-		// 5. Assert monitoring logs and metrics are available on ES (for otel mode)
-		for _, tc := range tests {
-			require.Eventuallyf(t,
-				func() bool {
-					findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
-					defer findCancel()
-
-					rawQuery := map[string]any{
-						"query": map[string]any{
-							"bool": map[string]any{
-								"must":   tc.query,
-								"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestampBeatReceiver}}},
-							},
+				rawQuery := map[string]any{
+					"query": map[string]any{
+						"bool": map[string]any{
+							"must":   tc.query,
+							"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestamp}}},
 						},
-						"sort": []map[string]any{
-							{"@timestamp": map[string]any{"order": "asc"}},
+					},
+				}
+
+				index := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
+				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, ".ds-"+index+"*", info.ESClient)
+				require.NoError(t, err)
+				if docs.Hits.Total.Value != 0 {
+					key := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
+					agentDocs[key] = docs
+				}
+				return docs.Hits.Total.Value > 0
+			},
+			2*time.Minute, 5*time.Second,
+			"agent monitoring classic no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestamp, tc.dsType, tc.dsDataset, tc.dsNamespace, tc.query)
+	}
+
+	// 3. Uninstall
+	combinedOutput, err := classicFixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+	require.NoErrorf(t, err, "error uninstalling classic agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
+
+	// 4. Install agent monitoring with otel runtime
+	var receiverBuffer bytes.Buffer
+	template.Must(template.New("config").Parse(monitoringTemplate)).Execute(&receiverBuffer,
+		configOptions{
+			ESEndpoint: esEndpoint,
+			ESApiKey:   apiKey,
+			Namespace:  info.Namespace,
+			RuntimeExp: "otel",
+		})
+
+	beatReceiverFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+	err = beatReceiverFixture.Prepare(ctx)
+	require.NoError(t, err)
+	err = beatReceiverFixture.Configure(ctx, receiverBuffer.Bytes())
+	require.NoError(t, err)
+	combinedOutput, err = beatReceiverFixture.InstallWithoutEnroll(ctx, &installOpts)
+	require.NoErrorf(t, err, "error install without enroll: %s\ncombinedoutput:\n%s", err, string(combinedOutput))
+	// store timestamp to filter otel docs with timestamp greater than this value
+	timestampBeatReceiver := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		status, statusErr := beatReceiverFixture.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+		// agent should be healthy
+		assert.Equal(collect, int(cproto.State_HEALTHY), status.State)
+		// we should have no normal components running
+		assert.Zero(collect, len(status.Components))
+
+		// we should have filebeatreceiver and metricbeatreceiver running
+		otelCollectorStatus := status.Collector
+		require.NotNil(collect, otelCollectorStatus)
+		assert.Equal(collect, int(cproto.CollectorComponentStatus_StatusOK), otelCollectorStatus.Status)
+		pipelineStatusMap := otelCollectorStatus.ComponentStatusMap
+
+		// we should have 3 pipelines running: filestream for logs, http metrics and beats metrics
+		assert.Equal(collect, 3, len(pipelineStatusMap))
+
+		fileStreamPipeline := "pipeline:logs/_agent-component/filestream-monitoring"
+		httpMetricsPipeline := "pipeline:logs/_agent-component/http/metrics-monitoring"
+		beatsMetricsPipeline := "pipeline:logs/_agent-component/beat/metrics-monitoring"
+		assert.Contains(collect, pipelineStatusMap, fileStreamPipeline)
+		assert.Contains(collect, pipelineStatusMap, httpMetricsPipeline)
+		assert.Contains(collect, pipelineStatusMap, beatsMetricsPipeline)
+
+		// and all the components should be healthy
+		assertCollectorComponentsHealthy(collect, otelCollectorStatus)
+
+		return
+	}, 1*time.Minute, 1*time.Second)
+
+	// 5. Assert monitoring logs and metrics are available on ES (for otel mode)
+	for _, tc := range tests {
+		require.Eventuallyf(t,
+			func() bool {
+				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+				defer findCancel()
+
+				rawQuery := map[string]any{
+					"query": map[string]any{
+						"bool": map[string]any{
+							"must":   tc.query,
+							"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestampBeatReceiver}}},
 						},
-					}
+					},
+					"sort": []map[string]any{
+						{"@timestamp": map[string]any{"order": "asc"}},
+					},
+				}
 
-					index := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
-					docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, ".ds-"+index+"*", info.ESClient)
-					require.NoError(t, err)
-					if docs.Hits.Total.Value != 0 {
-						key := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
-						otelDocs[key] = docs
-					}
-					return docs.Hits.Total.Value > 0
-				},
-				4*time.Minute, 5*time.Second,
-				"agent monitoring beats receivers no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestampBeatReceiver, tc.dsType, tc.dsDataset, tc.dsNamespace, tc.query)
+				index := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
+				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, ".ds-"+index+"*", info.ESClient)
+				require.NoError(t, err)
+				if docs.Hits.Total.Value != 0 {
+					key := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
+					otelDocs[key] = docs
+				}
+				return docs.Hits.Total.Value > 0
+			},
+			4*time.Minute, 5*time.Second,
+			"agent monitoring beats receivers no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestampBeatReceiver, tc.dsType, tc.dsDataset, tc.dsNamespace, tc.query)
+	}
+
+	// 6. Uninstall
+	combinedOutput, err = beatReceiverFixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+	require.NoErrorf(t, err, "error uninstalling beat receiver agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
+
+	// 7. Compare both documents are equivalent
+	for _, tc := range tests[:3] {
+		key := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
+		agent := agentDocs[key].Hits.Hits[0].Source
+		otel := otelDocs[key].Hits.Hits[0].Source
+		ignoredFields := []string{
+			// Expected to change between agentDocs and OtelDocs
+			"@timestamp",
+			"agent.ephemeral_id",
+			// agent.id is different because it's the id of the underlying beat
+			"agent.id",
+			// agent.version is different because we force version 9.0.0 in CI
+			"agent.version",
+			"elastic_agent.id",
+			"log.file.inode",
+			"log.file.fingerprint",
+			"log.file.path",
+			"log.offset",
 		}
-
-		// 6. Uninstall
-		combinedOutput, err = beatReceiverFixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
-		require.NoErrorf(t, err, "error uninstalling beat receiver agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
-
-		// 7. Compare both documents are equivalent
-		for _, tc := range tests[:3] {
-			key := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
-			agent := agentDocs[key].Hits.Hits[0].Source
-			otel := otelDocs[key].Hits.Hits[0].Source
-			ignoredFields := []string{
-				// Expected to change between agentDocs and OtelDocs
-				"@timestamp",
-				"agent.ephemeral_id",
-				// agent.id is different because it's the id of the underlying beat
-				"agent.id",
-				// agent.version is different because we force version 9.0.0 in CI
-				"agent.version",
-				"elastic_agent.id",
-				"log.file.inode",
-				"log.file.fingerprint",
-				"log.file.path",
-				"log.offset",
-				"event.ingested",
-			}
-			switch tc.onlyCompareKeys {
-			case true:
-				AssertMapstrKeysEqual(t, agent, otel, append(ignoredFields, tc.ignoreFields...), "expected document keys to be equal")
-			case false:
-				AssertMapsEqual(t, agent, otel, ignoredFields, "expected documents to be equal")
-			}
+		switch tc.onlyCompareKeys {
+		case true:
+			AssertMapstrKeysEqual(t, agent, otel, append(ignoredFields, tc.ignoreFields...), "expected document keys to be equal")
+		case false:
+			AssertMapsEqual(t, agent, otel, ignoredFields, "expected documents to be equal")
 		}
-	})
+	}
 }
 
 func assertCollectorComponentsHealthy(t *assert.CollectT, status *atesting.AgentStatusCollectorOutput) {
