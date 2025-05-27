@@ -1,8 +1,9 @@
 function ess_up {
   param (
       [string]$StackVersion,
-      [string]$EssRegion = "gcp-us-west2"
+      [string]$EssRegion = "gcp-us-central1"
   )
+  # If production region then gcp-us-west2
 
   Write-Output "~~~ Starting ESS Stack"
   
