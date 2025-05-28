@@ -6,7 +6,6 @@ package monitoring
 
 import (
 	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"maps"
 	"math"
@@ -138,8 +137,6 @@ func (b *BeatsMonitor) Reload(rawConfig *config.Config) error {
 		return errors.New(err, "failed to unpack monitoring config during reload")
 	}
 
-	s, _ := json.MarshalIndent(&newConfig, "", " ")
-	fmt.Println(string(s), "this is from inside reloading")
 	b.config = &newConfig
 	return nil
 }
@@ -461,7 +458,6 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentInfo
 		"streams":    streams,
 	}
 
-	fmt.Println(b.config.C.RuntimeManager, "this is runtime manager")
 	// Make sure we don't set anything until the configuration is stable if the otel manager isn't enabled
 	if b.config.C.RuntimeManager != monitoringCfg.DefaultRuntimeManager {
 		input["_runtime_experimental"] = b.config.C.RuntimeManager

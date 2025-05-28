@@ -125,6 +125,7 @@ func (sr *ServerReloader) Reload(rawConfig *aConfig.Config) error {
 	}
 
 	if sr.config != nil && !sr.config.Enabled && sr.isServerRunning.Load() {
+
 		return sr.Stop()
 	}
 
