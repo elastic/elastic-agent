@@ -111,7 +111,7 @@ func (sr *ServerReloader) Reload(rawConfig *aConfig.Config) error {
 	sr.config = newConfig.Settings.MonitoringConfig
 	var err error
 
-	if sr.config != nil && sr.config.Enabled {
+	if sr.config == nil || sr.config.Enabled {
 		if sr.isServerRunning.Load() {
 			err = sr.Stop()
 			if err != nil {
@@ -124,8 +124,7 @@ func (sr *ServerReloader) Reload(rawConfig *aConfig.Config) error {
 		return nil
 	}
 
-	if sr.config != nil && !sr.config.Enabled && sr.isServerRunning.Load() {
-
+	if !sr.config.Enabled && sr.isServerRunning.Load() {
 		return sr.Stop()
 	}
 
