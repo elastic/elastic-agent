@@ -985,7 +985,6 @@ func (Cloud) Image(ctx context.Context) {
 // Import imports an artifact as a docker image.
 // Looks in build/distributions for an elastic-agent-cloud*.docker.tar.gz artifact and imports it as docker.elastic.co/beats-ci/elastic-agent-cloud:$VERSION
 // DOCKER_IMPORT_SOURCE - override source for import
-// CUSTOM_IMAGE_TAG - Set image tag
 func (Cloud) Import() error {
 	snapshot := os.Getenv(snapshotEnv)
 	defer os.Setenv(snapshotEnv, snapshot)
@@ -993,11 +992,7 @@ func (Cloud) Import() error {
 	os.Setenv(snapshotEnv, "true")
 
 	version := getVersion()
-
 	tag := version
-	if envTag, ok := os.LookupEnv("CUSTOM_IMAGE_TAG"); ok && envTag != "" {
-		tag = envTag
-	}
 
 	// Need to get the FIPS env var flag to see if we are using the normal source cloud image name, or the FIPS variant
 	fips := os.Getenv(fipsEnv)
