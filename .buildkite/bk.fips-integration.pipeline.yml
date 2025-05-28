@@ -13,6 +13,8 @@ env:
 
 steps:
   - label: Build and push custom elastic-agent image
+    depends_on:
+      - 'packaging-containers-x86-64-fips'
     key: integration-fips-cloud-image
     env:
       ASDF_TERRAFORM_VERSION: 1.9.2
@@ -20,7 +22,8 @@ steps:
     command: |
       #!/usr/bin/env bash
       set -euo pipefail
-      mage cloud:image
+      buildkite-agent artifact download build/distributions/elastic-agent-fips-*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64-fips'
+      mage cloud:import
       mage cloud:push
     agents:
       provider: "gcp"

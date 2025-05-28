@@ -982,6 +982,49 @@ func (Cloud) Image(ctx context.Context) {
 	Package(ctx)
 }
 
+// Import imports an artifact as a docker image.
+// Looks in build/distributions for an elastic-agent-cloud*.docker.tar.gz artifact and imports it as docker.elastic.co/beats-ci/elastic-agent-cloud:$VERSION
+// DOCKER_IMPORT_SOURCE - override source for import
+// CUSTOM_IMAGE_TAG - Set image tag
+func (Cloud) Import() error {
+	snapshot := os.Getenv(snapshotEnv)
+	defer os.Setenv(snapshotEnv, snapshot)
+
+	os.Setenv(snapshotEnv, "true")
+
+	version := getVersion()
+
+	tag := version
+	if envTag, ok := os.LookupEnv("CUSTOM_IMAGE_TAG"); ok && envTag != "" {
+		tag = envTag
+	}
+
+	// Need to get the FIPS env var flag to see if we are using the normal source cloud image name, or the FIPS variant
+	fips := os.Getenv(fipsEnv)
+	defer os.Setenv(fipsEnv, fips)
+	fipsVal, err := strconv.ParseBool(fips)
+	if err != nil {
+		fipsVal = false
+	}
+	os.Setenv(fipsEnv, strconv.FormatBool(fipsVal))
+	devtools.FIPSBuild = fipsVal
+
+	sourceCloudImageName := "docker.elastic.co/beats-ci/elastic-agent-cloud"
+	if fipsVal {
+		sourceCloudImageName = "docker.elastic.co/beats-ci/elastic-agent-fips-cloud"
+	}
+
+	source := "build/distributions/elastic-agent-cloud-" + version + "-linux-" + runtime.GOARCH + ".docker.tar.gz"
+	if fipsVal {
+		source = "build/distributions/elastic-agent-fips-cloud-" + version + "-linux-" + runtime.GOARCH + ".docker.tar.gz"
+	}
+	if envSource, ok := os.LookupEnv("DOCKER_IMPORT_SOURCE"); ok && envSource != "" {
+		source = envSource
+	}
+
+	return sh.RunV("docker", "image", "import", source, sourceCloudImageName+":"+tag)
+}
+
 // Push builds a cloud image tags it correctly and pushes to remote image repo.
 // Previous login to elastic registry is required!
 func (Cloud) Push() error {
