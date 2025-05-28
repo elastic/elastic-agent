@@ -164,10 +164,22 @@ func TestDesiredOutcome_InvalidYAMLContent(t *testing.T) {
 
 	// Test cases with invalid YAML content for DesiredOutcome
 	testCases := []struct {
-		name        string
-		yamlContent string
-		expectError bool
+		name          string
+		yamlContent   string
+		expectError   bool
+		expectedValue UpgradeOutcome
 	}{
+		{
+			name: "Missing value",
+			yamlContent: `
+version: "8.5.0"
+hash: "abc123"
+versioned_home: "home/v8.5.0"
+updated_on: 2023-01-01T00:00:00Z
+`,
+			expectError:   false,
+			expectedValue: OUTCOME_UPGRADE,
+		},
 		{
 			name: "ProperValue",
 			yamlContent: `
@@ -177,7 +189,8 @@ versioned_home: "home/v8.5.0"
 updated_on: 2023-01-01T00:00:00Z
 desired_outcome: "UPGRADE"
 `,
-			expectError: false,
+			expectError:   false,
+			expectedValue: OUTCOME_UPGRADE,
 		},
 		{
 			name: "RollbackValue",
@@ -188,7 +201,8 @@ versioned_home: "home/v8.5.0"
 updated_on: 2023-01-01T00:00:00Z
 desired_outcome: "ROLLBACK"
 `,
-			expectError: false,
+			expectError:   false,
+			expectedValue: OUTCOME_ROLLBACK,
 		},
 		{
 			name: "StringValue",
@@ -232,11 +246,12 @@ desired_outcome: true
 			require.NoError(t, err, "Failed to write test YAML file")
 
 			// Try to load the marker
-			_, err = loadMarker(markerFile)
+			marker, err := loadMarker(markerFile)
 			if tc.expectError {
 				require.Error(t, err, "Expected error when loading invalid YAML for %s", tc.name)
 			} else {
 				require.NoError(t, err, "Unexpected error when loading YAML for %s", tc.name)
+				require.Equal(t, tc.expectedValue, marker.DesiredOutcome)
 			}
 
 			// Clean up
