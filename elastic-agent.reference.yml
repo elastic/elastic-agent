@@ -171,11 +171,11 @@ inputs:
 
 # agent.monitoring:
 #   # enabled turns on monitoring of running processes
-#   enabled: false
+#   enabled: true
 #   # enables log monitoring
-#   logs: false
+#   logs: true
 #   # enables metrics monitoring
-#   metrics: false
+#   metrics: true
 #   # metrics_period defines how frequent we should sample monitoring metrics. Default is 60 seconds.
 #   metrics_period: 60s
 #   # exposes /debug/pprof/ endpoints
