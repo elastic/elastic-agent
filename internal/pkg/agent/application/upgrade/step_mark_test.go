@@ -10,9 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-	"github.com/stretchr/testify/require"
 )
 
 func TestSaveAndLoadMarker_NoLoss(t *testing.T) {
