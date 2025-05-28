@@ -22,7 +22,6 @@ if systemctl list-unit-files --type=service | grep -q "^${SERVICE_NAME}.service"
     installed_endpoint_version="$(/opt/Elastic/Endpoint/elastic-endpoint version)"
     archive_endpoint_version="$("$new_endpoint_component_bin" version)"
 
-    # Service is present
     echo "ElasticEndpoint is installed"
     if ! systemctl is-active --quiet "$SERVICE_NAME"; then
         echo "$SERVICE_NAME is installed but not running"
