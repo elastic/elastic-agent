@@ -46,15 +46,12 @@ flavor_file="/var/lib/elastic-agent/.flavor"
 new_agent_dir="/var/lib/elastic-agent/data/elastic-agent-$version_dir-$commit_hash"
 old_agent_dir=""
 
-echo "NEW AGENT DIR $new_agent_dir"
-
 # upon upgrade we migrate the current symlink to an upgrade symlink as the previous
 # installed version will remove the symlink
 if test -L "$symlink"; then
 	resolved_symlink="$(readlink -- "$symlink")"
 	if ! [ -z "$resolved_symlink" ]; then
 		old_agent_dir="$(dirname "$resolved_symlink")"
-    echo "OLD AGENT DIR $old_agent_dir"
 		echo "previous installation directory $old_agent_dir"
 	else
 		echo "unable to read existing symlink"
