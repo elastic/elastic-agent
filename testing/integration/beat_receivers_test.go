@@ -7,18 +7,21 @@
 package integration
 
 import (
-	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"net/http"
 	"testing"
-	"text/template"
 	"time"
 
+	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
+	"github.com/gofrs/uuid/v5"
+	"gopkg.in/yaml.v2"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -64,7 +67,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 			dsType:          "metrics",
 			dsDataset:       "elastic_agent.filebeat",
 			dsNamespace:     info.Namespace,
-			query:           map[string]any{"exists": map[string]any{"field": "beat.stats.libbeat.output.events.active"}},
+			query:           map[string]any{"exists": map[string]any{"field": "beat.stats.system.cpu.cores"}},
 			onlyCompareKeys: true,
 			ignoreFields: []string{
 				// all process related metrics are dropped for beatreceivers
@@ -81,7 +84,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 			dsType:          "metrics",
 			dsDataset:       "elastic_agent.metricbeat",
 			dsNamespace:     info.Namespace,
-			query:           map[string]any{"exists": map[string]any{"field": "beat.stats.libbeat.output.events.active"}},
+			query:           map[string]any{"exists": map[string]any{"field": "beat.stats.system.cpu.cores"}},
 			onlyCompareKeys: true,
 			ignoreFields: []string{
 				//  all process related metrics are dropped for beatreceivers
@@ -131,47 +134,74 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
 	t.Cleanup(cancel)
 
-	type configOptions struct {
-		ESEndpoint string
-		ESApiKey   string
-		Namespace  string
-		RuntimeExp string
+	// prepare the policy and marshalled configuration
+	policyCtx, policyCancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	t.Cleanup(policyCancel)
+
+	// 1. Create and install policy with just monitoring
+	createPolicyReq := kibana.AgentPolicy{
+		Name:        fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String()),
+		Namespace:   info.Namespace,
+		Description: fmt.Sprintf("%s policy", t.Name()),
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
 	}
+	policyResponse, err := info.KibanaClient.CreatePolicy(policyCtx, createPolicyReq)
+	require.NoError(t, err, "error creating policy")
 
-	// 1. Start elastic agent monitoring in classic mode
-	monitoringTemplate := `
-outputs:
-  default:
-    type: elasticsearch
-    hosts: {{.ESEndpoint}}
-    api_key: {{.ESApiKey }}
-    preset: balanced
+	// 2. Download the policy, add the API key
+	downloadURL := fmt.Sprintf("/api/fleet/agent_policies/%s/download", policyResponse.ID)
+	resp, err := info.KibanaClient.Connection.SendWithContext(policyCtx, http.MethodGet, downloadURL, nil, nil, nil)
+	require.NoError(t, err, "error downloading policy")
+	policyBytes, err := io.ReadAll(resp.Body)
+	require.NoError(t, err, "error reading policy response")
+	defer resp.Body.Close()
 
-agent.monitoring:
-  enabled: true
-  logs: true
-  metrics: true
-  use_output: default
-  namespace: {{ .Namespace }}
-  _runtime_experimental: {{.RuntimeExp}}
-`
-	// Get elasticsearch endpoint and api_key
-	esEndpoint, err := getESHost()
 	apiKeyResponse, err := createESApiKey(info.ESClient)
 	require.NoError(t, err, "failed to get api key")
 	require.True(t, len(apiKeyResponse.Encoded) > 1, "api key is invalid %q", apiKeyResponse)
 	apiKey, err := getDecodedApiKey(apiKeyResponse)
 	require.NoError(t, err, "error decoding api key")
 
-	// Parse template
-	var classicMonitoring bytes.Buffer
-	template.Must(template.New("config").Parse(monitoringTemplate)).Execute(&classicMonitoring,
-		configOptions{
-			ESEndpoint: esEndpoint,
-			ESApiKey:   apiKey,
-			Namespace:  info.Namespace,
-			RuntimeExp: "process",
-		})
+	type PolicyOutputs struct {
+		Type   string   `yaml:"type"`
+		Hosts  []string `yaml:"hosts"`
+		Preset string   `yaml:"preset"`
+		ApiKey string   `yaml:"api_key"`
+	}
+	type PolicyStruct struct {
+		ID                string                   `yaml:"id"`
+		Revision          int                      `yaml:"revision"`
+		Outputs           map[string]PolicyOutputs `yaml:"outputs"`
+		Fleet             map[string]any           `yaml:"fleet"`
+		OutputPermissions map[string]any           `yaml:"output_permissions"`
+		Agent             struct {
+			Monitoring map[string]any `yaml:"monitoring"`
+			Rest       map[string]any `yaml:",inline"`
+		} `yaml:"agent"`
+		Inputs           []map[string]any `yaml:"inputs"`
+		Signed           map[string]any   `yaml:"signed"`
+		SecretReferences []map[string]any `yaml:"secret_references"`
+		Namespaces       []map[string]any `yaml:"namespaces"`
+	}
+
+	policy := PolicyStruct{}
+	err = yaml.Unmarshal(policyBytes, &policy)
+	require.NoError(t, err, "error unmarshalling policy")
+	d, prs := policy.Outputs["default"]
+	require.True(t, prs, "default must be in outputs")
+	d.ApiKey = string(apiKey)
+	policy.Outputs["default"] = d
+
+	updatedPolicyBytes, err := yaml.Marshal(policy)
+	require.NoErrorf(t, err, "error marshalling policy, struct was %v", policy)
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Logf("policy was %s", string(updatedPolicyBytes))
+		}
+	})
 
 	classicFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
@@ -179,7 +209,7 @@ agent.monitoring:
 	err = classicFixture.Prepare(ctx)
 	require.NoError(t, err, "error preparing fixture")
 
-	err = classicFixture.Configure(ctx, classicMonitoring.Bytes())
+	err = classicFixture.Configure(ctx, updatedPolicyBytes)
 	require.NoError(t, err, "error configuring fixture")
 
 	output, err := classicFixture.InstallWithoutEnroll(ctx, &installOpts)
@@ -228,21 +258,21 @@ agent.monitoring:
 	combinedOutput, err := classicFixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 	require.NoErrorf(t, err, "error uninstalling classic agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
 
-	// 4. Install agent monitoring with otel runtime
-	var receiverBuffer bytes.Buffer
-	template.Must(template.New("config").Parse(monitoringTemplate)).Execute(&receiverBuffer,
-		configOptions{
-			ESEndpoint: esEndpoint,
-			ESApiKey:   apiKey,
-			Namespace:  info.Namespace,
-			RuntimeExp: "otel",
-		})
+	// 4. switch monitoring to the otel runtime
+	policy.Agent.Monitoring["_runtime_experimental"] = "otel"
+	updatedPolicyBytes, err = yaml.Marshal(policy)
+	require.NoErrorf(t, err, "error marshalling policy, struct was %v", policy)
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Logf("policy was %s", string(updatedPolicyBytes))
+		}
+	})
 
 	beatReceiverFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 	err = beatReceiverFixture.Prepare(ctx)
 	require.NoError(t, err)
-	err = beatReceiverFixture.Configure(ctx, receiverBuffer.Bytes())
+	err = beatReceiverFixture.Configure(ctx, updatedPolicyBytes)
 	require.NoError(t, err)
 	combinedOutput, err = beatReceiverFixture.InstallWithoutEnroll(ctx, &installOpts)
 	require.NoErrorf(t, err, "error install without enroll: %s\ncombinedoutput:\n%s", err, string(combinedOutput))
