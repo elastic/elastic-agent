@@ -51,6 +51,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.127.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.127.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.127.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.127.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.127.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.127.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.127.0
