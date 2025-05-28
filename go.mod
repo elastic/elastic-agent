@@ -47,6 +47,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.123.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.123.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.123.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.123.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.123.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.123.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.123.0
