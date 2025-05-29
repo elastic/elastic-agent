@@ -135,7 +135,7 @@ func TestKubernetesJournaldInput(t *testing.T) {
 			docs := findESDocs(t, func() (estools.Documents, error) {
 				return estools.GetLogsForIndexWithContext(
 					ctx,
-					info.ESClient, fmt.Sprintf("logs-%s-default", testNamespace),
+					info.ESClient, fmt.Sprintf("logs-%s-default", namespace),
 					map[string]any{
 						"input.type": "journald",
 					},
