@@ -12,7 +12,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"maps"
 	"net/http"
 	"runtime"
 	"slices"
@@ -583,40 +582,36 @@ outputs:
 		testCases := []struct {
 			name          string
 			metricset     string
-			yieldDocsFunc func() (mapstr.M, mapstr.M)
+			yieldDocsFunc func(agent []estools.ESDoc, otel []estools.ESDoc) (mapstr.M, mapstr.M)
 		}{
 			{
 				name:      "cpu",
 				metricset: "cpu",
-				yieldDocsFunc: func() (mapstr.M, mapstr.M) {
-					agentDoc := mapstr.M(agentDocs["cpu"].Hits.Hits[0].Source).Flatten()
-					otelDoc := mapstr.M(otelDocs["cpu"].Hits.Hits[0].Source).Flatten()
-					return agentDoc, otelDoc
+				yieldDocsFunc: func(agent []estools.ESDoc, otel []estools.ESDoc) (mapstr.M, mapstr.M) {
+					return agent[0].Source, otel[0].Source
 				},
 			},
 			{
 				name:      "memory",
 				metricset: "memory",
-				yieldDocsFunc: func() (mapstr.M, mapstr.M) {
-					agentDoc := mapstr.M(agentDocs["memory"].Hits.Hits[0].Source).Flatten()
-					otelDoc := mapstr.M(otelDocs["memory"].Hits.Hits[0].Source).Flatten()
-					return agentDoc, otelDoc
+				yieldDocsFunc: func(agent []estools.ESDoc, otel []estools.ESDoc) (mapstr.M, mapstr.M) {
+					return agent[0].Source, otel[0].Source
 				},
 			},
 			{
 				name:      "network/interface-event",
 				metricset: "network",
-				yieldDocsFunc: func() (mapstr.M, mapstr.M) {
+				yieldDocsFunc: func(agent []estools.ESDoc, otel []estools.ESDoc) (mapstr.M, mapstr.M) {
 					var agentDoc, otelDoc mapstr.M
-					for _, hit := range agentDocs["network"].Hits.Hits {
-						agentDoc = mapstr.M(hit.Source).Flatten()
-						if ok, _ := agentDoc.HasKey("system.network.name"); ok {
+					for _, hit := range agent {
+						agentDoc = hit.Source
+						if ok, _ := agentDoc.Flatten().HasKey("system.network.name"); ok {
 							break
 						}
 					}
-					for _, hit := range otelDocs["network"].Hits.Hits {
-						otelDoc = mapstr.M(hit.Source).Flatten()
-						if ok, _ := otelDoc.HasKey("system.network.name"); ok {
+					for _, hit := range otel {
+						otelDoc = hit.Source
+						if ok, _ := otelDoc.Flatten().HasKey("system.network.name"); ok {
 							break
 						}
 					}
@@ -626,17 +621,17 @@ outputs:
 			{
 				name:      "network/host-event",
 				metricset: "network",
-				yieldDocsFunc: func() (mapstr.M, mapstr.M) {
+				yieldDocsFunc: func(agent []estools.ESDoc, otel []estools.ESDoc) (mapstr.M, mapstr.M) {
 					var agentDoc, otelDoc mapstr.M
-					for _, hit := range agentDocs["network"].Hits.Hits {
-						agentDoc = mapstr.M(hit.Source).Flatten()
-						if ok, _ := agentDoc.HasKey("system.network.name"); !ok {
+					for _, hit := range agent {
+						agentDoc = hit.Source
+						if ok, _ := agentDoc.Flatten().HasKey("system.network.name"); !ok {
 							break
 						}
 					}
-					for _, hit := range otelDocs["network"].Hits.Hits {
-						otelDoc = mapstr.M(hit.Source).Flatten()
-						if ok, _ := otelDoc.HasKey("system.network.name"); !ok {
+					for _, hit := range otel {
+						otelDoc = hit.Source
+						if ok, _ := otelDoc.Flatten().HasKey("system.network.name"); !ok {
 							break
 						}
 					}
@@ -646,20 +641,22 @@ outputs:
 			{
 				name:      "filesystem",
 				metricset: "filesystem",
-				yieldDocsFunc: func() (mapstr.M, mapstr.M) {
-					agentDoc := mapstr.M(agentDocs["filesystem"].Hits.Hits[0].Source).Flatten()
-					otelDoc := mapstr.M(otelDocs["filesystem"].Hits.Hits[0].Source).Flatten()
-					return agentDoc, otelDoc
+				yieldDocsFunc: func(agent []estools.ESDoc, otel []estools.ESDoc) (mapstr.M, mapstr.M) {
+					return agent[0].Source, otel[0].Source
 				},
 			},
 		}
 
 		for _, tt := range testCases {
 			t.Run(tt.name, func(t *testing.T) {
-				require.Greater(t, len(agentDocs[tt.metricset].Hits.Hits), 0, "expected to find agent documents for metricset %s", tt.metricset)
-				require.Greater(t, len(otelDocs[tt.metricset].Hits.Hits), 0, "expected to find otel documents for metricset %s", tt.metricset)
+				msetAgentDocs := agentDocs[tt.metricset].Hits.Hits
+				msetOtelDocs := otelDocs[tt.metricset].Hits.Hits
+				require.Greater(t, len(msetAgentDocs), 0, "expected to find agent documents for metricset %s", tt.metricset)
+				require.Greater(t, len(msetOtelDocs), 0, "expected to find otel documents for metricset %s", tt.metricset)
 
-				agentDoc, otelDoc := tt.yieldDocsFunc()
+				agentDoc, otelDoc := tt.yieldDocsFunc(msetAgentDocs, msetOtelDocs)
+				agentDoc = agentDoc.Flatten()
+				otelDoc = otelDoc.Flatten()
 
 				t.Cleanup(func() {
 					if t.Failed() {
@@ -671,8 +668,8 @@ outputs:
 				stripNondeterminism(agentDoc, tt.metricset)
 				stripNondeterminism(otelDoc, tt.metricset)
 
-				agentKeys := slices.Collect(maps.Keys(agentDoc))
-				otelKeys := slices.Collect(maps.Keys(otelDoc))
+				agentKeys := *agentDoc.FlattenKeys()
+				otelKeys := *otelDoc.FlattenKeys()
 				slices.Sort(agentKeys)
 				slices.Sort(otelKeys)
 				assert.Equal(t, agentKeys, otelKeys, "expected to have the same keys in agent and otel documents for metricset %s", tt.metricset)
