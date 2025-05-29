@@ -564,29 +564,7 @@ outputs:
 			"event.duration",
 		}
 
-		// Fields that are randomly missing in the agent and otel documents based on the test environment.
-		flakyFields := []string{
-			// depends on network activity during the test
-			"host.network.egress.bytes",
-			"host.network.egress.packets",
-			"host.network.ingress.bytes",
-			"host.network.ingress.packets",
-			"system.network.in.bytes",
-			"system.network.name",
-			"system.network.in.packets",
-			"system.network.in.dropped",
-			"system.network.in.errors",
-			"system.network.out.bytes",
-			"system.network.out.dropped",
-			"system.network.out.errors",
-			"system.network.out.packets",
-		}
-
 		stripNondeterminism := func(m mapstr.M, mset string) {
-			for _, field := range flakyFields {
-				m.Delete(field)
-			}
-
 			// These metrics will change from run to run
 			prefixes := []string{
 				fmt.Sprintf("system.%s", mset),
@@ -602,31 +580,104 @@ outputs:
 			}
 		}
 
-		for _, mset := range metricsets {
-			t.Run(mset, func(t *testing.T) {
-				require.Greater(t, len(agentDocs[mset].Hits.Hits), 0, "expected to find agent documents for metricset %s", mset)
-				require.Greater(t, len(otelDocs[mset].Hits.Hits), 0, "expected to find otel documents for metricset %s", mset)
+		testCases := []struct {
+			name          string
+			metricset     string
+			yieldDocsFunc func() (mapstr.M, mapstr.M)
+		}{
+			{
+				name:      "cpu",
+				metricset: "cpu",
+				yieldDocsFunc: func() (mapstr.M, mapstr.M) {
+					agentDoc := mapstr.M(agentDocs["cpu"].Hits.Hits[0].Source).Flatten()
+					otelDoc := mapstr.M(otelDocs["cpu"].Hits.Hits[0].Source).Flatten()
+					return agentDoc, otelDoc
+				},
+			},
+			{
+				name:      "memory",
+				metricset: "memory",
+				yieldDocsFunc: func() (mapstr.M, mapstr.M) {
+					agentDoc := mapstr.M(agentDocs["memory"].Hits.Hits[0].Source).Flatten()
+					otelDoc := mapstr.M(otelDocs["memory"].Hits.Hits[0].Source).Flatten()
+					return agentDoc, otelDoc
+				},
+			},
+			{
+				name:      "network/interface-event",
+				metricset: "network",
+				yieldDocsFunc: func() (mapstr.M, mapstr.M) {
+					var agentDoc, otelDoc mapstr.M
+					for _, hit := range agentDocs["network"].Hits.Hits {
+						agentDoc = mapstr.M(hit.Source).Flatten()
+						if ok, _ := agentDoc.HasKey("system.network.name"); ok {
+							break
+						}
+					}
+					for _, hit := range otelDocs["network"].Hits.Hits {
+						otelDoc = mapstr.M(hit.Source).Flatten()
+						if ok, _ := otelDoc.HasKey("system.network.name"); ok {
+							break
+						}
+					}
+					return agentDoc, otelDoc
+				},
+			},
+			{
+				name:      "network/host-event",
+				metricset: "network",
+				yieldDocsFunc: func() (mapstr.M, mapstr.M) {
+					var agentDoc, otelDoc mapstr.M
+					for _, hit := range agentDocs["network"].Hits.Hits {
+						agentDoc = mapstr.M(hit.Source).Flatten()
+						if ok, _ := agentDoc.HasKey("system.network.name"); !ok {
+							break
+						}
+					}
+					for _, hit := range otelDocs["network"].Hits.Hits {
+						otelDoc = mapstr.M(hit.Source).Flatten()
+						if ok, _ := otelDoc.HasKey("system.network.name"); !ok {
+							break
+						}
+					}
+					return agentDoc, otelDoc
+				},
+			},
+			{
+				name:      "filesystem",
+				metricset: "filesystem",
+				yieldDocsFunc: func() (mapstr.M, mapstr.M) {
+					agentDoc := mapstr.M(agentDocs["filesystem"].Hits.Hits[0].Source).Flatten()
+					otelDoc := mapstr.M(otelDocs["filesystem"].Hits.Hits[0].Source).Flatten()
+					return agentDoc, otelDoc
+				},
+			},
+		}
 
-				agentDoc := mapstr.M(agentDocs[mset].Hits.Hits[0].Source).Flatten()
-				otelDoc := mapstr.M(otelDocs[mset].Hits.Hits[0].Source).Flatten()
+		for _, tt := range testCases {
+			t.Run(tt.name, func(t *testing.T) {
+				require.Greater(t, len(agentDocs[tt.metricset].Hits.Hits), 0, "expected to find agent documents for metricset %s", tt.metricset)
+				require.Greater(t, len(otelDocs[tt.metricset].Hits.Hits), 0, "expected to find otel documents for metricset %s", tt.metricset)
+
+				agentDoc, otelDoc := tt.yieldDocsFunc()
 
 				t.Cleanup(func() {
 					if t.Failed() {
-						t.Logf("agent document for metricset %s:\n%s", mset, agentDoc.StringToPrint())
-						t.Logf("otel document for metricset %s:\n%s", mset, otelDoc.StringToPrint())
+						t.Logf("agent document for metricset %s:\n%s", tt.metricset, agentDoc.StringToPrint())
+						t.Logf("otel document for metricset %s:\n%s", tt.metricset, otelDoc.StringToPrint())
 					}
 				})
 
-				stripNondeterminism(agentDoc, mset)
-				stripNondeterminism(otelDoc, mset)
+				stripNondeterminism(agentDoc, tt.metricset)
+				stripNondeterminism(otelDoc, tt.metricset)
 
 				agentKeys := slices.Collect(maps.Keys(agentDoc))
 				otelKeys := slices.Collect(maps.Keys(otelDoc))
 				slices.Sort(agentKeys)
 				slices.Sort(otelKeys)
-				assert.Equal(t, agentKeys, otelKeys, "expected to have the same keys in agent and otel documents for metricset %s", mset)
+				assert.Equal(t, agentKeys, otelKeys, "expected to have the same keys in agent and otel documents for metricset %s", tt.metricset)
 
-				AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for metricset "+mset)
+				AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for metricset "+tt.metricset)
 			})
 
 		}
