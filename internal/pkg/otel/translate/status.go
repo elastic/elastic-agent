@@ -32,6 +32,14 @@ func GetAllComponentStatus(otelStatus *status.AggregateStatus, components []comp
 				if compState, statusErr = getComponentStatus(pipelineStatus, comp); statusErr != nil {
 					return nil, statusErr
 				}
+			} else {
+				// If the component is not found in the OTel status, we return a stopped state.
+				compState = runtime.ComponentComponentState{
+					Component: comp,
+					State: runtime.ComponentState{
+						State: client.UnitStateStopped,
+					},
+				}
 			}
 			componentStates = append(componentStates, compState)
 		}
@@ -40,6 +48,9 @@ func GetAllComponentStatus(otelStatus *status.AggregateStatus, components []comp
 }
 
 func DropComponentStatusFromOtelStatus(otelStatus *status.AggregateStatus) error {
+	if otelStatus == nil {
+		return nil
+	}
 	for pipelineStatusId := range otelStatus.ComponentStatusMap {
 		pipelineId := &pipeline.ID{}
 		componentKind, pipelineIdStr := parseEntityStatusId(pipelineStatusId)
@@ -59,7 +70,12 @@ func DropComponentStatusFromOtelStatus(otelStatus *status.AggregateStatus) error
 }
 
 func getOtelRuntimePipelines(otelStatus *status.AggregateStatus) (map[string]*status.AggregateStatus, error) {
+	if otelStatus == nil {
+		return map[string]*status.AggregateStatus{}, nil
+	}
+
 	pipelines := make(map[string]*status.AggregateStatus, len(otelStatus.ComponentStatusMap))
+
 	for pipelineStatusId, pipelineStatus := range otelStatus.ComponentStatusMap {
 		pipelineId := &pipeline.ID{}
 		componentKind, pipelineIdStr := parseEntityStatusId(pipelineStatusId)

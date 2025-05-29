@@ -349,8 +349,9 @@ type managerChans struct {
 	varsManagerUpdate <-chan []*transpiler.Vars
 	varsManagerError  <-chan error
 
-	otelManagerUpdate <-chan *status.AggregateStatus
-	otelManagerError  <-chan error
+	otelManagerUpdate          <-chan *status.AggregateStatus
+	otelManagerComponentUpdate chan []runtime.ComponentComponentState
+	otelManagerError           <-chan error
 
 	upgradeMarkerUpdate <-chan upgrade.UpdateMarker
 }
@@ -465,6 +466,9 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 	if otelMgr != nil {
 		c.managerChans.otelManagerUpdate = otelMgr.Watch()
 		c.managerChans.otelManagerError = otelMgr.Errors()
+		// This is temporarily a buffered channel, because we need to write to it from the main coordinator loop.
+		// The otel manager will soon run in its own process, and then this will work the same way as runtimeManagerUpdate.
+		c.managerChans.otelManagerComponentUpdate = make(chan []runtime.ComponentComponentState, 100)
 	}
 	if upgradeMgr != nil && upgradeMgr.MarkerWatcher() != nil {
 		c.managerChans.upgradeMarkerUpdate = upgradeMgr.MarkerWatcher().Watch()
@@ -666,14 +670,38 @@ func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case s := <-subChan:
-			handleComponentState(c.logger, state, &s)
+		case componentState := <-subChan:
+			handleComponentState(c.logger, state, &componentState)
 			// Forward the final changes back to Coordinator, unless our context
 			// has ended.
 			select {
-			case c.managerChans.runtimeManagerUpdate <- s:
+			case c.managerChans.runtimeManagerUpdate <- componentState:
 			case <-ctx.Done():
 				return
+			}
+		case componentStates := <-c.managerChans.otelManagerComponentUpdate:
+			// drop component states which don't exist in the configuration anymore
+			// we need to do this because we aren't guaranteed to receive a STOPPED state when the component is removed
+			componentIds := make(map[string]bool)
+			for _, componentState := range componentStates {
+				componentIds[componentState.Component.ID] = true
+			}
+			for id := range state {
+				if _, ok := componentIds[id]; !ok {
+					// this component is not in the configuration anymore, remove it
+					delete(state, id)
+				}
+			}
+			// now handle the component states
+			for _, componentState := range componentStates {
+				handleComponentState(c.logger, state, &componentState)
+				// Forward the final changes back to Coordinator, unless our context
+				// has ended.
+				select {
+				case c.managerChans.runtimeManagerUpdate <- componentState:
+				case <-ctx.Done():
+					return
+				}
 			}
 		}
 	}
@@ -1248,18 +1276,14 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 		}
 
 	case collectorStatus := <-c.managerChans.otelManagerUpdate:
-		if collectorStatus != nil {
-			componentStates, err := translate.GetAllComponentStatus(collectorStatus, c.componentModel)
-			if err != nil {
-				c.setOTelError(err)
-			}
-			for _, componentState := range componentStates {
-				c.applyComponentState(componentState)
-			}
-			err = translate.DropComponentStatusFromOtelStatus(collectorStatus)
-			if err != nil {
-				c.setOTelError(err)
-			}
+		componentStates, err := translate.GetAllComponentStatus(collectorStatus, c.componentModel)
+		if err != nil {
+			c.setOTelError(err)
+		}
+		c.managerChans.otelManagerComponentUpdate <- componentStates
+		err = translate.DropComponentStatusFromOtelStatus(collectorStatus)
+		if err != nil {
+			c.setOTelError(err)
 		}
 		c.state.Collector = collectorStatus
 		c.stateNeedsRefresh = true
