@@ -1313,7 +1313,9 @@ type k8sContext struct {
 	createdAt time.Time
 }
 
-// getNamespace returns a unique namespace for the current test
+// getNamespace returns a unique namespace on every call.
+// If K8S_TESTS_NAMESPACE is set, then its value is returned,
+// otherwise a unique namespace is generated.
 func (k k8sContext) getNamespace(t *testing.T) string {
 	if ns := os.Getenv("K8S_TESTS_NAMESPACE"); ns != "" {
 		return ns

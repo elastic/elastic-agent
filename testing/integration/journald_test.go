@@ -25,9 +25,9 @@ func TestKubernetesJournaldInput(t *testing.T) {
 		Local: false,
 		Sudo:  false,
 		OS: []define.OS{
-			// {Type: define.Kubernetes, DockerVariant: "basic"},
+			{Type: define.Kubernetes, DockerVariant: "basic"},
 			{Type: define.Kubernetes, DockerVariant: "complete"},
-			// {Type: define.Kubernetes, DockerVariant: "elastic-otel-collector"},
+			{Type: define.Kubernetes, DockerVariant: "elastic-otel-collector"},
 		},
 		Group: define.Kubernetes,
 	})
