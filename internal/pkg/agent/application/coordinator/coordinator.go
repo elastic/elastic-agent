@@ -667,58 +667,7 @@ func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case s := <-subChan:
-			oldState, ok := state[s.Component.ID]
-			if !ok {
-				componentLog := coordinatorComponentLog{
-					ID:    s.Component.ID,
-					State: s.State.State.String(),
-				}
-				logBasedOnState(c.logger, s.State.State, fmt.Sprintf("Spawned new component %s: %s", s.Component.ID, s.State.Message), "component", componentLog)
-				for ui, us := range s.State.Units {
-					unitLog := coordinatorUnitLog{
-						ID:    ui.UnitID,
-						Type:  ui.UnitType.String(),
-						State: us.State.String(),
-					}
-					logBasedOnState(c.logger, us.State, fmt.Sprintf("Spawned new unit %s: %s", ui.UnitID, us.Message), "component", componentLog, "unit", unitLog)
-				}
-			} else {
-				componentLog := coordinatorComponentLog{
-					ID:    s.Component.ID,
-					State: s.State.State.String(),
-				}
-				if oldState.State != s.State.State {
-					cl := coordinatorComponentLog{
-						ID:       s.Component.ID,
-						State:    s.State.State.String(),
-						OldState: oldState.State.String(),
-					}
-					logBasedOnState(c.logger, s.State.State, fmt.Sprintf("Component state changed %s (%s->%s): %s", s.Component.ID, oldState.State.String(), s.State.State.String(), s.State.Message), "component", cl)
-				}
-				for ui, us := range s.State.Units {
-					oldUS, ok := oldState.Units[ui]
-					if !ok {
-						unitLog := coordinatorUnitLog{
-							ID:    ui.UnitID,
-							Type:  ui.UnitType.String(),
-							State: us.State.String(),
-						}
-						logBasedOnState(c.logger, us.State, fmt.Sprintf("Spawned new unit %s: %s", ui.UnitID, us.Message), "component", componentLog, "unit", unitLog)
-					} else if oldUS.State != us.State {
-						unitLog := coordinatorUnitLog{
-							ID:       ui.UnitID,
-							Type:     ui.UnitType.String(),
-							State:    us.State.String(),
-							OldState: oldUS.State.String(),
-						}
-						logBasedOnState(c.logger, us.State, fmt.Sprintf("Unit state changed %s (%s->%s): %s", ui.UnitID, oldUS.State.String(), us.State.String(), us.Message), "component", componentLog, "unit", unitLog)
-					}
-				}
-			}
-			state[s.Component.ID] = s.State
-			if s.State.State == client.UnitStateStopped {
-				delete(state, s.Component.ID)
-			}
+			handleComponentState(c.logger, state, &s)
 			// Forward the final changes back to Coordinator, unless our context
 			// has ended.
 			select {
@@ -727,6 +676,73 @@ func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
 				return
 			}
 		}
+	}
+}
+
+func handleComponentState(
+	logger *logger.Logger,
+	coordinatorState map[string]runtime.ComponentState,
+	componentState *runtime.ComponentComponentState) {
+	oldState, ok := coordinatorState[componentState.Component.ID]
+	if !ok {
+		componentLog := coordinatorComponentLog{
+			ID:    componentState.Component.ID,
+			State: componentState.State.State.String(),
+		}
+		logMessage := fmt.Sprintf("Spawned new component %s: %s",
+			componentState.Component.ID,
+			componentState.State.Message)
+		logBasedOnState(logger, componentState.State.State, logMessage, "component", componentLog)
+		for ui, us := range componentState.State.Units {
+			unitLog := coordinatorUnitLog{
+				ID:    ui.UnitID,
+				Type:  ui.UnitType.String(),
+				State: us.State.String(),
+			}
+			unitLogMessage := fmt.Sprintf("Spawned new unit %s: %s", ui.UnitID, us.Message)
+			logBasedOnState(logger, us.State, unitLogMessage, "component", componentLog, "unit", unitLog)
+		}
+	} else {
+		componentLog := coordinatorComponentLog{
+			ID:    componentState.Component.ID,
+			State: componentState.State.State.String(),
+		}
+		if oldState.State != componentState.State.State {
+			cl := coordinatorComponentLog{
+				ID:       componentState.Component.ID,
+				State:    componentState.State.State.String(),
+				OldState: oldState.State.String(),
+			}
+			logBasedOnState(logger, componentState.State.State,
+				fmt.Sprintf("Component state changed %s (%s->%s): %s",
+					componentState.Component.ID, oldState.State.String(),
+					componentState.State.State.String(),
+					componentState.State.Message),
+				"component", cl)
+		}
+		for ui, us := range componentState.State.Units {
+			oldUS, ok := oldState.Units[ui]
+			if !ok {
+				unitLog := coordinatorUnitLog{
+					ID:    ui.UnitID,
+					Type:  ui.UnitType.String(),
+					State: us.State.String(),
+				}
+				logBasedOnState(logger, us.State, fmt.Sprintf("Spawned new unit %s: %s", ui.UnitID, us.Message), "component", componentLog, "unit", unitLog)
+			} else if oldUS.State != us.State {
+				unitLog := coordinatorUnitLog{
+					ID:       ui.UnitID,
+					Type:     ui.UnitType.String(),
+					State:    us.State.String(),
+					OldState: oldUS.State.String(),
+				}
+				logBasedOnState(logger, us.State, fmt.Sprintf("Unit state changed %s (%s->%s): %s", ui.UnitID, oldUS.State.String(), us.State.String(), us.Message), "component", componentLog, "unit", unitLog)
+			}
+		}
+	}
+	coordinatorState[componentState.Component.ID] = componentState.State
+	if componentState.State.State == client.UnitStateStopped {
+		delete(coordinatorState, componentState.Component.ID)
 	}
 }
 
@@ -1231,8 +1247,21 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 			c.processVars(ctx, vars)
 		}
 
-	case collector := <-c.managerChans.otelManagerUpdate:
-		c.state.Collector = collector
+	case collectorStatus := <-c.managerChans.otelManagerUpdate:
+		if collectorStatus != nil {
+			componentStates, err := translate.GetAllComponentStatus(collectorStatus, c.componentModel)
+			if err != nil {
+				c.setOTelError(err)
+			}
+			for _, componentState := range componentStates {
+				c.applyComponentState(componentState)
+			}
+			err = translate.DropComponentStatusFromOtelStatus(collectorStatus)
+			if err != nil {
+				c.setOTelError(err)
+			}
+		}
+		c.state.Collector = collectorStatus
 		c.stateNeedsRefresh = true
 
 	case ll := <-c.logLevelCh:
