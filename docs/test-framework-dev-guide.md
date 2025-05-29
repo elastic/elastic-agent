@@ -306,8 +306,11 @@ EXTERNAL=true PLATFORMS=darwin/arm64 mage package
 ```
 3. Run integration tests as per [the instructions](#running-the-tests)
 
-**_NOTE:_**: Make sure you add an absolute path in replace
-**_NOTE:_**: Old agent might be cached at `.agent-testing` directory. Run `mage integration:clean` to clean it.
+> [!NOTE]
+> Make sure you add an absolute path in replace directive
+
+> [!NOTE]
+> Old agent might be cached at `.agent-testing` directory. Run `mage integration:clean` to clean it.
 
 ## Writing tests
 
