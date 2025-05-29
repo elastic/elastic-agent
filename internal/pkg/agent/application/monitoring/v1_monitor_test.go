@@ -1085,7 +1085,8 @@ agent.monitoring:
 `
 	conf := config.MustNewConfigFrom(agentConfig)
 	// Reload will set unset fields to default
-	beatsMonitor.Reload(conf)
+	err := beatsMonitor.Reload(conf)
+	require.NoError(t, err)
 
 	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, true)
 	assert.Equal(t, beatsMonitor.config.C.MonitorMetrics, true)
