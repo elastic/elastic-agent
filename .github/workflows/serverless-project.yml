@@ -1,0 +1,61 @@
+---
+name: serverless-project
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 22 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  create-serverless:
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get token
+        id: get_token
+        uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a # v2.1.0
+        with:
+          app_id: ${{ secrets.OBS_AUTOMATION_APP_ID }}
+          private_key: ${{ secrets.OBS_AUTOMATION_APP_PEM }}
+          permissions: >-
+            {
+              "checks": "read",
+              "contents": "write",
+              "pull_requests": "write"
+            }
+          repositories: >-
+            ["observability-test-environments"]
+
+      - uses: elastic/oblt-actions/git/setup@v1
+        with:
+          github-token: ${{ steps.get_token.outputs.token }}
+
+      - name: Get next day of week
+        id: get_day
+        run: echo "day=$(date -d 'tomorrow' +'%a' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - uses: elastic/oblt-actions/oblt-cli/cluster-create-serverless@v1
+        with:
+          project-type: 'observability'
+          target: 'qa'
+          cluster-name-prefix: "ea-it-tests-${{ steps.get_day.outputs.day }}"
+          github-token: ${{ steps.get_token.outputs.token }}
+          gitops: true
+          wait: '15'
+
+      - if: ${{ failure()  }}
+        uses: elastic/oblt-actions/slack/send@v1
+        env:
+          JOB_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        with:
+          bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel-id: "#ingest-notifications"
+          message: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@agent-team` please look what's going on <${{ env.JOB_URL }}|here>"
