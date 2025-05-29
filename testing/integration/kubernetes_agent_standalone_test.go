@@ -899,7 +899,7 @@ func getAgentComponentState(status atesting.AgentStatusOutput, componentName str
 // k8sDumpPods creates an archive that contains logs of all pods in the given namespace and kube-system to the given target directory
 func k8sDumpPods(t *testing.T, ctx context.Context, client klient.Client, testName string, namespace string, targetDir string, testStartTime time.Time) {
 	// Create the tar file
-	archivePath := filepath.Join(targetDir, fmt.Sprintf("%s.tar.gz", namespace))
+	archivePath := filepath.Join(targetDir, fmt.Sprintf("%s.tar", namespace))
 	tarFile, err := os.Create(archivePath)
 	if err != nil {
 		t.Logf("failed to create archive at path %q", archivePath)
@@ -1315,6 +1315,10 @@ type k8sContext struct {
 
 // getNamespace returns a unique namespace for the current test
 func (k k8sContext) getNamespace(t *testing.T) string {
+	if ns := os.Getenv("K8S_TESTS_NAMESPACE"); ns != "" {
+		return ns
+	}
+
 	nsUUID, err := uuid.NewV4()
 	if err != nil {
 		t.Fatalf("error generating namespace UUID: %v", err)
@@ -1442,6 +1446,8 @@ type k8sKustomizeOverrides struct {
 	agentContainerExtraEnv         []corev1.EnvVar
 	agentContainerArgs             []string
 	agentContainerMemoryLimit      string
+	agentContainerVolumeMounts     []corev1.VolumeMount
+	agentPodVolumes                []corev1.Volume
 }
 
 // k8sStepDeployKustomize renders a kustomize manifest and deploys it. Also, it tries to
@@ -1464,6 +1470,8 @@ func k8sStepDeployKustomize(kustomizePath string, containerName string, override
 
 		k8sKustomizeAdjustObjects(objects, namespace, containerName,
 			func(container *corev1.Container) {
+				container.VolumeMounts = append(container.VolumeMounts, overrides.agentContainerVolumeMounts...)
+
 				// set agent image
 				container.Image = kCtx.agentImage
 				// set ImagePullPolicy to "Never" to avoid pulling the image
@@ -1523,6 +1531,7 @@ func k8sStepDeployKustomize(kustomizePath string, containerName string, override
 						}
 					}
 				}
+				pod.Volumes = append(pod.Volumes, overrides.agentPodVolumes...)
 			})
 
 		t.Cleanup(func() {

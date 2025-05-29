@@ -1,0 +1,23 @@
+outputs:
+  default:
+    type: elasticsearch
+    port: 443
+    hosts:
+      - ${ES_HOST}:443
+    username: ${ELASTICSEARCH_USERNAME}
+    password: ${ELASTICSEARCH_PASSWORD}
+
+agent:
+  monitoring:
+    enabled: false
+
+inputs:
+  - id: journald
+    log_level: debug
+    type: journald
+    data_stream:
+      dataset: ${EA_POLICY_NAMESPACE}
+    streams:
+      - id: journald-input-id
+        paths:
+          - "/opt/journald/*/*"
