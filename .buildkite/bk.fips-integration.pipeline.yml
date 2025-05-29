@@ -23,7 +23,7 @@ steps:
       #!/usr/bin/env bash
       set -euo pipefail
       buildkite-agent artifact download build/distributions/elastic-agent-fips-cloud-*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64-fips'
-      mage -v cloud:import
+      mage -v cloud:load
       mage -v cloud:push
     agents:
       provider: "gcp"
