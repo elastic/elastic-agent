@@ -620,7 +620,7 @@ outputs:
 				},
 			},
 			{
-				name:      "network/interface-event",
+				name:      "network",
 				metricset: "network",
 				yieldDocsFunc: func(agent []estools.ESDoc, otel []estools.ESDoc) (mapstr.M, mapstr.M) {
 					var agentDoc, otelDoc mapstr.M
@@ -633,26 +633,6 @@ outputs:
 					for _, hit := range otel {
 						otelDoc = hit.Source
 						if ok, _ := otelDoc.Flatten().HasKey("system.network.name"); ok {
-							break
-						}
-					}
-					return agentDoc, otelDoc
-				},
-			},
-			{
-				name:      "network/host-event",
-				metricset: "network",
-				yieldDocsFunc: func(agent []estools.ESDoc, otel []estools.ESDoc) (mapstr.M, mapstr.M) {
-					var agentDoc, otelDoc mapstr.M
-					for _, hit := range agent {
-						agentDoc = hit.Source
-						if ok, _ := agentDoc.Flatten().HasKey("host.network.egress.bytes"); ok {
-							break
-						}
-					}
-					for _, hit := range otel {
-						otelDoc = hit.Source
-						if ok, _ := otelDoc.Flatten().HasKey("host.network.egress.bytes"); !ok {
 							break
 						}
 					}
