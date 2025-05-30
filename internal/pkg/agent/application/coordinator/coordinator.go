@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/otel/configtranslate"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 
 	"go.opentelemetry.io/collector/component/componentstatus"
 
@@ -349,8 +349,9 @@ type managerChans struct {
 	varsManagerUpdate <-chan []*transpiler.Vars
 	varsManagerError  <-chan error
 
-	otelManagerUpdate <-chan *status.AggregateStatus
-	otelManagerError  <-chan error
+	otelManagerUpdate          <-chan *status.AggregateStatus
+	otelManagerComponentUpdate chan []runtime.ComponentComponentState
+	otelManagerError           <-chan error
 
 	upgradeMarkerUpdate <-chan upgrade.UpdateMarker
 }
@@ -465,6 +466,9 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 	if otelMgr != nil {
 		c.managerChans.otelManagerUpdate = otelMgr.Watch()
 		c.managerChans.otelManagerError = otelMgr.Errors()
+		// This is temporarily a buffered channel, because we need to write to it from the main coordinator loop.
+		// The otel manager will soon run in its own process, and then this will work the same way as runtimeManagerUpdate.
+		c.managerChans.otelManagerComponentUpdate = make(chan []runtime.ComponentComponentState, 100)
 	}
 	if upgradeMgr != nil && upgradeMgr.MarkerWatcher() != nil {
 		c.managerChans.upgradeMarkerUpdate = upgradeMgr.MarkerWatcher().Watch()
@@ -666,67 +670,107 @@ func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case s := <-subChan:
-			oldState, ok := state[s.Component.ID]
-			if !ok {
-				componentLog := coordinatorComponentLog{
-					ID:    s.Component.ID,
-					State: s.State.State.String(),
-				}
-				logBasedOnState(c.logger, s.State.State, fmt.Sprintf("Spawned new component %s: %s", s.Component.ID, s.State.Message), "component", componentLog)
-				for ui, us := range s.State.Units {
-					unitLog := coordinatorUnitLog{
-						ID:    ui.UnitID,
-						Type:  ui.UnitType.String(),
-						State: us.State.String(),
-					}
-					logBasedOnState(c.logger, us.State, fmt.Sprintf("Spawned new unit %s: %s", ui.UnitID, us.Message), "component", componentLog, "unit", unitLog)
-				}
-			} else {
-				componentLog := coordinatorComponentLog{
-					ID:    s.Component.ID,
-					State: s.State.State.String(),
-				}
-				if oldState.State != s.State.State {
-					cl := coordinatorComponentLog{
-						ID:       s.Component.ID,
-						State:    s.State.State.String(),
-						OldState: oldState.State.String(),
-					}
-					logBasedOnState(c.logger, s.State.State, fmt.Sprintf("Component state changed %s (%s->%s): %s", s.Component.ID, oldState.State.String(), s.State.State.String(), s.State.Message), "component", cl)
-				}
-				for ui, us := range s.State.Units {
-					oldUS, ok := oldState.Units[ui]
-					if !ok {
-						unitLog := coordinatorUnitLog{
-							ID:    ui.UnitID,
-							Type:  ui.UnitType.String(),
-							State: us.State.String(),
-						}
-						logBasedOnState(c.logger, us.State, fmt.Sprintf("Spawned new unit %s: %s", ui.UnitID, us.Message), "component", componentLog, "unit", unitLog)
-					} else if oldUS.State != us.State {
-						unitLog := coordinatorUnitLog{
-							ID:       ui.UnitID,
-							Type:     ui.UnitType.String(),
-							State:    us.State.String(),
-							OldState: oldUS.State.String(),
-						}
-						logBasedOnState(c.logger, us.State, fmt.Sprintf("Unit state changed %s (%s->%s): %s", ui.UnitID, oldUS.State.String(), us.State.String(), us.Message), "component", componentLog, "unit", unitLog)
-					}
-				}
-			}
-			state[s.Component.ID] = s.State
-			if s.State.State == client.UnitStateStopped {
-				delete(state, s.Component.ID)
-			}
+		case componentState := <-subChan:
+			handleComponentState(c.logger, state, &componentState)
 			// Forward the final changes back to Coordinator, unless our context
 			// has ended.
 			select {
-			case c.managerChans.runtimeManagerUpdate <- s:
+			case c.managerChans.runtimeManagerUpdate <- componentState:
 			case <-ctx.Done():
 				return
 			}
+		case componentStates := <-c.managerChans.otelManagerComponentUpdate:
+			// drop component states which don't exist in the configuration anymore
+			// we need to do this because we aren't guaranteed to receive a STOPPED state when the component is removed
+			componentIds := make(map[string]bool)
+			for _, componentState := range componentStates {
+				componentIds[componentState.Component.ID] = true
+			}
+			for id := range state {
+				if _, ok := componentIds[id]; !ok {
+					// this component is not in the configuration anymore, remove it
+					delete(state, id)
+				}
+			}
+			// now handle the component states
+			for _, componentState := range componentStates {
+				handleComponentState(c.logger, state, &componentState)
+				// Forward the final changes back to Coordinator, unless our context
+				// has ended.
+				select {
+				case c.managerChans.runtimeManagerUpdate <- componentState:
+				case <-ctx.Done():
+					return
+				}
+			}
 		}
+	}
+}
+
+func handleComponentState(
+	logger *logger.Logger,
+	coordinatorState map[string]runtime.ComponentState,
+	componentState *runtime.ComponentComponentState) {
+	oldState, ok := coordinatorState[componentState.Component.ID]
+	if !ok {
+		componentLog := coordinatorComponentLog{
+			ID:    componentState.Component.ID,
+			State: componentState.State.State.String(),
+		}
+		logMessage := fmt.Sprintf("Spawned new component %s: %s",
+			componentState.Component.ID,
+			componentState.State.Message)
+		logBasedOnState(logger, componentState.State.State, logMessage, "component", componentLog)
+		for ui, us := range componentState.State.Units {
+			unitLog := coordinatorUnitLog{
+				ID:    ui.UnitID,
+				Type:  ui.UnitType.String(),
+				State: us.State.String(),
+			}
+			unitLogMessage := fmt.Sprintf("Spawned new unit %s: %s", ui.UnitID, us.Message)
+			logBasedOnState(logger, us.State, unitLogMessage, "component", componentLog, "unit", unitLog)
+		}
+	} else {
+		componentLog := coordinatorComponentLog{
+			ID:    componentState.Component.ID,
+			State: componentState.State.State.String(),
+		}
+		if oldState.State != componentState.State.State {
+			cl := coordinatorComponentLog{
+				ID:       componentState.Component.ID,
+				State:    componentState.State.State.String(),
+				OldState: oldState.State.String(),
+			}
+			logBasedOnState(logger, componentState.State.State,
+				fmt.Sprintf("Component state changed %s (%s->%s): %s",
+					componentState.Component.ID, oldState.State.String(),
+					componentState.State.State.String(),
+					componentState.State.Message),
+				"component", cl)
+		}
+		for ui, us := range componentState.State.Units {
+			oldUS, ok := oldState.Units[ui]
+			if !ok {
+				unitLog := coordinatorUnitLog{
+					ID:    ui.UnitID,
+					Type:  ui.UnitType.String(),
+					State: us.State.String(),
+				}
+				logBasedOnState(logger, us.State, fmt.Sprintf("Spawned new unit %s: %s", ui.UnitID, us.Message), "component", componentLog, "unit", unitLog)
+			} else if oldUS.State != us.State {
+				unitLog := coordinatorUnitLog{
+					ID:       ui.UnitID,
+					Type:     ui.UnitType.String(),
+					State:    us.State.String(),
+					OldState: oldUS.State.String(),
+				}
+				logBasedOnState(logger, us.State, fmt.Sprintf("Unit state changed %s (%s->%s): %s", ui.UnitID, oldUS.State.String(), us.State.String(), us.Message), "component", componentLog, "unit", unitLog)
+			}
+		}
+	}
+	coordinatorState[componentState.Component.ID] = componentState.State
+	if componentState.State.State == client.UnitStateStopped {
+		delete(coordinatorState, componentState.Component.ID)
 	}
 }
 
@@ -1231,8 +1275,17 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 			c.processVars(ctx, vars)
 		}
 
-	case collector := <-c.managerChans.otelManagerUpdate:
-		c.state.Collector = collector
+	case collectorStatus := <-c.managerChans.otelManagerUpdate:
+		componentStates, err := translate.GetAllComponentStatus(collectorStatus, c.componentModel)
+		if err != nil {
+			c.setOTelError(err)
+		}
+		c.managerChans.otelManagerComponentUpdate <- componentStates
+		err = translate.DropComponentStatusFromOtelStatus(collectorStatus)
+		if err != nil {
+			c.setOTelError(err)
+		}
+		c.state.Collector = collectorStatus
 		c.stateNeedsRefresh = true
 
 	case ll := <-c.logLevelCh:
@@ -1469,7 +1522,7 @@ func (c *Coordinator) updateOtelManagerConfig(model *component.Model) error {
 	if len(model.Components) > 0 {
 		var err error
 		c.logger.With("components", model.Components).Debug("Updating otel manager model")
-		componentOtelCfg, err = configtranslate.GetOtelConfig(model, c.agentInfo, c.monitorMgr.ComponentMonitoringConfig)
+		componentOtelCfg, err = translate.GetOtelConfig(model, c.agentInfo, c.monitorMgr.ComponentMonitoringConfig)
 		if err != nil {
 			c.logger.Errorf("failed to generate otel config: %v", err)
 		}
