@@ -87,6 +87,7 @@ This section provides a summary of components included in the Elastic Distributi
 |---|---|
 | [filestorage](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/storage/filestorage/v0.123.0/extension/storage/filestorage/README.md) | v0.123.0 |
 | [healthcheckextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckextension/v0.123.0/extension/healthcheckextension/README.md) | v0.123.0 |
+| [healthcheckv2extension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckv2extension/v0.123.0/extension/healthcheckv2extension/README.md) | v0.123.0 |
 | [k8sobserver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/observer/k8sobserver/v0.123.0/extension/observer/k8sobserver/README.md) | v0.123.0 |
 | [memorylimiterextension](https://github.com/open-telemetry/opentelemetry-collector/blob/extension/memorylimiterextension/v0.123.0/extension/memorylimiterextension/README.md) | v0.123.0 |
 | [pprofextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/pprofextension/v0.123.0/extension/pprofextension/README.md) | v0.123.0 |

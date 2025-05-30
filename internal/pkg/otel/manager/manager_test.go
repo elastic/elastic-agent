@@ -9,6 +9,8 @@ package manager
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -64,37 +66,72 @@ var (
 	}
 )
 
+type EventTime[T interface{}] struct {
+	time time.Time
+	val  T
+}
+
+func (t *EventTime[T]) Before(u time.Time) bool {
+	return t != nil && t.time.Before(u)
+}
+
+func (t *EventTime[T]) Value() T {
+	if t == nil {
+		var zero T
+		return zero
+	}
+	return t.val
+}
+
+func (t *EventTime[T]) Time() time.Time {
+	if t == nil {
+		return time.Time{}
+	}
+	return t.time
+}
+
 func TestOTelManager_Run(t *testing.T) {
+	wd, erWd := os.Getwd()
+	require.NoError(t, erWd, "cannot get working directory")
+
+	testBinary := filepath.Join(wd, "testing", "testing")
+	require.FileExists(t, testBinary, "testing binary not found")
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	l, _ := loggertest.New("otel")
-	m := NewOTelManager(l)
+	m := &OTelManager{
+		logger:              l,
+		errCh:               make(chan error, 1), // holds at most one error
+		cfgCh:               make(chan *confmap.Conf),
+		statusCh:            make(chan *status.AggregateStatus),
+		doneChan:            make(chan struct{}),
+		collectorBinaryPath: testBinary,
+		collectorBinaryArgs: []string{""},
+	}
 
 	var errMx sync.Mutex
-	var err error
+	var err *EventTime[error]
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case e := <-m.Errors():
-				if e != nil {
-					// no error should be produced (any error is a failure)
-					errMx.Lock()
-					err = e
-					errMx.Unlock()
-				}
+				errMx.Lock()
+				err = &EventTime[error]{time: time.Now(), val: e}
+				errMx.Unlock()
 			}
 		}
 	}()
-	getLatestErr := func() error {
+	getLatestErr := func() *EventTime[error] {
 		errMx.Lock()
 		defer errMx.Unlock()
 		return err
 	}
 
 	var latestMx sync.Mutex
-	var latest *status.AggregateStatus
+	var latest *EventTime[*status.AggregateStatus]
 	go func() {
 		for {
 			select {
@@ -102,12 +139,12 @@ func TestOTelManager_Run(t *testing.T) {
 				return
 			case c := <-m.Watch():
 				latestMx.Lock()
-				latest = c
+				latest = &EventTime[*status.AggregateStatus]{val: c, time: time.Now()}
 				latestMx.Unlock()
 			}
 		}
 	}()
-	getLatestStatus := func() *status.AggregateStatus {
+	getLatestStatus := func() *EventTime[*status.AggregateStatus] {
 		latestMx.Lock()
 		defer latestMx.Unlock()
 		return latest
@@ -121,21 +158,18 @@ func TestOTelManager_Run(t *testing.T) {
 		runErr = m.Run(ctx)
 	}()
 
-	ensureHealthy := func() {
+	ensureHealthy := func(u time.Time) {
 		if !assert.Eventuallyf(t, func() bool {
-			err := getLatestErr()
-			if err != nil {
-				// return now (but not for the correct reasons)
-				return true
+			if latestErr := getLatestErr(); latestErr == nil || latestErr.Before(u) || latestErr.Value() != nil {
+				return false
 			}
-			latest := getLatestStatus()
-			if latest == nil || latest.Status() != componentstatus.StatusOK {
+			if latestStatus := getLatestStatus(); latestStatus == nil || latestStatus.Value() == nil || latestStatus.Before(u) || latestStatus.Value().Status() != componentstatus.StatusOK {
 				return false
 			}
 			return true
-		}, 5*time.Minute, 1*time.Second, "otel collector never got healthy") {
-			lastStatus := getLatestStatus()
-			lastErr := getLatestErr()
+		}, 60*time.Second, 1*time.Second, "otel collector never got healthy") {
+			lastStatus := getLatestStatus().Value()
+			lastErr := getLatestErr().Value()
 
 			// never got healthy, stop the manager and wait for it to end
 			cancel()
@@ -147,36 +181,37 @@ func TestOTelManager_Run(t *testing.T) {
 			}
 			t.Fatalf("otel collector never got healthy: %s (latest err: %v)", statusToYaml(lastStatus), lastErr)
 		}
-		latestErr := getLatestErr()
-		require.NoError(t, latestErr, "runtime errored")
+		require.NoError(t, getLatestErr().Value(), "runtime errored")
 	}
 
-	ensureOff := func() {
+	ensureOff := func(u time.Time) {
 		require.Eventuallyf(t, func() bool {
-			err := getLatestErr()
-			if err != nil {
-				// return now (but not for the correct reasons)
-				return true
+			if latestErr := getLatestErr(); latestErr == nil || latestErr.Before(u) || latestErr.Value() != nil {
+				return false
 			}
-			latest := getLatestStatus()
-			return latest == nil
-		}, 5*time.Minute, 1*time.Second, "otel collector never stopped")
-		latestErr := getLatestErr()
-		require.NoError(t, latestErr, "runtime errored")
+			if latestStatus := getLatestStatus(); latestStatus == nil || latestStatus.Before(u) || latestStatus.Value() != nil {
+				return false
+			}
+			return true
+		}, 60*time.Second, 1*time.Second, "otel collector never stopped")
+		require.NoError(t, getLatestErr().Value(), "runtime errored")
 	}
 
 	// ensure that it got healthy
 	cfg := confmap.NewFromStringMap(testConfig)
+	updateTime := time.Now()
 	m.Update(cfg)
-	ensureHealthy()
+	ensureHealthy(updateTime)
 
 	// trigger update (no config compare is due externally to otel collector)
+	updateTime = time.Now()
 	m.Update(cfg)
-	ensureHealthy()
+	ensureHealthy(updateTime)
 
 	// no configuration should stop the runner
+	updateTime = time.Now()
 	m.Update(nil)
-	ensureOff()
+	ensureOff(updateTime)
 
 	cancel()
 	runWg.Wait()
@@ -186,10 +221,24 @@ func TestOTelManager_Run(t *testing.T) {
 }
 
 func TestOTelManager_ConfigError(t *testing.T) {
+	wd, erWd := os.Getwd()
+	require.NoError(t, erWd, "cannot get working directory")
+
+	testBinary := filepath.Join(wd, "testing", "testing")
+	require.FileExists(t, testBinary, "testing binary not found")
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	l, _ := loggertest.New("otel")
-	m := NewOTelManager(l)
+	m := &OTelManager{
+		logger:              l,
+		errCh:               make(chan error, 1), // holds at most one error
+		cfgCh:               make(chan *confmap.Conf),
+		statusCh:            make(chan *status.AggregateStatus),
+		doneChan:            make(chan struct{}),
+		collectorBinaryPath: testBinary,
+		collectorBinaryArgs: []string{""},
+	}
 
 	go func() {
 		err := m.Run(ctx)
