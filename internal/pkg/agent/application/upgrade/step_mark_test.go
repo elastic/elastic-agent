@@ -5,9 +5,14 @@
 package upgrade
 
 import (
+	"bufio"
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -299,11 +304,11 @@ func Test_markUpgradeLocking(t *testing.T) {
 	}{
 		{
 			name: "Lock file is created when writing update marker", args: args{
-				agent:          newAgent456,
-				previousAgent:  prevAgent123,
-				action:         nil,
-				upgradeDetails: nil,
-			},
+			agent:          newAgent456,
+			previousAgent:  prevAgent123,
+			action:         nil,
+			upgradeDetails: nil,
+		},
 			afterUpdateMarkerCreation: func(t *testing.T, dataDir string) {
 				assert.FileExists(t, markerFilePath(dataDir), "Update marker file must exist")
 				assert.FileExists(t, markerFilePath(dataDir)+".lock", "Update marker lock file must exist")
@@ -316,11 +321,11 @@ func Test_markUpgradeLocking(t *testing.T) {
 		},
 		{
 			name: "Update marker is re-lockable after writing", args: args{
-				agent:          newAgent456,
-				previousAgent:  prevAgent123,
-				action:         nil,
-				upgradeDetails: nil,
-			},
+			agent:          newAgent456,
+			previousAgent:  prevAgent123,
+			action:         nil,
+			upgradeDetails: nil,
+		},
 			afterUpdateMarkerCreation: func(t *testing.T, dataDir string) {
 				assert.FileExists(t, markerFilePath(dataDir), "Update marker file must exist")
 				assert.FileExists(t, markerFilePath(dataDir)+".lock", "Update marker lock file must exist")
@@ -335,11 +340,11 @@ func Test_markUpgradeLocking(t *testing.T) {
 		},
 		{
 			name: "Update marker creation should not fail if marker is already locked by the same process", args: args{
-				agent:          newAgent456,
-				previousAgent:  prevAgent123,
-				action:         nil,
-				upgradeDetails: nil,
-			},
+			agent:          newAgent456,
+			previousAgent:  prevAgent123,
+			action:         nil,
+			upgradeDetails: nil,
+		},
 			beforeUpdateMarkerCreation: func(t *testing.T, dataDir string) {
 				// write some fake data in update marker file
 				updateMarkerFilePath := markerFilePath(dataDir)
@@ -362,6 +367,62 @@ func Test_markUpgradeLocking(t *testing.T) {
 			},
 			wantErr: assert.NoError,
 		},
+		{
+			name: "Update marker creation should fail if marker is already locked by another process", args: args{
+			agent:          newAgent456,
+			previousAgent:  prevAgent123,
+			action:         nil,
+			upgradeDetails: nil,
+		},
+			beforeUpdateMarkerCreation: func(t *testing.T, dataDir string) {
+				// write some fake data in update marker file
+				updateMarkerFilePath := markerFilePath(dataDir)
+				err := os.WriteFile(updateMarkerFilePath, []byte("this: is not a real update marker"), 0o664)
+				require.NoError(t, err, "error creating fake update marker")
+
+				// lock the fake update marker using an external process
+				lockFilePath := updateMarkerFilePath + ".lock"
+				cmdCancel, lockFileCmd := createFileLockerCmd(t, lockFilePath)
+
+				fileLockerStdErr, err := lockFileCmd.StderrPipe()
+				require.NoError(t, err, "Error getting stderr pipe from filelocker")
+
+				fileLockedCh := make(chan struct{})
+
+				// consume stderr to check for locking
+				go func() {
+					scanner := bufio.NewScanner(fileLockerStdErr)
+					for scanner.Scan() {
+						line := scanner.Text()
+						if strings.Contains(line, "Acquired lock on file") {
+							fileLockedCh <- struct{}{}
+						}
+					}
+				}()
+
+				err = lockFileCmd.Start()
+				require.NoError(t, err, "running filelocker should not fail")
+
+				t.Cleanup(func() {
+					cmdCancel()
+					_ = lockFileCmd.Wait()
+				})
+
+				select {
+				case <-fileLockedCh:
+					// file was locked from the external process: all good
+					t.Log("external filelocker acquired the lock!")
+				case <-time.After(30 * time.Second):
+					t.Fatalf("timed out waiting for file locker to lock the file")
+				}
+			},
+			afterUpdateMarkerCreation: func(t *testing.T, dataDir string) {
+				// verify we can't read the actual update marker since it's still locked
+				_, err := LoadMarker(dataDir)
+				require.Error(t, err, "loading update marker should fail")
+			},
+			wantErr: assert.Error,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -376,6 +437,24 @@ func Test_markUpgradeLocking(t *testing.T) {
 			}
 		})
 	}
+}
+
+func createFileLockerCmd(t *testing.T, lockFilePath string) (context.CancelFunc, *exec.Cmd) {
+	executableName := "filelocker"
+	if runtime.GOOS == "windows" {
+		executableName += ".exe"
+	}
+	filelockerExecutablePath := filepath.Join("test", "filelocker", executableName)
+	require.FileExistsf(
+		t,
+		filelockerExecutablePath,
+		"filelocker executable %s should exist. Please ensure that mage build:testbinaries has been executed.",
+		filelockerExecutablePath,
+	)
+
+	cmdCtx, cmdCancel := context.WithCancel(t.Context())
+	lockFileCmd := exec.CommandContext(cmdCtx, filelockerExecutablePath, "-lockfile", lockFilePath)
+	return cmdCancel, lockFileCmd
 }
 
 func checkUpgradeMarker(t *testing.T, updateMarker *UpdateMarker, prevAgent agentInstall, newAgent agentInstall) {

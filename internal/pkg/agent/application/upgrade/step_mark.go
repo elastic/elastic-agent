@@ -340,9 +340,12 @@ func markerFilePath(dataDirPath string) string {
 
 func lockMarkerFile(markerFileName string) (*flock.Flock, error) {
 	fLock := flock.New(markerFileName + ".lock")
-	_, err := fLock.TryLock()
+	locked, err := fLock.TryLock()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("locking %s: %w", fLock, err)
+	}
+	if !locked {
+		return nil, fmt.Errorf("failed locking %s", fLock)
 	}
 
 	return fLock, nil
