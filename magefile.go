@@ -3396,7 +3396,7 @@ func gceFindMissingRoles(actual []string, expected []string) []string {
 }
 
 func getGCEServiceTokenPath() (string, bool, error) {
-	serviceTokenPath := os.Getenv("TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE")
+	serviceTokenPath := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
 	if serviceTokenPath == "" {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
