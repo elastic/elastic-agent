@@ -2292,6 +2292,16 @@ func (Integration) Kubernetes(ctx context.Context) error {
 	return integRunner(ctx, false, "")
 }
 
+// KubernetesSingle runs a single Kubernetes integration test
+func (Integration) KubernetesSingle(ctx context.Context, testName string) error {
+	// invoke integration tests
+	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
+		return err
+	}
+
+	return integRunner(ctx, false, testName)
+}
+
 // KubernetesMatrix runs a matrix of kubernetes integration tests
 func (Integration) KubernetesMatrix(ctx context.Context) error {
 	// invoke integration tests

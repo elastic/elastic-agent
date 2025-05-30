@@ -1,9 +1,8 @@
 outputs:
   default:
     type: elasticsearch
-    port: 443
     hosts:
-      - ${ES_HOST}:443
+      - ${ES_HOST}
     username: ${ELASTICSEARCH_USERNAME}
     password: ${ELASTICSEARCH_PASSWORD}
 

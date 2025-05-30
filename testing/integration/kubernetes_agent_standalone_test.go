@@ -1387,8 +1387,8 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 	err = os.MkdirAll(testLogsBasePath, 0o755)
 	require.NoError(t, err, "failed to create test logs directory")
 
-	esHost := os.Getenv("ELASTICSEARCH_HOST")
-	require.NotEmpty(t, esHost, "ELASTICSEARCH_HOST must be set")
+	esHost, err := getESHost()
+	require.NoError(t, err, "cannot parse ELASTICSEARCH_HOST")
 
 	esAPIKey, err := generateESAPIKey(info.ESClient, info.Namespace)
 	require.NoError(t, err, "failed to generate ES API key")
