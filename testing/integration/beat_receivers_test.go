@@ -626,13 +626,13 @@ outputs:
 					var agentDoc, otelDoc mapstr.M
 					for _, hit := range agent {
 						agentDoc = hit.Source
-						if ok, _ := agentDoc.Flatten().HasKey("system.network.name"); !ok {
+						if ok, _ := agentDoc.Flatten().HasKey("host.network.egress.bytes"); ok {
 							break
 						}
 					}
 					for _, hit := range otel {
 						otelDoc = hit.Source
-						if ok, _ := otelDoc.Flatten().HasKey("system.network.name"); !ok {
+						if ok, _ := otelDoc.Flatten().HasKey("host.network.egress.bytes"); !ok {
 							break
 						}
 					}
