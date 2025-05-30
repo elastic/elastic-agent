@@ -1,0 +1,39 @@
+version: 9.0.2
+entries:
+    - kind: bug-fix
+      summary: Preserve agent run state on DEB and RPM upgrades
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7999
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3832
+      timestamp: 1745923884
+      file:
+        name: 1745923884-deb-rpm-preserve-run-state.yaml
+        checksum: f4aa59929c389c20bc8104c8da4824979c3b8f35
+    - kind: other
+      summary: NOTICE.txt now contains only those modules that are used by the Elastic Agent binaries.
+      description: |
+        Only those modules that the Elastic Agent binaries for various platforms directly
+        or indirectly depend on are now included in the NOTICE.txt file . Modules used for development
+        tooling are now excluded from NOTICE.txt.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8053
+      issue: []
+      timestamp: 1746636264
+      file:
+        name: 1746636264-fix-notice.yaml
+        checksum: 5e7c950a899c715c5c3bd7cc2c79e924f8f5585e
+    - kind: security
+      summary: Upgrade Go version to 1.24.3.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8109
+      issue: []
+      timestamp: 1746652545
+      file:
+        name: 1746652545-Upgrade-to-Go-1.24.3..yaml
+        checksum: c5b03e2e2685ef389a269f5904fdc53590c7e1b1
