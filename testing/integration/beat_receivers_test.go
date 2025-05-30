@@ -370,6 +370,7 @@ func TestAgentMetricsInput(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Default,
 		Local: true,
+		Sudo:  true,
 		OS: []define.OS{
 			{Type: define.Windows},
 			{Type: define.Linux},
