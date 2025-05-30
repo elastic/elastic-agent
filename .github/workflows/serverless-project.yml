@@ -4,7 +4,8 @@ name: serverless-project
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 22 * * *"
+    # To run more often if needed, for now weekly on sunday at 4:00 UTC
+    - cron: "0 4 * * 0"
 
 permissions:
   contents: read
@@ -16,6 +17,8 @@ jobs:
       pull-requests: write
       id-token: write
     runs-on: ubuntu-latest
+    env:
+      PREFIX: "ea-serverless-it"
     steps:
       - uses: actions/checkout@v4
 
@@ -38,19 +41,53 @@ jobs:
         with:
           github-token: ${{ steps.get_token.outputs.token }}
 
-      - name: Get next day of week
+      - name: Get day of the week
         id: get_day
-        run: echo "day=$(date -d 'tomorrow' +'%a' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+        run: echo "day=$(date +'%a' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
       - uses: elastic/oblt-actions/oblt-cli/cluster-create-serverless@v1
+        id: create_serverless
         with:
           project-type: 'observability'
-          target: 'qa'
-          cluster-name-prefix: "ea-it-tests-${{ steps.get_day.outputs.day }}"
+          target: 'production'
+          cluster-name-prefix: "${{ env.PREFIX }}-${{ steps.get_day.outputs.day }}"
           github-token: ${{ steps.get_token.outputs.token }}
           gitops: true
           wait: '15'
 
+      # Authenticate to the elastic-observability to get the cluster credentials
+      - uses: elastic/oblt-actions/google/auth@v1
+
+      - uses: elastic/oblt-actions/oblt-cli/cluster-credentials@v1
+        with:
+          cluster-name: ${{ steps.create_serverless.outputs.cluster-name }}
+          github-token: ${{ steps.get_token.outputs.token }}
+
+      - name: Smoke test
+        run: curl -X GET ${ELASTICSEARCH_HOST}/_cat/indices?v -u ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}
+
+      # Authenticate to the elastic-observability-ci to rotate the cluster credentials
+      - uses: elastic/oblt-actions/google/auth@v1
+        with:
+          project-number: "911195782929"
+          project-id: "elastic-observability-ci"
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@77e7a554d41e2ee56fc945c52dfd3f33d12def9a
+
+      # While runnning this workflow, it might cause some hiccups if a PR runs when rotating the secrets
+      - name: Rotate GCSM secrets
+        env:
+          GCP_PROJECT: "elastic-observability-ci"
+        run: |
+          echo -n "${ELASTICSEARCH_HOST}" | gcloud secrets versions add "${PREFIX}-elasticsearch-hostname" --data-file=- --quiet --project "${GCP_PROJECT}"
+          echo -n "${ELASTICSEARCH_PASSWORD}" | gcloud secrets versions add "${PREFIX}-it-elasticsearch-password" --data-file=- --quiet --project "${GCP_PROJECT}"
+          echo -n "${ELASTICSEARCH_USERNAME}" | gcloud secrets versions add "${PREFIX}-it-elasticsearch-username" --data-file=- --quiet --project "${GCP_PROJECT}"
+          echo -n "${KIBANA_HOST}" | gcloud secrets versions add "${PREFIX}-kibana-hostname" --data-file=- --quiet --project "${GCP_PROJECT}"
+          echo -n "${KIBANA_USERNAME}" | gcloud secrets versions add "${PREFIX}-kibana-password" --data-file=- --quiet --project "${GCP_PROJECT}"
+          echo -n "${KIBANA_PASSWORD}" | gcloud secrets versions add "${PREFIX}-kibana-username" --data-file=- --quiet --project "${GCP_PROJECT}"
+
+      # TODO: if rotation fails then rollback to the previous cluster.
       - if: ${{ failure()  }}
         uses: elastic/oblt-actions/slack/send@v1
         env:
@@ -58,4 +95,4 @@ jobs:
         with:
           bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
           channel-id: "#ingest-notifications"
-          message: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@agent-team` please look what's going on <${{ env.JOB_URL }}|here>"
+          message: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@robots-ci` please look what's going on <${{ env.JOB_URL }}|here>"

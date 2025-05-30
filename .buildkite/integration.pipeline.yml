@@ -14,9 +14,16 @@ common:
         lifetime: 10800 # seconds
         project-id: "elastic-observability-ci"
         project-number: "911195782929"
-  - oblt_cli_plugin: &oblt_cli_plugin
-      elastic/oblt-cli#v0.1.0:
-        version-file: .tool-versions
+  - gcp_serverless_secrets_plugin: &gcp_serverless_secrets_plugin
+      avaly/gcp-secret-manager#v1.2.0:
+        env:
+          # These secrets are created in .github/workflows/serverless-project.yml
+          ELASTICSEARCH_HOST: ea-serverless-it-elasticsearch-hostname
+          ELASTICSEARCH_PASSWORD: ea-serverless-it-elasticsearch-password
+          ELASTICSEARCH_USERNAME: ea-serverless-it-elasticsearch-username
+          KIBANA_HOST: ea-serverless-kibana-hostname
+          KIBANA_USERNAME: ea-serverless-kibana-username
+          KIBANA_PASSWORD: ea-serverless-kibana-password
 
 steps:
   - group: "Integration tests: packaging"
@@ -196,11 +203,7 @@ steps:
       machineType: "n2-standard-8"
     plugins:
       - *google_oidc_plugin
-      - *oblt_cli_plugin
-    env:
-      # VAULT_GITHUB_TOKEN is the ephemeral GitHub secret token
-      # You need to configure the corresponding GitHubPermissionsSet in elastic/terrazzo
-      GITHUB_TOKEN: ${VAULT_GITHUB_TOKEN}
+      - *gcp_serverless_secrets_plugin
     retry:
       automatic:
         limit: 1
