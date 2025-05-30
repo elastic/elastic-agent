@@ -5,11 +5,13 @@
 package upgrade
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
@@ -20,6 +22,14 @@ import (
 )
 
 const markerFilename = ".update-marker"
+
+// UpgradeOutcome can have 2 values, UPGRADE by default and ROLLBACK when rollback was initiated manually
+type UpgradeOutcome int
+
+const (
+	OUTCOME_UPGRADE UpgradeOutcome = iota
+	OUTCOME_ROLLBACK
+)
 
 // UpdateMarker is a marker holding necessary information about ongoing upgrade.
 type UpdateMarker struct {
@@ -45,6 +55,8 @@ type UpdateMarker struct {
 	Action *fleetapi.ActionUpgrade `json:"action" yaml:"action"`
 
 	Details *details.Details `json:"details,omitempty" yaml:"details,omitempty"`
+
+	DesiredOutcome UpgradeOutcome `json:"desired_outcome" yaml:"desired_outcome"`
 }
 
 // GetActionID returns the Fleet Action ID associated with the
@@ -101,6 +113,7 @@ type updateMarkerSerializer struct {
 	Acked             bool                 `yaml:"acked"`
 	Action            *MarkerActionUpgrade `yaml:"action"`
 	Details           *details.Details     `yaml:"details"`
+	DesiredOutcome    UpgradeOutcome       `yaml:"desired_outcome"`
 }
 
 func newMarkerSerializer(m *UpdateMarker) *updateMarkerSerializer {
@@ -115,7 +128,65 @@ func newMarkerSerializer(m *UpdateMarker) *updateMarkerSerializer {
 		Acked:             m.Acked,
 		Action:            convertToMarkerAction(m.Action),
 		Details:           m.Details,
+		DesiredOutcome:    m.DesiredOutcome,
 	}
+}
+
+func (o UpgradeOutcome) String() string {
+	switch o {
+	case OUTCOME_UPGRADE:
+		return "UPGRADE"
+	case OUTCOME_ROLLBACK:
+		return "ROLLBACK"
+	default:
+		return ""
+	}
+}
+
+// JSON marshaling
+func (o UpgradeOutcome) MarshalJSON() ([]byte, error) {
+	return json.Marshal(o.String())
+}
+
+func (o *UpgradeOutcome) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	switch s {
+	case "UPGRADE":
+		*o = OUTCOME_UPGRADE
+	case "ROLLBACK":
+		*o = OUTCOME_ROLLBACK
+	case "":
+		*o = OUTCOME_UPGRADE
+	default:
+		return fmt.Errorf("invalid Operation: %s", s)
+	}
+	return nil
+}
+
+// YAML marshaling
+func (o UpgradeOutcome) MarshalYAML() (interface{}, error) {
+	return o.String(), nil
+}
+
+func (o *UpgradeOutcome) UnmarshalYAML(value *yaml.Node) error {
+	var s string
+	if err := value.Decode(&s); err != nil {
+		return err
+	}
+	switch s {
+	case "UPGRADE":
+		*o = OUTCOME_UPGRADE
+	case "ROLLBACK":
+		*o = OUTCOME_ROLLBACK
+	case "":
+		*o = OUTCOME_UPGRADE
+	default:
+		return fmt.Errorf("invalid UpgradeOutcome: %s", s)
+	}
+	return nil
 }
 
 type agentInstall struct {
@@ -126,7 +197,7 @@ type agentInstall struct {
 }
 
 // markUpgrade marks update happened so we can handle grace period
-func markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details) error {
+func markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, desiredOutcome UpgradeOutcome) error {
 
 	if len(previousAgent.hash) > hashLen {
 		previousAgent.hash = previousAgent.hash[:hashLen]
@@ -142,6 +213,7 @@ func markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent ag
 		PrevVersionedHome: previousAgent.versionedHome,
 		Action:            action,
 		Details:           upgradeDetails,
+		DesiredOutcome:    desiredOutcome,
 	}
 
 	markerBytes, err := yaml.Marshal(newMarkerSerializer(marker))
@@ -216,6 +288,7 @@ func loadMarker(markerFile string) (*UpdateMarker, error) {
 		Acked:             marker.Acked,
 		Action:            convertToActionUpgrade(marker.Action),
 		Details:           marker.Details,
+		DesiredOutcome:    marker.DesiredOutcome,
 	}, nil
 }
 
@@ -223,6 +296,10 @@ func loadMarker(markerFile string) (*UpdateMarker, error) {
 // For critical upgrade transitions, pass shouldFsync as true so the marker
 // file is immediately flushed to persistent storage.
 func SaveMarker(marker *UpdateMarker, shouldFsync bool) error {
+	return saveMarkerToPath(marker, markerFilePath(paths.Data()), shouldFsync)
+}
+
+func saveMarkerToPath(marker *UpdateMarker, markerFile string, shouldFsync bool) error {
 	makerSerializer := &updateMarkerSerializer{
 		Version:           marker.Version,
 		Hash:              marker.Hash,
@@ -234,13 +311,14 @@ func SaveMarker(marker *UpdateMarker, shouldFsync bool) error {
 		Acked:             marker.Acked,
 		Action:            convertToMarkerAction(marker.Action),
 		Details:           marker.Details,
+		DesiredOutcome:    marker.DesiredOutcome,
 	}
 	markerBytes, err := yaml.Marshal(makerSerializer)
 	if err != nil {
 		return err
 	}
 
-	return writeMarkerFile(markerFilePath(paths.Data()), markerBytes, shouldFsync)
+	return writeMarkerFile(markerFile, markerBytes, shouldFsync)
 }
 
 func markerFilePath(dataDirPath string) string {
