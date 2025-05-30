@@ -1680,7 +1680,7 @@ func AssertMapstrKeysEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string
 		flatM2[k] = ""
 	}
 
-	require.Zero(t, cmp.Diff(flatM1, flatM2), "expected keys of maps to be equal")
+	require.Zero(t, cmp.Diff(flatM1, flatM2), msg)
 }
 
 func TestFBOtelRestartE2E(t *testing.T) {

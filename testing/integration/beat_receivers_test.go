@@ -14,14 +14,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
+	"gopkg.in/yaml.v2"
+
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
-	"github.com/gofrs/uuid/v5"
-	"gopkg.in/yaml.v2"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -248,8 +249,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, ".ds-"+index+"*", info.ESClient)
 				require.NoError(t, err)
 				if docs.Hits.Total.Value != 0 {
-					key := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
-					agentDocs[key] = docs
+					agentDocs[index] = docs
 				}
 				return docs.Hits.Total.Value > 0
 			},
