@@ -1517,8 +1517,7 @@ func k8sStepDeployKustomize(kustomizePath string, containerName string, override
 				}
 
 				if overrides.agentContainerArgs != nil {
-					// drop arguments overriding default config
-					container.Args = []string{}
+					container.Args = overrides.agentContainerArgs
 				}
 			},
 			func(pod *corev1.PodSpec) {
