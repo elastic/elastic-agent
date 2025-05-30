@@ -68,7 +68,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 			dsType:          "metrics",
 			dsDataset:       "elastic_agent.filebeat",
 			dsNamespace:     info.Namespace,
-			query:           map[string]any{"exists": map[string]any{"field": "beat.stats.system.cpu.cores"}},
+			query:           map[string]any{"exists": map[string]any{"field": "beat.stats.libbeat.pipeline.queue.acked"}},
 			onlyCompareKeys: true,
 			ignoreFields: []string{
 				// all process related metrics are dropped for beatreceivers
@@ -85,7 +85,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 			dsType:          "metrics",
 			dsDataset:       "elastic_agent.metricbeat",
 			dsNamespace:     info.Namespace,
-			query:           map[string]any{"exists": map[string]any{"field": "beat.stats.system.cpu.cores"}},
+			query:           map[string]any{"exists": map[string]any{"field": "beat.stats.libbeat.pipeline.queue.acked"}},
 			onlyCompareKeys: true,
 			ignoreFields: []string{
 				//  all process related metrics are dropped for beatreceivers
