@@ -43,8 +43,6 @@ const (
 	defaultFleetServerPort         = 8220
 	defaultFleetServerInternalHost = "localhost"
 	defaultFleetServerInternalPort = 8221
-	enrollBackoffInit              = time.Second * 5
-	enrollBackoffMax               = time.Minute * 10
 )
 
 var (
@@ -81,7 +79,7 @@ func newEnrollCmd(
 ) (*enrollCmd, error) {
 	if backoffFactory == nil {
 		backoffFactory = func(done <-chan struct{}) backoff.Backoff {
-			return backoff.NewEqualJitterBackoff(done, enrollBackoffInit, enrollBackoffMax)
+			return backoff.NewEqualJitterBackoff(done, enroll.EnrollBackoffInit, enroll.EnrollBackoffMax)
 		}
 	}
 	return &enrollCmd{

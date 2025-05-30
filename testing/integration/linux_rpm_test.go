@@ -9,16 +9,17 @@ package integration
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
+
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/version"
-	"github.com/elastic/elastic-agent/testing/upgradetest"
-
-	"github.com/gofrs/uuid/v5"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 
@@ -186,9 +187,9 @@ func TestRpmFleetUpgrade(t *testing.T) {
 		installingServers  bool
 		expectingServers   bool
 	}{
-		{"legacy installation", version.NewParsedSemVer(8, 17, 3, "", ""), false, true},      // in case of legacy we don't apply flavor, expecting all to be preserved
-		{"9.0 snapshot with basic flavor", upgradetest.Version_9_0_0_SNAPSHOT, false, false}, // TODO: replace with PreviousMinor once 9.1 is released
-		{"9.0 snapshot with servers flavor", upgradetest.Version_9_0_0_SNAPSHOT, true, true}, // TODO: replace with PreviousMinor once 9.1 is released
+		{"legacy installation", version.NewParsedSemVer(8, 17, 3, "", ""), false, true},   // in case of legacy we don't apply flavor, expecting all to be preserved
+		{"9.0 with basic flavor", version.NewParsedSemVer(9, 0, 0, "", ""), false, false}, // TODO: 9.0.0 is the first version to support installing servers. when 9.1.0 is released, this can be replaced by upgradetest.PreviousMinor()
+		{"9.0 with servers flavor", version.NewParsedSemVer(9, 0, 0, "", ""), true, true}, // TODO: 9.0.0 is the first version to support installing servers. when 9.1.0 is released, this can be replaced by upgradetest.PreviousMinor()
 	}
 
 	currentVersion, err := version.ParseVersion(define.Version())
@@ -264,11 +265,26 @@ func testRpmUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info
 
 	check.ConnectedToFleet(ctx, t, startFixture, 5*time.Minute)
 
+	const migrationMarkerFile = "migration_marker.file"
+	runDir, err := atesting.FindRunDir(startFixture)
+	require.NoError(t, err, "failed at getting run dir")
+
+	runMigrationMarker := filepath.Join(runDir, migrationMarkerFile)
+	f, err := os.Create(runMigrationMarker)
+	require.NoErrorf(t, err, "failed to create %q file", runMigrationMarker)
+	_ = f.Close()
+
 	// 3. Upgrade rpm to the build version
 	srcPackage, err := endFixture.SrcPackage(ctx)
 	require.NoError(t, err)
 	out, err := exec.CommandContext(ctx, "sudo", "rpm", "-U", "-v", srcPackage).CombinedOutput() // #nosec G204 -- Need to pass in name of package
 	require.NoError(t, err, string(out))
+
+	newRunDir, err := atesting.FindRunDir(endFixture)
+	require.NoError(t, err, "failed at getting run dir")
+	require.NotEqual(t, runDir, newRunDir, "the run dirs from upgrade should not match")
+	newRunMigrationMarker := filepath.Join(newRunDir, migrationMarkerFile)
+	require.FileExistsf(t, newRunMigrationMarker, "%q is missing", newRunMigrationMarker)
 
 	// 4. Wait for version in Fleet to match
 	// Fleet will not include the `-SNAPSHOT` in the `GetAgentVersion` result
