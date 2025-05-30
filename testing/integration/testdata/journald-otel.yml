@@ -1,0 +1,37 @@
+receivers:
+  filebeatreceiver:
+    filebeat:
+      inputs:
+        - type: journald
+          id: journald-input
+          paths:
+            - /opt/journal/*/*
+    output:
+      otelconsumer:
+    logging:
+      level: debug
+      selectors:
+        - '*'
+
+processors:
+  resource:
+    attributes:
+    - key: journald-test
+      action: insert
+      value: true
+    - key: data_stream.namespace
+      action: insert
+      value: "${EA_POLICY_NAMESPACE}"
+
+exporters:
+  elasticsearch:
+    endpoint: "${ES_HOST}"
+    api_key: "${ES_API_KEY_ENCODED}"
+
+service:
+  pipelines:
+    logs:
+      receivers: [filebeatreceiver]
+      processors: [resource]
+      exporters:
+        - elasticsearch

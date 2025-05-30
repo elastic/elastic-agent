@@ -13,7 +13,6 @@ import (
 	"slices"
 	"text/template"
 
-	"github.com/magefile/mage/mg"
 	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
@@ -219,9 +218,6 @@ func parsePackageSettings(r io.Reader) (*packagesConfig, error) {
 		return nil, fmt.Errorf("unmarshalling package spec yaml: %w", err)
 	}
 
-	if mg.Verbose() {
-		log.Printf("Read packages config: %+v", packagesConf)
-	}
 	return packagesConf, nil
 }
 
