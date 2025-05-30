@@ -279,6 +279,7 @@ func Test_markUpgradeLocking(t *testing.T) {
 		previousAgent  agentInstall
 		action         *fleetapi.ActionUpgrade
 		upgradeDetails *details.Details
+		desiredOutcome UpgradeOutcome
 	}
 
 	newAgent456 := agentInstall{
@@ -431,7 +432,7 @@ func Test_markUpgradeLocking(t *testing.T) {
 			if tt.beforeUpdateMarkerCreation != nil {
 				tt.beforeUpdateMarkerCreation(t, tmpDataDir)
 			}
-			tt.wantErr(t, markUpgrade(logger, tmpDataDir, tt.args.agent, tt.args.previousAgent, tt.args.action, tt.args.upgradeDetails), fmt.Sprintf("markUpgrade(%v, %v, %v, %v, %v, %v)", logger, tmpDataDir, tt.args.agent, tt.args.previousAgent, tt.args.action, tt.args.upgradeDetails))
+			tt.wantErr(t, markUpgrade(logger, tmpDataDir, tt.args.agent, tt.args.previousAgent, tt.args.action, tt.args.upgradeDetails, tt.args.desiredOutcome), fmt.Sprintf("markUpgrade(%v, %v, %v, %v, %v, %v, %v)", logger, tmpDataDir, tt.args.agent, tt.args.previousAgent, tt.args.action, tt.args.upgradeDetails, tt.args.desiredOutcome))
 			if tt.afterUpdateMarkerCreation != nil {
 				tt.afterUpdateMarkerCreation(t, tmpDataDir)
 			}
