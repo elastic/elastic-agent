@@ -127,6 +127,10 @@ func NewWithConfig(log *logger.Logger, cfg Config, wrapper wrapperFunc) (*Client
 			return nil, err
 		}
 
+		if cfg.Headers != nil {
+			transport = &headersRoundTripper{rt: transport, headers: cfg.Headers}
+		}
+
 		if wrapper != nil {
 			transport, err = wrapper(transport)
 			if err != nil {
@@ -344,4 +348,16 @@ func (r requestClient) newRequest(method string, path string, params url.Values,
 	newPath := strings.Join([]string{r.host, path, "?", params.Encode()}, "")
 
 	return http.NewRequestWithContext(context.TODO(), method, newPath, body)
+}
+
+type headersRoundTripper struct {
+	rt      http.RoundTripper
+	headers map[string]string
+}
+
+func (r *headersRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	for key, value := range r.headers {
+		req.Header.Set(key, value)
+	}
+	return r.rt.RoundTrip(req)
 }
