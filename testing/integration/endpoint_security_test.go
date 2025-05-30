@@ -164,8 +164,9 @@ func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageF
 	t.Log("Updating the policy to set \"is_protected\" to true")
 	_, err = info.KibanaClient.UpdatePolicy(ctx, policyResp.ID, updateReq)
 
-	t.Log("Get the policy uinstall token and store it in the fixture")
-	tools.SetPolicyUninstallTokenInFixture(ctx, t, info.KibanaClient, startFixture, policyResp.ID)
+	t.Log("Get the policy uninstall token")
+	uninstallToken, err := tools.GetUninstallToken(ctx, info.KibanaClient, policyResp.ID)
+	require.NoError(t, err)
 
 	opts := atesting.InstallOpts{}
 	t.Log("Install and enroll the first agent")
@@ -191,10 +192,10 @@ func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageF
 		uninstallContext, uninstallCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer uninstallCancel()
 
-		t.Logf("Uninstalling endpoint with the following uinstall token: %s", startFixture.UninstallToken())
-		_, err = exec.CommandContext(uninstallContext, "/opt/Elastic/Endpoint/elastic-endpoint", "uninstall", "--uninstall-token", startFixture.UninstallToken()).CombinedOutput()
+		t.Logf("Uninstalling endpoint with the following uinstall token: %s", uninstallToken)
+		_, err = exec.CommandContext(uninstallContext, "/opt/Elastic/Endpoint/elastic-endpoint", "uninstall", "--uninstall-token", uninstallToken).CombinedOutput()
 		if err != nil {
-			t.Logf("error when cleaning up elastic-endpoint: uninstall token %s", startFixture.UninstallToken())
+			t.Logf("error when cleaning up elastic-endpoint: uninstall token %s", uninstallToken)
 			t.FailNow()
 		}
 
@@ -217,10 +218,10 @@ func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageF
 	initEndpointVersion := getEndpointVersion(t)
 	t.Logf("The initial endpoint version is %s", initEndpointVersion)
 
-	// try to uninstall endpoint without token and assert that endpoint is not removed
-	_, err = exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "uninstall", "--log", "stdout").CombinedOutput()
-	require.Error(t, err)
-	t.Log("Tamper protection for the initial installation of the endpoint is enabled")
+	// try to uninstall the agent without a token and assert failure
+	_, err = exec.Command("sudo", "elastic-agent", "uninstall", "-y").CombinedOutput()
+	require.Error(t, err, "uninstalling agent without a token should fail because of tamper protection")
+	t.Log("Tamper protection for the initial installation of the agent is enabled")
 
 	t.Log("Setup agent fixture witht the test build")
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat(packageFormat))
@@ -257,18 +258,20 @@ func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageF
 	t.Logf("Comparing start version %s to upgraded version %s", startEndpointVersion.String(), parsedUpgradedVersion.String())
 	require.True(t, startEndpointVersion.Less(*parsedUpgradedVersion))
 
-	// try to uninstall endpoint without token and assert that endpoint is not removed
-	_, err = exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "uninstall", "--log", "stdout").CombinedOutput()
+	// try to uninstall the agent without token and assert that endpoint is not removed
+	t.Log("trying to uinstall without token, expecting error")
+	_, err = exec.Command("sudo", "elastic-agent", "uninstall", "-f").CombinedOutput()
+	require.Error(t, err, "uninstalling agent without a token should fail because of tamper protection")
+	t.Log("tamper protection for the upgraded agent is enabled")
+
+	// uninstall with the uninstall token and assert that endpoint is indeed removed.
+	t.Log("trying to uinstall with token, not expecting any error")
+	out, err := exec.Command("sudo", "elastic-agent", "uninstall", "-f", "--uninstall-token", uninstallToken).CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	_, err = exec.LookPath("elastic-agent")
 	require.Error(t, err)
-	t.Log("tamper protection for the upgraded endpoint is enabled")
 
-	// uninstall with the uninstall token and assert that endpoint is indeed
-	// removed. The uninstall token for both of the fixtures is the same
-	_, err = exec.Command("/opt/Elastic/Endpoint/elastic-endpoint", "uninstall", "--uninstall-token", startFixture.UninstallToken()).CombinedOutput()
-	require.NoError(t, err)
-
-	_, err = os.Stat("/opt/Elastic/Endpoint/elastic-endpoint")
-	require.True(t, os.IsNotExist(err))
 	t.Log("successfully uninstalled endpoint using the uninstall token")
 }
 
@@ -385,11 +388,11 @@ func installSecurityAgent(ctx context.Context, t *testing.T, info *define.Info, 
 		Privileged:     true,
 	}
 
-	policy, err := tools.InstallAgentWithPolicy(ctx, t,
+	policy, agentID, err := tools.InstallAgentWithPolicy(ctx, t,
 		installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoError(t, err, "failed to install agent with policy")
 
-	return fixture, policy
+	return fixture, policy, agentID
 }
 
 // buildPolicyWithTamperProtection helper function to build the policy request with or without tamper protection
