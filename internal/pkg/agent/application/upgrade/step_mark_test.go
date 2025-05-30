@@ -423,7 +423,7 @@ func Test_markUpgradeLocking(t *testing.T) {
 			afterUpdateMarkerCreation: func(t *testing.T, dataDir string) {
 				// verify we can't read the actual update marker since it's still locked
 				_, err := LoadMarker(dataDir)
-				require.Error(t, err, "loading update marker should fail")
+				assert.Error(t, err, "loading update marker should fail")
 			},
 			wantErr: assert.Error,
 		},
