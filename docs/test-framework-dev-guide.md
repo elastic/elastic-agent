@@ -85,7 +85,8 @@ between, and it can be very specific or not very specific.
 - `TEST_PLATFORMS="linux/amd64 windows/amd64/2022 mage integration:test` to execute tests on Linux AMD64 and Windows Server 2022.
 - `TEST_PLATFORMS="kubernetes/arm64/1.33.0/wolfi" mage integration:kubernetes` to execute kubernetes tests on Kubernetes version 1.33.0 with wolfi docker variant.
 
-> **_NOTE:_**  This only filters down the tests based on the platform. It will not execute a tests on a platform unless
+> [!NOTE]
+> This only filters down the tests based on the platform. It will not execute a tests on a platform unless
 > the test defines as supporting it.
 
 #### Selecting specific group
@@ -306,8 +307,11 @@ EXTERNAL=true PLATFORMS=darwin/arm64 mage package
 ```
 3. Run integration tests as per [the instructions](#running-the-tests)
 
-**_NOTE:_**: Make sure you add an absolute path in replace
-**_NOTE:_**: Old agent might be cached at `.agent-testing` directory. Run `mage integration:clean` to clean it.
+> [!NOTE]
+> Make sure you add an absolute path in replace directive
+
+> [!NOTE]
+> Old agent might be cached at `.agent-testing` directory. Run `mage integration:clean` to clean it.
 
 ## Writing tests
 
