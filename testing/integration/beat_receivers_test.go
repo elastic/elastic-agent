@@ -239,6 +239,9 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 							"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestamp}}},
 						},
 					},
+					"sort": []map[string]any{
+						{"@timestamp": map[string]any{"order": "asc"}},
+					},
 				}
 
 				index := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
