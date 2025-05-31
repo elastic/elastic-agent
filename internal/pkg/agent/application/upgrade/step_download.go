@@ -50,7 +50,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 	pgpBytes = u.appendFallbackPGP(parsedVersion, pgpBytes)
 
 	// do not update source config
-	settings := *u.settings
+	settings := *u.downloadSettings
 	var downloaderFunc downloader
 	var factory downloaderFactory
 	var verifier download.Verifier

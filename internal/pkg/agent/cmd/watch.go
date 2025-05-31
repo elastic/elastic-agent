@@ -33,8 +33,9 @@ import (
 )
 
 const (
-	watcherName     = "elastic-agent-watcher"
-	watcherLockFile = "watcher.lock"
+	watcherName        = "elastic-agent-watcher"
+	watcherLockFile    = "watcher.lock"
+	flagRollbackWindow = "rollback-window"
 )
 
 func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -42,7 +43,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 		Use:   "watch",
 		Short: "Watch the Elastic Agent for failures and initiate rollback",
 		Long:  `This command watches Elastic Agent for failures and initiates rollback if necessary.`,
-		Run: func(_ *cobra.Command, _ []string) {
+		Run: func(c *cobra.Command, _ []string) {
 			cfg := getConfig(streams)
 			log, err := configuredLogger(cfg, watcherName)
 			if err != nil {
@@ -53,7 +54,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 			// Make sure to flush any buffered logs before we're done.
 			defer log.Sync() //nolint:errcheck // flushing buffered logs is best effort.
 
-			if err := watchCmd(log, cfg); err != nil {
+			if err := watchCmd(c, log, cfg); err != nil {
 				log.Errorw("Watch command failed", "error.message", err)
 				fmt.Fprintf(streams.Err, "Watch command failed: %v\n%s\n", err, troubleshootMessage())
 				os.Exit(4)
@@ -61,10 +62,12 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 		},
 	}
 
+	cmd.Flags().DurationP(flagRollbackWindow, "", configuration.DefaultRollbackWindowDuration, "Duration in which Agent may be manually rolled back")
+
 	return cmd
 }
 
-func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
+func watchCmd(cmd *cobra.Command, log *logp.Logger, cfg *configuration.Configuration) error {
 	log.Infow("Upgrade Watcher started", "process.pid", os.Getpid(), "agent.version", version.GetAgentPackageVersion())
 	marker, err := upgrade.LoadMarker(paths.Data())
 	if err != nil {
@@ -92,6 +95,12 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 	defer func() {
 		_ = locker.Unlock()
 	}()
+
+	rollbackWindow, err := cmd.Flags().GetDuration(flagRollbackWindow)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve %s flag value while watching the agent upgrade: %w", flagRollbackWindow, err)
+	}
+	_ = rollbackWindow // TODO: use rollbackWindow when https://github.com/elastic/elastic-agent/issues/6884 is implemented
 
 	isWithinGrace, tilGrace := gracePeriod(marker, cfg.Settings.Upgrade.Watcher.GracePeriod)
 	if !isWithinGrace {
