@@ -176,14 +176,16 @@ func getLevel(evt map[string]interface{}, key string) zapcore.Level {
 }
 
 func unmarshalLevel(lvl *zapcore.Level, val string) error {
-	if val == "" {
+	switch val {
+	case "":
 		return errors.New("empty val")
-	} else if val == "trace" {
+	case "trace":
 		// zap doesn't handle trace level we cast to debug
 		*lvl = zapcore.DebugLevel
 		return nil
+	default:
+		return lvl.UnmarshalText([]byte(val))
 	}
-	return lvl.UnmarshalText([]byte(val))
 }
 
 func getMessage(evt map[string]interface{}, key string) string {
