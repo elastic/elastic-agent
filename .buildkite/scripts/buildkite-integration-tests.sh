@@ -14,6 +14,11 @@ if [ -z "$TEST_SUDO" ]; then
   exit 1
 fi
 
+if [ "${FIPS:-false}" == "true" ]; then
+  echo "~~~FIPS: Checking msft-go is installed"
+  GOEXPERIMENT=systemcrypto go version
+fi
+
 if [ "$TEST_SUDO" == "true" ]; then
   echo "Re-initializing ASDF. The user is changed to root..."
   export ASDF_DATA_DIR="/opt/buildkite-agent/.asdf"
@@ -66,7 +71,7 @@ TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true 
     -tags integration -test.shuffle on -test.timeout 2h0m0s \
     github.com/elastic/elastic-agent/testing/integration \
     -v \
-    -args -integration.groups="${GROUP_NAME}" -integration.sudo="${TEST_SUDO}" -integration.fips="${FIPS:-false}"
+    -args -integration.groups="${GROUP_NAME}" -integration.sudo="${TEST_SUDO}" -integration.fips="${FIPS-:false}"
 
 TESTS_EXIT_STATUS=$?
 set -e
