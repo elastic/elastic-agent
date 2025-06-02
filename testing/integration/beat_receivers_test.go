@@ -292,27 +292,18 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		assert.NoError(collect, statusErr)
 		// agent should be healthy
 		assert.Equal(collect, int(cproto.State_HEALTHY), status.State)
-		// we should have no normal components running
-		assert.Zero(collect, len(status.Components))
+		// we should have 3 components running: filestream-monitoring, http/metrics-monitoring and beats/metrics-monitoring
+		assert.Equal(collect, 3, len(status.Components))
 
-		// we should have filebeatreceiver and metricbeatreceiver running
-		otelCollectorStatus := status.Collector
-		require.NotNil(collect, otelCollectorStatus)
-		assert.Equal(collect, int(cproto.CollectorComponentStatus_StatusOK), otelCollectorStatus.Status)
-		pipelineStatusMap := otelCollectorStatus.ComponentStatusMap
-
-		// we should have 3 pipelines running: filestream for logs, http metrics and beats metrics
-		assert.Equal(collect, 3, len(pipelineStatusMap))
-
-		fileStreamPipeline := "pipeline:logs/_agent-component/filestream-monitoring"
-		httpMetricsPipeline := "pipeline:logs/_agent-component/http/metrics-monitoring"
-		beatsMetricsPipeline := "pipeline:logs/_agent-component/beat/metrics-monitoring"
-		assert.Contains(collect, pipelineStatusMap, fileStreamPipeline)
-		assert.Contains(collect, pipelineStatusMap, httpMetricsPipeline)
-		assert.Contains(collect, pipelineStatusMap, beatsMetricsPipeline)
-
-		// and all the components should be healthy
-		assertCollectorComponentsHealthy(collect, otelCollectorStatus)
+		// all the components should be healthy, their units should be healthy, and should identify themselves
+		// as beats receivers via their version info
+		for _, component := range status.Components {
+			assert.Equal(collect, int(cproto.State_HEALTHY), component.State)
+			assert.Equal(collect, "beats-receiver", component.VersionInfo.Name)
+			for _, unit := range component.Units {
+				assert.Equal(collect, int(cproto.State_HEALTHY), unit.State)
+			}
+		}
 
 		return
 	}, 1*time.Minute, 1*time.Second)
