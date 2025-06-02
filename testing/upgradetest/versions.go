@@ -199,8 +199,8 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 		case !version.Less(*parsedUpgradeToVersion):
 			continue
 
-		// same major, same minor, less or equal patch
-		case version.Major() == parsedUpgradeToVersion.Major() && version.Minor() == parsedUpgradeToVersion.Minor() && version.Patch() <= parsedUpgradeToVersion.Patch():
+		// never test upgrades if only the patch version changed
+		case version.Major() == parsedUpgradeToVersion.Major() && version.Minor() == parsedUpgradeToVersion.Minor():
 			continue
 
 		case recentSnapshotsToFind > 0 && version.IsSnapshot():
