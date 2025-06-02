@@ -106,6 +106,17 @@ func getEndpointVersion(t *testing.T) string {
 	return endpointVersion
 }
 
+func getInstallCommand(ctx context.Context, packageFormat string, srcPkg string) (*exec.Cmd, error) {
+	switch packageFormat {
+	case "deb":
+		return exec.CommandContext(ctx, "sudo", "DEBIAN_FRONTEND=noninteractive", "apt-get", "-y", "-q", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold", "install", srcPkg), nil
+	case "rpm":
+		return exec.CommandContext(ctx, "sudo", "rpm", "-Uvh", srcPkg), nil
+	default:
+		return nil, fmt.Errorf("unknown package format for install command: %s", packageFormat)
+	}
+}
+
 // The steps in this test are the following
 // * Prepare a fixture with an older version of the agent
 // * Create a generic policy
@@ -195,8 +206,7 @@ func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageF
 		t.Logf("Uninstalling endpoint with the following uinstall token: %s", uninstallToken)
 		_, err = exec.CommandContext(uninstallContext, "/opt/Elastic/Endpoint/elastic-endpoint", "uninstall", "--uninstall-token", uninstallToken).CombinedOutput()
 		if err != nil {
-			t.Logf("error when cleaning up elastic-endpoint: uninstall token %s", uninstallToken)
-			t.FailNow()
+			t.Fatalf("error when cleaning up elastic-endpoint: uninstall token %s", uninstallToken)
 		}
 
 		t.Log("Endpoint is successfully uninstalled by the cleanup function")
@@ -228,9 +238,19 @@ func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageF
 	require.NoError(t, err)
 	fixture.Prepare(ctx)
 
-	t.Log("Installing the second agent, upgrading from the older version")
-	_, err = fixture.SimpleInstall(ctx)
+	t.Log("Getting source package")
+	srcPkg, err := fixture.SrcPackage(ctx)
 	require.NoError(t, err)
+
+	t.Log("Installing the second agent, upgrading from the older version")
+	installCmd, err := getInstallCommand(ctx, fixture.PackageFormat(), srcPkg)
+	require.NoError(t, err)
+
+	out, err := installCmd.CombinedOutput()
+	t.Log(string(out))
+	require.NoError(t, err, "agent installation with package manager should not fail")
+
+	fixture.SetClient()
 
 	upgradedAgentClient := fixture.Client()
 	err = upgradedAgentClient.Connect(ctx)
@@ -266,7 +286,7 @@ func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageF
 
 	// uninstall with the uninstall token and assert that endpoint is indeed removed.
 	t.Log("trying to uinstall with token, not expecting any error")
-	out, err := exec.Command("sudo", "elastic-agent", "uninstall", "-f", "--uninstall-token", uninstallToken).CombinedOutput()
+	out, err = exec.Command("sudo", "elastic-agent", "uninstall", "-f", "--uninstall-token", uninstallToken).CombinedOutput()
 	require.NoError(t, err, string(out))
 
 	_, err = exec.LookPath("elastic-agent")
