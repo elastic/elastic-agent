@@ -16,15 +16,13 @@ permissions:
 jobs:
   create-serverless:
     permissions:
-      # TODO: test without a checkout step
-      #contents: read
+      contents: read
       id-token: write
     runs-on: ubuntu-latest
     env:
       PREFIX: "ea-serverless-it"
     steps:
-      # TODO: test without a checkout step
-      #- uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Get token
         id: get_token
@@ -41,10 +39,9 @@ jobs:
           repositories: >-
             ["observability-test-environments"]
 
-      # TODO: test without a checkout step
-      #- uses: elastic/oblt-actions/git/setup@v1
-      #  with:
-      #    github-token: ${{ steps.get_token.outputs.token }}
+      - uses: elastic/oblt-actions/git/setup@v1
+        with:
+          github-token: ${{ steps.get_token.outputs.token }}
 
       - name: Get day of the week
         id: get_day
