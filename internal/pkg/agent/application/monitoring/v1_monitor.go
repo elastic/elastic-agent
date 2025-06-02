@@ -129,9 +129,15 @@ func (b *BeatsMonitor) Reload(rawConfig *config.Config) error {
 		return nil
 	}
 
-	if err := rawConfig.UnpackTo(&b.config); err != nil {
+	newConfig := monitoringConfig{
+		C: monitoringCfg.DefaultConfig(),
+	}
+
+	if err := rawConfig.UnpackTo(&newConfig); err != nil {
 		return errors.New(err, "failed to unpack monitoring config during reload")
 	}
+
+	b.config = &newConfig
 	return nil
 }
 
@@ -451,6 +457,7 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentInfo
 		useOutputKey: monitoringOutput,
 		"streams":    streams,
 	}
+
 	// Make sure we don't set anything until the configuration is stable if the otel manager isn't enabled
 	if b.config.C.RuntimeManager != monitoringCfg.DefaultRuntimeManager {
 		input["_runtime_experimental"] = b.config.C.RuntimeManager
@@ -670,26 +677,28 @@ func (b *BeatsMonitor) getHttpStreams(
 		endpoints := []interface{}{prefixedEndpoint(utils.SocketURLWithFallback(compInfo.ID, paths.TempDir()))}
 		name := sanitizeName(binaryName)
 
-		httpStream := map[string]interface{}{
-			idKey: fmt.Sprintf("%s-%s-1", monitoringMetricsUnitID, name),
-			"data_stream": map[string]interface{}{
-				"type":      "metrics",
-				"dataset":   dataset,
-				"namespace": monitoringNamespace,
-			},
-			"metricsets": []interface{}{"json"},
-			"hosts":      endpoints,
-			"path":       "/stats",
-			"namespace":  "agent",
-			"period":     metricsCollectionIntervalString,
-			"index":      indexName,
-			"processors": processorsForHttpStream(binaryName, compInfo.ID, dataset, b.agentInfo, compInfo.RuntimeManager),
+		// Do not create http streams if runtime-manager is otel and binary is of beat type
+		if compInfo.RuntimeManager != component.OtelRuntimeManager || !strings.HasSuffix(binaryName, "beat") {
+			httpStream := map[string]interface{}{
+				idKey: fmt.Sprintf("%s-%s-1", monitoringMetricsUnitID, name),
+				"data_stream": map[string]interface{}{
+					"type":      "metrics",
+					"dataset":   dataset,
+					"namespace": monitoringNamespace,
+				},
+				"metricsets": []interface{}{"json"},
+				"hosts":      endpoints,
+				"path":       "/stats",
+				"namespace":  "agent",
+				"period":     metricsCollectionIntervalString,
+				"index":      indexName,
+				"processors": processorsForHttpStream(binaryName, compInfo.ID, dataset, b.agentInfo, compInfo.RuntimeManager),
+			}
+			if failureThreshold != nil {
+				httpStream[failureThresholdKey] = *failureThreshold
+			}
+			httpStreams = append(httpStreams, httpStream)
 		}
-		if failureThreshold != nil {
-			httpStream[failureThresholdKey] = *failureThreshold
-		}
-		httpStreams = append(httpStreams, httpStream)
-
 		// specifically for filebeat, we include input metrics
 		// disabled for filebeat receiver until https://github.com/elastic/beats/issues/43418 is resolved
 		if strings.EqualFold(name, "filebeat") && compInfo.RuntimeManager != component.OtelRuntimeManager {
@@ -1262,7 +1271,7 @@ func httpCopyRules() []interface{} {
 			"to":   "system.process.memory.size",
 		},
 
-		// I should be able to see fd usage. Am I keep too many files open?
+		// I should be able to see fd usage. Am I keeping too many files open?
 		map[string]interface{}{
 			"from": "http.agent.beat.handles",
 			"to":   "system.process.fd",

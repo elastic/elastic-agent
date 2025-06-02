@@ -334,7 +334,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		paths.Data(), // data dir to place the marker in
 		current,      // new agent version data
 		previous,     // old agent version data
-		action, det); err != nil {
+		action, det, OUTCOME_UPGRADE); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
 		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
 		return nil, goerrors.Join(err, rollbackErr)

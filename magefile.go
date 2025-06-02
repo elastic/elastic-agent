@@ -66,6 +66,8 @@ import (
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
 	// mage:import
 	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/integtest/notests"
+	// mage:import update
+	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/update"
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
 
