@@ -296,8 +296,8 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		assert.Equal(collect, int(cproto.CollectorComponentStatus_StatusOK), otelCollectorStatus.Status)
 		pipelineStatusMap := otelCollectorStatus.ComponentStatusMap
 
-		// we should have 3 pipelines running: filestream for logs, http metrics and beats metrics
-		assert.Equal(collect, 3, len(pipelineStatusMap))
+		// we should have 1 extension (healthcheckv2) and 3 pipelines running: filestream for logs, http metrics and beats metrics
+		assert.Equal(collect, 4, len(pipelineStatusMap))
 
 		fileStreamPipeline := "pipeline:logs/_agent-component/filestream-monitoring"
 		httpMetricsPipeline := "pipeline:logs/_agent-component/http/metrics-monitoring"

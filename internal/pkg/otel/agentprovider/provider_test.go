@@ -5,8 +5,11 @@
 package agentprovider
 
 import (
+	"bytes"
 	"context"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,28 +17,21 @@ import (
 )
 
 func TestProvider_NewFactory(t *testing.T) {
-	p := NewProvider(nil)
+	p, err := NewProvider(nil)
+	require.NoError(t, err)
 	assert.Equal(t, p, p.NewFactory().Create(confmap.ProviderSettings{}))
 }
 
 func TestProvider_Schema(t *testing.T) {
-	p := NewProvider(nil)
+	p, err := NewProvider(nil)
+	require.NoError(t, err)
 	assert.Equal(t, schemeName, p.Scheme())
 }
 
 func TestProvider_URI(t *testing.T) {
-	p := NewProvider(nil)
+	p, err := NewProvider(nil)
+	require.NoError(t, err)
 	assert.Equal(t, p.uri, p.URI())
-}
-
-func TestProvider_Update(t *testing.T) {
-	cfg := confmap.New()
-	cfg2 := confmap.New()
-	cfg3 := confmap.New()
-
-	p := NewProvider(cfg)
-	p.Update(cfg2) // should not block
-	p.Update(cfg3) // should not block
 }
 
 func TestProvider_Retrieve(t *testing.T) {
@@ -43,8 +39,12 @@ func TestProvider_Retrieve(t *testing.T) {
 	defer cancel()
 
 	cfg := confmap.New()
+	confMap := cfg.ToStringMap()
+	confBytes, err := yaml.Marshal(confMap)
+	require.NoError(t, err)
 
-	p := NewProvider(cfg)
+	p, err := NewProvider(bytes.NewReader(confBytes))
+	require.NoError(t, err)
 	ret, err := p.Retrieve(ctx, p.URI(), func(event *confmap.ChangeEvent) {})
 	require.NoError(t, err)
 	retCfg, err := ret.AsConf()
@@ -52,42 +52,17 @@ func TestProvider_Retrieve(t *testing.T) {
 	require.Equal(t, cfg, retCfg)
 }
 
-func TestProvider_Retrieve_Update(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	cfg := confmap.New()
-	cfg2 := confmap.New()
-
-	ch := make(chan *confmap.ChangeEvent, 1)
-
-	p := NewProvider(cfg)
-	ret, err := p.Retrieve(ctx, p.URI(), func(event *confmap.ChangeEvent) {
-		ch <- event
-	})
-	require.NoError(t, err)
-	retCfg, err := ret.AsConf()
-	require.NoError(t, err)
-	require.Equal(t, cfg, retCfg)
-
-	p.Update(cfg2)
-	evt := <-ch
-	require.NotNil(t, evt)
-
-	ret2, err := p.Retrieve(ctx, p.URI(), func(event *confmap.ChangeEvent) {})
-	require.NoError(t, err)
-	retCfg2, err := ret2.AsConf()
-	require.NoError(t, err)
-	assert.Equal(t, cfg2, retCfg2)
-}
-
 func TestProvider_Shutdown(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	cfg := confmap.New()
+	confMap := cfg.ToStringMap()
+	confBytes, err := yaml.Marshal(confMap)
+	require.NoError(t, err)
 
-	p := NewProvider(cfg)
+	p, err := NewProvider(bytes.NewReader(confBytes))
+	require.NoError(t, err)
 	ret, err := p.Retrieve(ctx, p.URI(), func(event *confmap.ChangeEvent) {})
 	require.NoError(t, err)
 	retCfg, err := ret.AsConf()
