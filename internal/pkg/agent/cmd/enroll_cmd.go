@@ -56,9 +56,8 @@ type saver interface {
 
 // enrollCmd is an enroll subcommand that interacts between the Kibana API and the Agent.
 type enrollCmd struct {
-	log     *logger.Logger
-	options *enroll.EnrollOptions
-	//	client         fleetclient.Sender
+	log            *logger.Logger
+	options        *enroll.EnrollOptions
 	configStore    saver
 	remoteConfig   remote.Config
 	agentProc      *process.Info
