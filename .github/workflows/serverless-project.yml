@@ -13,15 +13,14 @@ permissions:
 jobs:
   create-serverless:
     permissions:
-      contents: write
-      pull-requests: write
       id-token: write
     runs-on: ubuntu-latest
     env:
       PREFIX: "ea-serverless-it"
     steps:
-      - uses: actions/checkout@v4
-
+      ####################################
+      # 1. Create the serverless project
+      ####################################
       - name: Get token
         id: get_token
         uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a # v2.1.0
@@ -48,6 +47,7 @@ jobs:
       - uses: elastic/oblt-actions/oblt-cli/cluster-create-serverless@v1
         id: create_serverless
         with:
+          # TODO: support a different serverless oblt-cli template
           project-type: 'observability'
           target: 'production'
           cluster-name-prefix: "${{ env.PREFIX }}-${{ steps.get_day.outputs.day }}"
@@ -66,6 +66,9 @@ jobs:
       - name: Smoke test
         run: curl -X GET ${ELASTICSEARCH_HOST}/_cat/indices?v -u ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}
 
+      ####################################
+      # 2. Copy the serverless secrets
+      ####################################
       # Authenticate to the elastic-observability-ci to rotate the cluster credentials
       - uses: elastic/oblt-actions/google/auth@v1
         with:
@@ -75,7 +78,11 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@77e7a554d41e2ee56fc945c52dfd3f33d12def9a
 
-      # While runnning this workflow, it might cause some hiccups if a PR runs when rotating the secrets
+      # TODO: as soon as the oblt-framework supports elastic-observability-ci we can avoid this step.
+      # NOTE:
+      #   * While runnning this workflow, it might cause some hiccups if a PR runs when rotating the secrets
+      #   * Secrets need to be created firstly. gcloud secrets create otherwise gcloud secrets versions add will fail.
+      #     That's not an issue now, as we use the same secret name.
       - name: Rotate GCSM secrets
         env:
           GCP_PROJECT: "elastic-observability-ci"
@@ -95,4 +102,4 @@ jobs:
         with:
           bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
           channel-id: "#ingest-notifications"
-          message: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@robots-ci` please look what's going on <${{ env.JOB_URL }}|here>"
+          message: ":traffic_cone: serverless project creation failed for `${{ github.repository }}@${{ github.ref_name }}`, `@robots-ci` please look what's going on <${{ env.JOB_URL }}|here>"
