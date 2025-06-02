@@ -56,6 +56,8 @@ const fleetServer = "fleet-server"
 
 var ErrNotManaged = errors.New("unmanaged agent")
 
+var ErrFleetServer = errors.New("unsupported action: agent runs Fleet server")
+
 // ErrNotUpgradable error is returned when upgrade cannot be performed.
 var ErrNotUpgradable = errors.New(
 	"cannot be upgraded; must be installed with install sub-command and " +
@@ -564,7 +566,7 @@ func (c *Coordinator) Migrate(ctx context.Context, action *fleetapi.ActionMigrat
 
 	// check if agent is FS, fail if so
 	if c.isFleetServer() {
-		return errors.New("unsupported action: agent runs Fleet server")
+		return ErrFleetServer
 	}
 
 	// Keeping all enrollment options that are not overridden via action

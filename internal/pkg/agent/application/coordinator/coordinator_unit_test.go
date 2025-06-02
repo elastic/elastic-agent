@@ -1475,7 +1475,7 @@ func TestCoordinator_FleetServer_SkipsMigration(t *testing.T) {
 	}
 
 	err := coord.Migrate(ctx, action, backoffFactory)
-	require.ErrorContains(t, err, "unsupported action")
+	require.ErrorIs(t, err, ErrFleetServer)
 }
 
 func TestCoordinator_InitiatesMigration(t *testing.T) {

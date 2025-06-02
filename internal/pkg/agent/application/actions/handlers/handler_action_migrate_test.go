@@ -106,8 +106,31 @@ func TestActionMigratelHandler(t *testing.T) {
 
 		// ack delegated to migrate coordinator
 		ack.AssertNumberOfCalls(t, "Ack", 0)
-		ack.AssertNumberOfCalls(t, "Migrate", 0)
+		ack.AssertNumberOfCalls(t, "Commit", 0)
 		coord.AssertCalled(t, "ReExec", mock.Anything, mock.Anything)
+	})
+
+	t.Run("fleet server", func(t *testing.T) {
+		action := &fleetapi.ActionMigrate{}
+
+		ack := &fakeAcker{}
+		ack.On("Ack", t.Context(), action).Return(nil)
+		ack.On("Commit", t.Context()).Return(nil)
+
+		coord := &fakeMigrateCoordinator{}
+		coord.On("Migrate", mock.Anything, mock.Anything).Return(coordinator.ErrFleetServer)
+		coord.On("ReExec", mock.Anything, mock.Anything)
+
+		h := NewMigrate(log, mockAgentInfo, coord)
+		h.tamperProtectionFn = func() bool { return false }
+
+		require.Error(t, coordinator.ErrFleetServer, h.Handle(t.Context(), action, ack))
+		coord.AssertNumberOfCalls(t, "Migrate", 1)
+
+		// ack not delegated to migrate coordinator, failure is reported
+		ack.AssertNumberOfCalls(t, "Ack", 1)
+		ack.AssertNumberOfCalls(t, "Commit", 1)
+		coord.AssertNotCalled(t, "ReExec", mock.Anything, mock.Anything)
 	})
 }
 
