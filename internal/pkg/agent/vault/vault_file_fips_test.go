@@ -14,9 +14,12 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 )
 
 func TestFileVaultRekey(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "vault does not use NewGCMWithRandomNonce.")
 	const key = "foo"
 
 	ctx, cn := context.WithCancel(context.Background())

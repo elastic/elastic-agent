@@ -1,9 +1,219 @@
 ---
 
-# This file contains the package specifications for both Community Beats and
-# Official Beats. The shared section contains YAML anchors that are used to
-# define common parts of the package in order to not repeat ourselves.
+# This file contains the package specifications for Elastic Agent
 
+# List all the available platforms
+platforms: &all-platforms
+  - &linux-amd64
+    os: linux
+    arch: x86_64
+  - &linux-arm64
+    os: linux
+    arch: arm64
+  - &windows-amd64
+    os: windows
+    arch: x86_64
+  - &darwin-amd64
+    os: darwin
+    arch: x86_64
+  - &darwin-arm64
+    os: darwin
+    arch: aarch64
+
+# List all the package type constants (see dev-tools/mage/pkgcommon/pkgcommon-types.go)
+packageTypes: &all-package-types
+  - &pkg-type-rpm
+      1 # RPM
+  - &pkg-type-deb
+      2 # Deb
+  - &pkg-type-zip
+      3 # zip
+  - &pkg-type-targz
+      4 # tar.gz
+  - &pkg-type-docker
+      5 # docker
+
+# Settings section contains general compiling and packaging settings
+settings:
+  fips:
+    compile:
+      cgo: true
+      env:
+        GOEXPERIMENT: systemcrypto
+      tags:
+        - requirefips
+        - ms_tls13kdf
+      platforms:
+        - *linux-amd64
+        - *linux-arm64
+
+# List *all* the components available for packaging in elastic-agent
+components:
+  # general template for new components (all attributes are mandatory)
+  #  - &comp-<anchor name>
+  #    projectName: <project name under manifest>
+  #    packageName: <template representing the name of the archive to download/extract>
+  #    binaryName: <binary name>
+  #    rootDir: <template representing directory from the archive root where the binary is located>
+  #    fips: <boolean indicating if this component is FIPS compliant>
+  #    platforms:
+  #      - <platform, use anchors for platforms above>
+  #    pythonWheel: true # true if it's a package that is not platform specific
+  #    packageTypes: *all-package-types # package types it should be included in
+  - &comp-agentbeat
+    projectName: beats
+    packageName: agentbeat-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: agentbeat-{{.Version}}-{{.Platform}}
+    binaryName: agentbeat
+    fips: false
+    platforms: *all-platforms
+    packageTypes: *all-package-types
+  - &comp-apm_server
+    projectName: apm-server
+    packageName: apm-server-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: apm-server-{{.Version}}-{{.Platform}}
+    binaryName: apm-server
+    fips: false
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+      - *windows-amd64
+      - *darwin-amd64
+    packageTypes: *all-package-types
+  - &comp-cloudbeat
+    projectName: cloudbeat
+    packageName: cloudbeat-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: cloudbeat-{{.Version}}-{{.Platform}}
+    binaryName: cloudbeat
+    fips: false
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+  - &comp-cloud-defend
+    projectName: cloud-defend
+    packageName: cloud-defend-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: cloud-defend-{{.Version}}-{{.Arch}}
+    binaryName: cloud-defend
+    fips: false
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes:
+      - *pkg-type-docker
+  - &comp-connectors
+    projectName: connectors
+    packageName: connectors-{{.Version}}.zip
+    # FIXME: connectors use only <major>.<minor>.<patch> in the root directory name so the definition should be something
+    # using the beat_version or similar
+    # We don't support that yet, so we are defining a rootDir that will error out if rendered. This is not a problem since
+    # we don't extract/manipulate the archive during packaging, it has its own special handling in the 'service' docker image
+    rootDir: elasticsearch_connectors-{{beat_version}}
+    binaryName: connectors
+    fips: false
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    pythonWheel: true
+    packageTypes: *all-package-types
+  - &comp-endpoint
+    projectName: endpoint-dev
+    packageName: endpoint-security-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: endpoint-security-{{.Version}}-{{.Platform}}
+    binaryName: endpoint-security
+    fips: false
+    platforms: *all-platforms
+    packageTypes: *all-package-types
+  - &comp-fleet-server
+    projectName: fleet-server
+    packageName: fleet-server-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: fleet-server-{{.Version}}-{{.Platform}}
+    binaryName: fleet-server
+    fips: false
+    platforms: *all-platforms
+    packageTypes: *all-package-types
+  - &comp-pf-elastic-collector
+    projectName: prodfiler
+    packageName: pf-elastic-collector-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: pf-elastic-collector-{{.Version}}-{{.Platform}}
+    binaryName: pf-elastic-collector
+    fips: false
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+  - &comp-pf-elastic-symbolizer
+    projectName: prodfiler
+    packageName: pf-elastic-symbolizer-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: pf-elastic-symbolizer-{{.Version}}-{{.Platform}}
+    binaryName: pf-elastic-symbolizer
+    fips: false
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+  - &comp-pf-host-agent
+    projectName: prodfiler
+    packageName: pf-host-agent-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: pf-host-agent-{{.Version}}-{{.Platform}}
+    binaryName: pf-host-agent
+    fips: false
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+  # Elastic Agent core component, defined here because it's a dependency when packaging using elastic-agent DRA
+  - &comp-elastic-agent-core
+    projectName: elastic-agent-core
+    packageName: elastic-agent-core-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: elastic-agent-core-{{.Version}}-{{.Platform}}
+    binaryName: elastic-agent
+    fips: false
+    platforms: *all-platforms
+    packageTypes: *all-package-types
+  - &comp-agentbeat-fips
+    projectName: beats
+    packageName: agentbeat-fips-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: agentbeat-{{.Version}}-{{.Platform}}
+    binaryName: agentbeat
+    fips: true
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+  - &comp-apm_server-fips
+    projectName: apm-server
+    packageName: apm-server-fips-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: apm-server-fips-{{.Version}}-{{.Platform}}
+    binaryName: apm-server
+    fips: true
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+  - &comp-fleet-server-fips
+    projectName: fleet-server
+    packageName: fleet-server-fips-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: fleet-server-fips-{{.Version}}-{{.Platform}}
+    binaryName: fleet-server
+    fips: true
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+  # Elastic Agent core component (FIPS-compliant version), defined here because it's a dependency when packaging using elastic-agent DRA
+  - &comp-elastic-agent-core-fips
+    projectName: elastic-agent-core
+    packageName: elastic-agent-core-fips-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: elastic-agent-core-fips-{{.Version}}-{{.Platform}}
+    binaryName: elastic-agent
+    fips: true
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+# The shared section contains YAML anchors that are used to
+# define common parts of the package in order to not repeat ourselves.
 shared:
   - &common
     name: '{{.BeatName}}'
@@ -16,7 +226,41 @@ shared:
     url: '{{.BeatURL}}'
     description: '{{.BeatDescription}}'
 
+  - &common_fips
+    name: '{{.BeatName}}-fips'
+    service_name: '{{.BeatServiceName}}'
+    os: '{{.GOOS}}'
+    arch: '{{.PackageArch}}'
+    vendor: '{{.BeatVendor}}'
+    version: '{{ agent_package_version }}'
+    fips: true
+    license: '{{.BeatLicense}}'
+    url: '{{.BeatURL}}'
+    description: '{{.BeatDescription}}'
+
   # agent specific
+
+  # components included in elastic-agent package specs defined before components support in this YAML
+  - &elastic_agent_components
+    components:
+      - *comp-agentbeat
+      - *comp-apm_server
+      - *comp-cloudbeat
+      - *comp-cloud-defend
+      - *comp-connectors
+      - *comp-endpoint
+      - *comp-fleet-server
+      - *comp-pf-elastic-collector
+      - *comp-pf-elastic-symbolizer
+      - *comp-pf-host-agent
+
+  # components included in FIPS-compliant elastic-agent package specs
+  - &elastic_agent_fips_components
+    components:
+      - *comp-agentbeat-fips
+      - *comp-apm_server-fips
+      - *comp-fleet-server-fips
+
   # Deb/RPM spec for community beats.
   - &deb_rpm_agent_spec
     <<: *common
@@ -79,7 +323,7 @@ shared:
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/manifest.yaml:
         mode: 0644
         content: >
-          {{ manifest }}
+          {{ manifest .fips }}
 
   - &linux_otel_files
     'otelcol':
@@ -124,7 +368,7 @@ shared:
     'manifest.yaml':
       mode: 0644
       content: >
-        {{ manifest }}
+        {{ manifest .fips }}
 
   - &agent_binary_files
     '{{.BeatName}}{{.BinaryExt}}':
@@ -170,7 +414,7 @@ shared:
     <<: *agent_darwin_app_bundle_files
     <<: *agent_binary_common_files
 
-  - &agent_components
+  - &agent_unpacked_components_files
     'data/{{.BeatName}}-{{ commit_short }}/components':
       source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/'
       mode: 0755
@@ -180,21 +424,34 @@ shared:
   # Binary package spec (tar.gz for linux) for community beats.
   - &agent_binary_spec
     <<: *common
+    <<: *elastic_agent_components
     files:
       <<: *agent_binary_files
-      <<: *agent_components
       <<: *linux_otel_files
+      <<: *agent_unpacked_components_files
+
+  - &agent_binary_fips_spec
+    <<: *common_fips
+    <<: *elastic_agent_fips_components
+    files:
+      <<: *agent_binary_files
+      <<: *agent_unpacked_components_files
+      NOTICE.txt:
+        source: '{{ repo.RootDir }}/NOTICE-fips.txt'
+        mode: 0644
 
 
   - &agent_darwin_binary_spec
     <<: *common
+    <<: *elastic_agent_components
     files:
       <<: *agent_darwin_binary_files
-      <<: *agent_components
+      <<: *agent_unpacked_components_files
 
   # Binary package spec (zip for windows) for community beats.
   - &agent_windows_binary_spec
     <<: *common
+    <<: *elastic_agent_components
     files:
       <<: *agent_binary_files
       'data/{{.BeatName}}-{{ commit_short }}/components':
@@ -234,20 +491,26 @@ shared:
   - &docker_ubi_spec
     docker_variant: 'ubi'
     extra_vars:
-      from: '--platform=linux/amd64 docker.elastic.co/ubi9/ubi-minimal'
+      from: '--platform=linux/amd64 redhat/ubi9-minimal'
   - &docker_ubi_arm_spec
     docker_variant: 'ubi'
     extra_vars:
-      from: '--platform=linux/arm64 docker.elastic.co/ubi9/ubi-minimal'
+      from: '--platform=linux/arm64 redhat/ubi9-minimal'
 
   - &docker_wolfi_spec
     docker_variant: 'wolfi'
     extra_vars:
       from: '--platform=linux/amd64 cgr.dev/chainguard/wolfi-base'
+
   - &docker_wolfi_arm_spec
     docker_variant: 'wolfi'
     extra_vars:
       from: '--platform=linux/arm64 cgr.dev/chainguard/wolfi-base'
+
+  - &docker_fips_spec
+    docker_variant: 'basic'
+    extra_vars:
+      from: 'docker.elastic.co/wolfi/chainguard-base-fips:latest'
 
   - &docker_elastic_spec
     extra_vars:
@@ -278,6 +541,27 @@ shared:
         source: '{{ repo.RootDir }}/deploy/kubernetes/elastic-agent-standalone/templates.d'
         mode: 0755
 
+  - &agent_docker_fips_spec
+    <<: *agent_binary_fips_spec
+    extra_vars:
+      dockerfile: 'Dockerfile.elastic-agent.tmpl'
+      docker_entrypoint: 'docker-entrypoint.elastic-agent.tmpl'
+      user: '{{ .BeatName }}'
+      linux_capabilities: ''
+      beats_install_path: "install"
+    files:
+      'elastic-agent.yml':
+        source: 'elastic-agent.docker.yml'
+        mode: 0600
+        config: true
+      '.elastic-agent.active.commit':
+        content: >
+          {{ commit }}
+        mode: 0644
+      'hints.inputs.d':
+        source: '{{ repo.RootDir }}/deploy/kubernetes/elastic-agent-standalone/templates.d'
+        mode: 0755
+
   # cloud build to beats-ci repository
   - &agent_docker_cloud_spec
     docker_variant: 'cloud'
@@ -292,6 +576,21 @@ shared:
         mode: 0755
       'data/cloud_downloads/agentbeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz':
         source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/agentbeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
+        mode: 0755
+
+  - &agent_docker_cloud_fips_spec
+    docker_variant: 'cloud'
+    extra_vars:
+      repository: 'docker.elastic.co/beats-ci'
+    files:
+      'data/cloud_downloads/filebeat.sh':
+        source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/filebeat.sh'
+        mode: 0755
+      'data/cloud_downloads/metricbeat.sh':
+        source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/metricbeat.sh'
+        mode: 0755
+      'data/cloud_downloads/agentbeat-fips-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz':
+        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/agentbeat-fips-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
         mode: 0755
 
   # service build is based on previous cloud variant
@@ -1108,6 +1407,71 @@ specs:
             symlink: true
             mode: 0755
 
+    ######## Start FIPS Specs ########
+    - os: linux
+      types: [tgz]
+      spec:
+        <<: *agent_binary_fips_spec
+        <<: *elastic_license_for_binaries
+        files:
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}
+            symlink: true
+            mode: 0755
+
+    - os: linux
+      arch: amd64
+      types: [ docker ]
+      spec:
+        <<: *docker_fips_spec
+        <<: *docker_builder_spec
+        <<: *agent_docker_fips_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+        files:
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
+    - os: linux
+      arch: arm64
+      types: [ docker ]
+      spec:
+        <<: *docker_fips_spec
+        <<: *docker_builder_arm_spec
+        <<: *agent_docker_fips_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+        files:
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
+    - os: linux
+      arch: amd64
+      types: [ docker ]
+      spec:
+        <<: *docker_fips_spec
+        <<: *agent_docker_fips_spec
+        # The cloud image is always based on Wolfi
+        <<: *docker_builder_spec
+        <<: *agent_docker_cloud_fips_spec
+        <<: *elastic_license_for_binaries
+        files:
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+    - os: linux
+      arch: arm64
+      types: [ docker ]
+      spec:
+        <<: *docker_fips_spec
+        <<: *agent_docker_fips_spec
+        # The cloud image is always based on Wolfi
+        <<: *docker_builder_arm_spec
+        <<: *agent_docker_cloud_fips_spec
+        <<: *elastic_license_for_binaries
+        files:
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+    ######## End FIPS Specs ########
 
   # Elastic Beat with Elastic License and binary taken from the x-pack dir.
   elastic_beat_agent_demo_binaries:
@@ -1156,6 +1520,7 @@ specs:
         <<: *common
         <<: *elastic_license_for_binaries
         version: '{{ beat_version }}'
+        # this is a way to place 'core' in the correct place for both the archive and the root dir, see defaultRootDir in dev-tools/mage/pkgtypes.go
         qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
@@ -1190,6 +1555,18 @@ specs:
         <<: *elastic_license_for_binaries
         version: '{{ beat_version }}'
         qualifier: core
+        files:
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
+    - os: linux
+      types: [tgz]
+      spec:
+        <<: *common_fips
+        <<: *elastic_license_for_binaries
+        name: '{{.BeatName}}'
+        version: '{{ beat_version }}'
+        qualifier: 'core-fips'
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
