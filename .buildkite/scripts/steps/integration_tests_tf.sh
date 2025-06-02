@@ -21,10 +21,6 @@ if [ -z "$TEST_SUDO" ]; then
   exit 1
 fi
 
-if [[ ${FIPS:-false} == "true " ]]; then
-    echo "FIPS Integration tests detected."
-fi
-
 # Override the agent package version using a string with format <major>.<minor>.<patch>
 # There is a time when the snapshot is not built yet, so we cannot use the latest version automatically
 # This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
