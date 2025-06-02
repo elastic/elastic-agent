@@ -223,6 +223,53 @@ inputs:
           id: filestream-monitoring
         target: component
   - data_stream:
+      dataset: elastic_agent.filebeat
+      namespace: default
+      type: metrics
+    failure_threshold: 5
+    hosts:
+    - placeholder
+    id: metrics-monitoring-filebeat
+    index: metrics-elastic_agent.filebeat-default
+    metricsets:
+    - stats
+    period: 1m0s
+    processors:
+    - add_fields:
+        fields:
+          dataset: elastic_agent.filebeat
+          namespace: default
+          type: metrics
+        target: data_stream
+    - add_fields:
+        fields:
+          dataset: elastic_agent.filebeat
+        target: event
+    - add_fields:
+        fields:
+          id: ""
+          process: filebeat
+          snapshot: false
+          version: placeholder
+        target: elastic_agent
+    - add_fields:
+        fields:
+          id: ""
+        target: agent
+    - add_fields:
+        fields:
+          binary: filebeat
+          id: filestream-otel
+        target: component
+    - drop_fields:
+        fields:
+        - beat.stats.cgroup
+        - beat.stats.cpu
+        - beat.stats.handles
+        - beat.stats.memstats
+        - beat.stats.runtime
+        ignore_missing: true
+  - data_stream:
       dataset: elastic_agent.metricbeat
       namespace: default
       type: metrics

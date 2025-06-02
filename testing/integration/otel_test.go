@@ -696,6 +696,15 @@ func createESApiKey(esClient *elasticsearch.Client) (estools.APIKeyResponse, err
 	return estools.CreateAPIKey(context.Background(), esClient, estools.APIKeyRequest{Name: "test-api-key", Expiration: "1d"})
 }
 
+// getDecodedApiKey returns a decoded API key appropriate for use in beats configurations.
+func getDecodedApiKey(keyResponse estools.APIKeyResponse) (string, error) {
+	decoded, err := base64.StdEncoding.DecodeString(keyResponse.Encoded)
+	if err != nil {
+		return "", err
+	}
+	return string(decoded), nil
+}
+
 func linesTrackMap(lines []string) map[string]bool {
 	mm := make(map[string]bool)
 	for _, l := range lines {
@@ -1027,6 +1036,8 @@ func TestOtelFilestreamInput(t *testing.T) {
 	esApiKey, err := createESApiKey(info.ESClient)
 	require.NoError(t, err, "error creating API key")
 	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	decodedApiKey, err := getDecodedApiKey(esApiKey)
+	require.NoError(t, err)
 	configTemplate := `inputs:
   - type: filestream
     id: filestream-e2e
@@ -1046,10 +1057,16 @@ outputs:
     hosts: [{{.ESEndpoint}}]
     api_key: "{{.ESApiKey}}"
     preset: "balanced"
+  monitoring:
+    type: elasticsearch
+    hosts: [{{.ESEndpoint}}]
+    api_key: "{{.ESApiKey}}"
+    preset: "balanced"
 agent:
   monitoring:
-    metrics: false
+    metrics: true
     logs: false
+    use_output: monitoring
 `
 	index := ".ds-logs-e2e-*"
 	var configBuffer bytes.Buffer
@@ -1058,7 +1075,7 @@ agent:
 			otelConfigOptions{
 				InputPath:  inputFilePath,
 				ESEndpoint: esEndpoint,
-				ESApiKey:   esApiKey.Encoded,
+				ESApiKey:   decodedApiKey,
 			}))
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
@@ -1111,6 +1128,27 @@ agent:
 		2*time.Minute, 5*time.Second,
 		"Expected %d logs, got %v", numEvents, actualHits)
 
+	metricsIndex := ".ds-metrics-elastic_agent*"
+	// Check metrics from self-monitoring
+	assert.EventuallyWithT(t,
+		func(ct *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer findCancel()
+
+			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, metricsIndex, map[string]interface{}{
+				"component.id": "filestream-default",
+			})
+			require.NoError(ct, err)
+
+			actualHits.Hits = docs.Hits.Total.Value
+			output, execErr := fixture.ExecStatus(context.Background())
+			require.NoError(ct, execErr)
+			t.Logf("status output: %v", output)
+			assert.Greater(ct, actualHits.Hits, 0)
+		},
+		2*time.Minute, 5*time.Second,
+		"Expected %d metrics events, got %v", numEvents, actualHits)
+
 	cancel()
 }
 
@@ -1140,6 +1178,8 @@ func TestOTelHTTPMetricsInput(t *testing.T) {
 	esApiKey, err := createESApiKey(info.ESClient)
 	require.NoError(t, err, "error creating API key")
 	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	decodedApiKey, err := getDecodedApiKey(esApiKey)
+	require.NoError(t, err)
 	configTemplate := `
 inputs:
   - type: http/metrics
@@ -1147,7 +1187,7 @@ inputs:
     use_output: default
     _runtime_experimental: otel
     streams:
-    - metricsets: 
+    - metricsets:
        - json
       path: "/stats"
       hosts:
@@ -1175,7 +1215,7 @@ agent.monitoring:
 	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 		otelConfigOptions{
 			ESEndpoint: esEndpoint,
-			ESApiKey:   esApiKey.Encoded,
+			ESApiKey:   decodedApiKey,
 		})
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
@@ -1499,7 +1539,7 @@ service:
         - debug
 `
 
-	beatsApiKey, err := base64.StdEncoding.DecodeString(esApiKey.Encoded)
+	beatsApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err, "error decoding api key")
 
 	var configBuffer bytes.Buffer
@@ -1617,6 +1657,28 @@ func AssertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg 
 		flatM2.Delete(f)
 	}
 	require.Equal(t, "", cmp.Diff(flatM1, flatM2), "expected maps to be equal")
+}
+
+func AssertMapstrKeysEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg string) {
+
+	t.Helper()
+	// Delete all ignored fields.
+	for _, f := range ignoredFields {
+		_ = m1.Delete(f)
+		_ = m2.Delete(f)
+	}
+
+	flatM1 := m1.Flatten()
+	flatM2 := m2.Flatten()
+
+	for k := range flatM1 {
+		flatM1[k] = ""
+	}
+	for k := range flatM2 {
+		flatM2[k] = ""
+	}
+
+	require.Zero(t, cmp.Diff(flatM1, flatM2), msg)
 }
 
 func TestFBOtelRestartE2E(t *testing.T) {

@@ -1,0 +1,61 @@
+version: 9.0.1
+entries:
+    - kind: enhancement
+      summary: Update OTel components to v0.121.0
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1743783374
+      file:
+        name: 1743783374-update-otel-v0.121.0.yaml
+        checksum: 3491d3c13b6ebd1e7895b337d901d7df3e77dce1
+    - kind: feature
+      summary: Add nopexporter to EDOT Collector
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1744198660
+      file:
+        name: 1744198660-add-nopexporter.yaml
+        checksum: 9f989be89459d35a8fdc48362a0dad19880fa4e1
+    - kind: feature
+      summary: set collectors fullnameOverride for edot kube-stack values
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7754
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/7381
+      timestamp: 1744384247
+      file:
+        name: 1744384247-set-collector's-fullnameOverride-for-edot-kube-stack-values.yaml
+        checksum: d7ccd1a2a660e7e0cc8bed5fc91570465b9ff639
+    - kind: bug-fix
+      summary: Fix Managed OTLP Helm config to use current image repo.
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1744839123
+      file:
+        name: 1744839123-fix-MOtel-config-image-value.yaml
+        checksum: cd9cb5f75e1b3983a48ee156e478e0a62051ffb6
+    - kind: breaking-change
+      summary: '[otel] Disable process scraper of hostmetrics receiver'
+      description: |
+        The process scraper collects metrics for all available processes of a host without an easy way to limit
+        this to only report top N process for example. This results in quite big amount of timeseries.
+        Since this is not quite critical for any of the available UIs or dashboards we decide to disable
+        it temporarily until we find a better solution. Users that specifically need these metrics
+        can also enable it back manually.
+        Related to https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/39423.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7894
+      issue: []
+      timestamp: 1744886313
+      file:
+        name: 1744886313-otel_disable_process_scraper.yaml
+        checksum: 461df3d166c6ed60e8565e588b5ffce9078798ae
