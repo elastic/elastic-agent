@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
-	"os"
 	"testing"
 	"time"
 
@@ -19,6 +18,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 )
 
 const cloudAgentPolicyID = "policy-elastic-agent-on-cloud"
@@ -42,8 +42,8 @@ func TestFIPSAgentConnectingToFIPSFleetServerInECHFRH(t *testing.T) {
 		FIPS: true,
 	})
 
-	// Check that the Fleet Server in the deployment is healthy
-	fleetServerHost := os.Getenv("INTEGRATIONS_SERVER_HOST")
+	fleetServerURL, err := fleettools.DefaultURL(t.Context(), info.KibanaClient)
+	require.NoError(t, err)
 	statusUrl, err := url.JoinPath(fleetServerHost, "/api/status")
 	require.NoError(t, err)
 
@@ -59,10 +59,10 @@ func TestFIPSAgentConnectingToFIPSFleetServerInECHFRH(t *testing.T) {
 	err = decoder.Decode(&body)
 	require.NoError(t, err)
 
-	require.Equal(t, "HEALTHY", body.Status)
+	require.Equalf(t, "HEALTHY", body.Status, "response status code: %d", resp.StatusCode)
 
 	// Get all Agents
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	agents, err := info.KibanaClient.ListAgents(ctx, kibana.ListAgentsRequest{})
 	require.NoError(t, err)
