@@ -408,6 +408,7 @@ func TestAgentMetricsInput(t *testing.T) {
 		FBReceiverIndex     string
 		Namespace           string
 		RuntimeExperimental string
+		Metricsets          []string
 	}
 	configTemplate := `agent.logging.level: info
 agent.logging.to_stderr: true
@@ -421,18 +422,11 @@ inputs:
     _runtime_experimental: {{.RuntimeExperimental}}
     {{end}}
     streams:
+      {{range $mset := .Metricsets}}
       - metricsets:
-        - cpu
-        data_stream.dataset: system.cpu
-      - metricsets:
-        - memory
-        data_stream.dataset: system.memory
-      - metricsets:
-        - network
-        data_stream.dataset: system.network
-      - metricsets:
-        - filesystem
-        data_stream.dataset: system.filesystem
+        - {{$mset}}
+        data_stream.dataset: system.{{$mset}}
+      {{end}}
 outputs:
   default:
     type: elasticsearch
@@ -478,6 +472,7 @@ outputs:
 						BeatsESApiKey:       string(beatsApiKey),
 						Namespace:           info.Namespace,
 						RuntimeExperimental: tt.runtimeExperimental,
+						Metricsets:          metricsets,
 					}))
 			configContents := configBuffer.Bytes()
 			t.Cleanup(func() {
