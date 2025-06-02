@@ -60,6 +60,17 @@ func newLogWriter(core zapcoreWriter, logCfg component.CommandLogSpec, ll zapcor
 	}
 }
 
+func NewLogWriterWithDefaults(core zapcoreWriter, ll zapcore.Level) *logWriter {
+	cmdLogSpec := component.CommandLogSpec{}
+	cmdLogSpec.InitDefaults()
+	return &logWriter{
+		loggerCore:   core,
+		logCfg:       cmdLogSpec,
+		logLevel:     zap.NewAtomicLevelAt(ll),
+		inheritLevel: ll,
+	}
+}
+
 func (r *logWriter) SetLevels(ll zapcore.Level, unitLevels map[string]zapcore.Level) {
 	// must hold to lock so Write doesn't access the unitLevels
 	r.mx.Lock()

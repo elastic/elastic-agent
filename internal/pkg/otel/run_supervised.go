@@ -9,13 +9,19 @@ import (
 	"fmt"
 	"io"
 
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
 	"go.opentelemetry.io/collector/otelcol"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel/agentprovider"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-func RunSupervisedCollector(ctx context.Context, in io.Reader) error {
+const EDOTSupevisedCommand = "edot-supervised"
+
+func RunSupervisedCollector(ctx context.Context, l *logger.Logger, in io.Reader) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -31,6 +37,10 @@ func RunSupervisedCollector(ctx context.Context, in io.Reader) error {
 		WithConfigProviderFactory(configProvider.NewFactory()),
 	)
 	settings.DisableGracefulShutdown = false
+	settings.LoggingOptions = []zap.Option{zap.WrapCore(func(zapcore.Core) zapcore.Core {
+		return l.Core()
+	})}
+
 	svc, err := otelcol.NewCollector(*settings)
 	if err != nil {
 		return fmt.Errorf("failed to create collector: %w", err)
