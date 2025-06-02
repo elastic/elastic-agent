@@ -21,9 +21,9 @@ common:
           ELASTICSEARCH_HOST: ea-serverless-it-elasticsearch-hostname
           ELASTICSEARCH_PASSWORD: ea-serverless-it-elasticsearch-password
           ELASTICSEARCH_USERNAME: ea-serverless-it-elasticsearch-username
-          KIBANA_HOST: ea-serverless-kibana-hostname
-          KIBANA_USERNAME: ea-serverless-kibana-username
-          KIBANA_PASSWORD: ea-serverless-kibana-password
+          KIBANA_HOST: ea-serverless-it-kibana-hostname
+          KIBANA_USERNAME: ea-serverless-it-kibana-username
+          KIBANA_PASSWORD: ea-serverless-it-kibana-password
 
 steps:
   - group: "Integration tests: packaging"
