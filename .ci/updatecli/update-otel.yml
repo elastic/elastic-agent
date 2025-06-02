@@ -1,0 +1,75 @@
+---
+name: Update OTel
+pipelineid: 'updatecli-update-otel-{{ requiredEnv "BRANCH_NAME" }}'
+
+scms:
+  default:
+    kind: github
+    spec:
+      user: '{{ requiredEnv "GITHUB_ACTOR" }}'
+      username: '{{ requiredEnv "GITHUB_ACTOR" }}'
+      owner: '{{ .scm.owner }}'
+      repository: '{{ .scm.repository }}'
+      token: '{{ requiredEnv "GITHUB_TOKEN" }}'
+      branch: '{{ requiredEnv "BRANCH_NAME" }}'
+      commitusingapi: true
+
+sources:
+  current_core_beta:
+    kind: golang/gomod
+    name: Get current OTel Collector core beta version in go.mod
+    spec:
+      module: go.opentelemetry.io/collector/receiver/otlpreceiver
+  latest_core_beta:
+    kind: golang/module
+    name: Get latest OTel Collector core beta version
+    spec:
+      module: go.opentelemetry.io/collector/receiver/otlpreceiver
+  latest_core_stable:
+    kind: golang/module
+    name: Get latest OTel Collector core stable version
+    spec:
+      module: go.opentelemetry.io/collector/component
+  current_contrib:
+    kind: golang/gomod
+    name: Get current OTel Collector contrib version in go.mod
+    spec:
+      module: github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector
+  latest_contrib:
+    kind: golang/module
+    name: Get latest OTel Collector contrib version
+    spec:
+      module: github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector
+
+conditions:
+  is-new-version:
+    name: Succeeds if the latest core or contrib OTel Collector version is different than the one in go.mod
+    kind: shell
+    disablesourceinput: true
+    scmid: default
+    spec:
+      command: '[ {{ source "current_core_beta" }} != {{ source "latest_core_beta" }} ] || [ {{ source "current_contrib" }} != {{ source "latest_contrib" }} ]'
+
+targets:
+  update-otel:
+    name: Update OTel version
+    kind: shell
+    disablesourceinput: true
+    spec:
+      command: .ci/scripts/update-otel.sh {{ source "latest_core_beta" }} {{ source "latest_core_stable" }} {{ source "latest_contrib" }}
+
+actions:
+  default:
+    title: '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Update OTel to {{ source "latest_contrib" }}'
+    kind: github/pullrequest
+    scmid: default
+    spec:
+      automerge: false
+      labels:
+      - automation
+      - skip-changelog
+      - "Team:Elastic-Agent-Control-Plane"
+      description: |
+        Updates OTel components to core [{{ source "latest_core_stable" }}/{{ source "latest_core_beta" }}](https://github.com/open-telemetry/opentelemetry-collector/releases/{{ source "latest_core_beta" }})
+        and contrib [{{ source "latest_contrib" }}](https://github.com/open-telemetry/opentelemetry-collector-contrib/releases/{{ source "latest_contrib" }})
+        on branch `{{ requiredEnv "BRANCH_NAME" }}`.'
