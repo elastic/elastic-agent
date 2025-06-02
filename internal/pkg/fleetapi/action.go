@@ -434,8 +434,8 @@ func (a *ActionSettings) String() string {
 }
 
 type ActionMigrate struct {
-	ActionID   string
-	ActionType string
+	ActionID   string            `json:"id" yaml:"id"`
+	ActionType string            `json:"type" yaml:"type"`
 	Data       ActionMigrateData `json:"data,omitempty"`
 
 	Err error `json:"-" yaml:"-" mapstructure:"-"`
