@@ -601,28 +601,25 @@ outputs:
 		}
 
 		testCases := []struct {
-			name          string
 			metricset     string
 			yieldDocsFunc func(agent []estools.ESDoc, otel []estools.ESDoc) (mapstr.M, mapstr.M)
 		}{
 			{
-				name:      "cpu",
 				metricset: "cpu",
 				yieldDocsFunc: func(agent []estools.ESDoc, otel []estools.ESDoc) (mapstr.M, mapstr.M) {
 					return agent[0].Source, otel[0].Source
 				},
 			},
 			{
-				name:      "memory",
 				metricset: "memory",
 				yieldDocsFunc: func(agent []estools.ESDoc, otel []estools.ESDoc) (mapstr.M, mapstr.M) {
 					return agent[0].Source, otel[0].Source
 				},
 			},
 			{
-				name:      "network",
 				metricset: "network",
 				yieldDocsFunc: func(agent []estools.ESDoc, otel []estools.ESDoc) (mapstr.M, mapstr.M) {
+					// make sure we compare events from network interfaces and not host metrics
 					var agentDoc, otelDoc mapstr.M
 					for _, hit := range agent {
 						agentDoc = hit.Source
@@ -640,7 +637,6 @@ outputs:
 				},
 			},
 			{
-				name:      "filesystem",
 				metricset: "filesystem",
 				yieldDocsFunc: func(agent []estools.ESDoc, otel []estools.ESDoc) (mapstr.M, mapstr.M) {
 					return agent[0].Source, otel[0].Source
@@ -649,7 +645,7 @@ outputs:
 		}
 
 		for _, tt := range testCases {
-			t.Run(tt.name, func(t *testing.T) {
+			t.Run(tt.metricset, func(t *testing.T) {
 				msetAgentDocs := agentDocs[tt.metricset].Hits.Hits
 				msetOtelDocs := otelDocs[tt.metricset].Hits.Hits
 				require.Greater(t, len(msetAgentDocs), 0, "expected to find agent documents for metricset %s", tt.metricset)
