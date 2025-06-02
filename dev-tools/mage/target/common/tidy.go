@@ -29,7 +29,7 @@ func Tidy() error {
 			return fmt.Errorf("tidy: error getting absolute dir: %w", err)
 		}
 		fmt.Printf(">> tidy: Running go mod tidy inside %s\n", dir)
-		cmd := exec.Command(mg.GoCmd(), "mod", "tidy", "-v")
+		cmd := exec.Command(mg.GoCmd(), "mod", "tidy", "-v") // #nosec G204 -- Need to pass in name of package
 		cmd.Dir = dir
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
