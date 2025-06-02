@@ -39,6 +39,36 @@ jobs:
           repositories: >-
             ["observability-test-environments"]
 
+      - uses: elastic/oblt-actions/git/setup@v1
+        with:
+          github-token: ${{ steps.get_token.outputs.token }}
+
+      - name: Get day of the week
+        id: get_day
+        run: echo "day=$(date +'%a' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - uses: elastic/oblt-actions/oblt-cli/cluster-create-serverless@v1
+        id: create_serverless
+        with:
+          # TODO: support a different serverless oblt-cli template
+          project-type: 'observability'
+          target: 'production'
+          cluster-name-prefix: "${{ env.PREFIX }}-${{ steps.get_day.outputs.day }}"
+          github-token: ${{ steps.get_token.outputs.token }}
+          gitops: true
+          wait: '15'
+
+      # Authenticate to the elastic-observability to get the cluster credentials
+      - uses: elastic/oblt-actions/google/auth@v1
+
+      - uses: elastic/oblt-actions/oblt-cli/cluster-credentials@v1
+        with:
+          cluster-name: ${{ steps.create_serverless.outputs.cluster-name }}
+          github-token: ${{ steps.get_token.outputs.token }}
+
+      - name: Smoke test
+        run: curl -X GET ${ELASTICSEARCH_HOST}/_cat/indices?v -u ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}
+
       ####################################
       # 2. Copy the serverless secrets
       ####################################
@@ -58,12 +88,12 @@ jobs:
         env:
           GCP_PROJECT: "elastic-observability-ci"
         run: |
-          echo -n "a${ELASTICSEARCH_HOST}" | gcloud secrets versions add "${PREFIX}-elasticsearch-hostname" --data-file=- --quiet --project "${GCP_PROJECT}"
-          echo -n "b${ELASTICSEARCH_PASSWORD}" | gcloud secrets versions add "${PREFIX}-it-elasticsearch-password" --data-file=- --quiet --project "${GCP_PROJECT}"
-          echo -n "c${ELASTICSEARCH_USERNAME}" | gcloud secrets versions add "${PREFIX}-it-elasticsearch-username" --data-file=- --quiet --project "${GCP_PROJECT}"
-          echo -n "d${KIBANA_HOST}" | gcloud secrets versions add "${PREFIX}-kibana-hostname" --data-file=- --quiet --project "${GCP_PROJECT}"
-          echo -n "e${KIBANA_USERNAME}" | gcloud secrets versions add "${PREFIX}-kibana-password" --data-file=- --quiet --project "${GCP_PROJECT}"
-          echo -n "f${KIBANA_PASSWORD}" | gcloud secrets versions add "${PREFIX}-kibana-username" --data-file=- --quiet --project "${GCP_PROJECT}"
+          echo -n "${ELASTICSEARCH_HOST}" | gcloud secrets versions add "${PREFIX}-elasticsearch-hostname" --data-file=- --quiet --project "${GCP_PROJECT}"
+          echo -n "${ELASTICSEARCH_PASSWORD}" | gcloud secrets versions add "${PREFIX}-it-elasticsearch-password" --data-file=- --quiet --project "${GCP_PROJECT}"
+          echo -n "${ELASTICSEARCH_USERNAME}" | gcloud secrets versions add "${PREFIX}-it-elasticsearch-username" --data-file=- --quiet --project "${GCP_PROJECT}"
+          echo -n "${KIBANA_HOST}" | gcloud secrets versions add "${PREFIX}-kibana-hostname" --data-file=- --quiet --project "${GCP_PROJECT}"
+          echo -n "${KIBANA_USERNAME}" | gcloud secrets versions add "${PREFIX}-kibana-password" --data-file=- --quiet --project "${GCP_PROJECT}"
+          echo -n "${KIBANA_PASSWORD}" | gcloud secrets versions add "${PREFIX}-kibana-username" --data-file=- --quiet --project "${GCP_PROJECT}"
 
       # TODO: if rotation fails then rollback to the previous cluster.
       - if: ${{ failure()  }}
@@ -75,4 +105,4 @@ jobs:
           # TODO: change to the correct channel
           #channel-id: "#ingest-notifications"
           channel-id: "#on-week-oblt-productivity"
-          message: ":traffic_cone: serverless project creation failed for `${{ github.repository }}@${{ github.ref_name }}`, `@robots-ci` please look what's going on <${{ env.JOB_URL }}|here>"
+          message: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@robots-ci` please look what's going on <${{ env.JOB_URL }}|here>"
