@@ -24,6 +24,15 @@ fi
 
 # Make sure that all tools are installed
 asdf install
+if [ "$FIPS" == "true" ]; then
+  echo "~~~FIPS: Checking msft-go is installed"
+  if GOEXPERIMENT=systemcrypto go version &>/dev/null; then
+    echo "msft-go is used"
+  else
+    echo "ERROR: Wrong Golang distro is detected"
+    exit 1
+  fi  
+fi
 
 echo "~~~ Running integration tests as $USER"
 
