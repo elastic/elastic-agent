@@ -34,6 +34,8 @@ const (
 	ActionTypeCancel = "CANCEL"
 	// ActionTypeDiagnostics specifies a diagnostics action.
 	ActionTypeDiagnostics = "REQUEST_DIAGNOSTICS"
+	// ActionTypeDiagnostics specifies a diagnostics action.
+	ActionTypeMigrate = "MIGRATE"
 )
 
 // Error values that the Action interface can return
@@ -115,6 +117,8 @@ func NewAction(actionType string) Action {
 		action = &ActionUnenroll{}
 	case ActionTypeUpgrade:
 		action = &ActionUpgrade{}
+	case ActionTypeMigrate:
+		action = &ActionMigrate{}
 	default:
 		action = &ActionUnknown{OriginalType: actionType}
 	}
