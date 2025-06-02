@@ -1661,6 +1661,28 @@ func AssertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg 
 	require.Equal(t, "", cmp.Diff(flatM1, flatM2), "expected maps to be equal")
 }
 
+func AssertMapstrKeysEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg string) {
+
+	t.Helper()
+	// Delete all ignored fields.
+	for _, f := range ignoredFields {
+		_ = m1.Delete(f)
+		_ = m2.Delete(f)
+	}
+
+	flatM1 := m1.Flatten()
+	flatM2 := m2.Flatten()
+
+	for k := range flatM1 {
+		flatM1[k] = ""
+	}
+	for k := range flatM2 {
+		flatM2[k] = ""
+	}
+
+	require.Zero(t, cmp.Diff(flatM1, flatM2), msg)
+}
+
 func TestFBOtelRestartE2E(t *testing.T) {
 	// This test ensures that filebeatreceiver is able to deliver logs even
 	// in advent of a collector restart.
