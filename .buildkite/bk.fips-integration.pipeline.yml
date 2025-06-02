@@ -71,12 +71,7 @@ steps:
           image: "${IMAGE_UBUNTU_X86_64_FIPS}"
           instanceType: "m5.2xlarge"
         matrix:
-          - default
-          - upgrade
-          - upgrade-flavor
-          - standalone-upgrade
-          - fleet
-          # FIPS tests don't have other groups enabled in order to save resources
+          - fleet # currently there is only a single test in the fleet group, add more tests once they have been defined
 
       - label: "fips:x86_64:sudo:{{matrix}}"
         depends_on:
@@ -97,10 +92,6 @@ steps:
           image: "${IMAGE_UBUNTU_X86_64_FIPS}"
           instanceType: "m5.2xlarge"
         matrix:
-          - default
-          - upgrade
-          - upgrade-flavor
-          - standalone-upgrade
           - fleet
 
       - label: "fips:arm64:non-sudo:{{matrix}}"
@@ -122,10 +113,6 @@ steps:
           image: "${IMAGE_UBUNTU_ARM64_FIPS}"
           instanceType: "m6g.2xlarge"
         matrix:
-          - default
-          - upgrade
-          - upgrade-flavor
-          - standalone-upgrade
           - fleet
 
       - label: "fips:arm64:sudo:{{matrix}}"
@@ -147,10 +134,6 @@ steps:
           image: "${IMAGE_UBUNTU_ARM64_FIPS}"
           instanceType: "m6g.2xlarge"
         matrix:
-          - default
-          - upgrade
-          - upgrade-flavor
-          - standalone-upgrade
           - fleet
 
   - label: ESS FIPS stack cleanup

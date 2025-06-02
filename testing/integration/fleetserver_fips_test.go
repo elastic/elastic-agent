@@ -75,12 +75,13 @@ func TestFIPSAgentConnectingToFIPSFleetServerInECHFRH(t *testing.T) {
 		if item.PolicyID == cloudAgentPolicyID {
 			agentStatus = item.Status
 			agentIsFIPS = item.LocalMetadata.Elastic.Agent.FIPS
+			break
 		}
 	}
 
 	// Check that this Agent is online (i.e. healthy) and is FIPS-capable. This
 	// will prove that a FIPS-capable Agent is able to connect to a FIPS-capable
 	// Fleet Server, with both running in ECH.
-	require.Equal(t, "online", agentStatus)
 	require.Equal(t, true, agentIsFIPS)
+	require.Equal(t, "online", agentStatus)
 }
