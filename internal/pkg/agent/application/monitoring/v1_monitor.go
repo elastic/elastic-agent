@@ -430,16 +430,7 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentInfo
 			"streams":    streams,
 		},
 	}
-<<<<<<< HEAD
-=======
 
-	// Make sure we don't set anything until the configuration is stable if the otel manager isn't enabled
-	if b.config.C.RuntimeManager != monitoringCfg.DefaultRuntimeManager {
-		input["_runtime_experimental"] = b.config.C.RuntimeManager
-	}
-
-	inputs := []any{input}
->>>>>>> f02155832 ([bug] Fix monitoring config reloading (#8261))
 	inputsNode, found := cfg[inputsKey]
 	if !found {
 		return fmt.Errorf("no inputs in config")
