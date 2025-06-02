@@ -8,8 +8,8 @@ env:
   CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud"
 
   IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1744855248"
-  IMAGE_UBUNTU_X86_64_FIPS: "test-platform-ingest-elastic-agent-ubuntu-2204-fips-1748866806"
-  IMAGE_UBUNTU_ARM64_FIPS: "test-platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1748866806"
+  IMAGE_UBUNTU_X86_64_FIPS: "test-platform-ingest-elastic-agent-ubuntu-2204-fips-1748876280"
+  IMAGE_UBUNTU_ARM64_FIPS: "test-platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1748876280"
 
 steps:
   # - label: Build and push custom elastic-agent image
