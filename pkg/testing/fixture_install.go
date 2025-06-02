@@ -491,6 +491,12 @@ func (f *Fixture) simpleInstallRPM(ctx context.Context) ([]byte, error) {
 	return nil, nil
 }
 
+func (f *Fixture) SetClient() {
+	socketPath := "unix:///var/lib/elastic-agent/elastic-agent.sock"
+	c := client.New(client.WithAddress(socketPath))
+	f.setClient(c)
+}
+
 func (f *Fixture) simpleInstallDeb(ctx context.Context) ([]byte, error) {
 	f.t.Logf("[test %s] Inside fixture simpleInstallDeb function", f.t.Name())
 	// Prepare so that the f.srcPackage string is populated
