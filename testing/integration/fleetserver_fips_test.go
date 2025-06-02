@@ -42,7 +42,7 @@ func TestFIPSAgentConnectingToFIPSFleetServerInECHFRH(t *testing.T) {
 		FIPS: true,
 	})
 
-	fleetServerURL, err := fleettools.DefaultURL(t.Context(), info.KibanaClient)
+	fleetServerHost, err := fleettools.DefaultURL(t.Context(), info.KibanaClient)
 	require.NoError(t, err)
 	statusUrl, err := url.JoinPath(fleetServerHost, "/api/status")
 	require.NoError(t, err)
