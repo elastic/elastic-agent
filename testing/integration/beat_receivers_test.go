@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"slices"
 	"strings"
 	"testing"
 	"text/template"
@@ -660,12 +659,7 @@ outputs:
 				stripNondeterminism(agentDoc, tt.metricset)
 				stripNondeterminism(otelDoc, tt.metricset)
 
-				agentKeys := *agentDoc.FlattenKeys()
-				otelKeys := *otelDoc.FlattenKeys()
-				slices.Sort(agentKeys)
-				slices.Sort(otelKeys)
-				assert.Equal(t, agentKeys, otelKeys, "expected to have the same keys in agent and otel documents for metricset %s", tt.metricset)
-
+				AssertMapstrKeysEqual(t, agentDoc, otelDoc, nil, "expected documents keys to be equal for metricset "+tt.metricset)
 				AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for metricset "+tt.metricset)
 			})
 
