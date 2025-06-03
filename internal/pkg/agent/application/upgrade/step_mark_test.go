@@ -373,11 +373,11 @@ func Test_markUpgradeLocking(t *testing.T) {
 		},
 		{
 			name: "Update marker creation should fail if marker is already locked by another process", args: args{
-			agent:          newAgent456,
-			previousAgent:  prevAgent123,
-			action:         nil,
-			upgradeDetails: nil,
-		},
+				agent:          newAgent456,
+				previousAgent:  prevAgent123,
+				action:         nil,
+				upgradeDetails: nil,
+			},
 			beforeUpdateMarkerCreation: func(t *testing.T, dataDir string) {
 				// write some fake data in update marker file
 				updateMarkerFilePath := markerFilePath(dataDir)
