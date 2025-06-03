@@ -15,7 +15,7 @@ env:
 steps:
   - label: Build and push custom elastic-agent image
     depends_on:
-      - 'packaging-containers-x86-64-fips'
+      - 'packaging-containers-x86-64-fips' # Reuse artifacts produced in .buildkite/integration.pipeline.yml
     key: integration-fips-cloud-image
     env:
       FIPS: "true"
@@ -50,7 +50,7 @@ steps:
     steps:
       - label: "fips:x86_64:non-sudo:{{matrix}}"
         depends_on:
-          - packaging-ubuntu-x86-64-fips
+          - packaging-ubuntu-x86-64-fips # Reuse artifacts produced in .buildkite/integration.pipeline.yml
         env:
           FIPS: "true"
         command: |
