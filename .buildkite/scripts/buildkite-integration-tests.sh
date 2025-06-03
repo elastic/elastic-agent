@@ -3,6 +3,7 @@
 
 GROUP_NAME=$1
 TEST_SUDO=$2
+TEST_NAME_PATTERN=${3:-""}
 
 if [ -z "$GROUP_NAME" ]; then
   echo "Error: Specify the group name: sudo-integration-tests.sh [group_name]" >&2
@@ -46,9 +47,19 @@ outputXML="build/${fully_qualified_group_name}.integration.xml"
 outputJSON="build/${fully_qualified_group_name}.integration.out.json"
 
 echo "~~~ Integration tests: ${GROUP_NAME}"
+GOTEST_ARGS=(-tags integration -test.shuffle on -test.timeout 2h0m0s)
+if [ -n "$TEST_NAME_PATTERN" ]; then
+  GOTEST_ARGS+=(-run="${TEST_NAME_PATTERN}")
+fi
+GOTEST_ARGS+=("github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=${GROUP_NAME}" "-integration.sudo=${TEST_SUDO}")
 
 set +e
+<<<<<<< HEAD
 TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args -integration.groups="${GROUP_NAME}" -integration.sudo="${TEST_SUDO}"
+=======
+TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true \
+  gotestsum --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- "${GOTEST_ARGS[@]}"
+>>>>>>> f1086184d (ci: migrate extended runtime leak tests to buildkite (#7931))
 TESTS_EXIT_STATUS=$?
 set -e
 
