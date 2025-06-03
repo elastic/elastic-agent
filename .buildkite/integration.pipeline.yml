@@ -179,9 +179,8 @@ steps:
         depends_on:
           - packaging-windows
         command: |
-          #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
-          .buildkite/scripts/integration-tests.ps1 fleet true TestLogIngestionFleetManaged
+          .buildkite/scripts/steps/serverless-integration-tests.ps1
         artifact_paths:
           - build/**
           - build/diagnostics/**
@@ -200,9 +199,8 @@ steps:
         depends_on:
           - packaging-windows
         command: |
-          #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
-          .buildkite/scripts/integration-tests.ps1 fleet true TestLogIngestionFleetManaged
+          .buildkite/scripts/steps/serverless-integration-tests.ps1
         artifact_paths:
           - build/**
           - build/diagnostics/**
@@ -220,9 +218,8 @@ steps:
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-ubuntu-x86-64
         command: |
-          #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
-          .buildkite/scripts/steps/integration_tests_tf.sh fleet true TestLogIngestionFleetManaged
+          .buildkite/scripts/steps/serverless-integration-tests.sh
         artifact_paths:
           - build/**
           - build/diagnostics/**
