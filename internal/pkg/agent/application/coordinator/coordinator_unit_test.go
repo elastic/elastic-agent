@@ -13,9 +13,13 @@ package coordinator
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
@@ -1325,6 +1329,139 @@ func TestCoordinatorReportsOverrideState(t *testing.T) {
 	default:
 		assert.Fail(t, "Coordinator's state didn't change")
 	}
+}
+
+func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
+	// Send an otel status to the coordinator, verify that it is correctly reflected in the component state
+
+	// Set a one-second timeout -- nothing here should block, but if it
+	// does let's report a failure instead of timing out the test runner.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	logger := logp.NewLogger("testing")
+
+	statusChan := make(chan *status.AggregateStatus)
+	otelManager := &fakeOTelManager{
+		statusChan: statusChan,
+	}
+
+	componentModel := []component.Component{
+		{
+			ID:             "filestream-default",
+			InputType:      "filestream",
+			OutputType:     "elasticsearch",
+			RuntimeManager: component.OtelRuntimeManager,
+			InputSpec: &component.InputRuntimeSpec{
+				BinaryName: "agentbeat",
+				Spec: component.InputSpec{
+					Command: &component.CommandSpec{
+						Args: []string{"filebeat"},
+					},
+				},
+			},
+			Units: []component.Unit{
+				{
+					ID:   "filestream-unit",
+					Type: client.UnitTypeInput,
+					Config: &proto.UnitExpectedConfig{
+						Streams: []*proto.Stream{
+							{Id: "test-1"},
+							{Id: "test-2"},
+						},
+					},
+				},
+				{
+					ID:   "filestream-default",
+					Type: client.UnitTypeOutput,
+				},
+			},
+		},
+	}
+	otelStatus := &status.AggregateStatus{
+		Event: componentstatus.NewEvent(componentstatus.StatusOK),
+		ComponentStatusMap: map[string]*status.AggregateStatus{
+			fmt.Sprintf("pipeline:logs/%sfilestream-default", translate.OtelNamePrefix): {
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					fmt.Sprintf("receiver:filebeat/%sfilestream-unit", translate.OtelNamePrefix): {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+					fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", translate.OtelNamePrefix): {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+				},
+			},
+		},
+	}
+
+	coord := &Coordinator{
+		logger:           logger,
+		agentInfo:        &info.AgentInfo{},
+		stateBroadcaster: broadcaster.New(State{}, 0, 0),
+		managerChans: managerChans{
+			otelManagerUpdate:    make(chan *status.AggregateStatus),
+			runtimeManagerUpdate: make(chan runtime.ComponentComponentState),
+		},
+		otelMgr:        otelManager,
+		state:          State{},
+		componentModel: componentModel,
+	}
+
+	// start runtime status watching
+	go coord.watchRuntimeComponents(ctx)
+
+	// no component status
+	assert.Empty(t, coord.state.Components)
+
+	// push the status into the coordinator
+
+	select {
+	case statusChan <- otelStatus:
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for coordinator to receive status")
+	}
+
+	select {
+	case finalOtelStatus := <-coord.managerChans.otelManagerUpdate:
+		// we shouldn't have any status remaining for the otel collector
+		assert.Empty(t, finalOtelStatus.ComponentStatusMap)
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for coordinator to receive status")
+	}
+
+	select {
+	case componentState := <-coord.managerChans.runtimeManagerUpdate:
+		coord.applyComponentState(componentState)
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for coordinator to receive status")
+	}
+
+	assert.Len(t, coord.state.Components, 1)
+
+	// Now, we remove the component and resend the same status. The component state should be deleted.
+	coord.componentModel = []component.Component{}
+	select {
+	case statusChan <- otelStatus:
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for coordinator to receive status")
+	}
+
+	select {
+	case finalOtelStatus := <-coord.managerChans.otelManagerUpdate:
+		// we shouldn't have any status remaining for the otel collector
+		assert.Empty(t, finalOtelStatus.ComponentStatusMap)
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for coordinator to receive status")
+	}
+
+	select {
+	case componentState := <-coord.managerChans.runtimeManagerUpdate:
+		coord.applyComponentState(componentState)
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for coordinator to receive status")
+	}
+
+	assert.Empty(t, coord.state.Components)
 }
 
 func TestCoordinatorInitiatesUpgrade(t *testing.T) {
