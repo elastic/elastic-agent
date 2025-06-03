@@ -116,9 +116,15 @@ func (b *BeatsMonitor) Reload(rawConfig *config.Config) error {
 		return nil
 	}
 
-	if err := rawConfig.Unpack(&b.config); err != nil {
+	newConfig := monitoringConfig{
+		C: monitoringCfg.DefaultConfig(),
+	}
+
+	if err := rawConfig.Unpack(&newConfig); err != nil {
 		return errors.New(err, "failed to unpack monitoring config during reload")
 	}
+
+	b.config = &newConfig
 	return nil
 }
 
