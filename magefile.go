@@ -66,6 +66,8 @@ import (
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
 	// mage:import
 	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/integtest/notests"
+	// mage:import update
+	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/update"
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
 
@@ -126,7 +128,7 @@ var (
 )
 
 func init() {
-	common.RegisterCheckDeps(Update, Check.All)
+	common.RegisterCheckDeps(Update, Check.All, Otel.Readme)
 	test.RegisterDeps(UnitTest)
 	devtools.BeatLicense = "Elastic License 2.0"
 	devtools.BeatDescription = "Elastic Agent - single, unified way to add monitoring for logs, metrics, and other types of data to a host."
@@ -339,7 +341,7 @@ func (Build) WindowsArchiveRootBinary() error {
 	if devtools.FIPSBuild {
 		// there is no actual FIPS relevance for this particular binary
 		// but better safe than sorry
-		args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips")
+		args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips,ms_tls13kdf")
 		args.CGO = true
 	}
 
@@ -804,7 +806,7 @@ func commitID() string {
 
 // Update is an alias for executing control protocol, configs, and specs.
 func Update() {
-	mg.Deps(Config, BuildPGP, BuildFleetCfg, Otel.Readme)
+	mg.Deps(Config, BuildPGP, BuildFleetCfg)
 }
 
 func EnsureCrossBuildOutputDir() error {
@@ -2486,6 +2488,7 @@ func listStacks() (string, error) {
 		t.AppendRows([]table.Row{
 			{"Elasticsearch URL", stack.Elasticsearch},
 			{"Kibana", stack.Kibana},
+			{"Integrations Server", stack.IntegrationsServer},
 			{"Username", stack.Username},
 			{"Password", stack.Password},
 		})
@@ -2578,6 +2581,8 @@ func generateEnvFile(stack tcommon.Stack) error {
 	fmt.Fprintf(f, "export KIBANA_HOST=\"%s\"\n", stack.Kibana)
 	fmt.Fprintf(f, "export KIBANA_USERNAME=\"%s\"\n", stack.Username)
 	fmt.Fprintf(f, "export KIBANA_PASSWORD=\"%s\"\n", stack.Password)
+
+	fmt.Fprintf(f, "export INTEGRATIONS_SERVER_HOST=\"%s\"\n", stack.IntegrationsServer)
 
 	return nil
 }

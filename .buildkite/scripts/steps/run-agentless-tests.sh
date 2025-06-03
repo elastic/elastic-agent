@@ -20,29 +20,33 @@ set -eox pipefail
 _SELF=$(dirname $0)
 source "${_SELF}/../common.sh"
 
+setup_extract_sha() {
+    # Ensure repo is available - redirect output to /dev/null
+    if [ ! -d "serverless-gitops" ]; then
+        git clone --depth 1 git@github.com:elastic/serverless-gitops.git
+    else
+        (cd serverless-gitops && git pull)
+    fi
+
+    # Install yq for YAML parsing
+    go install github.com/mikefarah/yq/v4@v4.45.1
+}
+
 extract_sha() {
     local env=$1
-    local sha
-
-    # Ensure repo is available
-    git clone --depth 1 git@github.com:elastic/serverless-gitops.git || (
-        cd serverless-gitops
-        git pull
-    )
-
-    go install github.com/mikefarah/yq/v4@v4.45.1
-
+    
     # Extract first matching SHA for the environment pattern
-    sha=$(yq eval ".services.agentless-controller.versions | to_entries | .[] | select(.key | test(\"^${env}.*\")) | .value" serverless-gitops/services/agentless-controller/versions.yaml | head -1)
-
-    echo "$sha"
+    yq eval ".services.agentless-controller.versions | with_entries(select(.key | test(\"^${env}.*\"))) | to_entries | .[0].value // \"\"" serverless-gitops/services/agentless-controller/versions.yaml
 }
+
 
 # Check environment variable
 if [ -z "${ENVIRONMENT:-}" ]; then
     echo "ENVIRONMENT variable is not set"
     exit 1
 fi
+
+setup_extract_sha
 
 # Extract agentless_controller_sha for the specified environment
 agentless_controller_sha=$(extract_sha "$ENVIRONMENT")

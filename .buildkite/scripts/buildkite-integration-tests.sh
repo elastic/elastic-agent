@@ -3,6 +3,7 @@
 
 GROUP_NAME=$1
 TEST_SUDO=$2
+TEST_NAME_PATTERN=${3:-""}
 
 if [ -z "$GROUP_NAME" ]; then
   echo "Error: Specify the group name: sudo-integration-tests.sh [group_name]" >&2
@@ -27,15 +28,12 @@ asdf install
 
 echo "~~~ Running integration tests as $USER"
 
-go install gotest.tools/gotestsum
-gotestsum --version
+make install-gotestsum
 
 # Parsing version.go. Will be simplified here: https://github.com/elastic/ingest-dev/issues/4925
-#AGENT_VERSION=$(grep "const defaultBeatVersion =" version/version.go | cut -d\" -f2)
-#AGENT_VERSION="${AGENT_VERSION}-SNAPSHOT"
+AGENT_VERSION=$(grep "const defaultBeatVersion =" version/version.go | cut -d\" -f2)
+AGENT_VERSION="${AGENT_VERSION}-SNAPSHOT"
 
-# Remove agent pinning once 9.0.0 is released
-AGENT_VERSION=9.0.0-SNAPSHOT
 export AGENT_VERSION
 echo "~~~ Agent version: ${AGENT_VERSION}"
 
@@ -49,9 +47,15 @@ outputXML="build/${fully_qualified_group_name}.integration.xml"
 outputJSON="build/${fully_qualified_group_name}.integration.out.json"
 
 echo "~~~ Integration tests: ${GROUP_NAME}"
+GOTEST_ARGS=(-tags integration -test.shuffle on -test.timeout 2h0m0s)
+if [ -n "$TEST_NAME_PATTERN" ]; then
+  GOTEST_ARGS+=(-run="${TEST_NAME_PATTERN}")
+fi
+GOTEST_ARGS+=("github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=${GROUP_NAME}" "-integration.sudo=${TEST_SUDO}")
 
 set +e
-TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args -integration.groups="${GROUP_NAME}" -integration.sudo="${TEST_SUDO}"
+TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true \
+  gotestsum --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- "${GOTEST_ARGS[@]}"
 TESTS_EXIT_STATUS=$?
 set -e
 

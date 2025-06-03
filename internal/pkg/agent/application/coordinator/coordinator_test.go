@@ -1200,6 +1200,9 @@ func (*testMonitoringManager) Reload(rawConfig *config.Config) error          { 
 func (*testMonitoringManager) MonitoringConfig(map[string]interface{}, []component.Component, map[string]uint64) (map[string]interface{}, error) {
 	return nil, nil
 }
+func (*testMonitoringManager) ComponentMonitoringConfig(_, _ string) map[string]interface{} {
+	return nil
+}
 
 type fakeConfigManager struct {
 	errCh       chan error
