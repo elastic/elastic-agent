@@ -23,6 +23,7 @@ func Check() {
 	deps := make([]interface{}, 0, len(checkDeps)+2)
 	deps = append(deps, devtools.Format)
 	deps = append(deps, checkDeps...)
+	deps = append(deps, Tidy)
 	deps = append(deps, devtools.Check)
 	mg.SerialDeps(deps...)
 }
