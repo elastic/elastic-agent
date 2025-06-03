@@ -52,7 +52,7 @@ jobs:
         with:
           template: 'serverless-ea-it'
           cluster-name-prefix: "${{ env.PREFIX }}-${{ steps.get_day.outputs.day }}"
-          parameters: '{"Target":"production","ProjectType","observability"}'
+          parameters: '{"Target":"production","ProjectType":"observability"}'
           github-token: ${{ steps.get_token.outputs.token }}
           gitops: true
           wait: '15'
