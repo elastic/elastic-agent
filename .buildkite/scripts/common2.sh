@@ -43,11 +43,3 @@ getOSOptions() {
       ;;
   esac
 }
-
-google_cloud_auth() {
-    local keyFile=$1
-
-    gcloud auth activate-service-account --key-file ${keyFile} 2> /dev/null
-
-    export GOOGLE_APPLICATION_CREDENTIALS=${secretFileLocation}
-}
