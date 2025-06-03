@@ -384,7 +384,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 }
 
 // TestAgentMetricsInput is a test that compares documents ingested by
-// agent metrics input and otel metrics input and asserts that they are
+// agent system/metrics input in process and otel modes and asserts that they are
 // equivalent.
 func TestAgentMetricsInput(t *testing.T) {
 	info := define.Require(t, define.Requirements{
