@@ -169,47 +169,74 @@ steps:
           imagePrefix: "core-ubuntu-2204-aarch64"
           diskSizeGb: 200
 
-  - label: "Serverless integration test"
-    key: "serverless-integration-tests"
-    depends_on:
-      - int-packaging
-    concurrency_group: elastic-agent-extended-testing/serverless-integration
-    concurrency: 8
-    env:
-      # we run each step in a different data center to spread the load
-      TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-a"
-    command: |
-      buildkite-agent artifact download "build/distributions/**" . $BUILDKITE_BUILD_ID
-      .buildkite/scripts/steps/integration_tests.sh serverless integration:single TestLogIngestionFleetManaged #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
-    artifact_paths:
-      - "build/TEST-**"
-      - "build/diagnostics/*"
-    agents:
-      provider: "gcp"
-      machineType: "n2-standard-8"
-    retry:
-      automatic:
-        limit: 1
-    notify:
-      - github_commit_status:
-          context: "buildkite/elastic-agent-extended-testing - Serverless integration test"
-
-  - label: "Serverless integration test (oblt-cli)"
-    depends_on:
-      - int-packaging
-    command: .buildkite/scripts/steps/serverless-integration-tests.sh
-    agents:
-      provider: "gcp"
-      machineType: "n2-standard-8"
-    plugins:
-      - *google_oidc_plugin
-      - *gcp_serverless_secrets_plugin
-    retry:
-      automatic:
-        limit: 1
+  - group: "Serverless integration test (oblt-cli)"
+    key: serverless-integration-tests
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Serverless integration test (oblt-cli)"
+    steps:
+      - label: "Windows:2022:amd64:sudo"
+        depends_on:
+          - packaging-windows
+        command: |
+          #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
+          .buildkite/scripts/integration-tests.ps1 fleet true TestLogIngestionFleetManaged
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          # TODO: replace with IMAGE_WIN_2022 when we migrate this in bk.integration.pipeline.yml
+          image: "family/platform-ingest-elastic-agent-windows-2022"
+        plugins:
+          - *google_oidc_plugin
+          - *gcp_serverless_secrets_plugin
+      - label: "Windows:2025:amd64:sudo"
+        depends_on:
+          - packaging-windows
+        command: |
+          #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
+          .buildkite/scripts/integration-tests.ps1 fleet true TestLogIngestionFleetManaged
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          # TODO: replace with IMAGE_WIN_2025 when we migrate this in bk.integration.pipeline.yml
+          image: "family/platform-ingest-elastic-agent-windows-2025"
+        plugins:
+          - *google_oidc_plugin
+          - *gcp_serverless_secrets_plugin
+      - label: "Ubuntu:2404:amd64:sudo"
+        depends_on: packaging-ubuntu-x86-64
+        command: |
+          #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
+          .buildkite/scripts/steps/integration_tests_tf.sh fleet true TestLogIngestionFleetManaged
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          # TODO: replace with IMAGE_UBUNTU_2404_X86_64 when we migrate this in bk.integration.pipeline.yml
+          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+        plugins:
+          - *google_oidc_plugin
+          - *gcp_serverless_secrets_plugin
 
   - label: "Triggering Integration tests"
     depends_on:
