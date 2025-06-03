@@ -271,7 +271,6 @@ desired_outcome: true
 }
 
 func Test_markUpgradeLocking(t *testing.T) {
-
 	type dataDirHookFunc func(t *testing.T, dataDir string)
 
 	type args struct {
@@ -372,7 +371,8 @@ func Test_markUpgradeLocking(t *testing.T) {
 			wantErr: assert.Error,
 		},
 		{
-			name: "Update marker creation should fail if marker is already locked by another process", args: args{
+			name: "Update marker creation should fail if marker is already locked by another process",
+			args: args{
 				agent:          newAgent456,
 				previousAgent:  prevAgent123,
 				action:         nil,
@@ -430,6 +430,7 @@ func Test_markUpgradeLocking(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			tmpDataDir := t.TempDir()
 			logger, _ := loggertest.New(t.Name())
 			if tt.beforeUpdateMarkerCreation != nil {
