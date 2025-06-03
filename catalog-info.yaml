@@ -66,6 +66,8 @@ spec:
       teams:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ
+        observablt-robots:
+          access_level: MANAGE_BUILD_AND_READ
         everyone:
           access_level: READ_ONLY
 
@@ -107,6 +109,8 @@ spec:
       teams:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ
+        observablt-robots:
+          access_level: MANAGE_BUILD_AND_READ
         everyone:
           access_level: BUILD_AND_READ
 
@@ -140,6 +144,8 @@ spec:
       skip_intermediate_builds: false
       teams:
         ingest-fp:
+          access_level: MANAGE_BUILD_AND_READ
+        observablt-robots:
           access_level: MANAGE_BUILD_AND_READ
         everyone:
           access_level: BUILD_AND_READ
@@ -241,6 +247,8 @@ spec:
       teams:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ
+        observablt-robots:
+          access_level: MANAGE_BUILD_AND_READ
         everyone:
           access_level: BUILD_AND_READ
 
@@ -282,6 +290,8 @@ spec:
           message: Integration test matrix
       teams:
         ingest-fp:
+          access_level: MANAGE_BUILD_AND_READ
+        observablt-robots:
           access_level: MANAGE_BUILD_AND_READ
         everyone:
           access_level: BUILD_AND_READ
@@ -327,6 +337,8 @@ spec:
           message: GCE cleanup
       teams:
         ingest-fp:
+          access_level: MANAGE_BUILD_AND_READ
+        observablt-robots:
           access_level: MANAGE_BUILD_AND_READ
         everyone:
           access_level: BUILD_AND_READ
