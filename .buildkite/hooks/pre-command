@@ -60,12 +60,6 @@ if [[ "$BUILDKITE_STEP_KEY" == *"integration-tests"* ]]; then
   export TEST_INTEG_AUTH_ESS_APIKEY_FILE=$(realpath ./apiKey)
 fi
 
-if [[ "$BUILDKITE_STEP_KEY" == *"aggregate-reports"* || "$BUILDKITE_STEP_KEY" == *"integration-tests"* ]]; then
-  echo "--- Prepare BK test analytics token :vault:"
-  BUILDKITE_ANALYTICS_TOKEN=$(vault kv get -field token kv/ci-shared/platform-ingest/buildkite_analytics_token)
-  export BUILDKITE_ANALYTICS_TOKEN
-fi
-
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-binary-dra" ]]; then
   if command -v docker &>/dev/null; then
     docker_login
