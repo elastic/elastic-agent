@@ -5,7 +5,6 @@
 # upgrade integration tests.
 
 testVersions:
-  - 8.19.0-SNAPSHOT
   - 8.18.2
   - 8.17.6
   - 7.17.29-SNAPSHOT
