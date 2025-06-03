@@ -90,8 +90,8 @@ jobs:
           echo -n "${ELASTICSEARCH_PASSWORD}" | gcloud secrets versions add "${PREFIX}-elasticsearch-password" --data-file=- --quiet --project "${GCP_PROJECT}"
           echo -n "${ELASTICSEARCH_USERNAME}" | gcloud secrets versions add "${PREFIX}-elasticsearch-username" --data-file=- --quiet --project "${GCP_PROJECT}"
           echo -n "${KIBANA_HOST}" | gcloud secrets versions add "${PREFIX}-kibana-hostname" --data-file=- --quiet --project "${GCP_PROJECT}"
-          echo -n "${KIBANA_USERNAME}" | gcloud secrets versions add "${PREFIX}-kibana-password" --data-file=- --quiet --project "${GCP_PROJECT}"
-          echo -n "${KIBANA_PASSWORD}" | gcloud secrets versions add "${PREFIX}-kibana-username" --data-file=- --quiet --project "${GCP_PROJECT}"
+          echo -n "${KIBANA_USERNAME}" | gcloud secrets versions add "${PREFIX}-kibana-username" --data-file=- --quiet --project "${GCP_PROJECT}"
+          echo -n "${KIBANA_PASSWORD}" | gcloud secrets versions add "${PREFIX}-kibana-password" --data-file=- --quiet --project "${GCP_PROJECT}"
 
       # TODO: if rotation fails then rollback to the previous cluster.
       - if: ${{ failure()  }}
