@@ -258,6 +258,12 @@ rules implemented on our `Makefile` as well as CI will use the
 locally before submitting any PRs to have a quicker feedback instead
 of waiting for a CI failure.
 
+### Keeping Go module files tidy
+The Elastic Agent repository includes additional Go modules (e.g. `wrapper/windows/archive-proxy`) that import the main `elastic-agent` module. This requires keeping all `go.mod` files in sync whenever dependencies change. There is a dedicated `mage tidy` target that recursively runs `go mod tidy` across the entire repo. This is now handled automatically in the following targets:
+- `mage check`
+- `mage notice`
+- `mage update`
+
 ### Generating the `NOTICE.txt` when updating/adding dependencies
 To do so, just run `make notice`, this is also part of the `make
 check-ci` and is the same check our CI will do.
