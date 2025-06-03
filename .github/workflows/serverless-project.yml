@@ -81,9 +81,11 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@77e7a554d41e2ee56fc945c52dfd3f33d12def9a
 
+      # TODO: as soon as the oblt-framework supports elastic-observability-ci we can avoid this step.
       # NOTE:
       #   * While runnning this workflow, it might cause some hiccups if a PR runs when rotating the secrets
-      #   * Secrets need to be created firstly gcloud secrets create otherwise gcloud secrets versions add will fail.
+      #   * Secrets need to be created firstly. gcloud secrets create otherwise gcloud secrets versions add will fail.
+      #     That's not an issue now, as we use the same secret name.
       - name: Rotate GCSM secrets
         env:
           GCP_PROJECT: "elastic-observability-ci"
