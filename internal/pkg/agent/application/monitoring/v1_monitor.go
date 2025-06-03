@@ -125,9 +125,15 @@ func (b *BeatsMonitor) Reload(rawConfig *config.Config) error {
 		return nil
 	}
 
-	if err := rawConfig.UnpackTo(&b.config); err != nil {
+	newConfig := monitoringConfig{
+		C: monitoringCfg.DefaultConfig(),
+	}
+
+	if err := rawConfig.UnpackTo(&newConfig); err != nil {
 		return errors.New(err, "failed to unpack monitoring config during reload")
 	}
+
+	b.config = &newConfig
 	return nil
 }
 
@@ -424,6 +430,7 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentInfo
 			"streams":    streams,
 		},
 	}
+
 	inputsNode, found := cfg[inputsKey]
 	if !found {
 		return fmt.Errorf("no inputs in config")
