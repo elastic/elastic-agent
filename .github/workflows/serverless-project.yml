@@ -47,13 +47,12 @@ jobs:
         id: get_day
         run: echo "day=$(date +'%a' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
-      - uses: elastic/oblt-actions/oblt-cli/cluster-create-serverless@v1
+      - uses: elastic/oblt-actions/oblt-cli/cluster-create-custom@feature/support-wait
         id: create_serverless
         with:
-          # TODO: support a different serverless oblt-cli template
-          project-type: 'observability'
-          target: 'production'
+          template: 'serverless-ea-it'
           cluster-name-prefix: "${{ env.PREFIX }}-${{ steps.get_day.outputs.day }}"
+          parameters: '{"Target":"production":"ProjectType","observability"}'
           github-token: ${{ steps.get_token.outputs.token }}
           gitops: true
           wait: '15'
