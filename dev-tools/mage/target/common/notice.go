@@ -28,30 +28,10 @@ func runCommand(cmd string, args ...string) error {
 
 // Notice Generates NOTICE.txt.
 func Notice() (err error) {
-<<<<<<< HEAD
 	fmt.Println("Generating NOTICE")
-	if err := runCommand("go", "mod", "tidy"); err != nil {
-=======
-	if err := generateNotice(notice.NoticeFilename); err != nil {
-		return fmt.Errorf("failed to generate %s: %w", notice.NoticeFilename, err)
-	}
-	if err := generateNotice(notice.FIPSNoticeFilename, "requirefips"); err != nil {
-		return fmt.Errorf("failed to generate %s: %w", notice.FIPSNoticeFilename, err)
-	}
-	return nil
-}
-
-// generateNotice generates a generateNotice file with the name outputFilename.
-// see getDependentModules for use of additionalTags.
-func generateNotice(outputFilename string, additionalTags ...string) error {
-	// NOTE: this is not invoked through mg.Deps because
-	// we want to always invoke it and guarantee that it runs
-	// as mg.Deps does memoization
 	if err := Tidy(); err != nil {
->>>>>>> 5b7ee26ec (feat: introduce new mage tidy target (#8279))
 		return err
 	}
-	fmt.Printf("Generating %s...\n", outputFilename)
 	if err := runCommand("go", "mod", "download"); err != nil {
 		return err
 	}
