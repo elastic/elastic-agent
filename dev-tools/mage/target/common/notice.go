@@ -29,7 +29,7 @@ func runCommand(cmd string, args ...string) error {
 // Notice Generates NOTICE.txt.
 func Notice() (err error) {
 	fmt.Println("Generating NOTICE")
-	if err := runCommand("go", "mod", "tidy"); err != nil {
+	if err := Tidy(); err != nil {
 		return err
 	}
 	if err := runCommand("go", "mod", "download"); err != nil {
