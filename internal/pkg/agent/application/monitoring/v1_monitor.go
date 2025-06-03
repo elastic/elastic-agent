@@ -116,15 +116,11 @@ func (b *BeatsMonitor) Reload(rawConfig *config.Config) error {
 		return nil
 	}
 
-<<<<<<< HEAD
-	if err := rawConfig.Unpack(&b.config); err != nil {
-=======
 	newConfig := monitoringConfig{
 		C: monitoringCfg.DefaultConfig(),
 	}
 
 	if err := rawConfig.UnpackTo(&newConfig); err != nil {
->>>>>>> f02155832 ([bug] Fix monitoring config reloading (#8261))
 		return errors.New(err, "failed to unpack monitoring config during reload")
 	}
 
@@ -372,7 +368,6 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 	monitoringNamespace := b.monitoringNamespace()
 	logsDrop := filepath.Dir(loggingPath("unit", b.operatingSystem))
 
-<<<<<<< HEAD
 	streams := []interface{}{
 		map[string]interface{}{
 			idKey:  fmt.Sprintf("%s-agent", monitoringFilesUnitsID),
@@ -518,23 +513,6 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, components []
 				},
 			},
 		},
-=======
-	streams := []any{b.getAgentFilestreamStream(logsDrop)}
-
-	streams = append(streams, b.getServiceComponentFilestreamStreams(componentInfos)...)
-
-	input := map[string]interface{}{
-		idKey:        fmt.Sprintf("%s-agent", monitoringFilesUnitsID),
-		"name":       fmt.Sprintf("%s-agent", monitoringFilesUnitsID),
-		"type":       "filestream",
-		useOutputKey: monitoringOutput,
-		"streams":    streams,
-	}
-
-	// Make sure we don't set anything until the configuration is stable if the otel manager isn't enabled
-	if b.config.C.RuntimeManager != monitoringCfg.DefaultRuntimeManager {
-		input["_runtime_experimental"] = b.config.C.RuntimeManager
->>>>>>> f02155832 ([bug] Fix monitoring config reloading (#8261))
 	}
 
 	// service components that define a log path are monitored using its own stream in the monitor
