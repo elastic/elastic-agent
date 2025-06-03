@@ -9,8 +9,8 @@ env:
   TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
 
   IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1744855248"
-  IMAGE_UBUNTU_X86_64_FIPS: "test-platform-ingest-elastic-agent-ubuntu-2204-fips-1748876280"
-  IMAGE_UBUNTU_ARM64_FIPS: "test-platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1748876280"
+  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-1748955449"
+  IMAGE_UBUNTU_ARM64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1748955449"
 
 steps:
   - label: Build and push custom elastic-agent image
@@ -20,8 +20,6 @@ steps:
     env:
       FIPS: "true"
     command: |
-      #!/usr/bin/env bash
-      set -euo pipefail
       buildkite-agent artifact download build/distributions/elastic-agent-fips-cloud-*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64-fips'
       mage cloud:load
       mage cloud:push
@@ -37,8 +35,6 @@ steps:
     env:
       ASDF_TERRAFORM_VERSION: 1.9.2
     command: |
-      #!/usr/bin/env bash
-      set -euo pipefail
       source .buildkite/scripts/steps/ess_start.sh
     artifact_paths:
       - test_infra/ess/*.tfstate
