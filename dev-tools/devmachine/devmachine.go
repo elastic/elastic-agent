@@ -17,7 +17,7 @@ import (
 const (
 	ZONE_TEMPLATE  = "zones/%s/machineTypes/n1-standard-4"
 	IMAGE_TEMPLATE = "projects/%s/global/images/%s"
-	DEFAULT_IMAGE  = "platform-ingest-elastic-agent-ubuntu-2204-1749026946"
+	DEFAULT_IMAGE  = "platform-ingest-elastic-agent-ubuntu-2204-1749051876"
 	DEFAULT_ZONE   = "us-central1-a"
 )
 

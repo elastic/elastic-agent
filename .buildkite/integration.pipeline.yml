@@ -200,7 +200,7 @@ steps:
           imageProject: elastic-images-qa
           machineType: "n2-standard-8"
           # TODO: replace with IMAGE_WIN_2022 when we migrate this in bk.integration.pipeline.yml
-          image: "platform-ingest-elastic-agent-windows-2022-1749026946"
+          image: "platform-ingest-elastic-agent-windows-2022-1749051876"
         plugins:
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
@@ -221,7 +221,7 @@ steps:
           imageProject: elastic-images-qa
           machineType: "n2-standard-8"
           # TODO: replace with IMAGE_WIN_2025 when we migrate this in bk.integration.pipeline.yml
-          image: "platform-ingest-elastic-agent-windows-2025-1749026946"
+          image: "platform-ingest-elastic-agent-windows-2025-1749051876"
         plugins:
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
@@ -241,7 +241,7 @@ steps:
           imageProject: elastic-images-qa
           machineType: "n2-standard-8"
           # TODO: replace with IMAGE_UBUNTU_2404_X86_64 when we migrate this in bk.integration.pipeline.yml
-          image: "platform-ingest-elastic-agent-ubuntu-2404-1749026946"
+          image: "platform-ingest-elastic-agent-ubuntu-2404-1749051876"
         plugins:
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
