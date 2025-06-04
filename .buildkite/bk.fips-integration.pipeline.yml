@@ -4,9 +4,6 @@ env:
   DOCKER_REGISTRY: "docker.elastic.co"
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   ASDF_MAGE_VERSION: 1.14.0
-  CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
-  CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud"
-  TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
 
   IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1744855248"
   IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-1748955449"
@@ -19,6 +16,9 @@ steps:
     key: integration-fips-cloud-image
     env:
       FIPS: "true"
+      CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
+      CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud"
+      TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
     command: |
       buildkite-agent artifact download build/distributions/elastic-agent-fips-cloud-*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64-fips'
       mage cloud:load
@@ -34,6 +34,9 @@ steps:
       - integration-fips-cloud-image
     env:
       ASDF_TERRAFORM_VERSION: 1.9.2
+      CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
+      CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud"
+      TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
     command: |
       source .buildkite/scripts/steps/ess_start.sh
     artifact_paths:
@@ -53,6 +56,9 @@ steps:
           - packaging-ubuntu-x86-64-fips # Reuse artifacts produced in .buildkite/integration.pipeline.yml
         env:
           FIPS: "true"
+          CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
+          CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud"
+          TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64-fips'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
@@ -74,6 +80,9 @@ steps:
           - packaging-ubuntu-x86-64-fips
         env:
           FIPS: "true"
+          CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
+          CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud"
+          TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64-fips
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
@@ -95,6 +104,9 @@ steps:
           - packaging-ubuntu-arm64-fips
         env:
           FIPS: "true"
+          CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
+          CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud"
+          TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64-fips'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
@@ -116,6 +128,9 @@ steps:
           - packaging-ubuntu-arm64-fips
         env:
           FIPS: "true"
+          CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
+          CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud"
+          TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-arm64-fips
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
