@@ -57,6 +57,9 @@ targets:
     disablesourceinput: true
     spec:
       command: .ci/scripts/update-otel.sh {{ source "latest_core_beta" }} {{ source "latest_core_stable" }} {{ source "latest_contrib" }}
+      environments:
+      - name: PATH
+      - name: HOME
 
 actions:
   default:
