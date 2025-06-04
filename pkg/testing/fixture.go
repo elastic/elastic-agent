@@ -275,10 +275,6 @@ func (f *Fixture) SetUninstallToken(uninstallToken string) {
 	f.uninstallToken = uninstallToken
 }
 
-func (f *Fixture) UninstallToken() string {
-	return f.uninstallToken
-}
-
 // WorkDir returns the installed fixture's work dir AKA base dir AKA top dir. This
 // must be called after `Install` is called.
 func (f *Fixture) WorkDir() string {
