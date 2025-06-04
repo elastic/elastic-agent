@@ -1,0 +1,39 @@
+// begin 9.0.2 relnotes
+
+[[release-notes-9.0.2]]
+==  9.0.2
+
+Review important information about the  9.0.2 release.
+
+[discrete]
+[[security-updates-9.0.2]]
+=== Security updates
+
+
+elastic-agent::
+
+* Upgrade Go Version To 1.24.3. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8109[#https://github.com/elastic/elastic-agent/pull/8109] 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[bug-fixes-9.0.2]]
+=== Bug fixes
+
+
+elastic-agent::
+
+* Preserve Agent Run State On Deb And Rpm Upgrades. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7999[#https://github.com/elastic/elastic-agent/pull/7999] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/3832[#https://github.com/elastic/elastic-agent/issues/3832]
+
+// end 9.0.2 relnotes
