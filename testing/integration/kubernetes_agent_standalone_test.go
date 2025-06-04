@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -1447,8 +1448,12 @@ type k8sKustomizeOverrides struct {
 // to further adjust the k8s objects
 func k8sStepDeployKustomize(kustomizePath string, containerName string, overrides k8sKustomizeOverrides, forEachObject func(object k8s.Object)) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		renderedManifest, err := k8sRenderKustomize(kustomizePath)
-		require.NoError(t, err, "failed to render kustomize")
+		var renderedManifest []byte
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			var err error
+			renderedManifest, err = k8sRenderKustomize(kustomizePath)
+			assert.NoError(collect, err)
+		}, 5*time.Second, 500*time.Millisecond, "failed to render kustomize")
 
 		objects, err := testK8s.LoadFromYAML(bufio.NewReader(bytes.NewReader(renderedManifest)))
 		require.NoError(t, err, "failed to parse rendered kustomize")
