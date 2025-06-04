@@ -104,11 +104,11 @@ func TestGetAllComponentState(t *testing.T) {
 					Component: fileStreamOtelComponent,
 					State: runtime.ComponentState{
 						State:   client.UnitStateHealthy,
-						Message: "StatusOK",
+						Message: "HEALTHY",
 						Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
 							runtime.ComponentUnitKey{UnitID: "filestream-unit", UnitType: client.UnitTypeInput}: {
 								State:   client.UnitStateHealthy,
-								Message: client.UnitStateHealthy.String(),
+								Message: "Healthy",
 								Payload: map[string]any{
 									"streams": map[string]map[string]string{
 										"test-1": {
@@ -124,7 +124,7 @@ func TestGetAllComponentState(t *testing.T) {
 							},
 							runtime.ComponentUnitKey{UnitID: "filestream-default", UnitType: client.UnitTypeOutput}: {
 								State:   client.UnitStateHealthy,
-								Message: client.UnitStateHealthy.String(),
+								Message: "Healthy",
 							},
 						},
 						VersionInfo: runtime.ComponentVersionInfo{
@@ -431,7 +431,7 @@ func TestGetComponentUnitState(t *testing.T) {
 			},
 			expected: runtime.ComponentUnitState{
 				State:   client.UnitStateHealthy,
-				Message: client.UnitStateHealthy.String(),
+				Message: "Healthy",
 				Payload: map[string]any{
 					"streams": map[string]map[string]string{
 						"stream-1": {
@@ -453,7 +453,7 @@ func TestGetComponentUnitState(t *testing.T) {
 			},
 			expected: runtime.ComponentUnitState{
 				State:   client.UnitStateDegraded,
-				Message: client.UnitStateDegraded.String(),
+				Message: "recoverable error",
 				Payload: map[string]any{
 					"streams": map[string]map[string]string{
 						"stream-1": {

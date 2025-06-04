@@ -109,7 +109,7 @@ func getOtelRuntimePipelineStatuses(otelStatus *status.AggregateStatus) (map[str
 func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Component) (runtime.ComponentComponentState, error) {
 	compState := runtime.ComponentState{
 		State:   otelStatusToUnitState(pipelineStatus.Status()),
-		Message: pipelineStatus.Status().String(),
+		Message: otelStatusToUnitState(pipelineStatus.Status()).String(),
 		Units:   make(map[runtime.ComponentUnitKey]runtime.ComponentUnitState),
 		VersionInfo: runtime.ComponentVersionInfo{
 			Name: OtelComponentName,
@@ -194,6 +194,7 @@ func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus) (
 // getComponentUnitState extracts component unit state from otel status.
 func getComponentUnitState(otelUnitStatus *status.AggregateStatus, unit component.Unit) runtime.ComponentUnitState {
 	unitStatus := otelStatusToUnitState(otelUnitStatus.Status())
+	unitMessage := unitMessageFromOtelStatus(otelUnitStatus)
 	var streamStatus map[string]map[string]string
 
 	if unit.Config != nil {
@@ -220,9 +221,24 @@ func getComponentUnitState(otelUnitStatus *status.AggregateStatus, unit componen
 
 	return runtime.ComponentUnitState{
 		State:   unitStatus,
-		Message: unitStatus.String(),
+		Message: unitMessage,
 		Payload: payload,
 	}
+}
+
+// unitMessageFromOtelStatus converts otel status to component unit message.
+// This is a partial reimplementation of part of the logic in
+// https://github.com/elastic/beats/blob/main/x-pack/libbeat/management/unit.go#L208
+func unitMessageFromOtelStatus(otelUnitStatus *status.AggregateStatus) string {
+	if otelUnitStatus.Err() != nil {
+		return otelUnitStatus.Err().Error()
+	}
+	unitStatus := otelStatusToUnitState(otelUnitStatus.Status())
+	if unitStatus == client.UnitStateHealthy {
+		return "Healthy"
+	}
+
+	return unitStatus.String()
 }
 
 // otelStatusToUnitState translates otel status to component unit state.
