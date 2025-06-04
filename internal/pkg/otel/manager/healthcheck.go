@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
 	"go.opentelemetry.io/collector/confmap"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -155,9 +156,14 @@ func aggregateStatus(sts componentstatus.Status, err error) *status.AggregateSta
 
 // injectHeathCheckV2Extension injects the healthcheckv2 extension into the provided configuration.
 func injectHeathCheckV2Extension(conf *confmap.Conf, httpHealthCheckPort int) error {
-	err := conf.Merge(confmap.NewFromStringMap(map[string]interface{}{
+	nsUUID, err := uuid.NewV4()
+	if err != nil {
+		return fmt.Errorf("cannot generate UUID V4: %w", err)
+	}
+	healthCheckExtensionID := fmt.Sprintf("healthcheckv2/%s", nsUUID.String())
+	err = conf.Merge(confmap.NewFromStringMap(map[string]interface{}{
 		"extensions": map[string]interface{}{
-			healthCheckExtensionName: map[string]interface{}{
+			healthCheckExtensionID: map[string]interface{}{
 				"use_v2": true,
 				"component_health": map[string]interface{}{
 					"include_permanent_errors":   healthCheckIncludePermanentErrors,
@@ -193,7 +199,7 @@ func injectHeathCheckV2Extension(conf *confmap.Conf, httpHealthCheckPort int) er
 		// no extensions defined on service (easily add it)
 		err = conf.Merge(confmap.NewFromStringMap(map[string]interface{}{
 			"service": map[string]interface{}{
-				"extensions": []interface{}{healthCheckExtensionName},
+				"extensions": []interface{}{healthCheckExtensionID},
 			},
 		}))
 		if err != nil {
@@ -207,12 +213,12 @@ func injectHeathCheckV2Extension(conf *confmap.Conf, httpHealthCheckPort int) er
 	}
 	for _, extensionRaw := range extensionsSlice {
 		extension, ok := extensionRaw.(string)
-		if ok && extension == healthCheckExtensionName {
+		if ok && extension == healthCheckExtensionID {
 			// already present, nothing to do
 			return nil
 		}
 	}
-	extensionsSlice = append(extensionsSlice, healthCheckExtensionName)
+	extensionsSlice = append(extensionsSlice, healthCheckExtensionID)
 	err = conf.Merge(confmap.NewFromStringMap(map[string]interface{}{
 		"service": map[string]interface{}{
 			"extensions": extensionsSlice,
