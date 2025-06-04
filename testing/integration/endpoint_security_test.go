@@ -88,39 +88,6 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 	})
 }
 
-// func TestUpgradeSameVersion_DEB(t *testing.T) {
-// 	info := define.Require(t, define.Requirements{
-// 		Group: Deb,
-// 		Stack: &define.Stack{},
-// 		Local: false, // requires Agent installation
-// 		Sudo:  true,  // requires Agent installation
-// 		OS: []define.OS{
-// 			{
-// 				Type: define.Linux,
-// 			},
-// 		},
-// 	})
-//
-// 	testTamperProtectedSameVersionInstall(t, info, "deb")
-// }
-//
-// func TestUpgradeAgentWithTamperPrtotectionErrorRecovery_DEB(t *testing.T) {
-// 	info := define.Require(t, define.Requirements{
-// 		// define.Require(t, define.Requirements{
-// 		Group: Deb,
-// 		Stack: &define.Stack{},
-// 		Local: false, // requires Agent installation
-// 		Sudo:  true,  // requires Agent installation
-// 		OS: []define.OS{
-// 			{
-// 				Type: define.Linux,
-// 			},
-// 		},
-// 	})
-//
-// 	testTamperProtectedErrorRecovery(t, info, "deb")
-// }
-
 func TestUpgradeAgentWithTamperProtectedEndpoint_RPM(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: RPM,
