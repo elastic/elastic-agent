@@ -35,6 +35,8 @@ sed -i.bak "s/\(go\.opentelemetry\.io\/collector.*\) $current_stable_core/\1 $ne
 sed -i.bak "s/\(github\.com\/open-telemetry\/opentelemetry\-collector\-contrib\/.*\) $current_contrib/\1 $next_contrib/" go.mod
 rm go.mod.bak
 
+echo "=> Running go mod tidy"
+go mod tidy
 echo "=> Running mage notice"
 mage notice
 echo "=> Running mage otel:readme"
