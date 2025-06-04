@@ -49,6 +49,8 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 
 	agentDocs := make(map[string]estools.Documents)
 	otelDocs := make(map[string]estools.Documents)
+	var agentStatus atesting.AgentStatusOutput
+	var otelStatus atesting.AgentStatusOutput
 
 	// Tests logs and metrics are present
 	type test struct {
@@ -222,13 +224,26 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
 	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
-	require.Eventually(t, func() bool {
-		err = classicFixture.IsHealthy(ctx)
-		if err != nil {
-			t.Logf("waiting for agent healthy: %s", err.Error())
-			return false
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		agentStatus, statusErr = classicFixture.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+		// agent should be healthy
+		assert.Equal(collect, int(cproto.State_HEALTHY), agentStatus.State)
+		// we should have 3 components running: filestream-monitoring, http/metrics-monitoring and beats/metrics-monitoring
+		assert.Equal(collect, 3, len(agentStatus.Components))
+
+		// all the components should be healthy, their units should be healthy, and should identify themselves
+		// as beats processes via their version info
+		for _, component := range agentStatus.Components {
+			assert.Equal(collect, int(cproto.State_HEALTHY), component.State)
+			assert.Equal(collect, "beat-v2-client", component.VersionInfo.Name)
+			for _, unit := range component.Units {
+				assert.Equal(collect, int(cproto.State_HEALTHY), unit.State)
+			}
 		}
-		return true
+
+		return
 	}, 1*time.Minute, 1*time.Second)
 
 	// 2. Assert monitoring logs and metrics are available on ES
@@ -288,16 +303,17 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	timestampBeatReceiver := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		status, statusErr := beatReceiverFixture.ExecStatus(ctx)
+		var statusErr error
+		otelStatus, statusErr = beatReceiverFixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
 		// agent should be healthy
-		assert.Equal(collect, int(cproto.State_HEALTHY), status.State)
+		assert.Equal(collect, int(cproto.State_HEALTHY), otelStatus.State)
 		// we should have 3 components running: filestream-monitoring, http/metrics-monitoring and beats/metrics-monitoring
-		assert.Equal(collect, 3, len(status.Components))
+		assert.Equal(collect, 3, len(otelStatus.Components))
 
 		// all the components should be healthy, their units should be healthy, and should identify themselves
 		// as beats receivers via their version info
-		for _, component := range status.Components {
+		for _, component := range otelStatus.Components {
 			assert.Equal(collect, int(cproto.State_HEALTHY), component.State)
 			assert.Equal(collect, "beats-receiver", component.VersionInfo.Name)
 			for _, unit := range component.Units {
@@ -371,6 +387,20 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 			AssertMapsEqual(t, agent, otel, ignoredFields, fmt.Sprintf("expected document to be equal for dataset: %s", key))
 		}
 	}
+
+	// 8. Compare statuses
+	zeroDifferingFields := func(status *atesting.AgentStatusOutput) {
+		status.Info.ID = ""
+		status.Info.PID = 0
+		status.Collector = nil // we do get collector status with beats receivers, it's just empty
+		for i := range len(status.Components) {
+			status.Components[i].Message = ""
+			status.Components[i].VersionInfo = atesting.AgentStatusOutputVersionInfo{}
+		}
+	}
+	zeroDifferingFields(&agentStatus)
+	zeroDifferingFields(&otelStatus)
+	assert.Equal(t, agentStatus, otelStatus, "expected agent status to be equal to otel status")
 }
 
 // TestAgentMetricsInput is a test that compares documents ingested by
