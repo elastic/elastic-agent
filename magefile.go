@@ -984,6 +984,37 @@ func (Cloud) Image(ctx context.Context) {
 	Package(ctx)
 }
 
+// Load loads an artifact as a docker image.
+// Looks in build/distributions for an elastic-agent-cloud*.docker.tar.gz artifact and imports it as docker.elastic.co/beats-ci/elastic-agent-cloud:$VERSION
+// DOCKER_IMPORT_SOURCE - override source for import
+func (Cloud) Load() error {
+	snapshot := os.Getenv(snapshotEnv)
+	defer os.Setenv(snapshotEnv, snapshot)
+	os.Setenv(snapshotEnv, "true")
+
+	version := getVersion()
+
+	// Need to get the FIPS env var flag to see if we are using the normal source cloud image name, or the FIPS variant
+	fips := os.Getenv(fipsEnv)
+	defer os.Setenv(fipsEnv, fips)
+	fipsVal, err := strconv.ParseBool(fips)
+	if err != nil {
+		fipsVal = false
+	}
+	os.Setenv(fipsEnv, strconv.FormatBool(fipsVal))
+	devtools.FIPSBuild = fipsVal
+
+	source := "build/distributions/elastic-agent-cloud-" + version + "-linux-" + runtime.GOARCH + ".docker.tar.gz"
+	if fipsVal {
+		source = "build/distributions/elastic-agent-fips-cloud-" + version + "-linux-" + runtime.GOARCH + ".docker.tar.gz"
+	}
+	if envSource, ok := os.LookupEnv("DOCKER_IMPORT_SOURCE"); ok && envSource != "" {
+		source = envSource
+	}
+
+	return sh.RunV("docker", "image", "load", "-i", source)
+}
+
 // Push builds a cloud image tags it correctly and pushes to remote image repo.
 // Previous login to elastic registry is required!
 func (Cloud) Push() error {

@@ -4,6 +4,9 @@ env:
   DOCKER_REGISTRY: "docker.elastic.co"
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   ASDF_MAGE_VERSION: 1.14.0
+  CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
+  CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
+  TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
 
   IMAGE_UBUNTU_2404_X86_64: "family/platform-ingest-elastic-agent-ubuntu-2404"
   IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64"
@@ -13,8 +16,23 @@ env:
   IMAGE_WIN_2025: "family/platform-ingest-elastic-agent-windows-2025"
 
 steps:
+  - label: Build and push custom elastic-agent image
+    key: integration-cloud-image
+    depends_on:
+      - 'packaging-containers-x86-64' # Reuse artifacts produced in .buildkite/integration.pipeline.yml
+    command: |
+      buildkite-agent artifact download build/distributions/elastic-agent-cloud-*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64'
+      mage cloud:load
+      mage cloud:push
+    agents:
+      provider: "gcp"
+      machineType: "n1-standard-8"
+      image: "${IMAGE_UBUNTU_2404_X86_64}"
+
   - label: Start ESS stack for integration tests
     key: integration-ess
+    depends_on:
+      - integration-cloud-image
     env:
       ASDF_TERRAFORM_VERSION: 1.9.2
     command: |

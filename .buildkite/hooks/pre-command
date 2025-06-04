@@ -84,3 +84,7 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-binary-dra" ]]; then
     release_manager_login
   fi
 fi
+
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == "integration-cloud-image" ]]; then
+  docker_login
+fi
