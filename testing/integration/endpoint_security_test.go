@@ -82,41 +82,44 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 	t.Run("Install same version over the installed agent", func(t *testing.T) {
 		testTamperProtectedSameVersionInstall(t, info, "deb")
 	})
-}
 
-func TestUpgradeSameVersion_DEB(t *testing.T) {
-	info := define.Require(t, define.Requirements{
-		Group: Deb,
-		Stack: &define.Stack{},
-		Local: false, // requires Agent installation
-		Sudo:  true,  // requires Agent installation
-		OS: []define.OS{
-			{
-				Type: define.Linux,
-			},
-		},
+	t.Run("Validate endpoint is restarted if preinstall script fails", func(t *testing.T) {
+		testTamperProtectedErrorRecovery(t, info, "deb")
 	})
-
-	testTamperProtectedSameVersionInstall(t, info, "deb")
 }
 
-func TestUpgradeAgentWithTamperPrtotectionErrorRecovery_DEB(t *testing.T) {
-	info := define.Require(t, define.Requirements{
-		// define.Require(t, define.Requirements{
-		Group: Deb,
-		Stack: &define.Stack{},
-		Local: false, // requires Agent installation
-		Sudo:  true,  // requires Agent installation
-		OS: []define.OS{
-			{
-				Type: define.Linux,
-			},
-		},
-	})
-
-	testTamperProtectedErrorRecovery(t, info, "deb")
-	// testMockSystemctl(t)
-}
+// func TestUpgradeSameVersion_DEB(t *testing.T) {
+// 	info := define.Require(t, define.Requirements{
+// 		Group: Deb,
+// 		Stack: &define.Stack{},
+// 		Local: false, // requires Agent installation
+// 		Sudo:  true,  // requires Agent installation
+// 		OS: []define.OS{
+// 			{
+// 				Type: define.Linux,
+// 			},
+// 		},
+// 	})
+//
+// 	testTamperProtectedSameVersionInstall(t, info, "deb")
+// }
+//
+// func TestUpgradeAgentWithTamperPrtotectionErrorRecovery_DEB(t *testing.T) {
+// 	info := define.Require(t, define.Requirements{
+// 		// define.Require(t, define.Requirements{
+// 		Group: Deb,
+// 		Stack: &define.Stack{},
+// 		Local: false, // requires Agent installation
+// 		Sudo:  true,  // requires Agent installation
+// 		OS: []define.OS{
+// 			{
+// 				Type: define.Linux,
+// 			},
+// 		},
+// 	})
+//
+// 	testTamperProtectedErrorRecovery(t, info, "deb")
+// }
 
 func TestUpgradeAgentWithTamperProtectedEndpoint_RPM(t *testing.T) {
 	info := define.Require(t, define.Requirements{
@@ -131,7 +134,17 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_RPM(t *testing.T) {
 			},
 		},
 	})
-	testTamperProtectedDebRpmUpgrades(t, info, "rpm")
+	t.Run("Upgrade from older version to newer version", func(t *testing.T) {
+		testTamperProtectedDebRpmUpgrades(t, info, "rpm")
+	})
+
+	t.Run("Install same version over the installed agent", func(t *testing.T) {
+		testTamperProtectedSameVersionInstall(t, info, "rpm")
+	})
+
+	t.Run("Validate endpoint is restarted if preinstall script fails", func(t *testing.T) {
+		testTamperProtectedErrorRecovery(t, info, "rpm")
+	})
 }
 
 func getEndpointVersion(t *testing.T) string {
@@ -242,62 +255,21 @@ func createMockSystemctl(mockSystemctlPath, assertionsPath, serviceStart, servic
 	return nil
 }
 
-func testMockSystemctl(t *testing.T) {
-	ctx := t.Context()
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("deb"))
-	require.NoError(t, err)
-	fixture.Prepare(ctx)
-
-	t.Log("Getting source package")
-	srcPkg, err := fixture.SrcPackage(ctx)
-	require.NoError(t, err)
-
-	tmpdir := "/tmp/testing"
-
-	err = os.MkdirAll(tmpdir, 0o755)
-	if err != nil && !os.IsExist(err) {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-
-	mockSystemctlPath := filepath.Join(tmpdir, "endpoint_tamper_protected_mock_systemctl_debrpm.sh")
-	assertionsPath := filepath.Join(tmpdir, "assertions")
-	serviceStart := "Started endpoint service"
-	serviceStop := "Stopped endpoint service"
-
-	err = createMockSystemctl(mockSystemctlPath, assertionsPath, serviceStart, serviceStop)
-	require.NoError(t, err)
-
-	mockSystemctlLink := filepath.Join(tmpdir, "systemctl")
-
-	err = os.Symlink(mockSystemctlPath, mockSystemctlLink)
-	require.NoError(t, err)
-
-	mockEnvPath := tmpdir + ":" + os.Getenv("PATH")
-
-	t.Log("Installing the second agent, upgrading from the older version")
-	installCmd, err := getInstallCommand(ctx, fixture.PackageFormat(), srcPkg, []string{"PATH=" + mockEnvPath})
-	out, err := installCmd.CombinedOutput()
-	t.Log("INSTALL COMMAND OUT")
-	t.Log(string(out))
-	require.NoError(t, err)
-	// require.True(t, false, "forcing error")
-}
-
 type MockSystemctlParams struct {
 	AssertionsPath        string
 	ServiceStopAssertion  string
 	ServiceStartAssertion string
 }
 
-func installFirstAgent(ctx context.Context, t *testing.T, info *define.Info, packageFormat string, upgradeFromVersion string) string {
-	startFixture, err := atesting.NewFixture(
+func installFirstAgent(ctx context.Context, t *testing.T, info *define.Info, packageFormat string, upgradeFromVersion string) (*atesting.Fixture, string) {
+	fixture, err := atesting.NewFixture(
 		t,
 		upgradeFromVersion,
 		atesting.WithFetcher(atesting.ArtifactFetcher()),
 		atesting.WithPackageFormat(packageFormat),
 	)
 	require.NoError(t, err)
-	startFixture.Prepare(ctx)
+	fixture.Prepare(ctx)
 
 	t.Log("Creating a generic policy and enrollment token")
 	policy := createBasicPolicy()
@@ -323,11 +295,11 @@ func installFirstAgent(ctx context.Context, t *testing.T, info *define.Info, pac
 
 	opts := atesting.InstallOpts{}
 	t.Log("Install and enroll the first agent")
-	tools.InstallAgentForPolicyWithToken(ctx, t, opts, startFixture, info.KibanaClient, enrollKeyResp)
+	tools.InstallAgentForPolicyWithToken(ctx, t, opts, fixture, info.KibanaClient, enrollKeyResp)
 
-	addEndpointCleanup(t, startFixture, uninstallToken)
+	addEndpointCleanup(t, fixture, uninstallToken)
 
-	agentClient := startFixture.Client()
+	agentClient := fixture.Client()
 	err = agentClient.Connect(ctx)
 	require.NoError(t, err, "could not connect to the initial agent")
 
@@ -343,7 +315,7 @@ func installFirstAgent(ctx context.Context, t *testing.T, info *define.Info, pac
 	initEndpointVersion := getEndpointVersion(t)
 	t.Logf("The initial endpoint version is %s", initEndpointVersion)
 
-	return uninstallToken
+	return fixture, uninstallToken
 }
 
 func testTamperProtectedErrorRecovery(t *testing.T, info *define.Info, packageFormat string) {
@@ -353,55 +325,6 @@ func testTamperProtectedErrorRecovery(t *testing.T, info *define.Info, packageFo
 	t.Logf("Preparing fixture with agent version %s", upgradeFromVersion.String())
 
 	installFirstAgent(ctx, t, info, packageFormat, upgradeFromVersion.String())
-	// startFixture, err := atesting.NewFixture(
-	// 	t,
-	// 	upgradeFromVersion.String(),
-	// 	atesting.WithFetcher(atesting.ArtifactFetcher()),
-	// 	atesting.WithPackageFormat(packageFormat),
-	// )
-	// require.NoError(t, err)
-	// startFixture.Prepare(ctx)
-	//
-	// t.Log("Creating a generic policy and enrollment token")
-	// policy := createBasicPolicy()
-	// policyResp, enrollKeyResp := createPolicyAndEnrollmentToken(ctx, t, info.KibanaClient, policy)
-	//
-	// t.Log("Install elastic defend")
-	// pkgPolicyResp, err := installElasticDefendPackage(t, info, policyResp.ID)
-	// require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
-	//
-	// isProtected := true
-	// updateReq := kibana.AgentPolicyUpdateRequest{
-	// 	Name:        policy.Name,
-	// 	Namespace:   policy.Namespace,
-	// 	IsProtected: &isProtected,
-	// }
-	//
-	// t.Log("Updating the policy to set \"is_protected\" to true")
-	// _, err = info.KibanaClient.UpdatePolicy(ctx, policyResp.ID, updateReq)
-	//
-	// t.Log("Get the policy uninstall token")
-	// uninstallToken, err := tools.GetUninstallToken(ctx, info.KibanaClient, policyResp.ID)
-	// require.NoError(t, err)
-	//
-	// opts := atesting.InstallOpts{}
-	// t.Log("Install and enroll the first agent")
-	// tools.InstallAgentForPolicyWithToken(ctx, t, opts, startFixture, info.KibanaClient, enrollKeyResp)
-	//
-	// addEndpointCleanup(t, startFixture, uninstallToken)
-	//
-	// agentClient := startFixture.Client()
-	// err = agentClient.Connect(ctx)
-	// require.NoError(t, err, "could not connect to the initial agent")
-	//
-	// require.Eventually(t,
-	// 	func() bool { return agentAndEndpointAreHealthy(t, ctx, agentClient) },
-	// 	endpointHealthPollingTimeout,
-	// 	time.Second,
-	// 	"Endpoint component or units are not healthy prior to upgrade.",
-	// )
-	//
-	t.Log("The initial installation of both the agent and endpoint are healthy")
 
 	initEndpointVersion := getEndpointVersion(t)
 	t.Logf("The initial endpoint version is %s", initEndpointVersion)
@@ -451,63 +374,23 @@ func testTamperProtectedErrorRecovery(t *testing.T, info *define.Info, packageFo
 	t.Log(string(systemctlOut))
 
 	statusLogs := strings.Split(string(systemctlOut), "\n")
-	require.Equal(t, 2, len(statusLogs))
-	require.Equal(t, statusLogs[0], serviceStop)
-	require.Equal(t, statusLogs[1], serviceStart)
-	// upgradedAgentClient := fixture.Client()
-	// err = upgradedAgentClient.Connect(ctx)
-	// require.NoError(t, err, "could not connect to the upgraded agent")
-	require.True(t, false)
+	filtered := []string{}
+
+	for _, v := range statusLogs {
+		if v != "" {
+			filtered = append(filtered, v)
+		}
+	}
+
+	require.Equal(t, 2, len(filtered))
+	require.Equal(t, filtered[0], serviceStop)
+	require.Equal(t, filtered[1], serviceStart)
 }
 
 func testTamperProtectedSameVersionInstall(t *testing.T, info *define.Info, packageFormat string) {
 	ctx := t.Context()
 
-	t.Log("Setup agent fixture witht the test build")
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat(packageFormat))
-	require.NoError(t, err)
-	fixture.Prepare(ctx)
-
-	t.Log("Creating a generic policy and enrollment token")
-	policy := createBasicPolicy()
-	policyResp, enrollKeyResp := createPolicyAndEnrollmentToken(ctx, t, info.KibanaClient, policy)
-
-	t.Log("Install elastic defend")
-	pkgPolicyResp, err := installElasticDefendPackage(t, info, policyResp.ID)
-	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
-
-	isProtected := true
-	updateReq := kibana.AgentPolicyUpdateRequest{
-		Name:        policy.Name,
-		Namespace:   policy.Namespace,
-		IsProtected: &isProtected,
-	}
-
-	t.Log("Updating the policy to set \"is_protected\" to true")
-	_, err = info.KibanaClient.UpdatePolicy(ctx, policyResp.ID, updateReq)
-
-	t.Log("Get the policy uninstall token")
-	uninstallToken, err := tools.GetUninstallToken(ctx, info.KibanaClient, policyResp.ID)
-	require.NoError(t, err)
-
-	opts := atesting.InstallOpts{}
-	t.Log("Install and enroll the first agent")
-	tools.InstallAgentForPolicyWithToken(ctx, t, opts, fixture, info.KibanaClient, enrollKeyResp)
-
-	addEndpointCleanup(t, fixture, uninstallToken)
-
-	agentClient := fixture.Client()
-	err = agentClient.Connect(ctx)
-	require.NoError(t, err, "could not connect to the initial agent")
-
-	require.Eventually(t,
-		func() bool { return agentAndEndpointAreHealthy(t, ctx, agentClient) },
-		endpointHealthPollingTimeout,
-		time.Second,
-		"Endpoint component or units are not healthy prior to upgrade.",
-	)
-
-	t.Log("The initial installation of both the agent and endpoint are healthy")
+	fixture, uninstallToken := installFirstAgent(ctx, t, info, packageFormat, define.Version())
 
 	initEndpointVersion := getEndpointVersion(t)
 	t.Logf("The initial endpoint version is %s", initEndpointVersion)
@@ -562,86 +445,13 @@ func testTamperProtectedSameVersionInstall(t *testing.T, info *define.Info, pack
 	t.Log("successfully uninstalled endpoint using the uninstall token")
 }
 
-// The steps in this test are the following
-// * Prepare a fixture with an older version of the agent
-// * Create a generic policy
-// * Generate an enrollment token
-// * Add the elastic defend package to the policy
-// * Update the policy to set "is_protected" to true
-// * Get the uninstall token for the policy and store it in the fixture
-// * Install and enroll the fist agent
-// * Validate the health of both the agent and endpoint
-// * Validate that tamper protection is enabled in endpoint by trying to
-// uninstall it
-// * Setup a fixture with the test build
-// * Install the new agent
-// * Validate that the new agent and endpoint are healthy
-// * Validate that the initial endpoint version is smaller than that of the
-// upgraded one
-// * Validate that tamper protection is still enabled by trying to uninstall
-// endpoint
-// * Uninstall endpoint using the uninstall token
-// * Validate that endpoint is indeed uninstalled
-// * Cleanup endpoint
-// * Cleanup agent
-//
-// For cleaning up the agent the test relies on the first installation where the
-// cleanup functions are set
 func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageFormat string) {
 	ctx := t.Context()
 	upgradeFromVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
 	t.Logf("Preparing fixture with agent version %s", upgradeFromVersion.String())
 
-	startFixture, err := atesting.NewFixture(
-		t,
-		upgradeFromVersion.String(),
-		atesting.WithFetcher(atesting.ArtifactFetcher()),
-		atesting.WithPackageFormat(packageFormat),
-	)
-	require.NoError(t, err)
-	startFixture.Prepare(ctx)
-
-	t.Log("Creating a generic policy and enrollment token")
-	policy := createBasicPolicy()
-	policyResp, enrollKeyResp := createPolicyAndEnrollmentToken(ctx, t, info.KibanaClient, policy)
-
-	t.Log("Install elastic defend")
-	pkgPolicyResp, err := installElasticDefendPackage(t, info, policyResp.ID)
-	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
-
-	isProtected := true
-	updateReq := kibana.AgentPolicyUpdateRequest{
-		Name:        policy.Name,
-		Namespace:   policy.Namespace,
-		IsProtected: &isProtected,
-	}
-
-	t.Log("Updating the policy to set \"is_protected\" to true")
-	_, err = info.KibanaClient.UpdatePolicy(ctx, policyResp.ID, updateReq)
-
-	t.Log("Get the policy uninstall token")
-	uninstallToken, err := tools.GetUninstallToken(ctx, info.KibanaClient, policyResp.ID)
-	require.NoError(t, err)
-
-	opts := atesting.InstallOpts{}
-	t.Log("Install and enroll the first agent")
-	tools.InstallAgentForPolicyWithToken(ctx, t, opts, startFixture, info.KibanaClient, enrollKeyResp)
-
-	addEndpointCleanup(t, startFixture, uninstallToken)
-
-	agentClient := startFixture.Client()
-	err = agentClient.Connect(ctx)
-	require.NoError(t, err, "could not connect to the initial agent")
-
-	require.Eventually(t,
-		func() bool { return agentAndEndpointAreHealthy(t, ctx, agentClient) },
-		endpointHealthPollingTimeout,
-		time.Second,
-		"Endpoint component or units are not healthy prior to upgrade.",
-	)
-
-	t.Log("The initial installation of both the agent and endpoint are healthy")
+	_, uninstallToken := installFirstAgent(ctx, t, info, packageFormat, upgradeFromVersion.String())
 
 	initEndpointVersion := getEndpointVersion(t)
 	t.Logf("The initial endpoint version is %s", initEndpointVersion)
