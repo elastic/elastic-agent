@@ -1455,7 +1455,7 @@ func k8sStepDeployKustomize(kustomizePath string, containerName string, override
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
 			var err error
 			renderedManifest, err = k8sRenderKustomize(kustomizePath)
-			require.NoError(collect, err)
+			assert.NoError(collect, err)
 		}, 5*time.Second, 500*time.Millisecond, "failed to render kustomize")
 
 		objects, err := testK8s.LoadFromYAML(bufio.NewReader(bytes.NewReader(renderedManifest)))
