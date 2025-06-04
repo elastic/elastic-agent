@@ -36,7 +36,7 @@ func GetAllComponentStates(otelStatus *status.AggregateStatus, components []comp
 			var compState runtime.ComponentComponentState
 			if pipelineStatus, found := otelPipelineStatus[comp.ID]; found {
 				var statusErr error
-				if compState, statusErr = getComponentStatus(pipelineStatus, comp); statusErr != nil {
+				if compState, statusErr = getComponentState(pipelineStatus, comp); statusErr != nil {
 					return nil, statusErr
 				}
 			} else {
@@ -105,8 +105,8 @@ func getOtelRuntimePipelineStatuses(otelStatus *status.AggregateStatus) (map[str
 	return pipelines, nil
 }
 
-// getComponentStatus extracts the full status of a component from its respective otel pipeline status.
-func getComponentStatus(pipelineStatus *status.AggregateStatus, comp component.Component) (runtime.ComponentComponentState, error) {
+// getComponentState extracts the full status of a component from its respective otel pipeline status.
+func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Component) (runtime.ComponentComponentState, error) {
 	compState := runtime.ComponentState{
 		State:   otelStatusToUnitState(pipelineStatus.Status()),
 		Message: pipelineStatus.Status().String(),
