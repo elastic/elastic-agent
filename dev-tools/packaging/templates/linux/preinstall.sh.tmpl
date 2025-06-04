@@ -18,6 +18,7 @@ handle_endpoint() {
       else
         echo "ElasticEndpoint is already running"
       fi
+      exit 1
 		}
 
 		trap restore_endpoint ERR
