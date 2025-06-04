@@ -13,7 +13,6 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/confmap"
 
-	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -66,7 +65,7 @@ func NewOTelManager(logger, baseLogger *logger.Logger) (*OTelManager, error) {
 		statusCh: make(chan *status.AggregateStatus),
 		doneChan: make(chan struct{}),
 		collectorBinaryPath: executable,
-		collectorBinaryArgs: []string{otel.EDOTSupevisedCommand},
+		collectorBinaryArgs: []string{"otel", "--supervised"},
 	}, nil
 }
 
