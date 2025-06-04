@@ -4,12 +4,12 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   DOCKER_REGISTRY: "docker.elastic.co"
 
-  IMAGE_UBUNTU_2204_X86_64: "family/platform-ingest-elastic-agent-ubuntu-2204"
-  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64"
-  IMAGE_WIN_2016: "family/platform-ingest-elastic-agent-windows-2016"
-  IMAGE_WIN_2022: "family/platform-ingest-elastic-agent-windows-2022"
-  IMAGE_WIN_10: "family/platform-ingest-elastic-agent-windows-10"
-  IMAGE_WIN_11: "family/platform-ingest-elastic-agent-windows-11"
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1749026946"
+  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1749026946"
+  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1749026946"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1749026946"
+  IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-1749026946"
+  IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1749026946"
 
 steps:
   - label: "check-ci"
@@ -17,6 +17,7 @@ steps:
     command: ".buildkite/scripts/steps/check-ci.sh"
     agents:
       provider: "gcp"
+      imageProject: elastic-images-qa
       image: "${IMAGE_UBUNTU_2204_X86_64}"
     retry:
       manual:
@@ -35,6 +36,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         retry:
           automatic:
@@ -54,6 +56,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         retry:
           automatic:
@@ -74,6 +77,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         retry:
           automatic:
@@ -110,6 +114,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           image: "${IMAGE_WIN_2022}"
           machine_type: "n2-standard-8"
           disk_size: 200
@@ -130,6 +135,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           image: "${IMAGE_WIN_2016}"
           machine_type: "n2-standard-8"
           disk_size: 200
@@ -190,6 +196,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           image: "${IMAGE_WIN_10}"
           machine_type: "n2-standard-8"
           disk_type: "pd-ssd"
@@ -209,6 +216,7 @@ steps:
           - "coverage-*.out"
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           image: "${IMAGE_WIN_11}"
           machine_type: "n2-standard-8"
           disk_type: "pd-ssd"
@@ -225,6 +233,7 @@ steps:
           always-annotate: true
     agents:
       provider: "gcp"
+      imageProject: elastic-images-qa
     depends_on:
       - step: "unit-tests-2204"
         allow_failure: true
@@ -271,6 +280,7 @@ steps:
         command: ".buildkite/scripts/steps/k8s-tests.sh"
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         matrix:
           setup:
@@ -317,6 +327,7 @@ steps:
                 command: ".buildkite/scripts/steps/sync-k8s.sh"
                 agents:
                   provider: "gcp"
+                  imageProject: elastic-images-qa
                   image: "${IMAGE_UBUNTU_2204_X86_64}"
                 env:
                   - GH_VERSION=2.4.0

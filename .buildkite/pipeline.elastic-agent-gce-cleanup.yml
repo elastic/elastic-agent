@@ -11,3 +11,4 @@ steps:
     command: ".buildkite/scripts/steps/gce-cleanup.sh"
     agents:
       provider: "gcp"
+      imageProject: elastic-images-qa

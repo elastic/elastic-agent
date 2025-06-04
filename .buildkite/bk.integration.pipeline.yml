@@ -7,10 +7,10 @@ env:
 
   IMAGE_UBUNTU_2404_X86_64: "family/platform-ingest-elastic-agent-ubuntu-2404"
   IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64"
-  IMAGE_RHEL_8: "family/platform-ingest-elastic-agent-rhel-8"
-  IMAGE_DEBIAN_12: "family/platform-ingest-elastic-agent-debian-12"
-  IMAGE_WIN_2022: "family/platform-ingest-elastic-agent-windows-2022"
-  IMAGE_WIN_2025: "family/platform-ingest-elastic-agent-windows-2025"
+  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1749026946"
+  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1749026946"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1749026946"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1749026946"
 
 steps:
   - label: Start ESS stack for integration tests
@@ -46,6 +46,7 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "n1-standard-8"
           image: "${IMAGE_WIN_2022}"
         retry:
@@ -67,6 +68,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "n1-standard-8"
           image: "${IMAGE_WIN_2025}"
       - label: "Ubuntu:2404:amd64:sudo"
@@ -84,6 +86,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "n1-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
 
@@ -103,6 +106,7 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "n1-standard-8"
           image: "${IMAGE_WIN_2022}"
         retry:
@@ -129,6 +133,7 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "n1-standard-8"
           image: "${IMAGE_WIN_2022}"
         retry:
@@ -148,6 +153,7 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "n1-standard-8"
           image: "${IMAGE_WIN_2025}"
         retry:
@@ -177,6 +183,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "n1-standard-8"
           image: "${IMAGE_WIN_2025}"
         matrix:
@@ -200,6 +207,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "n1-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         matrix:
@@ -220,6 +228,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "n1-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         matrix:
@@ -309,6 +318,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "n1-standard-8"
           image: "${IMAGE_DEBIAN_12}"
         matrix:
@@ -329,6 +339,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "n1-standard-8"
           image: "${IMAGE_DEBIAN_12}"
         matrix:
@@ -367,6 +378,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "n1-standard-8"
           image: "${IMAGE_RHEL_8}"
 
@@ -394,6 +406,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "n1-standard-4"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
           diskSizeGb: 80

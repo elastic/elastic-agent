@@ -12,6 +12,7 @@ steps:
       - build/distributions/**
     agents:
       provider: "gcp"
+      imageProject: elastic-images-qa
       machineType: "n1-standard-8"
 
   - label: "Integration test matrix"
@@ -26,4 +27,5 @@ steps:
       - "build/diagnostics/*"
     agents:
       provider: "gcp"
+      imageProject: elastic-images-qa
       machineType: "n1-standard-8"

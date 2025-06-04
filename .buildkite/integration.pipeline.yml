@@ -47,6 +47,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "n2-standard-8"
 
       - label: "Packaging: Ubuntu x86_64 FIPS"
@@ -63,6 +64,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "n2-standard-4"
 
       # Packaging linux/arm64
@@ -112,6 +114,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "n2-standard-8"
 
       - label: "Packaging: Containers linux/amd64"
@@ -124,6 +127,7 @@ steps:
           - build/distributions/**
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "n2-standard-8"
           diskSizeGb: 200
 
@@ -153,6 +157,7 @@ steps:
           - build/distributions/**
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "n2-standard-8"
           diskSizeGb: 200
 
@@ -192,9 +197,10 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "n2-standard-8"
           # TODO: replace with IMAGE_WIN_2022 when we migrate this in bk.integration.pipeline.yml
-          image: "family/platform-ingest-elastic-agent-windows-2022"
+          image: "platform-ingest-elastic-agent-windows-2022-1749026946"
         plugins:
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
@@ -212,9 +218,10 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "n2-standard-8"
           # TODO: replace with IMAGE_WIN_2025 when we migrate this in bk.integration.pipeline.yml
-          image: "family/platform-ingest-elastic-agent-windows-2025"
+          image: "platform-ingest-elastic-agent-windows-2025-1749026946"
         plugins:
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
@@ -231,6 +238,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "n2-standard-8"
           # TODO: replace with IMAGE_UBUNTU_2404_X86_64 when we migrate this in bk.integration.pipeline.yml
           image: "family/platform-ingest-elastic-agent-ubuntu-2404"

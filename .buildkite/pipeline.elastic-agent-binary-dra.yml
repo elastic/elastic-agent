@@ -21,6 +21,7 @@ steps:
         - "build/distributions/**/*"
       agents:
         provider: "gcp"
+        imageProject: elastic-images-qa
         machineType: "c2-standard-16"
       env:
         DRA_WORKFLOW: "snapshot"
@@ -34,6 +35,7 @@ steps:
         - "build/distributions/**/*"
       agents:
         provider: "gcp"
+        imageProject: elastic-images-qa
         machineType: "c2-standard-16"
       env:
         DRA_WORKFLOW: "snapshot"
@@ -81,6 +83,7 @@ steps:
       key: "publish-dra-snapshot"
       agents:
         provider: "gcp"
+        imageProject: elastic-images-qa
         machineType: "c2-standard-16"
       env:
         DRA_WORKFLOW: "snapshot"
@@ -109,6 +112,7 @@ steps:
         - "build/distributions/**/*"
       agents:
         provider: "gcp"
+        imageProject: elastic-images-qa
         machineType: "c2-standard-16"
       env:
         DRA_WORKFLOW: "staging"
@@ -123,6 +127,7 @@ steps:
         - "build/distributions/**/*"
       agents:
         provider: "gcp"
+        imageProject: elastic-images-qa
         machineType: "c2-standard-16"
       env:
         DRA_WORKFLOW: "staging"
@@ -174,6 +179,7 @@ steps:
       key: "publish-dra-staging"
       agents:
         provider: "gcp"
+        imageProject: elastic-images-qa
         machineType: "c2-standard-16"
       env:
         DRA_WORKFLOW: "staging"

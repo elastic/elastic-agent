@@ -58,6 +58,7 @@ steps:
         key: package_elastic-agent
         agents:
           provider: "gcp"
+          imageProject: elastic-images-qa
           machineType: "c2-standard-16"
           diskSizeGb: 400
         env:
@@ -123,6 +124,7 @@ steps:
     depends_on: package
     agents:
       provider: "gcp"
+      imageProject: elastic-images-qa
     env:
       DRA_PROJECT_ID: "elastic-agent-package"
       DRA_PROJECT_ARTIFACT_ID: "agent-package"
@@ -159,6 +161,7 @@ steps:
     depends_on: package
     agents:
       provider: "gcp"
+      imageProject: elastic-images-qa
       machineType: "n2-standard-8"
       diskSizeGb: 400
     env:

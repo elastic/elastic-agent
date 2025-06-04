@@ -27,8 +27,8 @@ var (
 	bkStackAgent = StepAgent{
 		Provider:     "gcp",
 		ImageProject: "elastic-images-qa",
-		MachineType:  "n1-standard-8",                                    // does it need to be this large?
-		Image:        "family/platform-ingest-elastic-agent-ubuntu-2204", // is this the correct image for creating a stack?
+		MachineType:  "n1-standard-8",                                        // does it need to be this large?
+		Image:        "platform-ingest-elastic-agent-ubuntu-2204-1749026946", // is this the correct image for creating a stack?
 	}
 	bkUbuntuAMD64_2004 = StepAgent{
 		Provider:     defaultProvider,
@@ -40,7 +40,7 @@ var (
 		Provider:     defaultProvider,
 		ImageProject: defaultImageProject,
 		MachineType:  defaultAMD64MachineType,
-		Image:        "family/platform-ingest-elastic-agent-ubuntu-2204",
+		Image:        "platform-ingest-elastic-agent-ubuntu-2204-1749026946",
 	}
 	bkUbuntuAMD64_2404 = StepAgent{
 		Provider:     defaultProvider,
@@ -58,7 +58,7 @@ var (
 		Provider:     defaultProvider,
 		ImageProject: defaultImageProject,
 		MachineType:  defaultARM64MachineType,
-		Image:        "family/platform-ingest-elastic-agent-ubuntu-2204-arm",
+		Image:        "platform-ingest-elastic-agent-ubuntu-2204-1749026946-arm",
 	}
 	bkUbuntuARM64_2404 = StepAgent{
 		Provider:     defaultProvider,
@@ -70,37 +70,37 @@ var (
 		Provider:     defaultProvider,
 		ImageProject: defaultImageProject,
 		MachineType:  defaultAMD64MachineType,
-		Image:        "family/platform-ingest-elastic-agent-rhel-8",
+		Image:        "platform-ingest-elastic-agent-rhel-8-1749026946",
 	}
 	bkRHELARM64_8 = StepAgent{
 		Provider:     defaultProvider,
 		ImageProject: defaultImageProject,
 		MachineType:  defaultARM64MachineType,
-		Image:        "family/platform-ingest-elastic-agent-rhel-8-arm",
+		Image:        "platform-ingest-elastic-agent-rhel-8-1749026946-arm",
 	}
 	bkWindowsAMD64_2019 = StepAgent{
 		Provider:     defaultProvider,
 		ImageProject: defaultImageProject,
 		MachineType:  defaultAMD64MachineType,
-		Image:        "family/platform-ingest-elastic-agent-windows-2019",
+		Image:        "platform-ingest-elastic-agent-windows-2019-1749026946",
 	}
 	bkWindowsAMD64_2019_Core = StepAgent{
 		Provider:     defaultProvider,
 		ImageProject: defaultImageProject,
 		MachineType:  defaultAMD64MachineType,
-		Image:        "family/platform-ingest-elastic-agent-windows-2019-core",
+		Image:        "platform-ingest-elastic-agent-windows-2019-1749026946-core",
 	}
 	bkWindowsAMD64_2022 = StepAgent{
 		Provider:     defaultProvider,
 		ImageProject: defaultImageProject,
 		MachineType:  defaultAMD64MachineType,
-		Image:        "family/platform-ingest-elastic-agent-windows-2022",
+		Image:        "platform-ingest-elastic-agent-windows-2022-1749026946",
 	}
 	bkWindowsAMD64_2022_Core = StepAgent{
 		Provider:     defaultProvider,
 		ImageProject: defaultImageProject,
 		MachineType:  defaultAMD64MachineType,
-		Image:        "family/platform-ingest-elastic-agent-windows-2022-core",
+		Image:        "platform-ingest-elastic-agent-windows-2022-1749026946-core",
 	}
 )
 
