@@ -20,9 +20,9 @@ func TestAppLocker(t *testing.T) {
 	locker2 := NewAppLocker(tmp, testLockFile)
 
 	require.NoError(t, locker1.TryLock())
-	assert.Error(t, locker2.TryLock())
+	assert.ErrorIs(t, locker2.TryLock(), ErrAppAlreadyRunning)
 	require.NoError(t, locker1.Unlock())
 	require.NoError(t, locker2.TryLock())
-	assert.Error(t, locker1.TryLock())
+	assert.ErrorIs(t, locker1.TryLock(), ErrAppAlreadyRunning)
 	require.NoError(t, locker2.Unlock())
 }

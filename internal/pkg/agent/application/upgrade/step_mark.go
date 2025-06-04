@@ -5,16 +5,15 @@
 package upgrade
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/gofrs/flock"
 	"gopkg.in/yaml.v3"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -344,7 +343,7 @@ func fileLockName(markerFileName string) string {
 }
 
 func lockMarkerFile(markerFileName string) (Locker, error) {
-	locker, err := NewFileLocker(fileLockName(markerFileName), WithTimeout(10*time.Second))
+	locker, err := filelock.NewFileLocker(fileLockName(markerFileName), filelock.WithTimeout(10*time.Second))
 	if err != nil {
 		return nil, fmt.Errorf("instantiating file locker: %w", err)
 	}
@@ -359,75 +358,4 @@ func lockMarkerFile(markerFileName string) (Locker, error) {
 type Locker interface {
 	Lock() error
 	Unlock() error
-}
-
-type FileLocker struct {
-	fileLock             *flock.Flock
-	blocking             bool
-	timeout              time.Duration
-	customNotLockedError error
-}
-
-type FileLockerOption func(locker *FileLocker) error
-
-func WithCustomNotLockedError(customError error) FileLockerOption {
-	return func(locker *FileLocker) error {
-		locker.customNotLockedError = customError
-		return nil
-	}
-}
-
-var ErrZeroTimeout = errors.New("must specify a non-zero timeout for a blocking file locker")
-var ErrNotLocked = errors.New("file not locked")
-
-func WithTimeout(timeout time.Duration) FileLockerOption {
-	return func(locker *FileLocker) error {
-
-		if timeout == 0 {
-			return ErrZeroTimeout
-		}
-
-		locker.blocking = true
-		locker.timeout = timeout
-
-		return nil
-	}
-}
-
-func NewFileLocker(lockFilePath string, opts ...FileLockerOption) (*FileLocker, error) {
-	flocker := &FileLocker{fileLock: flock.New(lockFilePath)}
-	for _, opt := range opts {
-		if err := opt(flocker); err != nil {
-			return nil, fmt.Errorf("applying options to new file locker: %w", err)
-		}
-	}
-	return flocker, nil
-}
-
-func (fl *FileLocker) Lock() error {
-	var locked bool
-	var err error
-
-	if fl.blocking {
-		timeoutCtx, cancel := context.WithTimeout(context.TODO(), fl.timeout)
-		defer cancel()
-		locked, err = fl.fileLock.TryLockContext(timeoutCtx, time.Second)
-	} else {
-		locked, err = fl.fileLock.TryLock()
-	}
-
-	if err != nil {
-		return fmt.Errorf("locking %s: %w", fl.fileLock.Path(), err)
-	}
-	if !locked {
-		if fl.customNotLockedError != nil {
-			return fmt.Errorf("failed locking %s: %w", fl.fileLock.Path(), fl.customNotLockedError)
-		}
-		return fmt.Errorf("failed locking %s: %w", fl.fileLock.Path(), ErrNotLocked)
-	}
-	return nil
-}
-
-func (fl *FileLocker) Unlock() error {
-	return fl.fileLock.Unlock()
 }

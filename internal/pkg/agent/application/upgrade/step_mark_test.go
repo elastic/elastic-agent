@@ -445,11 +445,11 @@ func Test_markUpgradeLocking(t *testing.T) {
 }
 
 func createFileLockerCmd(t *testing.T, lockFilePath string) (context.CancelFunc, *exec.Cmd) {
-	executableName := "filelocker"
+	executableName := "testlocker"
 	if runtime.GOOS == "windows" {
 		executableName += ".exe"
 	}
-	filelockerExecutablePath := filepath.Join("test", "filelocker", executableName)
+	filelockerExecutablePath := filepath.Join("..", "filelock", "testlocker", executableName)
 	require.FileExistsf(
 		t,
 		filelockerExecutablePath,
