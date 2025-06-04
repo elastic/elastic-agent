@@ -19,15 +19,12 @@ import (
 	"go.opentelemetry.io/collector/extension"
 
 	"go.opentelemetry.io/collector/otelcol"
-
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
 const buildDescription = "Elastic opentelemetry-collector distribution"
 
-func Run(ctx context.Context, stop chan bool, configFiles []string) error {
+func Run(ctx context.Context, stop chan bool, settings *otelcol.CollectorSettings) error {
 	fmt.Fprintln(os.Stdout, "Starting in otel mode")
-	settings := NewSettings(release.Version(), configFiles)
 	svc, err := otelcol.NewCollector(*settings)
 	if err != nil {
 		return err

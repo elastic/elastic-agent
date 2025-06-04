@@ -9,30 +9,14 @@ import (
 	"errors"
 	"os"
 
-	"github.com/elastic/elastic-agent/internal/pkg/otel"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd"
 )
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var err error
-	defaultCfg := logger.DefaultLoggingConfig()
-	defaultEventLogCfg := logger.DefaultEventLoggingConfig()
-
-	defaultCfg.ToStderr = true
-	defaultCfg.ToFiles = false
-	defaultEventLogCfg.ToFiles = false
-	defaultEventLogCfg.ToStderr = true
-	defaultCfg.Level = logger.DefaultLogLevel
-
-	baseLogger, err := logger.NewFromConfig("edot", defaultCfg, defaultEventLogCfg, false)
-	if err != nil {
-		panic(err)
-	}
-
-	err = otel.RunSupervisedCollector(ctx, baseLogger, os.Stdin)
+	err := cmd.RunCollector(ctx, nil, true)
 	if err == nil || errors.Is(err, context.Canceled) {
 		os.Exit(0)
 	}
