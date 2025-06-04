@@ -355,7 +355,7 @@ out weight the benefits of creating another group.
           provider: "gcp"
           imageProject: elastic-images-qa
           machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+          image: "platform-ingest-elastic-agent-ubuntu-2404-1749026946"
         plugins:
           - test-collector#v1.10.1:
               files: "build/TEST-*.xml"

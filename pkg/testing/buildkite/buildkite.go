@@ -46,7 +46,7 @@ var (
 		Provider:     defaultProvider,
 		ImageProject: defaultImageProject,
 		MachineType:  defaultAMD64MachineType,
-		Image:        "family/platform-ingest-elastic-agent-ubuntu-2404",
+		Image:        "platform-ingest-elastic-agent-ubuntu-2404-1749026946",
 	}
 	bkUbuntuARM64_2004 = StepAgent{
 		Provider:     defaultProvider,
@@ -64,7 +64,7 @@ var (
 		Provider:     defaultProvider,
 		ImageProject: defaultImageProject,
 		MachineType:  defaultARM64MachineType,
-		Image:        "family/platform-ingest-elastic-agent-ubuntu-2404-arm",
+		Image:        "platform-ingest-elastic-agent-ubuntu-2404-1749026946-arm",
 	}
 	bkRHELAMD64_8 = StepAgent{
 		Provider:     defaultProvider,
