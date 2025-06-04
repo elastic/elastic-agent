@@ -46,7 +46,7 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2022}"
         retry:
           automatic:
@@ -67,7 +67,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-ubuntu-x86-64
@@ -84,7 +84,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
 
   - group: "Stateful: Windows"
@@ -103,7 +103,7 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2022}"
         retry:
           automatic:
@@ -128,7 +128,7 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2022}"
         retry:
           automatic:
@@ -147,7 +147,7 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
         retry:
           automatic:
@@ -176,7 +176,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
         matrix:
           - default
@@ -199,7 +199,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         matrix:
           - default
@@ -219,7 +219,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         matrix:
           - default
@@ -306,7 +306,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
           image: "${IMAGE_DEBIAN_12}"
         matrix:
           - default
@@ -326,7 +326,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
           image: "${IMAGE_DEBIAN_12}"
         matrix:
           - default
@@ -364,7 +364,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
           image: "${IMAGE_RHEL_8}"
 
   - group: "Kubernetes"
