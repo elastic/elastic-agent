@@ -162,7 +162,7 @@ func addEndpointCleanup(t *testing.T, fixture *atesting.Fixture, uninstallToken 
 		}
 
 		if atesting.KeepInstalledFlag() {
-			t.Logf("\"Keep installed\" flag is set, won't be removing endpoint. If you want to remove endpoint later on, use the following uninstall token: %s", fixture.UninstallToken())
+			t.Logf("\"Keep installed\" flag is set, won't be removing endpoint. If you want to remove endpoint later on, use the following uninstall token: %s", uninstallToken)
 			return
 		}
 
