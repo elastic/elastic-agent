@@ -6,11 +6,10 @@ package upgrade
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 
 	"github.com/cenkalti/backoff/v4"
 )
