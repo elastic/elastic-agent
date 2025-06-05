@@ -14,12 +14,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-viper/mapstructure/v2"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringcfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/component"
 )
@@ -37,6 +40,7 @@ func TestMonitoringFull(t *testing.T) {
 				HTTP: &monitoringcfg.MonitoringHTTPConfig{
 					Enabled: true,
 				},
+				RuntimeManager: monitoringcfg.DefaultRuntimeManager,
 			},
 		},
 		agentInfo: agentInfo,
@@ -80,6 +84,14 @@ func TestMonitoringFull(t *testing.T) {
 			InputSpec: &component.InputRuntimeSpec{
 				BinaryName: "filebeat",
 			},
+			RuntimeManager: component.DefaultRuntimeManager,
+		},
+		{
+			ID: "filestream-otel",
+			InputSpec: &component.InputRuntimeSpec{
+				BinaryName: "filebeat",
+			},
+			RuntimeManager: component.OtelRuntimeManager,
 		},
 	}
 
@@ -114,7 +126,7 @@ func TestMonitoringFull(t *testing.T) {
 	require.NoError(t, err)
 	outCfgString := string(outCfgBytes)
 	// replace the version with a placeholder
-	outCfgString = strings.Replace(outCfgString, agentInfo.Version(), "placeholder", -1)
+	outCfgString = strings.ReplaceAll(outCfgString, agentInfo.Version(), "placeholder")
 	assert.Equal(t, string(expectedConfigBytes), outCfgString)
 }
 
@@ -840,6 +852,208 @@ func TestMonitoringConfigComponentFields(t *testing.T) {
 	}
 }
 
+func TestMonitoringConfigForBeatsReceivers(t *testing.T) {
+	agentInfo, err := info.NewAgentInfo(context.Background(), false)
+	require.NoError(t, err, "Error creating agent info")
+
+	cfg := &monitoringConfig{
+		C: &monitoringcfg.MonitoringConfig{
+			Enabled:        true,
+			MonitorLogs:    true,
+			MonitorMetrics: true,
+			Namespace:      "test",
+			HTTP: &monitoringcfg.MonitoringHTTPConfig{
+				Enabled: false,
+			},
+			RuntimeManager: monitoringcfg.DefaultRuntimeManager,
+		},
+	}
+
+	policy := map[string]any{
+		"agent": map[string]any{
+			"monitoring": map[string]any{
+				"metrics": true,
+				"logs":    false,
+			},
+		},
+		"outputs": map[string]any{
+			"default": map[string]any{},
+		},
+	}
+
+	b := &BeatsMonitor{
+		enabled:   true,
+		config:    cfg,
+		agentInfo: agentInfo,
+	}
+
+	components := []component.Component{
+		{
+			ID: "filestream-process",
+			InputSpec: &component.InputRuntimeSpec{
+				Spec: component.InputSpec{
+					Command: &component.CommandSpec{
+						Name: "filebeat",
+					},
+				},
+			},
+			RuntimeManager: component.ProcessRuntimeManager,
+		},
+		{
+			ID: "filestream-receiver",
+			InputSpec: &component.InputRuntimeSpec{
+				Spec: component.InputSpec{
+					Command: &component.CommandSpec{
+						Name: "filebeat",
+					},
+				},
+			},
+			RuntimeManager: component.OtelRuntimeManager,
+		},
+	}
+	monitoringCfgMap, err := b.MonitoringConfig(policy, components, map[string]uint64{})
+	require.NoError(t, err)
+
+	// Verify that if we're using filebeat receiver, there's no filebeat input
+	var monitoringCfg struct {
+		Inputs []struct {
+			ID             string
+			RuntimeManager string `mapstructure:"_runtime_experimental"`
+			Streams        []struct {
+				Path string `mapstructure:"path"`
+			}
+		}
+	}
+	err = mapstructure.Decode(monitoringCfgMap, &monitoringCfg)
+	require.NoError(t, err)
+	var streamsForInputMetrics []struct {
+		Path string `mapstructure:"path"`
+	}
+	for _, input := range monitoringCfg.Inputs {
+		for _, stream := range input.Streams {
+			if stream.Path == "/inputs/" {
+				streamsForInputMetrics = append(streamsForInputMetrics, stream)
+			}
+		}
+	}
+	assert.Len(t, streamsForInputMetrics, 2)
+}
+
+func TestMonitoringWithOtelRuntime(t *testing.T) {
+	agentInfo, err := info.NewAgentInfo(context.Background(), false)
+	require.NoError(t, err, "Error creating agent info")
+
+	cfg := &monitoringConfig{
+		C: &monitoringcfg.MonitoringConfig{
+			Enabled:        true,
+			MonitorLogs:    true,
+			MonitorMetrics: true,
+			Namespace:      "test",
+			HTTP: &monitoringcfg.MonitoringHTTPConfig{
+				Enabled: false,
+			},
+			RuntimeManager: monitoringcfg.OtelRuntimeManager,
+		},
+	}
+
+	policy := map[string]any{
+		"agent": map[string]any{
+			"monitoring": map[string]any{
+				"metrics": true,
+				"logs":    false,
+			},
+		},
+		"outputs": map[string]any{
+			"default": map[string]any{},
+		},
+	}
+
+	b := &BeatsMonitor{
+		enabled:   true,
+		config:    cfg,
+		agentInfo: agentInfo,
+	}
+
+	components := []component.Component{
+		{
+			ID: "filestream-receiver",
+			InputSpec: &component.InputRuntimeSpec{
+				Spec: component.InputSpec{
+					Command: &component.CommandSpec{
+						Name: "filebeat",
+					},
+				},
+			},
+			RuntimeManager: component.OtelRuntimeManager,
+		},
+	}
+	monitoringCfgMap, err := b.MonitoringConfig(policy, components, map[string]uint64{})
+	require.NoError(t, err)
+
+	// Verify that if we're using filebeat receiver, there's no filebeat input
+	var monitoringCfg struct {
+		Inputs []struct {
+			ID             string
+			RuntimeManager string `mapstructure:"_runtime_experimental"`
+		}
+	}
+	err = mapstructure.Decode(monitoringCfgMap, &monitoringCfg)
+	require.NoError(t, err)
+	for _, input := range monitoringCfg.Inputs {
+		assert.Equal(t, monitoringcfg.OtelRuntimeManager, input.RuntimeManager)
+	}
+}
+
+func TestEnrichArgs(t *testing.T) {
+	unitID := "test"
+	tests := []struct {
+		name       string
+		enabled    bool
+		config     monitoringConfig
+		binaryName string
+		expected   []string
+	}{
+		{
+			name:       "disabled",
+			enabled:    false,
+			config:     monitoringConfig{},
+			binaryName: "filebeat",
+			expected:   nil,
+		},
+		{
+			name:       "unsupported",
+			enabled:    true,
+			config:     monitoringConfig{},
+			binaryName: "unsupported",
+			expected:   nil,
+		},
+		{
+			name:       "default",
+			enabled:    true,
+			config:     monitoringConfig{C: &monitoringcfg.MonitoringConfig{}},
+			binaryName: "filebeat",
+			expected:   []string{"-E", "http.enabled=true", "-E", "http.host=placeholder", "-E", "logging.metrics.enabled=false"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			b := &BeatsMonitor{
+				enabled: test.enabled,
+				config:  &test.config,
+			}
+			args := b.EnrichArgs(unitID, test.binaryName, nil)
+			// replace socket path with placeholder, it's annoying to do cross-platform tests on these
+			for i, arg := range args {
+				if strings.HasPrefix(arg, "http.host") {
+					args[i] = "http.host=placeholder"
+				}
+			}
+			assert.ElementsMatch(t, test.expected, args)
+		})
+	}
+}
+
 type Processor struct {
 	AddFields AddFields `json:"add_fields"`
 }
@@ -850,4 +1064,30 @@ type Fields struct {
 type AddFields struct {
 	Fields Fields `json:"fields"`
 	Target string `json:"target"`
+}
+
+// This test ensures if any field under [agent.monitoring] is unset,
+// it falls back to the default value defined in monitoringCfg.DefaultConfig()
+func TestMonitorReload(t *testing.T) {
+	// set log and metric monitoring to false
+	monitorcfg := monitoringcfg.DefaultConfig()
+	monitorcfg.MonitorLogs = false
+	monitorcfg.MonitorMetrics = false
+
+	beatsMonitor := New(true, "", monitorcfg, nil)
+	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, false)
+	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, false)
+
+	// unset logs and metrics
+	agentConfig := `
+agent.monitoring:
+  enabled: true
+`
+	conf := config.MustNewConfigFrom(agentConfig)
+	// Reload will set unset fields to default
+	err := beatsMonitor.Reload(conf)
+	require.NoError(t, err)
+
+	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, true)
+	assert.Equal(t, beatsMonitor.config.C.MonitorMetrics, true)
 }

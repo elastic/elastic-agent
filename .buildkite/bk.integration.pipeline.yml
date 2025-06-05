@@ -5,6 +5,13 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   ASDF_MAGE_VERSION: 1.14.0
 
+  IMAGE_UBUNTU_2404_X86_64: "family/platform-ingest-elastic-agent-ubuntu-2404"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64"
+  IMAGE_RHEL_8: "family/platform-ingest-elastic-agent-rhel-8"
+  IMAGE_DEBIAN_12: "family/platform-ingest-elastic-agent-debian-12"
+  IMAGE_WIN_2022: "family/platform-ingest-elastic-agent-windows-2022"
+  IMAGE_WIN_2025: "family/platform-ingest-elastic-agent-windows-2025"
+
 steps:
   - label: Start ESS stack for integration tests
     key: integration-ess
@@ -20,6 +27,65 @@ steps:
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
+
+  - group: "Extended runtime leak tests"
+    key: extended-integration-tests
+    depends_on:
+      - integration-ess
+    steps:
+      - label: "Windows:2022:amd64:sudo"
+        depends_on:
+          - packaging-windows
+        env:
+          TEST_LONG_RUNNING: "true"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
+          .buildkite/scripts/integration-tests.ps1 fleet true TestLongRunningAgentForLeaks
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_WIN_2022}"
+        retry:
+          automatic:
+            limit: 1
+      - label: "Windows:2025:amd64:sudo"
+        depends_on:
+          - packaging-windows
+        env:
+          TEST_LONG_RUNNING: "true"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
+          .buildkite/scripts/integration-tests.ps1 fleet true TestLongRunningAgentForLeaks
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_WIN_2025}"
+      - label: "Ubuntu:2404:amd64:sudo"
+        depends_on: packaging-ubuntu-x86-64
+        env:
+          TEST_LONG_RUNNING: "true"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
+          .buildkite/scripts/steps/integration_tests_tf.sh fleet true TestLongRunningAgentForLeaks
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
 
   - group: "Stateful: Windows"
     key: integration-tests-win
@@ -37,8 +103,8 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-windows-2022"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_WIN_2022}"
         retry:
           automatic:
             limit: 1
@@ -63,8 +129,8 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-windows-2022"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_WIN_2022}"
         retry:
           automatic:
             limit: 1
@@ -82,8 +148,8 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-windows-2025"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_WIN_2025}"
         retry:
           automatic:
             limit: 1
@@ -111,8 +177,8 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-windows-2025"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_WIN_2025}"
         matrix:
           - default
 
@@ -134,8 +200,8 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
         matrix:
           - default
 
@@ -154,8 +220,8 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
         matrix:
           - default
           - upgrade
@@ -183,7 +249,7 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "aws"
-          imagePrefix: "platform-ingest-elastic-agent-ubuntu-2404-aarch64"
+          imagePrefix: "${IMAGE_UBUNTU_2404_ARM_64}"
           instanceType: "m6g.2xlarge"
         retry:
           automatic:
@@ -220,7 +286,7 @@ steps:
             limit: 1
         agents:
           provider: "aws"
-          imagePrefix: "platform-ingest-elastic-agent-ubuntu-2404-aarch64"
+          imagePrefix: "${IMAGE_UBUNTU_2404_ARM_64}"
           instanceType: "m6g.xlarge"
         matrix:
           - default
@@ -243,8 +309,8 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-debian-12"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_DEBIAN_12}"
         matrix:
           - default
 
@@ -263,8 +329,8 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-debian-12"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_DEBIAN_12}"
         matrix:
           - default
           - upgrade
@@ -301,8 +367,8 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-rhel-8"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_RHEL_8}"
 
   - group: "Kubernetes"
     key: integration-tests-kubernetes
@@ -316,7 +382,6 @@ steps:
           ASDF_KIND_VERSION: "0.27.0"
           DOCKER_VARIANTS: "{{matrix.variants}}"
           TARGET_ARCH: "amd64"
-          AGENT_VERSION: "9.0.0-SNAPSHOT" # Remove agent pinning once 9.0.0 is released
         command: |
           buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64'
           .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
@@ -329,21 +394,26 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-4"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+          machineType: "n2-standard-4"
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
           diskSizeGb: 80
         matrix:
           setup:
             variants:
             - "basic,slim,complete,service,elastic-otel-collector"
             - "wolfi,slim-wolfi,complete-wolfi,elastic-otel-collector-wolfi"
+
+            # See the Kubernetes Compatible Versions for Elastic Agent in the Elastic
+            # Support Matrix (https://www.elastic.co/support/matrix#matrix_kubernetes) for
+            # the rationale on why these specific versions are chosen.
             version:
-            - v1.27.16
-            - v1.28.9
-            - v1.29.8
-            - v1.30.8
-            - v1.31.0
-            - v1.32.0
+              - v1.27.16
+              - v1.28.15
+              - v1.29.14
+              - v1.30.0
+              - v1.31.0
+              - v1.32.0
+              - v1.33.0
 
   - label: ESS stack cleanup
     depends_on:
@@ -351,6 +421,7 @@ steps:
       - integration-tests-win
       - integration-tests-rhel8
       - integration-tests-kubernetes
+      - extended-integration-tests
     allow_dependency_failure: true
     command: |
       buildkite-agent artifact download "test_infra/ess/**" . --step "integration-ess"

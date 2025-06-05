@@ -23,3 +23,7 @@ output "es_host" {
 output "kibana_endpoint" {
   value = ec_deployment.integration-testing.kibana.https_endpoint
 }
+
+output "integrations_server_endpoint" {
+  value = ec_deployment.integration-testing.integrations_server.https_endpoint
+}

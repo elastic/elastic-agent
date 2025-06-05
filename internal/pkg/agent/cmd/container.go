@@ -81,6 +81,7 @@ The following actions are possible and grouped based on the actions.
   FLEET_ENROLL - set to 1 for enrollment into Fleet Server. If not set, Elastic Agent is run in standalone mode.
   FLEET_URL - URL of the Fleet Server to enroll into
   FLEET_ENROLLMENT_TOKEN - token to use for enrollment. This is not needed in case FLEET_SERVER_ENABLED and FLEET_ENROLL is set. Then the token is fetched from Kibana.
+  FLEET_ENROLL_TIMEOUT - The timeout duration for the enroll commnd. Defaults to 10m. A negative value disables the timeout.
   FLEET_CA - path to certificate authority to use with communicate with Fleet Server [$KIBANA_CA]
   FLEET_INSECURE - communicate with Fleet with either insecure HTTP or unverified HTTPS
   ELASTIC_AGENT_CERT - path to certificate to use for connecting to fleet-server.
@@ -390,7 +391,7 @@ func ensureServiceToken(streams *cli.IOStreams, cfg *setupConfig) error {
 	if err != nil {
 		return err
 	}
-	code, r, err := client.Connection.Request("POST", "/api/fleet/service_tokens", nil, nil, nil)
+	code, r, err := client.Request("POST", "/api/fleet/service_tokens", nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("request to get security token from Kibana failed: %w", err)
 	}
@@ -516,6 +517,10 @@ func buildEnrollArgs(cfg setupConfig, token string, policyID string) ([]string, 
 	if cfg.Fleet.DaemonTimeout != 0 {
 		args = append(args, "--daemon-timeout")
 		args = append(args, cfg.Fleet.DaemonTimeout.String())
+	}
+	if cfg.Fleet.EnrollTimeout != 0 {
+		args = append(args, "--enroll-timeout")
+		args = append(args, cfg.Fleet.EnrollTimeout.String())
 	}
 	if cfg.Fleet.Cert != "" {
 		args = append(args, "--elastic-agent-cert", cfg.Fleet.Cert)
@@ -693,14 +698,14 @@ func isTrue(val string) bool {
 func performGET(cfg setupConfig, client *kibana.Client, path string, response interface{}, writer io.Writer, msg string) error {
 	var lastErr error
 	for i := 0; i < cfg.Kibana.RetryMaxCount; i++ {
-		code, result, err := client.Connection.Request("GET", path, nil, nil, nil)
+		code, result, err := client.Request("GET", path, nil, nil, nil)
 		if err != nil || code != 200 {
 			if err != nil {
 				err = fmt.Errorf("http GET request to %s%s fails: %w. Response: %s",
-					client.Connection.URL, path, err, truncateString(result))
+					client.URL, path, err, truncateString(result))
 			} else {
 				err = fmt.Errorf("http GET request to %s%s fails. StatusCode: %d Response: %s",
-					client.Connection.URL, path, code, truncateString(result))
+					client.URL, path, code, truncateString(result))
 			}
 			fmt.Fprintf(writer, "%s failed: %s\n", msg, err)
 			<-time.After(cfg.Kibana.RetrySleepDuration)
@@ -721,7 +726,7 @@ func truncateString(b []byte) string {
 		runes = append(runes[:maxLength], []rune("... (truncated)")...)
 	}
 
-	return strings.Replace(string(runes), "\n", " ", -1)
+	return strings.ReplaceAll(string(runes), "\n", " ")
 }
 
 // runLegacyAPMServer extracts the bundled apm-server from elastic-agent

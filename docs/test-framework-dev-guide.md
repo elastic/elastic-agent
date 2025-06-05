@@ -83,9 +83,10 @@ between, and it can be very specific or not very specific.
 - `TEST_PLATFORMS="linux/amd64/ubuntu/20.04 mage integration:test` to execute tests only on Ubuntu 20.04 ARM64.
 - `TEST_PLATFORMS="windows/amd64/2022 mage integration:test` to execute tests only on Windows Server 2022.
 - `TEST_PLATFORMS="linux/amd64 windows/amd64/2022 mage integration:test` to execute tests on Linux AMD64 and Windows Server 2022.
-- `TEST_PLATFORMS="kubernetes/arm64/1.32.0/wolfi" mage integration:kubernetes` to execute kubernetes tests on Kubernetes version 1.32.0 with wolfi docker variant.
+- `TEST_PLATFORMS="kubernetes/arm64/1.33.0/wolfi" mage integration:kubernetes` to execute kubernetes tests on Kubernetes version 1.33.0 with wolfi docker variant.
 
-> **_NOTE:_**  This only filters down the tests based on the platform. It will not execute a tests on a platform unless
+> [!NOTE]
+> This only filters down the tests based on the platform. It will not execute a tests on a platform unless
 > the test defines as supporting it.
 
 #### Selecting specific group
@@ -148,7 +149,8 @@ following `mage integration:*` commands to re-use the already provisioned resour
 
 Tests with external dependencies might need more environment variables to be set
 when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAME`,
-`ELASTICSEARCH_PASSWORD`, `KIBANA_HOST`, `KIBANA_USERNAME`, and `KIBANA_PASSWORD`.
+`ELASTICSEARCH_PASSWORD`, `KIBANA_HOST`, `KIBANA_USERNAME`, `KIBANA_PASSWORD`, and
+`INTEGRATIONS_SERVER_HOST`.
 
 ### Debugging tests
 
@@ -292,6 +294,25 @@ until it reports a failure.
 
 - `TEST_RUN_UNTIL_FAILURE=true mage integration:single [testName]`
 
+### Running integration tests with local changes in beats (for otel receivers)
+
+If you've made local changes to Beats-OTel and want to run the Agent's integration tests against those changes, follow these steps:
+1. Update go.mod and add a replace directive as follows (change the path to match your local machine):
+```
+replace github.com/elastic/beats/v7 => /Users/vihasmakwana/Desktop/Vihas/elastic/beats
+```
+2. Package the Agent with `EXTERNAL=true`:
+```sh
+EXTERNAL=true PLATFORMS=darwin/arm64 mage package
+```
+3. Run integration tests as per [the instructions](#running-the-tests)
+
+> [!NOTE]
+> Make sure you add an absolute path in replace directive
+
+> [!NOTE]
+> Old agent might be cached at `.agent-testing` directory. Run `mage integration:clean` to clean it.
+
 ## Writing tests
 
 Write integration and E2E tests by adding them to the `testing/integration`
@@ -318,11 +339,11 @@ groups is better than a ton of groups each executing a small set of tests, as th
 out weight the benefits of creating another group.
 
 #### Creating a new test group and Buildkite integration tests
-  
-  When creating a new test group, it is important to add the new group to the job in the `.buildkite/bk.integration.pipeline.yml` file. This will ensure that the new group is executed in the CI pipeline. 
 
-  Add the new group to the `matrix` in the corresponding steps. The matrix is a list of all test groups that are executed in the step. 
-  Example: 
+  When creating a new test group, it is important to add the new group to the job in the `.buildkite/bk.integration.pipeline.yml` file. This will ensure that the new group is executed in the CI pipeline.
+
+  Add the new group to the `matrix` in the corresponding steps. The matrix is a list of all test groups that are executed in the step.
+  Example:
 
   ```yaml
   - label: "x86_64:sudo: {{matrix}}"
@@ -419,6 +440,10 @@ being run with fresh instances and stack.
 If you encounter any errors mentioning `ogc`, try running `mage integration:clean` and then
 re-running whatever `mage integration:*` target you were trying to run originally when you
 encountered the error.
+
+### Tests seemingly using a stale Elastic Agent package
+
+If your integration tests seem to be using a stale or outdated version of Elastic Agent, it might be due to a cached copy in the .agent-testing directory. To fix this, run `mage clean` to remove cached artifacts, then rebuild the agent with `mage package`, and finally run the integration tests again.
 
 ### Using a different agent version from the stack version
 
