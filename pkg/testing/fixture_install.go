@@ -31,7 +31,7 @@ import (
 )
 
 // ErrNotInstalled is returned in cases where Agent isn't installed
-var ErrNotInstalled = errors.New("Elastic Agent is not installed") //nolint:stylecheck // Elastic Agent is a proper noun
+var ErrNotInstalled = errors.New("Elastic Agent is not installed") //nolint:staticcheck // Elastic Agent is a proper noun
 
 // CmdOpts creates vectors of command arguments for different agent commands
 type CmdOpts interface {
@@ -530,11 +530,11 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, shou
 	if installOpts.DelayEnroll {
 		enrollArgs = append(enrollArgs, "--delay-enroll")
 	}
-	if installOpts.EnrollOpts.URL != "" {
-		enrollArgs = append(enrollArgs, "--url", installOpts.EnrollOpts.URL)
+	if installOpts.URL != "" {
+		enrollArgs = append(enrollArgs, "--url", installOpts.URL)
 	}
-	if installOpts.EnrollOpts.EnrollmentToken != "" {
-		enrollArgs = append(enrollArgs, "--enrollment-token", installOpts.EnrollOpts.EnrollmentToken)
+	if installOpts.EnrollmentToken != "" {
+		enrollArgs = append(enrollArgs, "--enrollment-token", installOpts.EnrollmentToken)
 	}
 	out, err = exec.CommandContext(ctx, "sudo", enrollArgs...).CombinedOutput()
 	if err != nil {
@@ -625,11 +625,11 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 	if installOpts.DelayEnroll {
 		enrollArgs = append(enrollArgs, "--delay-enroll")
 	}
-	if installOpts.EnrollOpts.URL != "" {
-		enrollArgs = append(enrollArgs, "--url", installOpts.EnrollOpts.URL)
+	if installOpts.URL != "" {
+		enrollArgs = append(enrollArgs, "--url", installOpts.URL)
 	}
-	if installOpts.EnrollOpts.EnrollmentToken != "" {
-		enrollArgs = append(enrollArgs, "--enrollment-token", installOpts.EnrollOpts.EnrollmentToken)
+	if installOpts.EnrollmentToken != "" {
+		enrollArgs = append(enrollArgs, "--enrollment-token", installOpts.EnrollmentToken)
 	}
 	// run sudo elastic-agent enroll
 	out, err = exec.CommandContext(ctx, "sudo", enrollArgs...).CombinedOutput()
@@ -736,7 +736,7 @@ func (f *Fixture) uninstallNoPkgManager(ctx context.Context, uninstallOpts *Unin
 	}
 
 	if err != nil && topPathStats != nil {
-		return out, fmt.Errorf("Elastic Agent is still installed at [%s]", topPath) //nolint:stylecheck // Elastic Agent is a proper noun
+		return out, fmt.Errorf("Elastic Agent is still installed at [%s]", topPath) //nolint:staticcheck // Elastic Agent is a proper noun
 	}
 
 	return out, nil
