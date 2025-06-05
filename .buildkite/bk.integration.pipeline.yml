@@ -5,12 +5,14 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   ASDF_MAGE_VERSION: 1.14.0
 
-  IMAGE_UBUNTU_2404_X86_64: "family/platform-ingest-elastic-agent-ubuntu-2404"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64"
-  IMAGE_RHEL_8: "family/platform-ingest-elastic-agent-rhel-8"
-  IMAGE_DEBIAN_12: "family/platform-ingest-elastic-agent-debian-12"
-  IMAGE_WIN_2022: "family/platform-ingest-elastic-agent-windows-2022"
-  IMAGE_WIN_2025: "family/platform-ingest-elastic-agent-windows-2025"
+  # The following images are defined here and their values will be updated by updatecli
+  # Please do not change them manually.
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1748347205"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1748347205"
+  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1748347205"
+  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1748347205"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1748347205"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1748347205"
 
 steps:
   - label: Start ESS stack for integration tests
@@ -249,7 +251,7 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "aws"
-          imagePrefix: "${IMAGE_UBUNTU_2404_ARM_64}"
+          image: "${IMAGE_UBUNTU_2404_ARM_64}"
           instanceType: "m6g.2xlarge"
         retry:
           automatic:
@@ -286,7 +288,7 @@ steps:
             limit: 1
         agents:
           provider: "aws"
-          imagePrefix: "${IMAGE_UBUNTU_2404_ARM_64}"
+          image: "${IMAGE_UBUNTU_2404_ARM_64}"
           instanceType: "m6g.xlarge"
         matrix:
           - default
@@ -449,7 +451,11 @@ steps:
     soft_fail:
       - exit_status: "*"
     plugins:
-      - test-collector#v1.10.1:
+      - elastic/vault-secrets#v0.1.0:
+          path: "kv/ci-shared/platform-ingest/buildkite_analytics_token"
+          field: "token"
+          env_var: "BUILDKITE_ANALYTICS_TOKEN"
+      - test-collector#v1.11.0:
           files: "build/*.xml"
           format: "junit"
           branches: "main"
