@@ -36,13 +36,10 @@ func changeUser(topPath string, ownership utils.FileOwner, username string, grou
 	}
 	defer svc.Close()
 
-	cfg, err := svc.Config()
-	if err != nil {
-		return fmt.Errorf("failed to retrieve service config: %w", err)
+	cfg := mgr.Config{
+		ServiceStartName: serviceStartName(username),
+		Password:         password,
 	}
-
-	cfg.ServiceStartName = serviceStartName(username)
-	cfg.Password = password
 
 	err = svc.UpdateConfig(cfg)
 	if err != nil {
