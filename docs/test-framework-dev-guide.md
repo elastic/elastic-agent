@@ -333,6 +333,46 @@ are defined the more instances will be provisioned to complete all tests. A bala
 groups is better than a ton of groups each executing a small set of tests, as the time to set up an instance can
 out weight the benefits of creating another group.
 
+<<<<<<< HEAD
+=======
+#### Creating a new test group and Buildkite integration tests
+
+  When creating a new test group, it is important to add the new group to the job in the `.buildkite/bk.integration.pipeline.yml` file. This will ensure that the new group is executed in the CI pipeline.
+
+  Add the new group to the `matrix` in the corresponding steps. The matrix is a list of all test groups that are executed in the step.
+  Example:
+
+  ```yaml
+  - label: "x86_64:sudo: {{matrix}}"
+        command: |
+          ...
+        artifact_paths:
+          - build/**
+        agents:
+          provider: "gcp"
+          machineType: "n1-standard-8"
+          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/buildkite_analytics_token"
+              field: "token"
+              env_var: "BUILDKITE_ANALYTICS_TOKEN"
+          - test-collector#v1.11.0:
+              files: "build/TEST-*.xml"
+              format: "junit"
+              branches: "main"
+              debug: true
+        matrix:
+          - default
+          - container
+          - fleet-upgrade-to-pr-build
+          - upgrade
+          - fleet
+  ```
+
+  This requirement is temporary and will be removed once the Buildkite pipeline is updated to automatically detect new test groups.
+
+>>>>>>> 9206f0b27 (bk: use elastic/vault-secrets and test-collector plugins together (#8311))
 ### Test namespaces
 
 Every test has access to its own unique namespace (a string value). This namespace can
