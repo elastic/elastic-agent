@@ -82,8 +82,7 @@ func AllComponentsStatuses(ctx context.Context, httpHealthCheckPort int) (*statu
 		return nil, fmt.Errorf("failed to create http request: %w", err)
 	}
 
-	client := http.DefaultClient
-	res, err := client.Do(req)
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get status: %w", err)
 	}
