@@ -15,10 +15,11 @@ common:
         project-id: "elastic-observability-ci"
         project-number: "911195782929"
 # see https://github.com/avaly/gcp-secret-manager-buildkite-plugin/pull/10
+# see https://github.com/avaly/gcp-secret-manager-buildkite-plugin/pull/11
 #  - gcp_serverless_secrets_plugin: &gcp_serverless_secrets_plugin
       #avaly/gcp-secret-manager#v1.2.0:
   - gcp_serverless_secrets_plugin: &gcp_serverless_secrets_plugin
-      v1v/gcp-secret-manager#feature/remove-jq-reqs:
+      elastic/gcp-secret-manager#v1.3.0-elastic:
         env:
           # These secrets are created in .github/workflows/serverless-project.yml
           ELASTICSEARCH_HOST: ea-serverless-it-elasticsearch-hostname
