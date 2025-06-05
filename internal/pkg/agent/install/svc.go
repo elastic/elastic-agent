@@ -225,7 +225,7 @@ func changeSystemdServiceFile(serviceName string, serviceFilePath string, userna
 	return nil
 }
 
-func changeLaunchdServiceFile(serviceName string, plistPath string, username string, groupName string, stopFn, reloadFn func(string) error) error {
+func changeLaunchdServiceFile(serviceName string, plistPath string, username string, groupName string) error {
 	// Read the existing plist file
 	content, err := os.ReadFile(plistPath)
 	if err != nil {
@@ -277,23 +277,9 @@ func changeLaunchdServiceFile(serviceName string, plistPath string, username str
 		contentStr = groupNameRegex.ReplaceAllString(contentStr, "")
 	}
 
-	// Stop the service before modifying
-	if stopFn != nil {
-		if err := stopFn(serviceName); err != nil {
-			fmt.Printf("Warning: failed to stop service %s: %v\n", serviceName, err)
-		}
-	}
-
 	// Write the modified content back to the plist file
 	if err := os.WriteFile(plistPath, []byte(contentStr), 0644); err != nil {
 		return fmt.Errorf("failed to write plist file %s: %w", plistPath, err)
-	}
-
-	// Reload the service
-	if reloadFn != nil {
-		if err := reloadFn(serviceName); err != nil {
-			return fmt.Errorf("failed to reload service %s: %w", serviceName, err)
-		}
 	}
 
 	return nil

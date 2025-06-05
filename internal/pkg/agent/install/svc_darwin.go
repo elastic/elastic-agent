@@ -8,7 +8,6 @@ package install
 
 import (
 	"fmt"
-	"os/exec"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -24,17 +23,5 @@ func changeUser(topPath string, ownership utils.FileOwner, username string, grou
 		plistPath,
 		username,
 		groupName,
-		stopService,
-		reloadService,
 	)
-}
-
-func stopService(serviceName string) error {
-	cmd := exec.Command("launchctl", "unload", fmt.Sprintf("/Library/LaunchDaemons/%s.plist", serviceName))
-	return cmd.Run()
-}
-
-func reloadService(serviceName string) error {
-	cmd := exec.Command("launchctl", "load", fmt.Sprintf("/Library/LaunchDaemons/%s.plist", serviceName))
-	return cmd.Run()
 }
