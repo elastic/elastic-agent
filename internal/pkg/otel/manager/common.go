@@ -15,7 +15,9 @@ import (
 // for testing purposes
 var netListen = net.Listen
 
-// reportErr reports an error to the error channel, after draining it.
+// reportErr sends an error to the provided error channel. It first drains the channel
+// to ensure that only the most recent error is kept, as intermediate errors can be safely discarded.
+// This ensures the receiver always observes the latest reported error.
 func reportErr(ctx context.Context, errCh chan error, err error) {
 	select {
 	case <-ctx.Done():

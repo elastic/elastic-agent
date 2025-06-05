@@ -15,6 +15,7 @@ import (
 
 const schemeName = "elasticagent"
 
+// build time guard that BufferProvider implements confmap.Provider
 var _ confmap.Provider = (*BufferProvider)(nil)
 
 // BufferProvider is a fixed provider that has a factory but only returns the same provider.
