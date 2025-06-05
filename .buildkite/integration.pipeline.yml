@@ -69,7 +69,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           # TODO: replace with IMAGE_WIN_2022 when we migrate this in bk.integration.pipeline.yml
-          image: "core-windows-2022"
+          image: "family/core-windows-2022"
         plugins:
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
@@ -89,7 +89,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           # TODO: replace with IMAGE_WIN_2025 when we migrate this in bk.integration.pipeline.yml
-          image: "core-windows-2025"
+          image: "family/core-windows-2025"
         plugins:
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
