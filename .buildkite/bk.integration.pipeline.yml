@@ -18,7 +18,7 @@ steps:
     env:
       CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
       CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
-      TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
+      TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
     depends_on:
       - 'packaging-containers-x86-64' # Reuse artifacts produced in .buildkite/integration.pipeline.yml
     command: |
@@ -38,7 +38,7 @@ steps:
       ASDF_TERRAFORM_VERSION: 1.9.2
       CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
       CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
-      TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
+      TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
     command: |
       #!/usr/bin/env bash
       set -euo pipefail
@@ -62,7 +62,7 @@ steps:
           TEST_LONG_RUNNING: "true"
           CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
           CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
-          TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
+          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 fleet true TestLongRunningAgentForLeaks
@@ -83,7 +83,7 @@ steps:
           TEST_LONG_RUNNING: "true"
           CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
           CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
-          TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
+          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 fleet true TestLongRunningAgentForLeaks
@@ -103,7 +103,7 @@ steps:
           TEST_LONG_RUNNING: "true"
           CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
           CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
-          TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
+          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
           .buildkite/scripts/steps/integration_tests_tf.sh fleet true TestLongRunningAgentForLeaks
@@ -129,7 +129,7 @@ steps:
         env:
           CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
           CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
-          TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
+          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} true
@@ -159,7 +159,7 @@ steps:
         env:
           CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
           CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
-          TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
+          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} false
@@ -182,7 +182,7 @@ steps:
         env:
           CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
           CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
-          TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
+          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} true
@@ -212,7 +212,7 @@ steps:
         env:
           CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
           CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
-          TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
+          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/integration-tests.ps1 {{matrix}} false
@@ -239,7 +239,7 @@ steps:
         env:
           CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
           CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
-          TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
+          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
@@ -263,7 +263,7 @@ steps:
         env:
           CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
           CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
-          TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
+          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
@@ -299,7 +299,7 @@ steps:
         env:
           CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
           CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
-          TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
+          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
@@ -337,7 +337,7 @@ steps:
         env:
           CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
           CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
-          TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
+          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
@@ -364,7 +364,7 @@ steps:
         env:
           CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
           CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
-          TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
+          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
@@ -388,7 +388,7 @@ steps:
         env:
           CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
           CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
-          TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
+          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
@@ -430,7 +430,7 @@ steps:
         env:
           CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
           CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
-          TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
+          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64
           .buildkite/scripts/steps/integration_tests_tf.sh rpm true
@@ -459,7 +459,7 @@ steps:
           TARGET_ARCH: "amd64"
           CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
           CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
-          TF_VAR_integration_server_docker_image: "${CI_ELASTIC_AGENT_DOCKER_IMAGE}:${CUSTOM_IMAGE_TAG}"
+          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:fips-${BUILDKITE_COMMIT:0:12}"
         command: |
           buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64'
           .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
