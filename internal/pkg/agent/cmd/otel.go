@@ -70,8 +70,6 @@ func hideInheritedFlags(c *cobra.Command) {
 }
 
 func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool) error {
-	// NewForceExtensionConverterFactory is used to ensure that the agent_status extension is always enabled.
-	// It is required for the Elastic Agent to extract the status out of the OTel collector.
 	var settings *otelcol.CollectorSettings
 	if supervised {
 		// add stdin config provider
