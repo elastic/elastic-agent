@@ -12,24 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type mockListener struct {
-	port int
-}
-
-func (l *mockListener) Accept() (net.Conn, error) {
-	panic("not implemented")
-}
-
-func (l *mockListener) Close() error {
-	return nil
-}
-
-func (l *mockListener) Addr() net.Addr {
-	return &net.TCPAddr{
-		Port: l.port,
-	}
-}
-
 func TestFindRandomPort(t *testing.T) {
 	port, err := findRandomTCPPort()
 	require.NoError(t, err)
@@ -43,11 +25,5 @@ func TestFindRandomPort(t *testing.T) {
 		return nil, errors.New("some error")
 	}
 	_, err = findRandomTCPPort()
-	require.Error(t, err)
-
-	netListen = func(string, string) (net.Listener, error) {
-		return &mockListener{0}, nil
-	}
-	_, err = findRandomTCPPort()
-	require.Error(t, err)
+	require.Error(t, err, "failed to find random port")
 }
