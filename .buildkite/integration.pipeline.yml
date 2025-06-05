@@ -181,4 +181,4 @@ steps:
   - label: "Triggering custom FIPS integration tests"
     depends_on:
       - int-packaging
-    command: "buildkite-agent pipeline upload .buildkite/bk.fips-integration.pipeline.yml"
+    command: "buildkite-agent pipeline upload .buildkite/bk.integration-fips.pipeline.yml"

@@ -51,7 +51,7 @@ steps:
     depends_on:
       - integration-fips-ess
     steps:
-      - label: "fips:x86_64:non-sudo:{{matrix}}"
+      - label: "fips:x86_64:sudo-{{matrix.sudo}}:{{matrix.groups}}"
         depends_on:
           - packaging-ubuntu-x86-64-fips # Reuse artifacts produced in .buildkite/integration.pipeline.yml
         env:
@@ -61,7 +61,7 @@ steps:
           TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud:git-${BUILDKITE_COMMIT:0:12}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64-fips'
-          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.groups}} {{matrix.sudo}}
         artifact_paths:
           - build/**
           - build/diagnostics/**
@@ -73,33 +73,14 @@ steps:
           image: "${IMAGE_UBUNTU_X86_64_FIPS}"
           instanceType: "m5.2xlarge"
         matrix:
-          - fleet # currently there is only a single test in the fleet group, add more tests once they have been defined
+          setup:
+            sudo:
+              - "false"
+              - "true"
+            groups:
+              - fleet # currently there is only a single test in the fleet group, add more tests once they have been defined
 
-      - label: "fips:x86_64:sudo:{{matrix}}"
-        depends_on:
-          - packaging-ubuntu-x86-64-fips
-        env:
-          FIPS: "true"
-          CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
-          CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud"
-          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud:git-${BUILDKITE_COMMIT:0:12}"
-        command: |
-          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64-fips
-          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
-        artifact_paths:
-          - build/**
-          - build/diagnostics/**
-        retry:
-          automatic:
-            limit: 1
-        agents:
-          provider: "aws"
-          image: "${IMAGE_UBUNTU_X86_64_FIPS}"
-          instanceType: "m5.2xlarge"
-        matrix:
-          - fleet
-
-      - label: "fips:arm64:non-sudo:{{matrix}}"
+      - label: "fips:arm64:sudo-{{matrix.sudo}}:{{matrix.groups}}"
         depends_on:
           - packaging-ubuntu-arm64-fips
         env:
@@ -109,7 +90,7 @@ steps:
           TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud:git-${BUILDKITE_COMMIT:0:12}"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64-fips'
-          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.groups}} {{matrix.sudo}}
         artifact_paths:
           - build/**
           - build/diagnostics/**
@@ -121,31 +102,12 @@ steps:
           image: "${IMAGE_UBUNTU_ARM64_FIPS}"
           instanceType: "m6g.2xlarge"
         matrix:
-          - fleet
-
-      - label: "fips:arm64:sudo:{{matrix}}"
-        depends_on:
-          - packaging-ubuntu-arm64-fips
-        env:
-          FIPS: "true"
-          CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
-          CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud"
-          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud:git-${BUILDKITE_COMMIT:0:12}"
-        command: |
-          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-arm64-fips
-          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
-        artifact_paths:
-          - build/**
-          - build/diagnostics/**
-        retry:
-          automatic:
-            limit: 1
-        agents:
-          provider: "aws"
-          image: "${IMAGE_UBUNTU_ARM64_FIPS}"
-          instanceType: "m6g.2xlarge"
-        matrix:
-          - fleet
+          setup:
+            sudo:
+              - "false"
+              - "true"
+            groups:
+              - fleet
 
   - label: ESS FIPS stack cleanup
     depends_on:
