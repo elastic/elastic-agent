@@ -351,7 +351,11 @@ out weight the benefits of creating another group.
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-ubuntu-2404"
         plugins:
-          - test-collector#v1.10.1:
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/buildkite_analytics_token"
+              field: "token"
+              env_var: "BUILDKITE_ANALYTICS_TOKEN"
+          - test-collector#v1.11.0:
               files: "build/TEST-*.xml"
               format: "junit"
               branches: "main"
