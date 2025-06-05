@@ -34,7 +34,7 @@ func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Comman
 			if err != nil {
 				return err
 			}
-			supervised, err := cmd.Flags().GetBool(otelSetSupervised)
+			supervised, err := cmd.Flags().GetBool(otelSetSupervisedFlagName)
 			if err != nil {
 				return err
 			}
