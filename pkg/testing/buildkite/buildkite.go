@@ -28,7 +28,7 @@ var (
 		Provider:     "gcp",
 		ImageProject: "elastic-images-qa",
 		MachineType:  "n1-standard-8",                                        // does it need to be this large?
-		Image:        "platform-ingest-elastic-agent-ubuntu-2204-1749051876", // is this the correct image for creating a stack?
+		Image:        "platform-ingest-elastic-agent-ubuntu-2204-1749112555", // is this the correct image for creating a stack?
 	}
 	bkUbuntuAMD64_2004 = StepAgent{
 		Provider:     defaultProvider,
@@ -40,13 +40,13 @@ var (
 		Provider:     defaultProvider,
 		ImageProject: defaultImageProject,
 		MachineType:  defaultAMD64MachineType,
-		Image:        "platform-ingest-elastic-agent-ubuntu-2204-1749051876",
+		Image:        "platform-ingest-elastic-agent-ubuntu-2204-1749112555",
 	}
 	bkUbuntuAMD64_2404 = StepAgent{
 		Provider:     defaultProvider,
 		ImageProject: defaultImageProject,
 		MachineType:  defaultAMD64MachineType,
-		Image:        "platform-ingest-elastic-agent-ubuntu-2404-1749051876",
+		Image:        "platform-ingest-elastic-agent-ubuntu-2404-1749112555",
 	}
 	bkUbuntuARM64_2004 = StepAgent{
 		Provider:     defaultProvider,
@@ -58,49 +58,49 @@ var (
 		Provider:     defaultProvider,
 		ImageProject: defaultImageProject,
 		MachineType:  defaultARM64MachineType,
-		Image:        "platform-ingest-elastic-agent-ubuntu-2204-1749051876-arm",
+		Image:        "platform-ingest-elastic-agent-ubuntu-2204-1749112555-arm",
 	}
 	bkUbuntuARM64_2404 = StepAgent{
 		Provider:     defaultProvider,
 		ImageProject: defaultImageProject,
 		MachineType:  defaultARM64MachineType,
-		Image:        "platform-ingest-elastic-agent-ubuntu-2404-1749051876-arm",
+		Image:        "platform-ingest-elastic-agent-ubuntu-2404-1749112555-arm",
 	}
 	bkRHELAMD64_8 = StepAgent{
 		Provider:     defaultProvider,
 		ImageProject: defaultImageProject,
 		MachineType:  defaultAMD64MachineType,
-		Image:        "platform-ingest-elastic-agent-rhel-8-1749051876",
+		Image:        "platform-ingest-elastic-agent-rhel-8-1749112555",
 	}
 	bkRHELARM64_8 = StepAgent{
 		Provider:     defaultProvider,
 		ImageProject: defaultImageProject,
 		MachineType:  defaultARM64MachineType,
-		Image:        "platform-ingest-elastic-agent-rhel-8-1749051876-arm",
+		Image:        "platform-ingest-elastic-agent-rhel-8-1749112555-arm",
 	}
 	bkWindowsAMD64_2019 = StepAgent{
 		Provider:     defaultProvider,
 		ImageProject: defaultImageProject,
 		MachineType:  defaultAMD64MachineType,
-		Image:        "platform-ingest-elastic-agent-windows-2019-1749051876",
+		Image:        "platform-ingest-elastic-agent-windows-2019-1749112555",
 	}
 	bkWindowsAMD64_2019_Core = StepAgent{
 		Provider:     defaultProvider,
 		ImageProject: defaultImageProject,
 		MachineType:  defaultAMD64MachineType,
-		Image:        "platform-ingest-elastic-agent-windows-2019-1749051876-core",
+		Image:        "platform-ingest-elastic-agent-windows-2019-1749112555-core",
 	}
 	bkWindowsAMD64_2022 = StepAgent{
 		Provider:     defaultProvider,
 		ImageProject: defaultImageProject,
 		MachineType:  defaultAMD64MachineType,
-		Image:        "platform-ingest-elastic-agent-windows-2022-1749051876",
+		Image:        "platform-ingest-elastic-agent-windows-2022-1749112555",
 	}
 	bkWindowsAMD64_2022_Core = StepAgent{
 		Provider:     defaultProvider,
 		ImageProject: defaultImageProject,
 		MachineType:  defaultAMD64MachineType,
-		Image:        "platform-ingest-elastic-agent-windows-2022-1749051876-core",
+		Image:        "platform-ingest-elastic-agent-windows-2022-1749112555-core",
 	}
 )
 
