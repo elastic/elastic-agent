@@ -43,6 +43,8 @@ conditions:
     spec:
       command: 'grep -q -v {{ source "latestVersion" }} .buildkite/pipeline.yml #'
 
+# NOTE: if you add a new target file, please update the .mergify.yml file
+#       to include the new file for the approval and automatic merge
 targets:
   update-buildkite-pipeline:
     name: "Update .buildkite/pipeline.yml"
