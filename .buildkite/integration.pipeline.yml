@@ -45,7 +45,6 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          imageProject: elastic-images-qa
           machineType: "n2-standard-8"
 
   - group: "Serverless integration test (oblt-cli)"
@@ -68,7 +67,6 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          imageProject: elastic-images-qa
           machineType: "n2-standard-8"
           # TODO: replace with IMAGE_WIN_2022 when we migrate this in bk.integration.pipeline.yml
           image: "core-windows-2022"
@@ -89,7 +87,6 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          imageProject: elastic-images-qa
           machineType: "n2-standard-8"
           # TODO: replace with IMAGE_WIN_2025 when we migrate this in bk.integration.pipeline.yml
           image: "core-windows-2025"
