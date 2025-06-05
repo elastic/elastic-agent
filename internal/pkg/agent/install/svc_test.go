@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -156,26 +157,26 @@ func TestChangeLaunchdServiceFile(t *testing.T) {
 
 			// Verify UserName is set correctly
 			if tc.expectedUser != "" {
-				require.Contains(t, modifiedStr, "<key>UserName</key>", "UserName key should be present")
-				require.Contains(t, modifiedStr, fmt.Sprintf("<string>%s</string>", tc.expectedUser), "UserName value should be correct")
+				assert.Contains(t, modifiedStr, "<key>UserName</key>", "UserName key should be present")
+				assert.Contains(t, modifiedStr, fmt.Sprintf("<string>%s</string>", tc.expectedUser), "UserName value should be correct")
 
 				// Count occurrences to ensure only one UserName entry
 				userKeyCount := strings.Count(modifiedStr, "<key>UserName</key>")
 				require.Equal(t, 1, userKeyCount, "Should have exactly one UserName key")
 			} else {
-				require.NotContains(t, modifiedStr, "<key>UserName</key>", "UserName key should not be present when no user is specified")
+				assert.NotContains(t, modifiedStr, "<key>UserName</key>", "UserName key should not be present when no user is specified")
 			}
 
 			// Verify GroupName is set correctly
 			if tc.expectedGroup != "" {
-				require.Contains(t, modifiedStr, "<key>GroupName</key>", "GroupName key should be present")
-				require.Contains(t, modifiedStr, fmt.Sprintf("<string>%s</string>", tc.expectedGroup), "GroupName value should be correct")
+				assert.Contains(t, modifiedStr, "<key>GroupName</key>", "GroupName key should be present")
+				assert.Contains(t, modifiedStr, fmt.Sprintf("<string>%s</string>", tc.expectedGroup), "GroupName value should be correct")
 
 				// Count occurrences to ensure only one GroupName entry
 				groupKeyCount := strings.Count(modifiedStr, "<key>GroupName</key>")
-				require.Equal(t, 1, groupKeyCount, "Should have exactly one GroupName key")
+				assert.Equal(t, 1, groupKeyCount, "Should have exactly one GroupName key")
 			} else {
-				require.NotContains(t, modifiedStr, "<key>GroupName</key>", "GroupName key should not be present when no group specified")
+				assert.NotContains(t, modifiedStr, "<key>GroupName</key>", "GroupName key should not be present when no group specified")
 			}
 		})
 	}
@@ -390,48 +391,44 @@ WantedBy=multi-user.target
 
 			// Verify User is set correctly
 			if tc.expectedUser != "" {
-				require.Contains(t, modifiedStr, fmt.Sprintf("User=%s", tc.expectedUser), "User should be set correctly")
+				assert.Contains(t, modifiedStr, fmt.Sprintf("User=%s", tc.expectedUser), "User should be set correctly")
 
 				// Count occurrences to ensure only one User entry
 				userCount := strings.Count(modifiedStr, "User=")
-				require.Equal(t, 1, userCount, "Should have exactly one User entry")
+				assert.Equal(t, 1, userCount, "Should have exactly one User entry")
 
 				// Verify User is in [Service] section
 				serviceSection := extractServiceSection(modifiedStr)
-				require.Contains(t, serviceSection, fmt.Sprintf("User=%s", tc.expectedUser), "User should be in [Service] section")
+				assert.Contains(t, serviceSection, fmt.Sprintf("User=%s", tc.expectedUser), "User should be in [Service] section")
 			} else {
-				require.NotContains(t, modifiedStr, "User=", "User should not be present when no user is specified")
+				assert.NotContains(t, modifiedStr, "User=", "User should not be present when no user is specified")
 			}
 
 			// Verify Group is set correctly
 			if tc.expectedGroup != "" {
-				require.Contains(t, modifiedStr, fmt.Sprintf("Group=%s", tc.expectedGroup), "Group should be set correctly")
+				assert.Contains(t, modifiedStr, fmt.Sprintf("Group=%s", tc.expectedGroup), "Group should be set correctly")
 
 				// Count occurrences to ensure only one Group entry
 				groupCount := strings.Count(modifiedStr, "Group=")
-				require.Equal(t, 1, groupCount, "Should have exactly one Group entry")
+				assert.Equal(t, 1, groupCount, "Should have exactly one Group entry")
 
 				// Verify Group is in [Service] section
 				serviceSection := extractServiceSection(modifiedStr)
-				require.Contains(t, serviceSection, fmt.Sprintf("Group=%s", tc.expectedGroup), "Group should be in [Service] section")
+				assert.Contains(t, serviceSection, fmt.Sprintf("Group=%s", tc.expectedGroup), "Group should be in [Service] section")
 			} else {
-				require.NotContains(t, modifiedStr, "Group=", "Group should not be present when no group specified")
+				assert.NotContains(t, modifiedStr, "Group=", "Group should not be present when no group specified")
 			}
 
 			// Verify the service file structure is maintained
-			require.Contains(t, modifiedStr, "[Unit]", "Unit section should be present")
-			require.Contains(t, modifiedStr, "[Service]", "Service section should be present")
-			require.Contains(t, modifiedStr, "[Install]", "Install section should be present")
+			assert.Contains(t, modifiedStr, "[Unit]", "Unit section should be present")
+			assert.Contains(t, modifiedStr, "[Service]", "Service section should be present")
+			assert.Contains(t, modifiedStr, "[Install]", "Install section should be present")
 
 			// Verify other service properties are preserved
-			require.Contains(t, modifiedStr, "ExecStart=", "ExecStart should be preserved")
+			assert.Contains(t, modifiedStr, "ExecStart=", "ExecStart should be preserved")
 			if strings.Contains(tc.initialContent, "Restart=") {
-				require.Contains(t, modifiedStr, "Restart=", "Restart should be preserved")
+				assert.Contains(t, modifiedStr, "Restart=", "Restart should be preserved")
 			}
-
-			// Clean up
-			err = os.Remove(serviceFilePath)
-			require.NoError(t, err, "Failed to clean up service file")
 		})
 	}
 }
