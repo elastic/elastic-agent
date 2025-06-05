@@ -1394,6 +1394,15 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 		},
 	}
 
+	invalidOtelStatus := &status.AggregateStatus{
+		Event: componentstatus.NewEvent(componentstatus.StatusOK),
+		ComponentStatusMap: map[string]*status.AggregateStatus{
+			"unknown:logs/filestream-default": {
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+			},
+		},
+	}
+
 	coord := &Coordinator{
 		logger:           logger,
 		agentInfo:        &info.AgentInfo{},
@@ -1414,7 +1423,6 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 	assert.Empty(t, coord.state.Components)
 
 	// push the status into the coordinator
-
 	select {
 	case statusChan <- otelStatus:
 	case <-ctx.Done():
@@ -1462,6 +1470,24 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 	}
 
 	assert.Empty(t, coord.state.Components)
+
+	// Push an invalid status, there should be no component state, but there should be an otel status
+	select {
+	case statusChan <- invalidOtelStatus:
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for coordinator to receive status")
+	}
+
+	select {
+	case finalOtelStatus := <-coord.managerChans.otelManagerUpdate:
+		// we should have otel status with pipelines that didn't parse correctly
+		assert.NotEmpty(t, finalOtelStatus.ComponentStatusMap)
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for coordinator to receive status")
+	}
+
+	assert.Empty(t, coord.state.Components)
+	assert.Equal(t, coord.otelErr.Error(), "pipeline status id unknown:logs/filestream-default is not a pipeline")
 }
 
 func TestCoordinatorInitiatesUpgrade(t *testing.T) {

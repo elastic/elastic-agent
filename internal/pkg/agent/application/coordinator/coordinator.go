@@ -682,6 +682,8 @@ func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
 				return
 			}
 		case otelStatus := <-otelChan:
+			// We don't break on errors here, because we want to forward the status
+			// even if there was an error, and the rest of the code gracefully handles componentStates being nil
 			componentStates, err := translate.GetAllComponentStates(otelStatus, c.componentModel)
 			if err != nil {
 				c.setOTelError(err)
