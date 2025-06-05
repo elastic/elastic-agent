@@ -1,6 +1,7 @@
 # update-cli configuration for automated VM image version bumping
 ---
 name: Bump vm-images to latest version
+pipelineid: 'updatecli-update-vm-images-{{ requiredEnv "BRANCH_NAME" }}'
 
 scms:
   githubConfig:
