@@ -1,0 +1,32 @@
+# update-cli configuration for automated go updates
+---
+name: Bump .stable-snapshot-version
+
+scms:
+  githubConfig:
+    kind: github
+    spec:
+      user: '{{ requiredEnv "GITHUB_ACTOR" }}'
+      username: '{{ requiredEnv "GITHUB_ACTOR" }}'
+      owner: "{{ .scm.owner }}"
+      repository: "{{ .scm.repository }}"
+      token: '{{ requiredEnv "GITHUB_TOKEN" }}'
+      branch: '{{ requiredEnv "BRANCH_NAME" }}'
+      commitusingapi: true
+
+sources:
+  lastStableStackSnapshot:
+    name: "Latest Stable ESS snapshot for current branch"
+    kind: json
+    spec:
+      file: 'https://storage.googleapis.com/artifacts-api/channels/{{ source "branch" }}.json'
+      key: "build"
+targets:
+  updateStableSnapshotFile:
+    name: "Update .stable-snapshot-version"
+    sourceid: lastStableStackSnapshot
+    scmid: githubConfig
+    kind: file
+    spec:
+      file: "test_infra/ess/.stable-snapshot-version"
+      content: '{{ source "new-version" }}-SNAPSHOT'
