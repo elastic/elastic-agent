@@ -19,6 +19,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 func TestKubernetesJournaldInput(t *testing.T) {
@@ -46,106 +47,73 @@ func TestKubernetesJournaldInput(t *testing.T) {
 	namespace := kCtx.getNamespace(t)
 	hostPathType := corev1.HostPathDirectory
 
-	testCases := []struct {
-		name       string
-		skipReason string
-		steps      []k8sTestStep
-	}{
-		{
-			name: "happy path",
-			steps: []k8sTestStep{
-				k8sStepCreateNamespace(),
-				k8sStepDeployKustomize(
-					agentK8SKustomize,
-					"elastic-agent-standalone",
-					k8sKustomizeOverrides{
-						agentContainerExtraEnv: []corev1.EnvVar{
-							{
-								Name:  "ELASTICSEARCH_USERNAME",
-								Value: os.Getenv("ELASTICSEARCH_USERNAME"),
-							},
-							{
-								Name:  "ELASTICSEARCH_PASSWORD",
-								Value: os.Getenv("ELASTICSEARCH_PASSWORD"),
-							},
-							{
-								Name:  "EA_POLICY_NAMESPACE",
-								Value: namespace,
-							},
-						},
-						agentContainerVolumeMounts: []corev1.VolumeMount{
-							{
-								Name:      "journald-mount",
-								MountPath: "/opt/journald",
-								ReadOnly:  true,
-							},
-						},
-						agentPodVolumes: []corev1.Volume{
-							{
-								Name: "journald-mount",
-								VolumeSource: corev1.VolumeSource{
-									HostPath: &corev1.HostPathVolumeSource{
-										Path: "/run/log/journal",
-										Type: &hostPathType,
-									},
-								},
+	steps := []k8sTestStep{
+		k8sStepCreateNamespace(),
+		k8sStepDeployKustomize(
+			agentK8SKustomize,
+			"elastic-agent-standalone",
+			k8sKustomizeOverrides{
+				agentContainerExtraEnv: []corev1.EnvVar{
+					{
+						Name:  "ELASTICSEARCH_USERNAME",
+						Value: os.Getenv("ELASTICSEARCH_USERNAME"),
+					},
+					{
+						Name:  "ELASTICSEARCH_PASSWORD",
+						Value: os.Getenv("ELASTICSEARCH_PASSWORD"),
+					},
+					{
+						Name:  "EA_POLICY_NAMESPACE",
+						Value: namespace,
+					},
+				},
+				agentContainerVolumeMounts: []corev1.VolumeMount{
+					{
+						Name:      "journald-mount",
+						MountPath: "/opt/journald",
+						ReadOnly:  true,
+					},
+				},
+				agentPodVolumes: []corev1.Volume{
+					{
+						Name: "journald-mount",
+						VolumeSource: corev1.VolumeSource{
+							HostPath: &corev1.HostPathVolumeSource{
+								Path: "/run/log/journal",
+								Type: &hostPathType,
 							},
 						},
 					},
-					func(obj k8s.Object) {
-						// update the configmap to use the journald input
-						switch objWithType := obj.(type) {
-						case *corev1.ConfigMap:
-							_, ok := objWithType.Data["agent.yml"]
-							if ok {
-								objWithType.Data["agent.yml"] = string(agentConfigYAML)
-							}
-						}
-
-					}),
-				k8sStepCheckAgentStatus(
-					"app=elastic-agent-standalone",
-					schedulableNodeCount,
-					"elastic-agent-standalone",
-					map[string]bool{
-						"journald": true,
-					}),
+				},
 			},
-		},
+			func(obj k8s.Object) {
+				// update the configmap to use the journald input
+				switch objWithType := obj.(type) {
+				case *corev1.ConfigMap:
+					_, ok := objWithType.Data["agent.yml"]
+					if ok {
+						objWithType.Data["agent.yml"] = string(agentConfigYAML)
+					}
+				}
+
+			}),
+		k8sStepCheckAgentStatus(
+			"app=elastic-agent-standalone",
+			schedulableNodeCount,
+			"elastic-agent-standalone",
+			map[string]bool{
+				"journald": true,
+			}),
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			if tc.skipReason != "" {
-				t.Skip(tc.skipReason)
-			}
-
-			ctx := context.Background()
-			testNamespace := kCtx.getNamespace(t)
-
-			for _, step := range tc.steps {
-				step(t, ctx, kCtx, testNamespace)
-			}
-
-			// Check if the context was cancelled or timed out
-			if ctx.Err() != nil {
-				t.Errorf("context error: %v", ctx.Err())
-			}
-
-			// Query the index and filter by the input type
-			docs := findESDocs(t, func() (estools.Documents, error) {
-				return estools.GetLogsForIndexWithContext(
-					ctx,
-					info.ESClient, fmt.Sprintf("logs-%s-default", namespace),
-					map[string]any{
-						"input.type": "journald",
-					},
-				)
-			})
-
-			require.NotEmpty(t, docs, "expected logs to be found in Elasticsearch")
-		})
-	}
+	journaldTest(
+		t,
+		info.ESClient,
+		kCtx,
+		steps,
+		fmt.Sprintf("logs-%s-default", namespace),
+		"input.type",
+		"journald")
 }
 
 func TestKubernetesJournaldInputOtel(t *testing.T) {
@@ -162,104 +130,98 @@ func TestKubernetesJournaldInputOtel(t *testing.T) {
 	otelConfigYAML, err := os.ReadFile(filepath.Join("testdata", "journald-otel.yml"))
 	require.NoError(t, err, "failed to read journald input template")
 
-	ctx := context.Background()
 	kCtx := k8sGetContext(t, info)
-
-	schedulableNodeCount, err := k8sSchedulableNodeCount(ctx, kCtx)
-	require.NoError(t, err, "error at getting schedulable node count")
-	require.NotZero(t, schedulableNodeCount, "no schedulable Kubernetes nodes found")
-
 	namespace := kCtx.getNamespace(t)
 	hostPathType := corev1.HostPathDirectory
 
-	testCases := []struct {
-		name       string
-		skipReason string
-		steps      []k8sTestStep
-	}{
-		{
-			name: "happy path",
-			steps: []k8sTestStep{
-				k8sStepCreateNamespace(),
-				k8sStepDeployKustomize(
-					agentK8SKustomize,
-					"elastic-agent-standalone",
-					k8sKustomizeOverrides{
-						agentContainerArgs: []string{"--config", "/etc/elastic-agent/agent.yml"},
-						agentContainerExtraEnv: []corev1.EnvVar{
-							{
-								Name:  "EA_POLICY_NAMESPACE",
-								Value: namespace,
-							},
-							{
-								Name:  "ES_API_KEY_ENCODED",
-								Value: kCtx.esEncodedAPIKey,
-							},
-						},
-						agentContainerVolumeMounts: []corev1.VolumeMount{
-							{
-								Name:      "journald-mount",
-								MountPath: "/opt/journal",
-								ReadOnly:  true,
-							},
-						},
-						agentPodVolumes: []corev1.Volume{
-							{
-								Name: "journald-mount",
-								VolumeSource: corev1.VolumeSource{
-									HostPath: &corev1.HostPathVolumeSource{
-										Path: "/run/log/journal",
-										Type: &hostPathType,
-									},
-								},
+	steps := []k8sTestStep{
+		k8sStepCreateNamespace(),
+		k8sStepDeployKustomize(
+			agentK8SKustomize,
+			"elastic-agent-standalone",
+			k8sKustomizeOverrides{
+				agentContainerArgs: []string{"--config", "/etc/elastic-agent/agent.yml"},
+				agentContainerExtraEnv: []corev1.EnvVar{
+					{
+						Name:  "EA_POLICY_NAMESPACE",
+						Value: namespace,
+					},
+					{
+						Name:  "ES_API_KEY_ENCODED",
+						Value: kCtx.esEncodedAPIKey,
+					},
+				},
+				agentContainerVolumeMounts: []corev1.VolumeMount{
+					{
+						Name:      "journald-mount",
+						MountPath: "/opt/journal",
+						ReadOnly:  true,
+					},
+				},
+				agentPodVolumes: []corev1.Volume{
+					{
+						Name: "journald-mount",
+						VolumeSource: corev1.VolumeSource{
+							HostPath: &corev1.HostPathVolumeSource{
+								Path: "/run/log/journal",
+								Type: &hostPathType,
 							},
 						},
 					},
-					func(obj k8s.Object) {
-						// update the configmap to use the journald input
-						switch objWithType := obj.(type) {
-						case *corev1.ConfigMap:
-							_, ok := objWithType.Data["agent.yml"]
-							if ok {
-								objWithType.Data["agent.yml"] = string(otelConfigYAML)
-							}
-						}
-					}),
+				},
 			},
-		},
+			func(obj k8s.Object) {
+				// update the configmap to use the journald input
+				switch objWithType := obj.(type) {
+				case *corev1.ConfigMap:
+					_, ok := objWithType.Data["agent.yml"]
+					if ok {
+						objWithType.Data["agent.yml"] = string(otelConfigYAML)
+					}
+				}
+			}),
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			if tc.skipReason != "" {
-				t.Skip(tc.skipReason)
-			}
+	journaldTest(
+		t,
+		info.ESClient,
+		kCtx,
+		steps,
+		fmt.Sprintf("logs-generic.otel-%s", namespace),
+		"body.structured.input.type",
+		"journald")
+}
 
-			ctx := context.Background()
-			testNamespace := kCtx.getNamespace(t)
+func journaldTest(
+	t *testing.T,
+	esClient *elasticsearch.Client,
+	kCtx k8sContext,
+	steps []k8sTestStep,
+	index, field, value string) {
+	t.Helper()
 
-			for _, step := range tc.steps {
-				step(t, ctx, kCtx, testNamespace)
-			}
+	ctx := context.Background()
+	testNamespace := kCtx.getNamespace(t)
 
-			// Check if the context was cancelled or timed out
-			if ctx.Err() != nil {
-				t.Errorf("context error: %v", ctx.Err())
-			}
-
-			// Query the index and filter by the input type
-			docs := findESDocs(t, func() (estools.Documents, error) {
-				return estools.GetLogsForIndexWithContext(
-					ctx,
-					info.ESClient,
-					fmt.Sprintf("logs-generic.otel-%s", namespace),
-					map[string]any{
-						"event.dataset": "generic.otel",
-					},
-				)
-			})
-
-			require.NotEmpty(t, docs, "expected logs to be found in Elasticsearch")
-		})
+	for _, step := range steps {
+		step(t, ctx, kCtx, testNamespace)
 	}
+
+	// Check if the context was cancelled or timed out
+	if ctx.Err() != nil {
+		t.Errorf("context error: %v", ctx.Err())
+	}
+
+	// Query the index and filter by the input type
+	docs := findESDocs(t, func() (estools.Documents, error) {
+		return estools.GetLogsForIndexWithContext(
+			ctx,
+			esClient,
+			index,
+			map[string]any{
+				field: value,
+			},
+		)
+	})
+	require.NotEmpty(t, docs, "expected logs to be found in Elasticsearch")
 }

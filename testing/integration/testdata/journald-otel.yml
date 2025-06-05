@@ -16,9 +16,6 @@ receivers:
 processors:
   resource:
     attributes:
-    - key: journald-test
-      action: insert
-      value: true
     - key: data_stream.namespace
       action: insert
       value: "${EA_POLICY_NAMESPACE}"
