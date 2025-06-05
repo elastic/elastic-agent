@@ -70,29 +70,9 @@ func hideInheritedFlags(c *cobra.Command) {
 }
 
 func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool) error {
-	var settings *otelcol.CollectorSettings
-	if supervised {
-		// add stdin config provider
-		configProvider, err := agentprovider.NewProvider(os.Stdin)
-		if err != nil {
-			return fmt.Errorf("failed to create config provider: %w", err)
-		}
-		settings = otel.NewSettings(release.Version(), []string{configProvider.URI()},
-			otel.WithConfigProviderFactory(configProvider.NewFactory()),
-		)
-
-		// setup logger
-		l, err := supervisedGetLogger()
-		if err != nil {
-			return fmt.Errorf("failed to create logger: %w", err)
-		}
-		settings.LoggingOptions = []zap.Option{zap.WrapCore(func(zapcore.Core) zapcore.Core {
-			return l.Core()
-		})}
-
-		settings.DisableGracefulShutdown = false
-	} else {
-		settings = otel.NewSettings(release.Version(), configFiles)
+	settings, err := prepareCollectorSettings(configFiles, supervised)
+	if err != nil {
+		return fmt.Errorf("failed to prepare collector settings: %w", err)
 	}
 	// Windows: Mark service as stopped.
 	// After this is run, the service is considered by the OS to be stopped.
@@ -118,23 +98,42 @@ func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool)
 	return otel.Run(ctx, stop, settings)
 }
 
-func supervisedGetLogger() (*logger.Logger, error) {
-	defaultCfg := logger.DefaultLoggingConfig()
-	defaultEventLogCfg := logger.DefaultEventLoggingConfig()
+func prepareCollectorSettings(configFiles []string, supervised bool) (*otelcol.CollectorSettings, error) {
+	var settings *otelcol.CollectorSettings
+	if supervised {
+		// add stdin config provider
+		configProvider, err := agentprovider.NewProvider(os.Stdin)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create config provider: %w", err)
+		}
+		settings = otel.NewSettings(release.Version(), []string{configProvider.URI()},
+			otel.WithConfigProviderFactory(configProvider.NewFactory()),
+		)
 
-	defaultCfg.ToStderr = true
-	defaultCfg.ToFiles = false
+		// setup logger
+		defaultCfg := logger.DefaultLoggingConfig()
+		defaultEventLogCfg := logger.DefaultEventLoggingConfig()
 
-	defaultEventLogCfg.ToFiles = false
-	defaultEventLogCfg.ToStderr = true
-	defaultCfg.Level = logger.DefaultLogLevel
+		defaultCfg.ToStderr = true
+		defaultCfg.ToFiles = false
 
-	l, err := logger.NewFromConfig("edot", defaultCfg, defaultEventLogCfg, false)
-	if err != nil {
-		return nil, err
+		defaultEventLogCfg.ToFiles = false
+		defaultEventLogCfg.ToStderr = true
+		defaultCfg.Level = logger.DefaultLogLevel
+
+		l, err := logger.NewFromConfig("edot", defaultCfg, defaultEventLogCfg, false)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create logger: %w", err)
+		}
+		settings.LoggingOptions = []zap.Option{zap.WrapCore(func(zapcore.Core) zapcore.Core {
+			return l.Core()
+		})}
+
+		settings.DisableGracefulShutdown = false
+	} else {
+		settings = otel.NewSettings(release.Version(), configFiles)
 	}
-
-	return l, err
+	return settings, nil
 }
 
 func prepareEnv() error {
