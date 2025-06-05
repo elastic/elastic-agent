@@ -139,7 +139,7 @@ func getInstallCommand(ctx context.Context, packageFormat string, srcPkg string,
 	case "deb":
 		args = append(args, "dpkg", "-i")
 	case "rpm":
-		args = append(args, "rpm", "-Uvh")
+		args = append(args, "rpm", "-Uvh", "--force")
 	default:
 		return nil, fmt.Errorf("unknown package format for install command: %s", packageFormat)
 	}
@@ -312,23 +312,38 @@ func testTamperProtectedErrorRecovery(t *testing.T, info *define.Info, packageFo
 	require.NoError(t, err)
 
 	tmpdir := t.TempDir()
-	mockSystemctlPath := filepath.Join(tmpdir, "endpoint_tamper_protected_mock_systemctl_debrpm.sh")
+	mockSystemctlScriptPath := filepath.Join(tmpdir, "endpoint_tamper_protected_mock_systemctl_debrpm.sh")
 	assertionsPath := filepath.Join(tmpdir, "assertions")
 	serviceStart := "Started endpoint service"
 	serviceStop := "Stopped endpoint service"
 
-	err = createMockSystemctl(mockSystemctlPath, assertionsPath, serviceStart, serviceStop)
+	err = createMockSystemctl(mockSystemctlScriptPath, assertionsPath, serviceStart, serviceStop)
 	require.NoError(t, err, "creating mock systemctl failed")
 
-	mockSystemctlLink := filepath.Join(tmpdir, "systemctl")
+	systemctlPath := "/usr/bin/systemctl"
+	backupSystemctl := "/usr/bin/systemctl.real"
 
-	err = os.Symlink(mockSystemctlPath, mockSystemctlLink)
-	require.NoError(t, err)
+	if _, err := os.Stat(backupSystemctl); os.IsNotExist(err) {
+		err = os.Rename(systemctlPath, backupSystemctl)
+		require.NoError(t, err, "failed to move real systemctl")
+	}
 
-	mockEnvPath := tmpdir + ":" + os.Getenv("PATH")
+	err = os.Symlink(mockSystemctlScriptPath, systemctlPath)
+	require.NoError(t, err, "failed to create symlink to mock systemctl")
 
+	t.Cleanup(func() {
+		err := os.Remove(systemctlPath)
+		if err != nil {
+			t.Logf("Failed to remove mock symlink: %v", err)
+		}
+
+		err = os.Rename(backupSystemctl, systemctlPath)
+		if err != nil {
+			t.Logf("Failed to restore real systemctl: %v", err)
+		}
+	})
 	t.Log("Installing the second agent, upgrading from the older version")
-	installCmd, err := getInstallCommand(ctx, fixture.PackageFormat(), srcPkg, []string{"PATH=" + mockEnvPath})
+	installCmd, err := getInstallCommand(ctx, fixture.PackageFormat(), srcPkg, nil)
 	require.NoError(t, err)
 
 	t.Log("Installing the second agent")
