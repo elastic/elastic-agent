@@ -5,13 +5,18 @@
 package install
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strings"
 
 	"github.com/kardianos/service"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
@@ -24,6 +29,28 @@ const (
 	// depending on the shutdown timing.
 	darwinServiceExitTimeout = 60
 )
+
+var ErrChangeUserUnsupported = errors.New("ChangeUser is not supported on this system")
+
+// ChangeUser changes user in service definition file directly. In case username or groupName are not provided defaults are used.
+func ChangeUser(topPath string, ownership utils.FileOwner, username string, groupName string, password string) error {
+	serviceOptions, err := withServiceOptions(username, groupName, password)
+	if err != nil {
+		return fmt.Errorf("failed to create user info: %w", err)
+	}
+
+	opts := serviceOpts{
+		Username: username,
+		Group:    groupName,
+		Password: password,
+	}
+
+	for _, o := range serviceOptions {
+		o(&opts)
+	}
+
+	return changeUser(topPath, ownership, opts.Username, opts.Group, opts.Password)
+}
 
 // ExecutablePath returns the path for the installed Agents executable.
 func ExecutablePath(topPath string) string {
@@ -109,6 +136,167 @@ func newService(topPath string, opt ...serviceOpt) (service.Service, error) {
 	}
 
 	return service.New(nil, cfg)
+}
+
+func changeSystemdServiceFile(serviceName string, serviceFilePath string, username string, groupName string) error {
+	// Read the existing service file
+	content, err := os.ReadFile(serviceFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to read service file %s: %w", serviceFilePath, err)
+	}
+
+	lines := strings.Split(string(content), "\n")
+	var modifiedLines []string
+	userSet := false
+	groupSet := false
+	inServiceSection := false
+
+	for _, line := range lines {
+		trimmedLine := strings.TrimSpace(line)
+
+		// Check if we're in the [Service] section
+		if strings.HasPrefix(trimmedLine, "[Service]") {
+			inServiceSection = true
+			modifiedLines = append(modifiedLines, line)
+			continue
+		} else if strings.HasPrefix(trimmedLine, "[") {
+			// We've entered a different section
+			if inServiceSection && !userSet {
+				// Add User before leaving Service section
+				modifiedLines = append(modifiedLines, fmt.Sprintf("User=%s", username))
+				userSet = true
+			}
+			if inServiceSection && !groupSet && groupName != "" {
+				// Add Group before leaving Service section
+				modifiedLines = append(modifiedLines, fmt.Sprintf("Group=%s", groupName))
+				groupSet = true
+			}
+			inServiceSection = false
+			modifiedLines = append(modifiedLines, line)
+			continue
+		}
+
+		if inServiceSection {
+			// Replace existing User or Group definitions
+			if strings.HasPrefix(trimmedLine, "User=") {
+				if username != "" {
+					modifiedLines = append(modifiedLines, fmt.Sprintf("User=%s", username))
+				}
+				userSet = true // mark so it is not added at the end
+				continue
+			}
+			if strings.HasPrefix(trimmedLine, "Group=") {
+				if groupName != "" {
+					modifiedLines = append(modifiedLines, fmt.Sprintf("Group=%s", groupName))
+				}
+				groupSet = true // mark so it is not added at the end
+				continue
+			}
+		}
+
+		// include rest of the definition
+		modifiedLines = append(modifiedLines, line)
+	}
+
+	// If we never found User/Group in Service section, add them at the end
+	if !userSet || (!groupSet && groupName != "") {
+		// Find the last line of the Service section and add User/Group there
+		for i := len(modifiedLines) - 1; i >= 0; i-- {
+			if strings.TrimSpace(modifiedLines[i]) == "[Service]" {
+				insertPos := i + 1
+				if !userSet {
+					modifiedLines = append(modifiedLines[:insertPos], append([]string{fmt.Sprintf("User=%s", username)}, modifiedLines[insertPos:]...)...)
+					insertPos++
+				}
+				if !groupSet && groupName != "" {
+					modifiedLines = append(modifiedLines[:insertPos], append([]string{fmt.Sprintf("Group=%s", groupName)}, modifiedLines[insertPos:]...)...)
+				}
+				break
+			}
+		}
+	}
+
+	// Write the modified content back to the service file
+	modifiedContent := strings.Join(modifiedLines, "\n")
+	if err := os.WriteFile(serviceFilePath, []byte(modifiedContent), 0644); err != nil {
+		return fmt.Errorf("failed to write service file %s: %w", serviceFilePath, err)
+	}
+
+	return nil
+}
+
+func changeLaunchdServiceFile(serviceName string, plistPath string, username string, groupName string, stopFn, reloadFn func(string) error) error {
+	// Read the existing plist file
+	content, err := os.ReadFile(plistPath)
+	if err != nil {
+		return fmt.Errorf("failed to read plist file %s: %w", plistPath, err)
+	}
+
+	contentStr := string(content)
+
+	if username != "" {
+		// Update or add UserName
+		userNameRegex := regexp.MustCompile(`(?s)<key>UserName</key>\s*<string>[^<]*</string>`)
+		userNameReplacement := fmt.Sprintf("<key>UserName</key>\n    <string>%s</string>", username)
+
+		if userNameRegex.MatchString(contentStr) {
+			// Replace existing UserName
+			contentStr = userNameRegex.ReplaceAllString(contentStr, userNameReplacement)
+		} else {
+			// Add UserName after ProgramArguments array
+			progArgsEndRegex := regexp.MustCompile(`(?s)</array>`)
+			matches := progArgsEndRegex.FindAllStringIndex(contentStr, -1)
+			if len(matches) > 0 {
+				// Insert after the first </array> (ProgramArguments)
+				insertPos := matches[0][1]
+				contentStr = contentStr[:insertPos] + "\n    " + userNameReplacement + contentStr[insertPos:]
+			}
+		}
+	} else {
+		// remove user section
+		userNameRegex := regexp.MustCompile(`(?s)\s*<key>UserName</key>\s*<string>[^<]*</string>`)
+		contentStr = userNameRegex.ReplaceAllString(contentStr, "")
+	}
+
+	// Update or add GroupName if specified
+	if groupName != "" {
+		groupNameRegex := regexp.MustCompile(`(?s)<key>GroupName</key>\s*<string>[^<]*</string>`)
+		groupNameReplacement := fmt.Sprintf("<key>GroupName</key>\n    <string>%s</string>", groupName)
+
+		if groupNameRegex.MatchString(contentStr) {
+			// Replace existing GroupName
+			contentStr = groupNameRegex.ReplaceAllString(contentStr, groupNameReplacement)
+		} else {
+			// Add GroupName after UserName
+			userNameEndRegex := regexp.MustCompile(`(?s)<key>UserName</key>\s*<string>[^<]*</string>`)
+			contentStr = userNameEndRegex.ReplaceAllString(contentStr, "$0\n    "+groupNameReplacement)
+		}
+	} else {
+		// Remove GroupName if it exists and no group is specified
+		groupNameRegex := regexp.MustCompile(`(?s)\s*<key>GroupName</key>\s*<string>[^<]*</string>`)
+		contentStr = groupNameRegex.ReplaceAllString(contentStr, "")
+	}
+
+	// Stop the service before modifying
+	if stopFn != nil {
+		if err := stopFn(serviceName); err != nil {
+			fmt.Printf("Warning: failed to stop service %s: %v\n", serviceName, err)
+		}
+	}
+
+	// Write the modified content back to the plist file
+	if err := os.WriteFile(plistPath, []byte(contentStr), 0644); err != nil {
+		return fmt.Errorf("failed to write plist file %s: %w", plistPath, err)
+	}
+
+	// Reload the service
+	if reloadFn != nil {
+		if err := reloadFn(serviceName); err != nil {
+			return fmt.Errorf("failed to reload service %s: %w", serviceName, err)
+		}
+	}
+
+	return nil
 }
 
 // A copy of the launchd plist template from github.com/kardianos/service
