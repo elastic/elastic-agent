@@ -143,33 +143,10 @@ func TestChangeLaunchdServiceFile(t *testing.T) {
 			err := os.WriteFile(plistPath, []byte(tc.initialContent), 0644)
 			require.NoError(t, err, "Failed to write initial plist file")
 
-			// Track function calls
-			var stopCalled, reloadCalled bool
-			var stopServiceName, reloadServiceName string
-
-			stopFn := func(serviceName string) error {
-				stopCalled = true
-				stopServiceName = serviceName
-				return nil
-			}
-
-			reloadFn := func(serviceName string) error {
-				reloadCalled = true
-				reloadServiceName = serviceName
-				return nil
-			}
-
 			// Call the function under test
 			serviceName := "test-service"
-			err = changeLaunchdServiceFile(serviceName, plistPath, tc.username, tc.groupName, stopFn, reloadFn)
+			err = changeLaunchdServiceFile(serviceName, plistPath, tc.username, tc.groupName)
 			require.NoError(t, err, "changeLaunchdServiceFile should not return an error")
-
-			// Verify that stop and reload functions were called as expected
-			require.Equal(t, tc.expectStopCall, stopCalled, "Stop function call expectation mismatch")
-			require.Equal(t, tc.expectReloadCall, reloadCalled, "Reload function call expectation mismatch")
-
-			require.Equal(t, serviceName, stopServiceName, "Stop function called with wrong service name")
-			require.Equal(t, serviceName, reloadServiceName, "Reload function called with wrong service name")
 
 			// Read the modified content
 			modifiedContent, err := os.ReadFile(plistPath)
@@ -200,10 +177,6 @@ func TestChangeLaunchdServiceFile(t *testing.T) {
 			} else {
 				require.NotContains(t, modifiedStr, "<key>GroupName</key>", "GroupName key should not be present when no group specified")
 			}
-
-			// Clean up
-			err = os.Remove(plistPath)
-			require.NoError(t, err, "Failed to clean up plist file")
 		})
 	}
 }
