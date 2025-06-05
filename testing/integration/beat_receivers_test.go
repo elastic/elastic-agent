@@ -572,6 +572,7 @@ outputs:
 			"@timestamp",
 			"agent.id",
 			"agent.ephemeral_id",
+			"agent.version",
 			"elastic_agent.id",
 			"data_stream.namespace",
 			"event.ingested",
