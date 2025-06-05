@@ -31,5 +31,5 @@ func NewAppLocker(dir, lockFileName string) *AppLocker {
 
 // TryLock tries to grab the lock file and returns error if it cannot.
 func (a *AppLocker) TryLock() error {
-	return a.FileLocker.Lock()
+	return a.Lock()
 }

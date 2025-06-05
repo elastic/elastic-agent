@@ -42,7 +42,12 @@ func main() {
 	if !locked {
 		log.Fatalf("Failed acquiring lock on %s", *lockFile)
 	}
-	defer fLock.Unlock()
+	defer func(fLock *flock.Flock) {
+		err := fLock.Unlock()
+		if err != nil {
+			log.Printf("Error unlocking %s: %s", *lockFile, err.Error())
+		}
+	}(fLock)
 
 	log.Printf(AcquiredLockLogFmt, *lockFile)
 

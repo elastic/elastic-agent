@@ -188,12 +188,12 @@ func TestFileLocker_Lock(t *testing.T) {
 				tt.beforeLocking(t, tmpDir, fl)
 			}
 
-			tt.wantLockingErr(t, fl.Lock(), fmt.Sprintf("Lock()"))
+			tt.wantLockingErr(t, fl.Lock(), "Lock()")
 			if tt.afterLocking != nil {
 				tt.afterLocking(t, tmpDir, fl)
 			}
 
-			tt.wantUnlockingErr(t, fl.Unlock(), fmt.Sprintf("Unlock()"))
+			tt.wantUnlockingErr(t, fl.Unlock(), "Unlock()")
 			if tt.afterUnlocking != nil {
 				tt.afterUnlocking(t, tmpDir, fl)
 			}
