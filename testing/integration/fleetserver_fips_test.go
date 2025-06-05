@@ -69,12 +69,12 @@ func TestFIPSAgentConnectingToFIPSFleetServerInECHFRH(t *testing.T) {
 
 	// Find Fleet Server's own Agent and get its status and whether it's
 	// FIPS-capable
-	var agentStatus string
+	//var agentStatus string
 	var agentIsFIPS bool
 	for _, item := range agents.Items {
 		if item.PolicyID == cloudAgentPolicyID {
 			t.Logf("Found fleet-server entry: %+v", item)
-			agentStatus = item.Status
+			//agentStatus = item.Status
 			agentIsFIPS = item.LocalMetadata.Elastic.Agent.FIPS
 			break
 		}
