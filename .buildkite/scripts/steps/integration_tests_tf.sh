@@ -11,6 +11,9 @@ asdf install
 
 GROUP_NAME=$1
 TEST_SUDO=$2
+# NOTE: This argument is not used in this script, but is declared to show that it can be set
+# and passed down to downstream scripts where it may be used.
+TEST_NAME_PATTERN=${3:-""}
 if [ -z "$GROUP_NAME" ]; then
   echo "Error: Specify the group name: integration_tests_tf.sh [group_name]" >&2
   exit 1
