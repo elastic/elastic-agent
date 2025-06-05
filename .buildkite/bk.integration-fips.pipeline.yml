@@ -2,7 +2,6 @@
 
 env:
   DOCKER_REGISTRY: "docker.elastic.co"
-  VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   ASDF_MAGE_VERSION: 1.14.0
 
   IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1744855248"
