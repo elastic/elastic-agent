@@ -192,6 +192,9 @@ func (c *Client) CreateDeployment(ctx context.Context, req CreateDeploymentReque
 	return &r, nil
 }
 
+//go:embed upgrade_deployment_request.tmpl.json
+var upgradeDeploymentRequestTemplate string
+
 // UpgradeDeployment upgrades the specified deployment to the specified version.
 func (c *Client) UpgradeDeployment(ctx context.Context, deploymentID string, version string) error {
 	u, err := url.JoinPath("deployments", deploymentID)
@@ -236,14 +239,18 @@ func (c *Client) UpgradeDeployment(ctx context.Context, deploymentID string, ver
 		return fmt.Errorf("unable to parse current deployment version from GET deployment API response: %w", err)
 	}
 
-	// Replace current version in body with
+	tpl, err := template.New("upgrade_deployment_request").
+		Funcs(template.FuncMap{"json": jsonMarshal}).
+		Parse(upgradeDeploymentRequestTemplate)
+	if err != nil {
+		return fmt.Errorf("unable to parse deployment upgrade template: %w", err)
+	}
 
 	// See also: https://www.elastic.co/docs/api/doc/cloud/operation/operation-update-deployment
 	// - Only elements that change (version?) could be specified?
-	// See also: create_deployment_request.tmpl.json
+	// See also: upgrade_deployment_request.tmpl.json
 	//{
 	// "name": "test-8181",
-	// "alias": "test-8181",
 	// "prune_orphans": true,
 	// "metadata": {
 	//   "system_owned": false,
