@@ -4,7 +4,7 @@ env:
   DOCKER_REGISTRY: "docker.elastic.co"
   ASDF_MAGE_VERSION: 1.14.0
 
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1744855248"
+  IMAGE_UBUNTU_2404_X86_64: "family/platform-ingest-elastic-agent-ubuntu-2404"
   IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-1748955449"
   IMAGE_UBUNTU_ARM64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1748955449"
 
