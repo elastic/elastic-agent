@@ -230,6 +230,9 @@ func listUpgradeDetails(l list.Writer, upgradeDetails *cproto.UpgradeDetails) {
 		if upgradeDetails.Metadata.RetryErrorMsg != "" {
 			l.AppendItem("retry_error_msg: " + upgradeDetails.Metadata.RetryErrorMsg)
 		}
+		if upgradeDetails.Metadata.Reason != "" {
+			l.AppendItem("reason: " + upgradeDetails.Metadata.Reason)
+		}
 		l.UnIndent()
 	}
 

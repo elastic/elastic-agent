@@ -33,7 +33,7 @@ import (
 
 const reallyFastWatcherCfg = `
 agent.upgrade.watcher:
-  grace_period: 1m
+  grace_period: 2m
   error_check.interval: 5s
 `
 
@@ -140,7 +140,11 @@ inputs:
 			if state.UpgradeDetails == nil {
 				t.Fatal("upgrade details in the state cannot be nil")
 			}
-			require.Equal(t, details.StateRollback, details.State(state.UpgradeDetails.State))
+
+			assert.Equal(t, details.StateRollback, details.State(state.UpgradeDetails.State))
+			if !startVersion.Less(*upgradetest.Version_9_1_0_SNAPSHOT) {
+				assert.Equal(t, "automatic rollback", state.UpgradeDetails.Metadata.Reason)
+			}
 		} else {
 			t.Logf("rollback finished, status is '%s', cannot check UpgradeDetails", state.State.String())
 		}
@@ -172,27 +176,112 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 		t.Skip("This test is flaky on windows. See https://github.com/elastic/elastic-agent/issues/6733")
 	}
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
-	defer cancel()
+	type fixturesSetupFunc func(t *testing.T) (from *atesting.Fixture, to *atesting.Fixture)
+	testcases := []struct {
+		name          string
+		fixturesSetup fixturesSetupFunc
+	}{
+		{
+			name: "upgrade from previous minor to current version",
+			fixturesSetup: func(t *testing.T) (from *atesting.Fixture, to *atesting.Fixture) {
+				// Upgrade from an old build because the new watcher from the new build will
+				// be ran. Otherwise the test will run the old watcher from the old build.
+				upgradeFromVersion, err := upgradetest.PreviousMinor()
+				require.NoError(t, err)
+				startFixture, err := atesting.NewFixture(
+					t,
+					upgradeFromVersion.String(),
+					atesting.WithFetcher(atesting.ArtifactFetcher()),
+				)
+				require.NoError(t, err)
 
-	// Upgrade from an old build because the new watcher from the new build will
-	// be ran. Otherwise the test will run the old watcher from the old build.
-	upgradeFromVersion, err := upgradetest.PreviousMinor()
-	require.NoError(t, err)
-	startFixture, err := atesting.NewFixture(
-		t,
-		upgradeFromVersion.String(),
-		atesting.WithFetcher(atesting.ArtifactFetcher()),
-	)
-	require.NoError(t, err)
+				// Upgrade to the build under test.
+				endFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+				require.NoError(t, err)
+				return startFixture, endFixture
+			},
+		},
+		{
+			name: "downgrade from current version to previous minor",
+			fixturesSetup: func(t *testing.T) (from *atesting.Fixture, to *atesting.Fixture) {
+				// Upgrade from the current build to an older one. The new watcher will be run anyway, and we can check
+				// the postconditions on a rollback
+
+				// Start from the build under test.
+				fromFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+				require.NoError(t, err)
+
+				// Downgrade to a previous version (doesn't really matter what)
+				upgradeToVersion, err := upgradetest.PreviousMinor()
+				require.NoError(t, err)
+				toFixture, err := atesting.NewFixture(
+					t,
+					upgradeToVersion.String(),
+					atesting.WithFetcher(atesting.ArtifactFetcher()),
+				)
+				require.NoError(t, err)
+
+				return fromFixture, toFixture
+			},
+		},
+		{
+			name: "upgrade to a repackaged agent built from the same commit",
+			fixturesSetup: func(t *testing.T) (from *atesting.Fixture, to *atesting.Fixture) {
+				// Upgrade from the current build to the same build as Independent Agent Release.
+
+				// Start from the build under test.
+				fromFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+				require.NoError(t, err)
+
+				// Create a new package with a different version (IAR-style)
+				newPackageContainingDir := t.TempDir()
+
+				// modify the version with the "+buildYYYYMMDDHHMMSS"
+				currentVersion, err := version.ParseVersion(define.Version())
+				require.NoErrorf(t, err, "define.Version() %q is not parsable.", define.Version())
+
+				newVersionBuildMetadata := "build" + time.Now().Format("20060102150405")
+				parsedNewVersion := version.NewParsedSemVer(currentVersion.Major(), currentVersion.Minor(), currentVersion.Patch(), "", newVersionBuildMetadata)
+
+				versionForFixture, err := repackageArchive(t.Context(), t, err, fromFixture, newVersionBuildMetadata, currentVersion, newPackageContainingDir, parsedNewVersion)
+				require.NoError(t, err, "error repackaging the archive built from the same commit")
+
+				// I wish I could just pass the location of the package on disk to the whole upgrade tests/fixture/fetcher code
+				// but I would have to break too much code for that, when in Rome... add more code on top of inflexible code
+				repackagedLocalFetcher := atesting.LocalFetcher(newPackageContainingDir)
+				toFixture, err := atesting.NewFixture(
+					t,
+					versionForFixture.String(),
+					atesting.WithFetcher(repackagedLocalFetcher),
+				)
+				require.NoError(t, err)
+
+				return fromFixture, toFixture
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
+			defer cancel()
+			from, to := tc.fixturesSetup(t)
+
+			standaloneRollbackRestartTest(ctx, t, from, to)
+		})
+	}
+
+}
+
+func standaloneRollbackRestartTest(ctx context.Context, t *testing.T, startFixture *atesting.Fixture, endFixture *atesting.Fixture) {
+
 	startVersionInfo, err := startFixture.ExecVersion(ctx)
 	require.NoError(t, err, "failed to get start agent build version info")
 
-	// Upgrade to the build under test.
-	endFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-	require.NoError(t, err)
+	endVersionInfo, err := startFixture.ExecVersion(ctx)
+	require.NoError(t, err, "failed to get end agent build version info")
 
-	t.Logf("Testing Elastic Agent upgrade from %s to %s...", upgradeFromVersion, define.Version())
+	t.Logf("Testing Elastic Agent upgrade from %s to %s...", startFixture.Version(), endVersionInfo.Binary.String())
 
 	// Use the post-upgrade hook to bypass the remainder of the PerformUpgrade
 	// because we want to do our own checks for the rollback.
@@ -204,7 +293,8 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 	err = upgradetest.PerformUpgrade(
 		ctx, startFixture, endFixture, t,
 		upgradetest.WithPostUpgradeHook(postUpgradeHook),
-		upgradetest.WithCustomWatcherConfig(reallyFastWatcherCfg))
+		upgradetest.WithCustomWatcherConfig(reallyFastWatcherCfg),
+		upgradetest.WithDisableHashCheck(true))
 	if !errors.Is(err, ErrPostExit) {
 		require.NoError(t, err)
 	}
@@ -234,7 +324,7 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 				return false
 			}
 			return status != service.StatusRunning
-		}, 2*time.Minute, 1*time.Second, "service never fully stopped (status: %v): %s", status, statusErr)
+		}, 5*time.Minute, 1*time.Second, "service never fully stopped (status: %v): %s", status, statusErr)
 		t.Logf("Stopped agent via service to simulate crashing")
 
 		// start it again
@@ -249,12 +339,12 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 				return false
 			}
 			return status == service.StatusRunning
-		}, 2*time.Minute, 1*time.Second, "service never fully started (status: %v): %s", status, statusErr)
+		}, 5*time.Minute, 1*time.Second, "service never fully started (status: %v): %s", status, statusErr)
 		t.Logf("Started agent via service to simulate crashing")
 	}
 
 	// wait for the agent to be healthy and back at the start version
-	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 10*time.Minute, 10*time.Second, t)
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
 	if err != nil {
 		// agent never got healthy, but we need to ensure the watcher is stopped before continuing
 		// this kills the watcher instantly and waits for it to be gone before continuing
@@ -279,7 +369,10 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NotNil(t, state.UpgradeDetails)
-		require.Equal(t, details.StateRollback, details.State(state.UpgradeDetails.State))
+		assert.Equal(t, details.StateRollback, details.State(state.UpgradeDetails.State))
+		if !startVersion.Less(*upgradetest.Version_9_1_0_SNAPSHOT) {
+			assert.Equal(t, "automatic rollback", state.UpgradeDetails.Metadata.Reason)
+		}
 	}
 
 	// rollback should stop the watcher
