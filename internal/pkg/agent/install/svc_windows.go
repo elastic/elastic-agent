@@ -27,7 +27,7 @@ func changeUser(topPath string, ownership utils.FileOwner, username string, grou
 	if err != nil {
 		return fmt.Errorf("failed to connect to windows service manager: %w", err)
 	}
-	defer m.Disconnect()
+	defer func() { _ = m.Disconnect() }()
 
 	serviceName := paths.ServiceName()
 	svc, err := m.OpenService(serviceName)

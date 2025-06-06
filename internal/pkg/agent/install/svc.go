@@ -5,15 +5,16 @@
 package install
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
-	"strings"
 
 	"github.com/kardianos/service"
+	"gopkg.in/ini.v1"
+	"howett.net/plist"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -28,6 +29,12 @@ const (
 	// and the launchd sends SIGKILL after 5 secs which causes the beats processes to be left running orphaned
 	// depending on the shutdown timing.
 	darwinServiceExitTimeout = 60
+
+	SystemdUserNameKey  = "User"
+	SystemdGroupNameKey = "Group"
+
+	LaunchdUserNameKey  = "UserName"
+	LaunchdGroupNameKey = "GroupName"
 )
 
 var ErrChangeUserUnsupported = errors.New("ChangeUser is not supported on this system")
@@ -139,86 +146,43 @@ func newService(topPath string, opt ...serviceOpt) (service.Service, error) {
 }
 
 func changeSystemdServiceFile(serviceName string, serviceFilePath string, username string, groupName string) error {
-	// Read the existing service file
-	content, err := os.ReadFile(serviceFilePath)
+	svcCfg, err := ini.Load(serviceFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read service file %s: %w", serviceFilePath, err)
 	}
 
-	lines := strings.Split(string(content), "\n")
-	var modifiedLines []string
-	userSet := false
-	groupSet := false
-	inServiceSection := false
-
-	for _, line := range lines {
-		trimmedLine := strings.TrimSpace(line)
-
-		// Check if we're in the [Service] section
-		if strings.HasPrefix(trimmedLine, "[Service]") {
-			inServiceSection = true
-			modifiedLines = append(modifiedLines, line)
-			continue
-		} else if strings.HasPrefix(trimmedLine, "[") {
-			// We've entered a different section
-			if inServiceSection && !userSet {
-				// Add User before leaving Service section
-				modifiedLines = append(modifiedLines, fmt.Sprintf("User=%s", username))
-				userSet = true
-			}
-			if inServiceSection && !groupSet && groupName != "" {
-				// Add Group before leaving Service section
-				modifiedLines = append(modifiedLines, fmt.Sprintf("Group=%s", groupName))
-				groupSet = true
-			}
-			inServiceSection = false
-			modifiedLines = append(modifiedLines, line)
-			continue
-		}
-
-		if inServiceSection {
-			// Replace existing User or Group definitions
-			if strings.HasPrefix(trimmedLine, "User=") {
-				if username != "" {
-					modifiedLines = append(modifiedLines, fmt.Sprintf("User=%s", username))
-				}
-				userSet = true // mark so it is not added at the end
-				continue
-			}
-			if strings.HasPrefix(trimmedLine, "Group=") {
-				if groupName != "" {
-					modifiedLines = append(modifiedLines, fmt.Sprintf("Group=%s", groupName))
-				}
-				groupSet = true // mark so it is not added at the end
-				continue
+	ini.PrettyFormat = false
+	serviceSection := svcCfg.Section("Service")
+	if username != "" {
+		if serviceSection.HasKey(SystemdUserNameKey) {
+			serviceSection.Key(SystemdUserNameKey).SetValue(username)
+		} else {
+			_, err := serviceSection.NewKey(SystemdUserNameKey, username)
+			if err != nil {
+				return fmt.Errorf("failed to update username: %w", err)
 			}
 		}
-
-		// include rest of the definition
-		modifiedLines = append(modifiedLines, line)
+	} else if serviceSection.HasKey(SystemdUserNameKey) {
+		serviceSection.DeleteKey(SystemdUserNameKey)
 	}
 
-	// If we never found User/Group in Service section, add them at the end
-	if !userSet || (!groupSet && groupName != "") {
-		// Find the last line of the Service section and add User/Group there
-		for i := len(modifiedLines) - 1; i >= 0; i-- {
-			if strings.TrimSpace(modifiedLines[i]) == "[Service]" {
-				insertPos := i + 1
-				if !userSet {
-					modifiedLines = append(modifiedLines[:insertPos], append([]string{fmt.Sprintf("User=%s", username)}, modifiedLines[insertPos:]...)...)
-					insertPos++
-				}
-				if !groupSet && groupName != "" {
-					modifiedLines = append(modifiedLines[:insertPos], append([]string{fmt.Sprintf("Group=%s", groupName)}, modifiedLines[insertPos:]...)...)
-				}
-				break
+	if groupName != "" {
+		if serviceSection.HasKey(SystemdGroupNameKey) {
+			serviceSection.Key(SystemdGroupNameKey).SetValue(groupName)
+		} else {
+			_, err := serviceSection.NewKey(SystemdGroupNameKey, groupName)
+			if err != nil {
+				return fmt.Errorf("failed to update groupName: %w", err)
 			}
 		}
+	} else if serviceSection.HasKey(SystemdGroupNameKey) {
+		serviceSection.DeleteKey(SystemdGroupNameKey)
 	}
 
-	// Write the modified content back to the service file
-	modifiedContent := strings.Join(modifiedLines, "\n")
-	if err := os.WriteFile(serviceFilePath, []byte(modifiedContent), 0644); err != nil {
+	fileWriter, err := os.OpenFile(serviceFilePath, os.O_RDWR|os.O_TRUNC, 0644)
+	defer func() { _ = fileWriter.Close() }()
+
+	if _, err := svcCfg.WriteTo(fileWriter); err != nil {
 		return fmt.Errorf("failed to write service file %s: %w", serviceFilePath, err)
 	}
 
@@ -226,60 +190,40 @@ func changeSystemdServiceFile(serviceName string, serviceFilePath string, userna
 }
 
 func changeLaunchdServiceFile(serviceName string, plistPath string, username string, groupName string) error {
+
 	// Read the existing plist file
 	content, err := os.ReadFile(plistPath)
 	if err != nil {
 		return fmt.Errorf("failed to read plist file %s: %w", plistPath, err)
 	}
 
-	contentStr := string(content)
+	// parser implementation
+	dec := plist.NewDecoder(bytes.NewReader(content))
+	plistMap := make(map[string]interface{})
+
+	err = dec.Decode(&plistMap)
+	if err != nil {
+		return fmt.Errorf("failed to decode service file: %w", err)
+	}
 
 	if username != "" {
-		// Update or add UserName
-		userNameRegex := regexp.MustCompile(`(?s)<key>UserName</key>\s*<string>[^<]*</string>`)
-		userNameReplacement := fmt.Sprintf("<key>UserName</key>\n    <string>%s</string>", username)
-
-		if userNameRegex.MatchString(contentStr) {
-			// Replace existing UserName
-			contentStr = userNameRegex.ReplaceAllString(contentStr, userNameReplacement)
-		} else {
-			// Add UserName after ProgramArguments array
-			progArgsEndRegex := regexp.MustCompile(`(?s)</array>`)
-			matches := progArgsEndRegex.FindAllStringIndex(contentStr, -1)
-			if len(matches) > 0 {
-				// Insert after the first </array> (ProgramArguments)
-				insertPos := matches[0][1]
-				contentStr = contentStr[:insertPos] + "\n    " + userNameReplacement + contentStr[insertPos:]
-			}
-		}
+		plistMap[LaunchdUserNameKey] = username
 	} else {
-		// remove user section
-		userNameRegex := regexp.MustCompile(`(?s)\s*<key>UserName</key>\s*<string>[^<]*</string>`)
-		contentStr = userNameRegex.ReplaceAllString(contentStr, "")
+		delete(plistMap, LaunchdUserNameKey)
 	}
 
-	// Update or add GroupName if specified
 	if groupName != "" {
-		groupNameRegex := regexp.MustCompile(`(?s)<key>GroupName</key>\s*<string>[^<]*</string>`)
-		groupNameReplacement := fmt.Sprintf("<key>GroupName</key>\n    <string>%s</string>", groupName)
-
-		if groupNameRegex.MatchString(contentStr) {
-			// Replace existing GroupName
-			contentStr = groupNameRegex.ReplaceAllString(contentStr, groupNameReplacement)
-		} else {
-			// Add GroupName after UserName
-			userNameEndRegex := regexp.MustCompile(`(?s)<key>UserName</key>\s*<string>[^<]*</string>`)
-			contentStr = userNameEndRegex.ReplaceAllString(contentStr, "$0\n    "+groupNameReplacement)
-		}
+		plistMap[LaunchdGroupNameKey] = groupName
 	} else {
-		// Remove GroupName if it exists and no group is specified
-		groupNameRegex := regexp.MustCompile(`(?s)\s*<key>GroupName</key>\s*<string>[^<]*</string>`)
-		contentStr = groupNameRegex.ReplaceAllString(contentStr, "")
+		delete(plistMap, LaunchdGroupNameKey)
 	}
 
-	// Write the modified content back to the plist file
-	if err := os.WriteFile(plistPath, []byte(contentStr), 0644); err != nil {
-		return fmt.Errorf("failed to write plist file %s: %w", plistPath, err)
+	fileWriter, err := os.OpenFile(plistPath, os.O_RDWR|os.O_TRUNC, 0644)
+	defer func() { _ = fileWriter.Close() }()
+
+	enc := plist.NewEncoder(fileWriter)
+	if err := enc.Encode(plistMap); err != nil {
+		return fmt.Errorf("failed to encode service file: %w", err)
 	}
 
 	return nil
