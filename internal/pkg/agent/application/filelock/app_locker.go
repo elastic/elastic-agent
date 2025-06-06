@@ -28,7 +28,7 @@ func NewAppLocker(dir, lockFileName string) *AppLocker {
 	lock, err := NewFileLocker(lockFilePath, WithCustomNotLockedError(ErrAppAlreadyRunning))
 	if err != nil {
 		// should never happen, if it does something is seriously wrong. Better to abort here and let a human take over.
-		panic(fmt.Errorf("creating new file locker %s: %s", lockFilePath, err))
+		panic(fmt.Errorf("creating new file locker %s: %w", lockFilePath, err))
 	}
 
 	return &AppLocker{FileLocker: lock}
