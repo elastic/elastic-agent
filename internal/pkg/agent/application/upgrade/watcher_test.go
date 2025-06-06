@@ -145,14 +145,16 @@ func TestWatcher_PIDChange(t *testing.T) {
 func TestWatcher_PIDChangeSuccess(t *testing.T) {
 	// test tests for success, which only happens when no error comes in
 	// during this time period
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	errCh := make(chan error)
+	// buffered channel so we can drain after we send everything
+	errCh := make(chan error, 10)
 	logger, _ := loggertest.New("watcher")
 	w := NewAgentWatcher(errCh, logger, 1*time.Millisecond)
 
 	// error on watch (counts as lost connect)
+	sentEverything := make(chan struct{})
 	mockHandler := func(srv cproto.ElasticAgentControl_StateWatchServer) error {
 		// starts with PID 1
 		err := srv.Send(&cproto.StateResponse{
@@ -209,6 +211,8 @@ func TestWatcher_PIDChangeSuccess(t *testing.T) {
 		if err != nil {
 			return err
 		}
+		// close the channel to signify that we sent everything
+		close(sentEverything)
 		// keep open until end (exiting will count as a lost connection)
 		<-ctx.Done()
 		return nil
@@ -222,10 +226,19 @@ func TestWatcher_PIDChangeSuccess(t *testing.T) {
 	go w.Run(ctx)
 
 	select {
-	case <-ctx.Done():
-		require.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
-	case err := <-errCh:
-		assert.NoError(t, err, "error should not have been reported")
+	case <-sentEverything:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for everything to be sent")
+		return
+	}
+
+	for {
+		select {
+		case err := <-errCh:
+			assert.NoError(t, err, "error should not have been reported")
+		case <-time.After(1 * time.Second):
+			return
+		}
 	}
 }
 
