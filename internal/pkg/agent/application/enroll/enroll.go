@@ -59,7 +59,6 @@ func CheckRemote(ctx context.Context, c fleetclient.Sender) error {
 	ctx, cancel := context.WithTimeout(ctx, apiStatusTimeout)
 	defer cancel()
 
-	// TODO: a HEAD should be enough as we need to test only the connectivity part
 	resp, err := c.Send(ctx, http.MethodGet, "/api/status", nil, nil, nil)
 	if err != nil {
 		return fmt.Errorf("fail to communicate with Fleet Server API client hosts: %w", err)

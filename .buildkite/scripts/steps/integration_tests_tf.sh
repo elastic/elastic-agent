@@ -11,6 +11,9 @@ asdf install
 
 GROUP_NAME=$1
 TEST_SUDO=$2
+# NOTE: This argument is not used in this script, but is declared to show that it can be set
+# and passed down to downstream scripts where it may be used.
+TEST_NAME_PATTERN=${3:-""}
 if [ -z "$GROUP_NAME" ]; then
   echo "Error: Specify the group name: integration_tests_tf.sh [group_name]" >&2
   exit 1
@@ -49,12 +52,6 @@ else
   export KIBANA_PASSWORD=$(buildkite-agent meta-data get "kibana.pwd")
   export INTEGRATIONS_SERVER_HOST=$(buildkite-agent meta-data get "integrations_server.host")
 fi
-
-# TODO: move to common.sh when it's refactored
-# BK analytics
-echo "--- Prepare BK test analytics token :vault:"
-BUILDKITE_ANALYTICS_TOKEN=$(vault kv get -field token kv/ci-shared/platform-ingest/buildkite_analytics_token)
-export BUILDKITE_ANALYTICS_TOKEN
 
 # Run integration tests
 echo "~~~ Running integration tests"
