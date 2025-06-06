@@ -158,14 +158,15 @@ func (p *fakeStackProvisioner) Create(_ context.Context, request common.StackReq
 	defer p.mx.Unlock()
 	p.requests = append(p.requests, request)
 	return common.Stack{
-		ID:            request.ID,
-		Version:       request.Version,
-		Elasticsearch: "http://localhost:9200",
-		Kibana:        "http://localhost:5601",
-		Username:      "elastic",
-		Password:      "changeme",
-		Internal:      nil,
-		Ready:         false,
+		ID:                 request.ID,
+		Version:            request.Version,
+		Elasticsearch:      "http://localhost:9200",
+		Kibana:             "http://localhost:5601",
+		IntegrationsServer: "http://localhost:8220",
+		Username:           "elastic",
+		Password:           "changeme",
+		Internal:           nil,
+		Ready:              false,
 	}, nil
 }
 
