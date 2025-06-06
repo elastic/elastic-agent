@@ -46,7 +46,7 @@ const cloudAgentPolicyID = "policy-elastic-agent-on-cloud"
 //     up in the Elasticsearch cluster that's part of the ECH deployment.
 //   - Upgrading the local FIPS-capable Elastic Agent and ensuring that it only upgrades to another
 //     FIPS-capable Elastic Agent version.
-func FIPSTest(t *testing.T) {
+func TestFIPS(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Fleet,
 		Stack: &define.Stack{},
