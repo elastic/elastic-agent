@@ -55,7 +55,7 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 
 	action, ok := a.(*fleetapi.ActionMigrate)
 	if !ok {
-		return fmt.Errorf("invalid type, expected ActionSettings and received %T", a)
+		return fmt.Errorf("invalid type, expected ActionMigrate and received %T", a)
 	}
 
 	if h.tamperProtectionFn() {
