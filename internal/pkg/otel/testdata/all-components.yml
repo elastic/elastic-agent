@@ -24,6 +24,7 @@ processors:
         key: key1
         value: value1
   batch:
+  cumulativetodelta:
   elasticinframetrics:
   filter:
   resource:
@@ -125,6 +126,7 @@ service:
       processors:
         - attributes
         - batch
+        - cumulativetodelta
         - elasticinframetrics
         - filter
         - resource
