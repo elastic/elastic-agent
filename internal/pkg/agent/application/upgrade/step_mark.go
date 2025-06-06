@@ -13,6 +13,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -223,6 +224,23 @@ func markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent ag
 
 	markerPath := markerFilePath(dataDirPath)
 	log.Infow("Writing upgrade marker file", "file.path", markerPath, "hash", marker.Hash, "prev_hash", marker.PrevHash)
+	markerFileLocker, err := newMarkerFileLocker(markerPath)
+	if err != nil {
+		return fmt.Errorf("failed creating marker file locker: %w", err)
+	}
+
+	err = markerFileLocker.Lock()
+	if err != nil {
+		return fmt.Errorf("locking: %w", err)
+	}
+
+	defer func(markerFileLock Locker) {
+		err := markerFileLock.Unlock()
+		if err != nil {
+			log.Warnw("Failed to unlock marker file", "file.path", markerPath, "err", err)
+		}
+	}(markerFileLocker)
+
 	if err := os.WriteFile(markerPath, markerBytes, 0600); err != nil {
 		return errors.New(err, errors.TypeFilesystem, "failed to create update marker file", errors.M(errors.MetaKeyPath, markerPath))
 	}
@@ -323,4 +341,21 @@ func saveMarkerToPath(marker *UpdateMarker, markerFile string, shouldFsync bool)
 
 func markerFilePath(dataDirPath string) string {
 	return filepath.Join(dataDirPath, markerFilename)
+}
+
+func fileLockName(markerFileName string) string {
+	return markerFileName + ".lock"
+}
+
+func newMarkerFileLocker(markerFileName string) (Locker, error) {
+	locker, err := filelock.NewFileLocker(fileLockName(markerFileName), filelock.WithTimeout(10*time.Second))
+	if err != nil {
+		return nil, fmt.Errorf("instantiating file locker: %w", err)
+	}
+	return locker, nil
+}
+
+type Locker interface {
+	Lock() error
+	Unlock() error
 }
