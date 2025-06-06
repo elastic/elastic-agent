@@ -4,6 +4,12 @@ param (
     [string]$TEST_NAME_PATTERN = ""
 )
 
+### REMOVE
+if ($env:BUILDKITE_RETRY_COUNT -eq "0") {
+    Write-Error "Retry error"
+    exit 1
+}
+
 echo "~~~ Preparing environment"
 
 $PSVersionTable.PSVersion
