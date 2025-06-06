@@ -1,11 +1,3 @@
-function check_ec_access {
-  # EC_API_KEY provided by buildkite-vault plugin. See the pipeline step definition.
-  if (-not $Env:EC_API_KEY) {
-    Write-Error "Error: EC_API_KEY is empty"
-    exit 1
-  }
-}
-
 function ess_up {
   param (
       [string]$StackVersion,
@@ -21,9 +13,7 @@ function ess_up {
       Write-Error "Error: Specify stack version: ess_up [stack_version]"
       return 1
   }
-
-  check_ec_access
-
+  
   $BuildkiteBuildCreator = if ($Env:BUILDKITE_BUILD_CREATOR) { $Env:BUILDKITE_BUILD_CREATOR } else { get_git_user_email }
   $BuildkiteBuildNumber = if ($Env:BUILDKITE_BUILD_NUMBER) { $Env:BUILDKITE_BUILD_NUMBER } else { "0" }
   $BuildkitePipelineSlug = if ($Env:BUILDKITE_PIPELINE_SLUG) { $Env:BUILDKITE_PIPELINE_SLUG } else { "elastic-agent-integration-tests" }
@@ -58,7 +48,6 @@ function ess_down {
   }
   Write-Output "~~~ Tearing down the ESS Stack(created for this step)"
   try {
-    check_ec_access
     Push-Location -Path $TfDir
     & terraform init
     & terraform destroy -auto-approve

@@ -14,6 +14,15 @@ env:
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1749131198"
   IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1749131198"
 
+  # Anchors with repeatedly used plugin configurations
+  # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
+  common:
+    - vault_ec_key: &vault_ec_key
+        elastic/vault-secrets#v0.1.0:
+          path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+          field: "apiKey"
+          env_var: "EC_API_KEY"
+
 steps:
   - label: Start ESS stack for integration tests
     key: integration-ess
@@ -30,10 +39,7 @@ steps:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
     plugins:
-      - elastic/vault-secrets#v0.1.0:
-          path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-          field: "apiKey"
-          env_var: "EC_API_KEY"
+      - *vault_ec_key
 
   - group: "Extended runtime leak tests"
     key: extended-integration-tests
@@ -59,10 +65,7 @@ steps:
           automatic:
             limit: 1
         plugins:
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-              field: "apiKey"
-              env_var: "EC_API_KEY"
+          - *vault_ec_key
 
       - label: "Windows:2025:amd64:sudo"
         depends_on:
@@ -83,10 +86,7 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
         plugins:
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-              field: "apiKey"
-              env_var: "EC_API_KEY"
+          - *vault_ec_key
   
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-ubuntu-x86-64
@@ -106,10 +106,7 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         plugins:
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-              field: "apiKey"
-              env_var: "EC_API_KEY"
+          - *vault_ec_key
 
   - group: "Stateful: Windows"
     key: integration-tests-win
@@ -133,10 +130,7 @@ steps:
           automatic:
             limit: 1
         plugins:
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-              field: "apiKey"
-              env_var: "EC_API_KEY"
+          - *vault_ec_key
         matrix:
           - default
           - fleet
@@ -164,10 +158,7 @@ steps:
           automatic:
             limit: 1
         plugins:
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-              field: "apiKey"
-              env_var: "EC_API_KEY"
+          - *vault_ec_key
         matrix:
           - default
 
@@ -188,10 +179,7 @@ steps:
           automatic:
             limit: 1
         plugins:
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-              field: "apiKey"
-              env_var: "EC_API_KEY"
+          - *vault_ec_key
         matrix:
           - default
           - fleet
@@ -219,10 +207,7 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
         plugins:
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-              field: "apiKey"
-              env_var: "EC_API_KEY"
+          - *vault_ec_key
         matrix:
           - default
 
@@ -247,10 +232,7 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         plugins:
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-              field: "apiKey"
-              env_var: "EC_API_KEY"
+          - *vault_ec_key
         matrix:
           - default
 
@@ -272,10 +254,7 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         plugins:
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-              field: "apiKey"
-              env_var: "EC_API_KEY"  
+          - *vault_ec_key  
         matrix:
           - default
           - upgrade
@@ -309,10 +288,7 @@ steps:
           automatic:
             limit: 1
         plugins:
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-              field: "apiKey"
-              env_var: "EC_API_KEY"
+          - *vault_ec_key
         matrix:
           - default
           - upgrade
@@ -348,10 +324,7 @@ steps:
           image: "${IMAGE_UBUNTU_2404_ARM_64}"
           instanceType: "m6g.xlarge"
         plugins:
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-              field: "apiKey"
-              env_var: "EC_API_KEY"
+          - *vault_ec_key
         matrix:
           - default
 
@@ -376,10 +349,7 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_DEBIAN_12}"
         plugins:
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-              field: "apiKey"
-              env_var: "EC_API_KEY"
+          - *vault_ec_key
         matrix:
           - default
 
@@ -401,10 +371,7 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_DEBIAN_12}"
         plugins:
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-              field: "apiKey"
-              env_var: "EC_API_KEY"
+          - *vault_ec_key
         matrix:
           - default
           - upgrade
@@ -440,10 +407,7 @@ steps:
           automatic:
             limit: 1
         plugins:
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-              field: "apiKey"
-              env_var: "EC_API_KEY"
+          - *vault_ec_key
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
@@ -477,10 +441,7 @@ steps:
           image: "${IMAGE_UBUNTU_2404_X86_64}"
           diskSizeGb: 80
         plugins:
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-              field: "apiKey"
-              env_var: "EC_API_KEY"
+          - *vault_ec_key
         matrix:
           setup:
             variants:
@@ -515,11 +476,7 @@ steps:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
     plugins:
-      - elastic/vault-secrets#v0.1.0:
-          path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-          field: "apiKey"
-          env_var: "EC_API_KEY"
-
+      - *vault_ec_key
   - label: Aggregate test reports
     # Warning: The key has a hook in pre-command
     key: aggregate-reports
@@ -538,10 +495,7 @@ steps:
     soft_fail:
       - exit_status: "*"
     plugins:
-      - elastic/vault-secrets#v0.1.0:
-          path: "kv/ci-shared/platform-ingest/buildkite_analytics_token"
-          field: "token"
-          env_var: "BUILDKITE_ANALYTICS_TOKEN"
+      - *vault_ec_key
       - test-collector#v1.11.0:
           files: "build/*.xml"
           format: "junit"

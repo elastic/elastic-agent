@@ -1,14 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-function check_ec_access() {
-  # EC_API_KEY provided by buildkite-vault plugin. See the pipeline step definition.
-  if [[ -z "${EC_API_KEY}" ]]; then
-    echo "Error: EC_API_KEY is empty" >&2
-    exit 1
-  fi
-}
-
 function ess_up() {
   echo "~~~ Starting ESS Stack"
   local WORKSPACE=$(git rev-parse --show-toplevel)
@@ -20,8 +12,6 @@ function ess_up() {
     echo "Error: Specify stack version: ess_up [stack_version]" >&2
     return 1
   fi
-
-  check_ec_access
 
   BUILDKITE_BUILD_CREATOR="${BUILDKITE_BUILD_CREATOR:-"$(get_git_user_email)"}"
   BUILDKITE_BUILD_NUMBER="${BUILDKITE_BUILD_NUMBER:-"0"}"
@@ -51,7 +41,6 @@ function ess_down() {
   echo "~~~ Tearing down the ESS Stack"  
   local WORKSPACE=$(git rev-parse --show-toplevel)
   local TF_DIR="${WORKSPACE}/test_infra/ess/"
-  check_ec_access
   
   pushd "${TF_DIR}"
   terraform init
