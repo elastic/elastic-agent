@@ -22,6 +22,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringcfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/component"
 )
@@ -1063,4 +1064,30 @@ type Fields struct {
 type AddFields struct {
 	Fields Fields `json:"fields"`
 	Target string `json:"target"`
+}
+
+// This test ensures if any field under [agent.monitoring] is unset,
+// it falls back to the default value defined in monitoringCfg.DefaultConfig()
+func TestMonitorReload(t *testing.T) {
+	// set log and metric monitoring to false
+	monitorcfg := monitoringcfg.DefaultConfig()
+	monitorcfg.MonitorLogs = false
+	monitorcfg.MonitorMetrics = false
+
+	beatsMonitor := New(true, "", monitorcfg, nil)
+	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, false)
+	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, false)
+
+	// unset logs and metrics
+	agentConfig := `
+agent.monitoring:
+  enabled: true
+`
+	conf := config.MustNewConfigFrom(agentConfig)
+	// Reload will set unset fields to default
+	err := beatsMonitor.Reload(conf)
+	require.NoError(t, err)
+
+	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, true)
+	assert.Equal(t, beatsMonitor.config.C.MonitorMetrics, true)
 }

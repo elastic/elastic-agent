@@ -16,4 +16,4 @@ steps:
           project-number: "911195782929"
     agents:
       provider: "gcp"
-      machineType: "n1-standard-8"
+      machineType: "n2-standard-8"

@@ -15,70 +15,231 @@ import (
 	bversion "github.com/elastic/elastic-agent/version"
 )
 
-var (
-	versionList = []string{
-		"7.17.13",
-		"7.17.14",
-		"7.17.15",
-		"7.17.16",
-		"7.17.17",
-		"7.17.18",
-		"8.9.2",
-		"8.10.0",
-		"8.10.1",
-		"8.10.2",
-		"8.10.3",
-		"8.10.4",
-		"8.11.0",
-		"8.11.1",
-		"8.11.2",
-		"8.11.3",
-		"8.11.4",
-		"8.12.0",
-		"8.12.1",
-		"8.12.2",
-		"8.13.0",
-	}
-	snapshotList = []string{
-		"7.17.19-SNAPSHOT",
-		"8.12.2-SNAPSHOT",
-		"8.13.0-SNAPSHOT",
-		"8.14.0-SNAPSHOT",
-	}
-)
-
 func TestFetchUpgradableVersionsAfterFeatureFreeze(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	expectedUpgradableVersions := []string{
-		"8.13.0-SNAPSHOT",
-		"8.12.2",
-		"8.12.2-SNAPSHOT",
-		"8.12.1",
-		"8.12.0",
-		"8.11.4",
-		"7.17.18",
-	}
+	for _, tc := range []struct {
+		name                       string
+		expectedUpgradableVersions []string
+		versionReqs                VersionRequirements
+		fetchVersions              []string
+		snapshotFetchVersions      []string
+	}{
+		{
+			name: "generic case",
+			expectedUpgradableVersions: []string{
+				"8.12.2",
+				"8.12.2-SNAPSHOT",
+				"8.12.1",
+				"8.12.0",
+				"8.11.4",
+				"7.17.19-SNAPSHOT",
+				"7.17.18",
+			},
+			versionReqs: VersionRequirements{
+				UpgradeToVersion: "8.13.0",                 // to test that 8.14 is not returned
+				CurrentMajors:    3,                        // should return 8.12.2, 8.12.1, 8.12.0
+				PreviousMajors:   3,                        // should return 7.17.18
+				PreviousMinors:   2,                        // should return 8.12.2, 8.11.4
+				SnapshotBranches: []string{"8.13", "8.12"}, // should return 8.13.0-SNAPSHOT, 8.12.2-SNAPSHOT
+			},
+			fetchVersions: []string{
+				"7.17.13",
+				"7.17.14",
+				"7.17.15",
+				"7.17.16",
+				"7.17.17",
+				"7.17.18",
+				"8.9.2",
+				"8.10.0",
+				"8.10.1",
+				"8.10.2",
+				"8.10.3",
+				"8.10.4",
+				"8.11.0",
+				"8.11.1",
+				"8.11.2",
+				"8.11.3",
+				"8.11.4",
+				"8.12.0",
+				"8.12.1",
+				"8.12.2",
+				"8.13.0",
+			},
+			snapshotFetchVersions: []string{
+				"7.17.19-SNAPSHOT",
+				"8.12.2-SNAPSHOT",
+				"8.13.0-SNAPSHOT",
+				"8.14.0-SNAPSHOT",
+			},
+		},
 
-	reqs := VersionRequirements{
-		UpgradeToVersion: "8.13.0",                 // to test that 8.14 is not returned
-		CurrentMajors:    3,                        // should return 8.12.2, 8.12.1, 8.12.0
-		PreviousMajors:   3,                        // should return 7.17.18
-		PreviousMinors:   2,                        // should return 8.12.2, 8.11.4
-		SnapshotBranches: []string{"8.13", "8.12"}, // should return 8.13.0-SNAPSHOT, 8.12.2-SNAPSHOT
-	}
+		{
+			name: "9.1.x case",
+			expectedUpgradableVersions: []string{
+				"9.0.2-SNAPSHOT",
+				"9.0.1",
+				"8.19.0-SNAPSHOT",
+				"8.18.2",
+				"7.17.29-SNAPSHOT",
+			},
+			versionReqs: VersionRequirements{
+				UpgradeToVersion: "9.1.0",
+				CurrentMajors:    1,
+				PreviousMajors:   1,
+				PreviousMinors:   2,
+				SnapshotBranches: []string{"9.0", "8.19", "7.17"},
+			},
+			fetchVersions: []string{
+				"7.17.27",
+				"7.17.28",
+				"8.17.5",
+				"8.17.6",
+				"8.18.1",
+				"8.18.2",
+				"9.0.1",
+			},
+			snapshotFetchVersions: []string{
+				"7.17.29-SNAPSHOT",
+				"8.19.0-SNAPSHOT",
+				"9.0.2-SNAPSHOT",
+			},
+		},
+		{
+			name: "9.0.x case",
+			expectedUpgradableVersions: []string{
+				"8.19.0-SNAPSHOT",
+				"8.18.2",
+				"8.17.6",
+				"7.17.29-SNAPSHOT",
+			},
+			versionReqs: VersionRequirements{
+				UpgradeToVersion: "9.0.2",                         // to test that 8.14 is not returned
+				CurrentMajors:    1,                               // should return 8.12.2, 8.12.1, 8.12.0
+				PreviousMajors:   1,                               // should return 7.17.18
+				PreviousMinors:   2,                               // should return 8.12.2, 8.11.4
+				SnapshotBranches: []string{"9.0", "8.19", "7.17"}, // should return 8.13.0-SNAPSHOT, 8.12.2-SNAPSHOT
+			},
+			fetchVersions: []string{
+				"7.17.28",
+				"7.17.29",
+				"8.17.5",
+				"8.17.6",
+				"8.18.1",
+				"8.18.2",
+				"9.0.1",
+			},
+			snapshotFetchVersions: []string{
+				"7.17.29-SNAPSHOT",
+				"8.19.0-SNAPSHOT",
+				"9.0.3-SNAPSHOT",
+			},
+		},
+		{
+			name: "8.19.x case",
+			expectedUpgradableVersions: []string{
+				"8.18.2",
+				"8.17.6",
+				"7.17.29-SNAPSHOT",
+				"7.17.28",
+			},
+			versionReqs: VersionRequirements{
+				UpgradeToVersion: "8.19.0",
+				CurrentMajors:    1,
+				PreviousMajors:   1,
+				PreviousMinors:   2,
+				SnapshotBranches: []string{"9.0", "8.19", "7.17"},
+			},
+			fetchVersions: []string{
+				"7.17.28",
+				"8.17.5",
+				"8.17.6",
+				"8.18.1",
+				"8.18.2",
+				"9.0.1",
+			},
+			snapshotFetchVersions: []string{
+				"7.17.29-SNAPSHOT",
+				"8.19.0-SNAPSHOT", // this should be excluded
+				"9.0.3-SNAPSHOT",
+			},
+		},
+		{
+			name: "8.18.x case",
+			expectedUpgradableVersions: []string{
+				"8.17.6",
+				"8.16.6",
+				"7.17.29-SNAPSHOT",
+				"7.17.28",
+			},
+			versionReqs: VersionRequirements{
+				UpgradeToVersion: "8.18.2",
+				CurrentMajors:    1,
+				PreviousMajors:   1,
+				PreviousMinors:   2,
+				SnapshotBranches: []string{"9.0", "8.19", "7.17"},
+			},
+			fetchVersions: []string{
+				"7.17.28",
+				"8.16.5",
+				"8.16.6",
+				"8.17.5",
+				"8.17.6",
+				"8.18.1",
+				"8.18.2",
+				"9.0.1",
+			},
+			snapshotFetchVersions: []string{
+				"7.17.29-SNAPSHOT",
+				"8.19.0-SNAPSHOT",
+				"9.0.3-SNAPSHOT",
+			},
+		},
+		{
+			name: "8.17.x case",
+			expectedUpgradableVersions: []string{
+				"8.16.6",
+				"7.17.29-SNAPSHOT",
+				"7.17.28",
+			},
+			versionReqs: VersionRequirements{
+				UpgradeToVersion: "8.17.6",
+				CurrentMajors:    1,
+				PreviousMajors:   1,
+				PreviousMinors:   2,
+				SnapshotBranches: []string{"9.0", "8.19", "7.17"},
+			},
+			fetchVersions: []string{
+				"7.17.28",
+				"8.16.5",
+				"8.16.6",
+				"8.17.5",
+				"8.17.6",
+				"8.18.1",
+				"8.18.2",
+				"9.0.1",
+			},
+			snapshotFetchVersions: []string{
+				"7.17.29-SNAPSHOT",
+				"8.19.0-SNAPSHOT",
+				"9.0.3-SNAPSHOT",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vf := fetcherMock{
+				list: buildVersionList(t, tc.fetchVersions),
+			}
+			sf := fetcherMock{
+				list: buildVersionList(t, tc.snapshotFetchVersions),
+			}
 
-	vf := fetcherMock{
-		list: buildVersionList(t, versionList),
+			upgradableVersions, err := FetchUpgradableVersions(ctx, vf, sf, tc.versionReqs)
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedUpgradableVersions, upgradableVersions)
+		})
 	}
-	sf := fetcherMock{
-		list: buildVersionList(t, snapshotList),
-	}
-
-	versions, err := FetchUpgradableVersions(ctx, vf, sf, reqs)
-	require.NoError(t, err)
-	assert.Equal(t, expectedUpgradableVersions, versions)
 }
 
 func TestGetUpgradableVersions(t *testing.T) {

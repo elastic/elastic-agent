@@ -1,6 +1,7 @@
 param (
     [string]$GROUP_NAME,
-    [string]$TEST_SUDO
+    [string]$TEST_SUDO,
+    [string]$TEST_NAME_PATTERN = ""
 )
 
 echo "~~~ Preparing environment"
@@ -45,7 +46,12 @@ $TestsExitCode = 0
 try {
     Get-Ess-Stack -StackVersion $PACKAGE_VERSION
     Write-Output "~~~ Running integration test group: $GROUP_NAME as user: $env:USERNAME"
-    & gotestsum --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags=integration -shuffle=on -timeout=2h0m0s "github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=$GROUP_NAME" "-integration.sudo=$TEST_SUDO"
+    $gotestArgs = @("-tags=integration", "-shuffle=on", "-timeout=2h0m0s")
+    if ($TEST_NAME_PATTERN -ne "") {
+        $gotestArgs += "-run=${TEST_NAME_PATTERN}"
+    }
+    $gotestArgs += @("github.com/elastic/elastic-agent/testing/integration", "-v", "-args", "-integration.groups=$GROUP_NAME", "-integration.sudo=$TEST_SUDO")
+    & gotestsum --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- @gotestArgs
     $TestsExitCode = $LASTEXITCODE
 } finally {
     ess_down

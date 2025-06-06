@@ -13,5 +13,4 @@
 /deploy/helm/edot-collector @elastic/ingest-otel-data
 /deploy/kubernetes @elastic/elastic-agent-control-plane
 /dev-tools/kubernetes @elastic/elastic-agent-control-plane
-/internal/pkg/agent/application/configuration_embed_changed_test.go @elastic/cloudbeat
 /internal/pkg/composable/providers/kubernetes @elastic/elastic-agent-control-plane
