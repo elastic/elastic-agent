@@ -309,7 +309,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		// agent should be healthy
 		assert.Equal(collect, int(cproto.State_HEALTHY), otelStatus.State)
 		// we should have 1 extension (healthcheckv2) and 3 pipelines running: filestream for logs, http metrics and beats metrics
-		assert.Equal(collect, 4, len(pipelineStatusMap))
+		assert.Equal(collect, 4, len(otelStatus.Components))
 
 		// all the components should be healthy, their units should be healthy, and should identify themselves
 		// as beats receivers via their version info
