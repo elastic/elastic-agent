@@ -354,7 +354,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	watcherExecutable := selectWatcherExecutable(paths.Top(), previous, current)
 
 	rollbackWindow := u.upgradeSettings.Rollback.Window
-	if !isRollbackWindowFeatureAvailable(parsedVersion) {
+	if !isRollbackWindowSupported(parsedVersion) {
 		rollbackWindow = 0
 	}
 
