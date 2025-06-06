@@ -63,6 +63,10 @@ func DropComponentStateFromOtelStatus(otelStatus *status.AggregateStatus) (*stat
 
 	newStatus := deepCopyStatus(otelStatus)
 	for pipelineStatusId := range newStatus.ComponentStatusMap {
+		if pipelineStatusId == "extensions" {
+			// we do not want to report extension status
+			continue
+		}
 		pipelineId := &pipeline.ID{}
 		componentKind, pipelineIdStr := parseEntityStatusId(pipelineStatusId)
 		if componentKind != "pipeline" {
