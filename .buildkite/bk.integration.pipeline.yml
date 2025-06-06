@@ -14,14 +14,14 @@ env:
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1749131198"
   IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1749131198"
 
-  # Anchors with repeatedly used plugin configurations
-  # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
-  common:
-    - vault_ec_key: &vault_ec_key
-        elastic/vault-secrets#v0.1.0:
-          path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-          field: "apiKey"
-          env_var: "EC_API_KEY"
+# Anchors with repeatedly used plugin configurations
+# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
+common:
+  - vault_ec_key: &vault_ec_key
+      elastic/vault-secrets#v0.1.0:
+        path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+        field: "apiKey"
+        env_var: "EC_API_KEY"
 
 steps:
   - label: Start ESS stack for integration tests
