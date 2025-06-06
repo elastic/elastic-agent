@@ -21,7 +21,7 @@ var (
 // FileLocker is a thin wrapper around "github.com/gofrs/flock" Flock providing both blocking and non-blocking file locking.
 // It exposes a simplified Lock*/Unlock interface and by default is non-blocking.
 // If it's not possible to acquire a lock on the specified file ErrNotLocked (directly or wrapped in another error) is returned by default.
-// It's possible to customize FileLocker behavior specifying one or more FileLockerOption at creation time
+// It's possible to customize FileLocker behavior specifying one or more FileLockerOption at creation time.
 type FileLocker struct {
 	fileLock             *flock.Flock
 	blocking             bool
@@ -39,10 +39,19 @@ func NewFileLocker(lockFilePath string, opts ...FileLockerOption) (*FileLocker, 
 	return flocker, nil
 }
 
+// Lock() will attempt to lock the configured lockfile. Depending on the options specified at FileLocker creation this
+// call can be blocking or non-blocking. In order to use a blocking FileLocker a timeout must be specified at creation
+// specifying WithTimeout() option.
+// Even in case of a blocking FileLocker the maximum duration of the locking attempt will be the timeout specified at creation.
+// If no lock can be acquired ErrNotLocked error will be returned by default, unless a custom "not locked" error has been
+// specified with WithCustomNotLockedError at creation.
 func (fl *FileLocker) Lock() error {
 	return fl.LockContext(context.Background())
 }
 
+// LockWithContext() will attempt to lock the configured lockfile. It has the same semantics as Lock(), additionally it
+// allows passing a context as an argument to back out of locking attempts when context expires (useful in case of a
+// blocking FileLocker)
 func (fl *FileLocker) LockContext(ctx context.Context) error {
 	var locked bool
 	var err error
@@ -73,7 +82,7 @@ func (fl *FileLocker) Unlock() error {
 
 type FileLockerOption func(locker *FileLocker) error
 
-// WithCustomLockedError will set a custom error to be returned
+// WithCustomNotLockedError will set a custom error to be returned when it's not possible to acquire a lock
 func WithCustomNotLockedError(customError error) FileLockerOption {
 	return func(locker *FileLocker) error {
 		locker.customNotLockedError = customError
@@ -81,6 +90,8 @@ func WithCustomNotLockedError(customError error) FileLockerOption {
 	}
 }
 
+// WithTimeout will set the FileLocker to be blocking and will enforce a non-zero timeout.
+// If a zero timeout is passed this option will error out, failing the FileLocker creation.
 func WithTimeout(timeout time.Duration) FileLockerOption {
 	return func(locker *FileLocker) error {
 
