@@ -108,6 +108,7 @@ require (
 
 require (
 	github.com/distribution/reference v0.6.0 // indirect
+<<<<<<< HEAD
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.121.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.121.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.121.0
@@ -146,6 +147,47 @@ require (
 	go.opentelemetry.io/collector/processor/batchprocessor v0.121.0
 	go.opentelemetry.io/collector/receiver v0.121.0
 	go.opentelemetry.io/collector/receiver/otlpreceiver v0.121.0
+=======
+	github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.125.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.125.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.125.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.125.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.125.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/cumulativetodeltaprocessor v0.125.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.125.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/geoipprocessor v0.125.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.125.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor v0.125.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.125.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.125.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.125.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.125.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver v0.125.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver v0.125.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.125.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver v0.125.0
+	go.opentelemetry.io/collector/component v1.31.0
+	go.opentelemetry.io/collector/confmap v1.31.0
+	go.opentelemetry.io/collector/confmap/provider/envprovider v1.31.0
+	go.opentelemetry.io/collector/confmap/provider/fileprovider v1.31.0
+	go.opentelemetry.io/collector/confmap/provider/httpprovider v1.31.0
+	go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.31.0
+	go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.31.0
+	go.opentelemetry.io/collector/connector v0.125.0
+	go.opentelemetry.io/collector/exporter v0.125.0
+	go.opentelemetry.io/collector/exporter/debugexporter v0.125.0
+	go.opentelemetry.io/collector/exporter/nopexporter v0.125.0
+	go.opentelemetry.io/collector/exporter/otlpexporter v0.125.0
+	go.opentelemetry.io/collector/exporter/otlphttpexporter v0.125.0
+	go.opentelemetry.io/collector/extension v1.31.0
+	go.opentelemetry.io/collector/extension/memorylimiterextension v0.125.0
+	go.opentelemetry.io/collector/featuregate v1.31.0
+	go.opentelemetry.io/collector/otelcol v0.125.0
+	go.opentelemetry.io/collector/processor v1.31.0
+	go.opentelemetry.io/collector/processor/batchprocessor v0.125.0
+	go.opentelemetry.io/collector/receiver v1.31.0
+	go.opentelemetry.io/collector/receiver/otlpreceiver v0.125.0
+>>>>>>> 511197098 (otel: add cumulativetodeltaprocessor to EDOT collector (#8372))
 )
 
 require (
