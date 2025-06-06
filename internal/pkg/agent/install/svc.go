@@ -181,7 +181,7 @@ func changeSystemdServiceFile(serviceName string, serviceFilePath string, userna
 
 	fileWriter, err := os.OpenFile(serviceFilePath, os.O_RDWR|os.O_TRUNC, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to access service file at %q: %w", serviceFilePath, err)
+		return fmt.Errorf("failed to access service file for write at %q: %w", serviceFilePath, err)
 	}
 	defer func() { _ = fileWriter.Close() }()
 
@@ -222,6 +222,9 @@ func changeLaunchdServiceFile(serviceName string, plistPath string, username str
 	}
 
 	fileWriter, err := os.OpenFile(plistPath, os.O_RDWR|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to access service file for write at %q: %w", plistPath, err)
+	}
 	defer func() { _ = fileWriter.Close() }()
 
 	enc := plist.NewEncoder(fileWriter)
