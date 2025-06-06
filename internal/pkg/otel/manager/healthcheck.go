@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -159,7 +160,8 @@ func injectHeathCheckV2Extension(conf *confmap.Conf, httpHealthCheckPort int) er
 	if err != nil {
 		return fmt.Errorf("cannot generate UUID V4: %w", err)
 	}
-	healthCheckExtensionID := fmt.Sprintf("healthcheckv2/%s", nsUUID.String())
+	componentType := component.MustNewType(healthCheckExtensionName)
+	healthCheckExtensionID := component.NewIDWithName(componentType, nsUUID.String()).String()
 	err = conf.Merge(confmap.NewFromStringMap(map[string]interface{}{
 		"extensions": map[string]interface{}{
 			healthCheckExtensionID: map[string]interface{}{
