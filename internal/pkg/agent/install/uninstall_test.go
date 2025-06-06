@@ -177,7 +177,7 @@ func TestNotifyFleetAuditUnenroll(t *testing.T) {
 		err: fmt.Errorf("unretryable return status: 409"),
 	}}
 
-	log, _ := logp.NewInMemory("test", zap.NewDevelopmentEncoderConfig())
+	log, _ := logp.NewInMemoryLocal("test", zap.NewDevelopmentEncoderConfig())
 	pt := progressbar.NewOptions(-1, progressbar.OptionSetWriter(io.Discard))
 	var agentID agentInfo = "testID"
 
