@@ -118,6 +118,11 @@ func NewFixtureWithBinary(t *testing.T, version string, binary string, buildsDir
 	}
 	binFetcher := atesting.LocalFetcher(buildsDir, localFetcherOpts...)
 
+	if fips {
+		localFetcherOpts = append(localFetcherOpts, atesting.WithLocalFIPSOnly())
+	}
+	binFetcher := atesting.LocalFetcher(buildsDir, localFetcherOpts...)
+
 	opts = append(opts, atesting.WithFetcher(binFetcher), atesting.WithLogOutput())
 	if binary != "elastic-agent" {
 		opts = append(opts, atesting.WithBinaryName(binary))
