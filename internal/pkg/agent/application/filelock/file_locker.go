@@ -80,6 +80,10 @@ func (fl *FileLocker) Unlock() error {
 	return fl.fileLock.Unlock()
 }
 
+func (fl *FileLocker) Locked() bool {
+	return fl.fileLock.Locked()
+}
+
 type FileLockerOption func(locker *FileLocker) error
 
 // WithCustomNotLockedError will set a custom error to be returned when it's not possible to acquire a lock

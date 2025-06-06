@@ -80,6 +80,38 @@ func TestFileLocker_Lock(t *testing.T) {
 			wantUnlockingErr: assert.NoError,
 		},
 		{
+			name: "Non-blocking, verify that we can double lock",
+			args: args{
+				lockFilePath: "nb-doublelock.lock",
+				opts:         nil,
+			},
+			beforeLocking: nil,
+			afterLocking: func(t *testing.T, workDir string, fl *FileLocker) {
+				require.True(t, fl.Locked())
+				errRelock := fl.Lock()
+				assert.NoError(t, errRelock)
+			},
+			afterUnlocking:   nil,
+			wantLockingErr:   assert.NoError,
+			wantUnlockingErr: assert.NoError,
+		},
+		{
+			name: "blocking, verify that we can double lock",
+			args: args{
+				lockFilePath: "b-doublelock.lock",
+				opts:         []FileLockerOption{WithTimeout(1 * time.Second)},
+			},
+			beforeLocking: nil,
+			afterLocking: func(t *testing.T, workDir string, fl *FileLocker) {
+				require.True(t, fl.Locked())
+				errRelock := fl.Lock()
+				assert.NoError(t, errRelock)
+			},
+			afterUnlocking:   nil,
+			wantLockingErr:   assert.NoError,
+			wantUnlockingErr: assert.NoError,
+		},
+		{
 			name: "Non-blocking, default error when file is already locked from the same process",
 			args: args{
 				lockFilePath: "nb-failock.lock",
