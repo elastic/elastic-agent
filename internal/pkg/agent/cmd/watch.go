@@ -116,7 +116,7 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 	if err := watch(ctx, tilGrace, errorCheckInterval, log); err != nil {
 		log.Error("Error detected, proceeding to rollback: %v", err)
 
-		upgradeDetails.SetState(details.StateRollback)
+		upgradeDetails.SetStateWithReason(details.StateRollback, "automatic rollback")
 		err = upgrade.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash)
 		if err != nil {
 			log.Error("rollback failed", err)
