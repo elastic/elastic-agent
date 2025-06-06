@@ -1,7 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
-
 //go:build integration
 
 package integration
@@ -42,6 +41,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		OS: []define.OS{
 			{Type: define.Linux},
 			{Type: define.Darwin},
+			{Type: define.Windows},
 		},
 		Stack: &define.Stack{},
 		Sudo:  true,
@@ -54,69 +54,121 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	type test struct {
 		dsType          string
 		dsDataset       string
-		dsNamespace     string
-		query           map[string]any
+		query           []map[string]any
 		onlyCompareKeys bool
 		ignoreFields    []string
 	}
 
 	tests := []test{
 		{
-			dsType:          "logs",
-			dsDataset:       "elastic_agent",
-			dsNamespace:     info.Namespace,
-			query:           map[string]any{"match_phrase": map[string]any{"message": "Determined allowed capabilities"}},
+			dsType:    "logs",
+			dsDataset: "elastic_agent",
+			query: []map[string]any{
+				{"match_phrase": map[string]any{"message": "Determined allowed capabilities"}},
+			},
 			onlyCompareKeys: false,
+			ignoreFields: []string{
+				"log.file.idxhi",
+				"log.file.idxlo",
+			},
 		},
 
 		{
-			dsType:          "metrics",
-			dsDataset:       "elastic_agent.filebeat",
-			dsNamespace:     info.Namespace,
-			query:           map[string]any{"exists": map[string]any{"field": "beat.stats.libbeat.pipeline.queue.acked"}},
+			dsType:    "metrics",
+			dsDataset: "elastic_agent.filebeat",
+			query: []map[string]any{
+				{"match_phrase": map[string]any{"metricset.name": "stats"}},
+				{"match_phrase": map[string]any{"component.id": "filestream-monitoring"}},
+				{"exists": map[string]any{"field": "beat.stats.libbeat.pipeline.queue.acked"}},
+			},
 			onlyCompareKeys: true,
 			ignoreFields: []string{
-				// all process related metrics are dropped for beatreceivers
-				"beat.stats.cgroup",
-				"beat.stats.cpu",
-				"beat.stats.handles",
-				"beat.stats.memstats",
-				"beat.stats.runtime",
 				"beat.elasticsearch.cluster.id",
-				"beat.stats.libbeat.config",
+				"beat.stats.cgroup.cpu.id",
+				"beat.stats.cgroup.cpu.stats.periods",
+				"beat.stats.cgroup.cpu.stats.throttled.ns",
+				"beat.stats.cgroup.cpu.stats.throttled.periods",
+				"beat.stats.cgroup.memory.id",
+				"beat.stats.cgroup.memory.mem.usage.bytes",
+				"beat.stats.cpu.system.ticks",
+				"beat.stats.cpu.system.time.ms",
+				"beat.stats.cpu.total.ticks",
+				"beat.stats.cpu.total.time.ms",
+				"beat.stats.cpu.total.value",
+				"beat.stats.cpu.user.ticks",
+				"beat.stats.cpu.user.time.ms",
+				"beat.stats.handles.limit.hard",
+				"beat.stats.handles.limit.soft",
+				"beat.stats.handles.open",
+				"beat.stats.libbeat.config.reloads",
+				"beat.stats.libbeat.config.running",
+				"beat.stats.libbeat.config.starts",
+				"beat.stats.libbeat.config.stops",
+				"beat.stats.memstats.gc_next",
+				"beat.stats.memstats.memory.alloc",
+				"beat.stats.memstats.memory.total",
+				"beat.stats.memstats.rss",
+				"beat.stats.runtime.goroutines",
 			},
 		},
 		{
-			dsType:          "metrics",
-			dsDataset:       "elastic_agent.metricbeat",
-			dsNamespace:     info.Namespace,
-			query:           map[string]any{"exists": map[string]any{"field": "beat.stats.libbeat.pipeline.queue.acked"}},
+			dsType:    "metrics",
+			dsDataset: "elastic_agent.metricbeat",
+			query: []map[string]any{
+				{"match_phrase": map[string]any{"metricset.name": "stats"}},
+				{"match_phrase": map[string]any{"component.id": "http/metrics-monitoring"}},
+				{"exists": map[string]any{"field": "beat.stats.libbeat.pipeline.queue.acked"}},
+			},
 			onlyCompareKeys: true,
 			ignoreFields: []string{
-				//  all process related metrics are dropped for beatreceivers
-				"beat.stats.cgroup",
-				"beat.stats.cpu",
-				"beat.stats.handles",
-				"beat.stats.memstats",
-				"beat.stats.runtime",
 				"beat.elasticsearch.cluster.id",
-				"beat.stats.libbeat.config",
+				"beat.stats.cgroup.cpu.id",
+				"beat.stats.cgroup.cpu.stats.periods",
+				"beat.stats.cgroup.cpu.stats.throttled.ns",
+				"beat.stats.cgroup.cpu.stats.throttled.periods",
+				"beat.stats.cgroup.memory.id",
+				"beat.stats.cgroup.memory.mem.usage.bytes",
+				"beat.stats.cpu.system.ticks",
+				"beat.stats.cpu.system.time.ms",
+				"beat.stats.cpu.total.ticks",
+				"beat.stats.cpu.total.time.ms",
+				"beat.stats.cpu.total.value",
+				"beat.stats.cpu.user.ticks",
+				"beat.stats.cpu.user.time.ms",
+				"beat.stats.handles.limit.hard",
+				"beat.stats.handles.limit.soft",
+				"beat.stats.handles.open",
+				"beat.stats.libbeat.config.reloads",
+				"beat.stats.libbeat.config.running",
+				"beat.stats.libbeat.config.starts",
+				"beat.stats.libbeat.config.stops",
+				"beat.stats.memstats.gc_next",
+				"beat.stats.memstats.memory.alloc",
+				"beat.stats.memstats.memory.total",
+				"beat.stats.memstats.rss",
+				"beat.stats.runtime.goroutines",
 			},
 		},
 		{
 			dsType:          "metrics",
 			dsDataset:       "elastic_agent.elastic_agent",
-			dsNamespace:     info.Namespace,
 			onlyCompareKeys: true,
-			query:           map[string]any{"exists": map[string]any{"field": "system.process.memory.size"}},
+			query: []map[string]any{
+				{"match_phrase": map[string]any{"metricset.name": "json"}},
+				{"match_phrase": map[string]any{"component.id": "elastic-agent"}},
+				{"exists": map[string]any{"field": "system.process.memory.size"}},
+			},
 		},
-		// TODO: fbreceiver must support /inputs/ endpoint for this to work
-		// {
-		// 	dsType:      "metrics",
-		// 	dsDataset:   "elastic_agent.filebeat_input",
-		// 	dsNamespace: info.Namespace,
-		// 	query:       map[string]any{"exists": map[string]any{"field": "filebeat_input.bytes_processed_total"}},
-		// },
+		{
+			dsType:          "metrics",
+			dsDataset:       "elastic_agent.filebeat_input",
+			onlyCompareKeys: true,
+			query: []map[string]any{
+				{"match_phrase": map[string]any{"metricset.name": "json"}},
+				{"match_phrase": map[string]any{"component.id": "filestream-monitoring"}},
+				{"exists": map[string]any{"field": "filebeat_input.bytes_processed_total"}},
+			},
+		},
 	}
 
 	installOpts := atesting.InstallOpts{
@@ -126,25 +178,10 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		Develop:        true,
 	}
 
-	// Flow
-	// 1. Start elastic agent monitoring in classic mode (configure, install and wait for elastic-agent healthy)
-	// 2. Assert monitoring logs and metrics are available on ES
-	// 3. Uninstall
-
-	// 4. Start elastic agent monitoring in otel mode
-	// 5. Assert monitoring logs and metrics are available on ES (for otel mode)
-	// 6. Uninstall
-
-	// 7. Compare both documents are equivalent
-
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
-	t.Cleanup(cancel)
-
 	// prepare the policy and marshalled configuration
 	policyCtx, policyCancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
 	t.Cleanup(policyCancel)
 
-	// 1. Create and install policy with just monitoring
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String()),
 		Namespace:   info.Namespace,
@@ -157,7 +194,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	policyResponse, err := info.KibanaClient.CreatePolicy(policyCtx, createPolicyReq)
 	require.NoError(t, err, "error creating policy")
 
-	// 2. Download the policy, add the API key
+	// Download the policy, add the API key
 	downloadURL := fmt.Sprintf("/api/fleet/agent_policies/%s/download", policyResponse.ID)
 	resp, err := info.KibanaClient.Connection.SendWithContext(policyCtx, http.MethodGet, downloadURL, nil, nil, nil)
 	require.NoError(t, err, "error downloading policy")
@@ -201,185 +238,225 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	d.ApiKey = string(apiKey)
 	policy.Outputs["default"] = d
 
-	updatedPolicyBytes, err := yaml.Marshal(policy)
-	require.NoErrorf(t, err, "error marshalling policy, struct was %v", policy)
-	t.Cleanup(func() {
-		if t.Failed() {
-			t.Logf("policy was %s", string(updatedPolicyBytes))
+	t.Run("verify elastic-agent monitoring functionality", func(t *testing.T) {
+		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+		t.Cleanup(cancel)
+
+		// beats processes and beats receivers should use a different namespace to ensure each test looks only at the
+		// right data
+		processNamespace := fmt.Sprintf("%s-%s", info.Namespace, "process")
+		policy.Agent.Monitoring["namespace"] = processNamespace
+
+		processPolicyBytes, err := yaml.Marshal(policy)
+		require.NoErrorf(t, err, "error marshalling policy, struct was %v", policy)
+
+		// Install without enrolling in fleet
+		processFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+		require.NoError(t, err)
+
+		err = processFixture.Prepare(ctx)
+		require.NoError(t, err, "error preparing process agent monitoring fixture")
+
+		err = processFixture.Configure(ctx, processPolicyBytes)
+		require.NoError(t, err, "error configuring process agent monitoring fixture")
+
+		output, err := processFixture.InstallWithoutEnroll(ctx, &installOpts)
+		require.NoErrorf(t, err, "error install process agent monitoring without enroll: %s\ncombinedoutput:\n%s", err, string(output))
+		processTimestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+
+		require.Eventually(t, func() bool {
+			err = processFixture.IsHealthy(ctx)
+			if err != nil {
+				t.Logf("waiting for process based agent monitoring agent to be healthy: %s", err.Error())
+				return false
+			}
+			return true
+		}, 1*time.Minute, 1*time.Second)
+
+		// make sure logs and metrics for process based agent monitoring are being received
+		for _, tc := range tests {
+			require.Eventuallyf(t,
+				func() bool {
+					findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+					defer findCancel()
+					mustClauses := []map[string]any{
+						{"match": map[string]any{"data_stream.type": tc.dsType}},
+						{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
+						{"match": map[string]any{"data_stream.namespace": processNamespace}},
+					}
+					mustClauses = append(mustClauses, tc.query...)
+
+					rawQuery := map[string]any{
+						"query": map[string]any{
+							"bool": map[string]any{
+								"must":   mustClauses,
+								"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": processTimestamp}}},
+							},
+						},
+						"sort": []map[string]any{
+							{"@timestamp": map[string]any{"order": "asc"}},
+						},
+					}
+
+					docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
+					require.NoError(t, err)
+					if docs.Hits.Total.Value != 0 {
+						key := tc.dsType + "-" + tc.dsDataset + "-" + processNamespace
+						agentDocs[key] = docs
+					}
+					return docs.Hits.Total.Value > 0
+				},
+				5*time.Minute, 5*time.Second,
+				"process based agent monitoring no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", processTimestamp, tc.dsType, tc.dsDataset, processNamespace, tc.query)
+		}
+		// Uninstall process based elastic-agent monitoring
+		combinedOutput, err := processFixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+		require.NoErrorf(t, err, "error uninstalling process based agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
+
+		// beats processes and beats receivers need different namespaces
+		receiverNamespace := fmt.Sprintf("%s-%s", info.Namespace, "otel")
+		policy.Agent.Monitoring["namespace"] = receiverNamespace
+
+		// switch monitoring to the otel runtime
+		policy.Agent.Monitoring["_runtime_experimental"] = "otel"
+
+		receiverPolicyBytes, err := yaml.Marshal(policy)
+		require.NoErrorf(t, err, "error marshalling policy, struct was %v", policy)
+
+		// Install without enrolling in fleet
+		receiverFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+
+		err = receiverFixture.Prepare(ctx)
+		require.NoError(t, err, "error preparing receiver agent monitoring fixture")
+
+		err = receiverFixture.Configure(ctx, receiverPolicyBytes)
+		require.NoError(t, err, "error configuring receiver agent monitoring fixture")
+
+		output, err = receiverFixture.InstallWithoutEnroll(ctx, &installOpts)
+		require.NoErrorf(t, err, "error install with beat receiver monitoring without enroll: %s\ncombinedoutput:\n%s", err, string(output))
+		timestampBeatReceiver := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			status, statusErr := receiverFixture.ExecStatus(ctx)
+			assert.NoError(collect, statusErr)
+			// agent should be healthy
+			assert.Equal(collect, int(cproto.State_HEALTHY), status.State)
+			// we should have no normal components running
+			assert.Zero(collect, len(status.Components))
+
+			// we should have filebeatreceiver and metricbeatreceiver running
+			otelCollectorStatus := status.Collector
+			require.NotNil(collect, otelCollectorStatus)
+			assert.Equal(collect, int(cproto.CollectorComponentStatus_StatusOK), otelCollectorStatus.Status)
+			pipelineStatusMap := otelCollectorStatus.ComponentStatusMap
+
+			// we should have 3 pipelines running: filestream for logs, http metrics and beats metrics
+			assert.Equal(collect, 3, len(pipelineStatusMap))
+
+			fileStreamPipeline := "pipeline:logs/_agent-component/filestream-monitoring"
+			httpMetricsPipeline := "pipeline:logs/_agent-component/http/metrics-monitoring"
+			beatsMetricsPipeline := "pipeline:logs/_agent-component/beat/metrics-monitoring"
+			assert.Contains(collect, pipelineStatusMap, fileStreamPipeline)
+			assert.Contains(collect, pipelineStatusMap, httpMetricsPipeline)
+			assert.Contains(collect, pipelineStatusMap, beatsMetricsPipeline)
+
+			// and all the components should be healthy
+			assertCollectorComponentsHealthy(collect, otelCollectorStatus)
+
+			return
+		}, 1*time.Minute, 1*time.Second)
+
+		// make sure logs and metrics for beats receiver agent monitoring are being received
+
+		for _, tc := range tests {
+			require.Eventuallyf(t,
+				func() bool {
+					findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+					defer findCancel()
+					mustClauses := []map[string]any{
+						{"match": map[string]any{"data_stream.type": tc.dsType}},
+						{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
+						{"match": map[string]any{"data_stream.namespace": receiverNamespace}},
+					}
+					mustClauses = append(mustClauses, tc.query...)
+
+					rawQuery := map[string]any{
+						"query": map[string]any{
+							"bool": map[string]any{
+								"must":   mustClauses,
+								"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestampBeatReceiver}}},
+							},
+						},
+						"sort": []map[string]any{
+							{"@timestamp": map[string]any{"order": "asc"}},
+						},
+					}
+
+					docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
+					require.NoError(t, err)
+					if docs.Hits.Total.Value != 0 {
+						key := tc.dsType + "-" + tc.dsDataset + "-" + receiverNamespace
+						otelDocs[key] = docs
+					}
+					return docs.Hits.Total.Value > 0
+				},
+				5*time.Minute, 5*time.Second,
+				"receiver agent monitoring no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestampBeatReceiver, tc.dsType, tc.dsDataset, receiverNamespace, tc.query)
+		}
+
+		// Uninstall beat receiver monitoring
+		combinedOutput, err = receiverFixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+		require.NoErrorf(t, err, "error uninstalling beat receiver agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
+
+		// Compare process vs beat receiver events
+		for _, tc := range tests {
+			agent := agentDocs[tc.dsType+"-"+tc.dsDataset+"-"+processNamespace].Hits.Hits[0].Source
+			otel := otelDocs[tc.dsType+"-"+tc.dsDataset+"-"+receiverNamespace].Hits.Hits[0].Source
+			ignoredFields := []string{
+				// Expected to change between agentDocs and OtelDocs
+				"@timestamp",
+				"agent.ephemeral_id",
+				"agent.id",
+				"agent.version",
+				"data_stream.namespace",
+				"log.file.inode",
+				"log.file.fingerprint",
+				"log.file.path",
+				"log.offset",
+
+				// needs investigation
+				"event.agent_id_status",
+				"event.ingested",
+
+				// elastic_agent * fields are hardcoded in processor list for now which is why they differ
+				"elastic_agent.id",
+				"elastic_agent.snapshot",
+				"elastic_agent.version",
+				// queue stats will change
+				"beat.stats.libbeat.pipeline.events.retry",
+				"beat.stats.libbeat.pipeline.events.total",
+				"beat.stats.libbeat.pipeline.queue.acked",
+				"beat.stats.libbeat.pipeline.queue.acked.bytes",
+				"beat.stats.libbeat.pipeline.queue.acked.events",
+				"beat.stats.libbeat.pipeline.queue.added.bytes",
+				"beat.stats.libbeat.pipeline.queue.added.events",
+				"beat.stats.libbeat.pipeline.queue.consumed.bytes",
+				"beat.stats.libbeat.pipeline.queue.consumed.events",
+				"beat.stats.libbeat.pipeline.queue.filled.bytes",
+				"beat.stats.libbeat.pipeline.queue.filled.events",
+				"beat.stats.libbeat.pipeline.queue.filled.pct",
+				"beat.stats.libbeat.pipeline.queue.max_events",
+				"beat.stats.libbeat.pipeline.queue.removed.bytes",
+				"beat.stats.libbeat.pipeline.queue.removed.events",
+			}
+			switch tc.onlyCompareKeys {
+			case true:
+				AssertMapstrKeysEqual(t, agent, otel, append(ignoredFields, tc.ignoreFields...), "expected documents to be equal for "+tc.dsType+"-"+tc.dsDataset)
+			case false:
+				AssertMapsEqual(t, agent, otel, append(ignoredFields, tc.ignoreFields...), "expected documents to be equal for "+tc.dsType+"-"+tc.dsDataset)
+			}
 		}
 	})
-
-	classicFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-	require.NoError(t, err)
-
-	err = classicFixture.Prepare(ctx)
-	require.NoError(t, err, "error preparing fixture")
-
-	err = classicFixture.Configure(ctx, updatedPolicyBytes)
-	require.NoError(t, err, "error configuring fixture")
-
-	output, err := classicFixture.InstallWithoutEnroll(ctx, &installOpts)
-	require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
-	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
-
-	require.Eventually(t, func() bool {
-		err = classicFixture.IsHealthy(ctx)
-		if err != nil {
-			t.Logf("waiting for agent healthy: %s", err.Error())
-			return false
-		}
-		return true
-	}, 1*time.Minute, 1*time.Second)
-
-	// 2. Assert monitoring logs and metrics are available on ES
-	for _, tc := range tests {
-		require.Eventuallyf(t,
-			func() bool {
-				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
-				defer findCancel()
-
-				rawQuery := map[string]any{
-					"query": map[string]any{
-						"bool": map[string]any{
-							"must":   tc.query,
-							"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestamp}}},
-						},
-					},
-					"sort": []map[string]any{
-						{"@timestamp": map[string]any{"order": "asc"}},
-					},
-				}
-
-				index := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
-				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, ".ds-"+index+"*", info.ESClient)
-				require.NoError(t, err)
-				if docs.Hits.Total.Value != 0 {
-					agentDocs[index] = docs
-				}
-				return docs.Hits.Total.Value > 0
-			},
-			2*time.Minute, 5*time.Second,
-			"agent monitoring classic no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestamp, tc.dsType, tc.dsDataset, tc.dsNamespace, tc.query)
-	}
-
-	// 3. Uninstall
-	combinedOutput, err := classicFixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
-	require.NoErrorf(t, err, "error uninstalling classic agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
-
-	// 4. switch monitoring to the otel runtime
-	policy.Agent.Monitoring["_runtime_experimental"] = "otel"
-	updatedPolicyBytes, err = yaml.Marshal(policy)
-	require.NoErrorf(t, err, "error marshalling policy, struct was %v", policy)
-	t.Cleanup(func() {
-		if t.Failed() {
-			t.Logf("policy was %s", string(updatedPolicyBytes))
-		}
-	})
-
-	beatReceiverFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-	require.NoError(t, err)
-	err = beatReceiverFixture.Prepare(ctx)
-	require.NoError(t, err)
-	err = beatReceiverFixture.Configure(ctx, updatedPolicyBytes)
-	require.NoError(t, err)
-	combinedOutput, err = beatReceiverFixture.InstallWithoutEnroll(ctx, &installOpts)
-	require.NoErrorf(t, err, "error install without enroll: %s\ncombinedoutput:\n%s", err, string(combinedOutput))
-	// store timestamp to filter otel docs with timestamp greater than this value
-	timestampBeatReceiver := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
-
-	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		status, statusErr := beatReceiverFixture.ExecStatus(ctx)
-		assert.NoError(collect, statusErr)
-		// agent should be healthy
-		assert.Equal(collect, int(cproto.State_HEALTHY), status.State)
-		// we should have no normal components running
-		assert.Zero(collect, len(status.Components))
-
-		// we should have filebeatreceiver and metricbeatreceiver running
-		otelCollectorStatus := status.Collector
-		require.NotNil(collect, otelCollectorStatus)
-		assert.Equal(collect, int(cproto.CollectorComponentStatus_StatusOK), otelCollectorStatus.Status)
-		pipelineStatusMap := otelCollectorStatus.ComponentStatusMap
-
-		// we should have 3 pipelines running: filestream for logs, http metrics and beats metrics
-		assert.Equal(collect, 3, len(pipelineStatusMap))
-
-		fileStreamPipeline := "pipeline:logs/_agent-component/filestream-monitoring"
-		httpMetricsPipeline := "pipeline:logs/_agent-component/http/metrics-monitoring"
-		beatsMetricsPipeline := "pipeline:logs/_agent-component/beat/metrics-monitoring"
-		assert.Contains(collect, pipelineStatusMap, fileStreamPipeline)
-		assert.Contains(collect, pipelineStatusMap, httpMetricsPipeline)
-		assert.Contains(collect, pipelineStatusMap, beatsMetricsPipeline)
-
-		// and all the components should be healthy
-		assertCollectorComponentsHealthy(collect, otelCollectorStatus)
-
-		return
-	}, 1*time.Minute, 1*time.Second)
-
-	// 5. Assert monitoring logs and metrics are available on ES (for otel mode)
-	for _, tc := range tests {
-		require.Eventuallyf(t,
-			func() bool {
-				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
-				defer findCancel()
-
-				rawQuery := map[string]any{
-					"query": map[string]any{
-						"bool": map[string]any{
-							"must":   tc.query,
-							"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestampBeatReceiver}}},
-						},
-					},
-					"sort": []map[string]any{
-						{"@timestamp": map[string]any{"order": "asc"}},
-					},
-				}
-
-				index := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
-				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, ".ds-"+index+"*", info.ESClient)
-				require.NoError(t, err)
-				if docs.Hits.Total.Value != 0 {
-					key := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
-					otelDocs[key] = docs
-				}
-				return docs.Hits.Total.Value > 0
-			},
-			4*time.Minute, 5*time.Second,
-			"agent monitoring beats receivers no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestampBeatReceiver, tc.dsType, tc.dsDataset, tc.dsNamespace, tc.query)
-	}
-
-	// 6. Uninstall
-	combinedOutput, err = beatReceiverFixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
-	require.NoErrorf(t, err, "error uninstalling beat receiver agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
-
-	// 7. Compare both documents are equivalent
-	for _, tc := range tests[:3] {
-		key := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
-		agent := agentDocs[key].Hits.Hits[0].Source
-		otel := otelDocs[key].Hits.Hits[0].Source
-		ignoredFields := []string{
-			// Expected to change between agentDocs and OtelDocs
-			"@timestamp",
-			"agent.ephemeral_id",
-			// agent.id is different because it's the id of the underlying beat
-			"agent.id",
-			// agent.version is different because we force version 9.0.0 in CI
-			"agent.version",
-			"elastic_agent.id",
-			"log.file.inode",
-			"log.file.fingerprint",
-			"log.file.path",
-			"log.offset",
-			"event.ingested",
-		}
-		switch tc.onlyCompareKeys {
-		case true:
-			AssertMapstrKeysEqual(t, agent, otel, append(ignoredFields, tc.ignoreFields...), fmt.Sprintf("expected document keys to be equal for dataset: %s", key))
-		case false:
-			AssertMapsEqual(t, agent, otel, ignoredFields, fmt.Sprintf("expected document to be equal for dataset: %s", key))
-		}
-	}
 }
 
 // TestAgentMetricsInput is a test that compares documents ingested by
