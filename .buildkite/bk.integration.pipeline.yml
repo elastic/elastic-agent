@@ -53,6 +53,12 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+              field: "apiKey"
+              env_var: "EC_API_KEY"
+
       - label: "Windows:2025:amd64:sudo"
         depends_on:
           - packaging-windows
@@ -71,6 +77,12 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+              field: "apiKey"
+              env_var: "EC_API_KEY"
+  
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-ubuntu-x86-64
         env:
@@ -88,6 +100,11 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+              field: "apiKey"
+              env_var: "EC_API_KEY"
 
   - group: "Stateful: Windows"
     key: integration-tests-win
@@ -110,6 +127,11 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+              field: "apiKey"
+              env_var: "EC_API_KEY"
         matrix:
           - default
           - fleet
@@ -136,6 +158,11 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+              field: "apiKey"
+              env_var: "EC_API_KEY"
         matrix:
           - default
 
@@ -155,6 +182,11 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+              field: "apiKey"
+              env_var: "EC_API_KEY"
         matrix:
           - default
           - fleet
@@ -181,6 +213,11 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+              field: "apiKey"
+              env_var: "EC_API_KEY"
         matrix:
           - default
 
@@ -204,6 +241,11 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+              field: "apiKey"
+              env_var: "EC_API_KEY"
         matrix:
           - default
 
@@ -224,6 +266,11 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+              field: "apiKey"
+              env_var: "EC_API_KEY"  
         matrix:
           - default
           - upgrade
@@ -256,6 +303,11 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+              field: "apiKey"
+              env_var: "EC_API_KEY"
         matrix:
           - default
           - upgrade
@@ -290,6 +342,11 @@ steps:
           provider: "aws"
           image: "${IMAGE_UBUNTU_2404_ARM_64}"
           instanceType: "m6g.xlarge"
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+              field: "apiKey"
+              env_var: "EC_API_KEY"
         matrix:
           - default
 
@@ -313,6 +370,11 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_DEBIAN_12}"
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+              field: "apiKey"
+              env_var: "EC_API_KEY"
         matrix:
           - default
 
@@ -333,6 +395,11 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_DEBIAN_12}"
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+              field: "apiKey"
+              env_var: "EC_API_KEY"
         matrix:
           - default
           - upgrade
@@ -367,6 +434,11 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+              field: "apiKey"
+              env_var: "EC_API_KEY"
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
@@ -399,6 +471,11 @@ steps:
           machineType: "n2-standard-4"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
           diskSizeGb: 80
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+              field: "apiKey"
+              env_var: "EC_API_KEY"
         matrix:
           setup:
             variants:
@@ -432,6 +509,11 @@ steps:
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
+    plugins:
+      - elastic/vault-secrets#v0.1.0:
+          path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+          field: "apiKey"
+          env_var: "EC_API_KEY"
 
   - label: Aggregate test reports
     # Warning: The key has a hook in pre-command

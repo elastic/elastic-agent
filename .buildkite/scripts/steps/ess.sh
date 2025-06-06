@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+function check_es_access() {
+  # EC_API_KEY provided by buildkite-vault plugin. See the pipeline step definition.
+  if [[ -z "${EC_API_KEY}" ]]; then
+    echo "Error: EC_API_KEY is empty" >&2
+    exit 1
+  fi
+}
+
 function ess_up() {
   echo "~~~ Starting ESS Stack"
   local WORKSPACE=$(git rev-parse --show-toplevel)
@@ -13,12 +21,7 @@ function ess_up() {
     return 1
   fi
 
-  export EC_API_KEY=$(retry -t 5 -- vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
-  
-  if [[ -z "${EC_API_KEY}" ]]; then
-    echo "Error: Failed to get EC API key from vault" >&2
-    exit 1
-  fi
+  check_es_access
 
   BUILDKITE_BUILD_CREATOR="${BUILDKITE_BUILD_CREATOR:-"$(get_git_user_email)"}"
   BUILDKITE_BUILD_NUMBER="${BUILDKITE_BUILD_NUMBER:-"0"}"
@@ -48,9 +51,7 @@ function ess_down() {
   echo "~~~ Tearing down the ESS Stack"  
   local WORKSPACE=$(git rev-parse --show-toplevel)
   local TF_DIR="${WORKSPACE}/test_infra/ess/"
-  if [ -z "${EC_API_KEY:-}" ]; then
-    export EC_API_KEY=$(retry -t 5 -- vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)    
-  fi
+  check_es_access
   
   pushd "${TF_DIR}"
   terraform init
