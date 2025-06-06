@@ -1342,6 +1342,7 @@ type fakeOTelManager struct {
 	updateCallback func(*confmap.Conf) error
 	result         error
 	errChan        chan error
+	statusChan     chan *status.AggregateStatus
 }
 
 func (f *fakeOTelManager) Run(ctx context.Context) error {
@@ -1365,7 +1366,7 @@ func (f *fakeOTelManager) Update(cfg *confmap.Conf) {
 }
 
 func (f *fakeOTelManager) Watch() <-chan *status.AggregateStatus {
-	return nil
+	return f.statusChan
 }
 
 // An implementation of the RuntimeManager interface for use in testing.
