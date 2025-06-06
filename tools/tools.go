@@ -11,7 +11,6 @@ package tools
 
 import (
 	_ "github.com/magefile/mage"
-	_ "github.com/tsg/go-daemon"
 	_ "golang.org/x/tools/cmd/goimports"
 	_ "golang.org/x/tools/cmd/stringer"
 	_ "gotest.tools/gotestsum/cmd"
