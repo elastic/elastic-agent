@@ -330,7 +330,7 @@ data:
               dataset: system.system
             condition: '${host.platform} == ''windows'''
             ignore_older: 72h
-      - id: container-log-${kubernetes.pod.name}-${kubernetes.container.id}
+      - id: container-log-${kubernetes.namespace}-${kubernetes.pod.name}-${kubernetes.container.name}
         type: filestream
         use_output: default
         meta:
@@ -354,7 +354,7 @@ data:
               #     negate: true
               #     match: after
             paths:
-              - /var/log/containers/*${kubernetes.container.id}.log
+              - /var/log/pods/${kubernetes.namespace}_${kubernetes.pod.name}_${kubernetes.pod.uid}/${kubernetes.container.name}/*.log
       - id: audit-log
         type: filestream
         use_output: default
