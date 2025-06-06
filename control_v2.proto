@@ -265,6 +265,10 @@ message UpgradeDetailsMetadata {
   // The deadline until when a retryable upgrade step, e.g. the download
   // step, will be retried.
   string retry_until = 6;
+
+  // Reason is a string that may give out more information about transitioning to the current state.
+  // It has been introduced initially to distinguish between manual and automatic rollbacks
+  string reason = 7;
 }
 
 // DiagnosticFileResult is a file result from a diagnostic result.
