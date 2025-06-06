@@ -13,7 +13,7 @@ require (
 	github.com/docker/docker v28.1.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250529093440-3ec24d2b6dfb
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250606170016-4309305f5957
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.9.2
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
@@ -85,7 +85,7 @@ require (
 	golang.org/x/sync v0.14.0
 	golang.org/x/sys v0.33.0
 	golang.org/x/term v0.31.0
-	golang.org/x/text v0.24.0
+	golang.org/x/text v0.25.0
 	golang.org/x/time v0.11.0
 	golang.org/x/tools v0.30.0
 	google.golang.org/api v0.226.0
@@ -318,7 +318,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.6.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.18.0 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
-	github.com/elastic/sarama v1.19.1-0.20250304185506-df6449b5c996 // indirect
+	github.com/elastic/sarama v1.19.1-0.20250603175145-7672917f26b6 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.32.4 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.2.1 // indirect
@@ -557,7 +557,7 @@ require (
 	github.com/ugorji/go/codec v1.2.7 // indirect
 	github.com/urfave/cli/v2 v2.27.4 // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
-	github.com/vmware/govmomi v0.39.0 // indirect
+	github.com/vmware/govmomi v0.51.0 // indirect
 	github.com/vultr/govultr/v2 v2.17.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
