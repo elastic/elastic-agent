@@ -95,6 +95,18 @@ RUN for iter in {1..10}; do \
     (exit $exit_code)
 {{- end }}
 
+# Add Systemd only to: elastic-agent, elastic-agent-complete, ubi, and otel collector.
+# Systemd is not add to any of the wolfi or slim images/variants
+{{- if (not (contains .from "wolfi")) }}
+  {{- if (or (contains .Variant "basic") (contains .Variant "ubi") (contains .Variant "elastic-otel-collector") (contains .Variant "complete"))  }}
+  RUN for iter in {1..10}; do \
+          microdnf update -y && \
+          microdnf install -y systemd && \
+          microdnf clean all && \
+          exit_code=0 && break || exit_code=$? && echo "microdnf error: retry $iter in 10s" && sleep 10; done; (exit $exit_code)
+  {{- end }}
+{{- end }}
+
 LABEL \
   org.label-schema.build-date="{{ date }}" \
   org.label-schema.schema-version="1.0" \
@@ -247,7 +259,7 @@ RUN for iter in {1..10}; do \
         microdnf -y install fontconfig freetype cairo glib2 gtk3 pango xorg-x11-fonts-misc xorg-x11-fonts-Type1 \
         at-spi2-atk atk at-spi2-core alsa-lib cups-libs dbus-libs libdrm mesa-libEGL mesa-libgbm nspr nss libX11 \
         libX11-xcb libxcb libXcomposite libXdamage libXext libXfixes libXrandr libxkbcommon libxshmfence glib2 \
-        dbus-glib libicu mesa-libGL unzip iptables systemd && \
+        dbus-glib libicu mesa-libGL unzip iptables && \
         mkdir -p /usr/share/fonts/google-noto && \
         curl -LO https://noto-website-2.storage.googleapis.com/pkgs/NotoSansCJKjp-hinted.zip && \
         unzip NotoSansCJKjp-hinted.zip -d /usr/share/fonts/google-noto && \
