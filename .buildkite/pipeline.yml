@@ -6,12 +6,12 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1748347205"
-  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1748347205"
-  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1748347205"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1748347205"
-  IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-1748347205"
-  IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1748347205"
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1749131198"
+  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1749131198"
+  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1749131198"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1749131198"
+  IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-1749131198"
+  IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1749131198"
 
 steps:
   - label: "check-ci"
