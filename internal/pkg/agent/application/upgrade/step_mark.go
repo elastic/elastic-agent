@@ -224,9 +224,14 @@ func markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent ag
 
 	markerPath := markerFilePath(dataDirPath)
 	log.Infow("Writing upgrade marker file", "file.path", markerPath, "hash", marker.Hash, "prev_hash", marker.PrevHash)
-	markerFileLock, err := lockMarkerFile(markerPath)
+	markerFileLocker, err := newMarkerFileLocker(markerPath)
 	if err != nil {
-		return fmt.Errorf("failed locking marker file: %w", err)
+		return fmt.Errorf("failed creating marker file locker: %w", err)
+	}
+
+	err = markerFileLocker.Lock()
+	if err != nil {
+		return fmt.Errorf("locking: %w", err)
 	}
 
 	defer func(markerFileLock Locker) {
@@ -234,7 +239,7 @@ func markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent ag
 		if err != nil {
 			log.Warnw("Failed to unlock marker file", "file.path", markerPath, "err", err)
 		}
-	}(markerFileLock)
+	}(markerFileLocker)
 
 	if err := os.WriteFile(markerPath, markerBytes, 0600); err != nil {
 		return errors.New(err, errors.TypeFilesystem, "failed to create update marker file", errors.M(errors.MetaKeyPath, markerPath))
@@ -342,15 +347,10 @@ func fileLockName(markerFileName string) string {
 	return markerFileName + ".lock"
 }
 
-func lockMarkerFile(markerFileName string) (Locker, error) {
+func newMarkerFileLocker(markerFileName string) (Locker, error) {
 	locker, err := filelock.NewFileLocker(fileLockName(markerFileName), filelock.WithTimeout(10*time.Second))
 	if err != nil {
 		return nil, fmt.Errorf("instantiating file locker: %w", err)
-	}
-
-	err = locker.Lock()
-	if err != nil {
-		return nil, fmt.Errorf("locking: %w", err)
 	}
 	return locker, nil
 }

@@ -331,8 +331,11 @@ func Test_markUpgradeLocking(t *testing.T) {
 			afterUpdateMarkerCreation: func(t *testing.T, dataDir string) {
 				assert.FileExists(t, markerFilePath(dataDir), "Update marker file must exist")
 				assert.FileExists(t, markerFilePath(dataDir)+".lock", "Update marker lock file must exist")
-				fileLock, err := lockMarkerFile(markerFilePath(dataDir))
+				fileLock, err := newMarkerFileLocker(markerFilePath(dataDir))
+				require.NoError(t, err, "update marker locker creation should not fail")
+				err = fileLock.Lock()
 				require.NoError(t, err, "re-locking update marker after initial write should not fail")
+
 				t.Cleanup(func() {
 					errUnlock := fileLock.Unlock()
 					assert.NoError(t, errUnlock, "re-unlocking update marker file should not fail")
@@ -355,8 +358,10 @@ func Test_markUpgradeLocking(t *testing.T) {
 				require.NoError(t, err, "error creating fake update marker")
 
 				// lock the fake update marker
-				fileLock, err := lockMarkerFile(updateMarkerFilePath)
-				require.NoError(t, err, "locking fake update marker should not fail")
+				fileLock, err := newMarkerFileLocker(updateMarkerFilePath)
+				require.NoError(t, err, "update marker locker creation should not fail")
+				err = fileLock.Lock()
+				require.NoError(t, err, "re-locking update marker after initial write should not fail")
 
 				t.Cleanup(func() {
 					errUnlock := fileLock.Unlock()
