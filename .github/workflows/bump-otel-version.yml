@@ -12,31 +12,15 @@ env:
   JOB_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
 jobs:
-  filter:
-    runs-on: ubuntu-latest
-    timeout-minutes: 1
-    outputs:
-      matrix: ${{ steps.generator.outputs.matrix }}
-    permissions:
-      contents: read
-    steps:
-    - id: generator
-      uses: elastic/oblt-actions/elastic/active-branches@v1
-      with:
-        # Only run on `main` and `8.19` branches
-        exclude-branches: "7.17,8.17,8.18,9.0"
-        filter-branches: true
-
   update-otel:
     permissions:
       contents: write
       pull-requests: write
-    needs:
-    - filter
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.filter.outputs.matrix) }}
+      matrix:
+        branch: ["main", "8.19"]
     steps:
     - uses: actions/checkout@v4
       with:
