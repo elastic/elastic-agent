@@ -251,7 +251,7 @@ func makeBaseWatchCmd(agentExecutable string, rollbackWindow time.Duration) *exe
 	}
 
 	if rollbackWindow > 0 {
-		cmdArgs = append(cmdArgs, "--rollback-window", fmt.Sprintf("%.fs", rollbackWindow.Seconds()))
+		cmdArgs = append(cmdArgs, "--rollback-window", fmt.Sprintf("%s", rollbackWindow.String()))
 	}
 
 	// #nosec G204 -- user cannot inject any parameters to this command
