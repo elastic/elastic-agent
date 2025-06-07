@@ -330,19 +330,23 @@ func TestRollback(t *testing.T) {
 }
 
 func TestMakeBaseWatchCmd(t *testing.T) {
+	exec, _ := os.Executable()
+	execDir := filepath.Dir(exec)
+
 	agentExecutable := "elastic-agent"
 	t.Run("no_rollback_window", func(t *testing.T) {
 		cmd := makeBaseWatchCmd(agentExecutable, 0)
 
 		// Expected command:
 		// elastic-agent watch --path.config /some/path --path.home /some/path
-		require.Len(t, cmd.Args, 6)
-		require.Equal(t, agentExecutable, cmd.Args[0])
-		require.Equal(t, "watch", cmd.Args[1])
-		require.Equal(t, "--path.config", cmd.Args[2])
-		require.NotEmpty(t, cmd.Args[3])
-		require.Equal(t, "--path.home", cmd.Args[4])
-		require.NotEmpty(t, cmd.Args[5])
+		require.Equal(t, cmd.Args, []string{
+			agentExecutable,
+			"watch",
+			"--path.config",
+			execDir,
+			"--path.home",
+			execDir,
+		})
 	})
 
 	t.Run("with_rollback_window", func(t *testing.T) {
@@ -351,16 +355,16 @@ func TestMakeBaseWatchCmd(t *testing.T) {
 
 		// Expected command:
 		// elastic-agent watch --path.config /some/path --path.home /some/path --rollback-window 8100s
-		require.Len(t, cmd.Args, 8)
-		require.Equal(t, agentExecutable, cmd.Args[0])
-		require.Equal(t, "watch", cmd.Args[1])
-		require.Equal(t, "--path.config", cmd.Args[2])
-		require.NotEmpty(t, cmd.Args[3])
-		require.Equal(t, "--path.home", cmd.Args[4])
-		require.NotEmpty(t, cmd.Args[5])
-		require.Equal(t, "--rollback-window", cmd.Args[6])
-		require.Equal(t, rollbackWindow.String(), cmd.Args[7])
-
+		require.Equal(t, cmd.Args, []string{
+			agentExecutable,
+			"watch",
+			"--path.config",
+			execDir,
+			"--path.home",
+			execDir,
+			"--rollback-window",
+			rollbackWindow.String(),
+		})
 	})
 }
 
