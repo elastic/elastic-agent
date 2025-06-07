@@ -29,7 +29,7 @@ if systemctl list-unit-files --type=service | grep -q "^${SERVICE_NAME}.service"
             echo "New endpoint version is the same as the one that's already
             installed"
             echo "Starting $SERVICE_NAME"
-            sudo systemctl start ElasticEndpoint
+            sudo systemctl start ${SERVICE_NAME}
         else
             echo "New endpoint version  \"${archive_endpoint_version}\" is different than the one that's already
             installed  \"${installed_endpoint_version}\""
