@@ -1,15 +1,16 @@
 #!/bin/bash
 set -e
 
+# because this script is running on the matrix, we need to fetch the current branch on every run
+current_ref=$(git rev-parse --abbrev-ref HEAD)
 package_version=$(mage integration:updatePackageVersion)
 version_requirements=$(mage integration:updateVersions)
-changes=$(git status -s -uno testing/integration/testdata/.upgrade-test-agent-versions.yml .package-version)
+stable_snapshot_version=$(mage integration:UpdateStableSnapshot $current_ref)
+changes=$(git status -s -uno testing/integration/testdata/.upgrade-test-agent-versions.yml .package-version .stable-snapshot-version)
 if [ -z "$changes" ]
 then
     echo "The version files didn't change, skipping..."
 else
-		# because this script is running on the matrix, we need to fetch the current branch on every run
-		current_ref=$(git rev-parse --abbrev-ref HEAD)
     echo "The version file(s) changed"
     git diff -p
     open=$(gh pr list --repo "$GITHUB_REPOSITORY" --label="update-versions" --limit 1 --state open --base "$current_ref")
@@ -25,7 +26,7 @@ else
     git add testing/integration/testdata/.upgrade-test-agent-versions.yml .package-version
 
     nl=$'\n' # otherwise the new line character is not recognized properly
-    commit_desc="These files are used for picking the starting (pre-upgrade) or ending (post-upgrade) agent versions in upgrade integration tests.${nl}${nl}The content is based on responses from https://www.elastic.co/api/product_versions and https://snapshots.elastic.co${nl}${nl}The current update is generated based on the following requirements:${nl}${nl}Package version: ${package_version}${nl}${nl}\`\`\`json${nl}${version_requirements}${nl}\`\`\`"
+    commit_desc="These files are used for picking the starting (pre-upgrade) or ending (post-upgrade) agent versions in upgrade integration tests. The .stable-snapshot-version contains the latest available snapshot versions for integration testing ${nl}${nl}The content is based on responses from https://www.elastic.co/api/product_versions and https://snapshots.elastic.co${nl}${nl}The current update is generated based on the following requirements:${nl}${nl}Package version: ${package_version}${nl}${nl}\`\`\`json${nl}${version_requirements}${nl}\`\`\`"
 
     git commit -m "[$current_ref][Automation] Update versions" -m "$commit_desc"
     git push --set-upstream origin "$pr_branch"
