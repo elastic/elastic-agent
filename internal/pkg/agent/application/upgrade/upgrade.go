@@ -384,6 +384,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	return cb, nil
 }
 
+// selectWatcherExecutable returns the path to the watcher executable for the Agent that has the newer
+// of the two Agent versions involved in the upgrade.
 func selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string {
 	// check if the upgraded version is less than the previous (currently installed) version
 	if current.parsedVersion.Less(*previous.parsedVersion) {
