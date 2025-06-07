@@ -330,7 +330,10 @@ func TestRollback(t *testing.T) {
 }
 
 func TestMakeBaseWatchCmd(t *testing.T) {
-	exec, _ := os.Executable()
+	exec, err := os.Executable()
+	require.NoError(t, err)
+	exec, err = filepath.EvalSymlinks(exec)
+	require.NoError(t, err)
 	execDir := filepath.Dir(exec)
 
 	agentExecutable := "elastic-agent"
