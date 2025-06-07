@@ -300,6 +300,9 @@ func ParseVersion(version string) (*ParsedSemVer, error) {
 	}, nil
 }
 
+// assemblePrereleaseStringFromTokens recreates a prerelease version string starting from a list of tokens.
+// The string will be composed by the tokens listed in order separated by ".".
+// It returns an empty string if the list of token is nil or empty.
 func assemblePrereleaseStringFromTokens(tokens []string) string {
 	builder := new(strings.Builder)
 	for _, t := range tokens {
