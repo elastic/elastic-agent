@@ -46,7 +46,7 @@ func GetUninstallToken(ctx context.Context, kibClient *kibana.Client, policyId s
 	}
 
 	if len(resp.Items[0].Token) == 0 {
-		return "", fmt.Errorf("expected non-empty token: %w", err)
+		return "", fmt.Errorf("expected non-empty token")
 	}
 
 	return resp.Items[0].Token, nil
