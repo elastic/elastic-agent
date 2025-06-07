@@ -109,7 +109,7 @@ func watchCmd(cmd *cobra.Command, log *logp.Logger, topDir string, cfg *configur
 	if err != nil {
 		return fmt.Errorf("failed to retrieve %s flag value while watching the agent upgrade: %w", flagRollbackWindow, err)
 	}
-	_ = rollbackWindow // TODO: use rollbackWindow when https://github.com/elastic/elastic-agent/issues/6884 is implemented
+	_ = rollbackWindow // TODO: use rollbackWindow when implementing https://github.com/elastic/elastic-agent/issues/6884
 
 	isWithinGrace, tilGrace := gracePeriod(marker, cfg.GracePeriod)
 	if isTerminalState(marker) || !isWithinGrace {
