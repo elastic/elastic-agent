@@ -31,8 +31,8 @@ if systemctl list-unit-files --type=service | grep -q "^${SERVICE_NAME}.service"
             echo "Starting $SERVICE_NAME"
             sudo systemctl start ElasticEndpoint
         else
-            echo "New endpoint version is different than the one that's already
-            installed"
+            echo "New endpoint version  \"${archive_endpoint_version}\" is different than the one that's already
+            installed  \"${installed_endpoint_version}\""
         fi
         ls -li /opt/Elastic/Endpoint/elastic-endpoint
     else
