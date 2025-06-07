@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -326,6 +327,48 @@ func TestRollback(t *testing.T) {
 			tt.checkAfterRollback(t, testTop)
 		})
 	}
+}
+
+func TestMakeBaseWatchCmd(t *testing.T) {
+	exec, err := os.Executable()
+	require.NoError(t, err)
+	exec, err = filepath.EvalSymlinks(exec)
+	require.NoError(t, err)
+	execDir := filepath.Dir(exec)
+
+	agentExecutable := "elastic-agent"
+	t.Run("no_rollback_window", func(t *testing.T) {
+		cmd := makeBaseWatchCmd(agentExecutable, 0)
+
+		// Expected command:
+		// elastic-agent watch --path.config /some/path --path.home /some/path
+		require.Equal(t, cmd.Args, []string{
+			agentExecutable,
+			"watch",
+			"--path.config",
+			execDir,
+			"--path.home",
+			execDir,
+		})
+	})
+
+	t.Run("with_rollback_window", func(t *testing.T) {
+		rollbackWindow := 2*time.Hour + 15*time.Minute
+		cmd := makeBaseWatchCmd(agentExecutable, rollbackWindow)
+
+		// Expected command:
+		// elastic-agent watch --path.config /some/path --path.home /some/path --rollback-window 8100s
+		require.Equal(t, cmd.Args, []string{
+			agentExecutable,
+			"watch",
+			"--path.config",
+			execDir,
+			"--path.home",
+			execDir,
+			"--rollback-window",
+			rollbackWindow.String(),
+		})
+	})
 }
 
 // checkFilesAfterCleanup is a convenience function to check the file structure within topDir.
