@@ -26,8 +26,7 @@ if systemctl list-unit-files --type=service | grep -q "^${SERVICE_NAME}.service"
     if ! systemctl is-active --quiet "$SERVICE_NAME"; then
         echo "$SERVICE_NAME is installed but not running"
         if [[ "$installed_endpoint_version" == "$archive_endpoint_version" ]]; then
-            echo "New endpoint version is the same as the one that's already
-            installed"
+            echo "New endpoint and installed endpoint versions are the same: \"${installed_endpoint_version}\""
             echo "Starting $SERVICE_NAME"
             sudo systemctl start ${SERVICE_NAME}
         else
