@@ -492,6 +492,16 @@ shared:
     extra_vars:
       from: '--platform=linux/arm64 cgr.dev/chainguard/wolfi-base'
 
+  - &docker_elastic_wolfi_spec
+    docker_variant: 'wolfi'
+    extra_vars:
+      from: '--platform=linux/amd64 docker.elastic.co/wolfi/chaingaurd-base'
+
+  - &docker_elastic_wolfi_arm_spec
+    docker_variant: 'wolfi'
+    extra_vars:
+      from: '--platform=linux/arm64 docker.elastic.co/wolfi/chaingaurd-base'
+
   - &docker_fips_spec
     docker_variant: 'basic'
     extra_vars:
@@ -1481,7 +1491,7 @@ specs:
       spec:
         <<: *agent_docker_spec
         # The service image is always based on Wolfi
-        <<: *docker_wolfi_spec
+        <<: *docker_elastic_wolfi_spec
         <<: *docker_builder_spec
         <<: *agent_docker_cloud_spec
         <<: *agent_docker_service_spec
@@ -1495,7 +1505,7 @@ specs:
       spec:
         <<: *agent_docker_spec
         # The service image is always based on Wolfi
-        <<: *docker_wolfi_arm_spec
+        <<: *docker_elastic_wolfi_arm_spec
         <<: *docker_builder_arm_spec
         <<: *agent_docker_cloud_spec
         <<: *agent_docker_service_spec
