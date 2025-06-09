@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-////go:build integration
+//go:build integration
 
 package integration
 
@@ -66,13 +66,14 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Check that Integrations Server is healthy before upgrade
-	// https://www.elastic.co/docs/api/doc/cloud/operation/operation-get-deployment
-	// TODO
-	_ = deployment.ID
+	deployment, err = prov.WaitForReady(ctx, deployment)
+	require.NoError(t, err)
 
 	// Upgrade deployment to end version
-	// TODO: err = prov.Upgrade(deployment.ID, endVersion)
+	err = prov.Upgrade(ctx, deployment, endVersion)
+	require.NoError(t, err)
+
+	deployment, err = prov.WaitForReady(ctx, deployment)
 	require.NoError(t, err)
 
 	// Check that Integrations Server is healthy after upgrade
@@ -95,6 +96,8 @@ func getRandomStackVersionsPair(t *testing.T, prov *ess.StatefulProvisioner, min
 
 		return verI.Less(*verJ)
 	})
+
+	// TODO: filter out versions < minVersion and > maxVersion
 
 	var startIdx, endIdx int
 	startIdx = rand.Intn(len(versions) - 1)

@@ -4,7 +4,11 @@
 
 package common
 
-import "context"
+import (
+	"context"
+
+	"github.com/elastic/elastic-agent/pkg/version"
+)
 
 // Stack is a created stack.
 type Stack struct {
@@ -77,4 +81,7 @@ type StackProvisioner interface {
 
 	// Delete deletes the stack.
 	Delete(ctx context.Context, stack Stack) error
+
+	// Upgrade upgrades the stack to a new version.
+	Upgrade(ctx context.Context, stack Stack, newVersion *version.ParsedSemVer) error
 }
