@@ -130,8 +130,7 @@ func startSupervisedCollector(ctx context.Context, logger *logger.Logger, collec
 		defer func() {
 			close(healthCheckDone)
 		}()
-		currentStatus := componentstatus.StatusStarting
-		reportStatus(ctx, statusCh, aggregateStatus(currentStatus, nil))
+		reportStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStarting, nil))
 		// we will check the health of the collector every 1 second for the first 10 attempts
 		// until we get a successful response.
 		maxFailedAttempts := 10
@@ -152,10 +151,7 @@ func startSupervisedCollector(ctx context.Context, logger *logger.Logger, collec
 				}
 				currentFailedAttempts++
 			} else {
-				if reportedStatus := statuses.Status(); currentStatus != reportedStatus {
-					currentStatus = reportedStatus
-					reportStatus(procCtx, statusCh, statuses)
-				}
+				reportStatus(procCtx, statusCh, statuses)
 				// after successfully getting the status, reset the failed attempts,
 				// set the timer duration to 30 seconds and max failed attempts to 3
 				currentFailedAttempts = 0
