@@ -24,7 +24,7 @@ if ($LASTEXITCODE -ne 0) {
 
 $TestsExitCode = 0
 try {
-    # Get-Ess-Stack will start the ESS stack if it a BK retry, otherwise it will retrieve ESS stack metadata
+    # Get-Ess-Stack will start the ESS stack if it is a BK retry, otherwise it will retrieve ESS stack metadata
     Get-Ess-Stack -StackVersion $PACKAGE_VERSION
     & "$PWD\.buildkite\scripts\buildkite-integration-tests.ps1" $GROUP_NAME $TEST_SUDO
     $TestsExitCode = $LASTEXITCODE
