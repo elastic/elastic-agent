@@ -11,17 +11,15 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 )
-
-const cloudAgentPolicyID = "policy-elastic-agent-on-cloud"
 
 // TestFIPSAgentConnectingToFIPSFleetServerInECHFRH ensures that a FIPS-capable Elastic Agent
 // running in an ECH FRH (FedRamp High) environment is able to successfully connect to its
@@ -64,25 +62,42 @@ func TestFIPSAgentConnectingToFIPSFleetServerInECHFRH(t *testing.T) {
 	// Get all Agents
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
-	agents, err := info.KibanaClient.ListAgents(ctx, kibana.ListAgentsRequest{})
+
+	searchResp, err := info.ESClient.Search(info.ESClient.Search.WithContext(ctx), info.ESClient.Search.WithIndex(".fleet-agents"), info.ESClient.Search.WithBody(strings.NewReader(`{
+          "query": {
+	    "term": {
+	      "policy_id": "policy-elastic-agent-on-cloud"
+	    }
+	  }
+	}`)))
 	require.NoError(t, err)
+	defer searchResp.Body.Close()
+	require.Equal(t, http.StatusOK, searchResp.StatusCode)
 
-	// Find Fleet Server's own Agent and get its status and whether it's
-	// FIPS-capable
-	//var agentStatus string
-	var agentIsFIPS bool
-	for _, item := range agents.Items {
-		if item.PolicyID == cloudAgentPolicyID {
-			t.Logf("Found fleet-server entry: %+v", item)
-			//agentStatus = item.Status
-			agentIsFIPS = item.LocalMetadata.Elastic.Agent.FIPS
-			break
-		}
-	}
+	respObj := struct {
+		Hits struct {
+			Total struct {
+				Value int `json:"value"`
+			} `json:"total"`
+			Hits []struct {
+				Source struct {
+					LocalMetadata struct {
+						Elastic struct {
+							Agent struct {
+								FIPS bool `json:"fips"`
+							} `json:"agent"`
+						} `json:"elastic"`
+					} `json:"local_metadata"`
+					LastCheckinStatus string `json:"last_checkin_status"`
+					LastCheckinReason string `json:"last_checkin_reason"`
+				} `json:"_source"`
+			} `json:"hits"`
+		} `json:"hits"`
+	}{}
 
-	// Check that this Agent is online (i.e. healthy) and is FIPS-capable. This
-	// will prove that a FIPS-capable Agent is able to connect to a FIPS-capable
-	// Fleet Server, with both running in ECH.
-	require.Equal(t, true, agentIsFIPS)
-	//require.Equal(t, "online", agentStatus) // FIXME: Uncomment after https://github.com/elastic/apm-server/issues/17063 is resolved
+	err = json.NewDecoder(searchResp.Body).Decode(&respObj)
+	require.NoError(t, err)
+	require.Equal(t, 1, respObj.Hits.Total.Value, "expected only one hit from the ES query")
+	require.True(t, respObj.Hits.Hits[0].Source.LocalMetadata.Elastic.Agent.FIPS)
+	//require.Equalf(t, "online", respObj.Hits.Hits[0].Source.LastCheckinStatus, "last_checkin_status did not meet expectation, unhealthy reason: %v", respObj.Hits.Hits[0].Source.LastCheckinReason) // FIXME: Uncomment after https://github.com/elastic/apm-server/issues/17063 is resolved
 }
