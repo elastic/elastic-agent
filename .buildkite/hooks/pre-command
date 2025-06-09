@@ -73,6 +73,6 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-binary-dra" ]]; then
   fi
 fi
 
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && "$BUILDKITE_STEP_KEY" == "integration-cloud-image" ]]; then
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" && ("$BUILDKITE_STEP_KEY" == "integration-cloud-image" || "$BUILDKITE_STEP_KEY" == "integration-fips-cloud-image") ]]; then
   docker_login
 fi
