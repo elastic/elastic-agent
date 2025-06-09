@@ -1460,19 +1460,21 @@ type AgentStatusOutput struct {
 				OsqueryVersion string `json:"osquery_version"`
 			} `json:"payload"`
 		} `json:"units"`
-		VersionInfo struct {
-			Name    string `json:"name"`
-			Version string `json:"version"`
-			Meta    struct {
-				BuildTime string `json:"build_time"`
-				Commit    string `json:"commit"`
-			} `json:"meta"`
-		} `json:"version_info,omitempty"`
+		VersionInfo AgentStatusOutputVersionInfo `json:"version_info,omitempty"`
 	} `json:"components"`
 	Collector      *AgentStatusCollectorOutput `json:"collector"`
 	FleetState     int                         `json:"FleetState"`
 	FleetMessage   string                      `json:"FleetMessage"`
 	UpgradeDetails *details.Details            `json:"upgrade_details"`
+}
+
+type AgentStatusOutputVersionInfo struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	Meta    struct {
+		BuildTime string `json:"build_time"`
+		Commit    string `json:"commit"`
+	} `json:"meta"`
 }
 
 func (aso *AgentStatusOutput) IsZero() bool {
