@@ -62,27 +62,29 @@ func TestFIPSAgentConnectingToFIPSFleetServerInECHFRH(t *testing.T) {
 	require.Equalf(t, "HEALTHY", body.Status, "response status code: %d", resp.StatusCode)
 
 	// Get all Agents
-	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-	defer cancel()
-	agents, err := info.KibanaClient.ListAgents(ctx, kibana.ListAgentsRequest{})
-	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		agents, err := info.KibanaClient.ListAgents(ctx, kibana.ListAgentsRequest{})
+		require.NoError(t, err)
 
-	// Find Fleet Server's own Agent and get its status and whether it's
-	// FIPS-capable
-	//var agentStatus string
-	var agentIsFIPS bool
-	for _, item := range agents.Items {
-		if item.PolicyID == cloudAgentPolicyID {
-			t.Logf("Found fleet-server entry: %+v", item)
-			//agentStatus = item.Status
-			agentIsFIPS = item.LocalMetadata.Elastic.Agent.FIPS
-			break
+		// Find Fleet Server's own Agent and get its status and whether it's
+		// FIPS-capable
+		//var agentStatus string
+		var agentIsFIPS bool
+		for _, item := range agents.Items {
+			if item.PolicyID == cloudAgentPolicyID {
+				t.Logf("Found fleet-server entry: %+v", item)
+				//agentStatus = item.Status
+				agentIsFIPS = item.LocalMetadata.Elastic.Agent.FIPS
+				break
+			}
 		}
-	}
 
-	// Check that this Agent is online (i.e. healthy) and is FIPS-capable. This
-	// will prove that a FIPS-capable Agent is able to connect to a FIPS-capable
-	// Fleet Server, with both running in ECH.
-	require.Equal(t, true, agentIsFIPS)
-	//require.Equal(t, "online", agentStatus) // FIXME: Uncomment after https://github.com/elastic/apm-server/issues/17063 is resolved
+		// Check that this Agent is online (i.e. healthy) and is FIPS-capable. This
+		// will prove that a FIPS-capable Agent is able to connect to a FIPS-capable
+		// Fleet Server, with both running in ECH.
+		//require.Equal(t, "online", agentStatus) // FIXME: Uncomment after https://github.com/elastic/apm-server/issues/17063 is resolved
+		return agentIsFIPS
+	}, 10*time.Second, 200*time.Millisecond, "Fleet Server's Elastic Agent should be healthy and FIPS-capable")
 }
