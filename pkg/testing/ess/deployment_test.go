@@ -13,27 +13,27 @@ import (
 
 func TestOverallStatus(t *testing.T) {
 	tests := map[string]struct {
-		statuses              []DeploymentStatus
-		expectedOverallStatus DeploymentStatus
+		statuses              []string
+		expectedOverallStatus string
 	}{
 		"single_started": {
-			statuses:              []DeploymentStatus{DeploymentStatusStarted},
+			statuses:              []string{DeploymentStatusStarted},
 			expectedOverallStatus: DeploymentStatusStarted,
 		},
 		"single_not_started": {
-			statuses:              []DeploymentStatus{DeploymentStatusReconfiguring},
+			statuses:              []string{DeploymentStatusReconfiguring},
 			expectedOverallStatus: DeploymentStatusReconfiguring,
 		},
 		"multiple_none_started": {
-			statuses:              []DeploymentStatus{DeploymentStatusInitializing, DeploymentStatusReconfiguring},
+			statuses:              []string{DeploymentStatusInitializing, DeploymentStatusReconfiguring},
 			expectedOverallStatus: DeploymentStatusInitializing,
 		},
 		"multiple_some_started": {
-			statuses:              []DeploymentStatus{DeploymentStatusReconfiguring, DeploymentStatusStarted, DeploymentStatusInitializing},
+			statuses:              []string{DeploymentStatusReconfiguring, DeploymentStatusStarted, DeploymentStatusInitializing},
 			expectedOverallStatus: DeploymentStatusReconfiguring,
 		},
 		"multiple_all_started": {
-			statuses:              []DeploymentStatus{DeploymentStatusStarted, DeploymentStatusStarted, DeploymentStatusStarted},
+			statuses:              []string{DeploymentStatusStarted, DeploymentStatusStarted, DeploymentStatusStarted},
 			expectedOverallStatus: DeploymentStatusStarted,
 		},
 	}
