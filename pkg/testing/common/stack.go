@@ -76,7 +76,7 @@ type StackProvisioner interface {
 	// Create creates a stack.
 	Create(ctx context.Context, request StackRequest) (Stack, error)
 
-	// WaitForReady should block until the stack is ready or the context is cancelled.
+	// WaitForReady should block until the stack is ready and healthy or the context is cancelled.
 	WaitForReady(ctx context.Context, stack Stack) (Stack, error)
 
 	// Delete deletes the stack.

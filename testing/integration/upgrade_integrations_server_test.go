@@ -66,6 +66,7 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	// Check that deployment is ready and healthy after creation
 	deployment, err = prov.WaitForReady(ctx, deployment)
 	require.NoError(t, err)
 
@@ -73,12 +74,9 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 	err = prov.Upgrade(ctx, deployment, endVersion)
 	require.NoError(t, err)
 
+	// Check that deployment is ready and healthy after upgrade
 	deployment, err = prov.WaitForReady(ctx, deployment)
 	require.NoError(t, err)
-
-	// Check that Integrations Server is healthy after upgrade
-	// https://www.elastic.co/docs/api/doc/cloud/operation/operation-get-deployment
-	// TODO
 }
 
 // getRandomStackVersionsPair returns an ordered pair of versions, where the first return value is less than the second. The
