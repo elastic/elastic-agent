@@ -44,6 +44,12 @@ mage otel:readme
 
 echo "=> Creating changelog fragment"
 changelog_fragment_name="update-otel-components-to-$next_contrib"
+if command -v elastic-agent-changelog-tool &>/dev/null; then
+  echo "=> Using elastic-agent-changelog-tool to create changelog fragment"
+else
+  echo "=> elastic-agent-changelog-tool not found, installing it"
+  go install github.com/elastic/elastic-agent-changelog-tool@latest
+fi
 elastic-agent-changelog-tool new "$changelog_fragment_name"
 sed -i.bak "s/^kind:.*$/kind: enhancement/" ./changelog/fragments/*-"${changelog_fragment_name}".yaml
 sed -i.bak "s/^summary:.*$/summary: Update OTel components to ${next_contrib}/" ./changelog/fragments/*-"${changelog_fragment_name}".yaml
