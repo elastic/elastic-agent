@@ -212,6 +212,9 @@ func (c *Client) UpgradeDeployment(ctx context.Context, deploymentID string, ver
 
 	region := bodyObj.Resources.Elasticsearch[0].Region
 	reqBodyBytes, err := generateUpgradeDeploymentRequestBody(region, version)
+	if err != nil {
+		return fmt.Errorf("unable to generate upgrade request body: %w", err)
+	}
 
 	upgradeResp, err := c.doPost(
 		ctx,
