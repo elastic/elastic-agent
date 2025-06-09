@@ -145,6 +145,27 @@ func (p *StatefulProvisioner) Delete(ctx context.Context, stack common.Stack) er
 	return p.client.ShutdownDeployment(ctx, deploymentID)
 }
 
+// Upgrade upgrades a stack to a new version.
+func (p *StatefulProvisioner) Upgrade(ctx context.Context, stack common.Stack, newVersion *version.ParsedSemVer) error {
+	deploymentID, err := p.getDeploymentID(stack)
+	if err != nil {
+		return fmt.Errorf("failed to get deployment ID from the stack: %w", err)
+	}
+
+	p.logger.Logf("Upgrading cloud stack %s [stack_id: %s, deployment_id: %s] to version %s", stack.Version, stack.ID, deploymentID, newVersion)
+
+	// allow up to 10 minutes for request
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+
+	err = p.client.UpgradeDeployment(ctx, deploymentID, newVersion.String())
+	if err != nil {
+		return fmt.Errorf("failed to upgrade cloud stack %s [stack_id: %s, deployment_id: %s] to version %s: %w", stack.Version, stack.ID, deploymentID, newVersion.String(), err)
+	}
+
+	return nil
+}
+
 // AvailableVersions returns the stack versions available in the ECH region.
 func (p *StatefulProvisioner) AvailableVersions() ([]*version.ParsedSemVer, error) {
 	versionsApiUrl, err := url.JoinPath("regions", p.cfg.Region, "stack/versions?show_deleted=false&show_unusable=false")
