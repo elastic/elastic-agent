@@ -26,6 +26,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	agentsystemprocess "github.com/elastic/elastic-agent-system-metrics/metric/system/process"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
@@ -445,10 +446,16 @@ func getProcesses(t *gotesting.T, regex string) []runningProcess {
 	return processes
 }
 
-func (f *Fixture) SetClient() {
-	socketPath := "unix:///var/lib/elastic-agent/elastic-agent.sock"
+func (f *Fixture) SetClient() error {
+	socketPath, err := control.AddressFromPath(f.operatingSystem, f.workDir)
+	if err != nil {
+		return fmt.Errorf("failed to get control protcol address: %w", err)
+	}
+
 	c := client.New(client.WithAddress(socketPath))
 	f.setClient(c)
+
+	return nil
 }
 
 // installDeb installs the prepared Elastic Agent binary from the deb
@@ -508,9 +515,10 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, shou
 		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
 	}
 
-	socketPath := "unix:///var/lib/elastic-agent/elastic-agent.sock"
-	c := client.New(client.WithAddress(socketPath))
-	f.setClient(c)
+	err = f.SetClient()
+	if err != nil {
+		return nil, err
+	}
 
 	if !shouldEnroll {
 		return nil, nil
@@ -603,9 +611,10 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
 	}
 
-	socketPath := "unix:///var/lib/elastic-agent/elastic-agent.sock"
-	c := client.New(client.WithAddress(socketPath))
-	f.setClient(c)
+	err = f.SetClient()
+	if err != nil {
+		return nil, err
+	}
 
 	if !shouldEnroll {
 		return nil, nil
