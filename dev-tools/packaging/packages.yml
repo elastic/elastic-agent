@@ -495,12 +495,12 @@ shared:
   - &docker_elastic_wolfi_spec
     docker_variant: 'wolfi'
     extra_vars:
-      from: '--platform=linux/amd64 docker.elastic.co/wolfi/chaingaurd-base'
+      from: '--platform=linux/amd64 docker.elastic.co/wolfi/chainguard-base'
 
   - &docker_elastic_wolfi_arm_spec
     docker_variant: 'wolfi'
     extra_vars:
-      from: '--platform=linux/arm64 docker.elastic.co/wolfi/chaingaurd-base'
+      from: '--platform=linux/arm64 docker.elastic.co/wolfi/chainguard-base'
 
   - &docker_fips_spec
     docker_variant: 'basic'
