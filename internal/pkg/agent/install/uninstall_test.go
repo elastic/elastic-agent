@@ -92,7 +92,7 @@ func Test_checkForUnprivilegedVault(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tempDir := t.TempDir()
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 			defer cancel()
 			testVaultPath := filepath.Join(tempDir, filepath.Base(paths.AgentVaultPath()))
 
@@ -174,7 +174,7 @@ func TestNotifyFleetAuditUnenroll(t *testing.T) {
 		err: fmt.Errorf("unretryable return status: 409"),
 	}}
 
-	log, _ := logp.NewInMemory("test", zap.NewDevelopmentEncoderConfig())
+	log, _ := logp.NewInMemoryLocal("test", zap.NewDevelopmentEncoderConfig())
 	pt := progressbar.NewOptions(-1, progressbar.OptionSetWriter(io.Discard))
 	var agentID agentInfo = "testID"
 
