@@ -17,6 +17,7 @@ import (
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/version"
 )
 
 func TestNewRunner_Clean(t *testing.T) {
@@ -179,5 +180,10 @@ func (p *fakeStackProvisioner) Delete(_ context.Context, stack common.Stack) err
 	p.mx.Lock()
 	defer p.mx.Unlock()
 	p.deletedStacks = append(p.deletedStacks, stack)
+	return nil
+}
+
+func (p *fakeStackProvisioner) Upgrade(_ context.Context, _ common.Stack, _ *version.ParsedSemVer) error {
+	// fake upgrade does nothing
 	return nil
 }
