@@ -59,32 +59,15 @@ type GetDeploymentResponse struct {
 	}
 }
 
-type DeploymentStatus string
-
-func (d *DeploymentStatus) UnmarshalJSON(data []byte) error {
-	var status string
-	if err := json.Unmarshal(data, &status); err != nil {
-		return err
-	}
-
-	switch status {
-	case string(DeploymentStatusInitializing), string(DeploymentStatusReconfiguring), string(DeploymentStatusStarted):
-		*d = DeploymentStatus(status)
-	default:
-		return fmt.Errorf("unknown status: [%s]", status)
-	}
-
-	return nil
-}
-
-func (d *DeploymentStatus) String() string {
-	return string(*d)
+type DeploymentStatus struct {
+	Status  string
+	Healthy bool
 }
 
 const (
-	DeploymentStatusInitializing  DeploymentStatus = "initializing"
-	DeploymentStatusReconfiguring DeploymentStatus = "reconfiguring"
-	DeploymentStatusStarted       DeploymentStatus = "started"
+	DeploymentStatusInitializing  = "initializing"
+	DeploymentStatusReconfiguring = "reconfiguring"
+	DeploymentStatusStarted       = "started"
 )
 
 type DeploymentStatusResponse struct {
@@ -293,20 +276,24 @@ func (c *Client) DeploymentStatus(ctx context.Context, deploymentID string) (*De
 	defer getResp.Body.Close()
 
 	var getRespBody struct {
+		Healthy   bool `json:"healthy"`
 		Resources struct {
 			Elasticsearch []struct {
 				Info struct {
-					Status DeploymentStatus `json:"status"`
+					Healthy bool   `json:"healthy"`
+					Status  string `json:"status"`
 				} `json:"info"`
 			} `json:"elasticsearch"`
 			Kibana []struct {
 				Info struct {
-					Status DeploymentStatus `json:"status"`
+					Healthy bool   `json:"healthy"`
+					Status  string `json:"status"`
 				} `json:"info"`
 			} `json:"kibana"`
 			IntegrationsServer []struct {
 				Info struct {
-					Status DeploymentStatus `json:"status"`
+					Healthy bool   `json:"healthy"`
+					Status  string `json:"status"`
 				} `json:"info"`
 			} `json:"integrations_server"`
 		} `json:"resources"`
@@ -317,16 +304,28 @@ func (c *Client) DeploymentStatus(ctx context.Context, deploymentID string) (*De
 	}
 
 	s := DeploymentStatusResponse{
-		Elasticsearch:      getRespBody.Resources.Elasticsearch[0].Info.Status,
-		Kibana:             getRespBody.Resources.Kibana[0].Info.Status,
-		IntegrationsServer: getRespBody.Resources.IntegrationsServer[0].Info.Status,
+		Elasticsearch: DeploymentStatus{
+			Status:  getRespBody.Resources.Elasticsearch[0].Info.Status,
+			Healthy: getRespBody.Resources.Elasticsearch[0].Info.Healthy,
+		},
+		Kibana: DeploymentStatus{
+			Status:  getRespBody.Resources.Kibana[0].Info.Status,
+			Healthy: getRespBody.Resources.Kibana[0].Info.Healthy,
+		},
+		IntegrationsServer: DeploymentStatus{
+			Status:  getRespBody.Resources.IntegrationsServer[0].Info.Status,
+			Healthy: getRespBody.Resources.IntegrationsServer[0].Info.Healthy,
+		},
 	}
-	s.Overall = overallStatus(s.Elasticsearch, s.Kibana, s.IntegrationsServer)
+	s.Overall = DeploymentStatus{
+		Status:  overallStatus(s.Elasticsearch.Status, s.Kibana.Status, s.IntegrationsServer.Status),
+		Healthy: getRespBody.Healthy,
+	}
 
 	return &s, nil
 }
 
-// DeploymentIsReady returns true when the deployment is ready, checking its status
+// DeploymentIsReady returns true when the deployment is ready and healthy, checking its status
 // every `tick` until `waitFor` duration.
 func (c *Client) DeploymentIsReady(ctx context.Context, deploymentID string, tick time.Duration) (bool, error) {
 	ticker := time.NewTicker(tick)
@@ -350,7 +349,7 @@ func (c *Client) DeploymentIsReady(ctx context.Context, deploymentID string, tic
 				statusCh <- status.Overall
 			}()
 		case status := <-statusCh:
-			if status == DeploymentStatusStarted {
+			if status.Status == DeploymentStatusStarted && status.Healthy {
 				return true, nil
 			}
 		}
@@ -366,11 +365,11 @@ func (c *Client) getDeployment(ctx context.Context, deploymentID string) (*http.
 	return c.doGet(ctx, u)
 }
 
-func overallStatus(statuses ...DeploymentStatus) DeploymentStatus {
+func overallStatus(statuses ...string) string {
 	// The overall status is started if every component's status is started. Otherwise,
 	// we take the non-started components' statuses and pick the first one as the overall
 	// status.
-	statusMap := map[DeploymentStatus]struct{}{}
+	statusMap := map[string]struct{}{}
 	for _, status := range statuses {
 		statusMap[status] = struct{}{}
 	}
@@ -381,7 +380,7 @@ func overallStatus(statuses ...DeploymentStatus) DeploymentStatus {
 		}
 	}
 
-	var overallStatus DeploymentStatus
+	var overallStatus string
 	for _, status := range statuses {
 		if status != DeploymentStatusStarted {
 			overallStatus = status

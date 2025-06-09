@@ -109,7 +109,7 @@ func (p *StatefulProvisioner) Create(ctx context.Context, request common.StackRe
 	}, nil
 }
 
-// WaitForReady should block until the stack is ready or the context is cancelled.
+// WaitForReady should block until the stack is ready and healthy or the context is cancelled.
 func (p *StatefulProvisioner) WaitForReady(ctx context.Context, stack common.Stack) (common.Stack, error) {
 	deploymentID, err := p.getDeploymentID(stack)
 	if err != nil {
