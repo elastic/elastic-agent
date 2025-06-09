@@ -30,6 +30,7 @@ import (
 
 	// Processors:
 	attributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor" // for modifying signal attributes
+	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/cumulativetodeltaprocessor"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor"
 	k8sattributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor" // for adding k8s metadata
 	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor"
@@ -91,6 +92,7 @@ func components() (otelcol.Factories, error) {
 		batchprocessor.NewFactory(),
 		resourceprocessor.NewFactory(),
 		attributesprocessor.NewFactory(),
+		cumulativetodeltaprocessor.NewFactory(),
 		transformprocessor.NewFactory(),
 		filterprocessor.NewFactory(),
 		k8sattributesprocessor.NewFactory(),
