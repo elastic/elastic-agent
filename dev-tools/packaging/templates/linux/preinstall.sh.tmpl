@@ -2,40 +2,41 @@
 
 set -e
 
+SERVICE_NAME="ElasticEndpoint"
 endpoint_active=false
 
 handle_endpoint() {
-  echo "Checking if ElasticEndpoint is an active service"
-	if systemctl --quiet is-active ElasticEndpoint; then
-		endpoint_active=true
+  echo "Checking if $SERVICE_NAME is an active service"
+  if systemctl --quiet is-active $SERVICE_NAME; then
+    endpoint_active=true
 
-		# restore endpoint and vault by restarting the service
-		restore_endpoint() {
-      echo "Restore ElasticEndpoint"
-      if ! systemctl --quiet is-active ElasticEndpoint; then
-        echo "Starting ElasticEndpoint"
-        systemctl --quiet start ElasticEndpoint
+    # restore endpoint and vault by restarting the service
+    restore_endpoint() {
+      echo "Restore $SERVICE_NAME"
+      if ! systemctl --quiet is-active $SERVICE_NAME; then
+        echo "Starting $SERVICE_NAME"
+        systemctl --quiet start $SERVICE_NAME
       else
-        echo "ElasticEndpoint is already running"
+        echo "$SERVICE_NAME is already running"
       fi
       exit 1
-		}
+    }
 
-		trap restore_endpoint ERR
+    trap restore_endpoint ERR
 
-		# Remove the vault directory if it exists
-		if [ -d "/opt/Elastic/Endpoint/state/vault" ]; then
-      echo "ElasticEndpoint is tamper protected"
-      echo "Removing ElasticEndpoint vault"
+    # Remove the vault directory if it exists
+    if [ -d "/opt/Elastic/Endpoint/state/vault" ]; then
+      echo "$SERVICE_NAME is tamper protected"
+      echo "Removing $SERVICE_NAME vault"
 
-			rm -rf "/opt/Elastic/Endpoint/state/vault"
+      rm -rf "/opt/Elastic/Endpoint/state/vault"
 
-      echo "Stopping ElasticEndpoint"
-		  systemctl --quiet stop ElasticEndpoint
+      echo "Stopping $SERVICE_NAME"
+      systemctl --quiet stop $SERVICE_NAME
     else
-      echo "ElasticEndpoint tamper protection is not enabled"
-		fi
-	fi
+      echo "$SERVICE_NAME tamper protection is not enabled"
+    fi
+  fi
 }
 
 handle_endpoint
