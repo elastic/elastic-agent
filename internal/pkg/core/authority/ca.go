@@ -140,6 +140,8 @@ func (c *CertificateAuthority) GeneratePairWithName(name string) (*Pair, error) 
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	publicKey := &privateKey.PublicKey
 
+	certTemplate.SubjectKeyId = generateSubjectKeyID(publicKey)
+
 	// Sign the certificate
 	certBytes, err := x509.CreateCertificate(rand.Reader, certTemplate, c.caCert, publicKey, c.privateKey)
 	if err != nil {
