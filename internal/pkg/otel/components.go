@@ -69,7 +69,6 @@ func components() (otelcol.Factories, error) {
 	var err error
 	factories := otelcol.Factories{}
 
-<<<<<<< HEAD
 	// Receivers
 	factories.Receivers, err = receiver.MakeFactoryMap(
 		otlpreceiver.NewFactory(),
@@ -86,95 +85,6 @@ func components() (otelcol.Factories, error) {
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
-=======
-		// Receivers
-		receivers := []receiver.Factory{
-			otlpreceiver.NewFactory(),
-			filelogreceiver.NewFactory(),
-			kubeletstatsreceiver.NewFactory(),
-			k8sclusterreceiver.NewFactory(),
-			hostmetricsreceiver.NewFactory(),
-			httpcheckreceiver.NewFactory(),
-			k8sobjectsreceiver.NewFactory(),
-			receivercreator.NewFactory(),
-			redisreceiver.NewFactory(),
-			nginxreceiver.NewFactory(),
-			jaegerreceiver.NewFactory(),
-			zipkinreceiver.NewFactory(),
-			fbreceiver.NewFactory(),
-			mbreceiver.NewFactory(),
-			jmxreceiver.NewFactory(),
-			nopreceiver.NewFactory(),
-		}
-		// some receivers should only be available when
-		// not in fips mode due to restrictions on crypto usage
-		receivers = addNonFipsReceivers(receivers)
-		factories.Receivers, err = otelcol.MakeFactoryMap(receivers...)
-		if err != nil {
-			return otelcol.Factories{}, err
-		}
-
-		// Processors
-		factories.Processors, err = otelcol.MakeFactoryMap[processor.Factory](
-			batchprocessor.NewFactory(),
-			resourceprocessor.NewFactory(),
-			attributesprocessor.NewFactory(),
-			cumulativetodeltaprocessor.NewFactory(),
-			transformprocessor.NewFactory(),
-			filterprocessor.NewFactory(),
-			geoipprocessor.NewFactory(),
-			k8sattributesprocessor.NewFactory(),
-			elasticinframetricsprocessor.NewFactory(),
-			resourcedetectionprocessor.NewFactory(),
-			memorylimiterprocessor.NewFactory(),
-			elastictraceprocessor.NewFactory(),
-		)
-		if err != nil {
-			return otelcol.Factories{}, err
-		}
-
-		// Exporters
-		exporters := []exporter.Factory{
-			otlpexporter.NewFactory(),
-			debugexporter.NewFactory(),
-			fileexporter.NewFactory(),
-			elasticsearchexporter.NewFactory(),
-			loadbalancingexporter.NewFactory(),
-			otlphttpexporter.NewFactory(),
-			nopexporter.NewFactory(),
-		}
-		// some exporters should only be available when
-		// not in fips mode due to restrictions on crypto usage
-		exporters = addNonFipsExporters(exporters)
-		factories.Exporters, err = otelcol.MakeFactoryMap(exporters...)
-		if err != nil {
-			return otelcol.Factories{}, err
-		}
-
-		factories.Connectors, err = otelcol.MakeFactoryMap[connector.Factory](
-			routingconnector.NewFactory(),
-			spanmetricsconnector.NewFactory(),
-			elasticapmconnector.NewFactory(),
-		)
-		if err != nil {
-			return otelcol.Factories{}, err
-		}
-
-		extensions := []extension.Factory{
-			memorylimiterextension.NewFactory(),
-			filestorage.NewFactory(),
-			healthcheckextension.NewFactory(),
-			pprofextension.NewFactory(),
-			k8sobserver.NewFactory(),
-		}
-		extensions = append(extensions, extensionFactories...)
-		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)
-		if err != nil {
-			return otelcol.Factories{}, err
-		}
-
-		return factories, err
->>>>>>> 511197098 (otel: add cumulativetodeltaprocessor to EDOT collector (#8372))
 	}
 
 	// Processors
@@ -182,6 +92,7 @@ func components() (otelcol.Factories, error) {
 		batchprocessor.NewFactory(),
 		resourceprocessor.NewFactory(),
 		attributesprocessor.NewFactory(),
+		cumulativetodeltaprocessor.NewFactory(),
 		transformprocessor.NewFactory(),
 		filterprocessor.NewFactory(),
 		k8sattributesprocessor.NewFactory(),
