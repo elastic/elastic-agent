@@ -1280,6 +1280,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/pkg/xk8stest v0.125.0 
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/xk8stest v0.125.0/go.mod h1:/3AhBAO0ZSreopLgAi07hMrgeOc5iD5Ue6RXj3htKIo=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.125.0 h1:TZz0jQv3smTyMHCiD3Z4jPBH5yU9/F8hdmhk0YZEDxY=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.125.0/go.mod h1:Q7lsheavA9C4L7Kd+N0/2dB96HJcB7tarvjIpqRAXnY=
+github.com/open-telemetry/opentelemetry-collector-contrib/processor/cumulativetodeltaprocessor v0.125.0 h1:HVYiF2JGqPwob7vYbU7mSF671NiRSvMsKXt6zQCwfhQ=
+github.com/open-telemetry/opentelemetry-collector-contrib/processor/cumulativetodeltaprocessor v0.125.0/go.mod h1:povKaMFG1O5brNgcB9LjyxMu9/k4tPK6MEPH/TM0a2w=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.125.0 h1:uwF96SJ/YDfo26zJwYljRrwot9XAMBiyTf0uPk1aEGM=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.125.0/go.mod h1:2Nmo//97UbjpwULoIFWHQBJeS2Ymawu4wyhVeYQAY34=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/geoipprocessor v0.125.0 h1:UAtUw2fnALczXq9fs5m48a7Ubjq6qvgI4Cl5fVzW91M=
