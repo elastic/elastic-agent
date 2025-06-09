@@ -2,7 +2,6 @@
 
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
-  DOCKER_REGISTRY: "docker.elastic.co"
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.

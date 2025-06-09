@@ -34,7 +34,6 @@ write_annotation() {
 }
 
 DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
-DOCKER_REGISTRY="docker.elastic.co"
 PRIVATE_REPO="docker.elastic.co/observability-ci/ecp-elastic-agent-service"
 SNAPSHOT_DRA_URL=https://snapshots.elastic.co/latest/master.json
 
@@ -50,6 +49,7 @@ GIT_SHORT_COMMIT=$(echo "$GIT_COMMIT" | cut -c1-12)
 DOCKER_TAG="git-${GIT_SHORT_COMMIT}"
 PRIVATE_IMAGE="${PRIVATE_REPO}:${DOCKER_TAG}"
 
+# NOTE: pre-command set ups the DOCKER_REGISTRY env variable.
 DOCKER_USERNAME_SECRET=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
 DOCKER_PASSWORD_SECRET=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
 skopeo login --username "${DOCKER_USERNAME_SECRET}" --password "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}"

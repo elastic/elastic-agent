@@ -27,6 +27,6 @@ if [ -n "$TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE" ]; then
 fi
 
 if command -v docker &>/dev/null; then
-  DOCKER_REGISTRY="docker.elastic.co"
+  # NOTE: pre-command set ups the DOCKER_REGISTRY env variable.
   docker logout $DOCKER_REGISTRY
 fi
