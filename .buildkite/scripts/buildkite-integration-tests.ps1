@@ -49,6 +49,10 @@ $TestsExitCode = 0
 try
 {
     Write-Output "~~~ Integration tests: $GROUP_NAME as user: $env:USERNAME"
+    # -test.timeout=2h0m0s is set because some tests normally take up to 45 minutes.
+    # This 2-hour timeout provides enough room for future, potentially longer tests,
+    # while still enforcing a reasonable upper limit on total execution time.
+    # See: https://pkg.go.dev/cmd/go#hdr-Testing_flags
     $gotestArgs = @("-tags=integration", "-test.shuffle=on", "-test.timeout=2h0m0s", "$env:TEST_PACKAGE", "-v", "-args", "-integration.groups=$GROUP_NAME", "-integration.sudo=$TEST_SUDO")
     & gotestsum --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- @gotestArgs
     $TestsExitCode = $LASTEXITCODE
