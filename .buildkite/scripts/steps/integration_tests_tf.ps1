@@ -33,6 +33,4 @@ try {
     ess_down
 }
 
-if ($TestsExitCode -ne 0) {
-    exit 1
-}
+exit $TestsExitCode
