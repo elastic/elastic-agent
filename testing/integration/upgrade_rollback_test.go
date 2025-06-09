@@ -140,7 +140,8 @@ inputs:
 			if state.UpgradeDetails == nil {
 				t.Fatal("upgrade details in the state cannot be nil")
 			}
-			require.Equal(t, details.StateRollback, details.State(state.UpgradeDetails.State))
+			assert.Equal(t, details.StateRollback, details.State(state.UpgradeDetails.State))
+			assert.Equal(t, details.StateRollback, state.UpgradeDetails.Metadata.Reason)
 		} else {
 			t.Logf("rollback finished, status is '%s', cannot check UpgradeDetails", state.State.String())
 		}

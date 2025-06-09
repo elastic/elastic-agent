@@ -56,8 +56,8 @@ type Metadata struct {
 	// an upgrade fails.
 	ErrorMsg string `json:"error_msg,omitempty" yaml:"error_msg,omitempty"`
 
-	// Reason is a string that may give out more information about the current state. It has been introduced initially
-	// to distinguish between manual and automatic rollbacks
+	// Reason is a string that may give out more information about transitioning to the current state. It has been
+	// introduced initially to distinguish between manual and automatic rollbacks
 	Reason string `json:"reason,omitempty" yaml:"reason,omitempty"`
 }
 
