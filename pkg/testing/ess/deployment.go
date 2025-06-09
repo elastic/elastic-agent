@@ -214,23 +214,11 @@ func (c *Client) UpgradeDeployment(ctx context.Context, deploymentID string, ver
 		return fmt.Errorf("unable to read body of GET deployment API response: %w", err)
 	}
 
-	bodyStr := string(data)
-
-	// Parse out current version from body
+	// Parse out values from body that will be needed in the upgrade request body
 	var bodyObj struct {
 		Resources struct {
 			Elasticsearch []struct {
-				Info struct {
-					PlanInfo struct {
-						Current struct {
-							Plan struct {
-								Elasticsearch struct {
-									Version string `json:"version"`
-								} `json:"elasticsearch"`
-							} `json:"plan"`
-						} `json:"current"`
-					} `json:"plan_info"`
-				} `json:"info"`
+				Region string
 			} `json:"elasticsearch"`
 		} `json:"resources"`
 	}
@@ -239,465 +227,40 @@ func (c *Client) UpgradeDeployment(ctx context.Context, deploymentID string, ver
 		return fmt.Errorf("unable to parse current deployment version from GET deployment API response: %w", err)
 	}
 
-	tpl, err := template.New("upgrade_deployment_request").
-		Funcs(template.FuncMap{"json": jsonMarshal}).
-		Parse(upgradeDeploymentRequestTemplate)
+	region := bodyObj.Resources.Elasticsearch[0].Region
+	reqBodyBytes, err := generateUpgradeDeploymentRequestBody(region, version)
+
+	upgradeResp, err := c.doPost(
+		ctx,
+		u,
+		"application/json",
+		bytes.NewReader(reqBodyBytes),
+	)
 	if err != nil {
-		return fmt.Errorf("unable to parse deployment upgrade template: %w", err)
+		return fmt.Errorf("error calling deployment update API: %w", err)
+	}
+	defer upgradeResp.Body.Close()
+
+	var upgradeRespBody struct {
+		Errors []struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"errors"`
 	}
 
-	// See also: https://www.elastic.co/docs/api/doc/cloud/operation/operation-update-deployment
-	// - Only elements that change (version?) could be specified?
-	// See also: upgrade_deployment_request.tmpl.json
-	//{
-	// "name": "test-8181",
-	// "prune_orphans": true,
-	// "metadata": {
-	//   "system_owned": false,
-	//   "hidden": false
-	// },
-	// "settings": {
-	//   "autoscaling_enabled": false
-	// },
-	// "resources": {
-	//   "elasticsearch": [
-	//     {
-	//       "region": "gcp-us-west2",
-	//       "ref_id": "main-elasticsearch",
-	//       "plan": {
-	//         "tiebreaker_topology": {
-	//           "memory_per_node": 1024
-	//         },
-	//         "cluster_topology": [
-	//           {
-	//             "id": "hot_content",
-	//             "node_roles": [
-	//               "master",
-	//               "ingest",
-	//               "transform",
-	//               "data_hot",
-	//               "remote_cluster_client",
-	//               "data_content"
-	//             ],
-	//             "zone_count": 2,
-	//             "elasticsearch": {
-	//               "system_settings": {
-	//                 "scripting": {
-	//                   "stored": {
-	//                     "enabled": true
-	//                   },
-	//                   "inline": {
-	//                     "enabled": true
-	//                   }
-	//                 },
-	//                 "http": {
-	//                   "compression": true,
-	//                   "cors_enabled": false,
-	//                   "cors_max_age": 1728000,
-	//                   "cors_allow_credentials": false
-	//                 },
-	//                 "reindex_whitelist": [],
-	//                 "auto_create_index": true,
-	//                 "enable_close_index": true,
-	//                 "destructive_requires_name": false,
-	//                 "monitoring_collection_interval": -1,
-	//                 "monitoring_history_duration": "3d"
-	//               },
-	//               "node_attributes": {
-	//                 "data": "hot"
-	//               }
-	//             },
-	//             "instance_configuration_id": "gcp.es.datahot.n2.68x10x45",
-	//             "instance_configuration_version": 1,
-	//             "size": {
-	//               "value": 8192,
-	//               "resource": "memory"
-	//             },
-	//             "autoscaling_max": {
-	//               "value": 131072,
-	//               "resource": "memory"
-	//             }
-	//           },
-	//           {
-	//             "id": "warm",
-	//             "node_roles": [
-	//               "data_warm",
-	//               "remote_cluster_client"
-	//             ],
-	//             "zone_count": 2,
-	//             "elasticsearch": {
-	//               "system_settings": {
-	//                 "scripting": {
-	//                   "stored": {
-	//                     "enabled": true
-	//                   },
-	//                   "inline": {
-	//                     "enabled": true
-	//                   }
-	//                 },
-	//                 "http": {
-	//                   "compression": true,
-	//                   "cors_enabled": false,
-	//                   "cors_max_age": 1728000,
-	//                   "cors_allow_credentials": false
-	//                 },
-	//                 "reindex_whitelist": [],
-	//                 "auto_create_index": true,
-	//                 "enable_close_index": true,
-	//                 "destructive_requires_name": false,
-	//                 "monitoring_collection_interval": -1,
-	//                 "monitoring_history_duration": "3d"
-	//               },
-	//               "node_attributes": {
-	//                 "data": "warm"
-	//               }
-	//             },
-	//             "instance_configuration_id": "gcp.es.datawarm.n2.68x10x190",
-	//             "instance_configuration_version": 1,
-	//             "size": {
-	//               "value": 0,
-	//               "resource": "memory"
-	//             },
-	//             "autoscaling_max": {
-	//               "value": 131072,
-	//               "resource": "memory"
-	//             }
-	//           },
-	//           {
-	//             "id": "cold",
-	//             "node_roles": [
-	//               "data_cold",
-	//               "remote_cluster_client"
-	//             ],
-	//             "zone_count": 1,
-	//             "elasticsearch": {
-	//               "system_settings": {
-	//                 "scripting": {
-	//                   "stored": {
-	//                     "enabled": true
-	//                   },
-	//                   "inline": {
-	//                     "enabled": true
-	//                   }
-	//                 },
-	//                 "http": {
-	//                   "compression": true,
-	//                   "cors_enabled": false,
-	//                   "cors_max_age": 1728000,
-	//                   "cors_allow_credentials": false
-	//                 },
-	//                 "reindex_whitelist": [],
-	//                 "auto_create_index": true,
-	//                 "enable_close_index": true,
-	//                 "destructive_requires_name": false,
-	//                 "monitoring_collection_interval": -1,
-	//                 "monitoring_history_duration": "3d"
-	//               },
-	//               "node_attributes": {
-	//                 "data": "cold"
-	//               }
-	//             },
-	//             "instance_configuration_id": "gcp.es.datacold.n2.68x10x190",
-	//             "instance_configuration_version": 1,
-	//             "size": {
-	//               "value": 0,
-	//               "resource": "memory"
-	//             },
-	//             "autoscaling_max": {
-	//               "value": 65536,
-	//               "resource": "memory"
-	//             }
-	//           },
-	//           {
-	//             "id": "frozen",
-	//             "node_roles": [
-	//               "data_frozen"
-	//             ],
-	//             "zone_count": 1,
-	//             "elasticsearch": {
-	//               "system_settings": {
-	//                 "scripting": {
-	//                   "stored": {
-	//                     "enabled": true
-	//                   },
-	//                   "inline": {
-	//                     "enabled": true
-	//                   }
-	//                 },
-	//                 "http": {
-	//                   "compression": true,
-	//                   "cors_enabled": false,
-	//                   "cors_max_age": 1728000,
-	//                   "cors_allow_credentials": false
-	//                 },
-	//                 "reindex_whitelist": [],
-	//                 "auto_create_index": true,
-	//                 "enable_close_index": true,
-	//                 "destructive_requires_name": false,
-	//                 "monitoring_collection_interval": -1,
-	//                 "monitoring_history_duration": "3d"
-	//               },
-	//               "node_attributes": {
-	//                 "data": "frozen"
-	//               }
-	//             },
-	//             "instance_configuration_id": "gcp.es.datafrozen.n2.68x10x90",
-	//             "instance_configuration_version": 1,
-	//             "size": {
-	//               "value": 0,
-	//               "resource": "memory"
-	//             },
-	//             "autoscaling_max": {
-	//               "value": 131072,
-	//               "resource": "memory"
-	//             }
-	//           },
-	//           {
-	//             "id": "master",
-	//             "node_roles": [
-	//               "master",
-	//               "remote_cluster_client"
-	//             ],
-	//             "zone_count": 3,
-	//             "elasticsearch": {
-	//               "system_settings": {
-	//                 "scripting": {
-	//                   "stored": {
-	//                     "enabled": true
-	//                   },
-	//                   "inline": {
-	//                     "enabled": true
-	//                   }
-	//                 },
-	//                 "http": {
-	//                   "compression": true,
-	//                   "cors_enabled": false,
-	//                   "cors_max_age": 1728000,
-	//                   "cors_allow_credentials": false
-	//                 },
-	//                 "reindex_whitelist": [],
-	//                 "auto_create_index": true,
-	//                 "enable_close_index": true,
-	//                 "destructive_requires_name": false,
-	//                 "monitoring_collection_interval": -1,
-	//                 "monitoring_history_duration": "3d"
-	//               }
-	//             },
-	//             "instance_configuration_id": "gcp.es.master.n2.68x32x45",
-	//             "instance_configuration_version": 2,
-	//             "size": {
-	//               "value": 0,
-	//               "resource": "memory"
-	//             }
-	//           },
-	//           {
-	//             "id": "coordinating",
-	//             "node_roles": [
-	//               "ingest",
-	//               "remote_cluster_client"
-	//             ],
-	//             "zone_count": 2,
-	//             "elasticsearch": {
-	//               "system_settings": {
-	//                 "scripting": {
-	//                   "stored": {
-	//                     "enabled": true
-	//                   },
-	//                   "inline": {
-	//                     "enabled": true
-	//                   }
-	//                 },
-	//                 "http": {
-	//                   "compression": true,
-	//                   "cors_enabled": false,
-	//                   "cors_max_age": 1728000,
-	//                   "cors_allow_credentials": false
-	//                 },
-	//                 "reindex_whitelist": [],
-	//                 "auto_create_index": true,
-	//                 "enable_close_index": true,
-	//                 "destructive_requires_name": false,
-	//                 "monitoring_collection_interval": -1,
-	//                 "monitoring_history_duration": "3d"
-	//               }
-	//             },
-	//             "instance_configuration_id": "gcp.es.coordinating.n2.68x16x45",
-	//             "instance_configuration_version": 1,
-	//             "size": {
-	//               "value": 0,
-	//               "resource": "memory"
-	//             }
-	//           },
-	//           {
-	//             "id": "ml",
-	//             "node_roles": [
-	//               "ml",
-	//               "remote_cluster_client"
-	//             ],
-	//             "zone_count": 1,
-	//             "elasticsearch": {
-	//               "system_settings": {
-	//                 "scripting": {
-	//                   "stored": {
-	//                     "enabled": true
-	//                   },
-	//                   "inline": {
-	//                     "enabled": true
-	//                   }
-	//                 },
-	//                 "http": {
-	//                   "compression": true,
-	//                   "cors_enabled": false,
-	//                   "cors_max_age": 1728000,
-	//                   "cors_allow_credentials": false
-	//                 },
-	//                 "reindex_whitelist": [],
-	//                 "auto_create_index": true,
-	//                 "enable_close_index": true,
-	//                 "destructive_requires_name": false,
-	//                 "monitoring_collection_interval": -1,
-	//                 "monitoring_history_duration": "3d"
-	//               }
-	//             },
-	//             "instance_configuration_id": "gcp.es.ml.n2.68x32x45",
-	//             "instance_configuration_version": 1,
-	//             "autoscaling_min": {
-	//               "value": 0,
-	//               "resource": "memory"
-	//             },
-	//             "autoscaling_max": {
-	//               "value": 65536,
-	//               "resource": "memory"
-	//             },
-	//             "autoscaling_tier_override": true
-	//           }
-	//         ],
-	//         "elasticsearch": {
-	//           "version": "8.19.0-SNAPSHOT",
-	//           "enabled_built_in_plugins": [],
-	//           "user_bundles": [],
-	//           "user_plugins": []
-	//         },
-	//         "deployment_template": {
-	//           "id": "gcp-storage-optimized"
-	//         },
-	//         "transient": {
-	//           "strategy": {
-	//             "autodetect": {}
-	//           }
-	//         }
-	//       }
-	//     }
-	//   ],
-	//   "kibana": [
-	//     {
-	//       "region": "gcp-us-west2",
-	//       "ref_id": "main-kibana",
-	//       "elasticsearch_cluster_ref_id": "main-elasticsearch",
-	//       "plan": {
-	//         "cluster_topology": [
-	//           {
-	//             "instance_configuration_id": "gcp.kibana.n2.68x32x45",
-	//             "instance_configuration_version": 1,
-	//             "size": {
-	//               "value": 1024,
-	//               "resource": "memory"
-	//             },
-	//             "zone_count": 1,
-	//             "kibana": {
-	//               "system_settings": {}
-	//             }
-	//           }
-	//         ],
-	//         "kibana": {
-	//           "version": "8.19.0-SNAPSHOT"
-	//         },
-	//         "transient": {
-	//           "strategy": {
-	//             "autodetect": {}
-	//           }
-	//         }
-	//       }
-	//     }
-	//   ],
-	//   "apm": [],
-	//   "integrations_server": [
-	//     {
-	//       "region": "gcp-us-west2",
-	//       "ref_id": "main-integrations_server",
-	//       "elasticsearch_cluster_ref_id": "main-elasticsearch",
-	//       "plan": {
-	//         "cluster_topology": [
-	//           {
-	//             "instance_configuration_id": "gcp.integrationsserver.n2.68x32x45",
-	//             "instance_configuration_version": 1,
-	//             "size": {
-	//               "value": 1024,
-	//               "resource": "memory"
-	//             },
-	//             "zone_count": 1,
-	//             "integrations_server": {
-	//               "system_settings": {
-	//                 "debug_enabled": false
-	//               }
-	//             }
-	//           }
-	//         ],
-	//         "integrations_server": {
-	//           "version": "8.19.0-SNAPSHOT",
-	//           "system_settings": {
-	//             "secret_token": "TxdKLGthVCBamTXdCL"
-	//           }
-	//         },
-	//         "transient": {
-	//           "strategy": {
-	//             "autodetect": {}
-	//           }
-	//         }
-	//       }
-	//     }
-	//   ],
-	//   "appsearch": [],
-	//   "enterprise_search": [
-	//     {
-	//       "region": "gcp-us-west2",
-	//       "ref_id": "main-enterprise_search",
-	//       "elasticsearch_cluster_ref_id": "main-elasticsearch",
-	//       "plan": {
-	//         "cluster_topology": [
-	//           {
-	//             "node_type": {
-	//               "appserver": true,
-	//               "worker": true,
-	//               "connector": true
-	//             },
-	//             "instance_configuration_id": "gcp.enterprisesearch.n2.68x32x45",
-	//             "instance_configuration_version": 1,
-	//             "size": {
-	//               "value": 2048,
-	//               "resource": "memory"
-	//             },
-	//             "zone_count": 1,
-	//             "enterprise_search": {
-	//               "system_settings": {}
-	//             }
-	//           }
-	//         ],
-	//         "enterprise_search": {
-	//           "version": "8.19.0-SNAPSHOT",
-	//           "system_settings": {}
-	//         },
-	//         "transient": {
-	//           "strategy": {
-	//             "autodetect": {}
-	//           }
-	//         }
-	//       }
-	//     }
-	//   ]
-	// }
-	//}
+	if err = json.NewDecoder(upgradeResp.Body).Decode(&upgradeRespBody); err != nil {
+		return fmt.Errorf("error parsing deployment update API response: %w", err)
+	}
 
+	if upgradeResp.StatusCode != http.StatusOK {
+		return fmt.Errorf("got unexpected response code [%d] from deployment update API", upgradeResp.StatusCode)
+	}
+
+	if len(upgradeRespBody.Errors) > 0 {
+		return fmt.Errorf("failed to upgrade: (%s) %s", upgradeRespBody.Errors[0].Code, upgradeRespBody.Errors[0].Message)
+	}
+
+	return nil
 }
 
 // ShutdownDeployment attempts to shut down the ESS deployment with the specified ID.
@@ -832,23 +395,15 @@ func overallStatus(statuses ...DeploymentStatus) DeploymentStatus {
 //go:embed create_deployment_request.tmpl.json
 var createDeploymentRequestTemplate string
 
-//go:embed create_deployment_csp_configuration.yaml
+//go:embed deployment_csp_configuration.yaml
 var cloudProviderSpecificValues []byte
 
 func generateCreateDeploymentRequestBody(req CreateDeploymentRequest) ([]byte, error) {
-	var csp string
-	// Special case: AWS us-east-1 region is just called
-	// us-east-1 (instead of aws-us-east-1)!
-	if req.Region == "us-east-1" {
-		csp = "aws"
-	} else {
-		regionParts := strings.Split(req.Region, "-")
-		if len(regionParts) < 2 {
-			return nil, fmt.Errorf("unable to parse CSP out of region [%s]", req.Region)
-		}
-
-		csp = regionParts[0]
+	csp, err := parseCSPFromRegion(req.Region)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse CSP from region [%s]: %w", req.Region, err)
 	}
+
 	templateContext, err := createDeploymentTemplateContext(csp, req)
 	if err != nil {
 		return nil, fmt.Errorf("creating request template context: %w", err)
@@ -869,6 +424,21 @@ func generateCreateDeploymentRequestBody(req CreateDeploymentRequest) ([]byte, e
 	return bBuf.Bytes(), nil
 }
 
+func parseCSPFromRegion(region string) (string, error) {
+	// Special case: AWS us-east-1 region is just called
+	// us-east-1 (instead of aws-us-east-1)!
+	if region == "us-east-1" {
+		return "aws", nil
+	}
+
+	regionParts := strings.Split(region, "-")
+	if len(regionParts) < 2 {
+		return "", fmt.Errorf("unable to parse CSP out of region [%s]", region)
+	}
+
+	return regionParts[0], nil
+}
+
 func jsonMarshal(in any) (string, error) {
 	jsonBytes, err := json.Marshal(in)
 	if err != nil {
@@ -878,7 +448,7 @@ func jsonMarshal(in any) (string, error) {
 	return string(jsonBytes), nil
 }
 
-func createDeploymentTemplateContext(csp string, req CreateDeploymentRequest) (map[string]any, error) {
+func createDeploymentTemplateContext(csp string, req any) (map[string]any, error) {
 	cspSpecificContext, err := loadCspValues(csp)
 	if err != nil {
 		return nil, fmt.Errorf("loading csp-specific values for %q: %w", csp, err)
@@ -907,4 +477,35 @@ func loadCspValues(csp string) (map[string]any, error) {
 	}
 
 	return values, nil
+}
+
+func generateUpgradeDeploymentRequestBody(region, version string) ([]byte, error) {
+	csp, err := parseCSPFromRegion(region)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse CSP from region [%s]: %w", region, err)
+	}
+
+	req := map[string]string{
+		"region":  region,
+		"version": version,
+	}
+
+	templateContext, err := createDeploymentTemplateContext(csp, req)
+	if err != nil {
+		return nil, fmt.Errorf("creating request template context: %w", err)
+	}
+
+	tpl, err := template.New("upgrade_deployment_request").
+		Funcs(template.FuncMap{"json": jsonMarshal}).
+		Parse(upgradeDeploymentRequestTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse deployment upgrade template: %w", err)
+	}
+
+	var bBuf bytes.Buffer
+	err = tpl.Execute(&bBuf, templateContext)
+	if err != nil {
+		return nil, fmt.Errorf("rendering upgrade deployment request template with context %v: %w", templateContext, err)
+	}
+	return bBuf.Bytes(), nil
 }
