@@ -49,7 +49,7 @@ $TestsExitCode = 0
 try
 {
     Write-Output "~~~ Integration tests: $GROUP_NAME as user: $env:USERNAME"
-    $gotestArgs = @("-tags=integration", "-shuffle=on", "-timeout=2h0m0s", "$env:TEST_PACKAGE", "-v", "-args", "-integration.groups=$GROUP_NAME", "-integration.sudo=$TEST_SUDO")
+    $gotestArgs = @("-tags=integration", "-test.shuffle=on", "-test.timeout=2h0m0s", "$env:TEST_PACKAGE", "-v", "-args", "-integration.groups=$GROUP_NAME", "-integration.sudo=$TEST_SUDO")
     & gotestsum --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- @gotestArgs
     $TestsExitCode = $LASTEXITCODE
 }
