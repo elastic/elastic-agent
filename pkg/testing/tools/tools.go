@@ -42,7 +42,7 @@ func GetUninstallToken(ctx context.Context, kibClient *kibana.Client, policyId s
 		return "", fmt.Errorf("failed to fetch uninstall tokens: %w", err)
 	}
 	if len(resp.Items) == 0 {
-		return "", fmt.Errorf("expected non-zero number of tokens: %w", err)
+		return "", fmt.Errorf("expected non-zero number of tokens")
 	}
 
 	if len(resp.Items[0].Token) == 0 {
