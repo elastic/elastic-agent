@@ -1,0 +1,65 @@
+{
+    "prune_orphans": true,
+    "resources": {
+        "integrations_server": [
+            {
+                "elasticsearch_cluster_ref_id": "main-elasticsearch",
+                "region": "{{ .request.region }}",
+                "plan": {
+                    "integrations_server": {
+                        "version": "{{ .request.version }}"
+                    }
+                },
+                "ref_id": "main-integrations_server"
+            }
+        ],
+        "elasticsearch": [
+            {
+                "ref_id": "main-elasticsearch",
+                "region": "{{ .request.region }}",
+                "plan": {
+                    "cluster_topology": [
+                        {
+                            "id": "hot_content",
+                            "node_roles": [
+                                "master",
+                                "ingest",
+                                "transform",
+                                "data_hot",
+                                "remote_cluster_client",
+                                "data_content"
+                            ],
+                            "instance_configuration_id": "{{.elasticsearch_conf_id}}",
+                            "zone_count": 2,
+                            "size": {
+                                "value": 8192,
+                                "resource": "memory"
+                            }
+                        }
+                    ],
+                    "elasticsearch": {
+                        "version": "{{ .request.version }}"
+                    },
+                    "deployment_template": {
+                        "id": "{{ .elasticsearch_deployment_template_id }}"
+                    }
+                }
+            }
+        ],
+        "kibana": [
+            {
+                "ref_id": "main-kibana",
+                "elasticsearch_cluster_ref_id": "main-elasticsearch",
+                "region": "{{ .request.region }}",
+                "plan": {
+                    "kibana": {
+                        "version": "{{ .request.version }}"
+                    }
+                }
+            }
+        ],
+        "apm": [],
+        "appsearch": [],
+        "enterprise_search": []
+    }
+}
