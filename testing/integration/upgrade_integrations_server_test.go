@@ -66,7 +66,7 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		if deployment != nil {
+		if deployment.ID != "" {
 			err = prov.Delete(context.Background(), deployment)
 			require.NoError(t, err, "failed to delete deployment after test")
 		}
