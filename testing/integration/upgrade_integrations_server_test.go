@@ -58,6 +58,7 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 	startVersion, endVersion := getRandomStackVersionsPair(t, statefulProv, minStartVersion, nil)
 
 	// Create ECH deployment with start version
+	t.Logf("Creating ECH deployment with version [%s] in region [%s]", startVersion.String(), echRegion)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	deployment, err := prov.Create(ctx, common.StackRequest{
@@ -73,14 +74,17 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 	})
 
 	// Check that deployment is ready and healthy after creation
+	t.Logf("Waiting for ECH deployment [%s] in region [%s] to be ready and healthy after creation", deployment.ID, echRegion)
 	deployment, err = prov.WaitForReady(ctx, deployment)
 	require.NoError(t, err)
 
 	// Upgrade deployment to end version
+	t.Logf("Upgrading ECH deployment [%s] in region [%s] from version [%s] to [%s]", deployment.ID, echRegion, startVersion.String(), endVersion.String())
 	err = prov.Upgrade(ctx, deployment, endVersion)
 	require.NoError(t, err)
 
 	// Check that deployment is ready and healthy after upgrade
+	t.Logf("Waiting for ECH deployment [%s] in region [%s] to be ready and healthy after upgrade", deployment.ID, echRegion)
 	deployment, err = prov.WaitForReady(ctx, deployment)
 	require.NoError(t, err)
 }
