@@ -12,7 +12,6 @@ import (
 	"io"
 	"io/fs"
 	"log"
-	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,10 +19,6 @@ import (
 	"time"
 
 	"github.com/magefile/mage/mg"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
-	"github.com/elastic/elastic-agent/pkg/component"
-
 	"github.com/magefile/mage/sh"
 )
 
