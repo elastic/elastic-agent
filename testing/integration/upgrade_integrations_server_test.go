@@ -112,7 +112,7 @@ func getRandomStackVersionsPair(t *testing.T, prov *ess.StatefulProvisioner, min
 			continue
 		}
 
-		if maxVersion != nil && ver.Greater(*maxVersion) {
+		if maxVersion != nil && maxVersion.Less(*ver) {
 			continue
 		}
 
