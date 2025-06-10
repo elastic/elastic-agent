@@ -210,7 +210,7 @@ func (p *StatefulProvisioner) createDeployment(ctx context.Context, r common.Sta
 	defer cancel()
 
 	p.logger.Logf("Creating cloud stack %s [stack_id: %s]", r.Version, r.ID)
-	name := fmt.Sprintf("%s-%s", strings.Replace(p.cfg.Identifier, ".", "-", -1), r.ID)
+	name := fmt.Sprintf("%s-%s", strings.ReplaceAll(p.cfg.Identifier, ".", "-"), r.ID)
 
 	// prepare tags
 	tagArray := make([]Tag, 0, len(tags))
