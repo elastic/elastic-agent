@@ -72,3 +72,11 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-binary-dra" ]]; then
     release_manager_login
   fi
 fi
+<<<<<<< HEAD
+=======
+
+# BUILDKITE_PIPELINE_SLUG should match elastic-agent for PRs, and elastic-agent-extended-tests once it has merged to main
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent"* && "$BUILDKITE_STEP_KEY" == "integration-fips-cloud-image" ]]; then
+    docker_login
+fi
+>>>>>>> 97246c150 (Fix pre-command to support extended testing (#8418))
