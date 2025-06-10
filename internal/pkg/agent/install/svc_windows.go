@@ -36,28 +36,47 @@ func changeUser(topPath string, ownership utils.FileOwner, username string, grou
 	}
 	defer svc.Close()
 
-	cfg := mgr.Config{
-		ServiceStartName: serviceStartName(username),
-		Password:         password,
+	// always read current config first and then apply modifications to it.
+	// it does not work in a way PS sc edit works where it's enough to apply
+	// modifications only.
+	// beware that due to bug (or way of implementation) in x/sys empty string
+	// does not mean empty string but nil, hence no change in value.
+	// we don't support empty password for custom user and for system user it should
+	// ignore password setting so this should be fine.
+	curCfg, err := svc.Config()
+	if err != nil {
+		return fmt.Errorf("failed to retrieve current service config: %w", err)
 	}
 
-	err = svc.UpdateConfig(cfg)
+	curCfg.ServiceStartName = serviceStartName(username)
+	curCfg.Password = servicePassword(username, password)
+
+	err = svc.UpdateConfig(curCfg)
 	if err != nil {
-		return fmt.Errorf("failed to update config: %w", err)
+		return fmt.Errorf("failed to update config from %v: %w", curCfg, err)
 	}
 
 	err = serviceConfigure(ownership)
 	if err != nil {
-		return fmt.Errorf("failed to configure service (%s): %w", paths.ServiceName(), err)
+		return fmt.Errorf("failed to configure service (%s) from %v: %w", paths.ServiceName(), curCfg, err)
 	}
 
 	return nil
 }
 
 func serviceStartName(username string) string {
-	if username == "" {
-		return "LocalSystem"
+	if len(username) == 0 {
+		return `.\LocalSystem`
 	}
 
 	return username
+}
+
+func servicePassword(username, password string) string {
+	if len(username) == 0 {
+		// in case of LocalSystem password should be ignored,
+		// reset to empty string just to be sure
+		return ""
+	}
+	return password
 }
