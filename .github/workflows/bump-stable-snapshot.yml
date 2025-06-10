@@ -36,9 +36,8 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.filter.outputs.matrix) }}
     steps:
+      # We have same behavior for all branches.
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ matrix.branch }}
 
       - name: Run UpdateCLI in Apply mode
         uses: elastic/oblt-actions/updatecli/run@v1
