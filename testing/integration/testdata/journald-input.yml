@@ -3,8 +3,7 @@ outputs:
     type: elasticsearch
     hosts:
       - ${ES_HOST}
-    username: ${ELASTICSEARCH_USERNAME}
-    password: ${ELASTICSEARCH_PASSWORD}
+    api_key: ${ES_API_KEY_ENCODED}
 
 agent:
   monitoring:
@@ -15,7 +14,7 @@ inputs:
     log_level: debug
     type: journald
     data_stream:
-      dataset: ${EA_POLICY_NAMESPACE}
+      namespace: "${EA_POLICY_NAMESPACE}"
     streams:
       - id: journald-input-id
         paths:
