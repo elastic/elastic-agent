@@ -41,6 +41,7 @@ func changeUser(topPath string, ownership utils.FileOwner, username string, grou
 	// modifications only.
 	// beware that due to bug (or way of implementation) in x/sys empty string
 	// does not mean empty string but nil, hence no change in value.
+	// default values for integers results not in nil hence no change but in invalid values.
 	// we don't support empty password for custom user and for system user it should
 	// ignore password setting so this should be fine.
 	curCfg, err := svc.Config()
