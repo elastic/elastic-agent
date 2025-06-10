@@ -23,7 +23,7 @@ import (
 )
 
 // TestUpgradeIntegrationsServer attempts to upgrade the Integrations Server (i.e. Elastic Agent
-// running it's own Fleet Server) in ECH and ensures that the upgrade succeeds.
+// running its own Fleet Server) in ECH and ensures that the upgrade succeeds.
 func TestUpgradeIntegrationsServer(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: Upgrade,
