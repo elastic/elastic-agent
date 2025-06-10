@@ -23,6 +23,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"text/template"
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
@@ -88,27 +89,28 @@ type OSPackageArgs struct {
 
 // PackageSpec specifies package metadata and the contents of the package.
 type PackageSpec struct {
-	Name              string                 `yaml:"name,omitempty"`
-	ServiceName       string                 `yaml:"service_name,omitempty"`
-	OS                string                 `yaml:"os,omitempty"`
-	Arch              string                 `yaml:"arch,omitempty"`
-	Vendor            string                 `yaml:"vendor,omitempty"`
-	Snapshot          bool                   `yaml:"snapshot"`
-	FIPS              bool                   `yaml:"fips"`
-	Version           string                 `yaml:"version,omitempty"`
-	License           string                 `yaml:"license,omitempty"`
-	URL               string                 `yaml:"url,omitempty"`
-	Description       string                 `yaml:"description,omitempty"`
-	DockerVariant     DockerVariant          `yaml:"docker_variant,omitempty"`
-	PreInstallScript  string                 `yaml:"pre_install_script,omitempty"`
-	PostInstallScript string                 `yaml:"post_install_script,omitempty"`
-	PostRmScript      string                 `yaml:"post_rm_script,omitempty"`
-	Files             map[string]PackageFile `yaml:"files"`
-	Qualifier         string                 `yaml:"qualifier,omitempty"`   // Optional
-	OutputFile        string                 `yaml:"output_file,omitempty"` // Optional
-	ExtraVars         map[string]string      `yaml:"extra_vars,omitempty"`  // Optional
-	ExtraTags         []string               `yaml:"extra_tags,omitempty"`  // Optional
-	Components        []packaging.BinarySpec `yaml:"components"`            // Optional: Components required for this package
+	Name                    string                 `yaml:"name,omitempty"`
+	ServiceName             string                 `yaml:"service_name,omitempty"`
+	OS                      string                 `yaml:"os,omitempty"`
+	Arch                    string                 `yaml:"arch,omitempty"`
+	Vendor                  string                 `yaml:"vendor,omitempty"`
+	Snapshot                bool                   `yaml:"snapshot"`
+	FIPS                    bool                   `yaml:"fips"`
+	Version                 string                 `yaml:"version,omitempty"`
+	License                 string                 `yaml:"license,omitempty"`
+	URL                     string                 `yaml:"url,omitempty"`
+	Description             string                 `yaml:"description,omitempty"`
+	DockerVariant           DockerVariant          `yaml:"docker_variant,omitempty"`
+	DockerImageNameTemplate string                 `yaml:"docker_image_name_template,omitempty"` // Optional: template of the docker image name
+	PreInstallScript        string                 `yaml:"pre_install_script,omitempty"`
+	PostInstallScript       string                 `yaml:"post_install_script,omitempty"`
+	PostRmScript            string                 `yaml:"post_rm_script,omitempty"`
+	Files                   map[string]PackageFile `yaml:"files"`
+	Qualifier               string                 `yaml:"qualifier,omitempty"`   // Optional
+	OutputFile              string                 `yaml:"output_file,omitempty"` // Optional
+	ExtraVars               map[string]string      `yaml:"extra_vars,omitempty"`  // Optional
+	ExtraTags               []string               `yaml:"extra_tags,omitempty"`  // Optional
+	Components              []packaging.BinarySpec `yaml:"components"`            // Optional: Components required for this package
 
 	evalContext            map[string]interface{}
 	packageDir             string
@@ -488,6 +490,30 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 
 // ImageName computes the image name from the spec.
 func (s PackageSpec) ImageName() string {
+	if s.DockerImageNameTemplate != "" {
+		imageNameTmpl, err := template.New("dockerImageTemplate").Parse(s.DockerImageNameTemplate)
+		if err != nil {
+			panic(fmt.Errorf("parsing docker image name template for %s variant %s: %w", s.Name, s.DockerVariant, err))
+		}
+
+		data := s.toMap()
+		for k, v := range varMap() {
+			data[k] = v
+		}
+
+		buf := new(strings.Builder)
+		err = imageNameTmpl.Execute(buf, data)
+		if err != nil {
+			panic(fmt.Errorf("rendering docker image name template for %s variant %s: %w", s.Name, s.DockerVariant, err))
+		}
+
+		imageName := buf.String()
+		if mg.Verbose() {
+			log.Printf("rendered image name for %s variant %s: %s", s.Name, s.DockerVariant, imageName)
+		}
+		return imageName
+	}
+
 	if s.DockerVariant == Basic {
 		return s.Name
 	}
