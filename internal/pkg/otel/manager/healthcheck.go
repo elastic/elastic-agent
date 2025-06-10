@@ -159,10 +159,7 @@ func compareStatuses(s1, s2 *status.AggregateStatus) bool {
 
 	// NOTE: we don't check the timestamp
 	// as we care only about the event and component statuses/error differences
-	//if !s1.Timestamp().Equal(s2.Timestamp()) {
-	//	// timestamp doesn't match
-	//	return false
-	//}
+
 	if (s1.Err() == nil && s2.Err() != nil) || (s1.Err() != nil && s2.Err() == nil) {
 		return false
 	}
