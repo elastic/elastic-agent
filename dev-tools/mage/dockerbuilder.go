@@ -11,12 +11,14 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 )
 
@@ -207,6 +209,11 @@ func (b *dockerBuilder) dockerSave(tag string) error {
 		}
 		outputFile = filepath.Join(distributionsDir, outputTar)
 	}
+
+	if mg.Verbose() {
+		log.Printf(">>>> saving docker image %s to %s", tag, outputFile)
+	}
+
 	var stderr bytes.Buffer
 	cmd := exec.Command("docker", "save", tag)
 	cmd.Stderr = &stderr
