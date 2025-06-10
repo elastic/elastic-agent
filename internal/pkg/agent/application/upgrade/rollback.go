@@ -258,6 +258,8 @@ func makeBaseWatchCmd(agentExecutable string, rollbackWindow time.Duration) *exe
 	return exec.Command(agentExecutable, cmdArgs...)
 }
 
-func isRollbackWindowSupported(watcherVersion *version.ParsedSemVer) bool {
-	return !watcherVersion.Less(*rollbackWindowMinVersion)
+// isRollbackWindowSupported checks if the rollback window feature is supported by the version of
+// the target Agent, i.e the version being upgraded *to*.
+func isRollbackWindowSupported(targetAgentVersion *version.ParsedSemVer) bool {
+	return !targetAgentVersion.Less(*rollbackWindowMinVersion)
 }

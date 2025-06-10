@@ -353,6 +353,11 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	watcherExecutable := selectWatcherExecutable(paths.Top(), previous, current)
 
+	// Check if the target Agent version supports the rollback window feature. If it doesn't,
+	// it won't know how to perform a deferred cleanup after a successful upgrade, so we need
+	// to rely on the Upgrade Watcher to do the cleanup immediately after it has deemed the upgrade
+	// to be successful. We ask the Upgrade Watcher to do this immediate cleanup by passing
+	// a rollback window of 0 seconds to the Upgrade Watcher.
 	rollbackWindow := u.upgradeSettings.Rollback.Window
 	if !isRollbackWindowSupported(parsedVersion) {
 		rollbackWindow = 0
