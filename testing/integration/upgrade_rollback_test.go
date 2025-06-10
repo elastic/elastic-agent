@@ -141,7 +141,7 @@ inputs:
 				t.Fatal("upgrade details in the state cannot be nil")
 			}
 			assert.Equal(t, details.StateRollback, details.State(state.UpgradeDetails.State))
-			assert.Equal(t, details.StateRollback, state.UpgradeDetails.Metadata.Reason)
+			assert.Equal(t, "automatic rollback", state.UpgradeDetails.Metadata.Reason)
 		} else {
 			t.Logf("rollback finished, status is '%s', cannot check UpgradeDetails", state.State.String())
 		}
@@ -280,7 +280,8 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NotNil(t, state.UpgradeDetails)
-		require.Equal(t, details.StateRollback, details.State(state.UpgradeDetails.State))
+		assert.Equal(t, details.StateRollback, details.State(state.UpgradeDetails.State))
+		assert.Equal(t, "automatic rollback", state.UpgradeDetails.Metadata.Reason)
 	}
 
 	// rollback should stop the watcher
