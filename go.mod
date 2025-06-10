@@ -109,6 +109,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.120.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.120.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.120.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/cumulativetodeltaprocessor v0.120.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.120.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/geoipprocessor v0.120.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.120.1
