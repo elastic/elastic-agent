@@ -105,11 +105,23 @@ func getRandomStackVersionsPair(t *testing.T, prov *ess.StatefulProvisioner, min
 		return verI.Less(*verJ)
 	})
 
-	// TODO: filter out versions < minVersion and > maxVersion
+	// filter out versions < minVersion and > maxVersion
+	filteredVersions := make([]*version.ParsedSemVer, 0)
+	for _, ver := range versions {
+		if minVersion != nil && ver.Less(*minVersion) {
+			continue
+		}
+
+		if maxVersion != nil && ver.Greater(*maxVersion) {
+			continue
+		}
+
+		filteredVersions = append(filteredVersions, ver)
+	}
 
 	var startIdx, endIdx int
-	startIdx = rand.Intn(len(versions) - 1)
-	endIdx = startIdx + rand.Intn(len(versions)-startIdx-1) + 1
+	startIdx = rand.Intn(len(filteredVersions) - 1)
+	endIdx = startIdx + rand.Intn(len(filteredVersions)-startIdx-1) + 1
 
-	return versions[startIdx], versions[endIdx]
+	return filteredVersions[startIdx], filteredVersions[endIdx]
 }
