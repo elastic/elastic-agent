@@ -817,7 +817,7 @@ func runFPM(spec PackageSpec, packageType PackageType) error {
 		args = append(args, "--vendor", spec.Vendor)
 	}
 	if spec.License != "" {
-		args = append(args, "--license", strings.Replace(spec.License, " ", "-", -1))
+		args = append(args, "--license", strings.ReplaceAll(spec.License, " ", "-"))
 	}
 	if spec.Description != "" {
 		args = append(args, "--description", spec.Description)
