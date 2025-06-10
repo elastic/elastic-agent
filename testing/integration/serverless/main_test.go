@@ -33,14 +33,12 @@ func TestMain(m *testing.M) {
 	if define.AutoDiscover {
 		discoveredTests, err := define.DumpAutodiscoveryYAML()
 		if err != nil {
-			log.Println("Error dumping autodiscovery YAML:", err)
-			os.Exit(1)
+			log.Fatalf("Error dumping autodiscovery YAML: %v\n", err)
 		}
 
 		err = os.WriteFile(define.AutoDiscoveryOutput, discoveredTests, 0644)
 		if err != nil {
-			log.Printf("Error writing autodiscovery data in %q: %s", define.AutoDiscoveryOutput, err)
-			os.Exit(1)
+			log.Fatalf("Error writing autodiscovery data in %q: %v\n", define.AutoDiscoveryOutput, err)
 		}
 	}
 
