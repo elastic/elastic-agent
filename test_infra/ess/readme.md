@@ -9,7 +9,7 @@ Variables can be overridden to use stable snapshots or images instead of the lat
 
 * `integration_server_docker_image` - The Docker image for the integration server
 * `elasticsearch_docker_image` - The Docker image for Elasticsearch
-* `kibana_docker_image` - The Docker image for Kibana, e.g.
+* `kibana_docker_image` - The Docker image for Kibana
 
 #### The priority of the docker images is as follows:
 example for `integration_server_docker_image`:

@@ -19,7 +19,7 @@ sources:
     name: "Latest Stable ESS snapshot for current branch"
     kind: json
     spec:
-      file: 'https://storage.googleapis.com/artifacts-api/channels/{{ source "branch" }}.json'
+      file: 'https://storage.googleapis.com/artifacts-api/channels/{{ requiredEnv "BRANCH_NAME" }}.json'
       key: "build"
 targets:
   updateStableSnapshotFile:
@@ -29,4 +29,4 @@ targets:
     kind: file
     spec:
       file: "test_infra/ess/.stable-snapshot-version"
-      content: '{{ source "new-version" }}-SNAPSHOT'
+      content: '{{ source "lastStableStackSnapshot" }}-SNAPSHOT'
