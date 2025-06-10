@@ -43,10 +43,4 @@ actions:
         - skip-changelog
       title: '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Bump .stable-snapshot-version version to {{ source "lastStableStackSnapshot" }}'
       description: |
-        ### What does this PR do
-        Updates `.stable-snapshot-version`. 
-        It is used to pin stable stack version for integration tests.
-
-        ### How it works
-        The version: `{{ source "lastStableStackSnapshot" }}` is taken from 'https://storage.googleapis.com/artifacts-api/channels/{{ requiredEnv "BRANCH_NAME" }}.json'
-        These PRs are automatically created when a new stable/tested SNAPSHOT version is available for this branch.
+        Updates `.stable-snapshot-version`. It is used to pin stable stack version for integration tests.
