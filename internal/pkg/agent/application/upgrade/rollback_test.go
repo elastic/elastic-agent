@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/version"
 	mocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
 )
 
@@ -325,6 +326,36 @@ func TestRollback(t *testing.T) {
 			ctx := context.TODO()
 			tt.wantErr(t, Rollback(ctx, testLogger, mockClient, testTop, marker.PrevVersionedHome, marker.PrevHash), fmt.Sprintf("Rollback(%v, %v, %v, %v, %v, %v)", ctx, testLogger, mockClient, testTop, marker.PrevVersionedHome, marker.PrevHash))
 			tt.checkAfterRollback(t, testTop)
+		})
+	}
+}
+
+func TestIsRollbackWindowSupported(t *testing.T) {
+	tests := map[string]struct {
+		version string
+		want    bool
+	}{
+		"supported_version": {
+			version: "9.2.0-SNAPSHOT",
+			want:    true,
+		},
+		"older_version": {
+			version: "9.0.0-SNAPSHOT",
+			want:    false,
+		},
+		"exactly_minimum_version": {
+			version: "9.1.0",
+			want:    true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			v, err := version.ParseVersion(tt.version)
+			require.NoError(t, err)
+
+			got := isRollbackWindowSupported(v)
+			assert.Equal(t, tt.want, got, "isRollbackWindowSupported(%q)", tt.version)
 		})
 	}
 }
