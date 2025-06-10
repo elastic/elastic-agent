@@ -142,6 +142,51 @@ func fromSerializableEvent(se *SerializableEvent) status.Event {
 	}
 }
 
+// compareStatuses checks if two AggregateStatuses are equal, excluding timestamp.
+func compareStatuses(s1, s2 *status.AggregateStatus) bool {
+	if s1 == nil && s2 == nil {
+		// both nil
+		return true
+	}
+	if s1 == nil || s2 == nil {
+		// one of them is nil
+		return false
+	}
+	if s1.Status() != s2.Status() {
+		// status doesn't match
+		return false
+	}
+
+	// NOTE: we don't check the timestamp
+	// as we care only about the event and component statuses/error differences
+	//if !s1.Timestamp().Equal(s2.Timestamp()) {
+	//	// timestamp doesn't match
+	//	return false
+	//}
+	if (s1.Err() == nil && s2.Err() != nil) || (s1.Err() != nil && s2.Err() == nil) {
+		return false
+	}
+	if s1.Err() != nil && s2.Err() != nil {
+		if s1.Err().Error() != s2.Err().Error() {
+			return false
+		}
+	}
+
+	if len(s1.ComponentStatusMap) != len(s2.ComponentStatusMap) {
+		return false
+	}
+	for k, v1 := range s1.ComponentStatusMap {
+		v2, ok := s2.ComponentStatusMap[k]
+		if !ok {
+			return false
+		}
+		if !compareStatuses(v1, v2) {
+			return false
+		}
+	}
+	return true
+}
+
 // aggregateStatus creates a new AggregateStatus with the provided component status and error.
 func aggregateStatus(sts componentstatus.Status, err error) *status.AggregateStatus {
 	return &status.AggregateStatus{
