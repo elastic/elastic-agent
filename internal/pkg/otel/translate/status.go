@@ -61,6 +61,10 @@ func DropComponentStateFromOtelStatus(otelStatus *status.AggregateStatus) error 
 		return nil
 	}
 	for pipelineStatusId := range otelStatus.ComponentStatusMap {
+		if pipelineStatusId == "extensions" {
+			// we do not want to report extension status
+			continue
+		}
 		pipelineId := &pipeline.ID{}
 		componentKind, pipelineIdStr := parseEntityStatusId(pipelineStatusId)
 		if componentKind != "pipeline" {
@@ -88,6 +92,10 @@ func getOtelRuntimePipelineStatuses(otelStatus *status.AggregateStatus) (map[str
 	pipelines := make(map[string]*status.AggregateStatus, len(otelStatus.ComponentStatusMap))
 
 	for pipelineStatusId, pipelineStatus := range otelStatus.ComponentStatusMap {
+		if pipelineStatusId == "extensions" {
+			// we do not want to report extension status
+			continue
+		}
 		pipelineId := &pipeline.ID{}
 		componentKind, pipelineIdStr := parseEntityStatusId(pipelineStatusId)
 		if componentKind != "pipeline" {
