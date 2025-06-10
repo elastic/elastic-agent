@@ -1590,6 +1590,7 @@ specs:
         <<: *agent_docker_cloud_fips_spec
         <<: *elastic_license_for_binaries
         name: "elastic-agent-fips-cloud"
+        docker_image_name_template: "{{.BeatName}}-fips-cloud"
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
@@ -1606,6 +1607,7 @@ specs:
         <<: *agent_docker_cloud_fips_spec
         <<: *elastic_license_for_binaries
         name: "elastic-agent-fips-cloud"
+        docker_image_name_template: "{{.BeatName}}-fips-cloud"
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
