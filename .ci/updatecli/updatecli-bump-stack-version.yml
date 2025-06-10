@@ -30,3 +30,16 @@ targets:
     spec:
       file: "test_infra/ess/.stable-snapshot-version"
       content: '{{ source "lastStableStackSnapshot" }}-SNAPSHOT'
+actions:
+  elastic-agent:
+    kind: github/pullrequest
+    scmid: githubConfig
+    sourceid: lastStableStackSnapshot
+    spec:
+      automerge: false
+      labels:
+        - dependencies
+        - backport-skip
+      title: '[Automation] Bump .stable-snapshot-version version to {{ source "lastStableStackSnapshot" }}'
+      description: |
+        The version: `{{ source "lastStableStackSnapshot" }}` is taken from 'https://storage.googleapis.com/artifacts-api/channels/{{ requiredEnv "BRANCH_NAME" }}.json'
