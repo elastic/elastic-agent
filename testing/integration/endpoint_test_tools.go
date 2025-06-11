@@ -102,7 +102,7 @@ func installElasticDefendPackage(t *testing.T, info *define.Info, policyID strin
 		ID:       packagePolicyID,
 		Name:     "Defend-" + packagePolicyID,
 		PolicyID: policyID,
-		Version:  preinstalledPackages["endpoint"],
+		Version:  PreinstalledPackages["endpoint"],
 	})
 	if err != nil {
 		return r, fmt.Errorf("error executing template: %w", err)
