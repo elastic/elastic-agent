@@ -7,12 +7,12 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1749131198"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1749131198"
-  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1749131198"
-  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1749131198"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1749131198"
-  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1749131198"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1749258065"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1749258065"
+  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1749258065"
+  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1749258065"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1749258065"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1749258065"
 
 steps:
   - label: Start ESS stack for integration tests
@@ -39,10 +39,10 @@ steps:
         depends_on:
           - packaging-windows
         env:
-          TEST_LONG_RUNNING: "true"
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/leak"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
-          .buildkite/scripts/integration-tests.ps1 fleet true TestLongRunningAgentForLeaks
+          .buildkite/scripts/steps/integration_tests_tf.ps1 fleet true
         artifact_paths:
           - build/**
           - build/diagnostics/**
@@ -57,10 +57,10 @@ steps:
         depends_on:
           - packaging-windows
         env:
-          TEST_LONG_RUNNING: "true"
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/leak"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
-          .buildkite/scripts/integration-tests.ps1 fleet true TestLongRunningAgentForLeaks
+          .buildkite/scripts/steps/integration_tests_tf.ps1 fleet true
         artifact_paths:
           - build/**
           - build/diagnostics/**
@@ -74,10 +74,10 @@ steps:
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-ubuntu-x86-64
         env:
-          TEST_LONG_RUNNING: "true"
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/leak"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
-          .buildkite/scripts/steps/integration_tests_tf.sh fleet true TestLongRunningAgentForLeaks
+          .buildkite/scripts/steps/integration_tests_tf.sh fleet true
         artifact_paths:
           - build/**
           - build/diagnostics/**
@@ -99,7 +99,7 @@ steps:
           - packaging-windows
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
-          .buildkite/scripts/integration-tests.ps1 {{matrix}} true
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
         artifact_paths:
           - build/**
           - build/diagnostics/**
@@ -125,7 +125,7 @@ steps:
           - packaging-windows
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
-          .buildkite/scripts/integration-tests.ps1 {{matrix}} false
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
         artifact_paths:
           - build/**
           - build/diagnostics/**
@@ -144,7 +144,7 @@ steps:
           - packaging-windows
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
-          .buildkite/scripts/integration-tests.ps1 {{matrix}} true
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
         artifact_paths:
           - build/**
           - build/diagnostics/**
@@ -170,7 +170,7 @@ steps:
           - packaging-windows
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
-          .buildkite/scripts/integration-tests.ps1 {{matrix}} false
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
         artifact_paths:
           - build/**
           - build/diagnostics/**

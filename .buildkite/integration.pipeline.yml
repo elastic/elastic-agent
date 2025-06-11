@@ -159,7 +159,7 @@ steps:
       TEST_INTEG_AUTH_GCP_DATACENTER: "us-central1-a"
     command: |
       buildkite-agent artifact download "build/distributions/**" . $BUILDKITE_BUILD_ID
-      .buildkite/scripts/steps/integration_tests.sh serverless integration:single TestLogIngestionFleetManaged #right now, run a single test in serverless mode as a sort of smoke test, instead of re-running the entire suite
+      .buildkite/scripts/steps/integration_tests.sh serverless integration:testServerless
     artifact_paths:
       - "build/TEST-**"
       - "build/diagnostics/*"
@@ -177,3 +177,8 @@ steps:
     depends_on:
       - int-packaging
     command: "buildkite-agent pipeline upload .buildkite/bk.integration.pipeline.yml"
+
+  - label: "Triggering custom FIPS integration tests"
+    depends_on:
+      - int-packaging
+    command: "buildkite-agent pipeline upload .buildkite/bk.integration-fips.pipeline.yml"
