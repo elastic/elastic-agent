@@ -76,7 +76,11 @@ func (runner *NetworkTrafficRunner) SetupSuite() {
 	require.NoError(runner.T(), err)
 
 	packageFile := filepath.Join("testdata", "network_traffic_package.json")
+<<<<<<< HEAD
 	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "network_traffic", "1.32.1", packageFile, uuid.Must(uuid.NewV4()).String(), policyResp.ID)
+=======
+	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "network_traffic", PreinstalledPackages["network_traffic"], packageFile, uuid.Must(uuid.NewV4()).String(), policyResp.ID)
+>>>>>>> 92e139ca2 ([tests] split up serverless and resource leaks integration tests (#8396))
 	require.NoError(runner.T(), err)
 
 }

@@ -75,7 +75,11 @@ func (runner *OsqueryManagerRunner) SetupSuite() {
 	require.NoError(runner.T(), err)
 
 	packageFile := filepath.Join("testdata", "osquery_package.json")
+<<<<<<< HEAD
 	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "osquery_manager", "1.16.0", packageFile, uuid.Must(uuid.NewV4()).String(), policyResp.ID)
+=======
+	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "osquery_manager", PreinstalledPackages["osquery_manager"], packageFile, uuid.Must(uuid.NewV4()).String(), policyResp.ID)
+>>>>>>> 92e139ca2 ([tests] split up serverless and resource leaks integration tests (#8396))
 	require.NoError(runner.T(), err)
 
 }
