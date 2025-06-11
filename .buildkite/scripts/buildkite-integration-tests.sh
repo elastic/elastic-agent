@@ -22,12 +22,21 @@ if [ "${FIPS:-false}" == "true" ]; then
   GOEXPERIMENT=systemcrypto go version
 fi
 
-if [ "$TEST_SUDO" == "true" ]; then
+function install_tools_linux() {
+  echo "~~~ Installing tools for Linux"
   echo "Re-initializing ASDF. The user is changed to root..."
   export ASDF_DATA_DIR="/opt/buildkite-agent/.asdf"
   export PATH="$ASDF_DATA_DIR/bin:$ASDF_DATA_DIR/shims:$PATH"
   source /opt/buildkite-agent/hooks/pre-command
   source .buildkite/hooks/pre-command || echo "No pre-command hook found"
+}
+
+# We reinitialize ASDF tools only if the TEST_SUDO is set to true.
+if [ "$TEST_SUDO" == "true" ]; then
+  # We do not reinstall tools on macOS for sudo tests  
+  if [[ "$(uname)" != "Darwin" ]]; then    
+    install_tools_linux
+  fi
 fi
 
 # Make sure that all tools are installed

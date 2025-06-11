@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+
+# todo: get release branches and use matrix build
+steps:
+  - label: "macOS: main"
+    trigger: "elastic-agent-macos-integration"
+    build:
+      branch: "main"

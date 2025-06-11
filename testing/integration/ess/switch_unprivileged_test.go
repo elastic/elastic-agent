@@ -69,9 +69,8 @@ func TestSwitchUnprivilegedWithoutBasePathCustomUser(t *testing.T) {
 		// installs Elastic Agent.
 		Local: false,
 		OS: []define.OS{
+			// macOS excluded because this test fails: co.elastic.elastic-agent.err.log has world access
 			{
-				Type: define.Darwin,
-			}, {
 				Type: define.Linux,
 			},
 		},
@@ -141,7 +140,14 @@ func TestSwitchUnprivilegedWithBasePath(t *testing.T) {
 		// We require sudo for this test to run
 		// `elastic-agent install`.
 		Sudo: true,
-
+		// This test hangs on macOS
+		OS: []define.OS{
+			{
+				Type: define.Linux,
+			}, {
+				Type: define.Windows,
+			},
+		},
 		// It's not safe to run this test locally as it
 		// installs Elastic Agent.
 		Local: false,
