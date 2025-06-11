@@ -38,7 +38,7 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 		echRegion = "gcp-us-west2"
 	}
 
-	echApiKey, ok, err := ess.GetESSAPIKey()
+	echApiKey := os.Getenv("EC_API_KEY")
 	require.NoError(t, err)
 	if !ok {
 		t.Fatal("ECH API key missing")
