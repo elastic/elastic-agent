@@ -490,10 +490,19 @@ func untar(sourceFile, destinationDir string) error {
 			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 				return err
 			}
-			if err := os.Symlink(header.Linkname, path); err != nil {
-				return fmt.Errorf("error creating symlink %s pointing to %s: %w", path, header.Linkname, err)
+			// Resolve and validate the symlink target
+			linkTarget := filepath.Join(destinationDir, header.Linkname)
+			resolvedTarget, err := filepath.EvalSymlinks(linkTarget)
+			if err != nil {
+				return fmt.Errorf("error resolving symlink target %s: %w", linkTarget, err)
 			}
-
+			if !strings.HasPrefix(resolvedTarget, destinationDir) {
+				return fmt.Errorf("illegal symlink target: %s", resolvedTarget)
+			}
+			// Create the symlink
+			if err := os.Symlink(resolvedTarget, path); err != nil {
+				return fmt.Errorf("error creating symlink %s pointing to %s: %w", path, resolvedTarget, err)
+			}
 		default:
 			return fmt.Errorf("unable to untar type=%c in file=%s", header.Typeflag, path)
 		}
