@@ -42,6 +42,7 @@ actions:
         - dependencies
         - backport-skip
         - skip-changelog
+        - "Team:Elastic-Agent-Control-Plane"
       title: '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Bump stack images versions to {{ source "lastStableStackSnapshot" }}'
       description: |
         Updates `create_deployment_csp_configuration.yml`. It is used to pin stable images versions for integration tests.
