@@ -198,7 +198,7 @@ RUN apk add --no-cache git make python-3.11 py3.11-pip && \
     chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/connectors
 {{- end }}
 
-{{- if (and (eq .Variant "complete") (and (contains .from "redhat/ubi") (contains .from "-minimal") ))  }}
+{{- if (and (eq .Variant "complete") (contains .from "ubuntu")) }}
 USER root
 ENV NODE_PATH={{ $beatHome }}/.node
 RUN echo \
