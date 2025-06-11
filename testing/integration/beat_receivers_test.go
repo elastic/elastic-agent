@@ -725,6 +725,7 @@ func genIgnoredFields(goos string) []string {
 			"log.file.fingerprint",
 			"log.file.idxhi",
 			"log.file.idxlo",
+			"log.offset",
 		}
 	default:
 		return []string{
@@ -732,6 +733,7 @@ func genIgnoredFields(goos string) []string {
 			"log.file.fingerprint",
 			"log.file.inode",
 			"log.file.path",
+			"log.offset",
 		}
 	}
 }
