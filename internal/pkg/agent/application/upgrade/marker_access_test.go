@@ -15,11 +15,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/fsnotify/fsnotify"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
 func TestWriteMarkerFile(t *testing.T) {
