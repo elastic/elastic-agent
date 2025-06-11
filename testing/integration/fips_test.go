@@ -113,8 +113,7 @@ func ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t *testing.T, info *de
 		// Check that this Agent is online (i.e. healthy) and is FIPS-capable. This
 		// will prove that a FIPS-capable Agent is able to connect to a FIPS-capable
 		// Fleet Server, with both running in ECH.
-		require.Equal(t, "online", agentStatus)
-		require.Equal(t, true, agentIsFIPS)
+		return agentStatus == "online" && agentIsFIPS
 	}, 10*time.Second, 200*time.Millisecond, "Fleet Server's Elastic Agent should be healthy and FIPS-capable")
 }
 
