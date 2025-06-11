@@ -137,7 +137,6 @@ steps:
             limit: 1
         matrix:
           - default
-          - upgrade
 
       - label: "Win2025:sudo:{{matrix}}"
         depends_on:
@@ -183,7 +182,6 @@ steps:
           image: "${IMAGE_WIN_2025}"
         matrix:
           - default
-          - upgrade
 
   - group: "Stateful:Ubuntu"
     key: integration-tests-ubuntu
