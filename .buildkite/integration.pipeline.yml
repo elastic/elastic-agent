@@ -24,22 +24,22 @@ steps:
   #       agents:
   #         provider: "gcp"
   #         machineType: "n2-standard-8"
-      
-      - label: "Packaging: darwin/amd64"
-        key: packaging-macos-arm64
-        env:
-          PLATFORMS: "darwin/arm64"
-          PACKAGES: "tar.gz"
-        command: ".buildkite/scripts/steps/integration-package.sh"
-        artifact_paths:
-          - build/distributions/**
-        retry:
-          automatic:
-            limit: 1
-        agents:
-          provider: "aws"
-          instanceType: "c6g.4xlarge"
-          imagePrefix: "core-ubuntu-2204-aarch64"
+
+  # - label: "Packaging: darwin/amd64"
+  #   key: packaging-macos-arm64
+  #   env:
+  #     PLATFORMS: "darwin/arm64"
+  #     PACKAGES: "tar.gz"
+  #   command: ".buildkite/scripts/steps/integration-package.sh"
+  #   artifact_paths:
+  #     - build/distributions/**
+  #   retry:
+  #     automatic:
+  #       limit: 1
+  #   agents:
+  #     provider: "aws"
+  #     instanceType: "c6g.4xlarge"
+  #     imagePrefix: "core-ubuntu-2204-aarch64"
 
   #     - label: "Packaging: Ubuntu x86_64 FIPS"
   #       key: "packaging-ubuntu-x86-64-fips"

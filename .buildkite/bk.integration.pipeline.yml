@@ -30,6 +30,28 @@ steps:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
 
+  - group: "Stateful: MacOS"
+    key: integration-tests-macos
+    depends_on:
+      - integration-ess
+    steps:
+      - label: "macos:arm64:non-sudo: {{matrix}}"
+        # depends_on:
+        #   - packaging-macos-arm64
+        command: |
+          .buildkite/scripts/macos_install_asdf.sh
+          buildkite-agent artifact download build/distributions/** . --step packaging-macos-arm64 --build 01975f71-71dc-4233-b04c-d4d608a13c33
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        # retry:
+        #   automatic:
+        #     limit: 1
+        agents:
+          provider: orka
+          imagePrefix: generic-base-15-arm-002
+
   # - group: "Extended runtime leak tests"
   #   key: extended-integration-tests
   #   depends_on:
@@ -371,27 +393,6 @@ steps:
   #         provider: "gcp"
   #         machineType: "n2-standard-8"
   #         image: "${IMAGE_RHEL_8}"
-
-  - group: "Stateful: MacOS"
-    key: integration-tests-macos
-    depends_on: 
-      - integration-ess
-    steps:
-      - label: "macos:x86_64:sudo: {{matrix}}"
-        depends_on:
-          - packaging-macos-arm64
-        command: |
-          buildkite-agent artifact download build/distributions/** . --step packaging-macos-arm64
-          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
-        artifact_paths:
-          - build/**
-          - build/diagnostics/**
-        # retry:
-        #   automatic:
-        #     limit: 1
-        agents:
-          provider: orka
-          imagePrefix: generic-base-15-arm-002
 
   # - group: "Kubernetes"
   #   key: integration-tests-kubernetes
