@@ -33,9 +33,9 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 	})
 
 	// Default ECH region is gcp-us-west2 which is the CFT region.
-	echRegion := os.Getenv("TEST_INTEG_AUTH_ESS_REGION")
+	echRegion := os.Getenv("ESS_REGION")
 	if echRegion == "" {
-		require.Fail(t, "ECH FRH region not configured via the TEST_INTEG_AUTH_ESS_REGION environment variable")
+		echRegion = "gcp-us-west2"
 	}
 
 	echApiKey, ok, err := ess.GetESSAPIKey()
