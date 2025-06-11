@@ -52,4 +52,4 @@ jobs:
         with:
           bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
           channel-id: "#ingest-notifications"
-          message: ":traffic_cone: Update Stable snapshot: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@agent-team` and @pavel.zorin please look what's going on <${{ env.JOB_URL }}|here>"
+          message: ":traffic_cone: Update Stable snapshot: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@agent-team` and @robots-ci please look what's going on <${{ env.JOB_URL }}|here>"
