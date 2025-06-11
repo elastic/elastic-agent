@@ -76,19 +76,21 @@ func ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t *testing.T, info *de
 	statusUrl, err := url.JoinPath(fleetServerHost, "/api/status")
 	require.NoError(t, err)
 
-	resp, err := http.Get(statusUrl)
-	require.NoError(t, err)
-	defer resp.Body.Close()
+	require.Eventually(t, func() bool {
+		resp, err := http.Get(statusUrl)
+		require.NoError(t, err)
+		defer resp.Body.Close()
 
-	var body struct {
-		Name   string `json:"name"`
-		Status string `json:"status"`
-	}
-	decoder := json.NewDecoder(resp.Body)
-	err = decoder.Decode(&body)
-	require.NoError(t, err)
+		var bodystruct {
+			Name   string `json:"name"`
+			Status string `json:"status"`
+		}
+		decoder := json.NewDecoder(resp.Body)
+		err = decoder.Decode(&body)
+		require.NoError(t, err)
 
-	require.Equal(t, "HEALTHY", body.Status)
+		return body.Status == "HEALTHY"
+	}, 5*time.Minute, 10*time.Second, "Fleet Server in ECH deployment is not healthy")
 
 	// Get all Agents
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
