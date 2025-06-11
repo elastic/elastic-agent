@@ -156,7 +156,7 @@ func addIntegrationAndCheckData(t *testing.T, info *define.Info, fixture *atesti
 	// Install system integration
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
-	_, err := tools.InstallPackageFromDefaultFile(ctx, info.KibanaClient, "system", preinstalledPackages["system"], "system_integration_setup.json", uuid.Must(uuid.NewV4()).String(), policyID)
+	_, err := tools.InstallPackageFromDefaultFile(ctx, info.KibanaClient, "system", PreinstalledPackages["system"], "system_integration_setup.json", uuid.Must(uuid.NewV4()).String(), policyID)
 	require.NoError(t, err)
 
 	// Ensure data from system integration shows up in Elasticsearch
