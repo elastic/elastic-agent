@@ -122,7 +122,7 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 }
 
 func (mfw *MarkerFileWatcher) processMarker(currentVersion string, commit string) {
-	marker, err := loadMarker(mfw.markerFilePath)
+	marker, err := loadMarker(mfw.markerFilePath, true)
 	if err != nil {
 		mfw.logger.Error(err)
 		return

@@ -56,11 +56,11 @@ func TestSaveAndLoadMarker_NoLoss(t *testing.T) {
 	}
 
 	// Save the marker to the temporary file
-	err := saveMarkerToPath(originalMarker, markerFile, true)
+	err := saveMarkerToPath(originalMarker, markerFile, true, true)
 	require.NoError(t, err, "Failed to save marker")
 
 	// Load the marker from the temporary file
-	loadedMarker, err := loadMarker(markerFile)
+	loadedMarker, err := loadMarker(markerFile, true)
 	require.NoError(t, err, "Failed to load marker")
 
 	// Compare time separately due to potential precision differences
@@ -136,7 +136,7 @@ func TestDesiredOutcome_Serialization(t *testing.T) {
 			}
 
 			// Save the marker
-			err := saveMarkerToPath(originalMarker, markerFile, true)
+			err := saveMarkerToPath(originalMarker, markerFile, true, true)
 			if tc.expectError {
 				require.Error(t, err, "Expected error during save for %s", tc.name)
 				return
@@ -144,7 +144,7 @@ func TestDesiredOutcome_Serialization(t *testing.T) {
 			require.NoError(t, err, "Failed to save marker for %s", tc.name)
 
 			// Load the marker
-			loadedMarker, err := loadMarker(markerFile)
+			loadedMarker, err := loadMarker(markerFile, true)
 			require.NoError(t, err, "Failed to load marker for %s", tc.name)
 			require.NotNil(t, loadedMarker, "loaded marker should not be nil")
 
@@ -255,7 +255,7 @@ desired_outcome: true
 			require.NoError(t, err, "Failed to write test YAML file")
 
 			// Try to load the marker
-			marker, err := loadMarker(markerFile)
+			marker, err := loadMarker(markerFile, true)
 			if tc.expectError {
 				require.Error(t, err, "Expected error when loading invalid YAML for %s", tc.name)
 			} else {

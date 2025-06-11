@@ -9,7 +9,6 @@ package upgrade
 import (
 	"errors"
 	"fmt"
-	"os"
 )
 
 // On non-Windows platforms, readMarkerFile simply reads the marker file.
@@ -31,12 +30,8 @@ func readMarkerFile(markerFile string) (bytes []byte, err error) {
 			err = errors.Join(err, fmt.Errorf("unlocking marker file after reading: %w", errUnlock))
 		}
 	}(fileLock)
-	markerFileBytes, err := os.ReadFile(markerFile)
-	if errors.Is(err, os.ErrNotExist) {
-		// marker doesn't exist, nothing to do
-		return nil, nil
-	}
-	return markerFileBytes, nil
+
+	return readMarkerFileCommon(markerFile)
 }
 
 // On non-Windows platforms, writeMarkerFile simply writes the marker file.

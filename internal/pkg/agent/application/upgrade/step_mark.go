@@ -6,6 +6,7 @@ package upgrade
 
 import (
 	"encoding/json"
+	goerrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -277,11 +278,50 @@ func CleanMarker(log *logger.Logger, dataDirPath string) error {
 // LoadMarker loads the update marker. If the file does not exist it returns nil
 // and no error.
 func LoadMarker(dataDirPath string) (*UpdateMarker, error) {
-	return loadMarker(markerFilePath(dataDirPath))
+	return loadMarker(markerFilePath(dataDirPath), true)
 }
 
-func loadMarker(markerFile string) (*UpdateMarker, error) {
-	markerBytes, err := readMarkerFile(markerFile)
+func UpdateMarkerFile(markerFile string, opts ...func(*UpdateMarker)) error {
+	fileLock, err := newMarkerFileLocker(markerFile)
+	if err != nil {
+		return fmt.Errorf("creating update marker locker for reading: %w", err)
+	}
+	err = fileLock.Lock()
+	if err != nil {
+		return fmt.Errorf("locking update marker file %q for reading: %w", markerFile, err)
+	}
+	defer func(fileLock Locker) {
+		errUnlock := fileLock.Unlock()
+		if errUnlock != nil {
+			err = goerrors.Join(err, fmt.Errorf("unlocking marker file after reading: %w", errUnlock))
+		}
+	}(fileLock)
+
+	marker, err := loadMarker(markerFile, false)
+	if err != nil {
+		return fmt.Errorf("failed to read marker file during updating: %w", err)
+	}
+
+	for _, opt := range opts {
+		opt(marker)
+	}
+
+	if err := saveMarkerToPath(marker, markerFile, true, false); err != nil {
+		return fmt.Errorf("failed updating marker file: %w", err)
+	}
+
+	return nil
+}
+
+func loadMarker(markerFile string, isSafe bool) (*UpdateMarker, error) {
+	var markerBytes []byte
+	var err error
+	if isSafe {
+		markerBytes, err = readMarkerFile(markerFile)
+	} else {
+		markerBytes, err = readMarkerFileCommon(markerFile)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -314,10 +354,10 @@ func loadMarker(markerFile string) (*UpdateMarker, error) {
 // For critical upgrade transitions, pass shouldFsync as true so the marker
 // file is immediately flushed to persistent storage.
 func SaveMarker(marker *UpdateMarker, shouldFsync bool) error {
-	return saveMarkerToPath(marker, markerFilePath(paths.Data()), shouldFsync)
+	return saveMarkerToPath(marker, markerFilePath(paths.Data()), shouldFsync, true)
 }
 
-func saveMarkerToPath(marker *UpdateMarker, markerFile string, shouldFsync bool) error {
+func saveMarkerToPath(marker *UpdateMarker, markerFile string, shouldFsync bool, isSafe bool) error {
 	makerSerializer := &updateMarkerSerializer{
 		Version:           marker.Version,
 		Hash:              marker.Hash,
@@ -335,8 +375,11 @@ func saveMarkerToPath(marker *UpdateMarker, markerFile string, shouldFsync bool)
 	if err != nil {
 		return err
 	}
+	if isSafe {
+		return writeMarkerFile(markerFile, markerBytes, shouldFsync)
+	}
 
-	return writeMarkerFile(markerFile, markerBytes, shouldFsync)
+	return writeMarkerFileCommon(markerFile, markerBytes, shouldFsync)
 }
 
 func markerFilePath(dataDirPath string) string {

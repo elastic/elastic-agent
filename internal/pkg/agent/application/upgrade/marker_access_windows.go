@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -44,12 +43,7 @@ func readMarkerFile(markerFile string) ([]byte, error) {
 			}
 		}(fileLock)
 
-		markerFileBytes, err = os.ReadFile(markerFile)
-		if errors.Is(err, os.ErrNotExist) {
-			// marker doesn't exist, nothing to do
-			return nil
-		}
-
+		markerFileBytes, err = readMarkerFileCommon(markerFile)
 		return err
 	}
 
