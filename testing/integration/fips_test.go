@@ -92,28 +92,30 @@ func ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t *testing.T, info *de
 		return body.Status == "HEALTHY"
 	}, 5*time.Minute, 10*time.Second, "Fleet Server in ECH deployment is not healthy")
 
-	// Get all Agents
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	agents, err := info.KibanaClient.ListAgents(ctx, kibana.ListAgentsRequest{})
-	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		// Get all Agents
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		agents, err := info.KibanaClient.ListAgents(ctx, kibana.ListAgentsRequest{})
+		require.NoError(t, err)
 
-	// Find Fleet Server's own Agent and get its status and whether it's
-	// FIPS-capable
-	var agentStatus string
-	var agentIsFIPS bool
-	for _, item := range agents.Items {
-		if item.PolicyID == cloudAgentPolicyID {
-			agentStatus = item.Status
-			agentIsFIPS = item.LocalMetadata.Elastic.Agent.FIPS
+		// Find Fleet Server's own Agent and get its status and whether it's
+		// FIPS-capable
+		var agentStatus string
+		var agentIsFIPS bool
+		for _, item := range agents.Items {
+			if item.PolicyID == cloudAgentPolicyID {
+				agentStatus = item.Status
+				agentIsFIPS = item.LocalMetadata.Elastic.Agent.FIPS
+			}
 		}
-	}
 
-	// Check that this Agent is online (i.e. healthy) and is FIPS-capable. This
-	// will prove that a FIPS-capable Agent is able to connect to a FIPS-capable
-	// Fleet Server, with both running in ECH.
-	require.Equal(t, "online", agentStatus)
-	require.Equal(t, true, agentIsFIPS)
+		// Check that this Agent is online (i.e. healthy) and is FIPS-capable. This
+		// will prove that a FIPS-capable Agent is able to connect to a FIPS-capable
+		// Fleet Server, with both running in ECH.
+		require.Equal(t, "online", agentStatus)
+		require.Equal(t, true, agentIsFIPS)
+	}, 10*time.Second, 200*time.Millisecond, "Fleet Server's Elastic Agent should be healthy and FIPS-capable")
 }
 
 func enrollLocalFIPSAgentInFleetServer(t *testing.T, info *define.Info) (*atesting.Fixture, string) {
