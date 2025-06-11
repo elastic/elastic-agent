@@ -5,13 +5,13 @@ param(
 
 if (-not $GROUP_NAME)
 {
-    Write-Error "Error: Specify the group name: sudo-integration-tests.ps1 <group_name> <true|false>"
+    Write-Error "Error: Specify the group name: buildkite-integration-tests.ps1 <group_name> <true|false>"
     exit 1
 }
 
 if (-not $TEST_SUDO)
 {
-    Write-Error "Error: Specify the test sudo: sudo-integration-tests.ps1 <group_name> <true|false>"
+    Write-Error "Error: Specify the test sudo: buildkite-integration-tests.ps1 <group_name> <true|false>"
     exit 1
 }
 
