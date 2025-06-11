@@ -7,20 +7,31 @@
 package integration
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/http/httputil"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
+	"text/template"
+	"time"
 
-<<<<<<< HEAD
 	"github.com/gofrs/uuid/v5"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/internal/pkg/acl"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
-	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
-	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/installtest"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
@@ -29,20 +40,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mockes "github.com/elastic/mock-es/pkg/api"
-=======
-	"github.com/elastic/elastic-agent/pkg/testing/define"
->>>>>>> 92e139ca2 ([tests] split up serverless and resource leaks integration tests (#8396))
 )
 
-func TestLogIngestionFleetManaged(t *testing.T) {
-	info := define.Require(t, define.Requirements{
-		Group: Fleet,
-		Stack: &define.Stack{},
-		Local: false,
-		Sudo:  true,
-	})
-
-<<<<<<< HEAD
+func LogIngestionFleetManaged(t *testing.T, info *define.Info) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
@@ -84,7 +84,7 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 
 	// 2. Install the Elastic-Agent with the policy that
 	// was just created.
-	policy, err := tools.InstallAgentWithPolicy(
+	policy, _, err := tools.InstallAgentWithPolicy(
 		ctx,
 		t,
 		installOpts,
@@ -186,6 +186,8 @@ func testMonitoringLogsAreShipped(
 			"component %s: want %s, got %s",
 			c.Name, client.Healthy, client.State(c.State))
 	}
+	agentID := status.Info.ID
+	t.Logf("Agent ID: %q", agentID)
 
 	// Stage 3: Make sure there are no errors in logs
 	t.Log("Making sure there are no error logs")
@@ -204,6 +206,7 @@ func testMonitoringLogsAreShipped(
 			"add_cloud_metadata: received error for provider digitalocean: failed with http status code 404",
 			"add_cloud_metadata: received error for provider azure: failed with http status code 404",
 			"add_cloud_metadata: received error for provider openstack: failed with http status code 404",
+			"add_cloud_metadata: received error for provider gcp: failed with http status code 404",
 			"elastic-agent-client error: rpc error: code = Canceled desc = context canceled", // can happen on restart
 			"failed to invoke rollback watcher: failed to start Upgrade Watcher",             // on debian this happens probably need to fix.
 			"falling back to IMDSv1: operation error ec2imds: getToken",                      // okay for the cloud metadata to not work
@@ -234,16 +237,6 @@ func testMonitoringLogsAreShipped(
 	require.NotZero(t, len(docs.Hits.Hits))
 
 	// Stage 4: verify logs from the monitoring components are not sent to the output
-	t.Log("Check monitoring logs")
-	hostname, err := os.Hostname()
-	if err != nil {
-		t.Fatalf("could not get hostname to filter Agent: %s", err)
-	}
-
-	agentID, err := fleettools.GetAgentIDByHostname(ctx, info.KibanaClient, policy.ID, hostname)
-	require.NoError(t, err, "could not get Agent ID by hostname")
-	t.Logf("Agent ID: %q", agentID)
-
 	// We cannot search for `component.id` because at the moment of writing
 	// this field is not mapped. There is an issue for that:
 	// https://github.com/elastic/integrations/issues/6545
@@ -360,7 +353,7 @@ func testFlattenedDatastreamFleetPolicy(
 		LogFilePath:       logFilePath,
 		Namespace:         dsNamespace,
 		Dataset:           dsDataset,
-		LogPackageVersion: preinstalledPackages["log"],
+		LogPackageVersion: PreinstalledPackages["log"],
 	})
 	if err != nil {
 		t.Fatalf("could not render template: %s", err)
@@ -546,7 +539,4 @@ type Component struct {
 }
 type Host struct {
 	Hostname string `json:"hostname"`
-=======
-	LogIngestionFleetManaged(t, info)
->>>>>>> 92e139ca2 ([tests] split up serverless and resource leaks integration tests (#8396))
 }
