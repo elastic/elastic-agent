@@ -5,11 +5,11 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
 
 steps:
-  - group: "Integration tests: packaging"
-    key: "int-packaging"
-    steps:
-      # Build matrix is not used for packaging in favor to unique step keys
-      # Packaging linux/amd64
+  # - group: "Integration tests: packaging"
+  #   key: "int-packaging"
+  #   steps:
+  # Build matrix is not used for packaging in favor to unique step keys
+  # Packaging linux/amd64
   #     - label: "Packaging: linux/amd64 rpm"
   #       key: packaging-ubuntu-x86-64
   #       env:
