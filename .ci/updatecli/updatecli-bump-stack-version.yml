@@ -1,6 +1,6 @@
 # update-cli configuration for automated go updates
 ---
-name: Bump .stable-snapshot-version
+name: Bump ESS snapshots
 
 scms:
   githubConfig:
@@ -22,14 +22,15 @@ sources:
       file: 'https://storage.googleapis.com/artifacts-api/channels/{{ requiredEnv "BRANCH_NAME" }}.json'
       key: "build"
 targets:
-  updateStableSnapshotFile:
-    name: "Update .stable-snapshot-version"
+  updateStackImages:
+    name: "Update create_deployment_csp_configuration.yaml"
     sourceid: lastStableStackSnapshot
     scmid: githubConfig
     kind: file
     spec:
-      file: "test_infra/ess/.stable-snapshot-version"
-      content: '{{ source "lastStableStackSnapshot" }}-SNAPSHOT'
+      file: "pkg/testing/ess/create_deployment_csp_configuration.yaml"
+      matchpattern: '(\S*_image: ".*docker.*:)(.+)"'
+      replacepattern: '$1:{{ source "lastStableStackSnapshot" }}-SNAPSHOT"'
 actions:
   elastic-agent:
     kind: github/pullrequest
@@ -41,6 +42,6 @@ actions:
         - dependencies
         - backport-skip
         - skip-changelog
-      title: '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Bump .stable-snapshot-version version to {{ source "lastStableStackSnapshot" }}'
+      title: '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Bump stack images versions to {{ source "lastStableStackSnapshot" }}'
       description: |
-        Updates `.stable-snapshot-version`. It is used to pin stable stack version for integration tests.
+        Updates `create_deployment_csp_configuration.yml`. It is used to pin stable images versions for integration tests.
