@@ -29,7 +29,7 @@ targets:
     kind: file
     spec:
       file: "pkg/testing/ess/create_deployment_csp_configuration.yaml"
-      matchpattern: '(\S*_image: ".*docker.*:)(.+)"'
+      matchpattern: '(\S*_image: ".*docker.*):(.+)"'
       replacepattern: '$1:{{ source "lastStableStackSnapshot" }}-SNAPSHOT"'
 actions:
   elastic-agent:
