@@ -81,7 +81,7 @@ func ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t *testing.T, info *de
 		require.NoError(t, err)
 		defer resp.Body.Close()
 
-		var bodystruct {
+		var body struct {
 			Name   string `json:"name"`
 			Status string `json:"status"`
 		}
