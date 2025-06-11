@@ -55,6 +55,12 @@ type Metadata struct {
 	// the Fail() method of UpgradeDetails to correctly record details when
 	// an upgrade fails.
 	ErrorMsg string `json:"error_msg,omitempty" yaml:"error_msg,omitempty"`
+
+	AvailableRollbacks []RollbackMetadata `json:"available_rollbacks" yaml:"available_rollbacks"`
+}
+
+type RollbackMetadata struct {
+	// TODO: in https://github.com/elastic/elastic-agent/issues/6886
 }
 
 func NewDetails(targetVersion string, initialState State, actionID string) *Details {
