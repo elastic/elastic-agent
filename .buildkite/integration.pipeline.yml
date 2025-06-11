@@ -190,6 +190,6 @@ steps:
   #         context: "buildkite/elastic-agent-extended-testing - Serverless integration test"
 
   - label: "Triggering Integration tests"
-    depends_on:
-      - int-packaging
+    # depends_on:
+    #   - int-packaging
     command: "buildkite-agent pipeline upload .buildkite/bk.integration.pipeline.yml"

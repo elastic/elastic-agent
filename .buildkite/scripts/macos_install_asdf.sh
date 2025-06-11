@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -exuo pipefail
 
 echo $SHELL
 
@@ -13,10 +13,11 @@ ASDF_VERSION="v0.14.0"
 
 cd $AGENT_HOME
 
-retry -t 3 -- git clone https://github.com/asdf-vm/asdf.git ${ASDF_DIR} --branch ${ASDF_VERSION} \\
-&& echo 'source $ASDF_DIR/asdf.sh' >> $AGENT_HOME/.bashrc \\
-&& source $ASDF_DIR/asdf.sh \\
-&& asdf plugin update --all
+# todo retry
+git clone https://github.com/asdf-vm/asdf.git ${ASDF_DIR} --branch ${ASDF_VERSION} 
+echo 'source $ASDF_DIR/asdf.sh' >> $AGENT_HOME/.bashrc 
+source $ASDF_DIR/asdf.sh 
+asdf plugin update --all
 
 asdf plugin add terraform
 asdf plugin add golang
