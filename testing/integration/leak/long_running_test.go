@@ -74,6 +74,8 @@ func TestLongRunningAgentForLeaks(t *testing.T) {
 		},
 	})
 
+	t.Fatalf("Artificial test failure to test Buildkite logging group expansion")
+
 	suite.Run(t, &ExtendedRunner{info: info,
 		healthCheckTime:        time.Minute * 6,
 		healthCheckRefreshTime: time.Second * 20,
