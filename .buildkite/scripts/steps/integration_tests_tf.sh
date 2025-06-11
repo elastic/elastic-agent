@@ -63,12 +63,3 @@ else
   fi
 fi
 
-TESTS_EXIT_STATUS=$?
-
-if [[ $TESTS_EXIT_STATUS -ne 0 ]]; then
-   echo "^^^ +++"
-   echo "Integration tests failed"
-fi
-
-exit $TESTS_EXIT_STATUS
-
