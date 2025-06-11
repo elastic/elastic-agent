@@ -61,7 +61,6 @@ locals {
 
   ess_region             = coalesce(var.ess_region, "gcp-us-east1")
   deployment_template_id = coalesce(var.deployment_template_id, "gcp-storage-optimized")
-    
   ess_properties = merge(
     {
       docker = {
