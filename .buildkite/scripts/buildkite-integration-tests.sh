@@ -49,20 +49,11 @@ outputXML="build/${fully_qualified_group_name}.integration.xml"
 outputJSON="build/${fully_qualified_group_name}.integration.out.json"
 
 echo "~~~ Integration tests: ${GROUP_NAME}"
-<<<<<<< HEAD
-GOTEST_ARGS=(-tags integration -test.shuffle on -test.timeout 2h0m0s)
-if [ -n "$TEST_NAME_PATTERN" ]; then
-  GOTEST_ARGS+=(-run="${TEST_NAME_PATTERN}")
-fi
-GOTEST_ARGS+=("github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=${GROUP_NAME}" "-integration.sudo=${TEST_SUDO}")
-
-=======
 # -test.timeout=2h0m0s is set because some tests normally take up to 45 minutes.
 # This 2-hour timeout provides enough room for future, potentially longer tests,
 # while still enforcing a reasonable upper limit on total execution time.
 # See: https://pkg.go.dev/cmd/go#hdr-Testing_flags
 GOTEST_ARGS=(-tags integration -test.shuffle on -test.timeout 2h0m0s "${TEST_PACKAGE}" -v -args "-integration.groups=${GROUP_NAME}" "-integration.sudo=${TEST_SUDO}" "-integration.fips=${FIPS:-false}")
->>>>>>> 92e139ca2 ([tests] split up serverless and resource leaks integration tests (#8396))
 set +e
 TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true \
   gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- "${GOTEST_ARGS[@]}"

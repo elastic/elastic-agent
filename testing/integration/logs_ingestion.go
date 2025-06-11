@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -84,7 +85,7 @@ func LogIngestionFleetManaged(t *testing.T, info *define.Info) {
 
 	// 2. Install the Elastic-Agent with the policy that
 	// was just created.
-	policy, _, err := tools.InstallAgentWithPolicy(
+	policy, err := tools.InstallAgentWithPolicy(
 		ctx,
 		t,
 		installOpts,
@@ -186,8 +187,6 @@ func testMonitoringLogsAreShipped(
 			"component %s: want %s, got %s",
 			c.Name, client.Healthy, client.State(c.State))
 	}
-	agentID := status.Info.ID
-	t.Logf("Agent ID: %q", agentID)
 
 	// Stage 3: Make sure there are no errors in logs
 	t.Log("Making sure there are no error logs")
@@ -206,7 +205,6 @@ func testMonitoringLogsAreShipped(
 			"add_cloud_metadata: received error for provider digitalocean: failed with http status code 404",
 			"add_cloud_metadata: received error for provider azure: failed with http status code 404",
 			"add_cloud_metadata: received error for provider openstack: failed with http status code 404",
-			"add_cloud_metadata: received error for provider gcp: failed with http status code 404",
 			"elastic-agent-client error: rpc error: code = Canceled desc = context canceled", // can happen on restart
 			"failed to invoke rollback watcher: failed to start Upgrade Watcher",             // on debian this happens probably need to fix.
 			"falling back to IMDSv1: operation error ec2imds: getToken",                      // okay for the cloud metadata to not work
@@ -237,6 +235,16 @@ func testMonitoringLogsAreShipped(
 	require.NotZero(t, len(docs.Hits.Hits))
 
 	// Stage 4: verify logs from the monitoring components are not sent to the output
+	t.Log("Check monitoring logs")
+	hostname, err := os.Hostname()
+	if err != nil {
+		t.Fatalf("could not get hostname to filter Agent: %s", err)
+	}
+
+	agentID, err := fleettools.GetAgentIDByHostname(ctx, info.KibanaClient, policy.ID, hostname)
+	require.NoError(t, err, "could not get Agent ID by hostname")
+	t.Logf("Agent ID: %q", agentID)
+
 	// We cannot search for `component.id` because at the moment of writing
 	// this field is not mapped. There is an issue for that:
 	// https://github.com/elastic/integrations/issues/6545
