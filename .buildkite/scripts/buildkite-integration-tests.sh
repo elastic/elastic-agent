@@ -65,6 +65,11 @@ TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true 
 TESTS_EXIT_STATUS=$?
 set -e
 
+if [[ $TESTS_EXIT_STATUS -ne 0 ]]; then
+   echo "^^^ +++"
+   echo "Integration tests failed"
+fi
+
 if [ -f "$outputXML" ]; then
   go install github.com/alexec/junit2html@latest
   junit2html < "$outputXML" > build/TEST-report.html

@@ -56,6 +56,12 @@ try
     $gotestArgs = @("-tags=integration", "-test.shuffle=on", "-test.timeout=2h0m0s", "$env:TEST_PACKAGE", "-v", "-args", "-integration.groups=$GROUP_NAME", "-integration.sudo=$TEST_SUDO")
     & gotestsum --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- @gotestArgs
     $TestsExitCode = $LASTEXITCODE
+
+    if ($TestsExitCode -ne 0)
+    {
+        Write-Output "^^^ +++"
+        Write-Output "Integration tests failed"
+    }
 }
 finally
 {
