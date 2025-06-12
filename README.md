@@ -252,6 +252,7 @@ To deploy your changes use `make apply` (from `testing/environments/cloud`) with
 SNAPSHOT images are used by default. To use non-snapshot image specify `SNAPSHOT=false` explicitly.
 
 ## Updating dependencies/PRs
+
 Even though we prefer `mage` to our automation, we still have some
 rules implemented on our `Makefile` as well as CI will use the
 `Makefile`. CI will run `make check-ci`, so make sure to run it
