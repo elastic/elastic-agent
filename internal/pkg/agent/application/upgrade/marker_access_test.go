@@ -28,7 +28,7 @@ func TestWriteMarkerFile(t *testing.T) {
 	markerFile := filepath.Join(tmpDir, markerFilename)
 
 	markerBytes := []byte("foo bar")
-	err := writeMarkerFile(markerFile, markerBytes, true)
+	err := writeMarkerFile(markerFile, markerBytes, true, noopLocker)
 	require.NoError(t, err)
 
 	data, err := os.ReadFile(markerFile)
@@ -67,7 +67,7 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	}()
 
 	// Write a long marker file
-	err := writeMarkerFile(testMarkerFile, randomBytes(40), true)
+	err := writeMarkerFile(testMarkerFile, randomBytes(40), true, noopLocker)
 	require.NoError(t, err, "could not write long marker file")
 
 	// Get length of file
@@ -75,7 +75,7 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	require.NoError(t, err)
 	originalSize := fileInfo.Size()
 
-	err = writeMarkerFile(testMarkerFile, randomBytes(25), true)
+	err = writeMarkerFile(testMarkerFile, randomBytes(25), true, noopLocker)
 	require.NoError(t, err)
 
 	// Get length of file
@@ -116,7 +116,7 @@ func TestUpdateMarkerFile(t *testing.T) {
 	}
 	tmp := t.TempDir()
 	markerFile := filepath.Join(tmp, "marker")
-	require.NoError(t, saveMarkerToPath(marker, markerFile, true, true))
+	require.NoError(t, saveMarkerToPath(marker, markerFile, true, noopLocker))
 
 	// update marker
 	err := UpdateMarkerFile(markerFile, func(m *UpdateMarker) {
@@ -125,7 +125,7 @@ func TestUpdateMarkerFile(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Assert
-	loadedMarker, err := loadMarker(markerFile, true)
+	loadedMarker, err := loadMarker(markerFile, noopLocker)
 	assert.NoError(t, err)
 	assert.Equal(t, "1.2.3-up", loadedMarker.Version)
 	assert.Equal(t, marker.VersionedHome, loadedMarker.VersionedHome)

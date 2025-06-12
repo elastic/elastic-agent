@@ -13,12 +13,7 @@ import (
 
 // On non-Windows platforms, readMarkerFile simply reads the marker file.
 // See marker_access_windows.go for behavior on Windows platforms.
-func readMarkerFile(markerFile string) (bytes []byte, err error) {
-	fileLock, err := newMarkerFileLocker(markerFile)
-	if err != nil {
-		return nil, fmt.Errorf("creating update marker locker for reading: %w", err)
-	}
-
+func readMarkerFile(markerFile string, fileLock Locker) (bytes []byte, err error) {
 	err = fileLock.Lock()
 	if err != nil {
 		return nil, fmt.Errorf("locking update marker file %q for reading: %w", markerFile, err)
@@ -36,12 +31,7 @@ func readMarkerFile(markerFile string) (bytes []byte, err error) {
 
 // On non-Windows platforms, writeMarkerFile simply writes the marker file.
 // See marker_access_windows.go for behavior on Windows platforms.
-func writeMarkerFile(markerFile string, markerBytes []byte, shouldFsync bool) (err error) {
-	fileLock, err := newMarkerFileLocker(markerFile)
-	if err != nil {
-		return fmt.Errorf("creating update marker locker for writing: %w", err)
-	}
-
+func writeMarkerFile(markerFile string, markerBytes []byte, shouldFsync bool, fileLock Locker) (err error) {
 	err = fileLock.Lock()
 	if err != nil {
 		return fmt.Errorf("locking update marker file %q for writing: %w", markerFile, err)

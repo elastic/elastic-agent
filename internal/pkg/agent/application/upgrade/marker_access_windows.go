@@ -23,15 +23,10 @@ const minMarkerAccessRetries = 5
 // mechanism is necessary since the marker file could be accessed by multiple
 // processes (the Upgrade Watcher and the main Agent process) at the same time,
 // which could fail on Windows.
-func readMarkerFile(markerFile string) ([]byte, error) {
+func readMarkerFile(markerFile string, fileLock Locker) ([]byte, error) {
 	var markerFileBytes []byte
 	readFn := func() error {
-		fileLock, err := newMarkerFileLocker(markerFile)
-		if err != nil {
-			return fmt.Errorf("creating update marker locker for reading: %w", err)
-		}
-
-		err = fileLock.Lock()
+		err := fileLock.Lock()
 		if err != nil {
 			return fmt.Errorf("locking update marker file %q for reading: %w", markerFile, err)
 		}
@@ -59,14 +54,9 @@ func readMarkerFile(markerFile string) ([]byte, error) {
 // mechanism is necessary since the marker file could be accessed by multiple
 // processes (the Upgrade Watcher and the main Agent process) at the same time,
 // which could fail on Windows.
-func writeMarkerFile(markerFile string, markerBytes []byte, shouldFsync bool) error {
+func writeMarkerFile(markerFile string, markerBytes []byte, shouldFsync bool, fileLock Locker) error {
 	writeFn := func() error {
-		fileLock, err := newMarkerFileLocker(markerFile)
-		if err != nil {
-			return fmt.Errorf("creating update marker locker for writing: %w", err)
-		}
-
-		err = fileLock.Lock()
+		err := fileLock.Lock()
 		if err != nil {
 			return fmt.Errorf("locking update marker file %q for writing: %w", markerFile, err)
 		}
