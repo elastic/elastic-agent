@@ -26,4 +26,4 @@ asdf plugin add mage
 popd
 
 asdf install
-go version
+go install gotestsum@latest
