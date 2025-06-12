@@ -5,12 +5,39 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   ASDF_MAGE_VERSION: 1.14.0
 
-  IMAGE_UBUNTU_2404_X86_64: "family/platform-ingest-elastic-agent-ubuntu-2404"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64"
-  IMAGE_RHEL_8: "family/platform-ingest-elastic-agent-rhel-8"
-  IMAGE_DEBIAN_12: "family/platform-ingest-elastic-agent-debian-12"
-  IMAGE_WIN_2022: "family/platform-ingest-elastic-agent-windows-2022"
-  IMAGE_WIN_2025: "family/platform-ingest-elastic-agent-windows-2025"
+  # The following images are defined here and their values will be updated by updatecli
+  # Please do not change them manually.
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1749258065"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1749258065"
+  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1749258065"
+  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1749258065"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1749258065"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1749258065"
+
+# This section is used to define the plugins that will be used in the pipeline.
+# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
+common:
+  - google_oidc_plugin: &google_oidc_plugin
+      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-gcp-oidc.tf
+      # This plugin authenticates to Google Cloud using the OIDC token.
+      elastic/oblt-google-auth#v1.3.0:
+        lifetime: 10800 # seconds
+        project-id: "elastic-observability-ci"
+        project-number: "911195782929"
+# see https://github.com/avaly/gcp-secret-manager-buildkite-plugin/pull/10
+# see https://github.com/avaly/gcp-secret-manager-buildkite-plugin/pull/11
+#  - gcp_serverless_secrets_plugin: &gcp_serverless_secrets_plugin
+      #avaly/gcp-secret-manager#v1.2.0:
+  - gcp_serverless_secrets_plugin: &gcp_serverless_secrets_plugin
+      elastic/gcp-secret-manager#v1.3.0-elastic:
+        env:
+          # These secrets are created in .github/workflows/serverless-project.yml
+          ELASTICSEARCH_HOST: ea-serverless-it-elasticsearch-hostname
+          ELASTICSEARCH_PASSWORD: ea-serverless-it-elasticsearch-password
+          ELASTICSEARCH_USERNAME: ea-serverless-it-elasticsearch-username
+          KIBANA_HOST: ea-serverless-it-kibana-hostname
+          KIBANA_USERNAME: ea-serverless-it-kibana-username
+          KIBANA_PASSWORD: ea-serverless-it-kibana-password
 
 steps:
   - label: Start ESS stack for integration tests
@@ -28,6 +55,65 @@ steps:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
 
+  - group: "Extended runtime leak tests"
+    key: extended-integration-tests
+    depends_on:
+      - integration-ess
+    steps:
+      - label: "Windows:2022:amd64:sudo"
+        depends_on:
+          - packaging-windows
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/leak"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
+          .buildkite/scripts/steps/integration_tests_tf.ps1 fleet true
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_WIN_2022}"
+        retry:
+          automatic:
+            limit: 1
+      - label: "Windows:2025:amd64:sudo"
+        depends_on:
+          - packaging-windows
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/leak"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
+          .buildkite/scripts/steps/integration_tests_tf.ps1 fleet true
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_WIN_2025}"
+      - label: "Ubuntu:2404:amd64:sudo"
+        depends_on: packaging-ubuntu-x86-64
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/leak"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
+          .buildkite/scripts/steps/integration_tests_tf.sh fleet true
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
+
   - group: "Stateful: Windows"
     key: integration-tests-win
     depends_on:
@@ -38,13 +124,13 @@ steps:
           - packaging-windows
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
-          .buildkite/scripts/integration-tests.ps1 {{matrix}} true
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
         artifact_paths:
           - build/**
           - build/diagnostics/**
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2022}"
         retry:
           automatic:
@@ -64,13 +150,13 @@ steps:
           - packaging-windows
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
-          .buildkite/scripts/integration-tests.ps1 {{matrix}} false
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
         artifact_paths:
           - build/**
           - build/diagnostics/**
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2022}"
         retry:
           automatic:
@@ -83,13 +169,13 @@ steps:
           - packaging-windows
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
-          .buildkite/scripts/integration-tests.ps1 {{matrix}} true
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
         artifact_paths:
           - build/**
           - build/diagnostics/**
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
         retry:
           automatic:
@@ -109,7 +195,7 @@ steps:
           - packaging-windows
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
-          .buildkite/scripts/integration-tests.ps1 {{matrix}} false
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
         artifact_paths:
           - build/**
           - build/diagnostics/**
@@ -118,7 +204,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
         matrix:
           - default
@@ -141,7 +227,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         matrix:
           - default
@@ -161,7 +247,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         matrix:
           - default
@@ -190,7 +276,7 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "aws"
-          imagePrefix: "${IMAGE_UBUNTU_2404_ARM_64}"
+          image: "${IMAGE_UBUNTU_2404_ARM_64}"
           instanceType: "m6g.2xlarge"
         retry:
           automatic:
@@ -227,7 +313,7 @@ steps:
             limit: 1
         agents:
           provider: "aws"
-          imagePrefix: "${IMAGE_UBUNTU_2404_ARM_64}"
+          image: "${IMAGE_UBUNTU_2404_ARM_64}"
           instanceType: "m6g.xlarge"
         matrix:
           - default
@@ -250,7 +336,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
           image: "${IMAGE_DEBIAN_12}"
         matrix:
           - default
@@ -270,7 +356,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
           image: "${IMAGE_DEBIAN_12}"
         matrix:
           - default
@@ -308,7 +394,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-8"
+          machineType: "n2-standard-8"
           image: "${IMAGE_RHEL_8}"
 
   - group: "Kubernetes"
@@ -335,7 +421,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n1-standard-4"
+          machineType: "n2-standard-4"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
           diskSizeGb: 80
         matrix:
@@ -356,12 +442,83 @@ steps:
               - v1.32.0
               - v1.33.0
 
+  - group: "Serverless integration test"
+    key: integration-tests-serverless
+    notify:
+      - github_commit_status:
+          context: "buildkite/elastic-agent-extended-testing - Serverless integration test"
+    steps:
+      - label: "Windows:2022:amd64:sudo"
+        depends_on:
+          - packaging-windows
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/serverless"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
+          .buildkite/scripts/buildkite-integration-tests.ps1 fleet true
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_WIN_2022}"
+        plugins:
+          - *google_oidc_plugin
+          - *gcp_serverless_secrets_plugin
+
+      - label: "Windows:2025:amd64:sudo"
+        depends_on:
+          - packaging-windows
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/serverless"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
+          .buildkite/scripts/buildkite-integration-tests.ps1 fleet true
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_WIN_2025}"
+        plugins:
+          - *google_oidc_plugin
+          - *gcp_serverless_secrets_plugin
+      - label: "Ubuntu:2404:amd64:sudo"
+        depends_on: packaging-ubuntu-x86-64
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/serverless"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
+          sudo -E .buildkite/scripts/buildkite-integration-tests.sh fleet true
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
+        plugins:
+          - *google_oidc_plugin
+          - *gcp_serverless_secrets_plugin
+
   - label: ESS stack cleanup
     depends_on:
       - integration-tests-ubuntu
       - integration-tests-win
       - integration-tests-rhel8
       - integration-tests-kubernetes
+      - extended-integration-tests
     allow_dependency_failure: true
     command: |
       buildkite-agent artifact download "test_infra/ess/**" . --step "integration-ess"
@@ -379,6 +536,7 @@ steps:
       - integration-tests-win
       - integration-tests-rhel8
       - integration-tests-kubernetes
+      - integration-tests-serverless
     allow_dependency_failure: true
     command: |
       buildkite-agent artifact download "build/*.xml" .
@@ -389,7 +547,11 @@ steps:
     soft_fail:
       - exit_status: "*"
     plugins:
-      - test-collector#v1.10.1:
+      - elastic/vault-secrets#v0.1.0:
+          path: "kv/ci-shared/platform-ingest/buildkite_analytics_token"
+          field: "token"
+          env_var: "BUILDKITE_ANALYTICS_TOKEN"
+      - test-collector#v1.11.0:
           files: "build/*.xml"
           format: "junit"
           branches: "main"

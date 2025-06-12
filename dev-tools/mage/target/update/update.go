@@ -27,5 +27,8 @@ func BeatsModule(targetVersion string) error {
 	if err != nil {
 		return err
 	}
-	return sh.RunV(mg.GoCmd(), "mod", "tidy")
+	// NOTE: this is not invoked through mg.Deps because
+	// we want to always invoke it and guarantee that it runs
+	// as mg.Deps does memoization
+	return common.Tidy()
 }

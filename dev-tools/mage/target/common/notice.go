@@ -44,10 +44,13 @@ func Notice() (err error) {
 // generateNotice generates a generateNotice file with the name outputFilename.
 // see getDependentModules for use of additionalTags.
 func generateNotice(outputFilename string, additionalTags ...string) error {
-	fmt.Printf("Generating %s...\n", outputFilename)
-	if err := runCommand("go", "mod", "tidy"); err != nil {
+	// NOTE: this is not invoked through mg.Deps because
+	// we want to always invoke it and guarantee that it runs
+	// as mg.Deps does memoization
+	if err := Tidy(); err != nil {
 		return err
 	}
+	fmt.Printf("Generating %s...\n", outputFilename)
 	if err := runCommand("go", "mod", "download"); err != nil {
 		return err
 	}

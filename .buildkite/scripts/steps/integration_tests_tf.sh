@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source .buildkite/scripts/common2.sh
-
 source .buildkite/scripts/steps/ess.sh
 source .buildkite/scripts/steps/fleet.sh
 
@@ -11,6 +9,7 @@ asdf install
 
 GROUP_NAME=$1
 TEST_SUDO=$2
+
 if [ -z "$GROUP_NAME" ]; then
   echo "Error: Specify the group name: integration_tests_tf.sh [group_name]" >&2
   exit 1
@@ -36,7 +35,7 @@ mage build:testBinaries
 if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
   echo "~~~ The steps is retried, starting the ESS stack again"
   trap 'ess_down' EXIT
-  ess_up $OVERRIDE_STACK_VERSION || echo "Failed to start ESS stack" >&2
+  ess_up $OVERRIDE_STACK_VERSION || (echo -e "^^^ +++\nFailed to start ESS stack")
   preinstall_fleet_packages
 else
   # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data
@@ -49,12 +48,6 @@ else
   export KIBANA_PASSWORD=$(buildkite-agent meta-data get "kibana.pwd")
   export INTEGRATIONS_SERVER_HOST=$(buildkite-agent meta-data get "integrations_server.host")
 fi
-
-# TODO: move to common.sh when it's refactored
-# BK analytics
-echo "--- Prepare BK test analytics token :vault:"
-BUILDKITE_ANALYTICS_TOKEN=$(vault kv get -field token kv/ci-shared/platform-ingest/buildkite_analytics_token)
-export BUILDKITE_ANALYTICS_TOKEN
 
 # Run integration tests
 echo "~~~ Running integration tests"

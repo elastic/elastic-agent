@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package configtranslate
+package translate
 
 import (
 	"fmt"
@@ -39,7 +39,7 @@ type exporterConfigTranslationFunc func(*config.C) (map[string]any, error)
 
 var (
 	OtelSupportedOutputTypes         = []string{"elasticsearch"}
-	OtelSupportedInputTypes          = []string{"filestream", "http/metrics", "beat/metrics"}
+	OtelSupportedInputTypes          = []string{"filestream", "http/metrics", "beat/metrics", "system/metrics"}
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
 		otelcomponent.MustNewType("elasticsearch"): translateEsOutputToExporter,
 	}

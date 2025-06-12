@@ -33,6 +33,7 @@ import (
 
 	// Processors:
 	attributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor" // for modifying signal attributes
+	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/cumulativetodeltaprocessor"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor"
 	geoipprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/geoipprocessor"                 // for adding geographical metadata associated to an IP address
 	k8sattributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor" // for adding k8s metadata
@@ -106,6 +107,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			batchprocessor.NewFactory(),
 			resourceprocessor.NewFactory(),
 			attributesprocessor.NewFactory(),
+			cumulativetodeltaprocessor.NewFactory(),
 			transformprocessor.NewFactory(),
 			filterprocessor.NewFactory(),
 			geoipprocessor.NewFactory(),

@@ -85,7 +85,8 @@ between, and it can be very specific or not very specific.
 - `TEST_PLATFORMS="linux/amd64 windows/amd64/2022 mage integration:test` to execute tests on Linux AMD64 and Windows Server 2022.
 - `TEST_PLATFORMS="kubernetes/arm64/1.33.0/wolfi" mage integration:kubernetes` to execute kubernetes tests on Kubernetes version 1.33.0 with wolfi docker variant.
 
-> **_NOTE:_**  This only filters down the tests based on the platform. It will not execute a tests on a platform unless
+> [!NOTE]
+> This only filters down the tests based on the platform. It will not execute a tests on a platform unless
 > the test defines as supporting it.
 
 #### Selecting specific group
@@ -130,10 +131,13 @@ We pass a `-test.count` flag along with the name match
 We pass a `-test.run` flag along with the names of the tests we want to run in OR
 `GOTEST_FLAGS="-test.run ^(TestStandaloneUpgrade|TestFleetManagedUpgrade)$" mage integration:test`
 
+##### Run Serverless tests
+The test framework includes a smoke test suite to check elastic-agent in a serverless environment. The suite can be run via the `integration:TestServerless` mage target.
+
 ##### Run Extended Runtime Leak Test
 The test framework includes a "long running" test to check for resource leaks and stability.
 The runtime of the test can be set via the `LONG_TEST_RUNTIME` environment variable.
-The test itself can be run via the `integration:TestLongRunningAgentForLeaks` mage target.
+The test itself can be run via the `integration:TestForResourceLeaks` mage target.
 
 ##### Limitations
 Due to the way the parameters are passed to `devtools.GoTest` the value of the environment variable
@@ -306,8 +310,11 @@ EXTERNAL=true PLATFORMS=darwin/arm64 mage package
 ```
 3. Run integration tests as per [the instructions](#running-the-tests)
 
-**_NOTE:_**: Make sure you add an absolute path in replace
-**_NOTE:_**: Old agent might be cached at `.agent-testing` directory. Run `mage integration:clean` to clean it.
+> [!NOTE]
+> Make sure you add an absolute path in replace directive
+
+> [!NOTE]
+> Old agent might be cached at `.agent-testing` directory. Run `mage integration:clean` to clean it.
 
 ## Writing tests
 
@@ -352,7 +359,11 @@ out weight the benefits of creating another group.
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-ubuntu-2404"
         plugins:
-          - test-collector#v1.10.1:
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/buildkite_analytics_token"
+              field: "token"
+              env_var: "BUILDKITE_ANALYTICS_TOKEN"
+          - test-collector#v1.11.0:
               files: "build/TEST-*.xml"
               format: "junit"
               branches: "main"

@@ -435,6 +435,7 @@ func getTestBinariesPath() ([]string, error) {
 		filepath.Join(wd, "pkg", "component", "fake", "component"),
 		filepath.Join(wd, "internal", "pkg", "agent", "install", "testblocking"),
 		filepath.Join(wd, "pkg", "core", "process", "testsignal"),
+		filepath.Join(wd, "internal", "pkg", "agent", "application", "filelock", "testlocker"),
 	}
 	return testBinaryPkgs, nil
 }
@@ -984,6 +985,37 @@ func (Cloud) Image(ctx context.Context) {
 	Package(ctx)
 }
 
+// Load loads an artifact as a docker image.
+// Looks in build/distributions for an elastic-agent-cloud*.docker.tar.gz artifact and imports it as docker.elastic.co/beats-ci/elastic-agent-cloud:$VERSION
+// DOCKER_IMPORT_SOURCE - override source for import
+func (Cloud) Load() error {
+	snapshot := os.Getenv(snapshotEnv)
+	defer os.Setenv(snapshotEnv, snapshot)
+	os.Setenv(snapshotEnv, "true")
+
+	version := getVersion()
+
+	// Need to get the FIPS env var flag to see if we are using the normal source cloud image name, or the FIPS variant
+	fips := os.Getenv(fipsEnv)
+	defer os.Setenv(fipsEnv, fips)
+	fipsVal, err := strconv.ParseBool(fips)
+	if err != nil {
+		fipsVal = false
+	}
+	os.Setenv(fipsEnv, strconv.FormatBool(fipsVal))
+	devtools.FIPSBuild = fipsVal
+
+	source := "build/distributions/elastic-agent-cloud-" + version + "-linux-" + runtime.GOARCH + ".docker.tar.gz"
+	if fipsVal {
+		source = "build/distributions/elastic-agent-fips-cloud-" + version + "-linux-" + runtime.GOARCH + ".docker.tar.gz"
+	}
+	if envSource, ok := os.LookupEnv("DOCKER_IMPORT_SOURCE"); ok && envSource != "" {
+		source = envSource
+	}
+
+	return sh.RunV("docker", "image", "load", "-i", source)
+}
+
 // Push builds a cloud image tags it correctly and pushes to remote image repo.
 // Previous login to elastic registry is required!
 func (Cloud) Push() error {
@@ -1003,7 +1035,20 @@ func (Cloud) Push() error {
 		tag = fmt.Sprintf("%s-%s-%d", version, commit, time)
 	}
 
+	// Need to get the FIPS env var flag to see if we are using the normal source cloud image name, or the FIPS variant
+	fips := os.Getenv(fipsEnv)
+	defer os.Setenv(fipsEnv, fips)
+	fipsVal, err := strconv.ParseBool(fips)
+	if err != nil {
+		fipsVal = false
+	}
+	os.Setenv(fipsEnv, strconv.FormatBool(fipsVal))
+	devtools.FIPSBuild = fipsVal
+
 	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s", version)
+	if fipsVal {
+		sourceCloudImageName = fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-fips-cloud:%s", version)
+	}
 	var targetCloudImageName string
 	if customImage, isPresent := os.LookupEnv("CI_ELASTIC_AGENT_DOCKER_IMAGE"); isPresent && len(customImage) > 0 {
 		targetCloudImageName = fmt.Sprintf("%s:%s", customImage, tag)
@@ -1012,7 +1057,7 @@ func (Cloud) Push() error {
 	}
 
 	fmt.Printf(">> Setting a docker image tag to %s\n", targetCloudImageName)
-	err := sh.RunV("docker", "tag", sourceCloudImageName, targetCloudImageName)
+	err = sh.RunV("docker", "tag", sourceCloudImageName, targetCloudImageName)
 	if err != nil {
 		return fmt.Errorf("Failed setting a docker image tag: %w", err)
 	}
@@ -2212,7 +2257,11 @@ func (Integration) Clean() error {
 // Check checks that integration tests are using define.Require
 func (Integration) Check() error {
 	fmt.Println(">> check: Checking for define.Require in integration tests") // nolint:forbidigo // it's ok to use fmt.println in mage
-	return define.ValidateDir("testing/integration")
+	return errors.Join(
+		define.ValidateDir("testing/integration"),
+		define.ValidateDir("testing/integration/serverless"),
+		define.ValidateDir("testing/integration/leak"),
+	)
 }
 
 // Local runs only the integration tests that support local mode
@@ -2269,17 +2318,27 @@ func (Integration) Auth(ctx context.Context) error {
 
 // Test runs integration tests on remote hosts
 func (Integration) Test(ctx context.Context) error {
-	return integRunner(ctx, false, "")
+	return integRunner(ctx, "testing/integration", false, "")
 }
 
 // Matrix runs integration tests on a matrix of all supported remote hosts
 func (Integration) Matrix(ctx context.Context) error {
-	return integRunner(ctx, true, "")
+	return integRunner(ctx, "testing/integration", true, "")
 }
 
 // Single runs single integration test on remote host
 func (Integration) Single(ctx context.Context, testName string) error {
-	return integRunner(ctx, false, testName)
+	return integRunner(ctx, "testing/integration", false, testName)
+}
+
+// TestServerless runs the integration tests defined in testing/integration/serverless
+func (Integration) TestServerless(ctx context.Context) error {
+	err := os.Setenv("STACK_PROVISIONER", "serverless")
+	if err != nil {
+		return fmt.Errorf("error setting serverless stack env var: %w", err)
+	}
+
+	return integRunner(ctx, "testing/integration/serverless", false, "")
 }
 
 // Kubernetes runs kubernetes integration tests
@@ -2289,7 +2348,7 @@ func (Integration) Kubernetes(ctx context.Context) error {
 		return err
 	}
 
-	return integRunner(ctx, false, "")
+	return integRunner(ctx, "testing/integration", false, "")
 }
 
 // KubernetesMatrix runs a matrix of kubernetes integration tests
@@ -2299,7 +2358,7 @@ func (Integration) KubernetesMatrix(ctx context.Context) error {
 		return err
 	}
 
-	return integRunner(ctx, true, "")
+	return integRunner(ctx, "testing/integration", true, "")
 }
 
 // UpdateVersions runs an update on the `.agent-versions.yml` fetching
@@ -2755,7 +2814,7 @@ func (Integration) PrepareOnRemote() {
 	mg.Deps(mage.InstallGoTestTools)
 }
 
-// Run beat serverless tests
+// TestBeatServerless runs beats-oriented serverless tests
 func (Integration) TestBeatServerless(ctx context.Context, beatname string) error {
 	beatBuildPath := filepath.Join("..", "beats", "x-pack", beatname, "build", "distributions")
 	if os.Getenv("AGENT_BUILD_DIR") == "" {
@@ -2779,15 +2838,12 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 	if err != nil {
 		return fmt.Errorf("error setting binary name: %w", err)
 	}
-	return integRunner(ctx, false, "TestBeatsServerless")
+	return integRunner(ctx, "testing/integration", false, "TestBeatsServerless")
 }
 
+// TestForResourceLeaks runs tests that check for resource leaks
 func (Integration) TestForResourceLeaks(ctx context.Context) error {
-	err := os.Setenv("TEST_LONG_RUNNING", "true")
-	if err != nil {
-		return fmt.Errorf("error setting TEST_LONG_RUNNING: %w", err)
-	}
-	return integRunner(ctx, false, "TestLongRunningAgentForLeaks")
+	return integRunner(ctx, "testing/integration/leak", false, "TestLongRunningAgentForLeaks")
 }
 
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
@@ -2914,7 +2970,7 @@ func (Integration) Buildkite() error {
 	return nil
 }
 
-func integRunner(ctx context.Context, matrix bool, singleTest string) error {
+func integRunner(ctx context.Context, testDir string, matrix bool, singleTest string) error {
 	if _, ok := ctx.Deadline(); !ok {
 		// If the context doesn't have a timeout (usually via the mage -t option), give it one.
 		var cancel context.CancelFunc
@@ -2923,7 +2979,7 @@ func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	}
 
 	for {
-		failedCount, err := integRunnerOnce(ctx, matrix, singleTest)
+		failedCount, err := integRunnerOnce(ctx, matrix, testDir, singleTest)
 		if err != nil {
 			return err
 		}
@@ -2942,10 +2998,10 @@ func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	}
 }
 
-func integRunnerOnce(ctx context.Context, matrix bool, singleTest string) (int, error) {
+func integRunnerOnce(ctx context.Context, matrix bool, testDir string, singleTest string) (int, error) {
 	goTestFlags := os.Getenv("GOTEST_FLAGS")
 
-	batches, err := define.DetermineBatches("testing/integration", goTestFlags, "integration")
+	batches, err := define.DetermineBatches(testDir, goTestFlags, "integration")
 	if err != nil {
 		return 0, fmt.Errorf("failed to determine batches: %w", err)
 	}

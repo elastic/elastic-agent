@@ -165,18 +165,18 @@ inputs:
 
 # agent.monitoring:
 #   # enabled turns on monitoring of running processes
-#   enabled: false
+#   enabled: true
 #   # enables log monitoring
-#   logs: false
+#   logs: true
 #   # enables metrics monitoring
-#   metrics: false
+#   metrics: true
 #   # metrics_period defines how frequent we should sample monitoring metrics. Default is 60 seconds.
 #   metrics_period: 60s
 #   # exposes /debug/pprof/ endpoints
 #   # recommended that these endpoints are only enabled if the monitoring endpoint is set to localhost
 #   pprof.enabled: false
 #   # The name of the output to use for monitoring data.
-#   use_output: monitoring
+#   use_output: default
 #   # Exposes agent metrics using http, by default sockets and named pipes are used.
 #   #
 #   # `http` Also exposes a /liveness endpoint that will return an HTTP code depending on agent status:
