@@ -1,6 +1,5 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 env:
-  DOCKER_REGISTRY: "docker.elastic.co"
   # this is required in order to allow the build process to override the default PWD of the BEAT_NAME.
   BEAT_NAME: "elastic-agent"
   # after moving elastic-agent out of beats, we should update the URL of the packaging.
@@ -82,6 +81,10 @@ steps:
             fips:
               - false
               - true
+        plugins:
+          - elastic/vault-docker-login#v0.5.2:
+              secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+
       - label: ":package: FIPS={{matrix.fips}} Package ARM elastic-agent"
         key: package_elastic-agent-arm
         agents:
