@@ -28,8 +28,7 @@ asdf install
 
 echo "~~~ Running integration tests as $USER"
 
-go install gotest.tools/gotestsum
-gotestsum --version
+make install-gotestsum
 
 # Parsing version.go. Will be simplified here: https://github.com/elastic/ingest-dev/issues/4925
 AGENT_VERSION=$(grep "const defaultBeatVersion =" version/version.go | cut -d\" -f2)
@@ -55,7 +54,7 @@ GOTEST_ARGS+=("github.com/elastic/elastic-agent/testing/integration" -v -args "-
 
 set +e
 TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true \
-  gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- "${GOTEST_ARGS[@]}"
+  gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --junitfile-hide-skipped-tests --jsonfile "${outputJSON}" -- "${GOTEST_ARGS[@]}"
 TESTS_EXIT_STATUS=$?
 set -e
 
