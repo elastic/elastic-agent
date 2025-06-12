@@ -119,15 +119,34 @@ func TestUpdateMarkerFile(t *testing.T) {
 	require.NoError(t, saveMarkerToPath(marker, markerFile, true, noopLocker))
 
 	// update marker
-	err := UpdateMarkerFile(markerFile, func(m *UpdateMarker) {
-		m.Version = "1.2.3-up"
-	})
-	assert.NoError(t, err)
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// first concurrent update
+	go func() {
+		err := UpdateMarkerFile(markerFile, func(m *UpdateMarker) {
+			m.Version = "1.2.3-up"
+		})
+		assert.NoError(t, err)
+		wg.Done()
+	}()
+
+	// second update
+	go func() {
+		err := UpdateMarkerFile(markerFile, func(m *UpdateMarker) {
+			m.Hash = "sha...hash2"
+		})
+		assert.NoError(t, err)
+		wg.Done()
+	}()
+
+	wg.Wait()
 
 	// Assert
 	loadedMarker, err := loadMarker(markerFile, noopLocker)
 	assert.NoError(t, err)
 	assert.Equal(t, "1.2.3-up", loadedMarker.Version)
+	assert.Equal(t, "sha...hash2", loadedMarker.Hash)
 	assert.Equal(t, marker.VersionedHome, loadedMarker.VersionedHome)
 }
 
