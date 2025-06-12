@@ -4,21 +4,22 @@
 
 //go:build integration
 
-package integration
+package serverless
 
 import (
 	"testing"
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/testing/integration"
 )
 
 func TestLogIngestionFleetManaged(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: integration.Fleet,
 		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  true,
 	})
 
-	LogIngestionFleetManaged(t, info)
+	integration.LogIngestionFleetManaged(t, info)
 }
