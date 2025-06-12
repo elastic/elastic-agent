@@ -4,8 +4,8 @@ name: serverless-project
 on:
   workflow_dispatch:
   schedule:
-    # To run more often if needed, for now weekly on sunday at 4:00 UTC
-    - cron: "0 4 * * 0"
+    # To run more often if needed, for now daily at 4:00 UTC
+    - cron: "0 4 * * *"
 
 permissions:
   contents: read
