@@ -10,7 +10,8 @@
 **/html_docs
 data
 internal/pkg/agent/operation/tests/downloads
-pkg/core/process/testsignal
+pkg/core/process/testsignal/testsignal
+pkg/core/process/testsignal/testsignal.exe
 
 # Files
 .DS_Store
