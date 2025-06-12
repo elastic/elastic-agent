@@ -2358,7 +2358,7 @@ func (Integration) KubernetesSingle(ctx context.Context, testName string) error 
 		return err
 	}
 
-	return integRunner(ctx, false, testName)
+	return integRunner(ctx, "testing/integration", false, testName)
 }
 
 // KubernetesMatrix runs a matrix of kubernetes integration tests
