@@ -74,6 +74,7 @@ func ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t *testing.T, info *de
 	// Check that the Fleet Server in the deployment is healthy
 	fleetServerHost := os.Getenv("INTEGRATIONS_SERVER_HOST")
 	statusUrl, err := url.JoinPath(fleetServerHost, "/api/status")
+	t.Logf("statusUrl = %s", statusUrl)
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
@@ -89,6 +90,7 @@ func ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t *testing.T, info *de
 		err = decoder.Decode(&body)
 		require.NoError(t, err)
 
+		t.Logf("body.Status = %s", body.Status)
 		return body.Status == "HEALTHY"
 	}, 5*time.Minute, 10*time.Second, "Fleet Server in ECH deployment is not healthy")
 
