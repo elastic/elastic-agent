@@ -4,7 +4,10 @@ name: bump-vm-images
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 10 * * 0"
+    # Since the CI Agent images are produced weekly on Saturday at 0am UTC
+    # and we can only bump the version after the images are available
+    # let's try on Saturday at 12:00 UTC.
+    - cron: "0 12 * * 6"
 
 permissions:
   contents: read
@@ -13,11 +16,29 @@ env:
   JOB_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
 jobs:
+  filter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    outputs:
+      matrix: ${{ steps.generator.outputs.matrix }}
+    permissions:
+      contents: read
+    steps:
+    - id: generator
+      uses: elastic/oblt-actions/elastic/active-branches@v1
+      with:
+        filter-branches: true
+
   bump:
     permissions:
       contents: write
       pull-requests: write
     runs-on: ubuntu-latest
+    needs:
+      - filter
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.filter.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -26,26 +47,11 @@ jobs:
           command: apply --config .ci/updatecli/updatecli-bump-vm-images.yml --values .ci/updatecli/values.d/scm.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH_NAME: ${{ matrix.branch }}
 
       - if: ${{ failure()  }}
-        uses: slackapi/slack-github-action@485a9d42d3a73031f12ec201c457e2162c45d02d # v2.0.0
+        uses: elastic/oblt-actions/slack/send@v1
         with:
-          method: chat.postMessage
-          token: ${{ secrets.SLACK_BOT_TOKEN }}
-          payload: |
-            {
-              "channel": "#ingest-notifications",
-              "text": "${{ env.SLACK_MESSAGE }}",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "${{ env.SLACK_MESSAGE }}"
-                  }
-                }
-              ]
-            }
-        env:
-          #SLACK_MESSAGE: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@agent-team` please look what's going on <${{ env.JOB_URL }}|here>"
-          SLACK_MESSAGE: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`"
+          bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel-id: "#ingest-notifications"
+          message: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, @robots-ci please look what's going on <${{ env.JOB_URL }}|here>"
