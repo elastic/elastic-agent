@@ -521,7 +521,7 @@ func testUpgradeFleetManagedElasticAgent(
 	assert.NoError(t, err)
 
 	if upgradeOpts.PostWatcherSuccessHook != nil {
-		err = upgradeOpts.PostWatcherSuccessHook(ctx, endFixture)
+		err = upgradeOpts.PostWatcherSuccessHook(ctx, startFixture)
 		require.NoError(t, err)
 	}
 }

@@ -708,8 +708,8 @@ func getStatus(ctx context.Context, fixture *atesting.Fixture) *atesting.AgentSt
 
 // PostUpgradeAgentIsFIPSCapable checks if the Agent fixture after upgrade is FIPS-capable and
 // returns an error if it isn't.
-func PostUpgradeAgentIsFIPSCapable(ctx context.Context, endFixture *atesting.Fixture) error {
-	client := endFixture.Client()
+func PostUpgradeAgentIsFIPSCapable(ctx context.Context, f *atesting.Fixture) error {
+	client := f.Client()
 	err := client.Connect(ctx)
 	if err != nil {
 		return err
