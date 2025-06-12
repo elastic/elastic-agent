@@ -130,10 +130,13 @@ We pass a `-test.count` flag along with the name match
 We pass a `-test.run` flag along with the names of the tests we want to run in OR
 `GOTEST_FLAGS="-test.run ^(TestStandaloneUpgrade|TestFleetManagedUpgrade)$" mage integration:test`
 
+##### Run Serverless tests
+The test framework includes a smoke test suite to check elastic-agent in a serverless environment. The suite can be run via the `integration:TestServerless` mage target.
+
 ##### Run Extended Runtime Leak Test
 The test framework includes a "long running" test to check for resource leaks and stability.
 The runtime of the test can be set via the `LONG_TEST_RUNTIME` environment variable.
-The test itself can be run via the `integration:TestLongRunningAgentForLeaks` mage target.
+The test itself can be run via the `integration:TestForResourceLeaks` mage target.
 
 ##### Limitations
 Due to the way the parameters are passed to `devtools.GoTest` the value of the environment variable

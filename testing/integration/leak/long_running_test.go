@@ -4,7 +4,7 @@
 
 //go:build integration
 
-package integration
+package leak
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strconv"
@@ -35,6 +36,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
 	"github.com/elastic/elastic-agent/pkg/utils"
+	"github.com/elastic/elastic-agent/testing/integration"
 	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
 )
@@ -71,10 +73,6 @@ func TestLongRunningAgentForLeaks(t *testing.T) {
 			{Type: define.Windows},
 		},
 	})
-
-	if os.Getenv("TEST_LONG_RUNNING") == "" {
-		t.Skip("not running extended test unless TEST_LONG_RUNNING is set")
-	}
 
 	suite.Run(t, &ExtendedRunner{info: info,
 		healthCheckTime:        time.Minute * 6,
@@ -120,10 +118,26 @@ func (runner *ExtendedRunner) SetupSuite() {
 	policyResp, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
 
-	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "system", preinstalledPackages["system"], "agent_long_test_base_system_integ.json", uuid.Must(uuid.NewV4()).String(), policyResp.ID)
+	_, err = tools.InstallPackageFromDefaultFile(
+		ctx,
+		runner.info.KibanaClient,
+		"system",
+		integration.PreinstalledPackages["system"],
+		filepath.Join("testdata", "agent_long_test_base_system_integ.json"),
+		uuid.Must(uuid.NewV4()).String(),
+		policyResp.ID,
+	)
 	require.NoError(runner.T(), err)
 
-	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "apache", preinstalledPackages["apache"], "agent_long_test_apache.json", uuid.Must(uuid.NewV4()).String(), policyResp.ID)
+	_, err = tools.InstallPackageFromDefaultFile(
+		ctx,
+		runner.info.KibanaClient,
+		"apache",
+		integration.PreinstalledPackages["apache"],
+		filepath.Join("testdata", "agent_long_test_apache.json"),
+		uuid.Must(uuid.NewV4()).String(),
+		policyResp.ID,
+	)
 	require.NoError(runner.T(), err)
 
 }
@@ -401,6 +415,6 @@ func (handleMon *handleMonitor) GetSlopeHandlers() []tools.Slope {
 	return slopes
 }
 
-func (gm *handleMonitor) Name() string {
+func (handleMon *handleMonitor) Name() string {
 	return "handles"
 }

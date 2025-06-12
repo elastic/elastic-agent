@@ -126,7 +126,7 @@ func (runner *MonitoringTextRunner) SetupSuite() {
 	runner.policyID = policyResp.ID
 	runner.policyName = basePolicy.Name
 
-	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "system", preinstalledPackages["system"], "system_integration_setup.json", uuid.Must(uuid.NewV4()).String(), policyResp.ID)
+	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "system", PreinstalledPackages["system"], "system_integration_setup.json", uuid.Must(uuid.NewV4()).String(), policyResp.ID)
 	require.NoError(runner.T(), err)
 }
 
