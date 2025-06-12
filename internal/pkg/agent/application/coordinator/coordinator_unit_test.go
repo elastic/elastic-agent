@@ -20,12 +20,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
@@ -1841,4 +1843,97 @@ func (fs *fakeMonitoringServer) Reset() {
 
 func (fs *fakeMonitoringServer) Addr() net.Addr {
 	return nil
+}
+
+func TestMergeFleetConfig(t *testing.T) {
+	testutils.InitStorage(t)
+
+	cfg := map[string]interface{}{
+		"fleet": map[string]interface{}{
+			"enabled":        true,
+			"kibana":         map[string]interface{}{"host": "demo"},
+			"access_api_key": "123",
+		},
+		"agent": map[string]interface{}{
+			"grpc": map[string]interface{}{
+				"port": uint16(6790),
+			},
+		},
+	}
+
+	path := paths.AgentConfigFile()
+	store, err := storage.NewEncryptedDiskStore(t.Context(), path)
+	require.NoError(t, err)
+
+	rawConfig := config.MustNewConfigFrom(cfg)
+	conf, err := mergeFleetConfig(t.Context(), rawConfig, store)
+	require.NoError(t, err)
+	assert.NotNil(t, conf)
+	assert.Equal(t, conf.Fleet.Enabled, cfg["fleet"].(map[string]interface{})["enabled"])
+	assert.Equal(t, conf.Fleet.AccessAPIKey, cfg["fleet"].(map[string]interface{})["access_api_key"])
+	assert.Equal(t, conf.Settings.GRPC.Port, cfg["agent"].(map[string]interface{})["grpc"].(map[string]interface{})["port"].(uint16))
+}
+
+func TestComputeEnrollOptions(t *testing.T) {
+	testutils.InitStorage(t)
+	tmp := t.TempDir()
+
+	storePath := filepath.Join(tmp, "fleet.enc")
+	cfgPath := filepath.Join(tmp, "elastic-agent.yml")
+
+	cfg := map[string]interface{}{
+		"fleet": map[string]interface{}{
+			"enabled":        true,
+			"access_api_key": "123",
+		},
+		"agent": map[string]interface{}{
+			"grpc": map[string]interface{}{
+				"port": uint16(6790),
+			},
+		},
+	}
+
+	rawAgentConfigData, err := yaml.Marshal(cfg)
+	require.NoError(t, os.WriteFile(cfgPath, rawAgentConfigData, 0644))
+
+	store, err := storage.NewEncryptedDiskStore(t.Context(), storePath)
+	require.NoError(t, err)
+
+	fleetConfig := `fleet:
+  hosts: [localhost:1234]
+  ssl:
+    ca_sha256: ["sha1", "sha2"]
+    verification_mode: none
+  proxy_url: http://proxy.example.com:8080
+  proxy_disable: false
+  proxy_headers:
+    Proxy-Authorization: "Bearer token"
+    Custom-Header: "custom-value"
+  enrollment_token: enrollment-token-123
+  force: true
+  insecure: true
+  agent:
+    id: test-agent-id
+`
+	require.NoError(t, store.Save(bytes.NewReader([]byte(fleetConfig))))
+
+	options, err := computeEnrollOptions(t.Context(), cfgPath, storePath)
+	require.NoError(t, err)
+
+	require.NoError(t, err)
+	assert.NotNil(t, options)
+
+	assert.Equal(t, "123", options.EnrollAPIKey, "EnrollAPIKey mismatch")
+	assert.Equal(t, "localhost:1234", options.URL, "URL mismatch")
+
+	assert.Equal(t, []string{"sha1", "sha2"}, options.CASha256, "CASha256 mismatch")
+	assert.Equal(t, true, options.Insecure, "Insecure mismatch")
+	assert.Equal(t, "test-agent-id", options.ID, "ID mismatch")
+	assert.Equal(t, "http://proxy.example.com:8080", options.ProxyURL, "ProxyURL mismatch")
+	assert.Equal(t, false, options.ProxyDisabled, "ProxyDisabled mismatch")
+	expectedProxyHeaders := map[string]string{
+		"Proxy-Authorization": "Bearer token",
+		"Custom-Header":       "custom-value",
+	}
+	assert.Equal(t, expectedProxyHeaders, options.ProxyHeaders, "ProxyHeaders mismatch")
 }

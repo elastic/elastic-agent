@@ -572,7 +572,7 @@ func (c *Coordinator) Migrate(ctx context.Context, action *fleetapi.ActionMigrat
 	}
 
 	// Keeping all enrollment options that are not overridden via action
-	options, err := c.computeEnrollOptions(ctx, paths.ConfigFile(), paths.AgentConfigFile())
+	options, err := computeEnrollOptions(ctx, paths.ConfigFile(), paths.AgentConfigFile())
 	if err != nil {
 		return fmt.Errorf("failed to compute enroll options: %w", err)
 	}
@@ -638,7 +638,8 @@ func (c *Coordinator) Migrate(ctx context.Context, action *fleetapi.ActionMigrat
 		backoffFactory,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to enroll: %w", err)
+		restoreErr := enroll.RestoreConfig()
+		return errors.Join(fmt.Errorf("failed to enroll: %w", err), restoreErr)
 	}
 
 	if err := enroll.CleanBackupConfig(); err != nil {
@@ -654,7 +655,7 @@ func (c *Coordinator) Migrate(ctx context.Context, action *fleetapi.ActionMigrat
 
 	// Best effort: call unenroll on source cluster once done
 	if err := c.unenroll(ctx, originalClient); err != nil {
-		c.logger.Infof("failed to unenroll from original cluster: %v", err)
+		c.logger.Warnf("failed to unenroll from original cluster: %v", err)
 	}
 
 	return nil
@@ -1735,27 +1736,6 @@ func (c *Coordinator) ackMigration(ctx context.Context, action *fleetapi.ActionM
 	return nil
 }
 
-func (c *Coordinator) computeEnrollOptions(ctx context.Context, cfgPath string, cfgFleetPath string) (enroll.EnrollOptions, error) {
-	var options enroll.EnrollOptions
-	rawCfg, err := config.LoadFile(cfgPath)
-	if err != nil {
-		return options, fmt.Errorf("failed to load agent config: %w", err)
-	}
-
-	store, err := storage.NewEncryptedDiskStore(ctx, cfgFleetPath)
-	if err != nil {
-		return options, fmt.Errorf("error instantiating encrypted disk store: %w", err)
-	}
-
-	cfg, err := mergeFleetConfig(ctx, rawCfg, store)
-	if err != nil {
-		return options, fmt.Errorf("failed to merge agent fleet config: %w", err)
-	}
-
-	options = enroll.FromFleetConfig(cfg.Fleet)
-	return options, nil
-}
-
 // generateComponentModel regenerates the configuration tree and
 // components from the current AST and vars and returns the result.
 // Called from both the main Coordinator goroutine and from external
@@ -2208,4 +2188,25 @@ func mergeFleetConfig(ctx context.Context, rawConfig *config.Config, store stora
 	}
 
 	return cfg, nil
+}
+
+func computeEnrollOptions(ctx context.Context, cfgPath string, cfgFleetPath string) (enroll.EnrollOptions, error) {
+	var options enroll.EnrollOptions
+	rawCfg, err := config.LoadFile(cfgPath)
+	if err != nil {
+		return options, fmt.Errorf("failed to load agent config: %w", err)
+	}
+
+	store, err := storage.NewEncryptedDiskStore(ctx, cfgFleetPath)
+	if err != nil {
+		return options, fmt.Errorf("error instantiating encrypted disk store: %w", err)
+	}
+
+	cfg, err := mergeFleetConfig(ctx, rawCfg, store)
+	if err != nil {
+		return options, fmt.Errorf("failed to merge agent fleet config: %w", err)
+	}
+
+	options = enroll.FromFleetConfig(cfg.Fleet)
+	return options, nil
 }

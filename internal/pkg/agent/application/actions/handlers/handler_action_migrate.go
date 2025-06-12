@@ -26,7 +26,7 @@ type migrateCoordinator interface {
 	State() coordinator.State
 }
 
-// Settings handles settings change coming from fleet and updates log level.
+// Migrate handles migrate change coming from fleet.
 type Migrate struct {
 	log       *logger.Logger
 	agentInfo info.Agent
@@ -35,7 +35,7 @@ type Migrate struct {
 	tamperProtectionFn func() bool // allows to inject the flag for tests, defaults to features.TamperProtection
 }
 
-// NewSettings creates a new Settings handler.
+// NewMigrate creates a new Migrate handler.
 func NewMigrate(
 	log *logger.Logger,
 	agentInfo info.Agent,

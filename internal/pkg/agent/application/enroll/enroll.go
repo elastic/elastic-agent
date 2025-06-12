@@ -490,12 +490,11 @@ func LoadPersistentConfig(pathConfigFile string) (map[string]interface{}, error)
 }
 
 func delay(ctx context.Context, d time.Duration) {
-	t := time.NewTimer(rand.N(d))
-	defer t.Stop()
 	select {
 	case <-ctx.Done():
-	case <-t.C:
+	case <-time.After(rand.N(d)):
 	}
+
 }
 
 func yamlToReader(in interface{}) (io.Reader, error) {

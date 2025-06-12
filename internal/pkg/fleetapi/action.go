@@ -495,15 +495,6 @@ type ActionMigrateSettings struct {
 	ReplaceToken     string   `json:"replace_token,omitempty"`
 }
 
-func ParseMigrateSettings(raw json.RawMessage) (ActionMigrateSettings, error) {
-	var settings ActionMigrateSettings
-	if err := json.Unmarshal(raw, &settings); err != nil {
-		return settings, fmt.Errorf("failed to parse migrate settings: %w", err)
-	}
-
-	return settings, nil
-}
-
 func (a *ActionSettings) AckEvent() AckEvent {
 	return newAckEvent(a.ActionID, a.ActionType)
 }
