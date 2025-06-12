@@ -124,9 +124,11 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 func (mfw *MarkerFileWatcher) processMarker(currentVersion string, commit string) {
 	marker, err := loadMarker(mfw.markerFilePath)
 	if err != nil {
-		mfw.logger.Error(err)
+		mfw.logger.Errorf("loading marker: %s", err)
 		return
 	}
+
+	mfw.logger.Infof("loaded marker: %+v", marker)
 
 	// Nothing to do if marker is not (yet) present
 	if marker == nil {
