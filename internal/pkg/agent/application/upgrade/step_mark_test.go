@@ -19,13 +19,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
-var noopLocker = &dummyLocker{}
+var noopLocker = filelock.NewNoopLocker()
 
 func TestSaveAndLoadMarker_NoLoss(t *testing.T) {
 	// Create a temporary directory for the test
@@ -486,10 +487,3 @@ func checkUpgradeMarker(t *testing.T, updateMarker *UpdateMarker, prevAgent agen
 	// Check that there is an updated timestamp
 	assert.NotZero(t, updateMarker.UpdatedOn, "updated on timestamp should not be zero")
 }
-
-var _ Locker = &dummyLocker{}
-
-type dummyLocker struct{}
-
-func (*dummyLocker) Lock() error   { return nil }
-func (*dummyLocker) Unlock() error { return nil }
