@@ -1894,6 +1894,8 @@ func TestComputeEnrollOptions(t *testing.T) {
 	}
 
 	rawAgentConfigData, err := yaml.Marshal(cfg)
+	require.NoError(t, err)
+
 	require.NoError(t, os.WriteFile(cfgPath, rawAgentConfigData, 0644))
 
 	store, err := storage.NewEncryptedDiskStore(t.Context(), storePath)
