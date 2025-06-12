@@ -51,6 +51,8 @@ steps:
         agents:
           provider: orka
           imagePrefix: generic-base-15-arm-002
+        matrix:
+          - default
 
   # - group: "Extended runtime leak tests"
   #   key: extended-integration-tests

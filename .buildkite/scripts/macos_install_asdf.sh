@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -exuo pipefail
+set -euo pipefail
 
 echo $SHELL
 
@@ -22,5 +22,3 @@ asdf plugin update --all
 asdf plugin add terraform
 asdf plugin add golang
 asdf plugin add mage
-
-
