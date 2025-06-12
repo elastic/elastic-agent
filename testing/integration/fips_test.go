@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
-	"os"
 	"testing"
 	"time"
 
@@ -24,6 +23,7 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 )
 
 const cloudAgentPolicyID = "policy-elastic-agent-on-cloud"
@@ -72,7 +72,7 @@ func ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t *testing.T, info *de
 	t.Helper()
 
 	// Check that the Fleet Server in the deployment is healthy
-	fleetServerHost := os.Getenv("INTEGRATIONS_SERVER_HOST")
+	fleetServerHost, err := fleettools.DefaultURL(t.Context(), info.KibanaClient)
 	statusUrl, err := url.JoinPath(fleetServerHost, "/api/status")
 	t.Logf("statusUrl = %s", statusUrl)
 	require.NoError(t, err)
@@ -81,6 +81,8 @@ func ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t *testing.T, info *de
 		resp, err := http.Get(statusUrl)
 		require.NoError(t, err)
 		defer resp.Body.Close()
+
+		require.Equal(t, http.StatusOK, resp.StatusCode)
 
 		var body struct {
 			Name   string `json:"name"`
