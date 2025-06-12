@@ -55,12 +55,16 @@ func TestKubernetesJournaldInput(t *testing.T) {
 			k8sKustomizeOverrides{
 				agentContainerExtraEnv: []corev1.EnvVar{
 					{
-						Name:  "EA_POLICY_NAMESPACE",
-						Value: namespace,
+						Name:  "ELASTICSEARCH_USERNAME",
+						Value: os.Getenv("ELASTICSEARCH_USERNAME"),
 					},
 					{
-						Name:  "ES_API_KEY_ENCODED",
-						Value: kCtx.esEncodedAPIKey,
+						Name:  "ELASTICSEARCH_PASSWORD",
+						Value: os.Getenv("ELASTICSEARCH_PASSWORD"),
+					},
+					{
+						Name:  "EA_POLICY_NAMESPACE",
+						Value: namespace,
 					},
 				},
 				agentContainerVolumeMounts: []corev1.VolumeMount{

@@ -3,7 +3,8 @@ outputs:
     type: elasticsearch
     hosts:
       - ${ES_HOST}
-    api_key: ${ES_API_KEY_ENCODED}
+    username: ${ELASTICSEARCH_USERNAME}
+    password: ${ELASTICSEARCH_PASSWORD}
 
 agent:
   monitoring:
