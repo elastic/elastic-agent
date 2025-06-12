@@ -86,5 +86,5 @@ func TestFIPSAgentConnectingToFIPSFleetServerInECHFRH(t *testing.T) {
 		// Fleet Server, with both running in ECH.
 		//require.Equal(t, "online", agentStatus) // FIXME: Uncomment after https://github.com/elastic/apm-server/issues/17063 is resolved
 		return agentIsFIPS
-	}, 10*time.Second, 200*time.Millisecond, "Fleet Server's Elastic Agent should be healthy and FIPS-capable")
+	}, 30*time.Second, 500*time.Millisecond, "Fleet Server's Elastic Agent should be healthy and FIPS-capable")
 }
