@@ -14,6 +14,31 @@ env:
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1749258065"
   IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1749258065"
 
+# This section is used to define the plugins that will be used in the pipeline.
+# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
+common:
+  - google_oidc_plugin: &google_oidc_plugin
+      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-gcp-oidc.tf
+      # This plugin authenticates to Google Cloud using the OIDC token.
+      elastic/oblt-google-auth#v1.3.0:
+        lifetime: 10800 # seconds
+        project-id: "elastic-observability-ci"
+        project-number: "911195782929"
+# see https://github.com/avaly/gcp-secret-manager-buildkite-plugin/pull/10
+# see https://github.com/avaly/gcp-secret-manager-buildkite-plugin/pull/11
+#  - gcp_serverless_secrets_plugin: &gcp_serverless_secrets_plugin
+      #avaly/gcp-secret-manager#v1.2.0:
+  - gcp_serverless_secrets_plugin: &gcp_serverless_secrets_plugin
+      elastic/gcp-secret-manager#v1.3.0-elastic:
+        env:
+          # These secrets are created in .github/workflows/serverless-project.yml
+          ELASTICSEARCH_HOST: ea-serverless-it-elasticsearch-hostname
+          ELASTICSEARCH_PASSWORD: ea-serverless-it-elasticsearch-password
+          ELASTICSEARCH_USERNAME: ea-serverless-it-elasticsearch-username
+          KIBANA_HOST: ea-serverless-it-kibana-hostname
+          KIBANA_USERNAME: ea-serverless-it-kibana-username
+          KIBANA_PASSWORD: ea-serverless-it-kibana-password
+
 steps:
   - label: Start ESS stack for integration tests
     key: integration-ess
@@ -417,6 +442,76 @@ steps:
               - v1.32.0
               - v1.33.0
 
+  - group: "Serverless integration test"
+    key: integration-tests-serverless
+    notify:
+      - github_commit_status:
+          context: "buildkite/elastic-agent-extended-testing - Serverless integration test"
+    steps:
+      - label: "Windows:2022:amd64:sudo"
+        depends_on:
+          - packaging-windows
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/serverless"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
+          .buildkite/scripts/buildkite-integration-tests.ps1 fleet true
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_WIN_2022}"
+        plugins:
+          - *google_oidc_plugin
+          - *gcp_serverless_secrets_plugin
+
+      - label: "Windows:2025:amd64:sudo"
+        depends_on:
+          - packaging-windows
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/serverless"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
+          .buildkite/scripts/buildkite-integration-tests.ps1 fleet true
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_WIN_2025}"
+        plugins:
+          - *google_oidc_plugin
+          - *gcp_serverless_secrets_plugin
+      - label: "Ubuntu:2404:amd64:sudo"
+        depends_on: packaging-ubuntu-x86-64
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/serverless"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
+          sudo -E .buildkite/scripts/buildkite-integration-tests.sh fleet true
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
+        plugins:
+          - *google_oidc_plugin
+          - *gcp_serverless_secrets_plugin
+
   - label: ESS stack cleanup
     depends_on:
       - integration-tests-ubuntu
@@ -441,6 +536,7 @@ steps:
       - integration-tests-win
       - integration-tests-rhel8
       - integration-tests-kubernetes
+      - integration-tests-serverless
     allow_dependency_failure: true
     command: |
       buildkite-agent artifact download "build/*.xml" .
