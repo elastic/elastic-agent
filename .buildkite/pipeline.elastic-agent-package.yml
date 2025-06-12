@@ -75,20 +75,7 @@ steps:
           .buildkite/scripts/steps/package.sh
         artifact_paths:
           - "build/distributions/**/*"
-<<<<<<< HEAD
       - label: ":package: Package ARM elastic-agent"
-=======
-        matrix:
-          setup:
-            fips:
-              - false
-              - true
-        plugins:
-          - elastic/vault-docker-login#v0.5.2:
-              secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
-
-      - label: ":package: FIPS={{matrix.fips}} Package ARM elastic-agent"
->>>>>>> abda4f732 (bk(docker-login): use BK plugin (#8444))
         key: package_elastic-agent-arm
         agents:
           provider: "aws"
