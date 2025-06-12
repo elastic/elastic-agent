@@ -11,7 +11,8 @@ echo "~~~ Installing ASDF in ${ASDF_DIR} for user ${AGENT_USER}"
 # Installation instructions from https://asdf-vm.com/guide/getting-started.html
 ASDF_VERSION="v0.14.0"
 
-cd $AGENT_HOME
+trap 'popd' EXIT 
+pushd $AGENT_HOME
 
 # todo retry
 git clone https://github.com/asdf-vm/asdf.git ${ASDF_DIR} --branch ${ASDF_VERSION} 
