@@ -141,7 +141,6 @@ func TestMonitoringWithEndpoint(t *testing.T) {
 				Enabled:        true,
 				MonitorMetrics: true,
 				HTTP: &monitoringcfg.MonitoringHTTPConfig{
-
 					Enabled: true,
 				},
 			},
@@ -213,7 +212,6 @@ func TestMonitoringWithEndpoint(t *testing.T) {
 						require.Equal(t, uint64(1234), streamValues["process.pid"])
 					}
 				}
-
 			}
 		}
 	}
@@ -222,7 +220,6 @@ func TestMonitoringWithEndpoint(t *testing.T) {
 }
 
 func TestMonitoringConfigMetricsInterval(t *testing.T) {
-
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)
 	require.NoError(t, err, "Error creating agent info")
 	components := []component.Component{{ID: "foobeat", InputSpec: &component.InputRuntimeSpec{BinaryName: "filebeat"}}}
@@ -317,7 +314,6 @@ func TestMonitoringConfigMetricsInterval(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-
 		t.Run(tc.name, func(t *testing.T) {
 			b := &BeatsMonitor{
 				enabled:         true,
@@ -370,7 +366,6 @@ func TestMonitoringConfigMetricsInterval(t *testing.T) {
 }
 
 func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
-
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)
 	require.NoError(t, err, "Error creating agent info")
 	components := []component.Component{{ID: "foobeat", InputSpec: &component.InputRuntimeSpec{BinaryName: "filebeat"}}}
@@ -552,7 +547,6 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-
 		t.Run(tc.name, func(t *testing.T) {
 			b := &BeatsMonitor{
 				enabled:         true,
@@ -603,7 +597,6 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 }
 
 func TestErrorMonitoringConfigMetricsFailureThreshold(t *testing.T) {
-
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)
 	components := []component.Component{{ID: "foobeat", InputSpec: &component.InputRuntimeSpec{BinaryName: "filebeat"}}}
 	require.NoError(t, err, "Error creating agent info")
@@ -729,7 +722,6 @@ func TestErrorMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-
 		t.Run(tc.name, func(t *testing.T) {
 			b := &BeatsMonitor{
 				enabled:         true,
@@ -936,7 +928,7 @@ func TestMonitoringConfigForBeatsReceivers(t *testing.T) {
 			}
 		}
 	}
-	assert.Len(t, streamsForInputMetrics, 2)
+	assert.Len(t, streamsForInputMetrics, 3)
 }
 
 func TestMonitoringWithOtelRuntime(t *testing.T) {
