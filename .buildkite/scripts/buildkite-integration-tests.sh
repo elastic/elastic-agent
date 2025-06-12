@@ -53,12 +53,8 @@ fi
 GOTEST_ARGS+=("github.com/elastic/elastic-agent/testing/integration" -v -args "-integration.groups=${GROUP_NAME}" "-integration.sudo=${TEST_SUDO}")
 
 set +e
-<<<<<<< HEAD
 TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true \
-  gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- "${GOTEST_ARGS[@]}"
-=======
-TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true gotestsum --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args -integration.groups="${GROUP_NAME}" -integration.sudo="${TEST_SUDO}"
->>>>>>> 05289da6b (ci(test): skip skipped tests from the Test JUnit output (#8084))
+  gotestsum --no-color -f standard-quiet --junitfile "${outputXML}" --junitfile-hide-skipped-tests --jsonfile "${outputJSON}" -- "${GOTEST_ARGS[@]}"
 TESTS_EXIT_STATUS=$?
 set -e
 

@@ -34,7 +34,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.2.1
 	github.com/gofrs/flock v0.12.1
 	github.com/gofrs/uuid/v5 v5.2.0
-	github.com/google/go-cmp v0.6.0
+	github.com/google/go-cmp v0.7.0
 	github.com/google/pprof v0.0.0-20240727154555-813a5fbdbec8
 	github.com/gorilla/mux v1.8.1
 	github.com/jaypipes/ghw v0.12.0
@@ -82,21 +82,12 @@ require (
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
-<<<<<<< HEAD
-	gotest.tools/gotestsum v1.9.0
+	gotest.tools/gotestsum v1.12.2
 	helm.sh/helm/v3 v3.15.4
 	k8s.io/api v0.31.3
 	k8s.io/apimachinery v0.31.3
 	k8s.io/cli-runtime v0.30.3
 	k8s.io/client-go v0.31.3
-=======
-	gotest.tools/gotestsum v1.12.2
-	helm.sh/helm/v3 v3.17.3
-	k8s.io/api v0.32.3
-	k8s.io/apimachinery v0.32.3
-	k8s.io/cli-runtime v0.32.2
-	k8s.io/client-go v0.32.3
->>>>>>> 05289da6b (ci(test): skip skipped tests from the Test JUnit output (#8084))
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.70
 	sigs.k8s.io/e2e-framework v0.4.0
 	sigs.k8s.io/kustomize/api v0.13.5-0.20230601165947-6ce0bf390ce3
