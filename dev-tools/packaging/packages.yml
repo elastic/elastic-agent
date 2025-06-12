@@ -495,16 +495,19 @@ shared:
   - &docker_elastic_wolfi_spec
     docker_variant: 'wolfi'
     extra_vars:
+      # NOTE: This image is not publicly available.
       from: '--platform=linux/amd64 docker.elastic.co/wolfi/chainguard-base'
 
   - &docker_elastic_wolfi_arm_spec
     docker_variant: 'wolfi'
     extra_vars:
+      # NOTE: This image is not publicly available.
       from: '--platform=linux/arm64 docker.elastic.co/wolfi/chainguard-base'
 
   - &docker_fips_spec
     docker_variant: 'basic'
     extra_vars:
+      # NOTE: This image is not publicly available.
       from: 'docker.elastic.co/wolfi/chainguard-base-fips:latest'
 
   - &docker_elastic_spec
@@ -1463,8 +1466,8 @@ specs:
       types: [docker]
       spec:
         <<: *agent_docker_spec
-        # The cloud image is always based on Wolfi
-        <<: *docker_wolfi_spec
+        # The cloud image is always based on Elastic Wolfi
+        <<: *docker_elastic_wolfi_spec
         <<: *docker_builder_spec
         <<: *agent_docker_cloud_spec
         <<: *elastic_license_for_binaries
@@ -1476,8 +1479,8 @@ specs:
       types: [docker]
       spec:
         <<: *agent_docker_spec
-        # The cloud image is always based on Wolfi
-        <<: *docker_wolfi_arm_spec
+        # The cloud image is always based on Elastic Wolfi
+        <<: *docker_elastic_wolfi_spec
         <<: *docker_builder_arm_spec
         <<: *agent_docker_cloud_spec
         <<: *elastic_license_for_binaries
@@ -1490,7 +1493,7 @@ specs:
       types: [ docker ]
       spec:
         <<: *agent_docker_spec
-        # The service image is always based on Wolfi
+        # The service image is always based on Elastic Wolfi
         <<: *docker_elastic_wolfi_spec
         <<: *docker_builder_spec
         <<: *agent_docker_cloud_spec
