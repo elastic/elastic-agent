@@ -1507,7 +1507,7 @@ specs:
       types: [ docker ]
       spec:
         <<: *agent_docker_spec
-        # The service image is always based on Wolfi
+        # The service image is always based on Elastic Wolfi
         <<: *docker_elastic_wolfi_arm_spec
         <<: *docker_builder_arm_spec
         <<: *agent_docker_cloud_spec
