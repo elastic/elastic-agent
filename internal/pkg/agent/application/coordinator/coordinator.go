@@ -160,6 +160,23 @@ type OTelManager interface {
 	Watch() <-chan *status.AggregateStatus
 }
 
+// OTelComponentManager provides an interface to run components and plain otel configurations in an otel collector.
+type OTelComponentManager interface {
+	Runner
+
+	// UpdateCollector updates the current plain configuration for the otel collector.
+	UpdateCollector(cfg *confmap.Conf)
+
+	// SubscribeCollectorAll provides an interface to watch for changes in plain collector configuration.
+	WatchCollector() <-chan *status.AggregateStatus
+
+	// UpdateComponents updates the current components model.
+	UpdateComponents(model component.Model)
+
+	// SubscribeComponentsAll provides an interface to watch for changes in all components.
+	WatchComponents() <-chan runtime.ComponentComponentState
+}
+
 // ConfigChange provides an interface for receiving a new configuration.
 //
 // Ack must be called if the configuration change was accepted and Fail should be called if it fails to be accepted.
