@@ -13,10 +13,14 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
 
 func TestReadNotExistingMarkerFile(t *testing.T) {
@@ -142,6 +146,56 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	require.NoError(t, watchErr)
 
 	close(errCh)
+}
+
+func TestUpdateMarkerFile(t *testing.T) {
+	marker := &UpdateMarker{
+		Version:           "1.2.3",
+		VersionedHome:     "/home",
+		Hash:              "sha...hash",
+		UpdatedOn:         time.Now(),
+		PrevVersion:       "0.1.2",
+		PrevHash:          "sha..hash",
+		PrevVersionedHome: "/home/elastic",
+		Acked:             false,
+		Action:            &fleetapi.ActionUpgrade{ActionID: "123", ActionType: "UPGRADAE"},
+		Details:           details.NewDetails("1.2.3", details.StateRequested, "action-id"),
+		DesiredOutcome:    OUTCOME_UPGRADE,
+	}
+	tmp := t.TempDir()
+	markerFile := filepath.Join(tmp, "marker")
+	require.NoError(t, saveMarkerToPath(marker, markerFile, true))
+
+	// update marker
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// first concurrent update
+	go func() {
+		err := UpdateMarkerFile(markerFile, func(m *UpdateMarker) {
+			m.Version = "1.2.3-up"
+		})
+		assert.NoError(t, err)
+		wg.Done()
+	}()
+
+	// second update
+	go func() {
+		err := UpdateMarkerFile(markerFile, func(m *UpdateMarker) {
+			m.Hash = "sha...hash2"
+		})
+		assert.NoError(t, err)
+		wg.Done()
+	}()
+
+	wg.Wait()
+
+	// Assert
+	loadedMarker, err := loadMarker(markerFile)
+	assert.NoError(t, err)
+	assert.Equal(t, "1.2.3-up", loadedMarker.Version)
+	assert.Equal(t, "sha...hash2", loadedMarker.Hash)
+	assert.Equal(t, marker.VersionedHome, loadedMarker.VersionedHome)
 }
 
 func watchFileNotEmpty(t *testing.T, ctx context.Context, filePath string, errCh chan error, wg *sync.WaitGroup) {
