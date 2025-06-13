@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid/v5"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -30,7 +29,7 @@ import (
 
 const cloudAgentPolicyID = "policy-elastic-agent-on-cloud"
 
-// FIPSTest exercises a FIPS-capable Elastic Agent against a FIPS-capable Fleet Server
+// TestFIPS exercises a FIPS-capable Elastic Agent against a FIPS-capable Fleet Server
 // running in ECH. Concretely, it exercises the following functionality:
 //   - Building a local, FIPS-capable Elastic Agent Docker image that's deployable
 //     to ECH in a FRH region (this is actually done by the CI pipeline running this integration
@@ -170,8 +169,8 @@ func addIntegrationAndCheckData(t *testing.T, info *define.Info, fixture *atesti
 	require.NoError(t, err)
 
 	docs, err := estools.GetResultsForAgentAndDatastream(ctx, info.ESClient, "system.cpu", status.Info.ID)
-	assert.NoError(t, err, "error fetching system metrics")
-	assert.Greater(t, docs.Hits.Total.Value, 0, "could not find any matching system metrics for agent ID %s", status.Info.ID)
+	require.NoError(t, err, "error fetching system metrics")
+	require.Greater(t, docs.Hits.Total.Value, 0, "could not find any matching system metrics for agent ID %s", status.Info.ID)
 	t.Logf("Generated %d system events", docs.Hits.Total.Value)
 }
 
