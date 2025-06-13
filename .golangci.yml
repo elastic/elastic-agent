@@ -48,10 +48,15 @@ linters:
       exclude-godoc-examples: true
     gomoddirectives:
       replace-allow-list:
-        - github.com/Shopify/sarama
+        - github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption
+        - github.com/apoydence/eachers
         - github.com/dop251/goja
         - github.com/dop251/goja_nodejs
+        - github.com/fsnotify/fsevents
         - github.com/fsnotify/fsnotify
+        - github.com/google/gopacket
+        - github.com/insomniacslk/dhcp
+        - github.com/meraki/dashboard-api-go/v3
         - github.com/openshift/api
         - github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver
       replace-local: false
