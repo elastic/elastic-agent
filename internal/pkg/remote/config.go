@@ -13,11 +13,12 @@ import (
 
 // Config is the configuration for the client.
 type Config struct {
-	Protocol Protocol `config:"protocol" yaml:"protocol,omitempty"`
-	SpaceID  string   `config:"space.id" yaml:"space.id,omitempty"`
-	Path     string   `config:"path" yaml:"path,omitempty"`
-	Host     string   `config:"host" yaml:"host,omitempty"`
-	Hosts    []string `config:"hosts" yaml:"hosts,omitempty"`
+	Protocol Protocol          `config:"protocol" yaml:"protocol,omitempty"`
+	SpaceID  string            `config:"space.id" yaml:"space.id,omitempty"`
+	Path     string            `config:"path" yaml:"path,omitempty"`
+	Host     string            `config:"host" yaml:"host,omitempty"`
+	Hosts    []string          `config:"hosts" yaml:"hosts,omitempty"`
+	Headers  map[string]string `config:"headers" yaml:"headers,omitempty"`
 
 	Transport httpcommon.HTTPTransportSettings `config:",inline" yaml:",inline"`
 }
