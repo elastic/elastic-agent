@@ -8,3 +8,4 @@ repos:
         exclude: (.*/.*.(tmpl|tftpl)$)
     -   id: check-merge-conflict
         args: ['--assume-in-merge']
+        exclude: (^NOTICE.*\.txt$)
