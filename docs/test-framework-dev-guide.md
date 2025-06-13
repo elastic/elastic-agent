@@ -28,6 +28,17 @@ The Elastic Agent package that is used for integration tests packages Beats buil
 ESS (production) API Key to create on <https://cloud.elastic.co/account/keys>
 Warning: if you never created a deployment on it, you won't have permission to get this key, so you will need to create one first.
 
+
+#### Setup Serverless deployment
+
+This process is now automated and runs daily, utilizing the existing `oblt-cli` framework. Serverless deployments are created each day and automatically destroyed every three days.
+
+The automation is configured in the `serverless-project.yml` file located in the `.github/workflows` directory.
+
+If necessary, you can create a new serverless deployment manually; the previous deployments will be destroyed automatically, but not immediately. To do so, you need to run the GitHub action called [serverless-project.yml](https://github.com/elastic/elastic-agent/actions/workflows/serverless-project.yml).
+
+Credentials for these deployments are securely stored in Google and can only be accessed by Buildkite pipelines. The access control is set using [OpenID Connect in Google Cloud Platform](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-google-cloud-platform). And that's managed by the Robots team.
+
 ## Running tests
 
 Some integration and E2E tests are safe to run locally. These tests set
