@@ -243,7 +243,7 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 				newVersionBuildMetadata := "build" + time.Now().Format("20060102150405")
 				parsedNewVersion := version.NewParsedSemVer(currentVersion.Major(), currentVersion.Minor(), currentVersion.Patch(), "", newVersionBuildMetadata)
 
-				versionForFixture, err := repackageArchive(t.Context(), t, err, fromFixture, newVersionBuildMetadata, currentVersion, newPackageContainingDir, parsedNewVersion)
+				versionForFixture, err := repackageArchive(t.Context(), t, fromFixture, newVersionBuildMetadata, currentVersion, newPackageContainingDir, parsedNewVersion)
 				require.NoError(t, err, "error repackaging the archive built from the same commit")
 
 				// I wish I could just pass the location of the package on disk to the whole upgrade tests/fixture/fetcher code
