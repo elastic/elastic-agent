@@ -168,10 +168,15 @@ func addIntegrationAndCheckData(t *testing.T, info *define.Info, fixture *atesti
 	status, err := fixture.ExecStatus(ctx)
 	require.NoError(t, err)
 
-	docs, err := estools.GetResultsForAgentAndDatastream(ctx, info.ESClient, "system.cpu", status.Info.ID)
-	require.NoError(t, err, "error fetching system metrics")
-	require.Greater(t, docs.Hits.Total.Value, 0, "could not find any matching system metrics for agent ID %s", status.Info.ID)
-	t.Logf("Generated %d system events", docs.Hits.Total.Value)
+	t.Logf("status: %v", status)
+
+	require.Eventually(t, func() bool {
+		docs, err := estools.GetResultsForAgentAndDatastream(ctx, info.ESClient, "system.cpu", status.Info.ID)
+		require.NoError(t, err, "error fetching system metrics")
+		t.Logf("Generated %d system events", docs.Hits.Total.Value)
+
+		return docs.Hits.Total.Value > 0
+	}, 2*time.Minute, 5*time.Second, "no system.cpu data received in Elasticsearch")
 }
 
 func upgradeFIPSAgent(t *testing.T, info *define.Info) {
