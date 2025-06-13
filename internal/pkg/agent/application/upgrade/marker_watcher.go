@@ -128,12 +128,12 @@ func (mfw *MarkerFileWatcher) processMarker(currentVersion string, commit string
 		return
 	}
 
-	mfw.logger.Infof("loaded marker: %+v", marker)
-
 	// Nothing to do if marker is not (yet) present
 	if marker == nil {
 		return
 	}
+
+	mfw.logger.Infof("loaded marker: %+v details %+v", marker, marker.Details)
 
 	// If the marker exists but the version of Agent we're running right
 	// now is the same as the prevVersion recorded in the marker AND an upgrade
