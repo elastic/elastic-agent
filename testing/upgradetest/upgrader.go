@@ -34,7 +34,7 @@ type CustomPGP struct {
 	PGPPath string
 }
 
-type upgradeOpts struct {
+type UpgradeOpts struct {
 	sourceURI *string
 
 	unprivileged     *bool
@@ -51,90 +51,99 @@ type upgradeOpts struct {
 	// Disable check that enforces different hashed between the to and from version of upgrade
 	disableHashCheck bool
 
-	preInstallHook  func() error
-	postInstallHook func() error
-	preUpgradeHook  func() error
-	postUpgradeHook func() error
+	preInstallHook         func() error
+	postInstallHook        func() error
+	preUpgradeHook         func() error
+	postUpgradeHook        func() error
+	PostWatcherSuccessHook func(context.Context, *atesting.Fixture) error
 }
 
-type UpgradeOpt func(opts *upgradeOpts)
+type UpgradeOpt func(opts *UpgradeOpts)
 
 // WithSourceURI sets a specific --source-uri for the upgrade
 // command. This doesn't change the verification of the upgrade
 // the resulting upgrade must still be the same agent provided
 // in the endFixture variable.
 func WithSourceURI(sourceURI string) UpgradeOpt {
-	return func(opts *upgradeOpts) {
+	return func(opts *UpgradeOpts) {
 		opts.sourceURI = &sourceURI
 	}
 }
 
 // WithUnprivileged sets the install to be explicitly unprivileged.
 func WithUnprivileged(unprivileged bool) UpgradeOpt {
-	return func(opts *upgradeOpts) {
+	return func(opts *UpgradeOpts) {
 		opts.unprivileged = &unprivileged
 	}
 }
 
 // WithSkipVerify sets the skip verify option for upgrade.
 func WithSkipVerify(skipVerify bool) UpgradeOpt {
-	return func(opts *upgradeOpts) {
+	return func(opts *UpgradeOpts) {
 		opts.skipVerify = skipVerify
 	}
 }
 
 // WithSkipDefaultPgp sets the skip default pgp option for upgrade.
 func WithSkipDefaultPgp(skipDefaultPgp bool) UpgradeOpt {
-	return func(opts *upgradeOpts) {
+	return func(opts *UpgradeOpts) {
 		opts.skipDefaultPgp = skipDefaultPgp
 	}
 }
 
 // WithCustomPGP sets a custom pgp configuration for upgrade.
 func WithCustomPGP(customPgp CustomPGP) UpgradeOpt {
-	return func(opts *upgradeOpts) {
+	return func(opts *UpgradeOpts) {
 		opts.customPgp = &customPgp
 	}
 }
 
 // WithPreInstallHook sets a hook to be called before install.
 func WithPreInstallHook(hook func() error) UpgradeOpt {
-	return func(opts *upgradeOpts) {
+	return func(opts *UpgradeOpts) {
 		opts.preInstallHook = hook
 	}
 }
 
 // WithPostInstallHook sets a hook to be called before install.
 func WithPostInstallHook(hook func() error) UpgradeOpt {
-	return func(opts *upgradeOpts) {
+	return func(opts *UpgradeOpts) {
 		opts.postInstallHook = hook
 	}
 }
 
 // WithPreUpgradeHook sets a hook to be called before install.
 func WithPreUpgradeHook(hook func() error) UpgradeOpt {
-	return func(opts *upgradeOpts) {
+	return func(opts *UpgradeOpts) {
 		opts.preUpgradeHook = hook
 	}
 }
 
 // WithPostUpgradeHook sets a hook to be called before install.
 func WithPostUpgradeHook(hook func() error) UpgradeOpt {
-	return func(opts *upgradeOpts) {
+	return func(opts *UpgradeOpts) {
 		opts.postUpgradeHook = hook
+	}
+}
+
+// WithPostWatcherSuccessHook sets a hook to be called after the upgrade is successful
+// and the upgrade watcher has terminated as well.
+func WithPostWatcherSuccessHook(hook func(context.Context, *atesting.Fixture) error) UpgradeOpt {
+	return func(opts *UpgradeOpts) {
+		opts.PostWatcherSuccessHook = hook
 	}
 }
 
 // WithCustomWatcherConfig sets a custom watcher configuration to use.
 func WithCustomWatcherConfig(cfg string) UpgradeOpt {
-	return func(opts *upgradeOpts) {
+	return func(opts *UpgradeOpts) {
 		opts.customWatcherCfg = cfg
 	}
 }
 
 // WithServers will use start version with servers flavor.
 func WithServers() UpgradeOpt {
-	return func(opts *upgradeOpts) {
+	return func(opts *UpgradeOpts) {
 		opts.installServers = true
 	}
 }
@@ -144,14 +153,14 @@ func WithServers() UpgradeOpt {
 // useful in upgrade tests where the end Agent version does not contain changes
 // in the Upgrade Watcher whose effects are being asserted upon in PerformUpgrade.
 func WithDisableUpgradeWatcherUpgradeDetailsCheck() UpgradeOpt {
-	return func(opts *upgradeOpts) {
+	return func(opts *UpgradeOpts) {
 		opts.disableUpgradeWatcherUpgradeDetailsCheck = true
 	}
 }
 
 // WithDisableHashCheck disables hash check between start and end versions of upgrade
 func WithDisableHashCheck(disable bool) UpgradeOpt {
-	return func(opts *upgradeOpts) {
+	return func(opts *UpgradeOpts) {
 		opts.disableHashCheck = disable
 	}
 }
@@ -167,7 +176,7 @@ func PerformUpgrade(
 	// use the passed in options to perform the upgrade
 	// `skipVerify` is by default enabled, because default is to perform a local
 	// upgrade to a built version of the Elastic Agent.
-	var upgradeOpts upgradeOpts
+	var upgradeOpts UpgradeOpts
 	upgradeOpts.skipVerify = true
 	for _, o := range opts {
 		o(&upgradeOpts)
@@ -435,6 +444,12 @@ func PerformUpgrade(
 		}
 	}
 
+	if upgradeOpts.PostWatcherSuccessHook != nil {
+		if err := upgradeOpts.PostWatcherSuccessHook(ctx, endFixture); err != nil {
+			return fmt.Errorf("post watcher success hook failed: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -689,4 +704,25 @@ func getStatus(ctx context.Context, fixture *atesting.Fixture) *atesting.AgentSt
 			return &status
 		}
 	}
+}
+
+// PostUpgradeAgentIsFIPSCapable checks if the Agent fixture after upgrade is FIPS-capable and
+// returns an error if it isn't.
+func PostUpgradeAgentIsFIPSCapable(ctx context.Context, f *atesting.Fixture) error {
+	client := f.Client()
+	err := client.Connect(ctx)
+	if err != nil {
+		return err
+	}
+
+	ver, err := client.Version(ctx)
+	if err != nil {
+		return err
+	}
+
+	if !ver.Fips {
+		return errors.New("expected upgraded Agent to be FIPS-capable")
+	}
+
+	return nil
 }
