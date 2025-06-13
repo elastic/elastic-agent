@@ -612,7 +612,7 @@ instrumentation:
   java:
     image: docker.elastic.co/observability/elastic-otel-javaagent:1.4.1
   nodejs:
-    image: docker.elastic.co/observability/elastic-otel-node:1.1.0
+    image: docker.elastic.co/observability/elastic-otel-node:1.1.1
   dotnet:
     image: docker.elastic.co/observability/elastic-otel-dotnet:1.0.2
   python:
