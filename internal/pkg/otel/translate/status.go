@@ -56,26 +56,28 @@ func GetAllComponentStates(otelStatus *status.AggregateStatus, components []comp
 
 // DropComponentStateFromOtelStatus removes the statuses of otel pipelines representing runtime components from the
 // given status.
-func DropComponentStateFromOtelStatus(otelStatus *status.AggregateStatus) error {
+func DropComponentStateFromOtelStatus(otelStatus *status.AggregateStatus) (*status.AggregateStatus, error) {
 	if otelStatus == nil {
-		return nil
+		return nil, nil
 	}
-	for pipelineStatusId := range otelStatus.ComponentStatusMap {
+
+	newStatus := deepCopyStatus(otelStatus)
+	for pipelineStatusId := range newStatus.ComponentStatusMap {
 		pipelineId := &pipeline.ID{}
 		componentKind, pipelineIdStr := parseEntityStatusId(pipelineStatusId)
 		if componentKind != "pipeline" {
-			return fmt.Errorf("pipeline status id %s is not a pipeline", pipelineStatusId)
+			return nil, fmt.Errorf("pipeline status id %s is not a pipeline", pipelineStatusId)
 		}
 		err := pipelineId.UnmarshalText([]byte(pipelineIdStr)) // there's no ergonomic way to do this conversion
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if strings.HasPrefix(pipelineId.Name(), OtelNamePrefix) {
-			delete(otelStatus.ComponentStatusMap, pipelineStatusId)
+			delete(newStatus.ComponentStatusMap, pipelineStatusId)
 		}
 	}
 
-	return nil
+	return newStatus, nil
 }
 
 // getOtelRuntimePipelineStatuses finds otel pipeline statuses belonging to runtime components and returns them as a map
@@ -272,4 +274,25 @@ func parseEntityStatusId(id string) (kind string, entityId string) {
 		return "", ""
 	}
 	return parts[0], parts[1]
+}
+
+// deepCopyStatus makes a deep copy of the status.
+func deepCopyStatus(otelStatus *status.AggregateStatus) *status.AggregateStatus {
+	if otelStatus == nil {
+		return nil
+	}
+
+	newStatus := &status.AggregateStatus{
+		Event: otelStatus.Event,
+	}
+	if otelStatus.ComponentStatusMap == nil {
+		return newStatus
+	}
+
+	newStatus.ComponentStatusMap = make(map[string]*status.AggregateStatus, len(otelStatus.ComponentStatusMap))
+	for k, v := range otelStatus.ComponentStatusMap {
+		newStatus.ComponentStatusMap[k] = deepCopyStatus(v)
+	}
+
+	return newStatus
 }
