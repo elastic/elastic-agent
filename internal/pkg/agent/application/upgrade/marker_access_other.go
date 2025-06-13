@@ -9,11 +9,17 @@ package upgrade
 import (
 	"errors"
 	"fmt"
+	"os"
 )
 
 // On non-Windows platforms, readMarkerFile simply reads the marker file.
 // See marker_access_windows.go for behavior on Windows platforms.
 func readMarkerFile(markerFile string, fileLock Locker) (bytes []byte, err error) {
+	if _, err := os.Stat(markerFile); errors.Is(err, os.ErrNotExist) {
+		// marker doesn't exist, nothing to do
+		return nil, nil
+	}
+
 	err = fileLock.Lock()
 	if err != nil {
 		return nil, fmt.Errorf("locking update marker file %q for reading: %w", markerFile, err)
