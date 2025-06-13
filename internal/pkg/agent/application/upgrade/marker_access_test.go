@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
@@ -64,7 +65,7 @@ func TestReadNotExistingMarkerFile(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			markerFileName := tc.setup(t, tmpDir)
-			markerFileBytes, err := readMarkerFile(markerFileName)
+			markerFileBytes, err := readMarkerFile(markerFileName, filelock.NewNoopLocker())
 			tc.wantErr(t, err)
 			assert.Equal(t, tc.wantMarkerFileBytes, markerFileBytes)
 		})
