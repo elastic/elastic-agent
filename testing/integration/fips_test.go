@@ -56,7 +56,7 @@ func TestFIPS(t *testing.T) {
 		OS: []define.OS{
 			{Type: define.Linux},
 		},
-		Sudo:  false,
+		Sudo:  true, // requires Agent installation
 		Local: true,
 
 		// Ensures the test will run in a FIPS-configured environment against a
