@@ -15,8 +15,57 @@ import (
 	"testing"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestReadNotExistingMarkerFile(t *testing.T) {
+	testcases := []struct {
+		name                string
+		setup               func(t *testing.T, tmpDir string) string
+		wantMarkerFileBytes []byte
+		wantErr             assert.ErrorAssertionFunc
+	}{
+		{
+			name: "No error when containing dir does not exist",
+			setup: func(t *testing.T, tmpDir string) string {
+				notExistingDataDir := filepath.Join(tmpDir, "data")
+				return markerFilePath(notExistingDataDir)
+			},
+			wantMarkerFileBytes: nil,
+			wantErr:             assert.NoError,
+		},
+		{
+			name: "No error when marker file does not exist",
+			setup: func(t *testing.T, tmpDir string) string {
+				return markerFilePath(tmpDir)
+			},
+			wantMarkerFileBytes: nil,
+			wantErr:             assert.NoError,
+		},
+		{
+			name: "happy path: read marker file bytes",
+			setup: func(t *testing.T, tmpDir string) string {
+				filePath := markerFilePath(tmpDir)
+				err := os.WriteFile(filePath, []byte("foobar"), 0600)
+				require.NoError(t, err)
+				return filePath
+			},
+			wantMarkerFileBytes: []byte("foobar"),
+			wantErr:             assert.NoError,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			markerFileName := tc.setup(t, tmpDir)
+			markerFileBytes, err := readMarkerFile(markerFileName)
+			tc.wantErr(t, err)
+			assert.Equal(t, tc.wantMarkerFileBytes, markerFileBytes)
+		})
+	}
+}
 
 func TestWriteMarkerFile(t *testing.T) {
 	tmpDir := t.TempDir()
