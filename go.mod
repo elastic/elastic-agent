@@ -26,6 +26,8 @@ require (
 	github.com/elastic/go-ucfg v0.8.9-0.20250307075119-2a22403faaea
 	github.com/elastic/mock-es v0.0.0-20241101195702-0a41fa3d30d9
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.3.0
+	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.1.0
+	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.2.1
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.15.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.6.0
 	github.com/fatih/color v1.18.0
@@ -73,23 +75,23 @@ require (
 	go.elastic.co/apm/v2 v2.7.0
 	go.elastic.co/ecszap v1.0.3
 	go.elastic.co/go-licence-detector v0.7.0
-	go.opentelemetry.io/collector/component/componentstatus v0.125.0
-	go.opentelemetry.io/collector/pipeline v0.125.0
+	go.opentelemetry.io/collector/component/componentstatus v0.127.0
+	go.opentelemetry.io/collector/pipeline v0.127.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.125.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.125.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/crypto v0.37.0
+	golang.org/x/crypto v0.38.0
 	golang.org/x/exp v0.0.0-20250215185904-eff6e970281f
 	golang.org/x/mod v0.24.0
-	golang.org/x/net v0.39.0
+	golang.org/x/net v0.40.0
 	golang.org/x/sync v0.14.0
 	golang.org/x/sys v0.33.0
-	golang.org/x/term v0.31.0
+	golang.org/x/term v0.32.0
 	golang.org/x/text v0.25.0
 	golang.org/x/time v0.11.0
 	golang.org/x/tools v0.30.0
 	google.golang.org/api v0.226.0
-	google.golang.org/grpc v1.72.0
+	google.golang.org/grpc v1.72.1
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -126,7 +128,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver v0.125.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.125.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver v0.125.0
-	go.opentelemetry.io/collector/component v1.31.0
+	go.opentelemetry.io/collector/component v1.33.0
 	go.opentelemetry.io/collector/confmap v1.31.0
 	go.opentelemetry.io/collector/confmap/provider/envprovider v1.31.0
 	go.opentelemetry.io/collector/confmap/provider/fileprovider v1.31.0
@@ -141,7 +143,7 @@ require (
 	go.opentelemetry.io/collector/exporter/otlphttpexporter v0.125.0
 	go.opentelemetry.io/collector/extension v1.31.0
 	go.opentelemetry.io/collector/extension/memorylimiterextension v0.125.0
-	go.opentelemetry.io/collector/featuregate v1.31.0
+	go.opentelemetry.io/collector/featuregate v1.33.0
 	go.opentelemetry.io/collector/otelcol v0.125.0
 	go.opentelemetry.io/collector/processor v1.31.0
 	go.opentelemetry.io/collector/processor/batchprocessor v0.125.0
@@ -384,7 +386,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.14.1 // indirect
 	github.com/gophercloud/gophercloud v1.14.1 // indirect
 	github.com/gorilla/handlers v1.5.2 // indirect
-	github.com/gorilla/websocket v1.5.0 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/gosuri/uitable v0.0.4 // indirect
 	github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc // indirect
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
@@ -482,6 +484,7 @@ require (
 	github.com/nxadm/tail v1.4.11 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
+	github.com/open-telemetry/opamp-go v0.19.1-0.20250423191708-8d78a5169350 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/signaltometricsconnector v0.124.2-0.20250425060700-a372d054d598 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.125.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer v0.125.0 // indirect
@@ -618,8 +621,8 @@ require (
 	go.opentelemetry.io/collector/internal/fanoutconsumer v0.125.0 // indirect
 	go.opentelemetry.io/collector/internal/memorylimiter v0.125.0 // indirect
 	go.opentelemetry.io/collector/internal/sharedcomponent v0.125.0 // indirect
-	go.opentelemetry.io/collector/internal/telemetry v0.125.0 // indirect
-	go.opentelemetry.io/collector/pdata v1.31.0 // indirect
+	go.opentelemetry.io/collector/internal/telemetry v0.127.0 // indirect
+	go.opentelemetry.io/collector/pdata v1.33.0 // indirect
 	go.opentelemetry.io/collector/pdata/pprofile v0.125.0 // indirect
 	go.opentelemetry.io/collector/pdata/testdata v0.125.0 // indirect
 	go.opentelemetry.io/collector/pipeline/xpipeline v0.125.0 // indirect
