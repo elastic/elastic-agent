@@ -46,7 +46,7 @@ import (
 // would be redundant.
 func TestFleetManagedUpgradeUnprivileged(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: ECHDeployment,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
