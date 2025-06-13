@@ -401,12 +401,6 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 			"agent.version",
 			"data_stream.namespace",
 			"elastic_agent.id",
-<<<<<<< HEAD
-			"log.file.inode",
-			"log.file.path",
-			"log.offset",
-=======
->>>>>>> b8882aa19 (Add filebeat_input to beat receiver agent monitoring integration test (#8338))
 			"event.ingested",
 		}
 		switch tc.onlyCompareKeys {
