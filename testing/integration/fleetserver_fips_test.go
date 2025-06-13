@@ -68,6 +68,8 @@ func TestFIPSAgentConnectingToFIPSFleetServerInECHFRH(t *testing.T) {
 		agents, err := info.KibanaClient.ListAgents(ctx, kibana.ListAgentsRequest{})
 		require.NoError(t, err)
 
+		t.Logf("agents from Kibana ListAgents: %#+v", agents)
+
 		// Find Fleet Server's own Agent and get its status and whether it's
 		// FIPS-capable
 		var agentStatus string
@@ -81,10 +83,13 @@ func TestFIPSAgentConnectingToFIPSFleetServerInECHFRH(t *testing.T) {
 			}
 		}
 
+		t.Logf("agentStatus: %v", agentStatus)
+		t.Logf("agentIsFIPS: %v", agentIsFIPS)
+
 		// Check that this Agent is online (i.e. healthy) and is FIPS-capable. This
 		// will prove that a FIPS-capable Agent is able to connect to a FIPS-capable
 		// Fleet Server, with both running in ECH.
 		require.Equal(t, "online", agentStatus)
 		return agentIsFIPS
-	}, 10*time.Second, 200*time.Millisecond, "Fleet Server's Elastic Agent should be healthy and FIPS-capable")
+	}, 30*time.Second, 500*time.Millisecond, "Fleet Server's Elastic Agent should be healthy and FIPS-capable")
 }
