@@ -9,6 +9,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"errors"
 	"io"
 	"os"
@@ -22,9 +23,61 @@ import (
 
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/version"
 	agtversion "github.com/elastic/elastic-agent/version"
 )
+
+func repackageArchive(ctx context.Context, t *testing.T, err error, startFixture *atesting.Fixture, newVersionBuildMetadata string, currentVersion *version.ParsedSemVer, newPackageContainingDir string, parsedNewVersion *version.ParsedSemVer) (*version.ParsedSemVer, error) {
+	err = startFixture.EnsurePrepared(ctx)
+	require.NoErrorf(t, err, "fixture should be prepared")
+
+	// retrieve the compressed package file location
+	srcPackage, err := startFixture.SrcPackage(ctx)
+	require.NoErrorf(t, err, "error retrieving start fixture source package")
+
+	originalPackageFileName := filepath.Base(srcPackage)
+
+	// integration test fixtures and package names treat the version as a string including the "-SNAPSHOT" suffix
+	// while the repackage functions below separate version from the snapshot flag.
+	// Normally the early release versions are not snapshots but this test runs on PRs and main branch when we test
+	// starting from SNAPSHOT packages, so we have to work around the fact that we cannot simply re-generate the packages
+	// by defining versions in 2 separate ways for repackage hack and for fixtures
+	buildMetadataForAgentFixture := newVersionBuildMetadata
+	if currentVersion.IsSnapshot() {
+		buildMetadataForAgentFixture += "-SNAPSHOT"
+	}
+	versionForFixture := version.NewParsedSemVer(currentVersion.Major(), currentVersion.Minor(), currentVersion.Patch(), "", buildMetadataForAgentFixture)
+
+	// calculate the new package name
+	newPackageFileName := strings.Replace(originalPackageFileName, currentVersion.String(), versionForFixture.String(), 1)
+	t.Logf("originalPackageName: %q newPackageFileName: %q", originalPackageFileName, newPackageFileName)
+
+	newPackageAbsPath := filepath.Join(newPackageContainingDir, newPackageFileName)
+
+	// hack the package based on type
+	ext := filepath.Ext(originalPackageFileName)
+	if ext == ".gz" {
+		// fetch the next extension
+		ext = filepath.Ext(strings.TrimRight(originalPackageFileName, ext)) + ext
+	}
+	switch ext {
+	case ".zip":
+		t.Logf("file %q is a .zip package", originalPackageFileName)
+		repackageZipArchive(t, srcPackage, newPackageAbsPath, parsedNewVersion)
+	case ".tar.gz":
+		t.Logf("file %q is a .tar.gz package", originalPackageFileName)
+		repackageTarArchive(t, srcPackage, newPackageAbsPath, parsedNewVersion)
+	default:
+		t.Logf("unknown extension %q for package file %q ", ext, originalPackageFileName)
+		t.FailNow()
+	}
+
+	// Create hash file for the new package
+	err = mage.CreateSHA512File(newPackageAbsPath)
+	require.NoErrorf(t, err, "error creating .sha512 for file %q", newPackageAbsPath)
+	return versionForFixture, err
+}
 
 func repackageTarArchive(t *testing.T, srcPackagePath string, newPackagePath string, newVersion *version.ParsedSemVer) {
 	oldTopDirectoryName := strings.TrimRight(filepath.Base(srcPackagePath), ".tar.gz")
