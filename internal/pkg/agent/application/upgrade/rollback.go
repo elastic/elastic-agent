@@ -63,7 +63,7 @@ func Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPa
 	}
 
 	// cleanup everything except version we're rolling back into
-	return Cleanup(log, topDirPath, prevVersionedHome, prevHash, true, true)
+	return Cleanup(log, topDirPath, prevVersionedHome, prevHash, false, true)
 }
 
 // Cleanup removes all artifacts and files related to a specified version.
