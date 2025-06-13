@@ -33,7 +33,7 @@ pull_request_rules:
     conditions:
       - author=github-actions[bot]
       - check-success=buildkite/elastic-agent
-      - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
+      - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml|.buildkite/bk.integration-fips.pipeline.yml)$
       - head~=^updatecli_.*
       - "#approved-reviews-by>=1"
     actions:
