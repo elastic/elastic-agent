@@ -23,7 +23,7 @@ func readMarkerFileCommon(markerFile string) (bytes []byte, err error) {
 	return markerFileBytes, nil
 }
 
-func writeMarkerFileCommon(markerFile string, markerBytes []byte, shouldFsync bool) error {
+func writeMarkerFile(markerFile string, markerBytes []byte, shouldFsync bool) error {
 	f, err := os.CreateTemp(
 		filepath.Dir(markerFile), fmt.Sprintf("%d-*.tmp", os.Getpid()))
 	if err != nil {

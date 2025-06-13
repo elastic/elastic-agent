@@ -24,26 +24,15 @@ const minMarkerAccessRetries = 5
 // mechanism is necessary since the marker file could be accessed by multiple
 // processes (the Upgrade Watcher and the main Agent process) at the same time,
 // which could fail on Windows.
-func readMarkerFile(markerFile string, fileLock Locker) ([]byte, error) {
+func readMarkerFile(markerFile string) ([]byte, error) {
 	if _, err := os.Stat(markerFile); errors.Is(err, os.ErrNotExist) {
 		// marker doesn't exist, nothing to do
 		return nil, nil
 	}
 
 	var markerFileBytes []byte
+	var err error
 	readFn := func() error {
-		err := fileLock.Lock()
-		if err != nil {
-			return fmt.Errorf("locking update marker file %q for reading: %w", markerFile, err)
-		}
-
-		defer func(fileLock Locker) {
-			errUnlock := fileLock.Unlock()
-			if errUnlock != nil {
-				err = errors.Join(err, fmt.Errorf("unlocking marker file after reading: %w", errUnlock))
-			}
-		}(fileLock)
-
 		markerFileBytes, err = readMarkerFileCommon(markerFile)
 		return err
 	}
@@ -53,34 +42,6 @@ func readMarkerFile(markerFile string, fileLock Locker) ([]byte, error) {
 	}
 
 	return markerFileBytes, nil
-}
-
-// On Windows, writeMarkerFile tries to write the marker file, retrying with
-// randomized exponential backoff up to markerAccessTimeout duration. This retry
-// mechanism is necessary since the marker file could be accessed by multiple
-// processes (the Upgrade Watcher and the main Agent process) at the same time,
-// which could fail on Windows.
-func writeMarkerFile(markerFile string, markerBytes []byte, shouldFsync bool, fileLock Locker) error {
-	writeFn := func() error {
-		err := fileLock.Lock()
-		if err != nil {
-			return fmt.Errorf("locking update marker file %q for writing: %w", markerFile, err)
-		}
-
-		defer func(fileLock Locker) {
-			errUnlock := fileLock.Unlock()
-			if errUnlock != nil {
-				err = errors.Join(err, fmt.Errorf("unlocking marker file after writing: %w", errUnlock))
-			}
-		}(fileLock)
-		return writeMarkerFileCommon(markerFile, markerBytes, shouldFsync)
-	}
-
-	if err := accessMarkerFileWithRetries(writeFn); err != nil {
-		return fmt.Errorf("failed to write upgrade marker file [%s] despite retrying: %w", markerFile, err)
-	}
-
-	return nil
 }
 
 func accessMarkerFileWithRetries(accessFn func() error) error {

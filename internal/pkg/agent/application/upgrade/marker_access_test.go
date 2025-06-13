@@ -19,7 +19,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 )
@@ -65,7 +64,7 @@ func TestReadNotExistingMarkerFile(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			markerFileName := tc.setup(t, tmpDir)
-			markerFileBytes, err := readMarkerFile(markerFileName, filelock.NewNoopLocker())
+			markerFileBytes, err := readMarkerFile(markerFileName)
 			tc.wantErr(t, err)
 			assert.Equal(t, tc.wantMarkerFileBytes, markerFileBytes)
 		})
@@ -77,7 +76,7 @@ func TestWriteMarkerFile(t *testing.T) {
 	markerFile := filepath.Join(tmpDir, markerFilename)
 
 	markerBytes := []byte("foo bar")
-	err := writeMarkerFile(markerFile, markerBytes, true, noopLocker)
+	err := writeMarkerFile(markerFile, markerBytes, true)
 	require.NoError(t, err)
 
 	data, err := os.ReadFile(markerFile)
@@ -116,7 +115,7 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	}()
 
 	// Write a long marker file
-	err := writeMarkerFile(testMarkerFile, randomBytes(40), true, noopLocker)
+	err := writeMarkerFile(testMarkerFile, randomBytes(40), true)
 	require.NoError(t, err, "could not write long marker file")
 
 	// Get length of file
@@ -124,7 +123,7 @@ func TestWriteMarkerFileWithTruncation(t *testing.T) {
 	require.NoError(t, err)
 	originalSize := fileInfo.Size()
 
-	err = writeMarkerFile(testMarkerFile, randomBytes(25), true, noopLocker)
+	err = writeMarkerFile(testMarkerFile, randomBytes(25), true)
 	require.NoError(t, err)
 
 	// Get length of file
@@ -165,7 +164,7 @@ func TestUpdateMarkerFile(t *testing.T) {
 	}
 	tmp := t.TempDir()
 	markerFile := filepath.Join(tmp, "marker")
-	require.NoError(t, saveMarkerToPath(marker, markerFile, true, noopLocker))
+	require.NoError(t, saveMarkerToPath(marker, markerFile, true))
 
 	// update marker
 	var wg sync.WaitGroup
@@ -192,7 +191,7 @@ func TestUpdateMarkerFile(t *testing.T) {
 	wg.Wait()
 
 	// Assert
-	loadedMarker, err := loadMarker(markerFile, noopLocker)
+	loadedMarker, err := loadMarker(markerFile)
 	assert.NoError(t, err)
 	assert.Equal(t, "1.2.3-up", loadedMarker.Version)
 	assert.Equal(t, "sha...hash2", loadedMarker.Hash)

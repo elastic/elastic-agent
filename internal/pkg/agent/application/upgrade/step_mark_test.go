@@ -19,14 +19,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
-
-var noopLocker = filelock.NewNoopLocker()
 
 func TestSaveAndLoadMarker_NoLoss(t *testing.T) {
 	// Create a temporary directory for the test
@@ -59,11 +56,11 @@ func TestSaveAndLoadMarker_NoLoss(t *testing.T) {
 	}
 
 	// Save the marker to the temporary file
-	err := saveMarkerToPath(originalMarker, markerFile, true, noopLocker)
+	err := saveMarkerToPath(originalMarker, markerFile, true)
 	require.NoError(t, err, "Failed to save marker")
 
 	// Load the marker from the temporary file
-	loadedMarker, err := loadMarker(markerFile, noopLocker)
+	loadedMarker, err := loadMarker(markerFile)
 	require.NoError(t, err, "Failed to load marker")
 
 	// Compare time separately due to potential precision differences
@@ -139,7 +136,7 @@ func TestDesiredOutcome_Serialization(t *testing.T) {
 			}
 
 			// Save the marker
-			err := saveMarkerToPath(originalMarker, markerFile, true, noopLocker)
+			err := saveMarkerToPath(originalMarker, markerFile, true)
 			if tc.expectError {
 				require.Error(t, err, "Expected error during save for %s", tc.name)
 				return
@@ -147,7 +144,7 @@ func TestDesiredOutcome_Serialization(t *testing.T) {
 			require.NoError(t, err, "Failed to save marker for %s", tc.name)
 
 			// Load the marker
-			loadedMarker, err := loadMarker(markerFile, noopLocker)
+			loadedMarker, err := loadMarker(markerFile)
 			require.NoError(t, err, "Failed to load marker for %s", tc.name)
 			require.NotNil(t, loadedMarker, "loaded marker should not be nil")
 
@@ -258,7 +255,7 @@ desired_outcome: true
 			require.NoError(t, err, "Failed to write test YAML file")
 
 			// Try to load the marker
-			marker, err := loadMarker(markerFile, noopLocker)
+			marker, err := loadMarker(markerFile)
 			if tc.expectError {
 				require.Error(t, err, "Expected error when loading invalid YAML for %s", tc.name)
 			} else {
