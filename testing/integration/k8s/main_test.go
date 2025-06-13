@@ -22,6 +22,7 @@ func init() {
 }
 
 func TestMain(m *testing.M) {
+	define.SetKubernetesSupported()
 	flag.Parse()
 
 	if define.AutoDiscover {
