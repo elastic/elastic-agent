@@ -18,27 +18,35 @@ import (
 type localFetcher struct {
 	dir          string
 	snapshotOnly bool
+	fipsOnly     bool
 	binaryName   string
 }
 
-type localFetcherOpt func(f *localFetcher)
+type LocalFetcherOpt func(f *localFetcher)
 
 // WithLocalSnapshotOnly sets the LocalFetcher to only pull the snapshot build.
-func WithLocalSnapshotOnly() localFetcherOpt {
+func WithLocalSnapshotOnly() LocalFetcherOpt {
 	return func(f *localFetcher) {
 		f.snapshotOnly = true
 	}
 }
 
+// WithLocalFIPSOnly sets the LocalFetcher to only pull a FIPS-compliant build.
+func WithLocalFIPSOnly() LocalFetcherOpt {
+	return func(f *localFetcher) {
+		f.fipsOnly = true
+	}
+}
+
 // WithCustomBinaryName sets the binary to a custom name, the default is `elastic-agent`
-func WithCustomBinaryName(name string) localFetcherOpt {
+func WithCustomBinaryName(name string) LocalFetcherOpt {
 	return func(f *localFetcher) {
 		f.binaryName = name
 	}
 }
 
 // LocalFetcher returns a fetcher that pulls the binary of the Elastic Agent from a local location.
-func LocalFetcher(dir string, opts ...localFetcherOpt) Fetcher {
+func LocalFetcher(dir string, opts ...LocalFetcherOpt) Fetcher {
 	f := &localFetcher{
 		dir:        dir,
 		binaryName: "elastic-agent",
@@ -56,6 +64,7 @@ func (f *localFetcher) Name() string {
 
 // Fetch fetches the Elastic Agent and places the resulting binary at the path.
 func (f *localFetcher) Fetch(_ context.Context, operatingSystem string, architecture string, version string, packageFormat string) (FetcherResult, error) {
+	prefix := GetPackagePrefix(f.fipsOnly)
 	suffix, err := GetPackageSuffix(operatingSystem, architecture, packageFormat)
 	if err != nil {
 		return nil, err
@@ -66,7 +75,7 @@ func (f *localFetcher) Fetch(_ context.Context, operatingSystem string, architec
 		return nil, fmt.Errorf("invalid version: %q: %w", ver, err)
 	}
 
-	mainBuildfmt := "%s-%s-%s"
+	mainBuildfmt := "%s-%s%s-%s"
 	if f.snapshotOnly && !ver.IsSnapshot() {
 		if ver.Prerelease() == "" {
 			ver = semver.NewParsedSemVer(ver.Major(), ver.Minor(), ver.Patch(), "SNAPSHOT", ver.BuildMetadata())
@@ -85,10 +94,10 @@ func (f *localFetcher) Fetch(_ context.Context, operatingSystem string, architec
 	}
 
 	if ver.IsSnapshot() && !matchesEarlyReleaseVersion {
-		build := fmt.Sprintf(mainBuildfmt, f.binaryName, ver.VersionWithPrerelease(), suffix)
+		build := fmt.Sprintf(mainBuildfmt, f.binaryName, prefix, ver.VersionWithPrerelease(), suffix)
 		buildPath = filepath.Join(ver.BuildMetadata(), build)
 	} else {
-		buildPath = fmt.Sprintf(mainBuildfmt, f.binaryName, ver.String(), suffix)
+		buildPath = fmt.Sprintf(mainBuildfmt, f.binaryName, prefix, ver.String(), suffix)
 	}
 
 	fullPath := filepath.Join(f.dir, buildPath)
