@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+set -o xtrace
 
 GROUP_NAME=$1
 TEST_SUDO=$2
