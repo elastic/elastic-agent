@@ -57,7 +57,7 @@ func TestLocalFetcher(t *testing.T) {
 	tcs := []struct {
 		name     string
 		version  string
-		opts     []localFetcherOpt
+		opts     []LocalFetcherOpt
 		want     []byte
 		wantHash []byte
 	}{
@@ -69,7 +69,7 @@ func TestLocalFetcher(t *testing.T) {
 		}, {
 			name:     "SnapshotOnly",
 			version:  baseVersion,
-			opts:     []localFetcherOpt{WithLocalSnapshotOnly()},
+			opts:     []LocalFetcherOpt{WithLocalSnapshotOnly()},
 			want:     snapshotContent,
 			wantHash: snapshotContentHash,
 		}, {
@@ -80,13 +80,13 @@ func TestLocalFetcher(t *testing.T) {
 		}, {
 			name:     "version with snapshot and SnapshotOnly",
 			version:  baseVersion + "-SNAPSHOT",
-			opts:     []localFetcherOpt{WithLocalSnapshotOnly()},
+			opts:     []LocalFetcherOpt{WithLocalSnapshotOnly()},
 			want:     snapshotContent,
 			wantHash: snapshotContentHash,
 		}, {
 			name:     "version with snapshot and build ID",
 			version:  baseVersion + "-SNAPSHOT+l5snflwr",
-			opts:     []localFetcherOpt{},
+			opts:     []LocalFetcherOpt{},
 			want:     snapshotContent,
 			wantHash: snapshotContentHash,
 		},
