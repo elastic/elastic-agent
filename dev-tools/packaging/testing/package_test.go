@@ -40,6 +40,7 @@ import (
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/notice"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
+	"github.com/elastic/elastic-agent/pkg/version"
 )
 
 const (
@@ -303,9 +304,9 @@ func checkManifestFileContents(t *testing.T, extractedPackageDir string) {
 		if assert.Contains(t, m.Package.PathMappings[0], versionedHome, "path mappings in manifest do not contain the extraction path for versionedHome") {
 			// the first map should have the mapping for the data/elastic-agent-****** path)
 			mappedPath := m.Package.PathMappings[0][versionedHome]
-			assert.Contains(t, mappedPath, m.Package.Version, "mapped path for versionedHome does not contain the package version")
-			if m.Package.Snapshot {
-				assert.Contains(t, mappedPath, "SNAPSHOT", "mapped path for versionedHome does not contain the snapshot qualifier")
+			expectedVersionStringInPath, err := version.GenerateAgentVersionWithSnapshotFlag(m.Package.Version, m.Package.Snapshot)
+			if assert.NoError(t, err, "error generating agent version string with snapshot flag") {
+				assert.Contains(t, mappedPath, expectedVersionStringInPath, "mapped path for versionedHome does not contain the package version")
 			}
 		}
 	}
