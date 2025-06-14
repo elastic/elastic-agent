@@ -26,7 +26,7 @@ else
 fi
 
 SNAPSHOT=true EXTERNAL=true PACKAGES=docker mage -v package
-TEST_INTEG_CLEAN_ON_EXIT=true INSTANCE_PROVISIONER=kind STACK_PROVISIONER=stateful SNAPSHOT=true mage integration:kubernetesMatrix
+TEST_INTEG_CLEAN_ON_EXIT=true INSTANCE_PROVISIONER=kind STACK_PROVISIONER=stateful SNAPSHOT=true mage integration:testKubernetesMatrix
 TESTS_EXIT_STATUS=$?
 set -e
 

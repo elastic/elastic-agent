@@ -169,7 +169,7 @@ func testMonitoringLogsAreShipped(
 ) {
 	// Stage 1: Make sure metricbeat logs are populated
 	t.Log("Making sure metricbeat logs are populated")
-	docs := findESDocs(t, func() (estools.Documents, error) {
+	docs := FindESDocs(t, func() (estools.Documents, error) {
 		return estools.GetLogsForDataset(ctx, info.ESClient, "elastic_agent.metricbeat")
 	})
 	t.Logf("metricbeat: Got %d documents", len(docs.Hits.Hits))
@@ -230,7 +230,7 @@ func testMonitoringLogsAreShipped(
 
 	// Stage 3: Make sure we have message confirming central management is running
 	t.Log("Making sure we have message confirming central management is running")
-	docs = findESDocs(t, func() (estools.Documents, error) {
+	docs = FindESDocs(t, func() (estools.Documents, error) {
 		return estools.FindMatchingLogLines(ctx, info.ESClient, info.Namespace,
 			"Parsed configuration and determined agent is managed by Fleet")
 	})
@@ -241,7 +241,7 @@ func testMonitoringLogsAreShipped(
 	// this field is not mapped. There is an issue for that:
 	// https://github.com/elastic/integrations/issues/6545
 	// TODO: use runtime fields while the above issue is not resolved.
-	docs = findESDocs(t, func() (estools.Documents, error) {
+	docs = FindESDocs(t, func() (estools.Documents, error) {
 		return estools.GetLogsForAgentID(ctx, info.ESClient, agentID)
 	})
 	require.NoError(t, err, "could not get logs from Agent ID: %q, err: %s",
@@ -283,28 +283,6 @@ func queryESDocs(t *testing.T, findFn func() (estools.Documents, error)) estools
 				t.Logf("got an error querying ES, retrying. Error: %s", err)
 			}
 			return err == nil
-		},
-		3*time.Minute,
-		15*time.Second,
-	)
-
-	return docs
-}
-
-// findESDocs runs `findFn` until at least one document is returned and there is no error
-func findESDocs(t *testing.T, findFn func() (estools.Documents, error)) estools.Documents {
-	var docs estools.Documents
-	require.Eventually(
-		t,
-		func() bool {
-			var err error
-			docs, err = findFn()
-			if err != nil {
-				t.Logf("got an error querying ES, retrying. Error: %s", err)
-				return false
-			}
-
-			return docs.Hits.Total.Value != 0
 		},
 		3*time.Minute,
 		15*time.Second,

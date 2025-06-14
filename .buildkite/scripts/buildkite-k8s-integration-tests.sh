@@ -99,9 +99,13 @@ EOF
   pod_logs_base="${PWD}/build/${fully_qualified_group_name}.pod_logs_dump"
 
   set +e
-  K8S_TESTS_POD_LOGS_BASE="${pod_logs_base}" AGENT_IMAGE="${image}" DOCKER_VARIANT="${variant}" gotestsum --hide-summary=skipped --format testname --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags kubernetes,integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args -integration.groups="${group_name}" -integration.sudo="false"
+  K8S_TESTS_POD_LOGS_BASE="${pod_logs_base}" AGENT_IMAGE="${image}" DOCKER_VARIANT="${variant}" gotestsum --hide-summary=skipped --format testname --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags kubernetes,integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration/k8s -v -args -integration.groups="${group_name}" -integration.sudo="false"
   exit_status=$?
   set -e
+
+  if [[ $exit_status -ne 0 ]]; then
+     echo "^^^ +++"
+  fi
 
   if [[ $TESTS_EXIT_STATUS -eq 0 && $exit_status -ne 0 ]]; then
     TESTS_EXIT_STATUS=$exit_status
