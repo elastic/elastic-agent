@@ -375,7 +375,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	if err != nil {
 		return fmt.Errorf("checking if running with root/Administrator privileges: %w", err)
 	}
-	if hasRoot && !fromInstall {
+	if hasRoot && !fromInstall && runtime.GOOS != "windows" {
 		binPath, err := os.Executable()
 		if err != nil {
 			return fmt.Errorf("error while getting executable path: %w", err)
