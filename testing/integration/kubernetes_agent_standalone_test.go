@@ -28,6 +28,8 @@ import (
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/rest"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
@@ -101,7 +103,7 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 			name: "default deployment - rootful agent",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{}, nil),
+				k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{agentContainerMemoryLimit: "1200Mi"}, nil),
 				k8sStepCheckAgentStatus("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone", nil),
 			},
 		},
@@ -113,6 +115,7 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 					agentContainerRunUser:          int64Ptr(0),
 					agentContainerCapabilitiesAdd:  []corev1.Capability{},
 					agentContainerCapabilitiesDrop: []corev1.Capability{"ALL"},
+					agentContainerMemoryLimit:      "1200Mi",
 				}, nil),
 				k8sStepCheckAgentStatus("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone", nil),
 			},
@@ -125,6 +128,7 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 					agentContainerRunUser:          int64Ptr(0),
 					agentContainerCapabilitiesAdd:  []corev1.Capability{"CHOWN", "SETPCAP"},
 					agentContainerCapabilitiesDrop: []corev1.Capability{"ALL"},
+					agentContainerMemoryLimit:      "1200Mi",
 				}, nil),
 				k8sStepCheckAgentStatus("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone", nil),
 				k8sStepRunInnerTests("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone"),
@@ -139,6 +143,7 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 					agentContainerRunGroup:         int64Ptr(1000),
 					agentContainerCapabilitiesAdd:  []corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH", "SYS_PTRACE"},
 					agentContainerCapabilitiesDrop: []corev1.Capability{"ALL"},
+					agentContainerMemoryLimit:      "1200Mi",
 				}, nil),
 				k8sStepCheckAgentStatus("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone", nil),
 				k8sStepRunInnerTests("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone"),
@@ -153,6 +158,7 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 					agentContainerRunGroup:         int64Ptr(500),
 					agentContainerCapabilitiesAdd:  []corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH", "SYS_PTRACE"},
 					agentContainerCapabilitiesDrop: []corev1.Capability{"ALL"},
+					agentContainerMemoryLimit:      "1200Mi",
 				}, nil),
 				k8sStepCheckAgentStatus("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone", nil),
 				k8sStepRunInnerTests("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone"),
@@ -283,7 +289,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						"image": map[string]any{
 							"repository": kCtx.agentImageRepo,
 							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
 						},
 						"presets": map[string]any{
 							"clusterWide": map[string]any{
@@ -327,7 +332,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						"image": map[string]any{
 							"repository": kCtx.agentImageRepo,
 							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
 						},
 					},
 					"outputs": map[string]any{
@@ -357,7 +361,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						"image": map[string]any{
 							"repository": kCtx.agentImageRepo,
 							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
 						},
 						"fleet": map[string]any{
 							"enabled": true,
@@ -381,7 +384,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						"image": map[string]any{
 							"repository": kCtx.agentImageRepo,
 							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
 						},
 						"fleet": map[string]any{
 							"enabled": true,
@@ -418,7 +420,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 							"image": map[string]any{
 								"repository": kCtx.agentImageRepo,
 								"tag":        kCtx.agentImageTag,
-								"pullPolicy": "Never",
 							},
 							"fleet": map[string]any{
 								"enabled": true,
@@ -453,7 +454,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 							"image": map[string]any{
 								"repository": kCtx.agentImageRepo,
 								"tag":        kCtx.agentImageTag,
-								"pullPolicy": "Never",
 							},
 							"fleet": map[string]any{
 								"enabled": true,
@@ -494,7 +494,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						"image": map[string]any{
 							"repository": kCtx.agentImageRepo,
 							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
 						},
 						"fleet": map[string]any{
 							"enabled": true,
@@ -528,7 +527,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 							"image": map[string]any{
 								"repository": kCtx.agentImageRepo,
 								"tag":        kCtx.agentImageTag,
-								"pullPolicy": "Never",
 							},
 							"fleet": map[string]any{
 								"enabled": true,
@@ -563,7 +561,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 							"image": map[string]any{
 								"repository": kCtx.agentImageRepo,
 								"tag":        kCtx.agentImageTag,
-								"pullPolicy": "Never",
 							},
 							"fleet": map[string]any{
 								"enabled": true,
@@ -633,7 +630,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 							"image": map[string]any{
 								"repository": kCtx.agentImageRepo,
 								"tag":        kCtx.agentImageTag,
-								"pullPolicy": "Never",
 							},
 							"fleet": map[string]any{
 								"enabled": true,
@@ -672,7 +668,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						"image": map[string]any{
 							"repository": kCtx.agentImageRepo,
 							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
 						},
 						"fleet": map[string]any{
 							"enabled": true,
@@ -696,7 +691,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						"image": map[string]any{
 							"repository": kCtx.agentImageRepo,
 							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
 						},
 					},
 					"kubernetes": map[string]any{
@@ -741,7 +735,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						"image": map[string]any{
 							"repository": kCtx.agentImageRepo,
 							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
 						},
 					},
 					"kubernetes": map[string]any{
@@ -815,7 +808,8 @@ func k8sCheckAgentStatus(ctx context.Context, client klient.Client, stdout *byte
 			}
 
 			if restarts := container.RestartCount; restarts != 0 {
-				return fmt.Errorf("container %q of pod %q has restarted %d times: %w", containerName, agentPodName, restarts, stopCheck)
+				return fmt.Errorf("container %q of pod %q has restarted %d times: %w, last terminated state: %+v",
+					containerName, agentPodName, restarts, stopCheck, container.LastTerminationState.Terminated)
 			}
 		}
 
@@ -1104,6 +1098,12 @@ func k8sRenderKustomize(kustomizePath string) ([]byte, error) {
 	return renderedManifest, nil
 }
 
+func adjustKustomizeManifestsForOpenShift(manifestsBytes []byte) []byte {
+	// Openshift exposes kube-proxy on port 29102
+	return bytes.ReplaceAll(manifestsBytes, []byte("localhost:10249"), []byte("localhost:29102"))
+	//return manifestsBytes
+}
+
 // generateESAPIKey generates an API key for the given Elasticsearch.
 func generateESAPIKey(esClient *elasticsearch.Client, keyName string) (estools.APIKeyResponse, error) {
 	return estools.CreateAPIKey(context.Background(), esClient, estools.APIKeyRequest{Name: keyName, Expiration: "1d"})
@@ -1311,7 +1311,8 @@ type k8sContext struct {
 	// enrollParams contains the information needed to enroll an agent with Fleet in the test
 	enrollParams *fleettools.EnrollParams
 	// createdAt is the time when the k8sContext was created
-	createdAt time.Time
+	createdAt   time.Time
+	isOpenShift bool
 }
 
 // getNamespace returns a unique namespace on every call.
@@ -1382,6 +1383,9 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 	require.NoError(t, err)
 	require.NotNil(t, clientSet)
 
+	isOPS, err := isOpenShift(client.RESTConfig())
+	require.NoError(t, err)
+
 	testLogsBasePath := os.Getenv("K8S_TESTS_POD_LOGS_BASE")
 	require.NotEmpty(t, testLogsBasePath, "K8S_TESTS_POD_LOGS_BASE must be set")
 
@@ -1410,6 +1414,7 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 		esEncodedAPIKey: esAPIKey.Encoded,
 		enrollParams:    enrollParams,
 		createdAt:       time.Now(),
+		isOpenShift:     isOPS,
 	}
 }
 
@@ -1424,6 +1429,12 @@ func k8sStepCreateNamespace() k8sTestStep {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: namespace,
 			},
+		}
+		if kCtx.isOpenShift {
+			k8sNamespace.SetLabels(map[string]string{
+				"pod-security.kubernetes.io/audit": "privileged",
+				"pod-security.kubernetes.io/warn":  "privileged",
+			})
 		}
 
 		t.Cleanup(func() {
@@ -1466,6 +1477,10 @@ func k8sStepDeployKustomize(kustomizePath string, containerName string, override
 			assert.NoError(collect, err)
 		}, 5*time.Second, 500*time.Millisecond, "failed to render kustomize")
 
+		if kCtx.isOpenShift {
+			renderedManifest = adjustKustomizeManifestsForOpenShift(renderedManifest)
+		}
+
 		objects, err := testK8s.LoadFromYAML(bufio.NewReader(bytes.NewReader(renderedManifest)))
 		require.NoError(t, err, "failed to parse rendered kustomize")
 
@@ -1481,9 +1496,6 @@ func k8sStepDeployKustomize(kustomizePath string, containerName string, override
 
 				// set agent image
 				container.Image = kCtx.agentImage
-				// set ImagePullPolicy to "Never" to avoid pulling the image
-				// as the image is already loaded by the kubernetes provisioner
-				container.ImagePullPolicy = "Never"
 
 				if overrides.agentContainerMemoryLimit != "" {
 					container.Resources.Limits = corev1.ResourceList{
@@ -1817,4 +1829,29 @@ func kibanaGetAgent(ctx context.Context, kc *kibana.Client, id string) (*GetAgen
 		return nil, fmt.Errorf("unmarshalling response json: %w", err)
 	}
 	return &agentResp.Item, nil
+}
+
+// isOpenshift checks if the cluster from the provided config is an OpenShift cluster
+func isOpenShift(config *rest.Config) (bool, error) {
+	dcl, err := discovery.NewDiscoveryClientForConfig(config)
+	if err != nil {
+		// it's pretty much impossible to get into this problem, as most of the
+		// code branches from the previous call just won't fail at all,
+		// but let's handle this error anyway...
+		return false, err
+	}
+
+	apiList, err := dcl.ServerGroups()
+	if err != nil {
+		return false, err
+	}
+
+	apiGroups := apiList.Groups
+	for i := 0; i < len(apiGroups); i++ {
+		if apiGroups[i].Name == "route.openshift.io" {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
