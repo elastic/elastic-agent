@@ -13,6 +13,15 @@ env:
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1749258065"
   IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1749258065"
 
+# Anchors with repeatedly used plugin configurations
+# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
+common:
+  - vault_ec_key: &vault_ec_key
+      elastic/vault-secrets#v0.1.0:
+        path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+        field: "apiKey"
+        env_var: "EC_API_KEY"
+
 steps:
   - label: Start ESS stack for integration tests
     key: integration-ess
@@ -28,6 +37,8 @@ steps:
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
+    plugins:
+      - *vault_ec_key
 
   - group: "Extended runtime leak tests"
     key: extended-integration-tests
@@ -52,6 +63,9 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - *vault_ec_key
+
       - label: "Windows:2025:amd64:sudo"
         depends_on:
           - packaging-windows
@@ -70,6 +84,9 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
+        plugins:
+          - *vault_ec_key
+  
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-ubuntu-x86-64
         env:
@@ -87,6 +104,8 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
+        plugins:
+          - *vault_ec_key
 
   - group: "Stateful: Windows"
     key: integration-tests-win
@@ -109,6 +128,8 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - *vault_ec_key
         matrix:
           - default
           - fleet
@@ -135,6 +156,8 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - *vault_ec_key
         matrix:
           - default
 
@@ -154,6 +177,8 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - *vault_ec_key
         matrix:
           - default
           - fleet
@@ -180,6 +205,8 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
+        plugins:
+          - *vault_ec_key
         matrix:
           - default
 
@@ -203,6 +230,8 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
+        plugins:
+          - *vault_ec_key
         matrix:
           - default
 
@@ -223,6 +252,8 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
+        plugins:
+          - *vault_ec_key  
         matrix:
           - default
           - upgrade
@@ -255,6 +286,8 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - *vault_ec_key
         matrix:
           - default
           - upgrade
@@ -289,6 +322,8 @@ steps:
           provider: "aws"
           image: "${IMAGE_UBUNTU_2404_ARM_64}"
           instanceType: "m6g.xlarge"
+        plugins:
+          - *vault_ec_key
         matrix:
           - default
 
@@ -312,6 +347,8 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_DEBIAN_12}"
+        plugins:
+          - *vault_ec_key
         matrix:
           - default
 
@@ -332,6 +369,8 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_DEBIAN_12}"
+        plugins:
+          - *vault_ec_key
         matrix:
           - default
           - upgrade
@@ -366,6 +405,8 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - *vault_ec_key
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
@@ -398,6 +439,8 @@ steps:
           machineType: "n2-standard-4"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
           diskSizeGb: 80
+        plugins:
+          - *vault_ec_key
         matrix:
           setup:
             variants:
@@ -431,7 +474,8 @@ steps:
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
-
+    plugins:
+      - *vault_ec_key
   - label: Aggregate test reports
     # Warning: The key has a hook in pre-command
     key: aggregate-reports
@@ -450,10 +494,7 @@ steps:
     soft_fail:
       - exit_status: "*"
     plugins:
-      - elastic/vault-secrets#v0.1.0:
-          path: "kv/ci-shared/platform-ingest/buildkite_analytics_token"
-          field: "token"
-          env_var: "BUILDKITE_ANALYTICS_TOKEN"
+      - *vault_ec_key
       - test-collector#v1.11.0:
           files: "build/*.xml"
           format: "junit"
