@@ -8,7 +8,7 @@ env:
   IMAGE_UBUNTU_ARM64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1749862860"
 
 steps:
-  - label: Build and push custom elastic-agent image
+  - label: Load and push custom elastic-agent image
     depends_on:
       - 'packaging-containers-x86-64-fips' # Reuse artifacts produced in .buildkite/integration.pipeline.yml
     key: integration-fips-cloud-image
