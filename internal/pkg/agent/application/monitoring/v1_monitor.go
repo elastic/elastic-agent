@@ -700,8 +700,7 @@ func (b *BeatsMonitor) getHttpStreams(
 			httpStreams = append(httpStreams, httpStream)
 		}
 		// specifically for filebeat, we include input metrics
-		// disabled for filebeat receiver until https://github.com/elastic/beats/issues/43418 is resolved
-		if strings.EqualFold(name, "filebeat") && compInfo.RuntimeManager != component.OtelRuntimeManager {
+		if strings.EqualFold(name, "filebeat") {
 			fbDataStreamName := "filebeat_input"
 			fbDataset := fmt.Sprintf("elastic_agent.%s", fbDataStreamName)
 			fbIndexName := fmt.Sprintf("metrics-elastic_agent.%s-%s", fbDataStreamName, monitoringNamespace)
@@ -842,7 +841,6 @@ func processorsForAgentFilestream() []any {
 		addFormattedIndexProcessor(),
 	)
 	return processors
-
 }
 
 // processorsForServiceComponentFilestream returns processors used for filestream streams for components running as
