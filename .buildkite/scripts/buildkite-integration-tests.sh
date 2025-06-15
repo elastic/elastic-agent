@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+set -o xtrace
 
 GROUP_NAME=$1
 TEST_SUDO=$2
@@ -61,7 +62,7 @@ echo "~~~ Integration tests: ${GROUP_NAME}"
 GOTEST_ARGS=(-tags integration -test.shuffle on -test.timeout 2h0m0s "${TEST_PACKAGE}" -v -args "-integration.groups=${GROUP_NAME}" "-integration.sudo=${TEST_SUDO}" "-integration.fips=${FIPS:-false}")
 set +e
 TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true \
-  gotestsum --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- "${GOTEST_ARGS[@]}"
+  gotestsum --no-color -f standard-verbose --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- "${GOTEST_ARGS[@]}"
 TESTS_EXIT_STATUS=$?
 set -e
 
