@@ -180,8 +180,9 @@ func TestGetAllComponentState(t *testing.T) {
 
 func TestDropComponentStateFromOtelStatus(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
-		err := DropComponentStateFromOtelStatus(nil)
+		s, err := DropComponentStateFromOtelStatus(nil)
 		require.NoError(t, err)
+		require.Nil(t, s)
 	})
 
 	t.Run("drop non otel", func(t *testing.T) {
@@ -195,10 +196,10 @@ func TestDropComponentStateFromOtelStatus(t *testing.T) {
 				},
 			},
 		}
-		err := DropComponentStateFromOtelStatus(otelStatus)
+		s, err := DropComponentStateFromOtelStatus(otelStatus)
 		require.NoError(t, err)
-		assert.Len(t, otelStatus.ComponentStatusMap, 1)
-		assert.Contains(t, otelStatus.ComponentStatusMap, "pipeline:logs")
+		assert.Len(t, s.ComponentStatusMap, 1)
+		assert.Contains(t, s.ComponentStatusMap, "pipeline:logs")
 	})
 
 	t.Run("invalid status", func(t *testing.T) {
@@ -209,8 +210,9 @@ func TestDropComponentStateFromOtelStatus(t *testing.T) {
 				},
 			},
 		}
-		err := DropComponentStateFromOtelStatus(otelStatus)
+		s, err := DropComponentStateFromOtelStatus(otelStatus)
 		require.Error(t, err)
+		require.Nil(t, s)
 		assert.Equal(t, "pipeline status id logs is not a pipeline", err.Error())
 	})
 }
