@@ -205,6 +205,7 @@ steps:
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         matrix:
           - default
+          - upgrade
 
       - label: "x86_64:sudo: {{matrix}}"
         depends_on:
@@ -291,6 +292,7 @@ steps:
           instanceType: "m6g.xlarge"
         matrix:
           - default
+          - upgrade
 
   - group: "Stateful:Debian"
     key: integration-tests-debian
@@ -314,6 +316,7 @@ steps:
           image: "${IMAGE_DEBIAN_12}"
         matrix:
           - default
+          - upgrade
 
       - label: "x86_64:sudo: {{matrix}}"
         depends_on:
