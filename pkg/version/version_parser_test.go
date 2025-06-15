@@ -435,56 +435,79 @@ func TestExtractSnapshotFromVersionString(t *testing.T) {
 	}
 }
 
-func TestLess(t *testing.T) {
+func TestComparisons(t *testing.T) {
 	testcases := []struct {
 		name         string
 		leftVersion  string
 		rightVersion string
-		less         bool
+
+		less  bool
+		equal bool
 	}{
 		// major, minor, patch section
+		{
+			name:         "major, minor, patch are all equal",
+			leftVersion:  "7.17.10",
+			rightVersion: "7.17.10",
+			less:         false,
+			equal:        true,
+		},
 		{
 			name:         "major version less than ours",
 			leftVersion:  "7.17.10",
 			rightVersion: "8.9.0",
 			less:         true,
+			equal:        false,
 		},
 		{
 			name:         "minor version less than ours",
 			leftVersion:  "8.6.2",
 			rightVersion: "8.9.0",
 			less:         true,
+			equal:        false,
 		},
 		{
 			name:         "patch version less than ours",
 			leftVersion:  "8.7.0",
 			rightVersion: "8.7.1",
 			less:         true,
+			equal:        false,
 		},
 		// prerelease section
+		{
+			name:         "major, minor, patch, prerelease are all equal",
+			leftVersion:  "8.9.0-SNAPSHOT",
+			rightVersion: "8.9.0-SNAPSHOT",
+			less:         false,
+			equal:        true,
+		},
 		{
 			name:         "prerelease is always less than non-prerelease",
 			leftVersion:  "8.9.0-SNAPSHOT",
 			rightVersion: "8.9.0",
 			less:         true,
+			equal:        false,
 		},
 		{
 			name:         "2 prereleases are compared by their tokens",
 			leftVersion:  "8.9.0-SNAPSHOT",
 			rightVersion: "8.9.0-er1",
 			less:         false,
+			equal:        false,
 		},
 		{
 			name:         "2 prereleases are compared by their tokens, reversed",
 			leftVersion:  "8.9.0-er1",
 			rightVersion: "8.9.0-SNAPSHOT",
 			less:         true,
+			equal:        false,
 		},
 		{
 			name:         "2 prereleases have no specific order",
 			leftVersion:  "8.9.0-SNAPSHOT",
 			rightVersion: "8.9.0-er1",
 			less:         false,
+			equal:        false,
 		},
 		// build metadata (these have no impact on precedence)
 		{
@@ -492,12 +515,14 @@ func TestLess(t *testing.T) {
 			leftVersion:  "8.9.0-SNAPSHOT+aaaaaa",
 			rightVersion: "8.9.0-SNAPSHOT+bbbbbb",
 			less:         false,
+			equal:        true,
 		},
 		{
 			name:         "build metadata have no influence on precedence, reversed",
 			leftVersion:  "8.9.0-SNAPSHOT+bbbbbb",
 			rightVersion: "8.9.0-SNAPSHOT+aaaaaa",
 			less:         false,
+			equal:        true,
 		},
 		// testcases taken from semver.org
 		// 1.0.0-alpha < 1.0.0-alpha.1 < 1.0.0-alpha.beta < 1.0.0-beta < 1.0.0-beta.2 < 1.0.0-beta.11 < 1.0.0-rc.1 < 1.0.0.
@@ -506,68 +531,86 @@ func TestLess(t *testing.T) {
 			leftVersion:  "1.0.0-alpha",
 			rightVersion: "1.0.0-alpha.1",
 			less:         true,
+			equal:        false,
 		},
 		{
 			name:         "numeric identifiers always have lower precedence than non-numeric identifiers",
 			leftVersion:  "1.0.0-alpha.1",
 			rightVersion: "1.0.0-alpha.beta",
 			less:         true,
+			equal:        false,
 		},
 		{
 			name:         "minimum number of prerelease string tokens must be compared alphabetically",
 			leftVersion:  "1.0.0-alpha.beta",
 			rightVersion: "1.0.0-beta",
 			less:         true,
+			equal:        false,
 		},
 		{
 			name:         "prerelease with fewer tokens is less than same prerelease with extra tokens #2",
 			leftVersion:  "1.0.0-beta",
 			rightVersion: "1.0.0-beta.2",
 			less:         true,
+			equal:        false,
 		},
 		{
 			name:         "numeric identifiers must be compared numerically",
 			leftVersion:  "1.0.0-beta.2",
 			rightVersion: "1.0.0-beta.11",
 			less:         true,
+			equal:        false,
 		},
 		{
 			name:         "string identifiers are compared lexically",
 			leftVersion:  "1.0.0-beta.11",
 			rightVersion: "1.0.0-rc.1",
 			less:         true,
+			equal:        false,
 		},
 		{
 			name:         "prerelease versions have lower precedence than non-prerelease version ",
 			leftVersion:  "1.0.0-rc.1",
 			rightVersion: "1.0.0",
 			less:         true,
+			equal:        false,
 		},
 
 		// independent section
+		{
+			name:         "major, minor, patch, independent release is equal",
+			leftVersion:  "8.9.0+build202405061022",
+			rightVersion: "8.9.0+build202405061022",
+			equal:        true,
+			less:         false,
+		},
 		{
 			name:         "independent release is always more than regular",
 			leftVersion:  "8.9.0+build202405061022",
 			rightVersion: "8.9.0",
 			less:         false,
+			equal:        false,
 		},
 		{
 			name:         "prerelease is less than independent release",
 			leftVersion:  "8.9.0-SNAPSHOT",
 			rightVersion: "8.9.0+build202405061022",
 			less:         true,
+			equal:        false,
 		},
 		{
 			name:         "older release is less",
 			leftVersion:  "8.9.0+build202305061022",
 			rightVersion: "8.9.0+build202405061022",
 			less:         true,
+			equal:        false,
 		},
 		{
 			name:         "older release is less - reversed",
 			leftVersion:  "8.9.0+build202405061022",
 			rightVersion: "8.9.0+build202305061022",
 			less:         false,
+			equal:        false,
 		},
 	}
 
@@ -580,6 +623,7 @@ func TestLess(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, right)
 			assert.Equalf(t, tc.less, left.Less(*right), "Expected %s < %s = %v", tc.leftVersion, tc.rightVersion, tc.less)
+			assert.Equalf(t, tc.equal, left.Equal(*right), "Expected %s == %s = %v", tc.leftVersion, tc.rightVersion, tc.equal)
 		})
 	}
 }

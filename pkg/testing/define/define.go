@@ -18,6 +18,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/gofrs/uuid/v5"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -83,33 +85,31 @@ func Version() string {
 // NewFixtureFromLocalBuild returns a new Elastic Agent testing fixture with a LocalFetcher and
 // the agent logging to the test logger.
 func NewFixtureFromLocalBuild(t *testing.T, version string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
-	buildsDir := os.Getenv("AGENT_BUILD_DIR")
-	if buildsDir == "" {
-		projectDir, err := findProjectRoot()
-		if err != nil {
-			return nil, err
-		}
-		buildsDir = filepath.Join(projectDir, "build", "distributions")
-	}
+	return NewFixtureWithBinary(t, version, "elastic-agent", buildsDir(t), false, opts...)
+}
 
-	return NewFixtureWithBinary(t, version, "elastic-agent", buildsDir, opts...)
-
+// NewFixtureFromLocalFIPSBuild returns a new FIPS-capable Elastic Agent testing fixture with a LocalFetcher
+// and the agent logging to the test logger.
+func NewFixtureFromLocalFIPSBuild(t *testing.T, version string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
+	return NewFixtureWithBinary(t, version, "elastic-agent", buildsDir(t), true, opts...)
 }
 
 // NewFixtureWithBinary returns a new Elastic Agent testing fixture with a LocalFetcher and
 // the agent logging to the test logger.
-func NewFixtureWithBinary(t *testing.T, version string, binary string, buildsDir string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
+func NewFixtureWithBinary(t *testing.T, version string, binary string, buildsDir string, fips bool, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
 	ver, err := semver.ParseVersion(version)
 	if err != nil {
 		return nil, fmt.Errorf("%q is an invalid agent version: %w", version, err)
 	}
 
-	var binFetcher atesting.Fetcher
+	localFetcherOpts := []atesting.LocalFetcherOpt{atesting.WithCustomBinaryName(binary)}
 	if ver.IsSnapshot() {
-		binFetcher = atesting.LocalFetcher(buildsDir, atesting.WithLocalSnapshotOnly(), atesting.WithCustomBinaryName(binary))
-	} else {
-		binFetcher = atesting.LocalFetcher(buildsDir, atesting.WithCustomBinaryName(binary))
+		localFetcherOpts = append(localFetcherOpts, atesting.WithLocalSnapshotOnly())
 	}
+	if fips {
+		localFetcherOpts = append(localFetcherOpts, atesting.WithLocalFIPSOnly())
+	}
+	binFetcher := atesting.LocalFetcher(buildsDir, localFetcherOpts...)
 
 	opts = append(opts, atesting.WithFetcher(binFetcher), atesting.WithLogOutput())
 	if binary != "elastic-agent" {
@@ -300,4 +300,17 @@ func getKibanaClient() (*kibana.Client, error) {
 		return nil, fmt.Errorf("failed to create kibana client: %w", err)
 	}
 	return c, nil
+}
+
+func buildsDir(t *testing.T) string {
+	t.Helper()
+
+	buildsDir := os.Getenv("AGENT_BUILD_DIR")
+	if buildsDir == "" {
+		projectDir, err := findProjectRoot()
+		require.NoError(t, err)
+		buildsDir = filepath.Join(projectDir, "build", "distributions")
+	}
+
+	return buildsDir
 }

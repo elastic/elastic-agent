@@ -46,6 +46,7 @@ const (
 	runDirMod          = 0770
 	snapshotSuffix     = "-SNAPSHOT"
 	watcherMaxWaitTime = 30 * time.Second
+	fipsPrefix         = "-fips"
 )
 
 var agentArtifact = artifact.Artifact{
@@ -59,6 +60,12 @@ var (
 	ErrUpgradeSameVersion    = errors.New("upgrade did not occur because it is the same version")
 	ErrFipsNotUpgradedToFips = errors.New("cannot upgrade from a fips compliant agent to a non-compliant one")
 )
+
+func init() {
+	if release.FIPSDistribution() {
+		agentArtifact.Cmd += fipsPrefix
+	}
+}
 
 // Upgrader performs an upgrade
 type Upgrader struct {
@@ -172,12 +179,23 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 		return ErrUpgradeSameVersion
 	}
 
+<<<<<<< HEAD
 	if currentVersion.fips && metadata.manifest.Package.Fips {
 		return nil
 	}
 
 	if !currentVersion.fips && !metadata.manifest.Package.Fips {
 		return nil
+=======
+	if currentVersion.fips && !metadata.manifest.Package.Fips {
+		log.Warnf("Upgrade action skipped because FIPS-capable Agent cannot be upgraded to non-FIPS-capable Agent")
+		return ErrFipsToNonFips
+	}
+
+	if !currentVersion.fips && metadata.manifest.Package.Fips {
+		log.Warnf("Upgrade action skipped because non-FIPS-capable Agent cannot be upgraded to FIPS-capable Agent")
+		return ErrNonFipsToFips
+>>>>>>> ac9ee9a34 ([Integration Test] Ensure that upgrading a FIPS-capable Agent results in a FIPS-capable Agent (#7804))
 	}
 
 	return ErrFipsNotUpgradedToFips
