@@ -40,6 +40,7 @@ settings:
       cgo: true
       env:
         GOEXPERIMENT: systemcrypto
+        MS_GOTOOLCHAIN_TELEMETRY_ENABLED: "0"
       tags:
         - requirefips
         - ms_tls13kdf
