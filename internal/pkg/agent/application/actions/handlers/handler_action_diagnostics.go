@@ -338,7 +338,7 @@ func (h *Diagnostics) diagFile(
 	cDiag []client.DiagnosticComponentResult,
 	excludeEvents bool) (*os.File, int64, error) {
 
-	f, err := os.CreateTemp("", "elastic-agent-diagnostics")
+	f, err := os.CreateTemp(paths.TempDir(), "elastic-agent-diagnostics")
 	if err != nil {
 		return nil, 0, err
 	}
