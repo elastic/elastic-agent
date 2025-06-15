@@ -5,6 +5,7 @@
 package install
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -66,33 +67,41 @@ func SwitchExecutingMode(topPath string, pt *progressbar.ProgressBar, username s
 		}
 	}
 
-	// the service has to be uninstalled
-	pt.Describe("Removing service")
-
-	// this can happen if this action failed in the middle of this critical section, so to allow the
-	// command to be called again we don't return the error on the uninstall
-	err = UninstallService(topPath)
-	if err != nil {
-		// error context already added by UninstallService
-		pt.Describe(err.Error())
-	}
-
-	err = EnsureServiceRemoved(30*time.Second, 250*time.Millisecond, paths.ServiceName())
-	if err != nil {
-		pt.Describe(fmt.Sprintf("Failed to ensure service was removed: %s", err.Error()))
-	}
-
-	// re-install service
-	pt.Describe("Installing service")
-	err = InstallService(topPath, ownership, username, groupName, password)
-	if err != nil {
-		pt.Describe("Failed to install service")
-		// error context already added by InstallService
-
-		// this is now in a bad state, because the service is uninstall and now the service failed to install
+	pt.Describe("Changing service user")
+	err = ChangeUser(topPath, ownership, username, groupName, password)
+	if err != nil && !errors.Is(err, ErrChangeUserUnsupported) {
 		return err
 	}
-	pt.Describe("Installed service")
+
+	if errors.Is(err, ErrChangeUserUnsupported) {
+		// the service has to be uninstalled
+		pt.Describe("Removing service")
+
+		// this can happen if this action failed in the middle of this critical section, so to allow the
+		// command to be called again we don't return the error on the uninstall
+		err = UninstallService(topPath)
+		if err != nil {
+			// error context already added by UninstallService
+			pt.Describe(err.Error())
+		}
+
+		err = EnsureServiceRemoved(30*time.Second, 250*time.Millisecond, paths.ServiceName())
+		if err != nil {
+			pt.Describe(fmt.Sprintf("Failed to ensure service was removed: %s", err.Error()))
+		}
+
+		// re-install service
+		pt.Describe("Installing service")
+		err = InstallService(topPath, ownership, username, groupName, password)
+		if err != nil {
+			pt.Describe("Failed to install service")
+			// error context already added by InstallService
+
+			// this is now in a bad state, because the service is uninstall and now the service failed to install
+			return err
+		}
+		pt.Describe("Installed service")
+	}
 
 	// start the service
 	pt.Describe("Starting service")
