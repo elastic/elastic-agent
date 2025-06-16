@@ -8,7 +8,6 @@ package integration
 
 import (
 	"context"
-	"runtime"
 	"testing"
 
 	"github.com/gofrs/uuid/v5"
@@ -22,7 +21,41 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 )
 
-func testReEnroll(t *testing.T, info *define.Info, privileged bool) {
+func TestRenEnroll(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: Default,
+		Stack: &define.Stack{},
+		Sudo:  true,
+	})
+
+	testCases := []struct {
+		description string
+		privileged  bool
+		assertion   func(*testing.T, string, error)
+	}{
+		{
+			description: "root user is prevented from re-enrolling an unprivileged agent",
+			privileged:  false,
+			assertion: func(t *testing.T, out string, err error) {
+				require.Error(t, err)
+				require.Contains(t, string(out), cmd.UserOwnerMismatchError.Error())
+			},
+		},
+		{
+			description: "unenrolled privileged agent re-enrolls successfully using root user",
+			privileged:  false,
+			assertion: func(t *testing.T, _ string, err error) {
+				require.NoError(t, err)
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		testReEnroll(t, info, test.privileged, test.assertion)
+	}
+}
+
+func testReEnroll(t *testing.T, info *define.Info, privileged bool, assertFunc func(t *testing.T, output string, err error)) {
 	ctx := context.Background()
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
@@ -60,32 +93,31 @@ func testReEnroll(t *testing.T, info *define.Info, privileged bool) {
 	enrollArgs := []string{"enroll", "--url", enrollUrl, "--enrollment-token", enrollmentApiKey.APIKey, "--force"}
 
 	out, err := fixture.Exec(ctx, enrollArgs)
-	require.Error(t, err)
-	require.Contains(t, string(out), cmd.UserOwnerMismatchError.Error())
+	assertFunc(t, string(out), err)
 }
 
-func TestReEnrollUnprivileged(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Skipping test on Windows")
-	}
-
-	info := define.Require(t, define.Requirements{
-		Group: Default,
-		Stack: &define.Stack{},
-		Sudo:  true,
-	})
-	t.Run("root user is prevented from re-enrolling an unprivileged agent", func(t *testing.T) {
-		testReEnroll(t, info, false)
-	})
-}
-
-func TestReEnrollPrivileged(t *testing.T) {
-	info := define.Require(t, define.Requirements{
-		Group: Default,
-		Stack: &define.Stack{},
-		Sudo:  true,
-	})
-	t.Run("unenrolled privileged agent re-enrolls successfully using root user", func(t *testing.T) {
-		testReEnroll(t, info, true)
-	})
-}
+// func TestReEnrollUnprivileged(t *testing.T) {
+// 	if runtime.GOOS == "windows" {
+// 		t.Skip("Skipping test on Windows")
+// 	}
+//
+// 	info := define.Require(t, define.Requirements{
+// 		Group: Default,
+// 		Stack: &define.Stack{},
+// 		Sudo:  true,
+// 	})
+// 	t.Run("root user is prevented from re-enrolling an unprivileged agent", func(t *testing.T) {
+// 		testReEnroll(t, info, false)
+// 	})
+// }
+//
+// func TestReEnrollPrivileged(t *testing.T) {
+// 	info := define.Require(t, define.Requirements{
+// 		Group: Default,
+// 		Stack: &define.Stack{},
+// 		Sudo:  true,
+// 	})
+// 	t.Run("unenrolled privileged agent re-enrolls successfully using root user", func(t *testing.T) {
+// 		testReEnroll(t, info, true)
+// 	})
+// }
