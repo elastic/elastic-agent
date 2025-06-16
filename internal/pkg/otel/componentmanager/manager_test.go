@@ -79,7 +79,7 @@ func TestNewOtelComponentManager(t *testing.T) {
 	})
 }
 
-func TestOtelComponentManager_buildFinalConfig(t *testing.T) {
+func TestOtelComponentManager_buildMergedConfig(t *testing.T) {
 	// Common parameters used across all test cases
 	commonAgentInfo := &info.AgentInfo{}
 	commonBeatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
@@ -187,7 +187,7 @@ func TestOtelComponentManager_buildFinalConfig(t *testing.T) {
 				beatMonitoringConfigGetter: commonBeatMonitoringConfigGetter,
 			}
 
-			result, err := mgr.buildFinalConfig()
+			result, err := mgr.buildMergedConfig()
 
 			if tt.expectedErrorString != "" {
 				assert.Error(t, err)
@@ -315,6 +315,7 @@ func TestOtelComponentManager_handleCollectorUpdate(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Nil(t, mgr.collectorCfg)
+		assert.Nil(t, mgr.MergedOtelConfig())
 		// Verify that Update was called with nil config (no collector config should result in nil config)
 		assert.Nil(t, updatedConfig)
 	})
@@ -348,6 +349,7 @@ func TestOtelComponentManager_handleCollectorUpdate(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, collectorConfig, mgr.collectorCfg)
+		assert.Equal(t, collectorConfig, mgr.MergedOtelConfig())
 		// Verify that Update was called with the collector configuration
 		assert.NotNil(t, updatedConfig)
 		// Verify that the configuration contains expected collector sections
@@ -408,8 +410,7 @@ func TestOtelComponentManager_handleCollectorUpdate(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, collectorConfig, mgr.collectorCfg)
-		// Verify that Update was called with merged configuration
-		assert.NotNil(t, updatedConfig)
+		assert.Equal(t, updatedConfig, mgr.MergedOtelConfig())
 		// Verify that the configuration contains both collector and component sections
 		assert.True(t, updatedConfig.IsSet("receivers"), "Expected receivers section from components")
 		assert.True(t, updatedConfig.IsSet("exporters"), "Expected exporters section from components")
