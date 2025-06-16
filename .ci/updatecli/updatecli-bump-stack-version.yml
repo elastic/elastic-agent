@@ -40,7 +40,7 @@ actions:
     scmid: githubConfig
     sourceid: lastStableStackSnapshot
     spec:
-      automerge: false
+      automerge: true
       labels:
         - dependencies
         - backport-skip
