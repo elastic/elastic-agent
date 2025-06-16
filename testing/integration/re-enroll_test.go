@@ -21,21 +21,26 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 )
 
-func TestRenEnroll(t *testing.T) {
-	info := define.Require(t, define.Requirements{
-		Group: Default,
-		Stack: &define.Stack{},
-		Sudo:  true,
-	})
+type testCase struct {
+	description string
+	privileged  bool
+	os          []define.OS
+	assertion   func(*testing.T, string, error)
+}
 
-	testCases := []struct {
-		description string
-		privileged  bool
-		assertion   func(*testing.T, string, error)
-	}{
+func TestRenEnroll(t *testing.T) {
+	testCases := []testCase{
 		{
 			description: "root user is prevented from re-enrolling an unprivileged agent",
 			privileged:  false,
+			os: []define.OS{
+				{
+					Type: define.Darwin,
+				},
+				{
+					Type: define.Linux,
+				},
+			}, // specify OSes here as needed
 			assertion: func(t *testing.T, out string, err error) {
 				require.Error(t, err)
 				require.Contains(t, string(out), cmd.UserOwnerMismatchError.Error())
@@ -44,6 +49,7 @@ func TestRenEnroll(t *testing.T) {
 		{
 			description: "unenrolled privileged agent re-enrolls successfully using root user",
 			privileged:  false,
+			os:          []define.OS{}, // specify OSes here as needed
 			assertion: func(t *testing.T, _ string, err error) {
 				require.NoError(t, err)
 			},
@@ -51,6 +57,12 @@ func TestRenEnroll(t *testing.T) {
 	}
 
 	for _, test := range testCases {
+		info := define.Require(t, define.Requirements{
+			Group: Default,
+			Stack: &define.Stack{},
+			Sudo:  true,
+			OS:    test.os,
+		})
 		testReEnroll(t, info, test.privileged, test.assertion)
 	}
 }
@@ -95,29 +107,3 @@ func testReEnroll(t *testing.T, info *define.Info, privileged bool, assertFunc f
 	out, err := fixture.Exec(ctx, enrollArgs)
 	assertFunc(t, string(out), err)
 }
-
-// func TestReEnrollUnprivileged(t *testing.T) {
-// 	if runtime.GOOS == "windows" {
-// 		t.Skip("Skipping test on Windows")
-// 	}
-//
-// 	info := define.Require(t, define.Requirements{
-// 		Group: Default,
-// 		Stack: &define.Stack{},
-// 		Sudo:  true,
-// 	})
-// 	t.Run("root user is prevented from re-enrolling an unprivileged agent", func(t *testing.T) {
-// 		testReEnroll(t, info, false)
-// 	})
-// }
-//
-// func TestReEnrollPrivileged(t *testing.T) {
-// 	info := define.Require(t, define.Requirements{
-// 		Group: Default,
-// 		Stack: &define.Stack{},
-// 		Sudo:  true,
-// 	})
-// 	t.Run("unenrolled privileged agent re-enrolls successfully using root user", func(t *testing.T) {
-// 		testReEnroll(t, info, true)
-// 	})
-// }
