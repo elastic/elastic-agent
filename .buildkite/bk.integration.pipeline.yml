@@ -37,15 +37,11 @@ common:
           KIBANA_HOST: ea-serverless-it-kibana-hostname
           KIBANA_USERNAME: ea-serverless-it-kibana-username
           KIBANA_PASSWORD: ea-serverless-it-kibana-password
-
-# Anchors with repeatedly used plugin configurations
-# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
-common:
   - vault_ec_key_prod: &vault_ec_key_prod
       elastic/vault-secrets#v0.1.0:
         path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
         field: "apiKey"
-        env_var: "EC_API_KEY"
+        env_var: "EC_API_KEY"  
 
 steps:
   - label: Start ESS stack for integration tests
