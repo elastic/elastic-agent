@@ -29,15 +29,14 @@ type testCase struct {
 }
 
 func TestReEnrollUnprivileged(t *testing.T) {
-	osReq := []define.OS{
-		{Type: define.Darwin},
-		{Type: define.Linux},
-	}
 	info := define.Require(t, define.Requirements{
 		Group: Default,
 		Stack: &define.Stack{},
 		Sudo:  true,
-		OS:    osReq,
+		OS: []define.OS{
+			{Type: define.Darwin},
+			{Type: define.Linux},
+		},
 	})
 	testReEnroll(t, info, false, func(t *testing.T, out string, err error) {
 		require.Error(t, err)
@@ -46,12 +45,10 @@ func TestReEnrollUnprivileged(t *testing.T) {
 }
 
 func TestReEnrollPrivileged(t *testing.T) {
-	osReq := []define.OS{} // all OSes
 	info := define.Require(t, define.Requirements{
 		Group: Default,
 		Stack: &define.Stack{},
 		Sudo:  true,
-		OS:    osReq,
 	})
 	testReEnroll(t, info, false, func(t *testing.T, _ string, err error) {
 		require.NoError(t, err)
