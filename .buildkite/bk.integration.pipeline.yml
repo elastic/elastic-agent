@@ -6,12 +6,12 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1749258065"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1749258065"
-  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1749258065"
-  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1749258065"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1749258065"
-  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1749258065"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1749862860"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1749862860"
+  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1749862860"
+  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1749862860"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1749862860"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1749862860"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -41,6 +41,9 @@ common:
 steps:
   - label: Start ESS stack for integration tests
     key: integration-ess
+    notify:
+      - github_commit_status:
+          context: "buildkite/elastic-agent-extended-testing - ESS stack provision"
     env:
       ASDF_TERRAFORM_VERSION: 1.9.2
     command: |
@@ -56,6 +59,9 @@ steps:
 
   - group: "Extended runtime leak tests"
     key: extended-integration-tests
+    notify:
+      - github_commit_status:
+          context: "buildkite/elastic-agent-extended-testing - Runtime leak tests"
     depends_on:
       - integration-ess
     steps:
@@ -115,6 +121,9 @@ steps:
 
   - group: "Stateful: Windows"
     key: integration-tests-win
+    notify:
+      - github_commit_status:
+          context: "buildkite/elastic-agent-extended-testing - Windows"
     depends_on:
       - integration-ess
     steps:
@@ -210,6 +219,9 @@ steps:
 
   - group: "Stateful:Ubuntu"
     key: integration-tests-ubuntu
+    notify:
+      - github_commit_status:
+          context: "buildkite/elastic-agent-extended-testing - Ubuntu"
     depends_on:
       - integration-ess
     steps:
@@ -319,6 +331,9 @@ steps:
 
   - group: "Stateful:Debian"
     key: integration-tests-debian
+    notify:
+      - github_commit_status:
+          context: "buildkite/elastic-agent-extended-testing - Debian"
     depends_on:
       - integration-ess
     steps:
@@ -376,6 +391,9 @@ steps:
 
   - group: "Stateful(Sudo):RHEL8"
     key: integration-tests-rhel8
+    notify:
+      - github_commit_status:
+          context: "buildkite/elastic-agent-extended-testing - RHEL8"
     depends_on:
       - integration-ess
     steps:
@@ -398,6 +416,9 @@ steps:
 
   - group: "Kubernetes"
     key: integration-tests-kubernetes
+    notify:
+      - github_commit_status:
+          context: "buildkite/elastic-agent-extended-testing - Kubernetes"
     depends_on:
       - integration-ess
       - packaging-containers-x86-64
