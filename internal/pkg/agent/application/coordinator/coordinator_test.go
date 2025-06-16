@@ -22,6 +22,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
 
+	otelcomponentmanager "github.com/elastic/elastic-agent/internal/pkg/otel/componentmanager"
 	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -1080,6 +1081,7 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 	require.NoError(t, err)
 	otelMgr, err := otelmanager.NewOTelManager(l, logp.InfoLevel, l, otelmanager.EmbeddedExecutionMode)
 	require.NoError(t, err)
+	otelComponentMgr := otelcomponentmanager.NewOtelComponentManager(l, otelMgr, ai, monitoringMgr.ComponentMonitoringConfig)
 
 	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), l)
 	require.NoError(t, err)
@@ -1097,7 +1099,7 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 		acker = &fakeActionAcker{}
 	}
 
-	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelMgr, acker)
+	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelComponentMgr, acker)
 	return coord, cfgMgr, varsMgr
 }
 
@@ -1339,36 +1341,56 @@ func (f *fakeVarsManager) DefaultProvider() string {
 	return ""
 }
 
-type fakeOTelManager struct {
-	updateCallback func(*confmap.Conf) error
-	result         error
-	errChan        chan error
-	statusChan     chan *status.AggregateStatus
+var _ OTelComponentManager = (*fakeOtelComponentManager)(nil)
+
+type fakeOtelComponentManager struct {
+	updateCollectorCallback func(*confmap.Conf) error
+	updateComponentCallback func(component.Model) error
+	errChan                 chan error
+	collectorStatusChan     chan *status.AggregateStatus
+	componentStateChan      chan runtime.ComponentComponentState
 }
 
-func (f *fakeOTelManager) Run(ctx context.Context) error {
+func (f *fakeOtelComponentManager) Run(ctx context.Context) error {
 	<-ctx.Done()
 	return ctx.Err()
 }
 
-func (f *fakeOTelManager) Errors() <-chan error {
-	return nil
+func (f *fakeOtelComponentManager) Errors() <-chan error {
+	return f.errChan
 }
 
-func (f *fakeOTelManager) Update(cfg *confmap.Conf) {
-	f.result = nil
-	if f.updateCallback != nil {
-		f.result = f.updateCallback(cfg)
+func (f *fakeOtelComponentManager) UpdateCollector(cfg *confmap.Conf) {
+	var result error
+	if f.updateCollectorCallback != nil {
+		result = f.updateCollectorCallback(cfg)
 	}
-	if f.errChan != nil {
+	if f.errChan != nil && result != nil {
 		// If a reporting channel is set, send the result to it
-		f.errChan <- f.result
+		f.errChan <- result
 	}
 }
 
-func (f *fakeOTelManager) Watch() <-chan *status.AggregateStatus {
-	return f.statusChan
+func (f *fakeOtelComponentManager) WatchCollector() <-chan *status.AggregateStatus {
+	return f.collectorStatusChan
 }
+
+func (f *fakeOtelComponentManager) UpdateComponents(componentModel component.Model) {
+	var result error
+	if f.updateComponentCallback != nil {
+		result = f.updateComponentCallback(componentModel)
+	}
+	if f.errChan != nil && result != nil {
+		// If a reporting channel is set, send the result to it
+		f.errChan <- result
+	}
+}
+
+func (f *fakeOtelComponentManager) WatchComponents() <-chan runtime.ComponentComponentState {
+	return f.componentStateChan
+}
+
+func (f *fakeOtelComponentManager) MergedOtelConfig() *confmap.Conf { return nil }
 
 // An implementation of the RuntimeManager interface for use in testing.
 type fakeRuntimeManager struct {

@@ -13,8 +13,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
-
 	"go.opentelemetry.io/collector/component/componentstatus"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -134,17 +132,6 @@ type RuntimeManager interface {
 	PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error)
 }
 
-// OTelManager provides an interface to run and update the runtime.
-type OTelManager interface {
-	Runner
-
-	// Update updates the current configuration for OTel.
-	Update(cfg *confmap.Conf)
-
-	// Watch returns the chanel to watch for configuration changes.
-	Watch() <-chan *status.AggregateStatus
-}
-
 // OTelComponentManager provides an interface to run components and plain otel configurations in an otel collector.
 type OTelComponentManager interface {
 	Runner
@@ -152,14 +139,18 @@ type OTelComponentManager interface {
 	// UpdateCollector updates the current plain configuration for the otel collector.
 	UpdateCollector(cfg *confmap.Conf)
 
-	// SubscribeCollectorAll provides an interface to watch for changes in plain collector configuration.
+	// WatchCollector returns a channel to watch for collector status updates.
 	WatchCollector() <-chan *status.AggregateStatus
 
 	// UpdateComponents updates the current components model.
 	UpdateComponents(model component.Model)
 
-	// SubscribeComponentsAll provides an interface to watch for changes in all components.
+	// WatchComponents returns a channel to watch for component state updates.
 	WatchComponents() <-chan runtime.ComponentComponentState
+
+	// MergedOtelConfig returns the merged Otel collector configuration, containing both the plain config and the
+	// component config.
+	MergedOtelConfig() *confmap.Conf
 }
 
 // ConfigChange provides an interface for receiving a new configuration.
@@ -240,10 +231,8 @@ type Coordinator struct {
 	configMgr  ConfigManager
 	varsMgr    VarsManager
 
-	otelMgr OTelManager
-	otelCfg *confmap.Conf
-	// the final config sent to the manager, contains both config from hybrid mode and from components
-	finalOtelCfg *confmap.Conf
+	otelComponentMgr OTelComponentManager
+	otelCfg          *confmap.Conf
 
 	caps      capabilities.Capabilities
 	modifiers []ComponentsModifier
@@ -366,8 +355,9 @@ type managerChans struct {
 	varsManagerUpdate <-chan []*transpiler.Vars
 	varsManagerError  <-chan error
 
-	otelManagerUpdate chan *status.AggregateStatus
-	otelManagerError  <-chan error
+	otelManagerCollectorUpdate <-chan *status.AggregateStatus
+	otelManagerComponentUpdate <-chan runtime.ComponentComponentState
+	otelManagerError           <-chan error
 
 	upgradeMarkerUpdate <-chan upgrade.UpdateMarker
 }
@@ -395,7 +385,24 @@ type UpdateComponentChange struct {
 }
 
 // New creates a new coordinator.
-func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo info.Agent, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capabilities, monitorMgr MonitorManager, isManaged bool, otelMgr OTelManager, fleetAcker acker.Acker, modifiers ...ComponentsModifier) *Coordinator {
+func New(
+	logger *logger.Logger,
+	cfg *configuration.Configuration,
+	logLevel logp.Level,
+	agentInfo info.Agent,
+	specs component.RuntimeSpecs,
+	reexecMgr ReExecManager,
+	upgradeMgr UpgradeManager,
+	runtimeMgr RuntimeManager,
+	configMgr ConfigManager,
+	varsMgr VarsManager,
+	caps capabilities.Capabilities,
+	monitorMgr MonitorManager,
+	isManaged bool,
+	otelComponentMgr OTelComponentManager,
+	fleetAcker acker.Acker,
+	modifiers ...ComponentsModifier,
+) *Coordinator {
 	var fleetState cproto.State
 	var fleetMessage string
 	if !isManaged {
@@ -411,21 +418,21 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		LogLevel:     logLevel,
 	}
 	c := &Coordinator{
-		logger:     logger,
-		cfg:        cfg,
-		agentInfo:  agentInfo,
-		isManaged:  isManaged,
-		specs:      specs,
-		reexecMgr:  reexecMgr,
-		upgradeMgr: upgradeMgr,
-		monitorMgr: monitorMgr,
-		runtimeMgr: runtimeMgr,
-		configMgr:  configMgr,
-		varsMgr:    varsMgr,
-		otelMgr:    otelMgr,
-		caps:       caps,
-		modifiers:  modifiers,
-		state:      state,
+		logger:           logger,
+		cfg:              cfg,
+		agentInfo:        agentInfo,
+		isManaged:        isManaged,
+		specs:            specs,
+		reexecMgr:        reexecMgr,
+		upgradeMgr:       upgradeMgr,
+		monitorMgr:       monitorMgr,
+		runtimeMgr:       runtimeMgr,
+		configMgr:        configMgr,
+		varsMgr:          varsMgr,
+		otelComponentMgr: otelComponentMgr,
+		caps:             caps,
+		modifiers:        modifiers,
+		state:            state,
 		// Note: the uses of a buffered input channel in our broadcaster (the
 		// third parameter to broadcaster.New) means that it is possible for
 		// immediately adjacent writes/reads not to match, e.g.:
@@ -479,11 +486,12 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		c.managerChans.varsManagerUpdate = varsMgr.Watch()
 		c.managerChans.varsManagerError = varsMgr.Errors()
 	}
-	if otelMgr != nil {
+	if otelComponentMgr != nil {
 		// The otel manager sends updates to the watchRuntimeComponents function, which extracts component status
 		// and forwards the rest to this channel.
-		c.managerChans.otelManagerUpdate = make(chan *status.AggregateStatus)
-		c.managerChans.otelManagerError = otelMgr.Errors()
+		c.managerChans.otelManagerCollectorUpdate = otelComponentMgr.WatchCollector()
+		c.managerChans.otelManagerComponentUpdate = otelComponentMgr.WatchComponents()
+		c.managerChans.otelManagerError = otelComponentMgr.Errors()
 	}
 	if upgradeMgr != nil && upgradeMgr.MarkerWatcher() != nil {
 		c.managerChans.upgradeMarkerUpdate = upgradeMgr.MarkerWatcher().Watch()
@@ -674,20 +682,19 @@ func (c *Coordinator) SetLogLevel(ctx context.Context, lvl *logp.Level) error {
 func (c *Coordinator) watchRuntimeComponents(
 	ctx context.Context,
 	runtimeComponentStates <-chan runtime.ComponentComponentState,
-	otelStatuses <-chan *status.AggregateStatus,
+	otelComponentStates <-chan runtime.ComponentComponentState,
 ) {
 	// We need to track otel component state separately because otel components may not always get a STOPPED status
 	// If we receive an otel status without the state of a component we're tracking, we need to emit a fake STOPPED
 	// status for it. Process component states should not be affected by this logic.
-	processState := make(map[string]runtime.ComponentState)
-	otelState := make(map[string]runtime.ComponentState)
+	state := make(map[string]runtime.ComponentState)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case componentState := <-runtimeComponentStates:
-			logComponentStateChange(c.logger, processState, &componentState)
+			logComponentStateChange(c.logger, state, &componentState)
 			// Forward the final changes back to Coordinator, unless our context
 			// has ended.
 			select {
@@ -695,56 +702,14 @@ func (c *Coordinator) watchRuntimeComponents(
 			case <-ctx.Done():
 				return
 			}
-		case otelStatus := <-otelStatuses:
-			// We don't break on errors here, because we want to forward the status
-			// even if there was an error, and the rest of the code gracefully handles componentStates being nil
-			componentStates, err := translate.GetAllComponentStates(otelStatus, c.componentModel)
-			if err != nil {
-				c.setOTelError(err)
-			}
-			finalOtelStatus, err := translate.DropComponentStateFromOtelStatus(otelStatus)
-			if err != nil {
-				c.setOTelError(err)
-				finalOtelStatus = otelStatus
-			}
-
-			// forward the remaining otel status
-			// TODO: Implement subscriptions for otel manager status to avoid the need for this
+		case componentState := <-otelComponentStates:
+			logComponentStateChange(c.logger, state, &componentState)
+			// Forward the final changes back to Coordinator, unless our context
+			// has ended.
 			select {
-			case c.managerChans.otelManagerUpdate <- finalOtelStatus:
+			case c.managerChans.runtimeManagerUpdate <- componentState:
 			case <-ctx.Done():
 				return
-			}
-
-			// drop component states which don't exist in the configuration anymore
-			// we need to do this because we aren't guaranteed to receive a STOPPED state when the component is removed
-			componentIds := make(map[string]bool)
-			for _, componentState := range componentStates {
-				componentIds[componentState.Component.ID] = true
-			}
-			for id := range otelState {
-				if _, ok := componentIds[id]; !ok {
-					// this component is not in the configuration anymore, emit a fake STOPPED state
-					componentStates = append(componentStates, runtime.ComponentComponentState{
-						Component: component.Component{
-							ID: id,
-						},
-						State: runtime.ComponentState{
-							State: client.UnitStateStopped,
-						},
-					})
-				}
-			}
-			// now handle the component states
-			for _, componentState := range componentStates {
-				logComponentStateChange(c.logger, otelState, &componentState)
-				// Forward the final changes back to Coordinator, unless our context
-				// has ended.
-				select {
-				case c.managerChans.runtimeManagerUpdate <- componentState:
-				case <-ctx.Done():
-					return
-				}
 			}
 		}
 	}
@@ -830,15 +795,15 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	defer watchCanceller()
 
 	var subChan <-chan runtime.ComponentComponentState
-	var otelChan <-chan *status.AggregateStatus
+	var otelChan <-chan runtime.ComponentComponentState
 	// A real Coordinator will always have a runtime manager, but unit tests
 	// may not initialize all managers -- in that case we leave subChan nil,
 	// and just idle until Coordinator shuts down.
 	if c.runtimeMgr != nil {
 		subChan = c.runtimeMgr.SubscribeAll(ctx).Ch()
 	}
-	if c.otelMgr != nil {
-		otelChan = c.otelMgr.Watch()
+	if c.otelComponentMgr != nil {
+		otelChan = c.otelComponentMgr.WatchComponents()
 	}
 	go c.watchRuntimeComponents(watchCtx, subChan, otelChan)
 
@@ -1134,10 +1099,11 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			Description: "Final otel configuration used by the Elastic Agent. Includes hybrid mode config and component config.",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
-				if c.finalOtelCfg == nil {
+				mergedCfg := c.otelComponentMgr.MergedOtelConfig()
+				if mergedCfg == nil {
 					return []byte("no active OTel configuration")
 				}
-				o, err := yaml.Marshal(c.finalOtelCfg.ToStringMap())
+				o, err := yaml.Marshal(mergedCfg.ToStringMap())
 				if err != nil {
 					return []byte(fmt.Sprintf("error: failed to convert to yaml: %v", err))
 				}
@@ -1198,9 +1164,9 @@ func (c *Coordinator) runner(ctx context.Context) error {
 	}
 
 	otelErrCh := make(chan error, 1)
-	if c.otelMgr != nil {
+	if c.otelComponentMgr != nil {
 		go func() {
-			err := c.otelMgr.Run(ctx)
+			err := c.otelComponentMgr.Run(ctx)
 			cancel()
 			otelErrCh <- err
 		}()
@@ -1331,7 +1297,7 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 			c.processVars(ctx, vars)
 		}
 
-	case collectorStatus := <-c.managerChans.otelManagerUpdate:
+	case collectorStatus := <-c.managerChans.otelManagerCollectorUpdate:
 		c.state.Collector = collectorStatus
 		c.stateNeedsRefresh = true
 
@@ -1355,8 +1321,9 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 
 // Always called on the main Coordinator goroutine.
 func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (err error) {
-	if c.otelMgr != nil {
+	if c.otelComponentMgr != nil {
 		c.otelCfg = cfg.OTel
+		c.otelComponentMgr.UpdateCollector(c.otelCfg)
 	}
 	return c.processConfigAgent(ctx, cfg)
 }
@@ -1549,58 +1516,17 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 
 	c.logger.Info("Updating running component model")
 	c.logger.With("components", model.Components).Debug("Updating running component model")
-	return c.updateManagersWithConfig(model)
+	c.updateManagersWithConfig(model)
+	return nil
 }
 
 // updateManagersWithConfig updates runtime managers with the component model and config.
 // Components may be sent to different runtimes depending on various criteria.
-func (c *Coordinator) updateManagersWithConfig(model *component.Model) error {
+func (c *Coordinator) updateManagersWithConfig(model *component.Model) {
 	runtimeModel, otelModel := c.splitModelBetweenManagers(model)
 	c.logger.With("components", runtimeModel.Components).Debug("Updating runtime manager model")
 	c.runtimeMgr.Update(*runtimeModel)
-	return c.updateOtelManagerConfig(otelModel)
-}
-
-// updateOtelManagerConfig updates the otel collector configuration for the otel manager. It assembles this configuration
-// from the component model passed in and from the hybrid-mode otel config set on the Coordinator.
-func (c *Coordinator) updateOtelManagerConfig(model *component.Model) error {
-	finalOtelCfg := confmap.New()
-	var componentOtelCfg *confmap.Conf
-	if len(model.Components) > 0 {
-		var err error
-		c.logger.With("components", model.Components).Debug("Updating otel manager model")
-		componentOtelCfg, err = translate.GetOtelConfig(model, c.agentInfo, c.monitorMgr.ComponentMonitoringConfig)
-		if err != nil {
-			c.logger.Errorf("failed to generate otel config: %v", err)
-		}
-		componentIDs := make([]string, 0, len(model.Components))
-		for _, comp := range model.Components {
-			componentIDs = append(componentIDs, comp.ID)
-		}
-		c.logger.With("component_ids", componentIDs).Warn("The Otel runtime manager is HIGHLY EXPERIMENTAL and only intended for testing. Use at your own risk.")
-	}
-	if componentOtelCfg != nil {
-		err := finalOtelCfg.Merge(componentOtelCfg)
-		if err != nil {
-			c.logger.Error("failed to merge otel config: %v", err)
-		}
-	}
-
-	if c.otelCfg != nil {
-		err := finalOtelCfg.Merge(c.otelCfg)
-		if err != nil {
-			c.logger.Error("failed to merge otel config: %v", err)
-		}
-	}
-
-	if len(finalOtelCfg.AllKeys()) == 0 {
-		// if the config is empty, we want to send nil to the manager, so it knows to stop the collector
-		finalOtelCfg = nil
-	}
-
-	c.otelMgr.Update(finalOtelCfg)
-	c.finalOtelCfg = finalOtelCfg
-	return nil
+	c.otelComponentMgr.UpdateComponents(*otelModel)
 }
 
 // splitModelBetweenManager splits the model components between the runtime manager and the otel manager.

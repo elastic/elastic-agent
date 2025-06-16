@@ -13,17 +13,15 @@ package coordinator
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
-
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -188,7 +186,7 @@ func TestCoordinatorReportsUnhealthyOTelComponents(t *testing.T) {
 			InputChan: stateChan,
 		},
 		managerChans: managerChans{
-			otelManagerUpdate: otelChan,
+			otelManagerCollectorUpdate: otelChan,
 		},
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
@@ -471,8 +469,8 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 		// test by sending an invalid artifact URI to trigger an error.
 		upgradeMgr: upgradeMgr,
 		// Add a placeholder runtime manager that will accept any updates
-		runtimeMgr: &fakeRuntimeManager{},
-		otelMgr:    &fakeOTelManager{},
+		runtimeMgr:       &fakeRuntimeManager{},
+		otelComponentMgr: &fakeOtelComponentManager{},
 
 		// Set valid but empty initial values for ast and vars
 		vars:               emptyVars(t),
@@ -587,8 +585,8 @@ func TestCoordinatorReportsComponentModelError(t *testing.T) {
 			varsManagerUpdate:   varsChan,
 		},
 		// Add a placeholder runtime manager that will accept any updates
-		runtimeMgr: &fakeRuntimeManager{},
-		otelMgr:    &fakeOTelManager{},
+		runtimeMgr:       &fakeRuntimeManager{},
+		otelComponentMgr: &fakeOtelComponentManager{},
 
 		// Set valid but empty initial values for ast and vars
 		vars:               emptyVars(t),
@@ -687,7 +685,7 @@ func TestCoordinatorPolicyChangeUpdatesMonitorReloader(t *testing.T) {
 			configManagerUpdate: configChan,
 		},
 		runtimeMgr:         runtimeManager,
-		otelMgr:            &fakeOTelManager{},
+		otelComponentMgr:   &fakeOtelComponentManager{},
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
@@ -810,8 +808,8 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManager(t *testing.T) {
 	}
 	var otelUpdated bool         // Set by otel manager callback
 	var otelConfig *confmap.Conf // Set by otel manager callback
-	otelManager := &fakeOTelManager{
-		updateCallback: func(cfg *confmap.Conf) error {
+	otelComponentManager := &fakeOtelComponentManager{
+		updateCollectorCallback: func(cfg *confmap.Conf) error {
 			otelUpdated = true
 			otelConfig = cfg
 			return nil
@@ -826,7 +824,7 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManager(t *testing.T) {
 			configManagerUpdate: configChan,
 		},
 		runtimeMgr:         runtimeManager,
-		otelMgr:            otelManager,
+		otelComponentMgr:   otelComponentManager,
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
@@ -953,8 +951,8 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 	}
 	var otelUpdated bool         // Set by otel manager callback
 	var otelConfig *confmap.Conf // Set by otel manager callback
-	otelManager := &fakeOTelManager{
-		updateCallback: func(cfg *confmap.Conf) error {
+	otelComponentMgr := &fakeOtelComponentManager{
+		updateCollectorCallback: func(cfg *confmap.Conf) error {
 			otelUpdated = true
 			otelConfig = cfg
 			return nil
@@ -997,7 +995,7 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 		},
 		monitorMgr:         monitoringMgr,
 		runtimeMgr:         runtimeManager,
-		otelMgr:            otelManager,
+		otelComponentMgr:   otelComponentMgr,
 		specs:              specs,
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
@@ -1094,8 +1092,8 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 			// manager, so it receives the update result.
 			runtimeManagerError: updateErrChan,
 		},
-		runtimeMgr: runtimeManager,
-		otelMgr:    &fakeOTelManager{},
+		runtimeMgr:       runtimeManager,
+		otelComponentMgr: &fakeOtelComponentManager{},
 
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
@@ -1139,8 +1137,8 @@ func TestCoordinatorReportsOTelManagerUpdateFailure(t *testing.T) {
 	// Create a mocked otel manager that always reports an error
 	const errorStr = "update failed for testing reasons"
 	runtimeManager := &fakeRuntimeManager{}
-	otelManager := &fakeOTelManager{
-		updateCallback: func(retrieved *confmap.Conf) error {
+	otelComponentManager := &fakeOtelComponentManager{
+		updateCollectorCallback: func(retrieved *confmap.Conf) error {
 			return errors.New(errorStr)
 		},
 		errChan: updateErrChan,
@@ -1157,7 +1155,7 @@ func TestCoordinatorReportsOTelManagerUpdateFailure(t *testing.T) {
 			otelManagerError: updateErrChan,
 		},
 		runtimeMgr:         runtimeManager,
-		otelMgr:            otelManager,
+		otelComponentMgr:   otelComponentManager,
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
@@ -1221,7 +1219,7 @@ func TestCoordinatorAppliesVarsToPolicy(t *testing.T) {
 			varsManagerUpdate:   varsChan,
 		},
 		runtimeMgr:         runtimeManager,
-		otelMgr:            &fakeOTelManager{},
+		otelComponentMgr:   &fakeOtelComponentManager{},
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
@@ -1340,11 +1338,9 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 	defer cancel()
 	logger := logp.NewLogger("testing")
 
-	statusChan := make(chan *status.AggregateStatus)
+	componentUpdateChan := make(chan runtime.ComponentComponentState)
 
-	runtimeStateChan := make(chan runtime.ComponentComponentState)
-
-	otelComponent := component.Component{
+	comp := component.Component{
 		ID:             "filestream-default",
 		InputType:      "filestream",
 		OutputType:     "elasticsearch",
@@ -1374,33 +1370,11 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 			},
 		},
 	}
-	processComponent := otelComponent
-	processComponent.RuntimeManager = component.ProcessRuntimeManager
-	processComponent.ID = "filestream-process"
 
-	otelStatus := &status.AggregateStatus{
-		Event: componentstatus.NewEvent(componentstatus.StatusOK),
-		ComponentStatusMap: map[string]*status.AggregateStatus{
-			fmt.Sprintf("pipeline:logs/%sfilestream-default", translate.OtelNamePrefix): {
-				Event: componentstatus.NewEvent(componentstatus.StatusOK),
-				ComponentStatusMap: map[string]*status.AggregateStatus{
-					fmt.Sprintf("receiver:filebeat/%sfilestream-unit", translate.OtelNamePrefix): {
-						Event: componentstatus.NewEvent(componentstatus.StatusOK),
-					},
-					fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", translate.OtelNamePrefix): {
-						Event: componentstatus.NewEvent(componentstatus.StatusOK),
-					},
-				},
-			},
-		},
-	}
-
-	invalidOtelStatus := &status.AggregateStatus{
-		Event: componentstatus.NewEvent(componentstatus.StatusOK),
-		ComponentStatusMap: map[string]*status.AggregateStatus{
-			"unknown:logs/filestream-default": {
-				Event: componentstatus.NewEvent(componentstatus.StatusOK),
-			},
+	compState := runtime.ComponentComponentState{
+		Component: comp,
+		State: runtime.ComponentState{
+			State: client.UnitStateHealthy,
 		},
 	}
 
@@ -1409,10 +1383,11 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 		agentInfo:        &info.AgentInfo{},
 		stateBroadcaster: broadcaster.New(State{}, 0, 0),
 		managerChans: managerChans{
-			otelManagerUpdate:    make(chan *status.AggregateStatus),
-			runtimeManagerUpdate: make(chan runtime.ComponentComponentState),
+			otelManagerComponentUpdate: componentUpdateChan,
+			runtimeManagerUpdate:       make(chan runtime.ComponentComponentState),
 		},
-		state: State{},
+		state:          State{},
+		componentModel: []component.Component{comp},
 	}
 
 	// start runtime status watching
@@ -1421,19 +1396,9 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 	// no component status
 	assert.Empty(t, coord.state.Components)
 
-	coord.componentModel = []component.Component{otelComponent}
-
 	// push the status into the coordinator
 	select {
-	case statusChan <- otelStatus:
-	case <-ctx.Done():
-		t.Fatal("timeout waiting for coordinator to receive status")
-	}
-
-	select {
-	case finalOtelStatus := <-coord.managerChans.otelManagerUpdate:
-		// we shouldn't have any status remaining for the otel collector
-		assert.Empty(t, finalOtelStatus.ComponentStatusMap)
+	case componentUpdateChan <- compState:
 	case <-ctx.Done():
 		t.Fatal("timeout waiting for coordinator to receive status")
 	}
@@ -1499,15 +1464,7 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 	coord.componentModel = []component.Component{}
 	coord.state = State{}
 	select {
-	case statusChan <- otelStatus:
-	case <-ctx.Done():
-		t.Fatal("timeout waiting for coordinator to receive status")
-	}
-
-	select {
-	case finalOtelStatus := <-coord.managerChans.otelManagerUpdate:
-		// we shouldn't have any status remaining for the otel collector
-		assert.Empty(t, finalOtelStatus.ComponentStatusMap)
+	case componentUpdateChan <- stoppedState:
 	case <-ctx.Done():
 		t.Fatal("timeout waiting for coordinator to receive status")
 	}
