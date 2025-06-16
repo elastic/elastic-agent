@@ -1,12 +1,14 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 
 env:
-  DOCKER_REGISTRY: "docker.elastic.co"
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
 
 steps:
   - group: "Integration tests: packaging"
     key: "int-packaging"
+    notify:
+      - github_commit_status:
+          context: "buildkite/elastic-agent - Packaging"
     steps:
       # Build matrix is not used for packaging in favor to unique step keys
       # Packaging linux/amd64
