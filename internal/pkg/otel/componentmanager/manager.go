@@ -7,6 +7,7 @@ package componentmanager
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
@@ -50,6 +51,9 @@ type OtelComponentManager struct {
 
 	collectorCfg *confmap.Conf
 	components   []component.Component
+
+	collectorConfigMutex sync.RWMutex
+	mergedCollectorCfg   *confmap.Conf
 
 	currentCollectorStatus *status.AggregateStatus
 	currentComponentStates map[string]runtime.ComponentComponentState
@@ -150,24 +154,24 @@ func (m *OtelComponentManager) Run(ctx context.Context) error {
 }
 
 // handleCollectorUpdate processes collector configuration updates received through the collectorUpdateChan.
-// This method updates the internal collector configuration and triggers a rebuild of the final merged
+// This method updates the internal collector configuration and triggers a rebuild of the merged
 // configuration that combines collector and component configurations.
 func (m *OtelComponentManager) handleCollectorUpdate(cfg *confmap.Conf) error {
 	m.collectorCfg = cfg
-	return m.updateFinalConfig()
+	return m.updateMergedConfig()
 }
 
 // handleComponentUpdate processes component model updates received through the componentUpdateChan.
-// This method updates the internal component list and triggers a rebuild of the final merged
+// This method updates the internal component list and triggers a rebuild of the merged
 // configuration that combines collector and component configurations.
 func (m *OtelComponentManager) handleComponentUpdate(model component.Model) error {
 	m.components = model.Components
-	return m.updateFinalConfig()
+	return m.updateMergedConfig()
 }
 
-// buildFinalConfig combines collector configuration with component-derived configuration.
-func (m *OtelComponentManager) buildFinalConfig() (*confmap.Conf, error) {
-	finalOtelCfg := confmap.New()
+// buildMergedConfig combines collector configuration with component-derived configuration.
+func (m *OtelComponentManager) buildMergedConfig() (*confmap.Conf, error) {
+	mergedOtelCfg := confmap.New()
 
 	// Generate component otel config if there are components
 	var componentOtelCfg *confmap.Conf
@@ -188,7 +192,7 @@ func (m *OtelComponentManager) buildFinalConfig() (*confmap.Conf, error) {
 
 	// Merge component config if it exists
 	if componentOtelCfg != nil {
-		err := finalOtelCfg.Merge(componentOtelCfg)
+		err := mergedOtelCfg.Merge(componentOtelCfg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to merge component otel config: %w", err)
 		}
@@ -196,29 +200,33 @@ func (m *OtelComponentManager) buildFinalConfig() (*confmap.Conf, error) {
 
 	// Merge with base collector config if it exists
 	if m.collectorCfg != nil {
-		err := finalOtelCfg.Merge(m.collectorCfg)
+		err := mergedOtelCfg.Merge(m.collectorCfg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to merge collector otel config: %w", err)
 		}
 	}
 
 	// If the config is empty, return nil so the manager knows to stop the collector
-	if len(finalOtelCfg.AllKeys()) == 0 {
+	if len(mergedOtelCfg.AllKeys()) == 0 {
 		return nil, nil
 	}
 
-	return finalOtelCfg, nil
+	return mergedOtelCfg, nil
 }
 
-// updateFinalConfig builds the final configuration for the otel manager by merging the base collector configuration
-// with the component configuration, and updates the otel manager with the final configuration.
-func (m *OtelComponentManager) updateFinalConfig() error {
-	finalCfg, err := m.buildFinalConfig()
+// updateMergedConfig builds the merged configuration for the otel manager by merging the base collector configuration
+// with the component configuration, and updates the otel manager with the merged configuration.
+func (m *OtelComponentManager) updateMergedConfig() error {
+	mergedCfg, err := m.buildMergedConfig()
 	if err != nil {
 		return err
 	}
 
-	m.otelManager.Update(finalCfg)
+	m.otelManager.Update(mergedCfg)
+
+	m.collectorConfigMutex.Lock()
+	defer m.collectorConfigMutex.Unlock()
+	m.mergedCollectorCfg = mergedCfg
 	return nil
 }
 
@@ -272,6 +280,12 @@ func (m *OtelComponentManager) WatchCollector() <-chan *status.AggregateStatus {
 // WatchComponents returns a read-only channel that provides component state updates.
 func (m *OtelComponentManager) WatchComponents() <-chan runtime.ComponentComponentState {
 	return m.componentWatchChan
+}
+
+func (m *OtelComponentManager) MergedOtelConfig() *confmap.Conf {
+	m.collectorConfigMutex.RLock()
+	defer m.collectorConfigMutex.RUnlock()
+	return m.mergedCollectorCfg
 }
 
 // handleOtelStatusUpdate processes status updates from the underlying OpenTelemetry manager.
