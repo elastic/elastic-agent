@@ -24,8 +24,6 @@ jobs:
       - id: generator
         uses: elastic/oblt-actions/elastic/active-branches@v1
         with:
-          # Remove exclusions when backports are merged
-          exclude-branches: "8.17,8.18,8.19,9.0"
           filter-branches: true
 
   update-stable-snapshot:
