@@ -93,11 +93,10 @@ func extractComponentsFromGoMod(goModPath string) ([]string, error) {
 	// Special case for filestorage which is under extension/storage/
 	storageRegex := regexp.MustCompile(`extension/storage/([a-zA-Z0-9]+)`)
 
-
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		
+
 		// Match standard components
 		matches := componentRegex.FindAllStringSubmatch(line, -1)
 		for _, match := range matches {
@@ -105,7 +104,7 @@ func extractComponentsFromGoMod(goModPath string) ([]string, error) {
 				components = append(components, match[1])
 			}
 		}
-		
+
 		// Match special case for filestorage
 		storageMatches := storageRegex.FindAllStringSubmatch(line, -1)
 		for _, match := range storageMatches {
