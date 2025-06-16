@@ -1051,10 +1051,18 @@ func createFleetConfigFromEnroll(accessAPIKey string, enrollmentToken string, re
 	if err != nil {
 		return nil, errors.New(err, "failed to generate enrollment hash", errors.TypeConfig)
 	}
-	cfg.ReplaceTokenHash, err = fleetHashToken(replaceToken)
-	if err != nil {
-		return nil, errors.New(err, "failed to generate replace token hash", errors.TypeConfig)
+
+	// Hash replaceToken if provided; it is not expected to be provided when an Agent
+	// is being enrolled for the very first time. Hashing an empty replaceToken with the
+	// FIPS-capable build of Elastic Agent results in an "invalid key length" error from
+	// OpenSSL's FIPS provider.
+	if replaceToken != "" {
+		cfg.ReplaceTokenHash, err = fleetHashToken(replaceToken)
+		if err != nil {
+			return nil, errors.New(err, "failed to generate replace token hash", errors.TypeConfig)
+		}
 	}
+
 	if err := cfg.Valid(); err != nil {
 		return nil, errors.New(err, "invalid enrollment options", errors.TypeConfig)
 	}

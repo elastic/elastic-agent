@@ -625,3 +625,27 @@ func addEntryToZipArchive(af files, writer *zip.Writer) error {
 
 	return nil
 }
+
+func TestGetFileNamePrefix(t *testing.T) {
+	tests := map[string]struct {
+		archivePath    string
+		expectedPrefix string
+	}{
+		"fips": {
+			archivePath:    "/foo/bar/elastic-agent-fips-9.1.0-SNAPSHOT-linux-arm64.tar.gz",
+			expectedPrefix: "elastic-agent-9.1.0-SNAPSHOT-linux-arm64/",
+		},
+		"no_fips": {
+			archivePath:    "/foo/bar/elastic-agent-9.1.0-SNAPSHOT-linux-arm64.tar.gz",
+			expectedPrefix: "elastic-agent-9.1.0-SNAPSHOT-linux-arm64/",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			prefix := getFileNamePrefix(test.archivePath)
+			require.Equal(t, test.expectedPrefix, prefix)
+		})
+	}
+
+}
