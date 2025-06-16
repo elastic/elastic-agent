@@ -2,7 +2,7 @@
 ---
 name: Bump ESS snapshots
 
-pipelineid: 'bump-ess-snapshot-{{ requiredEnv "BRANCH" }}'
+pipelineid: 'bump-ess-snapshot-{{ requiredEnv "BRANCH_NAME" }}'
 
 scms:
   githubConfig:
