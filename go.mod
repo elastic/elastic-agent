@@ -25,16 +25,9 @@ require (
 	github.com/elastic/go-sysinfo v1.15.3
 	github.com/elastic/go-ucfg v0.8.9-0.20250307075119-2a22403faaea
 	github.com/elastic/mock-es v0.0.0-20241101195702-0a41fa3d30d9
-<<<<<<< HEAD
-	github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector v0.3.0
+	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.3.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.15.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.6.0
-	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.6.0
-=======
-	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.2.1
-	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.13.0
-	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.3.0
->>>>>>> 9a555bc40 (Use elastic apm connector to replace other apm components (#6937))
 	github.com/fatih/color v1.18.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-viper/mapstructure/v2 v2.2.1
@@ -85,7 +78,6 @@ require (
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.125.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.125.0
 	go.uber.org/zap v1.27.0
-<<<<<<< HEAD
 	golang.org/x/crypto v0.37.0
 	golang.org/x/exp v0.0.0-20250215185904-eff6e970281f
 	golang.org/x/mod v0.24.0
@@ -94,16 +86,6 @@ require (
 	golang.org/x/sys v0.33.0
 	golang.org/x/term v0.31.0
 	golang.org/x/text v0.25.0
-=======
-	golang.org/x/crypto v0.36.0
-	golang.org/x/exp v0.0.0-20250215185904-eff6e970281f
-	golang.org/x/mod v0.23.0
-	golang.org/x/net v0.38.0
-	golang.org/x/sync v0.12.0
-	golang.org/x/sys v0.31.0
-	golang.org/x/term v0.30.0
-	golang.org/x/text v0.23.0
->>>>>>> 9a555bc40 (Use elastic apm connector to replace other apm components (#6937))
 	golang.org/x/time v0.11.0
 	golang.org/x/tools v0.30.0
 	google.golang.org/grpc v1.72.0
@@ -212,11 +194,7 @@ require (
 	github.com/BurntSushi/toml v1.4.1-0.20240526193622-a339e1f7089c // indirect
 	github.com/Code-Hex/go-generics-cache v1.5.1 // indirect
 	github.com/DataDog/zstd v1.5.6 // indirect
-<<<<<<< HEAD
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.27.0 // indirect
-=======
-	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.26.0 // indirect
->>>>>>> 9a555bc40 (Use elastic apm connector to replace other apm components (#6937))
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.48.1 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.48.1 // indirect
 	github.com/IBM/sarama v1.45.1 // indirect
@@ -271,10 +249,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.19 // indirect
 	github.com/aws/smithy-go v1.22.3 // indirect
 	github.com/axiomhq/hyperloglog v0.2.3 // indirect
-<<<<<<< HEAD
 	github.com/bboreham/go-loser v0.0.0-20230920113527-fcc2c21820a3 // indirect
-=======
->>>>>>> 9a555bc40 (Use elastic apm connector to replace other apm components (#6937))
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bitfield/gotestdox v0.2.2 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
@@ -338,15 +313,10 @@ require (
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/lunes v0.1.0 // indirect
-<<<<<<< HEAD
 	github.com/elastic/mito v1.19.0 // indirect
-	github.com/elastic/opentelemetry-lib v0.18.0 // indirect
-=======
-	github.com/elastic/mito v1.17.1 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
-	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.4.0 // indirect
-	github.com/elastic/opentelemetry-lib v0.14.0 // indirect
->>>>>>> 9a555bc40 (Use elastic apm connector to replace other apm components (#6937))
+	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.6.0 // indirect
+	github.com/elastic/opentelemetry-lib v0.18.0 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
 	github.com/elastic/sarama v1.19.1-0.20250304185506-df6449b5c996 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
@@ -453,13 +423,8 @@ require (
 	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
-<<<<<<< HEAD
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
 	github.com/kamstrup/intmap v0.5.1 // indirect
-=======
-	github.com/kamstrup/intmap v0.5.1 // indirect
-	github.com/karrick/godirwalk v1.17.0 // indirect
->>>>>>> 9a555bc40 (Use elastic apm connector to replace other apm components (#6937))
 	github.com/klauspost/asmfmt v1.3.2 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.8 // indirect
@@ -515,9 +480,9 @@ require (
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/nginx/nginx-prometheus-exporter v1.4.1 // indirect
 	github.com/nxadm/tail v1.4.11 // indirect
-<<<<<<< HEAD
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/connector/signaltometricsconnector v0.124.2-0.20250425060700-a372d054d598 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.125.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer v0.125.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/aws/ecsutil v0.125.0 // indirect
@@ -543,33 +508,6 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/jaeger v0.125.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheus v0.125.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/zipkin v0.125.0 // indirect
-=======
-	github.com/open-telemetry/opentelemetry-collector-contrib/connector/signaltometricsconnector v0.120.1 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/internal/aws/ecsutil v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/internal/exp/metrics v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/internal/filter v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/internal/kafka v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/internal/kubelet v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/internal/metadataproviders v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/internal/pdatautil v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/internal/sharedcomponent v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/batchpersignal v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/core/xidutils v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/experimentalmetricmetadata v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/kafka/topic v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/azure v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/jaeger v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheus v0.121.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/zipkin v0.121.0 // indirect
->>>>>>> 9a555bc40 (Use elastic apm connector to replace other apm components (#6937))
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/openshift/api v3.9.0+incompatible // indirect
