@@ -11,12 +11,15 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/magefile/mage/mg"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -270,6 +273,11 @@ func (b *dockerBuilder) dockerSave(tag string, templateExtraArgs ...map[string]i
 		}
 		outputFile = filepath.Join(distributionsDir, outputTar)
 	}
+
+	if mg.Verbose() {
+		log.Printf(">>>> saving docker image %s to %s", tag, outputFile)
+	}
+
 	var stderr bytes.Buffer
 	cmd := exec.Command("docker", "save", tag)
 	cmd.Stderr = &stderr

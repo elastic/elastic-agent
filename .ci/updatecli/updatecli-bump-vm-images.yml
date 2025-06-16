@@ -1,6 +1,7 @@
 # update-cli configuration for automated VM image version bumping
 ---
 name: Bump vm-images to latest version
+pipelineid: 'updatecli-update-vm-images-{{ requiredEnv "BRANCH_NAME" }}'
 
 scms:
   githubConfig:
@@ -12,7 +13,7 @@ scms:
       repository: '{{ .scm.repository }}'
       token: '{{ requiredEnv "GITHUB_TOKEN" }}'
       commitusingapi: true
-      branch: '{{ .scm.branch }}'
+      branch: '{{ requiredEnv "BRANCH_NAME" }}'
       force: false
 
 actions:
@@ -24,8 +25,8 @@ actions:
       automerge: false
       labels:
         - dependencies
-        - backport-active-all
-      title: '[Automation] Bump VM Image version to {{ source "latestVersion" }}'
+        - backport-skip
+      title: '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Bump VM Image version to {{ source "latestVersion" }}'
 
 sources:
   latestVersion:
@@ -43,6 +44,8 @@ conditions:
     spec:
       command: 'grep -q -v {{ source "latestVersion" }} .buildkite/pipeline.yml #'
 
+# NOTE: if you add a new target file, please update the .mergify.yml file
+#       to include the new file for the approval and automatic merge
 targets:
   update-buildkite-pipeline:
     name: "Update .buildkite/pipeline.yml"
@@ -61,5 +64,15 @@ targets:
     kind: file
     spec:
       file: .buildkite/bk.integration.pipeline.yml
+      matchpattern: '(IMAGE_.+): "platform-ingest-elastic-agent-(.+)-(.+)"'
+      replacepattern: '$1: "platform-ingest-elastic-agent-$2-{{ source "latestVersion" }}"'
+
+  update-buildkite-bk.integration-fips.pipeline:
+    name: "Update .buildkite/bk.integration-fips.pipeline.yml"
+    sourceid: latestVersion
+    scmid: githubConfig
+    kind: file
+    spec:
+      file: .buildkite/bk.integration-fips.pipeline.yml
       matchpattern: '(IMAGE_.+): "platform-ingest-elastic-agent-(.+)-(.+)"'
       replacepattern: '$1: "platform-ingest-elastic-agent-$2-{{ source "latestVersion" }}"'

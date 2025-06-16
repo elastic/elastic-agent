@@ -78,7 +78,7 @@ func (runner *BeatRunner) SetupSuite() {
 	}
 	runner.T().Logf("running serverless tests with %s", runner.testbeatName)
 
-	agentFixture, err := define.NewFixtureWithBinary(runner.T(), define.Version(), runner.testbeatName, "/home/ubuntu", atesting.WithRunLength(time.Minute*3), atesting.WithAdditionalArgs([]string{"-E", "output.elasticsearch.allow_older_versions=true"}))
+	agentFixture, err := define.NewFixtureWithBinary(runner.T(), define.Version(), runner.testbeatName, "/home/ubuntu", false, atesting.WithRunLength(time.Minute*3), atesting.WithAdditionalArgs([]string{"-E", "output.elasticsearch.allow_older_versions=true"}))
 	runner.agentFixture = agentFixture
 	require.NoError(runner.T(), err)
 

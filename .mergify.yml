@@ -19,6 +19,35 @@ defaults:
       labels:
         - "backport"
 pull_request_rules:
+  - name: automatic approval for updatecli pull requests with changes in .buildkite
+    conditions:
+      - author=github-actions[bot]
+      - check-success=buildkite/elastic-agent
+      - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
+      - head~=^updatecli_.*
+    actions:
+      review:
+        type: APPROVE
+        message: Automatically approving mergify
+  - name: automatic squash and merge with success checks and the files matching the regex .buildkite is modified.
+    conditions:
+      - author=github-actions[bot]
+      - check-success=buildkite/elastic-agent
+      - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml|.buildkite/bk.integration-fips.pipeline.yml)$
+      - head~=^updatecli_.*
+      - "#approved-reviews-by>=1"
+    actions:
+      queue:
+        name: default
+  - name: rebase pull requests for the VM autobump
+    conditions:
+      - author=github-actions[bot]
+      - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml|.buildkite/bk.integration-fips.pipeline.yml)$
+      - head~=^updatecli_.*
+      - "#check-failure>0"
+      - schedule=Tue-Fri 04:00-06:00[Europe/Paris]
+    actions:
+      rebase:
   - name: self-assign PRs
     conditions:
       - -merged
