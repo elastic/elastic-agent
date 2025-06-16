@@ -1336,7 +1336,7 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 
 	// Set a one-second timeout -- nothing here should block, but if it
 	// does let's report a failure instead of timing out the test runner.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	logger := logp.NewLogger("testing")
 
