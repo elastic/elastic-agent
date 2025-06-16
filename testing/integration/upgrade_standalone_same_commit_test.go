@@ -30,8 +30,8 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 	})
 
 	// parse the version we are testing
-	currentVersion, err := version.ParseVersion(define.Version())
-	require.NoError(t, err)
+	currentVersion, parseVersionErr := version.ParseVersion(define.Version())
+	require.NoError(t, parseVersionErr)
 
 	// 8.13.0-SNAPSHOT is the minimum version we need for testing upgrading with the same hash
 	if currentVersion.Less(*upgradetest.Version_8_13_0_SNAPSHOT) {
@@ -83,7 +83,7 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 
 		newPackageContainingDir := t.TempDir()
 
-		versionForFixture, err := repackageArchive(ctx, t, err, startFixture, newVersionBuildMetadata, currentVersion, newPackageContainingDir, parsedNewVersion)
+		versionForFixture, err := repackageArchive(ctx, t, startFixture, newVersionBuildMetadata, currentVersion, newPackageContainingDir, parsedNewVersion)
 
 		// I wish I could just pass the location of the package on disk to the whole upgrade tests/fixture/fetcher code
 		// but I would have to break too much code for that, when in Rome... add more code on top of inflexible code

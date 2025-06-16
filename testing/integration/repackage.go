@@ -2,6 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
+//go:build integration
+
 package integration
 
 import (
@@ -28,8 +30,8 @@ import (
 	agtversion "github.com/elastic/elastic-agent/version"
 )
 
-func repackageArchive(ctx context.Context, t *testing.T, err error, startFixture *atesting.Fixture, newVersionBuildMetadata string, currentVersion *version.ParsedSemVer, newPackageContainingDir string, parsedNewVersion *version.ParsedSemVer) (*version.ParsedSemVer, error) {
-	err = startFixture.EnsurePrepared(ctx)
+func repackageArchive(ctx context.Context, t *testing.T, startFixture *atesting.Fixture, newVersionBuildMetadata string, currentVersion *version.ParsedSemVer, newPackageContainingDir string, parsedNewVersion *version.ParsedSemVer) (*version.ParsedSemVer, error) {
+	err := startFixture.EnsurePrepared(ctx)
 	require.NoErrorf(t, err, "fixture should be prepared")
 
 	// retrieve the compressed package file location
