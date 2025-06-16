@@ -50,7 +50,7 @@ func TestReEnrollPrivileged(t *testing.T) {
 		Stack: &define.Stack{},
 		Sudo:  true,
 	})
-	testReEnroll(t, info, false, func(t *testing.T, _ string, err error) {
+	testReEnroll(t, info, true, func(t *testing.T, _ string, err error) {
 		require.NoError(t, err)
 	})
 }
