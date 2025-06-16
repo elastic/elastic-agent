@@ -39,6 +39,16 @@ pull_request_rules:
     actions:
       queue:
         name: default
+  - name: rebase pull requests for the VM autobump
+    conditions:
+      - author=github-actions[bot]
+      - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml|.buildkite/bk.integration-fips.pipeline.yml)$
+      - head~=^updatecli_.*
+      - "#check-failure>0"
+      - schedule=Tue-Fri 04:00-06:00[Europe/Paris]
+    actions:
+      rebase:
+
   - name: automatic approval for updatecli pull requests with changes in create_deployment_csp_configuration.yaml
     conditions:
       - author=github-actions[bot]
@@ -58,17 +68,17 @@ pull_request_rules:
       - "#approved-reviews-by>=1"
     actions:
       queue:
-        name: default      
-
-  - name: rebase pull requests for the VM autobump
+        name: default
+  - name: rebase pull requests when create_deployment_csp_configuration.yaml is modified
     conditions:
       - author=github-actions[bot]
-      - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml|.buildkite/bk.integration-fips.pipeline.yml)$
+      - files~=^pkg/testing/ess/create_deployment_csp_configuration.yaml$
       - head~=^updatecli_.*
       - "#check-failure>0"
-      - schedule=Tue-Fri 04:00-06:00[Europe/Paris]
+      - schedule=Mon-Fri 04:00-06:00[Europe/Paris]
     actions:
       rebase:
+
   - name: self-assign PRs
     conditions:
       - -merged
