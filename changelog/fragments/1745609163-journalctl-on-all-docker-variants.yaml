@@ -13,8 +13,8 @@ kind: bug-fix
 # Change summary; a 80ish characters long description of the change.
 summary: |
   Ship journalctl in the elastic-agent, elastic-agent-complete, and
-  elastic-otel-collector Docker images to enable reading journald
-  logs. Journalctl is not present on *-slim and all Wolfi images.
+  elastic-agent-ubi Docker images to enable reading journald
+  logs. Journalctl is not present on Wolfi images.
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
@@ -28,7 +28,7 @@ component: elastic-agent
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
 # NOTE: the tooling supports backports, so it's able to fill the original PR number instead of the backport PR number.
 # Please provide it if you are adding a fragment for a different PR.
-pr: https://github.com/elastic/elastic-agent/pull/7995
+pr: https://github.com/elastic/elastic-agent/pull/8492
 
 # Issue URL; optional; the GitHub issue related to this changeset (either closes or is part of).
 # If not present is automatically filled by the tooling with the issue linked to the PR number.
