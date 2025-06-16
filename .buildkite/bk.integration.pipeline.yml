@@ -43,9 +43,7 @@ steps:
     key: integration-ess
     notify:
       - github_commit_status:
-          context: "buildkite/elastic-agent-extended-testing - ESS stack provision"
-    env:
-      ASDF_TERRAFORM_VERSION: 1.9.2
+          context: "buildkite/elastic-agent-extended-testing - ESS stack provision"    
     command: |
       #!/usr/bin/env bash
       set -euo pipefail
