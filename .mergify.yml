@@ -39,6 +39,27 @@ pull_request_rules:
     actions:
       queue:
         name: default
+  - name: automatic approval for updatecli pull requests with changes in create_deployment_csp_configuration.yaml
+    conditions:
+      - author=github-actions[bot]
+      - check-success=buildkite/elastic-agent
+      - files~=^pkg/testing/ess/create_deployment_csp_configuration.yaml$
+      - head~=^updatecli_.*
+    actions:
+      review: 
+        type: APPROVE
+        message: Automatically approving mergify
+  - name: automatic squash and merge with success checks when create_deployment_csp_configuration.yaml is modified.
+    conditions:
+      - author=github-actions[bot]
+      - check-success=buildkite/elastic-agent
+      - files~=^pkg/testing/ess/create_deployment_csp_configuration.yaml$
+      - head~=^updatecli_.*
+      - "#approved-reviews-by>=1"
+    actions:
+      queue:
+        name: default      
+
   - name: rebase pull requests for the VM autobump
     conditions:
       - author=github-actions[bot]
