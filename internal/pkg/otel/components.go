@@ -63,6 +63,9 @@ import (
 	filestorage "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage"
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
 
+	"github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension"
+	"github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension"
+
 	// Connectors
 	routingconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector"
 	spanmetricsconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector"
@@ -154,6 +157,8 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			healthcheckextension.NewFactory(),
 			pprofextension.NewFactory(),
 			k8sobserver.NewFactory(),
+			apikeyauthextension.NewFactory(),
+			apmconfigextension.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)
 		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)
