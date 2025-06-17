@@ -4,7 +4,7 @@
 
 //go:build integration
 
-package integration
+package k8s
 
 import (
 	"context"
@@ -19,6 +19,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/testing/integration"
 	"github.com/elastic/go-elasticsearch/v8"
 )
 
@@ -137,7 +138,7 @@ func journaldTest(
 	}
 
 	// Query the index and filter by the input type
-	docs := findESDocs(t, func() (estools.Documents, error) {
+	docs := integration.FindESDocs(t, func() (estools.Documents, error) {
 		return estools.GetLogsForIndexWithContext(
 			ctx,
 			esClient,
