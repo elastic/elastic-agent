@@ -59,6 +59,7 @@ import (
 	pv "github.com/elastic/elastic-agent/pkg/testing/tools/product_versions"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/snapshots"
 	"github.com/elastic/elastic-agent/pkg/version"
+	"github.com/elastic/elastic-agent/testing/integration/k8s"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 	bversion "github.com/elastic/elastic-agent/version"
 
@@ -2344,6 +2345,7 @@ func (Integration) TestServerless(ctx context.Context) error {
 
 // TestKubernetes runs kubernetes integration tests
 func (Integration) TestKubernetes(ctx context.Context) error {
+	mg.Deps(Integration.BuildKubernetesTestData)
 	// invoke integration tests
 	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
 		return err
@@ -2354,6 +2356,7 @@ func (Integration) TestKubernetes(ctx context.Context) error {
 
 // TestKubernetesSingle runs single k8s integration test
 func (Integration) TestKubernetesSingle(ctx context.Context, testName string) error {
+	mg.Deps(Integration.BuildKubernetesTestData)
 	// invoke integration tests
 	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
 		return err
@@ -2364,12 +2367,39 @@ func (Integration) TestKubernetesSingle(ctx context.Context, testName string) er
 
 // TestKubernetesMatrix runs a matrix of kubernetes integration tests
 func (Integration) TestKubernetesMatrix(ctx context.Context) error {
+	mg.Deps(Integration.BuildKubernetesTestData)
 	// invoke integration tests
 	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
 		return err
 	}
 
 	return integRunner(ctx, "testing/integration/k8s", true, "")
+}
+
+// BuildKubernetesTestData builds the test data required to run k8s integration tests
+func (Integration) BuildKubernetesTestData(ctx context.Context) error {
+	// build the dependencies for the elastic-agent helm chart
+	mg.Deps(Helm.BuildDependencies)
+
+	// download opentelemetry-kube-stack helm chart
+	kubeStackHelmChartPath, err := devtools.DownloadFile(k8s.KubeStackChartURL, filepath.Join("testing", "integration", "k8s", "testdata"))
+	if err != nil {
+		return fmt.Errorf("failed to download opentelemetry-kube-stack helm chart: %w", err)
+	}
+	if err := os.Rename(kubeStackHelmChartPath, filepath.Join("testing", "integration", "k8s", k8s.KubeStackChartPath)); err != nil {
+		return fmt.Errorf("failed to move elastic-agent helm chart package to testing dir: %w", err)
+	}
+
+	// render elastic-agent-standalone kustomize
+	kustomizeYaml, err := kubernetes.RenderKustomize(ctx, filepath.Join("deploy", "kubernetes", "elastic-agent-kustomize", "default", "elastic-agent-standalone"))
+	if err != nil {
+		return fmt.Errorf("failed to render kustomize: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join("testing", "integration", "k8s", k8s.AgentKustomizePath), kustomizeYaml, 0o644); err != nil {
+		return fmt.Errorf("failed to write kustomize.yaml: %w", err)
+	}
+
+	return nil
 }
 
 // UpdateVersions runs an update on the `.agent-versions.yml` fetching

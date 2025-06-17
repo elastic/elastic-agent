@@ -19,7 +19,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -37,14 +36,8 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
-	"github.com/elastic/elastic-agent/pkg/testing/helm"
 	testK8s "github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
-)
-
-const (
-	agentK8SKustomize = "../../../deploy/kubernetes/elastic-agent-kustomize/default/elastic-agent-standalone"
-	agentK8SHelm      = "../../../deploy/helm/elastic-agent"
 )
 
 func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
@@ -80,7 +73,7 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 			name: "default deployment - rootful agent",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{}, nil),
+				k8sStepDeployKustomize("elastic-agent-standalone", k8sKustomizeOverrides{}, nil),
 				k8sStepCheckAgentStatus("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone", nil),
 			},
 		},
@@ -88,7 +81,7 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 			name: "drop ALL capabilities - rootful agent",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{
+				k8sStepDeployKustomize("elastic-agent-standalone", k8sKustomizeOverrides{
 					agentContainerRunUser:          int64Ptr(0),
 					agentContainerCapabilitiesAdd:  []corev1.Capability{},
 					agentContainerCapabilitiesDrop: []corev1.Capability{"ALL"},
@@ -100,7 +93,7 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 			name: "drop ALL add CHOWN, SETPCAP capabilities - rootful agent",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{
+				k8sStepDeployKustomize("elastic-agent-standalone", k8sKustomizeOverrides{
 					agentContainerRunUser:          int64Ptr(0),
 					agentContainerCapabilitiesAdd:  []corev1.Capability{"CHOWN", "SETPCAP"},
 					agentContainerCapabilitiesDrop: []corev1.Capability{"ALL"},
@@ -113,7 +106,7 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 			name: "drop ALL add CHOWN, SETPCAP, DAC_READ_SEARCH, SYS_PTRACE capabilities - rootless agent",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{
+				k8sStepDeployKustomize("elastic-agent-standalone", k8sKustomizeOverrides{
 					agentContainerRunUser:          int64Ptr(1000),
 					agentContainerRunGroup:         int64Ptr(1000),
 					agentContainerCapabilitiesAdd:  []corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH", "SYS_PTRACE"},
@@ -127,7 +120,7 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 			name: "drop ALL add CHOWN, SETPCAP, DAC_READ_SEARCH, SYS_PTRACE capabilities - rootless agent random uid:gid",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{
+				k8sStepDeployKustomize("elastic-agent-standalone", k8sKustomizeOverrides{
 					agentContainerRunUser:          int64Ptr(500),
 					agentContainerRunGroup:         int64Ptr(500),
 					agentContainerCapabilitiesAdd:  []corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH", "SYS_PTRACE"},
@@ -188,7 +181,7 @@ func TestKubernetesAgentOtel(t *testing.T) {
 			name: "run agent in otel mode",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{
+				k8sStepDeployKustomize("elastic-agent-standalone", k8sKustomizeOverrides{
 					agentContainerExtraEnv: []corev1.EnvVar{},
 					agentContainerArgs:     []string{}, // clear default args
 				}, nil),
@@ -230,11 +223,8 @@ func TestKubernetesAgentHelm(t *testing.T) {
 	ctx := context.Background()
 	kCtx := k8sGetContext(t, info)
 
-	err := helm.BuildChartDependencies(agentK8SHelm)
-	require.NoError(t, err, "failed to build helm dependencies")
-
 	nodeList := corev1.NodeList{}
-	err = kCtx.client.Resources().List(ctx, &nodeList)
+	err := kCtx.client.Resources().List(ctx, &nodeList)
 	require.NoError(t, err)
 
 	schedulableNodeCount, err := k8sSchedulableNodeCount(ctx, kCtx)
@@ -253,7 +243,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 			name: "helm standalone agent default kubernetes privileged without host network port collision",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
+				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
 					"kubernetes": map[string]any{
 						"enabled": true,
 					},
@@ -292,7 +282,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 			name: "helm standalone agent default kubernetes unprivileged",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
+				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
 					"kubernetes": map[string]any{
 						"enabled": true,
 						"state": map[string]any{
@@ -330,7 +320,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 			name: "helm managed agent default kubernetes privileged",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
+				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
 					"agent": map[string]any{
 						"unprivileged": false,
 						"image": map[string]any{
@@ -354,7 +344,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 			name: "helm managed agent unenrolled with different enrollment token",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
+				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
 					"agent": map[string]any{
 						"unprivileged": false,
 						"image": map[string]any{
@@ -391,7 +381,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 					enrollParams, err := fleettools.NewEnrollParams(ctx, info.KibanaClient)
 					require.NoError(t, err, "failed to create fleet enroll params")
 					require.NotEqual(t, kCtx.enrollParams.EnrollmentToken, enrollParams.EnrollmentToken, "enrollment token did not change")
-					k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
+					k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
 						"agent": map[string]any{
 							"unprivileged": false,
 							"image": map[string]any{
@@ -426,7 +416,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 
 					// uninstall and reinstall but this time check that the elastic-agent is not re-enrolling
 					k8sStepHelmUninstall("helm-agent")(t, ctx, kCtx, namespace)
-					k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
+					k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
 						"agent": map[string]any{
 							"unprivileged": false,
 							"image": map[string]any{
@@ -467,7 +457,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 			name: "helm managed agent unenrolled",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
+				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
 					"agent": map[string]any{
 						"unprivileged": false,
 						"image": map[string]any{
@@ -501,7 +491,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 					// under the same release name and same namespace will have the same state
 					// as the previous deployment
 					k8sStepHelmUninstall("helm-agent")(t, ctx, kCtx, namespace)
-					k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
+					k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
 						"agent": map[string]any{
 							"unprivileged": false,
 							"image": map[string]any{
@@ -536,7 +526,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 
 					// uninstall and reinstall but this time check that the elastic-agent is not re-enrolling
 					k8sStepHelmUninstall("helm-agent")(t, ctx, kCtx, namespace)
-					k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
+					k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
 						"agent": map[string]any{
 							"unprivileged": false,
 							"image": map[string]any{
@@ -577,7 +567,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 			name: "helm managed agent upgrade older version",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
+				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
 					"agent": map[string]any{
 						"unprivileged": false,
 						"image": map[string]any{
@@ -606,7 +596,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						return nil
 					})(t, ctx, kCtx, namespace)
 					k8sStepHelmUninstall("helm-agent")(t, ctx, kCtx, namespace)
-					k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
+					k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
 						"agent": map[string]any{
 							"unprivileged": false,
 							"image": map[string]any{
@@ -645,7 +635,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 			name: "helm managed agent default kubernetes unprivileged",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
+				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
 					"agent": map[string]any{
 						"unprivileged": true,
 						"image": map[string]any{
@@ -669,7 +659,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 			name: "helm standalone agent unprivileged kubernetes hints",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
+				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
 					"agent": map[string]any{
 						"unprivileged": true,
 						"image": map[string]any{
@@ -714,7 +704,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
 				k8sStepHintsRedisCreate(),
-				k8sStepHelmDeploy(agentK8SHelm, "helm-agent", map[string]any{
+				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
 					"agent": map[string]any{
 						"unprivileged": true,
 						"image": map[string]any{
@@ -961,16 +951,12 @@ type k8sKustomizeOverrides struct {
 // adjust the k8s objects created from the rendering to match the needs of the current test with k8sKustomizeOverrides.
 // However, this is not that as flexible as we would like it to be. As a last resort somebody can use forEachObject callback
 // to further adjust the k8s objects
-func k8sStepDeployKustomize(kustomizePath string, containerName string, overrides k8sKustomizeOverrides, forEachObject func(object k8s.Object)) k8sTestStep {
+func k8sStepDeployKustomize(containerName string, overrides k8sKustomizeOverrides, forEachObject func(object k8s.Object)) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		var renderedManifest []byte
-		require.EventuallyWithT(t, func(collect *assert.CollectT) {
-			var err error
-			renderedManifest, err = k8sRenderKustomize(kustomizePath)
-			assert.NoError(collect, err)
-		}, 5*time.Second, 500*time.Millisecond, "failed to render kustomize")
+		kustomizeYaml, err := os.ReadFile(AgentKustomizePath)
+		require.NoError(t, err, "failed to read kustomize manifest")
 
-		objects, err := testK8s.LoadFromYAML(bufio.NewReader(bytes.NewReader(renderedManifest)))
+		objects, err := testK8s.LoadFromYAML(bufio.NewReader(bytes.NewReader(kustomizeYaml)))
 		require.NoError(t, err, "failed to parse rendered kustomize")
 
 		if forEachObject != nil {

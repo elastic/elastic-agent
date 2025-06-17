@@ -35,8 +35,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/e2e-framework/klient"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
-	"sigs.k8s.io/kustomize/api/filesys"
-	"sigs.k8s.io/kustomize/api/krusty"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
@@ -291,29 +289,6 @@ func k8sKustomizeAdjustObjects(objects []k8s.Object, namespace string, container
 			}
 		}
 	}
-}
-
-// k8sRenderKustomize renders the given kustomize directory to YAML
-func k8sRenderKustomize(kustomizePath string) ([]byte, error) {
-	// Create a file system pointing to the kustomize directory
-	fSys := filesys.MakeFsOnDisk()
-
-	// Create a kustomizer
-	k := krusty.MakeKustomizer(krusty.MakeDefaultOptions())
-
-	// Run the kustomizer on the given directory
-	resMap, err := k.Run(fSys, kustomizePath)
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert the result to YAML
-	renderedManifest, err := resMap.AsYaml()
-	if err != nil {
-		return nil, err
-	}
-
-	return renderedManifest, nil
 }
 
 // k8sDeleteOpts contains options for deleting k8s objects
