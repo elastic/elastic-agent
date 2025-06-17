@@ -7,10 +7,11 @@
 package integration
 
 import (
-	"context"
 	"testing"
+	"time"
 
 	"github.com/gofrs/uuid/v5"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -21,11 +22,13 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 )
 
+type AssertFunc func(*testing.T, *atesting.Fixture, string, error)
+
 type testCase struct {
 	description string
 	privileged  bool
 	os          []define.OS
-	assertion   func(*testing.T, string, error)
+	assertion   AssertFunc
 }
 
 func TestReEnrollUnprivileged(t *testing.T) {
@@ -38,9 +41,18 @@ func TestReEnrollUnprivileged(t *testing.T) {
 			{Type: define.Linux},
 		},
 	})
-	testReEnroll(t, info, false, func(t *testing.T, out string, err error) {
+
+	testReEnroll(t, info, false, func(t *testing.T, fixture *atesting.Fixture, out string, err error) {
 		require.Error(t, err)
 		require.Contains(t, string(out), cmd.UserOwnerMismatchError.Error())
+		assert.Eventuallyf(t, func() bool {
+			err := fixture.IsHealthy(t.Context())
+			return err == nil
+		},
+			2*time.Minute, time.Second,
+			"Elastic-Agent did not report healthy. Agent status error: \"%v\"",
+			err,
+		)
 	})
 }
 
@@ -50,13 +62,21 @@ func TestReEnrollPrivileged(t *testing.T) {
 		Stack: &define.Stack{},
 		Sudo:  true,
 	})
-	testReEnroll(t, info, true, func(t *testing.T, _ string, err error) {
+	testReEnroll(t, info, true, func(t *testing.T, fixture *atesting.Fixture, _ string, err error) {
 		require.NoError(t, err)
+		assert.Eventuallyf(t, func() bool {
+			err := fixture.IsHealthy(t.Context())
+			return err == nil
+		},
+			2*time.Minute, time.Second,
+			"Elastic-Agent did not report healthy. Agent status error: \"%v\"",
+			err,
+		)
 	})
 }
 
-func testReEnroll(t *testing.T, info *define.Info, privileged bool, assertFunc func(t *testing.T, output string, err error)) {
-	ctx := context.Background()
+func testReEnroll(t *testing.T, info *define.Info, privileged bool, assertFunc AssertFunc) {
+	ctx := t.Context()
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 	installOpts := atesting.InstallOpts{
@@ -93,5 +113,5 @@ func testReEnroll(t *testing.T, info *define.Info, privileged bool, assertFunc f
 	enrollArgs := []string{"enroll", "--url", enrollUrl, "--enrollment-token", enrollmentApiKey.APIKey, "--force"}
 
 	out, err := fixture.Exec(ctx, enrollArgs)
-	assertFunc(t, string(out), err)
+	assertFunc(t, fixture, string(out), err)
 }

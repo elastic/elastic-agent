@@ -6,10 +6,6 @@
 
 package cmd
 
-import "github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-
-var UserOwnerMismatchError = errors.New("the command is executed as root but the program files are not owned by the root user. execute the command as the user that owns the program files")
-
 func isOwnerExec(path string) (bool, error) {
 	// No-op for Windows: always allow
 	return true, nil
