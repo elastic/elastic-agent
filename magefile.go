@@ -1005,7 +1005,7 @@ func (Cloud) Load() error {
 
 	source := "build/distributions/elastic-agent-cloud-" + version + "-linux-" + runtime.GOARCH + ".docker.tar.gz"
 	if fipsVal {
-		source = "build/distributions/elastic-agent-fips-cloud-" + version + "-linux-" + runtime.GOARCH + ".docker.tar.gz"
+		source = "build/distributions/elastic-agent-cloud-fips-" + version + "-linux-" + runtime.GOARCH + ".docker.tar.gz"
 	}
 	if envSource, ok := os.LookupEnv("DOCKER_IMPORT_SOURCE"); ok && envSource != "" {
 		source = envSource
@@ -1045,7 +1045,7 @@ func (Cloud) Push() error {
 
 	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s", version)
 	if fipsVal {
-		sourceCloudImageName = fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-fips-cloud:%s", version)
+		sourceCloudImageName = fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud-fips:%s", version)
 	}
 	var targetCloudImageName string
 	if customImage, isPresent := os.LookupEnv("CI_ELASTIC_AGENT_DOCKER_IMAGE"); isPresent && len(customImage) > 0 {
@@ -2259,6 +2259,7 @@ func (Integration) Check() error {
 		define.ValidateDir("testing/integration"),
 		define.ValidateDir("testing/integration/serverless"),
 		define.ValidateDir("testing/integration/leak"),
+		define.ValidateDir("testing/integration/k8s"),
 	)
 }
 
@@ -2339,24 +2340,34 @@ func (Integration) TestServerless(ctx context.Context) error {
 	return integRunner(ctx, "testing/integration/serverless", false, "")
 }
 
-// Kubernetes runs kubernetes integration tests
-func (Integration) Kubernetes(ctx context.Context) error {
+// TestKubernetes runs kubernetes integration tests
+func (Integration) TestKubernetes(ctx context.Context) error {
 	// invoke integration tests
 	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
 		return err
 	}
 
-	return integRunner(ctx, "testing/integration", false, "")
+	return integRunner(ctx, "testing/integration/k8s", false, "")
 }
 
-// KubernetesMatrix runs a matrix of kubernetes integration tests
-func (Integration) KubernetesMatrix(ctx context.Context) error {
+// TestKubernetesSingle runs single k8s integration test
+func (Integration) TestKubernetesSingle(ctx context.Context, testName string) error {
 	// invoke integration tests
 	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
 		return err
 	}
 
-	return integRunner(ctx, "testing/integration", true, "")
+	return integRunner(ctx, "testing/integration/k8s", false, testName)
+}
+
+// TestKubernetesMatrix runs a matrix of kubernetes integration tests
+func (Integration) TestKubernetesMatrix(ctx context.Context) error {
+	// invoke integration tests
+	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
+		return err
+	}
+
+	return integRunner(ctx, "testing/integration/k8s", true, "")
 }
 
 // UpdateVersions runs an update on the `.agent-versions.yml` fetching

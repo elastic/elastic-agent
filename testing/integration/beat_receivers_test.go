@@ -477,7 +477,7 @@ outputs:
     api_key: {{.BeatsESApiKey}}
 `
 
-	esEndpoint, err := getESHost()
+	esEndpoint, err := GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
 	esApiKey, err := createESApiKey(info.ESClient)
 	require.NoError(t, err, "error creating API key")
