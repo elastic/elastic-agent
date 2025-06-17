@@ -39,9 +39,9 @@ function run_release_manager_list() {
     echo "+++ :hammer_and_pick: Release manager listing ${_branch} ${_workflow} DRA artifacts..."
     docker run --rm \
         --name release-manager \
-        -e VAULT_ADDR="${VAULT_ADDR_SECRET}" \
-        -e VAULT_ROLE_ID="${VAULT_ROLE_ID_SECRET}" \
-        -e VAULT_SECRET_ID="${VAULT_SECRET}" \
+        -e VAULT_ADDR \
+        -e VAULT_ROLE_ID \
+        -e VAULT_SECRET_ID \
         --mount type=bind,readonly=false,src="${PWD}",target=/artifacts \
         docker.elastic.co/infra/release-manager:latest \
         cli list \
@@ -60,9 +60,9 @@ function run_release_manager_collect() {
     echo "+++ :hammer_and_pick: Publishing ${_branch} ${_workflow} DRA artifacts..."
     docker run --rm \
         --name release-manager \
-        -e VAULT_ADDR="${VAULT_ADDR_SECRET}" \
-        -e VAULT_ROLE_ID="${VAULT_ROLE_ID_SECRET}" \
-        -e VAULT_SECRET_ID="${VAULT_SECRET}" \
+        -e VAULT_ADDR \
+        -e VAULT_ROLE_ID \
+        -e VAULT_SECRET_ID \
         --mount type=bind,readonly=false,src="${PWD}",target=/artifacts \
         docker.elastic.co/infra/release-manager:latest \
         cli collect \
