@@ -59,45 +59,47 @@ func TestFIPSAgentConnectingToFIPSFleetServerInECHFRH(t *testing.T) {
 
 	require.Equalf(t, "HEALTHY", body.Status, "response status code: %d", resp.StatusCode)
 
-	// Get all Agents
-	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-	defer cancel()
+	// Get agent running cloud policy
+	require.Eventually(t, func() bool {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
 
-	searchResp, err := info.ESClient.Search(info.ESClient.Search.WithContext(ctx), info.ESClient.Search.WithIndex(".fleet-agents"), info.ESClient.Search.WithBody(strings.NewReader(`{
+		searchResp, err := info.ESClient.Search(info.ESClient.Search.WithContext(ctx), info.ESClient.Search.WithIndex(".fleet-agents"), info.ESClient.Search.WithBody(strings.NewReader(`{
           "query": {
 	    "term": {
 	      "policy_id": "policy-elastic-agent-on-cloud"
 	    }
 	  }
 	}`)))
-	require.NoError(t, err)
-	defer searchResp.Body.Close()
-	require.Equal(t, http.StatusOK, searchResp.StatusCode)
+		require.NoError(t, err)
+		defer searchResp.Body.Close()
+		require.Equal(t, http.StatusOK, searchResp.StatusCode)
 
-	respObj := struct {
-		Hits struct {
-			Total struct {
-				Value int `json:"value"`
-			} `json:"total"`
-			Hits []struct {
-				Source struct {
-					LocalMetadata struct {
-						Elastic struct {
-							Agent struct {
-								FIPS bool `json:"fips"`
-							} `json:"agent"`
-						} `json:"elastic"`
-					} `json:"local_metadata"`
-					LastCheckinStatus string `json:"last_checkin_status"`
-					LastCheckinReason string `json:"last_checkin_reason"`
-				} `json:"_source"`
+		respObj := struct {
+			Hits struct {
+				Total struct {
+					Value int `json:"value"`
+				} `json:"total"`
+				Hits []struct {
+					Source struct {
+						LocalMetadata struct {
+							Elastic struct {
+								Agent struct {
+									FIPS bool `json:"fips"`
+								} `json:"agent"`
+							} `json:"elastic"`
+						} `json:"local_metadata"`
+						LastCheckinStatus string `json:"last_checkin_status"`
+						LastCheckinReason string `json:"last_checkin_reason"`
+					} `json:"_source"`
+				} `json:"hits"`
 			} `json:"hits"`
-		} `json:"hits"`
-	}{}
+		}{}
 
-	err = json.NewDecoder(searchResp.Body).Decode(&respObj)
-	require.NoError(t, err)
-	require.Equal(t, 1, respObj.Hits.Total.Value, "expected only one hit from the ES query")
-	require.True(t, respObj.Hits.Hits[0].Source.LocalMetadata.Elastic.Agent.FIPS)
-	//require.Equalf(t, "online", respObj.Hits.Hits[0].Source.LastCheckinStatus, "last_checkin_status did not meet expectation, unhealthy reason: %v", respObj.Hits.Hits[0].Source.LastCheckinReason) // FIXME: Uncomment after https://github.com/elastic/apm-server/issues/17063 is resolved
+		err = json.NewDecoder(searchResp.Body).Decode(&respObj)
+		require.NoError(t, err)
+		require.Equal(t, 1, respObj.Hits.Total.Value, "expected only one hit from the ES query")
+		t.Logf("FIPS: %v, Status: %s", respObj.Hits.Hits[0].Source.LocalMetadata.Elastic.Agent.FIPS, respObj.Hits.Hits[0].Source.LastCheckinStatus)
+		return respObj.Hits.Hits[0].Source.LocalMetadata.Elastic.Agent.FIPS && respObj.Hits.Hits[0].Source.LastCheckinStatus == "online"
+	}, 10*time.Second, 200*time.Millisecond, "Fleet Server's Elastic Agent should be healthy and FIPS-capable")
 }

@@ -1,7 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
-
 //go:build integration
 
 package integration
@@ -13,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"runtime"
 	"strings"
 	"testing"
 	"text/template"
@@ -42,6 +42,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		OS: []define.OS{
 			{Type: define.Linux},
 			{Type: define.Darwin},
+			{Type: define.Windows},
 		},
 		Stack: &define.Stack{},
 		Sudo:  true,
@@ -56,69 +57,80 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	type test struct {
 		dsType          string
 		dsDataset       string
-		dsNamespace     string
-		query           map[string]any
+		query           []map[string]any
 		onlyCompareKeys bool
 		ignoreFields    []string
 	}
 
 	tests := []test{
 		{
-			dsType:          "logs",
-			dsDataset:       "elastic_agent",
-			dsNamespace:     info.Namespace,
-			query:           map[string]any{"match_phrase": map[string]any{"message": "Determined allowed capabilities"}},
+			dsType:    "logs",
+			dsDataset: "elastic_agent",
+			query: []map[string]any{
+				{"match_phrase": map[string]any{"message": "Determined allowed capabilities"}},
+			},
 			onlyCompareKeys: false,
+			ignoreFields:    genIgnoredFields(runtime.GOOS),
 		},
 
 		{
-			dsType:          "metrics",
-			dsDataset:       "elastic_agent.filebeat",
-			dsNamespace:     info.Namespace,
-			query:           map[string]any{"exists": map[string]any{"field": "beat.stats.libbeat.pipeline.queue.acked"}},
+			dsType:    "metrics",
+			dsDataset: "elastic_agent.filebeat",
+			query: []map[string]any{
+				{"match_phrase": map[string]any{"metricset.name": "stats"}},
+				{"match_phrase": map[string]any{"component.id": "filestream-monitoring"}},
+				{"exists": map[string]any{"field": "beat.stats.libbeat.pipeline.queue.acked"}},
+			},
 			onlyCompareKeys: true,
 			ignoreFields: []string{
-				// all process related metrics are dropped for beatreceivers
+				"beat.elasticsearch.cluster.id",
 				"beat.stats.cgroup",
 				"beat.stats.cpu",
 				"beat.stats.handles",
-				"beat.stats.memstats",
-				"beat.stats.runtime",
-				"beat.elasticsearch.cluster.id",
 				"beat.stats.libbeat.config",
+				"beat.stats.memstats",
+				"beat.stats.runtime.goroutines",
 			},
 		},
 		{
-			dsType:          "metrics",
-			dsDataset:       "elastic_agent.metricbeat",
-			dsNamespace:     info.Namespace,
-			query:           map[string]any{"exists": map[string]any{"field": "beat.stats.libbeat.pipeline.queue.acked"}},
+			dsType:    "metrics",
+			dsDataset: "elastic_agent.metricbeat",
+			query: []map[string]any{
+				{"match_phrase": map[string]any{"metricset.name": "stats"}},
+				{"match_phrase": map[string]any{"component.id": "http/metrics-monitoring"}},
+				{"exists": map[string]any{"field": "beat.stats.libbeat.pipeline.queue.acked"}},
+			},
 			onlyCompareKeys: true,
 			ignoreFields: []string{
-				//  all process related metrics are dropped for beatreceivers
+				"beat.elasticsearch.cluster.id",
 				"beat.stats.cgroup",
 				"beat.stats.cpu",
 				"beat.stats.handles",
-				"beat.stats.memstats",
-				"beat.stats.runtime",
-				"beat.elasticsearch.cluster.id",
 				"beat.stats.libbeat.config",
+				"beat.stats.memstats",
+				"beat.stats.runtime.goroutines",
 			},
 		},
 		{
 			dsType:          "metrics",
 			dsDataset:       "elastic_agent.elastic_agent",
-			dsNamespace:     info.Namespace,
 			onlyCompareKeys: true,
-			query:           map[string]any{"exists": map[string]any{"field": "system.process.memory.size"}},
+			query: []map[string]any{
+				{"match_phrase": map[string]any{"metricset.name": "json"}},
+				{"match_phrase": map[string]any{"component.id": "elastic-agent"}},
+				{"exists": map[string]any{"field": "system.process.memory.size"}},
+			},
 		},
-		// TODO: fbreceiver must support /inputs/ endpoint for this to work
-		// {
-		// 	dsType:      "metrics",
-		// 	dsDataset:   "elastic_agent.filebeat_input",
-		// 	dsNamespace: info.Namespace,
-		// 	query:       map[string]any{"exists": map[string]any{"field": "filebeat_input.bytes_processed_total"}},
-		// },
+		{
+			dsType:          "metrics",
+			dsDataset:       "elastic_agent.filebeat_input",
+			onlyCompareKeys: true,
+			query: []map[string]any{
+				{"match_phrase": map[string]any{"metricset.name": "json"}},
+				{"match_phrase": map[string]any{"component.id": "filestream-monitoring"}},
+				{"exists": map[string]any{"field": "filebeat_input.bytes_processed_total"}},
+			},
+		},
 	}
 
 	installOpts := atesting.InstallOpts{
@@ -203,6 +215,9 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	d.ApiKey = string(apiKey)
 	policy.Outputs["default"] = d
 
+	processNamespace := fmt.Sprintf("%s-%s", info.Namespace, "process")
+	policy.Agent.Monitoring["namespace"] = processNamespace
+
 	updatedPolicyBytes, err := yaml.Marshal(policy)
 	require.NoErrorf(t, err, "error marshalling policy, struct was %v", policy)
 	t.Cleanup(func() {
@@ -252,11 +267,16 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 			func() bool {
 				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
 				defer findCancel()
-
+				mustClauses := []map[string]any{
+					{"match": map[string]any{"data_stream.type": tc.dsType}},
+					{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
+					{"match": map[string]any{"data_stream.namespace": processNamespace}},
+				}
+				mustClauses = append(mustClauses, tc.query...)
 				rawQuery := map[string]any{
 					"query": map[string]any{
 						"bool": map[string]any{
-							"must":   tc.query,
+							"must":   mustClauses,
 							"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestamp}}},
 						},
 					},
@@ -265,16 +285,16 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 					},
 				}
 
-				index := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
-				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, ".ds-"+index+"*", info.ESClient)
+				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
 				require.NoError(t, err)
 				if docs.Hits.Total.Value != 0 {
-					agentDocs[index] = docs
+					key := tc.dsType + "-" + tc.dsDataset + "-" + processNamespace
+					agentDocs[key] = docs
 				}
 				return docs.Hits.Total.Value > 0
 			},
 			2*time.Minute, 5*time.Second,
-			"agent monitoring classic no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestamp, tc.dsType, tc.dsDataset, tc.dsNamespace, tc.query)
+			"agent monitoring classic no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestamp, tc.dsType, tc.dsDataset, processNamespace, tc.query)
 	}
 
 	// 3. Uninstall
@@ -283,6 +303,8 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 
 	// 4. switch monitoring to the otel runtime
 	policy.Agent.Monitoring["_runtime_experimental"] = "otel"
+	receiverNamespace := fmt.Sprintf("%s-%s", info.Namespace, "otel")
+	policy.Agent.Monitoring["namespace"] = receiverNamespace
 	updatedPolicyBytes, err = yaml.Marshal(policy)
 	require.NoErrorf(t, err, "error marshalling policy, struct was %v", policy)
 	t.Cleanup(func() {
@@ -330,11 +352,17 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 			func() bool {
 				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
 				defer findCancel()
+				mustClauses := []map[string]any{
+					{"match": map[string]any{"data_stream.type": tc.dsType}},
+					{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
+					{"match": map[string]any{"data_stream.namespace": receiverNamespace}},
+				}
+				mustClauses = append(mustClauses, tc.query...)
 
 				rawQuery := map[string]any{
 					"query": map[string]any{
 						"bool": map[string]any{
-							"must":   tc.query,
+							"must":   mustClauses,
 							"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestampBeatReceiver}}},
 						},
 					},
@@ -343,17 +371,16 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 					},
 				}
 
-				index := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
-				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, ".ds-"+index+"*", info.ESClient)
+				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
 				require.NoError(t, err)
 				if docs.Hits.Total.Value != 0 {
-					key := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
+					key := tc.dsType + "-" + tc.dsDataset + "-" + receiverNamespace
 					otelDocs[key] = docs
 				}
 				return docs.Hits.Total.Value > 0
 			},
 			4*time.Minute, 5*time.Second,
-			"agent monitoring beats receivers no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestampBeatReceiver, tc.dsType, tc.dsDataset, tc.dsNamespace, tc.query)
+			"agent monitoring beats receivers no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestampBeatReceiver, tc.dsType, tc.dsDataset, receiverNamespace, tc.query)
 	}
 
 	// 6. Uninstall
@@ -362,9 +389,8 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 
 	// 7. Compare both documents are equivalent
 	for _, tc := range tests[:3] {
-		key := tc.dsType + "-" + tc.dsDataset + "-" + tc.dsNamespace
-		agent := agentDocs[key].Hits.Hits[0].Source
-		otel := otelDocs[key].Hits.Hits[0].Source
+		agent := agentDocs[tc.dsType+"-"+tc.dsDataset+"-"+processNamespace].Hits.Hits[0].Source
+		otel := otelDocs[tc.dsType+"-"+tc.dsDataset+"-"+receiverNamespace].Hits.Hits[0].Source
 		ignoredFields := []string{
 			// Expected to change between agentDocs and OtelDocs
 			"@timestamp",
@@ -373,18 +399,15 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 			"agent.id",
 			// agent.version is different because we force version 9.0.0 in CI
 			"agent.version",
+			"data_stream.namespace",
 			"elastic_agent.id",
-			"log.file.inode",
-			"log.file.fingerprint",
-			"log.file.path",
-			"log.offset",
 			"event.ingested",
 		}
 		switch tc.onlyCompareKeys {
 		case true:
-			AssertMapstrKeysEqual(t, agent, otel, append(ignoredFields, tc.ignoreFields...), fmt.Sprintf("expected document keys to be equal for dataset: %s", key))
+			AssertMapstrKeysEqual(t, agent, otel, append(ignoredFields, tc.ignoreFields...), "expected document keys to be equal for "+tc.dsType+"-"+tc.dsDataset)
 		case false:
-			AssertMapsEqual(t, agent, otel, ignoredFields, fmt.Sprintf("expected document to be equal for dataset: %s", key))
+			AssertMapsEqual(t, agent, otel, append(ignoredFields, tc.ignoreFields...), "expected document to be equal for "+tc.dsType+"-"+tc.dsDataset)
 		}
 	}
 
@@ -454,7 +477,7 @@ outputs:
     api_key: {{.BeatsESApiKey}}
 `
 
-	esEndpoint, err := getESHost()
+	esEndpoint, err := GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
 	esApiKey, err := createESApiKey(info.ESClient)
 	require.NoError(t, err, "error creating API key")
@@ -683,7 +706,6 @@ outputs:
 				AssertMapstrKeysEqual(t, agentDoc, otelDoc, nil, "expected documents keys to be equal for metricset "+tt.metricset)
 				AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for metricset "+tt.metricset)
 			})
-
 		}
 	})
 }
@@ -693,5 +715,25 @@ func assertCollectorComponentsHealthy(t *assert.CollectT, status *atesting.Agent
 	assert.Equal(t, "", status.Error, "component status should not have an error")
 	for _, componentStatus := range status.ComponentStatusMap {
 		assertCollectorComponentsHealthy(t, componentStatus)
+	}
+}
+
+func genIgnoredFields(goos string) []string {
+	switch goos {
+	case "windows":
+		return []string{
+			"log.file.fingerprint",
+			"log.file.idxhi",
+			"log.file.idxlo",
+			"log.offset",
+		}
+	default:
+		return []string{
+			"log.file.device_id",
+			"log.file.fingerprint",
+			"log.file.inode",
+			"log.file.path",
+			"log.offset",
+		}
 	}
 }
