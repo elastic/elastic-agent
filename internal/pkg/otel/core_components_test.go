@@ -30,9 +30,7 @@ func TestCoreComponentsInGoMod(t *testing.T) {
 
 	// Load components from core-components.yaml
 	yamlComponents, err := loadCoreComponentsYAML()
-	if err != nil {
-		t.Fatalf("Failed to load core-components.yaml: %v", err)
-	}
+	require.NoError(t, err, "Failed to load core-components.yaml)
 
 	// Verify all components in YAML are present in dependencies
 	for _, component := range yamlComponents {
