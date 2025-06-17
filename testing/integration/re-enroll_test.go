@@ -101,10 +101,7 @@ func testReEnroll(t *testing.T, info *define.Info, privileged bool, assertFunc A
 	enrollmentApiKey, err := tools.CreateEnrollmentToken(t, ctx, info.KibanaClient, policy.ID)
 	require.NoError(t, err)
 
-	agentID, err := tools.InstallAgentForPolicyWithToken(ctx, t, installOpts, fixture, info.KibanaClient, enrollmentApiKey)
-	require.NoError(t, err)
-
-	_, err = info.KibanaClient.UnEnrollAgent(ctx, kibana.UnEnrollAgentRequest{ID: agentID})
+	_, err = tools.InstallAgentForPolicyWithToken(ctx, t, installOpts, fixture, info.KibanaClient, enrollmentApiKey)
 	require.NoError(t, err)
 
 	enrollUrl, err := fleettools.DefaultURL(ctx, info.KibanaClient)
