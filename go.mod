@@ -26,6 +26,8 @@ require (
 	github.com/elastic/go-ucfg v0.8.9-0.20250307075119-2a22403faaea
 	github.com/elastic/mock-es v0.0.0-20241101195702-0a41fa3d30d9
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.3.0
+	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.1.0
+	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.2.1
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.15.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.6.0
 	github.com/fatih/color v1.18.0
@@ -385,7 +387,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.14.1 // indirect
 	github.com/gophercloud/gophercloud/v2 v2.4.0 // indirect
 	github.com/gorilla/handlers v1.5.2 // indirect
-	github.com/gorilla/websocket v1.5.0 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/gosuri/uitable v0.0.4 // indirect
 	github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc // indirect
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
@@ -483,6 +485,7 @@ require (
 	github.com/nxadm/tail v1.4.11 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
+	github.com/open-telemetry/opamp-go v0.19.1-0.20250423191708-8d78a5169350 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/signaltometricsconnector v0.124.2-0.20250425060700-a372d054d598 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.127.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer v0.127.0 // indirect

@@ -524,8 +524,14 @@ github.com/elastic/mock-es v0.0.0-20241101195702-0a41fa3d30d9 h1:wXto1Zck/WqoXIo
 github.com/elastic/mock-es v0.0.0-20241101195702-0a41fa3d30d9/go.mod h1:cXqWcLnmu5y4QveTb2hjk7rgzkHMuZsqeXtbJpNAcu0=
 github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.3.0 h1:sUP9fEU26Pex6GIYtCPm91aXZrI9vSFDmoBZfClS/6E=
 github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.3.0/go.mod h1:WzLl+CvujaQDVqrrXaEKIbn8+eZdhh+2j0lsd8RkT00=
+github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.1.0 h1:TqA/DvOyf/Fhqru5EIAH0q+XPj+Qpv+IC7Bwf8mlp3s=
+github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.1.0/go.mod h1:1FP7yfqYoTr7MfysGJdHb66Ku2FqabFbC/GlSlUddvo=
+github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.2.1 h1:U66A22bA4PUJKdp5voTdaCFVIsZx7S5HUhStfdgGVJs=
+github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.2.1/go.mod h1:ApCR1ML29ZMG9mgC8JS8BuvNRnnNUOSSctxAhMFpxVw=
 github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced h1:XcWi/S3OoeE5Qwmj381AoO3nr3AVXl4Z4QO0mqyjlzU=
 github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced/go.mod h1:8e9NcGfE2xeor8r+WV9a+hKBEkzJEDnqZN7tqb3GUe8=
+github.com/elastic/opentelemetry-collector-components/internal/testutil v0.0.0-20250613082151-282de5af1c9b h1:NWuTKdMCJlU9ehRH8V0w1Kk1QI5Vn+9OcJWIO9wI+pE=
+github.com/elastic/opentelemetry-collector-components/internal/testutil v0.0.0-20250613082151-282de5af1c9b/go.mod h1:R1WWATZlmmkryuE5hLQNHj89rdPPi4ErobBZYx2LmGs=
 github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.15.0 h1:kkuKUwqG9cjMm5DswK2LHos20xJ0XUaqsOa3yA6U/0o=
 github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.15.0/go.mod h1:WnaGEWQEgt1IUovcznKbdxW8zSs8akmwoVJrnQbDGbs=
 github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.6.0 h1:U91aey7kuAEuMMV0sEKxMCayjip2Dg3c56fIMfCiRcQ=
@@ -818,8 +824,8 @@ github.com/gorilla/securecookie v1.1.1/go.mod h1:ra0sb63/xPlUeL+yeDciTfxMRAA+MP+
 github.com/gorilla/sessions v1.2.1 h1:DHd3rPN5lE3Ts3D8rKkQ8x/0kqfeNmBAaiSi+o7FsgI=
 github.com/gorilla/sessions v1.2.1/go.mod h1:dk2InVEVJ0sfLlnXv9EAgkf6ecYs/i80K/zI+bUmuGM=
 github.com/gorilla/websocket v1.4.2/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
-github.com/gorilla/websocket v1.5.0 h1:PPwGk2jz7EePpoHN/+ClbZu8SPxiqlu12wZP/3sWmnc=
-github.com/gorilla/websocket v1.5.0/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
+github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=
+github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/gosuri/uitable v0.0.4 h1:IG2xLKRvErL3uhY6e1BylFzG+aJiwQviDDTfOKeKTpY=
 github.com/gosuri/uitable v0.0.4/go.mod h1:tKR86bXuXPZazfOTG1FIzvjIdXzd0mo4Vtn16vt0PJo=
 github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc h1:GN2Lv3MGO7AS6PrRoT6yV5+wkrOpcszoIsO4+4ds248=
@@ -1173,6 +1179,8 @@ github.com/onsi/gomega v1.7.1/go.mod h1:XdKZgCCFLUoM/7CFJVPcG8C1xQ1AJ0vpAezJrB7J
 github.com/onsi/gomega v1.10.1/go.mod h1:iN09h71vgCQne3DLsj+A5owkum+a2tYe+TOCB1ybHNo=
 github.com/onsi/gomega v1.36.1 h1:bJDPBO7ibjxcbHMgSCoo4Yj18UWbKDlLwX1x9sybDcw=
 github.com/onsi/gomega v1.36.1/go.mod h1:PvZbdDc8J6XJEpDK4HCuRBm8a6Fzp9/DmhC9C7yFlog=
+github.com/open-telemetry/opamp-go v0.19.1-0.20250423191708-8d78a5169350 h1:W+DzUrFsc2tzZH8h+oIwno9rXV0hskXsR2dGNZ3LXPQ=
+github.com/open-telemetry/opamp-go v0.19.1-0.20250423191708-8d78a5169350/go.mod h1:/ks8JtVfx2wtZINPRTp/IxaGoMFAB6Uberx1Jcaur6M=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.127.0 h1:3vLE9AD9v5qDkNy36DWqsysUgvIMZK3etKcp2xNdMSY=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.127.0/go.mod h1:YIcuy7j6kUspH4O7vg94Jd5VnArflaOZDirmijsXcXg=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/signaltometricsconnector v0.124.2-0.20250425060700-a372d054d598 h1:TDIUJpL7PT/ta9vr2rP/0Ks5uwDdBaiz4/UhCu/xWOI=
