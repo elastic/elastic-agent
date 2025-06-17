@@ -5,25 +5,6 @@ env:
   # after moving elastic-agent out of beats, we should update the URL of the packaging.
   BEAT_URL: "https://www.elastic.co/elastic-agent"
 
-# This section is used to define the plugins that will be used in the pipeline.
-# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
-common:
-  - dra_addr: &dra_addr
-      elastic/vault-secrets#v0.1.0:
-        path: "kv/ci-shared/release/dra-role"
-        field: "vault_addr"
-        env_var: "VAULT_ADDR"
-  - dra_role: &dra_role
-      elastic/vault-secrets#v0.1.0:
-        path: "kv/ci-shared/release/dra-role"
-        field: "role_id"
-        env_var: "VAULT_ROLE_ID"
-  - dra_secret: &dra_secret
-      elastic/vault-secrets#v0.1.0:
-        path: "kv/ci-shared/release/dra-role"
-        field: "secret_id"
-        env_var: "VAULT_SECRET_ID"
-
 steps:
   - input: "Build parameters"
     if: build.env("MANIFEST_URL") == null
@@ -145,10 +126,6 @@ steps:
     depends_on: package
     agents:
       provider: "gcp"
-    plugins:
-      - *dra_addr
-      - *dra_role
-      - *dra_secret
     env:
       DRA_PROJECT_ID: "elastic-agent-package"
       DRA_PROJECT_ARTIFACT_ID: "agent-package"
@@ -191,10 +168,6 @@ steps:
       DRA_PROJECT_ID: "elastic-agent-package"
       DRA_PROJECT_ARTIFACT_ID: "agent-package"
       DRA_DRY_RUN: "true"
-    plugins:
-      - *dra_addr
-      - *dra_role
-      - *dra_secret
     artifact_paths:
       - "build/distributions/**/*"
     command: |
