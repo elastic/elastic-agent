@@ -1578,40 +1578,6 @@ specs:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
 
-    # remove this spec once the elastic-agent-cloud-fips below is correctly uploaded as a DRA
-    - os: linux
-      arch: amd64
-      types: [ docker ]
-      spec:
-        <<: *docker_fips_spec
-        <<: *agent_docker_fips_spec
-        # The cloud image is always based on Wolfi
-        <<: *docker_builder_spec
-        <<: *agent_docker_cloud_fips_spec
-        <<: *elastic_license_for_binaries
-        name: "elastic-agent-fips-cloud"
-        docker_image_name_template: "{{.BeatName}}-fips-cloud"
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
-
-    # remove this spec once the elastic-agent-cloud-fips below is correctly uploaded as a DRA
-    - os: linux
-      arch: arm64
-      types: [ docker ]
-      spec:
-        <<: *docker_fips_spec
-        <<: *agent_docker_fips_spec
-        # The cloud image is always based on Wolfi
-        <<: *docker_builder_arm_spec
-        <<: *agent_docker_cloud_fips_spec
-        <<: *elastic_license_for_binaries
-        name: "elastic-agent-fips-cloud"
-        docker_image_name_template: "{{.BeatName}}-fips-cloud"
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
-
     - os: linux
       arch: amd64
       types: [ docker ]

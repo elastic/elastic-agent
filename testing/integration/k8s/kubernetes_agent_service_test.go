@@ -4,7 +4,7 @@
 
 //go:build integration
 
-package integration
+package k8s
 
 import (
 	"context"
