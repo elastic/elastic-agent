@@ -23,9 +23,7 @@ import (
 func TestCoreComponentsInGoMod(t *testing.T) {
 	// Extract components from project dependencies
 	moduleComponents, err := extractComponentsFromDeps()
-	if err != nil {
-		t.Fatalf("Failed to extract components from dependencies: %v", err)
-	}
+	require.NoError(t, err, "Failed to extract components from dependencies")
 
 	// Print found components for debugging
 	t.Logf("Found components in dependencies: %v", moduleComponents)
