@@ -167,6 +167,7 @@ steps:
     env:
       DRA_PROJECT_ID: "elastic-agent-package"
       DRA_PROJECT_ARTIFACT_ID: "agent-package"
+      DRA_DRY_RUN: "true"
     artifact_paths:
       - "build/distributions/**/*"
     command: |
@@ -181,8 +182,6 @@ steps:
       echo "--- File listing after workaround"
       ls -alR build
       echo "+++ Checking artifact validity with release-manager collect dry run"
-      DRA_DRY_RUN="--dry-run"
-      export DRA_DRY_RUN
       .buildkite/scripts/steps/dra-publish.sh
       # Artifacts will be uploaded via the artifact_paths entry above
       echo "+++ Set job metadata if TRIGGER_JOB_ID is properly set"
