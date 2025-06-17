@@ -182,6 +182,9 @@ func addIntegrationAndCheckData(t *testing.T, info *define.Info, fixture *atesti
 func upgradeFIPSAgent(t *testing.T, info *define.Info) {
 	t.Helper()
 
+	// TODO: use upgradetest.GetUpgradableVersions() + isFIPSCapableVersion() to determine start versions
+	// TODO: call testUpgradeFleetManagedElasticAgent() but amend it to optionally not install start fixture
+
 	// parse the version we are testing
 	currentVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
