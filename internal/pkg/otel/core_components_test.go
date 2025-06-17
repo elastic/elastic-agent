@@ -66,11 +66,11 @@ func extractComponentsFromDeps() ([]string, error) {
 	// Component types to look for in dependency paths
 	componentTypes := []string{
 		"processor",
-		"receiver", 
-		"extension", 
-		"exporter", 
+		"receiver",
+		"extension",
+		"exporter",
 		"connector",
-		"confmap/provider", 
+		"confmap/provider",
 		"storage",
 	}
 
@@ -88,7 +88,7 @@ func extractComponentsFromDeps() ([]string, error) {
 				}
 			}
 		}
-		
+
 		// Special case for filestorage which is under extension/storage/
 		if strings.Contains(dep, "/extension/storage/") {
 			parts := strings.Split(dep, "/")
