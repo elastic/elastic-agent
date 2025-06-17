@@ -6,6 +6,9 @@ env:
 steps:
   - group: "Integration tests: packaging"
     key: "int-packaging"
+    notify:
+      - github_commit_status:
+          context: "buildkite/elastic-agent - Packaging"
     steps:
       # Build matrix is not used for packaging in favor to unique step keys
       # Packaging linux/amd64
