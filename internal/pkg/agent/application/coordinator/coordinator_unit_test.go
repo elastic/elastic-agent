@@ -1478,7 +1478,9 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 
 	select {
 	case finalOtelStatus := <-coord.managerChans.otelManagerUpdate:
-		// we shouldn't have any status remaining for the otel collector
+		// we shouldn't have any status remaining for the otel collector, as the status we've pushed earlier only
+		// contains beats receiver status for the "filestream-default" component
+		// this status is removed from the otel collector status, because it's reported as component state instead
 		assert.Empty(t, finalOtelStatus.ComponentStatusMap)
 	case <-ctx.Done():
 		t.Fatal("timeout waiting for coordinator to receive status")
