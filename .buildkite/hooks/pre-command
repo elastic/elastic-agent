@@ -25,6 +25,7 @@ function release_manager_login {
   export VAULT_ADDR_SECRET VAULT_ROLE_ID_SECRET VAULT_SECRET
 }
 
+# TODO: use the buildkite plugin to access the secrets
 if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-package" || "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" ]]; then
   if [[ "$BUILDKITE_STEP_KEY" == "dra-publish" || "$BUILDKITE_STEP_KEY" == "bk-api-publish-independent-agent" ]]; then
     release_manager_login
