@@ -5,35 +5,30 @@
 package otel
 
 import (
-	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
 
 // TestCoreComponentsInGoMod verifies that all components listed in core-components.yaml
-// are present in the go.mod file.
+// are present in the project dependencies.
 func TestCoreComponentsInGoMod(t *testing.T) {
-	// Find the go.mod file (starting from the current directory and going up)
-	goModPath, err := findGoModFile()
+	// Extract components from project dependencies
+	moduleComponents, err := extractComponentsFromDeps()
 	if err != nil {
-		t.Fatalf("Failed to find go.mod file: %v", err)
-	}
-
-	// Extract components from go.mod
-	goModComponents, err := extractComponentsFromGoMod(goModPath)
-	if err != nil {
-		t.Fatalf("Failed to extract components from go.mod: %v", err)
+		t.Fatalf("Failed to extract components from dependencies: %v", err)
 	}
 
 	// Print found components for debugging
-	t.Logf("Found components in go.mod: %v", goModComponents)
+	t.Logf("Found components in dependencies: %v", moduleComponents)
 
 	// Load components from core-components.yaml
 	yamlComponents, err := loadCoreComponentsYAML()
@@ -41,74 +36,67 @@ func TestCoreComponentsInGoMod(t *testing.T) {
 		t.Fatalf("Failed to load core-components.yaml: %v", err)
 	}
 
-	// Verify all components in YAML are present in go.mod
+	// Verify all components in YAML are present in dependencies
 	for _, component := range yamlComponents {
-		assert.Contains(t, goModComponents, component)
+		assert.Contains(t, moduleComponents, component)
 	}
 }
 
-// findGoModFile locates the go.mod file by traversing up from the current directory
-func findGoModFile() (string, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-
-	for {
-		goModPath := filepath.Join(dir, "go.mod")
-		if _, err := os.Stat(goModPath); err == nil {
-			return goModPath, nil
-		}
-
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			break // Reached the root directory
-		}
-		dir = parent
-	}
-
-	return "", fmt.Errorf("go.mod file not found in any parent directory")
+// GoListModule represents the relevant parts of the `go list -json` output
+type GoListModule struct {
+	Deps []string `json:"Deps"`
 }
 
-// extractComponentsFromGoMod extracts component names from go.mod file
-// by looking for paths containing /processor/, /receiver/, /extension/, /exporter/, /connector/, and /provider/
-func extractComponentsFromGoMod(goModPath string) ([]string, error) {
-	file, err := os.Open(goModPath)
+// extractComponentsFromDeps extracts component names from the project dependencies
+// by running `go list -json` and parsing the output
+func extractComponentsFromDeps() ([]string, error) {
+	// Run go list -json to get the dependencies
+	cmd := exec.Command("go", "list", "-json", "github.com/elastic/elastic-agent")
+	output, err := cmd.Output()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to run go list command: %w", err)
 	}
-	defer file.Close()
 
+	// Parse the JSON output
+	var module GoListModule
+	if err := json.Unmarshal(output, &module); err != nil {
+		return nil, fmt.Errorf("failed to parse go list output: %w", err)
+	}
+
+	// Component types to look for in dependency paths
+	componentTypes := []string{
+		"processor",
+		"receiver", 
+		"extension", 
+		"exporter", 
+		"connector",
+		"confmap/provider", 
+		"storage",
+	}
+
+	// Extract component names from dependency paths
 	var components []string
-	// Match both standard paths and special cases like storage/filestorage
-	componentRegex := regexp.MustCompile(`(?:github\.com/[^/]+/[^/]+/|go\.opentelemetry\.io/collector/)(?:processor|receiver|extension|exporter|connector|confmap/provider|storage)/([a-zA-Z0-9]+)`)
-
-	// Special case for filestorage which is under extension/storage/
-	storageRegex := regexp.MustCompile(`extension/storage/([a-zA-Z0-9]+)`)
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Match standard components
-		matches := componentRegex.FindAllStringSubmatch(line, -1)
-		for _, match := range matches {
-			if len(match) >= 2 {
-				components = append(components, match[1])
+	for _, dep := range module.Deps {
+		for _, cType := range componentTypes {
+			// Check if the dependency path contains the component type
+			if strings.Contains(dep, "/"+cType+"/") {
+				// Extract the component name (last part of the path)
+				parts := strings.Split(dep, "/")
+				if len(parts) > 0 {
+					componentName := parts[len(parts)-1]
+					components = append(components, componentName)
+				}
 			}
 		}
-
-		// Match special case for filestorage
-		storageMatches := storageRegex.FindAllStringSubmatch(line, -1)
-		for _, match := range storageMatches {
-			if len(match) >= 2 {
-				components = append(components, match[1])
+		
+		// Special case for filestorage which is under extension/storage/
+		if strings.Contains(dep, "/extension/storage/") {
+			parts := strings.Split(dep, "/")
+			if len(parts) > 0 {
+				componentName := parts[len(parts)-1]
+				components = append(components, componentName)
 			}
 		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, err
 	}
 
 	return components, nil
@@ -148,14 +136,4 @@ func loadCoreComponentsYAML() ([]string, error) {
 	}
 
 	return filteredComponents, nil
-}
-
-// contains checks if a string is present in a slice
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
 }
