@@ -28,6 +28,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
+var UserOwnerMismatchError = errors.New("the command is executed as root but the program files are not owned by the root user. execute the command as the user that owns the program files")
+
 const (
 	fromInstallArg      = "from-install"
 	fromInstallUserArg  = "from-install-user"
