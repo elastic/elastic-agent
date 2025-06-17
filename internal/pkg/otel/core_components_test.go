@@ -42,15 +42,8 @@ func TestCoreComponentsInGoMod(t *testing.T) {
 	}
 
 	// Verify all components in YAML are present in go.mod
-	var missingComponents []string
 	for _, component := range yamlComponents {
-		if !contains(goModComponents, component) {
-			missingComponents = append(missingComponents, component)
-		}
-	}
-
-	if len(missingComponents) > 0 {
-		t.Errorf("The following components from core-components.yaml are missing in go.mod: %v", missingComponents)
+		assert.Contains(t, goModComponents, component)
 	}
 }
 
