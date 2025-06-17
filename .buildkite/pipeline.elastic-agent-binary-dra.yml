@@ -11,7 +11,7 @@ env:
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
 common:
   - docker_login_plugin: &docker_login_plugin
-      elastic/vault-docker-login#v0.5.2:
+      elastic/vault-docker-login#v0.6.0:
         secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
 
 steps:
