@@ -6,12 +6,12 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1749862860"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1749862860"
-  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1749862860"
-  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1749862860"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1749862860"
-  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1749862860"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1750062514"
+  IMAGE_UBUNTU_2404_ARM_64: "test-platform-ingest-elastic-agent-ubuntu-2404-aarch64-1750062514"
+  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1750062514"
+  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1750062514"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1750062514"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1750062514"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -80,6 +80,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2022}"
+          imageProject: "elastic-images-qa"
         retry:
           automatic:
             limit: 1
@@ -101,6 +102,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
+          imageProject: "elastic-images-qa"
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-ubuntu-x86-64
         env:
@@ -118,6 +120,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
+          imageProject: "elastic-images-qa"
 
   - group: "Stateful: Windows"
     key: integration-tests-win
@@ -140,6 +143,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2022}"
+          imageProject: "elastic-images-qa"
         retry:
           automatic:
             limit: 1
@@ -166,6 +170,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2022}"
+          imageProject: "elastic-images-qa"
         retry:
           automatic:
             limit: 1
@@ -185,6 +190,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
+          imageProject: "elastic-images-qa"
         retry:
           automatic:
             limit: 1
@@ -214,6 +220,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
+          imageProject: "elastic-images-qa"
         matrix:
           - default
 
@@ -240,6 +247,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
+          imageProject: "elastic-images-qa"
         matrix:
           - default
 
@@ -260,6 +268,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
+          imageProject: "elastic-images-qa"
         matrix:
           - default
           - upgrade
@@ -352,6 +361,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_DEBIAN_12}"
+          imageProject: "elastic-images-qa"
         matrix:
           - default
 
@@ -372,6 +382,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_DEBIAN_12}"
+          imageProject: "elastic-images-qa"
         matrix:
           - default
           - upgrade
@@ -413,6 +424,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_RHEL_8}"
+          imageProject: "elastic-images-qa"
 
   - group: "Kubernetes"
     key: integration-tests-kubernetes
@@ -443,6 +455,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-4"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
+          imageProject: "elastic-images-qa"
           diskSizeGb: 80
         matrix:
           setup:
@@ -486,6 +499,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2022}"
+          imageProject: "elastic-images-qa"
         plugins:
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
@@ -508,6 +522,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
+          imageProject: "elastic-images-qa"
         plugins:
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
@@ -528,6 +543,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
+          imageProject: "elastic-images-qa"
         plugins:
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
