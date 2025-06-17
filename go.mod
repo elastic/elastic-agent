@@ -98,8 +98,12 @@ require (
 	k8s.io/client-go v0.32.3
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.70
 	sigs.k8s.io/e2e-framework v0.4.0
+<<<<<<< HEAD
 	sigs.k8s.io/kustomize/api v0.13.5-0.20230601165947-6ce0bf390ce3
 	sigs.k8s.io/kustomize/kyaml v0.14.3-0.20230601165947-6ce0bf390ce3
+=======
+	sigs.k8s.io/kustomize/api v0.18.0
+>>>>>>> dd52e906c ([test] split up k8s integration tests (#8484))
 )
 
 require (
@@ -646,7 +650,12 @@ require (
 	oras.land/oras-go v1.2.5 // indirect
 	sigs.k8s.io/controller-runtime v0.20.4 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
+<<<<<<< HEAD
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.2 // indirect
+=======
+	sigs.k8s.io/kustomize/kyaml v0.18.1 // indirect
+	sigs.k8s.io/structured-merge-diff/v4 v4.4.3 // indirect
+>>>>>>> dd52e906c ([test] split up k8s integration tests (#8484))
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 

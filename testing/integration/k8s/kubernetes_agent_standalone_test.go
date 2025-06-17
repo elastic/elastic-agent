@@ -4,57 +4,38 @@
 
 //go:build integration
 
-package integration
+package k8s
 
 import (
 	"archive/tar"
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent-libs/testing/estools"
-	"github.com/elastic/go-elasticsearch/v8"
 
-	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	cliResource "k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/e2e-framework/klient"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
-	"sigs.k8s.io/kustomize/api/krusty"
-	"sigs.k8s.io/kustomize/kyaml/filesys"
 
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
-	helmKube "helm.sh/helm/v3/pkg/kube"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
-	aclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
-	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/helm"
 	testK8s "github.com/elastic/elastic-agent/pkg/testing/kubernetes"
@@ -62,11 +43,9 @@ import (
 )
 
 const (
-	agentK8SKustomize = "../../deploy/kubernetes/elastic-agent-kustomize/default/elastic-agent-standalone"
-	agentK8SHelm      = "../../deploy/helm/elastic-agent"
+	agentK8SKustomize = "../../../deploy/kubernetes/elastic-agent-kustomize/default/elastic-agent-standalone"
+	agentK8SHelm      = "../../../deploy/helm/elastic-agent"
 )
-
-var noSpecialCharsRegexp = regexp.MustCompile("[^a-zA-Z0-9]+")
 
 func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 	info := define.Require(t, define.Requirements{
@@ -789,111 +768,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 	}
 }
 
-// k8sCheckAgentStatus checks that the agent reports healthy.
-func k8sCheckAgentStatus(ctx context.Context, client klient.Client, stdout *bytes.Buffer, stderr *bytes.Buffer,
-	namespace string, agentPodName string, containerName string, componentPresence map[string]bool,
-) error {
-	command := []string{"elastic-agent", "status", "--output=json"}
-	stopCheck := errors.New("stop check")
-
-	// we will wait maximum 120 seconds for the agent to report healthy
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
-
-	checkStatus := func() error {
-		pod := corev1.Pod{}
-		if err := client.Resources(namespace).Get(ctx, agentPodName, namespace, &pod); err != nil {
-			return err
-		}
-
-		for _, container := range pod.Status.ContainerStatuses {
-			if container.Name != containerName {
-				continue
-			}
-
-			if restarts := container.RestartCount; restarts != 0 {
-				return fmt.Errorf("container %q of pod %q has restarted %d times: %w", containerName, agentPodName, restarts, stopCheck)
-			}
-		}
-
-		status := atesting.AgentStatusOutput{} // clear status output
-		stdout.Reset()
-		stderr.Reset()
-		if err := client.Resources().ExecInPod(ctx, namespace, agentPodName, containerName, command, stdout, stderr); err != nil {
-			return err
-		}
-
-		if err := json.Unmarshal(stdout.Bytes(), &status); err != nil {
-			return err
-		}
-
-		var err error
-		// validate that the components defined are also healthy if they should exist
-		for component, shouldBePresent := range componentPresence {
-			compState, ok := getAgentComponentState(status, component)
-			if shouldBePresent {
-				if !ok {
-					// doesn't exist
-					err = errors.Join(err, fmt.Errorf("required component %s not found", component))
-				} else if compState != int(aclient.Healthy) {
-					// not healthy
-					err = errors.Join(err, fmt.Errorf("required component %s is not healthy", component))
-				}
-			} else if ok {
-				// should not be present
-				err = errors.Join(err, fmt.Errorf("component %s should not be present", component))
-			}
-		}
-		return err
-	}
-	for {
-		err := checkStatus()
-		if err == nil {
-			return nil
-		} else if errors.Is(err, stopCheck) {
-			return err
-		}
-		if ctx.Err() != nil {
-			// timeout waiting for agent to become healthy
-			return errors.Join(err, errors.New("timeout waiting for agent to become healthy"))
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-}
-
-// k8sGetAgentID returns the agent ID for the given agent pod
-func k8sGetAgentID(ctx context.Context, client klient.Client, stdout *bytes.Buffer, stderr *bytes.Buffer,
-	namespace string, agentPodName string, containerName string,
-) (string, error) {
-	command := []string{"elastic-agent", "status", "--output=json"}
-
-	status := atesting.AgentStatusOutput{} // clear status output
-	stdout.Reset()
-	stderr.Reset()
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	err := client.Resources().ExecInPod(ctx, namespace, agentPodName, containerName, command, stdout, stderr)
-	cancel()
-	if err != nil {
-		return "", err
-	}
-
-	if err := json.Unmarshal(stdout.Bytes(), &status); err != nil {
-		return "", err
-	}
-
-	return status.Info.ID, nil
-}
-
-// getAgentComponentState returns the component state for the given component name and a bool indicating if it exists.
-func getAgentComponentState(status atesting.AgentStatusOutput, componentName string) (int, bool) {
-	for _, comp := range status.Components {
-		if comp.Name == componentName {
-			return comp.State, true
-		}
-	}
-	return -1, false
-}
-
 // k8sDumpPods creates an archive that contains logs of all pods in the given namespace and kube-system to the given target directory
 func k8sDumpPods(t *testing.T, ctx context.Context, client klient.Client, testName string, namespace string, targetDir string, testStartTime time.Time) {
 	// Create the tar file
@@ -1040,6 +914,7 @@ func k8sDumpPods(t *testing.T, ctx context.Context, client klient.Client, testNa
 	}
 }
 
+<<<<<<< HEAD:testing/integration/kubernetes_agent_standalone_test.go
 // k8sKustomizeAdjustObjects adjusts the namespace of given k8s objects and calls the given callbacks for the containers and the pod
 func k8sKustomizeAdjustObjects(objects []k8s.Object, namespace string, containerName string, cbContainer func(container *corev1.Container), cbPod func(pod *corev1.PodSpec)) {
 	// Update the agent image and image pull policy as it is already loaded in kind cluster
@@ -1410,6 +1285,8 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 	}
 }
 
+=======
+>>>>>>> dd52e906c ([test] split up k8s integration tests (#8484)):testing/integration/k8s/kubernetes_agent_standalone_test.go
 // k8sTestStep is a function that performs a single step in a k8s integration test
 type k8sTestStep func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string)
 
@@ -1783,35 +1660,4 @@ func k8sStepCheckRestrictUpgrade(agentPodLabelSelector string, expectedPodNumber
 			require.Contains(t, stderr.String(), coordinator.ErrNotUpgradable.Error())
 		}
 	}
-}
-
-// GetAgentResponse extends kibana.GetAgentResponse and includes the EnrolledAt field
-type GetAgentResponse struct {
-	kibana.GetAgentResponse `json:",inline"`
-	EnrolledAt              time.Time `json:"enrolled_at"`
-}
-
-// kibanaGetAgent essentially re-implements kibana.GetAgent to extract also GetAgentResponse.EnrolledAt
-func kibanaGetAgent(ctx context.Context, kc *kibana.Client, id string) (*GetAgentResponse, error) {
-	apiURL := fmt.Sprintf("/api/fleet/agents/%s", id)
-	r, err := kc.Connection.SendWithContext(ctx, http.MethodGet, apiURL, nil, nil, nil)
-	if err != nil {
-		return nil, fmt.Errorf("error calling get agent API: %w", err)
-	}
-	defer r.Body.Close()
-	var agentResp struct {
-		Item GetAgentResponse `json:"item"`
-	}
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading response body: %w", err)
-	}
-	if r.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("error calling get agent API: %s", string(b))
-	}
-	err = json.Unmarshal(b, &agentResp)
-	if err != nil {
-		return nil, fmt.Errorf("unmarshalling response json: %w", err)
-	}
-	return &agentResp.Item, nil
 }
