@@ -69,7 +69,8 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 	policyResp, err := info.KibanaClient.CreatePolicy(ctx, fleetPolicy())
 	require.NoError(t, err, "failed creating policy")
 	policy := policyResp.AgentPolicy
-	_, err = tools.InstallPackageFromDefaultFile(ctx, info.KibanaClient, "fleet-server", preinstalledPackages["fleet-server"], "fleet-server.json", uuid.Must(uuid.NewV4()).String(), policy.ID)
+
+	_, err = tools.InstallPackageFromDefaultFile(ctx, info.KibanaClient, "fleet-server", PreinstalledPackages["fleet-server"], "fleet-server.json", uuid.Must(uuid.NewV4()).String(), policy.ID)
 	require.NoError(t, err, "failed creating fleet-server integration")
 
 	t.Log("Get fleet-server service token...")
