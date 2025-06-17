@@ -9,6 +9,7 @@ package integration
 import (
 	"context"
 	"math/rand"
+	"net/url"
 	"os"
 	"sort"
 	"testing"
@@ -50,6 +51,7 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 		Region:     echRegion,
 	})
 	require.NoError(t, err)
+	prov.SetLogger(t)
 	statefulProv, ok := prov.(*ess.StatefulProvisioner)
 	require.True(t, ok)
 
@@ -94,8 +96,13 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 func getRandomStackVersionsPair(t *testing.T, prov *ess.StatefulProvisioner, minVersion *version.ParsedSemVer, maxVersion *version.ParsedSemVer) (*version.ParsedSemVer, *version.ParsedSemVer) {
 	t.Helper()
 
+	baseURL, err := url.JoinPath(os.Getenv("TEST_INTEG_AUTH_ESS_URL"), "api/v1")
+	require.NoError(t, err)
+	t.Logf("Base URL: %s", baseURL)
+
 	versions, err := prov.AvailableVersions()
 	require.NoError(t, err)
+	t.Logf("available versions: %#+v", versions)
 
 	sort.Slice(versions, func(i, j int) bool {
 		verI := versions[i]
@@ -118,9 +125,13 @@ func getRandomStackVersionsPair(t *testing.T, prov *ess.StatefulProvisioner, min
 		filteredVersions = append(filteredVersions, ver)
 	}
 
+	t.Logf("filtered versions: %#+v", filteredVersions)
+
 	var startIdx, endIdx int
-	startIdx = rand.Intn(len(filteredVersions) - 1)
+	startIdx = rand.Intn(len(filteredVersions))
 	endIdx = startIdx + rand.Intn(len(filteredVersions)-startIdx-1) + 1
+
+	t.Logf("startIdx: %d, endIdx: %d", startIdx, endIdx)
 
 	return filteredVersions[startIdx], filteredVersions[endIdx]
 }
