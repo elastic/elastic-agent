@@ -16,7 +16,6 @@ fi
 CI_DRA_ROLE_PATH="kv/ci-shared/release/dra-role"
 CI_GCP_OBS_PATH="kv/ci-shared/observability-ingest/cloud/gcp"
 CI_ESS_PATH="kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-CI_DRA_ROLE_PATH="kv/ci-shared/release/dra-role"
 
 function release_manager_login {
   DRA_CREDS_SECRET=$(retry 5 vault kv get -field=data -format=json ${CI_DRA_ROLE_PATH})
@@ -26,7 +25,7 @@ function release_manager_login {
   export VAULT_ADDR_SECRET VAULT_ROLE_ID_SECRET VAULT_SECRET
 }
 
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-package" ]]; then
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-package" || "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent" ]]; then
   if [[ "$BUILDKITE_STEP_KEY" == "dra-publish" || "$BUILDKITE_STEP_KEY" == "bk-api-publish-independent-agent" ]]; then
     release_manager_login
   fi
