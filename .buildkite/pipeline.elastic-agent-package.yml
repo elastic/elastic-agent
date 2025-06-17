@@ -82,7 +82,7 @@ steps:
               - false
               - true
         plugins:
-          - elastic/vault-docker-login#v0.6.0:
+          - elastic/vault-docker-login#v0.5.2:
               secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
 
       - label: ":package: FIPS={{matrix.fips}} Package ARM elastic-agent"
