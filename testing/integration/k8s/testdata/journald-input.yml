@@ -15,7 +15,7 @@ inputs:
     log_level: debug
     type: journald
     data_stream:
-      namespace: "${EA_POLICY_NAMESPACE}"
+      namespace: "${env.EA_POLICY_NAMESPACE}"
     streams:
       - id: journald-input-id
         paths:
