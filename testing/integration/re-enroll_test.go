@@ -7,6 +7,7 @@
 package integration
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -42,18 +43,22 @@ func TestReEnrollUnprivileged(t *testing.T) {
 		},
 	})
 
-	testReEnroll(t, info, false, func(t *testing.T, fixture *atesting.Fixture, out string, err error) {
-		require.Error(t, err)
-		require.Contains(t, string(out), cmd.UserOwnerMismatchError.Error())
-		assert.Eventuallyf(t, func() bool {
-			err := fixture.IsHealthy(t.Context())
-			return err == nil
-		},
-			2*time.Minute, time.Second,
-			"Elastic-Agent did not report healthy. Agent status error: \"%v\"",
-			err,
-		)
-	})
+	ctx := t.Context()
+
+	fixture, enrollArgs := prepareAgentforReEnroll(t, ctx, info, false)
+
+	out, err := fixture.Exec(ctx, enrollArgs)
+	require.Error(t, err)
+	require.Contains(t, string(out), cmd.UserOwnerMismatchError.Error())
+
+	assert.Eventuallyf(t, func() bool {
+		err := fixture.IsHealthy(t.Context())
+		return err == nil
+	},
+		2*time.Minute, time.Second,
+		"Elastic-Agent did not report healthy. Agent status error: \"%v\"",
+		err,
+	)
 }
 
 func TestReEnrollPrivileged(t *testing.T) {
@@ -62,21 +67,24 @@ func TestReEnrollPrivileged(t *testing.T) {
 		Stack: &define.Stack{},
 		Sudo:  true,
 	})
-	testReEnroll(t, info, true, func(t *testing.T, fixture *atesting.Fixture, _ string, err error) {
-		require.NoError(t, err)
-		assert.Eventuallyf(t, func() bool {
-			err := fixture.IsHealthy(t.Context())
-			return err == nil
-		},
-			2*time.Minute, time.Second,
-			"Elastic-Agent did not report healthy. Agent status error: \"%v\"",
-			err,
-		)
-	})
+
+	ctx := t.Context()
+
+	fixture, enrollArgs := prepareAgentforReEnroll(t, ctx, info, true)
+	_, err := fixture.Exec(ctx, enrollArgs)
+	require.NoError(t, err)
+
+	assert.Eventuallyf(t, func() bool {
+		err := fixture.IsHealthy(t.Context())
+		return err == nil
+	},
+		2*time.Minute, time.Second,
+		"Elastic-Agent did not report healthy. Agent status error: \"%v\"",
+		err,
+	)
 }
 
-func testReEnroll(t *testing.T, info *define.Info, privileged bool, assertFunc AssertFunc) {
-	ctx := t.Context()
+func prepareAgentforReEnroll(t *testing.T, ctx context.Context, info *define.Info, privileged bool) (*atesting.Fixture, []string) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 	installOpts := atesting.InstallOpts{
@@ -107,8 +115,5 @@ func testReEnroll(t *testing.T, info *define.Info, privileged bool, assertFunc A
 	enrollUrl, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 	require.NoError(t, err)
 
-	enrollArgs := []string{"enroll", "--url", enrollUrl, "--enrollment-token", enrollmentApiKey.APIKey, "--force"}
-
-	out, err := fixture.Exec(ctx, enrollArgs)
-	assertFunc(t, fixture, string(out), err)
+	return fixture, []string{"enroll", "--url", enrollUrl, "--enrollment-token", enrollmentApiKey.APIKey, "--force"}
 }
