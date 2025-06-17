@@ -10,11 +10,14 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+
+	"github.com/elastic/elastic-agent/pkg/testing/common"
 )
 
 type Client struct {
 	config *Config
 	client *http.Client
+	logger common.Logger
 }
 
 func NewClient(config Config) *Client {
@@ -28,11 +31,18 @@ func NewClient(config Config) *Client {
 	return c
 }
 
+func (c *Client) SetLogger(logger common.Logger) {
+	c.logger = logger
+}
+
 func (c *Client) doGet(ctx context.Context, relativeUrl string) (*http.Response, error) {
 	u, err := url.JoinPath(c.config.BaseUrl, relativeUrl)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create API URL: %w", err)
 	}
+
+	c.logger.Logf("URL: %s", u)
+	c.logger.Logf("API Key: %s", c.config.ApiKey)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"strings"
@@ -68,6 +69,7 @@ func (p *StatefulProvisioner) Name() string {
 
 func (p *StatefulProvisioner) SetLogger(l common.Logger) {
 	p.logger = l
+	p.client.SetLogger(l)
 }
 
 // Create creates a stack.
@@ -176,11 +178,16 @@ func (p *StatefulProvisioner) AvailableVersions() ([]*version.ParsedSemVer, erro
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	p.logger.Logf("Getting available stack versions from ECH from %s", versionsApiUrl)
 	resp, err := p.client.doGet(ctx, versionsApiUrl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get versions from ECH for region [%s]: %w", p.cfg.Region, err)
 	}
 	defer resp.Body.Close()
+
+	p.logger.Logf("response status: %v", resp.Status)
+	body, _ := io.ReadAll(resp.Body)
+	p.logger.Logf("response body: %s", string(body))
 
 	var stacks struct {
 		Stacks []struct {
