@@ -32,6 +32,11 @@ type testCase struct {
 	assertion   AssertFunc
 }
 
+// TestReEnrollUnprivileged verifies that re-enrollment as a privileged user fails
+// when the agent was installed unprivileged. This enforces the file ownership check
+// on Unix platforms. On Windows, this check is a no-op as of PR #8503, so this test
+// is not run for windows. See the discussion in PR #8503 (https://github.com/elastic/elastic-agent/pull/8503)
+// and comment (https://github.com/elastic/elastic-agent/pull/8503#discussion_r2152603141) for context.
 func TestReEnrollUnprivileged(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Default,
