@@ -4,7 +4,7 @@
 
 //go:build integration
 
-package integration
+package k8s
 
 import (
 	"bufio"
@@ -72,7 +72,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				k8sStepCreateNamespace(),
 				k8sStepHelmDeployWithValueOptions(chartLocation, "kube-stack-otel",
 					values.Options{
-						ValueFiles: []string{"../../deploy/helm/edot-collector/kube-stack/values.yaml"},
+						ValueFiles: []string{"../../../deploy/helm/edot-collector/kube-stack/values.yaml"},
 						Values: []string{
 							fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo),
 							fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag),
@@ -115,7 +115,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				k8sStepCreateNamespace(),
 				k8sStepHelmDeployWithValueOptions(chartLocation, "kube-stack-otel",
 					values.Options{
-						ValueFiles: []string{"../../deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"},
+						ValueFiles: []string{"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"},
 						Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
 
 						// override secrets reference with env variables
@@ -223,37 +223,5 @@ func k8sStepCheckDatastreamsHits(info *define.Info, dsType, dataset, datastreamN
 			require.NoError(t, err, "failed to get %s datastream documents", fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace))
 			return docs.Hits.Total.Value > 0
 		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least one document should be available for %s datastream", fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace)))
-	}
-}
-
-func queryK8sNamespaceDataStream(dsType, dataset, datastreamNamespace, k8snamespace string) map[string]any {
-	return map[string]any{
-		"_source": []string{"message"},
-		"query": map[string]any{
-			"bool": map[string]any{
-				"filter": []any{
-					map[string]any{
-						"term": map[string]any{
-							"data_stream.dataset": dataset,
-						},
-					},
-					map[string]any{
-						"term": map[string]any{
-							"data_stream.namespace": datastreamNamespace,
-						},
-					},
-					map[string]any{
-						"term": map[string]any{
-							"data_stream.type": dsType,
-						},
-					},
-					map[string]any{
-						"term": map[string]any{
-							"resource.attributes.k8s.namespace.name": k8snamespace,
-						},
-					},
-				},
-			},
-		},
 	}
 }
