@@ -39,8 +39,7 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 	}
 
 	echApiKey := os.Getenv("EC_API_KEY")
-	require.NoError(t, err)
-	if !ok {
+	if echApiKey == "" {
 		t.Fatal("ECH API key missing")
 	}
 
