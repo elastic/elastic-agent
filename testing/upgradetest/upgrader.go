@@ -140,16 +140,6 @@ func WithCustomWatcherConfig(cfg string) UpgradeOpt {
 	}
 }
 
-<<<<<<< HEAD
-=======
-// WithServers will use start version with servers flavor.
-func WithServers() UpgradeOpt {
-	return func(opts *UpgradeOpts) {
-		opts.installServers = true
-	}
-}
-
->>>>>>> ac9ee9a34 ([Integration Test] Ensure that upgrading a FIPS-capable Agent results in a FIPS-capable Agent (#7804))
 // WithDisableUpgradeWatcherUpgradeDetailsCheck disables any assertions for
 // upgrade details that are being set by the Upgrade Watcher. This option is
 // useful in upgrade tests where the end Agent version does not contain changes
