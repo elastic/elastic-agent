@@ -2106,10 +2106,6 @@ func (Integration) TestKubernetes(ctx context.Context) error {
 	return integRunner(ctx, "testing/integration/k8s", false, "")
 }
 
-<<<<<<< HEAD
-// KubernetesMatrix runs a matrix of kubernetes integration tests
-func (Integration) KubernetesMatrix(ctx context.Context) error {
-=======
 // TestKubernetesSingle runs single k8s integration test
 func (Integration) TestKubernetesSingle(ctx context.Context, testName string) error {
 	// invoke integration tests
@@ -2122,7 +2118,6 @@ func (Integration) TestKubernetesSingle(ctx context.Context, testName string) er
 
 // TestKubernetesMatrix runs a matrix of kubernetes integration tests
 func (Integration) TestKubernetesMatrix(ctx context.Context) error {
->>>>>>> dd52e906c ([test] split up k8s integration tests (#8484))
 	// invoke integration tests
 	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
 		return err

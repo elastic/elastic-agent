@@ -35,6 +35,7 @@ require (
 	github.com/gofrs/uuid/v5 v5.3.1
 	github.com/google/go-cmp v0.7.0
 	github.com/google/pprof v0.0.0-20241029153458-d1b30febd7db
+	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/jaypipes/ghw v0.12.0
 	github.com/jedib0t/go-pretty/v6 v6.4.6
@@ -102,12 +103,7 @@ require (
 	k8s.io/client-go v0.32.3
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.70
 	sigs.k8s.io/e2e-framework v0.4.0
-<<<<<<< HEAD
-	sigs.k8s.io/kustomize/api v0.13.5-0.20230601165947-6ce0bf390ce3
-	sigs.k8s.io/kustomize/kyaml v0.14.3-0.20230601165947-6ce0bf390ce3
-=======
 	sigs.k8s.io/kustomize/api v0.18.0
->>>>>>> dd52e906c ([test] split up k8s integration tests (#8484))
 )
 
 require (
@@ -368,7 +364,6 @@ require (
 	github.com/google/licenseclassifier v0.0.0-20221004142553-c1ed8fcf4bab // indirect
 	github.com/google/s2a-go v0.1.8 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.5 // indirect
 	github.com/googleapis/gax-go/v2 v2.14.1 // indirect
 	github.com/gophercloud/gophercloud v1.14.1 // indirect
@@ -397,7 +392,6 @@ require (
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/icholy/digest v0.1.22 // indirect
-	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/ionos-cloud/sdk-go/v6 v6.2.1 // indirect
 	github.com/jaegertracing/jaeger v1.66.0 // indirect
@@ -634,7 +628,6 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.35.0 // indirect
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
-	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/mock v0.5.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
@@ -660,12 +653,8 @@ require (
 	oras.land/oras-go v1.2.5 // indirect
 	sigs.k8s.io/controller-runtime v0.20.4 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
-<<<<<<< HEAD
-	sigs.k8s.io/structured-merge-diff/v4 v4.4.2 // indirect
-=======
 	sigs.k8s.io/kustomize/kyaml v0.18.1 // indirect
-	sigs.k8s.io/structured-merge-diff/v4 v4.4.3 // indirect
->>>>>>> dd52e906c ([test] split up k8s integration tests (#8484))
+	sigs.k8s.io/structured-merge-diff/v4 v4.4.2 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
