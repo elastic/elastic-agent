@@ -19,7 +19,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -43,8 +42,7 @@ import (
 )
 
 const (
-	agentK8SKustomize = "../../../deploy/kubernetes/elastic-agent-kustomize/default/elastic-agent-standalone"
-	agentK8SHelm      = "../../../deploy/helm/elastic-agent"
+	agentK8SHelm = "../../../deploy/helm/elastic-agent"
 )
 
 func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
@@ -72,23 +70,25 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 	require.NotZero(t, schedulableNodeCount, "no schedulable Kubernetes nodes found")
 
 	testCases := []struct {
-		name       string
-		skipReason string
-		steps      []k8sTestStep
+		name  string
+		skip  func(t *testing.T)
+		steps []k8sTestStep
 	}{
 		{
 			name: "default deployment - rootful agent",
+			skip: shouldSkipKustomizeTests,
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{}, nil),
+				k8sStepDeployKustomize("elastic-agent-standalone", k8sKustomizeOverrides{}, nil),
 				k8sStepCheckAgentStatus("app=elastic-agent-standalone", schedulableNodeCount, "elastic-agent-standalone", nil),
 			},
 		},
 		{
 			name: "drop ALL capabilities - rootful agent",
+			skip: shouldSkipKustomizeTests,
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{
+				k8sStepDeployKustomize("elastic-agent-standalone", k8sKustomizeOverrides{
 					agentContainerRunUser:          int64Ptr(0),
 					agentContainerCapabilitiesAdd:  []corev1.Capability{},
 					agentContainerCapabilitiesDrop: []corev1.Capability{"ALL"},
@@ -98,9 +98,10 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 		},
 		{
 			name: "drop ALL add CHOWN, SETPCAP capabilities - rootful agent",
+			skip: shouldSkipKustomizeTests,
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{
+				k8sStepDeployKustomize("elastic-agent-standalone", k8sKustomizeOverrides{
 					agentContainerRunUser:          int64Ptr(0),
 					agentContainerCapabilitiesAdd:  []corev1.Capability{"CHOWN", "SETPCAP"},
 					agentContainerCapabilitiesDrop: []corev1.Capability{"ALL"},
@@ -111,9 +112,10 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 		},
 		{
 			name: "drop ALL add CHOWN, SETPCAP, DAC_READ_SEARCH, SYS_PTRACE capabilities - rootless agent",
+			skip: shouldSkipKustomizeTests,
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{
+				k8sStepDeployKustomize("elastic-agent-standalone", k8sKustomizeOverrides{
 					agentContainerRunUser:          int64Ptr(1000),
 					agentContainerRunGroup:         int64Ptr(1000),
 					agentContainerCapabilitiesAdd:  []corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH", "SYS_PTRACE"},
@@ -125,9 +127,10 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 		},
 		{
 			name: "drop ALL add CHOWN, SETPCAP, DAC_READ_SEARCH, SYS_PTRACE capabilities - rootless agent random uid:gid",
+			skip: shouldSkipKustomizeTests,
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{
+				k8sStepDeployKustomize("elastic-agent-standalone", k8sKustomizeOverrides{
 					agentContainerRunUser:          int64Ptr(500),
 					agentContainerRunGroup:         int64Ptr(500),
 					agentContainerCapabilitiesAdd:  []corev1.Capability{"CHOWN", "SETPCAP", "DAC_READ_SEARCH", "SYS_PTRACE"},
@@ -142,9 +145,7 @@ func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.skipReason != "" {
-				t.Skip(tc.skipReason)
-			}
+			tc.skip(t)
 
 			testNamespace := kCtx.getNamespace(t)
 
@@ -180,15 +181,16 @@ func TestKubernetesAgentOtel(t *testing.T) {
 	require.NotZero(t, schedulableNodeCount, "no schedulable Kubernetes nodes found")
 
 	testCases := []struct {
-		name       string
-		skipReason string
-		steps      []k8sTestStep
+		name  string
+		skip  func(*testing.T)
+		steps []k8sTestStep
 	}{
 		{
 			name: "run agent in otel mode",
+			skip: shouldSkipKustomizeTests,
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{
+				k8sStepDeployKustomize("elastic-agent-standalone", k8sKustomizeOverrides{
 					agentContainerExtraEnv: []corev1.EnvVar{},
 					agentContainerArgs:     []string{}, // clear default args
 				}, nil),
@@ -199,9 +201,7 @@ func TestKubernetesAgentOtel(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.skipReason != "" {
-				t.Skip(tc.skipReason)
-			}
+			tc.skip(t)
 
 			testNamespace := kCtx.getNamespace(t)
 
@@ -961,16 +961,9 @@ type k8sKustomizeOverrides struct {
 // adjust the k8s objects created from the rendering to match the needs of the current test with k8sKustomizeOverrides.
 // However, this is not that as flexible as we would like it to be. As a last resort somebody can use forEachObject callback
 // to further adjust the k8s objects
-func k8sStepDeployKustomize(kustomizePath string, containerName string, overrides k8sKustomizeOverrides, forEachObject func(object k8s.Object)) k8sTestStep {
+func k8sStepDeployKustomize(containerName string, overrides k8sKustomizeOverrides, forEachObject func(object k8s.Object)) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		var renderedManifest []byte
-		require.EventuallyWithT(t, func(collect *assert.CollectT) {
-			var err error
-			renderedManifest, err = k8sRenderKustomize(kustomizePath)
-			assert.NoError(collect, err)
-		}, 5*time.Second, 500*time.Millisecond, "failed to render kustomize")
-
-		objects, err := testK8s.LoadFromYAML(bufio.NewReader(bytes.NewReader(renderedManifest)))
+		objects, err := testK8s.LoadFromYAML(bufio.NewReader(bytes.NewReader(kustomizeYaml)))
 		require.NoError(t, err, "failed to parse rendered kustomize")
 
 		if forEachObject != nil {

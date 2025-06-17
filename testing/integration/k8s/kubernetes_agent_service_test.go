@@ -31,6 +31,8 @@ func TestKubernetesAgentService(t *testing.T) {
 		Group: define.Kubernetes,
 	})
 
+	shouldSkipKustomizeTests(t)
+
 	// read the service agent config
 	serviceAgentYAML, err := os.ReadFile(filepath.Join("testdata", "connectors.agent.yml"))
 	require.NoError(t, err, "failed to read service agent config")
@@ -44,7 +46,7 @@ func TestKubernetesAgentService(t *testing.T) {
 
 	testSteps := []k8sTestStep{
 		k8sStepCreateNamespace(),
-		k8sStepDeployKustomize(agentK8SKustomize, "elastic-agent-standalone", k8sKustomizeOverrides{}, func(obj k8s.Object) {
+		k8sStepDeployKustomize("elastic-agent-standalone", k8sKustomizeOverrides{}, func(obj k8s.Object) {
 			// update the configmap to only run the connectors input
 			switch objWithType := obj.(type) {
 			case *corev1.ConfigMap:

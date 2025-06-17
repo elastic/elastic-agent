@@ -35,6 +35,8 @@ func TestKubernetesJournaldInput(t *testing.T) {
 		Group: define.Kubernetes,
 	})
 
+	shouldSkipKustomizeTests(t)
+
 	agentConfigYAML, err := os.ReadFile(filepath.Join("testdata", "journald-input.yml"))
 	require.NoError(t, err, "failed to read journald input template")
 
@@ -51,7 +53,6 @@ func TestKubernetesJournaldInput(t *testing.T) {
 	steps := []k8sTestStep{
 		k8sStepCreateNamespace(),
 		k8sStepDeployKustomize(
-			agentK8SKustomize,
 			"elastic-agent-standalone",
 			k8sKustomizeOverrides{
 				agentContainerExtraEnv: []corev1.EnvVar{
@@ -128,6 +129,8 @@ func TestKubernetesJournaldInputOtel(t *testing.T) {
 		Group: define.Kubernetes,
 	})
 
+	shouldSkipKustomizeTests(t)
+
 	otelConfigYAML, err := os.ReadFile(filepath.Join("testdata", "journald-otel.yml"))
 	require.NoError(t, err, "failed to read journald input template")
 
@@ -138,7 +141,6 @@ func TestKubernetesJournaldInputOtel(t *testing.T) {
 	steps := []k8sTestStep{
 		k8sStepCreateNamespace(),
 		k8sStepDeployKustomize(
-			agentK8SKustomize,
 			"elastic-agent-standalone",
 			k8sKustomizeOverrides{
 				agentContainerArgs: []string{"--config", "/etc/elastic-agent/agent.yml"},
