@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
 
@@ -30,7 +31,7 @@ func TestCoreComponentsInGoMod(t *testing.T) {
 
 	// Load components from core-components.yaml
 	yamlComponents, err := loadCoreComponentsYAML()
-	require.NoError(t, err, "Failed to load core-components.yaml)
+	require.NoError(t, err, "Failed to load core-components.yaml")
 
 	// Verify all components in YAML are present in dependencies
 	for _, component := range yamlComponents {
