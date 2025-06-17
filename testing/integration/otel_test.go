@@ -11,7 +11,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -314,7 +313,7 @@ func TestOtelLogsIngestion(t *testing.T) {
 	tempDir := t.TempDir()
 	inputFilePath := filepath.Join(tempDir, "input.log")
 
-	esHost, err := getESHost()
+	esHost, err := GetESHost()
 	require.NoError(t, err, "failed to get ES host")
 	require.True(t, len(esHost) > 0)
 
@@ -433,7 +432,7 @@ func TestOtelAPMIngestion(t *testing.T) {
 	require.NoError(t, err)
 
 	// start apm default config just configure ES output
-	esHost, err := getESHost()
+	esHost, err := GetESHost()
 	require.NoError(t, err, "failed to get ES host")
 	require.True(t, len(esHost) > 0)
 
@@ -547,18 +546,6 @@ func TestOtelAPMIngestion(t *testing.T) {
 	apmCancel()
 	fixtureWg.Wait()
 	apmFixtureWg.Wait()
-}
-
-func getESHost() (string, error) {
-	fixedESHost := os.Getenv("ELASTICSEARCH_HOST")
-	parsedES, err := url.Parse(fixedESHost)
-	if err != nil {
-		return "", err
-	}
-	if parsedES.Port() == "" {
-		fixedESHost = fmt.Sprintf("%s:443", fixedESHost)
-	}
-	return fixedESHost, nil
 }
 
 func createESApiKey(esClient *elasticsearch.Client) (estools.APIKeyResponse, error) {
@@ -741,7 +728,7 @@ func TestOtelFBReceiverE2E(t *testing.T) {
 		Index      string
 		MinItems   int
 	}
-	esEndpoint, err := getESHost()
+	esEndpoint, err := GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
 	esApiKey, err := createESApiKey(info.ESClient)
 	require.NoError(t, err, "error creating API key")

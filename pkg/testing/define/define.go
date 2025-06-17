@@ -37,6 +37,7 @@ var osInfo *types.OSInfo
 var osInfoErr error
 var osInfoOnce sync.Once
 var noSpecialCharsRegexp = regexp.MustCompile("[^a-zA-Z0-9]+")
+var kubernetesSupported = false
 
 // Require defines what this test requires for it to be run by the test runner.
 //
@@ -44,6 +45,12 @@ var noSpecialCharsRegexp = regexp.MustCompile("[^a-zA-Z0-9]+")
 // and the test runner will not be able to determine the requirements for a test.
 func Require(t *testing.T, req Requirements) *Info {
 	return defineAction(t, req)
+}
+
+// SetKubernetesSupported sets the kubernetesSupported flag to true
+// to allow kubernetes tests to be run.
+func SetKubernetesSupported() {
+	kubernetesSupported = true
 }
 
 type Info struct {
@@ -139,7 +146,7 @@ func findProjectRoot() (string, error) {
 	}
 }
 
-func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Info {
+func runOrSkip(t *testing.T, req Requirements, local bool) *Info {
 	// always validate requirement is valid
 	if err := req.Validate(); err != nil {
 		panic(fmt.Sprintf("test %s has invalid requirements: %s", t.Name(), err))
@@ -165,7 +172,7 @@ func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Inf
 		return nil
 	}
 	for _, o := range req.OS {
-		if o.Type == Kubernetes && !kubernetes {
+		if o.Type == Kubernetes && !kubernetesSupported {
 			t.Skip("test requires kubernetes")
 			return nil
 		}
