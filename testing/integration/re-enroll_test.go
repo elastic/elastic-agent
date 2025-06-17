@@ -114,7 +114,7 @@ func prepareAgentforReEnroll(t *testing.T, ctx context.Context, info *define.Inf
 	enrollmentApiKey, err := tools.CreateEnrollmentToken(t, ctx, info.KibanaClient, policy.ID)
 	require.NoError(t, err)
 
-	_, err = tools.InstallAgentForPolicyWithToken(ctx, t, installOpts, fixture, info.KibanaClient, enrollmentApiKey)
+	err = tools.InstallAgentForPolicyWithToken(ctx, t, installOpts, fixture, info.KibanaClient, policy.ID, enrollmentApiKey)
 	require.NoError(t, err)
 
 	enrollUrl, err := fleettools.DefaultURL(ctx, info.KibanaClient)
