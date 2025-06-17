@@ -7,3 +7,5 @@ repos:
     -   id: check-shebang-scripts-are-executable
         exclude: (.*/.*.(tmpl|tftpl)$)
     -   id: check-merge-conflict
+        args: ['--assume-in-merge']
+        exclude: (^NOTICE.*\.txt$)
