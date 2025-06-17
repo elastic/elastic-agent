@@ -20,8 +20,8 @@ steps:
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-binary-dra - DRA Core Snapshot"
-    # don't run snapshot builds with prereleases (non empty VERSION_QUALIFIER) unless forced (RUN_SNAPSHOT=true) or DRA_DRY_RUN=true
-    if: build.env("RUN_SNAPSHOT") == "true" || (build.env('VERSION_QUALIFIER') == null && (build.branch == 'main' || build.branch =~ /^[0-9]+\.[0-9x]+\$/ || build.env("DRA_DRY_RUN") == "true"))
+    # don't run snapshot builds with prereleases (non empty VERSION_QUALIFIER) unless forced (RUN_SNAPSHOT=true)
+    if: (build.env("RUN_SNAPSHOT") == "true" || build.env('VERSION_QUALIFIER') == null)
     steps:
     - label: ":package: Elastic-Agent Core Snapshot"
       commands:
