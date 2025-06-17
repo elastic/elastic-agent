@@ -4,65 +4,57 @@
 
 //go:build integration
 
-package integration
+package k8s
 
 import (
 	"archive/tar"
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+<<<<<<< HEAD:testing/integration/kubernetes_agent_standalone_test.go
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/go-elasticsearch/v8"
+=======
+	"github.com/elastic/elastic-agent-libs/kibana"
+>>>>>>> dd52e906c ([test] split up k8s integration tests (#8484)):testing/integration/k8s/kubernetes_agent_standalone_test.go
 
-	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	cliResource "k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/e2e-framework/klient"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
-	"sigs.k8s.io/kustomize/api/krusty"
-	"sigs.k8s.io/kustomize/kyaml/filesys"
 
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
-	helmKube "helm.sh/helm/v3/pkg/kube"
 
+<<<<<<< HEAD:testing/integration/kubernetes_agent_standalone_test.go
 	aclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
+=======
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+>>>>>>> dd52e906c ([test] split up k8s integration tests (#8484)):testing/integration/k8s/kubernetes_agent_standalone_test.go
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	testK8s "github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 )
 
 const (
-	agentK8SKustomize = "../../deploy/kubernetes/elastic-agent-kustomize/default/elastic-agent-standalone"
-	agentK8SHelm      = "../../deploy/helm/elastic-agent"
+	agentK8SKustomize = "../../../deploy/kubernetes/elastic-agent-kustomize/default/elastic-agent-standalone"
+	agentK8SHelm      = "../../../deploy/helm/elastic-agent"
 )
-
-var noSpecialCharsRegexp = regexp.MustCompile("[^a-zA-Z0-9]+")
 
 func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
 	info := define.Require(t, define.Requirements{
@@ -475,6 +467,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD:testing/integration/kubernetes_agent_standalone_test.go
 // k8sCheckAgentStatus checks that the agent reports healthy.
 func k8sCheckAgentStatus(ctx context.Context, client klient.Client, stdout *bytes.Buffer, stderr *bytes.Buffer,
 	namespace string, agentPodName string, containerName string, componentPresence map[string]bool,
@@ -557,6 +550,8 @@ func getAgentComponentState(status atesting.AgentStatusOutput, componentName str
 	return -1, false
 }
 
+=======
+>>>>>>> dd52e906c ([test] split up k8s integration tests (#8484)):testing/integration/k8s/kubernetes_agent_standalone_test.go
 // k8sDumpPods creates an archive that contains logs of all pods in the given namespace and kube-system to the given target directory
 func k8sDumpPods(t *testing.T, ctx context.Context, client klient.Client, testName string, namespace string, targetDir string, testStartTime time.Time) {
 	// Create the tar file
@@ -703,6 +698,7 @@ func k8sDumpPods(t *testing.T, ctx context.Context, client klient.Client, testNa
 	}
 }
 
+<<<<<<< HEAD:testing/integration/kubernetes_agent_standalone_test.go
 // k8sKustomizeAdjustObjects adjusts the namespace of given k8s objects and calls the given callbacks for the containers and the pod
 func k8sKustomizeAdjustObjects(objects []k8s.Object, namespace string, containerName string, cbContainer func(container *corev1.Container), cbPod func(pod *corev1.PodSpec)) {
 	// Update the agent image and image pull policy as it is already loaded in kind cluster
@@ -1067,6 +1063,8 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 	}
 }
 
+=======
+>>>>>>> dd52e906c ([test] split up k8s integration tests (#8484)):testing/integration/k8s/kubernetes_agent_standalone_test.go
 // k8sTestStep is a function that performs a single step in a k8s integration test
 type k8sTestStep func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string)
 
@@ -1381,3 +1379,28 @@ func k8sStepHintsRedisDelete() k8sTestStep {
 		require.NoError(t, err, "failed to delete redis k8s objects")
 	}
 }
+<<<<<<< HEAD:testing/integration/kubernetes_agent_standalone_test.go
+=======
+
+func k8sStepCheckRestrictUpgrade(agentPodLabelSelector string, expectedPodNumber int, containerName string) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		perNodePodList := &corev1.PodList{}
+		err := kCtx.client.Resources(namespace).List(ctx, perNodePodList, func(opt *metav1.ListOptions) {
+			opt.LabelSelector = agentPodLabelSelector
+		})
+		require.NoError(t, err, "failed to list pods with selector ", perNodePodList)
+		require.NotEmpty(t, perNodePodList.Items, "no pods found with selector ", perNodePodList)
+		require.Equal(t, expectedPodNumber, len(perNodePodList.Items), "unexpected number of pods found with selector ", perNodePodList)
+		for _, pod := range perNodePodList.Items {
+			var stdout, stderr bytes.Buffer
+
+			command := []string{"elastic-agent", "upgrade", "1.0.0"}
+			ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+			err := kCtx.client.Resources().ExecInPod(ctx, namespace, pod.Name, containerName, command, &stdout, &stderr)
+			cancel()
+			require.Error(t, err)
+			require.Contains(t, stderr.String(), coordinator.ErrNotUpgradable.Error())
+		}
+	}
+}
+>>>>>>> dd52e906c ([test] split up k8s integration tests (#8484)):testing/integration/k8s/kubernetes_agent_standalone_test.go
