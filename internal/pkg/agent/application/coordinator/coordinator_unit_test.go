@@ -1338,9 +1338,10 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 	defer cancel()
 	logger := logp.NewLogger("testing")
 
+	runtimeStateChan := make(chan runtime.ComponentComponentState)
 	componentUpdateChan := make(chan runtime.ComponentComponentState)
 
-	comp := component.Component{
+	otelComponent := component.Component{
 		ID:             "filestream-default",
 		InputType:      "filestream",
 		OutputType:     "elasticsearch",
@@ -1371,8 +1372,12 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 		},
 	}
 
+	processComponent := otelComponent
+	processComponent.RuntimeManager = component.ProcessRuntimeManager
+	processComponent.ID = "filestream-process"
+
 	compState := runtime.ComponentComponentState{
-		Component: comp,
+		Component: otelComponent,
 		State: runtime.ComponentState{
 			State: client.UnitStateHealthy,
 		},
@@ -1386,17 +1391,16 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 			otelManagerComponentUpdate: componentUpdateChan,
 			runtimeManagerUpdate:       make(chan runtime.ComponentComponentState),
 		},
-		state:          State{},
-		componentModel: []component.Component{comp},
+		state: State{},
 	}
 
 	// start runtime status watching
-	go coord.watchRuntimeComponents(ctx, runtimeStateChan, statusChan)
+	go coord.watchRuntimeComponents(ctx, runtimeStateChan, componentUpdateChan)
 
 	// no component status
 	assert.Empty(t, coord.state.Components)
 
-	// push the status into the coordinator
+	// push the otel component state into the coordinator
 	select {
 	case componentUpdateChan <- compState:
 	case <-ctx.Done():
@@ -1411,9 +1415,6 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 	}
 
 	assert.Len(t, coord.state.Components, 1)
-
-	// Add both a process component and an otel component, in that order. Both should appear in the state.
-	coord.componentModel = []component.Component{otelComponent, processComponent}
 
 	// push the process component state into the coordinator
 	select {
@@ -1434,37 +1435,16 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 		t.Fatal("timeout waiting for coordinator to receive status")
 	}
 
-	// push the otel status into the coordinator
-	select {
-	case statusChan <- otelStatus:
-	case <-ctx.Done():
-		t.Fatal("timeout waiting for coordinator to receive status")
-	}
-
-	select {
-	case finalOtelStatus := <-coord.managerChans.otelManagerUpdate:
-		// we shouldn't have any status remaining for the otel collector, as the status we've pushed earlier only
-		// contains beats receiver status for the "filestream-default" component
-		// this status is removed from the otel collector status, because it's reported as component state instead
-		assert.Empty(t, finalOtelStatus.ComponentStatusMap)
-	case <-ctx.Done():
-		t.Fatal("timeout waiting for coordinator to receive status")
-	}
-
-	select {
-	case componentState := <-coord.managerChans.runtimeManagerUpdate:
-		coord.applyComponentState(componentState)
-	case <-ctx.Done():
-		t.Fatal("timeout waiting for coordinator to receive status")
-	}
-
 	assert.Len(t, coord.state.Components, 2)
 
-	// Now, we remove the component and resend the same status. The component state should be deleted.
-	coord.componentModel = []component.Component{}
-	coord.state = State{}
+	// Push a stopped status, there should be no otel component state
 	select {
-	case componentUpdateChan <- stoppedState:
+	case componentUpdateChan <- runtime.ComponentComponentState{
+		Component: otelComponent,
+		State: runtime.ComponentState{
+			State: client.UnitStateStopped,
+		},
+	}:
 	case <-ctx.Done():
 		t.Fatal("timeout waiting for coordinator to receive status")
 	}
@@ -1476,25 +1456,7 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 		t.Fatal("timeout waiting for coordinator to receive status")
 	}
 
-	assert.Empty(t, coord.state.Components)
-
-	// Push an invalid status, there should be no otel component state, but there should be an otel status
-	select {
-	case statusChan <- invalidOtelStatus:
-	case <-ctx.Done():
-		t.Fatal("timeout waiting for coordinator to receive status")
-	}
-
-	select {
-	case finalOtelStatus := <-coord.managerChans.otelManagerUpdate:
-		// we should have otel status with pipelines that didn't parse correctly
-		assert.NotEmpty(t, finalOtelStatus.ComponentStatusMap)
-	case <-ctx.Done():
-		t.Fatal("timeout waiting for coordinator to receive status")
-	}
-
-	assert.Empty(t, coord.state.Components)
-	assert.Equal(t, coord.otelErr.Error(), "pipeline status id unknown:logs/filestream-default is not a pipeline")
+	assert.Len(t, coord.state.Components, 1)
 }
 
 func TestCoordinatorInitiatesUpgrade(t *testing.T) {

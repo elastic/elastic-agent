@@ -38,6 +38,12 @@ type OTelManager interface {
 	Watch() <-chan *status.AggregateStatus
 }
 
+// Status update channels are buffered for this manager. The reason is that otherwise it's easy for the caller to
+// deadlock themselves by updating the configuration concurrently with the manager pushing a status update.
+// The manager also pushes two status updates sequentially, for the collector and the components, which increases the
+// probability of this happening.
+const statusUpdateChannelSize = 100
+
 // OtelComponentManager provides an interface to run components and plain otel configurations in an otel collector.
 // Both the components and the otel configurations run in the same collector instance, but can be updated and
 // subscribed to separately.
@@ -83,8 +89,8 @@ func NewOtelComponentManager(logger *logger.Logger, otelManager OTelManager, age
 		agentInfo:                  agentInfo,
 		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
 		currentComponentStates:     make(map[string]runtime.ComponentComponentState),
-		collectorWatchChan:         make(chan *status.AggregateStatus),
-		componentWatchChan:         make(chan runtime.ComponentComponentState),
+		collectorWatchChan:         make(chan *status.AggregateStatus, statusUpdateChannelSize),
+		componentWatchChan:         make(chan runtime.ComponentComponentState, statusUpdateChannelSize),
 		collectorUpdateChan:        make(chan *confmap.Conf),
 		componentUpdateChan:        make(chan component.Model),
 		errCh:                      make(chan error, 1),
@@ -280,6 +286,10 @@ func (m *OtelComponentManager) MergedOtelConfig() *confmap.Conf {
 // and prepares component state updates for distribution to watchers.
 // Returns component state updates and any error encountered during processing.
 func (m *OtelComponentManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus) ([]runtime.ComponentComponentState, error) {
+	if otelStatus == nil {
+		return nil, fmt.Errorf("otel status is nil")
+	}
+
 	// Extract component states from otel status
 	componentStates, err := translate.GetAllComponentStates(otelStatus, m.components)
 	if err != nil {
@@ -287,13 +297,13 @@ func (m *OtelComponentManager) handleOtelStatusUpdate(otelStatus *status.Aggrega
 	}
 
 	// Drop component state information from otel status (modifies the status in place)
-	err = translate.DropComponentStateFromOtelStatus(otelStatus)
+	finalStatus, err := translate.DropComponentStateFromOtelStatus(otelStatus)
 	if err != nil {
 		return nil, fmt.Errorf("failed to drop component state from otel status: %w", err)
 	}
 
 	// Update the current collector status to the cleaned status (after dropping component states)
-	m.currentCollectorStatus = otelStatus
+	m.currentCollectorStatus = finalStatus
 
 	// Handle component state updates
 	return m.processComponentStates(componentStates), nil
