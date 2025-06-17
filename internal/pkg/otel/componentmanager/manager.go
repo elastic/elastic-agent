@@ -99,14 +99,11 @@ func NewOtelComponentManager(logger *logger.Logger, otelManager OTelManager, age
 // The run loop processes the following events:
 //   - Collector configuration updates via UpdateCollector()
 //   - Component model updates via UpdateComponents()
-//   - Status updates from the underlying OpenTelemetry manager
+//   - Status updates from the underlying OtelManager
 //   - Error reporting and propagation
 //
 // Returns the context error.
 func (m *OtelComponentManager) Run(ctx context.Context) error {
-	// Initialize any required state
-	m.logger.Debug("Starting OtelComponentManager run loop")
-
 	// Start the otel manager
 	go func() {
 		if err := m.otelManager.Run(ctx); err != nil && ctx.Err() == nil {
@@ -122,23 +119,19 @@ func (m *OtelComponentManager) Run(ctx context.Context) error {
 			break
 
 		case collectorCfg := <-m.collectorUpdateChan:
-			m.logger.Debug("Received collector configuration update")
 			if err := m.handleCollectorUpdate(collectorCfg); err != nil {
 				m.reportError(ctx, err)
 			}
 
 		case componentModel := <-m.componentUpdateChan:
-			m.logger.Debug("Received component model update")
 			if err := m.handleComponentUpdate(componentModel); err != nil {
 				m.reportError(ctx, err)
 			}
 
 		case err := <-m.errCh:
-			m.logger.Debug("Received error from otel manager")
 			m.reportError(ctx, err)
 
 		case otelStatus := <-m.otelManager.Watch():
-			m.logger.Debug("Received status update from otel manager")
 			componentUpdates, err := m.handleOtelStatusUpdate(otelStatus)
 			if err != nil {
 				m.reportError(ctx, err)
@@ -178,16 +171,10 @@ func (m *OtelComponentManager) buildMergedConfig() (*confmap.Conf, error) {
 	if len(m.components) > 0 {
 		model := &component.Model{Components: m.components}
 		var err error
-		m.logger.With("components", m.components).Debug("Updating otel manager model")
 		componentOtelCfg, err = translate.GetOtelConfig(model, m.agentInfo, m.beatMonitoringConfigGetter)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}
-		componentIDs := make([]string, 0, len(m.components))
-		for _, comp := range m.components {
-			componentIDs = append(componentIDs, comp.ID)
-		}
-		m.logger.With("component_ids", componentIDs).Warn("The Otel runtime manager is HIGHLY EXPERIMENTAL and only intended for testing. Use at your own risk.")
 	}
 
 	// Merge component config if it exists
@@ -288,12 +275,12 @@ func (m *OtelComponentManager) MergedOtelConfig() *confmap.Conf {
 	return m.mergedCollectorCfg
 }
 
-// handleOtelStatusUpdate processes status updates from the underlying OpenTelemetry manager.
+// handleOtelStatusUpdate processes status updates from the underlying OtelManager.
 // This method extracts component states from the aggregate status, updates internal state tracking,
 // and prepares component state updates for distribution to watchers.
 // Returns component state updates and any error encountered during processing.
 func (m *OtelComponentManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus) ([]runtime.ComponentComponentState, error) {
-	// Extract component states from otel status, similar to coordinator's watchRuntimeComponents
+	// Extract component states from otel status
 	componentStates, err := translate.GetAllComponentStates(otelStatus, m.components)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract component states: %w", err)
@@ -309,11 +296,7 @@ func (m *OtelComponentManager) handleOtelStatusUpdate(otelStatus *status.Aggrega
 	m.currentCollectorStatus = otelStatus
 
 	// Handle component state updates
-	if componentStates != nil {
-		return m.processComponentStates(componentStates), nil
-	}
-
-	return nil, nil
+	return m.processComponentStates(componentStates), nil
 }
 
 // processComponentStates updates the internal component state tracking and handles cleanup

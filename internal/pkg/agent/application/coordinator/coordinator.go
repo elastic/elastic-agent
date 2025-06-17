@@ -1644,6 +1644,14 @@ func (c *Coordinator) updateManagersWithConfig(model *component.Model) {
 	runtimeModel, otelModel := c.splitModelBetweenManagers(model)
 	c.logger.With("components", runtimeModel.Components).Debug("Updating runtime manager model")
 	c.runtimeMgr.Update(*runtimeModel)
+	c.logger.With("components", otelModel.Components).Debug("Updating otel manager model")
+	if len(otelModel.Components) > 0 {
+		componentIDs := make([]string, 0, len(otelModel.Components))
+		for _, comp := range otelModel.Components {
+			componentIDs = append(componentIDs, comp.ID)
+		}
+		c.logger.With("component_ids", componentIDs).Warn("The Otel runtime manager is HIGHLY EXPERIMENTAL and only intended for testing. Use at your own risk.")
+	}
 	c.otelComponentMgr.UpdateComponents(*otelModel)
 }
 
