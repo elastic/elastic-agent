@@ -36,15 +36,13 @@ func (c *Client) SetLogger(logger common.Logger) {
 }
 
 func (c *Client) doGet(ctx context.Context, relativeUrl string) (*http.Response, error) {
-	u, err := url.JoinPath(c.config.BaseUrl, relativeUrl)
+	u := c.config.BaseUrl + "/" + relativeUrl
+	parsedUrl, err := url.Parse(u)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create API URL: %w", err)
+		return nil, fmt.Errorf("unable to parse URL [%s]: %w", u, err)
 	}
 
-	c.logger.Logf("URL: %s", u)
-	c.logger.Logf("API Key: %s", c.config.ApiKey)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsedUrl.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create GET request: %w", err)
 	}
