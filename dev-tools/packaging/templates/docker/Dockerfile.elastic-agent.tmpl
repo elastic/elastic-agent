@@ -257,7 +257,8 @@ RUN for iter in {1..10}; do \
     $NODE_PATH/node/lib/node_modules/@elastic/synthetics/node_modules/.bin/playwright install-deps chromium && \
     DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends --yes \
     fonts-noto \
-    fonts-noto-cjk && \
+    fonts-noto-cjk \
+    systemd && \
     exit_code=0 && break || exit_code=$? && echo "apt-get error: retry $iter in 10s" && sleep 10; \
     done; \
     (exit $exit_code)
