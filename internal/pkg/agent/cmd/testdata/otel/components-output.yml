@@ -94,11 +94,6 @@ processors:
       logs: Beta
       metrics: Beta
       traces: Beta
-  - name: lsminterval
-    stability:
-      logs: Undefined
-      metrics: Development
-      traces: Undefined
   - name: memory_limiter
     stability:
       logs: Beta
@@ -162,17 +157,6 @@ connectors:
       traces-to-logs: Undefined
       traces-to-metrics: Undefined
       traces-to-traces: Alpha
-  - name: signaltometrics
-    stability:
-      logs-to-logs: Undefined
-      logs-to-metrics: Alpha
-      logs-to-traces: Undefined
-      metrics-to-logs: Undefined
-      metrics-to-metrics: Alpha
-      metrics-to-traces: Undefined
-      traces-to-logs: Undefined
-      traces-to-metrics: Alpha
-      traces-to-traces: Undefined
   - name: spanmetrics
     stability:
       logs-to-logs: Undefined
@@ -183,6 +167,17 @@ connectors:
       metrics-to-traces: Undefined
       traces-to-logs: Undefined
       traces-to-metrics: Alpha
+      traces-to-traces: Undefined
+  - name: elasticapm
+    stability:
+      logs-to-logs: Undefined
+      logs-to-metrics: Development
+      logs-to-traces: Undefined
+      metrics-to-logs: Undefined
+      metrics-to-metrics: Development
+      metrics-to-traces: Undefined
+      traces-to-logs: Undefined
+      traces-to-metrics: Development
       traces-to-traces: Undefined
 extensions:
   - name: file_storage

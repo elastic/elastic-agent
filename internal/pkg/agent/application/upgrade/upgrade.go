@@ -55,9 +55,10 @@ var agentArtifact = artifact.Artifact{
 }
 
 var (
-	ErrWatcherNotStarted     = errors.New("watcher did not start in time")
-	ErrUpgradeSameVersion    = errors.New("upgrade did not occur because it is the same version")
-	ErrFipsNotUpgradedToFips = errors.New("cannot upgrade from a fips compliant agent to a non-compliant one")
+	ErrWatcherNotStarted  = errors.New("watcher did not start in time")
+	ErrUpgradeSameVersion = errors.New("upgrade did not occur because it is the same version")
+	ErrNonFipsToFips      = errors.New("cannot switch to fips mode when upgrading")
+	ErrFipsToNonFips      = errors.New("cannot switch to non-fips mode when upgrading")
 )
 
 // Upgrader performs an upgrade
@@ -172,15 +173,15 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 		return ErrUpgradeSameVersion
 	}
 
-	if currentVersion.fips && metadata.manifest.Package.Fips {
-		return nil
+	if currentVersion.fips && !metadata.manifest.Package.Fips {
+		return ErrFipsToNonFips
 	}
 
-	if !currentVersion.fips && !metadata.manifest.Package.Fips {
-		return nil
+	if !currentVersion.fips && metadata.manifest.Package.Fips {
+		return ErrNonFipsToFips
 	}
 
-	return ErrFipsNotUpgradedToFips
+	return nil
 }
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.

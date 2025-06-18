@@ -28,6 +28,17 @@ The Elastic Agent package that is used for integration tests packages Beats buil
 ESS (production) API Key to create on <https://cloud.elastic.co/account/keys>
 Warning: if you never created a deployment on it, you won't have permission to get this key, so you will need to create one first.
 
+
+#### Setup Serverless deployment
+
+This process is now automated and runs daily, utilizing the existing `oblt-cli` framework. Serverless deployments are created each day and automatically destroyed every three days.
+
+The automation is configured in the `serverless-project.yml` file located in the `.github/workflows` directory.
+
+If necessary, you can create a new serverless deployment manually; the previous deployments will be destroyed automatically, but not immediately. To do so, you need to run the GitHub action called [serverless-project.yml](https://github.com/elastic/elastic-agent/actions/workflows/serverless-project.yml).
+
+Credentials for these deployments are securely stored in Google and can only be accessed by Buildkite pipelines. The access control is set using [OpenID Connect in Google Cloud Platform](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-google-cloud-platform). And that's managed by the Robots team.
+
 ## Running tests
 
 Some integration and E2E tests are safe to run locally. These tests set
@@ -65,9 +76,9 @@ The test are run with mage using the `integration` namespace:
 
 - `mage integration:matrix` to run all tests on the complete matrix of supported operating systems and architectures of the Elastic Agent.
 
-- `mage integration:kubernetes` to run kubernetes tests for the default image on the default version of kubernetes (all previous commands will not run any kubernetes tests).
+- `mage integration:testKubernetes` to run kubernetes tests for the default image on the default version of kubernetes (all previous commands will not run any kubernetes tests).
 
-- `mage integration:kubernetesMatrix` to run a matrix of kubernetes tests for all image types and supported versions of kubernetes.
+- `mage integration:testKubernetesMatrix` to run a matrix of kubernetes tests for all image types and supported versions of kubernetes.
 
 #### Selecting specific platform
 
@@ -83,7 +94,7 @@ between, and it can be very specific or not very specific.
 - `TEST_PLATFORMS="linux/amd64/ubuntu/20.04 mage integration:test` to execute tests only on Ubuntu 20.04 ARM64.
 - `TEST_PLATFORMS="windows/amd64/2022 mage integration:test` to execute tests only on Windows Server 2022.
 - `TEST_PLATFORMS="linux/amd64 windows/amd64/2022 mage integration:test` to execute tests on Linux AMD64 and Windows Server 2022.
-- `TEST_PLATFORMS="kubernetes/arm64/1.33.0/wolfi" mage integration:kubernetes` to execute kubernetes tests on Kubernetes version 1.33.0 with wolfi docker variant.
+- `INSTANCE_PROVISIONER="kind" TEST_PLATFORMS="kubernetes/arm64/1.33.0/wolfi" mage integration:testKubernetes` to execute kubernetes tests on Kubernetes version 1.33.0 with wolfi docker variant under kind cluster.
 
 > **_NOTE:_**  This only filters down the tests based on the platform. It will not execute a tests on a platform unless
 > the test defines as supporting it.
@@ -407,7 +418,7 @@ not cause already provisioned resources to be replaced with an instance created 
 ### Kind Instance Provisioner
 Use only when running Kubernetes tests. Uses local installed kind to create Kubernetes clusters on the fly.
 
-- `INSTANCE_PROVISIONER="kind" mage integration:kubernetes`
+- `INSTANCE_PROVISIONER="kind" mage integration:testKubernetes`
 
 ## Troubleshooting Tips
 
