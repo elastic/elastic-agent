@@ -127,8 +127,8 @@ func getRandomStackVersionsPair(t *testing.T, prov *ess.StatefulProvisioner, min
 	}
 
 	var startIdx, endIdx int
-	startIdx = rand.Intn(len(filteredVersions))
-	endIdx = startIdx + rand.Intn(len(filteredVersions)-startIdx-1) + 1
+	startIdx = rand.Intn(len(filteredVersions) - 1)
+	endIdx = startIdx + rand.Intn(len(filteredVersions)-1-startIdx) + 1
 
 	t.Logf("startIdx: %d, endIdx: %d", startIdx, endIdx)
 
