@@ -97,7 +97,6 @@ func getRandomStackVersionsPair(t *testing.T, prov *ess.StatefulProvisioner, min
 
 	versions, err := prov.AvailableVersions()
 	require.NoError(t, err)
-	t.Logf("available versions: %#+v", versions)
 
 	sort.Slice(versions, func(i, j int) bool {
 		verI := versions[i]
@@ -120,8 +119,6 @@ func getRandomStackVersionsPair(t *testing.T, prov *ess.StatefulProvisioner, min
 		filteredVersions = append(filteredVersions, ver)
 	}
 
-	t.Logf("filtered versions: %#+v", filteredVersions)
-
 	if len(filteredVersions) < 2 {
 		t.Fatalf("not enough versions available to generate start and end version pair for upgrade: %d", len(filteredVersions))
 	}
@@ -129,8 +126,6 @@ func getRandomStackVersionsPair(t *testing.T, prov *ess.StatefulProvisioner, min
 	var startIdx, endIdx int
 	startIdx = rand.Intn(len(filteredVersions) - 1)
 	endIdx = startIdx + rand.Intn(len(filteredVersions)-1-startIdx) + 1
-
-	t.Logf("startIdx: %d, endIdx: %d", startIdx, endIdx)
 
 	return filteredVersions[startIdx], filteredVersions[endIdx]
 }
