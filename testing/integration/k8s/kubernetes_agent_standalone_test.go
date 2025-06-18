@@ -1005,6 +1005,11 @@ func k8sStepDeployKustomize(containerName string, overrides k8sKustomizeOverride
 						container.Env[idx].Value = kCtx.esAPIKey
 						container.Env[idx].ValueFrom = nil
 					}
+					if env.Name == "CA_TRUSTED" {
+						// empty this otherwise it defaults to %CA_TRUSTED% and causes issues
+						container.Env[idx].Value = ""
+						container.Env[idx].ValueFrom = nil
+					}
 				}
 
 				if len(overrides.agentContainerExtraEnv) > 0 {
