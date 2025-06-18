@@ -9,7 +9,6 @@ package integration
 import (
 	"context"
 	"math/rand"
-	"net/url"
 	"os"
 	"sort"
 	"testing"
@@ -95,10 +94,6 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 // variable.
 func getRandomStackVersionsPair(t *testing.T, prov *ess.StatefulProvisioner, minVersion *version.ParsedSemVer, maxVersion *version.ParsedSemVer) (*version.ParsedSemVer, *version.ParsedSemVer) {
 	t.Helper()
-
-	baseURL, err := url.JoinPath(os.Getenv("TEST_INTEG_AUTH_ESS_URL"), "api/v1")
-	require.NoError(t, err)
-	t.Logf("Base URL: %s", baseURL)
 
 	versions, err := prov.AvailableVersions()
 	require.NoError(t, err)
