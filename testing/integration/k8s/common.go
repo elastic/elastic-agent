@@ -119,6 +119,9 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 	require.NoError(t, err, "failed to generate ES API key")
 	require.NotEmpty(t, esAPIKey, "failed to generate ES API key")
 
+	beatsStyleAPIKey, err := base64.StdEncoding.DecodeString(esAPIKey.Encoded)
+	require.NoError(t, err, "failed to decode ES API key")
+
 	enrollParams, err := fleettools.NewEnrollParams(context.Background(), info.KibanaClient)
 	require.NoError(t, err, "failed to create fleet enroll params")
 
@@ -130,7 +133,7 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 		agentImageTag:   agentImageTag,
 		logsBasePath:    testLogsBasePath,
 		esHost:          esHost,
-		esAPIKey:        esAPIKey.APIKey,
+		esAPIKey:        string(beatsStyleAPIKey),
 		esEncodedAPIKey: esAPIKey.Encoded,
 		enrollParams:    enrollParams,
 		createdAt:       time.Now(),
