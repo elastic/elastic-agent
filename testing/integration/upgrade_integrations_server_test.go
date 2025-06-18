@@ -122,6 +122,10 @@ func getRandomStackVersionsPair(t *testing.T, prov *ess.StatefulProvisioner, min
 
 	t.Logf("filtered versions: %#+v", filteredVersions)
 
+	if len(filteredVersions) < 2 {
+		t.Fatalf("not enough versions available to generate start and end version pair for upgrade: %d", len(filteredVersions))
+	}
+
 	var startIdx, endIdx int
 	startIdx = rand.Intn(len(filteredVersions))
 	endIdx = startIdx + rand.Intn(len(filteredVersions)-startIdx-1) + 1
