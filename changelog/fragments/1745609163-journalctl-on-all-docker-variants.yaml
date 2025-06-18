@@ -12,9 +12,9 @@ kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
 summary: |
-  Ship journalctl in the elastic-agent, elastic-agent-complete, and
-  elastic-otel-collector Docker images to enable reading journald
-  logs. Journalctl is not present on *-slim and all Wolfi images.
+  Ship journalctl in the elastic-agent-complete, Docker image
+  to enable reading journald logs. Journalctl is not present on 
+  Wolfi images.
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
