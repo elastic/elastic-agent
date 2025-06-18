@@ -43,6 +43,8 @@ var (
 	// Version 8_19_0_SNAPSHOT is a FIPS-capable artifact.
 	Version_8_19_0_SNAPSHOT = version.NewParsedSemVer(8, 19, 0, "SNAPSHOT", "")
 
+	Version_9_0_0_SNAPSHOT = version.NewParsedSemVer(9, 0, 0, "SNAPSHOT", "")
+
 	// Version_9_1_0_SNAPSHOT is a FIPS-capable artifact.
 	Version_9_1_0_SNAPSHOT = version.NewParsedSemVer(9, 1, 0, "SNAPSHOT", "")
 
