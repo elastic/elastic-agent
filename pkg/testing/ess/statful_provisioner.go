@@ -170,10 +170,11 @@ func (p *StatefulProvisioner) Upgrade(ctx context.Context, stack common.Stack, n
 
 // AvailableVersions returns the stack versions available in the ECH region.
 func (p *StatefulProvisioner) AvailableVersions() ([]*version.ParsedSemVer, error) {
-	versionsApiUrl, err := url.JoinPath("regions", p.cfg.Region, "stack/versions?show_deleted=false&show_unusable=false")
+	versionsApiUrl, err := url.JoinPath("regions", p.cfg.Region, "stack", "versions")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ECH versions API URL: %w", err)
 	}
+	versionsApiUrl += "?show_deleted=false&show_unusable=false"
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
