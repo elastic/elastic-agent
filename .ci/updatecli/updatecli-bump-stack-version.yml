@@ -1,4 +1,3 @@
-# update-cli configuration for automated go updates
 ---
 name: Bump ESS snapshots
 
@@ -40,7 +39,7 @@ actions:
     scmid: githubConfig
     sourceid: lastStableStackSnapshot
     spec:
-      automerge: true
+      automerge: false
       labels:
         - dependencies
         - backport-skip
