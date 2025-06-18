@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/url"
 	"os"
 	"strings"
@@ -185,10 +184,6 @@ func (p *StatefulProvisioner) AvailableVersions() ([]*version.ParsedSemVer, erro
 		return nil, fmt.Errorf("failed to get versions from ECH for region [%s]: %w", p.cfg.Region, err)
 	}
 	defer resp.Body.Close()
-
-	p.logger.Logf("response status: %v", resp.Status)
-	body, _ := io.ReadAll(resp.Body)
-	p.logger.Logf("response body: %s", string(body))
 
 	var stacks struct {
 		Stacks []struct {
