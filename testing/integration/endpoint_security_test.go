@@ -76,11 +76,13 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 	})
 
 	t.Run("Upgrade from older version to newer version", func(t *testing.T) {
-		testTamperProtectedDebRpmUpgrades(t, info, "deb")
+		upgradeFromVersion, err := upgradetest.PreviousMinor()
+		require.NoError(t, err)
+		testTamperProtectedInstallUpgrade(t, info, "deb", upgradeFromVersion.String(), true)
 	})
 
 	t.Run("Install same version over the installed agent", func(t *testing.T) {
-		testTamperProtectedSameVersionInstall(t, info, "deb")
+		testTamperProtectedInstallUpgrade(t, info, "deb", define.Version(), false)
 	})
 
 	t.Run("Validate endpoint is restarted if preinstall script fails", func(t *testing.T) {
@@ -102,11 +104,13 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_RPM(t *testing.T) {
 		},
 	})
 	t.Run("Upgrade from older version to newer version", func(t *testing.T) {
-		testTamperProtectedDebRpmUpgrades(t, info, "rpm")
+		upgradeFromVersion, err := upgradetest.PreviousMinor()
+		require.NoError(t, err)
+		testTamperProtectedInstallUpgrade(t, info, "rpm", upgradeFromVersion.String(), true)
 	})
 
 	t.Run("Install same version over the installed agent", func(t *testing.T) {
-		testTamperProtectedSameVersionInstall(t, info, "rpm")
+		testTamperProtectedInstallUpgrade(t, info, "rpm", define.Version(), false)
 	})
 
 	t.Run("Validate endpoint is restarted if preinstall script fails", func(t *testing.T) {
@@ -147,7 +151,7 @@ func getInstallCommand(ctx context.Context, packageFormat string, srcPkg string,
 	return exec.CommandContext(ctx, "sudo", args...), nil
 }
 
-func addEndpointCleanup(t *testing.T, fixture *atesting.Fixture, uninstallToken string) {
+func addEndpointCleanup(t *testing.T, uninstallToken string) {
 	t.Cleanup(func() {
 		_, err := os.Stat("/opt/Elastic/Endpoint/elastic-endpoint")
 		if os.IsNotExist(err) {
@@ -264,7 +268,7 @@ func installFirstAgent(ctx context.Context, t *testing.T, info *define.Info, pac
 	t.Log("Install and enroll the first agent")
 	tools.InstallAgentForPolicyWithToken(ctx, t, opts, fixture, info.KibanaClient, enrollKeyResp)
 
-	addEndpointCleanup(t, fixture, uninstallToken)
+	addEndpointCleanup(t, uninstallToken)
 
 	agentClient := fixture.Client()
 	err = agentClient.Connect(ctx)
@@ -369,10 +373,16 @@ func testTamperProtectedErrorRecovery(t *testing.T, info *define.Info, packageFo
 	require.Equal(t, filtered[1], serviceStart)
 }
 
-func testTamperProtectedSameVersionInstall(t *testing.T, info *define.Info, packageFormat string) {
+func testTamperProtectedInstallUpgrade(
+	t *testing.T,
+	info *define.Info,
+	packageFormat string,
+	initialVersion string,
+	checkVersionUpgrade bool,
+) {
 	ctx := t.Context()
 
-	fixture, uninstallToken := installFirstAgent(ctx, t, info, packageFormat, define.Version())
+	fixture, uninstallToken := installFirstAgent(ctx, t, info, packageFormat, initialVersion)
 
 	initEndpointVersion := getEndpointVersion(t)
 	t.Logf("The initial endpoint version is %s", initEndpointVersion)
@@ -383,71 +393,12 @@ func testTamperProtectedSameVersionInstall(t *testing.T, info *define.Info, pack
 	require.Error(t, err, "uninstalling agent without a token should fail because of tamper protection")
 	t.Log("Tamper protection for the initial installation of the agent is enabled")
 
-	t.Log("Getting source package")
-	srcPkg, err := fixture.SrcPackage(ctx)
-	require.NoError(t, err)
-
-	t.Log("Installing the second agent, upgrading from the older version")
-	installCmd, err := getInstallCommand(ctx, fixture.PackageFormat(), srcPkg, nil)
-	require.NoError(t, err)
-
-	out, err = installCmd.CombinedOutput()
-	t.Log(string(out))
-	require.NoError(t, err, "agent installation with package manager should not fail")
-	t.Log("second agent installation succefull")
-
-	fixture.SetDebRpmClient()
-
-	upgradedAgentClient := fixture.Client()
-	err = upgradedAgentClient.Connect(ctx)
-	require.NoError(t, err, "could not connect to the upgraded agent")
-
-	require.Eventually(t,
-		func() bool { return agentAndEndpointAreHealthy(t, ctx, upgradedAgentClient) },
-		endpointHealthPollingTimeout,
-		time.Second,
-		"Endpoint component or units are not healthy after the upgrade.",
-	)
-	t.Log("Agent and endpoint are healthy after installation")
-
-	// try to uninstall the agent without token and assert that endpoint is not removed
-	t.Log("trying to uinstall without token, expecting error")
-	_, err = exec.Command("sudo", "elastic-agent", "uninstall", "-f").CombinedOutput()
-	require.Error(t, err, "uninstalling agent without a token should fail because of tamper protection")
-	t.Log("tamper protection for the upgraded agent is enabled")
-
-	// uninstall with the uninstall token and assert that endpoint is indeed removed.
-	t.Log("trying to uinstall with token, not expecting any error")
-	out, err = exec.Command("sudo", "elastic-agent", "uninstall", "-f", "--uninstall-token", uninstallToken).CombinedOutput()
-	require.NoError(t, err, string(out))
-
-	_, err = exec.LookPath("elastic-agent")
-	require.Error(t, err)
-
-	t.Log("successfully uninstalled endpoint using the uninstall token")
-}
-
-func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageFormat string) {
-	ctx := t.Context()
-	upgradeFromVersion, err := upgradetest.PreviousMinor()
-	require.NoError(t, err)
-	t.Logf("Preparing fixture with agent version %s", upgradeFromVersion.String())
-
-	_, uninstallToken := installFirstAgent(ctx, t, info, packageFormat, upgradeFromVersion.String())
-
-	initEndpointVersion := getEndpointVersion(t)
-	t.Logf("The initial endpoint version is %s", initEndpointVersion)
-
-	// try to uninstall the agent without a token and assert failure
-	out, err := exec.Command("sudo", "elastic-agent", "uninstall", "-f").CombinedOutput()
-	t.Log(string(out))
-	require.Error(t, err, "uninstalling agent without a token should fail because of tamper protection")
-	t.Log("Tamper protection for the initial installation of the agent is enabled")
-
-	t.Log("Setup agent fixture with the test build")
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat(packageFormat))
-	require.NoError(t, err)
-	fixture.Prepare(ctx)
+	if checkVersionUpgrade {
+		t.Log("Setup agent fixture with the test build")
+		fixture, err = define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat(packageFormat))
+		require.NoError(t, err)
+		fixture.Prepare(ctx)
+	}
 
 	t.Log("Getting source package")
 	srcPkg, err := fixture.SrcPackage(ctx)
@@ -473,21 +424,21 @@ func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageF
 		time.Second,
 		"Endpoint component or units are not healthy after the upgrade.",
 	)
-	t.Log("The upgraded agent and endpoint are both healthy")
 
-	t.Log("Validate that the initial endpoint version is smaller than the upgraded version")
-	upgradedEndpointVersion := getEndpointVersion(t)
+	if checkVersionUpgrade {
+		t.Log("Validate that the initial endpoint version is smaller than the upgraded version")
+		upgradedEndpointVersion := getEndpointVersion(t)
+		t.Logf("The upgraded endpoint version is %s", upgradedEndpointVersion)
 
-	t.Logf("The upgraded endpoint version is %s", upgradedEndpointVersion)
+		startEndpointVersion, err := version.ParseVersion(initEndpointVersion)
+		require.NoError(t, err)
 
-	startEndpointVersion, err := version.ParseVersion(initEndpointVersion)
-	require.NoError(t, err)
+		parsedUpgradedVersion, err := version.ParseVersion(upgradedEndpointVersion)
+		require.NoError(t, err)
 
-	parsedUpgradedVersion, err := version.ParseVersion(upgradedEndpointVersion)
-	require.NoError(t, err)
-
-	t.Logf("Comparing start version %s to upgraded version %s", startEndpointVersion.String(), parsedUpgradedVersion.String())
-	require.True(t, startEndpointVersion.Less(*parsedUpgradedVersion))
+		t.Logf("Comparing start version %s to upgraded version %s", startEndpointVersion.String(), parsedUpgradedVersion.String())
+		require.True(t, startEndpointVersion.Less(*parsedUpgradedVersion))
+	}
 
 	// try to uninstall the agent without token and assert that endpoint is not removed
 	t.Log("trying to uinstall without token, expecting error")
