@@ -447,26 +447,14 @@ func getProcesses(t *gotesting.T, regex string) []runningProcess {
 }
 
 func (f *Fixture) SetClient() error {
-	f.t.Logf("[SetClient] Attempting to get control protocol address for OS: %s, workDir: %s", f.operatingSystem, f.workDir)
 	socketPath, err := control.AddressFromPath(f.operatingSystem, f.workDir)
 	if err != nil {
-		f.t.Logf("[SetClient] Failed to get control protcol address: %v", err)
 		return fmt.Errorf("failed to get control protcol address: %w", err)
 	}
-	f.t.Logf("[SetClient] Using socket path: %s", socketPath)
 
 	c := client.New(client.WithAddress(socketPath))
 	f.setClient(c)
-	f.t.Logf("[SetClient] Client set, attempting to ping agent via client...")
-	// Try a simple operation to verify the client is usable
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	_, err = c.State(ctx)
-	if err != nil {
-		f.t.Logf("[SetClient] WARNING: Unable to communicate with agent via client (State call failed): %v", err)
-	} else {
-		f.t.Logf("[SetClient] Successfully communicated with agent via client (State call succeeded).")
-	}
+
 	return nil
 }
 
@@ -478,68 +466,65 @@ func (f *Fixture) SetClient() error {
 //   - the combined output of Install command stdout and stderr
 //   - an error if any.
 func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, shouldEnroll bool, opts []process.CmdOption) ([]byte, error) {
-	f.t.Logf("[installDeb] Starting installDeb for package: %s", f.srcPackage)
+	f.t.Logf("[test %s] Inside fixture installDeb function", f.t.Name())
 	// Prepare so that the f.srcPackage string is populated
 	err := f.EnsurePrepared(ctx)
 	if err != nil {
-		f.t.Logf("[installDeb] EnsurePrepared failed: %v", err)
 		return nil, fmt.Errorf("failed to prepare: %w", err)
 	}
 
-	f.t.Logf("[installDeb] Running apt-get install for: %s", f.srcPackage)
+	// sudo apt-get install the deb
 	cmd := exec.CommandContext(ctx, "sudo", "-E", "apt-get", "install", "-y", f.srcPackage) // #nosec G204 -- Need to pass in name of package
 	if installOpts.InstallServers {
 		cmd.Env = append(cmd.Env, "ELASTIC_AGENT_FLAVOR=servers")
 	}
 	out, err := cmd.CombinedOutput() // #nosec G204 -- Need to pass in name of package
-	f.t.Logf("[installDeb] apt-get install output: %s", string(out))
 	if err != nil {
-		f.t.Logf("[installDeb] apt-get install failed: %v", err)
 		return out, fmt.Errorf("apt install failed: %w output:%s", err, string(out))
 	}
 
 	f.t.Cleanup(func() {
-		f.t.Logf("[installDeb] Inside fixture installDeb cleanup function")
+		f.t.Logf("[test %s] Inside fixture installDeb cleanup function", f.t.Name())
+
 		uninstallCtx, uninstallCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer uninstallCancel()
-		f.t.Logf("[installDeb] running 'sudo systemctl stop elastic-agent'")
+		// stop elastic-agent, non fatal if error, might have been stopped before this.
+		f.t.Logf("running 'sudo systemctl stop elastic-agent'")
 		out, err := exec.CommandContext(uninstallCtx, "sudo", "systemctl", "stop", "elastic-agent").CombinedOutput()
 		if err != nil {
-			f.t.Logf("[installDeb] error systemctl stop elastic-agent: %s, output: %s", err, string(out))
+			f.t.Logf("error systemctl stop elastic-agent: %s, output: %s", err, string(out))
 		}
+
 		if KeepInstalledFlag() {
-			f.t.Logf("[installDeb] skipping uninstall; test failed and AGENT_KEEP_INSTALLED=true")
+			f.t.Logf("skipping uninstall; test failed and AGENT_KEEP_INSTALLED=true")
 			return
 		}
-		f.t.Logf("[installDeb] running 'sudo apt-get -y -q purge elastic-agent'")
+
+		// apt-get purge elastic-agent
+		f.t.Logf("running 'sudo apt-get -y -q purge elastic-agent'")
 		out, err = exec.CommandContext(uninstallCtx, "sudo", "apt-get", "-y", "-q", "purge", "elastic-agent").CombinedOutput()
 		if err != nil {
-			f.t.Logf("[installDeb] failed to apt-get purge elastic-agent: %s, output: %s", err, string(out))
+			f.t.Logf("failed to apt-get purge elastic-agent: %s, output: %s", err, string(out))
 			f.t.FailNow()
 		}
 	})
 
-	f.t.Logf("[installDeb] Starting elastic-agent service")
+	// start elastic-agent
 	out, err = exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
-	f.t.Logf("[installDeb] systemctl start output: %s", string(out))
 	if err != nil {
-		f.t.Logf("[installDeb] systemctl start elastic-agent failed: %v", err)
 		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
 	}
 
-	f.t.Logf("[installDeb] Calling SetClient after starting agent")
 	err = f.SetClient()
 	if err != nil {
-		f.t.Logf("[installDeb] SetClient failed: %v", err)
 		return nil, err
 	}
 
 	if !shouldEnroll {
-		f.t.Logf("[installDeb] shouldEnroll is false, skipping enrollment step.")
 		return nil, nil
 	}
 
-	f.t.Logf("[installDeb] Running elastic-agent enroll")
+	// apt install doesn't enroll, so need to do that
 	enrollArgs := []string{"elastic-agent", "enroll"}
 	if installOpts.Force {
 		enrollArgs = append(enrollArgs, "--force")
@@ -559,15 +544,11 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, shou
 	if installOpts.EnrollmentToken != "" {
 		enrollArgs = append(enrollArgs, "--enrollment-token", installOpts.EnrollmentToken)
 	}
-	f.t.Logf("[installDeb] enroll command: %v", enrollArgs)
 	out, err = exec.CommandContext(ctx, "sudo", enrollArgs...).CombinedOutput()
-	f.t.Logf("[installDeb] enroll output: %s", string(out))
 	if err != nil {
-		f.t.Logf("[installDeb] elastic-agent enroll failed: %v", err)
 		return out, fmt.Errorf("elastic-agent enroll failed: %w, output: %s args: %v", err, string(out), enrollArgs)
 	}
 
-	f.t.Logf("[installDeb] installDeb completed successfully.")
 	return nil, nil
 }
 
