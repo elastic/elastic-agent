@@ -396,7 +396,7 @@ func testTamperProtectedSameVersionInstall(t *testing.T, info *define.Info, pack
 	require.NoError(t, err, "agent installation with package manager should not fail")
 	t.Log("second agent installation succefull")
 
-	fixture.SetClient()
+	fixture.SetDebRpmClient()
 
 	upgradedAgentClient := fixture.Client()
 	err = upgradedAgentClient.Connect(ctx)
@@ -461,7 +461,7 @@ func testTamperProtectedDebRpmUpgrades(t *testing.T, info *define.Info, packageF
 	t.Log(string(out))
 	require.NoError(t, err, "agent installation with package manager should not fail")
 
-	fixture.SetClient()
+	fixture.SetDebRpmClient()
 
 	upgradedAgentClient := fixture.Client()
 	err = upgradedAgentClient.Connect(ctx)

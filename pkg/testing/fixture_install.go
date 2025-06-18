@@ -446,8 +446,9 @@ func getProcesses(t *gotesting.T, regex string) []runningProcess {
 	return processes
 }
 
-func (f *Fixture) SetClient() error {
-	socketPath, err := control.AddressFromPath(f.operatingSystem, f.workDir)
+func (f *Fixture) SetDebRpmClient() error {
+	workDir := "/var/lib/elastic-agent"
+	socketPath, err := control.AddressFromPath(f.operatingSystem, workDir)
 	if err != nil {
 		return fmt.Errorf("failed to get control protcol address: %w", err)
 	}
@@ -515,7 +516,7 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, shou
 		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
 	}
 
-	err = f.SetClient()
+	err = f.SetDebRpmClient()
 	if err != nil {
 		return nil, err
 	}
@@ -611,7 +612,7 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
 	}
 
-	err = f.SetClient()
+	err = f.SetDebRpmClient()
 	if err != nil {
 		return nil, err
 	}
