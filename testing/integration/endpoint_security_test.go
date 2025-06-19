@@ -23,7 +23,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"text/template"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
