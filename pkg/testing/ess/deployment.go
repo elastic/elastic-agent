@@ -216,7 +216,10 @@ func (c *Client) UpgradeDeployment(ctx context.Context, deploymentID string, ver
 		return fmt.Errorf("unable to generate upgrade request body: %w", err)
 	}
 
-	upgradeResp, err := c.doPost(
+	c.logger.Logf("URL: %s", u)
+	c.logger.Logf("Request body: %s", string(reqBodyBytes))
+
+	upgradeResp, err := c.doPut(
 		ctx,
 		u,
 		"application/json",
@@ -227,6 +230,12 @@ func (c *Client) UpgradeDeployment(ctx context.Context, deploymentID string, ver
 	}
 	defer upgradeResp.Body.Close()
 
+	if upgradeResp.StatusCode != http.StatusOK {
+		resBytes, _ := io.ReadAll(upgradeResp.Body)
+		c.logger.Logf("Response body: %s", string(resBytes))
+		return fmt.Errorf("got unexpected response code [%d] from deployment update API", upgradeResp.StatusCode)
+	}
+
 	var upgradeRespBody struct {
 		Errors []struct {
 			Code    string `json:"code"`
@@ -236,10 +245,6 @@ func (c *Client) UpgradeDeployment(ctx context.Context, deploymentID string, ver
 
 	if err = json.NewDecoder(upgradeResp.Body).Decode(&upgradeRespBody); err != nil {
 		return fmt.Errorf("error parsing deployment update API response: %w", err)
-	}
-
-	if upgradeResp.StatusCode != http.StatusOK {
-		return fmt.Errorf("got unexpected response code [%d] from deployment update API", upgradeResp.StatusCode)
 	}
 
 	if len(upgradeRespBody.Errors) > 0 {

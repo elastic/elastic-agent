@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build integration
+////go:build integration
 
 package integration
 
@@ -26,7 +26,8 @@ import (
 // running its own Fleet Server) in ECH and ensures that the upgrade succeeds.
 func TestUpgradeIntegrationsServer(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: Upgrade,
+		//Group: Upgrade, // TODO: remove after testing in PR and use "ech" instead
+		Group: "ech", // TODO: make sure BK pipeline only runs this group when GH label is detected
 		Local: true,  // only orchestrates ECH resources
 		Sudo:  false, // only orchestrates ECH resources
 		FIPS:  true,  // ensures test runs against FRH ECH region
@@ -66,32 +67,42 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 		Version: startVersion.String(),
 	})
 	require.NoError(t, err)
-	//t.Cleanup(func() {
-	//	if deployment.ID != "" {
-	//		err = prov.Delete(context.Background(), deployment)
-	//		require.NoError(t, err, "failed to delete deployment after test")
-	//	}
-	//})
+	t.Cleanup(func() {
+		if deployment.ID == "" {
+			// Nothing to cleanup
+			return
+		}
+
+		if t.Failed() {
+			cleanupDelay := 1 * time.Minute
+			t.Logf("Cleaning up ECH deployment [%s] in region [%s] after [%s]", deployment.ID, echRegion, cleanupDelay)
+			<-time.After(cleanupDelay)
+		} else {
+			t.Logf("Cleaning up ECH deployment [%s] in region [%s]", deployment.ID, echRegion)
+		}
+
+		err = prov.Delete(context.Background(), deployment)
+		require.NoError(t, err, "failed to delete deployment after test")
+	})
 
 	// Check that deployment is ready and healthy after creation
 	t.Logf("Waiting for ECH deployment [%s] in region [%s] to be ready and healthy after creation", deployment.ID, echRegion)
-	deployment, err = prov.WaitForReady(ctx, deployment)
+	deployment, err = prov.WaitForReady(context.Background(), deployment)
 	require.NoError(t, err)
 
 	// Upgrade deployment to end version
 	t.Logf("Upgrading ECH deployment [%s] in region [%s] from version [%s] to [%s]", deployment.ID, echRegion, startVersion.String(), endVersion.String())
-	err = prov.Upgrade(ctx, deployment, endVersion)
+	err = prov.Upgrade(context.Background(), deployment, endVersion)
 	require.NoError(t, err)
 
 	// Check that deployment is ready and healthy after upgrade
 	t.Logf("Waiting for ECH deployment [%s] in region [%s] to be ready and healthy after upgrade", deployment.ID, echRegion)
-	deployment, err = prov.WaitForReady(ctx, deployment)
+	deployment, err = prov.WaitForReady(context.Background(), deployment)
 	require.NoError(t, err)
 }
 
 // getRandomStackVersionsPair returns an ordered pair of versions, where the first return value is less than the second. The
-// returned versions are those that are available in the ECH region specified in the TEST_INTEG_AUTH_ESS_REGION environment
-// variable.
+// returned versions are those that are available in the ECH region specified in the ESS_REGION environment variable.
 func getRandomStackVersionsPair(t *testing.T, prov *ess.StatefulProvisioner, minVersion *version.ParsedSemVer, maxVersion *version.ParsedSemVer) (*version.ParsedSemVer, *version.ParsedSemVer) {
 	t.Helper()
 
@@ -123,9 +134,25 @@ func getRandomStackVersionsPair(t *testing.T, prov *ess.StatefulProvisioner, min
 		t.Fatalf("not enough versions available to generate start and end version pair for upgrade: %d", len(filteredVersions))
 	}
 
-	var startIdx, endIdx int
-	startIdx = rand.Intn(len(filteredVersions) - 1)
-	endIdx = startIdx + rand.Intn(len(filteredVersions)-1-startIdx) + 1
+	// For the end version, pick the last (newest) element in the filtered list.
+	endIdx := len(filteredVersions) - 1
+	endVersion := filteredVersions[endIdx]
 
-	return filteredVersions[startIdx], filteredVersions[endIdx]
+	// For the start version, pick a random element from the filtered list that's
+	// before the last element, unless the start version is a SNAPSHOT of the endVersion
+	var startVersion *version.ParsedSemVer
+	for i := 0; i < 5; i++ {
+		startIdx := rand.Intn(len(filteredVersions) - 1)
+		startVersion = filteredVersions[startIdx]
+
+		if startVersion.CoreVersion() != endVersion.CoreVersion() {
+			break
+		}
+	}
+
+	if startVersion == nil {
+		t.Fatalf("failed to pick a start version that's different from the end version")
+	}
+
+	return startVersion, endVersion
 }
