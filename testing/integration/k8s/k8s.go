@@ -7,14 +7,14 @@ package k8s
 import "path/filepath"
 
 const (
-	AgentKustomizePath = "./testdata/elastic-agent-kustomize.yaml"
-	AgentHelmChartPath = "../../../deploy/helm/elastic-agent"
-
 	KubeStackChartVersion = "0.3.9"
 	KubeStackChartName    = "opentelemetry-kube-stack-" + KubeStackChartVersion + ".tgz"
 	KubeStackChartURL     = "https://github.com/open-telemetry/opentelemetry-helm-charts/releases/download/opentelemetry-kube-stack-" + KubeStackChartVersion + "/" + KubeStackChartName
 )
 
 var (
+	AgentKustomizePath = filepath.Join("testdata", "elastic-agent-kustomize.yaml")
+	AgentHelmChartPath = filepath.Join("..", "..", "..", "deploy", "helm", "elastic-agent")
+
 	KubeStackChartPath = filepath.Join("testdata", KubeStackChartName)
 )
