@@ -25,6 +25,32 @@ function ess_up {
 
   # Store the cluster name as a meta-data
   & buildkite-agent meta-data set cluster-name $ClusterName
+
+  # Load the ESS stack secrets
+  # QUESTION: should we support the case when using the ESS stack in local environment?
+  & oblt-cli cluster secrets env --cluster-name $ClusterName --output-file="secrets.env"
+
+  # Load environment variables from secrets.env
+  $envFile = Join-Path $PSScriptRoot "secrets.env"
+
+  if (Test-Path $envFile) {
+      Get-Content $envFile | ForEach-Object {
+          $name, $value = $_.split('=', 2)
+          if ($name -and $value) {
+              # Remove any surrounding quotes from the value
+              $value = $value.Trim('"''')
+
+              # Set the environment variable
+              [System.Environment]::SetEnvironmentVariable($name.Trim(), $value)
+              Write-Output "Set environment variable: $($name.Trim())"
+          }
+      }
+      Write-Output "Environment variables loaded successfully from $envFile" -ForegroundColor Green
+      Remove-Item -Path $envFile -Force -ErrorAction Stop
+  } else {
+      Write-Error "secrets.env file not found at $envFile"
+      return 1
+  }
 }
 
 function ess_down {  

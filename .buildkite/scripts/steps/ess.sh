@@ -24,6 +24,14 @@ function ess_up() {
 
   # Store the cluster name as a meta-data
   buildkite-agent meta-data set cluster-name "${CLUSTER_NAME}"
+
+  # Load the ESS stack secrets
+  # QUESTION: should we support the case when using the ESS stack in local environment?
+  oblt-cli cluster secrets env --cluster-name="${CLUSTER_NAME}" --output-file="secrets.env"
+
+  # Source the secrets file
+  source "secrets.env" || rm "secrets.env"
+  rm secrets.env || true
 }
 
 function ess_down() {
