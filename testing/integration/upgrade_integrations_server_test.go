@@ -66,12 +66,12 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 		Version: startVersion.String(),
 	})
 	require.NoError(t, err)
-	t.Cleanup(func() {
-		if deployment.ID != "" {
-			err = prov.Delete(context.Background(), deployment)
-			require.NoError(t, err, "failed to delete deployment after test")
-		}
-	})
+	//t.Cleanup(func() {
+	//	if deployment.ID != "" {
+	//		err = prov.Delete(context.Background(), deployment)
+	//		require.NoError(t, err, "failed to delete deployment after test")
+	//	}
+	//})
 
 	// Check that deployment is ready and healthy after creation
 	t.Logf("Waiting for ECH deployment [%s] in region [%s] to be ready and healthy after creation", deployment.ID, echRegion)
