@@ -82,6 +82,7 @@ steps:
               - "true"
             groups:
               - fleet # currently there is only a single test in the fleet group, add more tests once they have been defined
+              - ech-deployment # TODO: remove once tested in PR
 
       - label: "fips:arm64:sudo-{{matrix.sudo}}:{{matrix.groups}}"
         depends_on:
