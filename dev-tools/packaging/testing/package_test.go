@@ -499,7 +499,7 @@ func checkCompleteDocker(t *testing.T, file string) {
 		t.Errorf("error reading file %v: %v", file, err)
 	}
 
-	checkSyntheticsDeps(t, "", p)
+	checkSyntheticsDeps(t, "usr", p)
 }
 
 // Verify that the main configuration file is installed with a 0600 file mode.
@@ -724,7 +724,7 @@ func checkSyntheticsDeps(t *testing.T, prefix string, p *packageFile) {
 				}
 			}
 			if prefix != "" {
-				t.Fatalf("%s not found under %s: %v", dep, prefix, p.Contents)
+				t.Fatalf("%s not found under %s", dep, prefix)
 			}
 			t.Fatal("not found")
 		})
