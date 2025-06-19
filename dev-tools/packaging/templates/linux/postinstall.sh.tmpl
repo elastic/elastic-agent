@@ -16,7 +16,7 @@ fi
 
 SERVICE_NAME="ElasticEndpoint"
 
-echo "Checking if ElasticEndpoint is installed"
+echo "Checking if $SERVICE_NAME is installed"
 if systemctl list-unit-files --type=service | grep -q "^${SERVICE_NAME}.service"; then
 
     installed_endpoint_version="$(/opt/Elastic/Endpoint/elastic-endpoint version)"

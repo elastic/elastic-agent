@@ -7,15 +7,18 @@ SERVICE_NAME="ElasticEndpoint"
 # Check if the endpoint service is installed
 if systemctl list-unit-files --type=service | grep -q "^${SERVICE_NAME}.service"; then
     echo "$SERVICE_NAME is installed"
-    # Check if the endpoint is running
-    if systemctl --quiet is-active $SERVICE_NAME; then
-        echo "$SERVICE_NAME is running, stopping it"
-        systemctl --quiet stop $SERVICE_NAME
-    else
-        echo "$SERVICE_NAME is not running"
-    fi
+
     # Remove the vault directory if it exists
     if [ -d "/opt/Elastic/Endpoint/state/vault" ]; then
+
+        # Check if the endpoint is running
+        if systemctl --quiet is-active $SERVICE_NAME; then
+            echo "$SERVICE_NAME is running, stopping it"
+            systemctl --quiet stop $SERVICE_NAME
+        else
+            echo "$SERVICE_NAME is not running"
+        fi
+
         echo "$SERVICE_NAME is tamper protected"
         echo "Removing $SERVICE_NAME vault"
         rm -rf "/opt/Elastic/Endpoint/state/vault"
