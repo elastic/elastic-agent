@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/version"
 )
 
@@ -59,13 +60,17 @@ func Version() string {
 	return version.GetAgentPackageVersion()
 }
 
-// VersionWithSnapshot returns the version of the application.
+// VersionWithSnapshot returns the version of the application including SNAPSHOT string if we are dealing with a snapshot build.
 func VersionWithSnapshot() string {
+	// add the snapshot flag to the version string
 	agentPackageVersion := version.GetAgentPackageVersion()
-	if Snapshot() {
-		agentPackageVersion += "-SNAPSHOT"
+	versionWithSnapshotFlag, err := agtversion.GenerateAgentVersionWithSnapshotFlag(agentPackageVersion, Snapshot())
+	if err != nil {
+		// we cannot return an error here, either panic or log the error and return the unmodified agentPackageVersion
+		// TODO add error log
+		return agentPackageVersion
 	}
-	return agentPackageVersion
+	return versionWithSnapshotFlag
 }
 
 // Snapshot returns true if binary was built as snapshot.
@@ -110,9 +115,6 @@ func (v VersionInfo) String() string {
 	var sb strings.Builder
 
 	sb.WriteString(v.Version)
-	if v.Snapshot {
-		sb.WriteString("-SNAPSHOT")
-	}
 	sb.WriteString(" (build: ")
 	sb.WriteString(v.Commit)
 	if v.FIPSDistribution {
