@@ -7,13 +7,11 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/sys/windows"
 )
 
 func TestIsOwnerExecWindows(t *testing.T) {
@@ -23,30 +21,8 @@ func TestIsOwnerExecWindows(t *testing.T) {
 	require.NoError(t, err)
 	defer fi.Close()
 
-	var token windows.Token
-	err = windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_QUERY, &token)
-	require.NoError(t, err)
-	defer token.Close()
-
-	tokenUser, err := token.GetTokenUser()
-	require.NoError(t, err)
-
-	err = windows.SetNamedSecurityInfo(
-		fp,
-		windows.SE_FILE_OBJECT,
-		windows.OWNER_SECURITY_INFORMATION,
-		tokenUser.User.Sid,
-		nil,
-		nil,
-		nil,
-	)
-	require.NoError(t, err)
-
-	require.NoError(t, err)
-	defer fi.Close()
-
 	isOwner, err := isOwnerExec(fp)
 	require.NoError(t, err)
 
-	require.True(t, isOwner, fmt.Sprintf("expected isOwnerExec to return \"true\", received \"%v\"", isOwner))
+	require.True(t, isOwner)
 }

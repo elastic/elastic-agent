@@ -17,39 +17,36 @@ func TestGetArtifactName(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := map[string]struct {
-		a               Artifact
-		version         agtversion.ParsedSemVer
-		operatingSystem string
-		arch            string
-		expectedName    string
-		expectedErr     string
+		a            Artifact
+		version      agtversion.ParsedSemVer
+		arch         string
+		expectedName string
 	}{
-		"no_fips": {
-			a:               Artifact{Cmd: "elastic-agent"},
-			version:         *version,
-			operatingSystem: "linux",
-			arch:            "arm64",
-			expectedName:    "elastic-agent-9.1.0-linux-arm64.tar.gz",
+		"no_fips_arm64": {
+			a:            Artifact{Cmd: "elastic-agent"},
+			version:      *version,
+			arch:         "arm64",
+			expectedName: "elastic-agent-9.1.0-linux-arm64.tar.gz",
 		},
-		"fips": {
-			a:               Artifact{Cmd: "elastic-agent-fips"},
-			version:         *version,
-			operatingSystem: "linux",
-			arch:            "arm64",
-			expectedName:    "elastic-agent-fips-9.1.0-linux-arm64.tar.gz",
+		"fips_x86": {
+			a:            Artifact{Cmd: "elastic-agent-fips"},
+			version:      *version,
+			arch:         "32",
+			expectedName: "elastic-agent-fips-9.1.0-linux-x86.tar.gz",
+		},
+		"fips_x86_64": {
+			a:            Artifact{Cmd: "elastic-agent-fips"},
+			version:      *version,
+			arch:         "64",
+			expectedName: "elastic-agent-fips-9.1.0-linux-x86_64.tar.gz",
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			artifactName, err := GetArtifactName(test.a, test.version, test.operatingSystem, test.arch)
-			if test.expectedErr == "" {
-				require.NoError(t, err)
-				require.Equal(t, test.expectedName, artifactName)
-			} else {
-				require.Empty(t, artifactName)
-				require.Equal(t, test.expectedErr, err.Error())
-			}
+			artifactName, err := GetArtifactName(test.a, test.version, "linux", test.arch)
+			require.NoError(t, err)
+			require.Equal(t, test.expectedName, artifactName)
 		})
 	}
 
