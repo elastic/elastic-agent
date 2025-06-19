@@ -50,12 +50,9 @@ func (d *DockerIntegrationTester) Use(dir string) (bool, error) {
 	return false, nil
 }
 
-// HasRequirements ensures that the required docker and docker-compose are installed.
+// HasRequirements ensures that the required docker and docker compose are installed.
 func (d *DockerIntegrationTester) HasRequirements() error {
 	if err := HaveDocker(); err != nil {
-		return err
-	}
-	if err := HaveDockerCompose(); err != nil {
 		return err
 	}
 	return nil
@@ -66,7 +63,7 @@ func (d *DockerIntegrationTester) StepRequirements() IntegrationTestSteps {
 	return IntegrationTestSteps{&IntegrationTestStep{}}
 }
 
-// Test performs the tests with docker-compose.
+// Test performs the tests with docker compose.
 func (d *DockerIntegrationTester) Test(dir string, mageTarget string, env map[string]string) error {
 	var err error
 	d.buildImagesOnce.Do(func() { err = dockerComposeBuildImages() })
@@ -85,8 +82,8 @@ func (d *DockerIntegrationTester) Test(dir string, mageTarget string, env map[st
 	goPkgCache := filepath.Join(filepath.SplitList(build.Default.GOPATH)[0], "pkg/mod/cache/download")
 	dockerGoPkgCache := "/gocache"
 
-	// Execute the inside of docker-compose.
-	args := []string{"-p", dockerComposeProjectName(), "run",
+	// Execute the inside of docker compose.
+	args := []string{"compose", "-p", dockerComposeProjectName(), "run",
 		"-e", "DOCKER_COMPOSE_PROJECT_NAME=" + dockerComposeProjectName(),
 		// Disable strict.perms because we mount host dirs inside containers
 		// and the UID/GID won't meet the strict requirements.
@@ -125,13 +122,13 @@ func (d *DockerIntegrationTester) Test(dir string, mageTarget string, env map[st
 		composeEnv,
 		os.Stdout,
 		os.Stderr,
-		"docker-compose",
+		"docker",
 		args...,
 	)
 
 	err = saveDockerComposeLogs(dir, mageTarget, composeEnv)
 	if err != nil && testErr == nil {
-		// saving docker-compose logs failed but the test didn't.
+		// saving docker compose logs failed but the test didn't.
 		return err
 	}
 
@@ -145,12 +142,13 @@ func (d *DockerIntegrationTester) Test(dir string, mageTarget string, env map[st
 		composeEnv,
 		io.Discard,
 		out,
-		"docker-compose",
+		"docker",
+		"compose",
 		"-p", dockerComposeProjectName(),
 		"rm", "--stop", "--force",
 	)
 	if err != nil && testErr == nil {
-		// docker-compose rm failed but the test didn't
+		// docker compose rm failed but the test didn't
 		return err
 	}
 	return testErr
@@ -176,13 +174,14 @@ func saveDockerComposeLogs(rootDir string, mageTarget string, composeEnv map[str
 		composeEnv,
 		composeLogFile, // stdout
 		composeLogFile, // stderr
-		"docker-compose",
+		"docker",
+		"compose",
 		"-p", dockerComposeProjectName(),
 		"logs",
 		"--no-color",
 	)
 	if err != nil {
-		return fmt.Errorf("executing docker-compose logs: %w", err)
+		return fmt.Errorf("executing docker compose logs: %w", err)
 	}
 
 	return nil
@@ -205,8 +204,8 @@ func (d *DockerIntegrationTester) InsideTest(test func() error) error {
 }
 
 // integTestDockerComposeEnvVars returns the environment variables used for
-// executing docker-compose (not the variables passed into the containers).
-// docker-compose uses these when evaluating docker-compose.yml files.
+// executing docker compose (not the variables passed into the containers).
+// docker compose uses these when evaluating docker-compose.yml files.
 func integTestDockerComposeEnvVars() (map[string]string, error) {
 	esBeatsDir, err := ElasticBeatsDir()
 	if err != nil {
@@ -221,8 +220,8 @@ func integTestDockerComposeEnvVars() (map[string]string, error) {
 	}, nil
 }
 
-// dockerComposeProjectName returns the project name to use with docker-compose.
-// It is passed to docker-compose using the `-p` flag. And is passed to our
+// dockerComposeProjectName returns the project name to use with docker compose.
+// It is passed to docker compose using the `-p` flag. And is passed to our
 // Go and Python testing libraries through the DOCKER_COMPOSE_PROJECT_NAME
 // environment variable.
 func dockerComposeProjectName() string {
@@ -255,13 +254,13 @@ func dockerComposeBuildImages() error {
 		return err
 	}
 
-	args := []string{"-p", dockerComposeProjectName(), "build", "--force-rm"}
+	args := []string{"compose", "-p", dockerComposeProjectName(), "build", "--force-rm"}
 	if _, noCache := os.LookupEnv("DOCKER_NOCACHE"); noCache {
 		args = append(args, "--no-cache")
 	}
 
 	if _, forcePull := os.LookupEnv("DOCKER_PULL"); forcePull {
-		args = append(args, "--pull")
+		args = append(args, "--pull", "--quiet")
 	}
 
 	out := io.Discard
@@ -273,7 +272,7 @@ func dockerComposeBuildImages() error {
 		composeEnv,
 		out,
 		os.Stderr,
-		"docker-compose", args...,
+		"docker", args...,
 	)
 
 	if err != nil {
@@ -284,7 +283,7 @@ func dockerComposeBuildImages() error {
 			composeEnv,
 			out,
 			os.Stderr,
-			"docker-compose", args...,
+			"docker", args...,
 		)
 	}
 	return err
