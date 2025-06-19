@@ -2382,12 +2382,14 @@ func (Integration) BuildKubernetesTestData(ctx context.Context) error {
 	mg.Deps(Helm.BuildDependencies)
 
 	// download opentelemetry-kube-stack helm chart
-	kubeStackHelmChartPath, err := devtools.DownloadFile(k8s.KubeStackChartURL, filepath.Join("testing", "integration", "k8s", "testdata"))
+	kubeStackHelmChartTargetPath := filepath.Join("testing", "integration", "k8s", k8s.KubeStackChartPath)
+	kubeStackHelmChartTargetDir := filepath.Dir(kubeStackHelmChartTargetPath)
+	downloadedKubeStackHelmChartPath, err := devtools.DownloadFile(k8s.KubeStackChartURL, kubeStackHelmChartTargetDir)
 	if err != nil {
 		return fmt.Errorf("failed to download opentelemetry-kube-stack helm chart: %w", err)
 	}
-	if err := os.Rename(kubeStackHelmChartPath, filepath.Join("testing", "integration", "k8s", k8s.KubeStackChartPath)); err != nil {
-		return fmt.Errorf("failed to move elastic-agent helm chart package to testing dir: %w", err)
+	if downloadedKubeStackHelmChartPath != kubeStackHelmChartTargetPath {
+		return fmt.Errorf("expected opentelemetry-kube-stack helm chart to be downloaded to %q, got %q", kubeStackHelmChartTargetPath, downloadedKubeStackHelmChartPath)
 	}
 
 	// render elastic-agent-standalone kustomize
