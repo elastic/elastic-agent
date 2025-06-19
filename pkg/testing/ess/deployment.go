@@ -216,9 +216,6 @@ func (c *Client) UpgradeDeployment(ctx context.Context, deploymentID string, ver
 		return fmt.Errorf("unable to generate upgrade request body: %w", err)
 	}
 
-	c.logger.Logf("URL: %s", u)
-	c.logger.Logf("Request body: %s", string(reqBodyBytes))
-
 	upgradeResp, err := c.doPut(
 		ctx,
 		u,
