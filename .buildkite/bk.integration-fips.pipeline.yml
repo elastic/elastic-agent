@@ -16,7 +16,7 @@ common:
       elastic/oblt-google-auth#v1.3.0:
         lifetime: 10800 # seconds
   # TODO: maybe we can rely on the VM and install only if not present?
-  - oblt_cli_plugin: &oblt_cli_plugin:
+  - oblt_cli_plugin: &oblt_cli_plugin
       elastic/oblt-cli#v0.2.0:
         version-file: .oblt-cli-version
 
