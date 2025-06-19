@@ -89,6 +89,10 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 		require.NoError(t, err)
 		testTamperProtectedInstallUpgrade(t, info, "deb", upgradeFromVersion.String(), true, true)
 	})
+
+	t.Run("Make sure unprotected upgrades are not broken", func(t *testing.T) {
+		testUnprotectedInstallUpgrade(t, info, "deb")
+	})
 }
 
 func TestUpgradeAgentWithTamperProtectedEndpoint_RPM(t *testing.T) {
@@ -118,6 +122,9 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_RPM(t *testing.T) {
 		upgradeFromVersion, err := upgradetest.PreviousMinor()
 		require.NoError(t, err)
 		testTamperProtectedInstallUpgrade(t, info, "rpm", upgradeFromVersion.String(), true, true)
+	})
+	t.Run("Make sure unprotected upgrades are not broken", func(t *testing.T) {
+		testUnprotectedInstallUpgrade(t, info, "rpm")
 	})
 }
 
@@ -186,7 +193,7 @@ func addEndpointCleanup(t *testing.T, uninstallToken string) {
 	})
 }
 
-func installFirstAgent(ctx context.Context, t *testing.T, info *define.Info, packageFormat string, upgradeFromVersion string) (*atesting.Fixture, string) {
+func installFirstAgent(ctx context.Context, t *testing.T, info *define.Info, isProtected bool, packageFormat string, upgradeFromVersion string) (*atesting.Fixture, string) {
 	fixture, err := atesting.NewFixture(
 		t,
 		upgradeFromVersion,
@@ -204,7 +211,6 @@ func installFirstAgent(ctx context.Context, t *testing.T, info *define.Info, pac
 	pkgPolicyResp, err := installElasticDefendPackage(t, info, policyResp.ID)
 	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
 
-	isProtected := true
 	updateReq := kibana.AgentPolicyUpdateRequest{
 		Name:        policy.Name,
 		Namespace:   policy.Namespace,
@@ -243,6 +249,75 @@ func installFirstAgent(ctx context.Context, t *testing.T, info *define.Info, pac
 	return fixture, uninstallToken
 }
 
+func testUnprotectedInstallUpgrade(
+	t *testing.T,
+	info *define.Info,
+	packageFormat string,
+) {
+	ctx := t.Context()
+
+	upgradeFromVersion, err := upgradetest.PreviousMinor()
+	require.NoError(t, err)
+
+	installFirstAgent(ctx, t, info, false, packageFormat, upgradeFromVersion.String())
+
+	initEndpointVersion := getEndpointVersion(t)
+	t.Logf("The initial endpoint version is %s", initEndpointVersion)
+
+	t.Log("Setup agent fixture with the test build")
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat(packageFormat))
+	require.NoError(t, err)
+	fixture.Prepare(ctx)
+
+	t.Log("Getting source package")
+	srcPkg, err := fixture.SrcPackage(ctx)
+	require.NoError(t, err)
+
+	t.Log("Installing the second agent, upgrading from the older version")
+	installCmd, err := getInstallCommand(ctx, fixture.PackageFormat(), srcPkg, nil)
+	require.NoError(t, err)
+
+	out, err := installCmd.CombinedOutput()
+	t.Log(string(out))
+	require.NoError(t, err, "agent installation with package manager should not fail")
+
+	fixture.SetDebRpmClient()
+
+	upgradedAgentClient := fixture.Client()
+	err = upgradedAgentClient.Connect(ctx)
+	require.NoError(t, err, "could not connect to the upgraded agent")
+
+	require.Eventually(t,
+		func() bool { return agentAndEndpointAreHealthy(t, ctx, upgradedAgentClient) },
+		endpointHealthPollingTimeout,
+		time.Second,
+		"Endpoint component or units are not healthy after the upgrade.",
+	)
+
+	t.Log("Validate that the initial endpoint version is smaller than the upgraded version")
+	upgradedEndpointVersion := getEndpointVersion(t)
+	t.Logf("The upgraded endpoint version is %s", upgradedEndpointVersion)
+
+	startEndpointVersion, err := version.ParseVersion(initEndpointVersion)
+	require.NoError(t, err)
+
+	parsedUpgradedVersion, err := version.ParseVersion(upgradedEndpointVersion)
+	require.NoError(t, err)
+
+	t.Logf("Comparing start version %s to upgraded version %s", startEndpointVersion.String(), parsedUpgradedVersion.String())
+	require.True(t, startEndpointVersion.Less(*parsedUpgradedVersion))
+
+	t.Log("trying to uinstall without token, not expecting error")
+	out, err = exec.Command("sudo", "elastic-agent", "uninstall", "-f").CombinedOutput()
+	t.Log(string(out))
+	require.NoError(t, err)
+
+	_, err = exec.LookPath("elastic-agent")
+	require.Error(t, err)
+
+	t.Log("successfully uninstalled agent and endpoint")
+}
+
 func testTamperProtectedInstallUpgrade(
 	t *testing.T,
 	info *define.Info,
@@ -253,7 +328,7 @@ func testTamperProtectedInstallUpgrade(
 ) {
 	ctx := t.Context()
 
-	fixture, uninstallToken := installFirstAgent(ctx, t, info, packageFormat, initialVersion)
+	fixture, uninstallToken := installFirstAgent(ctx, t, info, true, packageFormat, initialVersion)
 
 	initEndpointVersion := getEndpointVersion(t)
 	t.Logf("The initial endpoint version is %s", initEndpointVersion)
