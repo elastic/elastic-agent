@@ -129,7 +129,6 @@ func Test_generateCreateDeploymentRequestBody(t *testing.T) {
                         "remote_cluster_client",
                         "data_content"
                       ],
-                      "id": "hot_content",
                       "size": {
                         "resource": "memory",
                         "value": 8192
@@ -222,6 +221,16 @@ func TestGenerateUpgradeDeploymentRequestBody(t *testing.T) {
                 "elasticsearch_cluster_ref_id": "main-elasticsearch",
                 "region": "us-east-1",
                 "plan": {
+                    "cluster_topology": [
+                        {
+                            "instance_configuration_id": "aws.integrationsserver.c5d",
+                            "size": {
+                                "value": 1024,
+                                "resource": "memory"
+                            },
+                            "zone_count": 1
+                        }
+                    ],
                     "integrations_server": {
                         "version": "1.2.3"
                     }
@@ -245,8 +254,13 @@ func TestGenerateUpgradeDeploymentRequestBody(t *testing.T) {
                                 "remote_cluster_client",
                                 "data_content"
                             ],
+                            "elasticsearch": {
+                                "node_attributes": {
+                                    "data": "hot"
+                                }
+                            },
                             "instance_configuration_id": "aws.es.datahot.i3",
-                            "zone_count": 2,
+                            "zone_count": 1,
                             "size": {
                                 "value": 8192,
                                 "resource": "memory"
@@ -268,6 +282,16 @@ func TestGenerateUpgradeDeploymentRequestBody(t *testing.T) {
                 "elasticsearch_cluster_ref_id": "main-elasticsearch",
                 "region": "us-east-1",
                 "plan": {
+                    "cluster_topology": [
+                        {
+                            "instance_configuration_id": "aws.kibana.c5d",
+                            "size": {
+                                "value": 1024,
+                                "resource": "memory"
+                            },
+                            "zone_count": 1
+                        }
+                    ],
                     "kibana": {
                         "version": "1.2.3"
                     }
