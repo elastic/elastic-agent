@@ -11,10 +11,26 @@ function ess_up() {
     return 1
   fi
 
-  oblt-cli
+  # Create a cluster with the specified stack version and store the cluster information in a file
+  GITHUB_TOKEN="$VAULT_GITHUB_TOKEN" \
+    oblt-cli cluster create ess \
+      --stack-version "$STACK_VERSION" \
+      --cluster-name-prefix ea-hosted-it \
+      --output-file="${PWD}/cluster-info.json" \
+      --wait 15
+
+  # Extract the cluster name from the cluster information file
+  CLUSTER_NAME=$(jq -r '.ClusterName' cluster-info.json)
+
+  # Store the cluster name as a meta-data
+  buildkite-agent meta-data set cluster-name "${CLUSTER_NAME}"
 }
 
 function ess_down() {
-  echo "~~~ Tearing down the ESS Stack"  
-  oblt-cli
+  echo "~~~ Tearing down the ESS Stack"
+  # Get the cluster name from the meta-data
+  CLUSTER_NAME="$(buildkite-agent meta-data get cluster-name)"
+
+  # Destroy the cluster
+  oblt-cli cluster destroy --cluster-name "${CLUSTER_NAME}" --force
 }

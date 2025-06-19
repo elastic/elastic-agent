@@ -39,6 +39,16 @@ if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
   preinstall_fleet_packages
 fi
 
+# Load the ESS stack secrets
+# Get the cluster name from the meta-data (CI specific)
+# QUESTION: should we support the case when using the ESS stack in local environment?
+CLUSTER_NAME="$(buildkite-agent meta-data get cluster-name)"
+
+oblt-cli cluster secrets env --cluster-name="${CLUSTER_NAME}" --output-file="${PWD}/env.sh"
+
+# Source the secrets file
+source "${PWD}/env.sh" || rm "${PWD}/env.sh"
+
 # Run integration tests
 echo "~~~ Running integration tests"
 

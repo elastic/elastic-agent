@@ -11,13 +11,27 @@ function ess_up {
       return 1
   }
 
-  & oblt-cli
+  & oblt-cli cluster create ess `
+      --stack-version "$StackVersion" `
+      --cluster-name-prefix ea-hosted-it `
+      --output-file="cluster-info.json" `
+      --wait 15
+
+  $ClusterName = (Get-Content -Path "cluster-info.json" | ConvertFrom-Json).ClusterName
+  if (-not $ClusterName) {
+      Write-Error "Error: Failed to retrieve cluster name from cluster-info.json"
+      return 1
+  }
+
+  # Store the cluster name as a meta-data
+  & buildkite-agent meta-data set cluster-name $ClusterName
 }
 
 function ess_down {  
   Write-Output "~~~ Tearing down the ESS Stack(created for this step)"
-  try {  
-    & oblt-cli
+  try {
+    $ClusterName = & buildkite-agent meta-data get cluster-name
+    & oblt-cli cluster destroy --cluster-name "$ClusterName" --force
   } catch {
     Write-Output "Error: Failed to destroy ESS stack(it will be auto-deleted later): $_"
   }

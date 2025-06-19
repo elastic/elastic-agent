@@ -42,21 +42,13 @@ common:
           KIBANA_HOST: ea-serverless-it-kibana-hostname
           KIBANA_USERNAME: ea-serverless-it-kibana-username
           KIBANA_PASSWORD: ea-serverless-it-kibana-password
-  - gcp_hosted_secrets_plugin: &gcp_hosted_secrets_plugin
-      elastic/gcp-secret-manager#v1.3.0-elastic:
-        env:
-          # These secrets are created in the step called Start ESS stack for integration tests
-          # TODO: need to find a way to use dynamic names in the secrets
-          ELASTICSEARCH_HOST: ea-hosted-it-elasticsearch-hostname
-          ELASTICSEARCH_PASSWORD: ea-hosted-it-elasticsearch-password
-          ELASTICSEARCH_USERNAME: ea-hosted-it-elasticsearch-username
-          KIBANA_HOST: ea-hosted-it-kibana-hostname
-          KIBANA_USERNAME: ea-hosted-it-kibana-username
-          KIBANA_PASSWORD: ea-hosted-it-kibana-password
-          INTEGRATIONS_SERVER_HOST: ea-hosted-it-integration-hostname
+  # TODO: maybe we can rely on the VM and install only if not present?
+  - oblt_cli_plugin: &oblt_cli_plugin:
+      elastic/oblt-cli#v0.2.0:
+        version-file: .oblt-cli-version
 
 steps:
-  - label: Start ESS stack for integration tests
+  - label: Start ESS stack for integration tests using oblt-cli
     key: integration-ess
     notify:
       - github_commit_status:
@@ -64,7 +56,6 @@ steps:
     command: .buildkite/scripts/steps/ess_start.sh
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/oblt-cli:latest"
-      useCustomGlobalHooks: true
 
   - group: "Extended runtime leak tests"
     key: extended-integration-tests
@@ -92,6 +83,10 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+
       - label: "Windows:2025:amd64:sudo"
         depends_on:
           - packaging-windows
@@ -110,6 +105,10 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-ubuntu-x86-64
         env:
@@ -127,6 +126,9 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
 
   - group: "Stateful: Windows"
     key: integration-tests-win
@@ -163,7 +165,7 @@ steps:
           - install-uninstall
         plugins:
           - *google_oidc_observability_plugin
-          - *gcp_hosted_secrets_plugin
+          - *oblt_cli_plugin
 
       - label: "Win2022:non-sudo:{{matrix}}"
         depends_on:
@@ -185,7 +187,7 @@ steps:
           - default
         plugins:
           - *google_oidc_observability_plugin
-          - *gcp_hosted_secrets_plugin
+          - *oblt_cli_plugin
 
       - label: "Win2025:sudo:{{matrix}}"
         depends_on:
@@ -214,7 +216,7 @@ steps:
           - install-uninstall
         plugins:
           - *google_oidc_observability_plugin
-          - *gcp_hosted_secrets_plugin
+          - *oblt_cli_plugin
 
       - label: "Win2025:non-sudo:{{matrix}}"
         depends_on:
@@ -236,7 +238,7 @@ steps:
           - default
         plugins:
           - *google_oidc_observability_plugin
-          - *gcp_hosted_secrets_plugin
+          - *oblt_cli_plugin
 
   - group: "Stateful:Ubuntu"
     key: integration-tests-ubuntu
@@ -265,7 +267,7 @@ steps:
           - default
         plugins:
           - *google_oidc_observability_plugin
-          - *gcp_hosted_secrets_plugin
+          - *oblt_cli_plugin
 
       - label: "x86_64:sudo: {{matrix}}"
         depends_on:
@@ -301,7 +303,7 @@ steps:
           - container
         plugins:
           - *google_oidc_observability_plugin
-          - *gcp_hosted_secrets_plugin
+          - *oblt_cli_plugin
 
       - label: "arm:sudo: {{matrix}}"
         depends_on:
@@ -337,7 +339,7 @@ steps:
           # - container
         plugins:
           - *google_oidc_observability_plugin
-          - *gcp_hosted_secrets_plugin
+          - *oblt_cli_plugin
 
       - label: "arm:non-sudo: {{matrix}}"
         skip: true
@@ -360,7 +362,7 @@ steps:
           - default
         plugins:
           - *google_oidc_observability_plugin
-          - *gcp_hosted_secrets_plugin
+          - *oblt_cli_plugin
 
   - group: "Stateful:Debian"
     key: integration-tests-debian
@@ -389,7 +391,7 @@ steps:
           - default
         plugins:
           - *google_oidc_observability_plugin
-          - *gcp_hosted_secrets_plugin
+          - *oblt_cli_plugin
 
       - label: "x86_64:sudo: {{matrix}}"
         depends_on:
@@ -426,7 +428,7 @@ steps:
           - container
         plugins:
           - *google_oidc_observability_plugin
-          - *gcp_hosted_secrets_plugin
+          - *oblt_cli_plugin
 
   - group: "Stateful(Sudo):RHEL8"
     key: integration-tests-rhel8
@@ -448,13 +450,13 @@ steps:
         retry:
           automatic:
             limit: 1
-        plugins:
-          - *google_oidc_observability_plugin
-          - *gcp_hosted_secrets_plugin
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_RHEL_8}"
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
 
   - group: "Kubernetes"
     key: integration-tests-kubernetes
@@ -486,9 +488,6 @@ steps:
           machineType: "n2-standard-4"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
           diskSizeGb: 80
-        plugins:
-          - *google_oidc_observability_plugin
-          - *gcp_hosted_secrets_plugin
         matrix:
           setup:
             variants:
@@ -506,6 +505,9 @@ steps:
               - v1.31.0
               - v1.32.0
               - v1.33.0
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
 
   - group: "Serverless integration test"
     key: integration-tests-serverless
@@ -585,10 +587,9 @@ steps:
       - integration-tests-kubernetes
       - extended-integration-tests
     allow_dependency_failure: true
-    command: .buildkite/scripts/steps/oblt-cli-teardown.sh
+    command: .buildkite/scripts/steps/ess_down.sh
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/oblt-cli:latest"
-      useCustomGlobalHooks: true
 
   - label: Aggregate test reports
     # Warning: The key has a hook in pre-command
