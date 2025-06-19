@@ -13,6 +13,7 @@ steps:
       # Build matrix is not used for packaging in favor to unique step keys
       # Packaging linux/amd64
       - label: "Packaging: linux/amd64 rpm"
+        skip: "true" # Skip this step for now, as it is not used in the pipeline
         key: packaging-ubuntu-x86-64
         env:
           PLATFORMS: "linux/amd64"
@@ -28,6 +29,7 @@ steps:
           machineType: "n2-standard-8"
 
       - label: "Packaging: Ubuntu x86_64 FIPS"
+        skip: "true" # Skip this step for now, as it is not used in the pipeline
         key: "packaging-ubuntu-x86-64-fips"
         env:
           PACKAGES: "tar.gz"
@@ -45,6 +47,7 @@ steps:
 
       # Packaging linux/arm64
       - label: "Packaging: linux/arm64 tar.gz"
+        skip: "true" # Skip this step for now, as it is not used in the pipeline
         key: packaging-ubuntu-arm64
         env:
           PLATFORMS: "linux/arm64"
@@ -61,6 +64,7 @@ steps:
           imagePrefix: "core-ubuntu-2204-aarch64"
 
       - label: "Packaging: Ubuntu arm64 FIPS"
+        skip: "true" # Skip this step for now, as it is not used in the pipeline
         key: "packaging-ubuntu-arm64-fips"
         env:
           PACKAGES: "tar.gz"
@@ -78,6 +82,7 @@ steps:
           imagePrefix: "core-ubuntu-2204-aarch64"
 
       - label: "Packaging: windows/amd64 zip"
+        skip: "true" # Skip this step for now, as it is not used in the pipeline
         key: packaging-windows
         env:
           PACKAGES: "zip"
@@ -93,6 +98,7 @@ steps:
           machineType: "n2-standard-8"
 
       - label: "Packaging: Containers linux/amd64"
+        skip: "true" # Skip this step for now, as it is not used in the pipeline
         key: packaging-containers-x86-64
         env:
           PACKAGES: "docker"
@@ -106,6 +112,7 @@ steps:
           diskSizeGb: 200
 
       - label: "Packaging: Containers linux/arm64"
+        skip: "true" # Skip this step for now, as it is not used in the pipeline
         key: packaging-containers-arm64
         env:
           PACKAGES: "docker"
@@ -121,6 +128,7 @@ steps:
           diskSizeGb: 200
 
       - label: "Packaging: Containers linux/amd64 FIPS"
+        skip: "true" # Skip this step for now, as it is not used in the pipeline
         key: packaging-containers-x86-64-fips
         env:
           PACKAGES: "docker"
@@ -135,6 +143,7 @@ steps:
           diskSizeGb: 200
 
       - label: "Packaging: Containers linux/arm64 FIPS"
+        skip: "true" # Skip this step for now, as it is not used in the pipeline
         key: packaging-containers-arm64-fips
         env:
           PACKAGES: "docker"
