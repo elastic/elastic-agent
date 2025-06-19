@@ -72,7 +72,7 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/leak"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows' --build '019789cc-f9bd-425c-b5cb-f1303c452c37'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/steps/integration_tests_tf.ps1 fleet true
         artifact_paths:
           - build/**
@@ -95,7 +95,7 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/leak"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows' --build '019789cc-f9bd-425c-b5cb-f1303c452c37'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/steps/integration_tests_tf.ps1 fleet true
         artifact_paths:
           - build/**
@@ -116,7 +116,7 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/leak"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64' --build '019789cc-f9ba-4188-97e9-88b05deaff57'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
           .buildkite/scripts/steps/integration_tests_tf.sh fleet true
         artifact_paths:
           - build/**
@@ -145,7 +145,7 @@ steps:
         depends_on:
           - packaging-windows
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows' --build '019789cc-f9bd-425c-b5cb-f1303c452c37'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
         artifact_paths:
           - build/**
@@ -174,7 +174,7 @@ steps:
         depends_on:
           - packaging-windows
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows' --build '019789cc-f9bd-425c-b5cb-f1303c452c37'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
         artifact_paths:
           - build/**
@@ -196,7 +196,7 @@ steps:
         depends_on:
           - packaging-windows
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows' --build '019789cc-f9bd-425c-b5cb-f1303c452c37'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
         artifact_paths:
           - build/**
@@ -225,7 +225,7 @@ steps:
         depends_on:
           - packaging-windows
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows' --build '019789cc-f9bd-425c-b5cb-f1303c452c37'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
         artifact_paths:
           - build/**
@@ -254,7 +254,7 @@ steps:
       - label: "x86_64:non-sudo: {{matrix}}"
         depends_on: packaging-ubuntu-x86-64
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64' --build '019789cc-f9ba-4188-97e9-88b05deaff57'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
@@ -277,7 +277,7 @@ steps:
           - packaging-ubuntu-x86-64
         # due to deb group present in matrix tar.gz and deb packages artifacts are required
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64' --build '019789cc-f9ba-4188-97e9-88b05deaff57'
+          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
@@ -312,7 +312,7 @@ steps:
         depends_on:
           - packaging-ubuntu-arm64
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64' --build '019789cc-f9bb-4325-83f9-7688c0e196c5'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
@@ -349,7 +349,7 @@ steps:
         depends_on:
           - packaging-ubuntu-arm64
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64' --build '019789cc-f9bb-4325-83f9-7688c0e196c5'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
@@ -378,7 +378,7 @@ steps:
       - label: "x86_64:non-sudo: {{matrix}}"
         depends_on: packaging-ubuntu-x86-64
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64' --build '019789cc-f9ba-4188-97e9-88b05deaff57'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
@@ -401,7 +401,7 @@ steps:
           - packaging-ubuntu-x86-64
         # due to deb group present in matrix tar.gz and deb packages artifacts are required
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64' --build '019789cc-f9ba-4188-97e9-88b05deaff57'
+          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
@@ -445,7 +445,7 @@ steps:
         depends_on:
           - packaging-ubuntu-x86-64
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64' --build '019789cc-f9ba-4188-97e9-88b05deaff57'
+          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64
           .buildkite/scripts/steps/integration_tests_tf.sh rpm true
         artifact_paths:
           - build/**
@@ -477,7 +477,7 @@ steps:
           DOCKER_VARIANTS: "{{matrix.variants}}"
           TARGET_ARCH: "amd64"
         command: |
-          buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64' --build '019789cc-f9be-4e7c-94b4-19f64f81fa34'
+          buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64'
           .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
         artifact_paths:
           - build/**
@@ -525,7 +525,7 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/serverless"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows' --build '019789cc-f9bd-425c-b5cb-f1303c452c37'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/buildkite-integration-tests.ps1 fleet true
         artifact_paths:
           - build/**
@@ -547,7 +547,7 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/serverless"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows' --build '019789cc-f9bd-425c-b5cb-f1303c452c37'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/buildkite-integration-tests.ps1 fleet true
         artifact_paths:
           - build/**
@@ -567,7 +567,7 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/serverless"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64' --build '019789cc-f9ba-4188-97e9-88b05deaff57'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
           sudo -E .buildkite/scripts/buildkite-integration-tests.sh fleet true
         artifact_paths:
           - build/**
