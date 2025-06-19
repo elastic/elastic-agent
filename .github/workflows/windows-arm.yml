@@ -1,0 +1,35 @@
+---
+name: windows-arm
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - 8.*
+      - 9.*
+  # Being: for testing purposes
+  push:
+    branches:
+      - feature/run-tests-windows-arm
+  # End: for testing purposes
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: windows-11-image
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
+
+      - name: Run Unit Tests
+        run: |
+          go install github.com/magefile/mage
+          mage build
+          RACE_DETECTOR=true TEST_COVERAGE=true mage unitTest
+
