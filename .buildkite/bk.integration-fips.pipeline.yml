@@ -2,6 +2,7 @@
 
 env:
   ASDF_MAGE_VERSION: 1.14.0
+  MS_GOTOOLCHAIN_TELEMETRY_ENABLED: "0"
 
   IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1749862860"
   IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-1749862860"
