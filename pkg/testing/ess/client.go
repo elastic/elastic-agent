@@ -53,12 +53,20 @@ func (c *Client) doGet(ctx context.Context, relativeUrl string) (*http.Response,
 }
 
 func (c *Client) doPost(ctx context.Context, relativeUrl, contentType string, body io.Reader) (*http.Response, error) {
+	return c.doWrite(ctx, http.MethodPost, relativeUrl, contentType, body)
+}
+
+func (c *Client) doPut(ctx context.Context, relativeUrl, contentType string, body io.Reader) (*http.Response, error) {
+	return c.doWrite(ctx, http.MethodPut, relativeUrl, contentType, body)
+}
+
+func (c *Client) doWrite(ctx context.Context, method, relativeUrl, contentType string, body io.Reader) (*http.Response, error) {
 	u, err := url.JoinPath(c.config.BaseUrl, relativeUrl)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create API URL: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, body)
+	req, err := http.NewRequestWithContext(ctx, method, u, body)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create POST request: %w", err)
 	}
