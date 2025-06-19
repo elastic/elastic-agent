@@ -7,9 +7,11 @@ package k8s
 import "path/filepath"
 
 const (
-	KubeStackChartVersion = "0.3.9"
-	KubeStackChartName    = "opentelemetry-kube-stack-" + KubeStackChartVersion + ".tgz"
-	KubeStackChartURL     = "https://github.com/open-telemetry/opentelemetry-helm-charts/releases/download/opentelemetry-kube-stack-" + KubeStackChartVersion + "/" + KubeStackChartName
+	KubeStackChartVersion         = "0.3.9"
+	KubeStackChartName            = "opentelemetry-kube-stack"
+	KubeStackChartNameWithVersion = KubeStackChartName + "-" + KubeStackChartVersion
+	KubeStackChartArchiveName     = KubeStackChartNameWithVersion + ".tgz"
+	KubeStackChartURL             = "https://github.com/open-telemetry/opentelemetry-helm-charts/releases/download/" + KubeStackChartNameWithVersion + "/" + KubeStackChartArchiveName
 )
 
 var (
