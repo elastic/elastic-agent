@@ -94,6 +94,7 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 	t.Logf("Upgrading ECH deployment [%s] in region [%s] from version [%s] to [%s]", deployment.ID, echRegion, startVersion.String(), endVersion.String())
 	err = prov.Upgrade(context.Background(), deployment, endVersion)
 	require.NoError(t, err)
+	deployment.Version = endVersion.String()
 
 	// Check that deployment is ready and healthy after upgrade
 	t.Logf("Waiting for ECH deployment [%s] in region [%s] to be ready and healthy after upgrade", deployment.ID, echRegion)
