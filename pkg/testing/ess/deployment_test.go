@@ -99,7 +99,6 @@ func Test_generateCreateDeploymentRequestBody(t *testing.T) {
                   "integrations_server": {
                     "version": "1.2.3",
                     "docker_image": "docker.elastic.co/cloud-release/elastic-agent-cloud:1.2.3-foo-SNAPSHOT"
-
                   }
                 },
                 "ref_id": "main-integrations_server"
@@ -129,6 +128,7 @@ func Test_generateCreateDeploymentRequestBody(t *testing.T) {
                         "remote_cluster_client",
                         "data_content"
                       ],
+                      "id": "hot_content",
                       "size": {
                         "resource": "memory",
                         "value": 8192
