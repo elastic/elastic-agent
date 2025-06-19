@@ -26,8 +26,8 @@ import (
 // running its own Fleet Server) in ECH and ensures that the upgrade succeeds.
 func TestUpgradeIntegrationsServer(t *testing.T) {
 	define.Require(t, define.Requirements{
-		//Group: Upgrade, // TODO: remove after testing in PR and use "ech" instead
-		Group: "ech", // TODO: make sure BK pipeline only runs this group when GH label is detected
+		Group: Upgrade, // TODO: remove after testing in PR and use "ech" instead
+		//Group: "ech", // TODO: make sure BK pipeline only runs this group when GH label is detected
 		Local: true,  // only orchestrates ECH resources
 		Sudo:  false, // only orchestrates ECH resources
 		FIPS:  true,  // ensures test runs against FRH ECH region
