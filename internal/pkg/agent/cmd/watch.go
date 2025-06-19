@@ -94,8 +94,8 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 	}()
 
 	isWithinGrace, tilGrace := gracePeriod(marker, cfg.Settings.Upgrade.Watcher.GracePeriod)
-	if !isWithinGrace {
-		log.Infof("not within grace [updatedOn %v] %v", marker.UpdatedOn.String(), time.Since(marker.UpdatedOn).String())
+	if !isWithinGrace || isTerminalState(marker) {
+		log.Infof("not within grace [updatedOn %v] %v or agent have been rolled back [state: %s]", marker.UpdatedOn.String(), time.Since(marker.UpdatedOn).String(), marker.Details.State)
 		// if it is started outside of upgrade loop
 		// if we're not within grace and marker is still there it might mean
 		// that cleanup was not performed ok, cleanup everything except current version
@@ -140,6 +140,20 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 		log.Error("cleanup after successful watch failed", err)
 	}
 	return err
+}
+
+func isTerminalState(marker *upgrade.UpdateMarker) bool {
+
+	if marker == nil || marker.Details == nil {
+		return false
+	}
+
+	switch marker.Details.State {
+	case details.StateCompleted, details.StateRollback:
+		return true
+	default:
+		return false
+	}
 }
 
 func isWindows() bool {
