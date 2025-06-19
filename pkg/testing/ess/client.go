@@ -36,13 +36,11 @@ func (c *Client) SetLogger(logger common.Logger) {
 }
 
 func (c *Client) doGet(ctx context.Context, relativeUrl string) (*http.Response, error) {
+	// We don't use url.JoinPath because it escapes the "?" in
+	// relativeUrl if it contains a query string
 	u := c.config.BaseUrl + "/" + relativeUrl
-	parsedUrl, err := url.Parse(u)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse URL [%s]: %w", u, err)
-	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsedUrl.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create GET request: %w", err)
 	}
