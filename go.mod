@@ -13,25 +13,14 @@ require (
 	github.com/docker/docker v27.5.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-<<<<<<< HEAD
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20241212201805-58af1537830b
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250404163238-b16c2c085d99
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.1
-	github.com/elastic/elastic-agent-libs v0.19.4
-	github.com/elastic/elastic-agent-system-metrics v0.11.12
-	github.com/elastic/elastic-transport-go/v8 v8.6.1
-	github.com/elastic/go-elasticsearch/v8 v8.17.1
-=======
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250617212518-cbe3da93548b
-	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
-	github.com/elastic/elastic-agent-autodiscover v0.9.2
-	github.com/elastic/elastic-agent-client/v7 v7.17.2
 	github.com/elastic/elastic-agent-libs v0.20.0
 	github.com/elastic/elastic-agent-system-metrics v0.11.15
-	github.com/elastic/elastic-transport-go/v8 v8.7.0
-	github.com/elastic/go-elasticsearch/v8 v8.18.0
->>>>>>> 27d9890be (build(deps): bump github.com/elastic/elastic-agent-system-metrics from 0.11.13 to 0.11.15 (#8573))
+	github.com/elastic/elastic-transport-go/v8 v8.6.1
+	github.com/elastic/go-elasticsearch/v8 v8.17.1
 	github.com/elastic/go-licenser v0.4.2
 	github.com/elastic/go-sysinfo v1.15.2
 	github.com/elastic/go-ucfg v0.8.9-0.20250307075119-2a22403faaea
