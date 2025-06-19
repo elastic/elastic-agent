@@ -66,6 +66,7 @@ steps:
       - integration-ess
     steps:
       - label: "Windows:2022:amd64:sudo"
+        skip: "Currently testing linux only"
         depends_on:
           - packaging-windows
         env:
@@ -88,6 +89,7 @@ steps:
           - *oblt_cli_plugin
 
       - label: "Windows:2025:amd64:sudo"
+        skip: "Currently testing linux only"
         depends_on:
           - packaging-windows
         env:
@@ -131,6 +133,7 @@ steps:
           - *oblt_cli_plugin
 
   - group: "Stateful: Windows"
+    skip: "Currently testing linux only"
     key: integration-tests-win
     notify:
       - github_commit_status:
@@ -511,6 +514,7 @@ steps:
 
   - group: "Serverless integration test"
     key: integration-tests-serverless
+    skip: "Currently testing linux only"
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Serverless integration test"
