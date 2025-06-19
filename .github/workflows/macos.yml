@@ -14,7 +14,7 @@ on:
   # Being: for testing purposes
   push:
     branches:
-      - feature/test-unit-macos-gh-action
+      - feature/run-unit-tests-only-macos
   # End: for testing purposes
 
 permissions:
