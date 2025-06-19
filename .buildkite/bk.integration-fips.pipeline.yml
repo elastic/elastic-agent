@@ -82,7 +82,6 @@ steps:
               - "true"
             groups:
               - fleet # currently there is only a single test in the fleet group, add more tests once they have been defined
-              - upgrade
 
       - label: "fips:arm64:sudo-{{matrix.sudo}}:{{matrix.groups}}"
         depends_on:
@@ -113,7 +112,6 @@ steps:
               - "true"
             groups:
               - fleet
-              - upgrade
 
       - label: "fips:upgrade-ech-deployment"
         if: build.env("BUILDKITE_PULL_REQUEST") == "true" &&  build.env("GITHUB_PR_LABELS") =~ /.*(Testing:run:TestUpgradeIntegrationsServer).*/
