@@ -78,15 +78,17 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 	t.Run("Upgrade from older version to newer version", func(t *testing.T) {
 		upgradeFromVersion, err := upgradetest.PreviousMinor()
 		require.NoError(t, err)
-		testTamperProtectedInstallUpgrade(t, info, "deb", upgradeFromVersion.String(), true)
+		testTamperProtectedInstallUpgrade(t, info, "deb", upgradeFromVersion.String(), true, false)
 	})
 
 	t.Run("Install same version over the installed agent", func(t *testing.T) {
-		testTamperProtectedInstallUpgrade(t, info, "deb", define.Version(), false)
+		testTamperProtectedInstallUpgrade(t, info, "deb", define.Version(), false, false)
 	})
 
-	t.Run("Validate endpoint is restarted if preinstall script fails", func(t *testing.T) {
-		testTamperProtectedErrorRecovery(t, info, "deb")
+	t.Run("Upgrade with endpoint stopped before upgrade", func(t *testing.T) {
+		upgradeFromVersion, err := upgradetest.PreviousMinor()
+		require.NoError(t, err)
+		testTamperProtectedInstallUpgrade(t, info, "deb", upgradeFromVersion.String(), true, true)
 	})
 }
 
@@ -106,15 +108,17 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_RPM(t *testing.T) {
 	t.Run("Upgrade from older version to newer version", func(t *testing.T) {
 		upgradeFromVersion, err := upgradetest.PreviousMinor()
 		require.NoError(t, err)
-		testTamperProtectedInstallUpgrade(t, info, "rpm", upgradeFromVersion.String(), true)
+		testTamperProtectedInstallUpgrade(t, info, "rpm", upgradeFromVersion.String(), true, false)
 	})
 
 	t.Run("Install same version over the installed agent", func(t *testing.T) {
-		testTamperProtectedInstallUpgrade(t, info, "rpm", define.Version(), false)
+		testTamperProtectedInstallUpgrade(t, info, "rpm", define.Version(), false, false)
 	})
 
-	t.Run("Validate endpoint is restarted if preinstall script fails", func(t *testing.T) {
-		testTamperProtectedErrorRecovery(t, info, "rpm")
+	t.Run("Upgrade with endpoint stopped before upgrade", func(t *testing.T) {
+		upgradeFromVersion, err := upgradetest.PreviousMinor()
+		require.NoError(t, err)
+		testTamperProtectedInstallUpgrade(t, info, "rpm", upgradeFromVersion.String(), true, true)
 	})
 }
 
@@ -183,55 +187,6 @@ func addEndpointCleanup(t *testing.T, uninstallToken string) {
 	})
 }
 
-func createMockSystemctl(mockSystemctlPath, assertionsPath, serviceStart, serviceStop string) error {
-	parsedMockSystemctl, err := os.Create(mockSystemctlPath)
-	if err != nil {
-		return err
-	}
-	defer parsedMockSystemctl.Close()
-
-	parsedMockSystemctl.Sync()
-	err = os.Chmod(mockSystemctlPath, 0o755)
-	if err != nil {
-		return err
-	}
-
-	assertions, err := os.Create(assertionsPath)
-	if err != nil {
-		return err
-	}
-	defer assertions.Close()
-
-	err = os.Chmod(assertionsPath, 0o666)
-	if err != nil {
-		return err
-	}
-
-	tmpl, err := template.ParseFiles("./endpoint_tamper_protected_mock_systemctl_debrpm.sh.tmpl")
-	if err != nil {
-		return err
-	}
-
-	params := MockSystemctlParams{
-		AssertionsPath:        assertionsPath,
-		ServiceStopAssertion:  serviceStop,
-		ServiceStartAssertion: serviceStart,
-	}
-
-	err = tmpl.Execute(parsedMockSystemctl, params)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-type MockSystemctlParams struct {
-	AssertionsPath        string
-	ServiceStopAssertion  string
-	ServiceStartAssertion string
-}
-
 func installFirstAgent(ctx context.Context, t *testing.T, info *define.Info, packageFormat string, upgradeFromVersion string) (*atesting.Fixture, string) {
 	fixture, err := atesting.NewFixture(
 		t,
@@ -289,96 +244,13 @@ func installFirstAgent(ctx context.Context, t *testing.T, info *define.Info, pac
 	return fixture, uninstallToken
 }
 
-func testTamperProtectedErrorRecovery(t *testing.T, info *define.Info, packageFormat string) {
-	ctx := t.Context()
-	upgradeFromVersion, err := upgradetest.PreviousMinor()
-	require.NoError(t, err)
-	t.Logf("Preparing fixture with agent version %s", upgradeFromVersion.String())
-
-	installFirstAgent(ctx, t, info, packageFormat, upgradeFromVersion.String())
-
-	initEndpointVersion := getEndpointVersion(t)
-	t.Logf("The initial endpoint version is %s", initEndpointVersion)
-
-	// try to uninstall the agent without a token and assert failure
-	out, err := exec.Command("sudo", "elastic-agent", "uninstall", "-f").CombinedOutput()
-	t.Log(string(out))
-	require.Error(t, err, "uninstalling agent without a token should fail because of tamper protection")
-	t.Log("Tamper protection for the initial installation of the agent is enabled")
-
-	t.Log("Setup agent fixture with the test build")
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat(packageFormat))
-	require.NoError(t, err)
-	fixture.Prepare(ctx)
-
-	t.Log("Getting source package")
-	srcPkg, err := fixture.SrcPackage(ctx)
-	require.NoError(t, err)
-
-	tmpdir := t.TempDir()
-	mockSystemctlScriptPath := filepath.Join(tmpdir, "endpoint_tamper_protected_mock_systemctl_debrpm.sh")
-	assertionsPath := filepath.Join(tmpdir, "assertions")
-	serviceStart := "Started endpoint service"
-	serviceStop := "Stopped endpoint service"
-
-	err = createMockSystemctl(mockSystemctlScriptPath, assertionsPath, serviceStart, serviceStop)
-	require.NoError(t, err, "creating mock systemctl failed")
-
-	systemctlPath := "/usr/bin/systemctl"
-	backupSystemctl := "/usr/bin/systemctl.real"
-
-	if _, err := os.Stat(backupSystemctl); os.IsNotExist(err) {
-		err = os.Rename(systemctlPath, backupSystemctl)
-		require.NoError(t, err, "failed to move real systemctl")
-	}
-
-	err = os.Symlink(mockSystemctlScriptPath, systemctlPath)
-	require.NoError(t, err, "failed to create symlink to mock systemctl")
-
-	t.Cleanup(func() {
-		err := os.Remove(systemctlPath)
-		if err != nil {
-			t.Logf("Failed to remove mock symlink: %v", err)
-		}
-
-		err = os.Rename(backupSystemctl, systemctlPath)
-		if err != nil {
-			t.Logf("Failed to restore real systemctl: %v", err)
-		}
-	})
-	t.Log("Installing the second agent, upgrading from the older version")
-	installCmd, err := getInstallCommand(ctx, fixture.PackageFormat(), srcPkg, nil)
-	require.NoError(t, err)
-
-	t.Log("Installing the second agent")
-	out, err = installCmd.CombinedOutput()
-	t.Log(string(out))
-	require.Error(t, err)
-
-	systemctlOut, err := os.ReadFile(assertionsPath)
-	require.NoError(t, err)
-	t.Log(string(systemctlOut))
-
-	statusLogs := strings.Split(string(systemctlOut), "\n")
-	filtered := []string{}
-
-	for _, v := range statusLogs {
-		if v != "" {
-			filtered = append(filtered, v)
-		}
-	}
-
-	require.Equal(t, 2, len(filtered))
-	require.Equal(t, filtered[0], serviceStop)
-	require.Equal(t, filtered[1], serviceStart)
-}
-
 func testTamperProtectedInstallUpgrade(
 	t *testing.T,
 	info *define.Info,
 	packageFormat string,
 	initialVersion string,
 	checkVersionUpgrade bool,
+	stopEndpointBeforeUpgrade bool,
 ) {
 	ctx := t.Context()
 
@@ -386,6 +258,14 @@ func testTamperProtectedInstallUpgrade(
 
 	initEndpointVersion := getEndpointVersion(t)
 	t.Logf("The initial endpoint version is %s", initEndpointVersion)
+
+	// Optionally stop the endpoint service before upgrade
+	if stopEndpointBeforeUpgrade {
+		t.Log("Stopping endpoint service before upgrade as requested")
+		out, err := exec.Command("sudo", "systemctl", "stop", "ElasticEndpoint").CombinedOutput()
+		t.Log(string(out))
+		require.NoError(t, err, "failed to stop ElasticEndpoint before upgrade")
+	}
 
 	// try to uninstall the agent without a token and assert failure
 	out, err := exec.Command("sudo", "elastic-agent", "uninstall", "-f").CombinedOutput()
