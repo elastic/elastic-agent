@@ -40,24 +40,24 @@ func TestStandaloneUpgrade(t *testing.T) {
 			unprivilegedAvailable = true
 		}
 		t.Run(fmt.Sprintf("Upgrade %s to %s (privileged)", startVersion, define.Version()), func(t *testing.T) {
-			testStandaloneUpgrade(t, startVersion, define.Version(), false)
+			testStandaloneUpgrade(t, startVersion, define.Version(), atesting.ArtifactFetcher(), upgradetest.WithUnprivileged(false))
 		})
 		if unprivilegedAvailable {
 			t.Run(fmt.Sprintf("Upgrade %s to %s (unprivileged)", startVersion, define.Version()), func(t *testing.T) {
-				testStandaloneUpgrade(t, startVersion, define.Version(), true)
+				testStandaloneUpgrade(t, startVersion, define.Version(), atesting.ArtifactFetcher(), upgradetest.WithUnprivileged(true))
 			})
 		}
 	}
 }
 
-func testStandaloneUpgrade(t *testing.T, startVersion *version.ParsedSemVer, endVersion string, unprivileged bool) {
+func testStandaloneUpgrade(t *testing.T, startVersion *version.ParsedSemVer, endVersion string, fetcher atesting.Fetcher, upgradeOpts ...upgradetest.UpgradeOpt) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	startFixture, err := atesting.NewFixture(
 		t,
 		startVersion.String(),
-		atesting.WithFetcher(atesting.ArtifactFetcher()),
+		atesting.WithFetcher(fetcher),
 	)
 	require.NoError(t, err, "error creating previous agent fixture")
 
@@ -73,6 +73,6 @@ func testStandaloneUpgrade(t *testing.T, startVersion *version.ParsedSemVer, end
 		return
 	}
 
-	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradetest.WithUnprivileged(unprivileged))
+	err = upgradetest.PerformUpgrade(ctx, startFixture, endFixture, t, upgradeOpts...)
 	assert.NoError(t, err)
 }
