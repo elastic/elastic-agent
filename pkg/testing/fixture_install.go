@@ -26,12 +26,13 @@ import (
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	agentsystemprocess "github.com/elastic/elastic-agent-system-metrics/metric/system/process"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
 // ErrNotInstalled is returned in cases where Agent isn't installed
-var ErrNotInstalled = errors.New("Elastic Agent is not installed") //nolint:stylecheck // Elastic Agent is a proper noun
+var ErrNotInstalled = errors.New("Elastic Agent is not installed") //nolint:staticcheck // Elastic Agent is a proper noun
 
 // CmdOpts creates vectors of command arguments for different agent commands
 type CmdOpts interface {
@@ -325,12 +326,12 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 
 		// environment variable AGENT_KEEP_INSTALLED=true will skip the uninstallation
 		// useful to debug the issue with the Elastic Agent
-		if f.t.Failed() && keepInstalledFlag() {
+		if f.t.Failed() && KeepInstalledFlag() {
 			f.t.Logf("skipping uninstall; test failed and AGENT_KEEP_INSTALLED=true")
 			return
 		}
 
-		if keepInstalledFlag() {
+		if KeepInstalledFlag() {
 			f.t.Logf("ignoring AGENT_KEEP_INSTALLED=true as test succeeded, " +
 				"keeping the agent installed will jeopardise other tests")
 		}
@@ -440,6 +441,19 @@ func getProcesses(t *gotesting.T, regex string) []runningProcess {
 	return processes
 }
 
+func (f *Fixture) SetDebRpmClient() error {
+	workDir := "/var/lib/elastic-agent"
+	socketPath, err := control.AddressFromPath(f.operatingSystem, workDir)
+	if err != nil {
+		return fmt.Errorf("failed to get control protcol address: %w", err)
+	}
+
+	c := client.New(client.WithAddress(socketPath))
+	f.setClient(c)
+
+	return nil
+}
+
 // installDeb installs the prepared Elastic Agent binary from the deb
 // package and registers a t.Cleanup function to uninstall the agent if
 // it hasn't been uninstalled. It also takes care of collecting a
@@ -473,7 +487,7 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, shou
 			f.t.Logf("error systemctl stop elastic-agent: %s, output: %s", err, string(out))
 		}
 
-		if keepInstalledFlag() {
+		if KeepInstalledFlag() {
 			f.t.Logf("skipping uninstall; test failed and AGENT_KEEP_INSTALLED=true")
 			return
 		}
@@ -491,6 +505,11 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, shou
 	out, err = exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
 	if err != nil {
 		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
+	}
+
+	err = f.SetDebRpmClient()
+	if err != nil {
+		return nil, err
 	}
 
 	if !shouldEnroll {
@@ -511,11 +530,11 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, shou
 	if installOpts.DelayEnroll {
 		enrollArgs = append(enrollArgs, "--delay-enroll")
 	}
-	if installOpts.EnrollOpts.URL != "" {
-		enrollArgs = append(enrollArgs, "--url", installOpts.EnrollOpts.URL)
+	if installOpts.URL != "" {
+		enrollArgs = append(enrollArgs, "--url", installOpts.URL)
 	}
-	if installOpts.EnrollOpts.EnrollmentToken != "" {
-		enrollArgs = append(enrollArgs, "--enrollment-token", installOpts.EnrollOpts.EnrollmentToken)
+	if installOpts.EnrollmentToken != "" {
+		enrollArgs = append(enrollArgs, "--enrollment-token", installOpts.EnrollmentToken)
 	}
 	out, err = exec.CommandContext(ctx, "sudo", enrollArgs...).CombinedOutput()
 	if err != nil {
@@ -580,6 +599,11 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
 	}
 
+	err = f.SetDebRpmClient()
+	if err != nil {
+		return nil, err
+	}
+
 	if !shouldEnroll {
 		return nil, nil
 	}
@@ -598,11 +622,11 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 	if installOpts.DelayEnroll {
 		enrollArgs = append(enrollArgs, "--delay-enroll")
 	}
-	if installOpts.EnrollOpts.URL != "" {
-		enrollArgs = append(enrollArgs, "--url", installOpts.EnrollOpts.URL)
+	if installOpts.URL != "" {
+		enrollArgs = append(enrollArgs, "--url", installOpts.URL)
 	}
-	if installOpts.EnrollOpts.EnrollmentToken != "" {
-		enrollArgs = append(enrollArgs, "--enrollment-token", installOpts.EnrollOpts.EnrollmentToken)
+	if installOpts.EnrollmentToken != "" {
+		enrollArgs = append(enrollArgs, "--enrollment-token", installOpts.EnrollmentToken)
 	}
 	// run sudo elastic-agent enroll
 	out, err = exec.CommandContext(ctx, "sudo", enrollArgs...).CombinedOutput()
@@ -709,7 +733,7 @@ func (f *Fixture) uninstallNoPkgManager(ctx context.Context, uninstallOpts *Unin
 	}
 
 	if err != nil && topPathStats != nil {
-		return out, fmt.Errorf("Elastic Agent is still installed at [%s]", topPath) //nolint:stylecheck // Elastic Agent is a proper noun
+		return out, fmt.Errorf("Elastic Agent is still installed at [%s]", topPath) //nolint:staticcheck // Elastic Agent is a proper noun
 	}
 
 	return out, nil
@@ -812,7 +836,7 @@ func collectDiagFlag() bool {
 	return v
 }
 
-func keepInstalledFlag() bool {
+func KeepInstalledFlag() bool {
 	// failure reports false (ignore error)
 	v, _ := strconv.ParseBool(os.Getenv("AGENT_KEEP_INSTALLED"))
 	return v
