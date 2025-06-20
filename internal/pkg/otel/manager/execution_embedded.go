@@ -19,15 +19,15 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-func newRuntimeEmbedded() *runtimeEmbedded {
-	return &runtimeEmbedded{}
+func newExecutionEmbedded() *embeddedExecution {
+	return &embeddedExecution{}
 }
 
-type runtimeEmbedded struct {
+type embeddedExecution struct {
 }
 
 // startCollector starts the collector in a new goroutine.
-func (r *runtimeEmbedded) startCollector(ctx context.Context, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus) (collectorHandle, error) {
+func (r *embeddedExecution) startCollector(ctx context.Context, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus) (collectorHandle, error) {
 	collectorCtx, collectorCancel := context.WithCancel(context.Background())
 	ap := agentprovider.NewProvider(cfg)
 

@@ -27,21 +27,21 @@ import (
 
 const processKillAfter = 5 * time.Second
 
-func newRuntimeSubprocess(collectorPath string, collectorArgs []string) *runtimeSubprocess {
-	return &runtimeSubprocess{
+func newSubprocessExecution(collectorPath string, collectorArgs []string) *subprocessExecution {
+	return &subprocessExecution{
 		collectorPath: collectorPath,
 		collectorArgs: collectorArgs,
 	}
 }
 
-type runtimeSubprocess struct {
+type subprocessExecution struct {
 	collectorPath string
 	collectorArgs []string
 }
 
 // startCollector starts a supervised collector and monitors its health. Process exit errors are sent to the
 // processErrCh channel. Other run errors, such as not able to connect to the health endpoint, are sent to the runErrCh channel.
-func (r *runtimeSubprocess) startCollector(ctx context.Context, logger *logger.Logger, cfg *confmap.Conf, processErrCh chan error, statusCh chan *status.AggregateStatus) (collectorHandle, error) {
+func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger.Logger, cfg *confmap.Conf, processErrCh chan error, statusCh chan *status.AggregateStatus) (collectorHandle, error) {
 	if cfg == nil {
 		// configuration is required
 		return nil, errors.New("no configuration provided")
