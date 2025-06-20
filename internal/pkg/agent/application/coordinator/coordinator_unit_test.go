@@ -35,6 +35,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -446,6 +447,7 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 	upgradeMgr, err := upgrade.NewUpgrader(
 		log,
 		&artifact.Config{},
+		&configuration.UpgradeConfig{},
 		&info.AgentInfo{},
 	)
 	require.NoError(t, err, "errored when creating a new upgrader")

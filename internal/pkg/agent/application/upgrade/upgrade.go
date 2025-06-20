@@ -70,12 +70,13 @@ func init() {
 
 // Upgrader performs an upgrade
 type Upgrader struct {
-	log            *logger.Logger
-	settings       *artifact.Config
-	agentInfo      info.Agent
-	upgradeable    bool
-	fleetServerURI string
-	markerWatcher  MarkerWatcher
+	log              *logger.Logger
+	downloadSettings *artifact.Config
+	upgradeSettings  *configuration.UpgradeConfig
+	agentInfo        info.Agent
+	upgradeable      bool
+	fleetServerURI   string
+	markerWatcher    MarkerWatcher
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -86,13 +87,14 @@ func IsUpgradeable() bool {
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
-func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.Agent) (*Upgrader, error) {
+func NewUpgrader(log *logger.Logger, downloadSettings *artifact.Config, upgradeSettings *configuration.UpgradeConfig, agentInfo info.Agent) (*Upgrader, error) {
 	return &Upgrader{
-		log:           log,
-		settings:      settings,
-		agentInfo:     agentInfo,
-		upgradeable:   IsUpgradeable(),
-		markerWatcher: newMarkerFileWatcher(markerFilePath(paths.Data()), log),
+		log:              log,
+		downloadSettings: downloadSettings,
+		upgradeSettings:  upgradeSettings,
+		agentInfo:        agentInfo,
+		upgradeable:      IsUpgradeable(),
+		markerWatcher:    newMarkerFileWatcher(markerFilePath(paths.Data()), log),
 	}, nil
 }
 
@@ -107,7 +109,7 @@ func (u *Upgrader) SetClient(c fleetclient.Sender) {
 	u.log.Debugf("Set client changed URI to %s", u.fleetServerURI)
 }
 
-// Reload reloads the artifact configuration for the upgrader.
+// Reload reloads the artifact download and upgrade configurations for the upgrader.
 // As of today, December 2023, fleet-server does not send most of the configuration
 // defined in artifact.Config, what will likely change in the near future.
 func (u *Upgrader) Reload(rawConfig *config.Config) error {
@@ -133,17 +135,18 @@ func (u *Upgrader) Reload(rawConfig *config.Config) error {
 
 	if cfg.Settings.DownloadConfig.SourceURI != "" {
 		u.log.Infof("Source URI changed from %q to %q",
-			u.settings.SourceURI,
+			u.downloadSettings.SourceURI,
 			cfg.Settings.DownloadConfig.SourceURI)
 	} else {
 		// source uri unset, reset to default
 		u.log.Infof("Source URI reset from %q to %q",
-			u.settings.SourceURI,
+			u.downloadSettings.SourceURI,
 			artifact.DefaultSourceURI)
 		cfg.Settings.DownloadConfig.SourceURI = artifact.DefaultSourceURI
 	}
 
-	u.settings = cfg.Settings.DownloadConfig
+	u.downloadSettings = cfg.Settings.DownloadConfig
+	u.upgradeSettings = cfg.Settings.Upgrade
 	return nil
 }
 
@@ -351,8 +354,18 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	watcherExecutable := selectWatcherExecutable(paths.Top(), previous, current)
 
+	// Check if the target Agent version supports the rollback window feature. If it doesn't,
+	// it won't know how to perform a deferred cleanup after a successful upgrade, so we need
+	// to rely on the Upgrade Watcher to do the cleanup immediately after it has deemed the upgrade
+	// to be successful. We ask the Upgrade Watcher to do this immediate cleanup by passing
+	// a rollback window of 0 seconds to the Upgrade Watcher.
+	rollbackWindow := u.upgradeSettings.Rollback.Window
+	if !isRollbackWindowSupported(parsedVersion) {
+		rollbackWindow = 0
+	}
+
 	var watcherCmd *exec.Cmd
-	if watcherCmd, err = InvokeWatcher(u.log, watcherExecutable); err != nil {
+	if watcherCmd, err = InvokeWatcher(u.log, watcherExecutable, rollbackWindow); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
 		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
 		return nil, goerrors.Join(err, rollbackErr)
@@ -377,6 +390,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	return cb, nil
 }
 
+// selectWatcherExecutable returns the path to the watcher executable for the Agent that has the newer
+// of the two Agent versions involved in the upgrade.
 func selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string {
 	// check if the upgraded version is less than the previous (currently installed) version
 	if current.parsedVersion.Less(*previous.parsedVersion) {
@@ -477,7 +492,7 @@ func (u *Upgrader) sourceURI(retrievedURI string) string {
 		return retrievedURI
 	}
 
-	return u.settings.SourceURI
+	return u.downloadSettings.SourceURI
 }
 
 func extractAgentVersion(metadata packageMetadata, upgradeVersion string) agentVersion {
