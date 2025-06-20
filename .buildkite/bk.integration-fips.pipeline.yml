@@ -2,6 +2,7 @@
 
 env:
   ASDF_MAGE_VERSION: 1.14.0
+  MS_GOTOOLCHAIN_TELEMETRY_ENABLED: "0"
   CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
   CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips"
   TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
