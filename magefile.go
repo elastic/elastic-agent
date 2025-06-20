@@ -2266,7 +2266,7 @@ func (Integration) Check() error {
 	return errors.Join(
 		define.ValidateDir("testing/integration/ess"),
 		define.ValidateDir("testing/integration/serverless"),
-		define.ValidateDir("testing/integration/serverless_beats"),
+		define.ValidateDir("testing/integration/beats/serverless"),
 		define.ValidateDir("testing/integration/leak"),
 		define.ValidateDir("testing/integration/k8s"),
 	)
@@ -2894,7 +2894,7 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 	if err != nil {
 		return fmt.Errorf("error setting binary name: %w", err)
 	}
-	return integRunner(ctx, "testing/integration/serverless_beats", false, "TestBeatsServerless")
+	return integRunner(ctx, "testing/integration/beats/serverless", false, "TestBeatsServerless")
 }
 
 // TestForResourceLeaks runs tests that check for resource leaks

@@ -4,7 +4,7 @@
 
 //go:build integration
 
-package serverless_beats
+package serverless
 
 import (
 	"flag"
