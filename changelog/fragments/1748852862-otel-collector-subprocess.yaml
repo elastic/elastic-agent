@@ -1,4 +1,0 @@
-kind: feature
-summary: Add support for running OTEL collector as a supervised subprocess
-component: elastic-agent
-pr: https://github.com/elastic/elastic-agent/pull/8248
