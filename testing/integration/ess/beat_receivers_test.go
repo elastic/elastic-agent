@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +18,8 @@ import (
 	"testing"
 	"text/template"
 	"time"
+
+	"github.com/elastic/elastic-agent/pkg/component"
 
 	"github.com/gofrs/uuid/v5"
 	"gopkg.in/yaml.v2"
@@ -242,23 +245,9 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error
-		agentStatus, statusErr = classicFixture.ExecStatus(ctx)
+		status, statusErr := classicFixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
-		// agent should be healthy
-		assert.Equal(collect, int(cproto.State_HEALTHY), agentStatus.State)
-		// we should have 3 components running: filestream-monitoring, http/metrics-monitoring and beats/metrics-monitoring
-		assert.Equal(collect, 3, len(agentStatus.Components))
-
-		// all the components should be healthy, their units should be healthy, and should identify themselves
-		// as beats processes via their version info
-		for _, component := range agentStatus.Components {
-			assert.Equal(collect, int(cproto.State_HEALTHY), component.State)
-			assert.Equal(collect, "beat-v2-client", component.VersionInfo.Name)
-			for _, unit := range component.Units {
-				assert.Equal(collect, int(cproto.State_HEALTHY), unit.State)
-			}
-		}
-
+		assertBeatsHealthy(collect, &status, component.ProcessRuntimeManager, 3)
 		return
 	}, 1*time.Minute, 1*time.Second)
 
@@ -327,23 +316,9 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error
-		otelStatus, statusErr = beatReceiverFixture.ExecStatus(ctx)
+		status, statusErr := beatReceiverFixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
-		// agent should be healthy
-		assert.Equal(collect, int(cproto.State_HEALTHY), otelStatus.State)
-		// we should have 3 components running: filestream-monitoring, http/metrics-monitoring and beats/metrics-monitoring
-		assert.Equal(collect, 3, len(otelStatus.Components))
-
-		// all the components should be healthy, their units should be healthy, and should identify themselves
-		// as beats receivers via their version info
-		for _, component := range otelStatus.Components {
-			assert.Equal(collect, int(cproto.State_HEALTHY), component.State)
-			assert.Equal(collect, "beats-receiver", component.VersionInfo.Name)
-			for _, unit := range component.Units {
-				assert.Equal(collect, int(cproto.State_HEALTHY), unit.State)
-			}
-		}
-
+		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 3)
 		return
 	}, 1*time.Minute, 1*time.Second)
 
@@ -711,11 +686,205 @@ outputs:
 	})
 }
 
+// TestBeatsReceiverLogs is a test that compares logs emitted by beats processes to those emitted by beats receivers.
+func TestBeatsReceiverLogs(t *testing.T) {
+	_ = define.Require(t, define.Requirements{
+		Group: Default,
+		Local: true,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: nil,
+	})
+	type configOptions struct {
+		RuntimeExperimental string
+	}
+	configTemplate := `agent.logging.level: info
+agent.logging.to_stderr: true
+agent.logging.to_files: false
+inputs:
+  # Collecting system metrics
+  - type: system/metrics
+    id: unique-system-metrics-input
+    _runtime_experimental: {{.RuntimeExperimental}}
+    streams:
+      - metricsets:
+        - cpu
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [http://localhost:9200]
+    api_key: placeholder
+agent.monitoring.enabled: false
+`
+
+	var configBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			configOptions{
+				RuntimeExperimental: "process",
+			}))
+	processConfig := configBuffer.Bytes()
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Contents of agent config file:\n")
+			println(string(processConfig))
+		}
+	})
+	require.NoError(t,
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			configOptions{
+				RuntimeExperimental: "otel",
+			}))
+	receiverConfig := configBuffer.Bytes()
+
+	// set up a standalone agent
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	err = fixture.Configure(ctx, processConfig)
+	require.NoError(t, err)
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err)
+	cmd.WaitDelay = 1 * time.Second
+
+	var output strings.Builder
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	err = cmd.Start()
+	require.NoError(t, err)
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+		assertBeatsHealthy(collect, &status, component.ProcessRuntimeManager, 1)
+		return
+	}, 1*time.Minute, 1*time.Second)
+
+	cancel()
+	require.Error(t, cmd.Wait())
+	processLogsString := output.String()
+	output.Reset()
+
+	// switch to the otel runtime
+	ctx, cancel = testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	fixture, err = define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	err = fixture.Configure(ctx, receiverConfig)
+	require.NoError(t, err)
+
+	cmd, err = fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err)
+	cmd.WaitDelay = 1 * time.Second
+
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	err = cmd.Start()
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 1)
+		return
+	}, 1*time.Minute, 1*time.Second)
+	cancel()
+	require.Error(t, cmd.Wait())
+	receiverLogsString := output.String()
+
+	// getBeatStartLogRecord returns the log record for the a particular log line emitted when the beat starts
+	// This log line is identical between beats processes and receivers, so it's a good point of comparison
+	getBeatStartLogRecord := func(logs string) (map[string]any, error) {
+		for _, line := range strings.Split(logs, "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			logRecord := make(map[string]any)
+			if unmarshalErr := json.Unmarshal([]byte(line), &logRecord); err != nil {
+				return nil, unmarshalErr
+			}
+
+			if message, ok := logRecord["message"].(string); !ok || !strings.HasPrefix(message, "Beat name:") {
+				continue
+			}
+
+			return logRecord, nil
+		}
+		return nil, nil
+	}
+
+	processLog, err := getBeatStartLogRecord(processLogsString)
+	require.NoError(t, err)
+	assert.NotEmpty(t, processLog)
+	receiverLog, err := getBeatStartLogRecord(receiverLogsString)
+	require.NoError(t, err)
+	assert.NotEmpty(t, receiverLog)
+
+	// Check that the process log is a subset of the receiver log
+	for key, value := range processLog {
+		assert.Contains(t, receiverLog, key)
+		if key == "@timestamp" { // the timestamp value will be different
+			continue
+		}
+		assert.Equal(t, value, receiverLog[key])
+	}
+}
+
 func assertCollectorComponentsHealthy(t *assert.CollectT, status *atesting.AgentStatusCollectorOutput) {
 	assert.Equal(t, int(cproto.CollectorComponentStatus_StatusOK), status.Status, "component status should be ok")
 	assert.Equal(t, "", status.Error, "component status should not have an error")
 	for _, componentStatus := range status.ComponentStatusMap {
 		assertCollectorComponentsHealthy(t, componentStatus)
+	}
+}
+
+func assertBeatsHealthy(t *assert.CollectT, status *atesting.AgentStatusOutput, runtime component.RuntimeManager, componentCount int) {
+	var componentVersionInfoName string
+	switch runtime {
+	case "otel":
+		componentVersionInfoName = "beats-receiver"
+	default:
+		componentVersionInfoName = "beat-v2-client"
+	}
+
+	// agent should be healthy
+	assert.Equal(t, int(cproto.State_HEALTHY), status.State)
+	assert.Equal(t, componentCount, len(status.Components))
+
+	// all the components should be healthy, their units should be healthy, and should identify themselves
+	// as beats processes via their version info
+	for _, comp := range status.Components {
+		assert.Equal(t, int(cproto.State_HEALTHY), comp.State)
+		assert.Equal(t, componentVersionInfoName, comp.VersionInfo.Name)
+		for _, unit := range comp.Units {
+			assert.Equal(t, int(cproto.State_HEALTHY), unit.State)
+		}
 	}
 }
 
