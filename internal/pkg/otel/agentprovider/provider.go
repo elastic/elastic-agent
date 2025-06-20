@@ -7,81 +7,107 @@ package agentprovider
 import (
 	"context"
 	"fmt"
-	"io"
+	"sync"
 
 	"github.com/gofrs/uuid/v5"
 	"go.opentelemetry.io/collector/confmap"
 )
 
-const AgentConfigProviderSchemeName = "elasticagent"
-
 // build time guard that BufferProvider implements confmap.Provider
-var _ confmap.Provider = (*BufferProvider)(nil)
+var _ confmap.Provider = (*Provider)(nil)
 
-// BufferProvider is a fixed provider that has a factory but only returns the same provider.
-type BufferProvider struct {
+// Provider is a fixed provider that has a factory but only returns the same provider.
+type Provider struct {
 	uri string
-	cfg *confmap.Conf
+
+	cfg     *confmap.Conf
+	cfgMu   sync.RWMutex
+	updated chan struct{}
+
+	canceller   context.CancelFunc
+	cancelledMu sync.Mutex
 }
 
-// NewProvider creates a `agentprovider.BufferProvider`.
-func NewProvider(in io.Reader) (*BufferProvider, error) {
+// NewProvider creates a `agentprovider.Provider`.
+func NewProvider(cfg *confmap.Conf) *Provider {
 	uri := fmt.Sprintf("%s:%s", AgentConfigProviderSchemeName, uuid.Must(uuid.NewV4()).String())
-
-	if in == nil {
-		return &BufferProvider{
-			uri: uri,
-			cfg: nil,
-		}, nil
+	return &Provider{
+		uri:     uri,
+		cfg:     cfg,
+		updated: make(chan struct{}, 1), // buffer of 1, stores the updated state
 	}
-
-	configBytes, err := io.ReadAll(in)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read config from buffer: %w", err)
-	}
-
-	retrieved, err := confmap.NewRetrievedFromYAML(configBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse config from buffer: %w", err)
-	}
-
-	conf, err := retrieved.AsConf()
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert config to confmap: %w", err)
-	}
-
-	return &BufferProvider{
-		uri: uri,
-		cfg: conf,
-	}, nil
 }
 
-// NewFactory provides a factory. This factory doesn't create a new provider on each call. It always returns the same provider.
-func (p *BufferProvider) NewFactory() confmap.ProviderFactory {
+// NewFactory provides a factory.
+//
+// This factory doesn't create a new provider on each call. It always returns the same provider.
+func (p *Provider) NewFactory() confmap.ProviderFactory {
 	return confmap.NewProviderFactory(func(_ confmap.ProviderSettings) confmap.Provider {
 		return p
 	})
 }
 
+// Update updates the latest configuration in the provider.
+func (p *Provider) Update(cfg *confmap.Conf) {
+	p.cfgMu.Lock()
+	p.cfg = cfg
+	p.cfgMu.Unlock()
+	select {
+	case p.updated <- struct{}{}:
+	default:
+		// already has an updated state
+	}
+}
+
 // Retrieve returns the latest configuration.
-func (p *BufferProvider) Retrieve(_ context.Context, uri string, _ confmap.WatcherFunc) (*confmap.Retrieved, error) {
+func (p *Provider) Retrieve(ctx context.Context, uri string, watcher confmap.WatcherFunc) (*confmap.Retrieved, error) {
 	if uri != p.uri {
 		return nil, fmt.Errorf("%q uri doesn't equal defined %q provider", uri, AgentConfigProviderSchemeName)
 	}
-	return confmap.NewRetrieved(p.cfg.ToStringMap())
+
+	// get latest cfg at time of call
+	p.cfgMu.RLock()
+	cfg := p.cfg
+	p.cfgMu.RUnlock()
+
+	// don't use passed in context, as the cancel comes from Shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	p.replaceCanceller(cancel)
+	go func() {
+		defer p.replaceCanceller(nil) // ensure the context is always cleaned up
+		select {
+		case <-ctx.Done():
+			return
+		case <-p.updated:
+			watcher(&confmap.ChangeEvent{})
+		}
+	}()
+
+	return confmap.NewRetrieved(cfg.ToStringMap())
 }
 
 // Scheme is the scheme for this provider.
-func (p *BufferProvider) Scheme() string {
+func (p *Provider) Scheme() string {
 	return AgentConfigProviderSchemeName
 }
 
 // Shutdown called by collect when stopping.
-func (p *BufferProvider) Shutdown(context.Context) error {
+func (p *Provider) Shutdown(ctx context.Context) error {
+	p.replaceCanceller(nil)
 	return nil
 }
 
 // URI returns the URI to be used for this provider.
-func (p *BufferProvider) URI() string {
+func (p *Provider) URI() string {
 	return p.uri
+}
+
+func (p *Provider) replaceCanceller(replace context.CancelFunc) {
+	p.cancelledMu.Lock()
+	canceller := p.canceller
+	p.canceller = replace
+	p.cancelledMu.Unlock()
+	if canceller != nil {
+		canceller()
+	}
 }

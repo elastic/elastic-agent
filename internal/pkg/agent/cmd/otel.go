@@ -102,7 +102,7 @@ func prepareCollectorSettings(configFiles []string, supervised bool) (*otelcol.C
 	var settings *otelcol.CollectorSettings
 	if supervised {
 		// add stdin config provider
-		configProvider, err := agentprovider.NewProvider(os.Stdin)
+		configProvider, err := agentprovider.NewBufferProvider(os.Stdin)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create config provider: %w", err)
 		}
