@@ -17,6 +17,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -38,7 +39,9 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
+	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/proxytest"
+	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
 const (
@@ -58,8 +61,6 @@ var protectionTests = []struct {
 	},
 }
 
-<<<<<<< HEAD
-=======
 func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: Deb,
@@ -423,7 +424,7 @@ func testTamperProtectedInstallUpgrade(
 	t.Log("successfully uninstalled endpoint using the uninstall token")
 }
 
->>>>>>> 249885f9f ([deb/rpm] restart endpoint with tamper protection after elastic-agent  (#8637))
+// TestInstallAndCLIUninstallWithEndpointSecurity tests that the agent ca
 // TestInstallAndCLIUninstallWithEndpointSecurity tests that the agent can
 // install and uninstall the endpoint-security service while remaining healthy.
 //
@@ -540,6 +541,7 @@ func installSecurityAgent(ctx context.Context, t *testing.T, info *define.Info, 
 	policy, agentID, err := tools.InstallAgentWithPolicy(ctx, t,
 		installOpts, fixture, info.KibanaClient, createPolicyReq)
 	require.NoError(t, err, "failed to install agent with policy")
+
 	return fixture, policy, agentID
 }
 
@@ -1631,8 +1633,8 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 }
 
 func prepareProxies(t *testing.T, fleethostWrong *url.URL, defaultFleetHost string) (
-	certificatePaths, certificatePaths, certificatePaths, *proxytest.Proxy, *proxytest.Proxy, *proxytest.Proxy) {
-
+	certificatePaths, certificatePaths, certificatePaths, *proxytest.Proxy, *proxytest.Proxy, *proxytest.Proxy,
+) {
 	mtlsCLI := generateMTLSCerts(t, "mtlsCLI")
 	mtlsPolicy := generateMTLSCerts(t, "mtlsPolicy")
 	oneWayTLSPolicy := generateMTLSCerts(t, "oneWayTLSPolicy")
