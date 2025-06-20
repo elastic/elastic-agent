@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   unit-tests:
-    runs-on: windows-11-image
+    runs-on: windows-11-arm
     steps:
       - uses: actions/checkout@v4
 
