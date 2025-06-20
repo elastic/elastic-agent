@@ -3922,9 +3922,10 @@ func (h Helm) BuildDependencies() error {
 	settings.SetNamespace("")
 	actionConfig := &action.Configuration{}
 
-	chartFile, err := os.ReadFile(fmt.Sprintf("%s/Chart.yaml", helmChartPath))
+	chartFilePath := filepath.Join(helmChartPath, "Chart.yaml")
+	chartFile, err := os.ReadFile(chartFilePath)
 	if err != nil {
-		return fmt.Errorf("could not read %s/Chart.yaml: %w", helmChartPath, err)
+		return fmt.Errorf("could not read %q: %w", chartFilePath, err)
 	}
 
 	dependencies := struct {
