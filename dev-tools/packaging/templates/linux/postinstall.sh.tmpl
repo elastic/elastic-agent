@@ -6,12 +6,41 @@ commit_hash="{{ commit_short }}"
 version_dir="{{agent_package_version}}{{snapshot_suffix}}"
 symlink="/usr/share/elastic-agent/bin/elastic-agent"
 new_agent_dir="/var/lib/elastic-agent/data/elastic-agent-$version_dir-$commit_hash"
+new_endpoint_component_bin="$new_agent_dir/components/endpoint-security"
 
 # delete $symlink if exists
 if test -L "$symlink"; then
     echo "found symlink $symlink, unlink"
     unlink "$symlink"
 fi
+
+SERVICE_NAME="ElasticEndpoint"
+
+echo "Checking if $SERVICE_NAME is installed"
+if systemctl list-unit-files --type=service | grep -q "^${SERVICE_NAME}.service"; then
+
+    installed_endpoint_version="$(/opt/Elastic/Endpoint/elastic-endpoint version)"
+    archive_endpoint_version="$("$new_endpoint_component_bin" version)"
+
+    echo "${SERVICE_NAME} is installed at version ${installed_endpoint_version}"
+    if ! systemctl is-active --quiet "$SERVICE_NAME"; then
+        echo "$SERVICE_NAME is installed but not running"
+        if [[ "$installed_endpoint_version" == "$archive_endpoint_version" ]]; then
+            echo "New endpoint and installed endpoint versions are the same: \"${installed_endpoint_version}\""
+            echo "Starting $SERVICE_NAME"
+            sudo systemctl start ${SERVICE_NAME}
+        else
+            echo "New endpoint version  \"${archive_endpoint_version}\" is different than the one that's already
+            installed  \"${installed_endpoint_version}\""
+        fi
+    else
+        # Endpoint can already be running if tamper protection is not enabled
+        echo "$SERVICE_NAME is already running"
+    fi
+else
+    echo "$SERVICE_NAME is not installed"
+fi
+
 
 # create symlink to the new agent
 echo "create symlink "$symlink" to "$new_agent_dir/elastic-agent""
