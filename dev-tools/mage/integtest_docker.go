@@ -83,7 +83,7 @@ func (d *DockerIntegrationTester) Test(dir string, mageTarget string, env map[st
 	dockerGoPkgCache := "/gocache"
 
 	// Execute the inside of docker compose.
-	args := []string{"compose", "-p", dockerComposeProjectName(), "run",
+	args := []string{"compose", "-p", dockerComposeProjectName(), "--progress=plain", "run",
 		"-e", "DOCKER_COMPOSE_PROJECT_NAME=" + dockerComposeProjectName(),
 		// Disable strict.perms because we mount host dirs inside containers
 		// and the UID/GID won't meet the strict requirements.
@@ -260,7 +260,7 @@ func dockerComposeBuildImages() error {
 	}
 
 	if _, forcePull := os.LookupEnv("DOCKER_PULL"); forcePull {
-		args = append(args, "--pull", "--quiet")
+		args = append(args, "--pull")
 	}
 
 	out := io.Discard
