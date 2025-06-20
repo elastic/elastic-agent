@@ -64,7 +64,7 @@ func NewEmptyPolicy(data TmplPolicy) (string, error) {
 type AckableAction struct {
 	ActionID string
 	acked    bool
-	data     string
+	Data     string
 }
 
 func NewActionWithEmptyPolicyChange(actionID string, data TmplPolicy) (AckableAction, error) {
@@ -102,7 +102,7 @@ func NewAction(data ActionTmpl) (AckableAction, error) {
 
 	return AckableAction{
 		ActionID: data.ActionID,
-		data:     buf.String(),
+		Data:     buf.String(),
 	}, nil
 }
 
