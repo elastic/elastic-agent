@@ -1271,6 +1271,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancing
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.127.0/go.mod h1:+j88Shas0ipAMWEGCfY4Wn2lfJ4i5wGQOqIioJ+PCY0=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusremotewriteexporter v0.127.0 h1:D66eqoO8s9GBeqvpJpOeXPdml2pf1LAxFIDp3sW6kQ0=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusremotewriteexporter v0.127.0/go.mod h1:3s2sN5SPnIgcj/REtDRm7ra7wbamUXRNsKWdiq9ozqo=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.127.0 h1:2vjW1LqUBgPE8w8KbVLypVqOqLiCyS5hynIE2vrF4Rc=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.127.0/go.mod h1:a8bCcGQCLviFAqSIdVLcxS3QEzk1BsWb+nBlRXgFOPU=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding v0.127.0 h1:3x1SEZgw9LwSwfBNWRXN6QI2FMLpzzD9YFs3yDGeAFA=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding v0.127.0/go.mod h1:PcZ2+7jJkl7J0k9xVFaVFdw4+0xK30ZXxHPu990uOIM=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/otlpencodingextension v0.127.0 h1:uOK6WT8/vqPYLNkdRM4ywTKDYfXe+BK9tZMNGNs7Lq8=
