@@ -49,12 +49,6 @@ exporters:
     endpoints:
       - ${ELASTIC_ENDPOINT} # Will be populated from environment variable
     api_key: ${ELASTIC_API_KEY} # Will be populated from environment variable
-    logs_dynamic_index:
-      enabled: true
-    metrics_dynamic_index:
-      enabled: true
-    traces_dynamic_index:
-      enabled: true
     # tls:
     #   insecure_skip_verify: true
     mapping:
