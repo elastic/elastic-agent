@@ -217,7 +217,7 @@ func (b *dockerBuilder) expandDockerfile(templatesDir string, data map[string]in
 	return nil
 }
 
-// dockerBuild runs "docker build -t t1 -t t2 ... buildDir"
+// dockerBuild runs "docker build --progress=plain -t t1 -t t2 ... buildDir"
 // returns the main tag additional tags if specified as part of extra_tags property
 // the extra tags are not push to the registry from b.ExtraVars["repository"]
 // returns an error if the command fails
@@ -237,6 +237,7 @@ func (b *dockerBuilder) dockerBuild() (string, []string, error) {
 
 	args := []string{
 		"build",
+		"--progress=plain",
 		"-t", mainTag,
 	}
 	extraTags := []string{}
