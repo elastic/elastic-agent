@@ -41,6 +41,7 @@ check-ci:
 	@mage -v helm:lint
 	@mage -v helm:updateAgentVersion
 	@mage -v helm:renderExamples
+	@mage -v integration:buildKubernetesTestData
 	@$(MAKE) check-no-changes
 
 ## check: run all the checks including linting using golangci-lint.

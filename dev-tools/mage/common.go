@@ -435,7 +435,7 @@ func untar(sourceFile, destinationDir string) error {
 
 	var fileReader io.ReadCloser = file
 
-	if strings.HasSuffix(sourceFile, ".gz") {
+	if strings.HasSuffix(sourceFile, ".gz") || strings.HasSuffix(sourceFile, ".tgz") {
 		if fileReader, err = gzip.NewReader(file); err != nil {
 			return err
 		}
