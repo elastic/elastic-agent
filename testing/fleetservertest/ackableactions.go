@@ -73,7 +73,7 @@ func (c *CheckinActionsWithAcker) NextAction() (CheckinAction, *HTTPError) {
 
 	var actions []string
 	for _, a := range checkin.AckableAction {
-		actions = append(actions, a.data)
+		actions = append(actions, a.Data)
 	}
 	return CheckinAction{
 		AckToken: checkin.AckToken,

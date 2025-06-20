@@ -81,7 +81,7 @@ func TestRunFleetServer(t *testing.T) {
 		switch actionsIdx {
 		case 0:
 			return CheckinAction{
-					AckToken: "tmpl.AckToken", Actions: []string{action.data}},
+					AckToken: "tmpl.AckToken", Actions: []string{action.Data}},
 				nil
 		}
 
@@ -157,7 +157,7 @@ func ExampleNewServer_checkin() {
 	// NewHandlerCheckin
 	ts := NewServer(&Handlers{
 		CheckinFn: NewHandlerCheckin(func() (CheckinAction, *HTTPError) {
-			return CheckinAction{Actions: []string{actions.data}}, nil
+			return CheckinAction{Actions: []string{actions.Data}}, nil
 		})},
 		WithAgentID(agentID))
 
@@ -195,7 +195,7 @@ func ExampleNewServer_checkin_fleetConnectionParams() {
 	// NewHandlerCheckin
 	ts := NewServer(&Handlers{
 		CheckinFn: NewHandlerCheckin(func() (CheckinAction, *HTTPError) {
-			return CheckinAction{Actions: []string{actions.data}}, nil
+			return CheckinAction{Actions: []string{actions.Data}}, nil
 		})},
 		WithAgentID(agentID))
 
@@ -445,7 +445,7 @@ func ExampleNewServer_checkin_fakeComponent() {
 
 		switch count {
 		case 0:
-			return CheckinAction{Actions: []string{action.data}}, nil
+			return CheckinAction{Actions: []string{action.Data}}, nil
 		case 1:
 			return CheckinAction{}, &HTTPError{StatusCode: http.StatusTeapot}
 		}
@@ -513,7 +513,7 @@ func ExampleNewServer_checkin_withDelay() {
 	nextAction := func() (CheckinAction, *HTTPError) {
 		if !sent {
 			sent = true
-			return CheckinAction{Actions: []string{action.data}, Delay: delay}, nil
+			return CheckinAction{Actions: []string{action.Data}, Delay: delay}, nil
 		}
 
 		return CheckinAction{}, nil
@@ -664,7 +664,7 @@ func ExampleNewServer_checkin_and_ackWithAcker() {
 
 		switch actionsIdx {
 		case 0:
-			return CheckinAction{Actions: []string{action.data}}, nil
+			return CheckinAction{Actions: []string{action.Data}}, nil
 		case 1:
 			return CheckinAction{}, &HTTPError{StatusCode: http.StatusTeapot}
 		}
