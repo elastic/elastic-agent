@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	otelConfigFlagName = "config"
-	otelSetFlagName    = "set"
+	otelConfigFlagName        = "config"
+	otelSetFlagName           = "set"
+	otelSetSupervisedFlagName = "supervised"
 )
 
 func setupOtelFlags(flags *pflag.FlagSet) {
@@ -27,6 +28,11 @@ func setupOtelFlags(flags *pflag.FlagSet) {
 
 	flags.StringArray(otelSetFlagName, []string{}, "Set arbitrary component config property. The component has to be defined in the config file and the flag"+
 		" has a higher precedence. Array config properties are overridden and maps are joined. Example --set=processors.batch.timeout=2s")
+
+	flags.Bool(otelSetSupervisedFlagName, false, "Set that this collector is supervised.")
+	// the only error we can get here is that the flag does not exist
+	// but look above, so we explicitly ignore it
+	_ = flags.MarkHidden(otelSetSupervisedFlagName)
 
 	goFlags := new(flag.FlagSet)
 	featuregate.GlobalRegistry().RegisterFlags(goFlags)

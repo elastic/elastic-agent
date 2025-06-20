@@ -20,7 +20,7 @@ func TestProvider_NewFactory(t *testing.T) {
 
 func TestProvider_Schema(t *testing.T) {
 	p := NewProvider(nil)
-	assert.Equal(t, schemeName, p.Scheme())
+	assert.Equal(t, AgentConfigProviderSchemeName, p.Scheme())
 }
 
 func TestProvider_URI(t *testing.T) {
