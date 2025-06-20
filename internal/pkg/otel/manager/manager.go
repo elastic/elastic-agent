@@ -16,11 +16,11 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-type CollectorRuntime string
+type ExecutionMode string
 
 const (
-	CollectorRuntimeSubprocess CollectorRuntime = "subprocess"
-	CollectorRuntimeEmbedded   CollectorRuntime = "embedded"
+	SubprocessExecutionMode ExecutionMode = "subprocess"
+	EmbeddedExecutionMode   ExecutionMode = "embedded"
 )
 
 // for testing purposes
@@ -47,14 +47,14 @@ type OTelManager struct {
 	// pending update calls should be ignored.
 	doneChan chan struct{}
 
-	runtime collectorRuntime
+	execution collectorExecution
 }
 
 // NewOTelManager returns a OTelManager.
-func NewOTelManager(logger *logger.Logger, baseLogger *logger.Logger, runtime CollectorRuntime) (*OTelManager, error) {
-	var run collectorRuntime
-	switch runtime {
-	case CollectorRuntimeSubprocess:
+func NewOTelManager(logger *logger.Logger, baseLogger *logger.Logger, mode ExecutionMode) (*OTelManager, error) {
+	var exec collectorExecution
+	switch mode {
+	case SubprocessExecutionMode:
 		// NOTE: if we stop embedding the collector binary in elastic-agent, we need to
 		// change this
 		executable, err := os.Executable()
@@ -62,21 +62,21 @@ func NewOTelManager(logger *logger.Logger, baseLogger *logger.Logger, runtime Co
 			return nil, fmt.Errorf("failed to get the path to the collector executable: %w", err)
 		}
 
-		run = newRuntimeSubprocess(executable, []string{"otel", "--supervised"})
-	case CollectorRuntimeEmbedded:
-		run = newRuntimeEmbedded()
+		exec = newSubprocessExecution(executable, []string{"otel", "--supervised"})
+	case EmbeddedExecutionMode:
+		exec = newExecutionEmbedded()
 	default:
-		return nil, errors.New("unknown otel collector runtime")
+		return nil, errors.New("unknown otel collector exec")
 	}
 
 	return &OTelManager{
-		logger:   logger,
+		logger:    logger,
 		baseLogger: baseLogger,
-		errCh:    make(chan error, 1), // holds at most one error
-		cfgCh:    make(chan *confmap.Conf),
-		statusCh: make(chan *status.AggregateStatus),
-		doneChan: make(chan struct{}),
-		runtime:  run,
+		errCh:     make(chan error, 1), // holds at most one error
+		cfgCh:     make(chan *confmap.Conf),
+		statusCh:  make(chan *status.AggregateStatus),
+		doneChan:  make(chan struct{}),
+		execution: exec,
 	}, nil
 }
 
@@ -96,7 +96,6 @@ func (m *OTelManager) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			// our caller context is cancelled so stop the collector and return
-			// NOTE: runtimeEmbedded won't write to collectorRunErr to signal that the collector
 			// has exited.
 			if proc != nil {
 				proc.Stop(ctx)
@@ -121,7 +120,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				}
 				// in this rare case the collector stopped running but a configuration was
 				// provided and the collector stopped with a clean exit
-				proc, err = m.runtime.startCollector(ctx, m.logger, m.cfg, collectorRunErr, m.statusCh)
+				proc, err = m.execution.startCollector(ctx, m.logger, m.cfg, collectorRunErr, m.statusCh)
 				if err != nil {
 					// failed to create the collector (this is different then
 					// it's failing to run). we do not retry creation on failure
@@ -177,7 +176,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			} else {
 				// either a new configuration or the first configuration
 				// that results in the collector being started
-				proc, err = m.runtime.startCollector(ctx, m.logger, m.cfg, collectorRunErr, m.statusCh)
+				proc, err = m.execution.startCollector(ctx, m.logger, m.cfg, collectorRunErr, m.statusCh)
 				if err != nil {
 					// failed to create the collector (this is different then
 					// it's failing to run). we do not retry creation on failure

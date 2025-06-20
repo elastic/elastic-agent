@@ -13,7 +13,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-type collectorRuntime interface {
+type collectorExecution interface {
 	startCollector(ctx context.Context, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus) (collectorHandle, error)
 }
 

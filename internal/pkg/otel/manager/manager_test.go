@@ -68,14 +68,14 @@ var (
 	}
 )
 
-type mockRuntime struct {
-	runtime collectorRuntime
-	handle  collectorHandle
+type mockExecution struct {
+	exec   collectorExecution
+	handle collectorHandle
 }
 
-func (m *mockRuntime) startCollector(ctx context.Context, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus) (collectorHandle, error) {
+func (m *mockExecution) startCollector(ctx context.Context, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus) (collectorHandle, error) {
 	var err error
-	m.handle, err = m.runtime.startCollector(ctx, logger, cfg, errCh, statusCh)
+	m.handle, err = m.exec.startCollector(ctx, logger, cfg, errCh, statusCh)
 	return m.handle, err
 }
 
@@ -198,14 +198,14 @@ func TestOTelManager_Run(t *testing.T) {
 
 	for _, tc := range []struct {
 		name                string
-		runtime             *mockRuntime
+		exec                *mockExecution
 		skipListeningErrors bool
-		testFn              func(t *testing.T, m *OTelManager, e *EventListener, runtime *mockRuntime)
+		testFn              func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution)
 	}{
 		{
-			name:    "embedded collector config updates",
-			runtime: &mockRuntime{runtime: newRuntimeEmbedded()},
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, runtime *mockRuntime) {
+			name: "embedded collector config updates",
+			exec: &mockExecution{exec: newExecutionEmbedded()},
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
@@ -224,9 +224,9 @@ func TestOTelManager_Run(t *testing.T) {
 			},
 		},
 		{
-			name:    "subprocess collector config updates",
-			runtime: &mockRuntime{runtime: newRuntimeSubprocess(testBinary, []string{""})},
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, runtime *mockRuntime) {
+			name: "subprocess collector config updates",
+			exec: &mockExecution{exec: newSubprocessExecution(testBinary, []string{""})},
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
@@ -245,9 +245,9 @@ func TestOTelManager_Run(t *testing.T) {
 			},
 		},
 		{
-			name:    "embedded collector stopped gracefully outside manager",
-			runtime: &mockRuntime{runtime: newRuntimeEmbedded()},
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, runtime *mockRuntime) {
+			name: "embedded collector stopped gracefully outside manager",
+			exec: &mockExecution{exec: newExecutionEmbedded()},
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
@@ -256,8 +256,8 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// stop it, this should be restarted by the manager
 				updateTime = time.Now()
-				require.NotNil(t, runtime.handle, "runtime handle should not be nil")
-				runtime.handle.Stop(t.Context())
+				require.NotNil(t, exec.handle, "exec handle should not be nil")
+				exec.handle.Stop(t.Context())
 				e.EnsureHealthy(t, updateTime)
 
 				// no configuration should stop the runner
@@ -267,9 +267,9 @@ func TestOTelManager_Run(t *testing.T) {
 			},
 		},
 		{
-			name:    "subprocess collector stopped gracefully outside manager",
-			runtime: &mockRuntime{runtime: newRuntimeSubprocess(testBinary, []string{""})},
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, runtime *mockRuntime) {
+			name: "subprocess collector stopped gracefully outside manager",
+			exec: &mockExecution{exec: newSubprocessExecution(testBinary, []string{""})},
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
@@ -278,8 +278,8 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// stop it, this should be restarted by the manager
 				updateTime = time.Now()
-				require.NotNil(t, runtime.handle, "runtime handle should not be nil")
-				runtime.handle.Stop(t.Context())
+				require.NotNil(t, exec.handle, "exec handle should not be nil")
+				exec.handle.Stop(t.Context())
 				e.EnsureHealthy(t, updateTime)
 
 				// no configuration should stop the runner
@@ -289,9 +289,9 @@ func TestOTelManager_Run(t *testing.T) {
 			},
 		},
 		{
-			name:    "subprocess collector killed outside manager",
-			runtime: &mockRuntime{runtime: newRuntimeSubprocess(testBinary, []string{""})},
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, runtime *mockRuntime) {
+			name: "subprocess collector killed outside manager",
+			exec: &mockExecution{exec: newSubprocessExecution(testBinary, []string{""})},
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
@@ -300,18 +300,18 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// kill it
 				updateTime = time.Now()
-				require.NotNil(t, runtime.handle, "runtime handle should not be nil")
-				handle, ok := runtime.handle.(*procHandle)
-				require.True(t, ok, "runtime handle should be of type procHandle")
+				require.NotNil(t, exec.handle, "exec handle should not be nil")
+				handle, ok := exec.handle.(*procHandle)
+				require.True(t, ok, "exec handle should be of type procHandle")
 				require.NoError(t, handle.processInfo.Kill(), "failed to kill collector process")
 				e.EnsureOffWithError(t, updateTime)
 			},
 		},
 		{
 			name:                "embedded collector invalid config",
-			runtime:             &mockRuntime{runtime: newRuntimeEmbedded()},
+			exec:                &mockExecution{exec: newExecutionEmbedded()},
 			skipListeningErrors: true,
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, runtime *mockRuntime) {
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// Errors channel is non-blocking, should be able to send an Update that causes an error multiple
 				// times without it blocking on sending over the errCh.
 				for range 3 {
@@ -347,9 +347,9 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name:                "subprocess collector invalid config",
-			runtime:             &mockRuntime{runtime: newRuntimeSubprocess(testBinary, []string{""})},
+			exec:                &mockExecution{exec: newSubprocessExecution(testBinary, []string{""})},
 			skipListeningErrors: true,
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, runtime *mockRuntime) {
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// Errors channel is non-blocking, should be able to send an Update that causes an error multiple
 				// times without it blocking on sending over the errCh.
 				for range 3 {
@@ -391,13 +391,13 @@ func TestOTelManager_Run(t *testing.T) {
 			l, _ := loggertest.New("otel")
 			base, _ := loggertest.New("otel")
 			m := &OTelManager{
-				logger:   l,
+				logger:    l,
 				baseLogger: base,
-				errCh:    make(chan error, 1), // holds at most one error
-				cfgCh:    make(chan *confmap.Conf),
-				statusCh: make(chan *status.AggregateStatus),
-				doneChan: make(chan struct{}),
-				runtime:  tc.runtime,
+				errCh:     make(chan error, 1), // holds at most one error
+				cfgCh:     make(chan *confmap.Conf),
+				statusCh:  make(chan *status.AggregateStatus),
+				doneChan:  make(chan struct{}),
+				execution: tc.exec,
 			}
 
 			eListener := &EventListener{}
@@ -427,7 +427,7 @@ func TestOTelManager_Run(t *testing.T) {
 				runErr = m.Run(ctx)
 			}()
 
-			tc.testFn(t, m, eListener, tc.runtime)
+			tc.testFn(t, m, eListener, tc.exec)
 
 			cancel()
 			runWg.Wait()
