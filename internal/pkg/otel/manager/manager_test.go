@@ -68,6 +68,17 @@ var (
 	}
 )
 
+type mockRuntime struct {
+	runtime collectorRuntime
+	handle  collectorHandle
+}
+
+func (m *mockRuntime) startCollector(ctx context.Context, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus) (collectorHandle, error) {
+	var err error
+	m.handle, err = m.runtime.startCollector(ctx, logger, cfg, errCh, statusCh)
+	return m.handle, err
+}
+
 // EventListener listens to the events from the OTelManager and stores the latest error and status.
 type EventListener struct {
 	mtx    sync.Mutex
@@ -187,12 +198,14 @@ func TestOTelManager_Run(t *testing.T) {
 
 	for _, tc := range []struct {
 		name                string
+		runtime             *mockRuntime
 		skipListeningErrors bool
-		testFn              func(t *testing.T, m *OTelManager, e *EventListener)
+		testFn              func(t *testing.T, m *OTelManager, e *EventListener, runtime *mockRuntime)
 	}{
 		{
-			name: "collector config updates",
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener) {
+			name:    "embedded collector config updates",
+			runtime: &mockRuntime{runtime: newRuntimeEmbedded()},
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, runtime *mockRuntime) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
@@ -211,27 +224,18 @@ func TestOTelManager_Run(t *testing.T) {
 			},
 		},
 		{
-			name: "collector stopped gracefully outside manager",
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener) {
-				var handle *procHandle
-				defer func() {
-					startSupervisedCollectorFn = startSupervisedCollector
-				}()
-				startSupervisedCollectorFn = func(ctx context.Context, logger *logger.Logger, collectorPath string, collectorArgs []string, cfg *confmap.Conf, processErrCh chan error, statusCh chan *status.AggregateStatus) (*procHandle, error) {
-					var err error
-					handle, err = startSupervisedCollector(ctx, logger, collectorPath, collectorArgs, cfg, processErrCh, statusCh)
-					return handle, err
-				}
-
+			name:    "subprocess collector config updates",
+			runtime: &mockRuntime{runtime: newRuntimeSubprocess(testBinary, []string{""})},
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, runtime *mockRuntime) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
 				m.Update(cfg)
 				e.EnsureHealthy(t, updateTime)
 
-				// stop it, this should be restarted by the manager
+				// trigger update (no config compare is due externally to otel collector)
 				updateTime = time.Now()
-				handle.Stop(t.Context())
+				m.Update(cfg)
 				e.EnsureHealthy(t, updateTime)
 
 				// no configuration should stop the runner
@@ -241,18 +245,53 @@ func TestOTelManager_Run(t *testing.T) {
 			},
 		},
 		{
-			name: "collector killed outside manager",
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener) {
-				defer func() {
-					startSupervisedCollectorFn = startSupervisedCollector
-				}()
-				var handle *procHandle
-				startSupervisedCollectorFn = func(ctx context.Context, logger *logger.Logger, collectorPath string, collectorArgs []string, cfg *confmap.Conf, processErrCh chan error, statusCh chan *status.AggregateStatus) (*procHandle, error) {
-					var err error
-					handle, err = startSupervisedCollector(ctx, logger, collectorPath, collectorArgs, cfg, processErrCh, statusCh)
-					return handle, err
-				}
+			name:    "embedded collector stopped gracefully outside manager",
+			runtime: &mockRuntime{runtime: newRuntimeEmbedded()},
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, runtime *mockRuntime) {
+				// ensure that it got healthy
+				cfg := confmap.NewFromStringMap(testConfig)
+				updateTime := time.Now()
+				m.Update(cfg)
+				e.EnsureHealthy(t, updateTime)
 
+				// stop it, this should be restarted by the manager
+				updateTime = time.Now()
+				require.NotNil(t, runtime.handle, "runtime handle should not be nil")
+				runtime.handle.Stop(t.Context())
+				e.EnsureHealthy(t, updateTime)
+
+				// no configuration should stop the runner
+				updateTime = time.Now()
+				m.Update(nil)
+				e.EnsureOffWithoutError(t, updateTime)
+			},
+		},
+		{
+			name:    "subprocess collector stopped gracefully outside manager",
+			runtime: &mockRuntime{runtime: newRuntimeSubprocess(testBinary, []string{""})},
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, runtime *mockRuntime) {
+				// ensure that it got healthy
+				cfg := confmap.NewFromStringMap(testConfig)
+				updateTime := time.Now()
+				m.Update(cfg)
+				e.EnsureHealthy(t, updateTime)
+
+				// stop it, this should be restarted by the manager
+				updateTime = time.Now()
+				require.NotNil(t, runtime.handle, "runtime handle should not be nil")
+				runtime.handle.Stop(t.Context())
+				e.EnsureHealthy(t, updateTime)
+
+				// no configuration should stop the runner
+				updateTime = time.Now()
+				m.Update(nil)
+				e.EnsureOffWithoutError(t, updateTime)
+			},
+		},
+		{
+			name:    "subprocess collector killed outside manager",
+			runtime: &mockRuntime{runtime: newRuntimeSubprocess(testBinary, []string{""})},
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, runtime *mockRuntime) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
@@ -261,14 +300,56 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// kill it
 				updateTime = time.Now()
+				require.NotNil(t, runtime.handle, "runtime handle should not be nil")
+				handle, ok := runtime.handle.(*procHandle)
+				require.True(t, ok, "runtime handle should be of type procHandle")
 				require.NoError(t, handle.processInfo.Kill(), "failed to kill collector process")
 				e.EnsureOffWithError(t, updateTime)
 			},
 		},
 		{
-			name:                "collector invalid config",
+			name:                "embedded collector invalid config",
+			runtime:             &mockRuntime{runtime: newRuntimeEmbedded()},
 			skipListeningErrors: true,
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener) {
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, runtime *mockRuntime) {
+				// Errors channel is non-blocking, should be able to send an Update that causes an error multiple
+				// times without it blocking on sending over the errCh.
+				for range 3 {
+					cfg := confmap.New() // invalid config
+					m.Update(cfg)
+
+					// delay between updates to ensure the collector will have to fail
+					<-time.After(100 * time.Millisecond)
+				}
+
+				// because of the retry logic and timing we need to ensure
+				// that this keeps retrying to see the error and only store
+				// an actual error
+				//
+				// a nil error just means that the collector is trying to restart
+				// which clears the error on the restart loop
+				timeoutCh := time.After(time.Second * 5)
+				var err error
+			outer:
+				for {
+					select {
+					case e := <-m.Errors():
+						if e != nil {
+							err = e
+							break outer
+						}
+					case <-timeoutCh:
+						break outer
+					}
+				}
+				assert.Error(t, err, "otel manager should have returned an error")
+			},
+		},
+		{
+			name:                "subprocess collector invalid config",
+			runtime:             &mockRuntime{runtime: newRuntimeSubprocess(testBinary, []string{""})},
+			skipListeningErrors: true,
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, runtime *mockRuntime) {
 				// Errors channel is non-blocking, should be able to send an Update that causes an error multiple
 				// times without it blocking on sending over the errCh.
 				for range 3 {
@@ -310,14 +391,13 @@ func TestOTelManager_Run(t *testing.T) {
 			l, _ := loggertest.New("otel")
 			base, _ := loggertest.New("otel")
 			m := &OTelManager{
-				logger:              l,
+				logger:   l,
 				baseLogger: base,
-				errCh:               make(chan error, 1), // holds at most one error
-				cfgCh:               make(chan *confmap.Conf),
-				statusCh:            make(chan *status.AggregateStatus),
-				doneChan:            make(chan struct{}),
-				collectorBinaryPath: testBinary,
-				collectorBinaryArgs: []string{""},
+				errCh:    make(chan error, 1), // holds at most one error
+				cfgCh:    make(chan *confmap.Conf),
+				statusCh: make(chan *status.AggregateStatus),
+				doneChan: make(chan struct{}),
+				runtime:  tc.runtime,
 			}
 
 			eListener := &EventListener{}
@@ -347,7 +427,7 @@ func TestOTelManager_Run(t *testing.T) {
 				runErr = m.Run(ctx)
 			}()
 
-			tc.testFn(t, m, eListener)
+			tc.testFn(t, m, eListener, tc.runtime)
 
 			cancel()
 			runWg.Wait()
@@ -356,42 +436,6 @@ func TestOTelManager_Run(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestOTelManager_Logging(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	base, obs := loggertest.New("otel")
-	l, _ := loggertest.New("otel-manager")
-	m, err := NewOTelManager(l, base)
-	require.NoError(t, err, "failed to create otel manager")
-
-	go func() {
-		err := m.Run(ctx)
-		assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
-	}()
-
-	// watch is synchronous, so we need to read from it to avoid blocking the manager
-	go func() {
-		for {
-			select {
-			case <-m.Watch():
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	cfg := confmap.NewFromStringMap(testConfig)
-	m.Update(cfg)
-
-	// the collector should log to the base logger
-	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
-		logs := obs.All()
-		require.NotEmpty(collect, logs, "Logs should not be empty")
-		firstMessage := logs[0].Message
-		assert.Equal(collect, firstMessage, "Setting up own telemetry...")
-	}, time.Second*10, time.Second)
 }
 
 // statusToYaml converts the status.AggregateStatus to a YAML string representation.

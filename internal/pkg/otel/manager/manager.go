@@ -16,8 +16,14 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+type CollectorRuntime string
+
+const (
+	CollectorRuntimeSubprocess CollectorRuntime = "subprocess"
+	CollectorRuntimeEmbedded   CollectorRuntime = "embedded"
+)
+
 // for testing purposes
-var startSupervisedCollectorFn = startSupervisedCollector
 
 // OTelManager is a manager that manages the lifecycle of the OTel collector inside of the Elastic Agent.
 type OTelManager struct {
@@ -41,20 +47,26 @@ type OTelManager struct {
 	// pending update calls should be ignored.
 	doneChan chan struct{}
 
-	// collectorBinaryPath is the path to the collector executable
-	collectorBinaryPath string
-
-	// collectorBinaryArgs are the arguments to pass to the collector
-	collectorBinaryArgs []string
+	runtime collectorRuntime
 }
 
 // NewOTelManager returns a OTelManager.
-func NewOTelManager(logger, baseLogger *logger.Logger) (*OTelManager, error) {
-	// NOTE: if we stop embedding the collector binary in elastic-agent, we need to
-	// change this
-	executable, err := os.Executable()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get the path to the collector executable: %w", err)
+func NewOTelManager(logger *logger.Logger, baseLogger *logger.Logger, runtime CollectorRuntime) (*OTelManager, error) {
+	var run collectorRuntime
+	switch runtime {
+	case CollectorRuntimeSubprocess:
+		// NOTE: if we stop embedding the collector binary in elastic-agent, we need to
+		// change this
+		executable, err := os.Executable()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get the path to the collector executable: %w", err)
+		}
+
+		run = newRuntimeSubprocess(executable, []string{"otel", "--supervised"})
+	case CollectorRuntimeEmbedded:
+		run = newRuntimeEmbedded()
+	default:
+		return nil, errors.New("unknown otel collector runtime")
 	}
 
 	return &OTelManager{
@@ -64,8 +76,7 @@ func NewOTelManager(logger, baseLogger *logger.Logger) (*OTelManager, error) {
 		cfgCh:    make(chan *confmap.Conf),
 		statusCh: make(chan *status.AggregateStatus),
 		doneChan: make(chan struct{}),
-		collectorBinaryPath: executable,
-		collectorBinaryArgs: []string{"otel", "--supervised"},
+		runtime:  run,
 	}, nil
 }
 
@@ -73,25 +84,25 @@ func NewOTelManager(logger, baseLogger *logger.Logger) (*OTelManager, error) {
 func (m *OTelManager) Run(ctx context.Context) error {
 	var (
 		err  error
-		proc *procHandle
+		proc collectorHandle
 	)
 
 	// signal that the run loop is ended to unblock any incoming update calls
 	defer close(m.doneChan)
 
-	// processErrCh is used to signal that the collector has exited.
-	processErrCh := make(chan error)
+	// collectorRunErr is used to signal that the collector has exited.
+	collectorRunErr := make(chan error)
 	for {
 		select {
 		case <-ctx.Done():
 			// our caller context is cancelled so stop the collector and return
-			// NOTE: runtime won't write to processErrCh to signal that the collector
+			// NOTE: runtimeEmbedded won't write to collectorRunErr to signal that the collector
 			// has exited.
 			if proc != nil {
 				proc.Stop(ctx)
 			}
 			return ctx.Err()
-		case err = <-processErrCh:
+		case err = <-collectorRunErr:
 			if err == nil {
 				// err is nil means that the collector has exited cleanly without an error
 				if proc != nil {
@@ -110,7 +121,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				}
 				// in this rare case the collector stopped running but a configuration was
 				// provided and the collector stopped with a clean exit
-				proc, err = startSupervisedCollectorFn(ctx, m.logger, m.collectorBinaryPath, m.collectorBinaryArgs, m.cfg, processErrCh, m.statusCh)
+				proc, err = m.runtime.startCollector(ctx, m.logger, m.cfg, collectorRunErr, m.statusCh)
 				if err != nil {
 					// failed to create the collector (this is different then
 					// it's failing to run). we do not retry creation on failure
@@ -131,7 +142,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				if proc != nil {
 					proc.Stop(ctx)
 					proc = nil
-					// don't wait here for <-processErrCh, already occurred
+					// don't wait here for <-collectorRunErr, already occurred
 					// clear status, no longer running
 					reportStatus(ctx, m.statusCh, nil)
 				}
@@ -149,7 +160,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				proc.Stop(ctx)
 				proc = nil
 				select {
-				case <-processErrCh:
+				case <-collectorRunErr:
 				case <-ctx.Done():
 					// our caller ctx is Done
 					return ctx.Err()
@@ -166,7 +177,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			} else {
 				// either a new configuration or the first configuration
 				// that results in the collector being started
-				proc, err = startSupervisedCollectorFn(ctx, m.logger, m.collectorBinaryPath, m.collectorBinaryArgs, m.cfg, processErrCh, m.statusCh)
+				proc, err = m.runtime.startCollector(ctx, m.logger, m.cfg, collectorRunErr, m.statusCh)
 				if err != nil {
 					// failed to create the collector (this is different then
 					// it's failing to run). we do not retry creation on failure

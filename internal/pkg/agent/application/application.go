@@ -224,7 +224,7 @@ func New(
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
-	otelManager, err := otelmanager.NewOTelManager(log.Named("otel_manager"), baseLogger)
+	otelManager, err := otelmanager.NewOTelManager(log.Named("otel_manager"), baseLogger, otelmanager.CollectorRuntimeEmbedded)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)
 	}
