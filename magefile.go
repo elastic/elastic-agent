@@ -3917,6 +3917,16 @@ func (Helm) ensureRepository(repoName, repoURL string, settings *cli.EnvSettings
 }
 
 // BuildDependencies builds the dependencies for the Elastic-Agent Helm chart.
+//
+// This is a custom implementation that extends the functionality of `helm dependency update`.
+// The standard Helm command assumes that all dependency repositories have been added beforehand
+// via `helm repo add`, otherwise it fails. This method improves usability by ensuring all
+// required repositories are added automatically before resolving dependencies.
+//
+// Furthermore, `helm dependency update` downloads dependencies as `.tgz` archives into the `charts/`
+// directory but does not untar them. For our integration tests, we require the subcharts to be
+// extracted. This method downloads and extracts each `.tgz` archive and removes the archive afterward,
+// so that only the extracted subcharts remain in the `charts/` directory.
 func (h Helm) BuildDependencies() error {
 	settings := cli.New()
 	settings.SetNamespace("")
