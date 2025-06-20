@@ -1,0 +1,23 @@
+receivers:
+  filebeatreceiver:
+    filebeat:
+      inputs:
+        - type: benchmark
+          enabled: true
+          count: 1
+          message: {{.Message}}
+    output:
+      otelconsumer:
+    logging:
+      level: info
+      selectors:
+        - '*'
+    path.home: {{.HomeDir}}
+exporters:
+  file/no_rotation:
+    path: {{.Output}}
+service:
+  pipelines:
+    logs:
+      receivers: [filebeatreceiver]
+      exporters: [file/no_rotation]
