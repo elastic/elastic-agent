@@ -9,7 +9,7 @@ ASDF_DIR="${ASDF_DIR:-"/Users/$AGENT_USER/.asdf"}"
 
 echo "~~~ Installing ASDF in ${ASDF_DIR} for user ${AGENT_USER}"
 # Installation instructions from https://asdf-vm.com/guide/getting-started.html
-ASDF_VERSION="v0.14.0"
+ASDF_VERSION="v0.16.7"
 
 pushd $AGENT_HOME
 
@@ -26,7 +26,7 @@ asdf plugin add mage
 popd
 
 echo "~~~ Installing golang $(cat .go-version) using ASDF"
-asdf set "$(cat .go-version)"
+asdf set golang "$(cat .go-version)"
 asdf install
 
 export GOROOT="$(asdf where golang)/go/"
