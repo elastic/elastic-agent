@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo $SHELL
-
 AGENT_USER="${AGENT_USER:-"$USER"}"
 AGENT_HOME="${AGENT_HOME:-"/Users/$AGENT_USER"}"
 ASDF_DIR="${ASDF_DIR:-"/Users/$AGENT_USER/.asdf"}"
 
 echo "~~~ Installing ASDF in ${ASDF_DIR} for user ${AGENT_USER}"
 # Installation instructions from https://asdf-vm.com/guide/getting-started.html
-ASDF_VERSION="v0.16.7"
+ASDF_VERSION="v0.14.1"
 
 # todo retry
 git clone https://github.com/asdf-vm/asdf.git ${ASDF_DIR} --branch ${ASDF_VERSION} 
@@ -23,8 +21,8 @@ asdf plugin add golang
 asdf plugin add mage
 
 echo "~~~ Installing golang $(cat .go-version) using ASDF"
-asdf set golang "$(cat .go-version)"
 asdf install
+asdf local golang "$(cat .go-version)"
 
 export GOROOT="$(asdf where golang)/go/"
 export GOPATH=$(go env GOPATH)
