@@ -25,5 +25,10 @@ asdf plugin add mage
 
 popd
 
+echo "~~~ Installing golang $(cat .go-version) using ASDF"
+asdf set "$(cat .go-version)"
 asdf install
-go install gotestsum@latest
+
+export GOROOT="$(asdf where golang)/go/"
+export GOPATH=$(go env GOPATH)
+export PATH="$GOPATH/bin:$PATH"
