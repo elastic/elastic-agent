@@ -16,8 +16,10 @@ mage:
 .PHONY: install-gotestsum
 install-gotestsum:
 	@echo Installing gotestsum
-	echo "PATH: $(PATH)"
+	@echo "PATH: $$PATH"
+	@echo "SHELL: $$SHELL"
 	go install gotest.tools/gotestsum
+	@@ls -l "$$(go env GOPATH)/bin/gotestsum"
 	@-gotestsum --version
 
 ## help : Show this help.
