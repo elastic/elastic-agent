@@ -16,6 +16,7 @@ mage:
 .PHONY: install-gotestsum
 install-gotestsum:
 	@echo Installing gotestsum
+	echo "PATH: $(PATH)"
 	go install gotest.tools/gotestsum
 	@-gotestsum --version
 
