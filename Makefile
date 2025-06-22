@@ -17,7 +17,9 @@ mage:
 install-gotestsum:
 	@echo Installing gotestsum
 	@echo "PATH: $$PATH"
+	@echo "GOPATH: $$GOPATH"
 	@echo "SHELL: $$SHELL"
+	@go version
 	go install gotest.tools/gotestsum
 	@@ls -l "$$(go env GOPATH)/bin/gotestsum"
 	@-gotestsum --version
