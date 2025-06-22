@@ -30,6 +30,9 @@ echo "~~~ Running integration tests as $USER"
 
 make install-gotestsum
 
+echo "GOPATH: $(go env GOPATH)"
+echo "PATH: $PATH"
+
 # Parsing version.go. Will be simplified here: https://github.com/elastic/ingest-dev/issues/4925
 AGENT_VERSION=$(grep "const defaultBeatVersion =" version/version.go | cut -d\" -f2)
 AGENT_VERSION="${AGENT_VERSION}-SNAPSHOT"
