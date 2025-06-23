@@ -1,26 +1,10 @@
 version: 9.0.3
 entries:
-    - kind: enhancement
-      summary: Allow upgrading deb or rpm agents when using Elastic Defend with tamper protection.
-      description: ""
-      component: elastic-agent
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/6907
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/6394
-      timestamp: 1740166208
-      file:
-        name: 1740166208-allow-deb-rpm-upgrade-with-tamper-protected-endpoint.yaml
-        checksum: e1124b779230d456de615b055b3d2c2f2ead20e1
     - kind: bug-fix
       summary: Address a race condition that can occur in Agent diagnostics if log rotation runs while logs are being zipped.
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/8352
-        - https://github.com/elastic/elastic-agent/pull/8573
-        - https://github.com/elastic/elastic-agent/pull/8575
-        - https://github.com/elastic/elastic-agent/pull/8616
         - https://github.com/elastic/elastic-agent/pull/8215
       issue: []
       timestamp: 1747938268
