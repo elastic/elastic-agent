@@ -97,6 +97,9 @@ steps:
         env:
           PACKAGES: "docker"
           PLATFORMS: "linux/amd64"
+          PUSH_IMAGE: "true"
+          CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
+          CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
@@ -104,6 +107,9 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           diskSizeGb: 200
+        plugins:
+          - elastic/vault-docker-login#v0.5.2:
+              secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
 
       - label: "Packaging: Containers linux/arm64"
         key: packaging-containers-arm64
@@ -126,6 +132,9 @@ steps:
           PACKAGES: "docker"
           PLATFORMS: "linux/amd64"
           FIPS: "true"
+          PUSH_IMAGE: "true"
+          CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
+          CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
@@ -133,6 +142,9 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           diskSizeGb: 200
+        plugins:
+          - elastic/vault-docker-login#v0.5.2:
+              secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
 
       - label: "Packaging: Containers linux/arm64 FIPS"
         key: packaging-containers-arm64-fips

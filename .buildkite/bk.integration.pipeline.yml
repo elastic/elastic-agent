@@ -39,30 +39,8 @@ common:
           KIBANA_PASSWORD: ea-serverless-it-kibana-password
 
 steps:
-  - label: Load and push custom elastic-agent image
-    key: integration-cloud-image
-    depends_on:
-      - 'packaging-containers-x86-64' # Reuse artifacts produced in .buildkite/integration.pipeline.yml
-    env:
-      CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
-      CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
-      TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
-    command: |
-      buildkite-agent artifact download build/distributions/elastic-agent-cloud-*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64'
-      mage cloud:load
-      mage cloud:push
-    agents:
-      provider: "gcp"
-      machineType: "n1-standard-8"
-      image: "${IMAGE_UBUNTU_2404_X86_64}"
-    plugins:
-      - elastic/vault-docker-login#v0.5.2:
-          secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
-
   - label: Start ESS stack for integration tests
     key: integration-ess
-    depends_on:
-      - integration-cloud-image
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - ESS stack provision"
