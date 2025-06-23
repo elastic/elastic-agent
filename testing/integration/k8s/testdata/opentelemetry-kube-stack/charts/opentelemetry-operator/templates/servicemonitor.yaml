@@ -1,0 +1,37 @@
+{{- if .Values.manager.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ template "opentelemetry-operator.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opentelemetry-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller-manager
+    {{- range $key, $value := .Values.manager.serviceMonitor.extraLabels }}
+    {{- printf "%s: %s" $key (tpl $value $ | quote) | nindent 4 }}
+    {{- end }}
+  {{- if .Values.manager.serviceMonitor.annotations }}
+  annotations:
+    {{- range $key, $value := .Values.manager.serviceMonitor.annotations }}
+    {{- printf "%s: %s" $key (tpl $value $ | quote) | nindent 4 }}
+    {{- end }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "opentelemetry-operator.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: controller-manager
+  endpoints:
+  {{- toYaml .Values.manager.serviceMonitor.metricsEndpoints | nindent 4 }}
+      {{- with .Values.manager.serviceMonitor.relabelings }}
+      relabelings:
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.manager.serviceMonitor.metricRelabelings }}
+      metricRelabelings:
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+{{- end }}
