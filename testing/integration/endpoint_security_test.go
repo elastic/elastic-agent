@@ -197,12 +197,20 @@ func addEndpointCleanup(t *testing.T, uninstallToken string) {
 }
 
 func installFirstAgent(ctx context.Context, t *testing.T, info *define.Info, isProtected bool, packageFormat string, upgradeFromVersion string) (*atesting.Fixture, string) {
-	fixture, err := atesting.NewFixture(
-		t,
-		upgradeFromVersion,
-		atesting.WithFetcher(atesting.ArtifactFetcher()),
-		atesting.WithPackageFormat(packageFormat),
-	)
+	var fixture *atesting.Fixture
+	var err error
+
+	if upgradeFromVersion == define.Version() {
+		fixture, err = define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat(packageFormat))
+	} else {
+		fixture, err = atesting.NewFixture(
+			t,
+			upgradeFromVersion,
+			atesting.WithFetcher(atesting.ArtifactFetcher()),
+			atesting.WithPackageFormat(packageFormat),
+		)
+	}
+
 	require.NoError(t, err)
 	fixture.Prepare(ctx)
 
