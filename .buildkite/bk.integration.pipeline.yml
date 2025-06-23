@@ -403,7 +403,6 @@ steps:
         command: |
           buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64
           .buildkite/scripts/steps/integration_tests_tf.sh rpm true
-          exit 1
         artifact_paths:
           - build/**
           - build/diagnostics/**
