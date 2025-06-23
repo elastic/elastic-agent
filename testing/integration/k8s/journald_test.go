@@ -50,7 +50,6 @@ func TestKubernetesJournaldInput(t *testing.T) {
 	steps := []k8sTestStep{
 		k8sStepCreateNamespace(),
 		k8sStepDeployKustomize(
-			agentK8SKustomize,
 			"elastic-agent-standalone",
 			k8sKustomizeOverrides{
 				agentContainerExtraEnv: []corev1.EnvVar{
