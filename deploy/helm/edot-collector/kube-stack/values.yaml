@@ -104,13 +104,6 @@ collectors:
               # Service attributes added based on https://opentelemetry.io/docs/specs/semconv/non-normative/k8s-attributes/#service-attributes
               - "service.name"
               - "service.version"
-            labels:
-              - tag_name: app.label.name
-                key: app.kubernetes.io/name
-                from: pod
-              - tag_name: app.label.version
-                key: app.kubernetes.io/version
-                from: pod
       receivers:
         # [K8s Objects Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sobjectsreceiver)
         k8sobjects:
@@ -304,13 +297,6 @@ collectors:
               # Service attributes added based on https://opentelemetry.io/docs/specs/semconv/non-normative/k8s-attributes/#service-attributes
               - "service.name"
               - "service.version"
-            labels:
-              - tag_name: app.label.name
-                key: app.kubernetes.io/name
-                from: pod
-              - tag_name: app.label.version
-                key: app.kubernetes.io/version
-                from: pod
       receivers:
         # [OTLP Receiver](https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver)
         otlp:
