@@ -24,14 +24,9 @@ actions:
       automerge: false
       labels:
         - dependencies
-<<<<<<< HEAD
         - backport-active-all
-      title: '[Automation] Bump VM Image version to {{ source "latestVersion" }}'
-=======
-        - backport-skip
         - skip-changelog
       title: '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Bump VM Image version to {{ source "latestVersion" }}'
->>>>>>> 7a579fab8 (Add skip-changelog PR label for bump VM PRs (#8627))
 
 sources:
   latestVersion:
