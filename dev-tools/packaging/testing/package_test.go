@@ -454,7 +454,7 @@ func dockerName(file string, labels map[string]string) (string, error) {
 		return "", errors.New("version label not found")
 	}
 
-	parts := strings.SplitN(file, "/", -1)
+	parts := strings.Split(file, "/")
 	if len(parts) == 0 {
 		return "", errors.New("failed to get file name parts")
 	}
