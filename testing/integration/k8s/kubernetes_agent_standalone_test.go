@@ -640,6 +640,9 @@ func k8sStepDeployKustomize(containerName string, overrides k8sKustomizeOverride
 		kustomizeYaml, err := os.ReadFile(AgentKustomizePath)
 		require.NoError(t, err, "failed to read kustomize manifest")
 
+		// remove this otherwise it defaults to %CA_TRUSTED% and causes issues
+		kustomizeYaml = bytes.ReplaceAll(kustomizeYaml, []byte("ssl.ca_trusted_fingerprint: ${CA_TRUSTED}"), []byte(""))
+
 		objects, err := testK8s.LoadFromYAML(bufio.NewReader(bytes.NewReader(kustomizeYaml)))
 		require.NoError(t, err, "failed to parse rendered kustomize")
 
@@ -685,11 +688,6 @@ func k8sStepDeployKustomize(containerName string, overrides k8sKustomizeOverride
 					}
 					if env.Name == "API_KEY" {
 						container.Env[idx].Value = kCtx.esAPIKey
-						container.Env[idx].ValueFrom = nil
-					}
-					if env.Name == "CA_TRUSTED" {
-						// empty this otherwise it defaults to %CA_TRUSTED% and causes issues
-						container.Env[idx].Value = ""
 						container.Env[idx].ValueFrom = nil
 					}
 				}
