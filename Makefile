@@ -23,7 +23,6 @@ install-gotestsum:
 	go install gotest.tools/gotestsum
 	ls -l "$$(go env GOPATH)"
 	ls -l /Users/admin/.asdf/shims
-	@ls -l "$$(go env GOPATH)/bin/gotestsum"
 	@-gotestsum --version
 
 ## help : Show this help.

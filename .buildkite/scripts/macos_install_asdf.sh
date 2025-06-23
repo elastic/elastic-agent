@@ -29,3 +29,7 @@ export GOROOT="$(asdf where golang)/go/"
 export GOPATH=$(go env GOPATH)
 export PATH="$GOPATH/bin:$PATH"
 go version
+
+asdf exec go install gotest.tools/gotestsum@latest
+asdf exec go install github.com/jstemmer/go-junit-report
+asdf reshim golang
