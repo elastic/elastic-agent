@@ -25,6 +25,7 @@ actions:
       labels:
         - dependencies
         - backport-active-all
+        - skip-changelog
       title: '[Automation] Bump VM Image version to {{ source "latestVersion" }}'
 
 sources:
