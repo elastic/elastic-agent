@@ -3526,8 +3526,6 @@ func updateYamlFile(path string, keyVal ...struct {
 	return nil
 }
 
-<<<<<<< HEAD
-=======
 func (Helm) ensureRepository(repoName, repoURL string, settings *cli.EnvSettings) error {
 	repoFile := settings.RepositoryConfig
 	// Load existing repositories
@@ -3751,7 +3749,6 @@ func (h Helm) Package() error {
 	return nil
 }
 
->>>>>>> 7259e54d9 ([ci] fix k8s integration tests flakiness (#8575))
 func updateYamlNodes(rootNode *yaml.Node, value string, keys ...string) error {
 	if len(keys) == 0 {
 		return fmt.Errorf("no keys provided")
