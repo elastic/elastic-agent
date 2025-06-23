@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
@@ -27,11 +26,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	testK8s "github.com/elastic/elastic-agent/pkg/testing/kubernetes"
-)
-
-var (
-	kubeStackChartVersion = "0.3.9"
-	kubeStackChartURL     = "https://github.com/open-telemetry/opentelemetry-helm-charts/releases/download/opentelemetry-kube-stack-" + kubeStackChartVersion + "/opentelemetry-kube-stack-" + kubeStackChartVersion + ".tgz"
 )
 
 func TestOtelKubeStackHelm(t *testing.T) {
@@ -52,16 +46,6 @@ func TestOtelKubeStackHelm(t *testing.T) {
 
 	kCtx := k8sGetContext(t, info)
 
-	chartOptions := &action.ChartPathOptions{
-		RepoURL: kubeStackChartURL,
-		Version: kubeStackChartVersion,
-	}
-
-	chartLocation, err := action.NewPull().LocateChart(chartOptions.RepoURL, cli.New())
-	if err != nil {
-		panic(err)
-	}
-
 	testCases := []struct {
 		name  string
 		steps []k8sTestStep
@@ -70,7 +54,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 			name: "managed helm kube-stack operator standalone agent kubernetes privileged",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepHelmDeployWithValueOptions(chartLocation, "kube-stack-otel",
+				k8sStepHelmDeployWithValueOptions(KubeStackChartPath, "kube-stack-otel",
 					values.Options{
 						ValueFiles: []string{"../../../deploy/helm/edot-collector/kube-stack/values.yaml"},
 						Values: []string{
@@ -112,7 +96,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 			name: "mOTel helm kube-stack operator standalone agent kubernetes privileged",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
-				k8sStepHelmDeployWithValueOptions(chartLocation, "kube-stack-otel",
+				k8sStepHelmDeployWithValueOptions(KubeStackChartPath, "kube-stack-otel",
 					values.Options{
 						ValueFiles: []string{"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"},
 						Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
