@@ -449,7 +449,7 @@ func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 
 	marker.Acked = true
 
-	return SaveMarker(marker, false)
+	return SaveMarker(paths.Data(), marker, false)
 }
 
 func (u *Upgrader) AckAction(ctx context.Context, acker acker.Acker, action fleetapi.Action) error {
