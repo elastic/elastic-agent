@@ -252,11 +252,6 @@ require (
 	github.com/bitfield/gotestdox v0.2.2 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.8.1 // indirect
-<<<<<<< HEAD
-	github.com/cenkalti/backoff/v5 v5.0.2 // indirect
-=======
-	github.com/cespare/xxhash v1.1.0 // indirect
->>>>>>> 7259e54d9 ([ci] fix k8s integration tests flakiness (#8575))
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/cilium/ebpf v0.16.0 // indirect
 	github.com/cloudfoundry-community/go-cfclient v0.0.0-20190808214049-35bcce23fc5f // indirect
@@ -659,12 +654,7 @@ require (
 	oras.land/oras-go v1.2.5 // indirect
 	sigs.k8s.io/controller-runtime v0.20.4 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
-<<<<<<< HEAD
-	sigs.k8s.io/kustomize/kyaml v0.18.1 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.2 // indirect
-=======
-	sigs.k8s.io/structured-merge-diff/v4 v4.4.3 // indirect
->>>>>>> 7259e54d9 ([ci] fix k8s integration tests flakiness (#8575))
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
