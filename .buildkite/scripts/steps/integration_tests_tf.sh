@@ -30,8 +30,8 @@ fi
 OVERRIDE_STACK_VERSION="$(cat .package-version)"
 OVERRIDE_STACK_VERSION=${OVERRIDE_STACK_VERSION}"-SNAPSHOT"
 
-echo "~~~ Building test binaries"
-mage build:testBinaries
+# echo "~~~ Building test binaries"
+# mage build:testBinaries
 
 # If the step is retried, we start the stack again.
 # BUILDKITE_RETRY_COUNT == "0" for the first run
