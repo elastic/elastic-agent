@@ -181,7 +181,7 @@ func TestKubernetesAgentOtel(t *testing.T) {
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
 				k8sStepDeployKustomize("elastic-agent-standalone", k8sKustomizeOverrides{
-					agentContainerExtraEnv: []corev1.EnvVar{},
+					agentContainerExtraEnv: []corev1.EnvVar{{Name: "ELASTIC_AGENT_OTEL", Value: "true"}},
 					agentContainerArgs:     []string{}, // clear default args
 				}, nil),
 			},
