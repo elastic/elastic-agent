@@ -30,18 +30,18 @@ fi
 OVERRIDE_STACK_VERSION="$(cat .package-version)"
 OVERRIDE_STACK_VERSION=${OVERRIDE_STACK_VERSION}"-SNAPSHOT"
 
-# echo "~~~ Building test binaries"
-# mage build:testBinaries
+echo "~~~ Building test binaries"
+mage build:testBinaries
 
 # If the step is retried, we start the stack again.
-# BUILDKITE_RETRY_COUNT == "0" for the first run
-# BUILDKITE_RETRY_COUNT > 0 for the retries
-# if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
-#   echo "~~~ The steps is retried, starting the ESS stack again"
-#   trap 'ess_down' EXIT
-#   ess_up $OVERRIDE_STACK_VERSION || echo "Failed to start ESS stack" >&2
-#   preinstall_fleet_packages
-# else
+BUILDKITE_RETRY_COUNT == "0" for the first run
+BUILDKITE_RETRY_COUNT > 0 for the retries
+if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
+  echo "~~~ The steps is retried, starting the ESS stack again"
+  trap 'ess_down' EXIT
+  ess_up $OVERRIDE_STACK_VERSION || echo "Failed to start ESS stack" >&2
+  preinstall_fleet_packages
+else
   # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data
   echo "~~~ Receiving ESS stack metadata"
   export ELASTICSEARCH_HOST=$(buildkite-agent meta-data get "es.host" --build 019764b1-6dba-4e8d-8fde-e91dfba525ca)
