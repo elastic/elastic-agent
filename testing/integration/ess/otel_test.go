@@ -11,7 +11,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent/testing/integration"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,11 +21,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/go-elasticsearch/v8"
+
 	aTesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/elastic-agent/testing/integration"
 )
 
 const apmProcessingContent = `2023-06-19 05:20:50 ERROR This is a test error message
