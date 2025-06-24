@@ -124,6 +124,7 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_RPM(t *testing.T) {
 		require.NoError(t, err)
 		testTamperProtectedInstallUpgrade(t, info, "rpm", upgradeFromVersion.String(), true, true)
 	})
+
 	t.Run("Make sure unprotected upgrades are not broken", func(t *testing.T) {
 		testUnprotectedInstallUpgrade(t, info, "rpm")
 	})
@@ -210,7 +211,8 @@ func installFirstAgent(ctx context.Context, t *testing.T, info *define.Info, isP
 	}
 
 	require.NoError(t, err)
-	fixture.Prepare(ctx)
+	err = fixture.EnsurePrepared(ctx)
+	require.NoError(t, err)
 
 	t.Log("Creating a generic policy and enrollment token")
 	policy := createBasicPolicy()
@@ -276,7 +278,9 @@ func testUnprotectedInstallUpgrade(
 	t.Log("Setup agent fixture with the test build")
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat(packageFormat))
 	require.NoError(t, err)
-	fixture.Prepare(ctx)
+
+	err = fixture.EnsurePrepared(ctx)
+	require.NoError(t, err)
 
 	t.Log("Getting source package")
 	srcPkg, err := fixture.SrcPackage(ctx)
