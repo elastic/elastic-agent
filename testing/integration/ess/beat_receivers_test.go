@@ -676,7 +676,7 @@ outputs:
 // TestBeatsReceiverLogs is a test that compares logs emitted by beats processes to those emitted by beats receivers.
 func TestBeatsReceiverLogs(t *testing.T) {
 	_ = define.Require(t, define.Requirements{
-		Group: Default,
+		Group: integration.Default,
 		Local: true,
 		Sudo:  true,
 		OS: []define.OS{
