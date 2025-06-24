@@ -109,8 +109,6 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_RPM(t *testing.T) {
 		},
 	})
 
-	t.Skip("https://github.com/elastic/elastic-agent/issues/8613: Flaky uninstall token issue")
-
 	t.Run("Upgrade from older version to newer version", func(t *testing.T) {
 		upgradeFromVersion, err := upgradetest.PreviousMinor()
 		require.NoError(t, err)
@@ -197,14 +195,22 @@ func addEndpointCleanup(t *testing.T, uninstallToken string) {
 }
 
 func installFirstAgent(ctx context.Context, t *testing.T, info *define.Info, isProtected bool, packageFormat string, upgradeFromVersion string) (*atesting.Fixture, string) {
-	fixture, err := atesting.NewFixture(
-		t,
-		upgradeFromVersion,
-		atesting.WithFetcher(atesting.ArtifactFetcher()),
-		atesting.WithPackageFormat(packageFormat),
-	)
-	require.NoError(t, err)
-	fixture.Prepare(ctx)
+	var fixture *atesting.Fixture
+	var err error
+
+	if upgradeFromVersion == define.Version() {
+		fixture, err = define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat(packageFormat))
+	} else {
+		fixture, err = atesting.NewFixture(
+			t,
+			upgradeFromVersion,
+			atesting.WithFetcher(atesting.ArtifactFetcher()),
+			atesting.WithPackageFormat(packageFormat),
+		)
+	}
+	require.NoError(t, err, "failed to create fixture")
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err, "failed to prepare fixture")
 
 	t.Log("Creating a generic policy and enrollment token")
 	policy := createBasicPolicy()
@@ -225,11 +231,12 @@ func installFirstAgent(ctx context.Context, t *testing.T, info *define.Info, isP
 
 	t.Log("Get the policy uninstall token")
 	uninstallToken, err := tools.GetUninstallToken(ctx, info.KibanaClient, policyResp.ID)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to get uninstall token")
 
 	opts := atesting.InstallOpts{}
 	t.Log("Install and enroll the first agent")
-	tools.InstallAgentForPolicyWithToken(ctx, t, opts, fixture, info.KibanaClient, enrollKeyResp)
+	_, err = tools.InstallAgentForPolicyWithToken(ctx, t, opts, fixture, info.KibanaClient, enrollKeyResp)
+	require.NoError(t, err, "failed to install agent for policy with token")
 
 	addEndpointCleanup(t, uninstallToken)
 
@@ -245,9 +252,6 @@ func installFirstAgent(ctx context.Context, t *testing.T, info *define.Info, isP
 	)
 
 	t.Log("The initial installation of both the agent and endpoint are healthy")
-
-	initEndpointVersion := getEndpointVersion(t)
-	t.Logf("The initial endpoint version is %s", initEndpointVersion)
 
 	return fixture, uninstallToken
 }
@@ -270,7 +274,8 @@ func testUnprotectedInstallUpgrade(
 	t.Log("Setup agent fixture with the test build")
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat(packageFormat))
 	require.NoError(t, err)
-	fixture.Prepare(ctx)
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err, "failed to prepare fixture")
 
 	t.Log("Getting source package")
 	srcPkg, err := fixture.SrcPackage(ctx)
@@ -284,7 +289,8 @@ func testUnprotectedInstallUpgrade(
 	t.Log(string(out))
 	require.NoError(t, err, "agent installation with package manager should not fail")
 
-	fixture.SetDebRpmClient()
+	err = fixture.SetDebRpmClient()
+	require.NoError(t, err, "could not set DEB/RPM client")
 
 	upgradedAgentClient := fixture.Client()
 	err = upgradedAgentClient.Connect(ctx)
@@ -353,23 +359,25 @@ func testTamperProtectedInstallUpgrade(
 	if checkVersionUpgrade {
 		t.Log("Setup agent fixture with the test build")
 		fixture, err = define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat(packageFormat))
-		require.NoError(t, err)
-		fixture.Prepare(ctx)
+		require.NoError(t, err, "failed to create agent fixture")
+		err = fixture.Prepare(ctx)
+		require.NoError(t, err, "failed to prepare agent fixture")
 	}
 
 	t.Log("Getting source package")
 	srcPkg, err := fixture.SrcPackage(ctx)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to get source package")
 
 	t.Log("Installing the second agent, upgrading from the older version")
 	installCmd, err := getInstallCommand(ctx, fixture.PackageFormat(), srcPkg, nil)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to get install command")
 
 	out, err = installCmd.CombinedOutput()
 	t.Log(string(out))
 	require.NoError(t, err, "agent installation with package manager should not fail")
 
-	fixture.SetDebRpmClient()
+	err = fixture.SetDebRpmClient()
+	require.NoError(t, err, "failed to set deb/rpm client")
 
 	upgradedAgentClient := fixture.Client()
 	err = upgradedAgentClient.Connect(ctx)
@@ -388,30 +396,30 @@ func testTamperProtectedInstallUpgrade(
 		t.Logf("The upgraded endpoint version is %s", upgradedEndpointVersion)
 
 		startEndpointVersion, err := version.ParseVersion(initEndpointVersion)
-		require.NoError(t, err)
+		require.NoError(t, err, "failed to parse initial endpoint version")
 
 		parsedUpgradedVersion, err := version.ParseVersion(upgradedEndpointVersion)
-		require.NoError(t, err)
+		require.NoError(t, err, "failed to parse upgraded endpoint version")
 
 		t.Logf("Comparing start version %s to upgraded version %s", startEndpointVersion.String(), parsedUpgradedVersion.String())
 		require.True(t, startEndpointVersion.Less(*parsedUpgradedVersion))
 	}
 
 	// try to uninstall the agent without token and assert that endpoint is not removed
-	t.Log("trying to uinstall without token, expecting error")
+	t.Log("trying to uninstall without token, expecting error")
 	out, err = exec.Command("sudo", "elastic-agent", "uninstall", "-f").CombinedOutput()
 	t.Log(string(out))
 	require.Error(t, err, "uninstalling agent without a token should fail because of tamper protection")
 	t.Log("tamper protection for the upgraded agent is enabled")
 
-	// uninstall with the uninstall token and assert that endpoint is indeed removed.
-	t.Log("trying to uinstall with token, not expecting any error")
+	// uninstall with the token and assert that endpoint is indeed removed.
+	t.Log("trying to uninstall with token, not expecting any error")
 	out, err = exec.Command("sudo", "elastic-agent", "uninstall", "-f", "--uninstall-token", uninstallToken).CombinedOutput()
 	t.Log(string(out))
 	require.NoError(t, err, string(out))
 
 	_, err = exec.LookPath("elastic-agent")
-	require.Error(t, err)
+	require.Error(t, err, "expected elastic-agent binary to not exist in PATH after uninstall")
 
 	t.Log("successfully uninstalled endpoint using the uninstall token")
 }
@@ -1239,14 +1247,14 @@ func TestForceInstallOverProtectedPolicy(t *testing.T) {
 		PolicyID: policy.ID,
 	})
 	require.NoError(t, err)
-	url, err := fleettools.DefaultURL(ctx, info.KibanaClient)
+	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 	require.NoError(t, err)
 
 	args := []string{
 		"install",
 		"--force",
 		"--url",
-		url,
+		fleetURL,
 		"--enrollment-token",
 		token.APIKey,
 	}
