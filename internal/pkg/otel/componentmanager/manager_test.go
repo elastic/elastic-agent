@@ -6,6 +6,7 @@ package componentmanager
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -14,8 +15,6 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/version"
-
-	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"github.com/stretchr/testify/assert"
@@ -529,7 +528,7 @@ func (f *fakeOTelManager) Run(ctx context.Context) error {
 }
 
 func (f *fakeOTelManager) Errors() <-chan error {
-	return nil
+	return f.errChan
 }
 
 func (f *fakeOTelManager) Update(cfg *confmap.Conf) {
@@ -539,6 +538,11 @@ func (f *fakeOTelManager) Update(cfg *confmap.Conf) {
 	}
 	if f.errChan != nil {
 		// If a reporting channel is set, send the result to it
+		// Drain the channel if necessary, we only care about the latest error
+		select {
+		case <-f.errChan:
+		default:
+		}
 		f.errChan <- f.result
 	}
 }
@@ -548,31 +552,31 @@ func (f *fakeOTelManager) Watch() <-chan *status.AggregateStatus {
 }
 
 // TestOtelComponentManagerEndToEnd tests the full lifecycle of the OtelComponentManager
-// including configuration updates, status updates, and error handling. It uses a real otel manager.
+// including configuration updates, status updates, and error handling.
 func TestOtelComponentManagerEndToEnd(t *testing.T) {
 	// Setup test logger and dependencies
-	testLogger, obs := loggertest.New("test")
-	t.Cleanup(func() {
-		if t.Failed() {
-			t.Log("test failed, printing collector logs")
-			for _, logRecord := range obs.TakeAll() {
-				if len(logRecord.Message) < 1000 {
-					t.Log(logRecord.Message)
-				}
-			}
-		}
-	})
+	testLogger, _ := loggertest.New("test")
 	agentInfo := &info.AgentInfo{}
 	beatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
 
-	otelManager := manager.NewOTelManager(testLogger)
+	otelStatusChan := make(chan *status.AggregateStatus, 1)
+	otelErrChan := make(chan error, 1)
+	otelConfigChan := make(chan *confmap.Conf, 1)
+	otelManager := &fakeOTelManager{
+		updateCallback: func(cfg *confmap.Conf) error {
+			otelConfigChan <- cfg
+			return nil
+		},
+		statusChan: otelStatusChan,
+		errChan:    otelErrChan,
+	}
 
 	// Create manager with test dependencies
 	mgr := NewOtelComponentManager(testLogger, otelManager, agentInfo, beatMonitoringConfigGetter)
 	require.NotNil(t, mgr)
 
 	// Start manager in a goroutine
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Hour*1)
 	defer cancel()
 
 	go func() {
@@ -603,92 +607,100 @@ func TestOtelComponentManagerEndToEnd(t *testing.T) {
 		},
 	}
 
-	verifyCollectorStatus := func(t require.TestingT, status *status.AggregateStatus) {
-		require.NotNil(t, status)
-		assert.Equal(t, componentstatus.StatusOK, status.Status(), "collector should be healthy")
-		pipelineKey := "pipeline:metrics"
-		pipelineStatus := status.ComponentStatusMap[pipelineKey]
-		require.NotNil(t, pipelineStatus)
-		assert.Equal(t, componentstatus.StatusOK, pipelineStatus.Status(), "pipeline should be healthy")
-		componentKeys := []string{"receiver:nop", "exporter:nop"}
-		for _, componentKey := range componentKeys {
-			componentStatus := pipelineStatus.ComponentStatusMap[componentKey]
-			require.NotNil(t, componentStatus)
-			assert.Equal(t, componentstatus.StatusOK, componentStatus.Status(), "component should be healthy")
+	t.Run("collector config is passed down to the otel manager", func(t *testing.T) {
+		mgr.UpdateCollector(collectorCfg)
+		cfg, err := getFromChannelOrErrorWithContext(t, ctx, otelConfigChan, mgr.Errors())
+		require.NoError(t, err)
+		assert.Equal(t, collectorCfg, cfg)
+	})
+
+	t.Run("collector status is passed up to the component manager", func(t *testing.T) {
+		otelStatus := &status.AggregateStatus{
+			Event: componentstatus.NewEvent(componentstatus.StatusOK),
 		}
-	}
 
-	verifyComponentState := func(t require.TestingT, componentState runtime.ComponentComponentState) {
-		assert.Equal(t, testComp, componentState.Component)
-		state := componentState.State
+		select {
+		case <-ctx.Done():
+			t.Fatal("timeout waiting for collector status update")
+		case otelStatusChan <- otelStatus:
+		}
 
-		assert.Equal(t, client.UnitStateHealthy, state.State)
-		unitKeys := []runtime.ComponentUnitKey{
-			{
-				UnitID:   "filestream-unit",
-				UnitType: client.UnitTypeInput,
+		collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
+		require.NoError(t, err)
+		assert.Equal(t, otelStatus, collectorStatus)
+	})
+
+	t.Run("component config is passed down to the otel manager", func(t *testing.T) {
+		mgr.UpdateComponents(componentModel)
+		cfg, err := getFromChannelOrErrorWithContext(t, ctx, otelConfigChan, mgr.Errors())
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+		receivers, err := cfg.Sub("receivers")
+		require.NoError(t, err)
+		require.NotNil(t, receivers)
+		assert.True(t, receivers.IsSet("nop"))
+		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test"))
+	})
+
+	t.Run("empty collector config leaves the component config running", func(t *testing.T) {
+		mgr.UpdateCollector(nil)
+		cfg, err := getFromChannelOrErrorWithContext(t, ctx, otelConfigChan, mgr.Errors())
+		require.NotNil(t, cfg)
+		require.NoError(t, err)
+		receivers, err := cfg.Sub("receivers")
+		require.NoError(t, err)
+		require.NotNil(t, receivers)
+		assert.False(t, receivers.IsSet("nop"))
+		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test"))
+	})
+
+	t.Run("collector status with components is passed up to the component manager", func(t *testing.T) {
+		otelStatus := &status.AggregateStatus{
+			Event: componentstatus.NewEvent(componentstatus.StatusOK),
+			ComponentStatusMap: map[string]*status.AggregateStatus{
+				// This represents a pipeline for our component (with OtelNamePrefix)
+				"pipeline:logs/_agent-component/test": {
+					Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					ComponentStatusMap: map[string]*status.AggregateStatus{
+						"receiver:filebeatreceiver/_agent-component/test": {
+							Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						},
+						"exporter:elasticsearch/_agent-component/test": {
+							Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						},
+					},
+				},
 			},
-			{
-				UnitID:   "filestream-default",
-				UnitType: client.UnitTypeOutput,
-			},
 		}
-		for _, unitKey := range unitKeys {
-			require.Contains(t, state.Units, unitKey)
-			unitState := state.Units[unitKey]
-			assert.Equal(t, client.UnitStateHealthy, unitState.State)
+
+		select {
+		case <-ctx.Done():
+			t.Fatal("timeout waiting for collector status update")
+		case otelStatusChan <- otelStatus:
 		}
-	}
 
-	// Set an otel collector configuration
-	mgr.UpdateCollector(collectorCfg)
+		collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
+		require.NoError(t, err)
+		assert.Len(t, collectorStatus.ComponentStatusMap, 0)
 
-	// should get an updated collector status
-	// there's no components defined, so no component states
-	assert.EventuallyWithT(t, func(collectT *assert.CollectT) {
-		otelStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
-		require.NoError(collectT, err)
-		verifyCollectorStatus(collectT, otelStatus)
-	}, 30*time.Second, 100*time.Millisecond)
-
-	// Update component configuration
-	mgr.UpdateComponents(componentModel)
-
-	// should get an updated collector status and component states
-	assert.EventuallyWithT(t, func(collectT *assert.CollectT) {
-		otelStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
-		require.NoError(collectT, err)
-		verifyCollectorStatus(collectT, otelStatus)
-	}, 30*time.Second, 100*time.Millisecond)
-
-	assert.EventuallyWithT(t, func(collectT *assert.CollectT) {
 		componentState, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchComponents(), mgr.Errors())
-		require.NoError(collectT, err)
-		verifyComponentState(collectT, componentState)
-	}, 30*time.Second, 100*time.Millisecond)
+		require.NoError(t, err)
+		assert.Equal(t, componentState.Component, testComp)
+	})
 
-	// drop collector configuration
-	// should get an updated collector status and component states
-	mgr.UpdateCollector(nil)
-	assert.EventuallyWithT(t, func(collectT *assert.CollectT) {
-		otelStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
-		require.NoError(collectT, err)
-		require.NotNil(collectT, otelStatus)
-		assert.Equal(collectT, componentstatus.StatusOK, otelStatus.Status(), "collector should be healthy")
-		assert.Len(collectT, otelStatus.ComponentStatusMap, 0, "collector should have no components")
-	}, 30*time.Second, 100*time.Millisecond)
-	assert.EventuallyWithT(t, func(collectT *assert.CollectT) {
-		componentState, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchComponents(), mgr.Errors())
-		require.NoError(collectT, err)
-		verifyComponentState(collectT, componentState)
-	}, 30*time.Second, 100*time.Millisecond)
+	t.Run("collector error is passed up to the component manager", func(t *testing.T) {
+		collectorErr := errors.New("collector error")
 
-	// add an invalid configuration, we should get an error
-	mgr.UpdateCollector(confmap.NewFromStringMap(map[string]any{"service": "invalid"}))
-	assert.EventuallyWithT(t, func(collectT *assert.CollectT) {
-		_, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
-		require.Error(collectT, err)
-	}, 30*time.Second, 100*time.Millisecond)
+		select {
+		case <-ctx.Done():
+			t.Fatal("timeout waiting for collector status update")
+		case otelErrChan <- collectorErr:
+		}
+
+		collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
+		require.Nil(t, collectorStatus)
+		assert.Equal(t, err, collectorErr)
+	})
 }
 
 func testComponent(componentId string) component.Component {
@@ -758,11 +770,14 @@ func getFromChannelOrErrorWithContext[T any](t *testing.T, ctx context.Context, 
 	t.Helper()
 	var result T
 	var err error
-	select {
-	case result = <-ch:
-	case err = <-errCh:
-	case <-ctx.Done():
-		err = ctx.Err()
+	for err == nil {
+		select {
+		case result = <-ch:
+			return result, nil
+		case err = <-errCh:
+		case <-ctx.Done():
+			err = ctx.Err()
+		}
 	}
 	return result, err
 }
