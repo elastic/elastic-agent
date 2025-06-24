@@ -20,10 +20,6 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 		Local: false,
 		Sudo:  true,
 	})
-<<<<<<< HEAD:testing/integration/logs_ingestion_test.go
-	LogIngestionFleetManaged(t, info)
-=======
 
 	integration.LogIngestionFleetManaged(t, info)
->>>>>>> 73737c9a3 ([test] split up ess and beats serverless integration tests (#8551)):testing/integration/ess/logs_ingestion_test.go
 }

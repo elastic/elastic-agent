@@ -21,11 +21,8 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
-<<<<<<< HEAD:testing/integration/metrics_monitoring_test.go
 	"github.com/elastic/elastic-agent/pkg/testing/tools/estools"
-=======
 	"github.com/elastic/elastic-agent/testing/integration"
->>>>>>> 73737c9a3 ([test] split up ess and beats serverless integration tests (#8551)):testing/integration/ess/metrics_monitoring_test.go
 )
 
 type MetricsRunner struct {

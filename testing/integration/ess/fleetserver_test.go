@@ -71,13 +71,9 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 	require.NoError(t, err, "failed creating policy")
 	policy := policyResp.AgentPolicy
 
-<<<<<<< HEAD:testing/integration/fleetserver_test.go
-	_, err = tools.InstallPackageFromDefaultFile(ctx, info.KibanaClient, "fleet-server", PreinstalledPackages["fleet-server"], "fleet-server.json", uuid.Must(uuid.NewV4()).String(), policy.ID)
-=======
 	packageFile := filepath.Join("testdata", "fleet-server.json")
 	_, err = tools.InstallPackageFromDefaultFile(ctx, info.KibanaClient, "fleet-server",
 		integration.PreinstalledPackages["fleet-server"], packageFile, uuid.Must(uuid.NewV4()).String(), policy.ID)
->>>>>>> 73737c9a3 ([test] split up ess and beats serverless integration tests (#8551)):testing/integration/ess/fleetserver_test.go
 	require.NoError(t, err, "failed creating fleet-server integration")
 
 	t.Log("Get fleet-server service token...")
