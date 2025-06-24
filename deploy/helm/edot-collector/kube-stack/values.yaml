@@ -535,10 +535,11 @@ collectors:
               endpoint: ${env:MY_POD_IP}:4318
       processors:
         # [Elastic Infra Metrics Processor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticinframetricsprocessor)
-        elasticinframetrics:
-          add_system_metrics: true
-          add_k8s_metrics: true
-          drop_original: true
+        # DEPRECATED: The elasticinframetrics processor is deprecated and will be removed in 9.2.0.
+        # elasticinframetrics:
+        #   add_system_metrics: true
+        #   add_k8s_metrics: true
+        #   drop_original: true
         # [Attributes Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/attributesprocessor)
         attributes/dataset:
           actions:

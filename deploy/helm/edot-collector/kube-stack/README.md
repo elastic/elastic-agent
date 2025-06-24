@@ -33,7 +33,6 @@ The Cluster Deployment collector handles the following data:
 The OpenTelemetry components deployed within the `Gateway` Deployment collectors focus on processing and exporting OTLP data to Elasticsearch. Processing components:
 
 - [Elastic Trace processor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elastictraceprocessor): The processor enriches traces with elastic specific requirements. It uses opentelemetry-lib to perform the actual enrichments.
-- [Elastic Infra Metrics processor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticinframetricsprocessor): The Elastic Infra Metrics Processor is used to bridge the gap between OTEL and Elastic Infra Metrics.
 - [Elastic APM connector](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector): The Elastic APM connector produces aggregated Elastic APM-specific metrics from all telemetry signals.
 
 ### Auto-instrumentation
