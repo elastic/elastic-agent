@@ -30,4 +30,5 @@ go version
 
 echo "~~~ Installing go packages using ASDF"
 asdf exec go install gotest.tools/gotestsum@latest
+asdf exec go install github.com/alexec/junit2html@latest
 asdf reshim golang
