@@ -1,0 +1,31 @@
+// begin 9.0.3 relnotes
+
+[[release-notes-9.0.3]]
+==  9.0.3
+
+Review important information about the  9.0.3 release.
+
+[discrete]
+[[new-features-9.0.3]]
+=== New features
+
+The 9.0.3 release adds the following new and notable features.
+
+
+elastic-agent::
+
+* Add Cumulativetodeltaprocessor To Edot Collector. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8372[#https://github.com/elastic/elastic-agent/pull/8372]
+
+
+[discrete]
+[[bug-fixes-9.0.3]]
+=== Bug fixes
+
+
+elastic-agent::
+
+* Address A Race Condition That Can Occur In Agent Diagnostics If Log Rotation Runs While Logs Are Being Zipped. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8215[#https://github.com/elastic/elastic-agent/pull/8215]
+* Use Paths.tempdir For Diagnostics Actions. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8472[#https://github.com/elastic/elastic-agent/pull/8472]
+* Relax File Ownership Check To Allow Admin Re-Enrollment On Windows. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8503[#https://github.com/elastic/elastic-agent/pull/8503] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/7794[#https://github.com/elastic/elastic-agent/issues/7794]
+
+// end 9.0.3 relnotes
