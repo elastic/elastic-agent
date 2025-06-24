@@ -14,8 +14,6 @@ if test -L "$symlink"; then
     unlink "$symlink"
 fi
 
-<<<<<<< HEAD
-=======
 SERVICE_NAME="ElasticEndpoint"
 should_restart_endpoint=false
 
@@ -44,7 +42,6 @@ else
 fi
 
 
->>>>>>> 249885f9f ([deb/rpm] restart endpoint with tamper protection after elastic-agent  (#8637))
 # create symlink to the new agent
 echo "create symlink "$symlink" to "$new_agent_dir/elastic-agent""
 ln -s "$new_agent_dir/elastic-agent" "$symlink"
