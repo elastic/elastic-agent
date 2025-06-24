@@ -131,9 +131,8 @@ func isFIPSCapableVersion(ver *version.ParsedSemVer) bool {
 		return false
 	}
 
-	// Version 9.0.0 is not FIPS-capable
-	if ver.Equal(version.NewParsedSemVer(9, 0, 0, "", "")) ||
-		ver.Equal(*upgradetest.Version_9_0_0_SNAPSHOT) {
+	// Versions 9.0.x are not FIPS-capable
+	if ver.Major() == 9 && ver.Minor() == 0 {
 		return false
 	}
 
