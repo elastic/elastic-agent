@@ -44,11 +44,7 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 		t.Fatal("ECH API key missing")
 	}
 
-	// Iterate over upgradeable versions >= 8.19.0 (the first version when we were able
-	// to produce FIPS-capable artifacts), using each as the start version for the upgrade.
-	// Try upgrading to the latest version.
 	startVersions := getUpgradeStartVersions(t)
-
 	endVersion := define.Version()
 
 	prov, err := ess.NewProvisioner(ess.ProvisionerConfig{
@@ -109,19 +105,37 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 	}
 }
 
+// getUpgradeStartVersions returns stack versions to use as the start version for an upgrade.
 func getUpgradeStartVersions(t *testing.T) version.SortableParsedVersions {
 	versions, err := upgradetest.GetUpgradableVersions()
 	require.NoError(t, err, "could not get upgradable versions")
 
 	filteredVersions := make([]*version.ParsedSemVer, 0)
 	for _, ver := range versions {
-		if ver.Less(*upgradetest.Version_8_19_0_SNAPSHOT) {
-			continue // Skip versions older than 8.19.0
+		// Filter out versions that are not FIPS-capable
+		if !isFIPSCapableVersion(ver) {
+			cotinue
 		}
+
 		filteredVersions = append(filteredVersions, ver)
 	}
 
 	sortedVers := version.SortableParsedVersions(filteredVersions)
 	sort.Sort(sortedVers)
 	return sortedVers
+}
+
+func isFIPSCapableVersion(ver *version.ParsedSemVer) bool {
+	// Versions < 8.19.0 are not FIPS-capable
+	if ver.Less(version.NewParsedSemVer(8, 19, 0, "", "")) {
+		return false
+	}
+
+	// Version 9.0.0 is not FIPS-capable
+	if ver.Equal(version.NewParsedSemVer(9, 0, 0, "", "")) ||
+		ver.Equal(*upgradetest.Version_9_0_0_SNAPSHOT) {
+		return false
+	}
+
+	return true
 }
