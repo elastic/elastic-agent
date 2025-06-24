@@ -34,8 +34,8 @@ echo "~~~ Building test binaries"
 mage build:testBinaries
 
 # If the step is retried, we start the stack again.
-BUILDKITE_RETRY_COUNT == "0" for the first run
-BUILDKITE_RETRY_COUNT > 0 for the retries
+# BUILDKITE_RETRY_COUNT == "0" for the first run
+# BUILDKITE_RETRY_COUNT > 0 for the retries
 if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
   echo "~~~ The steps is retried, starting the ESS stack again"
   trap 'ess_down' EXIT
