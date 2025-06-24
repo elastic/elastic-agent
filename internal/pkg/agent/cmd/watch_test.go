@@ -136,11 +136,9 @@ func Test_watchCmd(t *testing.T) {
 					Watch(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(nil)
 
-				expectedRemoveMarkerFlag := true
-				if runtime.GOOS == "windows" {
-					// on windows the marker is not removed immediately to allow for cleanup on restart
-					expectedRemoveMarkerFlag = false
-				}
+				// on windows the marker is not removed immediately to allow for cleanup on restart
+				expectedRemoveMarkerFlag := runtime.GOOS != "windows"
+
 				installModifier.EXPECT().
 					Cleanup(mock.Anything, topDir, "elastic-agent-4.5.6-newver", "newver", expectedRemoveMarkerFlag, false).
 					Return(nil)
