@@ -722,7 +722,6 @@ func genIgnoredFields(goos string) []string {
 	switch goos {
 	case "windows":
 		return []string{
-			"log.file.fingerprint",
 			"log.file.idxhi",
 			"log.file.idxlo",
 			"log.offset",
@@ -730,7 +729,6 @@ func genIgnoredFields(goos string) []string {
 	default:
 		return []string{
 			"log.file.device_id",
-			"log.file.fingerprint",
 			"log.file.inode",
 			"log.file.path",
 			"log.offset",
