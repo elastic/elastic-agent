@@ -6,6 +6,8 @@ package testing
 
 import (
 	"context"
+	"crypto/sha512"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,6 +18,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/cenkalti/backoff/v5"
 
 	semver "github.com/elastic/elastic-agent/pkg/version"
 )
@@ -116,21 +120,43 @@ func (r *artifactResult) Fetch(ctx context.Context, l Logger, dir string) error 
 		return fmt.Errorf("failed to create path %q: %w", dst, err)
 	}
 
-	err = DownloadPackage(ctx, l, r.doer, r.src, dst)
+	_, err = backoff.Retry(ctx, func() (any, error) {
+		if err = r.fetch(ctx, l, dst); err != nil {
+			return nil, err
+		}
+
+		// check package hash
+		if err = checkPackageSHA512Hash(dst, dst+extHash); err != nil {
+			l.Logf("inconsistent package hash detected: %s", err)
+			return nil, fmt.Errorf("inconsistent package hash: %w", err)
+		}
+
+		return nil, nil
+	},
+		backoff.WithMaxTries(3),
+		backoff.WithBackOff(backoff.NewConstantBackOff(3*time.Second)),
+	)
+
 	if err != nil {
+		return fmt.Errorf("failed to fetch %s: %w", r.src, err)
+	}
+
+	return nil
+}
+
+func (r *artifactResult) fetch(ctx context.Context, l Logger, dst string) error {
+	if err := DownloadPackage(ctx, l, r.doer, r.src, dst); err != nil {
 		return fmt.Errorf("failed to download %s: %w", r.src, err)
 	}
 
 	// fetch package hash
-	err = DownloadPackage(ctx, l, r.doer, r.src+extHash, dst+extHash)
-	if err != nil {
-		return fmt.Errorf("failed to download %s: %w", r.src, err)
+	if err := DownloadPackage(ctx, l, r.doer, r.src+extHash, dst+extHash); err != nil {
+		return fmt.Errorf("failed to download %s: %w", r.src+extHash, err)
 	}
 
 	// fetch package asc
-	err = DownloadPackage(ctx, l, r.doer, r.src+extAsc, dst+extAsc)
-	if err != nil {
-		return fmt.Errorf("failed to download %s: %w", r.src, err)
+	if err := DownloadPackage(ctx, l, r.doer, r.src+extAsc, dst+extAsc); err != nil {
+		return fmt.Errorf("failed to download %s: %w", r.src+extAsc, err)
 	}
 
 	return nil
@@ -144,7 +170,12 @@ func findURI(ctx context.Context, doer httpDoer, version *semver.ParsedSemVer) (
 			return fmt.Sprintf("https://snapshots.elastic.co/%s-%s/downloads/beats/elastic-agent/", version.CoreVersion(), version.BuildMetadata()), nil
 		}
 
-		buildID, err := findLatestSnapshot(ctx, doer, version.CoreVersion())
+		buildID, err := backoff.Retry(ctx, func() (any, error) {
+			return findLatestSnapshot(ctx, doer, version.CoreVersion())
+		},
+			backoff.WithMaxTries(3),
+			backoff.WithBackOff(backoff.NewConstantBackOff(3*time.Second)),
+		)
 		if err != nil {
 			return "", fmt.Errorf("failed to find snapshot information for version %q: %w", version, err)
 		}
@@ -192,6 +223,32 @@ func findLatestSnapshot(ctx context.Context, doer httpDoer, version string) (bui
 	default:
 		return "", fmt.Errorf("unexpected status code %d from %s", resp.StatusCode, latestSnapshotURI)
 	}
+}
+
+func checkPackageSHA512Hash(pkgPath, pkgHashPath string) error {
+	pkgHashFileContents, err := os.ReadFile(pkgHashPath)
+	if err != nil {
+		return fmt.Errorf("failed to read package hash: %w", err)
+	}
+	if len(pkgHashFileContents) < 128 {
+		return fmt.Errorf("wrong format for a package hash expected at least 128 bytes: %q", pkgHashFileContents)
+	}
+	pkgHash := string(pkgHashFileContents[0:128])
+
+	hasher := sha512.New()
+	pkgData, err := os.ReadFile(pkgPath)
+	if err != nil {
+		return fmt.Errorf("failed to read package data: %w", err)
+	}
+	_, err = hasher.Write(pkgData)
+	if err != nil {
+		return fmt.Errorf("failed to calculate package hash: %w", err)
+	}
+	hash := hex.EncodeToString(hasher.Sum(nil))
+	if pkgHash != hash {
+		return fmt.Errorf("package hash mismatch, want: %s, got: %s", pkgHash, hash[:])
+	}
+	return nil
 }
 
 func DownloadPackage(ctx context.Context, l Logger, doer httpDoer, downloadPath string, packageFile string) error {
