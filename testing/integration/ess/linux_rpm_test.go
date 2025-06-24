@@ -9,7 +9,6 @@ package ess
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/elastic-agent/testing/upgradetest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,6 +27,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/integration"
+	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
 func TestRpmLogIngestFleetManaged(t *testing.T) {
