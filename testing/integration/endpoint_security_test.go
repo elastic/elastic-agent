@@ -152,7 +152,10 @@ func getInstallCommand(ctx context.Context, packageFormat string, srcPkg string,
 
 	switch packageFormat {
 	case "deb":
-		args = append(args, "dpkg", "-i")
+		// since the previous agent is enrolled it means that the /etc/elastic-agent/elastic-agent.yml has changed
+		// and dpkg will ask if we want to overwrite it. Since this is a non-interactive install we need to
+		// force to keep the existing config
+		args = append(args, "dpkg", "--force-confold", "-i")
 	case "rpm":
 		args = append(args, "rpm", "-Uvh", "--force")
 	default:
