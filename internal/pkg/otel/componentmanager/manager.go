@@ -121,7 +121,6 @@ func (m *OtelComponentManager) Run(ctx context.Context) error {
 	for ctx.Err() == nil {
 		select {
 		case <-ctx.Done():
-			m.logger.Debug("OtelComponentManager run loop context cancelled")
 			break
 
 		case collectorCfg := <-m.collectorUpdateChan:
@@ -134,7 +133,7 @@ func (m *OtelComponentManager) Run(ctx context.Context) error {
 				m.reportError(ctx, err)
 			}
 
-		case err := <-m.errCh:
+		case err := <-m.otelManager.Errors():
 			m.reportError(ctx, err)
 
 		case otelStatus := <-m.otelManager.Watch():
