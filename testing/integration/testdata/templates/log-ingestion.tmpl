@@ -1,0 +1,33 @@
+exporters:
+  debug:
+    verbosity: basic
+
+  elasticsearch:
+    api_key: {{.ESApiKey}}
+    endpoint: {{.ESEndpoint}}
+    mapping:
+      mode: none
+
+processors:
+  resource/add-test-id:
+    attributes:
+    - key: test.id
+      action: insert
+      value: {{.TestId}}
+
+receivers:
+  filelog:
+    include:
+      - {{.InputFilePath}}
+    start_at: beginning
+
+service:
+  pipelines:
+    logs:
+      exporters:
+        - debug
+        - elasticsearch
+      processors:
+        - resource/add-test-id
+      receivers:
+        - filelog

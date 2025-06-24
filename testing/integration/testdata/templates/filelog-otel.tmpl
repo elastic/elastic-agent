@@ -1,0 +1,16 @@
+receivers:
+  filelog:
+    include:
+      - {{.InputPath}}
+    start_at: beginning
+
+exporters:
+  file:
+    path: {{.OutputPath}}
+service:
+  pipelines:
+    logs:
+      receivers:
+        - filelog
+      exporters:
+        - file
