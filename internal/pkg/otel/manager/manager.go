@@ -200,7 +200,7 @@ func (m *OTelManager) startCollector(cfg *confmap.Conf, errCh chan error) (conte
 		otel.WithExtensionFactory(NewAgentStatusFactory(m)))
 	settings.DisableGracefulShutdown = true // managed by this manager
 	settings.LoggingOptions = []zap.Option{zap.WrapCore(func(zapcore.Core) zapcore.Core {
-		return m.baseLogger.Core() // use same zap as agent
+		return m.baseLogger.Core() // use the base logger also used for logs from the command runtime
 	})}
 	svc, err := otelcol.NewCollector(*settings)
 	if err != nil {
