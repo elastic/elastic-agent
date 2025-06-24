@@ -574,6 +574,7 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 		cmd.Env = append(cmd.Env, "ELASTIC_AGENT_FLAVOR=servers")
 	}
 	out, err := cmd.CombinedOutput()
+	f.t.Logf("rpm install output: %s", string(out))
 	if err != nil {
 		return out, fmt.Errorf("rpm install failed: %w output:%s", err, string(out))
 	}
@@ -589,6 +590,12 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 		if err != nil {
 			f.t.Logf("error systemctl stop elastic-agent: %s, output: %s", err, string(out))
 		}
+
+		if KeepInstalledFlag() {
+			f.t.Logf("skipping uninstall; test failed and AGENT_KEEP_INSTALLED=true")
+			return
+		}
+
 		// rpm -e elastic-agent rpm
 		f.t.Logf("running 'sudo rpm -e elastic-agent'")
 		out, err = exec.CommandContext(uninstallCtx, "sudo", "rpm", "-e", "elastic-agent").CombinedOutput()

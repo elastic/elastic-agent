@@ -29,6 +29,31 @@ if systemctl list-unit-files --type=service | grep -q "^${SERVICE_NAME}.service"
             echo "New endpoint and installed endpoint versions are the same: \"${installed_endpoint_version}\""
             echo "Starting $SERVICE_NAME"
             sudo systemctl start ${SERVICE_NAME}
+
+            # Wait for endpoint to be ready before proceeding
+            echo "Waiting for Endpoint to initialize..."
+            
+            TIMEOUT_SECONDS=30
+            INTERVAL_SECONDS=2
+            
+            start_time=$(date +%s)
+            deadline=$((start_time + TIMEOUT_SECONDS))
+            
+            is_healthy=false
+            
+            while [[ "$(date +%s)" -lt "$deadline" ]]; do
+                if /opt/Elastic/Endpoint/elastic-endpoint status --output json | grep -q '"status":"(HEALTHY) Running"'; then
+                    echo "Endpoint is ready."
+                    is_healthy=true
+                    break
+                fi
+                echo "Endpoint not ready yet, waiting..."
+                sleep "$INTERVAL_SECONDS"
+            done
+
+            if [[ "$is_healthy" == false ]]; then
+                echo "Timed out after $TIMEOUT_SECONDS seconds waiting for Endpoint to become healthy."
+            fi
         else
             echo "New endpoint version  \"${archive_endpoint_version}\" is different than the one that's already
             installed  \"${installed_endpoint_version}\""
