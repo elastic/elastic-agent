@@ -69,46 +69,7 @@ func TestFleetManagedUpgradePrivileged(t *testing.T) {
 	testFleetManagedUpgrade(t, info, false)
 }
 
-<<<<<<< HEAD:testing/integration/upgrade_fleet_test.go
 func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool) {
-=======
-// TestFleetManagedUpgradeUnprivilegedFIPS tests that the build under test can retrieve an action from
-// Fleet and perform the upgrade as an unprivileged FIPS-capable Elastic Agent. It does not need to test
-// all the combinations of versions as the standalone tests already perform those tests and
-// would be redundant.
-func TestFleetManagedUpgradeUnprivilegedFIPS(t *testing.T) {
-	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
-		Stack: &define.Stack{},
-		Local: false, // requires Agent installation
-		Sudo:  true,  // requires Agent installation
-		OS: []define.OS{
-			{Type: define.Linux},
-		},
-		FIPS: true,
-	})
-
-	// parse the version we are testing
-	currentVersion, err := version.ParseVersion(define.Version())
-	require.NoError(t, err)
-
-	// We need to start the upgrade from a FIPS-capable version
-	if !isFIPSCapableVersion(currentVersion) {
-		t.Skipf(
-			"Minimum start version of FIPS-capable Agent for running this test is either %q or %q, current start version: %q",
-			*upgradetest.Version_8_19_0_SNAPSHOT,
-			*upgradetest.Version_9_1_0_SNAPSHOT,
-			currentVersion,
-		)
-	}
-
-	postWatcherSuccessHook := upgradetest.PostUpgradeAgentIsFIPSCapable
-	upgradeOpts := []upgradetest.UpgradeOpt{upgradetest.WithPostWatcherSuccessHook(postWatcherSuccessHook)}
-	testFleetManagedUpgrade(t, info, true, true, upgradeOpts...)
-}
-
-func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool, fips bool, upgradeOpts ...upgradetest.UpgradeOpt) {
->>>>>>> 73737c9a3 ([test] split up ess and beats serverless integration tests (#8551)):testing/integration/ess/upgrade_fleet_test.go
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
