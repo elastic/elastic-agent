@@ -69,22 +69,6 @@ collectors:
             resource_attributes:
               k8s.cluster.name:
                 enabled: true
-        # [Resource Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourceprocessor)
-        resource/k8s: # Resource attributes tailored for services within Kubernetes.
-          attributes:
-            - key: service.name # Set the service.name resource attribute based on the well-known app.kubernetes.io/name label
-              from_attribute: app.label.name
-              action: insert
-            - key: service.name # Set the service.name resource attribute based on the k8s.container.name attribute
-              from_attribute: k8s.container.name
-              action: insert
-            - key: app.label.name # Delete app.label.name attribute previously used for service.name
-              action: delete
-            - key: service.version # Set the service.version resource attribute based on the well-known app.kubernetes.io/version label
-              from_attribute: app.label.version
-              action: insert
-            - key: app.label.version # Delete app.label.version attribute previously used for service.version
-              action: delete
         resource/hostname:
           attributes:
             - key: host.name
@@ -117,13 +101,9 @@ collectors:
               - "k8s.pod.ip"
               - "k8s.pod.uid"
               - "k8s.pod.start_time"
-            labels:
-              - tag_name: app.label.name
-                key: app.kubernetes.io/name
-                from: pod
-              - tag_name: app.label.version
-                key: app.kubernetes.io/version
-                from: pod
+              # Service attributes added based on https://opentelemetry.io/docs/specs/semconv/non-normative/k8s-attributes/#service-attributes
+              - "service.name"
+              - "service.version"
       receivers:
         # [K8s Objects Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sobjectsreceiver)
         k8sobjects:
@@ -166,7 +146,6 @@ collectors:
               - resourcedetection/eks
               - resourcedetection/gcp
               - resourcedetection/aks
-              - resource/k8s
               - resource/hostname
             receivers:
               - k8s_cluster
@@ -280,22 +259,6 @@ collectors:
                 enabled: false
               host.id:
                 enabled: true
-        # [Resource Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourceprocessor)
-        resource/k8s: # Resource attributes tailored for services within Kubernetes.
-          attributes:
-            - key: service.name # Set the service.name resource attribute based on the well-known app.kubernetes.io/name label
-              from_attribute: app.label.name
-              action: insert
-            - key: service.name # Set the service.name resource attribute based on the k8s.container.name attribute
-              from_attribute: k8s.container.name
-              action: insert
-            - key: app.label.name # Delete app.label.name attribute previously used for service.name
-              action: delete
-            - key: service.version # Set the service.version resource attribute based on the well-known app.kubernetes.io/version label
-              from_attribute: app.label.version
-              action: insert
-            - key: app.label.version # Delete app.label.version attribute previously used for service.version
-              action: delete
         resource/cloud:
           attributes:
             - key: cloud.instance.id
@@ -331,13 +294,9 @@ collectors:
               - "k8s.pod.ip"
               - "k8s.pod.uid"
               - "k8s.pod.start_time"
-            labels:
-              - tag_name: app.label.name
-                key: app.kubernetes.io/name
-                from: pod
-              - tag_name: app.label.version
-                key: app.kubernetes.io/version
-                from: pod
+              # Service attributes added based on https://opentelemetry.io/docs/specs/semconv/non-normative/k8s-attributes/#service-attributes
+              - "service.name"
+              - "service.version"
       receivers:
         # [OTLP Receiver](https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver)
         otlp:
@@ -478,7 +437,6 @@ collectors:
               - resourcedetection/eks
               - resourcedetection/gcp
               - resourcedetection/aks
-              - resource/k8s
               - resource/hostname
               - resource/cloud
             exporters:
@@ -494,7 +452,6 @@ collectors:
               - resourcedetection/eks
               - resourcedetection/gcp
               - resourcedetection/aks
-              - resource/k8s
               - resource/hostname
               - resource/cloud
             exporters:
