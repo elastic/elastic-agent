@@ -48,7 +48,7 @@ extensions:
 
 processors:
   # DEPRECATED: The elasticinframetrics processor is deprecated and will be removed in 9.2.0.
-  # elasticinframetrics:
+  elasticinframetrics:
   resourcedetection:
     detectors: ["system"]
     system:
