@@ -1924,8 +1924,9 @@ func (Integration) Clean() error {
 func (Integration) Check() error {
 	fmt.Println(">> check: Checking for define.Require in integration tests") // nolint:forbidigo // it's ok to use fmt.println in mage
 	return errors.Join(
-		define.ValidateDir("testing/integration"),
+		define.ValidateDir("testing/integration/ess"),
 		define.ValidateDir("testing/integration/serverless"),
+		define.ValidateDir("testing/integration/beats/serverless"),
 		define.ValidateDir("testing/integration/leak"),
 		define.ValidateDir("testing/integration/k8s"),
 	)
@@ -1985,17 +1986,17 @@ func (Integration) Auth(ctx context.Context) error {
 
 // Test runs integration tests on remote hosts
 func (Integration) Test(ctx context.Context) error {
-	return integRunner(ctx, "testing/integration", false, "")
+	return integRunner(ctx, "testing/integration/ess", false, "")
 }
 
 // Matrix runs integration tests on a matrix of all supported remote hosts
 func (Integration) Matrix(ctx context.Context) error {
-	return integRunner(ctx, "testing/integration", true, "")
+	return integRunner(ctx, "testing/integration/ess", true, "")
 }
 
 // Single runs single integration test on remote host
 func (Integration) Single(ctx context.Context, testName string) error {
-	return integRunner(ctx, "testing/integration", false, testName)
+	return integRunner(ctx, "testing/integration/ess", false, testName)
 }
 
 // TestServerless runs the integration tests defined in testing/integration/serverless
@@ -2550,7 +2551,7 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 	if err != nil {
 		return fmt.Errorf("error setting binary name: %w", err)
 	}
-	return integRunner(ctx, "testing/integration", false, "TestBeatsServerless")
+	return integRunner(ctx, "testing/integration/beats/serverless", false, "TestBeatsServerless")
 }
 
 // TestForResourceLeaks runs tests that check for resource leaks
@@ -2633,7 +2634,7 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 
 func (Integration) Buildkite() error {
 	goTestFlags := os.Getenv("GOTEST_FLAGS")
-	batches, err := define.DetermineBatches("testing/integration", goTestFlags, "integration")
+	batches, err := define.DetermineBatches("testing/integration/ess", goTestFlags, "integration")
 	if err != nil {
 		return fmt.Errorf("failed to determine batches: %w", err)
 	}

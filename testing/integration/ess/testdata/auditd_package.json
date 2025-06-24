@@ -1,0 +1,107 @@
+{
+    "id": "9bf446fc-58d4-4767-b42d-3450815d5d3d",
+    "version": "WzYzMSwxXQ==",
+    "name": "auditd_manager-2",
+    "namespace": "default",
+    "package": {
+        "name": "auditd_manager",
+        "version": "1.19.0"
+    },
+    "enabled": true,
+    "policy_id": "0a4f6c12-446a-401a-b0eb-96afea6ca92d",
+    "inputs": [
+        {
+          "type": "audit/auditd",
+          "policy_template": "auditd",
+          "enabled": true,
+          "streams": [
+            {
+              "enabled": true,
+              "data_stream": {
+                "type": "logs",
+                "dataset": "auditd_manager.auditd"
+              },
+              "vars": {
+                "socket_type": {
+                  "value": "",
+                  "type": "select"
+                },
+                "session_data": {
+                  "value": false,
+                  "type": "bool"
+                },
+                "immutable": {
+                  "value": false,
+                  "type": "bool"
+                },
+                "resolve_ids": {
+                  "value": true,
+                  "type": "bool"
+                },
+                "failure_mode": {
+                  "value": "silent",
+                  "type": "text"
+                },
+                "audit_rules": {
+                  "type": "textarea"
+                },
+                "audit_rule_files": {
+                  "value": [],
+                  "type": "text"
+                },
+                "preserve_original_event": {
+                  "value": false,
+                  "type": "bool"
+                },
+                "backlog_limit": {
+                  "value": 8192,
+                  "type": "text"
+                },
+                "rate_limit": {
+                  "value": 0,
+                  "type": "text"
+                },
+                "include_warnings": {
+                  "value": false,
+                  "type": "bool"
+                },
+                "backpressure_strategy": {
+                  "value": "auto",
+                  "type": "text"
+                },
+                "tags": {
+                  "value": [
+                    "auditd_manager-auditd"
+                  ],
+                  "type": "text"
+                },
+                "processors": {
+                  "type": "yaml"
+                },
+                "session_data_processors": {
+                  "value": "  - add_session_metadata:\n     backend: \"auto\"",
+                  "type": "yaml"
+                }
+              },
+              "id": "audit/auditd-auditd_manager.auditd-346b3488-8f0b-4557-84f4-638e3d968af9",
+              "compiled_stream": {
+                "condition": "${host.platform} == 'linux'",
+                "type": "audit/auditd",
+                "include_raw_message": true,
+                "socket_type": "",
+                "immutable": false,
+                "resolve_ids": true,
+                "failure_mode": "silent",
+                "backlog_limit": 8192,
+                "rate_limit": 0,
+                "include_warnings": false,
+                "backpressure_strategy": "auto",
+                "tags": [
+                  "auditd_manager-auditd"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+}
