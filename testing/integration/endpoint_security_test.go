@@ -108,6 +108,9 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_RPM(t *testing.T) {
 			},
 		},
 	})
+
+	t.Skip("https://github.com/elastic/elastic-agent/issues/8613: Flaky uninstall token issue")
+
 	t.Run("Upgrade from older version to newer version", func(t *testing.T) {
 		upgradeFromVersion, err := upgradetest.PreviousMinor()
 		require.NoError(t, err)
