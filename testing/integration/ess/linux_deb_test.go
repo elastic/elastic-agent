@@ -17,29 +17,17 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid/v5"
-<<<<<<< HEAD:testing/integration/linux_deb_test.go
-
-	"github.com/elastic/elastic-agent-libs/kibana"
-
-=======
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
->>>>>>> 73737c9a3 ([test] split up ess and beats serverless integration tests (#8551)):testing/integration/ess/linux_deb_test.go
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
-<<<<<<< HEAD:testing/integration/linux_deb_test.go
-	"github.com/elastic/elastic-agent/testing/upgradetest"
-
-	"github.com/stretchr/testify/require"
-=======
-	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/integration"
->>>>>>> 73737c9a3 ([test] split up ess and beats serverless integration tests (#8551)):testing/integration/ess/linux_deb_test.go
+	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
 func TestDebLogIngestFleetManaged(t *testing.T) {
@@ -66,82 +54,6 @@ func TestDebLogIngestFleetManaged(t *testing.T) {
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("deb"))
 	require.NoError(t, err)
 
-<<<<<<< HEAD:testing/integration/linux_deb_test.go
-=======
-	installOpts := atesting.InstallOpts{
-		NonInteractive: true,
-		Force:          true,
-		InstallServers: false,
-	}
-
-	testDebLogIngestFleetManagedWithCheck(ctx, t, agentFixture, info, installOpts,
-		testComponentsPresence(ctx, agentFixture,
-			[]componentPresenceDefinition{
-				{"agentbeat", []string{"windows", "linux", "darwin"}},
-				{"endpoint-security", []string{"windows", "linux", "darwin"}},
-				{"pf-host-agent", []string{"linux"}},
-			},
-			[]componentPresenceDefinition{
-				{"cloudbeat", []string{"linux"}},
-				{"apm-server", []string{"windows", "linux", "darwin"}},
-				{"fleet-server", []string{"windows", "linux", "darwin"}},
-				{"pf-elastic-symbolizer", []string{"linux"}},
-				{"pf-elastic-collector", []string{"linux"}},
-			},
-		),
-	)
-}
-
-func TestDebInstallsServers(t *testing.T) {
-	info := define.Require(t, define.Requirements{
-		Group: integration.Deb,
-		Stack: &define.Stack{},
-		OS: []define.OS{
-			{
-				Type:   define.Linux,
-				Distro: "ubuntu",
-			},
-			{
-				Type:   define.Linux,
-				Distro: "debian",
-			},
-		},
-		Local: false,
-		Sudo:  true,
-	})
-
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
-	defer cancel()
-
-	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("deb"))
-	require.NoError(t, err)
-
-	installOpts := atesting.InstallOpts{
-		NonInteractive: true,
-		Force:          true,
-		InstallServers: true,
-	}
-
-	testDebLogIngestFleetManagedWithCheck(ctx, t, agentFixture, info, installOpts,
-		testComponentsPresence(ctx, agentFixture,
-			[]componentPresenceDefinition{
-				{"agentbeat", []string{"windows", "linux", "darwin"}},
-				{"endpoint-security", []string{"windows", "linux", "darwin"}},
-				{"pf-host-agent", []string{"linux"}},
-				{"cloudbeat", []string{"linux"}},
-				{"apm-server", []string{"windows", "linux", "darwin"}},
-				{"fleet-server", []string{"windows", "linux", "darwin"}},
-				{"pf-elastic-symbolizer", []string{"linux"}},
-				{"pf-elastic-collector", []string{"linux"}},
-			},
-			[]componentPresenceDefinition{},
-		),
-	)
-}
-
-func testDebLogIngestFleetManagedWithCheck(ctx context.Context, t *testing.T, agentFixture *atesting.Fixture, info *define.Info, installOpts atesting.InstallOpts, componentCheck func(t *testing.T)) {
-
->>>>>>> 73737c9a3 ([test] split up ess and beats serverless integration tests (#8551)):testing/integration/ess/linux_deb_test.go
 	// 1. Create a policy in Fleet with monitoring enabled.
 	// To ensure there are no conflicts with previous test runs against
 	// the same ESS stack, we add the current time at the end of the policy
