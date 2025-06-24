@@ -2,6 +2,33 @@
 
 set -e
 
+SERVICE_NAME="ElasticEndpoint"
+
+# Check if the endpoint service is installed
+if systemctl list-unit-files --type=service | grep -q "^${SERVICE_NAME}.service"; then
+    echo "$SERVICE_NAME is installed"
+
+    # Remove the vault directory if it exists
+    if [ -d "/opt/Elastic/Endpoint/state/vault" ]; then
+
+        # Check if the endpoint is running
+        if systemctl --quiet is-active $SERVICE_NAME; then
+            echo "$SERVICE_NAME is running, stopping it"
+            systemctl --quiet stop $SERVICE_NAME
+        else
+            echo "$SERVICE_NAME is not running"
+        fi
+
+        echo "$SERVICE_NAME is tamper protected"
+        echo "Removing $SERVICE_NAME vault"
+        rm -rf "/opt/Elastic/Endpoint/state/vault"
+    else
+        echo "$SERVICE_NAME tamper protection is not enabled"
+    fi
+else
+    echo "$SERVICE_NAME is not installed"
+fi
+
 commit_hash="{{ commit_short }}"
 version_dir="{{agent_package_version}}{{snapshot_suffix}}"
 symlink="/usr/share/elastic-agent/bin/elastic-agent"
@@ -11,27 +38,27 @@ old_agent_dir=""
 # upon upgrade we migrate the current symlink to an upgrade symlink as the previous
 # installed version will remove the symlink
 if test -L "$symlink"; then
-    resolved_symlink="$(readlink -- "$symlink")"
-    if ! [ -z "$resolved_symlink" ]; then
-        old_agent_dir="$( dirname "$resolved_symlink" )"
-        echo "previous installation directory $old_agent_dir"
-    else
-        echo "unable to read existing symlink"
-    fi
+	resolved_symlink="$(readlink -- "$symlink")"
+	if ! [ -z "$resolved_symlink" ]; then
+		old_agent_dir="$(dirname "$resolved_symlink")"
+		echo "previous installation directory $old_agent_dir"
+	else
+		echo "unable to read existing symlink"
+	fi
 
-    # copy the state files if there was a previous agent install
-    if ! [ -z "$old_agent_dir" ] && ! [ "$old_agent_dir" -ef "$new_agent_dir" ]; then
-        yml_path="$old_agent_dir/state.yml"
-        enc_path="$old_agent_dir/state.enc"
-        echo "migrate state from $old_agent_dir to $new_agent_dir"
+	# copy the state files if there was a previous agent install
+	if ! [ -z "$old_agent_dir" ] && ! [ "$old_agent_dir" -ef "$new_agent_dir" ]; then
+		yml_path="$old_agent_dir/state.yml"
+		enc_path="$old_agent_dir/state.enc"
+		echo "migrate state from $old_agent_dir to $new_agent_dir"
 
-        if test -f "$yml_path"; then
-            echo "found "$yml_path", copy to "$new_agent_dir"."
-            mkdir -p "$new_agent_dir"
-            cp "$yml_path" "$new_agent_dir"
-        else
-            echo "didn't find $yml_path"
-        fi
+		if test -f "$yml_path"; then
+			echo "found "$yml_path", copy to "$new_agent_dir"."
+			mkdir -p "$new_agent_dir"
+			cp "$yml_path" "$new_agent_dir"
+		else
+			echo "didn't find $yml_path"
+		fi
 
         if test -f "$enc_path"; then
             echo "found "$enc_path", copy to "$new_agent_dir"."
