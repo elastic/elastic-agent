@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os/exec"
 	"runtime"
 	"strings"
 	"testing"
@@ -501,24 +502,10 @@ outputs:
 				}
 			})
 
-			fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-			require.NoError(t, err)
-
 			ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 			defer cancel()
 
-			err = fixture.Prepare(ctx)
-			require.NoError(t, err)
-			err = fixture.Configure(ctx, configContents)
-			require.NoError(t, err)
-
-			cmd, err := fixture.PrepareAgentCommand(ctx, nil)
-			require.NoError(t, err)
-			cmd.WaitDelay = 1 * time.Second
-
-			var output strings.Builder
-			cmd.Stderr = &output
-			cmd.Stdout = &output
+			fixture, cmd, output := prepareAgentCmd(t, ctx, configContents)
 
 			err = cmd.Start()
 			require.NoError(t, err)
@@ -728,12 +715,6 @@ agent.monitoring.enabled: false
 				RuntimeExperimental: "process",
 			}))
 	processConfig := configBuffer.Bytes()
-	t.Cleanup(func() {
-		if t.Failed() {
-			t.Log("Contents of agent config file:\n")
-			println(string(processConfig))
-		}
-	})
 	require.NoError(t,
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 			configOptions{
@@ -741,28 +722,12 @@ agent.monitoring.enabled: false
 			}))
 	receiverConfig := configBuffer.Bytes()
 
-	// set up a standalone agent
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-	require.NoError(t, err)
-
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer cancel()
 
-	err = fixture.Prepare(ctx)
-	require.NoError(t, err)
-	err = fixture.Configure(ctx, processConfig)
-	require.NoError(t, err)
+	fixture, cmd, output := prepareAgentCmd(t, ctx, processConfig)
 
-	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
-	require.NoError(t, err)
-	cmd.WaitDelay = 1 * time.Second
-
-	var output strings.Builder
-	cmd.Stderr = &output
-	cmd.Stdout = &output
-
-	err = cmd.Start()
-	require.NoError(t, err)
+	require.NoError(t, cmd.Start())
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error
@@ -781,23 +746,9 @@ agent.monitoring.enabled: false
 	ctx, cancel = testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer cancel()
 
-	fixture, err = define.NewFixtureFromLocalBuild(t, define.Version())
-	require.NoError(t, err)
+	fixture, cmd, output = prepareAgentCmd(t, ctx, receiverConfig)
 
-	err = fixture.Prepare(ctx)
-	require.NoError(t, err)
-	err = fixture.Configure(ctx, receiverConfig)
-	require.NoError(t, err)
-
-	cmd, err = fixture.PrepareAgentCommand(ctx, nil)
-	require.NoError(t, err)
-	cmd.WaitDelay = 1 * time.Second
-
-	cmd.Stderr = &output
-	cmd.Stdout = &output
-
-	err = cmd.Start()
-	require.NoError(t, err)
+	require.NoError(t, cmd.Start())
 
 	t.Cleanup(func() {
 		if t.Failed() {
@@ -816,28 +767,6 @@ agent.monitoring.enabled: false
 	cancel()
 	require.Error(t, cmd.Wait())
 	receiverLogsString := output.String()
-
-	// getBeatStartLogRecord returns the log record for the a particular log line emitted when the beat starts
-	// This log line is identical between beats processes and receivers, so it's a good point of comparison
-	getBeatStartLogRecord := func(logs string) (map[string]any, error) {
-		for _, line := range strings.Split(logs, "\n") {
-			line = strings.TrimSpace(line)
-			if line == "" {
-				continue
-			}
-			logRecord := make(map[string]any)
-			if unmarshalErr := json.Unmarshal([]byte(line), &logRecord); err != nil {
-				return nil, unmarshalErr
-			}
-
-			if message, ok := logRecord["message"].(string); !ok || !strings.HasPrefix(message, "Beat name:") {
-				continue
-			}
-
-			return logRecord, nil
-		}
-		return nil, nil
-	}
 
 	processLog, err := getBeatStartLogRecord(processLogsString)
 	require.NoError(t, err)
@@ -886,6 +815,49 @@ func assertBeatsHealthy(t *assert.CollectT, status *atesting.AgentStatusOutput, 
 			assert.Equal(t, int(cproto.State_HEALTHY), unit.State)
 		}
 	}
+}
+
+// getBeatStartLogRecord returns the log record for the a particular log line emitted when the beat starts
+// This log line is identical between beats processes and receivers, so it's a good point of comparison
+func getBeatStartLogRecord(logs string) (map[string]any, error) {
+	for _, line := range strings.Split(logs, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		logRecord := make(map[string]any)
+		if unmarshalErr := json.Unmarshal([]byte(line), &logRecord); unmarshalErr != nil {
+			return nil, unmarshalErr
+		}
+
+		if message, ok := logRecord["message"].(string); !ok || !strings.HasPrefix(message, "Beat name:") {
+			continue
+		}
+
+		return logRecord, nil
+	}
+	return nil, nil
+}
+
+func prepareAgentCmd(t *testing.T, ctx context.Context, config []byte) (*atesting.Fixture, *exec.Cmd, *strings.Builder) {
+	// set up a standalone agent
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	err = fixture.Configure(ctx, config)
+	require.NoError(t, err)
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err)
+	cmd.WaitDelay = 1 * time.Second
+
+	var output strings.Builder
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	return fixture, cmd, &output
 }
 
 func genIgnoredFields(goos string) []string {
