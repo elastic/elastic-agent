@@ -6,8 +6,6 @@ package common
 
 import (
 	"context"
-
-	"github.com/elastic/elastic-agent/pkg/version"
 )
 
 // Stack is a created stack.
@@ -83,5 +81,5 @@ type StackProvisioner interface {
 	Delete(ctx context.Context, stack Stack) error
 
 	// Upgrade upgrades the stack to a new version.
-	Upgrade(ctx context.Context, stack Stack, newVersion *version.ParsedSemVer) error
+	Upgrade(ctx context.Context, stack Stack, newVersion string) error
 }

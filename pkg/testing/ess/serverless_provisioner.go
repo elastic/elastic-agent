@@ -15,7 +15,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/pkg/testing/common"
-	"github.com/elastic/elastic-agent/pkg/version"
 )
 
 const ProvisionerServerless = "serverless"
@@ -188,7 +187,7 @@ func (prov *ServerlessProvisioner) Delete(ctx context.Context, stack common.Stac
 }
 
 // Upgrade does not apply to Serverless projects!
-func (prov *ServerlessProvisioner) Upgrade(ctx context.Context, stack common.Stack, newVersion *version.ParsedSemVer) error {
+func (prov *ServerlessProvisioner) Upgrade(ctx context.Context, stack common.Stack, newVersion string) error {
 	return fmt.Errorf("upgrade is not supported for serverless projects")
 }
 
