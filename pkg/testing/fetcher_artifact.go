@@ -6,7 +6,10 @@ package testing
 
 import (
 	"context"
+	"crypto/sha512"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -110,27 +113,62 @@ func (r *artifactResult) Name() string {
 // Fetch performs the actual fetch into the provided directory.
 func (r *artifactResult) Fetch(ctx context.Context, l Logger, dir string) error {
 	dst := filepath.Join(dir, r.Name())
-	// the artifact name can contain a subfolder that needs to be created
-	err := os.MkdirAll(filepath.Dir(dst), 0755)
-	if err != nil {
-		return fmt.Errorf("failed to create path %q: %w", dst, err)
-	}
 
-	err = DownloadPackage(ctx, l, r.doer, r.src, dst)
-	if err != nil {
-		return fmt.Errorf("failed to download %s: %w", r.src, err)
-	}
+	const maxRetries = 3
+	var errs error
+	currentAttempt := 0
+	for {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 
-	// fetch package hash
-	err = DownloadPackage(ctx, l, r.doer, r.src+extHash, dst+extHash)
-	if err != nil {
-		return fmt.Errorf("failed to download %s: %w", r.src, err)
-	}
+		switch {
+		case currentAttempt >= maxRetries:
+			return fmt.Errorf("exceeded max retries (%d) with error: %w", maxRetries, errs)
+		case currentAttempt > 0:
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(5 * time.Second):
+			}
+		}
+		currentAttempt++
 
-	// fetch package asc
-	err = DownloadPackage(ctx, l, r.doer, r.src+extAsc, dst+extAsc)
-	if err != nil {
-		return fmt.Errorf("failed to download %s: %w", r.src, err)
+		// the artifact name can contain a subfolder that needs to be created
+		err := os.MkdirAll(filepath.Dir(dst), 0755)
+		if err != nil {
+			return fmt.Errorf("failed to create path %q: %w", dst, err)
+		}
+
+		err = DownloadPackage(ctx, l, r.doer, r.src, dst)
+		if err != nil {
+			errs = errors.Join(fmt.Errorf("failed to download %s: %w", r.src, err))
+			continue
+		}
+
+		// fetch package hash
+		err = DownloadPackage(ctx, l, r.doer, r.src+extHash, dst+extHash)
+		if err != nil {
+			errs = errors.Join(fmt.Errorf("failed to download %s: %w", r.src, err))
+			continue
+
+		}
+
+		// fetch package asc
+		err = DownloadPackage(ctx, l, r.doer, r.src+extAsc, dst+extAsc)
+		if err != nil {
+			errs = errors.Join(fmt.Errorf("failed to download %s: %w", r.src, err))
+			continue
+		}
+
+		// check package hash
+		err = checkPackageSHA512Hash(dst, dst+extHash)
+		if err != nil {
+			errs = errors.Join(fmt.Errorf("inconsistent package hash: %w", err))
+			continue
+		}
+
+		break
 	}
 
 	return nil
@@ -192,6 +230,31 @@ func findLatestSnapshot(ctx context.Context, doer httpDoer, version string) (bui
 	default:
 		return "", fmt.Errorf("unexpected status code %d from %s", resp.StatusCode, latestSnapshotURI)
 	}
+}
+
+func checkPackageSHA512Hash(pkgPath, pkgHashPath string) error {
+	pkgHash, err := os.ReadFile(pkgHashPath)
+	if err != nil {
+		return fmt.Errorf("failed to read package hash: %w", err)
+	}
+	if len(pkgHash) < 128 {
+		return fmt.Errorf("wrong format for a package hash expected at least 128 bytes: %s", pkgHash)
+	}
+
+	hasher := sha512.New()
+	pkgData, err := os.ReadFile(pkgPath)
+	if err != nil {
+		return fmt.Errorf("failed to read package data: %w", err)
+	}
+	_, err = hasher.Write(pkgData)
+	if err != nil {
+		return fmt.Errorf("failed to calculate package hash: %w", err)
+	}
+	hash := hex.EncodeToString(hasher.Sum(nil))
+	if string(pkgHash[0:128]) != hash {
+		return fmt.Errorf("package hash mismatch, want: %s, got: %s", pkgHash, hash[:])
+	}
+	return nil
 }
 
 func DownloadPackage(ctx context.Context, l Logger, doer httpDoer, downloadPath string, packageFile string) error {
