@@ -716,7 +716,7 @@ func copyFile(t *testing.T, srcPath, dstPath string) {
 
 func isFIPSCapableVersion(ver *version.ParsedSemVer) bool {
 	// Versions prior to 8.19.0 are not FIPS-capable
-	if ver.Less(version.NewParsedSemVer(8, 19, 0, "", "")) {
+	if ver.Less(*version.NewParsedSemVer(8, 19, 0, "", "")) {
 		return false
 	}
 

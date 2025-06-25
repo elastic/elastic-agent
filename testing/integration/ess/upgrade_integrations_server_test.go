@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
 	"github.com/elastic/elastic-agent/pkg/version"
+	"github.com/elastic/elastic-agent/testing/integration"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
@@ -27,7 +28,7 @@ import (
 // running its own Fleet Server) in ECH and ensures that the upgrade succeeds.
 func TestUpgradeIntegrationsServer(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: ECHDeployment,
+		Group: integration.ECHDeployment,
 		Local: true,  // only orchestrates ECH resources
 		Sudo:  false, // only orchestrates ECH resources
 		FIPS:  true,  // ensures test runs against FRH ECH region
