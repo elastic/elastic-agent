@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/pkg/version"
-	bversion "github.com/elastic/elastic-agent/version"
 )
 
 func TestFetchUpgradableVersionsAfterFeatureFreeze(t *testing.T) {
@@ -249,33 +248,118 @@ func TestGetUpgradableVersions(t *testing.T) {
 }
 
 func TestPreviousMinor(t *testing.T) {
-	currentParsed, err := version.ParseVersion(bversion.Agent)
-	require.NoError(t, err)
-
-	v, err := PreviousMinor()
-	require.NoError(t, err)
-	t.Logf("previous minor: %s", v.String())
-
-	// Special case: the current Agent version is the first release of a new
-	// major (vX.0.x). In this case we expect the previous minor to be the
-	// latest minor of the previous major.
-	if currentParsed.Minor() == 0 {
-		require.Equal(t, currentParsed.Major()-1, v.Major())
-
-		// The list of versions returned by GetUpgradableVersions will not contain any
-		// versions with the same major as the current version as the current version is
-		// the first release of the major. Further, since this list is sorted in
-		// descending order (newer versions first), we should expect the first item in the
-		// list to be the latest minor of the previous major.
-		versions, err := GetUpgradableVersions()
-		require.NoError(t, err)
-		require.Equal(t, versions[0], v)
-		return
+	testCases := []struct {
+		name                string
+		currentVersion      string
+		upgradeableVersions []string
+		expectedVersion     string
+		expectError         bool
+	}{
+		{
+			name:           "should return the previous minor from the same major and skip prerelease versions and versions with metadata",
+			currentVersion: "9.1.0",
+			upgradeableVersions: []string{
+				"9.0.3-SNAPSHOT",
+				"9.0.2+metadata",
+				"9.0.1",
+				"8.19.0-SNAPSHOT",
+				"8.18.2",
+			},
+			expectedVersion: "9.0.1",
+			expectError:     false,
+		},
+		{
+			name:           "should return the most recent version from the previous major when the current version is the first major release with a patch version",
+			currentVersion: "9.0.1",
+			upgradeableVersions: []string{
+				"8.19.0-SNAPSHOT+metadata",
+				"8.18.2",
+				"8.17.6",
+				"7.17.29-SNAPSHOT",
+			},
+			expectedVersion: "8.19.0-SNAPSHOT+metadata",
+			expectError:     false,
+		},
+		{
+			name:           "should return the most recent version from previous major when the current version is the first major release",
+			currentVersion: "9.0.0",
+			upgradeableVersions: []string{
+				"8.19.0-SNAPSHOT+metadata",
+				"8.18.2",
+				"8.17.6",
+				"7.17.29-SNAPSHOT",
+			},
+			expectedVersion: "8.19.0-SNAPSHOT+metadata",
+			expectError:     false,
+		},
+		{
+			name:           "should return the previous minor from the same major when the current version is a prerelease version",
+			currentVersion: "9.1.0-SNAPSHOT",
+			upgradeableVersions: []string{
+				"9.0.3-SNAPSHOT",
+				"9.0.2",
+				"9.0.1",
+				"8.19.0-SNAPSHOT",
+				"8.18.2",
+			},
+			expectedVersion: "9.0.2",
+			expectError:     false,
+		},
+		{
+			name:           "should return the most recent version from the previous major when the current version is the first major release with a prerelease version and metadata",
+			currentVersion: "9.0.0-SNAPSHOT+metadata",
+			upgradeableVersions: []string{
+				"8.19.0-SNAPSHOT+metadata",
+				"8.18.2",
+				"8.17.6",
+				"7.17.29-SNAPSHOT",
+			},
+			expectedVersion: "8.19.0-SNAPSHOT+metadata",
+			expectError:     false,
+		},
+		{
+			name:           "should return error when no previous minor is found",
+			currentVersion: "9.1.0",
+			upgradeableVersions: []string{
+				"9.2.0",
+				"9.1.1",
+				"8.19.0-SNAPSHOT",
+			},
+			expectedVersion: "",
+			expectError:     true,
+		},
+		{
+			name:                "should return error when no versions are available",
+			currentVersion:      "9.1.0",
+			upgradeableVersions: []string{},
+			expectedVersion:     "",
+			expectError:         true,
+		},
 	}
 
-	assert.Truef(t, currentParsed.Major() == v.Major() && currentParsed.Minor() > v.Minor(), "%s is not previous minor for %s", v, bversion.Agent)
-	assert.Empty(t, v.Prerelease())
-	assert.Empty(t, v.BuildMetadata())
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			upgradeableVersions := []*version.ParsedSemVer{}
+			for _, v := range tc.upgradeableVersions {
+				parsed, err := version.ParseVersion(v)
+				require.NoError(t, err)
+				upgradeableVersions = append(upgradeableVersions, parsed)
+			}
+
+			result, err := PreviousMinor(tc.currentVersion, upgradeableVersions)
+
+			if tc.expectError {
+				require.Nil(t, result)
+				require.Error(t, err)
+				require.Equal(t, ErrNoPreviousMinor, err)
+				return
+			}
+
+			expected, err := version.ParseVersion(tc.expectedVersion)
+			require.NoError(t, err)
+			require.Equal(t, expected, result)
+		})
+	}
 }
 
 func buildVersionList(t *testing.T, versions []string) version.SortableParsedVersions {
@@ -295,6 +379,7 @@ type fetcherMock struct {
 func (f fetcherMock) FetchAgentVersions(ctx context.Context) (version.SortableParsedVersions, error) {
 	return f.list, nil
 }
+
 func (f fetcherMock) FindLatestSnapshots(ctx context.Context, branches []string) (version.SortableParsedVersions, error) {
 	return f.list, nil
 }
