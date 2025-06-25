@@ -124,17 +124,3 @@ func getUpgradeStartVersions(t *testing.T) version.SortableParsedVersions {
 	sort.Sort(sortedVers)
 	return sortedVers
 }
-
-func isFIPSCapableVersion(ver *version.ParsedSemVer) bool {
-	// Versions < 8.19.0 are not FIPS-capable
-	if ver.Less(version.NewParsedSemVer(8, 19, 0, "", "")) {
-		return false
-	}
-
-	// Versions 9.0.x are not FIPS-capable
-	if ver.Major() == 9 && ver.Minor() == 0 {
-		return false
-	}
-
-	return true
-}
