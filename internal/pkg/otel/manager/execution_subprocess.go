@@ -128,11 +128,11 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 		reportStatus(ctx, statusCh, currentStatus)
 		// we will check the health of the collector every 1 second for the first 10 attempts
 		// until we get a successful response.
-		maxFailedAttempts := 10
+		maxFailedAttempts := 130 // this should roughly match 1.5 minutes of continuous failed attempts to poll healthcheck v2
 		timerDuration := 1 * time.Second
-		healthCheckTicker := time.NewTimer(timerDuration)
+		healthCheckTimer := time.NewTimer(timerDuration)
 		currentFailedAttempts := 0
-		defer healthCheckTicker.Stop()
+		defer healthCheckTimer.Stop()
 		for {
 			statuses, err := AllComponentsStatuses(procCtx, httpHealthCheckPort)
 			if err != nil {
@@ -141,8 +141,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 					reportStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStopped, nil))
 					return
 				case currentFailedAttempts > maxFailedAttempts:
-					reportStatus(procCtx, statusCh, aggregateStatus(componentstatus.StatusFatalError, err))
-					return
+					reportStatus(procCtx, statusCh, aggregateStatus(componentstatus.StatusRecoverableError, err))
 				}
 				currentFailedAttempts++
 			} else {
@@ -150,18 +149,14 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 					currentStatus = statuses
 					reportStatus(procCtx, statusCh, statuses)
 				}
-				// after successfully getting the status, reset the failed attempts,
-				// set the timer duration to 30 seconds and max failed attempts to 3
 				currentFailedAttempts = 0
-				timerDuration = 30 * time.Second
-				maxFailedAttempts = 3
 			}
 			select {
 			case <-procCtx.Done():
 				reportStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStopped, nil))
 				return
-			case <-healthCheckTicker.C:
-				healthCheckTicker.Reset(timerDuration)
+			case <-healthCheckTimer.C:
+				healthCheckTimer.Reset(timerDuration)
 				continue
 			}
 		}
