@@ -284,11 +284,76 @@ func checkNpcapNotices(pkg, file string, contents io.Reader) error {
 	return nil
 }
 
+<<<<<<< HEAD:dev-tools/packaging/package_test.go
 func checkDocker(t *testing.T, file string) {
 	p, info, err := readDocker(file)
 	if err != nil {
 		t.Errorf("error reading file %v: %v", file, err)
 		return
+=======
+func checkDocker(t *testing.T, file string, fipsPackage bool) (string, int64) {
+	if strings.Contains(file, "elastic-otel-collector") {
+		return checkEdotCollectorDocker(t, file)
+	}
+
+	p, info, err := readDocker(file, true)
+	if err != nil {
+		t.Errorf("error reading file %v: %v", file, err)
+		return "", -1
+	}
+
+	checkDockerEntryPoint(t, p, info)
+	checkDockerLabels(t, p, info, file)
+	checkDockerUser(t, p, info, *rootUserContainer)
+	checkFilePermissions(t, p, configFilePattern, os.FileMode(0644))
+	if !fipsPackage {
+		// FIPS docker image do not contain an otelcol script, run this check only on non FIPS-capable images
+		checkFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
+	}
+	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
+	checkModulesPresent(t, "", p)
+	checkModulesDPresent(t, "", p)
+	checkHintsInputsD(t, "hints.inputs.d", hintsInputsDFilePattern, p)
+	checkLicensesPresent(t, "licenses/", p)
+
+	if strings.Contains(file, "-complete") {
+		checkCompleteDocker(t, file)
+	}
+
+	name, err := dockerName(file, info.Config.Labels)
+	if err != nil {
+		t.Errorf("error constructing docker name: %v", err)
+		return "", -1
+	}
+
+	return name, info.Size
+}
+
+func dockerName(file string, labels map[string]string) (string, error) {
+	version, found := labels["version"]
+	if !found {
+		return "", errors.New("version label not found")
+	}
+
+	parts := strings.Split(file, "/")
+	if len(parts) == 0 {
+		return "", errors.New("failed to get file name parts")
+	}
+
+	lastPart := parts[len(parts)-1]
+	versionIdx := strings.Index(lastPart, version)
+	if versionIdx < 0 {
+		return "", fmt.Errorf("version not found in nam %q", file)
+	}
+	return lastPart[:versionIdx-1], nil
+}
+
+func checkEdotCollectorDocker(t *testing.T, file string) (string, int64) {
+	p, info, err := readDocker(file, true)
+	if err != nil {
+		t.Errorf("error reading file %v: %v", file, err)
+		return "", -1
+>>>>>>> f8c1f2ef0 ([Synthetics] Add e2e test for synthetics deps in complete variants (#8605)):dev-tools/packaging/testing/package_test.go
 	}
 
 	checkDockerEntryPoint(t, p, info)
@@ -300,6 +365,15 @@ func checkDocker(t *testing.T, file string) {
 	checkModulesPresent(t, "", p)
 	checkModulesDPresent(t, "", p)
 	checkLicensesPresent(t, "licenses/", p)
+}
+
+func checkCompleteDocker(t *testing.T, file string) {
+	p, _, err := readDocker(file, false)
+	if err != nil {
+		t.Errorf("error reading file %v: %v", file, err)
+	}
+
+	checkSyntheticsDeps(t, "usr", p)
 }
 
 // Verify that the main configuration file is installed with a 0600 file mode.
@@ -493,6 +567,23 @@ func checkLicensesPresent(t *testing.T, prefix string, p *packageFile) {
 			}
 			if prefix != "" {
 				t.Fatalf("not found under %s", prefix)
+			}
+			t.Fatal("not found")
+		})
+	}
+}
+
+func checkSyntheticsDeps(t *testing.T, prefix string, p *packageFile) {
+	syntheticsDeps := []string{"node", "npm", "elastic-synthetics", "chrome"}
+	for _, dep := range syntheticsDeps {
+		t.Run("Binary file "+dep, func(t *testing.T) {
+			for _, entry := range p.Contents {
+				if strings.HasPrefix(entry.File, prefix) && strings.HasSuffix(entry.File, "/"+dep) {
+					return
+				}
+			}
+			if prefix != "" {
+				t.Fatalf("%s not found under %s", dep, prefix)
 			}
 			t.Fatal("not found")
 		})
@@ -765,7 +856,7 @@ func openZip(zipFile string) (*zip.ReadCloser, error) {
 	return r, nil
 }
 
-func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
+func readDocker(dockerFile string, filterWorkingDir bool) (*packageFile, *dockerInfo, error) {
 	// Read the manifest file first so that the config file and layer
 	// names are known in advance.
 	manifest, err := getDockerManifest(dockerFile)
@@ -832,7 +923,7 @@ func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
 				continue
 			}
 			// Check only files in working dir and entrypoint
-			if strings.HasPrefix("/"+name, workingDir) || "/"+name == entrypoint {
+			if !filterWorkingDir || strings.HasPrefix("/"+name, workingDir) || "/"+name == entrypoint {
 				p.Contents[name] = entry
 			}
 			// Add also licenses
