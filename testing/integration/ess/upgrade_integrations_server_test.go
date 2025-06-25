@@ -114,7 +114,7 @@ func getUpgradeStartVersions(t *testing.T) version.SortableParsedVersions {
 	for _, ver := range versions {
 		// Filter out versions that are not FIPS-capable
 		if !isFIPSCapableVersion(ver) {
-			cotinue
+			continue
 		}
 
 		filteredVersions = append(filteredVersions, ver)
