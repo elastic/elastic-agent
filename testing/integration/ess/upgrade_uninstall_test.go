@@ -45,11 +45,15 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 	endVersionInfo, err := endFixture.ExecVersion(ctx)
 	require.NoError(t, err, "failed to get end agent build version info")
 
+	upgradeableVersions, err := upgradetest.GetUpgradableVersions()
+	require.NoError(t, err)
+
 	// Start on a snapshot build, we want this test to upgrade to our
 	// build to ensure that the uninstall will kill the watcher.
 	// We need a version with a non-matching commit hash to perform the upgrade
-	startVersion, err := upgradetest.PreviousMinor()
+	startVersion, err := upgradetest.PreviousMinor(define.Version(), upgradeableVersions)
 	require.NoError(t, err)
+
 	startFixture, err := atesting.NewFixture(
 		t,
 		startVersion.String(),

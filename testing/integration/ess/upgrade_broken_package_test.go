@@ -41,9 +41,13 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 	startFixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithAdditionalArgs([]string{"-E", "output.elasticsearch.allow_older_versions=true"}))
 	require.NoError(t, err)
 
-	// Upgrade to an old build.
-	upgradeToVersion, err := upgradetest.PreviousMinor()
+	upgradeableVersions, err := upgradetest.GetUpgradableVersions()
 	require.NoError(t, err)
+
+	// Upgrade to an old build.
+	upgradeToVersion, err := upgradetest.PreviousMinor(define.Version(), upgradeableVersions)
+	require.NoError(t, err)
+
 	endFixture, err := atesting.NewFixture(
 		t,
 		upgradeToVersion.String(),
