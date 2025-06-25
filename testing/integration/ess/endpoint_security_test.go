@@ -76,8 +76,12 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 	})
 
 	t.Run("Upgrade from older version to newer version", func(t *testing.T) {
-		upgradeFromVersion, err := upgradetest.PreviousMinor()
+		upgradeableVersions, err := upgradetest.GetUpgradableVersions()
 		require.NoError(t, err)
+
+		upgradeFromVersion, err := upgradetest.PreviousMinor(define.Version(), upgradeableVersions)
+		require.NoError(t, err)
+
 		testTamperProtectedInstallUpgrade(t, info, "deb", upgradeFromVersion.String(), true, false)
 	})
 
@@ -86,8 +90,12 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 	})
 
 	t.Run("Upgrade with endpoint stopped before upgrade", func(t *testing.T) {
-		upgradeFromVersion, err := upgradetest.PreviousMinor()
+		upgradeableVersions, err := upgradetest.GetUpgradableVersions()
 		require.NoError(t, err)
+
+		upgradeFromVersion, err := upgradetest.PreviousMinor(define.Version(), upgradeableVersions)
+		require.NoError(t, err)
+
 		testTamperProtectedInstallUpgrade(t, info, "deb", upgradeFromVersion.String(), true, true)
 	})
 
@@ -111,8 +119,12 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_RPM(t *testing.T) {
 	})
 
 	t.Run("Upgrade from older version to newer version", func(t *testing.T) {
-		upgradeFromVersion, err := upgradetest.PreviousMinor()
+		upgradeableVersions, err := upgradetest.GetUpgradableVersions()
 		require.NoError(t, err)
+
+		upgradeFromVersion, err := upgradetest.PreviousMinor(define.Version(), upgradeableVersions)
+		require.NoError(t, err)
+
 		testTamperProtectedInstallUpgrade(t, info, "rpm", upgradeFromVersion.String(), true, false)
 	})
 
@@ -121,8 +133,12 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_RPM(t *testing.T) {
 	})
 
 	t.Run("Upgrade with endpoint stopped before upgrade", func(t *testing.T) {
-		upgradeFromVersion, err := upgradetest.PreviousMinor()
+		upgradeableVersions, err := upgradetest.GetUpgradableVersions()
 		require.NoError(t, err)
+
+		upgradeFromVersion, err := upgradetest.PreviousMinor(define.Version(), upgradeableVersions)
+		require.NoError(t, err)
+
 		testTamperProtectedInstallUpgrade(t, info, "rpm", upgradeFromVersion.String(), true, true)
 	})
 	t.Run("Make sure unprotected upgrades are not broken", func(t *testing.T) {
@@ -267,7 +283,10 @@ func testUnprotectedInstallUpgrade(
 ) {
 	ctx := t.Context()
 
-	upgradeFromVersion, err := upgradetest.PreviousMinor()
+	upgradeableVersions, err := upgradetest.GetUpgradableVersions()
+	require.NoError(t, err)
+
+	upgradeFromVersion, err := upgradetest.PreviousMinor(define.Version(), upgradeableVersions)
 	require.NoError(t, err)
 
 	installFirstAgent(ctx, t, info, false, packageFormat, upgradeFromVersion.String())

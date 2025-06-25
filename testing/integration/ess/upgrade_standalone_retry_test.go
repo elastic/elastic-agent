@@ -42,10 +42,14 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	startFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
+	upgradeableVersions, err := upgradetest.GetUpgradableVersions()
+	require.NoError(t, err)
+
 	// The end version does not matter much but it must not match
 	// the commit hash of the current build.
-	endVersion, err := upgradetest.PreviousMinor()
+	endVersion, err := upgradetest.PreviousMinor(define.Version(), upgradeableVersions)
 	require.NoError(t, err)
+
 	endFixture, err := atesting.NewFixture(
 		t,
 		endVersion.String(),

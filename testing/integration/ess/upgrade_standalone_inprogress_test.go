@@ -36,12 +36,16 @@ func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
+	upgradeableVersions, err := upgradetest.GetUpgradableVersions()
+	require.NoError(t, err)
+
 	// For this test we start with a version of Agent that's two minors older
 	// than the current version and upgrade to the current version. Then we attempt
 	// upgrading to the current version again, expecting Elastic Agent to disallow
 	// this second upgrade.
-	upgradeFromVersion, err := upgradetest.PreviousMinor()
+	upgradeFromVersion, err := upgradetest.PreviousMinor(define.Version(), upgradeableVersions)
 	require.NoError(t, err)
+
 	startFixture, err := atesting.NewFixture(
 		t,
 		upgradeFromVersion.String(),
