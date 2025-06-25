@@ -245,14 +245,25 @@ func checkPackageSHA512Hash(pkgPath, pkgHashPath string) error {
 	pkgHash := string(pkgHashFileContents[0:128])
 
 	hasher := sha512.New()
-	pkgData, err := os.ReadFile(pkgPath)
+	pkgDataFile, err := os.Open(pkgPath)
 	if err != nil {
-		return fmt.Errorf("failed to read package data: %w", err)
+		return fmt.Errorf("failed to open package data: %w", err)
 	}
-	_, err = hasher.Write(pkgData)
+	defer pkgDataFile.Close()
+
+	pkgDataFileInfo, err := pkgDataFile.Stat()
 	if err != nil {
-		return fmt.Errorf("failed to calculate package hash: %w", err)
+		return fmt.Errorf("failed to stat package data: %w", err)
 	}
+
+	written, err := io.Copy(hasher, pkgDataFile)
+	if err != nil {
+		return fmt.Errorf("failed to copy package data to hasher: %w", err)
+	}
+	if written != pkgDataFileInfo.Size() {
+		return fmt.Errorf("failed to copy all package data to hasher: %w", err)
+	}
+
 	hash := hex.EncodeToString(hasher.Sum(nil))
 	if pkgHash != hash {
 		return fmt.Errorf("package hash mismatch, want: %s, got: %s", pkgHash, hash[:])
