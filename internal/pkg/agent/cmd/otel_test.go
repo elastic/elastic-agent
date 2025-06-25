@@ -27,7 +27,7 @@ func TestPrepareCollectorSettings(t *testing.T) {
 		require.NoError(t, w.Close(), "failed to close pipe")
 		os.Stdin = r
 
-		settings, err := prepareCollectorSettings(nil, true)
+		settings, err := prepareCollectorSettings(nil, true, "info")
 		require.NoError(t, err, "failed to prepare collector settings")
 		require.NotNil(t, settings, "settings should not be nil")
 		require.NotNil(t, settings.ConfigProviderSettings.ResolverSettings.URIs, "URIs should not be nil")
@@ -43,7 +43,7 @@ func TestPrepareCollectorSettings(t *testing.T) {
 	})
 
 	t.Run("returns valid settings in standalone mode", func(t *testing.T) {
-		settings, err := prepareCollectorSettings([]string{"fake-config.yaml"}, false)
+		settings, err := prepareCollectorSettings([]string{"fake-config.yaml"}, false, "info")
 		require.NoError(t, err, "failed to prepare collector settings")
 		require.NotNil(t, settings, "settings should not be nil")
 		require.Contains(t, settings.ConfigProviderSettings.ResolverSettings.URIs, "fake-config.yaml", "fake-config.yaml not found in the URIS of ConfigProviderSettings")
@@ -59,7 +59,7 @@ func TestPrepareCollectorSettings(t *testing.T) {
 		require.NoError(t, w.Close(), "failed to close pipe")
 		os.Stdin = r
 
-		settings, err := prepareCollectorSettings(nil, true)
+		settings, err := prepareCollectorSettings(nil, true, "info")
 		require.Error(t, err)
 		require.Nil(t, settings)
 	})
@@ -74,7 +74,7 @@ func TestPrepareCollectorSettings(t *testing.T) {
 		require.NoError(t, w.Close(), "failed to close pipe")
 		os.Stdin = r
 
-		settings, err := prepareCollectorSettings(nil, false)
+		settings, err := prepareCollectorSettings(nil, false, "info")
 		require.NoError(t, err)
 		require.NotNil(t, settings)
 	})

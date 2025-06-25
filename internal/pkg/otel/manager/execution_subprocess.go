@@ -13,30 +13,43 @@ import (
 	"os/exec"
 	"time"
 
-	"go.uber.org/zap/zapcore"
 	"gopkg.in/yaml.v3"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
+	"go.uber.org/zap/zapcore"
+
+	"github.com/elastic/elastic-agent-libs/logp"
 
 	runtimeLogger "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
-const processKillAfter = 5 * time.Second
+const (
+	processKillAfter = 5 * time.Second
 
-func newSubprocessExecution(collectorPath string, collectorArgs []string) *subprocessExecution {
+	OtelSetSupervisedFlagName          = "supervised"
+	OtelSupervisedLoggingLevelFlagName = "supervised.logging.level"
+)
+
+func newSubprocessExecution(logLevel logp.Level, collectorPath string) *subprocessExecution {
 	return &subprocessExecution{
 		collectorPath: collectorPath,
-		collectorArgs: collectorArgs,
+		collectorArgs: []string{
+			"otel",
+			fmt.Sprintf("--%s", OtelSetSupervisedFlagName),
+			fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, logLevel.String()),
+		},
+		logLevel: logLevel,
 	}
 }
 
 type subprocessExecution struct {
 	collectorPath string
 	collectorArgs []string
+	logLevel      logp.Level
 }
 
 // startCollector starts a supervised collector and monitors its health. Process exit errors are sent to the
@@ -72,13 +85,13 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 		return nil, fmt.Errorf("failed to marshal config to yaml: %w", err)
 	}
 
-	stdOut := runtimeLogger.NewLogWriterWithDefaults(logger.Core(), zapcore.InfoLevel)
+	stdOut := runtimeLogger.NewLogWriterWithDefaults(logger.Core(), zapcore.Level(r.logLevel))
 	// info level for stdErr because by default collector writes to stderr
-	stdErr := runtimeLogger.NewLogWriterWithDefaults(logger.Core(), zapcore.InfoLevel)
+	stdErr := runtimeLogger.NewLogWriterWithDefaults(logger.Core(), zapcore.Level(r.logLevel))
 
 	procCtx, procCtxCancel := context.WithCancel(ctx)
 	processInfo, err := process.Start(r.collectorPath,
-		process.WithArgs(r.collectorArgs),
+		process.WithArgs(append([]string{"--set=service.telemetry.logs.level=debug"}, r.collectorArgs...)),
 		process.WithContext(procCtx),
 		process.WithEnv(os.Environ()),
 		process.WithCmdOptions(func(c *exec.Cmd) error {
@@ -91,8 +104,10 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 	if err != nil {
 		// we failed to start the process
 		procCtxCancel()
+		logger.Debugf("failed to start supervised collector: %s", err)
 		return nil, fmt.Errorf("failed to start supervised collector: %w", err)
 	}
+	logger.Debugf("supervised collector started with pid: %d", processInfo.Process.Pid)
 	if processInfo.Process == nil {
 		// this should not happen but just in case
 		procCtxCancel()

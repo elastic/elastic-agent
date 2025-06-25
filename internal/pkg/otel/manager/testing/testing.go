@@ -16,7 +16,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	err := cmd.RunCollector(ctx, nil, true)
+	err := cmd.RunCollector(ctx, nil, true, "debug")
 	if err == nil || errors.Is(err, context.Canceled) {
 		os.Exit(0)
 	}

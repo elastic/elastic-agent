@@ -15,17 +15,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/core/logger"
-
-	"gopkg.in/yaml.v2"
-
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
+	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
@@ -225,7 +224,7 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name: "subprocess collector config updates",
-			exec: &mockExecution{exec: newSubprocessExecution(testBinary, []string{""})},
+			exec: &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
@@ -268,7 +267,7 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name: "subprocess collector stopped gracefully outside manager",
-			exec: &mockExecution{exec: newSubprocessExecution(testBinary, []string{""})},
+			exec: &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
@@ -290,7 +289,7 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name: "subprocess collector killed outside manager",
-			exec: &mockExecution{exec: newSubprocessExecution(testBinary, []string{""})},
+			exec: &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
@@ -347,7 +346,7 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name:                "subprocess collector invalid config",
-			exec:                &mockExecution{exec: newSubprocessExecution(testBinary, []string{""})},
+			exec:                &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
 			skipListeningErrors: true,
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// Errors channel is non-blocking, should be able to send an Update that causes an error multiple

@@ -16,10 +16,13 @@ import (
 	"github.com/spf13/pflag"
 	"go.opentelemetry.io/collector/otelcol"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/service"
+
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/agentprovider"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -34,14 +37,18 @@ func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Comman
 			if err != nil {
 				return err
 			}
-			supervised, err := cmd.Flags().GetBool(otelSetSupervisedFlagName)
+			supervised, err := cmd.Flags().GetBool(manager.OtelSetSupervisedFlagName)
+			if err != nil {
+				return err
+			}
+			supervisedLoggingLevel, err := cmd.Flags().GetString(manager.OtelSupervisedLoggingLevelFlagName)
 			if err != nil {
 				return err
 			}
 			if err := prepareEnv(); err != nil {
 				return err
 			}
-			return RunCollector(cmd.Context(), cfgFiles, supervised)
+			return RunCollector(cmd.Context(), cfgFiles, supervised, supervisedLoggingLevel)
 		},
 		PreRun: func(c *cobra.Command, args []string) {
 			// hide inherited flags not to bloat help with flags not related to otel
@@ -69,8 +76,8 @@ func hideInheritedFlags(c *cobra.Command) {
 	})
 }
 
-func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool) error {
-	settings, err := prepareCollectorSettings(configFiles, supervised)
+func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool, supervisedLoggingLevel string) error {
+	settings, err := prepareCollectorSettings(configFiles, supervised, supervisedLoggingLevel)
 	if err != nil {
 		return fmt.Errorf("failed to prepare collector settings: %w", err)
 	}
@@ -98,7 +105,7 @@ func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool)
 	return otel.Run(ctx, stop, settings)
 }
 
-func prepareCollectorSettings(configFiles []string, supervised bool) (*otelcol.CollectorSettings, error) {
+func prepareCollectorSettings(configFiles []string, supervised bool, supervisedLoggingLevel string) (*otelcol.CollectorSettings, error) {
 	var settings *otelcol.CollectorSettings
 	if supervised {
 		// add stdin config provider
@@ -119,12 +126,25 @@ func prepareCollectorSettings(configFiles []string, supervised bool) (*otelcol.C
 
 		defaultEventLogCfg.ToFiles = false
 		defaultEventLogCfg.ToStderr = true
-		defaultCfg.Level = logger.DefaultLogLevel
+
+		var logLevelSettingErr error
+		if supervisedLoggingLevel != "" {
+			if logLevelSettingErr = defaultCfg.Level.Unpack(supervisedLoggingLevel); logLevelSettingErr != nil {
+				defaultCfg.Level = logp.InfoLevel
+			}
+		} else {
+			defaultCfg.Level = logp.InfoLevel
+		}
 
 		l, err := logger.NewFromConfig("edot", defaultCfg, defaultEventLogCfg, false)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create logger: %w", err)
 		}
+
+		if logLevelSettingErr != nil {
+			l.Warnf("Fallback to default logging level due to: %v", logLevelSettingErr)
+		}
+
 		settings.LoggingOptions = []zap.Option{zap.WrapCore(func(zapcore.Core) zapcore.Core {
 			return l.Core()
 		})}

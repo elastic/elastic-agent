@@ -13,6 +13,8 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/confmap"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -51,7 +53,7 @@ type OTelManager struct {
 }
 
 // NewOTelManager returns a OTelManager.
-func NewOTelManager(logger *logger.Logger, baseLogger *logger.Logger, mode ExecutionMode) (*OTelManager, error) {
+func NewOTelManager(logger *logger.Logger, logLevel logp.Level, baseLogger *logger.Logger, mode ExecutionMode) (*OTelManager, error) {
 	var exec collectorExecution
 	switch mode {
 	case SubprocessExecutionMode:
@@ -62,12 +64,14 @@ func NewOTelManager(logger *logger.Logger, baseLogger *logger.Logger, mode Execu
 			return nil, fmt.Errorf("failed to get the path to the collector executable: %w", err)
 		}
 
-		exec = newSubprocessExecution(executable, []string{"otel", "--supervised"})
+		exec = newSubprocessExecution(logLevel, executable)
 	case EmbeddedExecutionMode:
 		exec = newExecutionEmbedded()
 	default:
 		return nil, errors.New("unknown otel collector exec")
 	}
+
+	logger.Debugf("Using collector execution mode: %s", mode)
 
 	return &OTelManager{
 		logger:    logger,
