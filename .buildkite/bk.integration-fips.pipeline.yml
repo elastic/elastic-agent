@@ -2,10 +2,11 @@
 
 env:
   ASDF_MAGE_VERSION: 1.14.0
+  MS_GOTOOLCHAIN_TELEMETRY_ENABLED: "0"
 
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1749862860"
-  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-1749862860"
-  IMAGE_UBUNTU_ARM64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1749862860"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1750467641"
+  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-1750467641"
+  IMAGE_UBUNTU_ARM64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1750467641"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -53,7 +54,8 @@ steps:
       TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
     command: .buildkite/scripts/steps/ess_start.sh
     agents:
-      image: "docker.elastic.co/ci-agent-images/platform-ingest/oblt-cli:latest"
+      # image: "docker.elastic.co/ci-agent-images/platform-ingest/oblt-cli:latest"
+      image: "docker.elastic.co/observability-ci/oblt-cli:7.21.0"
 
   - group: "fips:Stateful:Ubuntu"
     key: integration-tests-ubuntu-fips
@@ -68,6 +70,7 @@ steps:
           CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
           CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips"
           TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64-fips'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.groups}} {{matrix.sudo}}
@@ -100,6 +103,7 @@ steps:
           CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
           CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips"
           TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64-fips'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.groups}} {{matrix.sudo}}
@@ -130,7 +134,8 @@ steps:
     allow_dependency_failure: true
     command: .buildkite/scripts/steps/ess_down.sh
     agents:
-      image: "docker.elastic.co/ci-agent-images/platform-ingest/oblt-cli:latest"
+      # image: "docker.elastic.co/ci-agent-images/platform-ingest/oblt-cli:latest"
+      image: "docker.elastic.co/observability-ci/oblt-cli:7.21.0"
 
   - label: Aggregate test reports
     depends_on:

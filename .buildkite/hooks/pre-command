@@ -18,6 +18,13 @@ CI_GCP_OBS_PATH="kv/ci-shared/observability-ingest/cloud/gcp"
 CI_ESS_PATH="kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
 CI_DRA_ROLE_PATH="kv/ci-shared/release/dra-role"
 
+# NOTE: oblt-cli requires the GITHUB_TOKEN to be set in the environment
+#       unfortunatelym, we cannot use the BK pipeline itself as it will
+#       print the content, so we need to set it in the pre-command hook.
+#       I decided to set it here for all the steps regardless to avoid
+#       complicated logic in the pre-command hook.
+export GITHUB_TOKEN=$VAULT_GITHUB_TOKEN
+
 function release_manager_login {
   DRA_CREDS_SECRET=$(retry 5 vault kv get -field=data -format=json ${CI_DRA_ROLE_PATH})
   VAULT_ADDR_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.vault_addr')

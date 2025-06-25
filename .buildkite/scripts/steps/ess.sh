@@ -12,8 +12,7 @@ function ess_up() {
   fi
 
   # Create a cluster with the specified stack version and store the cluster information in a file
-  GITHUB_TOKEN="$VAULT_GITHUB_TOKEN" \
-    oblt-cli cluster create ess \
+  oblt-cli cluster create ess \
       --stack-version "$STACK_VERSION" \
       --cluster-name-prefix ea-hosted-it \
       --output-file="${PWD}/cluster-info.json" \
