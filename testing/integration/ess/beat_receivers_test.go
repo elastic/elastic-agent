@@ -721,11 +721,13 @@ agent.monitoring.enabled: false
 				RuntimeExperimental: "otel",
 			}))
 	receiverConfig := configBuffer.Bytes()
-
+	// this is the context for the whole test, with a global timeout defined
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer cancel()
 
-	fixture, cmd, output := prepareAgentCmd(t, ctx, processConfig)
+	// use a subcontext for the agent
+	agentProcessCtx, agentProcessCancel := context.WithCancel(ctx)
+	fixture, cmd, output := prepareAgentCmd(t, agentProcessCtx, receiverConfig)
 
 	require.NoError(t, cmd.Start())
 
@@ -737,7 +739,7 @@ agent.monitoring.enabled: false
 		return
 	}, 1*time.Minute, 1*time.Second)
 
-	cancel()
+	agentProcessCancel()
 	require.Error(t, cmd.Wait())
 	processLogsString := output.String()
 	output.Reset()
@@ -746,7 +748,9 @@ agent.monitoring.enabled: false
 	ctx, cancel = testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer cancel()
 
-	fixture, cmd, output = prepareAgentCmd(t, ctx, receiverConfig)
+	// use a subcontext for the agent
+	agentReceiverCtx, agentReceiverCancel := context.WithCancel(ctx)
+	fixture, cmd, output = prepareAgentCmd(t, agentReceiverCtx, processConfig)
 
 	require.NoError(t, cmd.Start())
 
@@ -764,7 +768,7 @@ agent.monitoring.enabled: false
 		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 1)
 		return
 	}, 1*time.Minute, 1*time.Second)
-	cancel()
+	agentReceiverCancel()
 	require.Error(t, cmd.Wait())
 	receiverLogsString := output.String()
 
