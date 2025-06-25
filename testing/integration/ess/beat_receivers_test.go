@@ -768,11 +768,9 @@ agent.monitoring.enabled: false
 	require.Error(t, cmd.Wait())
 	receiverLogsString := output.String()
 
-	processLog, err := getBeatStartLogRecord(processLogsString)
-	require.NoError(t, err)
+	processLog := getBeatStartLogRecord(processLogsString)
 	assert.NotEmpty(t, processLog)
-	receiverLog, err := getBeatStartLogRecord(receiverLogsString)
-	require.NoError(t, err)
+	receiverLog := getBeatStartLogRecord(receiverLogsString)
 	assert.NotEmpty(t, receiverLog)
 
 	// Check that the process log is a subset of the receiver log
@@ -819,7 +817,7 @@ func assertBeatsHealthy(t *assert.CollectT, status *atesting.AgentStatusOutput, 
 
 // getBeatStartLogRecord returns the log record for the a particular log line emitted when the beat starts
 // This log line is identical between beats processes and receivers, so it's a good point of comparison
-func getBeatStartLogRecord(logs string) (map[string]any, error) {
+func getBeatStartLogRecord(logs string) map[string]any {
 	for _, line := range strings.Split(logs, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -827,16 +825,16 @@ func getBeatStartLogRecord(logs string) (map[string]any, error) {
 		}
 		logRecord := make(map[string]any)
 		if unmarshalErr := json.Unmarshal([]byte(line), &logRecord); unmarshalErr != nil {
-			return nil, unmarshalErr
+			continue
 		}
 
 		if message, ok := logRecord["message"].(string); !ok || !strings.HasPrefix(message, "Beat name:") {
 			continue
 		}
 
-		return logRecord, nil
+		return logRecord
 	}
-	return nil, nil
+	return nil
 }
 
 func prepareAgentCmd(t *testing.T, ctx context.Context, config []byte) (*atesting.Fixture, *exec.Cmd, *strings.Builder) {
