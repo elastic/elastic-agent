@@ -120,6 +120,7 @@ steps:
           CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
           CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud"
           TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud:git-${BUILDKITE_COMMIT:0:12}"
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           .buildkite/scripts/steps/integration_tests_tf.sh ech-deployment false
         artifact_paths:
