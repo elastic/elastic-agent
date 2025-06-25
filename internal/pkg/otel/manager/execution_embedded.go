@@ -28,7 +28,7 @@ type embeddedExecution struct {
 
 // startCollector starts the collector in a new goroutine.
 func (r *embeddedExecution) startCollector(ctx context.Context, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus) (collectorHandle, error) {
-	collectorCtx, collectorCancel := context.WithCancel(context.Background())
+	collectorCtx, collectorCancel := context.WithCancel(ctx)
 	ap := agentprovider.NewProvider(cfg)
 
 	ctl := &ctxHandle{
