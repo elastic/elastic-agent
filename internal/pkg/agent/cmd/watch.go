@@ -74,7 +74,7 @@ type installationModifier interface {
 }
 
 func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcherConfig, watcher agentWatcher, installModifier installationModifier) error {
-	log.Infow("Upgrade Watcher started", "process.pid", os.Getpid(), "agent.version", version.GetAgentPackageVersion())
+	log.Infow("Upgrade Watcher started", "process.pid", os.Getpid(), "agent.version", version.GetAgentPackageVersion(), "config", cfg)
 	dataDir := paths.DataFrom(topDir)
 	marker, err := upgrade.LoadMarker(dataDir)
 	if err != nil {

@@ -15,10 +15,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
 	"github.com/kardianos/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
@@ -273,6 +275,135 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 
 }
 
+// TestFleetManagedUpgradeRollbackOnRestarts tests the scenario where upgrading to a new version
+// of Agent fails due to the new Agent binary not starting up. It checks that the Agent is
+// rolled back to the previous version and that Fleet reports the correct informations
+func TestFleetManagedUpgradeRollbackOnRestarts(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Fleet,
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+		Stack: &define.Stack{},
+	})
+
+	type fixturesSetupFunc func(t *testing.T) (from *atesting.Fixture, to *atesting.Fixture)
+	testcases := []struct {
+		name          string
+		fixturesSetup fixturesSetupFunc
+	}{
+		{
+			name: "downgrade from current version to previous minor",
+			fixturesSetup: func(t *testing.T) (from *atesting.Fixture, to *atesting.Fixture) {
+				// Upgrade from the current build to an older one. The new watcher will be run anyway, and we can check
+				// the postconditions on a rollback
+
+				// Start from the build under test.
+				fromFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+				require.NoError(t, err)
+
+				// Downgrade to a previous version (doesn't really matter what)
+				upgradeToVersion, err := upgradetest.PreviousMinor()
+				require.NoError(t, err)
+				toFixture, err := atesting.NewFixture(
+					t,
+					upgradeToVersion.String(),
+					atesting.WithFetcher(atesting.ArtifactFetcher()),
+				)
+				require.NoError(t, err)
+
+				return fromFixture, toFixture
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
+			defer cancel()
+			from, to := tc.fixturesSetup(t)
+
+			managedRollbackRestartTest(ctx, t, info, from, to)
+		})
+	}
+}
+
+func managedRollbackRestartTest(ctx context.Context, t *testing.T, info *define.Info, from *atesting.Fixture, to *atesting.Fixture) {
+
+	startVersionInfo, err := from.ExecVersion(ctx)
+	require.NoError(t, err, "failed to get start agent build version info")
+
+	endVersionInfo, err := to.ExecVersion(ctx)
+	require.NoError(t, err, "failed to get end agent build version info")
+
+	t.Logf("Testing Elastic Agent upgrade from %s to %s...", from.Version(), endVersionInfo.Binary.String())
+
+	policyUUID := uuid.Must(uuid.NewV4()).String()
+
+	policy := kibana.AgentPolicy{
+		Name:        fmt.Sprintf("%s-policy-%s", t.Name(), policyUUID),
+		Namespace:   "default",
+		Description: fmt.Sprintf("Rollback test policy %s (%s)", t.Name(), policyUUID),
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+	}
+
+	// Use the post-upgrade hook to skip part of the PerformUpgrade (the checks during the grace period)
+	// because we want to do our own checks for the rollback.
+	var ErrSkipGrace = errors.New("skip grace period")
+	postUpgradeHook := func() error {
+		return ErrSkipGrace
+	}
+
+	err = PerformManagedUpgrade(ctx, t, info, from, to, policy, false,
+		upgradetest.WithPostUpgradeHook(postUpgradeHook),
+		upgradetest.WithDisableHashCheck(true),
+		upgradetest.WithCustomWatcherConfig(reallyFastWatcherCfg),
+	)
+
+	// we expect ErrSkipGrace at this point, meaning that we finished installing but didn't wait for agent to become healthy
+	require.ErrorIs(t, err, ErrSkipGrace, "managed upgrade failed with unexpected error")
+
+	// A few seconds after the upgrade, deliberately restart upgraded Agent a
+	// couple of times to simulate Agent crashing.
+	restartAgentNTimes(t, 3, 10*time.Second)
+
+	// wait for the agent to be healthy and correct version
+	err = upgradetest.WaitHealthyAndVersion(ctx, from, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	require.NoError(t, err, "agent never came online with version %s", startVersionInfo.Binary.String())
+
+	agentID, err := from.AgentID(ctx)
+	require.NoError(t, err, "error retrieving agent ID")
+
+	// ensure that upgrade details now show the state as UPG_ROLLBACK. This is only possible with Elastic
+	// Agent versions >= 8.12.0.
+	startVersion, err := version.ParseVersion(startVersionInfo.Binary.Version)
+	require.NoError(t, err)
+
+	if !startVersion.Less(*version.NewParsedSemVer(8, 12, 0, "", "")) {
+		fleetAgent, fleetAgentErr := info.KibanaClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
+		require.NoError(t, fleetAgentErr, "error getting agent from Fleet")
+		require.NotNil(t, fleetAgent.UpgradeDetails, "upgrade details not set")
+		assert.Equal(t, details.StateRollback, details.State(fleetAgent.UpgradeDetails.State))
+		if !startVersion.Less(*upgradetest.Version_9_1_0_SNAPSHOT) {
+			assert.Equal(t, "automatic rollback", fleetAgent.UpgradeDetails.Metadata.Reason)
+		}
+	}
+
+	// rollback should stop the watcher
+	// killTimeout is greater than timeout as the watcher should have been
+	// stopped on its own, and we don't want this test to hide that fact
+	err = upgradetest.WaitForNoWatcher(ctx, 2*time.Minute, 10*time.Second, 3*time.Minute)
+	require.NoError(t, err)
+
+	// now that the watcher has stopped lets ensure that it's still the expected
+	// version, otherwise it's possible that it was rolled back to the original version
+	err = upgradetest.CheckHealthyAndVersion(ctx, from, startVersionInfo.Binary)
+	assert.NoError(t, err)
+
+}
+
 func standaloneRollbackRestartTest(ctx context.Context, t *testing.T, startFixture *atesting.Fixture, endFixture *atesting.Fixture) {
 
 	startVersionInfo, err := startFixture.ExecVersion(ctx)
@@ -301,47 +432,7 @@ func standaloneRollbackRestartTest(ctx context.Context, t *testing.T, startFixtu
 
 	// A few seconds after the upgrade, deliberately restart upgraded Agent a
 	// couple of times to simulate Agent crashing.
-	for restartIdx := 0; restartIdx < 3; restartIdx++ {
-		time.Sleep(10 * time.Second)
-		topPath := paths.Top()
-
-		t.Logf("Stopping agent via service to simulate crashing")
-		err = install.StopService(topPath, install.DefaultStopTimeout, install.DefaultStopInterval)
-		if err != nil && runtime.GOOS == define.Windows && strings.Contains(err.Error(), "The service has not been started.") {
-			// Due to the quick restarts every 10 seconds its possible that this is faster than Windows
-			// can handle. Decrementing restartIdx means that the loop will occur again.
-			t.Logf("Got an allowed error on Windows: %s", err)
-			err = nil
-		}
-		require.NoError(t, err)
-
-		// ensure that it's stopped before starting it again
-		var status service.Status
-		var statusErr error
-		require.Eventuallyf(t, func() bool {
-			status, statusErr = install.StatusService(topPath)
-			if statusErr != nil {
-				return false
-			}
-			return status != service.StatusRunning
-		}, 5*time.Minute, 1*time.Second, "service never fully stopped (status: %v): %s", status, statusErr)
-		t.Logf("Stopped agent via service to simulate crashing")
-
-		// start it again
-		t.Logf("Starting agent via service to simulate crashing")
-		err = install.StartService(topPath)
-		require.NoError(t, err)
-
-		// ensure that it's started before next loop
-		require.Eventuallyf(t, func() bool {
-			status, statusErr = install.StatusService(topPath)
-			if statusErr != nil {
-				return false
-			}
-			return status == service.StatusRunning
-		}, 5*time.Minute, 1*time.Second, "service never fully started (status: %v): %s", status, statusErr)
-		t.Logf("Started agent via service to simulate crashing")
-	}
+	restartAgentNTimes(t, 3, 10*time.Second)
 
 	// wait for the agent to be healthy and back at the start version
 	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
@@ -385,4 +476,49 @@ func standaloneRollbackRestartTest(ctx context.Context, t *testing.T, startFixtu
 	// version, otherwise it's possible that it was rolled back to the original version
 	err = upgradetest.CheckHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary)
 	assert.NoError(t, err)
+}
+
+func restartAgentNTimes(t *testing.T, noOfRestarts int, sleepBetweenIterations time.Duration) {
+	topPath := paths.Top()
+
+	for restartIdx := 0; restartIdx < noOfRestarts; restartIdx++ {
+		time.Sleep(sleepBetweenIterations)
+
+		t.Logf("Stopping agent via service to simulate crashing")
+		err := install.StopService(topPath, install.DefaultStopTimeout, install.DefaultStopInterval)
+		if err != nil && runtime.GOOS == define.Windows && strings.Contains(err.Error(), "The service has not been started.") {
+			// Due to the quick restarts every 10 seconds its possible that this is faster than Windows
+			// can handle. Decrementing restartIdx means that the loop will occur again.
+			t.Logf("Got an allowed error on Windows: %s", err)
+			err = nil
+		}
+		require.NoError(t, err)
+
+		// ensure that it's stopped before starting it again
+		var status service.Status
+		var statusErr error
+		require.Eventuallyf(t, func() bool {
+			status, statusErr = install.StatusService(topPath)
+			if statusErr != nil {
+				return false
+			}
+			return status != service.StatusRunning
+		}, 5*time.Minute, 1*time.Second, "service never fully stopped (status: %v): %s", status, statusErr)
+		t.Logf("Stopped agent via service to simulate crashing")
+
+		// start it again
+		t.Logf("Starting agent via service to simulate crashing")
+		err = install.StartService(topPath)
+		require.NoError(t, err)
+
+		// ensure that it's started before next loop
+		require.Eventuallyf(t, func() bool {
+			status, statusErr = install.StatusService(topPath)
+			if statusErr != nil {
+				return false
+			}
+			return status == service.StatusRunning
+		}, 5*time.Minute, 1*time.Second, "service never fully started (status: %v): %s", status, statusErr)
+		t.Logf("Started agent via service to simulate crashing")
+	}
 }
