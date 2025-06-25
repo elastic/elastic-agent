@@ -1341,11 +1341,13 @@ func (f *fakeVarsManager) DefaultProvider() string {
 var _ OTelManager = (*fakeOTelManager)(nil)
 
 type fakeOTelManager struct {
-	updateCollectorCallback func(*confmap.Conf) error
-	updateComponentCallback func([]component.Component) error
-	errChan                 chan error
-	collectorStatusChan     chan *status.AggregateStatus
-	componentStateChan      chan []runtime.ComponentComponentState
+	updateCollectorCallback             func(*confmap.Conf) error
+	updateComponentCallback             func([]component.Component) error
+	performDiagnosticsCallback          func(context.Context, ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic
+	performComponentDiagnosticsCallback func(context.Context, []cproto.AdditionalDiagnosticRequest, ...component.Component) ([]runtime.ComponentDiagnostic, error)
+	errChan                             chan error
+	collectorStatusChan                 chan *status.AggregateStatus
+	componentStateChan                  chan []runtime.ComponentComponentState
 }
 
 func (f *fakeOTelManager) Run(ctx context.Context) error {
@@ -1385,12 +1387,28 @@ func (f *fakeOTelManager) WatchComponents() <-chan []runtime.ComponentComponentS
 
 func (f *fakeOTelManager) MergedOtelConfig() *confmap.Conf { return nil }
 
+func (f *fakeOTelManager) PerformDiagnostics(ctx context.Context, reqs ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic {
+	if f.performDiagnosticsCallback != nil {
+		return f.performDiagnosticsCallback(ctx, reqs...)
+	}
+	return nil
+}
+
+func (f *fakeOTelManager) PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error) {
+	if f.performComponentDiagnosticsCallback != nil {
+		return f.performComponentDiagnosticsCallback(ctx, additionalMetrics, req...)
+	}
+	return nil, nil
+}
+
 // An implementation of the RuntimeManager interface for use in testing.
 type fakeRuntimeManager struct {
-	state          []runtime.ComponentComponentState
-	updateCallback func([]component.Component) error
-	result         error
-	errChan        chan error
+	state                               []runtime.ComponentComponentState
+	updateCallback                      func([]component.Component) error
+	performDiagnosticsCallback          func(context.Context, ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic
+	performComponentDiagnosticsCallback func(context.Context, []cproto.AdditionalDiagnosticRequest, ...component.Component) ([]runtime.ComponentDiagnostic, error)
+	result                              error
+	errChan                             chan error
 }
 
 func (r *fakeRuntimeManager) Run(ctx context.Context) error {
@@ -1428,12 +1446,18 @@ func (r *fakeRuntimeManager) SubscribeAll(context.Context) *runtime.Subscription
 
 // PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
 // it performs diagnostics for all current units.
-func (r *fakeRuntimeManager) PerformDiagnostics(context.Context, ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic {
+func (r *fakeRuntimeManager) PerformDiagnostics(ctx context.Context, req ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic {
+	if r.performDiagnosticsCallback != nil {
+		return r.performDiagnosticsCallback(ctx, req...)
+	}
 	return nil
 }
 
 // PerformComponentDiagnostics  executes the diagnostic action for the provided components.
-func (r *fakeRuntimeManager) PerformComponentDiagnostics(_ context.Context, _ []cproto.AdditionalDiagnosticRequest, _ ...component.Component) ([]runtime.ComponentDiagnostic, error) {
+func (r *fakeRuntimeManager) PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error) {
+	if r.performComponentDiagnosticsCallback != nil {
+		return r.performComponentDiagnosticsCallback(ctx, additionalMetrics, req...)
+	}
 	return nil, nil
 }
 

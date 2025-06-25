@@ -293,8 +293,10 @@ func (m *OTelManager) Errors() <-chan error {
 // This method updates the internal collector and component configurations and triggers a rebuild of the merged
 // configuration that combines them.
 func (m *OTelManager) handleConfigUpdate(cfg *confmap.Conf, components []component.Component) error {
+	m.mx.Lock()
 	m.collectorCfg = cfg
 	m.components = components
+	m.mx.Unlock()
 	return m.updateMergedConfig()
 }
 

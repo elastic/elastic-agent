@@ -28,6 +28,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
@@ -691,3 +692,284 @@ func (a fakeAgentInfo) ECSMetadata(l *logger.Logger) (*info.ECSMeta, error) {
 
 func (a fakeAgentInfo) ReloadID(ctx context.Context) error                  { panic("implement me") }
 func (a fakeAgentInfo) SetLogLevel(ctx context.Context, level string) error { panic("implement me") }
+
+func TestCoordinatorPerformDiagnostics(t *testing.T) {
+	tests := []struct {
+		name                     string
+		runtimeDiags             []runtime.ComponentUnitDiagnostic
+		otelDiags                []runtime.ComponentUnitDiagnostic
+		expectedRuntimeDiagCount int
+		expectedOtelDiagCount    int
+	}{
+		{
+			name: "both runtime and otel return diagnostics",
+			runtimeDiags: []runtime.ComponentUnitDiagnostic{
+				{
+					Component: component.Component{ID: "runtime-comp-1"},
+					Unit:      component.Unit{ID: "runtime-unit-1", Type: client.UnitTypeInput},
+					Results:   []*proto.ActionDiagnosticUnitResult{{Name: "runtime-diag"}},
+				},
+			},
+			otelDiags: []runtime.ComponentUnitDiagnostic{
+				{
+					Component: component.Component{ID: "otel-comp-1"},
+					Unit:      component.Unit{ID: "otel-unit-1", Type: client.UnitTypeOutput},
+					Results:   []*proto.ActionDiagnosticUnitResult{{Name: "otel-diag"}},
+				},
+			},
+			expectedRuntimeDiagCount: 1,
+			expectedOtelDiagCount:    1,
+		},
+		{
+			name: "only runtime returns diagnostics",
+			runtimeDiags: []runtime.ComponentUnitDiagnostic{
+				{
+					Component: component.Component{ID: "runtime-comp-1"},
+					Unit:      component.Unit{ID: "runtime-unit-1", Type: client.UnitTypeInput},
+					Results:   []*proto.ActionDiagnosticUnitResult{{Name: "runtime-diag"}},
+				},
+			},
+			otelDiags:                []runtime.ComponentUnitDiagnostic{},
+			expectedRuntimeDiagCount: 1,
+			expectedOtelDiagCount:    0,
+		},
+		{
+			name:         "only otel returns diagnostics",
+			runtimeDiags: []runtime.ComponentUnitDiagnostic{},
+			otelDiags: []runtime.ComponentUnitDiagnostic{
+				{
+					Component: component.Component{ID: "otel-comp-1"},
+					Unit:      component.Unit{ID: "otel-unit-1", Type: client.UnitTypeOutput},
+					Results:   []*proto.ActionDiagnosticUnitResult{{Name: "otel-diag"}},
+				},
+			},
+			expectedRuntimeDiagCount: 0,
+			expectedOtelDiagCount:    1,
+		},
+		{
+			name:                     "no diagnostics from either manager",
+			runtimeDiags:             []runtime.ComponentUnitDiagnostic{},
+			otelDiags:                []runtime.ComponentUnitDiagnostic{},
+			expectedRuntimeDiagCount: 0,
+			expectedOtelDiagCount:    0,
+		},
+		{
+			name: "multiple diagnostics from both managers",
+			runtimeDiags: []runtime.ComponentUnitDiagnostic{
+				{
+					Component: component.Component{ID: "runtime-comp-1"},
+					Unit:      component.Unit{ID: "runtime-unit-1", Type: client.UnitTypeInput},
+					Results:   []*proto.ActionDiagnosticUnitResult{{Name: "runtime-diag-1"}},
+				},
+				{
+					Component: component.Component{ID: "runtime-comp-2"},
+					Unit:      component.Unit{ID: "runtime-unit-2", Type: client.UnitTypeInput},
+					Results:   []*proto.ActionDiagnosticUnitResult{{Name: "runtime-diag-2"}},
+				},
+			},
+			otelDiags: []runtime.ComponentUnitDiagnostic{
+				{
+					Component: component.Component{ID: "otel-comp-1"},
+					Unit:      component.Unit{ID: "otel-unit-1", Type: client.UnitTypeOutput},
+					Results:   []*proto.ActionDiagnosticUnitResult{{Name: "otel-diag-1"}},
+				},
+				{
+					Component: component.Component{ID: "otel-comp-2"},
+					Unit:      component.Unit{ID: "otel-unit-2", Type: client.UnitTypeOutput},
+					Results:   []*proto.ActionDiagnosticUnitResult{{Name: "otel-diag-2"}},
+				},
+			},
+			expectedRuntimeDiagCount: 2,
+			expectedOtelDiagCount:    2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create mock managers with callbacks
+			mockRuntimeMgr := &fakeRuntimeManager{
+				performDiagnosticsCallback: func(
+					ctx context.Context,
+					reqs ...runtime.ComponentUnitDiagnosticRequest,
+				) []runtime.ComponentUnitDiagnostic {
+					return tt.runtimeDiags
+				},
+			}
+			mockOtelMgr := &fakeOTelManager{
+				performDiagnosticsCallback: func(
+					ctx context.Context,
+					reqs ...runtime.ComponentUnitDiagnosticRequest,
+				) []runtime.ComponentUnitDiagnostic {
+					return tt.otelDiags
+				},
+			}
+
+			// Create coordinator with mock managers
+			coord := &Coordinator{
+				runtimeMgr: mockRuntimeMgr,
+				otelMgr:    mockOtelMgr,
+			}
+
+			// Create test requests
+			req1 := runtime.ComponentUnitDiagnosticRequest{
+				Component: component.Component{ID: "test-comp-1"},
+				Unit:      component.Unit{ID: "test-unit-1", Type: client.UnitTypeInput},
+			}
+			req2 := runtime.ComponentUnitDiagnosticRequest{
+				Component: component.Component{ID: "test-comp-2"},
+				Unit:      component.Unit{ID: "test-unit-2", Type: client.UnitTypeOutput},
+			}
+
+			// Execute PerformDiagnostics
+			ctx := context.Background()
+			result := coord.PerformDiagnostics(ctx, req1, req2)
+
+			// Verify results
+			runtimeDiagFound := 0
+			otelDiagFound := 0
+			for _, diag := range result {
+				if diag.Component.ID == "runtime-comp-1" || diag.Component.ID == "runtime-comp-2" {
+					runtimeDiagFound++
+				}
+				if diag.Component.ID == "otel-comp-1" || diag.Component.ID == "otel-comp-2" {
+					otelDiagFound++
+				}
+			}
+			assert.Equal(t, tt.expectedRuntimeDiagCount, runtimeDiagFound, "Runtime diagnostic count should match expected")
+			assert.Equal(t, tt.expectedOtelDiagCount, otelDiagFound, "OTel diagnostic count should match expected")
+		})
+	}
+}
+
+func TestCoordinatorPerformComponentDiagnostics(t *testing.T) {
+	tests := []struct {
+		name                     string
+		runtimeDiags             []runtime.ComponentDiagnostic
+		runtimeErr               error
+		otelDiags                []runtime.ComponentDiagnostic
+		otelErr                  error
+		expectedRuntimeDiagCount int
+		expectedOtelDiagCount    int
+	}{
+		{
+			name: "both runtime and otel return diagnostics successfully",
+			runtimeDiags: []runtime.ComponentDiagnostic{
+				{
+					Component: component.Component{ID: "runtime-comp-1"},
+					Results:   []*proto.ActionDiagnosticUnitResult{{Name: "runtime-diag"}},
+				},
+			},
+			otelDiags: []runtime.ComponentDiagnostic{
+				{
+					Component: component.Component{ID: "otel-comp-1"},
+					Results:   []*proto.ActionDiagnosticUnitResult{{Name: "otel-diag"}},
+				},
+			},
+			expectedRuntimeDiagCount: 1,
+			expectedOtelDiagCount:    1,
+		},
+		{
+			name:         "runtime manager returns error",
+			runtimeDiags: []runtime.ComponentDiagnostic{},
+			runtimeErr:   errors.New("runtime manager error"),
+			otelDiags: []runtime.ComponentDiagnostic{
+				{
+					Component: component.Component{ID: "otel-comp-1"},
+					Results:   []*proto.ActionDiagnosticUnitResult{{Name: "otel-diag"}},
+				},
+			},
+			expectedRuntimeDiagCount: 0,
+			expectedOtelDiagCount:    0,
+		},
+		{
+			name: "otel manager returns error",
+			runtimeDiags: []runtime.ComponentDiagnostic{
+				{
+					Component: component.Component{ID: "runtime-comp-1"},
+					Results:   []*proto.ActionDiagnosticUnitResult{{Name: "runtime-diag"}},
+				},
+			},
+			otelDiags:                []runtime.ComponentDiagnostic{},
+			otelErr:                  errors.New("otel manager error"),
+			expectedRuntimeDiagCount: 0,
+			expectedOtelDiagCount:    0,
+		},
+		{
+			name:                     "only runtime returns diagnostics",
+			runtimeDiags:             []runtime.ComponentDiagnostic{{Component: component.Component{ID: "runtime-comp-1"}}},
+			otelDiags:                []runtime.ComponentDiagnostic{},
+			expectedRuntimeDiagCount: 1,
+			expectedOtelDiagCount:    0,
+		},
+		{
+			name:                     "only otel returns diagnostics",
+			runtimeDiags:             []runtime.ComponentDiagnostic{},
+			otelDiags:                []runtime.ComponentDiagnostic{{Component: component.Component{ID: "otel-comp-1"}}},
+			expectedRuntimeDiagCount: 0,
+			expectedOtelDiagCount:    1,
+		},
+		{
+			name:                     "no diagnostics from either manager",
+			runtimeDiags:             []runtime.ComponentDiagnostic{},
+			otelDiags:                []runtime.ComponentDiagnostic{},
+			expectedRuntimeDiagCount: 0,
+			expectedOtelDiagCount:    0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create mock managers with callbacks
+			mockRuntimeMgr := &fakeRuntimeManager{
+				performComponentDiagnosticsCallback: func(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, comps ...component.Component) ([]runtime.ComponentDiagnostic, error) {
+					return tt.runtimeDiags, tt.runtimeErr
+				},
+			}
+			mockOtelMgr := &fakeOTelManager{
+				performComponentDiagnosticsCallback: func(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, comps ...component.Component) ([]runtime.ComponentDiagnostic, error) {
+					return tt.otelDiags, tt.otelErr
+				},
+			}
+
+			// Create coordinator with mock managers
+			coord := &Coordinator{
+				runtimeMgr: mockRuntimeMgr,
+				otelMgr:    mockOtelMgr,
+			}
+
+			// Create test components and additional metrics
+			comp1 := component.Component{ID: "test-comp-1"}
+			comp2 := component.Component{ID: "test-comp-2"}
+			additionalMetrics := []cproto.AdditionalDiagnosticRequest{
+				cproto.AdditionalDiagnosticRequest_CPU,
+				cproto.AdditionalDiagnosticRequest_CONN,
+			}
+
+			// Execute PerformComponentDiagnostics
+			ctx := context.Background()
+			result, err := coord.PerformComponentDiagnostics(ctx, additionalMetrics, comp1, comp2)
+
+			// Verify error handling
+			if tt.otelErr != nil || tt.runtimeErr != nil {
+				assert.Error(t, err, "Should return error when expected")
+				assert.Nil(t, result, "Result should be nil when error occurs")
+				return
+			}
+			assert.NoError(t, err, "Should not return error when not expected")
+
+			// Verify results
+			runtimeDiagFound := 0
+			otelDiagFound := 0
+			for _, diag := range result {
+				if diag.Component.ID == "runtime-comp-1" {
+					runtimeDiagFound++
+				}
+				if diag.Component.ID == "otel-comp-1" {
+					otelDiagFound++
+				}
+			}
+			assert.Equal(t, tt.expectedRuntimeDiagCount, runtimeDiagFound, "Runtime diagnostic count should match expected")
+			assert.Equal(t, tt.expectedOtelDiagCount, otelDiagFound, "OTel diagnostic count should match expected")
+		})
+	}
+}
