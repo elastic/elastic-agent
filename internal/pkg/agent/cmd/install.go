@@ -111,7 +111,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	unprivileged, _ := cmd.Flags().GetBool(flagInstallUnprivileged)
 	if unprivileged {
-		fmt.Fprintln(streams.Out, "Unprivileged installation mode enabled; this feature is currently in beta.")
+		fmt.Fprintln(streams.Out, "Unprivileged installation mode enabled.") 
 	}
 
 	isDevelopmentMode, _ := cmd.Flags().GetBool(flagInstallDevelopment)
