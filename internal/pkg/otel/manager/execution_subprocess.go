@@ -141,16 +141,18 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 					reportStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStopped, nil))
 					return
 				case currentFailedAttempts > maxFailedAttempts:
-					reportStatus(procCtx, statusCh, aggregateStatus(componentstatus.StatusRecoverableError, err))
+					statuses = aggregateStatus(componentstatus.StatusRecoverableError, err)
 				}
 				currentFailedAttempts++
 			} else {
-				if !compareStatuses(currentStatus, statuses) {
-					currentStatus = statuses
-					reportStatus(procCtx, statusCh, statuses)
-				}
 				currentFailedAttempts = 0
 			}
+
+			if !compareStatuses(currentStatus, statuses) {
+				currentStatus = statuses
+				reportStatus(procCtx, statusCh, statuses)
+			}
+
 			select {
 			case <-procCtx.Done():
 				reportStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStopped, nil))
