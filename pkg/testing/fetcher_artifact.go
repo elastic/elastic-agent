@@ -6,8 +6,6 @@ package testing
 
 import (
 	"context"
-	"crypto/sha512"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,6 +19,7 @@ import (
 
 	"github.com/cenkalti/backoff/v5"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	semver "github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -135,7 +134,7 @@ func (r *artifactResult) Fetch(ctx context.Context, l Logger, dir string) error 
 		}
 
 		// check package hash
-		if err = checkPackageSHA512Hash(dst, dst+extHash); err != nil {
+		if err = download.VerifySHA512Hash(dst); err != nil {
 			l.Logf("inconsistent package hash detected: %s", err)
 			return nil, fmt.Errorf("inconsistent package hash: %w", err)
 		}
@@ -232,43 +231,6 @@ func findLatestSnapshot(ctx context.Context, doer httpDoer, version string) (bui
 	default:
 		return "", fmt.Errorf("unexpected status code %d from %s", resp.StatusCode, latestSnapshotURI)
 	}
-}
-
-func checkPackageSHA512Hash(pkgPath, pkgHashPath string) error {
-	pkgHashFileContents, err := os.ReadFile(pkgHashPath)
-	if err != nil {
-		return fmt.Errorf("failed to read package hash: %w", err)
-	}
-	if len(pkgHashFileContents) < 128 {
-		return fmt.Errorf("wrong format for a package hash expected at least 128 bytes: %q", pkgHashFileContents)
-	}
-	pkgHash := string(pkgHashFileContents[0:128])
-
-	hasher := sha512.New()
-	pkgDataFile, err := os.Open(pkgPath)
-	if err != nil {
-		return fmt.Errorf("failed to open package data: %w", err)
-	}
-	defer pkgDataFile.Close()
-
-	pkgDataFileInfo, err := pkgDataFile.Stat()
-	if err != nil {
-		return fmt.Errorf("failed to stat package data: %w", err)
-	}
-
-	written, err := io.Copy(hasher, pkgDataFile)
-	if err != nil {
-		return fmt.Errorf("failed to copy package data to hasher: %w", err)
-	}
-	if written != pkgDataFileInfo.Size() {
-		return fmt.Errorf("failed to copy all package data to hasher: %w", err)
-	}
-
-	hash := hex.EncodeToString(hasher.Sum(nil))
-	if pkgHash != hash {
-		return fmt.Errorf("package hash mismatch, want: %s, got: %s", pkgHash, hash[:])
-	}
-	return nil
 }
 
 func DownloadPackage(ctx context.Context, l Logger, doer httpDoer, downloadPath string, packageFile string) error {
