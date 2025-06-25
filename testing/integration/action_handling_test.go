@@ -31,11 +31,11 @@ func TestActionHandling(t *testing.T) {
 	})
 
 	t.Run("agent restarts before all the actions in a checkin are processed", func(t *testing.T) {
-		testFunc(t)
+		testAgentRestartsBeforeActionsProcessed(t)
 	})
 }
 
-func testFunc(t *testing.T) {
+func testAgentRestartsBeforeActionsProcessed(t *testing.T) {
 	ctx := t.Context()
 
 	apiKey, policy := createBasicFleetPolicyData(t, "http://fleet-server:8220")
@@ -67,7 +67,6 @@ func testFunc(t *testing.T) {
 			t.Logf("Count: %d, CheckinRequest: Status=%s, Message=%s, AckToken='%s'", checkinCounter.Load(), checkinRequest.Status, checkinRequest.Message, checkinRequest.AckToken)
 
 			if int(checkinCounter.Load()) == 2 {
-				// Send the acktoken to the test
 				<-waitChan
 				ackTokenChan <- checkinRequest.AckToken
 				<-finalWaitChan
@@ -128,8 +127,6 @@ func testFunc(t *testing.T) {
 					t.Log("Acker waiting for waitChan")
 
 					<-waitChan
-					// t.Log("Acker returning from acker")
-					// return &resp, nil
 				}
 				t.Logf("Acking action event with id: %s", e.ActionId)
 				r, isErr := acker(e.ActionId)
@@ -151,12 +148,6 @@ func testFunc(t *testing.T) {
 	server := fleetservertest.NewServer(&handlers)
 	defer server.Close()
 
-	// policyChangeAction, err := fleetservertest.NewActionPolicyChangeWithFakeComponent("test-policy-change", fleetservertest.TmplPolicy{
-	// 	AgentID:    policy.AgentID,
-	// 	PolicyID:   policy.PolicyID,
-	// 	FleetHosts: []string{server.LocalhostURL},
-	// })
-	// require.NoError(t, err)
 	actions := []fleetservertest.AckableAction{}
 	for i := range 8 {
 		action, err := fleetservertest.NewAction(fleetservertest.ActionTmpl{
@@ -169,29 +160,6 @@ func testFunc(t *testing.T) {
 		actions = append(actions, action)
 	}
 
-	// policyReassignAction, err := fleetservertest.NewAction(fleetservertest.ActionTmpl{
-	// 	AgentID:  policy.AgentID,
-	// 	ActionID: "test-action-id-0",
-	// 	Type:     "POLICY_REASSIGN",
-	// 	Data:     `{"policy_id": "new-policy-456"}`,
-	// })
-	// require.NoError(t, err)
-	// policyReassignAction1, err := fleetservertest.NewAction(fleetservertest.ActionTmpl{
-	// 	AgentID:  policy.AgentID,
-	// 	ActionID: "test-action-id-1",
-	// 	Type:     "POLICY_REASSIGN",
-	// 	Data:     `{"policy_id": "new-policy-456"}`,
-	// })
-	// require.NoError(t, err)
-	// policyReassignAction2, err := fleetservertest.NewAction(fleetservertest.ActionTmpl{
-	// 	AgentID:  policy.AgentID,
-	// 	ActionID: "test-action-id-2",
-	// 	Type:     "POLICY_REASSIGN",
-	// 	Data:     `{"policy_id": "new-policy-456"}`,
-	// })
-	// require.NoError(t, err)
-
-	// checkinWithAcker.AddCheckin("AckToken-0", 0, policyChangeAction, policyReassignAction)
 	checkinWithAcker.AddCheckin("AckToken-0", 0, actions[:3]...)
 	checkinWithAcker.AddCheckin("AckToken-1", 0, actions[3:6]...)
 	checkinWithAcker.AddCheckin("AckToken-2", 0, actions[6:]...)
@@ -232,7 +200,7 @@ func testFunc(t *testing.T) {
 	close(waitChan)
 
 	ackToken := <-ackTokenChan
-	// For the assertions in this loop we need to wait until all actions have been sent.
+
 	for _, action := range actions {
 		acked := checkinWithAcker.Acked(action.ActionID)
 		assert.True(t, acked, fmt.Sprintf("Action with id %s", action.ActionID))
