@@ -114,7 +114,7 @@ steps:
               - fleet
 
       - label: "fips:upgrade-ech-deployment"
-        if: build.env("BUILDKITE_PULL_REQUEST") == "true" &&  build.env("GITHUB_PR_LABELS") =~ /.*(Testing:run:TestUpgradeIntegrationsServer).*/
+#        if: build.env("BUILDKITE_PULL_REQUEST") == "true" &&  build.env("GITHUB_PR_LABELS") =~ /.*(Testing:run:TestUpgradeIntegrationsServer).*/
         env:
           FIPS: "true"
           CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
