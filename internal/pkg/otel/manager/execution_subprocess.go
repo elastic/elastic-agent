@@ -125,12 +125,13 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 		}()
 		currentStatus := aggregateStatus(componentstatus.StatusStarting, nil)
 		reportStatus(ctx, statusCh, currentStatus)
-		// we will check the health of the collector every 1 second for the first 10 attempts
-		// until we get a successful response.
+
+		// specify a max duration of not being able to get the status from the collector
 		const maxFailuresDuration = 130 * time.Second
 		maxFailuresTimer := time.NewTimer(maxFailuresDuration)
 		defer maxFailuresTimer.Stop()
 
+		// check the health of the collector every 1 second
 		const healthCheckPollDuration = 1 * time.Second
 		healthCheckPollTimer := time.NewTimer(healthCheckPollDuration)
 		defer healthCheckPollTimer.Stop()
