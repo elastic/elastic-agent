@@ -727,7 +727,7 @@ agent.monitoring.enabled: false
 
 	// use a subcontext for the agent
 	agentProcessCtx, agentProcessCancel := context.WithCancel(ctx)
-	fixture, cmd, output := prepareAgentCmd(t, agentProcessCtx, receiverConfig)
+	fixture, cmd, output := prepareAgentCmd(t, agentProcessCtx, processConfig)
 
 	require.NoError(t, cmd.Start())
 
@@ -750,7 +750,7 @@ agent.monitoring.enabled: false
 
 	// use a subcontext for the agent
 	agentReceiverCtx, agentReceiverCancel := context.WithCancel(ctx)
-	fixture, cmd, output = prepareAgentCmd(t, agentReceiverCtx, processConfig)
+	fixture, cmd, output = prepareAgentCmd(t, agentReceiverCtx, receiverConfig)
 
 	require.NoError(t, cmd.Start())
 
