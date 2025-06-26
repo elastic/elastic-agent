@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -66,7 +67,7 @@ type OTelManager struct {
 
 	// recoveryRetries is the number of times the collector has been
 	// restarted through the recovery timer.
-	recoveryRetries uint32
+	recoveryRetries atomic.Uint32
 
 	// execution is used to invoke the collector into different execution modes
 	execution collectorExecution
@@ -138,8 +139,8 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				continue
 			}
 
-			m.recoveryRetries++
-			m.logger.Infof("collector recovery restarting, total retries: %d", m.recoveryRetries)
+			newRetries := m.recoveryRetries.Add(1)
+			m.logger.Infof("collector recovery restarting, total retries: %d", newRetries)
 			proc, err = m.execution.startCollector(ctx, m.logger, m.cfg, collectorRunErr, m.statusCh)
 			if err != nil {
 				m.logger.Errorf("collector exited with error: %v", err)
@@ -214,7 +215,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			// we received a new configuration, thus stop the recovery timer
 			// and reset the retry count
 			m.recoveryTimer.Stop()
-			m.recoveryRetries = 0
+			m.recoveryRetries.Store(0)
 			m.cfg = cfg
 
 			if proc != nil {

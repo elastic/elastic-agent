@@ -68,14 +68,25 @@ var (
 )
 
 type mockExecution struct {
+	mtx    sync.Mutex
 	exec   collectorExecution
 	handle collectorHandle
 }
 
 func (m *mockExecution) startCollector(ctx context.Context, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus) (collectorHandle, error) {
+	m.mtx.Lock()
+	defer m.mtx.Unlock()
+
 	var err error
 	m.handle, err = m.exec.startCollector(ctx, logger, cfg, errCh, statusCh)
 	return m.handle, err
+}
+
+func (m *mockExecution) getProcessHandle() collectorHandle {
+	m.mtx.Lock()
+	defer m.mtx.Unlock()
+
+	return m.handle
 }
 
 // EventListener listens to the events from the OTelManager and stores the latest error and status.
@@ -246,7 +257,7 @@ func TestOTelManager_Run(t *testing.T) {
 				m.Update(nil)
 				e.EnsureOffWithoutError(t, updateTime)
 				assert.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
-				assert.Equal(t, uint32(0), m.recoveryRetries, "recovery retries should be 0")
+				assert.Equal(t, uint32(0), m.recoveryRetries.Load(), "recovery retries should be 0")
 			},
 		},
 		{
@@ -295,7 +306,7 @@ func TestOTelManager_Run(t *testing.T) {
 				m.Update(nil)
 				e.EnsureOffWithoutError(t, updateTime)
 				assert.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
-				assert.Equal(t, uint32(0), m.recoveryRetries, "recovery retries should be 0")
+				assert.Equal(t, uint32(0), m.recoveryRetries.Load(), "recovery retries should be 0")
 			},
 		},
 		{
@@ -309,24 +320,25 @@ func TestOTelManager_Run(t *testing.T) {
 				m.Update(cfg)
 				e.EnsureHealthy(t, updateTime)
 
-				var oldHandle *procHandle
+				var oldPHandle *procHandle
 				// repeatedly kill the collector
 				for i := 0; i < 3; i++ {
 					// kill it
-					require.NotNil(t, exec.handle, "exec handle should not be nil, iteration ", i)
-					handle, ok := exec.handle.(*procHandle)
+					handle := exec.getProcessHandle()
+					require.NotNil(t, handle, "exec handle should not be nil, iteration ", i)
+					pHandle, ok := handle.(*procHandle)
 					require.True(t, ok, "exec handle should be of type procHandle, iteration ", i)
-					if oldHandle != nil {
-						require.NotEqual(t, handle.processInfo.PID, oldHandle.processInfo.PID, "processes PIDs should be different, iteration ", i)
+					if oldPHandle != nil {
+						require.NotEqual(t, pHandle.processInfo.PID, oldPHandle.processInfo.PID, "processes PIDs should be different, iteration ", i)
 					}
-					oldHandle = handle
-					require.NoError(t, handle.processInfo.Kill(), "failed to kill collector process, iteration ", i)
+					oldPHandle = pHandle
+					require.NoError(t, pHandle.processInfo.Kill(), "failed to kill collector process, iteration ", i)
 					// the collector should restart and report healthy
 					updateTime = time.Now()
 					e.EnsureHealthy(t, updateTime)
 				}
 
-				seenRecoveredTimes := m.recoveryRetries
+				seenRecoveredTimes := m.recoveryRetries.Load()
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
@@ -353,7 +365,7 @@ func TestOTelManager_Run(t *testing.T) {
 
 				seenRecoveredTimes := uint32(0)
 				require.Eventually(t, func() bool {
-					seenRecoveredTimes = m.recoveryRetries
+					seenRecoveredTimes = m.recoveryRetries.Load()
 					return seenRecoveredTimes > 2
 				}, time.Minute, time.Second, "expected recovered times to be at least 3, got %d", seenRecoveredTimes)
 
