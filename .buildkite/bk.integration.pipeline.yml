@@ -116,7 +116,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "c2-standard-16"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
 
   - group: "Stateful: Windows"

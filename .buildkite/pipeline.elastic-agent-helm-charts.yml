@@ -3,7 +3,7 @@ env:
   HELM_REPO_ENV: ${HELM_REPO_ENV:-dev}
   SNAPSHOT: ${SNAPSHOT:-true}
   # Machine type
-  DEFAULT_GCP_MACHINE_TYPE: "n2-standard-8"
+  DEFAULT_GCP_MACHINE_TYPE: "c2-standard-16"
 
 steps:
   - label: ":elastic-stack: Create helm chart"

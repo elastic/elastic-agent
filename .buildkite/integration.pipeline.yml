@@ -4,7 +4,7 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
 
   # Machine type
-  DEFAULT_GCP_MACHINE_TYPE: "n2-standard-8"
+  DEFAULT_GCP_MACHINE_TYPE: "c2-standard-16"
 
 steps:
   - group: "Integration tests: packaging"
@@ -93,7 +93,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "c2-standard-16"
 
       - label: "Packaging: Containers linux/amd64"
         key: packaging-containers-x86-64

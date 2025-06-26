@@ -11,7 +11,7 @@ env:
   IMAGE_UBUNTU_ARM64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1750467641"
 
   # Machine type
-  DEFAULT_GCP_MACHINE_TYPE: "n2-standard-8"
+  DEFAULT_GCP_MACHINE_TYPE: "c2-standard-16"
 
 steps:
   - label: Build and push custom elastic-agent image

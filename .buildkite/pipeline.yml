@@ -13,7 +13,7 @@ env:
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1750467641"
 
   # Machine type
-  DEFAULT_GCP_MACHINE_TYPE: "n2-standard-8"
+  DEFAULT_GCP_MACHINE_TYPE: "c2-standard-16"
 
 steps:
   - label: "check-ci"
@@ -217,7 +217,7 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_WIN_11}"
-          machine_type: "n2-standard-8"
+          machine_type: "c2-standard-16"
           disk_type: "pd-ssd"
         retry:
           automatic:

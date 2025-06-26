@@ -13,4 +13,4 @@ steps:
       .buildkite/scripts/steps/beats_tests.sh
     agents:
       provider: "gcp"
-      machineType: "n2-standard-8"
+      machineType: "c2-standard-16"
