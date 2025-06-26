@@ -127,11 +127,13 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 		reportStatus(ctx, statusCh, currentStatus)
 		// we will check the health of the collector every 1 second for the first 10 attempts
 		// until we get a successful response.
-		maxFailedAttempts := 130 // this should roughly match 1.5 minutes of continuous failed attempts to poll healthcheck v2
-		timerDuration := 1 * time.Second
-		healthCheckTimer := time.NewTimer(timerDuration)
-		currentFailedAttempts := 0
-		defer healthCheckTimer.Stop()
+		const maxFailuresDuration = 130 * time.Second
+		maxFailuresTimer := time.NewTimer(maxFailuresDuration)
+		defer maxFailuresTimer.Stop()
+
+		const healthCheckPollDuration = 1 * time.Second
+		healthCheckPollTimer := time.NewTimer(healthCheckPollDuration)
+		defer healthCheckPollTimer.Stop()
 		for {
 			statuses, err := AllComponentsStatuses(procCtx, httpHealthCheckPort)
 			if err != nil {
@@ -139,26 +141,31 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 				case errors.Is(err, context.Canceled):
 					reportStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStopped, nil))
 					return
-				case currentFailedAttempts > maxFailedAttempts:
-					statuses = aggregateStatus(componentstatus.StatusRecoverableError, err)
 				}
-				currentFailedAttempts++
 			} else {
-				currentFailedAttempts = 0
-			}
+				maxFailuresTimer.Reset(maxFailuresDuration)
 
-			if !compareStatuses(currentStatus, statuses) {
-				currentStatus = statuses
-				reportStatus(procCtx, statusCh, statuses)
+				if !compareStatuses(currentStatus, statuses) {
+					currentStatus = statuses
+					reportStatus(procCtx, statusCh, statuses)
+				}
 			}
 
 			select {
 			case <-procCtx.Done():
 				reportStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStopped, nil))
 				return
-			case <-healthCheckTimer.C:
-				healthCheckTimer.Reset(timerDuration)
-				continue
+			case <-healthCheckPollTimer.C:
+				healthCheckPollTimer.Reset(healthCheckPollDuration)
+			case <-maxFailuresTimer.C:
+				failedToConnectStatuses := aggregateStatus(
+					componentstatus.StatusRecoverableError,
+					errors.New("failed to connect to collector"),
+				)
+				if !compareStatuses(currentStatus, failedToConnectStatuses) {
+					currentStatus = statuses
+					reportStatus(procCtx, statusCh, statuses)
+				}
 			}
 		}
 	}()
