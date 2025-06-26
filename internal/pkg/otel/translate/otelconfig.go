@@ -401,14 +401,14 @@ func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	// we want to use dynamic indexing
-	esConfig["logs_index"] = "" // needs to be empty for logs_dynamic_index
-	esConfig["logs_dynamic_index"] = map[string]any{"enabled": true}
+
+	// log failed docs
+	esConfig["telemetry"] = map[string]any{
+		"log_failed_docs_input": true,
+	}
 
 	// we also want to use dynamic log ids
 	esConfig["logs_dynamic_id"] = map[string]any{"enabled": true}
 
-	// for compatibility with beats, we want bodymap mapping
-	esConfig["mapping"] = map[string]any{"mode": "bodymap"}
 	return esConfig, nil
 }

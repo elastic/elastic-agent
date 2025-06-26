@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/agentprovider"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -188,6 +189,10 @@ func (m *OTelManager) startCollector(cfg *confmap.Conf, errCh chan error) (conte
 	ctx, cancel := context.WithCancel(context.Background())
 	ap := agentprovider.NewProvider(cfg)
 
+	typedMsg := []string{
+		"failed to index document; input may contain sensitive data", // This comes from ES exporter https://github.com/open-telemetry/opentelemetry-collector-contrib//blob/main/exporter/elasticsearchexporter/bulkindexer.go#L384C32-L384C90
+	}
+
 	// NewForceExtensionConverterFactory is used to ensure that the agent_status extension is always enabled.
 	// It is required for the Elastic Agent to extract the status out of the OTel collector.
 	settings := otel.NewSettings(
@@ -197,7 +202,9 @@ func (m *OTelManager) startCollector(cfg *confmap.Conf, errCh chan error) (conte
 		otel.WithExtensionFactory(NewAgentStatusFactory(m)))
 	settings.DisableGracefulShutdown = true // managed by this manager
 	settings.LoggingOptions = []zap.Option{zap.WrapCore(func(zapcore.Core) zapcore.Core {
-		return m.logger.Core() // use same zap as agent
+		// ensures sensitive data from supported outputs is logged to -event.log file
+		logger, _ := logp.ConfigureEventLoggingOTel(typedMsg, m.logger.Core())
+		return logger.Core()
 	})}
 	svc, err := otelcol.NewCollector(*settings)
 	if err != nil {
