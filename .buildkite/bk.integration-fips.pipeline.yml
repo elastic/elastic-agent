@@ -117,7 +117,6 @@ steps:
         if: build.env("BUILDKITE_PULL_REQUEST") != "false" &&  build.env("GITHUB_PR_LABELS") =~ /.*(Testing:run:TestUpgradeIntegrationsServer).*/
         env:
           FIPS: "true"
-          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-fips-cloud:git-${BUILDKITE_COMMIT:0:12}"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           export EC_API_KEY=$(retry -t 5 -- vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
