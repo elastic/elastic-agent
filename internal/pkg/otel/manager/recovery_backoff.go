@@ -55,12 +55,14 @@ func (r *recoveryBackoff) Stop() {
 	r.stopped = true
 }
 
-// ResetInitial resets the timer to the initial interval
-func (r *recoveryBackoff) ResetInitial() {
+// ResetInitial resets the timer to the initial interval and returns the duration that the timer was reset to
+func (r *recoveryBackoff) ResetInitial() time.Duration {
 	r.backoff.Reset()
-	r.timer.Reset(r.backoff.InitialInterval)
+	delay := r.backoff.NextBackOff()
+	r.timer.Reset(delay)
 	r.prevReset = time.Now()
 	r.stopped = false
+	return delay
 }
 
 // C returns the timer channel
@@ -68,17 +70,18 @@ func (r *recoveryBackoff) C() <-chan time.Time {
 	return r.timer.C
 }
 
-// ResetNext resets the timer to the next backoff interval. Note that this will reset to the initial interval if
-// resetToInitial is set and the time since the previous ResetNext exceeds it.
-func (r *recoveryBackoff) ResetNext() {
+// ResetNext resets the timer to the next backoff interval and returns the duration that the timer was reset to.
+// Note that this will reset to the initial interval if resetToInitial is set and the time since the previous
+// ResetNext exceeds it.
+func (r *recoveryBackoff) ResetNext() time.Duration {
 	if r.resetToInitial != 0 && time.Now().After(r.prevReset.Add(r.resetToInitial)) {
 		// resetToInitial is set and the time since the last reset exceeds resetToInitial,
 		// so reset the backoff to the initial interval
-		r.ResetInitial()
-		return
+		return r.ResetInitial()
 	}
 
 	r.prevReset = time.Now()
-	r.timer.Reset(r.backoff.NextBackOff())
-	r.stopped = false
+	delay := r.backoff.NextBackOff()
+	r.timer.Reset(delay)
+	return delay
 }

@@ -24,7 +24,8 @@ func (r *recoveryNoop) Stop() {
 }
 
 // ResetInitial has no effect on noop the recovery timer
-func (r *recoveryNoop) ResetInitial() {
+func (r *recoveryNoop) ResetInitial() time.Duration {
+	return 0
 }
 
 // C returns always nil
@@ -33,5 +34,6 @@ func (r *recoveryNoop) C() <-chan time.Time {
 }
 
 // ResetNext has no effect on the noop recovery timer
-func (r *recoveryNoop) ResetNext() {
+func (r *recoveryNoop) ResetNext() time.Duration {
+	return 0
 }

@@ -14,33 +14,31 @@ import (
 func TestRecoveryBackoff(t *testing.T) {
 	initialInterval := 100 * time.Nanosecond
 	maxInterval := 1 * time.Second
-	resetToInitial := 5 * time.Second
+	resetToInitial := 10 * time.Second
 	recovery := newRecoveryBackoff(initialInterval, maxInterval, resetToInitial)
 	recovery.backoff.RandomizationFactor = 0
 	assert.True(t, recovery.stopped, "timer should be stopped when instantiated")
 
-	resetTime := time.Now()
-	recovery.ResetInitial()
+	delay := recovery.ResetInitial()
 	assert.False(t, recovery.stopped, "timer should not be stopped")
-	assert.True(t, resetTime.Before(recovery.prevReset), "resetTime should be before prevReset")
+	assert.Equal(t, initialInterval, delay, "timer reset duration should be the initial interval")
 
-	resetTime = time.Now()
-	recovery.ResetNext()
+	delay = recovery.ResetNext()
 	assert.False(t, recovery.stopped, "timer should not be stopped")
-	assert.True(t, resetTime.Before(recovery.prevReset), "resetTime should be before prevReset")
-	nextBackoffWithoutReset := recovery.backoff.NextBackOff()
+	assert.Greater(t, delay, initialInterval, "timer reset duration should be greater than the initial interval")
+	assert.Less(t, delay, maxInterval, "timer reset duration should be less than the max interval")
 
 	// wait for resetToInitial to check that ResetNext will reset to the initial backoff
 	select {
 	case <-time.After(resetToInitial + 2*time.Second):
+		// add 2 extra seconds to account for jitter
 	case <-t.Context().Done():
 		t.Fatal("timed out waiting for resetToInitial")
 	}
 
-	recovery.ResetNext()
+	delay = recovery.ResetNext()
 	assert.False(t, recovery.stopped, "timer should not be stopped")
-	assert.True(t, resetTime.Before(recovery.prevReset), "resetTime should be before prevReset")
-	assert.Less(t, recovery.backoff.NextBackOff(), nextBackoffWithoutReset, "next backoff should be less than backoff without reset")
+	assert.Equal(t, initialInterval, delay, "timer reset duration should be reset to the initial interval")
 
 	recovery.Stop()
 	assert.True(t, recovery.stopped, "timer should be stopped")

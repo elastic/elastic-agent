@@ -33,9 +33,9 @@ type collectorRecoveryTimer interface {
 	// Stop stops the timer
 	Stop()
 	// ResetInitial resets the timer to the initial interval
-	ResetInitial()
+	ResetInitial() time.Duration
 	// ResetNext resets the timer to the next interval
-	ResetNext()
+	ResetNext() time.Duration
 	// C returns the timer channel
 	C() <-chan time.Time
 }
@@ -143,10 +143,10 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			m.logger.Infof("collector recovery restarting, total retries: %d", newRetries)
 			proc, err = m.execution.startCollector(ctx, m.logger, m.cfg, collectorRunErr, m.statusCh)
 			if err != nil {
-				m.logger.Errorf("collector exited with error: %v", err)
 				reportErr(ctx, m.errCh, err)
 				// reset the restart timer to the next backoff
-				m.recoveryTimer.ResetNext()
+				recoveryDelay := m.recoveryTimer.ResetNext()
+				m.logger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
 			} else {
 				reportErr(ctx, m.errCh, nil)
 			}
@@ -176,14 +176,14 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				// provided and the collector stopped with a clean exit
 				proc, err = m.execution.startCollector(ctx, m.logger, m.cfg, collectorRunErr, m.statusCh)
 				if err != nil {
-					m.logger.Errorf("collector exited with error: %v", err)
 					// failed to create the collector (this is different then
 					// it's failing to run). we do not retry creation on failure
 					// as it will always fail. A new configuration is required for
 					// it not to fail (a new configuration will result in the retry)
 					reportErr(ctx, m.errCh, err)
 					// reset the restart timer to the next backoff
-					m.recoveryTimer.ResetNext()
+					recoveryDelay := m.recoveryTimer.ResetNext()
+					m.logger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
 				} else {
 					// all good at the moment (possible that it will fail)
 					reportErr(ctx, m.errCh, nil)
@@ -204,10 +204,10 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				}
 				// pass the error to the errCh so the coordinator, unless it's a cancel error
 				if !errors.Is(err, context.Canceled) {
-					m.logger.Errorf("collector exited with error: %v", err)
 					reportErr(ctx, m.errCh, err)
 					// reset the restart timer to the next backoff
-					m.recoveryTimer.ResetNext()
+					recoveryDelay := m.recoveryTimer.ResetNext()
+					m.logger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
 				}
 			}
 
@@ -241,7 +241,6 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				// that results in the collector being started
 				proc, err = m.execution.startCollector(ctx, m.logger, m.cfg, collectorRunErr, m.statusCh)
 				if err != nil {
-					m.logger.Errorf("collector exited with error: %v", err)
 					// failed to create the collector (this is different then
 					// it's failing to run). we do not retry creation on failure
 					// as it will always fail. A new configuration is required for
@@ -249,7 +248,8 @@ func (m *OTelManager) Run(ctx context.Context) error {
 					reportErr(ctx, m.errCh, err)
 					// since this is a new configuration we want to start the timer
 					// from the initial delay
-					m.recoveryTimer.ResetInitial()
+					recoveryDelay := m.recoveryTimer.ResetInitial()
+					m.logger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
 				} else {
 					// all good at the moment (possible that it will fail)
 					reportErr(ctx, m.errCh, nil)
