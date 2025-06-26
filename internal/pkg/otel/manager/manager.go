@@ -85,7 +85,7 @@ func NewOTelManager(logger *logger.Logger, logLevel logp.Level, baseLogger *logg
 		if err != nil {
 			return nil, fmt.Errorf("failed to get the path to the collector executable: %w", err)
 		}
-		recoveryTimer = newRecoveryBackoff(time.Second, 10*time.Second)
+		recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
 		exec = newSubprocessExecution(logLevel, executable)
 	case EmbeddedExecutionMode:
 		recoveryTimer = newRestarterNoop()

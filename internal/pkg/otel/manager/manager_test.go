@@ -239,7 +239,7 @@ func TestOTelManager_Run(t *testing.T) {
 		{
 			name:      "subprocess collector config updates",
 			exec:      &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
-			restarter: newRecoveryBackoff(time.Second, 10*time.Second),
+			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
@@ -287,7 +287,7 @@ func TestOTelManager_Run(t *testing.T) {
 		{
 			name:      "subprocess collector stopped gracefully outside manager",
 			exec:      &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
-			restarter: newRecoveryBackoff(time.Second, 10*time.Second),
+			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
@@ -312,7 +312,7 @@ func TestOTelManager_Run(t *testing.T) {
 		{
 			name:      "subprocess collector killed outside manager",
 			exec:      &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
-			restarter: newRecoveryBackoff(time.Second, 10*time.Second),
+			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
@@ -351,7 +351,7 @@ func TestOTelManager_Run(t *testing.T) {
 		{
 			name:      "subprocess collector panics",
 			exec:      &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
-			restarter: newRecoveryBackoff(time.Second, 10*time.Second),
+			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				err := os.Setenv("TEST_SUPERVISED_COLLECTOR_PANIC", (3 * time.Second).String())
 				require.NoError(t, err, "failed to set TEST_SUPERVISED_COLLECTOR_PANIC env var")
@@ -424,7 +424,7 @@ func TestOTelManager_Run(t *testing.T) {
 		{
 			name:                "subprocess collector invalid config",
 			exec:                &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
-			restarter:           newRecoveryBackoff(time.Second, 10*time.Second),
+			restarter:           newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			skipListeningErrors: true,
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// Errors channel is non-blocking, should be able to send an Update that causes an error multiple
