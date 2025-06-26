@@ -13,7 +13,7 @@ env:
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1750467641"
 
   # Machine type
-  DEFAULT_GCP_MACHINE_TYPE: "c2-standard-16"
+  DEFAULT_GCP_MACHINE_TYPE: "c2-standard-8"
 
 steps:
   - label: "check-ci"

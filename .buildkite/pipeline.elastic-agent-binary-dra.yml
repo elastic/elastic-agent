@@ -7,7 +7,7 @@ env:
   DRA_PROJECT_ID: "elastic-agent-core"
   DRA_PROJECT_ARTIFACT_ID: "agent-core"
   # Machine type
-  DEFAULT_GCP_MACHINE_TYPE: "c2-standard-16"
+  DEFAULT_GCP_MACHINE_TYPE: "c2-standard-8"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins

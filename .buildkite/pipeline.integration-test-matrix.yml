@@ -3,7 +3,7 @@
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   # Machine type
-  DEFAULT_GCP_MACHINE_TYPE: "c2-standard-16"
+  DEFAULT_GCP_MACHINE_TYPE: "c2-standard-8"
 
 steps:
   - label: "Integration tests: packaging"

@@ -5,7 +5,7 @@ env:
   # after moving elastic-agent out of beats, we should update the URL of the packaging.
   BEAT_URL: "https://www.elastic.co/elastic-agent"
   # Machine type
-  DEFAULT_GCP_MACHINE_TYPE: "c2-standard-16"
+  DEFAULT_GCP_MACHINE_TYPE: "c2-standard-8"
 
 steps:
   - input: "Build parameters"
