@@ -55,6 +55,8 @@ steps:
     command: .buildkite/scripts/steps/ess_start.sh
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/oblt-cli:latest"
+    plugins:
+      - *google_oidc_observability_plugin
 
   - group: "fips:Stateful:Ubuntu"
     key: integration-tests-ubuntu-fips
