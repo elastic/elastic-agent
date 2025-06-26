@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/confmap"
@@ -25,7 +26,18 @@ const (
 	EmbeddedExecutionMode   ExecutionMode = "embedded"
 )
 
-// for testing purposes
+type collectorRecoveryTimer interface {
+	// IsStopped returns true if the timer is stopped
+	IsStopped() bool
+	// Stop stops the timer
+	Stop()
+	// ResetInitial resets the timer to the initial interval
+	ResetInitial()
+	// ResetNext resets the timer to the next interval
+	ResetNext()
+	// C returns the timer channel
+	C() <-chan time.Time
+}
 
 // OTelManager is a manager that manages the lifecycle of the OTel collector inside of the Elastic Agent.
 type OTelManager struct {
@@ -49,12 +61,21 @@ type OTelManager struct {
 	// pending update calls should be ignored.
 	doneChan chan struct{}
 
+	// recoveryTimer is used to restart the collector when it has errored.
+	recoveryTimer collectorRecoveryTimer
+
+	// recoveryRetries is the number of times the collector has been
+	// restarted through the recovery timer.
+	recoveryRetries uint32
+
+	// execution is used to invoke the collector into different execution modes
 	execution collectorExecution
 }
 
 // NewOTelManager returns a OTelManager.
 func NewOTelManager(logger *logger.Logger, logLevel logp.Level, baseLogger *logger.Logger, mode ExecutionMode) (*OTelManager, error) {
 	var exec collectorExecution
+	var recoveryTimer collectorRecoveryTimer
 	switch mode {
 	case SubprocessExecutionMode:
 		// NOTE: if we stop embedding the collector binary in elastic-agent, we need to
@@ -63,9 +84,10 @@ func NewOTelManager(logger *logger.Logger, logLevel logp.Level, baseLogger *logg
 		if err != nil {
 			return nil, fmt.Errorf("failed to get the path to the collector executable: %w", err)
 		}
-
+		recoveryTimer = newRecoveryBackoff(time.Second, 10*time.Second)
 		exec = newSubprocessExecution(logLevel, executable)
 	case EmbeddedExecutionMode:
+		recoveryTimer = newRestarterNoop()
 		exec = newExecutionEmbedded()
 	default:
 		return nil, errors.New("unknown otel collector exec")
@@ -74,13 +96,14 @@ func NewOTelManager(logger *logger.Logger, logLevel logp.Level, baseLogger *logg
 	logger.Debugf("Using collector execution mode: %s", mode)
 
 	return &OTelManager{
-		logger:    logger,
+		logger:        logger,
 		baseLogger: baseLogger,
-		errCh:     make(chan error, 1), // holds at most one error
-		cfgCh:     make(chan *confmap.Conf),
-		statusCh:  make(chan *status.AggregateStatus),
-		doneChan:  make(chan struct{}),
-		execution: exec,
+		errCh:         make(chan error, 1), // holds at most one error
+		cfgCh:         make(chan *confmap.Conf),
+		statusCh:      make(chan *status.AggregateStatus),
+		doneChan:      make(chan struct{}),
+		execution:     exec,
+		recoveryTimer: recoveryTimer,
 	}, nil
 }
 
@@ -99,13 +122,36 @@ func (m *OTelManager) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			m.recoveryTimer.Stop()
 			// our caller context is cancelled so stop the collector and return
 			// has exited.
 			if proc != nil {
 				proc.Stop(ctx)
 			}
 			return ctx.Err()
+		case <-m.recoveryTimer.C():
+			m.recoveryTimer.Stop()
+
+			if m.cfg == nil || proc != nil || ctx.Err() != nil {
+				// no configuration, or the collector is already running, or the context
+				// is cancelled.
+				continue
+			}
+
+			m.recoveryRetries++
+			m.logger.Infof("collector recovery restarting, total retries: %d", m.recoveryRetries)
+			proc, err = m.execution.startCollector(ctx, m.logger, m.cfg, collectorRunErr, m.statusCh)
+			if err != nil {
+				m.logger.Errorf("collector exited with error: %v", err)
+				reportErr(ctx, m.errCh, err)
+				// reset the restart timer to the next backoff
+				m.recoveryTimer.ResetNext()
+			} else {
+				reportErr(ctx, m.errCh, nil)
+			}
+
 		case err = <-collectorRunErr:
+			m.recoveryTimer.Stop()
 			if err == nil {
 				// err is nil means that the collector has exited cleanly without an error
 				if proc != nil {
@@ -122,15 +168,21 @@ func (m *OTelManager) Run(ctx context.Context) error {
 					reportErr(ctx, m.errCh, nil)
 					continue
 				}
+
+				m.logger.Warnf("collector exited without an error but a configuration was provided")
+
 				// in this rare case the collector stopped running but a configuration was
 				// provided and the collector stopped with a clean exit
 				proc, err = m.execution.startCollector(ctx, m.logger, m.cfg, collectorRunErr, m.statusCh)
 				if err != nil {
+					m.logger.Errorf("collector exited with error: %v", err)
 					// failed to create the collector (this is different then
 					// it's failing to run). we do not retry creation on failure
 					// as it will always fail. A new configuration is required for
 					// it not to fail (a new configuration will result in the retry)
 					reportErr(ctx, m.errCh, err)
+					// reset the restart timer to the next backoff
+					m.recoveryTimer.ResetNext()
 				} else {
 					// all good at the moment (possible that it will fail)
 					reportErr(ctx, m.errCh, nil)
@@ -153,10 +205,16 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				if !errors.Is(err, context.Canceled) {
 					m.logger.Errorf("collector exited with error: %v", err)
 					reportErr(ctx, m.errCh, err)
+					// reset the restart timer to the next backoff
+					m.recoveryTimer.ResetNext()
 				}
 			}
 
 		case cfg := <-m.cfgCh:
+			// we received a new configuration, thus stop the recovery timer
+			// and reset the retry count
+			m.recoveryTimer.Stop()
+			m.recoveryRetries = 0
 			m.cfg = cfg
 
 			if proc != nil {
@@ -182,11 +240,15 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				// that results in the collector being started
 				proc, err = m.execution.startCollector(ctx, m.logger, m.cfg, collectorRunErr, m.statusCh)
 				if err != nil {
+					m.logger.Errorf("collector exited with error: %v", err)
 					// failed to create the collector (this is different then
 					// it's failing to run). we do not retry creation on failure
 					// as it will always fail. A new configuration is required for
 					// it not to fail (a new configuration will result in the retry)
 					reportErr(ctx, m.errCh, err)
+					// since this is a new configuration we want to start the timer
+					// from the initial delay
+					m.recoveryTimer.ResetInitial()
 				} else {
 					// all good at the moment (possible that it will fail)
 					reportErr(ctx, m.errCh, nil)

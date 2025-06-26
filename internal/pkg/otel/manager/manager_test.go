@@ -198,12 +198,14 @@ func TestOTelManager_Run(t *testing.T) {
 	for _, tc := range []struct {
 		name                string
 		exec                *mockExecution
+		restarter           collectorRecoveryTimer
 		skipListeningErrors bool
 		testFn              func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution)
 	}{
 		{
-			name: "embedded collector config updates",
-			exec: &mockExecution{exec: newExecutionEmbedded()},
+			name:      "embedded collector config updates",
+			exec:      &mockExecution{exec: newExecutionEmbedded()},
+			restarter: newRestarterNoop(),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
@@ -220,11 +222,13 @@ func TestOTelManager_Run(t *testing.T) {
 				updateTime = time.Now()
 				m.Update(nil)
 				e.EnsureOffWithoutError(t, updateTime)
+				require.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 			},
 		},
 		{
-			name: "subprocess collector config updates",
-			exec: &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
+			name:      "subprocess collector config updates",
+			exec:      &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
+			restarter: newRecoveryBackoff(time.Second, 10*time.Second),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
@@ -241,11 +245,14 @@ func TestOTelManager_Run(t *testing.T) {
 				updateTime = time.Now()
 				m.Update(nil)
 				e.EnsureOffWithoutError(t, updateTime)
+				assert.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
+				assert.Equal(t, uint32(0), m.recoveryRetries, "recovery retries should be 0")
 			},
 		},
 		{
-			name: "embedded collector stopped gracefully outside manager",
-			exec: &mockExecution{exec: newExecutionEmbedded()},
+			name:      "embedded collector stopped gracefully outside manager",
+			exec:      &mockExecution{exec: newExecutionEmbedded()},
+			restarter: newRestarterNoop(),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
@@ -263,11 +270,13 @@ func TestOTelManager_Run(t *testing.T) {
 				updateTime = time.Now()
 				m.Update(nil)
 				e.EnsureOffWithoutError(t, updateTime)
+				require.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 			},
 		},
 		{
-			name: "subprocess collector stopped gracefully outside manager",
-			exec: &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
+			name:      "subprocess collector stopped gracefully outside manager",
+			exec:      &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
+			restarter: newRecoveryBackoff(time.Second, 10*time.Second),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
@@ -285,11 +294,14 @@ func TestOTelManager_Run(t *testing.T) {
 				updateTime = time.Now()
 				m.Update(nil)
 				e.EnsureOffWithoutError(t, updateTime)
+				assert.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
+				assert.Equal(t, uint32(0), m.recoveryRetries, "recovery retries should be 0")
 			},
 		},
 		{
-			name: "subprocess collector killed outside manager",
-			exec: &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
+			name:      "subprocess collector killed outside manager",
+			exec:      &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
+			restarter: newRecoveryBackoff(time.Second, 10*time.Second),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
@@ -297,18 +309,71 @@ func TestOTelManager_Run(t *testing.T) {
 				m.Update(cfg)
 				e.EnsureHealthy(t, updateTime)
 
-				// kill it
+				var oldHandle *procHandle
+				// repeatedly kill the collector
+				for i := 0; i < 3; i++ {
+					// kill it
+					require.NotNil(t, exec.handle, "exec handle should not be nil, iteration ", i)
+					handle, ok := exec.handle.(*procHandle)
+					require.True(t, ok, "exec handle should be of type procHandle, iteration ", i)
+					if oldHandle != nil {
+						require.NotEqual(t, handle.processInfo.PID, oldHandle.processInfo.PID, "processes PIDs should be different, iteration ", i)
+					}
+					oldHandle = handle
+					require.NoError(t, handle.processInfo.Kill(), "failed to kill collector process, iteration ", i)
+					// the collector should restart and report healthy
+					updateTime = time.Now()
+					e.EnsureHealthy(t, updateTime)
+				}
+
+				seenRecoveredTimes := m.recoveryRetries
+
+				// no configuration should stop the runner
 				updateTime = time.Now()
-				require.NotNil(t, exec.handle, "exec handle should not be nil")
-				handle, ok := exec.handle.(*procHandle)
-				require.True(t, ok, "exec handle should be of type procHandle")
-				require.NoError(t, handle.processInfo.Kill(), "failed to kill collector process")
-				e.EnsureOffWithError(t, updateTime)
+				m.Update(nil)
+				e.EnsureOffWithoutError(t, updateTime)
+				assert.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
+				assert.Equal(t, uint32(3), seenRecoveredTimes, "recovery retries should be 3")
+			},
+		},
+		{
+			name:      "subprocess collector panics",
+			exec:      &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
+			restarter: newRecoveryBackoff(time.Second, 10*time.Second),
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
+				err := os.Setenv("TEST_SUPERVISED_COLLECTOR_PANIC", (3 * time.Second).String())
+				require.NoError(t, err, "failed to set TEST_SUPERVISED_COLLECTOR_PANIC env var")
+				t.Cleanup(func() {
+					_ = os.Unsetenv("TEST_SUPERVISED_COLLECTOR_PANIC")
+				})
+
+				// ensure that it got healthy
+				cfg := confmap.NewFromStringMap(testConfig)
+				m.Update(cfg)
+
+				seenRecoveredTimes := uint32(0)
+				require.Eventually(t, func() bool {
+					seenRecoveredTimes = m.recoveryRetries
+					return seenRecoveredTimes > 2
+				}, time.Minute, time.Second, "expected recovered times to be at least 3, got %d", seenRecoveredTimes)
+
+				err = os.Unsetenv("TEST_SUPERVISED_COLLECTOR_PANIC")
+				require.NoError(t, err, "failed to unset TEST_SUPERVISED_COLLECTOR_PANIC env var")
+				updateTime := time.Now()
+				e.EnsureHealthy(t, updateTime)
+
+				// no configuration should stop the runner
+				updateTime = time.Now()
+				m.Update(nil)
+				e.EnsureOffWithoutError(t, updateTime)
+				require.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
+				assert.GreaterOrEqual(t, uint32(3), seenRecoveredTimes, "recovery retries should be 3")
 			},
 		},
 		{
 			name:                "embedded collector invalid config",
 			exec:                &mockExecution{exec: newExecutionEmbedded()},
+			restarter:           newRestarterNoop(),
 			skipListeningErrors: true,
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// Errors channel is non-blocking, should be able to send an Update that causes an error multiple
@@ -347,6 +412,7 @@ func TestOTelManager_Run(t *testing.T) {
 		{
 			name:                "subprocess collector invalid config",
 			exec:                &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
+			restarter:           newRecoveryBackoff(time.Second, 10*time.Second),
 			skipListeningErrors: true,
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
 				// Errors channel is non-blocking, should be able to send an Update that causes an error multiple
@@ -390,13 +456,14 @@ func TestOTelManager_Run(t *testing.T) {
 			l, _ := loggertest.New("otel")
 			base, _ := loggertest.New("otel")
 			m := &OTelManager{
-				logger:    l,
+				logger:        l,
 				baseLogger: base,
-				errCh:     make(chan error, 1), // holds at most one error
-				cfgCh:     make(chan *confmap.Conf),
-				statusCh:  make(chan *status.AggregateStatus),
-				doneChan:  make(chan struct{}),
-				execution: tc.exec,
+				errCh:         make(chan error, 1), // holds at most one error
+				cfgCh:         make(chan *confmap.Conf),
+				statusCh:      make(chan *status.AggregateStatus),
+				doneChan:      make(chan struct{}),
+				recoveryTimer: tc.restarter,
+				execution:     tc.exec,
 			}
 
 			eListener := &EventListener{}

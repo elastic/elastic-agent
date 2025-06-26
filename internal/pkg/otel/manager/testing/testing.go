@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd"
 )
@@ -15,6 +16,17 @@ import (
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	if panicEnvVar := os.Getenv("TEST_SUPERVISED_COLLECTOR_PANIC"); panicEnvVar != "" {
+		panicDelay, err := time.ParseDuration(panicEnvVar)
+		if err != nil {
+			// fallback to 3 seconds
+			panicDelay = 3 * time.Second
+		}
+		time.AfterFunc(panicDelay, func() {
+			panic("test panic")
+		})
+	}
 
 	err := cmd.RunCollector(ctx, nil, true, "debug")
 	if err == nil || errors.Is(err, context.Canceled) {

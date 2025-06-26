@@ -91,7 +91,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 
 	procCtx, procCtxCancel := context.WithCancel(ctx)
 	processInfo, err := process.Start(r.collectorPath,
-		process.WithArgs(append([]string{"--set=service.telemetry.logs.level=debug"}, r.collectorArgs...)),
+		process.WithArgs(r.collectorArgs),
 		process.WithContext(procCtx),
 		process.WithEnv(os.Environ()),
 		process.WithCmdOptions(func(c *exec.Cmd) error {
@@ -104,10 +104,9 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 	if err != nil {
 		// we failed to start the process
 		procCtxCancel()
-		logger.Debugf("failed to start supervised collector: %s", err)
 		return nil, fmt.Errorf("failed to start supervised collector: %w", err)
 	}
-	logger.Debugf("supervised collector started with pid: %d", processInfo.Process.Pid)
+	logger.Infof("supervised collector started with pid: %d and healthcheck port: %d", processInfo.Process.Pid, httpHealthCheckPort)
 	if processInfo.Process == nil {
 		// this should not happen but just in case
 		procCtxCancel()
