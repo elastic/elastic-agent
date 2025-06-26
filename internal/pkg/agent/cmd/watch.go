@@ -132,7 +132,7 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	if err := watcher.Watch(ctx, tilGrace, errorCheckInterval, log); err != nil {
 		log.Error("Error detected, proceeding to rollback: %v", err)
 
-		upgradeDetails.SetStateWithReason(details.StateRollback, "automatic rollback")
+		upgradeDetails.SetStateWithReason(details.StateRollback, details.ReasonWatchFailed)
 		err = installModifier.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash)
 		if err != nil {
 			log.Error("rollback failed", err)

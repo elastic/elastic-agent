@@ -207,7 +207,7 @@ func Test_watchCmd(t *testing.T) {
 							TargetVersion: "4.5.6",
 							State:         details.StateRollback,
 							Metadata: details.Metadata{
-								Reason: "automatic rollback",
+								Reason: details.ReasonWatchFailed,
 							},
 						},
 						DesiredOutcome: upgrade.OUTCOME_UPGRADE,

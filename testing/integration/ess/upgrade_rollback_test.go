@@ -145,7 +145,7 @@ inputs:
 
 			assert.Equal(t, details.StateRollback, details.State(state.UpgradeDetails.State))
 			if !startVersion.Less(*upgradetest.Version_9_1_0_SNAPSHOT) {
-				assert.Equal(t, "automatic rollback", state.UpgradeDetails.Metadata.Reason)
+				assert.Equal(t, details.ReasonWatchFailed, state.UpgradeDetails.Metadata.Reason)
 			}
 		} else {
 			t.Logf("rollback finished, status is '%s', cannot check UpgradeDetails", state.State.String())
@@ -387,7 +387,7 @@ func managedRollbackRestartTest(ctx context.Context, t *testing.T, info *define.
 		require.NotNil(t, fleetAgent.UpgradeDetails, "upgrade details not set")
 		assert.Equal(t, details.StateRollback, details.State(fleetAgent.UpgradeDetails.State))
 		if !startVersion.Less(*upgradetest.Version_9_1_0_SNAPSHOT) {
-			assert.Equal(t, "automatic rollback", fleetAgent.UpgradeDetails.Metadata.Reason)
+			assert.Equal(t, details.ReasonWatchFailed, fleetAgent.UpgradeDetails.Metadata.Reason)
 		}
 	}
 
@@ -462,7 +462,7 @@ func standaloneRollbackRestartTest(ctx context.Context, t *testing.T, startFixtu
 		require.NotNil(t, state.UpgradeDetails)
 		assert.Equal(t, details.StateRollback, details.State(state.UpgradeDetails.State))
 		if !startVersion.Less(*upgradetest.Version_9_1_0_SNAPSHOT) {
-			assert.Equal(t, "automatic rollback", state.UpgradeDetails.Metadata.Reason)
+			assert.Equal(t, details.ReasonWatchFailed, state.UpgradeDetails.Metadata.Reason)
 		}
 	}
 
