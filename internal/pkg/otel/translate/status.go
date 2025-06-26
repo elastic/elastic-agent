@@ -65,6 +65,9 @@ func DropComponentStateFromOtelStatus(otelStatus *status.AggregateStatus) (*stat
 	for pipelineStatusId := range newStatus.ComponentStatusMap {
 		pipelineId := &pipeline.ID{}
 		componentKind, pipelineIdStr := parseEntityStatusId(pipelineStatusId)
+		if componentKind == "extensions" {
+			continue
+		}
 		if componentKind != "pipeline" {
 			return nil, fmt.Errorf("pipeline status id %s is not a pipeline", pipelineStatusId)
 		}
@@ -92,6 +95,9 @@ func getOtelRuntimePipelineStatuses(otelStatus *status.AggregateStatus) (map[str
 	for pipelineStatusId, pipelineStatus := range otelStatus.ComponentStatusMap {
 		pipelineId := &pipeline.ID{}
 		componentKind, pipelineIdStr := parseEntityStatusId(pipelineStatusId)
+		if componentKind == "extensions" {
+			continue
+		}
 		if componentKind != "pipeline" {
 			return nil, fmt.Errorf("pipeline status id %s is not a pipeline", pipelineStatusId)
 		}
@@ -267,8 +273,12 @@ func otelStatusToUnitState(status componentstatus.Status) client.UnitState {
 
 // parseEntityStatusId parses an entity status ID into its kind and entity ID. An entity can be a pipeline or otel component.
 // The ID is expected to be in the format "kind:entityId", where kind is either "pipeline" or the otel component type (e.g., "receiver", "exporter").
+// The returned entityId may be empty - this is true for the top-level "extensions" key.
 // This format is used by the healthcheckv2 extension.
 func parseEntityStatusId(id string) (kind string, entityId string) {
+	if id == "extensions" {
+		return "extensions", ""
+	}
 	parts := strings.SplitN(id, ":", 2)
 	if len(parts) != 2 {
 		return "", ""

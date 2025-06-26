@@ -215,6 +215,19 @@ func TestDropComponentStateFromOtelStatus(t *testing.T) {
 		require.Nil(t, s)
 		assert.Equal(t, "pipeline status id logs is not a pipeline", err.Error())
 	})
+
+	t.Run("ignore extensions", func(t *testing.T) {
+		otelStatus := &status.AggregateStatus{
+			ComponentStatusMap: map[string]*status.AggregateStatus{
+				"extensions": {
+					Event: componentstatus.NewEvent(componentstatus.StatusOK),
+				},
+			},
+		}
+		s, err := DropComponentStateFromOtelStatus(otelStatus)
+		require.NoError(t, err)
+		assert.Equal(t, otelStatus, s)
+	})
 }
 
 func TestGetOtelRuntimePipelineStatuses(t *testing.T) {
@@ -263,6 +276,18 @@ func TestGetOtelRuntimePipelineStatuses(t *testing.T) {
 			},
 			expected: nil,
 			err:      "pipeline status id invalid-format is not a pipeline",
+		},
+		{
+			name: "extensions are ignored",
+			status: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					"extensions": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+				},
+			},
+			expected: map[string]*status.AggregateStatus{},
 		},
 	}
 
@@ -493,6 +518,7 @@ func TestParseEntityStatusId(t *testing.T) {
 		{"receiver:filebeat/filestream-monitoring", "receiver", "filebeat/filestream-monitoring"},
 		{"exporter:elasticsearch/default", "exporter", "elasticsearch/default"},
 		{"invalid", "", ""},
+		{"extensions", "extensions", ""},
 	}
 
 	for _, test := range tests {
