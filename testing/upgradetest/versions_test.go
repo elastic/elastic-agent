@@ -248,15 +248,13 @@ func TestGetUpgradableVersions(t *testing.T) {
 }
 
 func TestPreviousMinor(t *testing.T) {
-	testCases := []struct {
-		name                string
+	testCases := map[string]struct {
 		currentVersion      string
 		upgradeableVersions []string
 		expectedVersion     string
 		expectError         bool
 	}{
-		{
-			name:           "should return the previous minor from the same major and skip prerelease versions and versions with metadata",
+		"should return the previous minor from the same major and skip prerelease versions and versions with metadata": {
 			currentVersion: "9.1.0",
 			upgradeableVersions: []string{
 				"9.0.3-SNAPSHOT",
@@ -268,8 +266,7 @@ func TestPreviousMinor(t *testing.T) {
 			expectedVersion: "9.0.1",
 			expectError:     false,
 		},
-		{
-			name:           "should return the most recent version from the previous major when the current version is the first major release with a patch version",
+		"should return the most recent version from the previous major when the current version is the first major release with a patch version": {
 			currentVersion: "9.0.1",
 			upgradeableVersions: []string{
 				"8.19.0-SNAPSHOT+metadata",
@@ -280,8 +277,7 @@ func TestPreviousMinor(t *testing.T) {
 			expectedVersion: "8.19.0-SNAPSHOT+metadata",
 			expectError:     false,
 		},
-		{
-			name:           "should return the most recent version from previous major when the current version is the first major release",
+		"should return the most recent version from previous major when the current version is the first major release": {
 			currentVersion: "9.0.0",
 			upgradeableVersions: []string{
 				"8.19.0-SNAPSHOT+metadata",
@@ -292,8 +288,7 @@ func TestPreviousMinor(t *testing.T) {
 			expectedVersion: "8.19.0-SNAPSHOT+metadata",
 			expectError:     false,
 		},
-		{
-			name:           "should return the previous minor from the same major when the current version is a prerelease version",
+		"should return the previous minor from the same major when the current version is a prerelease version": {
 			currentVersion: "9.1.0-SNAPSHOT",
 			upgradeableVersions: []string{
 				"9.0.3-SNAPSHOT",
@@ -305,8 +300,7 @@ func TestPreviousMinor(t *testing.T) {
 			expectedVersion: "9.0.2",
 			expectError:     false,
 		},
-		{
-			name:           "should return the most recent version from the previous major when the current version is the first major release with a prerelease version and metadata",
+		"should return the most recent version from the previous major when the current version is the first major release with a prerelease version and metadata": {
 			currentVersion: "9.0.0-SNAPSHOT+metadata",
 			upgradeableVersions: []string{
 				"8.19.0-SNAPSHOT+metadata",
@@ -317,8 +311,7 @@ func TestPreviousMinor(t *testing.T) {
 			expectedVersion: "8.19.0-SNAPSHOT+metadata",
 			expectError:     false,
 		},
-		{
-			name:           "should return error when no previous minor is found",
+		"should return error when no previous minor is found": {
 			currentVersion: "9.1.0",
 			upgradeableVersions: []string{
 				"9.2.0",
@@ -328,8 +321,7 @@ func TestPreviousMinor(t *testing.T) {
 			expectedVersion: "",
 			expectError:     true,
 		},
-		{
-			name:                "should return error when no versions are available",
+		"should return error when no versions are available": {
 			currentVersion:      "9.1.0",
 			upgradeableVersions: []string{},
 			expectedVersion:     "",
@@ -337,8 +329,8 @@ func TestPreviousMinor(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+	for testName, tc := range testCases {
+		t.Run(testName, func(t *testing.T) {
 			upgradeableVersions := []*version.ParsedSemVer{}
 			for _, v := range tc.upgradeableVersions {
 				parsed, err := version.ParseVersion(v)
