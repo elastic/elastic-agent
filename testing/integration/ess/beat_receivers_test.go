@@ -733,7 +733,7 @@ agent.monitoring.enabled: false
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error
-		status, statusErr := fixture.ExecStatus(ctx)
+		status, statusErr := fixture.ExecStatus(agentProcessCtx)
 		assert.NoError(collect, statusErr)
 		assertBeatsHealthy(collect, &status, component.ProcessRuntimeManager, 1)
 		return
@@ -743,10 +743,6 @@ agent.monitoring.enabled: false
 	require.Error(t, cmd.Wait())
 	processLogsString := output.String()
 	output.Reset()
-
-	// switch to the otel runtime
-	ctx, cancel = testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
-	defer cancel()
 
 	// use a subcontext for the agent
 	agentReceiverCtx, agentReceiverCancel := context.WithCancel(ctx)
@@ -763,7 +759,7 @@ agent.monitoring.enabled: false
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error
-		status, statusErr := fixture.ExecStatus(ctx)
+		status, statusErr := fixture.ExecStatus(agentReceiverCtx)
 		assert.NoError(collect, statusErr)
 		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 1)
 		return
