@@ -3,6 +3,9 @@
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
 
+  # Machine type
+  DEFAULT_GCP_MACHINE_TYPE: "n2-standard-8"
+
 steps:
   - group: "Integration tests: packaging"
     key: "int-packaging"
@@ -25,7 +28,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
 
       - label: "Packaging: Ubuntu x86_64 FIPS"
         key: "packaging-ubuntu-x86-64-fips"
@@ -41,7 +44,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n2-standard-4"
+          machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
 
       # Packaging linux/arm64
       - label: "Packaging: linux/arm64 tar.gz"
@@ -102,7 +105,7 @@ steps:
           - build/distributions/**
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
           diskSizeGb: 200
 
       - label: "Packaging: Containers linux/arm64"
@@ -131,7 +134,7 @@ steps:
           - build/distributions/**
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
           diskSizeGb: 200
 
       - label: "Packaging: Containers linux/arm64 FIPS"

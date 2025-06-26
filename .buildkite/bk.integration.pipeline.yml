@@ -78,7 +78,7 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
           image: "${IMAGE_WIN_2022}"
         retry:
           automatic:
@@ -99,7 +99,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
           image: "${IMAGE_WIN_2025}"
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-ubuntu-x86-64
@@ -140,7 +140,7 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
           image: "${IMAGE_WIN_2022}"
         retry:
           automatic:
@@ -168,7 +168,7 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
           image: "${IMAGE_WIN_2022}"
         retry:
           automatic:
@@ -189,7 +189,7 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
           image: "${IMAGE_WIN_2025}"
         retry:
           automatic:
@@ -220,7 +220,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
           image: "${IMAGE_WIN_2025}"
         matrix:
           - default
@@ -248,7 +248,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         matrix:
           - default
@@ -270,7 +270,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         matrix:
           - default
@@ -368,7 +368,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
           image: "${IMAGE_DEBIAN_12}"
         matrix:
           - default
@@ -390,7 +390,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
           image: "${IMAGE_DEBIAN_12}"
         matrix:
           - default
@@ -433,7 +433,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
           image: "${IMAGE_RHEL_8}"
 
   - group: "Kubernetes"
@@ -463,7 +463,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n2-standard-4"
+          machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
           diskSizeGb: 80
         matrix:
@@ -506,7 +506,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
           image: "${IMAGE_WIN_2022}"
         plugins:
           - *google_oidc_plugin
@@ -528,7 +528,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
           image: "${IMAGE_WIN_2025}"
         plugins:
           - *google_oidc_plugin
@@ -548,7 +548,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         plugins:
           - *google_oidc_plugin
