@@ -522,6 +522,8 @@ github.com/elastic/elastic-agent-autodiscover v0.9.2 h1:eBmru2v66HRRHOFf89rDl9OZ
 github.com/elastic/elastic-agent-autodiscover v0.9.2/go.mod h1:RNaHnOTYfNptSTQUyZYnjypxmrR5AaE6BIap/175F5c=
 github.com/elastic/elastic-agent-client/v7 v7.17.2 h1:Cl2TeABqWZgW40t5fchGWT/sRk4MDDLWA0d8iHHOxLA=
 github.com/elastic/elastic-agent-client/v7 v7.17.2/go.mod h1:5irRFqp6HLqtu1S+OeY0jg8x7K6PLL+DW+PwVk1vJnk=
+github.com/elastic/elastic-agent-libs v0.21.0 h1:lt2Xc87Si0mea0BgRKZGZA30j8LEx57k7GAyiKmZP/8=
+github.com/elastic/elastic-agent-libs v0.21.0/go.mod h1:xSeIP3NtOIT4N2pPS4EyURmS1Q8mK0lWZ8Wd1Du6q3w=
 github.com/elastic/elastic-agent-system-metrics v0.11.16 h1:cLjuO8pE5cUwPGWUHmy1VOERmJVDaep8gY+U4YRQ5vs=
 github.com/elastic/elastic-agent-system-metrics v0.11.16/go.mod h1:qiZC5p1hd8te4XVnhh7FkXdcYhxFnl5i9GJpROtf6zo=
 github.com/elastic/elastic-transport-go/v8 v8.7.0 h1:OgTneVuXP2uip4BA658Xi6Hfw+PeIOod2rY3GVMGoVE=
@@ -1425,8 +1427,6 @@ github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FI
 github.com/pascaldekloe/goe v0.1.0 h1:cBOtyMzM9HTpWjXfbbunk26uA6nG3a8n06Wieeh0MwY=
 github.com/pascaldekloe/goe v0.1.0/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/pborman/getopt v0.0.0-20170112200414-7148bc3a4c30/go.mod h1:85jBQOZwpVEaDAr341tbn15RS4fCAsIst0qp7i8ex1o=
-github.com/pchila/elastic-agent-libs v0.0.0-20250625135236-36a5aadd7019 h1:j9sZOHKr/7HA0LOITnx37EBqgdCGqsfY9C0zC31CzHs=
-github.com/pchila/elastic-agent-libs v0.0.0-20250625135236-36a5aadd7019/go.mod h1:xSeIP3NtOIT4N2pPS4EyURmS1Q8mK0lWZ8Wd1Du6q3w=
 github.com/peterbourgon/diskv v2.0.1+incompatible h1:UBdAOUP5p4RWqPBg048CAvpKN+vxiaj6gdUUzhl4XmI=
 github.com/peterbourgon/diskv v2.0.1+incompatible/go.mod h1:uqqh8zWWbv1HBMNONnaR/tNboyR3/BZd58JJSHlUSCU=
 github.com/phayes/freeport v0.0.0-20220201140144-74d24b5ae9f5 h1:Ii+DKncOVM8Cu1Hc+ETb5K+23HdAMvESYE3ZJ5b5cMI=

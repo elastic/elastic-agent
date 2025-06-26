@@ -18,7 +18,7 @@ require (
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.9.2
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
-	github.com/elastic/elastic-agent-libs v0.20.1
+	github.com/elastic/elastic-agent-libs v0.21.0
 	github.com/elastic/elastic-agent-system-metrics v0.11.16
 	github.com/elastic/elastic-transport-go/v8 v8.7.0
 	github.com/elastic/go-elasticsearch/v8 v8.18.1
@@ -756,6 +756,3 @@ replace (
 	github.com/insomniacslk/dhcp => github.com/elastic/dhcp v0.0.0-20200227161230-57ec251c7eb3 // indirect
 	github.com/meraki/dashboard-api-go/v3 => github.com/tommyers-elastic/dashboard-api-go/v3 v3.0.0-20250616163611-a325b49669a4
 )
-
-// Local dev replace for dev/testing purposes ONLY!
-replace github.com/elastic/elastic-agent-libs => github.com/pchila/elastic-agent-libs v0.0.0-20250625135236-36a5aadd7019
