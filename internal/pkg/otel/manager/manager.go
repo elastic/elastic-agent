@@ -7,23 +7,45 @@ package manager
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
+	"sync/atomic"
+	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/confmap"
-	"go.opentelemetry.io/collector/otelcol"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 
-	"github.com/elastic/elastic-agent/internal/pkg/otel"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/agentprovider"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent-libs/logp"
+
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+type ExecutionMode string
+
+const (
+	SubprocessExecutionMode ExecutionMode = "subprocess"
+	EmbeddedExecutionMode   ExecutionMode = "embedded"
+)
+
+type collectorRecoveryTimer interface {
+	// IsStopped returns true if the timer is stopped
+	IsStopped() bool
+	// Stop stops the timer
+	Stop()
+	// ResetInitial resets the timer to the initial interval
+	ResetInitial() time.Duration
+	// ResetNext resets the timer to the next interval
+	ResetNext() time.Duration
+	// C returns the timer channel
+	C() <-chan time.Time
+}
+
 // OTelManager is a manager that manages the lifecycle of the OTel collector inside of the Elastic Agent.
 type OTelManager struct {
-	logger *logger.Logger
-	errCh  chan error
+	// baseLogger is the base logger for the otel collector, and doesn't include any agent-specific fields.
+	baseLogger *logger.Logger
+	logger     *logger.Logger
+	errCh      chan error
 
 	// The current configuration that the OTel collector is using. In the case that
 	// the cfg is nil then the collector is not running.
@@ -39,54 +61,132 @@ type OTelManager struct {
 	// doneChan is closed when Run is stopped to signal that any
 	// pending update calls should be ignored.
 	doneChan chan struct{}
+
+	// recoveryTimer is used to restart the collector when it has errored.
+	recoveryTimer collectorRecoveryTimer
+
+	// recoveryRetries is the number of times the collector has been
+	// restarted through the recovery timer.
+	recoveryRetries atomic.Uint32
+
+	// execution is used to invoke the collector into different execution modes
+	execution collectorExecution
 }
 
 // NewOTelManager returns a OTelManager.
-func NewOTelManager(logger *logger.Logger) *OTelManager {
-	return &OTelManager{
-		logger:   logger,
-		errCh:    make(chan error, 1), // holds at most one error
-		cfgCh:    make(chan *confmap.Conf),
-		statusCh: make(chan *status.AggregateStatus),
-		doneChan: make(chan struct{}),
+func NewOTelManager(logger *logger.Logger, logLevel logp.Level, baseLogger *logger.Logger, mode ExecutionMode) (*OTelManager, error) {
+	var exec collectorExecution
+	var recoveryTimer collectorRecoveryTimer
+	switch mode {
+	case SubprocessExecutionMode:
+		// NOTE: if we stop embedding the collector binary in elastic-agent, we need to
+		// change this
+		executable, err := os.Executable()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get the path to the collector executable: %w", err)
+		}
+		recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
+		exec = newSubprocessExecution(logLevel, executable)
+	case EmbeddedExecutionMode:
+		recoveryTimer = newRestarterNoop()
+		exec = newExecutionEmbedded()
+	default:
+		return nil, errors.New("unknown otel collector exec")
 	}
+
+	logger.Debugf("Using collector execution mode: %s", mode)
+
+	return &OTelManager{
+		logger:        logger,
+		baseLogger:    baseLogger,
+		errCh:         make(chan error, 1), // holds at most one error
+		cfgCh:         make(chan *confmap.Conf),
+		statusCh:      make(chan *status.AggregateStatus),
+		doneChan:      make(chan struct{}),
+		execution:     exec,
+		recoveryTimer: recoveryTimer,
+	}, nil
 }
 
 // Run runs the lifecycle of the manager.
 func (m *OTelManager) Run(ctx context.Context) error {
-	var err error
-	var cancel context.CancelFunc
-	var provider *agentprovider.Provider
+	var (
+		err  error
+		proc collectorHandle
+	)
 
 	// signal that the run loop is ended to unblock any incoming update calls
 	defer close(m.doneChan)
 
-	runErrCh := make(chan error)
+	// collectorRunErr is used to signal that the collector has exited.
+	collectorRunErr := make(chan error)
 	for {
 		select {
 		case <-ctx.Done():
-			if cancel != nil {
-				cancel()
-				<-runErrCh // wait for collector to be stopped
+			m.recoveryTimer.Stop()
+			// our caller context is cancelled so stop the collector and return
+			// has exited.
+			if proc != nil {
+				proc.Stop(ctx)
 			}
 			return ctx.Err()
-		case err = <-runErrCh:
+		case <-m.recoveryTimer.C():
+			m.recoveryTimer.Stop()
+
+			if m.cfg == nil || proc != nil || ctx.Err() != nil {
+				// no configuration, or the collector is already running, or the context
+				// is cancelled.
+				continue
+			}
+
+			newRetries := m.recoveryRetries.Add(1)
+			m.logger.Infof("collector recovery restarting, total retries: %d", newRetries)
+			proc, err = m.execution.startCollector(ctx, m.logger, m.cfg, collectorRunErr, m.statusCh)
+			if err != nil {
+				reportErr(ctx, m.errCh, err)
+				// reset the restart timer to the next backoff
+				recoveryDelay := m.recoveryTimer.ResetNext()
+				m.logger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
+			} else {
+				reportErr(ctx, m.errCh, nil)
+			}
+
+		case err = <-collectorRunErr:
+			m.recoveryTimer.Stop()
 			if err == nil {
-				// err is nil but there is a configuration
-				//
+				// err is nil means that the collector has exited cleanly without an error
+				if proc != nil {
+					proc.Stop(ctx)
+					proc = nil
+					reportStatus(ctx, m.statusCh, nil)
+				}
+
+				if m.cfg == nil {
+					// no configuration then the collector should not be
+					// running.
+					// ensure that the coordinator knows that there is no error
+					// as the collector is not running anymore
+					reportErr(ctx, m.errCh, nil)
+					continue
+				}
+
+				m.logger.Warnf("collector exited without an error but a configuration was provided")
+
 				// in this rare case the collector stopped running but a configuration was
 				// provided and the collector stopped with a clean exit
-				cancel()
-				cancel, provider, err = m.startCollector(m.cfg, runErrCh)
+				proc, err = m.execution.startCollector(ctx, m.logger, m.cfg, collectorRunErr, m.statusCh)
 				if err != nil {
 					// failed to create the collector (this is different then
 					// it's failing to run). we do not retry creation on failure
 					// as it will always fail a new configuration is required for
 					// it not to fail (a new configuration will result in the retry)
-					m.reportErr(ctx, err)
+					reportErr(ctx, m.errCh, err)
+					// reset the restart timer to the next backoff
+					recoveryDelay := m.recoveryTimer.ResetNext()
+					m.logger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
 				} else {
 					// all good at the moment (possible that it will fail)
-					m.reportErr(ctx, nil)
+					reportErr(ctx, m.errCh, nil)
 				}
 			} else {
 				// error occurred while running the collector, this occurs in the
@@ -95,65 +195,64 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				//
 				// in the case that the configuration is invalid there is no reason to
 				// try again as it will keep failing so we do not trigger a restart
-				if cancel != nil {
-					cancel()
-					cancel = nil
-					provider = nil
-					// don't wait here for <-runErrCh, already occurred
+				if proc != nil {
+					proc.Stop(ctx)
+					proc = nil
+					// don't wait here for <-collectorRunErr, already occurred
 					// clear status, no longer running
-					select {
-					case m.statusCh <- nil:
-					case <-ctx.Done():
-					}
+					reportStatus(ctx, m.statusCh, nil)
 				}
 				// pass the error to the errCh so the coordinator, unless it's a cancel error
 				if !errors.Is(err, context.Canceled) {
-					m.reportErr(ctx, err)
+					reportErr(ctx, m.errCh, err)
+					// reset the restart timer to the next backoff
+					recoveryDelay := m.recoveryTimer.ResetNext()
+					m.logger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
 				}
 			}
+
 		case cfg := <-m.cfgCh:
+			// we received a new configuration, thus stop the recovery timer
+			// and reset the retry count
+			m.recoveryTimer.Stop()
+			m.recoveryRetries.Store(0)
 			m.cfg = cfg
+
+			if proc != nil {
+				proc.Stop(ctx)
+				proc = nil
+				select {
+				case <-collectorRunErr:
+				case <-ctx.Done():
+					// our caller ctx is Done
+					return ctx.Err()
+				}
+				reportStatus(ctx, m.statusCh, nil)
+			}
+
 			if cfg == nil {
 				// no configuration then the collector should not be
-				// running. if a cancel exists then it is running
-				// this cancels the context that will stop the running
-				// collector (this configuration does not get passed
-				// to the agent provider as an update)
-				if cancel != nil {
-					cancel()
-					cancel = nil
-					provider = nil
-					<-runErrCh // wait for collector to be stopped
-					// clear status, no longer running
-					select {
-					case m.statusCh <- nil:
-					case <-ctx.Done():
-					}
-				}
+				// running.
 				// ensure that the coordinator knows that there is no error
 				// as the collector is not running anymore
-				m.reportErr(ctx, nil)
+				reportErr(ctx, m.errCh, nil)
 			} else {
 				// either a new configuration or the first configuration
 				// that results in the collector being started
-				if cancel == nil {
-					// no cancel exists so the collector has not been
-					// started. start the collector with this configuration
-					cancel, provider, err = m.startCollector(m.cfg, runErrCh)
-					if err != nil {
-						// failed to create the collector (this is different then
-						// it's failing to run). we do not retry creation on failure
-						// as it will always fail a new configuration is required for
-						// it not to fail (a new configuration will result in the retry)
-						m.reportErr(ctx, err)
-					} else {
-						// all good at the moment (possible that it will fail)
-						m.reportErr(ctx, nil)
-					}
+				proc, err = m.execution.startCollector(ctx, m.logger, m.cfg, collectorRunErr, m.statusCh)
+				if err != nil {
+					// failed to create the collector (this is different then
+					// it's failing to run). we do not retry creation on failure
+					// as it will always fail. A new configuration is required for
+					// it not to fail (a new configuration will result in the retry)
+					reportErr(ctx, m.errCh, err)
+					// since this is a new configuration we want to start the timer
+					// from the initial delay
+					recoveryDelay := m.recoveryTimer.ResetInitial()
+					m.logger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
 				} else {
-					// collector is already running so only the configuration
-					// needs to be updated in the collector
-					provider.Update(m.cfg)
+					// all good at the moment (possible that it will fail)
+					reportErr(ctx, m.errCh, nil)
 				}
 			}
 		}
@@ -181,48 +280,4 @@ func (m *OTelManager) Update(cfg *confmap.Conf) {
 // This must be called and the channel must be read from, or it will block this manager.
 func (m *OTelManager) Watch() <-chan *status.AggregateStatus {
 	return m.statusCh
-}
-
-func (m *OTelManager) startCollector(cfg *confmap.Conf, errCh chan error) (context.CancelFunc, *agentprovider.Provider, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	ap := agentprovider.NewProvider(cfg)
-
-	// NewForceExtensionConverterFactory is used to ensure that the agent_status extension is always enabled.
-	// It is required for the Elastic Agent to extract the status out of the OTel collector.
-	settings := otel.NewSettings(
-		release.Version(), []string{ap.URI()},
-		otel.WithConfigProviderFactory(ap.NewFactory()),
-		otel.WithConfigConvertorFactory(NewForceExtensionConverterFactory(AgentStatusExtensionType.String())),
-		otel.WithExtensionFactory(NewAgentStatusFactory(m)))
-	settings.DisableGracefulShutdown = true // managed by this manager
-	settings.LoggingOptions = []zap.Option{zap.WrapCore(func(zapcore.Core) zapcore.Core {
-		return m.logger.Core() // use same zap as agent
-	})}
-	svc, err := otelcol.NewCollector(*settings)
-	if err != nil {
-		cancel()
-		return nil, nil, err
-	}
-	go func() {
-		errCh <- svc.Run(ctx)
-	}()
-	return cancel, ap, nil
-}
-
-// reportErr reports an error to the service that is controlling this manager
-//
-// the manager can be blocked doing other work like sending this manager a new configuration
-// so we do not want error reporting to be a blocking send over the channel
-//
-// the manager really only needs the most recent error, so if it misses an error it's not a big
-// deal, what matters is that it has the current error for the state of this manager
-func (m *OTelManager) reportErr(ctx context.Context, err error) {
-	select {
-	case <-m.errCh:
-	default:
-	}
-	select {
-	case m.errCh <- err:
-	case <-ctx.Done():
-	}
 }
