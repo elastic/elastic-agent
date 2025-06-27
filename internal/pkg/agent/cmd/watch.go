@@ -158,14 +158,18 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	return err
 }
 
+// isTerminalState returns true if the state in the upgrade marker contains details and the upgrade details state is a
+// terminal one: UPG_COMPLETE, UPG_ROLLBACK and UPG_FAILED
+// If the upgrade marker or the upgrade marker details are nil the function will return false: as
+// no state is specified, having simply a marker without details would mean that some upgrade operation is ongoing
+// (probably initiated by an older agent).
 func isTerminalState(marker *upgrade.UpdateMarker) bool {
-
-	if marker == nil || marker.Details == nil {
+	if marker.Details == nil {
 		return false
 	}
 
 	switch marker.Details.State {
-	case details.StateCompleted, details.StateRollback:
+	case details.StateCompleted, details.StateRollback, details.StateFailed:
 		return true
 	default:
 		return false
