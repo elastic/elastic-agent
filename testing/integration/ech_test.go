@@ -90,7 +90,7 @@ func TestECH(t *testing.T) {
 		Privileged: true,
 		EnrollOpts: atesting.EnrollOpts{
 			URL:             fleetServerHost,
-			EnrollmentToken: enrollmentTokenResp.APIKey,
+			EnrollmentToken: enrollmentToken.APIKey,
 		},
 	}
 	out, err := fixture.Install(t.Context(), opts)
