@@ -141,7 +141,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 			newRetries := m.recoveryRetries.Add(1)
 			m.logger.Infof("collector recovery restarting, total retries: %d", newRetries)
-			proc, err = m.execution.startCollector(ctx, m.logger, m.cfg, collectorRunErr, m.statusCh)
+			proc, err = m.execution.startCollector(ctx, m.baseLogger, m.cfg, collectorRunErr, m.statusCh)
 			if err != nil {
 				reportErr(ctx, m.errCh, err)
 				// reset the restart timer to the next backoff
@@ -174,7 +174,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 				// in this rare case the collector stopped running but a configuration was
 				// provided and the collector stopped with a clean exit
-				proc, err = m.execution.startCollector(ctx, m.logger, m.cfg, collectorRunErr, m.statusCh)
+				proc, err = m.execution.startCollector(ctx, m.baseLogger, m.cfg, collectorRunErr, m.statusCh)
 				if err != nil {
 					// failed to create the collector (this is different then
 					// it's failing to run). we do not retry creation on failure
@@ -239,7 +239,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			} else {
 				// either a new configuration or the first configuration
 				// that results in the collector being started
-				proc, err = m.execution.startCollector(ctx, m.logger, m.cfg, collectorRunErr, m.statusCh)
+				proc, err = m.execution.startCollector(ctx, m.baseLogger, m.cfg, collectorRunErr, m.statusCh)
 				if err != nil {
 					// failed to create the collector (this is different then
 					// it's failing to run). we do not retry creation on failure
