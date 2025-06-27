@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-
 AGENT_USER="$(whoami)"
-AGENT_HOME="${AGENT_HOME:-"/Users/$AGENT_USER"}"
-ASDF_DIR="${ASDF_DIR:-"/Users/$AGENT_USER/.asdf"}"
+AGENT_HOME="$(eval echo "~${AGENT_USER}")"
+ASDF_DIR="${ASDF_DIR:-"$AGENT_HOME/.asdf"}"
 
 echo "~~~ Installing ASDF in ${ASDF_DIR} for user ${AGENT_USER}"
 # Installation instructions from https://asdf-vm.com/guide/getting-started.html
