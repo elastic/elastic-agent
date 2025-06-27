@@ -22,8 +22,10 @@ import (
 
 // OTelManager is a manager that manages the lifecycle of the OTel collector inside of the Elastic Agent.
 type OTelManager struct {
-	logger *logger.Logger
-	errCh  chan error
+	// baseLogger is the base logger for the otel collector, and doesn't include any agent-specific fields.
+	baseLogger *logger.Logger
+	logger     *logger.Logger
+	errCh      chan error
 
 	// The current configuration that the OTel collector is using. In the case that
 	// the cfg is nil then the collector is not running.
@@ -42,13 +44,14 @@ type OTelManager struct {
 }
 
 // NewOTelManager returns a OTelManager.
-func NewOTelManager(logger *logger.Logger) *OTelManager {
+func NewOTelManager(logger, baseLogger *logger.Logger) *OTelManager {
 	return &OTelManager{
-		logger:   logger,
-		errCh:    make(chan error, 1), // holds at most one error
-		cfgCh:    make(chan *confmap.Conf),
-		statusCh: make(chan *status.AggregateStatus),
-		doneChan: make(chan struct{}),
+		logger:     logger,
+		baseLogger: baseLogger,
+		errCh:      make(chan error, 1), // holds at most one error
+		cfgCh:      make(chan *confmap.Conf),
+		statusCh:   make(chan *status.AggregateStatus),
+		doneChan:   make(chan struct{}),
 	}
 }
 
@@ -196,7 +199,7 @@ func (m *OTelManager) startCollector(cfg *confmap.Conf, errCh chan error) (conte
 		otel.WithExtensionFactory(NewAgentStatusFactory(m)))
 	settings.DisableGracefulShutdown = true // managed by this manager
 	settings.LoggingOptions = []zap.Option{zap.WrapCore(func(zapcore.Core) zapcore.Core {
-		return m.logger.Core() // use same zap as agent
+		return m.baseLogger.Core() // use the base logger also used for logs from the command runtime
 	})}
 	svc, err := otelcol.NewCollector(*settings)
 	if err != nil {
