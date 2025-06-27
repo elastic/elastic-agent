@@ -5,6 +5,7 @@
 package upgrade
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,7 +14,16 @@ import (
 	"github.com/elastic/elastic-agent-libs/file"
 )
 
-func writeMarkerFileCommon(markerFile string, markerBytes []byte, shouldFsync bool) error {
+func readMarkerFileCommon(markerFile string) (bytes []byte, err error) {
+	markerFileBytes, err := os.ReadFile(markerFile)
+	if errors.Is(err, os.ErrNotExist) {
+		// marker doesn't exist, nothing to do
+		return nil, nil
+	}
+	return markerFileBytes, nil
+}
+
+func writeMarkerFile(markerFile string, markerBytes []byte, shouldFsync bool) error {
 	f, err := os.CreateTemp(
 		filepath.Dir(markerFile), fmt.Sprintf("%d-*.tmp", os.Getpid()))
 	if err != nil {

@@ -6,6 +6,7 @@ package upgrade
 
 import (
 	"encoding/json"
+	goerrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -264,9 +265,25 @@ func UpdateActiveCommit(log *logger.Logger, topDirPath, hash string) error {
 }
 
 // CleanMarker removes a marker from disk.
-func CleanMarker(log *logger.Logger, dataDirPath string) error {
+func CleanMarker(log *logger.Logger, dataDirPath string) (err error) {
 	markerFile := markerFilePath(dataDirPath)
 	log.Infow("Removing marker file", "file.path", markerFile)
+
+	fileLock, err := newMarkerFileLocker(markerFile)
+	if err != nil {
+		return fmt.Errorf("creating update marker locker for writing: %w", err)
+	}
+
+	if err := fileLock.Lock(); err != nil {
+		return fmt.Errorf("locking update marker file %q for reading: %w", markerFile, err)
+	}
+	defer func(fileLock Locker) {
+		errUnlock := fileLock.Unlock()
+		if errUnlock != nil {
+			err = goerrors.Join(err, fmt.Errorf("unlocking marker file after reading: %w", errUnlock))
+		}
+	}(fileLock)
+
 	if err := os.Remove(markerFile); !os.IsNotExist(err) {
 		return err
 	}
@@ -277,7 +294,61 @@ func CleanMarker(log *logger.Logger, dataDirPath string) error {
 // LoadMarker loads the update marker. If the file does not exist it returns nil
 // and no error.
 func LoadMarker(dataDirPath string) (*UpdateMarker, error) {
-	return loadMarker(markerFilePath(dataDirPath))
+	markerFile := markerFilePath(dataDirPath)
+	return LoadMarkerFromFile(markerFile)
+}
+
+// LoadMarkerFromFile loads the update marker from file. If the file does not exist it returns nil
+// and no error.
+func LoadMarkerFromFile(markerFile string) (marker *UpdateMarker, err error) {
+	fileLock, err := newMarkerFileLocker(markerFile)
+	if err != nil {
+		return nil, fmt.Errorf("creating update marker locker for writing: %w", err)
+	}
+
+	if err := fileLock.Lock(); err != nil {
+		return nil, fmt.Errorf("locking update marker file %q for reading: %w", markerFile, err)
+	}
+	defer func(fileLock Locker) {
+		errUnlock := fileLock.Unlock()
+		if errUnlock != nil {
+			err = goerrors.Join(err, fmt.Errorf("unlocking marker file after reading: %w", errUnlock))
+		}
+	}(fileLock)
+
+	return loadMarker(markerFile)
+}
+
+func UpdateMarkerFile(markerFile string, opts ...func(*UpdateMarker)) (err error) {
+	fileLock, err := newMarkerFileLocker(markerFile)
+	if err != nil {
+		return fmt.Errorf("creating update marker locker for reading: %w", err)
+	}
+	err = fileLock.Lock()
+	if err != nil {
+		return fmt.Errorf("locking update marker file %q for reading: %w", markerFile, err)
+	}
+	defer func(fileLock Locker) {
+		errUnlock := fileLock.Unlock()
+		if errUnlock != nil {
+			err = goerrors.Join(err, fmt.Errorf("unlocking marker file after reading: %w", errUnlock))
+		}
+	}(fileLock)
+
+	marker, err := loadMarker(markerFile)
+	if err != nil {
+		return fmt.Errorf("failed to read marker file during updating: %w", err)
+	}
+
+	for _, opt := range opts {
+		opt(marker)
+	}
+
+	if err := saveMarkerToPath(marker, markerFile, true); err != nil {
+		return fmt.Errorf("failed updating marker file: %w", err)
+	}
+
+	return nil
 }
 
 func loadMarker(markerFile string) (*UpdateMarker, error) {
@@ -313,8 +384,24 @@ func loadMarker(markerFile string) (*UpdateMarker, error) {
 // SaveMarker serializes and persists the given upgrade marker to disk.
 // For critical upgrade transitions, pass shouldFsync as true so the marker
 // file is immediately flushed to persistent storage.
-func SaveMarker(marker *UpdateMarker, shouldFsync bool) error {
-	return saveMarkerToPath(marker, markerFilePath(paths.Data()), shouldFsync)
+func SaveMarker(marker *UpdateMarker, shouldFsync bool) (err error) {
+	markerFile := markerFilePath(paths.Data())
+	fileLock, err := newMarkerFileLocker(markerFile)
+	if err != nil {
+		return fmt.Errorf("creating update marker locker for writing: %w", err)
+	}
+
+	if err := fileLock.Lock(); err != nil {
+		return fmt.Errorf("locking update marker file %q for reading: %w", markerFile, err)
+	}
+	defer func(fileLock Locker) {
+		errUnlock := fileLock.Unlock()
+		if errUnlock != nil {
+			err = goerrors.Join(err, fmt.Errorf("unlocking marker file after reading: %w", errUnlock))
+		}
+	}(fileLock)
+
+	return saveMarkerToPath(marker, markerFile, shouldFsync)
 }
 
 func saveMarkerToPath(marker *UpdateMarker, markerFile string, shouldFsync bool) error {
