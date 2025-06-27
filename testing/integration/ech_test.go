@@ -1,0 +1,118 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
+
+//go:build integration
+
+package integration
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/url"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/gofrs/uuid/v5"
+	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
+	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
+)
+
+func TestECH(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: ECH,
+		Stack: &define.Stack{},
+		Sudo:  true,
+		Local: false,
+		OS: []define.OS{
+			{
+				Type: define.Linux,
+			},
+		},
+	})
+
+	// Check that the Fleet Server in the deployment is healthy
+	fleetServerHost, err := fleettools.DefaultURL(t.Context(), info.KibanaClient)
+	statusUrl, err := url.JoinPath(fleetServerHost, "/api/status")
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		resp, err := http.Get(statusUrl)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var body struct {
+			Name   string `json:"name"`
+			Status string `json:"status"`
+		}
+		err = json.NewDecoder(resp.Body).Decode(&body)
+		require.NoError(t, err)
+
+		t.Logf("body.status = %s", body.Status)
+		return body.Status == "HEALTHY"
+	}, 5*time.Minute, 10*time.Second, "Fleet Server in ECH deployment is not healthy")
+
+	// Create a policy and install an agent
+	policyUUID := uuid.Must(uuid.NewV4()).String()
+	policy := kibana.AgentPolicy{
+		Name:              "testloglevel-policy-" + policyUUID,
+		Namespace:         "default",
+		Description:       "Test Log Level Policy " + policyUUID,
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{},
+	}
+	t.Log("Creating Agent policy...")
+	policyResp, err := info.KibanaClient.CreatePolicy(t.Context(), policy)
+	require.NoError(t, err, "failed creating policy")
+
+	t.Log("Creating Agent enrollment API key...")
+	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
+		PolicyID: policyResp.ID,
+	}
+	enrollmentToken, err := info.KibanaClient.CreateEnrollmentAPIKey(t.Context(), createEnrollmentApiKeyReq)
+	require.NoError(t, err, "failed creating enrollment API key")
+	t.Logf("Created policy %+v", policyResp.AgentPolicy)
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+	err = fixture.Prepare(t.Context())
+	require.NoError(t, err)
+
+	opts := &atesting.InstallOpts{
+		Force:      true,
+		Privileged: true,
+		EnrollOpts: atesting.EnrollOpts{
+			URL:             fleetServerHost,
+			EnrollmentToken: enrollmentToken.APIKey,
+		},
+	}
+	out, err := fixture.Install(t.Context(), opts)
+	if err != nil {
+		t.Logf("install output: %s", out)
+		require.NoError(t, err)
+	}
+
+	require.Eventuallyf(t, func() bool {
+		status, err := fixture.ExecStatus(t.Context())
+		if err != nil {
+			t.Logf("error fetching agent status: %v", err)
+			return false
+		}
+		statusBuffer := new(strings.Builder)
+		err = json.NewEncoder(statusBuffer).Encode(status)
+		if err != nil {
+			t.Logf("error marshaling agent status: %v", err)
+		} else {
+			t.Logf("agent status: %v", statusBuffer.String())
+		}
+
+		return status.State == int(cproto.State_HEALTHY) && status.FleetState == int(cproto.State_HEALTHY)
+	}, time.Minute, time.Second, "agent never became healthy or connected to Fleet")
+}
