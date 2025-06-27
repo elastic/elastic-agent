@@ -14,18 +14,18 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-type agtWatcherImpl struct{}
+type upgradeAgentWatcher struct{}
 
-func (a agtWatcherImpl) Watch(ctx context.Context, tilGrace, errorCheckInterval time.Duration, log *logp.Logger) error {
+func (a upgradeAgentWatcher) Watch(ctx context.Context, tilGrace, errorCheckInterval time.Duration, log *logp.Logger) error {
 	return watch(ctx, tilGrace, errorCheckInterval, log)
 }
 
-type agtInstallationModifierImpl struct{}
+type upgradeInstallationModifier struct{}
 
-func (a agtInstallationModifierImpl) Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool) error {
+func (a upgradeInstallationModifier) Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool) error {
 	return upgrade.Cleanup(log, topDirPath, currentVersionedHome, currentHash, removeMarker, keepLogs)
 }
 
-func (a agtInstallationModifierImpl) Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string) error {
+func (a upgradeInstallationModifier) Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string) error {
 	return upgrade.Rollback(ctx, log, c, topDirPath, prevVersionedHome, prevHash)
 }
