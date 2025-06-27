@@ -56,7 +56,6 @@ func TestStandaloneUpgradeRollback(t *testing.T) {
 	// be ran. Otherwise the test will run the old watcher from the old build.
 	upgradeFromVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
-
 	startFixture, err := atesting.NewFixture(
 		t,
 		upgradeFromVersion.String(),
@@ -98,7 +97,7 @@ inputs:
 
 	// Use the post-upgrade hook to bypass the remainder of the PerformUpgrade
 	// because we want to do our own checks for the rollback.
-	ErrPostExit := errors.New("post exit")
+	var ErrPostExit = errors.New("post exit")
 	postUpgradeHook := func() error {
 		return ErrPostExit
 	}
@@ -269,6 +268,7 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 			standaloneRollbackRestartTest(ctx, t, from, to)
 		})
 	}
+
 }
 
 // TestFleetManagedUpgradeRollbackOnRestarts tests the scenario where upgrading to a new version
@@ -324,6 +324,7 @@ func TestFleetManagedUpgradeRollbackOnRestarts(t *testing.T) {
 }
 
 func managedRollbackRestartTest(ctx context.Context, t *testing.T, info *define.Info, from *atesting.Fixture, to *atesting.Fixture) {
+
 	startVersionInfo, err := from.ExecVersion(ctx)
 	require.NoError(t, err, "failed to get start agent build version info")
 
@@ -409,7 +410,7 @@ func standaloneRollbackRestartTest(ctx context.Context, t *testing.T, startFixtu
 
 	// Use the post-upgrade hook to bypass the remainder of the PerformUpgrade
 	// because we want to do our own checks for the rollback.
-	ErrPostExit := errors.New("post exit")
+	var ErrPostExit = errors.New("post exit")
 	postUpgradeHook := func() error {
 		return ErrPostExit
 	}

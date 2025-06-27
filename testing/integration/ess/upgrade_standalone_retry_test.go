@@ -46,7 +46,6 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	// the commit hash of the current build.
 	endVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
-
 	endFixture, err := atesting.NewFixture(
 		t,
 		endVersion.String(),
@@ -67,6 +66,7 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	count := 0
 	fs := http.FileServer(http.Dir(filepath.Dir(srcPackage)))
 	handler := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+
 		// fix path to remove '/beats/elastic-agent/' prefix
 		upath := r.URL.Path
 		if !strings.HasPrefix(upath, "/") {

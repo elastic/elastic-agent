@@ -78,7 +78,6 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 	t.Run("Upgrade from older version to newer version", func(t *testing.T) {
 		upgradeFromVersion, err := upgradetest.PreviousMinor()
 		require.NoError(t, err)
-
 		testTamperProtectedInstallUpgrade(t, info, "deb", upgradeFromVersion.String(), true, false)
 	})
 
@@ -89,7 +88,6 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 	t.Run("Upgrade with endpoint stopped before upgrade", func(t *testing.T) {
 		upgradeFromVersion, err := upgradetest.PreviousMinor()
 		require.NoError(t, err)
-
 		testTamperProtectedInstallUpgrade(t, info, "deb", upgradeFromVersion.String(), true, true)
 	})
 
@@ -115,7 +113,6 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_RPM(t *testing.T) {
 	t.Run("Upgrade from older version to newer version", func(t *testing.T) {
 		upgradeFromVersion, err := upgradetest.PreviousMinor()
 		require.NoError(t, err)
-
 		testTamperProtectedInstallUpgrade(t, info, "rpm", upgradeFromVersion.String(), true, false)
 	})
 
@@ -126,7 +123,6 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_RPM(t *testing.T) {
 	t.Run("Upgrade with endpoint stopped before upgrade", func(t *testing.T) {
 		upgradeFromVersion, err := upgradetest.PreviousMinor()
 		require.NoError(t, err)
-
 		testTamperProtectedInstallUpgrade(t, info, "rpm", upgradeFromVersion.String(), true, true)
 	})
 	t.Run("Make sure unprotected upgrades are not broken", func(t *testing.T) {
