@@ -118,7 +118,6 @@ func watchCmd(cmd *cobra.Command, log *logp.Logger, topDir string, cfg *configur
 			stateString = string(marker.Details.State)
 		}
 		log.Infof("not within grace [updatedOn %v] %v or agent have been rolled back [state: %s]", marker.UpdatedOn.String(), time.Since(marker.UpdatedOn).String(), stateString)
-
 		// if it is started outside of upgrade loop
 		// if we're not within grace and marker is still there it might mean
 		// that cleanup was not performed ok, cleanup everything except current version
