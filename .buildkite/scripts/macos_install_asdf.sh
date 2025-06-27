@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-AGENT_USER="${AGENT_USER:-"$USER"}"
+
+AGENT_USER="$(whoami)"
 AGENT_HOME="${AGENT_HOME:-"/Users/$AGENT_USER"}"
 ASDF_DIR="${ASDF_DIR:-"/Users/$AGENT_USER/.asdf"}"
 
