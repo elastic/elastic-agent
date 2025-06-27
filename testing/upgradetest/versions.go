@@ -263,10 +263,9 @@ func PreviousMinor(currentVersion string, upgradeableVersions []*version.ParsedS
 	var mostRecentVersion *version.ParsedSemVer
 
 	for _, v := range upgradeableVersions {
-		if (current.Minor() == 0 || (current.Minor() == 1 && current.Prerelease() != "")) && v.Less(*current) {
-			if mostRecentVersion == nil {
-				mostRecentVersion = v
-			} else if mostRecentVersion.Less(*v) {
+		isFirstMajorOrFirstMinorPrerelease := current.Minor() == 0 || (current.Minor() == 1 && current.Prerelease() != "")
+		if isFirstMajorOrFirstMinorPrerelease && v.Less(*current) {
+			if mostRecentVersion == nil || mostRecentVersion.Less(*v) {
 				mostRecentVersion = v
 			}
 		}
