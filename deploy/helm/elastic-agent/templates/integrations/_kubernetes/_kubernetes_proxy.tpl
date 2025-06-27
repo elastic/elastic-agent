@@ -17,6 +17,10 @@ Config input for kube proxy
   data_stream:
     namespace: {{ .Values.kubernetes.namespace }}
   use_output: {{ .Values.kubernetes.output }}
+  {{- with $.Values.kubernetes._onboarding_processor }}
+  processors:
+  - {{ . | toYaml | nindent 4 }}
+  {{- end }}
   streams:
   - id: kubernetes/metrics-kubernetes.proxy
     data_stream:

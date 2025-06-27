@@ -16,6 +16,10 @@ Config input for kube audit_logs_filestream
   data_stream:
     namespace: {{.Values.kubernetes.namespace}}
   use_output: {{ .Values.kubernetes.output }}
+  {{- with $.Values.kubernetes._onboarding_processor }}
+  processors:
+  - {{ . | toYaml | nindent 4 }}
+  {{- end }}
   streams:
   - id: filestream-kubernetes.audit_logs
     data_stream:

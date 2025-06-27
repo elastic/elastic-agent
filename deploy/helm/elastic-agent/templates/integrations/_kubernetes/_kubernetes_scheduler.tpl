@@ -16,6 +16,10 @@ Config input for kube_scheduler
   data_stream:
     namespace: {{ .Values.kubernetes.namespace }}
   use_output: {{ .Values.kubernetes.output }}
+  {{- with $.Values.kubernetes._onboarding_processor }}
+  processors:
+  - {{ . | toYaml | nindent 4 }}
+  {{- end }}
   streams:
   - id: kubernetes/metrics-kubernetes.scheduler
     data_stream:

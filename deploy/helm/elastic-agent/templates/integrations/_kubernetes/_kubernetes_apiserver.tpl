@@ -16,6 +16,10 @@ Config input for kube apiserver
   data_stream:
     namespace: {{ $.Values.kubernetes.namespace }}
   use_output: {{ $.Values.kubernetes.output }}
+  {{- with $.Values.kubernetes._onboarding_processor }}
+  processors:
+  - {{ . | toYaml | nindent 4 }}
+  {{- end }}
   streams:
   - id: kubernetes/metrics-kubernetes.apiserver
     data_stream:

@@ -48,6 +48,10 @@ kubernetes:
   # @section -- 2 - Kubernetes integration
   # @sectionDescriptionTemplate -- Kubernetes
   enabled: true
+  # -- Specify the onboarding ID for a quick start flow.
+  # @section -- 2 - Kubernetes integration
+  # @sectionDescriptionTemplate -- Kubernetes
+  onboardingID: ""
   # -- name of the output used in kubernetes integration. Note that this output needs to be defined in
   # [outputs](#1-outputs)
   # @section -- 2 - Kubernetes integration

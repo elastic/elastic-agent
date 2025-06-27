@@ -33,7 +33,7 @@ Config input for container logs
       {{- end }}
     {{- $additionalProcessors := dig "vars" "processors" list $.Values.kubernetes.containers.logs -}}
     {{- $builtInProcessors := dig "vars" "enabledDefaultProcessors" true $.Values.kubernetes.containers.logs -}}
-    {{- if (or $builtInProcessors $additionalProcessors) }}
+    {{- if compact (list $builtInProcessors $additionalProcessors $.Values.kubernetes._onboarding_processor) }}
     processors:
       {{- with $builtInProcessors }}
       - add_fields:
@@ -72,6 +72,9 @@ Config input for container logs
                   - kubernetes.annotations.elastic_co/preserve_original_event
               - regexp:
                   kubernetes.annotations.elastic_co/preserve_original_event: ^(?i)true$
+      {{- end }}
+      {{- with $.Values.kubernetes._onboarding_processor }}
+      - {{ . | toYaml | nindent 8 }}
       {{- end }}
       {{- with $additionalProcessors }}
       {{- . | toYaml | nindent 6 }}

@@ -1,0 +1,6 @@
+kubernetes:
+  onboardingID: "my-onboarding-id"
+  enabled: true
+
+agent:
+  unprivileged: true
