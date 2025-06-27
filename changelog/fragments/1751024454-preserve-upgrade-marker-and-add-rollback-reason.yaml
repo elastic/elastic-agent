@@ -16,9 +16,9 @@ summary: Preserve upgrade marker when rolling back upgrade and add rollback reas
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-description|: Upgrade marker is now preserved by the watcher when performing a rollback and a new`reason`
-field is added to the upgrade details structure. The reason for keeping the upgrade marker when rolling back is
-to allow the rolled back agent to read the rollback reason and communicate that to user/Fleet.
+description: Upgrade marker is now preserved by the watcher when performing a rollback and a new `reason`
+  field is added to the upgrade details structure. The reason for keeping the upgrade marker when rolling back is
+  to allow the rolled back agent to read the rollback reason and communicate that to user/Fleet.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
