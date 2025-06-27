@@ -44,8 +44,8 @@ type collectorRecoveryTimer interface {
 type OTelManager struct {
 	// baseLogger is the base logger for the otel collector, and doesn't include any agent-specific fields.
 	baseLogger *logger.Logger
-	logger *logger.Logger
-	errCh  chan error
+	logger     *logger.Logger
+	errCh      chan error
 
 	// The current configuration that the OTel collector is using. In the case that
 	// the cfg is nil then the collector is not running.
@@ -98,7 +98,7 @@ func NewOTelManager(logger *logger.Logger, logLevel logp.Level, baseLogger *logg
 
 	return &OTelManager{
 		logger:        logger,
-		baseLogger: baseLogger,
+		baseLogger:    baseLogger,
 		errCh:         make(chan error, 1), // holds at most one error
 		cfgCh:         make(chan *confmap.Conf),
 		statusCh:      make(chan *status.AggregateStatus),

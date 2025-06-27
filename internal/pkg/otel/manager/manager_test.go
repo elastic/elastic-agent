@@ -469,7 +469,7 @@ func TestOTelManager_Run(t *testing.T) {
 			base, _ := loggertest.New("otel")
 			m := &OTelManager{
 				logger:        l,
-				baseLogger: base,
+				baseLogger:    base,
 				errCh:         make(chan error, 1), // holds at most one error
 				cfgCh:         make(chan *confmap.Conf),
 				statusCh:      make(chan *status.AggregateStatus),
