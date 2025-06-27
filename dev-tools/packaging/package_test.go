@@ -285,7 +285,7 @@ func checkNpcapNotices(pkg, file string, contents io.Reader) error {
 }
 
 func checkDocker(t *testing.T, file string) {
-	p, info, err := readDocker(file)
+	p, info, err := readDocker(file, true)
 	if err != nil {
 		t.Errorf("error reading file %v: %v", file, err)
 		return
@@ -300,6 +300,19 @@ func checkDocker(t *testing.T, file string) {
 	checkModulesPresent(t, "", p)
 	checkModulesDPresent(t, "", p)
 	checkLicensesPresent(t, "licenses/", p)
+
+	if strings.Contains(file, "-complete") {
+		checkCompleteDocker(t, file)
+	}
+}
+
+func checkCompleteDocker(t *testing.T, file string) {
+	p, _, err := readDocker(file, false)
+	if err != nil {
+		t.Errorf("error reading file %v: %v", file, err)
+	}
+
+	checkSyntheticsDeps(t, "usr", p)
 }
 
 // Verify that the main configuration file is installed with a 0600 file mode.
@@ -493,6 +506,23 @@ func checkLicensesPresent(t *testing.T, prefix string, p *packageFile) {
 			}
 			if prefix != "" {
 				t.Fatalf("not found under %s", prefix)
+			}
+			t.Fatal("not found")
+		})
+	}
+}
+
+func checkSyntheticsDeps(t *testing.T, prefix string, p *packageFile) {
+	syntheticsDeps := []string{"node", "npm", "elastic-synthetics", "chrome"}
+	for _, dep := range syntheticsDeps {
+		t.Run("Binary file "+dep, func(t *testing.T) {
+			for _, entry := range p.Contents {
+				if strings.HasPrefix(entry.File, prefix) && strings.HasSuffix(entry.File, "/"+dep) {
+					return
+				}
+			}
+			if prefix != "" {
+				t.Fatalf("%s not found under %s", dep, prefix)
 			}
 			t.Fatal("not found")
 		})
@@ -765,7 +795,7 @@ func openZip(zipFile string) (*zip.ReadCloser, error) {
 	return r, nil
 }
 
-func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
+func readDocker(dockerFile string, filterWorkingDir bool) (*packageFile, *dockerInfo, error) {
 	// Read the manifest file first so that the config file and layer
 	// names are known in advance.
 	manifest, err := getDockerManifest(dockerFile)
@@ -832,7 +862,7 @@ func readDocker(dockerFile string) (*packageFile, *dockerInfo, error) {
 				continue
 			}
 			// Check only files in working dir and entrypoint
-			if strings.HasPrefix("/"+name, workingDir) || "/"+name == entrypoint {
+			if !filterWorkingDir || strings.HasPrefix("/"+name, workingDir) || "/"+name == entrypoint {
 				p.Contents[name] = entry
 			}
 			// Add also licenses
