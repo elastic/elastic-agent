@@ -11,7 +11,7 @@
 kind: other
 
 # Change summary; a 80ish characters long description of the change.
-summary: synth-upgra-node-v20
+summary: Upgrade Synthetics NodeJS version to latest LTS v20.
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
