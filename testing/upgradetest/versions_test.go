@@ -311,12 +311,26 @@ func TestPreviousMinor(t *testing.T) {
 			expectedVersion: "8.19.0-SNAPSHOT+metadata",
 			expectError:     false,
 		},
+		"should return the most recent version from previous major when current version is first minor prerelease with no other minors in current major": {
+			currentVersion: "9.1.0-SNAPSHOT",
+			upgradeableVersions: []string{
+				"8.19.0-SNAPSHOT+metadata",
+				"8.18.2",
+				"8.17.6",
+				"7.17.29-SNAPSHOT",
+			},
+			expectedVersion: "8.19.0-SNAPSHOT+metadata",
+			expectError:     false,
+		},
 		"should return error when no previous minor is found": {
 			currentVersion: "9.1.0",
 			upgradeableVersions: []string{
 				"9.2.0",
 				"9.1.1",
-				"8.19.0-SNAPSHOT",
+				"8.19.0-SNAPSHOT+metadata",
+				"8.18.2",
+				"8.17.6",
+				"7.17.29-SNAPSHOT",
 			},
 			expectedVersion: "",
 			expectError:     true,
