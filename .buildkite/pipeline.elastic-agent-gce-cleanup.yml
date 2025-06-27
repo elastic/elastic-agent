@@ -4,9 +4,13 @@
 # See gce-cleanup.sh and .buildkite/misc/gce-cleanup.yml
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
+  # Machine type
+  DEFAULT_GCP_MACHINE_TYPE: "n2-standard-8"
+
 steps:
   - label: "GCE Cleanup"
     key: "gce-cleanup"
     command: ".buildkite/scripts/steps/gce-cleanup.sh"
     agents:
       provider: "gcp"
+      machineType: "${DEFAULT_GCP_MACHINE_TYPE}"

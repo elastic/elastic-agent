@@ -4,6 +4,8 @@ env:
   BEAT_NAME: "elastic-agent"
   # after moving elastic-agent out of beats, we should update the URL of the packaging.
   BEAT_URL: "https://www.elastic.co/elastic-agent"
+  # Machine type
+  DEFAULT_GCP_MACHINE_TYPE: "c2-standard-16"
 
 steps:
   - input: "Build parameters"
@@ -57,7 +59,7 @@ steps:
         key: package_elastic-agent
         agents:
           provider: "gcp"
-          machineType: "c2-standard-16"
+          machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
           diskSizeGb: 400
         env:
           PLATFORMS: "linux/amd64 windows/amd64 darwin/amd64"
@@ -126,6 +128,7 @@ steps:
     depends_on: package
     agents:
       provider: "gcp"
+      machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
     env:
       DRA_PROJECT_ID: "elastic-agent-package"
       DRA_PROJECT_ARTIFACT_ID: "agent-package"
@@ -162,7 +165,7 @@ steps:
     depends_on: package
     agents:
       provider: "gcp"
-      machineType: "n2-standard-8"
+      machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
       diskSizeGb: 400
     env:
       DRA_PROJECT_ID: "elastic-agent-package"

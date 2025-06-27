@@ -2,6 +2,8 @@
 
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
+  # Machine type
+  DEFAULT_GCP_MACHINE_TYPE: "n2-standard-8"
 
 steps:
   - label: "Integration tests: packaging"
@@ -11,7 +13,7 @@ steps:
       - build/distributions/**
     agents:
       provider: "gcp"
-      machineType: "n2-standard-8"
+      machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
 
   - label: "Integration test matrix"
     key: "integration-tests-matrix"
@@ -25,4 +27,4 @@ steps:
       - "build/diagnostics/*"
     agents:
       provider: "gcp"
-      machineType: "n2-standard-8"
+      machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
