@@ -204,14 +204,10 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				}
 				// pass the error to the errCh so the coordinator, unless it's a cancel error
 				if !errors.Is(err, context.Canceled) {
-<<<<<<< HEAD
-					m.reportErr(ctx, err)
-=======
 					reportErr(ctx, m.errCh, err)
 					// reset the restart timer to the next backoff
 					recoveryDelay := m.recoveryTimer.ResetNext()
 					m.logger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
->>>>>>> c56581d44 (feat: hybrid elastic agent invoke collector as subprocess (#8248))
 				}
 			}
 
@@ -243,22 +239,6 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			} else {
 				// either a new configuration or the first configuration
 				// that results in the collector being started
-<<<<<<< HEAD
-				if cancel == nil {
-					// no cancel exists so the collector has not been
-					// started. start the collector with this configuration
-					cancel, provider, err = m.startCollector(m.cfg, runErrCh)
-					if err != nil {
-						// failed to create the collector (this is different then
-						// it's failing to run). we do not retry creation on failure
-						// as it will always fail a new configuration is required for
-						// it not to fail (a new configuration will result in the retry)
-						m.reportErr(ctx, err)
-					} else {
-						// all good at the moment (possible that it will fail)
-						m.reportErr(ctx, nil)
-					}
-=======
 				proc, err = m.execution.startCollector(ctx, m.logger, m.cfg, collectorRunErr, m.statusCh)
 				if err != nil {
 					// failed to create the collector (this is different then
@@ -270,7 +250,6 @@ func (m *OTelManager) Run(ctx context.Context) error {
 					// from the initial delay
 					recoveryDelay := m.recoveryTimer.ResetInitial()
 					m.logger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
->>>>>>> c56581d44 (feat: hybrid elastic agent invoke collector as subprocess (#8248))
 				} else {
 					// all good at the moment (possible that it will fail)
 					reportErr(ctx, m.errCh, nil)

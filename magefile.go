@@ -436,12 +436,7 @@ func getTestBinariesPath() ([]string, error) {
 	testBinaryPkgs := []string{
 		filepath.Join(wd, "pkg", "component", "fake", "component"),
 		filepath.Join(wd, "internal", "pkg", "agent", "install", "testblocking"),
-<<<<<<< HEAD
-=======
-		filepath.Join(wd, "pkg", "core", "process", "testsignal"),
-		filepath.Join(wd, "internal", "pkg", "agent", "application", "filelock", "testlocker"),
 		filepath.Join(wd, "internal", "pkg", "otel", "manager", "testing"),
->>>>>>> c56581d44 (feat: hybrid elastic agent invoke collector as subprocess (#8248))
 	}
 	return testBinaryPkgs, nil
 }
