@@ -115,12 +115,9 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 	startFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	upgradeableVersions, err := upgradetest.GetUpgradableVersions()
-	require.NoError(t, err)
-
 	// Upgrade to an old build.
 	// This is probably a way of getting a signed package
-	upgradeToVersion, err := upgradetest.PreviousMinor(define.Version(), upgradeableVersions)
+	upgradeToVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
 
 	require.NoError(t, err)

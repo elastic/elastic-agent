@@ -352,7 +352,7 @@ func TestPreviousMinor(t *testing.T) {
 				upgradeableVersions = append(upgradeableVersions, parsed)
 			}
 
-			result, err := PreviousMinor(tc.currentVersion, upgradeableVersions)
+			result, err := previousMinor(tc.currentVersion, upgradeableVersions)
 
 			if tc.expectError {
 				require.Nil(t, result)
