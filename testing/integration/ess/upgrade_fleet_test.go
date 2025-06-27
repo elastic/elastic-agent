@@ -24,8 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cenkalti/backoff/v5"
 	"github.com/gofrs/uuid/v5"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -393,7 +393,19 @@ func testUpgradeFleetManagedElasticAgent(
 	unprivileged bool,
 	opts ...upgradetest.UpgradeOpt,
 ) {
+	require.NoError(t, PerformManagedUpgrade(ctx, t, info, startFixture, endFixture, policy, unprivileged, opts...))
+}
 
+func PerformManagedUpgrade(
+	ctx context.Context,
+	t *testing.T,
+	info *define.Info,
+	startFixture *atesting.Fixture,
+	endFixture *atesting.Fixture,
+	policy kibana.AgentPolicy,
+	unprivileged bool,
+	opts ...upgradetest.UpgradeOpt,
+) error {
 	// use the passed in options to perform the upgrade
 	var upgradeOpts upgradetest.UpgradeOpts
 	for _, o := range opts {
@@ -403,13 +415,21 @@ func testUpgradeFleetManagedElasticAgent(
 	kibClient := info.KibanaClient
 
 	startVersionInfo, err := startFixture.ExecVersion(ctx)
-	require.NoError(t, err)
+	if err != nil {
+		return fmt.Errorf("exec version on startFixture: %w", err)
+	}
 	startParsedVersion, err := version.ParseVersion(startVersionInfo.Binary.String())
-	require.NoError(t, err)
+	if err != nil {
+		return fmt.Errorf("parsing version on startVersionInfo: %w", err)
+	}
 	endVersionInfo, err := endFixture.ExecVersion(ctx)
-	require.NoError(t, err)
+	if err != nil {
+		return fmt.Errorf("exec version on endFixture: %w", err)
+	}
 	endParsedVersion, err := version.ParseVersion(endVersionInfo.Binary.String())
-	require.NoError(t, err)
+	if err != nil {
+		return fmt.Errorf("parsing version on endVersionInfo: %w", err)
+	}
 
 	if unprivileged {
 		if !upgradetest.SupportsUnprivileged(startParsedVersion, endParsedVersion) {
@@ -419,24 +439,29 @@ func testUpgradeFleetManagedElasticAgent(
 
 	if startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
 		t.Skipf("target version has the same commit hash %q", endVersionInfo.Binary.Commit)
-		return
 	}
 
 	t.Log("Creating Agent policy...")
 	policyResp, err := kibClient.CreatePolicy(ctx, policy)
-	require.NoError(t, err, "failed creating policy")
-	policy = policyResp.AgentPolicy
+	if err != nil {
+		return fmt.Errorf("failed creating policy: %w", err)
+	}
 
+	policy = policyResp.AgentPolicy
 	t.Log("Creating Agent enrollment API key...")
 	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
 		PolicyID: policyResp.ID,
 	}
 	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(ctx, createEnrollmentApiKeyReq)
-	require.NoError(t, err, "failed creating enrollment API key")
+	if err != nil {
+		return fmt.Errorf("failed creating enrollment token: %w", err)
+	}
 
 	t.Log("Getting default Fleet Server URL...")
 	fleetServerURL, err := fleettools.DefaultURL(ctx, kibClient)
-	require.NoError(t, err, "failed getting Fleet Server URL")
+	if err != nil {
+		return fmt.Errorf("failed getting default Fleet Server URL: %w", err)
+	}
 
 	t.Logf("Installing Elastic Agent (unprivileged: %t)...", unprivileged)
 	var nonInteractiveFlag bool
@@ -453,78 +478,135 @@ func testUpgradeFleetManagedElasticAgent(
 		Privileged: !unprivileged,
 	}
 	output, err := startFixture.Install(ctx, &installOpts)
-	require.NoError(t, err, "failed to install start agent [output: %s]", string(output))
+	t.Logf("install start agent output:\n%s", string(output))
+	if err != nil {
+		return fmt.Errorf("failed to install start agent: %w", err)
+	}
+
+	// start fixture gets the agent configured to use a faster watcher
+	// THIS IS A HACK: we are modifying elastic-agent.yaml after enrollment because the watcher reads only that file to
+	// configure itself. This is obviously not fit for production code or even guaranteed to be stable.
+	if upgradeOpts.CustomWatcherCfg != "" {
+		t.Log("Setting custom watcher config")
+		err = startFixture.Configure(ctx, []byte("fleet.enabled: true\n"+upgradeOpts.CustomWatcherCfg))
+	}
 
 	t.Log("Waiting for Agent to be correct version and healthy...")
 	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
-	require.NoError(t, err)
+	if err != nil {
+		return fmt.Errorf("waiting for agent to become healthy: %w", err)
+	}
 
 	agentID, err := startFixture.AgentID(ctx)
-	require.NoError(t, err)
+	if err != nil {
+		return fmt.Errorf("retrieving agent ID: %w", err)
+	}
 	t.Logf("Agent ID: %q", agentID)
 
 	t.Log("Waiting for enrolled Agent status to be online...")
-	require.Eventually(t,
-		check.FleetAgentStatus(
-			ctx, t, kibClient, agentID, "online"),
-		2*time.Minute,
-		10*time.Second,
-		"Agent status is not online")
+	_, err = backoff.Retry(ctx, func() (bool, error) {
+		checkSuccessful := check.FleetAgentStatus(
+			ctx, t, kibClient, agentID, "online")()
+		if !checkSuccessful {
+			return checkSuccessful, fmt.Errorf("agent status is not online")
+		}
+		return checkSuccessful, nil
+	}, backoff.WithMaxElapsedTime(2*time.Minute), backoff.WithBackOff(backoff.NewConstantBackOff(10*time.Second)))
+	if err != nil {
+		return fmt.Errorf("waiting for upgraded agent to be online: %w", err)
+	}
 
 	t.Logf("Upgrading from version \"%s-%s\" to version \"%s-%s\"...",
 		startParsedVersion, startVersionInfo.Binary.Commit,
 		endVersionInfo.Binary.String(), endVersionInfo.Binary.Commit)
 	err = fleettools.UpgradeAgent(ctx, kibClient, agentID, endVersionInfo.Binary.String(), true)
-	require.NoError(t, err)
+	if err != nil {
+		return fmt.Errorf("requesting agent upgrade: %w", err)
+	}
 
 	t.Log("Waiting from upgrade details to show up in Fleet")
-	var agent kibana.GetAgentResponse
-	require.Eventuallyf(t, func() bool {
-		agent, err = kibClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
-		return err == nil && agent.UpgradeDetails != nil
-	},
-		5*time.Minute, time.Second,
-		"last error: %v. agent.UpgradeDetails: %s",
-		err, agentUpgradeDetailsString(agent))
+	_, err = backoff.Retry[kibana.GetAgentResponse](ctx, func() (kibana.GetAgentResponse, error) {
+		agent, getAgentErr := kibClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
+		if getAgentErr != nil {
+			return agent, getAgentErr
+		}
+		if agent.UpgradeDetails == nil {
+			return agent, fmt.Errorf("agent upgrade details is empty")
+		}
+		return agent, nil
+	}, backoff.WithMaxElapsedTime(5*time.Minute), backoff.WithBackOff(backoff.NewConstantBackOff(time.Second)))
+	if err != nil {
+		return fmt.Errorf("waiting for upgrade details to show up in Fleet: %w", err)
+	}
 
 	// wait for the watcher to show up
 	t.Logf("Waiting for upgrade watcher to start...")
 	err = upgradetest.WaitForWatcher(ctx, 5*time.Minute, 10*time.Second)
-	require.NoError(t, err, "upgrade watcher did not start")
+	if err != nil {
+		return fmt.Errorf("waiting for upgrade watcher to start: %w", err)
+	}
 	t.Logf("Upgrade watcher started")
+
+	if upgradeOpts.PostUpgradeHook != nil {
+		if err := upgradeOpts.PostUpgradeHook(); err != nil {
+			return fmt.Errorf("post upgrade hook failed: %w", err)
+		}
+	}
 
 	// wait for the agent to be healthy and correct version
 	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
-	require.NoError(t, err)
+	if err != nil {
+		return fmt.Errorf("waiting for agent to be healthy and version %s: %w", endVersionInfo.Binary.String(), err)
+	}
 
-	t.Log("Waiting for enrolled Agent status to be online...")
-	require.Eventually(t, check.FleetAgentStatus(ctx, t, kibClient, agentID, "online"), 10*time.Minute, 15*time.Second, "Agent status is not online")
+	t.Log("Waiting for upgraded Agent status to be online...")
+	_, err = backoff.Retry(ctx, func() (any, error) {
+		checkSuccessful := check.FleetAgentStatus(ctx, t, kibClient, agentID, "online")()
+		if !checkSuccessful {
+			return checkSuccessful, fmt.Errorf("agent status is not online")
+		}
+		return checkSuccessful, nil
+	}, backoff.WithMaxElapsedTime(10*time.Minute), backoff.WithBackOff(backoff.NewConstantBackOff(15*time.Second)))
+
+	if err != nil {
+		return fmt.Errorf("waiting for upgraded agent to be online: %w", err)
+	}
 
 	// wait for version
-	require.Eventually(t, func() bool {
+	_, err = backoff.Retry(ctx, func() (string, error) {
 		t.Log("Getting Agent version...")
 		newVersion, err := fleettools.GetAgentVersion(ctx, kibClient, agentID)
 		if err != nil {
 			t.Logf("error getting agent version: %v", err)
-			return false
+			return "", fmt.Errorf("getting agent information: %w", err)
 		}
-		return endVersionInfo.Binary.Version == newVersion
-	}, 5*time.Minute, time.Second)
+		if endVersionInfo.Binary.Version != newVersion {
+			return newVersion, fmt.Errorf("agent version mismatch: got %s, want %s", newVersion, endVersionInfo.Binary.Version)
+		}
+		return newVersion, nil
+	}, backoff.WithMaxElapsedTime(5*time.Minute), backoff.WithBackOff(backoff.NewConstantBackOff(time.Second)))
 
 	t.Logf("Waiting for upgrade watcher to finish...")
 	err = upgradetest.WaitForNoWatcher(ctx, 2*time.Minute, 10*time.Second, 1*time.Minute+15*time.Second)
-	require.NoError(t, err)
+	if err != nil {
+		return fmt.Errorf("waiting for upgrade watcher to finish: %w", err)
+	}
 	t.Logf("Upgrade watcher finished")
 
 	// now that the watcher has stopped lets ensure that it's still the expected
 	// version, otherwise it's possible that it was rolled back to the original version
 	err = upgradetest.CheckHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary)
-	assert.NoError(t, err)
+	if err != nil {
+		return fmt.Errorf("checking agent has not been rolled back: %w", err)
+	}
 
 	if upgradeOpts.PostWatcherSuccessHook != nil {
 		err = upgradeOpts.PostWatcherSuccessHook(ctx, startFixture)
-		require.NoError(t, err)
+		if err != nil {
+			return fmt.Errorf("PostWatcherSuccessHook failed: %w", err)
+		}
 	}
+	return nil
 }
 
 func defaultPolicy() kibana.AgentPolicy {

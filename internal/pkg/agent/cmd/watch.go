@@ -53,7 +53,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 			// Make sure to flush any buffered logs before we're done.
 			defer log.Sync() //nolint:errcheck // flushing buffered logs is best effort.
 
-			if err := watchCmd(log, cfg); err != nil {
+			if err := watchCmd(log, paths.Top(), cfg.Settings.Upgrade.Watcher, new(upgradeAgentWatcher), new(upgradeInstallationModifier)); err != nil {
 				log.Errorw("Watch command failed", "error.message", err)
 				fmt.Fprintf(streams.Err, "Watch command failed: %v\n%s\n", err, troubleshootMessage())
 				os.Exit(4)
@@ -64,21 +64,30 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 	return cmd
 }
 
-func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
-	log.Infow("Upgrade Watcher started", "process.pid", os.Getpid(), "agent.version", version.GetAgentPackageVersion())
-	marker, err := upgrade.LoadMarker(paths.Data())
+type agentWatcher interface {
+	Watch(ctx context.Context, tilGrace, errorCheckInterval time.Duration, log *logp.Logger) error
+}
+
+type installationModifier interface {
+	Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool) error
+	Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string) error
+}
+
+func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcherConfig, watcher agentWatcher, installModifier installationModifier) error {
+	log.Infow("Upgrade Watcher started", "process.pid", os.Getpid(), "agent.version", version.GetAgentPackageVersion(), "config", cfg)
+	dataDir := paths.DataFrom(topDir)
+	marker, err := upgrade.LoadMarker(dataDir)
 	if err != nil {
 		log.Error("failed to load marker", err)
 		return err
 	}
 	if marker == nil {
 		// no marker found we're not in upgrade process
-		log.Infof("update marker not present at '%s'", paths.Data())
+		log.Infof("update marker not present at '%s'", dataDir)
 		return nil
 	}
 
-	log.Infof("Loaded update marker %+v", marker)
-
+	log.With("marker", marker, "details", marker.Details).Info("Loaded update marker")
 	locker := filelock.NewAppLocker(paths.Top(), watcherLockFile)
 	if err := locker.TryLock(); err != nil {
 		if errors.Is(err, filelock.ErrAppAlreadyRunning) {
@@ -93,14 +102,18 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 		_ = locker.Unlock()
 	}()
 
-	isWithinGrace, tilGrace := gracePeriod(marker, cfg.Settings.Upgrade.Watcher.GracePeriod)
-	if !isWithinGrace {
-		log.Infof("not within grace [updatedOn %v] %v", marker.UpdatedOn.String(), time.Since(marker.UpdatedOn).String())
+	isWithinGrace, tilGrace := gracePeriod(marker, cfg.GracePeriod)
+	if isTerminalState(marker) || !isWithinGrace {
+		stateString := ""
+		if marker.Details != nil {
+			stateString = string(marker.Details.State)
+		}
+		log.Infof("not within grace [updatedOn %v] %v or agent have been rolled back [state: %s]", marker.UpdatedOn.String(), time.Since(marker.UpdatedOn).String(), stateString)
 		// if it is started outside of upgrade loop
 		// if we're not within grace and marker is still there it might mean
 		// that cleanup was not performed ok, cleanup everything except current version
 		// hash is the same as hash of agent which initiated watcher.
-		if err := upgrade.Cleanup(log, paths.Top(), paths.VersionedHome(paths.Top()), release.ShortCommit(), true, false); err != nil {
+		if err := installModifier.Cleanup(log, paths.Top(), paths.VersionedHome(topDir), release.ShortCommit(), true, false); err != nil {
 			log.Error("clean up of prior watcher run failed", err)
 		}
 		// exit nicely
@@ -109,15 +122,18 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 
 	// About to start watching the upgrade. Initialize upgrade details and save them in the
 	// upgrade marker.
-	upgradeDetails := initUpgradeDetails(marker, upgrade.SaveMarker, log)
+	saveMarkerFunc := func(marker *upgrade.UpdateMarker, b bool) error {
+		return upgrade.SaveMarker(dataDir, marker, b)
+	}
+	upgradeDetails := initUpgradeDetails(marker, saveMarkerFunc, log)
 
-	errorCheckInterval := cfg.Settings.Upgrade.Watcher.ErrorCheck.Interval
+	errorCheckInterval := cfg.ErrorCheck.Interval
 	ctx := context.Background()
-	if err := watch(ctx, tilGrace, errorCheckInterval, log); err != nil {
+	if err := watcher.Watch(ctx, tilGrace, errorCheckInterval, log); err != nil {
 		log.Error("Error detected, proceeding to rollback: %v", err)
 
-		upgradeDetails.SetState(details.StateRollback)
-		err = upgrade.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash)
+		upgradeDetails.SetStateWithReason(details.StateRollback, details.ReasonWatchFailed)
+		err = installModifier.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash)
 		if err != nil {
 			log.Error("rollback failed", err)
 			upgradeDetails.Fail(err)
@@ -135,11 +151,29 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 	// Why is this being skipped on Windows? The comment above is not clear.
 	// issue: https://github.com/elastic/elastic-agent/issues/3027
 	removeMarker := !isWindows()
-	err = upgrade.Cleanup(log, paths.Top(), marker.VersionedHome, marker.Hash, removeMarker, false)
+	err = installModifier.Cleanup(log, topDir, marker.VersionedHome, marker.Hash, removeMarker, false)
 	if err != nil {
 		log.Error("cleanup after successful watch failed", err)
 	}
 	return err
+}
+
+// isTerminalState returns true if the state in the upgrade marker contains details and the upgrade details state is a
+// terminal one: UPG_COMPLETE, UPG_ROLLBACK and UPG_FAILED
+// If the upgrade marker or the upgrade marker details are nil the function will return false: as
+// no state is specified, having simply a marker without details would mean that some upgrade operation is ongoing
+// (probably initiated by an older agent).
+func isTerminalState(marker *upgrade.UpdateMarker) bool {
+	if marker.Details == nil {
+		return false
+	}
+
+	switch marker.Details.State {
+	case details.StateCompleted, details.StateRollback, details.StateFailed:
+		return true
+	default:
+		return false
+	}
 }
 
 func isWindows() bool {
