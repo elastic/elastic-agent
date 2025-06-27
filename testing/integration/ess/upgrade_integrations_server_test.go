@@ -58,7 +58,9 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 	statefulProv, ok := prov.(*ess.StatefulProvisioner)
 	require.True(t, ok)
 
+	t.Logf("Running test cases for upgrade from versions [%v] to version [%s]", startVersions, endVersion)
 	for _, startVersion := range startVersions {
+		t.Logf("Running test case for upgrade from version [%s] to version [%s]...", startVersion.String(), endVersion)
 		t.Run(fmt.Sprintf("%s_to_%s", startVersion.String(), endVersion), func(t *testing.T) {
 			// Create ECH deployment with start version
 			t.Logf("Creating ECH deployment with version [%s] in region [%s]", startVersion.String(), echRegion)
