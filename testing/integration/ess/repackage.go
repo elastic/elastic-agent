@@ -108,7 +108,7 @@ func repackageTarArchive(t *testing.T, srcPackagePath string, newPackagePath str
 
 	// Create the output file and its writers
 	newPackageFile, err := os.OpenFile(newPackagePath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o750)
-	require.NoErrorf(t, err, "error opening output file %q", newPackageFile)
+	require.NoErrorf(t, err, "error opening output file %q", newPackagePath)
 	defer func(newPackageFile *os.File) {
 		err := newPackageFile.Close()
 		if err != nil {
@@ -207,7 +207,7 @@ func repackageZipArchive(t *testing.T, srcPackagePath string, newPackagePath str
 
 	// Create the output file and its writers
 	newPackageFile, err := os.OpenFile(newPackagePath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o750)
-	require.NoErrorf(t, err, "error opening output file %q", newPackageFile)
+	require.NoErrorf(t, err, "error opening output file %q", newPackagePath)
 	defer func(newPackageFile *os.File) {
 		err := newPackageFile.Close()
 		if err != nil {
