@@ -1277,6 +1277,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/otl
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/otlpencodingextension v0.127.0/go.mod h1:PuBIKJHNhHfyrBojM0q9OJDoUB2pA7cb2ytVYd3jLvA=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.127.0 h1:jZ1jm12S1KZ28lI9mqWbqnAnTVVBoBOcDGTmgrTQJ08=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.127.0/go.mod h1:muh17dM7w489SrmFc6n42wWA+wWvTLV1BlE92xUY150=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.127.0 h1:YMWd06HhyJY6iTlwfENNMEXNIyVtQ6A2mZ9TUt/Wje4=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.127.0/go.mod h1:PaDEiW3h30o0LQlemkTaKbPac6RzxnDthw/ZKQQkbLE=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.127.0 h1:FVzar7k+uGx7hrLUqwfKhCyrfQFCWLqRUNR/W5zUsoc=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.127.0/go.mod h1:N1aky/3s9tGQkSVII5BoemeEp6rCsFLjxg7pmDhOSV0=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer v0.127.0 h1:IxhkClhCt4W/KhyRru1vIzOVmVzRpwRsGh6D+vLgP+0=
