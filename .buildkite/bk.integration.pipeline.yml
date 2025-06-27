@@ -23,6 +23,11 @@ common:
         lifetime: 10800 # seconds
         project-id: "elastic-observability-ci"
         project-number: "911195782929"
+  - google_oidc_observability_plugin: &google_oidc_observability_plugin
+      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-gcp-oidc.tf
+      # This plugin authenticates to Google Cloud using the OIDC token.
+      elastic/oblt-google-auth#v1.3.0:
+        lifetime: 10800 # seconds
 # see https://github.com/avaly/gcp-secret-manager-buildkite-plugin/pull/10
 # see https://github.com/avaly/gcp-secret-manager-buildkite-plugin/pull/11
 #  - gcp_serverless_secrets_plugin: &gcp_serverless_secrets_plugin
@@ -37,25 +42,22 @@ common:
           KIBANA_HOST: ea-serverless-it-kibana-hostname
           KIBANA_USERNAME: ea-serverless-it-kibana-username
           KIBANA_PASSWORD: ea-serverless-it-kibana-password
+  # TODO: maybe we can rely on the VM and install only if not present?
+  - oblt_cli_plugin: &oblt_cli_plugin
+      elastic/oblt-cli#v0.2.0:
+        version-file: .oblt-cli-version
 
 steps:
-  - label: Start ESS stack for integration tests
+  - label: Start ESS stack for integration tests using oblt-cli
     key: integration-ess
     notify:
       - github_commit_status:
-          context: "buildkite/elastic-agent-extended-testing - ESS stack provision"
-    env:
-      ASDF_TERRAFORM_VERSION: 1.9.2
-    command: |
-      #!/usr/bin/env bash
-      set -euo pipefail
-      source .buildkite/scripts/steps/ess_start.sh
-    artifact_paths:
-      - test_infra/ess/*.tfstate
-      - test_infra/ess/*.lock.hcl
+          context: "buildkite/elastic-agent-extended-testing - ESS stack provision using oblt-cli"
+    command: .buildkite/scripts/steps/ess_start.sh
     agents:
-      image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
-      useCustomGlobalHooks: true
+      image: "docker.elastic.co/ci-agent-images/platform-ingest/oblt-cli:latest"
+    plugins:
+      - *google_oidc_observability_plugin
 
   - group: "Extended runtime leak tests"
     key: extended-integration-tests
@@ -83,6 +85,10 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+
       - label: "Windows:2025:amd64:sudo"
         depends_on:
           - packaging-windows
@@ -101,6 +107,10 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-ubuntu-x86-64
         env:
@@ -118,6 +128,9 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
 
   - group: "Stateful: Windows"
     key: integration-tests-win
@@ -154,6 +167,9 @@ steps:
           - upgrade
           - upgrade-flavor
           - install-uninstall
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
 
       - label: "Win2022:non-sudo:{{matrix}}"
         depends_on:
@@ -175,6 +191,9 @@ steps:
             limit: 1
         matrix:
           - default
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
 
       - label: "Win2025:sudo:{{matrix}}"
         depends_on:
@@ -203,6 +222,9 @@ steps:
           - upgrade
           - upgrade-flavor
           - install-uninstall
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
 
       - label: "Win2025:non-sudo:{{matrix}}"
         depends_on:
@@ -224,6 +246,9 @@ steps:
           image: "${IMAGE_WIN_2025}"
         matrix:
           - default
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
 
   - group: "Stateful:Ubuntu"
     key: integration-tests-ubuntu
@@ -252,6 +277,9 @@ steps:
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         matrix:
           - default
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
 
       - label: "x86_64:sudo: {{matrix}}"
         depends_on:
@@ -287,6 +315,9 @@ steps:
           - fqdn
           - deb
           - container
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
 
       - label: "arm:sudo: {{matrix}}"
         depends_on:
@@ -322,6 +353,9 @@ steps:
           # - fqdn
           # - deb
           # - container
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
 
       - label: "arm:non-sudo: {{matrix}}"
         skip: true
@@ -344,6 +378,9 @@ steps:
           instanceType: "m6g.xlarge"
         matrix:
           - default
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
 
   - group: "Stateful:Debian"
     key: integration-tests-debian
@@ -372,6 +409,9 @@ steps:
           image: "${IMAGE_DEBIAN_12}"
         matrix:
           - default
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
 
       - label: "x86_64:sudo: {{matrix}}"
         depends_on:
@@ -408,6 +448,9 @@ steps:
           #- fqdn
           - deb
           - container
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
 
   - group: "Stateful(Sudo):RHEL8"
     key: integration-tests-rhel8
@@ -435,6 +478,9 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_RHEL_8}"
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
 
   - group: "Kubernetes"
     key: integration-tests-kubernetes
@@ -483,6 +529,9 @@ steps:
               - v1.31.0
               - v1.32.0
               - v1.33.0
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
 
   - group: "Serverless integration test"
     key: integration-tests-serverless
@@ -562,13 +611,10 @@ steps:
       - integration-tests-kubernetes
       - extended-integration-tests
     allow_dependency_failure: true
-    command: |
-      buildkite-agent artifact download "test_infra/ess/**" . --step "integration-ess"
-      ls -lah test_infra/ess
-      .buildkite/scripts/steps/ess_down.sh
+    command: .buildkite/scripts/steps/ess_down.sh
     agents:
-      image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
-      useCustomGlobalHooks: true
+      # image: "docker.elastic.co/ci-agent-images/platform-ingest/oblt-cli:latest"
+      image: "docker.elastic.co/observability-ci/oblt-cli:7.21.0"
 
   - label: Aggregate test reports
     # Warning: The key has a hook in pre-command
