@@ -97,7 +97,7 @@ inputs:
 
 	// Use the post-upgrade hook to bypass the remainder of the PerformUpgrade
 	// because we want to do our own checks for the rollback.
-	var ErrPostExit = errors.New("post exit")
+	ErrPostExit := errors.New("post exit")
 	postUpgradeHook := func() error {
 		return ErrPostExit
 	}
@@ -272,7 +272,6 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 			standaloneRollbackRestartTest(ctx, t, from, to)
 		})
 	}
-
 }
 
 // TestFleetManagedUpgradeRollbackOnRestarts tests the scenario where upgrading to a new version
@@ -328,7 +327,6 @@ func TestFleetManagedUpgradeRollbackOnRestarts(t *testing.T) {
 }
 
 func managedRollbackRestartTest(ctx context.Context, t *testing.T, info *define.Info, from *atesting.Fixture, to *atesting.Fixture) {
-
 	startVersionInfo, err := from.ExecVersion(ctx)
 	require.NoError(t, err, "failed to get start agent build version info")
 
@@ -351,7 +349,7 @@ func managedRollbackRestartTest(ctx context.Context, t *testing.T, info *define.
 
 	// Use the post-upgrade hook to skip part of the PerformUpgrade (the checks during the grace period)
 	// because we want to do our own checks for the rollback.
-	ErrSkipGrace := errors.New("skip grace period")
+	var ErrSkipGrace = errors.New("skip grace period")
 	postUpgradeHook := func() error {
 		return ErrSkipGrace
 	}
@@ -401,9 +399,11 @@ func managedRollbackRestartTest(ctx context.Context, t *testing.T, info *define.
 	// version, otherwise it's possible that it was rolled back to the original version
 	err = upgradetest.CheckHealthyAndVersion(ctx, from, startVersionInfo.Binary)
 	assert.NoError(t, err)
+
 }
 
 func standaloneRollbackRestartTest(ctx context.Context, t *testing.T, startFixture *atesting.Fixture, endFixture *atesting.Fixture) {
+
 	startVersionInfo, err := startFixture.ExecVersion(ctx)
 	require.NoError(t, err, "failed to get start agent build version info")
 
