@@ -240,8 +240,13 @@ func New(
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
+<<<<<<< HEAD
 	otelManager := otelmanager.NewOTelManager(log.Named("otel_manager"))
 	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelManager, actionAcker, initialUpgradeDetails, compModifiers...)
+=======
+	otelManager := otelmanager.NewOTelManager(log.Named("otel_manager"), baseLogger)
+	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelManager, actionAcker, compModifiers...)
+>>>>>>> aa44f8b5e (Ensure beats receivers log the same metadata as beats processes (#8606))
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created
