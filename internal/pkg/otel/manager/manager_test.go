@@ -516,6 +516,42 @@ func TestOTelManager_Run(t *testing.T) {
 	}
 }
 
+func TestOTelManager_Logging(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	base, obs := loggertest.New("otel")
+	l, _ := loggertest.New("otel-manager")
+	m, err := NewOTelManager(l, logp.DebugLevel, base, EmbeddedExecutionMode)
+	require.NoError(t, err, "could not create otel manager")
+
+	go func() {
+		err := m.Run(ctx)
+		assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
+	}()
+
+	// watch is synchronous, so we need to read from it to avoid blocking the manager
+	go func() {
+		for {
+			select {
+			case <-m.Watch():
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	cfg := confmap.NewFromStringMap(testConfig)
+	m.Update(cfg)
+
+	// the collector should log to the base logger
+	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+		logs := obs.All()
+		require.NotEmpty(collect, logs, "Logs should not be empty")
+		firstMessage := logs[0].Message
+		assert.Equal(collect, firstMessage, "Setting up own telemetry...")
+	}, time.Second*10, time.Second)
+}
+
 // statusToYaml converts the status.AggregateStatus to a YAML string representation.
 func statusToYaml(s *status.AggregateStatus) string {
 	printable := toSerializableStatus(s)
