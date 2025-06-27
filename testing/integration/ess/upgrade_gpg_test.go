@@ -119,8 +119,6 @@ func TestStandaloneUpgradeWithGPGFallbackOneRemoteFailing(t *testing.T) {
 	// This is probably a way of getting a signed package
 	upgradeToVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
-
-	require.NoError(t, err)
 	var fetcher atesting.Fetcher
 
 	// FIXME: this is a hack, PreviousMinor() uses a version.ParsedSemVer internally and that's what we should use for the snapshot check

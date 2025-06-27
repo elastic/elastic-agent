@@ -42,7 +42,6 @@ func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
 	// this second upgrade.
 	upgradeFromVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
-
 	startFixture, err := atesting.NewFixture(
 		t,
 		upgradeFromVersion.String(),
@@ -57,7 +56,7 @@ func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
 
 	// Use the post-upgrade hook to bypass the remainder of the PerformUpgrade
 	// because we want to do our own checks for the rollback.
-	ErrPostExit := errors.New("post exit")
+	var ErrPostExit = errors.New("post exit")
 	postUpgradeHook := func() error {
 		return ErrPostExit
 	}
