@@ -60,7 +60,6 @@ steps:
         key: integration-tests-ech
         depends_on:
           - integration-ess-custom
-          - packaging-ubuntu-x86_64
         env:
           TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
         command: |
