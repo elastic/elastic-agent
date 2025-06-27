@@ -97,7 +97,7 @@ inputs:
 
 	// Use the post-upgrade hook to bypass the remainder of the PerformUpgrade
 	// because we want to do our own checks for the rollback.
-	ErrPostExit := errors.New("post exit")
+	var ErrPostExit = errors.New("post exit")
 	postUpgradeHook := func() error {
 		return ErrPostExit
 	}
@@ -268,6 +268,7 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 			standaloneRollbackRestartTest(ctx, t, from, to)
 		})
 	}
+
 }
 
 // TestFleetManagedUpgradeRollbackOnRestarts tests the scenario where upgrading to a new version
@@ -323,6 +324,7 @@ func TestFleetManagedUpgradeRollbackOnRestarts(t *testing.T) {
 }
 
 func managedRollbackRestartTest(ctx context.Context, t *testing.T, info *define.Info, from *atesting.Fixture, to *atesting.Fixture) {
+
 	startVersionInfo, err := from.ExecVersion(ctx)
 	require.NoError(t, err, "failed to get start agent build version info")
 
