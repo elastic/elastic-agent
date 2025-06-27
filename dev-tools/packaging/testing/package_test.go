@@ -371,17 +371,8 @@ func checkNpcapNotices(pkg, file string, contents io.Reader) error {
 	return nil
 }
 
-<<<<<<< HEAD
 func checkDocker(t *testing.T, file string, fipsPackage bool) {
-	p, info, err := readDocker(file)
-=======
-func checkDocker(t *testing.T, file string, fipsPackage bool) (string, int64) {
-	if strings.Contains(file, "elastic-otel-collector") {
-		return checkEdotCollectorDocker(t, file)
-	}
-
 	p, info, err := readDocker(file, true)
->>>>>>> f8c1f2ef0 ([Synthetics] Add e2e test for synthetics deps in complete variants (#8605))
 	if err != nil {
 		t.Errorf("error reading file %v: %v", file, err)
 		return
@@ -400,66 +391,10 @@ func checkDocker(t *testing.T, file string, fipsPackage bool) (string, int64) {
 	checkModulesDPresent(t, "", p)
 	checkHintsInputsD(t, "hints.inputs.d", hintsInputsDFilePattern, p)
 	checkLicensesPresent(t, "licenses/", p)
-<<<<<<< HEAD
-=======
 
 	if strings.Contains(file, "-complete") {
 		checkCompleteDocker(t, file)
 	}
-
-	name, err := dockerName(file, info.Config.Labels)
-	if err != nil {
-		t.Errorf("error constructing docker name: %v", err)
-		return "", -1
-	}
-
-	return name, info.Size
-}
-
-func dockerName(file string, labels map[string]string) (string, error) {
-	version, found := labels["version"]
-	if !found {
-		return "", errors.New("version label not found")
-	}
-
-	parts := strings.Split(file, "/")
-	if len(parts) == 0 {
-		return "", errors.New("failed to get file name parts")
-	}
-
-	lastPart := parts[len(parts)-1]
-	versionIdx := strings.Index(lastPart, version)
-	if versionIdx < 0 {
-		return "", fmt.Errorf("version not found in nam %q", file)
-	}
-	return lastPart[:versionIdx-1], nil
-}
-
-func checkEdotCollectorDocker(t *testing.T, file string) (string, int64) {
-	p, info, err := readDocker(file, true)
-	if err != nil {
-		t.Errorf("error reading file %v: %v", file, err)
-		return "", -1
-	}
-
-	checkDockerEntryPoint(t, p, info)
-	checkDockerLabels(t, p, info, file)
-	checkDockerUser(t, p, info, *rootUserContainer)
-	checkFilePermissions(t, p, configFilePattern, os.FileMode(0644))
-	checkFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
-	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
-	checkModulesPresent(t, "", p)
-	checkModulesDPresent(t, "", p)
-	checkLicensesPresent(t, "licenses/", p)
-
-	name, err := dockerName(file, info.Config.Labels)
-	if err != nil {
-		t.Errorf("error constructing docker name: %v", err)
-		return "", -1
-	}
-
-	return name, info.Size
->>>>>>> f8c1f2ef0 ([Synthetics] Add e2e test for synthetics deps in complete variants (#8605))
 }
 
 func checkCompleteDocker(t *testing.T, file string) {
