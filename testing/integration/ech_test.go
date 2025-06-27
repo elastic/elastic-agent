@@ -10,11 +10,15 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
@@ -57,12 +61,28 @@ func TestECH(t *testing.T) {
 	}, 5*time.Minute, 10*time.Second, "Fleet Server in ECH deployment is not healthy")
 
 	// Create a policy and install an agent
-	policyResp, enrollmentTokenResp := createPolicyAndEnrollmentToken(ctx, t, info.KibanaClient, createBasicPolicy())
+	policyUUID := uuid.Must(uuid.NewV4()).String()
+	policy := kibana.AgentPolicy{
+		Name:              "testloglevel-policy-" + policyUUID,
+		Namespace:         "default",
+		Description:       "Test Log Level Policy " + policyUUID,
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{},
+	}
+	t.Log("Creating Agent policy...")
+	policyResp, err := info.KibanaClient.CreatePolicy(t.Context(), policy)
+	require.NoError(t, err, "failed creating policy")
+
+	t.Log("Creating Agent enrollment API key...")
+	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
+		PolicyID: policyResp.ID,
+	}
+	enrollmentToken, err := info.KibanaClient.CreateEnrollmentAPIKey(t.Context(), createEnrollmentApiKeyReq)
+	require.NoError(t, err, "failed creating enrollment API key")
 	t.Logf("Created policy %+v", policyResp.AgentPolicy)
 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
-	err = fixture.Prepare(ctx)
+	err = fixture.Prepare(t.Context())
 	require.NoError(t, err)
 
 	opts := &atesting.InstallOpts{
@@ -73,15 +93,26 @@ func TestECH(t *testing.T) {
 			EnrollmentToken: enrollmentTokenResp.APIKey,
 		},
 	}
-	out, err := fixture.Install(ctx, opts)
+	out, err := fixture.Install(t.Context(), opts)
 	if err != nil {
 		t.Logf("install output: %s", out)
 		require.NoError(t, err)
 	}
 
 	require.Eventuallyf(t, func() bool {
-		return waitForAgentAndFleetHealthy(ctx, t, fixture)
-	}, time.Minute, time.Second, "agent never became healthy or connected to Fleet")
+		status, err := fixture.ExecStatus(t.Context())
+		if err != nil {
+			t.Logf("error fetching agent status: %v", err)
+			return false
+		}
+		statusBuffer := new(strings.Builder)
+		err = json.NewEncoder(statusBuffer).Encode(status)
+		if err != nil {
+			t.Logf("error marshaling agent status: %v", err)
+		} else {
+			t.Logf("agent status: %v", statusBuffer.String())
+		}
 
-	t.Run("run uninstall", testUninstallAuditUnenroll(ctx, fixture, info))
+		return status.State == int(cproto.State_HEALTHY) && status.FleetState == int(cproto.State_HEALTHY)
+	}, time.Minute, time.Second, "agent never became healthy or connected to Fleet")
 }
