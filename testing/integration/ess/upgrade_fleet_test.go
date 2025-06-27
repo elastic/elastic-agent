@@ -797,14 +797,18 @@ func copyFile(t *testing.T, srcPath, dstPath string) {
 }
 
 func isFIPSCapableVersion(ver *version.ParsedSemVer) bool {
-	// Versions prior to 8.19.0-SNAPSHOT are not FIPS-capable
-	if ver.Less(*upgradetest.Version_8_19_0_SNAPSHOT) {
+	// The 8.19.x versions are FIPS-capable
+	if ver.Major() == 8 && ver.Minor() == 19 {
+		return true
+	}
+
+	// Versions prior to 8.19.0 are not FIPS-capable
+	if ver.Less(*version.NewParsedSemVer(8, 19, 0, "", "")) {
 		return false
 	}
 
 	// The 9.0.x versions are not FIPS-capable
-	if ver.Major() == upgradetest.Version_9_0_0_SNAPSHOT.Major() &&
-		ver.Minor() == upgradetest.Version_9_0_0_SNAPSHOT.Minor() {
+	if ver.Major() == 9 && ver.Minor() == 0 {
 		return false
 	}
 
