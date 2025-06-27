@@ -16,7 +16,7 @@ summary: Upgrade Synthetics NodeJS version to latest LTS v20.
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-description: Upgrade Synthetics NodeJS version to latest LTS v20.
+# description:
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: heartbeat
