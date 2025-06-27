@@ -36,8 +36,6 @@ steps:
       - integration-fips-cloud-image
     env:
       ASDF_TERRAFORM_VERSION: 1.9.2
-      CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
-      CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips"
       TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
     command: |
       source .buildkite/scripts/steps/ess_start.sh
@@ -58,8 +56,6 @@ steps:
           - packaging-ubuntu-x86-64-fips # Reuse artifacts produced in .buildkite/integration.pipeline.yml
         env:
           FIPS: "true"
-          CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
-          CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips"
           TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
@@ -88,8 +84,6 @@ steps:
           - packaging-ubuntu-arm64-fips
         env:
           FIPS: "true"
-          CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
-          CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips"
           TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
