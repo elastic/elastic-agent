@@ -36,14 +36,11 @@ func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
-	upgradeableVersions, err := upgradetest.GetUpgradableVersions()
-	require.NoError(t, err)
-
 	// For this test we start with a version of Agent that's two minors older
 	// than the current version and upgrade to the current version. Then we attempt
 	// upgrading to the current version again, expecting Elastic Agent to disallow
 	// this second upgrade.
-	upgradeFromVersion, err := upgradetest.PreviousMinor(define.Version(), upgradeableVersions)
+	upgradeFromVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
 
 	startFixture, err := atesting.NewFixture(
@@ -60,7 +57,7 @@ func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
 
 	// Use the post-upgrade hook to bypass the remainder of the PerformUpgrade
 	// because we want to do our own checks for the rollback.
-	var ErrPostExit = errors.New("post exit")
+	ErrPostExit := errors.New("post exit")
 	postUpgradeHook := func() error {
 		return ErrPostExit
 	}

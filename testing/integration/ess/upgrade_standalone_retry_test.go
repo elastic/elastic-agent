@@ -42,12 +42,9 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	startFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	upgradeableVersions, err := upgradetest.GetUpgradableVersions()
-	require.NoError(t, err)
-
 	// The end version does not matter much but it must not match
 	// the commit hash of the current build.
-	endVersion, err := upgradetest.PreviousMinor(define.Version(), upgradeableVersions)
+	endVersion, err := upgradetest.PreviousMinor()
 	require.NoError(t, err)
 
 	endFixture, err := atesting.NewFixture(
@@ -70,7 +67,6 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	count := 0
 	fs := http.FileServer(http.Dir(filepath.Dir(srcPackage)))
 	handler := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-
 		// fix path to remove '/beats/elastic-agent/' prefix
 		upath := r.URL.Path
 		if !strings.HasPrefix(upath, "/") {

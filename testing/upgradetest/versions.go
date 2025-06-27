@@ -246,7 +246,17 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 	return upgradableVersions, nil
 }
 
-// PreviousMinor returns the previous minor version available for upgrade from the given list of upgradeable versions.
+func PreviousMinor() (*version.ParsedSemVer, error) {
+	currentVersion := define.Version()
+	upgradeableVersions, err := GetUpgradableVersions()
+	if err != nil {
+		return nil, err
+	}
+
+	return previousMinor(currentVersion, upgradeableVersions)
+}
+
+// previousMinor returns the previous minor version available for upgrade from the given list of upgradeable versions.
 //
 // The function follows these logic rules:
 //  1. If the current version is a first minor release (minor = 0) or a prerelease of the first minor (minor = 1 with prerelease),
@@ -254,7 +264,7 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 //  2. For all other cases, it returns the most recent previous minor version within the same major version.
 //  3. The function skips versions with prerelease tags or build metadata when looking for previous minors.
 //  4. If no suitable previous minor version is found, it returns ErrNoPreviousMinor.
-func PreviousMinor(currentVersion string, upgradeableVersions []*version.ParsedSemVer) (*version.ParsedSemVer, error) {
+func previousMinor(currentVersion string, upgradeableVersions []*version.ParsedSemVer) (*version.ParsedSemVer, error) {
 	current, err := version.ParseVersion(currentVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse the current version %s: %w", currentVersion, err)
