@@ -46,7 +46,6 @@ else
   export KIBANA_USERNAME=$(buildkite-agent meta-data get "kibana.username")
   export KIBANA_PASSWORD=$(buildkite-agent meta-data get "kibana.pwd")
   export INTEGRATIONS_SERVER_HOST=$(buildkite-agent meta-data get "integrations_server.host")
-  export EC_API_KEY=$(buildkite-agent meta-data get "ec_api_key")
 fi
 
 # Run integration tests
