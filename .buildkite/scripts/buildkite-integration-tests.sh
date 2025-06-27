@@ -29,6 +29,7 @@ function install_tools_linux() {
   source .buildkite/hooks/pre-command || echo "No pre-command hook found"
 }
 
+# We reinitialize ASDF tools only if the TEST_SUDO is set to true.
 if [ "$TEST_SUDO" == "true" ]; then
   if [[ "$(uname)" == "Darwin" ]]; then
     install_tools_macos

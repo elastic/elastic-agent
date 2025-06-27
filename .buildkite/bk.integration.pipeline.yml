@@ -59,7 +59,7 @@ steps:
         command: |
           source .buildkite/scripts/macos_install_asdf.sh
           buildkite-agent artifact download build/distributions/** . --step packaging-macos-arm64 --build 01975f71-71dc-4233-b04c-d4d608a13c33          
-          .buildkite/scripts/steps/macos-integration-tests.sh {{matrix}} true
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
           - build/diagnostics/**
