@@ -214,19 +214,3 @@ func upgradeFIPSAgent(t *testing.T, info *define.Info) {
 	upgradeOpts := []upgradetest.UpgradeOpt{upgradetest.WithPostWatcherSuccessHook(postWatcherSuccessHook)}
 	testFleetManagedUpgrade(t, info, true, true, upgradeOpts...)
 }
-
-func isFIPSCapableVersion(ver *version.ParsedSemVer) bool {
-	// Versions prior to 8.19.0-SNAPSHOT are not FIPS-capable
-	if ver.Less(*upgradetest.Version_8_19_0_SNAPSHOT) {
-		return false
-	}
-
-	// The 9.0.x versions are not FIPS-capable
-	if ver.Major() == upgradetest.Version_9_0_0_SNAPSHOT.Major() &&
-		ver.Minor() == upgradetest.Version_9_0_0_SNAPSHOT.Minor() {
-		return false
-	}
-
-	// All versions starting with 9.1.0-SNAPSHOT are FIPS-capable
-	return true
-}
