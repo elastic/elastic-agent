@@ -270,6 +270,10 @@ shared:
         content: >
           {{ commit }}
         mode: 0644
+      /etc/{{.BeatName}}/autoops-es.yml:
+        source: 'autoops-es.yml'
+        mode: 0600
+        config: true
       /etc/{{.BeatName}}/elastic-agent.reference.yml:
         source: 'elastic-agent.reference.yml'
         mode: 0644
@@ -339,6 +343,10 @@ shared:
       content: >
         {{ commit }}
       mode: 0644
+    'autoops-es.yml':
+      source: 'autoops-es.yml'
+      mode: 0600
+      config: true
     'elastic-agent.reference.yml':
       source: 'elastic-agent.reference.yml'
       mode: 0644
@@ -512,6 +520,10 @@ shared:
       linux_capabilities: ''
       beats_install_path: "install"
     files:
+      'autoops-es.yml':
+        source: 'autoops-es.yml'
+        mode: 0600
+        config: true
       'elastic-agent.yml':
         source: 'elastic-agent.docker.yml'
         mode: 0600
@@ -607,6 +619,10 @@ shared:
       linux_capabilities: ''
       beats_install_path: "install"
     files:
+      'autoops-es.yml':
+        source: 'autoops-es.yml'
+        mode: 0600
+        config: true
       'elastic-agent.yml':
         source: 'elastic-agent.docker.yml'
         mode: 0600
@@ -638,6 +654,10 @@ shared:
       linux_capabilities: ''
       beats_install_path: "install"
     files:
+      'autoops-es.yml':
+        source: 'autoops-es.yml'
+        mode: 0600
+        config: true
       'elastic-agent.yml':
         source: 'elastic-agent.docker.yml'
         mode: 0600
