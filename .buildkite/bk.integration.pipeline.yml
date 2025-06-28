@@ -46,10 +46,10 @@ steps:
           context: "buildkite/elastic-agent-extended-testing - ESS stack provision"
     env:
       ASDF_TERRAFORM_VERSION: 1.9.2
-    command: |
-      #!/usr/bin/env bash
-      set -euo pipefail
-      source .buildkite/scripts/steps/ess_start.sh
+    command: .buildkite/scripts/steps/ess_start.sh
+    retry:
+      automatic:
+        limit: 1
     artifact_paths:
       - test_infra/ess/*.tfstate
       - test_infra/ess/*.lock.hcl
