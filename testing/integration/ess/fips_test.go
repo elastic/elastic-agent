@@ -4,7 +4,7 @@
 
 //go:build integration
 
-package integration
+package ess
 
 import (
 	"context"
@@ -24,6 +24,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/version"
+	"github.com/elastic/elastic-agent/testing/integration"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
@@ -50,7 +51,7 @@ const cloudAgentPolicyID = "policy-elastic-agent-on-cloud"
 //     FIPS-capable Elastic Agent version.
 func TestFIPS(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: integration.Fleet,
 		Stack: &define.Stack{},
 		OS: []define.OS{
 			{Type: define.Linux},
@@ -161,7 +162,7 @@ func addIntegrationAndCheckData(t *testing.T, info *define.Info, fixture *atesti
 	// Install system integration
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
-	_, err := tools.InstallPackageFromDefaultFile(ctx, info.KibanaClient, "system", PreinstalledPackages["system"], "system_integration_setup.json", uuid.Must(uuid.NewV4()).String(), policyID)
+	_, err := tools.InstallPackageFromDefaultFile(ctx, info.KibanaClient, "system", integration.PreinstalledPackages["system"], "system_integration_setup.json", uuid.Must(uuid.NewV4()).String(), policyID)
 	require.NoError(t, err)
 
 	// Ensure data from system integration shows up in Elasticsearch
