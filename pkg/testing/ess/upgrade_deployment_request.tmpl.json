@@ -1,0 +1,90 @@
+{
+    "prune_orphans": true,
+    "resources": {
+        "integrations_server": [
+            {
+                "elasticsearch_cluster_ref_id": "main-elasticsearch",
+                "region": "{{ .request.region }}",
+                "plan": {
+                    "cluster_topology": [
+                        {
+                            "instance_configuration_id": "{{ .integrations_server_conf_id }}",
+                            "size": {
+                                "value": 1024,
+                                "resource": "memory"
+                            },
+                            "zone_count": 1
+                        }
+                    ],
+                    "integrations_server": {
+                        "version": "{{ .request.version }}"
+                    }
+                },
+                "ref_id": "main-integrations_server"
+            }
+        ],
+        "elasticsearch": [
+            {
+                "ref_id": "main-elasticsearch",
+                "region": "{{ .request.region }}",
+                "plan": {
+                    "cluster_topology": [
+                        {
+                            "id": "hot_content",
+                            "node_roles": [
+                                "master",
+                                "ingest",
+                                "transform",
+                                "data_hot",
+                                "remote_cluster_client",
+                                "data_content"
+                            ],
+                            "elasticsearch": {
+                                "node_attributes": {
+                                    "data": "hot"
+                                }
+                            },
+                            "instance_configuration_id": "{{.elasticsearch_conf_id}}",
+                            "zone_count": 1,
+                            "size": {
+                                "value": 8192,
+                                "resource": "memory"
+                            }
+                        }
+                    ],
+                    "elasticsearch": {
+                        "version": "{{ .request.version }}"
+                    },
+                    "deployment_template": {
+                        "id": "{{ .elasticsearch_deployment_template_id }}"
+                    }
+                }
+            }
+        ],
+        "kibana": [
+            {
+                "ref_id": "main-kibana",
+                "elasticsearch_cluster_ref_id": "main-elasticsearch",
+                "region": "{{ .request.region }}",
+                "plan": {
+                    "cluster_topology": [
+                        {
+                            "instance_configuration_id": "{{.kibana_instance_configuration_id}}",
+                            "size": {
+                                "value": 1024,
+                                "resource": "memory"
+                            },
+                            "zone_count": 1
+                        }
+                    ],
+                    "kibana": {
+                        "version": "{{ .request.version }}"
+                    }
+                }
+            }
+        ],
+        "apm": [],
+        "appsearch": [],
+        "enterprise_search": []
+    }
+}

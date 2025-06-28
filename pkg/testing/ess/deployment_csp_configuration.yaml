@@ -15,6 +15,6 @@ aws:
   kibana_instance_configuration_id: "aws.kibana.c5d"
 # Automatically updated by updatecli-bump-stack-version.yml. Don't change the structure and key names
 docker:
-  integration_server_image: "docker.elastic.co/cloud-release/elastic-agent-cloud:9.1.0-85c1d52a-SNAPSHOT"
-  elasticsearch_image: "docker.elastic.co/cloud-release/elasticsearch-cloud-ess:9.1.0-85c1d52a-SNAPSHOT"
-  kibana_image: "docker.elastic.co/cloud-release/kibana-cloud:9.1.0-85c1d52a-SNAPSHOT"
+  integration_server_image: "docker.elastic.co/cloud-release/elastic-agent-cloud:9.1.0-dd974feb-SNAPSHOT"
+  elasticsearch_image: "docker.elastic.co/cloud-release/elasticsearch-cloud-ess:9.1.0-dd974feb-SNAPSHOT"
+  kibana_image: "docker.elastic.co/cloud-release/kibana-cloud:9.1.0-dd974feb-SNAPSHOT"

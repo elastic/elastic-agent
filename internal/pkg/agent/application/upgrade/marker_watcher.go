@@ -146,7 +146,7 @@ func (mfw *MarkerFileWatcher) processMarker(currentVersion string, commit string
 		if marker.Details == nil {
 			marker.Details = details.NewDetails("unknown", details.StateRollback, marker.GetActionID())
 		} else if marker.Details.State == "" {
-			marker.Details.SetState(details.StateRollback)
+			marker.Details.SetStateWithReason(details.StateRollback, details.ReasonWatchFailed)
 		}
 	}
 

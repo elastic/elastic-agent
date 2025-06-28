@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,6 +29,15 @@ func TestDetailsSetState(t *testing.T) {
 
 	det.SetState(StateDownloading)
 	require.Equal(t, StateDownloading, det.State)
+}
+
+func TestDetailsSetStateWithReason(t *testing.T) {
+	det := NewDetails("99.999.9999", StateWatching, "test_action_id")
+	require.Equal(t, StateWatching, det.State)
+
+	det.SetStateWithReason(StateRollback, ReasonWatchFailed)
+	assert.Equal(t, StateRollback, det.State)
+	assert.Equal(t, ReasonWatchFailed, det.Metadata.Reason)
 }
 
 func TestDetailsFail(t *testing.T) {

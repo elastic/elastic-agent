@@ -13,27 +13,27 @@ import (
 
 func TestOverallStatus(t *testing.T) {
 	tests := map[string]struct {
-		statuses              []DeploymentStatus
-		expectedOverallStatus DeploymentStatus
+		statuses              []string
+		expectedOverallStatus string
 	}{
 		"single_started": {
-			statuses:              []DeploymentStatus{DeploymentStatusStarted},
+			statuses:              []string{DeploymentStatusStarted},
 			expectedOverallStatus: DeploymentStatusStarted,
 		},
 		"single_not_started": {
-			statuses:              []DeploymentStatus{DeploymentStatusReconfiguring},
+			statuses:              []string{DeploymentStatusReconfiguring},
 			expectedOverallStatus: DeploymentStatusReconfiguring,
 		},
 		"multiple_none_started": {
-			statuses:              []DeploymentStatus{DeploymentStatusInitializing, DeploymentStatusReconfiguring},
+			statuses:              []string{DeploymentStatusInitializing, DeploymentStatusReconfiguring},
 			expectedOverallStatus: DeploymentStatusInitializing,
 		},
 		"multiple_some_started": {
-			statuses:              []DeploymentStatus{DeploymentStatusReconfiguring, DeploymentStatusStarted, DeploymentStatusInitializing},
+			statuses:              []string{DeploymentStatusReconfiguring, DeploymentStatusStarted, DeploymentStatusInitializing},
 			expectedOverallStatus: DeploymentStatusReconfiguring,
 		},
 		"multiple_all_started": {
-			statuses:              []DeploymentStatus{DeploymentStatusStarted, DeploymentStatusStarted, DeploymentStatusStarted},
+			statuses:              []string{DeploymentStatusStarted, DeploymentStatusStarted, DeploymentStatusStarted},
 			expectedOverallStatus: DeploymentStatusStarted,
 		},
 	}
@@ -99,7 +99,6 @@ func Test_generateCreateDeploymentRequestBody(t *testing.T) {
                   "integrations_server": {
                     "version": "1.2.3",
                     "docker_image": "docker.elastic.co/cloud-release/elastic-agent-cloud:1.2.3-foo-SNAPSHOT"
-                    
                   }
                 },
                 "ref_id": "main-integrations_server"
@@ -209,4 +208,101 @@ func Test_generateCreateDeploymentRequestBody(t *testing.T) {
 			assert.JSONEq(t, tt.want, actualJSON)
 		})
 	}
+}
+
+func TestGenerateUpgradeDeploymentRequestBody(t *testing.T) {
+	got, err := generateUpgradeDeploymentRequestBody("us-east-1", "1.2.3")
+	require.NoError(t, err)
+	want := `{
+    "prune_orphans": true,
+    "resources": {
+        "integrations_server": [
+            {
+                "elasticsearch_cluster_ref_id": "main-elasticsearch",
+                "region": "us-east-1",
+                "plan": {
+                    "cluster_topology": [
+                        {
+                            "instance_configuration_id": "aws.integrationsserver.c5d",
+                            "size": {
+                                "value": 1024,
+                                "resource": "memory"
+                            },
+                            "zone_count": 1
+                        }
+                    ],
+                    "integrations_server": {
+                        "version": "1.2.3"
+                    }
+                },
+                "ref_id": "main-integrations_server"
+            }
+        ],
+        "elasticsearch": [
+            {
+                "ref_id": "main-elasticsearch",
+                "region": "us-east-1",
+                "plan": {
+                    "cluster_topology": [
+                        {
+                            "id": "hot_content",
+                            "node_roles": [
+                                "master",
+                                "ingest",
+                                "transform",
+                                "data_hot",
+                                "remote_cluster_client",
+                                "data_content"
+                            ],
+                            "elasticsearch": {
+                                "node_attributes": {
+                                    "data": "hot"
+                                }
+                            },
+                            "instance_configuration_id": "aws.es.datahot.i3",
+                            "zone_count": 1,
+                            "size": {
+                                "value": 8192,
+                                "resource": "memory"
+                            }
+                        }
+                    ],
+                    "elasticsearch": {
+                        "version": "1.2.3"
+                    },
+                    "deployment_template": {
+                        "id": "aws-storage-optimized"
+                    }
+                }
+            }
+        ],
+        "kibana": [
+            {
+                "ref_id": "main-kibana",
+                "elasticsearch_cluster_ref_id": "main-elasticsearch",
+                "region": "us-east-1",
+                "plan": {
+                    "cluster_topology": [
+                        {
+                            "instance_configuration_id": "aws.kibana.c5d",
+                            "size": {
+                                "value": 1024,
+                                "resource": "memory"
+                            },
+                            "zone_count": 1
+                        }
+                    ],
+                    "kibana": {
+                        "version": "1.2.3"
+                    }
+                }
+            }
+        ],
+        "apm": [],
+        "appsearch": [],
+        "enterprise_search": []
+    }
+}
+`
+	require.Equal(t, want, string(got))
 }

@@ -224,7 +224,10 @@ func New(
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
-	otelManager := otelmanager.NewOTelManager(log.Named("otel_manager"))
+	otelManager, err := otelmanager.NewOTelManager(log.Named("otel_manager"), logLevel, baseLogger, otelmanager.EmbeddedExecutionMode)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)
+	}
 	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelManager, actionAcker, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
