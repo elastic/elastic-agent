@@ -23,9 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
-	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/integration"
-	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
 const cloudAgentPolicyID = "policy-elastic-agent-on-cloud"
@@ -193,24 +191,33 @@ func addIntegrationAndCheckData(t *testing.T, info *define.Info, fixture *atesti
 func upgradeFIPSAgent(t *testing.T, info *define.Info) {
 	t.Helper()
 
-	// TODO: use upgradetest.GetUpgradableVersions() + isFIPSCapableVersion() to determine start versions
-	// TODO: call testUpgradeFleetManagedElasticAgent() but amend it to optionally not install start fixture
+	startVersions := getUpgradeStartVersions(t)
+	endVersion := define.Version()
 
-	// parse the version we are testing
-	currentVersion, err := version.ParseVersion(define.Version())
-	require.NoError(t, err)
+	for _, startVersion := range startVersions {
+		t.Run(startVersion.String()+"_to_"+endVersion, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.TODO())
+			defer cancel()
 
-	// We need to start the upgrade from a FIPS-capable version
-	if !isFIPSCapableVersion(currentVersion) {
-		t.Skipf(
-			"Minimum start version of FIPS-capable Agent for running this test is either %q or %q, current start version: %q",
-			*upgradetest.Version_8_19_0_SNAPSHOT,
-			*upgradetest.Version_9_1_0_SNAPSHOT,
-			currentVersion,
-		)
+			// Setup start fixture
+			startFixture, err := atesting.NewFixture(
+				t,
+				startVersion,
+				atesting.WithFetcher(atesting.ArtifactFetcher(atesting.WithArtifactFIPSOnly())),
+			)
+			require.NoError(t, err)
+			err = startFixture.Prepare(ctx)
+			require.NoError(t, err)
+
+			// Setup end fixture
+			endFixture, err := define.NewFixtureFromLocalFIPSBuild(t, endVersion)
+			require.NoError(t, err)
+			err = endFixture.Prepare(ctx)
+			require.NoError(t, err)
+
+			// TODO: create and pass new upgradetest.UpgradeOpt for not installing startFixture since it'll already
+			// be installed.
+			testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture, defaultPolicy(), false)
+		})
 	}
-
-	postWatcherSuccessHook := upgradetest.PostUpgradeAgentIsFIPSCapable
-	upgradeOpts := []upgradetest.UpgradeOpt{upgradetest.WithPostWatcherSuccessHook(postWatcherSuccessHook)}
-	testFleetManagedUpgrade(t, info, true, true, upgradeOpts...)
 }
