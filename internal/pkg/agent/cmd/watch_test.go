@@ -275,8 +275,9 @@ func Test_watchCmd(t *testing.T) {
 			tmpDir := t.TempDir()
 			mockWatcher := cmdmocks.NewAgentWatcher(t)
 			mockInstallModifier := cmdmocks.NewInstallationModifier(t)
+			cmd := newWatchCommandWithArgs(nil, nil)
 			tt.setupUpgradeMarker(t, tmpDir, mockWatcher, mockInstallModifier)
-			tt.wantErr(t, watchCmd(log, tmpDir, tt.args.cfg, mockWatcher, mockInstallModifier), fmt.Sprintf("watchCmd(%v, ...)", tt.args.cfg))
+			tt.wantErr(t, watchCmd(cmd, log, tmpDir, tt.args.cfg, mockWatcher, mockInstallModifier), fmt.Sprintf("watchCmd(%v, ...)", tt.args.cfg))
 			t.Logf("watchCmd logs:\n%v", obs.All())
 		})
 	}
