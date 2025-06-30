@@ -479,22 +479,6 @@ type ActionMigrateData struct {
 	Settings json.RawMessage `json:"settings" yaml:"settings,omitempty"`
 }
 
-type ActionMigrateSettings struct {
-	CaSHA256         string   `json:"ca_sha256,omitempty"`
-	CAs              string   `json:"certificate_authorities,omitempty"`
-	AgentCert        string   `json:"elastic_agent_cert,omitempty"`
-	AgentCertKey     string   `json:"elastic_agent_cert_key,omitempty"`
-	AgentCertLeyPass string   `json:"elastic_agent_cert_key_passphrase,omitempty"`
-	Headers          []string `json:"headers,omitempty"`
-	Insecure         bool     `json:"insecure,omitempty"`
-	ProxyDisabled    bool     `json:"proxy_disabled,omitempty"`
-	ProxyHeaders     []string `json:"proxy_headers,omitempty"`
-	ProxyURL         string   `json:"proxy_url,omitempty"`
-	Staging          string   `json:"staging,omitempty"`
-	Tags             []string `json:"tags,omitempty"`
-	ReplaceToken     string   `json:"replace_token,omitempty"`
-}
-
 func (a *ActionSettings) AckEvent() AckEvent {
 	return newAckEvent(a.ActionID, a.ActionType)
 }
