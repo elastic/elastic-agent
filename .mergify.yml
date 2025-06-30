@@ -23,7 +23,11 @@ pull_request_rules:
     conditions:
       - author=github-actions[bot]
       - check-success=buildkite/elastic-agent
+<<<<<<< HEAD
       - or: 
+=======
+      - or:
+>>>>>>> 2252fdd7c (ci: revert deployment_csp_configuration.yaml to create_deployment_csp_configuration.yaml (#8746))
         - files~=^pkg/testing/ess/create_deployment_csp_configuration.yaml$
         - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
       - head~=^updatecli_.*
@@ -35,7 +39,11 @@ pull_request_rules:
     conditions:
       - author=github-actions[bot]
       - check-success=buildkite/elastic-agent
+<<<<<<< HEAD
       - or: 
+=======
+      - or:
+>>>>>>> 2252fdd7c (ci: revert deployment_csp_configuration.yaml to create_deployment_csp_configuration.yaml (#8746))
         - files~=^pkg/testing/ess/create_deployment_csp_configuration.yaml$
         - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
       - head~=^updatecli_.*
@@ -46,7 +54,11 @@ pull_request_rules:
   - name: rebase pull requests for the VM autobump and ESS version pinning
     conditions:
       - author=github-actions[bot]
+<<<<<<< HEAD
       - or: 
+=======
+      - or:
+>>>>>>> 2252fdd7c (ci: revert deployment_csp_configuration.yaml to create_deployment_csp_configuration.yaml (#8746))
         - files~=^pkg/testing/ess/create_deployment_csp_configuration.yaml$
         - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
       - head~=^updatecli_.*
