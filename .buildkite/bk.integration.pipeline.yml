@@ -13,7 +13,6 @@ env:
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1750467641"
   IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1750467641"
   # Remove AGENT_PACKAGE_VERSION and AGENT_VERSION pinning once 9.2.0 DRA and stack are released
-  AGENT_PACKAGE_VERSION: "9.1.0"
   AGENT_VERSION: "9.1.0-SNAPSHOT"
 
 
