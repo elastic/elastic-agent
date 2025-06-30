@@ -205,7 +205,7 @@ type Client interface {
 	// Restart triggers restarting the current running daemon.
 	Restart(ctx context.Context) error
 	// Upgrade triggers upgrade of the current running daemon.
-	Upgrade(ctx context.Context, version string, sourceURI string, skipVerify bool, skipDefaultPgp bool, pgpBytes ...string) (string, error)
+	Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, skipVerify bool, skipDefaultPgp bool, pgpBytes ...string) (string, error)
 	// DiagnosticAgent gathers diagnostics information for the running Elastic Agent.
 	DiagnosticAgent(ctx context.Context, additionalDiags []AdditionalMetrics) ([]DiagnosticFileResult, error)
 	// DiagnosticUnits gathers diagnostics information from specific units (or all if non are provided).
@@ -328,13 +328,14 @@ func (c *client) Restart(ctx context.Context) error {
 }
 
 // Upgrade triggers upgrade of the current running daemon.
-func (c *client) Upgrade(ctx context.Context, version string, sourceURI string, skipVerify bool, skipDefaultPgp bool, pgpBytes ...string) (string, error) {
+func (c *client) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, skipVerify bool, skipDefaultPgp bool, pgpBytes ...string) (string, error) {
 	res, err := c.client.Upgrade(ctx, &cproto.UpgradeRequest{
 		Version:        version,
 		SourceURI:      sourceURI,
 		SkipVerify:     skipVerify,
 		PgpBytes:       pgpBytes,
 		SkipDefaultPgp: skipDefaultPgp,
+		Rollback:       rollback,
 	})
 	if err != nil {
 		return "", err
