@@ -642,15 +642,15 @@ func (c *Coordinator) Migrate(ctx context.Context, action *fleetapi.ActionMigrat
 		return errors.Join(fmt.Errorf("failed to enroll: %w", err), restoreErr)
 	}
 
+	// ACK success to source fleet server
+	if err := c.ackMigration(ctx, action, c.fleetAcker); err != nil {
+		c.logger.Infof("failed to ACK success: %v", err)
+	}
+
 	if err := enroll.CleanBackupConfig(); err != nil {
 		// when backup is present, it will be restored on next start.
 		// do not ack success
 		return fmt.Errorf("failed to clean backup config: %w", err)
-	}
-
-	// ACK success to source fleet server
-	if err := c.ackMigration(ctx, action, c.fleetAcker); err != nil {
-		c.logger.Infof("failed to ACK success: %v", err)
 	}
 
 	// Best effort: call unenroll on source cluster once done
