@@ -19,24 +19,24 @@ defaults:
       labels:
         - "backport"
 pull_request_rules:
-  - name: automatic approval for updatecli pull requests with changes in .buildkite or deployment_csp_configuration.yaml
+  - name: automatic approval for updatecli pull requests with changes in .buildkite or create_deployment_csp_configuration.yaml
     conditions:
       - author=github-actions[bot]
       - check-success=buildkite/elastic-agent
       - or:
-        - files~=^pkg/testing/ess/deployment_csp_configuration.yaml$
+        - files~=^pkg/testing/ess/create_deployment_csp_configuration.yaml$
         - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
       - head~=^updatecli_.*
     actions:
       review:
         type: APPROVE
         message: Automatically approving mergify
-  - name: automatic squash and merge with success checks and the files matching the regex .buildkite or deployment_csp_configuration.yaml is modified.
+  - name: automatic squash and merge with success checks and the files matching the regex .buildkite or create_deployment_csp_configuration.yaml is modified.
     conditions:
       - author=github-actions[bot]
       - check-success=buildkite/elastic-agent
       - or:
-        - files~=^pkg/testing/ess/deployment_csp_configuration.yaml$
+        - files~=^pkg/testing/ess/create_deployment_csp_configuration.yaml$
         - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
       - head~=^updatecli_.*
       - "#approved-reviews-by>=1"
@@ -47,7 +47,7 @@ pull_request_rules:
     conditions:
       - author=github-actions[bot]
       - or:
-        - files~=^pkg/testing/ess/deployment_csp_configuration.yaml$
+        - files~=^pkg/testing/ess/create_deployment_csp_configuration.yaml$
         - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
       - head~=^updatecli_.*
       - "#check-failure>0"
