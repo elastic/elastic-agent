@@ -11,7 +11,7 @@ ASDF_VERSION="v0.14.1"
 
 # todo retry
 git clone https://github.com/asdf-vm/asdf.git ${ASDF_DIR} --branch ${ASDF_VERSION} 
-echo 'source $ASDF_DIR/asdf.sh' >> $AGENT_HOME/.bashrc 
+echo "source $ASDF_DIR/asdf.sh" >> $AGENT_HOME/.bashrc 
 source $ASDF_DIR/asdf.sh
 asdf version
 
