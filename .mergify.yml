@@ -3,26 +3,61 @@ queue_rules:
     conditions:
       - check-success=fleet-ci/pr-merge
 pull_request_rules:
+<<<<<<< HEAD
   - name: automatic approval for updatecli pull requests with changes in .buildkite
     conditions:
       - author=github-actions[bot]
       - check-success=buildkite/elastic-agent
       - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
+=======
+  - name: automatic approval for updatecli pull requests with changes in .buildkite or create_deployment_csp_configuration.yaml
+    conditions:
+      - author=github-actions[bot]
+      - check-success=buildkite/elastic-agent
+      - or:
+        - files~=^pkg/testing/ess/create_deployment_csp_configuration.yaml$
+        - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
+>>>>>>> 2252fdd7c (ci: revert deployment_csp_configuration.yaml to create_deployment_csp_configuration.yaml (#8746))
       - head~=^updatecli_.*
     actions:
       review:
         type: APPROVE
         message: Automatically approving mergify
+<<<<<<< HEAD
   - name: automatic squash and merge with success checks and the files matching the regex .buildkite is modified.
     conditions:
       - author=github-actions[bot]
       - check-success=buildkite/elastic-agent
       - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
+=======
+  - name: automatic squash and merge with success checks and the files matching the regex .buildkite or create_deployment_csp_configuration.yaml is modified.
+    conditions:
+      - author=github-actions[bot]
+      - check-success=buildkite/elastic-agent
+      - or:
+        - files~=^pkg/testing/ess/create_deployment_csp_configuration.yaml$
+        - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
+>>>>>>> 2252fdd7c (ci: revert deployment_csp_configuration.yaml to create_deployment_csp_configuration.yaml (#8746))
       - head~=^updatecli_.*
       - "#approved-reviews-by>=1"
     actions:
       queue:
         name: default
+<<<<<<< HEAD
+=======
+  - name: rebase pull requests for the VM autobump and ESS version pinning
+    conditions:
+      - author=github-actions[bot]
+      - or:
+        - files~=^pkg/testing/ess/create_deployment_csp_configuration.yaml$
+        - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
+      - head~=^updatecli_.*
+      - "#check-failure>0"
+      - schedule=Mon-Fri 04:00-06:00[Europe/Paris]
+    actions:
+      rebase:
+
+>>>>>>> 2252fdd7c (ci: revert deployment_csp_configuration.yaml to create_deployment_csp_configuration.yaml (#8746))
   - name: self-assign PRs
     conditions:
       - -merged

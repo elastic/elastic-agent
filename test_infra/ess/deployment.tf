@@ -71,7 +71,7 @@ locals {
       }
 
     },
-    yamldecode(file("${path.module}/../../pkg/testing/ess/deployment_csp_configuration.yaml")))
+    yamldecode(file("${path.module}/../../pkg/testing/ess/create_deployment_csp_configuration.yaml")))
 
 
   integration_server_docker_image = coalesce(var.integration_server_docker_image, local.ess_properties.docker.integration_server_image, "docker.elastic.co/cloud-release/elastic-agent-cloud:${var.stack_version}")
