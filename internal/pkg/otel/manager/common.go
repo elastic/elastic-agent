@@ -33,8 +33,8 @@ func reportErr(ctx context.Context, errCh chan error, err error) {
 	}
 }
 
-// reportStatus sends the new status to the status channel.
-func reportStatus(ctx context.Context, statusCh chan *status.AggregateStatus, statuses *status.AggregateStatus) {
+// reportCollectorStatus sends the new status to the status channel.
+func reportCollectorStatus(ctx context.Context, statusCh chan *status.AggregateStatus, statuses *status.AggregateStatus) {
 	select {
 	case <-ctx.Done():
 		return
