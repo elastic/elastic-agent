@@ -133,6 +133,8 @@ steps:
       - label: "Win2022:sudo:{{matrix}}"
         depends_on:
           - packaging-windows
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
@@ -158,6 +160,8 @@ steps:
       - label: "Win2022:non-sudo:{{matrix}}"
         depends_on:
           - packaging-windows
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
@@ -177,6 +181,8 @@ steps:
       - label: "Win2025:sudo:{{matrix}}"
         depends_on:
           - packaging-windows
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
@@ -203,6 +209,8 @@ steps:
       - label: "Win2025:non-sudo:{{matrix}}"
         depends_on:
           - packaging-windows
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
@@ -229,6 +237,8 @@ steps:
     steps:
       - label: "x86_64:non-sudo: {{matrix}}"
         depends_on: packaging-ubuntu-x86-64
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
@@ -249,6 +259,8 @@ steps:
         depends_on:
           - packaging-ubuntu-x86-64
         # due to deb group present in matrix tar.gz and deb packages artifacts are required
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
@@ -280,6 +292,8 @@ steps:
       - label: "arm:sudo: {{matrix}}"
         depends_on:
           - packaging-ubuntu-arm64
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
@@ -313,6 +327,8 @@ steps:
         skip: true
         depends_on:
           - packaging-ubuntu-arm64
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
@@ -339,6 +355,8 @@ steps:
     steps:
       - label: "x86_64:non-sudo: {{matrix}}"
         depends_on: packaging-ubuntu-x86-64
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
@@ -359,6 +377,8 @@ steps:
         depends_on:
           - packaging-ubuntu-x86-64
         # due to deb group present in matrix tar.gz and deb packages artifacts are required
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
@@ -400,6 +420,8 @@ steps:
       - label: "x86_64:sudo:rpm"
         depends_on:
           - packaging-ubuntu-x86-64
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64
           .buildkite/scripts/steps/integration_tests_tf.sh rpm true
