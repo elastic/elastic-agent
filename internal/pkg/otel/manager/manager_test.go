@@ -1275,21 +1275,21 @@ func testComponent(componentId string) component.Component {
 	}
 }
 
-func getFromChannelOrErrorWithContext[T any](t *testing.T, ctx context.Context, ch <-chan T, errCh <-chan error) (T, error) {
-	t.Helper()
-	var result T
-	var err error
-	for err == nil {
-		select {
-		case result = <-ch:
-			return result, nil
-		case err = <-errCh:
-		case <-ctx.Done():
-			err = ctx.Err()
-		}
-	}
-	return result, err
-}
+//func getFromChannelOrErrorWithContext[T any](t *testing.T, ctx context.Context, ch <-chan T, errCh <-chan error) (T, error) {
+//	t.Helper()
+//	var result T
+//	var err error
+//	for err == nil {
+//		select {
+//		case result = <-ch:
+//			return result, nil
+//		case err = <-errCh:
+//		case <-ctx.Done():
+//			err = ctx.Err()
+//		}
+//	}
+//	return result, err
+//}
 
 func assertOtelStatusesEqualIgnoringTimestamps(t require.TestingT, a, b *status.AggregateStatus) bool {
 	if a == nil || b == nil {
