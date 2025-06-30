@@ -1338,9 +1338,9 @@ func (f *fakeVarsManager) DefaultProvider() string {
 	return ""
 }
 
-var _ OTelManager = (*fakeOtelComponentManager)(nil)
+var _ OTelManager = (*fakeOTelManager)(nil)
 
-type fakeOtelComponentManager struct {
+type fakeOTelManager struct {
 	updateCollectorCallback func(*confmap.Conf) error
 	updateComponentCallback func(component.Model) error
 	errChan                 chan error
@@ -1348,16 +1348,16 @@ type fakeOtelComponentManager struct {
 	componentStateChan      chan runtime.ComponentComponentState
 }
 
-func (f *fakeOtelComponentManager) Run(ctx context.Context) error {
+func (f *fakeOTelManager) Run(ctx context.Context) error {
 	<-ctx.Done()
 	return ctx.Err()
 }
 
-func (f *fakeOtelComponentManager) Errors() <-chan error {
+func (f *fakeOTelManager) Errors() <-chan error {
 	return f.errChan
 }
 
-func (f *fakeOtelComponentManager) UpdateCollector(cfg *confmap.Conf) {
+func (f *fakeOTelManager) UpdateCollector(cfg *confmap.Conf) {
 	var result error
 	if f.updateCollectorCallback != nil {
 		result = f.updateCollectorCallback(cfg)
@@ -1368,11 +1368,11 @@ func (f *fakeOtelComponentManager) UpdateCollector(cfg *confmap.Conf) {
 	}
 }
 
-func (f *fakeOtelComponentManager) WatchCollector() <-chan *status.AggregateStatus {
+func (f *fakeOTelManager) WatchCollector() <-chan *status.AggregateStatus {
 	return f.collectorStatusChan
 }
 
-func (f *fakeOtelComponentManager) UpdateComponents(componentModel component.Model) {
+func (f *fakeOTelManager) UpdateComponents(componentModel component.Model) {
 	var result error
 	if f.updateComponentCallback != nil {
 		result = f.updateComponentCallback(componentModel)
@@ -1383,11 +1383,11 @@ func (f *fakeOtelComponentManager) UpdateComponents(componentModel component.Mod
 	}
 }
 
-func (f *fakeOtelComponentManager) WatchComponents() <-chan runtime.ComponentComponentState {
+func (f *fakeOTelManager) WatchComponents() <-chan runtime.ComponentComponentState {
 	return f.componentStateChan
 }
 
-func (f *fakeOtelComponentManager) MergedOtelConfig() *confmap.Conf { return nil }
+func (f *fakeOTelManager) MergedOtelConfig() *confmap.Conf { return nil }
 
 // An implementation of the RuntimeManager interface for use in testing.
 type fakeRuntimeManager struct {
