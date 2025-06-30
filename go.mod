@@ -18,7 +18,7 @@ require (
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.9.2
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
-	github.com/elastic/elastic-agent-libs v0.20.1
+	github.com/elastic/elastic-agent-libs v0.21.0
 	github.com/elastic/elastic-agent-system-metrics v0.11.16
 	github.com/elastic/elastic-transport-go/v8 v8.7.0
 	github.com/elastic/go-elasticsearch/v8 v8.18.1
@@ -51,6 +51,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.127.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.127.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.127.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.127.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.127.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.127.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.127.0

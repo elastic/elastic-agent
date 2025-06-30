@@ -186,6 +186,11 @@ func (prov *ServerlessProvisioner) Delete(ctx context.Context, stack common.Stac
 	return nil
 }
 
+// Upgrade does not apply to Serverless projects!
+func (prov *ServerlessProvisioner) Upgrade(ctx context.Context, stack common.Stack, newVersion string) error {
+	return fmt.Errorf("upgrade is not supported for serverless projects")
+}
+
 // CheckCloudRegion checks to see if the provided region is valid for the serverless
 // if we have an invalid region, overwrite with a valid one.
 // The "normal" and serverless ESS APIs have different regions, hence why we need this.

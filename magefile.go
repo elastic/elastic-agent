@@ -442,6 +442,7 @@ func getTestBinariesPath() ([]string, error) {
 		filepath.Join(wd, "internal", "pkg", "agent", "install", "testblocking"),
 		filepath.Join(wd, "pkg", "core", "process", "testsignal"),
 		filepath.Join(wd, "internal", "pkg", "agent", "application", "filelock", "testlocker"),
+		filepath.Join(wd, "internal", "pkg", "otel", "manager", "testing"),
 	}
 	return testBinaryPkgs, nil
 }
@@ -995,11 +996,10 @@ func (Cloud) Image(ctx context.Context) {
 // Looks in build/distributions for an elastic-agent-cloud*.docker.tar.gz artifact and imports it as docker.elastic.co/beats-ci/elastic-agent-cloud:$VERSION
 // DOCKER_IMPORT_SOURCE - override source for import
 func (Cloud) Load() error {
-	snapshot := os.Getenv(snapshotEnv)
-	defer os.Setenv(snapshotEnv, snapshot)
-	os.Setenv(snapshotEnv, "true")
-
-	version := getVersion()
+	agentVersion, err := mage.AgentPackageVersion()
+	if err != nil {
+		return fmt.Errorf("failed to get agent package version: %w", err)
+	}
 
 	// Need to get the FIPS env var flag to see if we are using the normal source cloud image name, or the FIPS variant
 	fips := os.Getenv(fipsEnv)
@@ -1008,12 +1008,14 @@ func (Cloud) Load() error {
 	if err != nil {
 		fipsVal = false
 	}
-	os.Setenv(fipsEnv, strconv.FormatBool(fipsVal))
+	if err := os.Setenv(fipsEnv, strconv.FormatBool(fipsVal)); err != nil {
+		return fmt.Errorf("failed to set fips env var: %w", err)
+	}
 	devtools.FIPSBuild = fipsVal
 
-	source := "build/distributions/elastic-agent-cloud-" + version + "-linux-" + runtime.GOARCH + ".docker.tar.gz"
+	source := "build/distributions/elastic-agent-cloud-" + agentVersion + "-SNAPSHOT-linux-" + runtime.GOARCH + ".docker.tar.gz"
 	if fipsVal {
-		source = "build/distributions/elastic-agent-cloud-fips-" + version + "-linux-" + runtime.GOARCH + ".docker.tar.gz"
+		source = "build/distributions/elastic-agent-cloud-fips-" + agentVersion + "-SNAPSHOT-linux-" + runtime.GOARCH + ".docker.tar.gz"
 	}
 	if envSource, ok := os.LookupEnv("DOCKER_IMPORT_SOURCE"); ok && envSource != "" {
 		source = envSource
@@ -1025,20 +1027,9 @@ func (Cloud) Load() error {
 // Push builds a cloud image tags it correctly and pushes to remote image repo.
 // Previous login to elastic registry is required!
 func (Cloud) Push() error {
-	snapshot := os.Getenv(snapshotEnv)
-	defer os.Setenv(snapshotEnv, snapshot)
-
-	os.Setenv(snapshotEnv, "true")
-
-	version := getVersion()
-	var tag string
-	if envTag, isPresent := os.LookupEnv("CUSTOM_IMAGE_TAG"); isPresent && len(envTag) > 0 {
-		tag = envTag
-	} else {
-		commit := dockerCommitHash()
-		time := time.Now().Unix()
-
-		tag = fmt.Sprintf("%s-%s-%d", version, commit, time)
+	agentVersion, err := mage.AgentPackageVersion()
+	if err != nil {
+		return fmt.Errorf("failed to get agent package version: %w", err)
 	}
 
 	// Need to get the FIPS env var flag to see if we are using the normal source cloud image name, or the FIPS variant
@@ -1048,38 +1039,46 @@ func (Cloud) Push() error {
 	if err != nil {
 		fipsVal = false
 	}
-	os.Setenv(fipsEnv, strconv.FormatBool(fipsVal))
+	if err := os.Setenv(fipsEnv, strconv.FormatBool(fipsVal)); err != nil {
+		return fmt.Errorf("failed to set fips env var: %w", err)
+	}
 	devtools.FIPSBuild = fipsVal
 
-	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s", version)
+	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s-SNAPSHOT", agentVersion)
 	if fipsVal {
-		sourceCloudImageName = fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud-fips:%s", version)
+		sourceCloudImageName = fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud-fips:%s-SNAPSHOT", agentVersion)
+	}
+	var targetTag string
+	if envTag, isPresent := os.LookupEnv("CUSTOM_IMAGE_TAG"); isPresent && len(envTag) > 0 {
+		targetTag = envTag
+	} else {
+		targetTag = fmt.Sprintf("%s-%s-%d", agentVersion, dockerCommitHash(), time.Now().Unix())
 	}
 	var targetCloudImageName string
 	if customImage, isPresent := os.LookupEnv("CI_ELASTIC_AGENT_DOCKER_IMAGE"); isPresent && len(customImage) > 0 {
-		targetCloudImageName = fmt.Sprintf("%s:%s", customImage, tag)
+		targetCloudImageName = fmt.Sprintf("%s:%s", customImage, targetTag)
 	} else {
-		targetCloudImageName = fmt.Sprintf(cloudImageTmpl, tag)
+		targetCloudImageName = fmt.Sprintf(cloudImageTmpl, targetTag)
 	}
 
 	fmt.Printf(">> Setting a docker image tag to %s\n", targetCloudImageName)
 	err = sh.RunV("docker", "tag", sourceCloudImageName, targetCloudImageName)
 	if err != nil {
-		return fmt.Errorf("Failed setting a docker image tag: %w", err)
+		return fmt.Errorf("failed setting a docker image tag: %w", err)
 	}
 	fmt.Println(">> Docker image tag updated successfully")
 
 	fmt.Println(">> Pushing a docker image to remote registry")
 	err = sh.RunV("docker", "image", "push", targetCloudImageName)
 	if err != nil {
-		return fmt.Errorf("Failed pushing docker image: %w", err)
+		return fmt.Errorf("failed pushing docker image: %w", err)
 	}
 	fmt.Printf(">> Docker image pushed to remote registry successfully: %s\n", targetCloudImageName)
 
 	return nil
 }
 
-// Creates a new devmachine that will be auto-deleted in 6 hours.
+// Create a new devmachine that will be auto-deleted in 6 hours.
 // Example: MACHINE_IMAGE="family/platform-ingest-elastic-agent-ubuntu-2204" ZONE="us-central1-a" mage devmachine:create "pavel-dev-machine"
 // ZONE defaults to 'us-central1-a', MACHINE_IMAGE defaults to 'family/platform-ingest-elastic-agent-ubuntu-2204'
 func (Devmachine) Create(instanceName string) error {

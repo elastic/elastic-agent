@@ -1,4 +1,4 @@
-## Terraform-managed Elastic Stack deployment for integration tests 
+## Terraform-managed Elastic Stack deployment for integration tests
 
 ### Required variables
 `stack_version` - The version of the Elastic Stack to deploy, e.g., `9.1.0-SNAPSHOT`.
@@ -6,7 +6,7 @@
 ### Stable snapshots and images override
 This deployment uses the latest tested snapshots of the Elastic Stack components by default. However, you can override the Docker images used for the integration server, Elasticsearch, and Kibana.
 
-`create_deployment_csp_configuration.yaml` contains the default configuration for the deployment, including the Docker images for the integration server, Elasticsearch, and Kibana. These images are automatically updated to the latest tested snapshots of the Elastic Stack components. 
+`create_deployment_csp_configuration.yaml` contains the default configuration for the deployment, including the Docker images for the integration server, Elasticsearch, and Kibana. These images are automatically updated to the latest tested snapshots of the Elastic Stack components.
 * `integration_server_image` - The Docker image for the integration server
 * `elasticsearch_docker_image` - The Docker image for Elasticsearch
 * `kibana_docker_image` - The Docker image for Kibana
