@@ -55,4 +55,7 @@ const (
 
 	// FleetEndpointSecurity group of tests. Used for the long running fleet-related "TestInstall..." tests.
 	FleetEndpointSecurity = "fleet-endpoint-security"
+
+	// ECHDeployment group of tests. Used for tests that orchestrate ECH deployments.
+	ECHDeployment = "ech-deployment"
 )

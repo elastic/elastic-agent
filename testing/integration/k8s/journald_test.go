@@ -51,7 +51,6 @@ func TestKubernetesJournaldInput(t *testing.T) {
 	steps := []k8sTestStep{
 		k8sStepCreateNamespace(),
 		k8sStepDeployKustomize(
-			agentK8SKustomize,
 			"elastic-agent-standalone",
 			k8sKustomizeOverrides{
 				agentContainerExtraEnv: []corev1.EnvVar{
@@ -138,7 +137,6 @@ func TestKubernetesJournaldInputOtel(t *testing.T) {
 	steps := []k8sTestStep{
 		k8sStepCreateNamespace(),
 		k8sStepDeployKustomize(
-			agentK8SKustomize,
 			"elastic-agent-standalone",
 			k8sKustomizeOverrides{
 				agentContainerArgs: []string{"--config", "/etc/elastic-agent/agent.yml"},

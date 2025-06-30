@@ -15,6 +15,7 @@ if test -L "$symlink"; then
 fi
 
 SERVICE_NAME="ElasticEndpoint"
+should_restart_endpoint=false
 
 echo "Checking if $SERVICE_NAME is installed"
 if systemctl list-unit-files --type=service | grep -q "^${SERVICE_NAME}.service"; then
@@ -27,8 +28,7 @@ if systemctl list-unit-files --type=service | grep -q "^${SERVICE_NAME}.service"
         echo "$SERVICE_NAME is installed but not running"
         if [[ "$installed_endpoint_version" == "$archive_endpoint_version" ]]; then
             echo "New endpoint and installed endpoint versions are the same: \"${installed_endpoint_version}\""
-            echo "Starting $SERVICE_NAME"
-            sudo systemctl start ${SERVICE_NAME}
+            should_restart_endpoint=true
         else
             echo "New endpoint version  \"${archive_endpoint_version}\" is different than the one that's already
             installed  \"${installed_endpoint_version}\""
@@ -53,4 +53,9 @@ echo "systemd enable/restart elastic-agent"
 systemctl daemon-reload 2> /dev/null
 systemctl enable elastic-agent 2> /dev/null || true
 systemctl restart elastic-agent 2> /dev/null || true
+# restart endpoint if needed
+if [ "$should_restart_endpoint" = true ]; then
+    echo "Starting $SERVICE_NAME after elastic-agent"
+    systemctl restart "$SERVICE_NAME" 2> /dev/null || true
+fi
 exit 0
