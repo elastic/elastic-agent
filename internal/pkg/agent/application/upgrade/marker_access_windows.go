@@ -25,10 +25,6 @@ const minMarkerAccessRetries = 5
 // processes (the Upgrade Watcher and the main Agent process) at the same time,
 // which could fail on Windows.
 func readMarkerFile(markerFile string) ([]byte, error) {
-	if _, err := os.Stat(markerFile); errors.Is(err, os.ErrNotExist) {
-		// marker doesn't exist, nothing to do
-		return nil, nil
-	}
 	var markerFileBytes []byte
 	readFn := func() error {
 		fileLock, err := newMarkerFileLocker(markerFile)
