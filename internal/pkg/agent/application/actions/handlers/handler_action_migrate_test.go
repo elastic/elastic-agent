@@ -63,7 +63,7 @@ func TestActionMigratelHandler(t *testing.T) {
 								ProxiedActions: []string{"MIGRATE"},
 							},
 						},
-						InputType: "tampered-input",
+						InputType: "endpoint",
 						Units: []component.Unit{
 							component.Unit{
 								Type: client.UnitTypeInput,
