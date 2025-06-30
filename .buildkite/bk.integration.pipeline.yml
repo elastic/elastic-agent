@@ -12,8 +12,8 @@ env:
   IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1750467641"
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1750467641"
   IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1750467641"
-  # Remove AGENT_PACKAGE_VERSION and AGENT_VERSION pinning once 9.2.0 DRA and stack are released
-  AGENT_VERSION: "9.1.0-SNAPSHOT"
+  # Remove AGENT_PACKAGE_VERSION pinning once 9.0.4 DRA and stack are released
+  AGENT_VERSION: "9.0.3-SNAPSHOT"
 
 
 # This section is used to define the plugins that will be used in the pipeline.
