@@ -1,0 +1,44 @@
+// begin 8.17.8 relnotes
+
+[[release-notes-8.17.8]]
+==  8.17.8
+
+Review important information about the  8.17.8 release.
+
+
+
+
+
+
+
+
+
+[discrete]
+[[new-features-8.17.8]]
+=== New features
+
+The 8.17.8 release adds the following new and notable features.
+
+
+elastic-agent::
+
+* Add Cumulativetodeltaprocessor To Edot Collector. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8372[#https://github.com/elastic/elastic-agent/pull/8372] 
+
+
+
+
+
+
+[discrete]
+[[bug-fixes-8.17.8]]
+=== Bug fixes
+
+
+elastic-agent::
+
+* Address A Race Condition That Can Occur In Agent Diagnostics If Log Rotation Runs While Logs Are Being Zipped. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8215[#https://github.com/elastic/elastic-agent/pull/8215] 
+* Use Paths.tempdir For Diagnostics Actions. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8472[#https://github.com/elastic/elastic-agent/pull/8472] 
+* Use Debian 11 To Build Linux/Arm To Match Linux/Amd64. Upgrades Linux/Arm64&#39;s Statically Linked Glibc From Version 2.28 To 2.31. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8497[#https://github.com/elastic/elastic-agent/pull/8497] 
+* Relax File Ownership Check To Allow Admin Re-Enrollment On Windows. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8503[#https://github.com/elastic/elastic-agent/pull/8503] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/7794[#https://github.com/elastic/elastic-agent/issues/7794]
+
+// end 8.17.8 relnotes

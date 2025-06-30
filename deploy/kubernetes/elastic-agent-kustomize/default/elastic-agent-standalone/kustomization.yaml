@@ -16,7 +16,7 @@ configMapGenerator:
   
 resources:
   - ./base
-  - https://github.com/kubernetes/kube-state-metrics/
+  - https://github.com/kubernetes/kube-state-metrics/?ref=v2.15.0
 
 patches:
 - path: environmental-variables-remove.yaml

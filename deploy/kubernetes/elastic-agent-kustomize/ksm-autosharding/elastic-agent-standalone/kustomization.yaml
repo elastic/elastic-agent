@@ -4,7 +4,7 @@ kind: Kustomization
 namespace: kube-system
 
 resources:
-  - https://github.com/kubernetes/kube-state-metrics/examples/autosharding
+  - https://github.com/kubernetes/kube-state-metrics/examples/autosharding?ref=v2.15.0
   - ./base
 replicas:
   - name: kube-state-metrics
