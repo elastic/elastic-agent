@@ -41,7 +41,7 @@ type UpgradeOpts struct {
 	skipVerify       bool
 	skipDefaultPgp   bool
 	customPgp        *CustomPGP
-	customWatcherCfg string
+	CustomWatcherCfg string
 	installServers   bool
 
 	// Used to disable upgrade details checks for versions that don't support them, like 7.17.x.
@@ -54,7 +54,7 @@ type UpgradeOpts struct {
 	preInstallHook         func() error
 	postInstallHook        func() error
 	preUpgradeHook         func() error
-	postUpgradeHook        func() error
+	PostUpgradeHook        func() error
 	PostWatcherSuccessHook func(context.Context, *atesting.Fixture) error
 }
 
@@ -119,10 +119,10 @@ func WithPreUpgradeHook(hook func() error) UpgradeOpt {
 	}
 }
 
-// WithPostUpgradeHook sets a hook to be called before install.
+// WithPostUpgradeHook sets a hook to be called after install.
 func WithPostUpgradeHook(hook func() error) UpgradeOpt {
 	return func(opts *UpgradeOpts) {
-		opts.postUpgradeHook = hook
+		opts.PostUpgradeHook = hook
 	}
 }
 
@@ -137,7 +137,7 @@ func WithPostWatcherSuccessHook(hook func(context.Context, *atesting.Fixture) er
 // WithCustomWatcherConfig sets a custom watcher configuration to use.
 func WithCustomWatcherConfig(cfg string) UpgradeOpt {
 	return func(opts *UpgradeOpts) {
-		opts.customWatcherCfg = cfg
+		opts.CustomWatcherCfg = cfg
 	}
 }
 
@@ -193,8 +193,8 @@ func PerformUpgrade(
 	}
 
 	// start fixture gets the agent configured to use a faster watcher
-	if upgradeOpts.customWatcherCfg != "" {
-		err = startFixture.Configure(ctx, []byte(upgradeOpts.customWatcherCfg))
+	if upgradeOpts.CustomWatcherCfg != "" {
+		err = startFixture.Configure(ctx, []byte(upgradeOpts.CustomWatcherCfg))
 	} else {
 		err = ConfigureFastWatcher(ctx, startFixture)
 	}
@@ -387,8 +387,8 @@ func PerformUpgrade(
 		}
 	}
 
-	if upgradeOpts.postUpgradeHook != nil {
-		if err := upgradeOpts.postUpgradeHook(); err != nil {
+	if upgradeOpts.PostUpgradeHook != nil {
+		if err := upgradeOpts.PostUpgradeHook(); err != nil {
 			return fmt.Errorf("post upgrade hook failed: %w", err)
 		}
 	}

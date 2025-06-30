@@ -26,12 +26,12 @@ sources:
       key: .build
 targets:
   updateStackImages:
-    name: "Update create_deployment_csp_configuration.yaml"
+    name: "Update deployment_csp_configuration.yaml"
     sourceid: lastStableStackSnapshot
     scmid: githubConfig
     kind: file
     spec:
-      file: "pkg/testing/ess/create_deployment_csp_configuration.yaml"
+      file: "pkg/testing/ess/deployment_csp_configuration.yaml"
       matchpattern: '(\S*_image: ".*docker.*):(.+)"'
       replacepattern: '$1:{{ source "lastStableStackSnapshot" }}-SNAPSHOT"'
 actions:
@@ -48,4 +48,4 @@ actions:
         - "Team:Elastic-Agent-Control-Plane"
       title: '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Bump stack images versions to {{ source "lastStableStackSnapshot" }}'
       description: |
-        Updates `create_deployment_csp_configuration.yml`. It is used to pin stable images versions for integration tests.
+        Updates `deployment_csp_configuration.yml`. It is used to pin stable images versions for integration tests.
