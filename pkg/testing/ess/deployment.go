@@ -399,7 +399,7 @@ func overallStatus(statuses ...string) string {
 //go:embed create_deployment_request.tmpl.json
 var createDeploymentRequestTemplate string
 
-//go:embed deployment_csp_configuration.yaml
+//go:embed create_deployment_csp_configuration.yaml
 var cloudProviderSpecificValues []byte
 
 func generateCreateDeploymentRequestBody(req CreateDeploymentRequest) ([]byte, error) {
