@@ -33,6 +33,7 @@ const (
 	flagPGPBytesPath   = "pgp-path"
 	flagPGPBytesURI    = "pgp-uri"
 	flagForce          = "force"
+	flagRollback       = "rollback"
 )
 
 var (
@@ -64,6 +65,7 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 	cmd.Flags().String(flagPGPBytesURI, "", "Path to a web location containing PGP to use for package verification")
 	cmd.Flags().String(flagPGPBytesPath, "", "Path to a file containing PGP to use for package verification")
 	cmd.Flags().BoolP(flagForce, "", false, "Advanced option to force an upgrade on a fleet managed agent")
+	cmd.Flags().BoolP(flagRollback, "", false, "Roll back an upgrade")
 	err := cmd.Flags().MarkHidden(flagForce)
 	if err != nil {
 		fmt.Fprintf(streams.Err, "error while setting upgrade force flag attributes: %s", err.Error())
@@ -162,6 +164,11 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 		return fmt.Errorf("failed to retrieve command flag information while trying to upgrade the agent: %w", err)
 	}
 
+	rollback, err := cmd.Flags().GetBool(flagRollback)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve command flag information %q while trying to upgrade the agent: %w", flagRollback, err)
+	}
+
 	skipVerification, err := cmd.Flags().GetBool(flagSkipVerify)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve %s flag information while upgrading the agent: %w", flagSkipVerify, err)
@@ -215,7 +222,7 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 		}
 	}
 	skipDefaultPgp, _ := cmd.Flags().GetBool(flagSkipDefaultPgp)
-	version, err = c.Upgrade(context.Background(), version, sourceURI, skipVerification, skipDefaultPgp, pgpChecks...)
+	version, err = c.Upgrade(context.Background(), version, rollback, sourceURI, skipVerification, skipDefaultPgp, pgpChecks...)
 	if err != nil {
 		s, ok := status.FromError(err)
 		// Sometimes the gRPC server shuts down before replying to the command which is expected
