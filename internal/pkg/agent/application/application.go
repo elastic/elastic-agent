@@ -227,6 +227,9 @@ func New(
 	}
 
 	otelManager, err := otelmanager.NewOTelManager(log.Named("otel_manager"), logLevel, baseLogger, otelmanager.EmbeddedExecutionMode)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	otelComponentManager := componentmanager.NewOtelComponentManager(log.Named("otel_component_manager"), otelManager, agentInfo, monitor.ComponentMonitoringConfig)
 	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelComponentManager, actionAcker, compModifiers...)
 	if managed != nil {
