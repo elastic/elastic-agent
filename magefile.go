@@ -877,41 +877,6 @@ func (Cloud) Image(ctx context.Context) {
 	Package(ctx)
 }
 
-<<<<<<< HEAD
-=======
-// Load loads an artifact as a docker image.
-// Looks in build/distributions for an elastic-agent-cloud*.docker.tar.gz artifact and imports it as docker.elastic.co/beats-ci/elastic-agent-cloud:$VERSION
-// DOCKER_IMPORT_SOURCE - override source for import
-func (Cloud) Load() error {
-	agentVersion, err := mage.AgentPackageVersion()
-	if err != nil {
-		return fmt.Errorf("failed to get agent package version: %w", err)
-	}
-
-	// Need to get the FIPS env var flag to see if we are using the normal source cloud image name, or the FIPS variant
-	fips := os.Getenv(fipsEnv)
-	defer os.Setenv(fipsEnv, fips)
-	fipsVal, err := strconv.ParseBool(fips)
-	if err != nil {
-		fipsVal = false
-	}
-	if err := os.Setenv(fipsEnv, strconv.FormatBool(fipsVal)); err != nil {
-		return fmt.Errorf("failed to set fips env var: %w", err)
-	}
-	devtools.FIPSBuild = fipsVal
-
-	source := "build/distributions/elastic-agent-cloud-" + agentVersion + "-SNAPSHOT-linux-" + runtime.GOARCH + ".docker.tar.gz"
-	if fipsVal {
-		source = "build/distributions/elastic-agent-cloud-fips-" + agentVersion + "-SNAPSHOT-linux-" + runtime.GOARCH + ".docker.tar.gz"
-	}
-	if envSource, ok := os.LookupEnv("DOCKER_IMPORT_SOURCE"); ok && envSource != "" {
-		source = envSource
-	}
-
-	return sh.RunV("docker", "image", "load", "-i", source)
-}
-
->>>>>>> 5c5b174ae (ci: pin elastic-agent version (#8736))
 // Push builds a cloud image tags it correctly and pushes to remote image repo.
 // Previous login to elastic registry is required!
 func (Cloud) Push() error {
@@ -920,32 +885,14 @@ func (Cloud) Push() error {
 		return fmt.Errorf("failed to get agent package version: %w", err)
 	}
 
-<<<<<<< HEAD
-	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s", version)
-=======
-	// Need to get the FIPS env var flag to see if we are using the normal source cloud image name, or the FIPS variant
-	fips := os.Getenv(fipsEnv)
-	defer os.Setenv(fipsEnv, fips)
-	fipsVal, err := strconv.ParseBool(fips)
-	if err != nil {
-		fipsVal = false
-	}
-	if err := os.Setenv(fipsEnv, strconv.FormatBool(fipsVal)); err != nil {
-		return fmt.Errorf("failed to set fips env var: %w", err)
-	}
-	devtools.FIPSBuild = fipsVal
-
-	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s-SNAPSHOT", agentVersion)
-	if fipsVal {
-		sourceCloudImageName = fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud-fips:%s-SNAPSHOT", agentVersion)
-	}
 	var targetTag string
 	if envTag, isPresent := os.LookupEnv("CUSTOM_IMAGE_TAG"); isPresent && len(envTag) > 0 {
 		targetTag = envTag
 	} else {
 		targetTag = fmt.Sprintf("%s-%s-%d", agentVersion, dockerCommitHash(), time.Now().Unix())
 	}
->>>>>>> 5c5b174ae (ci: pin elastic-agent version (#8736))
+
+	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s-SNAPSHOT", agentVersion)
 	var targetCloudImageName string
 	if customImage, isPresent := os.LookupEnv("CI_ELASTIC_AGENT_DOCKER_IMAGE"); isPresent && len(customImage) > 0 {
 		targetCloudImageName = fmt.Sprintf("%s:%s", customImage, targetTag)
@@ -954,7 +901,7 @@ func (Cloud) Push() error {
 	}
 
 	fmt.Printf(">> Setting a docker image tag to %s\n", targetCloudImageName)
-	err := sh.RunV("docker", "tag", sourceCloudImageName, targetCloudImageName)
+	err = sh.RunV("docker", "tag", sourceCloudImageName, targetCloudImageName)
 	if err != nil {
 		return fmt.Errorf("failed setting a docker image tag: %w", err)
 	}
@@ -970,22 +917,6 @@ func (Cloud) Push() error {
 	return nil
 }
 
-<<<<<<< HEAD
-=======
-// Create a new devmachine that will be auto-deleted in 6 hours.
-// Example: MACHINE_IMAGE="family/platform-ingest-elastic-agent-ubuntu-2204" ZONE="us-central1-a" mage devmachine:create "pavel-dev-machine"
-// ZONE defaults to 'us-central1-a', MACHINE_IMAGE defaults to 'family/platform-ingest-elastic-agent-ubuntu-2204'
-func (Devmachine) Create(instanceName string) error {
-	if instanceName == "" {
-		return errors.New(
-			`instanceName is required.
-	Example:
-	mage devmachine:create "pavel-dev-machine"  `)
-	}
-	return devmachine.Run(instanceName)
-}
-
->>>>>>> 5c5b174ae (ci: pin elastic-agent version (#8736))
 func Clean() {
 	mg.Deps(devtools.Clean, Build.Clean)
 }
