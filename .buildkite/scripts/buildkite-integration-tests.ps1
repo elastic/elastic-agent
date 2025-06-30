@@ -25,9 +25,11 @@ go install gotest.tools/gotestsum
 gotestsum --version
 
 $env:TEST_BINARY_NAME = "elastic-agent"
-# Parsing version.go. Will be simplified here: https://github.com/elastic/ingest-dev/issues/4925
-$AGENT_VERSION = (Get-Content version/version.go | Select-String -Pattern 'const defaultBeatVersion =' | ForEach-Object { $_ -replace '.*?"(.*?)".*', '$1' })
-$env:AGENT_VERSION = $AGENT_VERSION + "-SNAPSHOT"
+if (-not $env:AGENT_VERSION) {
+    # Parsing version.go. Will be simplified here: https://github.com/elastic/ingest-dev/issues/4925
+    $AGENT_VERSION = (Get-Content version/version.go | Select-String -Pattern 'const defaultBeatVersion =' | ForEach-Object { $_ -replace '.*?"(.*?)".*', '$1' })
+    $env:AGENT_VERSION = $AGENT_VERSION + "-SNAPSHOT"
+}
 
 Write-Output "~~~ Agent version: $env:AGENT_VERSION"
 $env:SNAPSHOT = $true
