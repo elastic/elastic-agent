@@ -148,8 +148,8 @@ type RuntimeManager interface {
 	PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error)
 }
 
-// OTelComponentManager provides an interface to run components and plain otel configurations in an otel collector.
-type OTelComponentManager interface {
+// OTelManager provides an interface to run components and plain otel configurations in an otel collector.
+type OTelManager interface {
 	Runner
 
 	// UpdateCollector updates the current plain configuration for the otel collector.
@@ -247,7 +247,7 @@ type Coordinator struct {
 	configMgr  ConfigManager
 	varsMgr    VarsManager
 
-	otelComponentMgr OTelComponentManager
+	otelComponentMgr OTelManager
 	otelCfg          *confmap.Conf
 
 	caps      capabilities.Capabilities
@@ -415,7 +415,7 @@ func New(
 	caps capabilities.Capabilities,
 	monitorMgr MonitorManager,
 	isManaged bool,
-	otelComponentMgr OTelComponentManager,
+	otelComponentMgr OTelManager,
 	fleetAcker acker.Acker,
 	modifiers ...ComponentsModifier,
 ) *Coordinator {

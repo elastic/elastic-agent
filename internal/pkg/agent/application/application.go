@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/otel/componentmanager"
-
 	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/go-ucfg"
@@ -228,12 +226,11 @@ func New(
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
-	otelManager, err := otelmanager.NewOTelManager(log.Named("otel_manager"), logLevel, baseLogger, otelmanager.EmbeddedExecutionMode)
+	otelManager, err := otelmanager.NewOTelManager(log.Named("otel_manager"), logLevel, baseLogger, otelmanager.EmbeddedExecutionMode, agentInfo, monitor.ComponentMonitoringConfig)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)
 	}
-	otelComponentManager := componentmanager.NewOtelComponentManager(log.Named("otel_component_manager"), otelManager, agentInfo, monitor.ComponentMonitoringConfig)
-	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelComponentManager, actionAcker, compModifiers...)
+	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelManager, actionAcker, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created
