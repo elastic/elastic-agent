@@ -20,6 +20,10 @@ import (
 	"github.com/elastic/elastic-agent/pkg/features"
 )
 
+const (
+	endpoint = "endpoint"
+)
+
 type migrateCoordinator interface {
 	Migrate(_ context.Context, _ *fleetapi.ActionMigrate, _ func(done <-chan struct{}) backoff.Backoff) error
 	ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string)
@@ -60,11 +64,13 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 
 	if h.tamperProtectionFn() {
 		state := h.coord.State()
-		if ucs := findMatchingUnitsByActionType(state, a.Type()); len(ucs) > 0 {
-			// tamper protected agents are unsupported, fail fast
-			err := errors.New("unsupported action: tamper protected agent")
-			h.ackFailure(ctx, err, action, ack)
-			return err
+		// if endpoint is present do not proceed
+		for _, component := range state.Components {
+			if component.Component.InputType == endpoint {
+				err := errors.New("unsupported action: tamper protected agent")
+				h.ackFailure(ctx, err, action, ack)
+				return err
+			}
 		}
 	}
 
