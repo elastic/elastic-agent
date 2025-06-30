@@ -85,7 +85,7 @@ type UpgradeManager interface {
 	Reload(rawConfig *config.Config) error
 
 	// Upgrade upgrades running agent.
-	Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error)
+	Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error)
 
 	// Ack is used on startup to check if the agent has upgraded and needs to send an ack for the action
 	Ack(ctx context.Context, acker acker.Acker) error
@@ -700,6 +700,7 @@ type upgradeOpts struct {
 	skipDefaultPgp     bool
 	pgpBytes           []string
 	preUpgradeCallback func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error
+	rollback           bool
 }
 
 type UpgradeOpt func(*upgradeOpts)
@@ -725,6 +726,12 @@ func WithPgpBytes(pgpBytes []string) UpgradeOpt {
 func WithPreUpgradeCallback(preUpgradeCallback func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error) UpgradeOpt {
 	return func(opts *upgradeOpts) {
 		opts.preUpgradeCallback = preUpgradeCallback
+	}
+}
+
+func WithRollback(rollback bool) UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.rollback = rollback
 	}
 }
 
@@ -785,7 +792,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		}
 	}
 
-	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, uOpts.skipVerifyOverride, uOpts.skipDefaultPgp, uOpts.pgpBytes...)
+	cb, err := c.upgradeMgr.Upgrade(ctx, version, uOpts.rollback, sourceURI, action, det, uOpts.skipVerifyOverride, uOpts.skipDefaultPgp, uOpts.pgpBytes...)
 	if err != nil {
 		c.ClearOverrideState()
 		if errors.Is(err, upgrade.ErrUpgradeSameVersion) {
