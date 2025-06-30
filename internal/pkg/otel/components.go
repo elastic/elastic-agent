@@ -69,10 +69,10 @@ import (
 	"github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension"
 
 	// Connectors
+	elasticapmconnector "github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector"
 	routingconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector"
 	spanmetricsconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector"
-
-	elasticapmconnector "github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector"
+	forwardconnector "go.opentelemetry.io/collector/connector/forwardconnector"
 )
 
 func components(extensionFactories ...extension.Factory) func() (otelcol.Factories, error) {
@@ -148,6 +148,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			routingconnector.NewFactory(),
 			spanmetricsconnector.NewFactory(),
 			elasticapmconnector.NewFactory(),
+			forwardconnector.NewFactory(),
 		)
 		if err != nil {
 			return otelcol.Factories{}, err
