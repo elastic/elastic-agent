@@ -69,6 +69,8 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 	}
 
 	if err := h.coord.Migrate(ctx, action, fleetgateway.RequestBackoff); err != nil {
+		// this should not happen, not managed agent should not receive the action
+		// defensive coding to avoid misbehavior
 		if errors.Is(err, coordinator.ErrNotManaged) {
 			return errors.New("unmanaged agent, use Enroll instead")
 		}
