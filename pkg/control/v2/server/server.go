@@ -378,6 +378,7 @@ func stateToProto(state *coordinator.State, agentInfo info.Agent) (*cproto.State
 				FailedState:     string(state.UpgradeDetails.Metadata.FailedState),
 				ErrorMsg:        state.UpgradeDetails.Metadata.ErrorMsg,
 				RetryErrorMsg:   state.UpgradeDetails.Metadata.RetryErrorMsg,
+				Reason:          state.UpgradeDetails.Metadata.Reason,
 			},
 		}
 

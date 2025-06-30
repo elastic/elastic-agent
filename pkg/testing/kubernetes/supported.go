@@ -18,6 +18,11 @@ var arches = []string{define.AMD64, define.ARM64}
 
 // versions defines the list of supported version of Kubernetes.
 var versions = []define.OS{
+	// Kubernetes 1.33
+	{
+		Type:    define.Kubernetes,
+		Version: "1.33.0",
+	},
 	// Kubernetes 1.32
 	{
 		Type:    define.Kubernetes,
@@ -84,19 +89,19 @@ var variants = []struct {
 	},
 	{
 		Name:  "elastic-otel-collector",
-		Image: "docker.elastic.co/beats-ci/elastic-otel-collector",
+		Image: "docker.elastic.co/elastic-agent/elastic-otel-collector",
 	},
 	{
 		Name:  "slim",
-		Image: "docker.elastic.co/beats-ci/elastic-agent-slim",
+		Image: "docker.elastic.co/elastic-agent/elastic-agent-slim",
 	},
 	{
 		Name:  "elastic-otel-collector-wolfi",
-		Image: "docker.elastic.co/beats-ci/elastic-otel-collector-wolfi",
+		Image: "docker.elastic.co/elastic-agent/elastic-otel-collector-wolfi",
 	},
 	{
 		Name:  "slim-wolfi",
-		Image: "docker.elastic.co/beats-ci/elastic-agent-slim-wolfi",
+		Image: "docker.elastic.co/elastic-agent/elastic-agent-slim-wolfi",
 	},
 }
 

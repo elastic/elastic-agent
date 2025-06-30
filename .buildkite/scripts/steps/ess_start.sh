@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source .buildkite/scripts/common2.sh
 source .buildkite/scripts/steps/ess.sh
 source .buildkite/scripts/steps/fleet.sh
 
@@ -19,3 +18,4 @@ buildkite-agent meta-data set "es.pwd" $ELASTICSEARCH_PASSWORD
 buildkite-agent meta-data set "kibana.host" $KIBANA_HOST
 buildkite-agent meta-data set "kibana.username" $KIBANA_USERNAME
 buildkite-agent meta-data set "kibana.pwd" $KIBANA_PASSWORD
+buildkite-agent meta-data set "integrations_server.host" $INTEGRATIONS_SERVER_HOST

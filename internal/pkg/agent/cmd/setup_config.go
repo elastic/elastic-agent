@@ -26,6 +26,7 @@ type fleetConfig struct {
 	TokenPolicyName string        `config:"token_policy_name"`
 	URL             string        `config:"url"`
 	DaemonTimeout   time.Duration `config:"daemon_timeout"`
+	EnrollTimeout   time.Duration `config:"enroll_timeout"`
 	Cert            string        `config:"cert"`
 	CertKey         string        `config:"cert_key"`
 }
@@ -96,6 +97,7 @@ func defaultAccessConfig() (setupConfig, error) {
 			TokenPolicyName: envWithDefault("", "FLEET_TOKEN_POLICY_NAME"),
 			URL:             envWithDefault("", "FLEET_URL"),
 			DaemonTimeout:   envTimeout("FLEET_DAEMON_TIMEOUT"),
+			EnrollTimeout:   envTimeout("FLEET_ENROLL_TIMEOUT"),
 			Cert:            envWithDefault("", "ELASTIC_AGENT_CERT"),
 			CertKey:         envWithDefault("", "ELASTIC_AGENT_CERT_KEY"),
 		},

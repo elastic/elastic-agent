@@ -22,6 +22,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringcfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/component"
 )
@@ -39,6 +40,7 @@ func TestMonitoringFull(t *testing.T) {
 				HTTP: &monitoringcfg.MonitoringHTTPConfig{
 					Enabled: true,
 				},
+				RuntimeManager: monitoringcfg.DefaultRuntimeManager,
 			},
 		},
 		agentInfo: agentInfo,
@@ -139,7 +141,6 @@ func TestMonitoringWithEndpoint(t *testing.T) {
 				Enabled:        true,
 				MonitorMetrics: true,
 				HTTP: &monitoringcfg.MonitoringHTTPConfig{
-
 					Enabled: true,
 				},
 			},
@@ -211,7 +212,6 @@ func TestMonitoringWithEndpoint(t *testing.T) {
 						require.Equal(t, uint64(1234), streamValues["process.pid"])
 					}
 				}
-
 			}
 		}
 	}
@@ -220,7 +220,6 @@ func TestMonitoringWithEndpoint(t *testing.T) {
 }
 
 func TestMonitoringConfigMetricsInterval(t *testing.T) {
-
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)
 	require.NoError(t, err, "Error creating agent info")
 	components := []component.Component{{ID: "foobeat", InputSpec: &component.InputRuntimeSpec{BinaryName: "filebeat"}}}
@@ -315,7 +314,6 @@ func TestMonitoringConfigMetricsInterval(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-
 		t.Run(tc.name, func(t *testing.T) {
 			b := &BeatsMonitor{
 				enabled:         true,
@@ -368,7 +366,6 @@ func TestMonitoringConfigMetricsInterval(t *testing.T) {
 }
 
 func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
-
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)
 	require.NoError(t, err, "Error creating agent info")
 	components := []component.Component{{ID: "foobeat", InputSpec: &component.InputRuntimeSpec{BinaryName: "filebeat"}}}
@@ -550,7 +547,6 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-
 		t.Run(tc.name, func(t *testing.T) {
 			b := &BeatsMonitor{
 				enabled:         true,
@@ -601,7 +597,6 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 }
 
 func TestErrorMonitoringConfigMetricsFailureThreshold(t *testing.T) {
-
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)
 	components := []component.Component{{ID: "foobeat", InputSpec: &component.InputRuntimeSpec{BinaryName: "filebeat"}}}
 	require.NoError(t, err, "Error creating agent info")
@@ -727,7 +722,6 @@ func TestErrorMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-
 		t.Run(tc.name, func(t *testing.T) {
 			b := &BeatsMonitor{
 				enabled:         true,
@@ -863,6 +857,7 @@ func TestMonitoringConfigForBeatsReceivers(t *testing.T) {
 			HTTP: &monitoringcfg.MonitoringHTTPConfig{
 				Enabled: false,
 			},
+			RuntimeManager: monitoringcfg.DefaultRuntimeManager,
 		},
 	}
 
@@ -914,7 +909,9 @@ func TestMonitoringConfigForBeatsReceivers(t *testing.T) {
 	// Verify that if we're using filebeat receiver, there's no filebeat input
 	var monitoringCfg struct {
 		Inputs []struct {
-			Streams []struct {
+			ID             string
+			RuntimeManager string `mapstructure:"_runtime_experimental"`
+			Streams        []struct {
 				Path string `mapstructure:"path"`
 			}
 		}
@@ -931,7 +928,72 @@ func TestMonitoringConfigForBeatsReceivers(t *testing.T) {
 			}
 		}
 	}
-	assert.Len(t, streamsForInputMetrics, 2) // we have two filebeats running: filestream-process and monitoring
+	assert.Len(t, streamsForInputMetrics, 3)
+}
+
+func TestMonitoringWithOtelRuntime(t *testing.T) {
+	agentInfo, err := info.NewAgentInfo(context.Background(), false)
+	require.NoError(t, err, "Error creating agent info")
+
+	cfg := &monitoringConfig{
+		C: &monitoringcfg.MonitoringConfig{
+			Enabled:        true,
+			MonitorLogs:    true,
+			MonitorMetrics: true,
+			Namespace:      "test",
+			HTTP: &monitoringcfg.MonitoringHTTPConfig{
+				Enabled: false,
+			},
+			RuntimeManager: monitoringcfg.OtelRuntimeManager,
+		},
+	}
+
+	policy := map[string]any{
+		"agent": map[string]any{
+			"monitoring": map[string]any{
+				"metrics": true,
+				"logs":    false,
+			},
+		},
+		"outputs": map[string]any{
+			"default": map[string]any{},
+		},
+	}
+
+	b := &BeatsMonitor{
+		enabled:   true,
+		config:    cfg,
+		agentInfo: agentInfo,
+	}
+
+	components := []component.Component{
+		{
+			ID: "filestream-receiver",
+			InputSpec: &component.InputRuntimeSpec{
+				Spec: component.InputSpec{
+					Command: &component.CommandSpec{
+						Name: "filebeat",
+					},
+				},
+			},
+			RuntimeManager: component.OtelRuntimeManager,
+		},
+	}
+	monitoringCfgMap, err := b.MonitoringConfig(policy, components, map[string]uint64{})
+	require.NoError(t, err)
+
+	// Verify that if we're using filebeat receiver, there's no filebeat input
+	var monitoringCfg struct {
+		Inputs []struct {
+			ID             string
+			RuntimeManager string `mapstructure:"_runtime_experimental"`
+		}
+	}
+	err = mapstructure.Decode(monitoringCfgMap, &monitoringCfg)
+	require.NoError(t, err)
+	for _, input := range monitoringCfg.Inputs {
+		assert.Equal(t, monitoringcfg.OtelRuntimeManager, input.RuntimeManager)
+	}
 }
 
 func TestEnrichArgs(t *testing.T) {
@@ -994,4 +1056,30 @@ type Fields struct {
 type AddFields struct {
 	Fields Fields `json:"fields"`
 	Target string `json:"target"`
+}
+
+// This test ensures if any field under [agent.monitoring] is unset,
+// it falls back to the default value defined in monitoringCfg.DefaultConfig()
+func TestMonitorReload(t *testing.T) {
+	// set log and metric monitoring to false
+	monitorcfg := monitoringcfg.DefaultConfig()
+	monitorcfg.MonitorLogs = false
+	monitorcfg.MonitorMetrics = false
+
+	beatsMonitor := New(true, "", monitorcfg, nil)
+	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, false)
+	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, false)
+
+	// unset logs and metrics
+	agentConfig := `
+agent.monitoring:
+  enabled: true
+`
+	conf := config.MustNewConfigFrom(agentConfig)
+	// Reload will set unset fields to default
+	err := beatsMonitor.Reload(conf)
+	require.NoError(t, err)
+
+	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, true)
+	assert.Equal(t, beatsMonitor.config.C.MonitorMetrics, true)
 }

@@ -545,25 +545,23 @@ func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[
 	defer close(signal)
 	backExp := c.backoffFactory(signal)
 
+RETRYLOOP:
 	for {
-		retry := false
 		switch {
 		case errors.Is(err, fleetapi.ErrTooManyRequests):
 			c.log.Warn("Too many requests on the remote server, will retry in a moment.")
-			retry = true
 		case errors.Is(err, fleetapi.ErrConnRefused):
 			c.log.Warn("Remote server is not ready to accept connections(Connection Refused), will retry in a moment.")
-			retry = true
 		case errors.Is(err, fleetapi.ErrTemporaryServerError):
 			c.log.Warnf("Remote server failed to handle the request(%s), will retry in a moment.", err.Error())
-			retry = true
+		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded), err == nil:
+			break RETRYLOOP
 		case err != nil:
-			c.log.Warnf("Enrollment failed: %s", err.Error())
+			c.log.Warnf("Error detected: %s, will retry in a moment.", err.Error())
 		}
-		if !retry {
-			break
+		if !backExp.Wait() {
+			break RETRYLOOP
 		}
-		backExp.Wait()
 		c.log.Infof("Retrying enrollment to URL: %s", c.client.URI())
 		err = c.enroll(ctx, persistentConfig)
 	}
@@ -599,9 +597,7 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 
 	resp, err := cmd.Execute(ctx, r)
 	if err != nil {
-		return errors.New(err,
-			"fail to execute request to fleet-server",
-			errors.TypeNetwork)
+		return fmt.Errorf("failed to execute request to fleet-server: %w", err)
 	}
 
 	fleetConfig, err := createFleetConfigFromEnroll(resp.Item.AccessAPIKey, c.options.EnrollAPIKey, c.options.ReplaceToken, c.remoteConfig)
@@ -1057,10 +1053,18 @@ func createFleetConfigFromEnroll(accessAPIKey string, enrollmentToken string, re
 	if err != nil {
 		return nil, errors.New(err, "failed to generate enrollment hash", errors.TypeConfig)
 	}
-	cfg.ReplaceTokenHash, err = fleetHashToken(replaceToken)
-	if err != nil {
-		return nil, errors.New(err, "failed to generate replace token hash", errors.TypeConfig)
+
+	// Hash replaceToken if provided; it is not expected to be provided when an Agent
+	// is being enrolled for the very first time. Hashing an empty replaceToken with the
+	// FIPS-capable build of Elastic Agent results in an "invalid key length" error from
+	// OpenSSL's FIPS provider.
+	if replaceToken != "" {
+		cfg.ReplaceTokenHash, err = fleetHashToken(replaceToken)
+		if err != nil {
+			return nil, errors.New(err, "failed to generate replace token hash", errors.TypeConfig)
+		}
 	}
+
 	if err := cfg.Valid(); err != nil {
 		return nil, errors.New(err, "invalid enrollment options", errors.TypeConfig)
 	}

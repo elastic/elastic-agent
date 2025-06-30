@@ -148,9 +148,13 @@ func startContext(ctx context.Context, path string, uid, gid int, args []string,
 			return nil, fmt.Errorf("failed to set option command for %q: %w", path, err)
 		}
 	}
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stdin for %q: %w", path, err)
+
+	var stdin io.WriteCloser
+	if cmd.Stdin == nil {
+		stdin, err = cmd.StdinPipe()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create stdin for %q: %w", path, err)
+		}
 	}
 
 	var stderr io.ReadCloser

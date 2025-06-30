@@ -52,8 +52,13 @@ linters:
         - github.com/dop251/goja
         - github.com/dop251/goja_nodejs
         - github.com/fsnotify/fsnotify
+        - github.com/fsnotify/fsevents
         - github.com/openshift/api
-        - github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver
+        - github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption
+        - github.com/apoydence/eachers
+        - github.com/google/gopacket
+        - github.com/insomniacslk/dhcp
+        - github.com/meraki/dashboard-api-go/v3
       replace-local: false
     gomodguard:
       blocked:

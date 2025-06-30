@@ -390,7 +390,7 @@ func checkFilesAfterRollback(t *testing.T, topDir, oldAgentHome, newAgentHome st
 		assert.Equal(t, []byte("Placeholder for agent 1.2.3-SNAPSHOT"), elasticAgentBytes, "reading elastic-agent content through symbolic link should point to the old version")
 	}
 
-	assert.NoFileExists(t, filepath.Join(topDir, "data", markerFilename), "update marker should have been cleaned up")
+	assert.FileExists(t, filepath.Join(topDir, "data", markerFilename), "update marker should survive cleanup in case of rollback")
 }
 
 // setupAgents create fake agent installs, update marker file and symlink pointing to one of the installations' elastic-agent placeholder
@@ -508,6 +508,6 @@ func createUpdateMarker(t *testing.T, log *logger.Logger, topDir, newAgentVersio
 		paths.DataFrom(topDir),
 		newAgentInstall,
 		oldAgentInstall,
-		nil, nil)
+		nil, nil, OUTCOME_UPGRADE)
 	require.NoError(t, err, "error writing fake update marker")
 }

@@ -314,7 +314,7 @@ func writeErrorResult(zw *zip.Writer, path string, errBody string) error {
 	if err != nil {
 		return fmt.Errorf("error writing header for error.txt file for component: %w", err)
 	}
-	_, err = w.Write([]byte(fmt.Sprintf("%s\n", errBody)))
+	_, err = fmt.Fprintf(w, "%s\n", errBody)
 	if err != nil {
 		return fmt.Errorf("error writing error.txt file for component: %w", err)
 	}
@@ -507,7 +507,12 @@ func zipLogsWithPath(pathsHome, commitName string, collectServices, excludeEvent
 			return nil
 		}
 
-		return saveLogs(name, path, zw)
+		// Add the file to the zip.
+		// Ignore files that don't exist to account for races with log rotation.
+		if err := saveLogs(name, path, zw); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+		return nil
 	})
 }
 

@@ -36,7 +36,7 @@ extract_sha() {
     local env=$1
     
     # Extract first matching SHA for the environment pattern
-    yq eval ".services.agentless-controller.versions | to_entries | .[] | select(.key | test(\"^${env}.*\")) | .value" serverless-gitops/services/agentless-controller/versions.yaml | head -1
+    yq eval ".services.agentless-controller.versions | with_entries(select(.key | test(\"^${env}.*\"))) | to_entries | .[0].value // \"\"" serverless-gitops/services/agentless-controller/versions.yaml
 }
 
 

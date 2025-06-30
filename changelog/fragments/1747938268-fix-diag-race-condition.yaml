@@ -1,0 +1,4 @@
+kind: bug-fix
+summary: Address a race condition that can occur in Agent diagnostics if log rotation runs while logs are being zipped.
+component: elastic-agent
+pull_request: https://github.com/elastic/elastic-agent/pull/8215

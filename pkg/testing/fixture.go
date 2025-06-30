@@ -50,6 +50,7 @@ type Fixture struct {
 	binaryName      string
 	runLength       time.Duration
 	additionalArgs  []string
+	fipsArtifact    bool
 
 	srcPackage string
 	workDir    string
@@ -145,6 +146,12 @@ func WithAdditionalArgs(args []string) FixtureOpt {
 	}
 }
 
+func WithFIPSArtifact() FixtureOpt {
+	return func(f *Fixture) {
+		f.fipsArtifact = true
+	}
+}
+
 // NewFixture creates a new fixture to setup and manage Elastic Agent.
 func NewFixture(t *testing.T, version string, opts ...FixtureOpt) (*Fixture, error) {
 	// we store the caller so the fixture can find the cache directory for the artifacts that
@@ -214,10 +221,19 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	}
 	f.srcPackage = src
 	filename := filepath.Base(src)
+
+	// Determine name of extracted Agent artifact directory from
+	// the artifact filename.
 	name, _, err := splitFileType(filename)
 	if err != nil {
 		return err
 	}
+
+	// If the name has "-fips" in it, remove that part because
+	// the extracted directory does not have that in it, even though
+	// the artifact filename does.
+	name = strings.Replace(name, "-fips", "", 1)
+
 	extractDir := createTempDir(f.t)
 	finalDir := filepath.Join(extractDir, name)
 	err = ExtractArtifact(f.t, src, extractDir)
@@ -346,7 +362,6 @@ func (f *Fixture) RunBeat(ctx context.Context) error {
 		process.WithContext(ctx),
 		process.WithArgs(args),
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
-
 	if err != nil {
 		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
 	}
@@ -401,7 +416,8 @@ func RunProcess(t *testing.T,
 	lp Logger,
 	ctx context.Context, runLength time.Duration,
 	logOutput, allowErrs bool,
-	processPath string, args ...string) error {
+	processPath string, args ...string,
+) error {
 	if _, deadlineSet := ctx.Deadline(); !deadlineSet {
 		t.Fatal("Context passed to RunProcess() has no deadline set.")
 	}
@@ -419,7 +435,6 @@ func RunProcess(t *testing.T,
 		process.WithContext(ctx),
 		process.WithArgs(args),
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
-
 	if err != nil {
 		return fmt.Errorf("failed to spawn %q: %w", processPath, err)
 	}
@@ -549,7 +564,6 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 		process.WithContext(ctx),
 		process.WithArgs(args),
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
-
 	if err != nil {
 		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
 	}
@@ -1451,19 +1465,21 @@ type AgentStatusOutput struct {
 				OsqueryVersion string `json:"osquery_version"`
 			} `json:"payload"`
 		} `json:"units"`
-		VersionInfo struct {
-			Name    string `json:"name"`
-			Version string `json:"version"`
-			Meta    struct {
-				BuildTime string `json:"build_time"`
-				Commit    string `json:"commit"`
-			} `json:"meta"`
-		} `json:"version_info,omitempty"`
+		VersionInfo AgentStatusOutputVersionInfo `json:"version_info,omitempty"`
 	} `json:"components"`
 	Collector      *AgentStatusCollectorOutput `json:"collector"`
 	FleetState     int                         `json:"FleetState"`
 	FleetMessage   string                      `json:"FleetMessage"`
 	UpgradeDetails *details.Details            `json:"upgrade_details"`
+}
+
+type AgentStatusOutputVersionInfo struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	Meta    struct {
+		BuildTime string `json:"build_time"`
+		Commit    string `json:"commit"`
+	} `json:"meta"`
 }
 
 func (aso *AgentStatusOutput) IsZero() bool {

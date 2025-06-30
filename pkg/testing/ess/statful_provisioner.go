@@ -6,18 +6,21 @@ package ess
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/testing/common"
+	"github.com/elastic/elastic-agent/pkg/version"
 )
 
 const ProvisionerStateful = "stateful"
 
-// ProvisionerConfig is the configuration for the ESS statefulProvisioner.
+// ProvisionerConfig is the configuration for the ESS StatefulProvisioner.
 type ProvisionerConfig struct {
 	Identifier string
 	APIKey     string
@@ -38,7 +41,7 @@ func (c *ProvisionerConfig) Validate() error {
 	return nil
 }
 
-type statefulProvisioner struct {
+type StatefulProvisioner struct {
 	logger common.Logger
 	cfg    ProvisionerConfig
 	client *Client
@@ -53,22 +56,23 @@ func NewProvisioner(cfg ProvisionerConfig) (common.StackProvisioner, error) {
 	essClient := NewClient(Config{
 		ApiKey: cfg.APIKey,
 	})
-	return &statefulProvisioner{
+	return &StatefulProvisioner{
 		cfg:    cfg,
 		client: essClient,
 	}, nil
 }
 
-func (p *statefulProvisioner) Name() string {
+func (p *StatefulProvisioner) Name() string {
 	return ProvisionerStateful
 }
 
-func (p *statefulProvisioner) SetLogger(l common.Logger) {
+func (p *StatefulProvisioner) SetLogger(l common.Logger) {
 	p.logger = l
+	p.client.SetLogger(l)
 }
 
 // Create creates a stack.
-func (p *statefulProvisioner) Create(ctx context.Context, request common.StackRequest) (common.Stack, error) {
+func (p *StatefulProvisioner) Create(ctx context.Context, request common.StackRequest) (common.Stack, error) {
 	// allow up to 2 minutes for request
 	createCtx, createCancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer createCancel()
@@ -91,13 +95,14 @@ func (p *statefulProvisioner) Create(ctx context.Context, request common.StackRe
 		return common.Stack{}, err
 	}
 	return common.Stack{
-		ID:            request.ID,
-		Provisioner:   p.Name(),
-		Version:       request.Version,
-		Elasticsearch: resp.ElasticsearchEndpoint,
-		Kibana:        resp.KibanaEndpoint,
-		Username:      resp.Username,
-		Password:      resp.Password,
+		ID:                 request.ID,
+		Provisioner:        p.Name(),
+		Version:            request.Version,
+		Elasticsearch:      resp.ElasticsearchEndpoint,
+		Kibana:             resp.KibanaEndpoint,
+		IntegrationsServer: resp.IntegrationsServerEndpoint,
+		Username:           resp.Username,
+		Password:           resp.Password,
 		Internal: map[string]interface{}{
 			"deployment_id": resp.ID,
 		},
@@ -105,8 +110,8 @@ func (p *statefulProvisioner) Create(ctx context.Context, request common.StackRe
 	}, nil
 }
 
-// WaitForReady should block until the stack is ready or the context is cancelled.
-func (p *statefulProvisioner) WaitForReady(ctx context.Context, stack common.Stack) (common.Stack, error) {
+// WaitForReady should block until the stack is ready and healthy or the context is cancelled.
+func (p *StatefulProvisioner) WaitForReady(ctx context.Context, stack common.Stack) (common.Stack, error) {
 	deploymentID, err := p.getDeploymentID(stack)
 	if err != nil {
 		return stack, fmt.Errorf("failed to get deployment ID from the stack: %w", err)
@@ -127,7 +132,7 @@ func (p *statefulProvisioner) WaitForReady(ctx context.Context, stack common.Sta
 }
 
 // Delete deletes a stack.
-func (p *statefulProvisioner) Delete(ctx context.Context, stack common.Stack) error {
+func (p *StatefulProvisioner) Delete(ctx context.Context, stack common.Stack) error {
 	deploymentID, err := p.getDeploymentID(stack)
 	if err != nil {
 		return err
@@ -141,12 +146,74 @@ func (p *statefulProvisioner) Delete(ctx context.Context, stack common.Stack) er
 	return p.client.ShutdownDeployment(ctx, deploymentID)
 }
 
-func (p *statefulProvisioner) createDeployment(ctx context.Context, r common.StackRequest, tags map[string]string) (*CreateDeploymentResponse, error) {
+// Upgrade upgrades a stack to a new version.
+func (p *StatefulProvisioner) Upgrade(ctx context.Context, stack common.Stack, newVersion string) error {
+	deploymentID, err := p.getDeploymentID(stack)
+	if err != nil {
+		return fmt.Errorf("failed to get deployment ID from the stack: %w", err)
+	}
+
+	p.logger.Logf("Upgrading cloud stack %s [stack_id: %s, deployment_id: %s] to version %s", stack.Version, stack.ID, deploymentID, newVersion)
+
+	// allow up to 10 minutes for request
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+
+	err = p.client.UpgradeDeployment(ctx, deploymentID, newVersion)
+	if err != nil {
+		return fmt.Errorf("failed to upgrade cloud stack %s [stack_id: %s, deployment_id: %s] to version %s: %w", stack.Version, stack.ID, deploymentID, newVersion, err)
+	}
+
+	return nil
+}
+
+// AvailableVersions returns the stack versions available in the ECH region.
+func (p *StatefulProvisioner) AvailableVersions() ([]*version.ParsedSemVer, error) {
+	versionsApiUrl, err := url.JoinPath("regions", p.cfg.Region, "stack", "versions")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ECH versions API URL: %w", err)
+	}
+	versionsApiUrl += "?show_deleted=false&show_unusable=false"
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	p.logger.Logf("Getting available stack versions from ECH from %s", versionsApiUrl)
+	resp, err := p.client.doGet(ctx, versionsApiUrl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get versions from ECH for region [%s]: %w", p.cfg.Region, err)
+	}
+	defer resp.Body.Close()
+
+	var stacks struct {
+		Stacks []struct {
+			Version string `json:"version"`
+		} `json:"stacks"`
+	}
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&stacks)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse ECH versions API response from region [%s]: %w", p.cfg.Region, err)
+	}
+
+	var versions []*version.ParsedSemVer
+	for _, stack := range stacks.Stacks {
+		ver, err := version.ParseVersion(stack.Version)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse stack version [%s]: %w", stack.Version, err)
+		}
+		versions = append(versions, ver)
+	}
+
+	return versions, nil
+}
+
+func (p *StatefulProvisioner) createDeployment(ctx context.Context, r common.StackRequest, tags map[string]string) (*CreateDeploymentResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 
 	p.logger.Logf("Creating cloud stack %s [stack_id: %s]", r.Version, r.ID)
-	name := fmt.Sprintf("%s-%s", strings.Replace(p.cfg.Identifier, ".", "-", -1), r.ID)
+	name := fmt.Sprintf("%s-%s", strings.ReplaceAll(p.cfg.Identifier, ".", "-"), r.ID)
 
 	// prepare tags
 	tagArray := make([]Tag, 0, len(tags))
@@ -173,7 +240,7 @@ func (p *statefulProvisioner) createDeployment(ctx context.Context, r common.Sta
 	return resp, nil
 }
 
-func (p *statefulProvisioner) getDeploymentID(stack common.Stack) (string, error) {
+func (p *StatefulProvisioner) getDeploymentID(stack common.Stack) (string, error) {
 	if stack.Internal == nil {
 		return "", fmt.Errorf("missing internal information")
 	}

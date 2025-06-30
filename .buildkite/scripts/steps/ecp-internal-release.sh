@@ -33,8 +33,6 @@ write_annotation() {
     cat $BUILDKITE_ANNOTATE_FILE | buildkite-agent annotate --style info
 }
 
-DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
-DOCKER_REGISTRY="docker.elastic.co"
 PRIVATE_REPO="docker.elastic.co/observability-ci/ecp-elastic-agent-service"
 SNAPSHOT_DRA_URL=https://snapshots.elastic.co/latest/master.json
 
@@ -50,6 +48,12 @@ GIT_SHORT_COMMIT=$(echo "$GIT_COMMIT" | cut -c1-12)
 DOCKER_TAG="git-${GIT_SHORT_COMMIT}"
 PRIVATE_IMAGE="${PRIVATE_REPO}:${DOCKER_TAG}"
 
+# TODO: let's avoid accessing vault directly but use the vault plugin itself
+#       https://github.com/elastic/vault-docker-login-buildkite-plugin does not support
+#       the `skopeo` command by default but looks for the current installed tools in the runner
+#       Let's contribute in a follow-up PR to support `skopeo` as well.
+DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
+DOCKER_REGISTRY="docker.elastic.co"
 DOCKER_USERNAME_SECRET=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
 DOCKER_PASSWORD_SECRET=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
 skopeo login --username "${DOCKER_USERNAME_SECRET}" --password "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}"

@@ -1,0 +1,14 @@
+version: 8.17.6
+entries:
+    - kind: feature
+      summary: Set collectors fullnameOverride for edot kube-stack values.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7754
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/7381
+      timestamp: 1744384247
+      file:
+        name: 1744384247-set-collector's-fullnameOverride-for-edot-kube-stack-values.yaml
+        checksum: d7ccd1a2a660e7e0cc8bed5fc91570465b9ff639

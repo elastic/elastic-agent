@@ -1078,7 +1078,8 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 	cfg.Port = 0
 	rm, err := runtime.NewManager(l, l, ai, apmtest.DiscardTracer, monitoringMgr, cfg)
 	require.NoError(t, err)
-	otelMgr := otelmanager.NewOTelManager(l)
+	otelMgr, err := otelmanager.NewOTelManager(l, logp.InfoLevel, l, otelmanager.EmbeddedExecutionMode)
+	require.NoError(t, err)
 
 	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), l)
 	require.NoError(t, err)
@@ -1342,6 +1343,7 @@ type fakeOTelManager struct {
 	updateCallback func(*confmap.Conf) error
 	result         error
 	errChan        chan error
+	statusChan     chan *status.AggregateStatus
 }
 
 func (f *fakeOTelManager) Run(ctx context.Context) error {
@@ -1365,7 +1367,7 @@ func (f *fakeOTelManager) Update(cfg *confmap.Conf) {
 }
 
 func (f *fakeOTelManager) Watch() <-chan *status.AggregateStatus {
-	return nil
+	return f.statusChan
 }
 
 // An implementation of the RuntimeManager interface for use in testing.

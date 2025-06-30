@@ -654,23 +654,24 @@ inputs:
           id: filestream-monitoring
         target: component
   - data_stream:
-      dataset: elastic_agent.elastic_agent
+      dataset: elastic_agent.filebeat_input
       namespace: default
       type: metrics
     failure_threshold: 5
     hosts:
     - placeholder
     id: metrics-monitoring-filebeat-1
-    index: metrics-elastic_agent.elastic_agent-default
+    index: metrics-elastic_agent.filebeat_input-default
+    json.is_array: true
     metricsets:
     - json
-    namespace: agent
-    path: /stats
+    namespace: filebeat_input
+    path: /inputs/
     period: 1m0s
     processors:
     - add_fields:
         fields:
-          dataset: elastic_agent.elastic_agent
+          dataset: elastic_agent.filebeat_input
         target: event
     - add_fields:
         fields:
