@@ -599,7 +599,10 @@ func readCommitHash(reader io.Reader) (string, error) {
 }
 
 func getFileNamePrefix(archivePath string) string {
-	return strings.TrimSuffix(filepath.Base(archivePath), ".tar.gz") + "/" // omitting `elastic-agent-{version}-{os}-{arch}/` in filename
+	prefix := strings.TrimSuffix(filepath.Base(archivePath), ".tar.gz") + "/" // omitting `elastic-agent-{version}-{os}-{arch}/` in filename
+	prefix = strings.Replace(prefix, fipsPrefix, "", 1)
+
+	return prefix
 }
 
 func validFileName(p string) bool {

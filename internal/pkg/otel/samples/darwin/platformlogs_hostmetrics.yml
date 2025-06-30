@@ -40,6 +40,7 @@ extensions:
     directory: ${env:STORAGE_DIR}
 
 processors:
+  # DEPRECATED: The elasticinframetrics processor is deprecated and will be removed in 9.2.0.
   elasticinframetrics:
   resourcedetection:
     detectors: ["system"]
@@ -91,23 +92,11 @@ exporters:
     api_key: ${env:ELASTIC_API_KEY}
     mapping:
       mode: ecs
-    logs_dynamic_index:
-      enabled: true
-    metrics_dynamic_index:
-      enabled: true
-    traces_dynamic_index:
-      enabled: true
   elasticsearch/otel:
     endpoints: [ "${env:ELASTIC_ENDPOINT}" ]
     api_key: ${env:ELASTIC_API_KEY}
     mapping:
       mode: otel
-    logs_dynamic_index:
-      enabled: true
-    metrics_dynamic_index:
-      enabled: true
-    traces_dynamic_index:
-      enabled: true
 
 service:
   extensions: [file_storage]

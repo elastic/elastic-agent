@@ -46,6 +46,7 @@ const (
 	runDirMod          = 0770
 	snapshotSuffix     = "-SNAPSHOT"
 	watcherMaxWaitTime = 30 * time.Second
+	fipsPrefix         = "-fips"
 )
 
 var agentArtifact = artifact.Artifact{
@@ -60,6 +61,12 @@ var (
 	ErrNonFipsToFips      = errors.New("cannot switch to fips mode when upgrading")
 	ErrFipsToNonFips      = errors.New("cannot switch to non-fips mode when upgrading")
 )
+
+func init() {
+	if release.FIPSDistribution() {
+		agentArtifact.Cmd += fipsPrefix
+	}
+}
 
 // Upgrader performs an upgrade
 type Upgrader struct {
@@ -174,10 +181,12 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 	}
 
 	if currentVersion.fips && !metadata.manifest.Package.Fips {
+		log.Warnf("Upgrade action skipped because FIPS-capable Agent cannot be upgraded to non-FIPS-capable Agent")
 		return ErrFipsToNonFips
 	}
 
 	if !currentVersion.fips && metadata.manifest.Package.Fips {
+		log.Warnf("Upgrade action skipped because non-FIPS-capable Agent cannot be upgraded to FIPS-capable Agent")
 		return ErrNonFipsToFips
 	}
 
@@ -408,7 +417,7 @@ func waitForWatcherWithTimeoutCreationFunc(ctx context.Context, log *logger.Logg
 			}
 
 		case <-watcherContext.Done():
-			log.Error("upgrade watcher did not start watching within %s or context has expired", waitTime)
+			log.Errorf("upgrade watcher did not start watching within %s or context has expired", waitTime)
 			return goerrors.Join(ErrWatcherNotStarted, watcherContext.Err())
 		}
 	}
@@ -440,7 +449,7 @@ func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 
 	marker.Acked = true
 
-	return SaveMarker(marker, false)
+	return SaveMarker(paths.Data(), marker, false)
 }
 
 func (u *Upgrader) AckAction(ctx context.Context, acker acker.Acker, action fleetapi.Action) error {

@@ -1,0 +1,51 @@
+# update-cli configuration for automated go updates
+---
+name: Bump ESS snapshots
+
+pipelineid: 'bump-ess-snapshot-{{ requiredEnv "BRANCH_NAME" }}'
+
+scms:
+  githubConfig:
+    kind: github
+    spec:
+      user: '{{ requiredEnv "GITHUB_ACTOR" }}'
+      username: '{{ requiredEnv "GITHUB_ACTOR" }}'
+      owner: "{{ .scm.owner }}"
+      repository: "{{ .scm.repository }}"
+      token: '{{ requiredEnv "GITHUB_TOKEN" }}'
+      branch: '{{ requiredEnv "BRANCH_NAME" }}'
+      commitusingapi: true
+      force: false
+
+sources:
+  lastStableStackSnapshot:
+    name: "Latest Stable ESS snapshot for current branch"
+    kind: json
+    spec:
+      file: 'https://storage.googleapis.com/artifacts-api/channels/{{ requiredEnv "BRANCH_NAME" }}.json'
+      key: .build
+targets:
+  updateStackImages:
+    name: "Update deployment_csp_configuration.yaml"
+    sourceid: lastStableStackSnapshot
+    scmid: githubConfig
+    kind: file
+    spec:
+      file: "pkg/testing/ess/deployment_csp_configuration.yaml"
+      matchpattern: '(\S*_image: ".*docker.*):(.+)"'
+      replacepattern: '$1:{{ source "lastStableStackSnapshot" }}-SNAPSHOT"'
+actions:
+  elastic-agent:
+    kind: github/pullrequest
+    scmid: githubConfig
+    sourceid: lastStableStackSnapshot
+    spec:
+      automerge: true
+      labels:
+        - dependencies
+        - backport-skip
+        - skip-changelog
+        - "Team:Elastic-Agent-Control-Plane"
+      title: '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Bump stack images versions to {{ source "lastStableStackSnapshot" }}'
+      description: |
+        Updates `deployment_csp_configuration.yml`. It is used to pin stable images versions for integration tests.
