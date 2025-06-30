@@ -60,6 +60,17 @@ func newLogWriter(core zapcoreWriter, logCfg component.CommandLogSpec, ll zapcor
 	}
 }
 
+func NewLogWriterWithDefaults(core zapcoreWriter, ll zapcore.Level) *logWriter {
+	cmdLogSpec := component.CommandLogSpec{}
+	cmdLogSpec.InitDefaults()
+	return &logWriter{
+		loggerCore:   core,
+		logCfg:       cmdLogSpec,
+		logLevel:     zap.NewAtomicLevelAt(ll),
+		inheritLevel: ll,
+	}
+}
+
 func (r *logWriter) SetLevels(ll zapcore.Level, unitLevels map[string]zapcore.Level) {
 	// must hold to lock so Write doesn't access the unitLevels
 	r.mx.Lock()
@@ -165,14 +176,16 @@ func getLevel(evt map[string]interface{}, key string) zapcore.Level {
 }
 
 func unmarshalLevel(lvl *zapcore.Level, val string) error {
-	if val == "" {
+	switch val {
+	case "":
 		return errors.New("empty val")
-	} else if val == "trace" {
+	case "trace":
 		// zap doesn't handle trace level we cast to debug
 		*lvl = zapcore.DebugLevel
 		return nil
+	default:
+		return lvl.UnmarshalText([]byte(val))
 	}
-	return lvl.UnmarshalText([]byte(val))
 }
 
 func getMessage(evt map[string]interface{}, key string) string {
