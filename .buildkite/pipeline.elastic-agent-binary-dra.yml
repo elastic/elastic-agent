@@ -6,6 +6,8 @@ env:
   BEAT_URL: "https://www.elastic.co/elastic-agent"
   DRA_PROJECT_ID: "elastic-agent-core"
   DRA_PROJECT_ARTIFACT_ID: "agent-core"
+  # Machine type
+  DEFAULT_GCP_MACHINE_TYPE: "c2-standard-16"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -28,7 +30,7 @@ steps:
         - "build/distributions/**/*"
       agents:
         provider: "gcp"
-        machineType: "c2-standard-16"
+        machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
       env:
         DRA_WORKFLOW: "snapshot"
         PLATFORMS: "linux/amd64 windows/amd64 darwin/amd64"
@@ -41,7 +43,7 @@ steps:
         - "build/distributions/**/*"
       agents:
         provider: "gcp"
-        machineType: "c2-standard-16"
+        machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
       env:
         DRA_WORKFLOW: "snapshot"
         PLATFORMS: "linux/amd64"
@@ -88,7 +90,7 @@ steps:
       key: "publish-dra-snapshot"
       agents:
         provider: "gcp"
-        machineType: "c2-standard-16"
+        machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
       env:
         DRA_WORKFLOW: "snapshot"
       plugins:
@@ -118,7 +120,7 @@ steps:
         - "build/distributions/**/*"
       agents:
         provider: "gcp"
-        machineType: "c2-standard-16"
+        machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
       env:
         DRA_WORKFLOW: "staging"
         PLATFORMS: "linux/amd64 windows/amd64 darwin/amd64"
@@ -132,7 +134,7 @@ steps:
         - "build/distributions/**/*"
       agents:
         provider: "gcp"
-        machineType: "c2-standard-16"
+        machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
       env:
         DRA_WORKFLOW: "staging"
         PLATFORMS: "linux/amd64"
@@ -183,7 +185,7 @@ steps:
       key: "publish-dra-staging"
       agents:
         provider: "gcp"
-        machineType: "c2-standard-16"
+        machineType: "${DEFAULT_GCP_MACHINE_TYPE}"
       env:
         DRA_WORKFLOW: "staging"
       plugins:
