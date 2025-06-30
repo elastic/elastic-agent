@@ -247,8 +247,8 @@ type Coordinator struct {
 	configMgr  ConfigManager
 	varsMgr    VarsManager
 
-	otelComponentMgr OTelManager
-	otelCfg          *confmap.Conf
+	otelMgr OTelManager
+	otelCfg *confmap.Conf
 
 	caps      capabilities.Capabilities
 	modifiers []ComponentsModifier
@@ -415,7 +415,7 @@ func New(
 	caps capabilities.Capabilities,
 	monitorMgr MonitorManager,
 	isManaged bool,
-	otelComponentMgr OTelManager,
+	otelMgr OTelManager,
 	fleetAcker acker.Acker,
 	modifiers ...ComponentsModifier,
 ) *Coordinator {
@@ -434,21 +434,21 @@ func New(
 		LogLevel:     logLevel,
 	}
 	c := &Coordinator{
-		logger:           logger,
-		cfg:              cfg,
-		agentInfo:        agentInfo,
-		isManaged:        isManaged,
-		specs:            specs,
-		reexecMgr:        reexecMgr,
-		upgradeMgr:       upgradeMgr,
-		monitorMgr:       monitorMgr,
-		runtimeMgr:       runtimeMgr,
-		configMgr:        configMgr,
-		varsMgr:          varsMgr,
-		otelComponentMgr: otelComponentMgr,
-		caps:             caps,
-		modifiers:        modifiers,
-		state:            state,
+		logger:     logger,
+		cfg:        cfg,
+		agentInfo:  agentInfo,
+		isManaged:  isManaged,
+		specs:      specs,
+		reexecMgr:  reexecMgr,
+		upgradeMgr: upgradeMgr,
+		monitorMgr: monitorMgr,
+		runtimeMgr: runtimeMgr,
+		configMgr:  configMgr,
+		varsMgr:    varsMgr,
+		otelMgr:    otelMgr,
+		caps:       caps,
+		modifiers:  modifiers,
+		state:      state,
 		// Note: the uses of a buffered input channel in our broadcaster (the
 		// third parameter to broadcaster.New) means that it is possible for
 		// immediately adjacent writes/reads not to match, e.g.:
@@ -502,12 +502,12 @@ func New(
 		c.managerChans.varsManagerUpdate = varsMgr.Watch()
 		c.managerChans.varsManagerError = varsMgr.Errors()
 	}
-	if otelComponentMgr != nil {
+	if otelMgr != nil {
 		// The otel manager sends updates to the watchRuntimeComponents function, which extracts component status
 		// and forwards the rest to this channel.
-		c.managerChans.otelManagerCollectorUpdate = otelComponentMgr.WatchCollector()
-		c.managerChans.otelManagerComponentUpdate = otelComponentMgr.WatchComponents()
-		c.managerChans.otelManagerError = otelComponentMgr.Errors()
+		c.managerChans.otelManagerCollectorUpdate = otelMgr.WatchCollector()
+		c.managerChans.otelManagerComponentUpdate = otelMgr.WatchComponents()
+		c.managerChans.otelManagerError = otelMgr.Errors()
 	}
 	if upgradeMgr != nil && upgradeMgr.MarkerWatcher() != nil {
 		c.managerChans.upgradeMarkerUpdate = upgradeMgr.MarkerWatcher().Watch()
@@ -920,8 +920,8 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	if c.runtimeMgr != nil {
 		subChan = c.runtimeMgr.SubscribeAll(ctx).Ch()
 	}
-	if c.otelComponentMgr != nil {
-		otelChan = c.otelComponentMgr.WatchComponents()
+	if c.otelMgr != nil {
+		otelChan = c.otelMgr.WatchComponents()
 	}
 	go c.watchRuntimeComponents(watchCtx, subChan, otelChan)
 
@@ -1217,7 +1217,7 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			Description: "Final otel configuration used by the Elastic Agent. Includes hybrid mode config and component config.",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
-				mergedCfg := c.otelComponentMgr.MergedOtelConfig()
+				mergedCfg := c.otelMgr.MergedOtelConfig()
 				if mergedCfg == nil {
 					return []byte("no active OTel configuration")
 				}
@@ -1282,9 +1282,9 @@ func (c *Coordinator) runner(ctx context.Context) error {
 	}
 
 	otelErrCh := make(chan error, 1)
-	if c.otelComponentMgr != nil {
+	if c.otelMgr != nil {
 		go func() {
-			err := c.otelComponentMgr.Run(ctx)
+			err := c.otelMgr.Run(ctx)
 			cancel()
 			otelErrCh <- err
 		}()
@@ -1439,9 +1439,9 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 
 // Always called on the main Coordinator goroutine.
 func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (err error) {
-	if c.otelComponentMgr != nil {
+	if c.otelMgr != nil {
 		c.otelCfg = cfg.OTel
-		c.otelComponentMgr.UpdateCollector(c.otelCfg)
+		c.otelMgr.UpdateCollector(c.otelCfg)
 	}
 	return c.processConfigAgent(ctx, cfg)
 }
@@ -1652,7 +1652,7 @@ func (c *Coordinator) updateManagersWithConfig(model *component.Model) {
 		}
 		c.logger.With("component_ids", componentIDs).Warn("The Otel runtime manager is HIGHLY EXPERIMENTAL and only intended for testing. Use at your own risk.")
 	}
-	c.otelComponentMgr.UpdateComponents(*otelModel)
+	c.otelMgr.UpdateComponents(*otelModel)
 }
 
 // splitModelBetweenManager splits the model components between the runtime manager and the otel manager.

@@ -489,8 +489,8 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 		// test by sending an invalid artifact URI to trigger an error.
 		upgradeMgr: upgradeMgr,
 		// Add a placeholder runtime manager that will accept any updates
-		runtimeMgr:       &fakeRuntimeManager{},
-		otelComponentMgr: &fakeOtelComponentManager{},
+		runtimeMgr: &fakeRuntimeManager{},
+		otelMgr:    &fakeOTelManager{},
 
 		// Set valid but empty initial values for ast and vars
 		vars:               emptyVars(t),
@@ -605,8 +605,8 @@ func TestCoordinatorReportsComponentModelError(t *testing.T) {
 			varsManagerUpdate:   varsChan,
 		},
 		// Add a placeholder runtime manager that will accept any updates
-		runtimeMgr:       &fakeRuntimeManager{},
-		otelComponentMgr: &fakeOtelComponentManager{},
+		runtimeMgr: &fakeRuntimeManager{},
+		otelMgr:    &fakeOTelManager{},
 
 		// Set valid but empty initial values for ast and vars
 		vars:               emptyVars(t),
@@ -705,7 +705,7 @@ func TestCoordinatorPolicyChangeUpdatesMonitorReloader(t *testing.T) {
 			configManagerUpdate: configChan,
 		},
 		runtimeMgr:         runtimeManager,
-		otelComponentMgr:   &fakeOtelComponentManager{},
+		otelMgr:            &fakeOTelManager{},
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
@@ -828,7 +828,7 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManager(t *testing.T) {
 	}
 	var otelUpdated bool         // Set by otel manager callback
 	var otelConfig *confmap.Conf // Set by otel manager callback
-	otelComponentManager := &fakeOtelComponentManager{
+	otelManager := &fakeOTelManager{
 		updateCollectorCallback: func(cfg *confmap.Conf) error {
 			otelUpdated = true
 			otelConfig = cfg
@@ -844,7 +844,7 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManager(t *testing.T) {
 			configManagerUpdate: configChan,
 		},
 		runtimeMgr:         runtimeManager,
-		otelComponentMgr:   otelComponentManager,
+		otelMgr:            otelManager,
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
@@ -971,7 +971,7 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 	}
 	var otelUpdated bool         // Set by otel manager callback
 	var otelConfig *confmap.Conf // Set by otel manager callback
-	otelComponentMgr := &fakeOtelComponentManager{
+	otelManager := &fakeOTelManager{
 		updateCollectorCallback: func(cfg *confmap.Conf) error {
 			otelUpdated = true
 			otelConfig = cfg
@@ -1015,7 +1015,7 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 		},
 		monitorMgr:         monitoringMgr,
 		runtimeMgr:         runtimeManager,
-		otelComponentMgr:   otelComponentMgr,
+		otelMgr:            otelManager,
 		specs:              specs,
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
@@ -1112,8 +1112,8 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 			// manager, so it receives the update result.
 			runtimeManagerError: updateErrChan,
 		},
-		runtimeMgr:       runtimeManager,
-		otelComponentMgr: &fakeOtelComponentManager{},
+		runtimeMgr: runtimeManager,
+		otelMgr:    &fakeOTelManager{},
 
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
@@ -1157,7 +1157,7 @@ func TestCoordinatorReportsOTelManagerUpdateFailure(t *testing.T) {
 	// Create a mocked otel manager that always reports an error
 	const errorStr = "update failed for testing reasons"
 	runtimeManager := &fakeRuntimeManager{}
-	otelComponentManager := &fakeOtelComponentManager{
+	otelManager := &fakeOTelManager{
 		updateCollectorCallback: func(retrieved *confmap.Conf) error {
 			return errors.New(errorStr)
 		},
@@ -1175,7 +1175,7 @@ func TestCoordinatorReportsOTelManagerUpdateFailure(t *testing.T) {
 			otelManagerError: updateErrChan,
 		},
 		runtimeMgr:         runtimeManager,
-		otelComponentMgr:   otelComponentManager,
+		otelMgr:            otelManager,
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
@@ -1239,7 +1239,7 @@ func TestCoordinatorAppliesVarsToPolicy(t *testing.T) {
 			varsManagerUpdate:   varsChan,
 		},
 		runtimeMgr:         runtimeManager,
-		otelComponentMgr:   &fakeOtelComponentManager{},
+		otelMgr:            &fakeOTelManager{},
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
