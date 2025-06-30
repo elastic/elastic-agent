@@ -31,9 +31,8 @@ function install_tools_linux() {
 
 # We reinitialize ASDF tools only if the TEST_SUDO is set to true.
 if [ "$TEST_SUDO" == "true" ]; then
-  if [[ "$(uname)" == "Darwin" ]]; then
-    # We do not reinstall tools on macOS for sudo tests
-  else
+  # We do not reinstall tools on macOS for sudo tests  
+  if [[ "$(uname)" != "Darwin" ]]; then    
     install_tools_linux
   fi
 fi
