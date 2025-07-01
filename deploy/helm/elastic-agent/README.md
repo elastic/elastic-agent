@@ -5,7 +5,7 @@
 
 # elastic-agent
 
-![Version: 9.0.0-beta](https://img.shields.io/badge/Version-9.0.0--beta-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 9.0.0](https://img.shields.io/badge/AppVersion-9.0.0-informational?style=flat-square)
+![Version: 9.0.4-beta](https://img.shields.io/badge/Version-9.0.4--beta-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 9.0.4](https://img.shields.io/badge/AppVersion-9.0.4-informational?style=flat-square)
 
 Elastic-Agent Helm Chart
 
@@ -63,6 +63,7 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | kubernetes.enabled | bool | `true` | enable Kubernetes integration. |
+| kubernetes.onboardingID | string | `""` | Specify the onboarding ID for a quick start flow. |
 | kubernetes.output | string | `"default"` | name of the output used in kubernetes integration. Note that this output needs to be defined in [outputs](#1-outputs) |
 | kubernetes.namespace | string | `"default"` | kubernetes namespace |
 | kubernetes.hints.enabled | bool | `false` | enable [elastic-agent autodiscovery](https://www.elastic.co/guide/en/fleet/current/elastic-agent-kubernetes-autodiscovery.html) feature |
@@ -145,8 +146,8 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 ### 6 - Elastic-Agent Configuration
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| agent.version | string | `"9.0.0"` | elastic-agent version |
-| agent.image | object | `{"pullPolicy":"IfNotPresent","repository":"docker.elastic.co/elastic-agent/elastic-agent","tag":"9.0.0-SNAPSHOT"}` | image configuration |
+| agent.version | string | `"9.0.4"` | elastic-agent version |
+| agent.image | object | `{"pullPolicy":"IfNotPresent","repository":"docker.elastic.co/elastic-agent/elastic-agent","tag":"9.0.4-SNAPSHOT"}` | image configuration |
 | agent.imagePullSecrets | list | `[]` | image pull secrets |
 | agent.engine | string | `"k8s"` | generate kubernetes manifests or [ECK](https://github.com/elastic/cloud-on-k8s) CRDs |
 | agent.unprivileged | bool | `false` | enable unprivileged mode |
