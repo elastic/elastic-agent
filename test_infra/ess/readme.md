@@ -6,7 +6,7 @@
 ### Stable snapshots and images override
 This deployment uses the latest tested snapshots of the Elastic Stack components by default. However, you can override the Docker images used for the integration server, Elasticsearch, and Kibana.
 
-`deployment_csp_configuration.yaml` contains the default configuration for the deployment, including the Docker images for the integration server, Elasticsearch, and Kibana. These images are automatically updated to the latest tested snapshots of the Elastic Stack components.
+`create_deployment_csp_configuration.yaml` contains the default configuration for the deployment, including the Docker images for the integration server, Elasticsearch, and Kibana. These images are automatically updated to the latest tested snapshots of the Elastic Stack components.
 * `integration_server_image` - The Docker image for the integration server
 * `elasticsearch_docker_image` - The Docker image for Elasticsearch
 * `kibana_docker_image` - The Docker image for Kibana
@@ -25,4 +25,4 @@ export TF_VAR_elasticsearch_docker_image="docker.elastic.co/cloud-release/elasti
 export TF_VAR_kibana_docker_image="docker.elastic.co/cloud-release/kibana-cloud:9.1.0-48398db3-SNAPSHOT"
 ```
 
-Note: terraform variables take precedence over `deployment_csp_configuration.yaml` docker images configuration. Use `terraform.tfvars` and `TF_VAR_` environment variables to override the images if you don't want to modify the `deployment_csp_configuration.yaml` file.
+Note: terraform variables take precedence over `create_deployment_csp_configuration.yaml` docker images configuration. Use `terraform.tfvars` and `TF_VAR_` environment variables to override the images if you don't want to modify the `create_deployment_csp_configuration.yaml` file.
