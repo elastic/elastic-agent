@@ -254,6 +254,40 @@ func TestInjectOutputOverrides(t *testing.T) {
 				},
 			},
 		},
+		{
+			Name: "setting variables are not expanded",
+			RawConfig: map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type": "elasticsearch",
+						"headers": map[string]any{
+							"X-App-Auth": "${filesource.app_token}",
+						},
+					},
+				},
+			},
+			ChangeConfig: map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type": "kafka",
+						"headers": map[string]any{
+							"X-App-Other": "${filesource.other_token}",
+						},
+					},
+				},
+			},
+			Result: map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type": "kafka",
+						"headers": map[string]any{
+							"X-App-Auth":  "${filesource.app_token}",
+							"X-App-Other": "${filesource.other_token}",
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, scenario := range scenarios {
 		t.Run(scenario.Name, func(t *testing.T) {
