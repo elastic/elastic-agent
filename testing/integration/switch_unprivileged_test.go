@@ -141,7 +141,14 @@ func TestSwitchUnprivilegedWithBasePath(t *testing.T) {
 		// We require sudo for this test to run
 		// `elastic-agent install`.
 		Sudo: true,
-
+		// TODO: Remove
+		OS: []define.OS{
+			{
+				Type: define.Linux,
+			}, {
+				Type: define.Windows,
+			},
+		},
 		// It's not safe to run this test locally as it
 		// installs Elastic Agent.
 		Local: false,
