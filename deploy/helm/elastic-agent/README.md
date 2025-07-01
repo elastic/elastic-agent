@@ -5,7 +5,7 @@
 
 # elastic-agent
 
-![Version: 9.0.0-beta](https://img.shields.io/badge/Version-9.0.0--beta-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 9.0.0](https://img.shields.io/badge/AppVersion-9.0.0-informational?style=flat-square)
+![Version: 9.0.4-beta](https://img.shields.io/badge/Version-9.0.4--beta-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 9.0.4](https://img.shields.io/badge/AppVersion-9.0.4-informational?style=flat-square)
 
 Elastic-Agent Helm Chart
 
@@ -51,6 +51,14 @@ For `ESPlainAuthBasic`, `ESPlainAuthAPI` `ESSecretAuthBasic`, `ESSecretAuthAPI` 
  - ["Memory queue settings"](https://www.elastic.co/guide/en/fleet/current/elasticsearch-output.html#output-elasticsearch-memory-queue-settings)
 
 ### 2 - Kubernetes integration
+
+The chart built-in [kubernetes integration](https://docs.elastic.co/integrations/kubernetes) is used to collect logs and metrics from [Kubernetes clusters](https://kubernetes.io/). This integration is capable of fetching metrics from several components:
+- [kubelet](https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/)
+- [kube-state-metrics](https://github.com/kubernetes/kube-state-metrics)
+- [apiserver](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/)
+- [controller-manager](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/)
+- [scheduler](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-scheduler/)
+- [proxy](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-proxy/)
 
 The chart built-in [kubernetes integration](https://docs.elastic.co/integrations/kubernetes) is used to collect logs and metrics from [Kubernetes clusters](https://kubernetes.io/). This integration is capable of fetching metrics from several components:
 - [kubelet](https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/)
@@ -146,8 +154,8 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 ### 6 - Elastic-Agent Configuration
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| agent.version | string | `"9.0.0"` | elastic-agent version |
-| agent.image | object | `{"pullPolicy":"IfNotPresent","repository":"docker.elastic.co/elastic-agent/elastic-agent","tag":"9.0.0-SNAPSHOT"}` | image configuration |
+| agent.version | string | `"9.0.4"` | elastic-agent version |
+| agent.image | object | `{"pullPolicy":"IfNotPresent","repository":"docker.elastic.co/elastic-agent/elastic-agent","tag":"9.0.4-SNAPSHOT"}` | image configuration |
 | agent.imagePullSecrets | list | `[]` | image pull secrets |
 | agent.engine | string | `"k8s"` | generate kubernetes manifests or [ECK](https://github.com/elastic/cloud-on-k8s) CRDs |
 | agent.unprivileged | bool | `false` | enable unprivileged mode |
@@ -180,4 +188,30 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 | agent.fleet.kibanaCA.valueFromSecret.key | string | `""` | Key in the secret for the Kibana CA certificate |
 | agent.fleet.kibanaServiceToken | string | `""` | Service token to use when connecting to Kibana if the enrollment token is not supplied |
 | agent.fleet.preset | string | `"perNode"` | Agent preset to deploy |
+
+# kube-state-metrics
+
+![Version: 5.30.1](https://img.shields.io/badge/Version-5.30.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 2.15.0](https://img.shields.io/badge/AppVersion-2.15.0-informational?style=flat-square)
+
+Install kube-state-metrics to generate and expose cluster-level metrics
+
+**Homepage:** <https://github.com/kubernetes/kube-state-metrics/>
+
+## Maintainers
+
+| Name | Email | Url |
+| ---- | ------ | --- |
+| tariq1890 | <tariq.ibrahim@mulesoft.com> | <https://github.com/tariq1890> |
+| mrueg | <manuel@rueg.eu> | <https://github.com/mrueg> |
+| dotdc | <david@0xdc.me> | <https://github.com/dotdc> |
+
+## Source Code
+
+* <https://github.com/kubernetes/kube-state-metrics/>
+
+## Values
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| networkPolicy.flavor | string | `"kubernetes"` | Flavor of the network policy to use. Can be: * kubernetes for networking.k8s.io/v1/NetworkPolicy * cilium     for cilium.io/v2/CiliumNetworkPolicy |
 
