@@ -32,6 +32,10 @@ inputs:
         when:
           regexp:
             message: ^Non-zero metrics in the last
+    - drop_event:
+        when:
+          regexp:
+            input: \{"create":\{"_index":.*
     - copy_fields:
         fields:
         - from: data_stream.dataset
