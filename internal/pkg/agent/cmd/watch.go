@@ -102,17 +102,6 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		_ = locker.Unlock()
 	}()
 
-	if marker.DesiredOutcome == upgrade.OUTCOME_ROLLBACK {
-		// TODO: there should be some sanity check in rollback functions like the installation we are going back to should exist and work
-		log.Info("rolling back because of DesiredOutcome=%s", marker.DesiredOutcome.String())
-
-		err = installModifier.Rollback(context.Background(), log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash)
-		if err != nil {
-			return fmt.Errorf("rolling back: %w", err)
-		}
-		return nil
-	}
-
 	isWithinGrace, tilGrace := gracePeriod(marker, cfg.GracePeriod)
 	if isTerminalState(marker) || !isWithinGrace {
 		stateString := ""
@@ -128,6 +117,30 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 			log.Error("clean up of prior watcher run failed", err)
 		}
 		// exit nicely
+		return nil
+	}
+
+	if marker.DesiredOutcome == upgrade.OUTCOME_ROLLBACK {
+		// TODO: there should be some sanity check in rollback functions like the installation we are going back to should exist and work
+		log.Info("rolling back because of DesiredOutcome=%s", marker.DesiredOutcome.String())
+		err = installModifier.Rollback(context.Background(), log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash)
+		if err != nil {
+			return fmt.Errorf("rolling back: %w", err)
+		}
+
+		if marker.Details == nil {
+			actionID := ""
+			if marker.Action != nil {
+				actionID = marker.Action.ActionID
+			}
+			marker.Details = details.NewDetails(marker.Version, details.StateRollback, actionID)
+		}
+		marker.Details.SetStateWithReason(details.StateRollback, details.ReasonManualRollback)
+		err := upgrade.SaveMarker(dataDir, marker, true)
+		if err != nil {
+			return fmt.Errorf("saving marker after rolling back: %w", err)
+		}
+
 		return nil
 	}
 

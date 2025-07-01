@@ -188,7 +188,7 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 	if err != nil {
 		return fmt.Errorf("failed to check if upgrade is already in progress: %w", err)
 	}
-	if isBeingUpgraded {
+	if isBeingUpgraded && !rollback {
 		return errors.New("an upgrade is already in progress; please try again later.")
 	}
 
