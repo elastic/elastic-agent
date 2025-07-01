@@ -187,52 +187,45 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 		return errors.New("an upgrade is already in progress; please try again later.")
 	}
 
-	rollback, err := cmd.Flags().GetBool(flagRollback)
+	performRollback, err := cmd.Flags().GetBool(flagRollback)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve %q command flag information while trying to upgrade the agent: %w", flagRollback, err)
 	}
 
-	if rollback {
-		if err := rollbackCmdWithClient(c); err != nil {
-			if !isConnectionInterruptedError(err) {
-				return errors.New(err, "Failed trigger upgrade of daemon")
-			}
-		}
-		fmt.Fprint(input.streams.Out, "Rollback triggered, Elastic Agent is currently restarting\n")
-		return nil
-	}
-
 	var pgpChecks []string
-	if !skipVerification {
-		// get local PGP
-		pgpPath, _ := cmd.Flags().GetString(flagPGPBytesPath)
-		if len(pgpPath) > 0 {
-			content, err := os.ReadFile(pgpPath)
-			if err != nil {
-				return errors.New(err, "failed to read pgp file")
-			}
-			if len(content) > 0 {
-				pgpChecks = append(pgpChecks, download.PgpSourceRawPrefix+string(content))
-			}
-		}
-
-		pgpBytes, _ := cmd.Flags().GetString(flagPGPBytes)
-		if len(pgpBytes) > 0 {
-			pgpChecks = append(pgpChecks, download.PgpSourceRawPrefix+pgpBytes)
-		}
-
-		pgpUri, _ := cmd.Flags().GetString(flagPGPBytesURI)
-		if len(pgpUri) > 0 {
-			if uriErr := download.CheckValidDownloadUri(pgpUri); uriErr != nil {
-				return uriErr
+	if !performRollback {
+		if !skipVerification {
+			// get local PGP
+			pgpPath, _ := cmd.Flags().GetString(flagPGPBytesPath)
+			if len(pgpPath) > 0 {
+				content, err := os.ReadFile(pgpPath)
+				if err != nil {
+					return errors.New(err, "failed to read pgp file")
+				}
+				if len(content) > 0 {
+					pgpChecks = append(pgpChecks, download.PgpSourceRawPrefix+string(content))
+				}
 			}
 
-			// URI is parsed later with proper TLS and Proxy config within downloader
-			pgpChecks = append(pgpChecks, download.PgpSourceURIPrefix+pgpUri)
+			pgpBytes, _ := cmd.Flags().GetString(flagPGPBytes)
+			if len(pgpBytes) > 0 {
+				pgpChecks = append(pgpChecks, download.PgpSourceRawPrefix+pgpBytes)
+			}
+
+			pgpUri, _ := cmd.Flags().GetString(flagPGPBytesURI)
+			if len(pgpUri) > 0 {
+				if uriErr := download.CheckValidDownloadUri(pgpUri); uriErr != nil {
+					return uriErr
+				}
+
+				// URI is parsed later with proper TLS and Proxy config within downloader
+				pgpChecks = append(pgpChecks, download.PgpSourceURIPrefix+pgpUri)
+			}
 		}
 	}
+
 	skipDefaultPgp, _ := cmd.Flags().GetBool(flagSkipDefaultPgp)
-	version, err = c.Upgrade(context.Background(), version, sourceURI, skipVerification, skipDefaultPgp, pgpChecks...)
+	version, err = c.Upgrade(context.Background(), version, sourceURI, skipVerification, skipDefaultPgp, performRollback, pgpChecks...)
 	if err != nil && !isConnectionInterruptedError(err) {
 		return errors.New(err, "Failed trigger upgrade of daemon")
 	}
@@ -242,7 +235,7 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 }
 
 func rollbackCmdWithClient(c client.Client) error {
-	_, err := c.Upgrade(context.Background(), "", "", true, true)
+	_, err := c.Upgrade(context.Background(), "", "", true, true, true)
 	if err != nil {
 		return fmt.Errorf("failed to perform rollback: %w", err)
 	}
