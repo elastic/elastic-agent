@@ -19,6 +19,7 @@ import (
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm/v2"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
@@ -36,6 +37,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/utils"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 	currentagtversion "github.com/elastic/elastic-agent/version"
 )
@@ -239,7 +241,12 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 }
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
-func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+
+	if rollback {
+		return u.forceRollbackToPreviousVersion(version, action, det)
+	}
+
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 
 	defer func() {
@@ -430,6 +437,83 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	}
 
 	return cb, nil
+}
+
+func (u *Upgrader) forceRollbackToPreviousVersion(version string, action *fleetapi.ActionUpgrade, d *details.Details) (reexec.ShutdownCallbackFn, error) {
+	// Formal checks for verifying we can rollback properly:
+	// 1. d.Metadata.RollbacksAvailable should contain the desired version with a valid TTL (it may need to be written by main agent process before starting watcher)
+	// 2. there has been at least the first restart with the new agent (i.e. we are not still downloading/extracting/rotating)
+	// 3. upgrade marker exists
+	// these should be revalidated after taking over watcher
+	err := u.PersistManualRollback()
+	if err != nil {
+		return nil, err
+	}
+
+	// Invoke watcher again
+	_, err = InvokeWatcher(u.log, paths.BinaryPath(paths.VersionedHome(paths.Top()), agentName))
+	if err != nil {
+		return nil, fmt.Errorf("invoking watcher: %w", err)
+	}
+
+	return nil, nil
+
+}
+
+func (u *Upgrader) PersistManualRollback() error {
+	watcherApplock, err := u.takeOverWatcher()
+	if err != nil {
+		return fmt.Errorf("taking over watcher processes: %w", err)
+	}
+	defer func(watcherApplock *filelock.AppLocker) {
+		releaseWatcherAppLockerErr := watcherApplock.Unlock()
+		if releaseWatcherAppLockerErr != nil {
+			u.log.Warnw("error releasing watcher applock", "error", releaseWatcherAppLockerErr)
+		}
+	}(watcherApplock)
+
+	// read the upgrade marker
+	updateMarker, err := LoadMarker(paths.Data())
+	if err != nil {
+		return fmt.Errorf("loading marker: %w", err)
+	}
+	updateMarker.DesiredOutcome = OUTCOME_ROLLBACK
+	err = SaveMarker(paths.Data(), updateMarker, true)
+	if err != nil {
+		return fmt.Errorf("saving marker: %w", err)
+	}
+
+	return nil
+}
+
+func (u *Upgrader) takeOverWatcher() (*filelock.AppLocker, error) {
+	pids, err := utils.GetWatcherPIDs()
+	if err != nil {
+		return nil, fmt.Errorf("listing watcher processes: %w", err)
+	}
+
+	// this should be run continuously and concurrently attempting to get the app locker
+	for _, pid := range pids {
+		u.log.Debugf("attempting to kill watcher process with PID: %d", pid)
+		process, findProcErr := os.FindProcess(pid)
+		if findProcErr != nil {
+			return nil, fmt.Errorf("finding process with PID: %d: %w", pid, findProcErr)
+		}
+		killProcErr := process.Kill()
+		if killProcErr != nil {
+			return nil, fmt.Errorf("killing process with PID: %d: %w", pid, killProcErr)
+		}
+		u.log.Debugf("killed watcher process with PID: %d", pid)
+	}
+
+	// we should retry to take over the AppLocker for 30s, but AppLocker interface is limited
+	locker := filelock.NewAppLocker(paths.Top(), "watcher.lock")
+	err = locker.TryLock()
+	if err != nil {
+		return nil, fmt.Errorf("locking watcher applocker: %w", err)
+	}
+
+	return locker, nil
 }
 
 func selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string {
