@@ -181,29 +181,3 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 | agent.fleet.kibanaServiceToken | string | `""` | Service token to use when connecting to Kibana if the enrollment token is not supplied |
 | agent.fleet.preset | string | `"perNode"` | Agent preset to deploy |
 
-# kube-state-metrics
-
-![Version: 5.30.1](https://img.shields.io/badge/Version-5.30.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 2.15.0](https://img.shields.io/badge/AppVersion-2.15.0-informational?style=flat-square)
-
-Install kube-state-metrics to generate and expose cluster-level metrics
-
-**Homepage:** <https://github.com/kubernetes/kube-state-metrics/>
-
-## Maintainers
-
-| Name | Email | Url |
-| ---- | ------ | --- |
-| tariq1890 | <tariq.ibrahim@mulesoft.com> | <https://github.com/tariq1890> |
-| mrueg | <manuel@rueg.eu> | <https://github.com/mrueg> |
-| dotdc | <david@0xdc.me> | <https://github.com/dotdc> |
-
-## Source Code
-
-* <https://github.com/kubernetes/kube-state-metrics/>
-
-## Values
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| networkPolicy.flavor | string | `"kubernetes"` | Flavor of the network policy to use. Can be: * kubernetes for networking.k8s.io/v1/NetworkPolicy * cilium     for cilium.io/v2/CiliumNetworkPolicy |
-
