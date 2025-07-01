@@ -86,3 +86,184 @@ func TestLimitsLog(t *testing.T) {
 	logs := obs.FilterMessageSnippet(expLogLine)
 	require.Equalf(t, 1, logs.Len(), "expected one log message about limits change")
 }
+
+func TestInjectOutputOverrides(t *testing.T) {
+	scenarios := []struct {
+		Name         string
+		RawConfig    map[string]any
+		ChangeConfig map[string]any
+		Result       map[string]any
+	}{
+		{
+			Name: "rawConfig no outputs",
+			RawConfig: map[string]any{
+				"inputs": []any{},
+			},
+			ChangeConfig: map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type": "elasticsearch",
+					},
+				},
+			},
+			Result: map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type": "elasticsearch",
+					},
+				},
+			},
+		},
+		{
+			Name: "change config no outputs",
+			RawConfig: map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type": "elasticsearch",
+					},
+				},
+			},
+			ChangeConfig: map[string]any{
+				"inputs": []any{},
+			},
+			Result: map[string]any{
+				"inputs": []any{},
+			},
+		},
+		{
+			Name: "mismatch output",
+			RawConfig: map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type": "elasticsearch",
+						"headers": map[string]any{
+							"X-App-Auth": "token-123",
+						},
+					},
+				},
+			},
+			ChangeConfig: map[string]any{
+				"outputs": map[string]any{
+					"elasticsearch": map[string]any{
+						"type": "elasticsearch",
+					},
+				},
+			},
+			Result: map[string]any{
+				"outputs": map[string]any{
+					"elasticsearch": map[string]any{
+						"type": "elasticsearch",
+					},
+				},
+			},
+		},
+		{
+			Name: "simple merge",
+			RawConfig: map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type": "elasticsearch",
+						"headers": map[string]any{
+							"X-App-Auth": "token-123",
+						},
+					},
+				},
+			},
+			ChangeConfig: map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type": "elasticsearch",
+					},
+				},
+			},
+			Result: map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type": "elasticsearch",
+						"headers": map[string]any{
+							"X-App-Auth": "token-123",
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "simple merge array",
+			RawConfig: map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type": "elasticsearch",
+						"headers": map[string]any{
+							"X-App-Auth": "token-123",
+						},
+					},
+				},
+			},
+			ChangeConfig: map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type": "elasticsearch",
+						"headers": map[string]any{
+							"X-Other-Field": "field-123",
+						},
+					},
+				},
+			},
+			Result: map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type": "elasticsearch",
+						"headers": map[string]any{
+							"X-App-Auth":    "token-123",
+							"X-Other-Field": "field-123",
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "override setting from change",
+			RawConfig: map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type": "elasticsearch",
+						"headers": map[string]any{
+							"X-App-Auth": "token-123",
+						},
+					},
+				},
+			},
+			ChangeConfig: map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type": "kafka",
+						"headers": map[string]any{
+							"X-App-Auth": "token-546",
+						},
+					},
+				},
+			},
+			Result: map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type": "kafka",
+						"headers": map[string]any{
+							"X-App-Auth": "token-546",
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, scenario := range scenarios {
+		t.Run(scenario.Name, func(t *testing.T) {
+			log, _ := loggertest.New(t.Name())
+			rawConfig := config.MustNewConfigFrom(scenario.RawConfig)
+			cc := &mockConfigChange{c: config.MustNewConfigFrom(scenario.ChangeConfig)}
+			observed := injectOutputOverrides(log, rawConfig)(cc).Config()
+			observedMap, err := observed.ToMapStr()
+			require.NoError(t, err)
+			assert.Equal(t, scenario.Result, observedMap)
+		})
+	}
+}
