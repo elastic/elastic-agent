@@ -4,7 +4,9 @@
 
 package common
 
-import "context"
+import (
+	"context"
+)
 
 // Stack is a created stack.
 type Stack struct {
@@ -72,9 +74,12 @@ type StackProvisioner interface {
 	// Create creates a stack.
 	Create(ctx context.Context, request StackRequest) (Stack, error)
 
-	// WaitForReady should block until the stack is ready or the context is cancelled.
+	// WaitForReady should block until the stack is ready and healthy or the context is cancelled.
 	WaitForReady(ctx context.Context, stack Stack) (Stack, error)
 
 	// Delete deletes the stack.
 	Delete(ctx context.Context, stack Stack) error
+
+	// Upgrade upgrades the stack to a new version.
+	Upgrade(ctx context.Context, stack Stack, newVersion string) error
 }

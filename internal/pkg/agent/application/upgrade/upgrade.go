@@ -46,6 +46,7 @@ const (
 	runDirMod          = 0770
 	snapshotSuffix     = "-SNAPSHOT"
 	watcherMaxWaitTime = 30 * time.Second
+	fipsPrefix         = "-fips"
 )
 
 var agentArtifact = artifact.Artifact{
@@ -60,6 +61,12 @@ var (
 	ErrNonFipsToFips      = errors.New("cannot switch to fips mode when upgrading")
 	ErrFipsToNonFips      = errors.New("cannot switch to non-fips mode when upgrading")
 )
+
+func init() {
+	if release.FIPSDistribution() {
+		agentArtifact.Cmd += fipsPrefix
+	}
+}
 
 // Upgrader performs an upgrade
 type Upgrader struct {
@@ -174,17 +181,19 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 	}
 
 	if currentVersion.fips && !metadata.manifest.Package.Fips {
+		log.Warnf("Upgrade action skipped because FIPS-capable Agent cannot be upgraded to non-FIPS-capable Agent")
 		return ErrFipsToNonFips
 	}
 
 	if !currentVersion.fips && metadata.manifest.Package.Fips {
+		log.Warnf("Upgrade action skipped because non-FIPS-capable Agent cannot be upgraded to FIPS-capable Agent")
 		return ErrNonFipsToFips
 	}
 
 	return nil
 }
 
-func handleRollback(ctx context.Context, log *logger.Logger, dataDirPath, topDirPath, versionedHome string) error {
+func handleRollback(ctx context.Context, log *logger.Logger, dataDirPath, topDirPath string) error {
 	marker, err := LoadMarker(dataDirPath)
 	if err != nil {
 		return fmt.Errorf("failed to load upgrade marker during rollback: %w", err)
@@ -201,16 +210,16 @@ func handleRollback(ctx context.Context, log *logger.Logger, dataDirPath, topDir
 	}
 
 	// update marker with Rollback intention
-	//upgradeDesiredOutcome := func(m *UpdateMarker) {
-	_ = func(m *UpdateMarker) {
-		m.DesiredOutcome = OUTCOME_ROLLBACK
+	marker.DesiredOutcome = OUTCOME_ROLLBACK
+
+	if err := SaveMarker(dataDirPath, marker, true); err != nil {
+		return fmt.Errorf("failed to write update marker: %w", err)
 	}
-	// TODO: perform actual update of marker
 
 	// execute watcher
 	var watcherCmd *exec.Cmd
 
-	watcherExecutable := paths.BinaryPath(filepath.Join(topDirPath, versionedHome), agentName)
+	watcherExecutable := paths.BinaryPath(paths.VersionedHome(topDirPath), agentName)
 	if watcherCmd, err = InvokeWatcher(log, watcherExecutable); err != nil {
 		return fmt.Errorf("failed to invoke watcher %q from rollback handler: %w", watcherExecutable, err)
 	}
@@ -229,7 +238,7 @@ func isStateValidForRollback(currentState details.State) bool {
 }
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
-func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, isRollback bool, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, performRollback bool, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 
 	currentVersion := agentVersion{
@@ -239,8 +248,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		fips:     release.FIPSDistribution(),
 	}
 
-	if isRollback {
-		if err := handleRollback(paths.Data()); err != nil {
+	if performRollback {
+		if err := handleRollback(ctx, u.log, paths.Data(), paths.Top()); err != nil {
 			return nil, fmt.Errorf("failed to handle rollback: %w", err)
 		}
 
@@ -460,7 +469,7 @@ func waitForWatcherWithTimeoutCreationFunc(ctx context.Context, log *logger.Logg
 			}
 
 		case <-watcherContext.Done():
-			log.Error("upgrade watcher did not start watching within %s or context has expired", waitTime)
+			log.Errorf("upgrade watcher did not start watching within %s or context has expired", waitTime)
 			return goerrors.Join(ErrWatcherNotStarted, watcherContext.Err())
 		}
 	}
@@ -492,7 +501,7 @@ func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 
 	marker.Acked = true
 
-	return SaveMarker(marker, false)
+	return SaveMarker(paths.Data(), marker, false)
 }
 
 func (u *Upgrader) AckAction(ctx context.Context, acker acker.Acker, action fleetapi.Action) error {

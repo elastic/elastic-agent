@@ -537,7 +537,7 @@ func TestUpgradeSameErrorAcked(t *testing.T) {
 
 	acker.On("Ack", mock.Anything, actionUpgrade).Return(nil)
 
-	require.NoError(t, coord.Upgrade(t.Context(), "9.0", "http://localhost", actionUpgrade, true, true))
+	require.NoError(t, coord.Upgrade(t.Context(), "9.0", "http://localhost", actionUpgrade, false, true, true))
 
 	acker.AssertCalled(t, "Ack", mock.Anything, actionUpgrade)
 }
@@ -919,7 +919,7 @@ func TestCoordinator_Upgrade(t *testing.T) {
 	require.NoError(t, err)
 	cfgMgr.Config(ctx, cfg)
 
-	err = coord.Upgrade(ctx, "9.0.0", "", nil, true, false)
+	err = coord.Upgrade(ctx, "9.0.0", "", nil, false, true, false)
 	require.ErrorIs(t, err, ErrNotUpgradable)
 	cancel()
 
@@ -956,7 +956,7 @@ func TestCoordinator_UpgradeDetails(t *testing.T) {
 	require.NoError(t, err)
 	cfgMgr.Config(ctx, cfg)
 
-	err = coord.Upgrade(ctx, "9.0.0", "", nil, true, false)
+	err = coord.Upgrade(ctx, "9.0.0", "", nil, false, true, false)
 	require.ErrorIs(t, expectedErr, err)
 	cancel()
 
@@ -1078,7 +1078,8 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 	cfg.Port = 0
 	rm, err := runtime.NewManager(l, l, ai, apmtest.DiscardTracer, monitoringMgr, cfg)
 	require.NoError(t, err)
-	otelMgr := otelmanager.NewOTelManager(l)
+	otelMgr, err := otelmanager.NewOTelManager(l, logp.InfoLevel, l, otelmanager.EmbeddedExecutionMode)
+	require.NoError(t, err)
 
 	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), l)
 	require.NoError(t, err)
@@ -1162,7 +1163,7 @@ func (f *fakeUpgradeManager) Reload(cfg *config.Config) error {
 	return nil
 }
 
-func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, performRollback bool, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	f.upgradeCalled = true
 	if f.upgradeErr != nil {
 		return nil, f.upgradeErr

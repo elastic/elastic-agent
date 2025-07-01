@@ -70,7 +70,7 @@ type UpgradeManager interface {
 	Reload(rawConfig *config.Config) error
 
 	// Upgrade upgrades running agent.
-	Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error)
+	Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, performRollback bool, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error)
 
 	// Ack is used on startup to check if the agent has upgraded and needs to send an ack for the action
 	Ack(ctx context.Context, acker acker.Acker) error
@@ -549,7 +549,7 @@ func (c *Coordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ..
 
 // Upgrade runs the upgrade process.
 // Called from external goroutines.
-func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) error {
+func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, performRollback bool, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) error {
 	// early check outside of upgrader before overriding the state
 	if !c.upgradeMgr.Upgradeable() {
 		return ErrNotUpgradable
@@ -589,7 +589,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	det := details.NewDetails(version, details.StateRequested, actionID)
 	det.RegisterObserver(c.SetUpgradeDetails)
 
-	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, performRollback, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 	if err != nil {
 		c.ClearOverrideState()
 		if errors.Is(err, upgrade.ErrUpgradeSameVersion) {
@@ -654,26 +654,23 @@ func (c *Coordinator) SetLogLevel(ctx context.Context, lvl *logp.Level) error {
 // watchRuntimeComponents listens for state updates from the runtime
 // manager, logs them, and forwards them to CoordinatorState.
 // Runs in its own goroutine created in Coordinator.Run.
-func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
-	state := make(map[string]runtime.ComponentState)
+func (c *Coordinator) watchRuntimeComponents(
+	ctx context.Context,
+	runtimeComponentStates <-chan runtime.ComponentComponentState,
+	otelStatuses <-chan *status.AggregateStatus,
+) {
+	// We need to track otel component state separately because otel components may not always get a STOPPED status
+	// If we receive an otel status without the state of a component we're tracking, we need to emit a fake STOPPED
+	// status for it. Process component states should not be affected by this logic.
+	processState := make(map[string]runtime.ComponentState)
+	otelState := make(map[string]runtime.ComponentState)
 
-	var subChan <-chan runtime.ComponentComponentState
-	var otelChan <-chan *status.AggregateStatus
-	// A real Coordinator will always have a runtime manager, but unit tests
-	// may not initialize all managers -- in that case we leave subChan nil,
-	// and just idle until Coordinator shuts down.
-	if c.runtimeMgr != nil {
-		subChan = c.runtimeMgr.SubscribeAll(ctx).Ch()
-	}
-	if c.otelMgr != nil {
-		otelChan = c.otelMgr.Watch()
-	}
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case componentState := <-subChan:
-			logComponentStateChange(c.logger, state, &componentState)
+		case componentState := <-runtimeComponentStates:
+			logComponentStateChange(c.logger, processState, &componentState)
 			// Forward the final changes back to Coordinator, unless our context
 			// has ended.
 			select {
@@ -681,22 +678,23 @@ func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			}
-		case otelStatus := <-otelChan:
+		case otelStatus := <-otelStatuses:
 			// We don't break on errors here, because we want to forward the status
 			// even if there was an error, and the rest of the code gracefully handles componentStates being nil
 			componentStates, err := translate.GetAllComponentStates(otelStatus, c.componentModel)
 			if err != nil {
 				c.setOTelError(err)
 			}
-			err = translate.DropComponentStateFromOtelStatus(otelStatus)
+			finalOtelStatus, err := translate.DropComponentStateFromOtelStatus(otelStatus)
 			if err != nil {
 				c.setOTelError(err)
+				finalOtelStatus = otelStatus
 			}
 
 			// forward the remaining otel status
 			// TODO: Implement subscriptions for otel manager status to avoid the need for this
 			select {
-			case c.managerChans.otelManagerUpdate <- otelStatus:
+			case c.managerChans.otelManagerUpdate <- finalOtelStatus:
 			case <-ctx.Done():
 				return
 			}
@@ -707,7 +705,7 @@ func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
 			for _, componentState := range componentStates {
 				componentIds[componentState.Component.ID] = true
 			}
-			for id := range state {
+			for id := range otelState {
 				if _, ok := componentIds[id]; !ok {
 					// this component is not in the configuration anymore, emit a fake STOPPED state
 					componentStates = append(componentStates, runtime.ComponentComponentState{
@@ -722,7 +720,7 @@ func (c *Coordinator) watchRuntimeComponents(ctx context.Context) {
 			}
 			// now handle the component states
 			for _, componentState := range componentStates {
-				logComponentStateChange(c.logger, state, &componentState)
+				logComponentStateChange(c.logger, otelState, &componentState)
 				// Forward the final changes back to Coordinator, unless our context
 				// has ended.
 				select {
@@ -813,7 +811,19 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	// log all changes in the state of the runtime and update the coordinator state
 	watchCtx, watchCanceller := context.WithCancel(ctx)
 	defer watchCanceller()
-	go c.watchRuntimeComponents(watchCtx)
+
+	var subChan <-chan runtime.ComponentComponentState
+	var otelChan <-chan *status.AggregateStatus
+	// A real Coordinator will always have a runtime manager, but unit tests
+	// may not initialize all managers -- in that case we leave subChan nil,
+	// and just idle until Coordinator shuts down.
+	if c.runtimeMgr != nil {
+		subChan = c.runtimeMgr.SubscribeAll(ctx).Ch()
+	}
+	if c.otelMgr != nil {
+		otelChan = c.otelMgr.Watch()
+	}
+	go c.watchRuntimeComponents(watchCtx, subChan, otelChan)
 
 	// Close the state broadcaster on finish, but leave it running in the
 	// background until all subscribers have read the final values or their

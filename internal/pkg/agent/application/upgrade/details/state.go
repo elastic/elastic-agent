@@ -6,9 +6,9 @@ package details
 
 type State string
 
-// The values of these State* constants should match those enumerated for
-// upgrade_details.state in https://github.com/elastic/fleet-server/blob/main/model/openapi.yml
 const (
+	// The values of these State* constants should match those enumerated for
+	// upgrade_details.state in https://github.com/elastic/fleet-server/blob/main/model/openapi.yml
 	StateRequested         State = "UPG_REQUESTED"
 	StateScheduled         State = "UPG_SCHEDULED"
 	StateDownloading       State = "UPG_DOWNLOADING"
@@ -20,4 +20,7 @@ const (
 	StateCompleted         State = "UPG_COMPLETED"
 	StateFailed            State = "UPG_FAILED"
 	StateRollbackAvailable State = "UPG_ROLLBACK_AVAILABLE"
+
+	// List of well-known reasons for state transitions
+	ReasonWatchFailed = "watch failed"
 )

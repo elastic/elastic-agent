@@ -9,9 +9,7 @@ asdf install
 
 GROUP_NAME=$1
 TEST_SUDO=$2
-# NOTE: This argument is not used in this script, but is declared to show that it can be set
-# and passed down to downstream scripts where it may be used.
-TEST_NAME_PATTERN=${3:-""}
+
 if [ -z "$GROUP_NAME" ]; then
   echo "Error: Specify the group name: integration_tests_tf.sh [group_name]" >&2
   exit 1
@@ -37,8 +35,7 @@ mage build:testBinaries
 if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
   echo "~~~ The steps is retried, starting the ESS stack again"
   trap 'ess_down' EXIT
-  ess_up $OVERRIDE_STACK_VERSION || echo "Failed to start ESS stack" >&2
-  preinstall_fleet_packages
+  ess_up $OVERRIDE_STACK_VERSION || (echo -e "^^^ +++\nFailed to start ESS stack")
 else
   # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data
   echo "~~~ Receiving ESS stack metadata"

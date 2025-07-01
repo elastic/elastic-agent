@@ -57,11 +57,16 @@ import (
 	otlphttpexporter "go.opentelemetry.io/collector/exporter/otlphttpexporter"
 
 	// Extensions
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension"
+	healthcheckv2extension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension"
 	k8sobserver "github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver"
 	pprofextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension"
 	filestorage "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage"
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
+
+	"github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension"
+	"github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension"
 
 	// Connectors
 	routingconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector"
@@ -149,11 +154,15 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		}
 
 		extensions := []extension.Factory{
+			healthcheckv2extension.NewFactory(),
 			memorylimiterextension.NewFactory(),
 			filestorage.NewFactory(),
 			healthcheckextension.NewFactory(),
+			bearertokenauthextension.NewFactory(),
 			pprofextension.NewFactory(),
 			k8sobserver.NewFactory(),
+			apikeyauthextension.NewFactory(),
+			apmconfigextension.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)
 		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)
