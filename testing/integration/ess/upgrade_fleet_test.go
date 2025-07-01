@@ -428,24 +428,26 @@ func PerformManagedUpgrade(
 		return fmt.Errorf("failed getting default Fleet Server URL: %w", err)
 	}
 
-	t.Logf("Installing Elastic Agent (unprivileged: %t)...", unprivileged)
-	var nonInteractiveFlag bool
-	if upgradetest.Version_8_2_0.Less(*startParsedVersion) {
-		nonInteractiveFlag = true
-	}
-	installOpts := atesting.InstallOpts{
-		NonInteractive: nonInteractiveFlag,
-		Force:          true,
-		EnrollOpts: atesting.EnrollOpts{
-			URL:             fleetServerURL,
-			EnrollmentToken: enrollmentToken.APIKey,
-		},
-		Privileged: !unprivileged,
-	}
-	output, err := startFixture.Install(ctx, &installOpts)
-	t.Logf("install start agent output:\n%s", string(output))
-	if err != nil {
-		return fmt.Errorf("failed to install start agent: %w", err)
+	if !upgradeOpts.SkipInstall {
+		t.Logf("Installing Elastic Agent (unprivileged: %t)...", unprivileged)
+		var nonInteractiveFlag bool
+		if upgradetest.Version_8_2_0.Less(*startParsedVersion) {
+			nonInteractiveFlag = true
+		}
+		installOpts := atesting.InstallOpts{
+			NonInteractive: nonInteractiveFlag,
+			Force:          true,
+			EnrollOpts: atesting.EnrollOpts{
+				URL:             fleetServerURL,
+				EnrollmentToken: enrollmentToken.APIKey,
+			},
+			Privileged: !unprivileged,
+		}
+		output, err := startFixture.Install(ctx, &installOpts)
+		t.Logf("install start agent output:\n%s", string(output))
+		if err != nil {
+			return fmt.Errorf("failed to install start agent: %w", err)
+		}
 	}
 
 	// start fixture gets the agent configured to use a faster watcher

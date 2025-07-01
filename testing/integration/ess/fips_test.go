@@ -24,6 +24,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/testing/integration"
+	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
 const cloudAgentPolicyID = "policy-elastic-agent-on-cloud"
@@ -215,9 +216,7 @@ func upgradeFIPSAgent(t *testing.T, info *define.Info) {
 			err = endFixture.Prepare(ctx)
 			require.NoError(t, err)
 
-			// TODO: create and pass new upgradetest.UpgradeOpt for not installing startFixture since it'll already
-			// be installed.
-			testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture, defaultPolicy(), false)
+			testUpgradeFleetManagedElasticAgent(ctx, t, info, startFixture, endFixture, defaultPolicy(), false, upgradetest.WithoutInstall())
 		})
 	}
 }
