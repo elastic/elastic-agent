@@ -33,6 +33,7 @@ const (
 	flagPGPBytesPath   = "pgp-path"
 	flagPGPBytesURI    = "pgp-uri"
 	flagForce          = "force"
+	flagRollback       = "rollback"
 )
 
 var (
@@ -64,6 +65,7 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 	cmd.Flags().String(flagPGPBytesURI, "", "Path to a web location containing PGP to use for package verification")
 	cmd.Flags().String(flagPGPBytesPath, "", "Path to a file containing PGP to use for package verification")
 	cmd.Flags().BoolP(flagForce, "", false, "Advanced option to force an upgrade on a fleet managed agent")
+	cmd.Flags().BoolP(flagRollback, "", false, "Advanced option to initiate rollback to previous available version")
 	err := cmd.Flags().MarkHidden(flagForce)
 	if err != nil {
 		fmt.Fprintf(streams.Err, "error while setting upgrade force flag attributes: %s", err.Error())
@@ -185,6 +187,21 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 		return errors.New("an upgrade is already in progress; please try again later.")
 	}
 
+	rollback, err := cmd.Flags().GetBool(flagRollback)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve %q command flag information while trying to upgrade the agent: %w", flagRollback, err)
+	}
+
+	if rollback {
+		if err := rollbackCmdWithClient(c); err != nil {
+			if !isConnectionInterruptedError(err) {
+				return errors.New(err, "Failed trigger upgrade of daemon")
+			}
+		}
+		fmt.Fprint(input.streams.Out, "Rollback triggered, Elastic Agent is currently restarting\n")
+		return nil
+	}
+
 	var pgpChecks []string
 	if !skipVerification {
 		// get local PGP
@@ -216,16 +233,28 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 	}
 	skipDefaultPgp, _ := cmd.Flags().GetBool(flagSkipDefaultPgp)
 	version, err = c.Upgrade(context.Background(), version, sourceURI, skipVerification, skipDefaultPgp, pgpChecks...)
-	if err != nil {
-		s, ok := status.FromError(err)
-		// Sometimes the gRPC server shuts down before replying to the command which is expected
-		// we can determine this state by the EOF error coming from the server.
-		// If the server is just unavailable/not running, we should not succeed.
-		isConnectionInterrupted := ok && s.Code() == codes.Unavailable && strings.Contains(s.Message(), "EOF")
-		if !isConnectionInterrupted {
-			return errors.New(err, "Failed trigger upgrade of daemon")
-		}
+	if err != nil && !isConnectionInterruptedError(err) {
+		return errors.New(err, "Failed trigger upgrade of daemon")
 	}
+
 	fmt.Fprintf(input.streams.Out, "Upgrade triggered to version %s, Elastic Agent is currently restarting\n", version)
 	return nil
+}
+
+func rollbackCmdWithClient(c client.Client) error {
+	_, err := c.Upgrade(context.Background(), "", "", true, true)
+	if err != nil {
+		return fmt.Errorf("failed to perform rollback: %w", err)
+	}
+
+	return nil
+}
+
+func isConnectionInterruptedError(err error) bool {
+	s, ok := status.FromError(err)
+	// Sometimes the gRPC server shuts down before replying to the command which is expected
+	// we can determine this state by the EOF error coming from the server.
+	// If the server is just unavailable/not running, we should not succeed.
+
+	return ok && s.Code() == codes.Unavailable && strings.Contains(s.Message(), "EOF")
 }

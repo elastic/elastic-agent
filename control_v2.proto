@@ -116,6 +116,9 @@ message UpgradeRequest {
   //
   // If provided Elastic Agent package embedded PGP key is not checked for signature during upgrade.
   bool skipDefaultPgp = 5;
+
+  // (Optional) Overrides predefined behavior for agent and performs rollback instead of ugprade.
+	bool performRollback = 6;
 }
 
 // A upgrade response message.

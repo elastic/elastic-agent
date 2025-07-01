@@ -580,6 +580,8 @@ type UpgradeRequest struct {
 	//
 	// If provided Elastic Agent package embedded PGP key is not checked for signature during upgrade.
 	SkipDefaultPgp bool `protobuf:"varint,5,opt,name=skipDefaultPgp,proto3" json:"skipDefaultPgp,omitempty"`
+	// (Optional) Overrides predefined behavior for agent and performs rollback instead of ugprade.
+	PerformRollback bool `protobuf:"varint,6,opt,name=performRollback,proto3" json:"performRollback,omitempty"`
 }
 
 func (x *UpgradeRequest) Reset() {
