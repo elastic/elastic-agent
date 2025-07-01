@@ -6,14 +6,25 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"go.opentelemetry.io/collector/otelcol"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/service"
+
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/agentprovider"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
@@ -26,10 +37,18 @@ func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Comman
 			if err != nil {
 				return err
 			}
+			supervised, err := cmd.Flags().GetBool(manager.OtelSetSupervisedFlagName)
+			if err != nil {
+				return err
+			}
+			supervisedLoggingLevel, err := cmd.Flags().GetString(manager.OtelSupervisedLoggingLevelFlagName)
+			if err != nil {
+				return err
+			}
 			if err := prepareEnv(); err != nil {
 				return err
 			}
-			return runCollector(cmd.Context(), cfgFiles)
+			return RunCollector(cmd.Context(), cfgFiles, supervised, supervisedLoggingLevel)
 		},
 		PreRun: func(c *cobra.Command, args []string) {
 			// hide inherited flags not to bloat help with flags not related to otel
@@ -57,7 +76,11 @@ func hideInheritedFlags(c *cobra.Command) {
 	})
 }
 
-func runCollector(cmdCtx context.Context, configFiles []string) error {
+func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool, supervisedLoggingLevel string) error {
+	settings, err := prepareCollectorSettings(configFiles, supervised, supervisedLoggingLevel)
+	if err != nil {
+		return fmt.Errorf("failed to prepare collector settings: %w", err)
+	}
 	// Windows: Mark service as stopped.
 	// After this is run, the service is considered by the OS to be stopped.
 	// This must be the first deferred cleanup task (last to execute).
@@ -79,7 +102,58 @@ func runCollector(cmdCtx context.Context, configFiles []string) error {
 	defer cancel()
 	go service.ProcessWindowsControlEvents(stopCollector)
 
-	return otel.Run(ctx, stop, configFiles)
+	return otel.Run(ctx, stop, settings)
+}
+
+func prepareCollectorSettings(configFiles []string, supervised bool, supervisedLoggingLevel string) (*otelcol.CollectorSettings, error) {
+	var settings *otelcol.CollectorSettings
+	if supervised {
+		// add stdin config provider
+		configProvider, err := agentprovider.NewBufferProvider(os.Stdin)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create config provider: %w", err)
+		}
+		settings = otel.NewSettings(release.Version(), []string{configProvider.URI()},
+			otel.WithConfigProviderFactory(configProvider.NewFactory()),
+		)
+
+		// setup logger
+		defaultCfg := logger.DefaultLoggingConfig()
+		defaultEventLogCfg := logger.DefaultEventLoggingConfig()
+
+		defaultCfg.ToStderr = true
+		defaultCfg.ToFiles = false
+
+		defaultEventLogCfg.ToFiles = false
+		defaultEventLogCfg.ToStderr = true
+
+		var logLevelSettingErr error
+		if supervisedLoggingLevel != "" {
+			if logLevelSettingErr = defaultCfg.Level.Unpack(supervisedLoggingLevel); logLevelSettingErr != nil {
+				defaultCfg.Level = logp.InfoLevel
+			}
+		} else {
+			defaultCfg.Level = logp.InfoLevel
+		}
+
+		l, err := logger.NewFromConfig("edot", defaultCfg, defaultEventLogCfg, false)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create logger: %w", err)
+		}
+
+		if logLevelSettingErr != nil {
+			l.Warnf("Fallback to default logging level due to: %v", logLevelSettingErr)
+		}
+
+		settings.LoggingOptions = []zap.Option{zap.WrapCore(func(zapcore.Core) zapcore.Core {
+			return l.Core()
+		})}
+
+		settings.DisableGracefulShutdown = false
+	} else {
+		settings = otel.NewSettings(release.Version(), configFiles)
+	}
+	return settings, nil
 }
 
 func prepareEnv() error {

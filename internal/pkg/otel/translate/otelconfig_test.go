@@ -223,7 +223,6 @@ func TestGetOtelConfig(t *testing.T) {
 				"max_size": 1600,
 				"min_size": 0,
 			},
-			"logs_index": "",
 			"mapping": map[string]any{
 				"mode": "bodymap",
 			},
@@ -235,9 +234,6 @@ func TestGetOtelConfig(t *testing.T) {
 				"initial_interval": 1 * time.Second,
 				"max_interval":     1 * time.Minute,
 				"max_retries":      3,
-			},
-			"logs_dynamic_index": map[string]any{
-				"enabled": true,
 			},
 			"logs_dynamic_id": map[string]any{
 				"enabled": true,

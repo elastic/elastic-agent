@@ -57,7 +57,9 @@ import (
 	otlphttpexporter "go.opentelemetry.io/collector/exporter/otlphttpexporter"
 
 	// Extensions
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension"
+	healthcheckv2extension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension"
 	k8sobserver "github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver"
 	pprofextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension"
 	filestorage "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage"
@@ -152,9 +154,11 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		}
 
 		extensions := []extension.Factory{
+			healthcheckv2extension.NewFactory(),
 			memorylimiterextension.NewFactory(),
 			filestorage.NewFactory(),
 			healthcheckextension.NewFactory(),
+			bearertokenauthextension.NewFactory(),
 			pprofextension.NewFactory(),
 			k8sobserver.NewFactory(),
 			apikeyauthextension.NewFactory(),

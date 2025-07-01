@@ -9,25 +9,26 @@ require (
 	github.com/blakesmith/ar v0.0.0-20150311145944-8bd4349a67f2
 	github.com/cavaliergopher/rpm v1.2.0
 	github.com/cenkalti/backoff/v4 v4.3.0
+	github.com/cenkalti/backoff/v5 v5.0.2
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/docker/docker v28.1.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250617212518-cbe3da93548b
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250625230922-20190076bbd3
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.9.2
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
-	github.com/elastic/elastic-agent-libs v0.20.1
-	github.com/elastic/elastic-agent-system-metrics v0.11.15
+	github.com/elastic/elastic-agent-libs v0.21.0
+	github.com/elastic/elastic-agent-system-metrics v0.11.16
 	github.com/elastic/elastic-transport-go/v8 v8.7.0
-	github.com/elastic/go-elasticsearch/v8 v8.18.0
+	github.com/elastic/go-elasticsearch/v8 v8.18.1
 	github.com/elastic/go-licenser v0.4.2
 	github.com/elastic/go-sysinfo v1.15.3
 	github.com/elastic/go-ucfg v0.8.9-0.20250307075119-2a22403faaea
 	github.com/elastic/mock-es v0.0.0-20241101195702-0a41fa3d30d9
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.3.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.1.0
-	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.2.1
+	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.3.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.15.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.6.0
 	github.com/fatih/color v1.18.0
@@ -48,7 +49,9 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.127.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.127.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.127.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.127.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.127.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.127.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.127.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.127.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.127.0
@@ -80,14 +83,14 @@ require (
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.127.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.127.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/crypto v0.38.0
+	golang.org/x/crypto v0.39.0
 	golang.org/x/exp v0.0.0-20250215185904-eff6e970281f
-	golang.org/x/mod v0.24.0
-	golang.org/x/net v0.40.0
-	golang.org/x/sync v0.14.0
+	golang.org/x/mod v0.25.0
+	golang.org/x/net v0.41.0
+	golang.org/x/sync v0.15.0
 	golang.org/x/sys v0.33.0
 	golang.org/x/term v0.32.0
-	golang.org/x/text v0.25.0
+	golang.org/x/text v0.26.0
 	golang.org/x/time v0.11.0
 	golang.org/x/tools v0.33.0
 	google.golang.org/api v0.226.0
@@ -105,6 +108,7 @@ require (
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.70
 	sigs.k8s.io/e2e-framework v0.4.0
 	sigs.k8s.io/kustomize/api v0.18.0
+	sigs.k8s.io/kustomize/kyaml v0.18.1
 )
 
 require (
@@ -277,7 +281,6 @@ require (
 	github.com/bitfield/gotestdox v0.2.2 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.8.1 // indirect
-	github.com/cenkalti/backoff/v5 v5.0.2 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/cilium/ebpf v0.16.0 // indirect
@@ -330,7 +333,7 @@ require (
 	github.com/elastic/go-freelru v0.16.0 // indirect
 	github.com/elastic/go-grok v0.3.1 // indirect
 	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
-	github.com/elastic/go-seccomp-bpf v1.5.0 // indirect
+	github.com/elastic/go-seccomp-bpf v1.6.0 // indirect
 	github.com/elastic/go-sfdc v0.0.0-20241010131323-8e176480d727 // indirect
 	github.com/elastic/go-structform v0.0.12 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
@@ -480,7 +483,7 @@ require (
 	github.com/mdlayher/socket v0.4.1 // indirect
 	github.com/mdlayher/vsock v1.2.1 // indirect
 	github.com/meraki/dashboard-api-go/v3 v3.0.9 // indirect
-	github.com/microsoft/go-mssqldb v1.7.2 // indirect
+	github.com/microsoft/go-mssqldb v1.8.2 // indirect
 	github.com/microsoft/wmi v0.25.1 // indirect
 	github.com/miekg/dns v1.1.63 // indirect
 	github.com/mileusna/useragent v1.3.4 // indirect
@@ -726,7 +729,6 @@ require (
 	oras.land/oras-go v1.2.5 // indirect
 	sigs.k8s.io/controller-runtime v0.20.4 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
-	sigs.k8s.io/kustomize/kyaml v0.18.1 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.3 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
@@ -753,5 +755,5 @@ replace (
 	github.com/fsnotify/fsnotify => github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3
 	github.com/google/gopacket => github.com/elastic/gopacket v1.1.20-0.20241002174017-e8c5fda595e6
 	github.com/insomniacslk/dhcp => github.com/elastic/dhcp v0.0.0-20200227161230-57ec251c7eb3 // indirect
-	github.com/meraki/dashboard-api-go/v3 => github.com/tommyers-elastic/dashboard-api-go/v3 v3.0.0-20250514220331-e52c94766b6f
+	github.com/meraki/dashboard-api-go/v3 => github.com/tommyers-elastic/dashboard-api-go/v3 v3.0.0-20250616163611-a325b49669a4
 )

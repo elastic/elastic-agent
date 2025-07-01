@@ -22,7 +22,7 @@ type evtPair struct {
 }
 
 type AgentStatusExtension struct {
-	mgr        *OTelManager
+	statusCh   chan *status.AggregateStatus
 	telemetry  component.TelemetrySettings
 	aggregator *status.Aggregator
 	eventCh    chan *evtPair
@@ -39,11 +39,11 @@ var _ componentstatus.Watcher = (*AgentStatusExtension)(nil)
 
 // NewAgentStatusExtension returns the agent_status extension to be used by the
 // OTel collector when running in hybrid mode.
-func NewAgentStatusExtension(ctx context.Context, set extension.Settings, mgr *OTelManager) *AgentStatusExtension {
+func NewAgentStatusExtension(ctx context.Context, set extension.Settings, statusCh chan *status.AggregateStatus) *AgentStatusExtension {
 	ctx, cancel := context.WithCancel(ctx)
 	aggregator := status.NewAggregator(status.PriorityRecoverable)
 	as := &AgentStatusExtension{
-		mgr:        mgr,
+		statusCh:   statusCh,
 		telemetry:  set.TelemetrySettings,
 		aggregator: aggregator,
 		eventCh:    make(chan *evtPair),
@@ -60,14 +60,14 @@ func NewAgentStatusExtension(ctx context.Context, set extension.Settings, mgr *O
 }
 
 // NewAgentStatusFactory provides a factory for creating the AgentStatusExtension.
-func NewAgentStatusFactory(mgr *OTelManager) extension.Factory {
+func NewAgentStatusFactory(statusCh chan *status.AggregateStatus) extension.Factory {
 	return extension.NewFactory(
 		AgentStatusExtensionType,
 		func() component.Config {
 			return nil
 		},
 		func(ctx context.Context, set extension.Settings, cfg component.Config) (extension.Extension, error) {
-			return NewAgentStatusExtension(ctx, set, mgr), nil
+			return NewAgentStatusExtension(ctx, set, statusCh), nil
 		},
 		component.StabilityLevelDevelopment,
 	)
@@ -184,5 +184,5 @@ func (as *AgentStatusExtension) triggerKickCh() {
 
 func (as *AgentStatusExtension) publishStatus() {
 	current, _ := as.aggregator.AggregateStatus(status.ScopeAll, status.Verbose)
-	as.mgr.statusCh <- current
+	as.statusCh <- current
 }

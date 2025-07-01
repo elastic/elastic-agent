@@ -406,6 +406,7 @@ func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
 	esConfig["telemetry"] = map[string]any{
 		"log_failed_docs_input": true,
 	}
+	// dynamic indexing works by default
 
 	// we also want to use dynamic log ids
 	esConfig["logs_dynamic_id"] = map[string]any{"enabled": true}
