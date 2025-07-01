@@ -17,6 +17,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cenkalti/backoff/v5"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	semver "github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -116,21 +119,43 @@ func (r *artifactResult) Fetch(ctx context.Context, l Logger, dir string) error 
 		return fmt.Errorf("failed to create path %q: %w", dst, err)
 	}
 
-	err = DownloadPackage(ctx, l, r.doer, r.src, dst)
+	_, err = backoff.Retry(ctx, func() (any, error) {
+		if err = r.fetch(ctx, l, dst); err != nil {
+			return nil, err
+		}
+
+		// check package hash
+		if err = download.VerifySHA512Hash(dst); err != nil {
+			l.Logf("inconsistent package hash detected: %s", err)
+			return nil, fmt.Errorf("inconsistent package hash: %w", err)
+		}
+
+		return nil, nil
+	},
+		backoff.WithMaxTries(3),
+		backoff.WithBackOff(backoff.NewConstantBackOff(3*time.Second)),
+	)
+
 	if err != nil {
+		return fmt.Errorf("failed to fetch %s: %w", r.src, err)
+	}
+
+	return nil
+}
+
+func (r *artifactResult) fetch(ctx context.Context, l Logger, dst string) error {
+	if err := DownloadPackage(ctx, l, r.doer, r.src, dst); err != nil {
 		return fmt.Errorf("failed to download %s: %w", r.src, err)
 	}
 
 	// fetch package hash
-	err = DownloadPackage(ctx, l, r.doer, r.src+extHash, dst+extHash)
-	if err != nil {
-		return fmt.Errorf("failed to download %s: %w", r.src, err)
+	if err := DownloadPackage(ctx, l, r.doer, r.src+extHash, dst+extHash); err != nil {
+		return fmt.Errorf("failed to download %s: %w", r.src+extHash, err)
 	}
 
 	// fetch package asc
-	err = DownloadPackage(ctx, l, r.doer, r.src+extAsc, dst+extAsc)
-	if err != nil {
-		return fmt.Errorf("failed to download %s: %w", r.src, err)
+	if err := DownloadPackage(ctx, l, r.doer, r.src+extAsc, dst+extAsc); err != nil {
+		return fmt.Errorf("failed to download %s: %w", r.src+extAsc, err)
 	}
 
 	return nil
@@ -144,7 +169,12 @@ func findURI(ctx context.Context, doer httpDoer, version *semver.ParsedSemVer) (
 
 	// if it's the latest snapshot of a version, we can find a build ID and build the URI in the same manner
 	if version.IsSnapshot() {
-		buildID, err := findLatestSnapshot(ctx, doer, version.CoreVersion())
+		buildID, err := backoff.Retry(ctx, func() (any, error) {
+			return findLatestSnapshot(ctx, doer, version.CoreVersion())
+		},
+			backoff.WithMaxTries(3),
+			backoff.WithBackOff(backoff.NewConstantBackOff(3*time.Second)),
+		)
 		if err != nil {
 			return "", fmt.Errorf("failed to find snapshot information for version %q: %w", version, err)
 		}

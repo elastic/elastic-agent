@@ -5,7 +5,7 @@ namespace: kube-system
 
 resources:
   - ./base
-  - https://github.com/kubernetes/kube-state-metrics/examples/autosharding
+  - https://github.com/kubernetes/kube-state-metrics/examples/autosharding?ref=v2.15.0
 replicas:
   - name: kube-state-metrics
     count: 2

@@ -821,41 +821,37 @@ func (Cloud) Image(ctx context.Context) {
 // Push builds a cloud image tags it correctly and pushes to remote image repo.
 // Previous login to elastic registry is required!
 func (Cloud) Push() error {
-	snapshot := os.Getenv(snapshotEnv)
-	defer os.Setenv(snapshotEnv, snapshot)
-
-	os.Setenv(snapshotEnv, "true")
-
-	version := getVersion()
-	var tag string
-	if envTag, isPresent := os.LookupEnv("CUSTOM_IMAGE_TAG"); isPresent && len(envTag) > 0 {
-		tag = envTag
-	} else {
-		commit := dockerCommitHash()
-		time := time.Now().Unix()
-
-		tag = fmt.Sprintf("%s-%s-%d", version, commit, time)
+	agentVersion, err := mage.AgentPackageVersion()
+	if err != nil {
+		return fmt.Errorf("failed to get agent package version: %w", err)
 	}
 
-	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s", version)
+	var targetTag string
+	if envTag, isPresent := os.LookupEnv("CUSTOM_IMAGE_TAG"); isPresent && len(envTag) > 0 {
+		targetTag = envTag
+	} else {
+		targetTag = fmt.Sprintf("%s-%s-%d", agentVersion, dockerCommitHash(), time.Now().Unix())
+	}
+
+	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s-SNAPSHOT", agentVersion)
 	var targetCloudImageName string
 	if customImage, isPresent := os.LookupEnv("CI_ELASTIC_AGENT_DOCKER_IMAGE"); isPresent && len(customImage) > 0 {
-		targetCloudImageName = fmt.Sprintf("%s:%s", customImage, tag)
+		targetCloudImageName = fmt.Sprintf("%s:%s", customImage, targetTag)
 	} else {
-		targetCloudImageName = fmt.Sprintf(cloudImageTmpl, tag)
+		targetCloudImageName = fmt.Sprintf(cloudImageTmpl, targetTag)
 	}
 
 	fmt.Printf(">> Setting a docker image tag to %s\n", targetCloudImageName)
-	err := sh.RunV("docker", "tag", sourceCloudImageName, targetCloudImageName)
+	err = sh.RunV("docker", "tag", sourceCloudImageName, targetCloudImageName)
 	if err != nil {
-		return fmt.Errorf("Failed setting a docker image tag: %w", err)
+		return fmt.Errorf("failed setting a docker image tag: %w", err)
 	}
 	fmt.Println(">> Docker image tag updated successfully")
 
 	fmt.Println(">> Pushing a docker image to remote registry")
 	err = sh.RunV("docker", "image", "push", targetCloudImageName)
 	if err != nil {
-		return fmt.Errorf("Failed pushing docker image: %w", err)
+		return fmt.Errorf("failed pushing docker image: %w", err)
 	}
 	fmt.Printf(">> Docker image pushed to remote registry successfully: %s\n", targetCloudImageName)
 
@@ -1924,8 +1920,9 @@ func (Integration) Clean() error {
 func (Integration) Check() error {
 	fmt.Println(">> check: Checking for define.Require in integration tests") // nolint:forbidigo // it's ok to use fmt.println in mage
 	return errors.Join(
-		define.ValidateDir("testing/integration"),
+		define.ValidateDir("testing/integration/ess"),
 		define.ValidateDir("testing/integration/serverless"),
+		define.ValidateDir("testing/integration/beats/serverless"),
 		define.ValidateDir("testing/integration/leak"),
 		define.ValidateDir("testing/integration/k8s"),
 	)
@@ -1985,17 +1982,17 @@ func (Integration) Auth(ctx context.Context) error {
 
 // Test runs integration tests on remote hosts
 func (Integration) Test(ctx context.Context) error {
-	return integRunner(ctx, "testing/integration", false, "")
+	return integRunner(ctx, "testing/integration/ess", false, "")
 }
 
 // Matrix runs integration tests on a matrix of all supported remote hosts
 func (Integration) Matrix(ctx context.Context) error {
-	return integRunner(ctx, "testing/integration", true, "")
+	return integRunner(ctx, "testing/integration/ess", true, "")
 }
 
 // Single runs single integration test on remote host
 func (Integration) Single(ctx context.Context, testName string) error {
-	return integRunner(ctx, "testing/integration", false, testName)
+	return integRunner(ctx, "testing/integration/ess", false, testName)
 }
 
 // TestServerless runs the integration tests defined in testing/integration/serverless
@@ -2550,7 +2547,7 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 	if err != nil {
 		return fmt.Errorf("error setting binary name: %w", err)
 	}
-	return integRunner(ctx, "testing/integration", false, "TestBeatsServerless")
+	return integRunner(ctx, "testing/integration/beats/serverless", false, "TestBeatsServerless")
 }
 
 // TestForResourceLeaks runs tests that check for resource leaks
@@ -2633,7 +2630,7 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 
 func (Integration) Buildkite() error {
 	goTestFlags := os.Getenv("GOTEST_FLAGS")
-	batches, err := define.DetermineBatches("testing/integration", goTestFlags, "integration")
+	batches, err := define.DetermineBatches("testing/integration/ess", goTestFlags, "integration")
 	if err != nil {
 		return fmt.Errorf("failed to determine batches: %w", err)
 	}
