@@ -7,10 +7,11 @@ package application
 import (
 	"context"
 	"fmt"
-	"github.com/elastic/go-ucfg"
 	"time"
 
 	"go.elastic.co/apm/v2"
+
+	"github.com/elastic/go-ucfg"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
