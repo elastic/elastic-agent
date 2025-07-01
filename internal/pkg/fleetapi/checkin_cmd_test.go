@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"io"
 	"net/http"
 	"testing"
@@ -19,6 +18,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/remote"
 )
 
 type agentinfo struct{}
