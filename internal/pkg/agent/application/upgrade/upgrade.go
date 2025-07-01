@@ -244,7 +244,7 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 
 	if rollback {
-		return u.forceRollbackToPreviousVersion(version, action, det)
+		return u.forceRollbackToPreviousVersion(ctx, version, action, det)
 	}
 
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
@@ -439,13 +439,13 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	return cb, nil
 }
 
-func (u *Upgrader) forceRollbackToPreviousVersion(version string, action *fleetapi.ActionUpgrade, d *details.Details) (reexec.ShutdownCallbackFn, error) {
+func (u *Upgrader) forceRollbackToPreviousVersion(ctx context.Context, version string, action *fleetapi.ActionUpgrade, d *details.Details) (reexec.ShutdownCallbackFn, error) {
 	// Formal checks for verifying we can rollback properly:
 	// 1. d.Metadata.RollbacksAvailable should contain the desired version with a valid TTL (it may need to be written by main agent process before starting watcher)
 	// 2. there has been at least the first restart with the new agent (i.e. we are not still downloading/extracting/rotating)
 	// 3. upgrade marker exists
 	// these should be revalidated after taking over watcher
-	err := u.PersistManualRollback()
+	err := u.PersistManualRollback(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -460,8 +460,8 @@ func (u *Upgrader) forceRollbackToPreviousVersion(version string, action *fleeta
 
 }
 
-func (u *Upgrader) PersistManualRollback() error {
-	watcherApplock, err := u.takeOverWatcher()
+func (u *Upgrader) PersistManualRollback(ctx context.Context) error {
+	watcherApplock, err := u.takeOverWatcher(ctx)
 	if err != nil {
 		return fmt.Errorf("taking over watcher processes: %w", err)
 	}
@@ -486,34 +486,59 @@ func (u *Upgrader) PersistManualRollback() error {
 	return nil
 }
 
-func (u *Upgrader) takeOverWatcher() (*filelock.AppLocker, error) {
-	pids, err := utils.GetWatcherPIDs()
-	if err != nil {
-		return nil, fmt.Errorf("listing watcher processes: %w", err)
-	}
+func (u *Upgrader) takeOverWatcher(ctx context.Context) (*filelock.AppLocker, error) {
 
-	// this should be run continuously and concurrently attempting to get the app locker
-	for _, pid := range pids {
-		u.log.Debugf("attempting to kill watcher process with PID: %d", pid)
-		process, findProcErr := os.FindProcess(pid)
-		if findProcErr != nil {
-			return nil, fmt.Errorf("finding process with PID: %d: %w", pid, findProcErr)
+	takeoverCtx, takeoverCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer takeoverCancel()
+	go func() {
+		killingTicker := time.NewTicker(500 * time.Millisecond)
+		defer killingTicker.Stop()
+		for {
+			select {
+			case <-takeoverCtx.Done():
+				return
+			case <-killingTicker.C:
+				pids, err := utils.GetWatcherPIDs()
+				if err != nil {
+					u.log.Errorf("error listing watcher processes: %s", err)
+					continue
+				}
+
+				// this should be run continuously and concurrently to attempting to get the app locker
+				for _, pid := range pids {
+					u.log.Debugf("attempting to kill watcher process with PID: %d", pid)
+					process, findProcErr := os.FindProcess(pid)
+					if findProcErr != nil {
+						u.log.Errorf("error finding process with PID: %d: %s", pid, findProcErr)
+						continue
+					}
+					killProcErr := process.Kill()
+					if killProcErr != nil {
+						u.log.Errorf("error killing process with PID: %d: %s", pid, killProcErr)
+					}
+					u.log.Debugf("killed watcher process with PID: %d", pid)
+				}
+			}
 		}
-		killProcErr := process.Kill()
-		if killProcErr != nil {
-			return nil, fmt.Errorf("killing process with PID: %d: %w", pid, killProcErr)
-		}
-		u.log.Debugf("killed watcher process with PID: %d", pid)
-	}
+	}()
 
 	// we should retry to take over the AppLocker for 30s, but AppLocker interface is limited
-	locker := filelock.NewAppLocker(paths.Top(), "watcher.lock")
-	err = locker.TryLock()
-	if err != nil {
-		return nil, fmt.Errorf("locking watcher applocker: %w", err)
+	takeOverTicker := time.NewTicker(100 * time.Millisecond)
+	defer takeOverTicker.Stop()
+	for {
+		select {
+		case <-takeoverCtx.Done():
+			return nil, fmt.Errorf("timed out taking over watcher applocker")
+		case <-takeOverTicker.C:
+			locker := filelock.NewAppLocker(paths.Top(), "watcher.lock")
+			err := locker.TryLock()
+			if err != nil {
+				u.log.Errorf("error locking watcher applocker: %s", err)
+				continue
+			}
+			return locker, nil
+		}
 	}
-
-	return locker, nil
 }
 
 func selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string {

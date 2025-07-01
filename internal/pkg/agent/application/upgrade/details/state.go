@@ -21,5 +21,6 @@ const (
 	StateFailed      State = "UPG_FAILED"
 
 	// List of well-known reasons for state transitions
-	ReasonWatchFailed = "watch failed"
+	ReasonWatchFailed    = "watch failed"
+	ReasonManualRollback = "manual rollback requested"
 )
