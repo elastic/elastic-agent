@@ -60,14 +60,6 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 - [scheduler](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-scheduler/)
 - [proxy](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-proxy/)
 
-The chart built-in [kubernetes integration](https://docs.elastic.co/integrations/kubernetes) is used to collect logs and metrics from [Kubernetes clusters](https://kubernetes.io/). This integration is capable of fetching metrics from several components:
-- [kubelet](https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/)
-- [kube-state-metrics](https://github.com/kubernetes/kube-state-metrics)
-- [apiserver](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/)
-- [controller-manager](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/)
-- [scheduler](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-scheduler/)
-- [proxy](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-proxy/)
-
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | kubernetes.enabled | bool | `true` | enable Kubernetes integration. |
