@@ -203,7 +203,7 @@ func upgradeFIPSAgent(t *testing.T, info *define.Info) {
 			// Setup start fixture
 			startFixture, err := atesting.NewFixture(
 				t,
-				startVersion,
+				startVersion.String(),
 				atesting.WithFetcher(atesting.ArtifactFetcher(atesting.WithArtifactFIPSOnly())),
 			)
 			require.NoError(t, err)
