@@ -102,6 +102,17 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		_ = locker.Unlock()
 	}()
 
+	if marker.DesiredOutcome == upgrade.OUTCOME_ROLLBACK {
+		// TODO: there should be some sanity check in rollback functions like the installation we are going back to should exist and work
+		log.Info("rolling back because of DesiredOutcome=%s", marker.DesiredOutcome.String())
+
+		err = installModifier.Rollback(context.Background(), log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash)
+		if err != nil {
+			return fmt.Errorf("rolling back: %w", err)
+		}
+		return nil
+	}
+
 	isWithinGrace, tilGrace := gracePeriod(marker, cfg.GracePeriod)
 	if isTerminalState(marker) || !isWithinGrace {
 		stateString := ""
