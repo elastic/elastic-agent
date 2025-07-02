@@ -181,3 +181,8 @@ func (p *fakeStackProvisioner) Delete(_ context.Context, stack common.Stack) err
 	p.deletedStacks = append(p.deletedStacks, stack)
 	return nil
 }
+
+func (p *fakeStackProvisioner) Upgrade(_ context.Context, _ common.Stack, _ string) error {
+	// fake upgrade does nothing
+	return nil
+}
