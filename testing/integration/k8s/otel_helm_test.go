@@ -122,6 +122,33 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 4, "otc-container"),
 			},
 		},
+		{
+			name: "mOTel only logs helm kube-stack operator standalone agent kubernetes privileged",
+			steps: []k8sTestStep{
+				k8sStepCreateNamespace(),
+				k8sStepHelmDeployWithValueOptions(KubeStackChartPath, "kube-stack-otel",
+					values.Options{
+						ValueFiles: []string{"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/logs_values.yaml"},
+						Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
+
+						// override secrets reference with env variables
+						JSONValues: []string{
+							// TODO: replace with managed OTLP ingest endpoint/apiKey when available
+							fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_OTLP_ENDPOINT","value":"%s"}`, "https://otlp.ingest:433"),
+							fmt.Sprintf(`collectors.gateway.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, "CHANGEME=="),
+						},
+					},
+				),
+				// - An OpenTelemetry Operator Deployment (1 pod per
+				// cluster)
+				k8sStepCheckRunningPods("app.kubernetes.io/name=opentelemetry-operator", 1, "manager"),
+				// - A Daemonset to collect K8s node's logs
+				// (1 EDOT collector pod per node)
+				// - One Gateway replicas to collect, aggregate and forward
+				// telemetry.
+				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 2, "otc-container"),
+			},
+		},
 	}
 
 	for _, tc := range testCases {
