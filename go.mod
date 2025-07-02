@@ -30,8 +30,13 @@ require (
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.13.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.4.1
 	github.com/fatih/color v1.18.0
+<<<<<<< HEAD
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-viper/mapstructure/v2 v2.2.1
+=======
+	github.com/fsnotify/fsnotify v1.9.0
+	github.com/go-viper/mapstructure/v2 v2.3.0
+>>>>>>> 676e18de4 (Bump up github.com/go-viper/mapstructure/v2 dependency (#8764))
 	github.com/gofrs/flock v0.12.1
 	github.com/gofrs/uuid/v5 v5.3.1
 	github.com/google/go-cmp v0.7.0
