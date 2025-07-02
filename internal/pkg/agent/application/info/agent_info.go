@@ -76,9 +76,13 @@ func NewAgentInfoWithLog(ctx context.Context, level string, createAgentID bool) 
 		return nil, fmt.Errorf("failed to determine root/Administrator: %w", err)
 	}
 
+	if !isStandalone {
+		level = agentInfo.LogLevel
+	}
+
 	return &AgentInfo{
 		agentID:      agentInfo.ID,
-		logLevel:     agentInfo.LogLevel,
+		logLevel:     level,
 		unprivileged: !isRoot,
 		esHeaders:    agentInfo.Headers,
 		isStandalone: isStandalone,
