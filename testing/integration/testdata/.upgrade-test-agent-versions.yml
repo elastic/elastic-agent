@@ -5,16 +5,7 @@
 # upgrade integration tests.
 
 testVersions:
-<<<<<<< HEAD
   - 8.18.3
   - 8.17.8
   - 7.17.30-SNAPSHOT
   - 7.17.29
-=======
-  - 9.1.0-SNAPSHOT
-  - 9.0.4-SNAPSHOT
-  - 9.0.3
-  - 8.19.0-SNAPSHOT
-  - 8.18.3
-  - 7.17.30-SNAPSHOT
->>>>>>> e629b9ee5 (ci: always include 8.19 LTS release branch in snapshots of test versions (#8761))
