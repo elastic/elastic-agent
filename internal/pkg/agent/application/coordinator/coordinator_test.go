@@ -949,7 +949,7 @@ func TestCoordinator_Upgrade_RollbackInitiated(t *testing.T) {
 	upgradeManager.On("Upgradeable").Return(true)
 	upgradeManager.On("MarkerWatcher").Return(markerWatcher)
 	upgradeManager.On("Reload", mock.Anything).Return(nil)
-	upgradeManager.On("Upgrade", mock.Anything, "9.0.0", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+	upgradeManager.On("Upgrade", mock.Anything, "9.0.0", mock.Anything, mock.Anything, mock.Anything, true, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 
 	coord, cfgMgr, varsMgr := createCoordinator(t, ctx, WithUpgradeManager(upgradeManager))
 	go func() {
@@ -972,7 +972,7 @@ func TestCoordinator_Upgrade_RollbackInitiated(t *testing.T) {
 	err = coord.Upgrade(ctx, "9.0.0", "", nil, true, true, false)
 	require.NoError(t, err)
 
-	upgradeManager.AssertCalled(t, "Upgrade", ctx, "9.0.0", mock.Anything, nil, mock.Anything, true, mock.Anything, mock.Anything, mock.Anything)
+	upgradeManager.AssertExpectations(t)
 	cancel()
 
 	err = <-coordCh

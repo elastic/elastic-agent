@@ -300,7 +300,6 @@ func (c *client) Version(ctx context.Context) (Version, error) {
 		Commit:    res.Commit,
 		BuildTime: bt,
 		Snapshot:  res.Snapshot,
-		Fips:      res.Fips,
 	}, nil
 }
 
