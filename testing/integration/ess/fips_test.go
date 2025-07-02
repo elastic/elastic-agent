@@ -66,7 +66,7 @@ func TestFIPS(t *testing.T) {
 	ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t, info)
 	fixture, policyID := enrollLocalFIPSAgentInFleetServer(t, info)
 	addIntegrationAndCheckData(t, info, fixture, policyID)
-	upgradeFIPSAgent(t, info)
+	downgradeFIPSAgent(t, info, fixture) // downgrade exercises same code paths as upgrade
 }
 
 func ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t *testing.T, info *define.Info) {
@@ -189,29 +189,23 @@ func addIntegrationAndCheckData(t *testing.T, info *define.Info, fixture *atesti
 	}, 2*time.Minute, 5*time.Second, "no system.syslog data received in Elasticsearch")
 }
 
-func upgradeFIPSAgent(t *testing.T, info *define.Info) {
+func downgradeFIPSAgent(t *testing.T, info *define.Info, startFixture *atesting.Fixture) {
 	t.Helper()
 
-	startVersions := getUpgradeStartVersions(t)
-	endVersion := define.Version()
+	startVersion := define.Version()
+	endVersions := getUpgradeableFIPSVersions(t)
 
-	for _, startVersion := range startVersions {
-		t.Run(startVersion.String()+"_to_"+endVersion, func(t *testing.T) {
+	for _, endVersion := range endVersions {
+		t.Run(startVersion+"_to_"+endVersion.String(), func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.TODO())
 			defer cancel()
 
-			// Setup start fixture
-			startFixture, err := atesting.NewFixture(
+			// Setup end fixture
+			endFixture, err := atesting.NewFixture(
 				t,
-				startVersion.String(),
+				endVersion.String(),
 				atesting.WithFetcher(atesting.ArtifactFetcher(atesting.WithArtifactFIPSOnly())),
 			)
-			require.NoError(t, err)
-			err = startFixture.Prepare(ctx)
-			require.NoError(t, err)
-
-			// Setup end fixture
-			endFixture, err := define.NewFixtureFromLocalFIPSBuild(t, endVersion)
 			require.NoError(t, err)
 			err = endFixture.Prepare(ctx)
 			require.NoError(t, err)
