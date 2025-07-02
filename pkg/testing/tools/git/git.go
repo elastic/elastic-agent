@@ -41,7 +41,7 @@ func GetReleaseBranches(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 
-	sort.Slice(branchList, less(branchList))
+	sort.Slice(branchList, Less(branchList))
 
 	return branchList, nil
 }
@@ -49,8 +49,8 @@ func GetReleaseBranches(ctx context.Context) ([]string, error) {
 // we use this to emulate the maximum possible version value aliased by `.x`
 var maxIntString = strconv.Itoa(math.MaxInt)
 
-// less makes sure we have our release branches in the right order
-func less(branches []string) func(i, j int) bool {
+// Less makes sure we have our release branches in the right order
+func Less(branches []string) func(i, j int) bool {
 	return func(i, j int) bool {
 		// we complete the versions, so we can parse semver and compare
 		var (
