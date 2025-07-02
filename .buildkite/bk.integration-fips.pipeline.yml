@@ -107,6 +107,25 @@ steps:
             groups:
               - fleet
 
+      - label: "fips:upgrade-ech-deployment"
+        if: build.env("BUILDKITE_PULL_REQUEST") != "false" &&  build.env("GITHUB_PR_LABELS") =~ /.*(Testing:run:TestUpgradeIntegrationsServer).*/
+        env:
+          FIPS: "true"
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+        command: |
+          export EC_API_KEY=$(retry -t 5 -- vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
+          .buildkite/scripts/buildkite-integration-tests.sh ech-deployment false
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "aws"
+          image: "${IMAGE_UBUNTU_X86_64_FIPS}"
+          instanceType: "m5.2xlarge"
+
   - label: ESS FIPS stack cleanup
     depends_on:
       - integration-tests-ubuntu-fips
