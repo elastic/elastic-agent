@@ -897,11 +897,61 @@ func TestCoordinator_ReExec(t *testing.T) {
 }
 
 func TestCoordinator_Upgrade(t *testing.T) {
+	testCases := []struct {
+		name     string
+		rollback bool
+	}{
+		{"rollback", true},
+		{"upgrade", false},
+	}
+
+	for _, tc := range testCases {
+		coordCh := make(chan error)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		coord, cfgMgr, varsMgr := createCoordinator(t, ctx)
+		go func() {
+			err := coord.Run(ctx)
+			if errors.Is(err, context.Canceled) {
+				// allowed error
+				err = nil
+			}
+			coordCh <- err
+		}()
+
+		// no vars used by the config
+		varsMgr.Vars(ctx, []*transpiler.Vars{{}})
+
+		// no need for anything to really run
+		cfg, err := config.NewConfigFrom(nil)
+		require.NoError(t, err)
+		cfgMgr.Config(ctx, cfg)
+
+		err = coord.Upgrade(ctx, "9.0.0", "", nil, tc.rollback, true, false)
+		require.ErrorIs(t, err, ErrNotUpgradable)
+		cancel()
+
+		err = <-coordCh
+		require.NoError(t, err)
+	}
+}
+
+func TestCoordinator_Upgrade_RollbackInitiated(t *testing.T) {
 	coordCh := make(chan error)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	coord, cfgMgr, varsMgr := createCoordinator(t, ctx)
+	upgradeManager := &mockUpgradeManager{}
+
+	var markerWatcher upgrade.MarkerWatcher
+
+	upgradeManager.On("Upgradeable").Return(true)
+	upgradeManager.On("MarkerWatcher").Return(markerWatcher)
+	upgradeManager.On("Reload", mock.Anything).Return(nil)
+	upgradeManager.On("Upgrade", mock.Anything, "9.0.0", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+
+	coord, cfgMgr, varsMgr := createCoordinator(t, ctx, WithUpgradeManager(upgradeManager))
 	go func() {
 		err := coord.Run(ctx)
 		if errors.Is(err, context.Canceled) {
@@ -919,8 +969,10 @@ func TestCoordinator_Upgrade(t *testing.T) {
 	require.NoError(t, err)
 	cfgMgr.Config(ctx, cfg)
 
-	err = coord.Upgrade(ctx, "9.0.0", "", nil, false, true, false)
-	require.ErrorIs(t, err, ErrNotUpgradable)
+	err = coord.Upgrade(ctx, "9.0.0", "", nil, true, true, false)
+	require.NoError(t, err)
+
+	upgradeManager.AssertCalled(t, "Upgrade", ctx, "9.0.0", mock.Anything, nil, mock.Anything, true, mock.Anything, mock.Anything, mock.Anything)
 	cancel()
 
 	err = <-coordCh
@@ -1444,4 +1496,41 @@ func testBinary(t testing.TB, name string) string {
 		}
 	}
 	return binaryPath
+}
+
+type mockUpgradeManager struct {
+	mock.Mock
+}
+
+func (m *mockUpgradeManager) Upgradeable() bool {
+	ret := m.Called()
+	return ret.Bool(0)
+}
+
+func (m *mockUpgradeManager) Reload(cfg *config.Config) error {
+	ret := m.Called(cfg)
+	return ret.Error(0)
+}
+
+func (m *mockUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, performRollback bool, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+	ret := m.Called(ctx, version, sourceURI, action, details, performRollback, skipVerifyOverride, skipDefaultPgp, pgpBytes)
+
+	cb, _ := ret.Get(0).(reexec.ShutdownCallbackFn)
+	return cb, ret.Error(1)
+}
+
+func (m *mockUpgradeManager) Ack(ctx context.Context, acker acker.Acker) error {
+	ret := m.Called(ctx, acker)
+	return ret.Error(0)
+}
+
+func (m *mockUpgradeManager) AckAction(ctx context.Context, acker acker.Acker, action fleetapi.Action) error {
+	ret := m.Called(ctx, acker, action)
+	return ret.Error(0)
+}
+
+func (m *mockUpgradeManager) MarkerWatcher() upgrade.MarkerWatcher {
+	ret := m.Called()
+	mw, _ := ret.Get(0).(upgrade.MarkerWatcher)
+	return mw
 }

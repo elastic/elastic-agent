@@ -199,6 +199,10 @@ func handleRollback(ctx context.Context, log *logger.Logger, dataDirPath, topDir
 		return fmt.Errorf("failed to load upgrade marker during rollback: %w", err)
 	}
 
+	if marker == nil {
+		return fmt.Errorf("failed to load marker, no rollback available")
+	}
+
 	// verify upgrade marker has available_rollbacks populated
 	if len(marker.Details.Metadata.AvailableRollbacks) == 0 {
 		return fmt.Errorf("no rollback available")
@@ -226,7 +230,10 @@ func handleRollback(ctx context.Context, log *logger.Logger, dataDirPath, topDir
 
 	watcherWaitErr := waitForWatcher(ctx, log, markerFilePath(dataDirPath), watcherMaxWaitTime)
 	if watcherWaitErr != nil {
-		killWatcherErr := watcherCmd.Process.Kill()
+		var killWatcherErr error
+		if watcherCmd != nil && watcherCmd.Process != nil {
+			killWatcherErr = watcherCmd.Process.Kill()
+		}
 		return goerrors.Join(watcherWaitErr, killWatcherErr)
 	}
 
@@ -249,6 +256,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	if performRollback {
+		u.log.Info("initiating rollback")
 		if err := handleRollback(ctx, u.log, paths.Data(), paths.Top()); err != nil {
 			return nil, fmt.Errorf("failed to handle rollback: %w", err)
 		}

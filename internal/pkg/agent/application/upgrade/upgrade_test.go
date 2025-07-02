@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -1273,6 +1274,75 @@ func TestIsSameReleaseVersion(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			log, _ := loggertest.New(tc.name)
 			assert.Equal(t, tc.expect, isSameReleaseVersion(log, tc.current, tc.target))
+		})
+	}
+}
+
+func TestHandleRollback(t *testing.T) {
+	testCases := []struct {
+		name               string
+		initialstate       details.State
+		hasMarker          bool
+		expectedUpgradeErr string
+		expectedOutcome    UpgradeOutcome
+	}{
+		{"successful rollback", details.StateRollbackAvailable, true, "watcher did not start in time", OUTCOME_ROLLBACK},
+		{"valid state marker - watching", details.StateWatching, true, "", OUTCOME_ROLLBACK}, // state watching in marker file will skip watcher wait
+
+		{"no marker", details.StateRollbackAvailable, false, "no rollback available", OUTCOME_UPGRADE},
+
+		{"invalid state marker - StateRequested", details.StateRequested, true, "agent cannot perform rollback at", OUTCOME_UPGRADE},
+		{"invalid state marker - StateScheduled", details.StateScheduled, true, "agent cannot perform rollback at", OUTCOME_UPGRADE},
+		{"invalid state marker - StateDownloading", details.StateDownloading, true, "agent cannot perform rollback at", OUTCOME_UPGRADE},
+		{"invalid state marker - StateExtracting", details.StateExtracting, true, "agent cannot perform rollback at", OUTCOME_UPGRADE},
+		{"invalid state marker - StateReplacing", details.StateReplacing, true, "agent cannot perform rollback at", OUTCOME_UPGRADE},
+		{"invalid state marker - StateRestarting", details.StateRestarting, true, "agent cannot perform rollback at", OUTCOME_UPGRADE},
+		{"invalid state marker - StateRollback", details.StateRollback, true, "agent cannot perform rollback at", OUTCOME_UPGRADE},
+		{"invalid state marker - StateCompleted", details.StateCompleted, true, "agent cannot perform rollback at", OUTCOME_UPGRADE},
+		{"invalid state marker - StateFailed", details.StateFailed, true, "agent cannot perform rollback at", OUTCOME_UPGRADE},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			log, _ := loggertest.New("")
+			u := Upgrader{
+				log:      log,
+				settings: artifact.DefaultConfig(),
+			}
+
+			tmpDir := t.TempDir()
+			dataDir := filepath.Join(tmpDir, "data")
+			require.NoError(t, os.MkdirAll(dataDir, 0o750))
+			paths.SetTop(tmpDir)
+
+			if tc.hasMarker {
+				markerDetails := details.NewDetails("9.0.0", tc.initialstate, "action-id")
+				markerDetails.Metadata.AvailableRollbacks = []details.RollbackMetadata{{}}
+				demoMarker := &UpdateMarker{
+					Version: "9.0.0",
+					Details: markerDetails,
+				}
+
+				require.NoError(t, SaveMarker(paths.Data(), demoMarker, true))
+			}
+
+			action := fleetapi.NewAction(fleetapi.ActionTypeUpgrade).(*fleetapi.ActionUpgrade)
+			ctx := t.Context()
+			cb, err := u.Upgrade(ctx, "9.0.0", "", action, nil, true, false, false)
+			assert.Nil(t, cb)
+
+			if err == nil && len(tc.expectedUpgradeErr) > 0 {
+				assert.Fail(t, "expected error but got nil")
+			} else if err != nil {
+				assert.True(t, strings.Contains(err.Error(), tc.expectedUpgradeErr), err)
+			}
+
+			if tc.hasMarker {
+				m, err := LoadMarker(paths.Data())
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expectedOutcome, m.DesiredOutcome)
+			}
+
 		})
 	}
 }
