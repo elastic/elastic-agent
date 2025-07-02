@@ -335,7 +335,10 @@ func injectOutputOverrides(log *logger.Logger, rawConfig *config.Config) func(ch
 		cfg := change.Config()
 		outputs, err := cfg.Agent.Child("outputs", -1)
 		if err != nil {
-			// no outputs in configuration; do nothing
+			if !isMissingError(err) {
+				// expecting only ErrMissing
+				log.Errorf("error getting outputs from config: %v", err)
+			}
 			return change
 		}
 		for outputName, outputOverrides := range parsed.Outputs {
@@ -370,7 +373,20 @@ func injectOutputOverrides(log *logger.Logger, rawConfig *config.Config) func(ch
 				log.Errorf("failed to perform output injection for output %s: %v", outputName, err)
 				continue
 			}
+			log.Infof("successfully injected output overrides for output %s", outputName)
 		}
 		return change
 	}
+}
+
+// isMissingError returns true if the error is because the field is missing
+//
+// Sadly go-ucfg doesn't support Unwrap interface so using `errors.Is(err, ucfg.ErrMissing)` doesn't work
+// this specific function is required to ensure its an `ErrMissing` error.
+func isMissingError(err error) bool {
+	switch v := err.(type) {
+	case ucfg.Error:
+		return v.Reason() == ucfg.ErrMissing
+	}
+	return false
 }
