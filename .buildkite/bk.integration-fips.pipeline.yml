@@ -1,0 +1,180 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+
+env:
+  ASDF_MAGE_VERSION: 1.14.0
+  MS_GOTOOLCHAIN_TELEMETRY_ENABLED: "0"
+
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1751072471"
+  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-1751072471"
+  IMAGE_UBUNTU_ARM64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1751072471"
+  # Remove AGENT_VERSION pinning once 9.2.0 DRA and stack are released
+  AGENT_VERSION: "9.1.0-SNAPSHOT"
+
+# This section is used to define the plugins that will be used in the pipeline.
+# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
+common:
+  - vault_ec_key_prod: &vault_ec_key_prod
+      elastic/vault-secrets#v0.1.0:
+        path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+        field: "apiKey"
+        env_var: "EC_API_KEY"
+
+steps:
+  - label: Build and push custom elastic-agent image
+    depends_on:
+      - 'packaging-containers-x86-64-fips' # Reuse artifacts produced in .buildkite/integration.pipeline.yml
+    key: integration-fips-cloud-image
+    env:
+      FIPS: "true"
+      CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
+      CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips"
+      TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
+    command: |
+      buildkite-agent artifact download build/distributions/elastic-agent-cloud-fips-*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64-fips'
+      mage cloud:load
+      mage cloud:push
+    agents:
+      provider: "gcp"
+      machineType: "n1-standard-8"
+      image: "${IMAGE_UBUNTU_2404_X86_64}"
+    plugins:
+      - elastic/vault-docker-login#v0.5.2:
+          secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+
+  - label: Start ESS stack for FIPS integration tests
+    key: integration-fips-ess
+    depends_on:
+      - integration-fips-cloud-image
+    env:
+      ASDF_TERRAFORM_VERSION: 1.9.2
+      TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
+    command: |
+      source .buildkite/scripts/steps/ess_start.sh
+    artifact_paths:
+      - test_infra/ess/*.tfstate
+      - test_infra/ess/*.lock.hcl
+    agents:
+      image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
+      useCustomGlobalHooks: true
+    plugins:
+      - *vault_ec_key_prod  
+
+  - group: "fips:Stateful:Ubuntu"
+    key: integration-tests-ubuntu-fips
+    depends_on:
+      - integration-fips-ess
+    steps:
+      - label: "fips:x86_64:sudo-{{matrix.sudo}}:{{matrix.groups}}"
+        depends_on:
+          - packaging-ubuntu-x86-64-fips # Reuse artifacts produced in .buildkite/integration.pipeline.yml
+        env:
+          FIPS: "true"
+          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64-fips'
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.groups}} {{matrix.sudo}}
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "aws"
+          image: "${IMAGE_UBUNTU_X86_64_FIPS}"
+          instanceType: "m5.2xlarge"
+        plugins:
+          - *vault_ec_key_prod  
+        matrix:
+          setup:
+            sudo:
+              - "false"
+              - "true"
+            groups:
+              - fleet # currently there is only a single test in the fleet group, add more tests once they have been defined
+
+      - label: "fips:arm64:sudo-{{matrix.sudo}}:{{matrix.groups}}"
+        depends_on:
+          - packaging-ubuntu-arm64-fips
+        env:
+          FIPS: "true"
+          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+        command: |
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64-fips'
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.groups}} {{matrix.sudo}}
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "aws"
+          image: "${IMAGE_UBUNTU_ARM64_FIPS}"
+          instanceType: "m6g.2xlarge"
+        plugins:
+          - *vault_ec_key_prod  
+        matrix:
+          setup:
+            sudo:
+              - "false"
+              - "true"
+            groups:
+              - fleet
+
+      - label: "fips:upgrade-ech-deployment"
+        if: build.env("BUILDKITE_PULL_REQUEST") != "false" &&  build.env("GITHUB_PR_LABELS") =~ /.*(Testing:run:TestUpgradeIntegrationsServer).*/
+        env:
+          FIPS: "true"
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+        command: |
+          export EC_API_KEY=$(retry -t 5 -- vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
+          .buildkite/scripts/buildkite-integration-tests.sh ech-deployment false
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "aws"
+          image: "${IMAGE_UBUNTU_X86_64_FIPS}"
+          instanceType: "m5.2xlarge"
+
+  - label: ESS FIPS stack cleanup
+    depends_on:
+      - integration-tests-ubuntu-fips
+    allow_dependency_failure: true
+    command: |
+      buildkite-agent artifact download "test_infra/ess/**" . --step "integration-fips-ess"
+      ls -lah test_infra/ess
+      .buildkite/scripts/steps/ess_down.sh
+    agents:
+      image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
+      useCustomGlobalHooks: true
+    plugins:
+      - *vault_ec_key_prod  
+
+  - label: Aggregate test reports
+    depends_on:
+      - integration-tests-ubuntu-fips
+    allow_dependency_failure: true
+    command: |
+      buildkite-agent artifact download "build/*.xml" .
+    agents:
+      image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
+      useCustomGlobalHooks: true
+    soft_fail:
+      - exit_status: "*"
+    plugins:
+      - elastic/vault-secrets#v0.1.0:
+          path: "kv/ci-shared/platform-ingest/buildkite_analytics_token"
+          field: "token"
+          env_var: "BUILDKITE_ANALYTICS_TOKEN"
+      - test-collector#v1.11.0:
+          files: "build/*.xml"
+          format: "junit"
+          branches: "main"
+          debug: true
