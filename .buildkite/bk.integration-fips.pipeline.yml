@@ -4,11 +4,20 @@ env:
   ASDF_MAGE_VERSION: 1.14.0
   MS_GOTOOLCHAIN_TELEMETRY_ENABLED: "0"
 
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1750467641"
-  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-1750467641"
-  IMAGE_UBUNTU_ARM64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1750467641"
-  # Remove AGENT_PACKAGE_VERSION and AGENT_VERSION pinning once 9.2.0 DRA and stack are released
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1751072471"
+  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-1751072471"
+  IMAGE_UBUNTU_ARM64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1751072471"
+  # Remove AGENT_VERSION pinning once 9.2.0 DRA and stack are released
   AGENT_VERSION: "9.1.0-SNAPSHOT"
+
+# This section is used to define the plugins that will be used in the pipeline.
+# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
+common:
+  - vault_ec_key_prod: &vault_ec_key_prod
+      elastic/vault-secrets#v0.1.0:
+        path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+        field: "apiKey"
+        env_var: "EC_API_KEY"
 
 steps:
   - label: Build and push custom elastic-agent image
@@ -47,6 +56,8 @@ steps:
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
+    plugins:
+      - *vault_ec_key_prod  
 
   - group: "fips:Stateful:Ubuntu"
     key: integration-tests-ubuntu-fips
@@ -73,6 +84,8 @@ steps:
           provider: "aws"
           image: "${IMAGE_UBUNTU_X86_64_FIPS}"
           instanceType: "m5.2xlarge"
+        plugins:
+          - *vault_ec_key_prod  
         matrix:
           setup:
             sudo:
@@ -101,6 +114,8 @@ steps:
           provider: "aws"
           image: "${IMAGE_UBUNTU_ARM64_FIPS}"
           instanceType: "m6g.2xlarge"
+        plugins:
+          - *vault_ec_key_prod  
         matrix:
           setup:
             sudo:
@@ -139,6 +154,8 @@ steps:
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
+    plugins:
+      - *vault_ec_key_prod  
 
   - label: Aggregate test reports
     depends_on:
