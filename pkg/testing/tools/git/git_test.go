@@ -47,7 +47,7 @@ func TestLess(t *testing.T) {
 		"wrong",
 	}
 
-	sort.Slice(branchList, less(branchList))
+	sort.Slice(branchList, Less(branchList))
 
 	require.Equal(t, expected, branchList)
 }
