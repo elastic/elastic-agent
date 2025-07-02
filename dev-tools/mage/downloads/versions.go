@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -375,7 +376,26 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 			return val, nil
 		}
 
-		err := downloadFile(&downloadRequest)
+		parsedURL, err := url.Parse(URL)
+		if err != nil {
+			return "", fmt.Errorf("parsing URL: %w", err)
+		}
+		etagFilePath := getEtagFilePath(path.Dir(downloadPath), parsedURL)
+		if present, pErr := alreadyPresent(URL, etagFilePath); pErr == nil && present {
+			logger.Info("Found binary etag file, skipping download",
+				slog.String("URL", URL),
+				slog.String("etagFilePath", etagFilePath),
+			)
+			return filepath.Join(downloadPath, name), nil
+		} else if pErr != nil {
+			logger.Warn("Failed checking if binary is present via etag",
+				slog.String("URL", URL),
+				slog.String("etagFilePath", etagFilePath),
+				slog.String("error", err.Error()),
+			)
+		}
+
+		err = downloadFile(&downloadRequest)
 		if err != nil {
 			return downloadRequest.UnsanitizedFilePath, err
 		}

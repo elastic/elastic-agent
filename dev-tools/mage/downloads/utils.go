@@ -7,6 +7,8 @@ package downloads
 import (
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -87,4 +89,33 @@ func downloadFile(downloadRequest *downloadRequest) error {
 	_ = os.Chmod(tempFile.Name(), 0666)
 
 	return nil
+}
+
+func alreadyPresent(url string, etagFilePath string) (bool, error) {
+	res, err := http.Head(url)
+	if err != nil {
+		return false, fmt.Errorf("head request: %w", err)
+	}
+	if res.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("download failed with http status: %v", res.StatusCode)
+	}
+
+	etagFileValue, err := os.ReadFile(etagFilePath)
+	if err != nil && !os.IsNotExist(err) {
+		return false, nil
+	}
+
+	etagValue := res.Header.Get("ETag")
+	err = os.WriteFile(etagFilePath, []byte(etagValue), 0666)
+	if err != nil {
+		return false, fmt.Errorf("writing etag file: %w", err)
+	}
+
+	return etagValue == string(etagFileValue), nil
+}
+
+func getEtagFilePath(dirPath string, url *url.URL) string {
+	urlFileName := filepath.Base(url.Path)
+	fileName := fmt.Sprintf("%s.etag", urlFileName)
+	return filepath.Join(dirPath, fileName)
 }

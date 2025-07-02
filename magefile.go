@@ -1200,8 +1200,8 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	archivePath, dropPath, dependencies := collectPackageDependencies(platforms, dependenciesVersion, packageTypes, dependencies)
 
 	// cleanup after build
-	defer os.RemoveAll(archivePath)
-	defer os.RemoveAll(dropPath)
+	//defer os.RemoveAll(archivePath)
+	//defer os.RemoveAll(dropPath)
 	defer os.Unsetenv(agentDropPath)
 
 	// create flat dir
