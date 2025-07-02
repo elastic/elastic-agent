@@ -27,6 +27,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -2419,20 +2420,39 @@ func (Integration) BuildKubernetesTestData(ctx context.Context) error {
 // UpdateVersions runs an update on the `.agent-versions.yml` fetching
 // the latest version list from the artifact API.
 func (Integration) UpdateVersions(ctx context.Context) error {
-	maxSnapshots := 3
+	agentVersion, err := version.ParseVersion(bversion.Agent)
+	if err != nil {
+		return fmt.Errorf("failed to parse agent version %s: %w", bversion.Agent, err)
+	}
+
+	// maxSnapshots is the maximum number of snapshots from
+	// releases branches we want to include in the snapshot list
+	maxSnapshots := 2
 
 	branches, err := git.GetReleaseBranches(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list release branches: %w", err)
 	}
 
-	// -1 because we manually add 7.17 below
-	if len(branches) > maxSnapshots-1 {
-		branches = branches[:maxSnapshots-1]
+	// limit the number of snapshot branches to the maxSnapshots
+	targetSnapshotBranches := branches[:maxSnapshots]
+
+	// we also want to always include the latest snapshot from lts release branches
+	ltsBranches := []string{
+		// 7.17 is an LTS branch so we need to include it always
+		"7.17",
 	}
 
-	// it's not a part of this repository, cannot be retrieved with `GetReleaseBranches`
-	branches = append(branches, "7.17")
+	// if we have a newer version of the agent, we want to include the latest snapshot from 8.19 LTS branch
+	if agentVersion.Major() > 8 || agentVersion.Major() == 8 && agentVersion.Minor() > 19 {
+		// order is important
+		ltsBranches = append([]string{"8.19"}, ltsBranches...)
+	}
+
+	// need to include the LTS branches, sort them and remove duplicates
+	targetSnapshotBranches = append(targetSnapshotBranches, ltsBranches...)
+	sort.Slice(targetSnapshotBranches, git.Less(targetSnapshotBranches))
+	targetSnapshotBranches = slices.Compact(targetSnapshotBranches)
 
 	// uncomment if want to have the current version snapshot on the list as well
 	// branches = append([]string{"master"}, branches...)
@@ -2442,7 +2462,7 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 		CurrentMajors:    1,
 		PreviousMinors:   2,
 		PreviousMajors:   1,
-		SnapshotBranches: branches,
+		SnapshotBranches: targetSnapshotBranches,
 	}
 	b, _ := json.MarshalIndent(reqs, "", "  ")
 	fmt.Println(string(b))
