@@ -64,21 +64,41 @@ Go to https://docker-auth.elastic.co/ and authenticate with Okta to receive your
 
 The test are run with mage using the `integration` namespace:
 
-- `mage integration:test` to execute all tests under the `testing/integration`
+#### ESS oriented tests
+
+- `mage integration:test` to execute all tests under the `testing/integration/ess`
   folder. All tests are executed on remote VMs, including those that set `Local: true`.
 
 - `mage integration:local [testName|all]` to execute only those tests under the
-  `testing/integration` folder that set `Local: true`. It'll run all the tests if
+  `testing/integration/ess` folder that set `Local: true`. It'll run all the tests if
   `all` is passed as argument, or it'll pass `[testName]` to `go test` as
   `--run=[testName]`. These tests are executed on your local machine.
 
-- `mage integration:single [testName]` to execute a single test under the `testing/integration` folder. Only the selected test will be executed on remote VMs.
+- `mage integration:single [testName]` to execute a single test under the `testing/integration/ess` folder. Only the selected test will be executed on remote VMs.
 
-- `mage integration:matrix` to run all tests on the complete matrix of supported operating systems and architectures of the Elastic Agent.
+- `mage integration:matrix` to run all tests under the `testing/integration/ess` folder on the complete matrix of supported operating systems and architectures of the Elastic Agent.
 
-- `mage integration:testKubernetes` to run kubernetes tests for the default image on the default version of kubernetes (all previous commands will not run any kubernetes tests).
+#### Kubernetes oriented tests
 
-- `mage integration:testKubernetesMatrix` to run a matrix of kubernetes tests for all image types and supported versions of kubernetes.
+- `mage integration:testKubernetes` to run kubernetes tests under the `testing/integration/k8s` folder for the default image on the default version of kubernetes (all previous commands will not run any kubernetes tests).
+
+- `mage integration:testKubernetesMatrix` to run a matrix of kubernetes tests under the `testing/integration/k8s` folder for all image types and supported versions of kubernetes.
+
+- `mage integration:testKubernetesSingle [testName|all]` to execute a single test under the `testing/integration/k8s` folder. Only the selected test will be executed.
+
+#### Serverless oriented tests
+
+- `mage integration:testServerless` to execute all tests under the `testing/integration/serverless` folder. All tests are executed on remote VMs, including those that set `Local: true`.
+
+- `mage integration:testServerlessSingle [testName|all]` to execute a single test under the `testing/integration/serverless` folder. Only the selected test will be executed on remote VMs.
+
+#### Resource leaks tests
+
+- `mage integration:testForResourceLeaks` to execute all tests under the `testing/integration/leak` folder. All tests are executed on remote VMs.
+
+- `mage integration:testForResourceLeaksSingle [testName|all]` to execute a single test under the `testing/integration/leak` folder. Only the selected test will be executed on remote VMs.
+
+You can list all available mage targets by running `mage -l`
 
 #### Selecting specific platform
 
