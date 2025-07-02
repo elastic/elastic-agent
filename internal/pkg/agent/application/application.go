@@ -384,8 +384,10 @@ func injectOutputOverrides(log *logger.Logger, rawConfig *config.Config) func(ch
 // Sadly go-ucfg doesn't support Unwrap interface so using `errors.Is(err, ucfg.ErrMissing)` doesn't work
 // this specific function is required to ensure its an `ErrMissing` error.
 func isMissingError(err error) bool {
+	//nolint:errorlint // limitation of go-ucfg (read docstring)
 	switch v := err.(type) {
 	case ucfg.Error:
+		//nolint:errorlint // limitation of go-ucfg (read docstring)
 		return v.Reason() == ucfg.ErrMissing
 	}
 	return false
