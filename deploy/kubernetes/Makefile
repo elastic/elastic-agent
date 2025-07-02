@@ -10,6 +10,8 @@ ELASTIC_AGENT_REPO=kibana
 ELASTIC_AGENT_REPO_PATH=x-pack/plugins/fleet/server/services/
 FILE_REPO=elastic_agent_manifest.ts
 ELASTIC_AGENT_BRANCH=update-k8s-templates-$(shell date "+%Y%m%d%H%M%S")
+GITHUB_USERNAME?=elasticmachine
+GITHUB_EMAIL?=elasticmachine@elastic.co
 
 #variable needed for kustomize build
 KUSTOMIZE=elastic-agent-kustomize
@@ -69,9 +71,9 @@ $(eval HASDIFF =$(shell sh -c "git status | grep $(FILE_REPO) | wc -l"))
 ci-create-kubernetes-templates-pull-request:
 ifeq ($(HASDIFF),1)
 	echo "INFO: Create branch to update k8s templates"	
-	@git config user.name "elasticmachine"
-	@git config user.email "elasticmachine@elastic.co"
-	@git config remote.origin.url "https://elasticmachine:${VAULT_GITHUB_TOKEN}@github.com/elastic/kibana.git"
+	@git config user.name "$(GITHUB_USERNAME)"
+	@git config user.email "$(GITHUB_EMAIL)"
+	@git config remote.origin.url "https://$(GITHUB_USERNAME):${VAULT_GITHUB_TOKEN}@github.com/elastic/kibana.git"
 	git checkout -b $(ELASTIC_AGENT_BRANCH)
 	echo "INFO: add files if any"
 	git add $(ELASTIC_AGENT_REPO_PATH)$(FILE_REPO)
