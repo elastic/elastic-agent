@@ -18,6 +18,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/remote"
 )
 
 type agentinfo struct{}
@@ -267,6 +268,50 @@ func TestCheckin(t *testing.T) {
 			require.NoError(t, err)
 
 			require.Equal(t, 0, len(r.Actions))
+		},
+	))
+
+	t.Run("Headers are sent", withServerWithAuthClient(
+		func(t *testing.T) *http.ServeMux {
+			raw := `{"actions": []}`
+			mux := http.NewServeMux()
+			path := fmt.Sprintf("/api/fleet/agents/%s/checkin", agentInfo.AgentID())
+			mux.HandleFunc(path, authHandler(func(w http.ResponseWriter, r *http.Request) {
+				type Request struct {
+					Metadata *info.ECSMeta `json:"local_metadata"`
+				}
+
+				var req *Request
+
+				content, err := io.ReadAll(r.Body)
+				assert.NoError(t, err)
+				assert.NoError(t, json.Unmarshal(content, &req))
+				assert.Nil(t, req.Metadata)
+
+				authHeader, ok := r.Header["X-App-Auth"]
+				if assert.True(t, ok) && assert.Len(t, authHeader, 1) {
+					assert.Equal(t, "auth-token-123", authHeader[0])
+				}
+
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, raw)
+			}, withAPIKey))
+			return mux
+		}, withAPIKey,
+		func(t *testing.T, client client.Sender) {
+			cmd := NewCheckinCmd(agentInfo, client)
+
+			request := CheckinRequest{}
+
+			r, _, err := cmd.Execute(ctx, &request)
+			require.NoError(t, err)
+
+			require.Equal(t, 0, len(r.Actions))
+		},
+		func(config *remote.Config) {
+			config.Headers = map[string]string{
+				"X-App-Auth": "auth-token-123",
+			}
 		},
 	))
 }
