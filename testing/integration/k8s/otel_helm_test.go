@@ -123,12 +123,12 @@ func TestOtelKubeStackHelm(t *testing.T) {
 			},
 		},
 		{
-			name: "mOTel only logs helm kube-stack operator standalone agent kubernetes privileged",
+			name: "mOTel logs only helm kube-stack operator standalone agent kubernetes privileged",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
 				k8sStepHelmDeployWithValueOptions(KubeStackChartPath, "kube-stack-otel",
 					values.Options{
-						ValueFiles: []string{"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/logs_values.yaml"},
+						ValueFiles: []string{"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/logs-values.yaml"},
 						Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
 
 						// override secrets reference with env variables
