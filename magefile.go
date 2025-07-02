@@ -2341,46 +2341,47 @@ func (Integration) Single(ctx context.Context, testName string) error {
 }
 
 // TestServerless runs the integration tests defined in testing/integration/serverless
-func (Integration) TestServerless(ctx context.Context) error {
+func (i Integration) TestServerless(ctx context.Context) error {
+	return i.testServerless(ctx, false, "")
+}
+
+// TestServerlessSingle runs a single integration test defined in testing/integration/serverless
+func (i Integration) TestServerlessSingle(ctx context.Context, testName string) error {
+	return i.testServerless(ctx, false, testName)
+}
+
+func (i Integration) testServerless(ctx context.Context, matrix bool, testName string) error {
 	err := os.Setenv("STACK_PROVISIONER", "serverless")
 	if err != nil {
 		return fmt.Errorf("error setting serverless stack env var: %w", err)
 	}
 
-	return integRunner(ctx, "testing/integration/serverless", false, "")
+	return integRunner(ctx, "testing/integration/serverless", matrix, testName)
 }
 
-// TestKubernetes runs kubernetes integration tests
-func (Integration) TestKubernetes(ctx context.Context) error {
+// TestKubernetes runs the integration tests defined in testing/integration/k8s
+func (i Integration) TestKubernetes(ctx context.Context) error {
+	return i.testKubernetes(ctx, false, "")
+}
+
+// TestKubernetesSingle runs a single integration test defined in testing/integration/k8s
+func (i Integration) TestKubernetesSingle(ctx context.Context, testName string) error {
+	return i.testKubernetes(ctx, false, testName)
+}
+
+// TestKubernetesMatrix runs a matrix of integration tests defined in testing/integration/k8s
+func (i Integration) TestKubernetesMatrix(ctx context.Context) error {
+	return i.testKubernetes(ctx, true, "")
+}
+
+func (i Integration) testKubernetes(ctx context.Context, matrix bool, testName string) error {
 	mg.Deps(Integration.BuildKubernetesTestData)
 	// invoke integration tests
 	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
 		return err
 	}
 
-	return integRunner(ctx, "testing/integration/k8s", false, "")
-}
-
-// TestKubernetesSingle runs single k8s integration test
-func (Integration) TestKubernetesSingle(ctx context.Context, testName string) error {
-	mg.Deps(Integration.BuildKubernetesTestData)
-	// invoke integration tests
-	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
-		return err
-	}
-
-	return integRunner(ctx, "testing/integration/k8s", false, testName)
-}
-
-// TestKubernetesMatrix runs a matrix of kubernetes integration tests
-func (Integration) TestKubernetesMatrix(ctx context.Context) error {
-	mg.Deps(Integration.BuildKubernetesTestData)
-	// invoke integration tests
-	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
-		return err
-	}
-
-	return integRunner(ctx, "testing/integration/k8s", true, "")
+	return integRunner(ctx, "testing/integration/k8s", matrix, testName)
 }
 
 // BuildKubernetesTestData builds the test data required to run k8s integration tests
@@ -2917,9 +2918,18 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 	return integRunner(ctx, "testing/integration/beats/serverless", false, "TestBeatsServerless")
 }
 
-// TestForResourceLeaks runs tests that check for resource leaks
-func (Integration) TestForResourceLeaks(ctx context.Context) error {
-	return integRunner(ctx, "testing/integration/leak", false, "TestLongRunningAgentForLeaks")
+// TestForResourceLeaks runs the integration tests defined in testing/integration/leak
+func (i Integration) TestForResourceLeaks(ctx context.Context) error {
+	return i.testForResourceLeaks(ctx, false, "")
+}
+
+// TestForResourceLeaksSingle runs a single integration test defined in testing/integration/leak
+func (i Integration) TestForResourceLeaksSingle(ctx context.Context, testName string) error {
+	return i.testForResourceLeaks(ctx, false, testName)
+}
+
+func (i Integration) testForResourceLeaks(ctx context.Context, matrix bool, testName string) error {
+	return integRunner(ctx, "testing/integration/leak", matrix, testName)
 }
 
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
