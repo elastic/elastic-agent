@@ -89,8 +89,10 @@ i4EFZLWrFRsAAAARYWxleGtAZ3JlbWluLm5lc3QBAg==
 			"nested1": mapstr.M{
 				"certificate": "unredacted",
 				"nested2": mapstr.M{
-					"passphrase": "unredacted",
-					"password":   "unredacted",
+					"X-Authentication": "unredacted",
+					"X-App-Auth":       "unredacted",
+					"passphrase":       "unredacted",
+					"password":         "unredacted",
 					"nested3": mapstr.M{
 						"token": "unredacted",
 						"key":   "unredacted",
