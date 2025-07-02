@@ -32,7 +32,7 @@ func TestStartCollector(t *testing.T) {
 		},
 		{
 			configFile:           "nonexistent-component.yml",
-			expectedErrorMessage: `error decoding 'extensions': unknown type: "zpages"`,
+			expectedErrorMessage: `'extensions' unknown type: "zpages"`,
 		},
 	}
 
