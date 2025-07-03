@@ -25,7 +25,7 @@ receivers:
       - add_fields:
           target: autoops_es
           fields:
-            token2: ${env:AUTOOPS_TOKEN}
+            token: ${env:AUTOOPS_TOKEN}
     output:
       otelconsumer:
     telemetry_types: ["logs"]
@@ -37,7 +37,10 @@ exporters:
     endpoint: ${env:AUTOOPS_OTEL_URL}
 
 service:
-  pipelines:  
+  pipelines:
     logs:
       receivers: [metricbeatreceiver]
       exporters: [otlphttp]
+  telemetry:
+    logs:
+      encoding: json
