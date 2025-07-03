@@ -2,9 +2,6 @@
 
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
-  # Remove AGENT_PACKAGE_VERSION and AGENT_VERSION pinning once 8.18.4 DRA and stack are released
-  AGENT_PACKAGE_VERSION: "8.18.3"
-  BEAT_VERSION: "8.18.3"
 
 steps:
   - group: "Integration tests: packaging"
