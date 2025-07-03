@@ -60,6 +60,9 @@ type AgentInfo struct {
 	esHeaders map[string]string
 }
 
+// for unit testing
+var doLoadAgentInfoWithBackoff = loadAgentInfoWithBackoff
+
 // NewAgentInfoWithLog creates a new agent information.
 // In case when agent ID was already created it returns,
 // this created ID otherwise it generates
@@ -67,7 +70,7 @@ type AgentInfo struct {
 // If agent config file does not exist it gets created.
 // Initiates log level to predefined value.
 func NewAgentInfoWithLog(ctx context.Context, level string, createAgentID bool) (*AgentInfo, error) {
-	agentInfo, isStandalone, err := loadAgentInfoWithBackoff(ctx, false, level, createAgentID)
+	agentInfo, isStandalone, err := doLoadAgentInfoWithBackoff(ctx, false, level, createAgentID)
 	if err != nil {
 		return nil, err
 	}
