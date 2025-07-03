@@ -270,10 +270,6 @@ shared:
         content: >
           {{ commit }}
         mode: 0644
-      /etc/{{.BeatName}}/autoops-es.yml:
-        source: 'autoops-es.yml'
-        mode: 0600
-        config: true
       /etc/{{.BeatName}}/elastic-agent.reference.yml:
         source: 'elastic-agent.reference.yml'
         mode: 0644
@@ -343,10 +339,6 @@ shared:
       content: >
         {{ commit }}
       mode: 0644
-    'autoops-es.yml':
-      source: 'autoops-es.yml'
-      mode: 0600
-      config: true
     'elastic-agent.reference.yml':
       source: 'elastic-agent.reference.yml'
       mode: 0644
@@ -468,10 +460,9 @@ shared:
       'data/{{.BeatName}}-{{ commit_short }}/otelcol.ps1':
         source: '{{ repo.RootDir }}/dev-tools/packaging/files/windows/otelcol.ps1'
         mode: 0755
-      # windows not supported yet
-      # 'otel_samples':
-      #   source: '{{ repo.RootDir }}/internal/pkg/otel/samples/windows/'
-      #   mode: 0755
+      'otel_samples':
+        source: '{{ repo.RootDir }}/internal/pkg/otel/samples/windows/'
+        mode: 0755
 
   # This image is used only for preparing the file tree before actually building the image
   - &docker_builder_spec
@@ -520,10 +511,6 @@ shared:
       linux_capabilities: ''
       beats_install_path: "install"
     files:
-      'autoops-es.yml':
-        source: 'autoops-es.yml'
-        mode: 0600
-        config: true
       'elastic-agent.yml':
         source: 'elastic-agent.docker.yml'
         mode: 0600
@@ -619,10 +606,6 @@ shared:
       linux_capabilities: ''
       beats_install_path: "install"
     files:
-      'autoops-es.yml':
-        source: 'autoops-es.yml'
-        mode: 0600
-        config: true
       'elastic-agent.yml':
         source: 'elastic-agent.docker.yml'
         mode: 0600
@@ -654,10 +637,6 @@ shared:
       linux_capabilities: ''
       beats_install_path: "install"
     files:
-      'autoops-es.yml':
-        source: 'autoops-es.yml'
-        mode: 0600
-        config: true
       'elastic-agent.yml':
         source: 'elastic-agent.docker.yml'
         mode: 0600
