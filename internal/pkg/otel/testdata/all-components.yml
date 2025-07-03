@@ -92,6 +92,7 @@ connectors:
       - telemetry.sdk.language
       - telemetry.sdk.name
   elasticapm:
+  forward:
 
 service:
   extensions:
@@ -116,6 +117,18 @@ service:
       receivers:
         - filelog
         - otlp
+        - nop
+
+    logs/forward_receive:
+      receivers:
+        - nop
+      exporters:
+        - forward
+
+    logs/forward_export:
+      receivers:
+        - forward
+      exporters:
         - nop
 
     metrics:
