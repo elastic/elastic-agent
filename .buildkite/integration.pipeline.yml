@@ -100,10 +100,11 @@ steps:
         env:
           PACKAGES: "docker"
           PLATFORMS: "linux/amd64"
-          PUSH_IMAGE: "true"
           CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
           CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
-        command: ".buildkite/scripts/steps/integration-package.sh"
+        command: |
+          .buildkite/scripts/steps/integration-package.sh
+          mage cloud:push
         artifact_paths:
           - build/distributions/**
         agents:
@@ -119,8 +120,11 @@ steps:
         env:
           PACKAGES: "docker"
           PLATFORMS: "linux/arm64"
+          CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
+          CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud"
         command: |
           .buildkite/scripts/steps/integration-package.sh
+          mage cloud:push
         artifact_paths:
           - build/distributions/**
         agents:
@@ -135,10 +139,11 @@ steps:
           PACKAGES: "docker"
           PLATFORMS: "linux/amd64"
           FIPS: "true"
-          PUSH_IMAGE: "true"
           CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
           CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips"
-        command: ".buildkite/scripts/steps/integration-package.sh"
+        command: |
+          .buildkite/scripts/steps/integration-package.sh
+          mage cloud:push
         artifact_paths:
           - build/distributions/**
         agents:
@@ -155,8 +160,11 @@ steps:
           PACKAGES: "docker"
           PLATFORMS: "linux/arm64"
           FIPS: "true"
+          CUSTOM_IMAGE_TAG: "git-${BUILDKITE_COMMIT:0:12}"
+          CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips"
         command: |
           .buildkite/scripts/steps/integration-package.sh
+          mage cloud:push
         artifact_paths:
           - build/distributions/**
         agents:
