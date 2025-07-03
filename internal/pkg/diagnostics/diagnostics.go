@@ -398,7 +398,8 @@ func redactKey(k string) bool {
 	}
 
 	k = strings.ToLower(k)
-	return strings.Contains(k, "certificate") ||
+	return strings.Contains(k, "auth") ||
+		strings.Contains(k, "certificate") ||
 		strings.Contains(k, "passphrase") ||
 		strings.Contains(k, "password") ||
 		strings.Contains(k, "token") ||

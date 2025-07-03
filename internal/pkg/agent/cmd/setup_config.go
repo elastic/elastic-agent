@@ -15,20 +15,21 @@ type setupConfig struct {
 }
 
 type fleetConfig struct {
-	CA              string        `config:"ca"`
-	Enroll          bool          `config:"enroll"`
-	EnrollmentToken string        `config:"enrollment_token"`
-	ID              string        `config:"id"`
-	ReplaceToken    string        `config:"replace_token"`
-	Force           bool          `config:"force"`
-	Insecure        bool          `config:"insecure"`
-	TokenName       string        `config:"token_name"`
-	TokenPolicyName string        `config:"token_policy_name"`
-	URL             string        `config:"url"`
-	DaemonTimeout   time.Duration `config:"daemon_timeout"`
-	EnrollTimeout   time.Duration `config:"enroll_timeout"`
-	Cert            string        `config:"cert"`
-	CertKey         string        `config:"cert_key"`
+	CA              string            `config:"ca"`
+	Enroll          bool              `config:"enroll"`
+	EnrollmentToken string            `config:"enrollment_token"`
+	ID              string            `config:"id"`
+	ReplaceToken    string            `config:"replace_token"`
+	Force           bool              `config:"force"`
+	Insecure        bool              `config:"insecure"`
+	TokenName       string            `config:"token_name"`
+	TokenPolicyName string            `config:"token_policy_name"`
+	URL             string            `config:"url"`
+	Headers         map[string]string `config:"headers"`
+	DaemonTimeout   time.Duration     `config:"daemon_timeout"`
+	EnrollTimeout   time.Duration     `config:"enroll_timeout"`
+	Cert            string            `config:"cert"`
+	CertKey         string            `config:"cert_key"`
 }
 
 type fleetServerConfig struct {
@@ -96,6 +97,7 @@ func defaultAccessConfig() (setupConfig, error) {
 			TokenName:       envWithDefault("Default", "FLEET_TOKEN_NAME"),
 			TokenPolicyName: envWithDefault("", "FLEET_TOKEN_POLICY_NAME"),
 			URL:             envWithDefault("", "FLEET_URL"),
+			Headers:         envMap("FLEET_HEADER"),
 			DaemonTimeout:   envTimeout("FLEET_DAEMON_TIMEOUT"),
 			EnrollTimeout:   envTimeout("FLEET_ENROLL_TIMEOUT"),
 			Cert:            envWithDefault("", "ELASTIC_AGENT_CERT"),
