@@ -132,6 +132,9 @@ steps:
           instanceType: "c6g.4xlarge"
           imagePrefix: "core-ubuntu-2204-aarch64"
           diskSizeGb: 200
+        plugins:
+          - elastic/vault-docker-login#v0.5.2:
+              secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
 
       - label: "Packaging: Containers linux/amd64 FIPS"
         key: packaging-containers-x86-64-fips
@@ -172,6 +175,9 @@ steps:
           instanceType: "c6g.4xlarge"
           imagePrefix: "core-ubuntu-2204-aarch64"
           diskSizeGb: 200
+        plugins:
+          - elastic/vault-docker-login#v0.5.2:
+              secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
 
   - label: "Triggering Integration tests"
     depends_on:
