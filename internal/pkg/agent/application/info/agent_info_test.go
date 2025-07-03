@@ -8,10 +8,17 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/pkg/utils"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewAgentInfoWithLog(t *testing.T) {
+	hasRoot, err := utils.HasRoot()
+	require.NoError(t, err, "failed to check for root")
+
 	for _, tc := range []struct {
 		name                string
 		levelFromConfig     string
@@ -32,7 +39,7 @@ func TestNewAgentInfoWithLog(t *testing.T) {
 			expected: &AgentInfo{
 				agentID:      "testID",
 				logLevel:     "debug",
-				unprivileged: true,
+				unprivileged: !hasRoot,
 				esHeaders:    nil,
 				isStandalone: true,
 			},
@@ -50,7 +57,7 @@ func TestNewAgentInfoWithLog(t *testing.T) {
 			expected: &AgentInfo{
 				agentID:      "testID",
 				logLevel:     "info",
-				unprivileged: true,
+				unprivileged: !hasRoot,
 				esHeaders:    nil,
 				isStandalone: false,
 			},
