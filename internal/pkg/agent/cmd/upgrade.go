@@ -48,7 +48,20 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 		Use:   "upgrade <version>",
 		Short: "Upgrade the currently installed Elastic Agent to the specified version",
 		Long:  "This command upgrades the currently installed Elastic Agent to the specified version.",
-		Args:  cobra.ExactArgs(1),
+		Args: func(cmd *cobra.Command, args []string) error {
+			if isRollback, _ := cmd.Flags().GetBool(flagRollback); isRollback {
+				if len(args) > 0 {
+					return fmt.Errorf("no arguments expected for rollback")
+				}
+				return nil
+			}
+
+			if len(args) != 1 {
+				return fmt.Errorf("accepts 1 arg(s), received %d", len(args))
+			}
+
+			return nil
+		},
 		Run: func(c *cobra.Command, args []string) {
 			c.SetContext(context.Background())
 			if err := upgradeCmd(streams, c, args); err != nil {
@@ -156,44 +169,46 @@ func checkUpgradable(cond upgradeCond) error {
 func upgradeCmdWithClient(input *upgradeInput) error {
 	cmd := input.cmd
 	c := input.c
-	version := input.args[0]
-	sourceURI, _ := cmd.Flags().GetString(flagSourceURI)
-
-	force, err := cmd.Flags().GetBool(flagForce)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve command flag information while trying to upgrade the agent: %w", err)
-	}
-
-	skipVerification, err := cmd.Flags().GetBool(flagSkipVerify)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve %s flag information while upgrading the agent: %w", flagSkipVerify, err)
-	}
-
-	err = checkUpgradable(upgradeCond{
-		isManaged:  input.agentInfo.IsManaged,
-		force:      force,
-		isRoot:     input.isRoot,
-		skipVerify: skipVerification,
-	})
-	if err != nil {
-		return fmt.Errorf("aborting upgrade: %w", err)
-	}
-
-	isBeingUpgraded, err := upgrade.IsInProgress(c, utils.GetWatcherPIDs)
-	if err != nil {
-		return fmt.Errorf("failed to check if upgrade is already in progress: %w", err)
-	}
-	if isBeingUpgraded {
-		return errors.New("an upgrade is already in progress; please try again later.")
-	}
 
 	performRollback, err := cmd.Flags().GetBool(flagRollback)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve %q command flag information while trying to upgrade the agent: %w", flagRollback, err)
 	}
-
 	var pgpChecks []string
+	var version, sourceURI string
+	var skipVerification bool
 	if !performRollback {
+		version = input.args[0]
+		sourceURI, _ = cmd.Flags().GetString(flagSourceURI)
+
+		force, err := cmd.Flags().GetBool(flagForce)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve command flag information while trying to upgrade the agent: %w", err)
+		}
+
+		skipVerification, err = cmd.Flags().GetBool(flagSkipVerify)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve %s flag information while upgrading the agent: %w", flagSkipVerify, err)
+		}
+
+		err = checkUpgradable(upgradeCond{
+			isManaged:  input.agentInfo.IsManaged,
+			force:      force,
+			isRoot:     input.isRoot,
+			skipVerify: skipVerification,
+		})
+		if err != nil {
+			return fmt.Errorf("aborting upgrade: %w", err)
+		}
+
+		isBeingUpgraded, err := upgrade.IsInProgress(c, utils.GetWatcherPIDs)
+		if err != nil {
+			return fmt.Errorf("failed to check if upgrade is already in progress: %w", err)
+		}
+		if isBeingUpgraded {
+			return errors.New("an upgrade is already in progress; please try again later.")
+		}
+
 		if !skipVerification {
 			// get local PGP
 			pgpPath, _ := cmd.Flags().GetString(flagPGPBytesPath)
@@ -230,16 +245,11 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 		return errors.New(err, "Failed trigger upgrade of daemon")
 	}
 
-	fmt.Fprintf(input.streams.Out, "Upgrade triggered to version %s, Elastic Agent is currently restarting\n", version)
-	return nil
-}
-
-func rollbackCmdWithClient(c client.Client) error {
-	_, err := c.Upgrade(context.Background(), "", "", true, true, true)
-	if err != nil {
-		return fmt.Errorf("failed to perform rollback: %w", err)
+	if version == "" {
+		fmt.Fprintf(input.streams.Out, "Upgrade triggered, Elastic Agent is currently restarting\n")
+	} else {
+		fmt.Fprintf(input.streams.Out, "Upgrade triggered to version %s, Elastic Agent is currently restarting\n", version)
 	}
-
 	return nil
 }
 
