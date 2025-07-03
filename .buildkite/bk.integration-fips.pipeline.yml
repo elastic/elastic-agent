@@ -20,6 +20,8 @@ common:
   - oblt_cli_plugin: &oblt_cli_plugin
       elastic/oblt-cli#v0.2.0:
         version-file: .oblt-cli-version
+  - vault_github_token: &vault_github_token
+      elastic/vault-github-token#v0.1.0:
 
 steps:
   - label: Build and push custom elastic-agent image
@@ -95,6 +97,7 @@ steps:
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
+          - *vault_github_token
 
       - label: "fips:arm64:sudo-{{matrix.sudo}}:{{matrix.groups}}"
         depends_on:
@@ -128,6 +131,7 @@ steps:
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
+          - *vault_github_token
 
   - label: ESS FIPS stack cleanup
     depends_on:

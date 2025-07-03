@@ -46,6 +46,8 @@ common:
   - oblt_cli_plugin: &oblt_cli_plugin
       elastic/oblt-cli#v0.2.0:
         version-file: .oblt-cli-version
+  - vault_github_token: &vault_github_token
+      elastic/vault-github-token#v0.1.0:
 
 steps:
   - label: Start ESS stack for integration tests using oblt-cli
@@ -88,6 +90,7 @@ steps:
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
+          - *vault_github_token
 
       - label: "Windows:2025:amd64:sudo"
         depends_on:
@@ -110,6 +113,7 @@ steps:
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
+          - *vault_github_token
 
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-ubuntu-x86-64
@@ -131,6 +135,7 @@ steps:
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
+          - *vault_github_token
 
   - group: "Stateful: Windows"
     key: integration-tests-win
@@ -170,6 +175,7 @@ steps:
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
+          - *vault_github_token
 
       - label: "Win2022:non-sudo:{{matrix}}"
         depends_on:
@@ -194,6 +200,7 @@ steps:
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
+          - *vault_github_token
 
       - label: "Win2025:sudo:{{matrix}}"
         depends_on:
@@ -225,6 +232,7 @@ steps:
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
+          - *vault_github_token
 
       - label: "Win2025:non-sudo:{{matrix}}"
         depends_on:
@@ -249,6 +257,7 @@ steps:
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
+          - *vault_github_token
 
   - group: "Stateful:Ubuntu"
     key: integration-tests-ubuntu
@@ -280,6 +289,7 @@ steps:
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
+          - *vault_github_token
 
       - label: "x86_64:sudo: {{matrix}}"
         depends_on:
@@ -318,6 +328,7 @@ steps:
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
+          - *vault_github_token
 
       - label: "arm:sudo: {{matrix}}"
         depends_on:
@@ -356,6 +367,7 @@ steps:
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
+          - *vault_github_token
 
       - label: "arm:non-sudo: {{matrix}}"
         skip: true
@@ -381,6 +393,7 @@ steps:
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
+          - *vault_github_token
 
   - group: "Stateful:Debian"
     key: integration-tests-debian
@@ -412,6 +425,7 @@ steps:
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
+          - *vault_github_token
 
       - label: "x86_64:sudo: {{matrix}}"
         depends_on:
@@ -451,6 +465,7 @@ steps:
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
+          - *vault_github_token
 
   - group: "Stateful(Sudo):RHEL8"
     key: integration-tests-rhel8
@@ -481,6 +496,7 @@ steps:
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
+          - *vault_github_token
 
   - group: "Kubernetes"
     key: integration-tests-kubernetes
@@ -532,6 +548,7 @@ steps:
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
+          - *vault_github_token
 
   - group: "Serverless integration test"
     key: integration-tests-serverless
