@@ -91,6 +91,10 @@
                     "type": "boolean",
                     "description": "Enable Kubernetes integration."
                 },
+                "onboardingID": {
+                    "type": "string",
+                    "description": "Onboarding ID for quick-start flow."
+                },
                 "output": {
                     "type": "string",
                     "description": "Name of the output used in Kubernetes integration. Must be defined in outputs."

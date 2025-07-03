@@ -35,6 +35,7 @@ type mockUpgradeManager struct {
 		sourceURI string,
 		action *fleetapi.ActionUpgrade,
 		details *details.Details,
+		performUpgrade bool,
 		skipVerifyOverride bool,
 		skipDefaultPgp bool,
 		pgpBytes ...string) (reexec.ShutdownCallbackFn, error)
@@ -54,6 +55,7 @@ func (u *mockUpgradeManager) Upgrade(
 	sourceURI string,
 	action *fleetapi.ActionUpgrade,
 	details *details.Details,
+	performUpgrade bool,
 	skipVerifyOverride bool,
 	skipDefaultPgp bool,
 	pgpBytes ...string) (reexec.ShutdownCallbackFn, error) {
@@ -64,6 +66,7 @@ func (u *mockUpgradeManager) Upgrade(
 		sourceURI,
 		action,
 		details,
+		false,
 		skipVerifyOverride,
 		skipDefaultPgp,
 		pgpBytes...)
@@ -107,6 +110,7 @@ func TestUpgradeHandler(t *testing.T) {
 				sourceURI string,
 				action *fleetapi.ActionUpgrade,
 				details *details.Details,
+				performUpgrade bool,
 				skipVerifyOverride bool,
 				skipDefaultPgp bool,
 				pgpBytes ...string) (reexec.ShutdownCallbackFn, error) {
@@ -161,6 +165,7 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 				sourceURI string,
 				action *fleetapi.ActionUpgrade,
 				details *details.Details,
+				performUpgrade bool,
 				skipVerifyOverride bool,
 				skipDefaultPgp bool,
 				pgpBytes ...string) (reexec.ShutdownCallbackFn, error) {
@@ -222,6 +227,7 @@ func TestDuplicateActionsHandled(t *testing.T) {
 				sourceURI string,
 				action *fleetapi.ActionUpgrade,
 				details *details.Details,
+				performUpgrade bool,
 				skipVerifyOverride bool,
 				skipDefaultPgp bool,
 				pgpBytes ...string) (reexec.ShutdownCallbackFn, error) {
@@ -313,6 +319,7 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 				sourceURI string,
 				action *fleetapi.ActionUpgrade,
 				details *details.Details,
+				performUpgrade bool,
 				skipVerifyOverride bool,
 				skipDefaultPgp bool,
 				pgpBytes ...string) (reexec.ShutdownCallbackFn, error) {

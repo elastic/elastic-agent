@@ -193,8 +193,59 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 	return nil
 }
 
+func handleRollback(ctx context.Context, log *logger.Logger, dataDirPath, topDirPath string) error {
+	marker, err := LoadMarker(dataDirPath)
+	if err != nil {
+		return fmt.Errorf("failed to load upgrade marker during rollback: %w", err)
+	}
+
+	if marker == nil {
+		return fmt.Errorf("failed to load marker, no rollback available")
+	}
+
+	// verify upgrade marker has available_rollbacks populated
+	if len(marker.Details.Metadata.AvailableRollbacks) == 0 {
+		return fmt.Errorf("no rollback available")
+	}
+
+	// verify upgrade state is valid: [UPG_ROLLBACK_AVAILABLE, UPG_WATCHING]
+	if !isStateValidForRollback(marker.Details.State) {
+		return fmt.Errorf("agent cannot perform rollback at %q state", marker.Details.State)
+	}
+
+	// update marker with Rollback intention
+	marker.DesiredOutcome = OUTCOME_ROLLBACK
+
+	if err := SaveMarker(dataDirPath, marker, true); err != nil {
+		return fmt.Errorf("failed to write update marker: %w", err)
+	}
+
+	// execute watcher
+	var watcherCmd *exec.Cmd
+
+	watcherExecutable := paths.BinaryPath(paths.VersionedHome(topDirPath), agentName)
+	if watcherCmd, err = InvokeWatcher(log, watcherExecutable); err != nil {
+		return fmt.Errorf("failed to invoke watcher %q from rollback handler: %w", watcherExecutable, err)
+	}
+
+	watcherWaitErr := waitForWatcher(ctx, log, markerFilePath(dataDirPath), watcherMaxWaitTime)
+	if watcherWaitErr != nil {
+		var killWatcherErr error
+		if watcherCmd != nil && watcherCmd.Process != nil {
+			killWatcherErr = watcherCmd.Process.Kill()
+		}
+		return goerrors.Join(watcherWaitErr, killWatcherErr)
+	}
+
+	return nil
+}
+
+func isStateValidForRollback(currentState details.State) bool {
+	return currentState == details.StateRollbackAvailable || currentState == details.StateWatching
+}
+
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
-func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, performRollback bool, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 
 	currentVersion := agentVersion{
@@ -202,6 +253,15 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		snapshot: release.Snapshot(),
 		hash:     release.Commit(),
 		fips:     release.FIPSDistribution(),
+	}
+
+	if performRollback {
+		u.log.Info("initiating rollback")
+		if err := handleRollback(ctx, u.log, paths.Data(), paths.Top()); err != nil {
+			return nil, fmt.Errorf("failed to handle rollback: %w", err)
+		}
+
+		return nil, nil
 	}
 
 	// Compare versions and exit before downloading anything if the upgrade

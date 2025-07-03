@@ -540,13 +540,13 @@ func (_c *Client_StateWatch_Call) RunAndReturn(run func(context.Context) (client
 }
 
 // Upgrade provides a mock function with given fields: ctx, version, sourceURI, skipVerify, skipDefaultPgp, pgpBytes
-func (_m *Client) Upgrade(ctx context.Context, version string, sourceURI string, skipVerify bool, skipDefaultPgp bool, pgpBytes ...string) (string, error) {
+func (_m *Client) Upgrade(ctx context.Context, version string, sourceURI string, performRollback bool, skipVerify bool, skipDefaultPgp bool, pgpBytes ...string) (string, error) {
 	_va := make([]interface{}, len(pgpBytes))
 	for _i := range pgpBytes {
 		_va[_i] = pgpBytes[_i]
 	}
 	var _ca []interface{}
-	_ca = append(_ca, ctx, version, sourceURI, skipVerify, skipDefaultPgp)
+	_ca = append(_ca, ctx, version, sourceURI, performRollback, skipVerify, skipDefaultPgp)
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
