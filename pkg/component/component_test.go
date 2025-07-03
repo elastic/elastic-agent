@@ -5,7 +5,7 @@
 package component
 
 import (
-	"errors"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,15 +16,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/go-ucfg"
-
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
+	"github.com/elastic/go-ucfg"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -700,7 +699,7 @@ func TestToComponents(t *testing.T) {
 							ID:       "filestream-default-filestream-1",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
-							Err:      fmt.Errorf("decoding error: %w", fmt.Errorf("decoding failed due to the following error(s):\n\n%w", errors.Join(errors.New("'meta' expected a map, got 'slice'")))),
+							Err:      fmt.Errorf("decoding error: %w", makeMapStructureErr(t)),
 						},
 					},
 					RuntimeManager: DefaultRuntimeManager,
@@ -790,7 +789,7 @@ func TestToComponents(t *testing.T) {
 							ID:       "cloudbeat-default-cloudbeat-1-unit",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
-							Err:      fmt.Errorf("decoding error: %w", fmt.Errorf("decoding failed due to the following error(s):\n\n%w", errors.Join(errors.New("'meta' expected a map, got 'slice'")))),
+							Err:      fmt.Errorf("decoding error: %w", makeMapStructureErr(t)),
 						},
 					},
 					RuntimeManager: DefaultRuntimeManager,
@@ -3117,4 +3116,19 @@ func TestFlattenedDataStreamIsolatedUnits(t *testing.T) {
 			t.Errorf("expecting DataStream.Namespace: %q, got: %q", expectedNamespace[currentId], dataStream.Namespace)
 		}
 	}
+}
+
+func makeMapStructureErr(t *testing.T) error {
+	t.Helper()
+
+	jsonStr := `{ "meta": [] }`
+
+	var data map[string]interface{}
+	err := json.Unmarshal([]byte(jsonStr), &data)
+	require.NoError(t, err)
+
+	var output struct {
+		Meta struct{} `mapstructure:"meta"`
+	}
+	return mapstructure.Decode(data, &output)
 }
