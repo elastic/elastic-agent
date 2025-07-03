@@ -539,8 +539,8 @@ github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnec
 github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.3.0/go.mod h1:WzLl+CvujaQDVqrrXaEKIbn8+eZdhh+2j0lsd8RkT00=
 github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.1.0 h1:TqA/DvOyf/Fhqru5EIAH0q+XPj+Qpv+IC7Bwf8mlp3s=
 github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.1.0/go.mod h1:1FP7yfqYoTr7MfysGJdHb66Ku2FqabFbC/GlSlUddvo=
-github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.3.0 h1:COSoB8XSfwfy7hcv0QlBZrrsXHczDg8EauJ/BWT/SVs=
-github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.3.0/go.mod h1:JLwZA+FGfoP5HFm5YiSAP+s4nPq5d9rT5Zr04AJs9Ck=
+github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.4.0 h1:/RaVOCdJjFcLVshu5XL/crKGFb1cjVV/jYQWpqrsbqs=
+github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.4.0/go.mod h1:NbdjpM601OGL+vygiO72dB+Muh8EJd0WsQRQNjTdJZg=
 github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced h1:XcWi/S3OoeE5Qwmj381AoO3nr3AVXl4Z4QO0mqyjlzU=
 github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced/go.mod h1:8e9NcGfE2xeor8r+WV9a+hKBEkzJEDnqZN7tqb3GUe8=
 github.com/elastic/opentelemetry-collector-components/internal/testutil v0.0.0-20250613082151-282de5af1c9b h1:NWuTKdMCJlU9ehRH8V0w1Kk1QI5Vn+9OcJWIO9wI+pE=
