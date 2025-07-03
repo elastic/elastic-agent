@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,8 +27,6 @@ import (
 	"github.com/elastic/elastic-agent/testing/integration"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
-
-const cloudAgentPolicyID = "policy-elastic-agent-on-cloud"
 
 // TestFIPS exercises a FIPS-capable Elastic Agent against a FIPS-capable Fleet Server
 // running in ECH. Concretely, it exercises the following functionality:
@@ -98,27 +97,55 @@ func ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t *testing.T, info *de
 	}, 5*time.Minute, 10*time.Second, "Fleet Server in ECH deployment is not healthy")
 
 	require.Eventually(t, func() bool {
-		// Get all Agents
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
-		agents, err := info.KibanaClient.ListAgents(ctx, kibana.ListAgentsRequest{})
-		require.NoError(t, err)
 
 		// Find Fleet Server's own Agent and get its status and whether it's
 		// FIPS-capable
-		var agentStatus string
-		var agentIsFIPS bool
-		for _, item := range agents.Items {
-			if item.PolicyID == cloudAgentPolicyID {
-				agentStatus = item.Status
-				agentIsFIPS = item.LocalMetadata.Elastic.Agent.FIPS
-			}
-		}
+		searchResp, err := info.ESClient.Search(
+			info.ESClient.Search.WithContext(ctx),
+			info.ESClient.Search.WithIndex(".fleet-agents"),
+			info.ESClient.Search.WithBody(strings.NewReader(`{
+				"query": {
+					"term": {
+						"policy_id": "policy-elastic-agent-on-cloud"
+					}
+				}
+			}`,
+			)))
+		require.NoError(t, err)
+		defer searchResp.Body.Close()
+		require.Equal(t, http.StatusOK, searchResp.StatusCode)
+
+		respObj := struct {
+			Hits struct {
+				Total struct {
+					Value int `json:"value"`
+				} `json:"total"`
+				Hits []struct {
+					Source struct {
+						LocalMetadata struct {
+							Elastic struct {
+								Agent struct {
+									FIPS bool `json:"fips"`
+								} `json:"agent"`
+							} `json:"elastic"`
+						} `json:"local_metadata"`
+						LastCheckinStatus string `json:"last_checkin_status"`
+					} `json:"_source"`
+				} `json:"hits"`
+			} `json:"hits"`
+		}{}
+
+		err = json.NewDecoder(searchResp.Body).Decode(&respObj)
+		require.NoError(t, err)
+		require.Equal(t, 1, respObj.Hits.Total.Value, "expected only one hit from the ES query")
 
 		// Check that this Agent is online (i.e. healthy) and is FIPS-capable. This
 		// will prove that a FIPS-capable Agent is able to connect to a FIPS-capable
 		// Fleet Server, with both running in ECH.
-		return agentStatus == "online" && agentIsFIPS
+		t.Logf("FIPS: %v, Status: %s", respObj.Hits.Hits[0].Source.LocalMetadata.Elastic.Agent.FIPS, respObj.Hits.Hits[0].Source.LastCheckinStatus)
+		return respObj.Hits.Hits[0].Source.LocalMetadata.Elastic.Agent.FIPS && respObj.Hits.Hits[0].Source.LastCheckinStatus == "online"
 	}, 10*time.Second, 200*time.Millisecond, "Fleet Server's Elastic Agent should be healthy and FIPS-capable")
 }
 
