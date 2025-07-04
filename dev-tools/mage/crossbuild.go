@@ -9,6 +9,7 @@ import (
 	"go/build"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -326,6 +327,16 @@ func (b GolangCrossBuilder) Build() error {
 		// Mount $GOPATH/pkg/mod into the container, read-only.
 		hostDir := filepath.Join(build.Default.GOPATH, "pkg", "mod")
 		args = append(args, "-v", hostDir+":/go/pkg/mod:ro")
+	}
+
+	if CrossBuildMountGoBuildCache {
+		// Mount the go build cache into the container, read-only.
+		out, err := exec.Command("go", "env", "GOCACHE").Output()
+		if err != nil {
+			return fmt.Errorf("failed to get GOCACHE: %w", err)
+		}
+		cacheDir := strings.TrimSpace(string(out))
+		args = append(args, "-v", cacheDir+":/root/.cache/go-build")
 	}
 
 	if !ExternalBuild {

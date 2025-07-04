@@ -74,6 +74,9 @@ var (
 	// the crossbuild images at /go/pkg/mod, read-only,  when set to true.
 	CrossBuildMountModcache = true
 
+	// CrossBuildMountGoBuildCache mounts the go build cache into the crossbuild images
+	CrossBuildMountGoBuildCache = true
+
 	BeatName        = EnvOr("BEAT_NAME", defaultName)
 	BeatServiceName = EnvOr("BEAT_SERVICE_NAME", BeatName)
 	BeatIndexPrefix = EnvOr("BEAT_INDEX_PREFIX", BeatName)
