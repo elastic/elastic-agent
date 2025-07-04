@@ -12,9 +12,10 @@ function ess_up() {
   fi
 
   # Create a cluster with the specified stack version and store the cluster information in a file
-  oblt-cli cluster create ess \
-      --stack-version "$STACK_VERSION" \
+  oblt-cli cluster create custom \
+      --template ess-ea-it \
       --cluster-name-prefix ea-hosted-it \
+      --parameters="{\"GitOps\":\"true\",\"GitHubRepository\":\"${BUILDKITE_REPO}\",\"GitHubCommit\":\"${BUILDKITE_COMMIT}\",\"EphemeralCluster\":\"true\",\"StackVersion\":\"$STACK_VERSION\"}" \
       --output-file="${PWD}/cluster-info.json" \
       --wait 15
 
