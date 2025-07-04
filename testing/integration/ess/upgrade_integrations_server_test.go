@@ -45,7 +45,7 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 		t.Fatal("ECH API key missing")
 	}
 
-	startVersions := getUpgradeStartVersions(t)
+	startVersions := getUpgradeableFIPSVersions(t)
 	endVersion := define.Version()
 
 	prov, err := ess.NewProvisioner(ess.ProvisionerConfig{
@@ -108,8 +108,8 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 	}
 }
 
-// getUpgradeStartVersions returns stack versions to use as the start version for an upgrade.
-func getUpgradeStartVersions(t *testing.T) version.SortableParsedVersions {
+// getUpgradeableFIPSVersions returns stack versions to use as the start version for an upgrade.
+func getUpgradeableFIPSVersions(t *testing.T) version.SortableParsedVersions {
 	versions, err := upgradetest.GetUpgradableVersions()
 	require.NoError(t, err, "could not get upgradable versions")
 
