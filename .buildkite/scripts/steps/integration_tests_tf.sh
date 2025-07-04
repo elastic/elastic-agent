@@ -38,6 +38,8 @@ if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
   ess_up $OVERRIDE_STACK_VERSION || (echo -e "^^^ +++\nFailed to start ESS stack")
 fi
 
+ess_load_secrets
+
 # Run integration tests
 echo "~~~ Running integration tests"
 
@@ -51,4 +53,3 @@ else
     .buildkite/scripts/buildkite-integration-tests.sh $@
   fi
 fi
-
