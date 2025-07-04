@@ -29,3 +29,11 @@ packages:
   github.com/elastic/elastic-agent/internal/pkg/agent/application/info:
     interfaces:
       Agent:
+  github.com/elastic/elastic-agent/internal/pkg/agent/cmd:
+    interfaces:
+      agentWatcher:
+        config:
+          mockname: "AgentWatcher"
+      installationModifier:
+        config:
+          mockname: "InstallationModifier"

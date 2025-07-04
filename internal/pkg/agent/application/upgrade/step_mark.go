@@ -313,8 +313,8 @@ func loadMarker(markerFile string) (*UpdateMarker, error) {
 // SaveMarker serializes and persists the given upgrade marker to disk.
 // For critical upgrade transitions, pass shouldFsync as true so the marker
 // file is immediately flushed to persistent storage.
-func SaveMarker(marker *UpdateMarker, shouldFsync bool) error {
-	return saveMarkerToPath(marker, markerFilePath(paths.Data()), shouldFsync)
+func SaveMarker(dataDirPath string, marker *UpdateMarker, shouldFsync bool) error {
+	return saveMarkerToPath(marker, markerFilePath(dataDirPath), shouldFsync)
 }
 
 func saveMarkerToPath(marker *UpdateMarker, markerFile string, shouldFsync bool) error {
