@@ -15,8 +15,6 @@ updates:
       - dependency-name: "github.com/elastic/opentelemetry-collector-components/*"
     ignore:
       - dependency-name: "github.com/elastic/beats/*"
-    reviewers:
-      - "elastic/elastic-agent-control-plane"
     open-pull-requests-limit: 10
 
   - package-ecosystem: "github-actions"
@@ -27,6 +25,9 @@ updates:
       - automation
       - skip-changelog
       - Team:Elastic-Agent-Control-Plane
+<<<<<<< HEAD
     reviewers:
       - "elastic/elastic-agent-control-plane"
+=======
+>>>>>>> 48379406b (removed reviewers from dependabot.yml (#8709))
     open-pull-requests-limit: 10
