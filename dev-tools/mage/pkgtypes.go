@@ -785,7 +785,7 @@ func runFPM(spec PackageSpec, packageType PackageType) error {
 	}
 	spec.OutputFile = packageType.AddFileExtension(filepath.Join(distributionsDir, outputFile))
 
-	dockerRun := sh.RunCmd("docker", "run")
+	dockerRun := sh.RunCmd("docker", "run", "--quiet")
 	var args []string
 
 	args, err = addUIDGidEnvArgs(args)
