@@ -24,7 +24,7 @@ function ess_up() {
   # Store the cluster name as a meta-data
   buildkite-agent meta-data set cluster-name "${CLUSTER_NAME}"
 
-  load_secrets
+  ess_load_secrets
 }
 
 function ess_down() {
