@@ -545,8 +545,8 @@ github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v
 github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced/go.mod h1:8e9NcGfE2xeor8r+WV9a+hKBEkzJEDnqZN7tqb3GUe8=
 github.com/elastic/opentelemetry-collector-components/internal/testutil v0.0.0-20250613082151-282de5af1c9b h1:NWuTKdMCJlU9ehRH8V0w1Kk1QI5Vn+9OcJWIO9wI+pE=
 github.com/elastic/opentelemetry-collector-components/internal/testutil v0.0.0-20250613082151-282de5af1c9b/go.mod h1:R1WWATZlmmkryuE5hLQNHj89rdPPi4ErobBZYx2LmGs=
-github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.15.0 h1:kkuKUwqG9cjMm5DswK2LHos20xJ0XUaqsOa3yA6U/0o=
-github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.15.0/go.mod h1:WnaGEWQEgt1IUovcznKbdxW8zSs8akmwoVJrnQbDGbs=
+github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.16.0 h1:gYF93+rFhbl20lttJIO4GH38E6YOQShurBZt7hsSJNc=
+github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.16.0/go.mod h1:BH0yjGBnAxrQekOOq6ELiqA9VggIpFMP2pyQA4Z9bN8=
 github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.7.0 h1:Y8Pl2AOFCudBivihgyvBTMwnKuQttDyRcRHDt0zf2HM=
 github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.7.0/go.mod h1:J3GYiuoaqLpjL/KmxOa/i5qwufSVUtow5UEVBdccaY8=
 github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.6.0 h1:HrZ1KAI40+gmkkwPBt6I9yqrqgfZx0JJGczw+wsMW0Q=
