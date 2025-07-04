@@ -59,6 +59,7 @@ steps:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/oblt-cli:latest"
     plugins:
       - *google_oidc_observability_plugin
+      - *vault_github_token
 
   - group: "fips:Stateful:Ubuntu"
     key: integration-tests-ubuntu-fips
@@ -141,6 +142,8 @@ steps:
     agents:
       # image: "docker.elastic.co/ci-agent-images/platform-ingest/oblt-cli:latest"
       image: "docker.elastic.co/observability-ci/oblt-cli:7.21.0"
+    plugins:
+      - *vault_github_token
 
   - label: Aggregate test reports
     depends_on:
