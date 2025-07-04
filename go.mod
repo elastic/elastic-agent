@@ -30,7 +30,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.1.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.4.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.15.0
-	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.6.0
+	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.7.0
 	github.com/fatih/color v1.18.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-viper/mapstructure/v2 v2.3.0
