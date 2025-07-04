@@ -38,6 +38,7 @@ import (
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	"github.com/magefile/mage/target"
+	"go.opentelemetry.io/otel"
 )
 
 const (
@@ -283,19 +284,25 @@ func DownloadFile(url, destinationDir string) (string, error) {
 }
 
 // Extract extracts .zip, .tar.gz, or .tgz files to destinationDir.
-func Extract(sourceFile, destinationDir string) error {
+func Extract(ctx context.Context, sourceFile, destinationDir string) error {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "Extract")
+	defer span.End()
+
 	ext := filepath.Ext(sourceFile)
 	switch {
 	case strings.HasSuffix(sourceFile, ".tar.gz"), ext == ".tgz":
-		return untar(sourceFile, destinationDir)
+		return untar(ctx, sourceFile, destinationDir)
 	case ext == ".zip":
-		return unzip(sourceFile, destinationDir)
+		return unzip(ctx, sourceFile, destinationDir)
 	default:
 		return fmt.Errorf("failed to extract %v, unhandled file extension", sourceFile)
 	}
 }
 
-func unzip(sourceFile, destinationDir string) error {
+func unzip(ctx context.Context, sourceFile, destinationDir string) error {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "unzip")
+	defer span.End()
+
 	r, err := zip.OpenReader(sourceFile)
 	if err != nil {
 		return err
@@ -426,7 +433,10 @@ func Tar(src string, targetFile string) error {
 	return nil
 }
 
-func untar(sourceFile, destinationDir string) error {
+func untar(ctx context.Context, sourceFile, destinationDir string) error {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "untar")
+	defer span.End()
+
 	file, err := os.Open(sourceFile)
 	if err != nil {
 		return err
@@ -559,6 +569,9 @@ func numParallel() int {
 // based on GOMAXPROCS. The provided ctx is passed to the functions (if they
 // accept it as a param).
 func ParallelCtx(ctx context.Context, fns ...interface{}) {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "ParallelCtx")
+	defer span.End()
+
 	fnWrappers := make([]func(context.Context) error, 0, len(fns))
 	for _, f := range fns {
 		fnWrapper := funcTypeWrap(f)
@@ -621,6 +634,9 @@ func funcTypeWrap(fn interface{}) func(context.Context) error {
 		}
 	case func(context.Context):
 		return func(ctx context.Context) error {
+			ctx, span := otel.Tracer("my-service").Start(ctx, "anonymous")
+			defer span.End()
+
 			f(ctx)
 			return nil
 		}

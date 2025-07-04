@@ -5,6 +5,7 @@
 package mage
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -15,11 +16,15 @@ import (
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
+	"go.opentelemetry.io/otel"
 )
 
 // Package packages the Beat for distribution. It generates packages based on
 // the set of target platforms and registered packaging specifications.
-func Package() error {
+func Package(ctx context.Context) error {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "Package")
+	defer span.End()
+
 	fmt.Println("--- Package artifact")
 	if len(Platforms) == 0 {
 		fmt.Println(">> package: Skipping because the platform list is empty")
@@ -125,7 +130,7 @@ func Package() error {
 
 	for k, v := range tasks {
 		fmt.Printf(">> package: Building %s\n", k)
-		Parallel(v...)
+		ParallelCtx(ctx, v...)
 	}
 	return nil
 }
@@ -166,10 +171,13 @@ type packageBuilder struct {
 	Type     PackageType
 }
 
-func (b packageBuilder) Build() error {
+func (b packageBuilder) Build(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "packageBuilder.Build")
+	defer span.End()
+
 	fmt.Printf(">> package: Building %v type=%v for platform=%v fips=%v\n", b.Spec.Name, b.Type, b.Platform.Name, b.Spec.FIPS)
 	log.Printf("Package spec: %+v", b.Spec)
-	if err := b.Type.Build(b.Spec); err != nil {
+	if err := b.Type.Build(ctx, b.Spec); err != nil {
 		return fmt.Errorf("failed building %v type=%v for platform=%v fips=%v : %w",
 			b.Spec.Name, b.Type, b.Platform.Name, b.Spec.FIPS, err)
 	}

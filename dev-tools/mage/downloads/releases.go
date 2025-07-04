@@ -14,11 +14,12 @@ import (
 
 	"github.com/Jeffail/gabs/v2"
 	"github.com/cenkalti/backoff/v4"
+	"go.opentelemetry.io/otel"
 )
 
 // DownloadURLResolver interface to resolve URLs for downloadable artifacts
 type DownloadURLResolver interface {
-	Resolve() (url string, shaURL string, err error)
+	Resolve(ctx context.Context) (url string, shaURL string, err error)
 	Kind() string
 }
 
@@ -44,8 +45,11 @@ func (r *ArtifactURLResolver) Kind() string {
 
 // Resolve returns the URL of a released artifact, which its full name is defined in the first argument,
 // from Elastic's artifact repository, building the JSON path query based on the full name
-func (r *ArtifactURLResolver) Resolve() (string, string, error) {
-	resolvedVersion, err := GetElasticArtifactVersion(r.Version)
+func (r *ArtifactURLResolver) Resolve(ctx context.Context) (string, string, error) {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "ArtifactURLResolver.Resolve")
+	defer span.End()
+
+	resolvedVersion, err := GetElasticArtifactVersion(ctx, r.Version)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to get version %s: %w", r.Version, err)
 	}
@@ -67,7 +71,7 @@ func (r *ArtifactURLResolver) Resolve() (string, string, error) {
 	tmpVersion := version
 	hasCommit := SnapshotHasCommit(version)
 	if hasCommit {
-		logger.Log(context.Background(), TraceLevel, "Removing SNAPSHOT from version including commit",
+		logger.Log(ctx, TraceLevel, "Removing SNAPSHOT from version including commit",
 			slog.String("resolver", r.Kind()),
 			slog.String("version", version),
 		)
@@ -79,7 +83,8 @@ func (r *ArtifactURLResolver) Resolve() (string, string, error) {
 	apiStatus := func() error {
 		url := fmt.Sprintf("https://artifacts-api.elastic.co/v1/search/%s/%s?x-elastic-no-kpi=true", tmpVersion, artifact)
 		req := httpRequest{
-			URL: url,
+			URL:     url,
+			Context: ctx,
 		}
 		bodyStr, err := get(req)
 		if err != nil {
@@ -125,7 +130,7 @@ func (r *ArtifactURLResolver) Resolve() (string, string, error) {
 		return "", "", err
 	}
 
-	logger.Log(context.Background(), TraceLevel, "Resolver succeeded",
+	logger.Log(ctx, TraceLevel, "Resolver succeeded",
 		slog.String("resolver", r.Kind()),
 		slog.Int("retries", retryCount),
 		slog.String("artifact", artifact),
@@ -178,7 +183,10 @@ func newArtifactsSnapshotCustom(host string) *ArtifactsSnapshotVersion {
 // 1. Elastic's artifact repository, building the JSON path query based
 // If the version is a SNAPSHOT including a commit, then it will directly use the version without checking the artifacts API
 // i.e. GetSnapshotArtifactVersion("$VERSION-abcdef-SNAPSHOT")
-func (as *ArtifactsSnapshotVersion) GetSnapshotArtifactVersion(project string, version string) (string, error) {
+func (as *ArtifactsSnapshotVersion) GetSnapshotArtifactVersion(ctx context.Context, project string, version string) (string, error) {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "ArtifactsSnapshotVersion.GetSnapshotArtifactVersion")
+	defer span.End()
+
 	cacheKey := fmt.Sprintf("%s/%s/latest/%s.json", as.Host, project, version)
 
 	elasticVersionsMutex.RLock()
@@ -208,7 +216,8 @@ func (as *ArtifactsSnapshotVersion) GetSnapshotArtifactVersion(project string, v
 	apiStatus := func() error {
 		url := cacheKey
 		r := httpRequest{
-			URL: url,
+			URL:     url,
+			Context: ctx,
 		}
 		bodyStr, err := get(r)
 		if err != nil {
@@ -275,14 +284,20 @@ func (as *ArtifactsSnapshotVersion) GetSnapshotArtifactVersion(project string, v
 }
 
 // NewArtifactSnapshotURLResolver creates a new resolver for artifacts that are currently in development, from the artifacts API
-func NewArtifactSnapshotURLResolver(fullName string, name string, project string, version string) DownloadURLResolver {
-	return newCustomSnapshotURLResolver(fullName, name, project, version, "https://artifacts-snapshot.elastic.co")
+func NewArtifactSnapshotURLResolver(ctx context.Context, fullName string, name string, project string, version string) DownloadURLResolver {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "NewArtifactSnapshotURLResolver")
+	defer span.End()
+
+	return newCustomSnapshotURLResolver(ctx, fullName, name, project, version, "https://artifacts-snapshot.elastic.co")
 }
 
 // For testing purposes
-func newCustomSnapshotURLResolver(fullName string, name string, project string, version string, host string) DownloadURLResolver {
+func newCustomSnapshotURLResolver(ctx context.Context, fullName string, name string, project string, version string, host string) DownloadURLResolver {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "newCustomSnapshotURLResolver")
+	defer span.End()
+
 	// resolve version alias
-	resolvedVersion, err := newArtifactsSnapshotCustom(host).GetSnapshotArtifactVersion(project, version)
+	resolvedVersion, err := newArtifactsSnapshotCustom(host).GetSnapshotArtifactVersion(ctx, project, version)
 	if err != nil {
 		return nil
 	}
@@ -309,7 +324,10 @@ func (asur *ArtifactsSnapshotURLResolver) Kind() string {
 	return fmt.Sprintf("Project snapshot resolver: %s", asur.FullName)
 }
 
-func (asur *ArtifactsSnapshotURLResolver) Resolve() (string, string, error) {
+func (asur *ArtifactsSnapshotURLResolver) Resolve(ctx context.Context) (string, string, error) {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "ArtifactsSnapshotURLResolver.Resolve")
+	defer span.End()
+
 	artifactName := asur.FullName
 	artifact := asur.Name
 	version := asur.Version
@@ -334,7 +352,7 @@ func (asur *ArtifactsSnapshotURLResolver) Resolve() (string, string, error) {
 	apiStatus := func() error {
 		// https://artifacts-snapshot.elastic.co/beats/8.9.0-d1b14479/manifest-8.9.0-SNAPSHOT.json
 		url := fmt.Sprintf("%s/%s/%s-%s/manifest-%s-SNAPSHOT.json", asur.SnapshotApiHost, asur.Project, semVer, commit, semVer)
-		r := httpRequest{URL: url}
+		r := httpRequest{URL: url, Context: ctx}
 		bodyStr, err := get(r)
 		if err != nil {
 			logger.Warn("resolver failed",
@@ -439,7 +457,10 @@ func (r *ReleaseURLResolver) Kind() string {
 
 // Resolve resolves the URL of a download, which is located in the Elastic. It will use a HEAD request
 // and if it returns a 200 OK it will return the URL of both file and its SHA512 file
-func (r *ReleaseURLResolver) Resolve() (string, string, error) {
+func (r *ReleaseURLResolver) Resolve(ctx context.Context) (string, string, error) {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "ReleaseURLResolver.Resolve")
+	defer span.End()
+
 	url := fmt.Sprintf("https://artifacts.elastic.co/downloads/%s/%s/%s", r.Project, r.Name, r.FullName)
 	shaURL := fmt.Sprintf("%s.sha512", url)
 
@@ -448,9 +469,12 @@ func (r *ReleaseURLResolver) Resolve() (string, string, error) {
 	found := false
 
 	apiStatus := func() error {
-		req := httpRequest{URL: url}
+		req := httpRequest{URL: url, Context: ctx}
 		bodyStr, err := head(req)
 		if err != nil {
+			if strings.Contains(err.Error(), "404") {
+				return backoff.Permanent(err)
+			}
 			logger.Debug("Resolver failed",
 				slog.String("kind", r.Kind()),
 				slog.String("error", err.Error()),

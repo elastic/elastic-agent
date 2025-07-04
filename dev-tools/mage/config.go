@@ -6,6 +6,7 @@ package mage
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 	"text/template"
 
 	"github.com/magefile/mage/mg"
+	"go.opentelemetry.io/otel"
 )
 
 // ConfigFileType is a bitset that indicates what types of config files to
@@ -53,7 +55,10 @@ type ConfigParams struct {
 
 // Config generates config files. Set DEV_OS and DEV_ARCH to change the target
 // host for the generated configs. Defaults to linux/amd64.
-func Config(types ConfigFileType, args ConfigFileParams, targetDir string) error {
+func Config(ctx context.Context, types ConfigFileType, args ConfigFileParams, targetDir string) error {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "Config")
+	defer span.End()
+
 	// Short
 	if types.IsShort() {
 		file := filepath.Join(targetDir, BeatName+".yml")

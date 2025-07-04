@@ -10,6 +10,8 @@ package main
 import (
 	"context"
 
+	"go.opentelemetry.io/otel"
+
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 
 	// mage:import
@@ -26,5 +28,8 @@ func init() {
 // Use TEST_COVERAGE=true to enable code coverage profiling.
 // Use RACE_DETECTOR=true to enable the race detector.
 func GoUnitTest(ctx context.Context) {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "GoUnitTest")
+	defer span.End()
+
 	devtools.GoTest(ctx, devtools.DefaultGoTestUnitArgs())
 }

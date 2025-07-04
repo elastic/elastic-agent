@@ -18,9 +18,13 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/Jeffail/gabs/v2"
 	"github.com/cenkalti/backoff/v4"
 	"go.elastic.co/apm/v2"
+	"go.opentelemetry.io/otel"
 )
 
 // BeatsLocalPath is the path to a local copy of the Beats git repository
@@ -71,7 +75,7 @@ type elasticVersion struct {
 func newElasticVersion(version string) *elasticVersion {
 	aliasMatch := versionAliasRegex.FindStringSubmatch(version)
 	if aliasMatch != nil {
-		v, err := GetElasticArtifactVersion(version)
+		v, err := GetElasticArtifactVersion(context.Background(), version)
 		if err != nil {
 			logger.Error("Failed to get version",
 				slog.String("error", err.Error()),
@@ -107,6 +111,9 @@ func CheckPRVersion(version string, fallbackVersion string) string {
 
 // FetchElasticArtifact fetches an artifact from the right repository, returning binary name, path and error
 func FetchElasticArtifact(ctx context.Context, artifact string, version string, os string, arch string, extension string, isDocker bool, xpack bool) (string, string, error) {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "FetchElasticArtifact")
+	defer span.End()
+
 	useCISnapshots := GithubCommitSha1 != ""
 
 	return FetchElasticArtifactForSnapshots(ctx, useCISnapshots, artifact, version, os, arch, extension, isDocker, xpack)
@@ -114,6 +121,9 @@ func FetchElasticArtifact(ctx context.Context, artifact string, version string, 
 
 // FetchElasticArtifactForSnapshots fetches an artifact from the right repository, returning binary name, path and error
 func FetchElasticArtifactForSnapshots(ctx context.Context, useCISnapshots bool, artifact string, version string, os string, arch string, extension string, isDocker bool, xpack bool) (string, string, error) {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "FetchElasticArtifactForSnapshots")
+	defer span.End()
+
 	binaryName := buildArtifactName(artifact, version, os, arch, extension, isDocker)
 	binaryPath, err := FetchProjectBinaryForSnapshots(ctx, useCISnapshots, artifact, binaryName, artifact, version, timeoutFactor, xpack, "", false)
 	if err != nil {
@@ -142,19 +152,25 @@ func GetCommitVersion(version string) string {
 // i.e. GetElasticArtifactURL("elastic-agent-$VERSION-$ARCH.deb", "elastic-agent", "$VERSION")
 // i.e. GetElasticArtifactURL("elastic-agent-$VERSION-x86_64.rpm", "elastic-agent","$VERSION")
 // i.e. GetElasticArtifactURL("elastic-agent-$VERSION-linux-$ARCH.tar.gz", "elastic-agent","$VERSION")
-func GetElasticArtifactURL(artifactName string, artifact string, version string) (string, string, error) {
+func GetElasticArtifactURL(ctx context.Context, artifactName string, artifact string, version string) (string, string, error) {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "GetElasticArtifactURL")
+	defer span.End()
+
 	resolver := NewArtifactURLResolver(artifactName, artifact, version)
 	if resolver == nil {
 		return "", "", errors.New("nil resolver returned")
 	}
-	return resolver.Resolve()
+	return resolver.Resolve(ctx)
 }
 
 // GetElasticArtifactVersion returns the current version:
 // 1. Elastic's artifact repository, building the JSON path query based
 // If the version is a SNAPSHOT including a commit, then it will directly use the version without checking the artifacts API
 // i.e. GetElasticArtifactVersion("$VERSION-abcdef-SNAPSHOT")
-func GetElasticArtifactVersion(version string) (string, error) {
+func GetElasticArtifactVersion(ctx context.Context, version string) (string, error) {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "GetElasticArtifactVersion")
+	defer span.End()
+
 	cacheKey := fmt.Sprintf("https://artifacts-api.elastic.co/v1/versions/%s/?x-elastic-no-kpi=true", version)
 
 	elasticVersionsMutex.RLock()
@@ -181,7 +197,7 @@ func GetElasticArtifactVersion(version string) (string, error) {
 
 	apiStatus := func() error {
 		url := cacheKey
-		r := httpRequest{URL: url}
+		r := httpRequest{URL: url, Context: ctx}
 		bodyStr, err := get(r)
 		if err != nil {
 			return fmt.Errorf("error getting %s: %w", url, err)
@@ -329,6 +345,9 @@ func buildArtifactName(artifact string, artifactVersion string, OS string, arch 
 // Else, if the environment variable GITHUB_CHECK_SHA1 is set, then the artifact
 // to be downloaded will be defined by the snapshot produced by the Beats CI for that commit.
 func FetchBeatsBinary(ctx context.Context, artifactName string, artifact string, version string, timeoutFactor int, xpack bool, downloadPath string, downloadSHAFile bool) (string, error) {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "FetchBeatsBinary")
+	defer span.End()
+
 	return FetchProjectBinary(ctx, "beats", artifactName, artifact, version, timeoutFactor, xpack, downloadPath, downloadSHAFile)
 }
 
@@ -338,6 +357,9 @@ func FetchBeatsBinary(ctx context.Context, artifactName string, artifact string,
 // Else, if the environment variable GITHUB_CHECK_SHA1 is set, then the artifact
 // to be downloaded will be defined by the snapshot produced by the Beats CI for that commit.
 func FetchProjectBinary(ctx context.Context, project string, artifactName string, artifact string, version string, timeoutFactor int, xpack bool, downloadPath string, downloadSHAFile bool) (string, error) {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "FetchProjectBinary")
+	defer span.End()
+
 	useCISnapshots := GithubCommitSha1 != ""
 
 	return FetchProjectBinaryForSnapshots(ctx, useCISnapshots, project, artifactName, artifact, version, timeoutFactor, xpack, downloadPath, downloadSHAFile)
@@ -348,21 +370,28 @@ func FetchProjectBinary(ctx context.Context, project string, artifactName string
 // Else, if the useCISnapshots argument is set to true, then the artifact
 // to be downloaded will be defined by the snapshot produced by the Beats CI or Fleet CI for that commit.
 func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, project string, artifactName string, artifact string, version string, timeoutFactor int, xpack bool, downloadPath string, downloadSHAFile bool) (string, error) {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "FetchProjectBinaryForSnapshots")
+	defer span.End()
+
 	if BeatsLocalPath != "" {
 		return "", fmt.Errorf("⚠️ Beats local path usage is deprecated and not used to fetch the binaries. Please use the packaging job to generate the artifacts to be consumed by these tests")
 	}
 
-	handleDownload := func(URL string) (string, error) {
+	handleDownload := func(ctx context.Context, URL string) (string, error) {
+		ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "anonymous",
+			trace.WithAttributes(
+				attribute.KeyValue{
+					Key:   "project",
+					Value: attribute.StringValue(project),
+				},
+			))
+		defer span.End()
+
 		name := artifactName
 		downloadRequest := downloadRequest{
 			DownloadPath: downloadPath,
 			URL:          URL,
 		}
-		span, _ := apm.StartSpanOptions(ctx, "Fetching Project binary", "project.url.fetch-binary", apm.SpanOptions{
-			Parent: apm.SpanFromContext(ctx).TraceContext(),
-		})
-		span.Context.SetLabel("project", project)
-		defer span.End()
 
 		binariesMutex.RLock()
 		val, ok := binariesCache[URL]
@@ -375,7 +404,7 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 			return val, nil
 		}
 
-		err := downloadFile(&downloadRequest)
+		err := downloadFile(ctx, &downloadRequest)
 		if err != nil {
 			return downloadRequest.UnsanitizedFilePath, err
 		}
@@ -430,11 +459,11 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 			NewBeatsLegacyURLResolver(artifact, artifactName, variant),
 		}
 
-		downloadURL, err = getObjectURLFromResolvers(resolvers, maxTimeout)
+		downloadURL, err = getObjectURLFromResolvers(ctx, resolvers, maxTimeout)
 		if err != nil {
 			return "", err
 		}
-		downloadLocation, err := handleDownload(downloadURL)
+		downloadLocation, err := handleDownload(ctx, downloadURL)
 
 		// check if sha file should be downloaded, else return
 		if !downloadSHAFile {
@@ -450,11 +479,11 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 			NewBeatsLegacyURLResolver(artifact, sha512ArtifactName, variant),
 		}
 
-		downloadURL, err = getObjectURLFromResolvers(sha512Resolvers, maxTimeout)
+		downloadURL, err = getObjectURLFromResolvers(ctx, sha512Resolvers, maxTimeout)
 		if err != nil {
 			return "", err
 		}
-		return handleDownload(downloadURL)
+		return handleDownload(ctx, downloadURL)
 	}
 
 	elasticAgentNamespace := project
@@ -466,19 +495,19 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 	downloadURLResolvers := []DownloadURLResolver{
 		NewReleaseURLResolver(elasticAgentNamespace, artifactName, artifact),
 		NewArtifactURLResolver(artifactName, artifact, version),
-		NewArtifactSnapshotURLResolver(artifactName, artifact, project, version),
+		NewArtifactSnapshotURLResolver(ctx, artifactName, artifact, project, version),
 	}
-	downloadURL, downloadShaURL, err = getDownloadURLFromResolvers(downloadURLResolvers)
+	downloadURL, downloadShaURL, err = getDownloadURLFromResolvers(ctx, downloadURLResolvers)
 	if err != nil {
 		return "", err
 	}
 	fmt.Printf("Downloading from %s\n", downloadURL)
-	downloadLocation, err := handleDownload(downloadURL)
+	downloadLocation, err := handleDownload(ctx, downloadURL)
 	if err != nil {
 		return "", err
 	}
 	if downloadSHAFile && downloadShaURL != "" {
-		downloadLocation, err = handleDownload(downloadShaURL)
+		downloadLocation, err = handleDownload(ctx, downloadShaURL)
 	}
 	return downloadLocation, err
 }
@@ -494,7 +523,10 @@ func getBucketSearchNextPageParam(jsonParsed *gabs.Container) string {
 }
 
 // getDownloadURLFromResolvers returns the URL for the desired artifacts
-func getDownloadURLFromResolvers(resolvers []DownloadURLResolver) (string, string, error) {
+func getDownloadURLFromResolvers(ctx context.Context, resolvers []DownloadURLResolver) (string, string, error) {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "getDownloadURLFromResolvers")
+	defer span.End()
+
 	for i, resolver := range resolvers {
 		if resolver == nil {
 			continue
@@ -503,7 +535,7 @@ func getDownloadURLFromResolvers(resolvers []DownloadURLResolver) (string, strin
 		attr := slog.String("kind", resolver.Kind())
 
 		logger.Info("Trying resolver.", attr)
-		url, shaURL, err := resolver.Resolve()
+		url, shaURL, err := resolver.Resolve(ctx)
 		if err != nil {
 			if i < len(resolvers)-1 {
 				logger.Warn("Object not found.", attr)
@@ -522,11 +554,14 @@ func getDownloadURLFromResolvers(resolvers []DownloadURLResolver) (string, strin
 
 // getObjectURLFromResolvers extracts the media URL for the desired artifact from the
 // Google Cloud Storage bucket used by the CI to push snapshots
-func getObjectURLFromResolvers(resolvers []BucketURLResolver, maxtimeout time.Duration) (string, error) {
+func getObjectURLFromResolvers(ctx context.Context, resolvers []BucketURLResolver, maxtimeout time.Duration) (string, error) {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "getObjectURLFromResolvers")
+	defer span.End()
+
 	for i, resolver := range resolvers {
 		bucket, prefix, object := resolver.Resolve()
 
-		downloadURL, err := getObjectURLFromBucket(bucket, prefix, object, maxtimeout)
+		downloadURL, err := getObjectURLFromBucket(ctx, bucket, prefix, object, maxtimeout)
 		if err != nil {
 			if i < len(resolvers)-1 {
 				logger.Warn("Object not found. Trying with another artifact resolver", slog.String("resolver", fmt.Sprintf("%T", resolver)))
@@ -545,7 +580,10 @@ func getObjectURLFromResolvers(resolvers []BucketURLResolver, maxtimeout time.Du
 
 // getObjectURLFromBucket extracts the media URL for the desired artifact from the
 // Google Cloud Storage bucket used by the CI to push snapshots
-func getObjectURLFromBucket(bucket string, prefix string, object string, maxtimeout time.Duration) (string, error) {
+func getObjectURLFromBucket(ctx context.Context, bucket string, prefix string, object string, maxtimeout time.Duration) (string, error) {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "getObjectURLFromBucket")
+	defer span.End()
+
 	exp := getExponentialBackoff(maxtimeout)
 
 	retryCount := 1
@@ -556,7 +594,8 @@ func getObjectURLFromBucket(bucket string, prefix string, object string, maxtime
 
 	storageAPI := func() error {
 		r := httpRequest{
-			URL: fmt.Sprintf("https://storage.googleapis.com/storage/v1/b/%s/o?prefix=%s%s", bucket, prefix, pageTokenQueryParam),
+			URL:     fmt.Sprintf("https://storage.googleapis.com/storage/v1/b/%s/o?prefix=%s%s", bucket, prefix, pageTokenQueryParam),
+			Context: ctx,
 		}
 
 		response, err := get(r)

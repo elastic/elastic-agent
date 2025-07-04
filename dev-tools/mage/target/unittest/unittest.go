@@ -8,6 +8,7 @@ import (
 	"context"
 
 	"github.com/magefile/mage/mg"
+	"go.opentelemetry.io/otel"
 
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
@@ -35,6 +36,9 @@ func UnitTest() {
 // Use TEST_COVERAGE=true to enable code coverage profiling.
 // Use RACE_DETECTOR=true to enable the race detector.
 func GoUnitTest(ctx context.Context) error {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "GoUnitTest")
+	defer span.End()
+
 	mg.SerialCtxDeps(ctx, goTestDeps...)
 	return devtools.GoTest(ctx, devtools.DefaultGoTestUnitArgs())
 }

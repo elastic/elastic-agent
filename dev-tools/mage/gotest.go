@@ -19,6 +19,7 @@ import (
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
+	"go.opentelemetry.io/otel"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 )
@@ -130,6 +131,9 @@ func DefaultTestBinaryArgs() TestBinaryArgs {
 // Use RACE_DETECTOR=true to enable the race detector.
 // Use MODULE=module to run only tests for `module`.
 func GoTestIntegrationForModule(ctx context.Context) error {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "GoTestIntegrationForModule")
+	defer span.End()
+
 	module := EnvOr("MODULE", "")
 	modulesDirEntry, err := os.ReadDir("./module")
 	if err != nil {
@@ -183,6 +187,9 @@ func InstallGoTestTools() error {
 }
 
 func GoTestBuild(ctx context.Context, params GoTestArgs) error {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "GoTestBuild")
+	defer span.End()
+
 	if params.OutputFile == "" {
 		return fmt.Errorf("missing output file")
 	}
@@ -213,6 +220,9 @@ func GoTestBuild(ctx context.Context, params GoTestArgs) error {
 // error if there was any failure executing the tests or if there were any
 // test failures.
 func GoTest(ctx context.Context, params GoTestArgs) error {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "GoTest")
+	defer span.End()
+
 	mg.Deps(InstallGoTestTools)
 
 	fmt.Println(">> go test:", params.LogName, "Testing")
@@ -356,6 +366,9 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 }
 
 func makeCommand(ctx context.Context, env map[string]string, cmd string, args ...string) *exec.Cmd {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "makeCommand")
+	defer span.End()
+
 	c := exec.CommandContext(ctx, cmd, args...)
 	c.Env = os.Environ()
 	for k, v := range env {

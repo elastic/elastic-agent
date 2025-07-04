@@ -6,11 +6,13 @@ package mage
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 
+	"go.opentelemetry.io/otel"
 	"gopkg.in/yaml.v2"
 )
 
@@ -34,7 +36,10 @@ func UseCommunityBeatPackaging() {
 
 // UseElasticAgentPackaging configures the package target to build packages for
 // an Elastic Agent.
-func UseElasticAgentPackaging() {
+func UseElasticAgentPackaging(ctx context.Context) {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "UseElasticAgentPackaging")
+	defer span.End()
+
 	// Prepare binaries so they can be packed into agent
 	MustUsePackaging("elastic_beat_agent_binaries", packageSpecFile)
 }

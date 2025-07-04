@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/magefile/mage/mg"
+	"go.opentelemetry.io/otel"
 )
 
 func doWithRetries[T any](f func() (T, error)) (T, error) {
@@ -37,6 +38,9 @@ func doWithRetries[T any](f func() (T, error)) (T, error) {
 }
 
 func downloadFile(ctx context.Context, url string, filepath string) (string, error) {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "downloadFile")
+	defer span.End()
+
 	outFile, fileErr := os.Create(filepath)
 	if fileErr != nil {
 		return "", fmt.Errorf("failed to create destination file %w", fileErr)
@@ -74,6 +78,9 @@ func downloadFile(ctx context.Context, url string, filepath string) (string, err
 }
 
 func downloadManifestData(ctx context.Context, url string) (Build, error) {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "downloadManifestData")
+	defer span.End()
+
 	var response Build
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
