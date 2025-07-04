@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
 
 	"go.elastic.co/apm/v2"
@@ -163,6 +164,11 @@ func logReturn(l *logger.Logger, err error) error {
 }
 
 func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override application.CfgOverrider, stop chan bool, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
+	err := coordinator.RestoreConfig()
+	if err != nil {
+		return err
+	}
+
 	cfg, err := loadConfig(ctx, override)
 	if err != nil {
 		return err
@@ -199,13 +205,9 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override ap
 	if err != nil {
 		return logReturn(l, errors.New(err, "failed to perform delayed enrollment"))
 	}
-	pathConfigFile := paths.AgentConfigFile()
 
 	// agent ID needs to stay empty in bootstrap mode
-	createAgentID := true
-	if cfg.Fleet != nil && cfg.Fleet.Server != nil && cfg.Fleet.Server.Bootstrap {
-		createAgentID = false
-	}
+	createAgentID := cfg.Fleet == nil || cfg.Fleet.Server == nil || cfg.Fleet.Server.Bootstrap
 
 	// Ensure we have the agent secret created.
 	// The secret is not created here if it exists already from the previous enrollment.
@@ -237,7 +239,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override ap
 		return logReturn(l, errors.New(err,
 			"could not load agent info",
 			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, pathConfigFile)))
+			errors.M(errors.MetaKeyPath, paths.AgentConfigFile())))
 	}
 
 	// Ensure that the log level now matches what is configured in the agentInfo.
@@ -517,7 +519,7 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 			errors.TypeFilesystem,
 			errors.M("path", enrollPath))
 	}
-	var options enrollCmdOption
+	var options enroll.EnrollOptions
 	err = yaml.Unmarshal(contents, &options)
 	if err != nil {
 		return nil, errors.New(
@@ -539,7 +541,7 @@ func tryDelayEnroll(ctx context.Context, logger *logger.Logger, cfg *configurati
 	}
 	store := storage.NewReplaceOnSuccessStore(
 		pathConfigFile,
-		application.DefaultAgentFleetConfig,
+		info.DefaultAgentFleetConfig,
 		encStore,
 	)
 	c, err := newEnrollCmd(
