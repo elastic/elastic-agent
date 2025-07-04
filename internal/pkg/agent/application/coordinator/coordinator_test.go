@@ -1078,9 +1078,8 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 	cfg.Port = 0
 	rm, err := runtime.NewManager(l, l, ai, apmtest.DiscardTracer, monitoringMgr, cfg)
 	require.NoError(t, err)
-	otelMgr, err := otelmanager.NewOTelManager(l, logp.InfoLevel, l, otelmanager.EmbeddedExecutionMode)
+	otelMgr, err := otelmanager.NewOTelManager(l, logp.InfoLevel, l, otelmanager.EmbeddedExecutionMode, ai, monitoringMgr.ComponentMonitoringConfig)
 	require.NoError(t, err)
-
 	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), l)
 	require.NoError(t, err)
 
@@ -1339,11 +1338,14 @@ func (f *fakeVarsManager) DefaultProvider() string {
 	return ""
 }
 
+var _ OTelManager = (*fakeOTelManager)(nil)
+
 type fakeOTelManager struct {
-	updateCallback func(*confmap.Conf) error
-	result         error
-	errChan        chan error
-	statusChan     chan *status.AggregateStatus
+	updateCollectorCallback func(*confmap.Conf) error
+	updateComponentCallback func(component.Model) error
+	errChan                 chan error
+	collectorStatusChan     chan *status.AggregateStatus
+	componentStateChan      chan runtime.ComponentComponentState
 }
 
 func (f *fakeOTelManager) Run(ctx context.Context) error {
@@ -1352,23 +1354,40 @@ func (f *fakeOTelManager) Run(ctx context.Context) error {
 }
 
 func (f *fakeOTelManager) Errors() <-chan error {
-	return nil
+	return f.errChan
 }
 
-func (f *fakeOTelManager) Update(cfg *confmap.Conf) {
-	f.result = nil
-	if f.updateCallback != nil {
-		f.result = f.updateCallback(cfg)
+func (f *fakeOTelManager) UpdateCollector(cfg *confmap.Conf) {
+	var result error
+	if f.updateCollectorCallback != nil {
+		result = f.updateCollectorCallback(cfg)
 	}
-	if f.errChan != nil {
+	if f.errChan != nil && result != nil {
 		// If a reporting channel is set, send the result to it
-		f.errChan <- f.result
+		f.errChan <- result
 	}
 }
 
-func (f *fakeOTelManager) Watch() <-chan *status.AggregateStatus {
-	return f.statusChan
+func (f *fakeOTelManager) WatchCollector() <-chan *status.AggregateStatus {
+	return f.collectorStatusChan
 }
+
+func (f *fakeOTelManager) UpdateComponents(componentModel component.Model) {
+	var result error
+	if f.updateComponentCallback != nil {
+		result = f.updateComponentCallback(componentModel)
+	}
+	if f.errChan != nil && result != nil {
+		// If a reporting channel is set, send the result to it
+		f.errChan <- result
+	}
+}
+
+func (f *fakeOTelManager) WatchComponents() <-chan runtime.ComponentComponentState {
+	return f.componentStateChan
+}
+
+func (f *fakeOTelManager) MergedOtelConfig() *confmap.Conf { return nil }
 
 // An implementation of the RuntimeManager interface for use in testing.
 type fakeRuntimeManager struct {
