@@ -41,11 +41,18 @@ function ess_load_secrets() {
 
   # Get the cluster name from the meta-data
   CLUSTER_NAME="$(buildkite-agent meta-data get cluster-name)"
+
   # Load the ESS stack secrets
+  secrets_file="secrets.env.sh"
   # QUESTION: should we support the case when using the ESS stack in local environment?
-  oblt-cli cluster secrets env --cluster-name="${CLUSTER_NAME}" --output-file="secrets.env"
+  oblt-cli cluster secrets env --cluster-name="${CLUSTER_NAME}" --output-file="${secrets_file}"
 
   # Source the secrets file
-  source "secrets.env" || rm "secrets.env"
-  rm secrets.env || true
+  # shellcheck source=/dev/null
+  source "${secrets_file}" || rm "$secrets_file"
+  rm $secrets_file || true
+
+  # NOTE: only for debugging purposes
+  #       so we know they have been loaded
+  env | grep -E '^(ELASTICSEARCH|KIBANA|FLEET_SERVER|AGENT_POLICY_ID)' | cut -d= -f1
 }
