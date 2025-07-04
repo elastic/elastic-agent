@@ -44,8 +44,8 @@ func VarSkipKeys(keys ...string) Option {
 	}
 }
 
-// noResolveOptions don't do any resolve of variables.
-var noResolveOptions = []ucfg.Option{
+// NoResolveOptions don't do any resolve of variables.
+var NoResolveOptions = []ucfg.Option{
 	ucfg.PathSep("."),
 	ucfg.IgnoreCommas,
 	ucfg.ResolveNOOP,
@@ -137,7 +137,7 @@ func NewConfigFrom(from interface{}, opts ...interface{}) (*Config, error) {
 		return nil, err
 	}
 	if len(skippedKeys) > 0 {
-		err = cfg.Merge(skippedKeys, noResolveOptions...)
+		err = cfg.Merge(skippedKeys, NoResolveOptions...)
 		if err != nil {
 			return nil, err
 		}
@@ -238,14 +238,14 @@ func (c *Config) ToMapStr(opts ...interface{}) (map[string]interface{}, error) {
 			var subUnpacked interface{}
 			if subCfg.IsDict() {
 				var subDict map[string]interface{}
-				err = subCfg.Unpack(&subDict, noResolveOptions...)
+				err = subCfg.Unpack(&subDict, NoResolveOptions...)
 				if err != nil {
 					return nil, fmt.Errorf("error unpacking subdict object in config for skip key %s: %w", skip, err)
 				}
 				subUnpacked = subDict
 			} else if subCfg.IsArray() {
 				var subArr []interface{}
-				err = subCfg.Unpack(&subArr, noResolveOptions...)
+				err = subCfg.Unpack(&subArr, NoResolveOptions...)
 				if err != nil {
 					return nil, fmt.Errorf("error unpacking subarray in config for skip key %s: %w ", skip, err)
 				}
@@ -273,7 +273,7 @@ func (c *Config) ToMapStr(opts ...interface{}) (map[string]interface{}, error) {
 		m[k] = v
 	}
 	if len(skippedKeysOrig) > 0 {
-		err := c.access().Merge(skippedKeysOrig, noResolveOptions...)
+		err := c.access().Merge(skippedKeysOrig, NoResolveOptions...)
 		if err != nil {
 			return nil, fmt.Errorf("error merging config with skipped key config: %w", err)
 		}
