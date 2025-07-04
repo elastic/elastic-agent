@@ -75,26 +75,75 @@ var (
 	}
 )
 
-type mockExecution struct {
+type testExecution struct {
 	mtx    sync.Mutex
 	exec   collectorExecution
 	handle collectorHandle
 }
 
-func (m *mockExecution) startCollector(ctx context.Context, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus) (collectorHandle, error) {
-	m.mtx.Lock()
-	defer m.mtx.Unlock()
+func (e *testExecution) startCollector(ctx context.Context, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus) (collectorHandle, error) {
+	e.mtx.Lock()
+	defer e.mtx.Unlock()
 
 	var err error
-	m.handle, err = m.exec.startCollector(ctx, logger, cfg, errCh, statusCh)
-	return m.handle, err
+	e.handle, err = e.exec.startCollector(ctx, logger, cfg, errCh, statusCh)
+	return e.handle, err
 }
 
-func (m *mockExecution) getProcessHandle() collectorHandle {
-	m.mtx.Lock()
-	defer m.mtx.Unlock()
+func (e *testExecution) getProcessHandle() collectorHandle {
+	e.mtx.Lock()
+	defer e.mtx.Unlock()
 
-	return m.handle
+	return e.handle
+}
+
+var _ collectorExecution = &mockExecution{}
+
+type mockExecution struct {
+	errCh            chan error
+	statusCh         chan *status.AggregateStatus
+	cfg              *confmap.Conf
+	collectorStarted chan struct{}
+}
+
+func (e *mockExecution) startCollector(
+	ctx context.Context,
+	_ *logger.Logger,
+	cfg *confmap.Conf,
+	errCh chan error,
+	statusCh chan *status.AggregateStatus,
+) (collectorHandle, error) {
+	e.errCh = errCh
+	e.statusCh = statusCh
+	e.cfg = cfg
+	stopCh := make(chan struct{})
+	collectorCtx, collectorCancel := context.WithCancel(ctx)
+	go func() {
+		<-collectorCtx.Done()
+		close(stopCh)
+		reportErr(ctx, errCh, nil)
+	}()
+	handle := &mockCollectorHandle{
+		stopCh: stopCh,
+		cancel: collectorCancel,
+	}
+	e.collectorStarted <- struct{}{}
+	return handle, nil
+}
+
+var _ collectorHandle = &mockCollectorHandle{}
+
+type mockCollectorHandle struct {
+	stopCh chan struct{}
+	cancel context.CancelFunc
+}
+
+func (h *mockCollectorHandle) Stop(ctx context.Context) {
+	h.cancel()
+	select {
+	case <-ctx.Done():
+	case <-h.stopCh:
+	}
 }
 
 // EventListener listens to the events from the OTelManager and stores the latest error and status.
@@ -225,16 +274,16 @@ func TestOTelManager_Run(t *testing.T) {
 
 	for _, tc := range []struct {
 		name                string
-		exec                *mockExecution
+		exec                *testExecution
 		restarter           collectorRecoveryTimer
 		skipListeningErrors bool
-		testFn              func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution)
+		testFn              func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution)
 	}{
 		{
 			name:      "embedded collector config updates",
-			exec:      &mockExecution{exec: newExecutionEmbedded()},
+			exec:      &testExecution{exec: newExecutionEmbedded()},
 			restarter: newRestarterNoop(),
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
@@ -255,9 +304,9 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name:      "subprocess collector config updates",
-			exec:      &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
+			exec:      &testExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
@@ -279,9 +328,9 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name:      "embedded collector stopped gracefully outside manager",
-			exec:      &mockExecution{exec: newExecutionEmbedded()},
+			exec:      &testExecution{exec: newExecutionEmbedded()},
 			restarter: newRestarterNoop(),
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
@@ -303,9 +352,9 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name:      "subprocess collector stopped gracefully outside manager",
-			exec:      &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
+			exec:      &testExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
@@ -328,9 +377,9 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name:      "subprocess collector killed outside manager",
-			exec:      &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
+			exec:      &testExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
@@ -367,9 +416,9 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name:      "subprocess collector panics",
-			exec:      &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
+			exec:      &testExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
 				err := os.Setenv("TEST_SUPERVISED_COLLECTOR_PANIC", (3 * time.Second).String())
 				require.NoError(t, err, "failed to set TEST_SUPERVISED_COLLECTOR_PANIC env var")
 				t.Cleanup(func() {
@@ -401,10 +450,10 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name:                "embedded collector invalid config",
-			exec:                &mockExecution{exec: newExecutionEmbedded()},
+			exec:                &testExecution{exec: newExecutionEmbedded()},
 			restarter:           newRestarterNoop(),
 			skipListeningErrors: true,
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
 				// Errors channel is non-blocking, should be able to send an Update that causes an error multiple
 				// times without it blocking on sending over the errCh.
 				for range 3 {
@@ -440,10 +489,10 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name:                "subprocess collector invalid config",
-			exec:                &mockExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
+			exec:                &testExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
 			restarter:           newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			skipListeningErrors: true,
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *mockExecution) {
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
 				// Errors channel is non-blocking, should be able to send an Update that causes an error multiple
 				// times without it blocking on sending over the errCh.
 				for range 3 {
@@ -1054,163 +1103,182 @@ func TestOTelManager_processComponentStates(t *testing.T) {
 
 // TestOTelManagerEndToEnd tests the full lifecycle of the OTelManager
 // including configuration updates, status updates, and error handling.
-//func TestOTelManagerEndToEnd(t *testing.T) {
-//	// Setup test logger and dependencies
-//	testLogger, _ := loggertest.New("test")
-//	agentInfo := &info.AgentInfo{}
-//	beatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
-//
-//	otelStatusChan := make(chan *status.AggregateStatus, 1)
-//	otelErrChan := make(chan error, 1)
-//	otelConfigChan := make(chan *confmap.Conf, 1)
-//	otelManager := &fakeOTelManager{
-//		updateCallback: func(cfg *confmap.Conf) error {
-//			otelConfigChan <- cfg
-//			return nil
-//		},
-//		statusChan: otelStatusChan,
-//		errChan:    otelErrChan,
-//	}
-//
-//	// Create manager with test dependencies
-//	mgr := OTelManager{
-//		logger:                 testLogger,
-//		otelManager:            otelManager,
-//		agentInfo:              agentInfo,
-//		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
-//		collectorStatusCh:      otelStatusChan,
-//		errCh:                  otelErrChan,
-//		collectorUpdateCh:      otelConfigChan,
-//	}
-//	require.NotNil(t, mgr)
-//
-//	// Start manager in a goroutine
-//	ctx, cancel := context.WithTimeout(context.Background(), time.Hour*1)
-//	defer cancel()
-//
-//	go func() {
-//		err := mgr.Run(ctx)
-//		assert.ErrorIs(t, err, context.Canceled)
-//	}()
-//
-//	collectorCfg := confmap.NewFromStringMap(map[string]interface{}{
-//		"receivers": map[string]interface{}{
-//			"nop": map[string]interface{}{},
-//		},
-//		"exporters": map[string]interface{}{"nop": map[string]interface{}{}},
-//		"service": map[string]interface{}{
-//			"pipelines": map[string]interface{}{
-//				"metrics": map[string]interface{}{
-//					"receivers": []string{"nop"},
-//					"exporters": []string{"nop"},
-//				},
-//			},
-//		},
-//	})
-//
-//	testComp := testComponent("test")
-//
-//	componentModel := component.Model{
-//		Components: []component.Component{
-//			testComp,
-//		},
-//	}
-//
-//	t.Run("collector config is passed down to the otel manager", func(t *testing.T) {
-//		mgr.UpdateCollector(collectorCfg)
-//		cfg, err := getFromChannelOrErrorWithContext(t, ctx, otelConfigChan, mgr.Errors())
-//		require.NoError(t, err)
-//		assert.Equal(t, collectorCfg, cfg)
-//	})
-//
-//	t.Run("collector status is passed up to the component manager", func(t *testing.T) {
-//		otelStatus := &status.AggregateStatus{
-//			Event: componentstatus.NewEvent(componentstatus.StatusOK),
-//		}
-//
-//		select {
-//		case <-ctx.Done():
-//			t.Fatal("timeout waiting for collector status update")
-//		case otelStatusChan <- otelStatus:
-//		}
-//
-//		collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
-//		require.NoError(t, err)
-//		assert.Equal(t, otelStatus, collectorStatus)
-//	})
-//
-//	t.Run("component config is passed down to the otel manager", func(t *testing.T) {
-//		mgr.UpdateComponents(componentModel)
-//		cfg, err := getFromChannelOrErrorWithContext(t, ctx, otelConfigChan, mgr.Errors())
-//		require.NoError(t, err)
-//		require.NotNil(t, cfg)
-//		receivers, err := cfg.Sub("receivers")
-//		require.NoError(t, err)
-//		require.NotNil(t, receivers)
-//		assert.True(t, receivers.IsSet("nop"))
-//		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test"))
-//	})
-//
-//	t.Run("empty collector config leaves the component config running", func(t *testing.T) {
-//		mgr.UpdateCollector(nil)
-//		cfg, err := getFromChannelOrErrorWithContext(t, ctx, otelConfigChan, mgr.Errors())
-//		require.NotNil(t, cfg)
-//		require.NoError(t, err)
-//		receivers, err := cfg.Sub("receivers")
-//		require.NoError(t, err)
-//		require.NotNil(t, receivers)
-//		assert.False(t, receivers.IsSet("nop"))
-//		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test"))
-//	})
-//
-//	t.Run("collector status with components is passed up to the component manager", func(t *testing.T) {
-//		otelStatus := &status.AggregateStatus{
-//			Event: componentstatus.NewEvent(componentstatus.StatusOK),
-//			ComponentStatusMap: map[string]*status.AggregateStatus{
-//				// This represents a pipeline for our component (with OtelNamePrefix)
-//				"pipeline:logs/_agent-component/test": {
-//					Event: componentstatus.NewEvent(componentstatus.StatusOK),
-//					ComponentStatusMap: map[string]*status.AggregateStatus{
-//						"receiver:filebeatreceiver/_agent-component/test": {
-//							Event: componentstatus.NewEvent(componentstatus.StatusOK),
-//						},
-//						"exporter:elasticsearch/_agent-component/test": {
-//							Event: componentstatus.NewEvent(componentstatus.StatusOK),
-//						},
-//					},
-//				},
-//			},
-//		}
-//
-//		select {
-//		case <-ctx.Done():
-//			t.Fatal("timeout waiting for collector status update")
-//		case otelStatusChan <- otelStatus:
-//		}
-//
-//		collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
-//		require.NoError(t, err)
-//		assert.Len(t, collectorStatus.ComponentStatusMap, 0)
-//
-//		componentState, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchComponents(), mgr.Errors())
-//		require.NoError(t, err)
-//		assert.Equal(t, componentState.Component, testComp)
-//	})
-//
-//	t.Run("collector error is passed up to the component manager", func(t *testing.T) {
-//		collectorErr := errors.New("collector error")
-//
-//		select {
-//		case <-ctx.Done():
-//			t.Fatal("timeout waiting for collector status update")
-//		case otelErrChan <- collectorErr:
-//		}
-//
-//		collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
-//		require.Nil(t, collectorStatus)
-//		assert.Equal(t, err, collectorErr)
-//	})
-//}
+func TestOTelManagerEndToEnd(t *testing.T) {
+	// Setup test logger and dependencies
+	testLogger, _ := loggertest.New("test")
+	agentInfo := &info.AgentInfo{}
+	beatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
+	collectorStarted := make(chan struct{})
+
+	execution := &mockExecution{
+		collectorStarted: collectorStarted,
+	}
+
+	// Create manager with test dependencies
+	mgr := OTelManager{
+		logger:                     testLogger,
+		baseLogger:                 testLogger,
+		errCh:                      make(chan error, 1), // holds at most one error
+		collectorUpdateCh:          make(chan *confmap.Conf),
+		componentUpdateCh:          make(chan component.Model),
+		collectorStatusCh:          make(chan *status.AggregateStatus, statusUpdateChannelSize),
+		componentStateCh:           make(chan runtime.ComponentComponentState, statusUpdateChannelSize),
+		doneChan:                   make(chan struct{}),
+		recoveryTimer:              newRestarterNoop(),
+		execution:                  execution,
+		agentInfo:                  agentInfo,
+		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
+	}
+
+	// Start manager in a goroutine
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*1)
+	defer cancel()
+
+	go func() {
+		err := mgr.Run(ctx)
+		assert.ErrorIs(t, err, context.Canceled)
+	}()
+
+	collectorCfg := confmap.NewFromStringMap(map[string]interface{}{
+		"receivers": map[string]interface{}{
+			"nop": map[string]interface{}{},
+		},
+		"exporters": map[string]interface{}{"nop": map[string]interface{}{}},
+		"service": map[string]interface{}{
+			"pipelines": map[string]interface{}{
+				"metrics": map[string]interface{}{
+					"receivers": []string{"nop"},
+					"exporters": []string{"nop"},
+				},
+			},
+		},
+	})
+
+	testComp := testComponent("test")
+
+	componentModel := component.Model{
+		Components: []component.Component{
+			testComp,
+		},
+	}
+
+	t.Run("collector config is passed down to the collector execution", func(t *testing.T) {
+		mgr.UpdateCollector(collectorCfg)
+		select {
+		case <-collectorStarted:
+		case <-ctx.Done():
+			t.Fatal("timeout waiting for collector config update")
+		}
+		assert.Equal(t, collectorCfg, execution.cfg)
+
+	})
+
+	t.Run("collector status is passed up to the component manager", func(t *testing.T) {
+		otelStatus := &status.AggregateStatus{
+			Event: componentstatus.NewEvent(componentstatus.StatusOK),
+		}
+
+		select {
+		case <-ctx.Done():
+			t.Fatal("timeout waiting for collector status update")
+		case execution.statusCh <- otelStatus:
+		}
+
+		collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
+		require.NoError(t, err)
+		assert.Equal(t, otelStatus, collectorStatus)
+	})
+
+	t.Run("component config is passed down to the otel manager", func(t *testing.T) {
+		mgr.UpdateComponents(componentModel)
+		select {
+		case <-collectorStarted:
+		case <-ctx.Done():
+			t.Fatal("timeout waiting for collector config update")
+		}
+		cfg := execution.cfg
+		require.NotNil(t, cfg)
+		receivers, err := cfg.Sub("receivers")
+		require.NoError(t, err)
+		require.NotNil(t, receivers)
+		assert.True(t, receivers.IsSet("nop"))
+		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test"))
+
+		collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
+		assert.Nil(t, err)
+		assert.Nil(t, collectorStatus)
+	})
+
+	t.Run("empty collector config leaves the component config running", func(t *testing.T) {
+		mgr.UpdateCollector(nil)
+		select {
+		case <-collectorStarted:
+		case <-ctx.Done():
+			t.Fatal("timeout waiting for collector config update")
+		}
+		cfg := execution.cfg
+		require.NotNil(t, cfg)
+		receivers, err := cfg.Sub("receivers")
+		require.NoError(t, err)
+		require.NotNil(t, receivers)
+		assert.False(t, receivers.IsSet("nop"))
+		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test"))
+
+		collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
+		assert.Nil(t, err)
+		assert.Nil(t, collectorStatus)
+	})
+
+	t.Run("collector status with components is passed up to the component manager", func(t *testing.T) {
+		otelStatus := &status.AggregateStatus{
+			Event: componentstatus.NewEvent(componentstatus.StatusOK),
+			ComponentStatusMap: map[string]*status.AggregateStatus{
+				// This represents a pipeline for our component (with OtelNamePrefix)
+				"pipeline:logs/_agent-component/test": {
+					Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					ComponentStatusMap: map[string]*status.AggregateStatus{
+						"receiver:filebeatreceiver/_agent-component/test": {
+							Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						},
+						"exporter:elasticsearch/_agent-component/test": {
+							Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						},
+					},
+				},
+			},
+		}
+
+		select {
+		case <-ctx.Done():
+			t.Fatal("timeout waiting for collector status update")
+		case execution.statusCh <- otelStatus:
+		}
+
+		collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
+		require.NoError(t, err)
+		require.NotNil(t, collectorStatus)
+		assert.Len(t, collectorStatus.ComponentStatusMap, 0)
+
+		componentState, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchComponents(), mgr.Errors())
+		require.NoError(t, err)
+		require.NotNil(t, componentState)
+		assert.Equal(t, componentState.Component, testComp)
+	})
+
+	t.Run("collector error is passed up to the component manager", func(t *testing.T) {
+		collectorErr := errors.New("collector error")
+
+		select {
+		case <-ctx.Done():
+			t.Fatal("timeout waiting for collector status update")
+		case execution.errCh <- collectorErr:
+		}
+
+		collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
+		require.Nil(t, collectorStatus)
+		assert.Equal(t, err, collectorErr)
+	})
+}
 
 func testComponent(componentId string) component.Component {
 	fileStreamConfig := map[string]any{
@@ -1275,21 +1343,21 @@ func testComponent(componentId string) component.Component {
 	}
 }
 
-//func getFromChannelOrErrorWithContext[T any](t *testing.T, ctx context.Context, ch <-chan T, errCh <-chan error) (T, error) {
-//	t.Helper()
-//	var result T
-//	var err error
-//	for err == nil {
-//		select {
-//		case result = <-ch:
-//			return result, nil
-//		case err = <-errCh:
-//		case <-ctx.Done():
-//			err = ctx.Err()
-//		}
-//	}
-//	return result, err
-//}
+func getFromChannelOrErrorWithContext[T any](t *testing.T, ctx context.Context, ch <-chan T, errCh <-chan error) (T, error) {
+	t.Helper()
+	var result T
+	var err error
+	for err == nil {
+		select {
+		case result = <-ch:
+			return result, nil
+		case err = <-errCh:
+		case <-ctx.Done():
+			err = ctx.Err()
+		}
+	}
+	return result, err
+}
 
 func assertOtelStatusesEqualIgnoringTimestamps(t require.TestingT, a, b *status.AggregateStatus) bool {
 	if a == nil || b == nil {
