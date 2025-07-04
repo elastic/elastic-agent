@@ -342,7 +342,7 @@ require (
 	github.com/elastic/lunes v0.1.0 // indirect
 	github.com/elastic/mito v1.21.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
-	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.6.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.7.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.18.0 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
 	github.com/elastic/sarama v1.19.1-0.20250603175145-7672917f26b6 // indirect
