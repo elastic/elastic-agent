@@ -4,7 +4,7 @@
 
 //go:build integration
 
-package integration
+package ess
 
 import (
 	"encoding/json"

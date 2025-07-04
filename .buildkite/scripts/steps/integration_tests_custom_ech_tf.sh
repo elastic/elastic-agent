@@ -16,9 +16,9 @@ OVERRIDE_STACK_VERSION=${OVERRIDE_STACK_VERSION}"-SNAPSHOT"
 echo "~~~ Building test binaries"
 mage build:testBinaries
 
-# Provision the ECH deployment
+# Remove deployment on exit
 trap 'ess_down' EXIT
-ess_up $OVERRIDE_STACK_VERSION || (echo -e "^^^ +++\nFailed to start ESS stack")
+
 preinstall_fleet_packages
 
 # Run integration tests
