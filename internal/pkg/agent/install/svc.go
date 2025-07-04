@@ -5,13 +5,19 @@
 package install
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 
 	"github.com/kardianos/service"
+	"gopkg.in/ini.v1"
+	"howett.net/plist"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
@@ -23,7 +29,35 @@ const (
 	// and the launchd sends SIGKILL after 5 secs which causes the beats processes to be left running orphaned
 	// depending on the shutdown timing.
 	darwinServiceExitTimeout = 60
+
+	SystemdUserNameKey  = "User"
+	SystemdGroupNameKey = "Group"
+
+	LaunchdUserNameKey  = "UserName"
+	LaunchdGroupNameKey = "GroupName"
 )
+
+var ErrChangeUserUnsupported = errors.New("ChangeUser is not supported on this system")
+
+// ChangeUser changes user in service definition file directly. In case username or groupName are not provided defaults are used.
+func ChangeUser(topPath string, ownership utils.FileOwner, username string, groupName string, password string) error {
+	serviceOptions, err := withServiceOptions(username, groupName, password)
+	if err != nil {
+		return fmt.Errorf("failed to create user info: %w", err)
+	}
+
+	opts := serviceOpts{
+		Username: username,
+		Group:    groupName,
+		Password: password,
+	}
+
+	for _, o := range serviceOptions {
+		o(&opts)
+	}
+
+	return changeUser(topPath, ownership, opts.Username, opts.Group, opts.Password)
+}
 
 // ExecutablePath returns the path for the installed Agents executable.
 func ExecutablePath(topPath string) string {
@@ -109,6 +143,96 @@ func newService(topPath string, opt ...serviceOpt) (service.Service, error) {
 	}
 
 	return service.New(nil, cfg)
+}
+
+func changeSystemdServiceFile(serviceName string, serviceFilePath string, username string, groupName string) error {
+	svcCfg, err := ini.Load(serviceFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to read service file %s: %w", serviceFilePath, err)
+	}
+
+	ini.PrettyFormat = false
+	serviceSection := svcCfg.Section("Service")
+	if username != "" {
+		if serviceSection.HasKey(SystemdUserNameKey) {
+			serviceSection.Key(SystemdUserNameKey).SetValue(username)
+		} else {
+			_, err := serviceSection.NewKey(SystemdUserNameKey, username)
+			if err != nil {
+				return fmt.Errorf("failed to update username: %w", err)
+			}
+		}
+	} else if serviceSection.HasKey(SystemdUserNameKey) {
+		serviceSection.DeleteKey(SystemdUserNameKey)
+	}
+
+	if groupName != "" {
+		if serviceSection.HasKey(SystemdGroupNameKey) {
+			serviceSection.Key(SystemdGroupNameKey).SetValue(groupName)
+		} else {
+			_, err := serviceSection.NewKey(SystemdGroupNameKey, groupName)
+			if err != nil {
+				return fmt.Errorf("failed to update groupName: %w", err)
+			}
+		}
+	} else if serviceSection.HasKey(SystemdGroupNameKey) {
+		serviceSection.DeleteKey(SystemdGroupNameKey)
+	}
+
+	fileWriter, err := os.OpenFile(serviceFilePath, os.O_RDWR|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to access service file for write at %q: %w", serviceFilePath, err)
+	}
+	defer func() { _ = fileWriter.Close() }()
+
+	if _, err := svcCfg.WriteTo(fileWriter); err != nil {
+		return fmt.Errorf("failed to write service file %s: %w", serviceFilePath, err)
+	}
+
+	return nil
+}
+
+func changeLaunchdServiceFile(serviceName string, plistPath string, username string, groupName string) error {
+
+	// Read the existing plist file
+	content, err := os.ReadFile(plistPath)
+	if err != nil {
+		return fmt.Errorf("failed to read plist file %s: %w", plistPath, err)
+	}
+
+	// parser implementation
+	dec := plist.NewDecoder(bytes.NewReader(content))
+	plistMap := make(map[string]interface{})
+
+	err = dec.Decode(&plistMap)
+	if err != nil {
+		return fmt.Errorf("failed to decode service file: %w", err)
+	}
+
+	if username != "" {
+		plistMap[LaunchdUserNameKey] = username
+	} else {
+		delete(plistMap, LaunchdUserNameKey)
+	}
+
+	if groupName != "" {
+		plistMap[LaunchdGroupNameKey] = groupName
+	} else {
+		delete(plistMap, LaunchdGroupNameKey)
+	}
+
+	fileWriter, err := os.OpenFile(plistPath, os.O_RDWR|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to access service file for write at %q: %w", plistPath, err)
+	}
+	defer func() { _ = fileWriter.Close() }()
+
+	enc := plist.NewEncoder(fileWriter)
+	if err := enc.Encode(plistMap); err != nil {
+		return fmt.Errorf("failed to encode service file: %w", err)
+	}
+
+	return nil
 }
 
 // A copy of the launchd plist template from github.com/kardianos/service
