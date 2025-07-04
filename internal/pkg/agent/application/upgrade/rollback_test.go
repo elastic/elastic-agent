@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -19,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/version"
 	mocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
 )
 
@@ -326,6 +328,78 @@ func TestRollback(t *testing.T) {
 			tt.checkAfterRollback(t, testTop)
 		})
 	}
+}
+
+func TestIsRollbackWindowSupported(t *testing.T) {
+	tests := map[string]struct {
+		version string
+		want    bool
+	}{
+		"supported_version": {
+			version: "9.2.0-SNAPSHOT",
+			want:    true,
+		},
+		"older_version": {
+			version: "9.0.0-SNAPSHOT",
+			want:    false,
+		},
+		"exactly_minimum_version": {
+			version: "9.1.0",
+			want:    true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			v, err := version.ParseVersion(tt.version)
+			require.NoError(t, err)
+
+			got := isRollbackWindowSupported(v)
+			assert.Equal(t, tt.want, got, "isRollbackWindowSupported(%q)", tt.version)
+		})
+	}
+}
+
+func TestMakeBaseWatchCmd(t *testing.T) {
+	exec, err := os.Executable()
+	require.NoError(t, err)
+	exec, err = filepath.EvalSymlinks(exec)
+	require.NoError(t, err)
+	execDir := filepath.Dir(exec)
+
+	agentExecutable := "elastic-agent"
+	t.Run("no_rollback_window", func(t *testing.T) {
+		cmd := makeBaseWatchCmd(agentExecutable, 0)
+
+		// Expected command:
+		// elastic-agent watch --path.config /some/path --path.home /some/path
+		require.Equal(t, cmd.Args, []string{
+			agentExecutable,
+			"watch",
+			"--path.config",
+			execDir,
+			"--path.home",
+			execDir,
+		})
+	})
+
+	t.Run("with_rollback_window", func(t *testing.T) {
+		rollbackWindow := 2*time.Hour + 15*time.Minute
+		cmd := makeBaseWatchCmd(agentExecutable, rollbackWindow)
+
+		// Expected command:
+		// elastic-agent watch --path.config /some/path --path.home /some/path --rollback-window 8100s
+		require.Equal(t, cmd.Args, []string{
+			agentExecutable,
+			"watch",
+			"--path.config",
+			execDir,
+			"--path.home",
+			execDir,
+			"--rollback-window",
+			rollbackWindow.String(),
+		})
+	})
 }
 
 // checkFilesAfterCleanup is a convenience function to check the file structure within topDir.
