@@ -12,8 +12,6 @@ env:
   IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1751072471"
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1751072471"
   IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1751072471"
-  # Remove AGENT_PACKAGE_VERSION and AGENT_VERSION pinning once 9.2.0 DRA and stack are released
-  AGENT_VERSION: "9.1.0-SNAPSHOT"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -53,10 +51,10 @@ steps:
           context: "buildkite/elastic-agent-extended-testing - ESS stack provision"
     env:
       ASDF_TERRAFORM_VERSION: 1.9.2
-    command: |
-      #!/usr/bin/env bash
-      set -euo pipefail
-      source .buildkite/scripts/steps/ess_start.sh
+    command: .buildkite/scripts/steps/ess_start.sh
+    retry:
+      automatic:
+        limit: 1
     artifact_paths:
       - test_infra/ess/*.tfstate
       - test_infra/ess/*.lock.hcl
