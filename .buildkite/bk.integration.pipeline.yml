@@ -44,6 +44,30 @@ common:
         env_var: "EC_API_KEY"  
 
 steps:
+  - label: "Custom ECH Testing"
+    key: integration-tests-ech
+    depends_on:
+      - packaging-ubuntu-x86-64
+    env:
+      ASDF_TERRAFORM_VERSION: 1.9.2
+      TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
+    command: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
+      source .buildkite/scripts/steps/ess_start.sh
+      .buildkite/scripts/steps/integration_tests_custom_ech_tf.sh
+    artifact_paths:
+      - build/**
+      - build/diagnostics/**
+    retry:
+      automatic:
+        limit: 1
+    agents:
+      provider: "gcp"
+      machineType: "n2-standard-8"
+      image: "${IMAGE_UBUNTU_2404_X86_64}"
+
   - label: Start ESS stack for integration tests
     key: integration-ess
     notify:
@@ -614,6 +638,7 @@ steps:
     # Warning: The key has a hook in pre-command
     key: aggregate-reports
     depends_on:
+      - integration-tests-ech
       - integration-tests-ubuntu
       - integration-tests-win
       - integration-tests-rhel8
