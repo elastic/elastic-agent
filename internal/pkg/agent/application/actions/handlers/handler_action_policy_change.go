@@ -19,7 +19,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -166,7 +165,7 @@ func testFleetConfig(ctx context.Context, log *logger.Logger, clientConfig remot
 				clientConfig.Hosts, clientConfig.Host)))
 	}
 
-	return enroll.CheckRemote(ctx, fleetClient)
+	return client.CheckRemote(ctx, fleetClient)
 }
 
 // updateFleetConfig copies the relevant Fleet client settings from policyConfig on agentConfig. The destination struct is modified in-place

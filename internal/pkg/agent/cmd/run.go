@@ -164,7 +164,7 @@ func logReturn(l *logger.Logger, err error) error {
 }
 
 func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override application.CfgOverrider, stop chan bool, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
-	err := enroll.RestoreConfig()
+	err := coordinator.RestoreConfig()
 	if err != nil {
 		return err
 	}

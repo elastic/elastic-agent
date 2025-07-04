@@ -11,15 +11,12 @@ import (
 	"fmt"
 	"io"
 	"math/rand/v2"
-	"net/http"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/otiai10/copy"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -46,75 +43,10 @@ const (
 	defaultFleetServerPort         = 8220
 	defaultFleetServerInternalHost = "localhost"
 	defaultFleetServerInternalPort = 8221
-	statusPath                     = "/api/status"
-	apiStatusTimeout               = 15 * time.Second
-	backupSuffix                   = ".enroll.bak"
 )
 
 type saver interface {
 	Save(io.Reader) error
-}
-
-func CheckRemote(ctx context.Context, c fleetclient.Sender) error {
-	ctx, cancel := context.WithTimeout(ctx, apiStatusTimeout)
-	defer cancel()
-
-	resp, err := c.Send(ctx, http.MethodGet, "/api/status", nil, nil, nil)
-	if err != nil {
-		return fmt.Errorf("fail to communicate with Fleet Server API client hosts: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("fleet server ping returned a bad status code: %d", resp.StatusCode)
-	}
-
-	// discard body for proper cancellation and connection reuse
-	_, _ = io.Copy(io.Discard, resp.Body)
-	resp.Body.Close()
-
-	return nil
-}
-
-// BackupConfig creates a backup of currently used fleet config
-func BackupConfig() error {
-	configFile := paths.AgentConfigFile()
-	backup := configFile + backupSuffix
-
-	err := copy.Copy(configFile, backup, copy.Options{
-		PermissionControl: copy.AddPermission(0600),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to backup config file %s -> %s: %w", configFile, backup, err)
-	}
-
-	return nil
-}
-
-// RestoreConfig restores from backup if needed and signals restore was performed
-func RestoreConfig() error {
-	configFile := paths.AgentConfigFile()
-	backup := configFile + backupSuffix
-
-	// check backup exists
-	if _, err := os.Stat(backup); os.IsNotExist(err) {
-		return nil
-	}
-
-	if err := file.SafeFileRotate(configFile, backup); err != nil {
-		return fmt.Errorf("failed to safe rotate backup config file: %w", err)
-	}
-
-	return nil
-}
-
-// CleanBackupConfig removes backup config file
-func CleanBackupConfig() error {
-	backup := paths.AgentConfigFile() + backupSuffix
-	if err := os.RemoveAll(backup); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-
-	return nil
 }
 
 func EnrollWithBackoff(

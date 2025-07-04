@@ -20,14 +20,12 @@ import (
 	"github.com/elastic/elastic-agent/pkg/features"
 )
 
-const (
-	endpoint = "endpoint"
-)
+const ()
 
 type migrateCoordinator interface {
 	Migrate(_ context.Context, _ *fleetapi.ActionMigrate, _ func(done <-chan struct{}) backoff.Backoff) error
 	ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string)
-	State() coordinator.State
+	HasEndpoint() bool
 }
 
 // Migrate handles migrate change coming from fleet.
@@ -62,20 +60,15 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 		return fmt.Errorf("invalid type, expected ActionMigrate and received %T", a)
 	}
 
-	if h.tamperProtectionFn() {
-		state := h.coord.State()
-		// if endpoint is present do not proceed
-		for _, component := range state.Components {
-			if component.Component.InputType == endpoint {
-				err := errors.New("unsupported action: tamper protected agent")
-				h.ackFailure(ctx, err, action, ack)
-				return err
-			}
-		}
+	// if endpoint is present do not proceed
+	if h.tamperProtectionFn() && h.coord.HasEndpoint() {
+		err := errors.New("unsupported action: tamper protected agent")
+		h.ackFailure(ctx, err, action, ack)
+		return err
 	}
 
 	if err := h.coord.Migrate(ctx, action, fleetgateway.RequestBackoff); err != nil {
-		// this should not happen, not managed agent should not receive the action
+		// this should not happen, unmanaged agent should not receive the action
 		// defensive coding to avoid misbehavior
 		if errors.Is(err, coordinator.ErrNotManaged) {
 			return errors.New("unmanaged agent, use Enroll instead")
@@ -83,6 +76,11 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 
 		// ack failure
 		h.ackFailure(ctx, err, action, ack)
+
+		if errors.Is(err, coordinator.ErrFleetServer) {
+			return errors.New("action not available for agents running Fleet Server")
+		}
+
 		return fmt.Errorf("migration of agent to a new cluster failed: %w", err)
 
 	}

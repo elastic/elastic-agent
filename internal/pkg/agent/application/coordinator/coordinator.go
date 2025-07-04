@@ -52,7 +52,10 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
 
-const fleetServer = "fleet-server"
+const (
+	fleetServer = "fleet-server"
+	endpoint    = "endpoint"
+)
 
 var ErrNotManaged = errors.New("unmanaged agent")
 
@@ -572,7 +575,7 @@ func (c *Coordinator) Migrate(ctx context.Context, action *fleetapi.ActionMigrat
 	}
 
 	// Keeping all enrollment options that are not overridden via action
-	options, err := computeEnrollOptions(ctx, paths.ConfigFile(), paths.AgentConfigFile())
+	originalOptions, err := computeEnrollOptions(ctx, paths.ConfigFile(), paths.AgentConfigFile())
 	if err != nil {
 		return fmt.Errorf("failed to compute enroll options: %w", err)
 	}
@@ -582,19 +585,8 @@ func (c *Coordinator) Migrate(ctx context.Context, action *fleetapi.ActionMigrat
 		return err
 	}
 
-	originalRemoteConfig, err := options.RemoteConfig(false)
-	if err != nil {
-		return fmt.Errorf("failed to construct original remote config: %w", err)
-	}
-
-	originalClient, err := fleetapiClient.NewAuthWithConfig(
-		c.logger, options.EnrollAPIKey, originalRemoteConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create original fleet client: %w", err)
-	}
-
 	// merge with options coming from action
-	options, err = enroll.MergeOptionsWithMigrateAction(action, options)
+	options, err := enroll.MergeOptionsWithMigrateAction(action, originalOptions)
 	if err != nil {
 		return fmt.Errorf("failed to merge options with migrate action: %w", err)
 	}
@@ -610,12 +602,12 @@ func (c *Coordinator) Migrate(ctx context.Context, action *fleetapi.ActionMigrat
 	}
 
 	// Target is checked prior to enroll
-	if err := enroll.CheckRemote(ctx, newFleetClient); err != nil {
+	if err := fleetapiClient.CheckRemote(ctx, newFleetClient); err != nil {
 		return err
 	}
 
 	// Backing up config
-	if err := enroll.BackupConfig(); err != nil {
+	if err := backupConfig(); err != nil {
 		return err
 	}
 
@@ -638,19 +630,30 @@ func (c *Coordinator) Migrate(ctx context.Context, action *fleetapi.ActionMigrat
 		backoffFactory,
 	)
 	if err != nil {
-		restoreErr := enroll.RestoreConfig()
+		restoreErr := RestoreConfig()
 		return errors.Join(fmt.Errorf("failed to enroll: %w", err), restoreErr)
 	}
 
 	// ACK success to source fleet server
 	if err := c.ackMigration(ctx, action, c.fleetAcker); err != nil {
-		c.logger.Infof("failed to ACK success: %v", err)
+		c.logger.Warnf("failed to ACK success: %v", err)
 	}
 
-	if err := enroll.CleanBackupConfig(); err != nil {
+	if err := cleanBackupConfig(); err != nil {
 		// when backup is present, it will be restored on next start.
 		// do not ack success
 		return fmt.Errorf("failed to clean backup config: %w", err)
+	}
+
+	originalRemoteConfig, err := originalOptions.RemoteConfig(false)
+	if err != nil {
+		return fmt.Errorf("failed to construct original remote config: %w", err)
+	}
+
+	originalClient, err := fleetapiClient.NewAuthWithConfig(
+		c.logger, originalOptions.EnrollAPIKey, originalRemoteConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create original fleet client: %w", err)
 	}
 
 	// Best effort: call unenroll on source cluster once done
@@ -1731,6 +1734,16 @@ func (c *Coordinator) isFleetServer() bool {
 			return true
 		}
 	}
+	return false
+}
+
+func (c *Coordinator) HasEndpoint() bool {
+	for _, component := range c.state.Components {
+		if component.Component.InputType == endpoint {
+			return true
+		}
+	}
+
 	return false
 }
 

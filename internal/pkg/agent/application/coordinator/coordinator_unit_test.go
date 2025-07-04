@@ -1989,3 +1989,57 @@ func TestComputeEnrollOptions(t *testing.T) {
 	}
 	assert.Equal(t, expectedProxyHeaders, options.ProxyHeaders, "ProxyHeaders mismatch")
 }
+
+func TestHasEndpoint(t *testing.T) {
+	testCases := []struct {
+		name     string
+		state    State
+		expected bool
+	}{
+		{
+			"endpoint",
+			State{
+				Components: []runtime.ComponentComponentState{
+					{
+						Component: component.Component{
+							InputType: endpoint,
+						},
+					},
+				},
+			},
+			true,
+		},
+		{
+			"no endpoint",
+			State{
+				Components: []runtime.ComponentComponentState{
+					{
+						Component: component.Component{
+							InputType: "not endpoint",
+						},
+					},
+				},
+			},
+			false,
+		},
+
+		{
+			"no component",
+			State{
+				Components: []runtime.ComponentComponentState{},
+			},
+			false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Coordinator{
+				state: tc.state,
+			}
+
+			result := c.HasEndpoint()
+			assert.Equal(t, tc.expected, result, "HasEndpoint result mismatch")
+		})
+	}
+}
