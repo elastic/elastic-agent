@@ -5,6 +5,7 @@
 package mage
 
 import (
+	"context"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -41,7 +42,7 @@ func TestPackageZip(t *testing.T) {
 }
 
 func TestPackageTarGz(t *testing.T) {
-	testPackage(t, PackageTarGz)
+	testPackageCtx(t, PackageTarGz)
 }
 
 func TestPackageRPM(t *testing.T) {
@@ -50,7 +51,7 @@ func TestPackageRPM(t *testing.T) {
 		t.Skip("docker is required")
 	}
 
-	testPackage(t, PackageRPM)
+	testPackageCtx(t, PackageRPM)
 }
 
 func TestPackageDeb(t *testing.T) {
@@ -59,7 +60,14 @@ func TestPackageDeb(t *testing.T) {
 		t.Skip("docker is required")
 	}
 
-	testPackage(t, PackageDeb)
+	testPackageCtx(t, PackageDeb)
+}
+
+func testPackageCtx(t testing.TB, pack func(context.Context, PackageSpec) error) {
+	ctx := t.Context()
+	testPackage(t, func(spec PackageSpec) error {
+		return pack(ctx, spec)
+	})
 }
 
 func testPackage(t testing.TB, pack func(PackageSpec) error) {

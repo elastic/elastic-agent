@@ -8,6 +8,7 @@ import (
 	"context"
 
 	"github.com/magefile/mage/mg"
+	"go.opentelemetry.io/otel"
 
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
@@ -42,6 +43,9 @@ func IntegTest() {
 // Use TEST_COVERAGE=true to enable code coverage profiling.
 // Use RACE_DETECTOR=true to enable the race detector.
 func GoIntegTest(ctx context.Context) error {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "GoIntegTest")
+	defer span.End()
+
 	if !devtools.IsInIntegTestEnv() {
 		mg.SerialDeps(goTestDeps...)
 	}

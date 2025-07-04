@@ -12,6 +12,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // httpRequest configures an HTTP request
@@ -24,6 +26,7 @@ type httpRequest struct {
 	Payload           string // string representation of fthe payload, in JSON format
 	QueryString       string
 	URL               string
+	Context           context.Context
 }
 
 // GetURL returns the URL as a string
@@ -83,6 +86,9 @@ func put(r httpRequest) (string, error) {
 
 // request executes a request
 func request(r httpRequest) (string, error) {
+	if r.Context == nil {
+		r.Context = context.Background()
+	}
 	escapedURL := r.GetURL()
 
 	fields := []any{
@@ -98,9 +104,9 @@ func request(r httpRequest) (string, error) {
 		body = nil
 	}
 
-	logger.Log(context.Background(), TraceLevel, "Executing request", fields...)
+	logger.Log(r.Context, TraceLevel, "Executing request", fields...)
 
-	req, err := http.NewRequestWithContext(context.TODO(), r.method, escapedURL, body)
+	req, err := http.NewRequestWithContext(r.Context, r.method, escapedURL, body)
 	if err != nil {
 		logger.Warn("Error creating request",
 			slog.String("error", err.Error()),
@@ -120,7 +126,7 @@ func request(r httpRequest) (string, error) {
 		req.SetBasicAuth(r.BasicAuthUser, r.BasicAuthPassword)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := otelhttp.DefaultClient.Do(req)
 	if err != nil {
 		logger.Warn("Error executing request",
 			slog.String("error", err.Error()),
@@ -146,6 +152,5 @@ func request(r httpRequest) (string, error) {
 	if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusBadRequest {
 		return bodyString, nil
 	}
-
 	return bodyString, fmt.Errorf("%s request failed with %d", r.method, resp.StatusCode)
 }

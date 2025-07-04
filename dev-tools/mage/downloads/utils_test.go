@@ -25,7 +25,7 @@ func TestDownloadFile(t *testing.T) {
 		DownloadPath: "",
 	}
 
-	err := downloadFile(&dRequest)
+	err := downloadFile(t.Context(), &dRequest)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, dRequest.UnsanitizedFilePath)
 	defer os.Remove(filepath.Dir(dRequest.UnsanitizedFilePath))

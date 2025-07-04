@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/magefile/mage/mg"
+	"go.opentelemetry.io/otel"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/elastic/elastic-agent/dev-tools/packaging"
@@ -97,6 +98,9 @@ var PlatformPackages = map[string]string{
 
 // DownloadManifest is going to download the given manifest file and return the ManifestResponse
 func DownloadManifest(ctx context.Context, manifest string) (Build, error) {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "DownloadManifest")
+	defer span.End()
+
 	manifestUrl, urlError := url.Parse(manifest)
 	if urlError != nil {
 		return Build{}, errorInvalidManifestURL
@@ -127,6 +131,9 @@ func DownloadManifest(ctx context.Context, manifest string) (Build, error) {
 // DownloadComponents is going to download a set of components from the given manifest into the destination
 // dropPath folder in order to later use that folder for packaging
 func DownloadComponents(ctx context.Context, expectedBinaries []packaging.BinarySpec, manifest string, platforms []string, dropPath string) error {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "DownloadComponents")
+	defer span.End()
+
 	manifestResponse, err := DownloadManifest(ctx, manifest)
 	if err != nil {
 		return fmt.Errorf("failed to download remote manifest file %w", err)
@@ -170,6 +177,9 @@ func DownloadComponents(ctx context.Context, expectedBinaries []packaging.Binary
 				downloadTarget := filepath.Join(targetPath, pkgFilename)
 				if _, err := os.Stat(downloadTarget); err != nil {
 					errGrp.Go(func(ctx context.Context, url, target string) func() error {
+						ctx, span := otel.Tracer("my-service").Start(ctx, "anonymous")
+						defer span.End()
+
 						return func() error { return DownloadPackage(ctx, url, target) }
 					}(downloadsCtx, p, downloadTarget))
 				}
@@ -304,6 +314,9 @@ func relaxVersion(version string) (string, error) {
 }
 
 func DownloadPackage(ctx context.Context, downloadUrl string, target string) error {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "DownloadPackage")
+	defer span.End()
+
 	parsedURL, errorUrl := url.Parse(downloadUrl)
 	if errorUrl != nil {
 		return errorInvalidManifestURL
