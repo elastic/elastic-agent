@@ -831,6 +831,8 @@ func processorsForAgentFilestream() []any {
 		dropEventsFromMonitoringComponentsProcessor(),
 		// drop periodic metrics logs (those are useful mostly in diagnostic dumps where we collect log files)
 		dropPeriodicMetricsLogsProcessor(),
+		// drop sensitive information from ES exporter ensuring we do not send it to fleet
+		dropSensitiveInfoFromESExporter(),
 	}
 	// if the event is from a component, use the component's dataset
 	processors = append(processors, useComponentDatasetProcessors()...)
@@ -1148,6 +1150,19 @@ func dropEcsVersionFieldProcessor() map[string]any {
 				"ecs.version",
 			},
 			"ignore_missing": true,
+		},
+	}
+}
+
+// dropSensitiveInfoFromESExporter returns a processor which drops any sensitive information logged by ES exporter
+func dropSensitiveInfoFromESExporter() map[string]any {
+	return map[string]interface{}{
+		"drop_event": map[string]interface{}{
+			"when": map[string]interface{}{
+				"regexp": map[string]interface{}{
+					"input": `\{"create":\{"_index":.*`,
+				},
+			},
 		},
 	}
 }
