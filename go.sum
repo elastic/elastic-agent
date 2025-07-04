@@ -266,8 +266,8 @@ github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 h1:DklsrG3d
 github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2/go.mod h1:WaHUgvxTVq04UNunO+XhnAqY/wQc+bxr74GqbsZ/Jqw=
 github.com/aws/aws-msk-iam-sasl-signer-go v1.0.4 h1:2jAwFwA0Xgcx94dUId+K24yFabsKYDtAhCgyMit6OqE=
 github.com/aws/aws-msk-iam-sasl-signer-go v1.0.4/go.mod h1:MVYeeOhILFFemC/XlYTClvBjYZrg/EPd3ts885KrNTI=
-github.com/aws/aws-sdk-go v1.55.6 h1:cSg4pvZ3m8dgYcgqB97MrcdjUmZ1BeMYKUxMMB89IPk=
-github.com/aws/aws-sdk-go v1.55.6/go.mod h1:eRwEWoyTWFMVYVQzKMNHWP5/RV4xIUGMQfXQHfHkpNU=
+github.com/aws/aws-sdk-go v1.55.7 h1:UJrkFq7es5CShfBwlWAC8DA077vp8PyVbQd3lqLiztE=
+github.com/aws/aws-sdk-go v1.55.7/go.mod h1:eRwEWoyTWFMVYVQzKMNHWP5/RV4xIUGMQfXQHfHkpNU=
 github.com/aws/aws-sdk-go-v2 v1.36.4 h1:GySzjhVvx0ERP6eyfAbAuAXLtAda5TEy19E5q5W8I9E=
 github.com/aws/aws-sdk-go-v2 v1.36.4/go.mod h1:LLXuLpgzEbD766Z5ECcRmi8AzSwfZItDtmABVkRLGzg=
 github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.10 h1:zAybnyUQXIZ5mok5Jqwlf58/TFE7uvd3IAsa1aF9cXs=
@@ -514,8 +514,8 @@ github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumpti
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic/go.mod h1:0vCBR1wgGwZeGmloJ+eCWIZF2S47grTXRzj2mftg2Nk=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
 github.com/elastic/bayeux v1.0.5/go.mod h1:CSI4iP7qeo5MMlkznGvYKftp8M7qqP/3nzmVZoXHY68=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250625230922-20190076bbd3 h1:u/ckO4G9Zg/1KFlkUcA8cLdKHOKskJwllvxB3Ivu7n8=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250625230922-20190076bbd3/go.mod h1:apN5Sv0n9dW/dJ+i+a+zeC28fmaPCFqeJIh31Y5TWIA=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250701100201-045d0d83add6 h1:t3wet+F1L6up5d+OD1rv+rejlGRGbJEh7I10U4r8Da4=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250701100201-045d0d83add6/go.mod h1:2M1hWjAG5GZHh3seT6LdPc2vCFsumKDed1ND/GKewYM=
 github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae h1:OiShmbWAyGU0MS0ADJWr1/QgeLIZliMk9xsrFicR3/s=
 github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae/go.mod h1:D2IckZVXARugvikE4fv1glvaJMohKSZRzrPsxCjo9O0=
 github.com/elastic/elastic-agent-autodiscover v0.9.2 h1:eBmru2v66HRRHOFf89rDl9OZUr7VsPoT4+ZNYHW6e9I=
@@ -564,8 +564,8 @@ github.com/elastic/gosigar v0.14.3 h1:xwkKwPia+hSfg9GqrCUKYdId102m9qTJIIr7egmK/u
 github.com/elastic/gosigar v0.14.3/go.mod h1:iXRIGg2tLnu7LBdpqzyQfGDEidKCfWcCMS0WKyPWoMs=
 github.com/elastic/lunes v0.1.0 h1:amRtLPjwkWtzDF/RKzcEPMvSsSseLDLW+bnhfNSLRe4=
 github.com/elastic/lunes v0.1.0/go.mod h1:xGphYIt3XdZRtyWosHQTErsQTd4OP1p9wsbVoHelrd4=
-github.com/elastic/mito v1.19.0 h1:rrJ8GR6SniJ/KieB5j8kDTNf5vAIJOtKiAz4hcfP1LU=
-github.com/elastic/mito v1.19.0/go.mod h1:f+W7LJ18FGwjVGmbXlOLVYsAbuVAtqqMkgdh0Sf00W0=
+github.com/elastic/mito v1.20.0 h1:vZM2Uln6wjyGdJOsQb498xsGwEqHJ9S5EVMa4lwOaqw=
+github.com/elastic/mito v1.20.0/go.mod h1:Nxs3xIs4YRCWZKU1SDc9Y0vFpw0Nn5q6GsIWlrEnVr4=
 github.com/elastic/mock-es v0.0.0-20241101195702-0a41fa3d30d9 h1:wXto1Zck/WqoXIoxEI8+nqoSSohPGp5dWV5zLskldYU=
 github.com/elastic/mock-es v0.0.0-20241101195702-0a41fa3d30d9/go.mod h1:cXqWcLnmu5y4QveTb2hjk7rgzkHMuZsqeXtbJpNAcu0=
 github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.3.0 h1:sUP9fEU26Pex6GIYtCPm91aXZrI9vSFDmoBZfClS/6E=
@@ -730,8 +730,8 @@ github.com/go-task/slim-sprig/v3 v3.0.0 h1:sUs3vkvUymDpBKi3qH1YSqBQk9+9D/8M2mN1v
 github.com/go-task/slim-sprig/v3 v3.0.0/go.mod h1:W848ghGpv3Qj3dhTPRyJypKRiqCdHZiAzKg9hl15HA8=
 github.com/go-test/deep v1.1.1 h1:0r/53hagsehfO4bzD2Pgr/+RgHqhmf+k1Bpse2cTu1U=
 github.com/go-test/deep v1.1.1/go.mod h1:5C2ZWiW0ErCdrYzpqxLbTX7MG14M9iiw8DgHncVwcsE=
-github.com/go-viper/mapstructure/v2 v2.2.1 h1:ZAaOCxANMuZx5RCeg0mBdEZk7DZasvvZIxtHqx8aGss=
-github.com/go-viper/mapstructure/v2 v2.2.1/go.mod h1:oJDH3BJKyqBA2TXFhDsKDGDTlndYOZ6rGS0BRZIxGhM=
+github.com/go-viper/mapstructure/v2 v2.3.0 h1:27XbWsHIqhbdR5TIC911OfYvgSaW93HM+dX7970Q7jk=
+github.com/go-viper/mapstructure/v2 v2.3.0/go.mod h1:oJDH3BJKyqBA2TXFhDsKDGDTlndYOZ6rGS0BRZIxGhM=
 github.com/go-zookeeper/zk v1.0.4 h1:DPzxraQx7OrPyXq2phlGlNSIyWEsAox0RJmjTseMV6I=
 github.com/go-zookeeper/zk v1.0.4/go.mod h1:nOB03cncLtlp4t+UAkGSV+9beXP/akpekBwL+UX1Qcw=
 github.com/gobuffalo/logger v1.0.6 h1:nnZNpxYo0zx+Aj9RfMPBm+x9zAU2OayFh/xrAWi34HU=
@@ -1765,6 +1765,8 @@ go.opentelemetry.io/collector/connector v0.127.0 h1:oH1qfmZK5Ma6ytbXcInFHySSv3M3
 go.opentelemetry.io/collector/connector v0.127.0/go.mod h1:KYOVGKGj23WL4+y5bHvbPc7VSPRm8BpwzKdx6YOzb98=
 go.opentelemetry.io/collector/connector/connectortest v0.127.0 h1:bTJCvSWj4TywQ4i9AAF3PFMcAuE7oUtYBXyzl6ng7Yo=
 go.opentelemetry.io/collector/connector/connectortest v0.127.0/go.mod h1:1khc74iFfEJYYOazVfr6KRAfHESNrR9fUgpNtx0I55I=
+go.opentelemetry.io/collector/connector/forwardconnector v0.127.0 h1:eO2fOyA0NKBd95B1+bngJRGVmwP1aYLa+2cKaBsJHuk=
+go.opentelemetry.io/collector/connector/forwardconnector v0.127.0/go.mod h1:EXBHMQyui4DDAZlNO9/8WEEYytLPRY1RoHVQuqxiAWY=
 go.opentelemetry.io/collector/connector/xconnector v0.127.0 h1:re8+Wt4uzgcXRs2uagBotAImGgjjqdZg6i/vpdjAe7U=
 go.opentelemetry.io/collector/connector/xconnector v0.127.0/go.mod h1:UQODXm9pN1LbOEQqjQ225PMI8caNCmWHMQxmW9V72cA=
 go.opentelemetry.io/collector/consumer v1.33.0 h1:y6ohYtFsXHdD3eJ67SRHSgumRQRNlR6N+DuyjOq3hYo=

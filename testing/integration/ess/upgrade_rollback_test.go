@@ -174,10 +174,6 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
-	if runtime.GOOS == "windows" {
-		t.Skip("This test is flaky on windows. See https://github.com/elastic/elastic-agent/issues/6733")
-	}
-
 	type fixturesSetupFunc func(t *testing.T) (from *atesting.Fixture, to *atesting.Fixture)
 	testcases := []struct {
 		name          string
