@@ -41,6 +41,10 @@ collectors:
       - name: ELASTIC_AGENT_OTEL
         value: '"true"'
     presets:
+      kubeletMetrics:
+        enabled: false
+      hostMetrics:
+        enabled: false
       logsCollection:
         enabled: true # Enable/disable the collection of node's logs.
         storeCheckpoints: true # Store checkpoints for log collection, allowing for resumption from the last processed log.
@@ -179,24 +183,18 @@ collectors:
                 key: app.kubernetes.io/version
                 from: pod
       receivers:
+        otlp: null
         # [File Log Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/filelogreceiver)
         filelog:
-          retry_on_failure:
-            enabled: true
-          start_at: end
           exclude:
-            # exlude collector logs
+            # exlude opentelemetry-kube-stack pod logs
             - /var/log/pods/*opentelemetry-kube-stack*/*/*.log
-          include:
-            - /var/log/pods/*/*/*.log
-          include_file_name: false
-          include_file_path: true
-          operators:
-            - id: container-parser # Extract container's metadata
-              type: container
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
         pipelines:
+          logs: null
+          metrics: null
+          traces: null
           logs/node:
             receivers:
               - filelog
