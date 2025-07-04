@@ -18,21 +18,6 @@ const (
 	backupSuffix = ".enroll.bak"
 )
 
-// backupConfig creates a backup of currently used fleet config
-func backupConfig() error {
-	configFile := paths.AgentConfigFile()
-	backup := configFile + backupSuffix
-
-	err := copy.Copy(configFile, backup, copy.Options{
-		PermissionControl: copy.AddPermission(0600),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to backup config file %s -> %s: %w", configFile, backup, err)
-	}
-
-	return nil
-}
-
 // RestoreConfig restores from backup if needed and signals restore was performed
 func RestoreConfig() error {
 	configFile := paths.AgentConfigFile()
@@ -45,6 +30,21 @@ func RestoreConfig() error {
 
 	if err := file.SafeFileRotate(configFile, backup); err != nil {
 		return fmt.Errorf("failed to safe rotate backup config file: %w", err)
+	}
+
+	return nil
+}
+
+// backupConfig creates a backup of currently used fleet config
+func backupConfig() error {
+	configFile := paths.AgentConfigFile()
+	backup := configFile + backupSuffix
+
+	err := copy.Copy(configFile, backup, copy.Options{
+		PermissionControl: copy.AddPermission(0600),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to backup config file %s -> %s: %w", configFile, backup, err)
 	}
 
 	return nil
