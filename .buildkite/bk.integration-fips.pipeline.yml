@@ -59,6 +59,7 @@ steps:
       image: "docker.elastic.co/observability-ci/test-oblt-cli:latest"
     plugins:
       - *google_oidc_observability_plugin
+      - *vault_github_token
 
   - group: "fips:Stateful:Ubuntu"
     key: integration-tests-ubuntu-fips
@@ -140,6 +141,8 @@ steps:
     command: .buildkite/scripts/steps/ess_down.sh
     agents:
       image: "docker.elastic.co/observability-ci/test-oblt-cli:latest"
+    plugins:
+      - *vault_github_token
 
   - label: Aggregate test reports
     depends_on:
