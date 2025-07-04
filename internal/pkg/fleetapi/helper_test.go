@@ -43,12 +43,16 @@ func withServerWithAuthClient(
 	m func(t *testing.T) *http.ServeMux,
 	apiKey string,
 	test func(t *testing.T, client client.Sender),
+	configMod ...func(*remote.Config),
 ) func(t *testing.T) {
 
 	return withServer(m, func(t *testing.T, host string) {
 		log, _ := logger.New("", false)
 		cfg := remote.Config{
 			Host: host,
+		}
+		for _, mod := range configMod {
+			mod(&cfg)
 		}
 
 		client, err := client.NewAuthWithConfig(log, apiKey, cfg)

@@ -9,8 +9,11 @@ fi
 if [[ -z "${SETUP_GVM_VERSION-""}" ]]; then
     SETUP_GVM_VERSION="v0.5.2" # https://github.com/andrewkroh/gvm/issues/44#issuecomment-1013231151
 fi
-BEAT_VERSION=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\-[a-zA-Z]+[0-9]+)?' "${WORKSPACE}/version/version.go")
-export BEAT_VERSION
+
+if [[ -z "${BEAT_VERSION-""}" ]]; then
+  BEAT_VERSION=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\-[a-zA-Z]+[0-9]+)?' "${WORKSPACE}/version/version.go")
+  export BEAT_VERSION
+fi
 
 getOSOptions() {
   case $(uname | tr '[:upper:]' '[:lower:]') in
