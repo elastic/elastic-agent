@@ -64,7 +64,13 @@ func DropComponentStateFromOtelStatus(otelStatus *status.AggregateStatus) (*stat
 	newStatus := deepCopyStatus(otelStatus)
 	for pipelineStatusId := range newStatus.ComponentStatusMap {
 		pipelineId := &pipeline.ID{}
-		componentKind, pipelineIdStr := parseEntityStatusId(pipelineStatusId)
+		componentKind, pipelineIdStr, parseErr := parseEntityStatusId(pipelineStatusId)
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		if componentKind == "extensions" {
+			continue
+		}
 		if componentKind != "pipeline" {
 			return nil, fmt.Errorf("pipeline status id %s is not a pipeline", pipelineStatusId)
 		}
@@ -91,7 +97,13 @@ func getOtelRuntimePipelineStatuses(otelStatus *status.AggregateStatus) (map[str
 
 	for pipelineStatusId, pipelineStatus := range otelStatus.ComponentStatusMap {
 		pipelineId := &pipeline.ID{}
-		componentKind, pipelineIdStr := parseEntityStatusId(pipelineStatusId)
+		componentKind, pipelineIdStr, parseErr := parseEntityStatusId(pipelineStatusId)
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		if componentKind == "extensions" {
+			continue
+		}
 		if componentKind != "pipeline" {
 			return nil, fmt.Errorf("pipeline status id %s is not a pipeline", pipelineStatusId)
 		}
@@ -176,8 +188,11 @@ func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus) (
 
 	for otelCompStatusId, otelCompStatus := range pipelineStatus.ComponentStatusMap {
 		var otelComponentID otelcomponent.ID
-		componentKind, otelComponentIDStr := parseEntityStatusId(otelCompStatusId)
-		err := otelComponentID.UnmarshalText([]byte(otelComponentIDStr))
+		componentKind, otelComponentIDStr, parseErr := parseEntityStatusId(otelCompStatusId)
+		if parseErr != nil {
+			return nil, nil, parseErr
+		}
+		err = otelComponentID.UnmarshalText([]byte(otelComponentIDStr))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -267,13 +282,17 @@ func otelStatusToUnitState(status componentstatus.Status) client.UnitState {
 
 // parseEntityStatusId parses an entity status ID into its kind and entity ID. An entity can be a pipeline or otel component.
 // The ID is expected to be in the format "kind:entityId", where kind is either "pipeline" or the otel component type (e.g., "receiver", "exporter").
+// The returned entityId may be empty - this is true for the top-level "extensions" key.
 // This format is used by the healthcheckv2 extension.
-func parseEntityStatusId(id string) (kind string, entityId string) {
+func parseEntityStatusId(id string) (kind string, entityId string, err error) {
+	if id == "extensions" {
+		return "extensions", "", nil
+	}
 	parts := strings.SplitN(id, ":", 2)
 	if len(parts) != 2 {
-		return "", ""
+		return "", "", fmt.Errorf("couldn't parse otel status id: %s", id)
 	}
-	return parts[0], parts[1]
+	return parts[0], parts[1], nil
 }
 
 // deepCopyStatus makes a deep copy of the status.
