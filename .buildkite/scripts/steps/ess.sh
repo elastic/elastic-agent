@@ -54,5 +54,5 @@ function ess_load_secrets() {
 
   # NOTE: only for debugging purposes
   #       so we know they have been loaded
-  env | grep -E '^(ELASTICSEARCH|KIBANA|FLEET_SERVER|AGENT_POLICY_ID)' | cut -d= -f1
+  env | sort
 }
