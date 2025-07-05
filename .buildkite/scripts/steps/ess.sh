@@ -41,6 +41,7 @@ function ess_load_secrets() {
 
   # Get the cluster name from the meta-data
   CLUSTER_NAME="$(buildkite-agent meta-data get cluster-name)"
+  echo "Cluster name: ${CLUSTER_NAME}"
 
   # Load the ESS stack secrets
   secrets_file="secrets.env.sh"
