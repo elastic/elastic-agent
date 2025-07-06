@@ -11,15 +11,17 @@ function ess_up() {
   fi
 
   # Create a cluster with the specified stack version and store the cluster information in a file
-  oblt-cli cluster create custom \
-      --template ess-ea-it \
-      --cluster-name-prefix ea-hosted-it \
-      --parameters="{\"GitOps\":\"true\",\"GitHubRepository\":\"${BUILDKITE_REPO}\",\"GitHubCommit\":\"${BUILDKITE_COMMIT}\",\"EphemeralCluster\":\"true\",\"StackVersion\":\"$STACK_VERSION\"}" \
-      --output-file="${PWD}/cluster-info.json" \
-      --wait 15
+  #oblt-cli cluster create custom \
+  #    --template ess-ea-it \
+  #    --cluster-name-prefix ea-hosted-it \
+  #    --parameters="{\"GitOps\":\"true\",\"GitHubRepository\":\"${BUILDKITE_REPO}\",\"GitHubCommit\":\"${BUILDKITE_COMMIT}\",\"EphemeralCluster\":\"true\",\"StackVersion\":\"$STACK_VERSION\"}" \
+  #    --output-file="${PWD}/cluster-info.json" \
+  #    --wait 15
 
   # Extract the cluster name from the cluster information file
-  CLUSTER_NAME=$(jq -r '.ClusterName' cluster-info.json)
+  #CLUSTER_NAME=$(jq -r '.ClusterName' cluster-info.json)
+
+  CLUSTER_NAME=ea-hosted-it-ess-ea--nnszz
 
   # Store the cluster name as a meta-data
   buildkite-agent meta-data set cluster-name "${CLUSTER_NAME}"
