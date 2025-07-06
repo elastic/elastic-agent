@@ -57,7 +57,6 @@ function ess_load_secrets() {
   source "${secrets_file}" || rm "$secrets_file"
   rm $secrets_file || true
 
-  # NOTE: only for debugging purposes
-  #       so we know they have been loaded
-  env | sort
+  echo "smoke test: ESS Stack secrets loaded"
+  curl -X GET "${ELASTICSEARCH_HOST}/_cat/indices?v" -u ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}
 }
