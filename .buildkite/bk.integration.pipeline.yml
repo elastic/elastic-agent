@@ -64,6 +64,7 @@ steps:
 
   - group: "Extended runtime leak tests"
     key: extended-integration-tests
+    skip: "TODO: Currently testing ubuntu"
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Runtime leak tests"
@@ -71,7 +72,6 @@ steps:
       - integration-ess
     steps:
       - label: "Windows:2022:amd64:sudo"
-        skip: "Currently testing linux only"
         #depends_on:
         #  - packaging-windows
         env:
@@ -95,7 +95,6 @@ steps:
           - *vault_github_token
 
       - label: "Windows:2025:amd64:sudo"
-        skip: "Currently testing linux only"
         #depends_on:
         #  - packaging-windows
         env:
@@ -400,6 +399,7 @@ steps:
           - *vault_github_token
 
   - group: "Stateful:Debian"
+    skip: "TODO: Currently testing ubuntu"
     key: integration-tests-debian
     notify:
       - github_commit_status:
@@ -472,6 +472,7 @@ steps:
           - *vault_github_token
 
   - group: "Stateful(Sudo):RHEL8"
+    skip: "TODO: Currently testing ubuntu"
     key: integration-tests-rhel8
     notify:
       - github_commit_status:
@@ -503,6 +504,7 @@ steps:
           - *vault_github_token
 
   - group: "Kubernetes"
+    skip: "TODO: Currently testing ubuntu"
     key: integration-tests-kubernetes
     notify:
       - github_commit_status:
@@ -556,7 +558,7 @@ steps:
 
   - group: "Serverless integration test"
     key: integration-tests-serverless
-    skip: "Currently testing linux only"
+    skip: "TODO: Currently testing ubuntu"
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Serverless integration test"
@@ -640,6 +642,7 @@ steps:
       - *vault_github_token
 
   - label: Aggregate test reports
+    skip: "TODO: Currently testing ubuntu"
     # Warning: The key has a hook in pre-command
     key: aggregate-reports
     depends_on:
