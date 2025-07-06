@@ -44,7 +44,8 @@ common:
           KIBANA_PASSWORD: ea-serverless-it-kibana-password
   # TODO: maybe we can rely on the VM and install only if not present?
   - oblt_cli_plugin: &oblt_cli_plugin
-      elastic/oblt-cli#v0.2.0:
+      # TODO: see https://github.com/elastic/oblt-cli-buildkite-plugin/pull/40
+      elastic/oblt-cli#test-aarch64:
         version-file: .oblt-cli-version
   - vault_github_token: &vault_github_token
       elastic/vault-github-token#v0.1.0:
