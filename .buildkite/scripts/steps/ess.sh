@@ -58,6 +58,11 @@ function ess_load_secrets() {
   # shellcheck source=/dev/null
   source "${secrets_file}" || rm "$secrets_file"
   rm $secrets_file || true
+  # Export the secrets as environment variables
+  export ELASTICSEARCH_HOST ELASTICSEARCH_USERNAME ELASTICSEARCH_PASSWORD
+  export KIBANA_HOST KIBANA_USERNAME KIBANA_PASSWORD=$ELASTICSEARCH_PASSWORD
+  # NOTE: I don't think INTEGRATIONS_SERVER_HOST is used in the ESS stack
+  #export INTEGRATIONS_SERVER_HOST=$FLEET_URL
 
   echo "smoke test: ESS Stack secrets loaded"
   curl -X GET "${ELASTICSEARCH_HOST}/_cat/indices?v" -u ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}
