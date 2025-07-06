@@ -11,7 +11,7 @@ function ess_up {
       return 1
   }
 
-  oblt-cli cluster create custom `
+  & oblt-cli cluster create custom `
       --template ess-ea-it `
       --cluster-name-prefix ea-hosted-it `
       --parameters="{\"GitOps\":\"true\",\"GitHubRepository\":\"$Env:BUILDKITE_REPO\",\"GitHubCommit\":\"$Env:BUILDKITE_COMMIT\",\"EphemeralCluster\":\"true\",\"StackVersion\":\"$StackVersion\"}" `
@@ -27,7 +27,23 @@ function ess_up {
   # Store the cluster name as a meta-data
   & buildkite-agent meta-data set cluster-name $ClusterName
 
-  # Load the ESS stack secrets
+  ess_load_secrets
+}
+
+function ess_down {
+  Write-Output "~~~ Tearing down the ESS Stack(created for this step)"
+  try {
+    $ClusterName = & buildkite-agent meta-data get cluster-name
+    & oblt-cli cluster destroy --cluster-name "$ClusterName" --force
+  } catch {
+    Write-Output "Error: Failed to destroy ESS stack(it will be auto-deleted later): $_"
+  }
+}
+
+function ess_load_secrets() {
+  $ClusterName = & buildkite-agent meta-data get cluster-name
+
+    # Load the ESS stack secrets
   # QUESTION: should we support the case when using the ESS stack in local environment?
   & oblt-cli cluster secrets env --cluster-name $ClusterName --output-file="secrets.env"
 
@@ -51,16 +67,6 @@ function ess_up {
   } else {
       Write-Error "secrets.env file not found at $envFile"
       return 1
-  }
-}
-
-function ess_down {  
-  Write-Output "~~~ Tearing down the ESS Stack(created for this step)"
-  try {
-    $ClusterName = & buildkite-agent meta-data get cluster-name
-    & oblt-cli cluster destroy --cluster-name "$ClusterName" --force
-  } catch {
-    Write-Output "Error: Failed to destroy ESS stack(it will be auto-deleted later): $_"
   }
 }
 
