@@ -34,7 +34,7 @@ steps:
       CI_ELASTIC_AGENT_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips"
       TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
     command: |
-      buildkite-agent artifact download build/distributions/elastic-agent-cloud-fips-*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64-fips'
+      buildkite-agent artifact download build/distributions/elastic-agent-cloud-fips-*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64-fips' --build 0197d98b-cb36-4c75-a121-7e4368a11d4c
       mage cloud:load
       mage cloud:push
     agents:
@@ -76,7 +76,7 @@ steps:
           TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64-fips'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64-fips' --build 0197d98b-cb36-4c75-a121-7e4368a11d4c
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.groups}} {{matrix.sudo}}
         artifact_paths:
           - build/**
@@ -110,7 +110,7 @@ steps:
           TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64-fips'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64-fips' --build 0197d98b-cb36-4c75-a121-7e4368a11d4c
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.groups}} {{matrix.sudo}}
         artifact_paths:
           - build/**

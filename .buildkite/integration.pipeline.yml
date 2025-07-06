@@ -5,6 +5,7 @@ env:
 
 steps:
   - group: "Integration tests: packaging"
+    skip: "Currently using a previous build"
     key: "int-packaging"
     notify:
       - github_commit_status:
