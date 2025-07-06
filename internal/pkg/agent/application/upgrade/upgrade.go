@@ -417,7 +417,7 @@ func waitForWatcherWithTimeoutCreationFunc(ctx context.Context, log *logger.Logg
 			}
 
 		case <-watcherContext.Done():
-			log.Error("upgrade watcher did not start watching within %s or context has expired", waitTime)
+			log.Errorf("upgrade watcher did not start watching within %s or context has expired", waitTime)
 			return goerrors.Join(ErrWatcherNotStarted, watcherContext.Err())
 		}
 	}
@@ -449,7 +449,7 @@ func (u *Upgrader) Ack(ctx context.Context, acker acker.Acker) error {
 
 	marker.Acked = true
 
-	return SaveMarker(marker, false)
+	return SaveMarker(paths.Data(), marker, false)
 }
 
 func (u *Upgrader) AckAction(ctx context.Context, acker acker.Acker, action fleetapi.Action) error {

@@ -27,6 +27,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -442,6 +443,7 @@ func getTestBinariesPath() ([]string, error) {
 		filepath.Join(wd, "internal", "pkg", "agent", "install", "testblocking"),
 		filepath.Join(wd, "pkg", "core", "process", "testsignal"),
 		filepath.Join(wd, "internal", "pkg", "agent", "application", "filelock", "testlocker"),
+		filepath.Join(wd, "internal", "pkg", "otel", "manager", "testing"),
 	}
 	return testBinaryPkgs, nil
 }
@@ -995,11 +997,10 @@ func (Cloud) Image(ctx context.Context) {
 // Looks in build/distributions for an elastic-agent-cloud*.docker.tar.gz artifact and imports it as docker.elastic.co/beats-ci/elastic-agent-cloud:$VERSION
 // DOCKER_IMPORT_SOURCE - override source for import
 func (Cloud) Load() error {
-	snapshot := os.Getenv(snapshotEnv)
-	defer os.Setenv(snapshotEnv, snapshot)
-	os.Setenv(snapshotEnv, "true")
-
-	version := getVersion()
+	agentVersion, err := mage.AgentPackageVersion()
+	if err != nil {
+		return fmt.Errorf("failed to get agent package version: %w", err)
+	}
 
 	// Need to get the FIPS env var flag to see if we are using the normal source cloud image name, or the FIPS variant
 	fips := os.Getenv(fipsEnv)
@@ -1008,12 +1009,14 @@ func (Cloud) Load() error {
 	if err != nil {
 		fipsVal = false
 	}
-	os.Setenv(fipsEnv, strconv.FormatBool(fipsVal))
+	if err := os.Setenv(fipsEnv, strconv.FormatBool(fipsVal)); err != nil {
+		return fmt.Errorf("failed to set fips env var: %w", err)
+	}
 	devtools.FIPSBuild = fipsVal
 
-	source := "build/distributions/elastic-agent-cloud-" + version + "-linux-" + runtime.GOARCH + ".docker.tar.gz"
+	source := "build/distributions/elastic-agent-cloud-" + agentVersion + "-SNAPSHOT-linux-" + runtime.GOARCH + ".docker.tar.gz"
 	if fipsVal {
-		source = "build/distributions/elastic-agent-cloud-fips-" + version + "-linux-" + runtime.GOARCH + ".docker.tar.gz"
+		source = "build/distributions/elastic-agent-cloud-fips-" + agentVersion + "-SNAPSHOT-linux-" + runtime.GOARCH + ".docker.tar.gz"
 	}
 	if envSource, ok := os.LookupEnv("DOCKER_IMPORT_SOURCE"); ok && envSource != "" {
 		source = envSource
@@ -1025,20 +1028,9 @@ func (Cloud) Load() error {
 // Push builds a cloud image tags it correctly and pushes to remote image repo.
 // Previous login to elastic registry is required!
 func (Cloud) Push() error {
-	snapshot := os.Getenv(snapshotEnv)
-	defer os.Setenv(snapshotEnv, snapshot)
-
-	os.Setenv(snapshotEnv, "true")
-
-	version := getVersion()
-	var tag string
-	if envTag, isPresent := os.LookupEnv("CUSTOM_IMAGE_TAG"); isPresent && len(envTag) > 0 {
-		tag = envTag
-	} else {
-		commit := dockerCommitHash()
-		time := time.Now().Unix()
-
-		tag = fmt.Sprintf("%s-%s-%d", version, commit, time)
+	agentVersion, err := mage.AgentPackageVersion()
+	if err != nil {
+		return fmt.Errorf("failed to get agent package version: %w", err)
 	}
 
 	// Need to get the FIPS env var flag to see if we are using the normal source cloud image name, or the FIPS variant
@@ -1048,38 +1040,46 @@ func (Cloud) Push() error {
 	if err != nil {
 		fipsVal = false
 	}
-	os.Setenv(fipsEnv, strconv.FormatBool(fipsVal))
+	if err := os.Setenv(fipsEnv, strconv.FormatBool(fipsVal)); err != nil {
+		return fmt.Errorf("failed to set fips env var: %w", err)
+	}
 	devtools.FIPSBuild = fipsVal
 
-	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s", version)
+	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s-SNAPSHOT", agentVersion)
 	if fipsVal {
-		sourceCloudImageName = fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud-fips:%s", version)
+		sourceCloudImageName = fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud-fips:%s-SNAPSHOT", agentVersion)
+	}
+	var targetTag string
+	if envTag, isPresent := os.LookupEnv("CUSTOM_IMAGE_TAG"); isPresent && len(envTag) > 0 {
+		targetTag = envTag
+	} else {
+		targetTag = fmt.Sprintf("%s-%s-%d", agentVersion, dockerCommitHash(), time.Now().Unix())
 	}
 	var targetCloudImageName string
 	if customImage, isPresent := os.LookupEnv("CI_ELASTIC_AGENT_DOCKER_IMAGE"); isPresent && len(customImage) > 0 {
-		targetCloudImageName = fmt.Sprintf("%s:%s", customImage, tag)
+		targetCloudImageName = fmt.Sprintf("%s:%s", customImage, targetTag)
 	} else {
-		targetCloudImageName = fmt.Sprintf(cloudImageTmpl, tag)
+		targetCloudImageName = fmt.Sprintf(cloudImageTmpl, targetTag)
 	}
 
 	fmt.Printf(">> Setting a docker image tag to %s\n", targetCloudImageName)
 	err = sh.RunV("docker", "tag", sourceCloudImageName, targetCloudImageName)
 	if err != nil {
-		return fmt.Errorf("Failed setting a docker image tag: %w", err)
+		return fmt.Errorf("failed setting a docker image tag: %w", err)
 	}
 	fmt.Println(">> Docker image tag updated successfully")
 
 	fmt.Println(">> Pushing a docker image to remote registry")
 	err = sh.RunV("docker", "image", "push", targetCloudImageName)
 	if err != nil {
-		return fmt.Errorf("Failed pushing docker image: %w", err)
+		return fmt.Errorf("failed pushing docker image: %w", err)
 	}
 	fmt.Printf(">> Docker image pushed to remote registry successfully: %s\n", targetCloudImageName)
 
 	return nil
 }
 
-// Creates a new devmachine that will be auto-deleted in 6 hours.
+// Create a new devmachine that will be auto-deleted in 6 hours.
 // Example: MACHINE_IMAGE="family/platform-ingest-elastic-agent-ubuntu-2204" ZONE="us-central1-a" mage devmachine:create "pavel-dev-machine"
 // ZONE defaults to 'us-central1-a', MACHINE_IMAGE defaults to 'family/platform-ingest-elastic-agent-ubuntu-2204'
 func (Devmachine) Create(instanceName string) error {
@@ -2340,46 +2340,47 @@ func (Integration) Single(ctx context.Context, testName string) error {
 }
 
 // TestServerless runs the integration tests defined in testing/integration/serverless
-func (Integration) TestServerless(ctx context.Context) error {
+func (i Integration) TestServerless(ctx context.Context) error {
+	return i.testServerless(ctx, false, "")
+}
+
+// TestServerlessSingle runs a single integration test defined in testing/integration/serverless
+func (i Integration) TestServerlessSingle(ctx context.Context, testName string) error {
+	return i.testServerless(ctx, false, testName)
+}
+
+func (i Integration) testServerless(ctx context.Context, matrix bool, testName string) error {
 	err := os.Setenv("STACK_PROVISIONER", "serverless")
 	if err != nil {
 		return fmt.Errorf("error setting serverless stack env var: %w", err)
 	}
 
-	return integRunner(ctx, "testing/integration/serverless", false, "")
+	return integRunner(ctx, "testing/integration/serverless", matrix, testName)
 }
 
-// TestKubernetes runs kubernetes integration tests
-func (Integration) TestKubernetes(ctx context.Context) error {
+// TestKubernetes runs the integration tests defined in testing/integration/k8s
+func (i Integration) TestKubernetes(ctx context.Context) error {
+	return i.testKubernetes(ctx, false, "")
+}
+
+// TestKubernetesSingle runs a single integration test defined in testing/integration/k8s
+func (i Integration) TestKubernetesSingle(ctx context.Context, testName string) error {
+	return i.testKubernetes(ctx, false, testName)
+}
+
+// TestKubernetesMatrix runs a matrix of integration tests defined in testing/integration/k8s
+func (i Integration) TestKubernetesMatrix(ctx context.Context) error {
+	return i.testKubernetes(ctx, true, "")
+}
+
+func (i Integration) testKubernetes(ctx context.Context, matrix bool, testName string) error {
 	mg.Deps(Integration.BuildKubernetesTestData)
 	// invoke integration tests
 	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
 		return err
 	}
 
-	return integRunner(ctx, "testing/integration/k8s", false, "")
-}
-
-// TestKubernetesSingle runs single k8s integration test
-func (Integration) TestKubernetesSingle(ctx context.Context, testName string) error {
-	mg.Deps(Integration.BuildKubernetesTestData)
-	// invoke integration tests
-	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
-		return err
-	}
-
-	return integRunner(ctx, "testing/integration/k8s", false, testName)
-}
-
-// TestKubernetesMatrix runs a matrix of kubernetes integration tests
-func (Integration) TestKubernetesMatrix(ctx context.Context) error {
-	mg.Deps(Integration.BuildKubernetesTestData)
-	// invoke integration tests
-	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
-		return err
-	}
-
-	return integRunner(ctx, "testing/integration/k8s", true, "")
+	return integRunner(ctx, "testing/integration/k8s", matrix, testName)
 }
 
 // BuildKubernetesTestData builds the test data required to run k8s integration tests
@@ -2420,20 +2421,39 @@ func (Integration) BuildKubernetesTestData(ctx context.Context) error {
 // UpdateVersions runs an update on the `.agent-versions.yml` fetching
 // the latest version list from the artifact API.
 func (Integration) UpdateVersions(ctx context.Context) error {
-	maxSnapshots := 3
+	agentVersion, err := version.ParseVersion(bversion.Agent)
+	if err != nil {
+		return fmt.Errorf("failed to parse agent version %s: %w", bversion.Agent, err)
+	}
+
+	// maxSnapshots is the maximum number of snapshots from
+	// releases branches we want to include in the snapshot list
+	maxSnapshots := 2
 
 	branches, err := git.GetReleaseBranches(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list release branches: %w", err)
 	}
 
-	// -1 because we manually add 7.17 below
-	if len(branches) > maxSnapshots-1 {
-		branches = branches[:maxSnapshots-1]
+	// limit the number of snapshot branches to the maxSnapshots
+	targetSnapshotBranches := branches[:maxSnapshots]
+
+	// we also want to always include the latest snapshot from lts release branches
+	ltsBranches := []string{
+		// 7.17 is an LTS branch so we need to include it always
+		"7.17",
 	}
 
-	// it's not a part of this repository, cannot be retrieved with `GetReleaseBranches`
-	branches = append(branches, "7.17")
+	// if we have a newer version of the agent, we want to include the latest snapshot from 8.19 LTS branch
+	if agentVersion.Major() > 8 || agentVersion.Major() == 8 && agentVersion.Minor() > 19 {
+		// order is important
+		ltsBranches = append([]string{"8.19"}, ltsBranches...)
+	}
+
+	// need to include the LTS branches, sort them and remove duplicates
+	targetSnapshotBranches = append(targetSnapshotBranches, ltsBranches...)
+	sort.Slice(targetSnapshotBranches, git.Less(targetSnapshotBranches))
+	targetSnapshotBranches = slices.Compact(targetSnapshotBranches)
 
 	// uncomment if want to have the current version snapshot on the list as well
 	// branches = append([]string{"master"}, branches...)
@@ -2443,7 +2463,7 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 		CurrentMajors:    1,
 		PreviousMinors:   2,
 		PreviousMajors:   1,
-		SnapshotBranches: branches,
+		SnapshotBranches: targetSnapshotBranches,
 	}
 	b, _ := json.MarshalIndent(reqs, "", "  ")
 	fmt.Println(string(b))
@@ -2897,9 +2917,18 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 	return integRunner(ctx, "testing/integration/beats/serverless", false, "TestBeatsServerless")
 }
 
-// TestForResourceLeaks runs tests that check for resource leaks
-func (Integration) TestForResourceLeaks(ctx context.Context) error {
-	return integRunner(ctx, "testing/integration/leak", false, "TestLongRunningAgentForLeaks")
+// TestForResourceLeaks runs the integration tests defined in testing/integration/leak
+func (i Integration) TestForResourceLeaks(ctx context.Context) error {
+	return i.testForResourceLeaks(ctx, false, "")
+}
+
+// TestForResourceLeaksSingle runs a single integration test defined in testing/integration/leak
+func (i Integration) TestForResourceLeaksSingle(ctx context.Context, testName string) error {
+	return i.testForResourceLeaks(ctx, false, testName)
+}
+
+func (i Integration) testForResourceLeaks(ctx context.Context, matrix bool, testName string) error {
+	return integRunner(ctx, "testing/integration/leak", matrix, testName)
 }
 
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)

@@ -12,9 +12,9 @@ type ConfigPatch func(change ConfigChange) ConfigChange
 
 // ConfigPatchManager is a decorator to restore some agent settings from the elastic agent configuration file
 type ConfigPatchManager struct {
-	inner   ConfigManager
-	outCh   chan ConfigChange
-	patchFn ConfigPatch
+	inner    ConfigManager
+	outCh    chan ConfigChange
+	patchFns []ConfigPatch
 }
 
 func (c ConfigPatchManager) Run(ctx context.Context) error {
@@ -36,14 +36,17 @@ func (c ConfigPatchManager) Watch() <-chan ConfigChange {
 
 func (c ConfigPatchManager) patch(src <-chan ConfigChange, dst chan ConfigChange) {
 	for ccc := range src {
-		dst <- c.patchFn(ccc)
+		for _, patchFn := range c.patchFns {
+			ccc = patchFn(ccc)
+		}
+		dst <- ccc
 	}
 }
 
-func NewConfigPatchManager(inner ConfigManager, pf ConfigPatch) *ConfigPatchManager {
+func NewConfigPatchManager(inner ConfigManager, pfs ...ConfigPatch) *ConfigPatchManager {
 	return &ConfigPatchManager{
-		inner:   inner,
-		outCh:   make(chan ConfigChange),
-		patchFn: pf,
+		inner:    inner,
+		outCh:    make(chan ConfigChange),
+		patchFns: pfs,
 	}
 }

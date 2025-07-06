@@ -6,12 +6,12 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1750467641"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1750467641"
-  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1750467641"
-  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1750467641"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1750467641"
-  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1750467641"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1751072471"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1751072471"
+  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1751072471"
+  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1751072471"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1751072471"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1751072471"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -167,6 +167,8 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - *vault_ec_key_prod
         matrix:
           - default
           - fleet
@@ -199,6 +201,8 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - *vault_ec_key_prod
         matrix:
           - default
         plugins:
@@ -224,6 +228,8 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - *vault_ec_key_prod
         matrix:
           - default
           - fleet
@@ -256,6 +262,8 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
+        plugins:
+          - *vault_ec_key_prod
         matrix:
           - default
         plugins:
@@ -288,6 +296,8 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
+        plugins:
+          - *vault_ec_key_prod
         matrix:
           - default
         plugins:
@@ -314,6 +324,8 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
+        plugins:
+          - *vault_ec_key_prod  
         matrix:
           - default
           - upgrade
@@ -352,6 +364,8 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - *vault_ec_key_prod
         matrix:
           - default
           - upgrade
@@ -392,6 +406,8 @@ steps:
           provider: "aws"
           image: "${IMAGE_UBUNTU_2404_ARM_64}"
           instanceType: "m6g.xlarge"
+        plugins:
+          - *vault_ec_key_prod
         matrix:
           - default
         plugins:
@@ -425,6 +441,8 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_DEBIAN_12}"
+        plugins:
+          - *vault_ec_key_prod
         matrix:
           - default
         plugins:
@@ -451,6 +469,8 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_DEBIAN_12}"
+        plugins:
+          - *vault_ec_key_prod
         matrix:
           - default
           - upgrade
@@ -495,6 +515,8 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - *vault_ec_key_prod
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
@@ -535,6 +557,8 @@ steps:
           machineType: "n2-standard-4"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
           diskSizeGb: 80
+        plugins:
+          - *vault_ec_key_prod
         matrix:
           setup:
             variants:

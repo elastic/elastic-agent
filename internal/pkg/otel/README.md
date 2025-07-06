@@ -91,6 +91,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [bearertokenauthextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/bearertokenauthextension/v0.127.0/extension/bearertokenauthextension/README.md) | v0.127.0 |
 | [filestorage](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/storage/filestorage/v0.127.0/extension/storage/filestorage/README.md) | v0.127.0 |
 | [healthcheckextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckextension/v0.127.0/extension/healthcheckextension/README.md) | v0.127.0 |
+| [healthcheckv2extension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckv2extension/v0.127.0/extension/healthcheckv2extension/README.md) | v0.127.0 |
 | [k8sobserver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/observer/k8sobserver/v0.127.0/extension/observer/k8sobserver/README.md) | v0.127.0 |
 | [memorylimiterextension](https://github.com/open-telemetry/opentelemetry-collector/blob/extension/memorylimiterextension/v0.127.0/extension/memorylimiterextension/README.md) | v0.127.0 |
 | [pprofextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/pprofextension/v0.127.0/extension/pprofextension/README.md) | v0.127.0 |
@@ -100,6 +101,7 @@ This section provides a summary of components included in the Elastic Distributi
 | Component | Version |
 |---|---|
 | [elasticapmconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/elasticapmconnector/v0.3.0/connector/elasticapmconnector/README.md) | v0.3.0 |
+| [forwardconnector](https://github.com/open-telemetry/opentelemetry-collector/blob/connector/forwardconnector/v0.127.0/connector/forwardconnector/README.md) | v0.127.0 |
 | [routingconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/routingconnector/v0.127.0/connector/routingconnector/README.md) | v0.127.0 |
 | [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.127.0/connector/spanmetricsconnector/README.md) | v0.127.0 |
 ## Persistence in OpenTelemetry Collector

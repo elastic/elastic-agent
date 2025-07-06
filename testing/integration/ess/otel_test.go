@@ -21,6 +21,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -326,15 +328,24 @@ service:
 
 	statusCtx, statusCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer statusCancel()
-	output, err := fixture.ExecStatus(statusCtx)
-	require.NoError(t, err, "status command failed")
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		status, statusErr := fixture.ExecStatus(statusCtx)
+		assert.NoError(collect, statusErr)
+		// agent should be healthy
+		assert.Equal(collect, int(cproto.State_HEALTHY), status.State)
+		// we should have no normal components running
+		assert.Zero(collect, len(status.Components))
+
+		// we should have filebeatreceiver and metricbeatreceiver running
+		otelCollectorStatus := status.Collector
+		require.NotNil(collect, otelCollectorStatus)
+		assert.Equal(collect, int(cproto.CollectorComponentStatus_StatusOK), otelCollectorStatus.Status)
+		return
+	}, 1*time.Minute, 1*time.Second)
 
 	cancel()
 	fixtureWg.Wait()
-	require.True(t, err == nil || err == context.Canceled || err == context.DeadlineExceeded, "Retrieved unexpected error: %s", err.Error())
-
-	assert.NotNil(t, output.Collector)
-	assert.Equal(t, 2, output.Collector.Status, "collector status should have been StatusOK")
 }
 
 func validateCommandIsWorking(t *testing.T, ctx context.Context, fixture *aTesting.Fixture, tempDir string) {
