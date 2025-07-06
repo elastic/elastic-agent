@@ -36,6 +36,9 @@ if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 ]]; then
   echo "~~~ The steps is retried, starting the ESS stack again"
   trap 'ess_down' EXIT
   ess_up $OVERRIDE_STACK_VERSION || (echo -e "^^^ +++\nFailed to start ESS stack")
+else
+  # For the first run, we start the stack in the start_ess.sh step and it loads the secrets
+  ess_load_secrets
 fi
 
 # Run integration tests
