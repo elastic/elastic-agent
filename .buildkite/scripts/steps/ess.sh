@@ -48,6 +48,10 @@ function ess_load_secrets() {
   # QUESTION: should we support the case when using the ESS stack in local environment?
   oblt-cli cluster secrets env --cluster-name="${CLUSTER_NAME}" --output-file="${secrets_file}"
 
+  # NOTE: only for debugging purposes
+  #       so we know the secrets file has been created
+  buildkite-agent artifact upload "$secrets_file"
+
   # Source the secrets file
   # shellcheck source=/dev/null
   source "${secrets_file}" || rm "$secrets_file"
