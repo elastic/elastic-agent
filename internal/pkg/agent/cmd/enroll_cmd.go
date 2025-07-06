@@ -122,6 +122,7 @@ type enrollCmdOption struct {
 	ReplaceToken         string                     `yaml:"replace_token,omitempty"`
 	EnrollAPIKey         string                     `yaml:"enrollment_key,omitempty"`
 	Staging              string                     `yaml:"staging,omitempty"`
+	Headers              map[string]string          `yaml:"headers,omitempty"`
 	ProxyURL             string                     `yaml:"proxy_url,omitempty"`
 	ProxyDisabled        bool                       `yaml:"proxy_disabled,omitempty"`
 	ProxyHeaders         map[string]string          `yaml:"proxy_headers,omitempty"`
@@ -144,6 +145,7 @@ func (e *enrollCmdOption) remoteConfig() (remote.Config, error) {
 	if cfg.Protocol == remote.ProtocolHTTP && !e.Insecure {
 		return remote.Config{}, fmt.Errorf("connection to fleet-server is insecure, strongly recommended to use a secure connection (override with --insecure)")
 	}
+	cfg.Headers = e.Headers
 
 	var tlsCfg tlscommon.Config
 
