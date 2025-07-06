@@ -13,6 +13,11 @@ if [[ -z "${GO_VERSION-""}" ]]; then
     export GO_VERSION=$(cat "${WORKSPACE}/.go-version")
 fi
 
+# Debug the current system information
+echo "~~~ System information"
+uname -s
+uname -m
+
 CI_DRA_ROLE_PATH="kv/ci-shared/release/dra-role"
 CI_GCP_OBS_PATH="kv/ci-shared/observability-ingest/cloud/gcp"
 CI_ESS_PATH="kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
