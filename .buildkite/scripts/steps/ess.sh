@@ -72,5 +72,5 @@ function ess_load_secrets() {
   export INTEGRATIONS_SERVER_HOST=$FLEET_URL
 
   echo "smoke test: ESS Stack secrets loaded"
-  curl -s -X GET "${ELASTICSEARCH_HOST}/_cluster/health?pretty" -u ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}
+  curl -s -X GET "${ELASTICSEARCH_HOST}/_cluster/health?pretty" -u "${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}"
 }
