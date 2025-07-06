@@ -11,15 +11,6 @@ env:
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
 common:
-  - vault_ec_key_prod: &vault_ec_key_prod
-      elastic/vault-secrets#v0.1.0:
-        path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-        field: "apiKey"
-        env_var: "EC_API_KEY"
-
-# This section is used to define the plugins that will be used in the pipeline.
-# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
-common:
   - google_oidc_observability_plugin: &google_oidc_observability_plugin
       # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-gcp-oidc.tf
       # This plugin authenticates to Google Cloud using the OIDC token.
@@ -94,8 +85,6 @@ steps:
           provider: "aws"
           image: "${IMAGE_UBUNTU_X86_64_FIPS}"
           instanceType: "m5.2xlarge"
-        plugins:
-          - *vault_ec_key_prod  
         matrix:
           setup:
             sudo:
@@ -128,8 +117,6 @@ steps:
           provider: "aws"
           image: "${IMAGE_UBUNTU_ARM64_FIPS}"
           instanceType: "m6g.2xlarge"
-        plugins:
-          - *vault_ec_key_prod  
         matrix:
           setup:
             sudo:

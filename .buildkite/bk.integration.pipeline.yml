@@ -167,8 +167,6 @@ steps:
         retry:
           automatic:
             limit: 1
-        plugins:
-          - *vault_ec_key_prod
         matrix:
           - default
           - fleet
@@ -201,8 +199,6 @@ steps:
         retry:
           automatic:
             limit: 1
-        plugins:
-          - *vault_ec_key_prod
         matrix:
           - default
         plugins:
@@ -228,8 +224,6 @@ steps:
         retry:
           automatic:
             limit: 1
-        plugins:
-          - *vault_ec_key_prod
         matrix:
           - default
           - fleet
@@ -262,8 +256,6 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
-        plugins:
-          - *vault_ec_key_prod
         matrix:
           - default
         plugins:
@@ -296,8 +288,6 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
-        plugins:
-          - *vault_ec_key_prod
         matrix:
           - default
         plugins:
@@ -324,8 +314,6 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
-        plugins:
-          - *vault_ec_key_prod  
         matrix:
           - default
           - upgrade
@@ -364,8 +352,6 @@ steps:
         retry:
           automatic:
             limit: 1
-        plugins:
-          - *vault_ec_key_prod
         matrix:
           - default
           - upgrade
@@ -406,8 +392,6 @@ steps:
           provider: "aws"
           image: "${IMAGE_UBUNTU_2404_ARM_64}"
           instanceType: "m6g.xlarge"
-        plugins:
-          - *vault_ec_key_prod
         matrix:
           - default
         plugins:
@@ -441,8 +425,6 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_DEBIAN_12}"
-        plugins:
-          - *vault_ec_key_prod
         matrix:
           - default
         plugins:
@@ -469,8 +451,6 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_DEBIAN_12}"
-        plugins:
-          - *vault_ec_key_prod
         matrix:
           - default
           - upgrade
@@ -515,8 +495,6 @@ steps:
         retry:
           automatic:
             limit: 1
-        plugins:
-          - *vault_ec_key_prod
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
@@ -557,8 +535,6 @@ steps:
           machineType: "n2-standard-4"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
           diskSizeGb: 80
-        plugins:
-          - *vault_ec_key_prod
         matrix:
           setup:
             variants:
