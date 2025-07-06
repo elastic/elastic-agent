@@ -1,4 +1,27 @@
 #!/usr/bin/env bash
+#
+# This script provides functions to manage an Elastic Stack Service (ESS) cluster
+# for integration testing in a CI/CD pipeline (e.g., Buildkite).
+#
+# Functions:
+#   ess_up [stack_version]  - Creates and starts an ESS cluster with the specified stack version.
+#   ess_down                - Tears down the ESS cluster created by ess_up.
+#   ess_load_secrets        - Loads secrets from the ESS cluster and exports them as environment variables.
+#
+# Usage:
+#   Source this script or call the functions directly in your pipeline steps.
+#
+# Requirements:
+#   - oblt-cli: CLI tool for managing clusters.
+#   - buildkite-agent: For Buildkite meta-data and artifact handling.
+#   - jq: For parsing JSON output.
+#
+# Notes:
+#   - The script assumes it is running in a Buildkite environment.
+#   - Secrets are redacted from logs using buildkite-agent redactor.
+#   - The script performs a smoke test to verify ESS secrets are loaded.
+#
+
 set -euo pipefail
 
 function ess_up() {
@@ -11,16 +34,15 @@ function ess_up() {
   fi
 
   # Create a cluster with the specified stack version and store the cluster information in a file
-  #oblt-cli cluster create custom \
-  #    --template ess-ea-it \
-  #    --cluster-name-prefix ea-hosted-it \
-  #    --parameters="{\"GitOps\":\"true\",\"GitHubRepository\":\"${BUILDKITE_REPO}\",\"GitHubCommit\":\"${BUILDKITE_COMMIT}\",\"EphemeralCluster\":\"true\",\"StackVersion\":\"$STACK_VERSION\"}" \
-  #    --output-file="${PWD}/cluster-info.json" \
-  #    --wait 15
+  oblt-cli cluster create custom \
+      --template ess-ea-it \
+      --cluster-name-prefix ea-hosted-it \
+      --parameters="{\"GitOps\":\"true\",\"GitHubRepository\":\"${BUILDKITE_REPO}\",\"GitHubCommit\":\"${BUILDKITE_COMMIT}\",\"EphemeralCluster\":\"true\",\"StackVersion\":\"$STACK_VERSION\"}" \
+      --output-file="${PWD}/cluster-info.json" \
+      --wait 15
 
   # Extract the cluster name from the cluster information file
-  #CLUSTER_NAME=$(jq -r '.ClusterName' cluster-info.json)
-  CLUSTER_NAME=ea-hosted-it-ess-ea--ppknr
+  CLUSTER_NAME=$(jq -r '.ClusterName' cluster-info.json)
 
   # Store the cluster name as a meta-data
   buildkite-agent meta-data set cluster-name "${CLUSTER_NAME}"
