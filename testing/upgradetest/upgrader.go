@@ -50,6 +50,9 @@ type UpgradeOpts struct {
 	// Disable check that enforces different hashed between the to and from version of upgrade
 	disableHashCheck bool
 
+	// Used to skip the installation of the Elastic Agent fixture.
+	SkipInstall bool
+
 	preInstallHook         func() error
 	postInstallHook        func() error
 	preUpgradeHook         func() error
@@ -154,6 +157,14 @@ func WithDisableUpgradeWatcherUpgradeDetailsCheck() UpgradeOpt {
 func WithDisableHashCheck(disable bool) UpgradeOpt {
 	return func(opts *UpgradeOpts) {
 		opts.disableHashCheck = disable
+	}
+}
+
+// WithoutInstall does not install the Elastic Agent fixture. This is useful
+// for tests that already install the fixture.
+func WithoutInstall() UpgradeOpt {
+	return func(opts *UpgradeOpts) {
+		opts.SkipInstall = true
 	}
 }
 
