@@ -41,6 +41,12 @@ import (
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
+const fastWatcherCfg = `
+agent.upgrade.watcher:
+  grace_period: 2m
+  error_check.interval: 5s
+`
+
 // TestFleetManagedUpgradeUnprivileged tests that the build under test can retrieve an action from
 // Fleet and perform the upgrade as an unprivileged Elastic Agent. It does not need to test
 // all the combinations of versions as the standalone tests already perform those tests and
@@ -52,7 +58,7 @@ func TestFleetManagedUpgradeUnprivileged(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
-	testFleetManagedUpgrade(t, info, true, false)
+	testFleetManagedUpgrade(t, info, true, false, upgradetest.WithCustomWatcherConfig(fastWatcherCfg))
 }
 
 // TestFleetManagedUpgradePrivileged tests that the build under test can retrieve an action from
@@ -66,7 +72,7 @@ func TestFleetManagedUpgradePrivileged(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
-	testFleetManagedUpgrade(t, info, false, false)
+	testFleetManagedUpgrade(t, info, false, false, upgradetest.WithCustomWatcherConfig(fastWatcherCfg))
 }
 
 // TestFleetManagedUpgradeUnprivilegedFIPS tests that the build under test can retrieve an action from
@@ -100,7 +106,7 @@ func TestFleetManagedUpgradeUnprivilegedFIPS(t *testing.T) {
 	}
 
 	postWatcherSuccessHook := upgradetest.PostUpgradeAgentIsFIPSCapable
-	upgradeOpts := []upgradetest.UpgradeOpt{upgradetest.WithPostWatcherSuccessHook(postWatcherSuccessHook)}
+	upgradeOpts := []upgradetest.UpgradeOpt{upgradetest.WithPostWatcherSuccessHook(postWatcherSuccessHook), upgradetest.WithCustomWatcherConfig(fastWatcherCfg)}
 	testFleetManagedUpgrade(t, info, true, true, upgradeOpts...)
 }
 
@@ -312,7 +318,7 @@ func TestFleetUpgradeToPRBuild(t *testing.T) {
 	t.Logf("policy %s using DownloadSourceID: %s",
 		policy.ID, policy.DownloadSourceID)
 
-	testUpgradeFleetManagedElasticAgent(ctx, t, stack, fromFixture, toFixture, policy, false)
+	testUpgradeFleetManagedElasticAgent(ctx, t, stack, fromFixture, toFixture, policy, false, upgradetest.WithCustomWatcherConfig(fastWatcherCfg))
 }
 
 func testFleetAirGappedUpgrade(t *testing.T, stack *define.Info, unprivileged bool) {
@@ -380,7 +386,7 @@ func testFleetAirGappedUpgrade(t *testing.T, stack *define.Info, unprivileged bo
 	policy := defaultPolicy()
 	policy.DownloadSourceID = src.Item.ID
 
-	testUpgradeFleetManagedElasticAgent(ctx, t, stack, fixture, upgradeTo, policy, unprivileged)
+	testUpgradeFleetManagedElasticAgent(ctx, t, stack, fixture, upgradeTo, policy, unprivileged, upgradetest.WithCustomWatcherConfig(fastWatcherCfg))
 }
 
 func testUpgradeFleetManagedElasticAgent(
