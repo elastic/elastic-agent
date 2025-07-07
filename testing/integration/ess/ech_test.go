@@ -21,12 +21,13 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/integration"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 )
 
 func TestECH(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: ECH,
+		Group: integration.ECH,
 		Stack: &define.Stack{},
 		Sudo:  true,
 		Local: false,
