@@ -13,16 +13,7 @@ function ess_up {
       Write-Error "Error: Specify stack version: ess_up [stack_version]"
       return 1
   }
-
-  $Env:EC_API_KEY = Retry-Command -ScriptBlock {  
-    vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod
-  }
-
-  if (-not $Env:EC_API_KEY) {
-      Write-Error "Error: Failed to get EC API key from vault"
-      exit 1
-  }
-
+  
   $BuildkiteBuildCreator = if ($Env:BUILDKITE_BUILD_CREATOR) { $Env:BUILDKITE_BUILD_CREATOR } else { get_git_user_email }
   $BuildkiteBuildNumber = if ($Env:BUILDKITE_BUILD_NUMBER) { $Env:BUILDKITE_BUILD_NUMBER } else { "0" }
   $BuildkitePipelineSlug = if ($Env:BUILDKITE_PIPELINE_SLUG) { $Env:BUILDKITE_PIPELINE_SLUG } else { "elastic-agent-integration-tests" }
@@ -55,10 +46,7 @@ function ess_down {
     return 0
   }
   Write-Output "~~~ Tearing down the ESS Stack(created for this step)"
-  try {  
-    $Env:EC_API_KEY = Retry-Command -ScriptBlock {  
-      vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod
-    }
+  try {
     Push-Location -Path $TfDir
     & terraform init
     & terraform destroy -auto-approve
