@@ -37,6 +37,8 @@ const (
 	watcherLockFile = "watcher.lock"
 )
 
+var ErrWatchCancelled = errors.New("watch cancelled")
+
 func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "watch",
@@ -154,6 +156,11 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	errorCheckInterval := cfg.ErrorCheck.Interval
 	ctx := context.Background()
 	if err := watcher.Watch(ctx, tilGrace, errorCheckInterval, log); err != nil {
+		if errors.Is(err, ErrWatchCancelled) {
+			// the watch has been cancelled prematurely, don't clean or rollback just yet
+			return nil
+		}
+
 		log.Error("Error detected, proceeding to rollback: %v", err)
 
 		upgradeDetails.SetStateWithReason(details.StateRollback, details.ReasonWatchFailed)
@@ -227,8 +234,12 @@ func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval time.
 WATCHLOOP:
 	for {
 		select {
-		case <-signals:
-			// ignore
+		case s := <-signals:
+			log.Infof("received signal: (%d): %v during watch", s, s)
+			if s == syscall.SIGINT || s == syscall.SIGTERM {
+				log.Infof("received signal: (%d): %v. Exiting watch", s, s)
+				return ErrWatchCancelled
+			}
 			continue
 		case <-ctx.Done():
 			break WATCHLOOP
