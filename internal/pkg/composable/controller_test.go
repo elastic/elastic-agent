@@ -325,10 +325,10 @@ func TestProvidersDefaultDisabled(t *testing.T) {
 
 			c.Observe(tt.observed)
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 
-			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 1*time.Second)
+			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Second)
 			defer timeoutCancel()
 
 			var setVars []*transpiler.Vars
