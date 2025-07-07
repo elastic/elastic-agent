@@ -141,7 +141,7 @@ func validateFileTree(dir string, uid uint32, gid uint32) error {
 		}
 		info, err := d.Info()
 		if err != nil {
-			if os.IsNotExist(err) {
+			if errors.Is(err, fs.ErrNotExist) {
 				return nil
 			}
 			return fmt.Errorf("error caling info: %w", err)
