@@ -14,11 +14,7 @@ require (
 	github.com/docker/docker v28.1.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-<<<<<<< HEAD
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250703174004-4d095bf336a7
-=======
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250704071946-38b3f7392262
->>>>>>> 2a60241d6 (Update OTel components to v0.129.0 (#8819))
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.9.2
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
@@ -50,30 +46,11 @@ require (
 	github.com/knadh/koanf/maps v0.1.2
 	github.com/magefile/mage v1.15.0
 	github.com/oklog/ulid/v2 v2.1.0
-<<<<<<< HEAD
-	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.127.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.127.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.127.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.127.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.127.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.127.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.127.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.127.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.127.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver v0.127.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver v0.127.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver v0.127.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.127.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.127.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver v0.127.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.127.0
-=======
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.129.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.129.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.129.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.129.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.129.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.129.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.129.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.129.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.129.0
@@ -85,7 +62,6 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.129.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver v0.129.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.129.0
->>>>>>> 2a60241d6 (Update OTel components to v0.129.0 (#8819))
 	github.com/otiai10/copy v1.14.0
 	github.com/rednafi/link-patrol v0.0.0-20240826150821-057643e74d4d
 	github.com/rs/zerolog v1.27.0
@@ -298,11 +274,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.30.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.34.0 // indirect
 	github.com/aws/smithy-go v1.22.4 // indirect
-<<<<<<< HEAD
-	github.com/axiomhq/hyperloglog v0.2.3 // indirect
-=======
 	github.com/axiomhq/hyperloglog v0.2.5 // indirect
->>>>>>> 2a60241d6 (Update OTel components to v0.129.0 (#8819))
 	github.com/bboreham/go-loser v0.0.0-20230920113527-fcc2c21820a3 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
