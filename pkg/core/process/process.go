@@ -172,3 +172,8 @@ func startContext(ctx context.Context, path string, uid, gid int, args []string,
 		Stderr:  stderr,
 	}, err
 }
+
+// Terminate is a utility function to gracefully shutdown a process
+func Terminate(proc *os.Process) error {
+	return terminateCmd(proc)
+}

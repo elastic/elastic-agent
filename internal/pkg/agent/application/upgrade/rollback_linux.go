@@ -38,7 +38,7 @@ func invokeCmd(agentExecutable string) *exec.Cmd {
 		Credential: cred,
 		Setsid:     true,
 		// propagate sigint instead of sigkill so we can ignore it
-		Pdeathsig: syscall.SIGINT,
+		Pdeathsig: syscall.Signal(0x0),
 	}
 	cmd.SysProcAttr = sysproc
 	return cmd

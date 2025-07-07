@@ -37,6 +37,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 	"github.com/elastic/elastic-agent/pkg/utils"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 	currentagtversion "github.com/elastic/elastic-agent/version"
@@ -504,15 +505,15 @@ func (u *Upgrader) takeOverWatcher(ctx context.Context) (*filelock.AppLocker, er
 					continue
 				}
 
-				// this should be run continuously and concurrently to attempting to get the app locker
+				// this should be run continuously and concurrently attempting to get the app locker
 				for _, pid := range pids {
 					u.log.Debugf("attempting to kill watcher process with PID: %d", pid)
-					process, findProcErr := os.FindProcess(pid)
+					watcherProcess, findProcErr := os.FindProcess(pid)
 					if findProcErr != nil {
 						u.log.Errorf("error finding process with PID: %d: %s", pid, findProcErr)
 						continue
 					}
-					killProcErr := process.Kill()
+					killProcErr := process.Terminate(watcherProcess)
 					if killProcErr != nil {
 						u.log.Errorf("error killing process with PID: %d: %s", pid, killProcErr)
 					}
