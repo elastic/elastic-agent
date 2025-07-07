@@ -403,24 +403,6 @@ func testUpgradeFleetManagedElasticAgent(
 	fleetServerURL, err := fleettools.DefaultURL(ctx, kibClient)
 	require.NoError(t, err, "failed getting Fleet Server URL")
 
-<<<<<<< HEAD
-	t.Logf("Installing Elastic Agent (unprivileged: %t)...", unprivileged)
-	var nonInteractiveFlag bool
-	if upgradetest.Version_8_2_0.Less(*startParsedVersion) {
-		nonInteractiveFlag = true
-	}
-	installOpts := atesting.InstallOpts{
-		NonInteractive: nonInteractiveFlag,
-		Force:          true,
-		EnrollOpts: atesting.EnrollOpts{
-			URL:             fleetServerURL,
-			EnrollmentToken: enrollmentToken.APIKey,
-		},
-		Privileged: !unprivileged,
-	}
-	output, err := startFixture.Install(ctx, &installOpts)
-	require.NoError(t, err, "failed to install start agent [output: %s]", string(output))
-=======
 	if !upgradeOpts.SkipInstall {
 		t.Logf("Installing Elastic Agent (unprivileged: %t)...", unprivileged)
 		var nonInteractiveFlag bool
@@ -437,20 +419,8 @@ func testUpgradeFleetManagedElasticAgent(
 			Privileged: !unprivileged,
 		}
 		output, err := startFixture.Install(ctx, &installOpts)
-		t.Logf("install start agent output:\n%s", string(output))
-		if err != nil {
-			return fmt.Errorf("failed to install start agent: %w", err)
-		}
+		require.NoError(t, err, "failed to install start agent [output: %s]", string(output))
 	}
-
-	// start fixture gets the agent configured to use a faster watcher
-	// THIS IS A HACK: we are modifying elastic-agent.yaml after enrollment because the watcher reads only that file to
-	// configure itself. This is obviously not fit for production code or even guaranteed to be stable.
-	if upgradeOpts.CustomWatcherCfg != "" {
-		t.Log("Setting custom watcher config")
-		err = startFixture.Configure(ctx, []byte("fleet.enabled: true\n"+upgradeOpts.CustomWatcherCfg))
-	}
->>>>>>> 1cf28a8f2 (Adding a unified FIPS integration test (#8383))
 
 	t.Log("Waiting for Agent to be correct version and healthy...")
 	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
