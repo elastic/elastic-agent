@@ -249,10 +249,11 @@ func TestGetUpgradableVersions(t *testing.T) {
 
 func TestPreviousMinor(t *testing.T) {
 	testCases := map[string]struct {
-		currentVersion      string
-		upgradeableVersions []string
-		expectedVersion     string
-		expectError         bool
+		currentVersion         string
+		upgradeableVersions    []string
+		fallbackReleaseVersion bool
+		expectedVersion        string
+		expectError            bool
 	}{
 		"should return the previous minor from the same major and skip prerelease versions and versions with metadata": {
 			currentVersion: "9.1.0",
@@ -263,8 +264,9 @@ func TestPreviousMinor(t *testing.T) {
 				"8.19.0-SNAPSHOT",
 				"8.18.2",
 			},
-			expectedVersion: "9.0.1",
-			expectError:     false,
+			fallbackReleaseVersion: false,
+			expectedVersion:        "9.0.1",
+			expectError:            false,
 		},
 		"should return the most recent version from the previous major when the current version is the first major release with a patch version": {
 			currentVersion: "9.0.1",
@@ -274,8 +276,9 @@ func TestPreviousMinor(t *testing.T) {
 				"8.17.6",
 				"7.17.29-SNAPSHOT",
 			},
-			expectedVersion: "8.19.0-SNAPSHOT+metadata",
-			expectError:     false,
+			fallbackReleaseVersion: false,
+			expectedVersion:        "8.19.0-SNAPSHOT+metadata",
+			expectError:            false,
 		},
 		"should return the most recent version from previous major when the current version is the first major release": {
 			currentVersion: "9.0.0",
@@ -285,8 +288,9 @@ func TestPreviousMinor(t *testing.T) {
 				"8.17.6",
 				"7.17.29-SNAPSHOT",
 			},
-			expectedVersion: "8.19.0-SNAPSHOT+metadata",
-			expectError:     false,
+			fallbackReleaseVersion: false,
+			expectedVersion:        "8.19.0-SNAPSHOT+metadata",
+			expectError:            false,
 		},
 		"should return the previous minor from the same major when the current version is a prerelease version": {
 			currentVersion: "9.1.0-SNAPSHOT",
@@ -297,8 +301,9 @@ func TestPreviousMinor(t *testing.T) {
 				"8.19.0-SNAPSHOT",
 				"8.18.2",
 			},
-			expectedVersion: "9.0.2",
-			expectError:     false,
+			fallbackReleaseVersion: false,
+			expectedVersion:        "9.0.2",
+			expectError:            false,
 		},
 		"should return the most recent version from the previous major when the current version is the first major release with a prerelease version and metadata": {
 			currentVersion: "9.0.0-SNAPSHOT+metadata",
@@ -308,8 +313,9 @@ func TestPreviousMinor(t *testing.T) {
 				"8.17.6",
 				"7.17.29-SNAPSHOT",
 			},
-			expectedVersion: "8.19.0-SNAPSHOT+metadata",
-			expectError:     false,
+			fallbackReleaseVersion: false,
+			expectedVersion:        "8.19.0-SNAPSHOT+metadata",
+			expectError:            false,
 		},
 		"should return the most recent version from previous major when current version is first minor prerelease with no other minors in current major": {
 			currentVersion: "9.1.0-SNAPSHOT",
@@ -319,8 +325,53 @@ func TestPreviousMinor(t *testing.T) {
 				"8.17.6",
 				"7.17.29-SNAPSHOT",
 			},
-			expectedVersion: "8.19.0-SNAPSHOT+metadata",
-			expectError:     false,
+			fallbackReleaseVersion: false,
+			expectedVersion:        "8.19.0-SNAPSHOT+metadata",
+			expectError:            false,
+		},
+		"should return the most recent release version from the previous major when the current version is the first minor prerelease with no other minors in the current major and fallbackReleaseVersion is true": {
+			currentVersion: "9.1.0-SNAPSHOT",
+			upgradeableVersions: []string{
+				"8.19.0-SNAPSHOT+metadata",
+				"8.18.2",
+				"8.17.6",
+				"7.17.29-SNAPSHOT",
+			},
+			fallbackReleaseVersion: true,
+			expectedVersion:        "8.18.2",
+			expectError:            false,
+		},
+		"should return the most recent release version from the previous major when the current version is the first major version and fallbackReleaseVersion is true": {
+			currentVersion: "9.0.0-SNAPSHOT",
+			upgradeableVersions: []string{
+				"8.19.0-SNAPSHOT+metadata",
+				"8.18.2",
+				"8.17.6",
+				"7.17.29-SNAPSHOT",
+			},
+			fallbackReleaseVersion: true,
+			expectedVersion:        "8.18.2",
+			expectError:            false,
+		},
+		"should return error when the current version is the first minor release and fallbackReleaseVersion is true and only prerelease versions exist in the previous major": {
+			currentVersion: "9.1.0",
+			upgradeableVersions: []string{
+				"8.19.0-SNAPSHOT",
+				"8.18.2-SNAPSHOT",
+			},
+			fallbackReleaseVersion: true,
+			expectedVersion:        "",
+			expectError:            true,
+		},
+		"should return error when the current version is the first major release and fallbackReleaseVersion is true and only prerelease versions exist in the previous major": {
+			currentVersion: "9.0.0",
+			upgradeableVersions: []string{
+				"8.19.0-SNAPSHOT",
+				"8.18.2-SNAPSHOT",
+			},
+			fallbackReleaseVersion: true,
+			expectedVersion:        "",
+			expectError:            true,
 		},
 		"should return error when no previous minor is found": {
 			currentVersion: "9.1.0",
@@ -332,14 +383,16 @@ func TestPreviousMinor(t *testing.T) {
 				"8.17.6",
 				"7.17.29-SNAPSHOT",
 			},
-			expectedVersion: "",
-			expectError:     true,
+			fallbackReleaseVersion: false,
+			expectedVersion:        "",
+			expectError:            true,
 		},
 		"should return error when no versions are available": {
-			currentVersion:      "9.1.0",
-			upgradeableVersions: []string{},
-			expectedVersion:     "",
-			expectError:         true,
+			currentVersion:         "9.1.0",
+			upgradeableVersions:    []string{},
+			fallbackReleaseVersion: false,
+			expectedVersion:        "",
+			expectError:            true,
 		},
 	}
 
@@ -352,7 +405,7 @@ func TestPreviousMinor(t *testing.T) {
 				upgradeableVersions = append(upgradeableVersions, parsed)
 			}
 
-			result, err := previousMinor(tc.currentVersion, upgradeableVersions)
+			result, err := previousMinor(tc.currentVersion, upgradeableVersions, tc.fallbackReleaseVersion)
 
 			if tc.expectError {
 				require.Nil(t, result)
