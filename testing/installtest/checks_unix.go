@@ -8,6 +8,7 @@ package installtest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"math"
