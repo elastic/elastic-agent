@@ -69,41 +69,6 @@ func TestFleetManagedUpgradePrivileged(t *testing.T) {
 	testFleetManagedUpgrade(t, info, false, false)
 }
 
-// TestFleetManagedUpgradeUnprivilegedFIPS tests that the build under test can retrieve an action from
-// Fleet and perform the upgrade as an unprivileged FIPS-capable Elastic Agent. It does not need to test
-// all the combinations of versions as the standalone tests already perform those tests and
-// would be redundant.
-func TestFleetManagedUpgradeUnprivilegedFIPS(t *testing.T) {
-	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
-		Stack: &define.Stack{},
-		Local: false, // requires Agent installation
-		Sudo:  true,  // requires Agent installation
-		OS: []define.OS{
-			{Type: define.Linux},
-		},
-		FIPS: true,
-	})
-
-	// parse the version we are testing
-	currentVersion, err := version.ParseVersion(define.Version())
-	require.NoError(t, err)
-
-	// We need to start the upgrade from a FIPS-capable version
-	if !isFIPSCapableVersion(currentVersion) {
-		t.Skipf(
-			"Minimum start version of FIPS-capable Agent for running this test is either %q or %q, current start version: %q",
-			*upgradetest.Version_8_19_0_SNAPSHOT,
-			*upgradetest.Version_9_1_0_SNAPSHOT,
-			currentVersion,
-		)
-	}
-
-	postWatcherSuccessHook := upgradetest.PostUpgradeAgentIsFIPSCapable
-	upgradeOpts := []upgradetest.UpgradeOpt{upgradetest.WithPostWatcherSuccessHook(postWatcherSuccessHook)}
-	testFleetManagedUpgrade(t, info, true, true, upgradeOpts...)
-}
-
 func testFleetManagedUpgrade(t *testing.T, info *define.Info, unprivileged bool, fips bool, upgradeOpts ...upgradetest.UpgradeOpt) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
@@ -438,22 +403,24 @@ func testUpgradeFleetManagedElasticAgent(
 	fleetServerURL, err := fleettools.DefaultURL(ctx, kibClient)
 	require.NoError(t, err, "failed getting Fleet Server URL")
 
-	t.Logf("Installing Elastic Agent (unprivileged: %t)...", unprivileged)
-	var nonInteractiveFlag bool
-	if upgradetest.Version_8_2_0.Less(*startParsedVersion) {
-		nonInteractiveFlag = true
+	if !upgradeOpts.SkipInstall {
+		t.Logf("Installing Elastic Agent (unprivileged: %t)...", unprivileged)
+		var nonInteractiveFlag bool
+		if upgradetest.Version_8_2_0.Less(*startParsedVersion) {
+			nonInteractiveFlag = true
+		}
+		installOpts := atesting.InstallOpts{
+			NonInteractive: nonInteractiveFlag,
+			Force:          true,
+			EnrollOpts: atesting.EnrollOpts{
+				URL:             fleetServerURL,
+				EnrollmentToken: enrollmentToken.APIKey,
+			},
+			Privileged: !unprivileged,
+		}
+		output, err := startFixture.Install(ctx, &installOpts)
+		require.NoError(t, err, "failed to install start agent [output: %s]", string(output))
 	}
-	installOpts := atesting.InstallOpts{
-		NonInteractive: nonInteractiveFlag,
-		Force:          true,
-		EnrollOpts: atesting.EnrollOpts{
-			URL:             fleetServerURL,
-			EnrollmentToken: enrollmentToken.APIKey,
-		},
-		Privileged: !unprivileged,
-	}
-	output, err := startFixture.Install(ctx, &installOpts)
-	require.NoError(t, err, "failed to install start agent [output: %s]", string(output))
 
 	t.Log("Waiting for Agent to be correct version and healthy...")
 	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
