@@ -323,12 +323,16 @@ func TestProvidersDefaultDisabled(t *testing.T) {
 			c, err := composable.New(log, cfg, false)
 			require.NoError(t, err)
 
+<<<<<<< HEAD
 			c.Observe(tt.observed)
 
 			ctx, cancel := context.WithCancel(context.Background())
+=======
+			ctx, cancel := context.WithCancel(t.Context())
+>>>>>>> ad94a7e23 (flaky: accommodate for slower CI runners in TestProvidersDefaultDisabled (#8865))
 			defer cancel()
 
-			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 1*time.Second)
+			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Second)
 			defer timeoutCancel()
 
 			var setVars []*transpiler.Vars
