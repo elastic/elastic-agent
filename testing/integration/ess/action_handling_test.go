@@ -4,7 +4,7 @@
 
 //go:build integration
 
-package integration
+package ess
 
 import (
 	"context"
@@ -19,13 +19,14 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 	"github.com/elastic/elastic-agent/testing/fleetservertest"
+	"github.com/elastic/elastic-agent/testing/integration"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestActionHandling(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: Fleet,
+		Group: integration.Fleet,
 		Local: false,
 		Sudo:  true,
 	})
@@ -35,7 +36,22 @@ func TestActionHandling(t *testing.T) {
 	})
 }
 
+type Semaphore struct {
+	c chan (struct{})
+}
+
+func (s *Semaphore) Wait() {
+	<-s.c
+}
+
+func (s *Semaphore) Release() {
+	s.c <- struct{}{}
+}
+
 func testAgentRestartsBeforeActionsProcessed(t *testing.T) {
+	checkinSem := Semaphore{}
+	ackSem := Semaphore{}
+
 	ctx := t.Context()
 
 	apiKey, policy := createBasicFleetPolicyData(t, "http://fleet-server:8220")
@@ -44,8 +60,8 @@ func testAgentRestartsBeforeActionsProcessed(t *testing.T) {
 	checkinWithAcker := fleetservertest.NewCheckinActionsWithAcker()
 	var checkinCounter atomic.Int32
 
-	waitChan := make(chan struct{})
-	finalWaitChan := make(chan struct{})
+	// waitChan := make(chan struct{})
+	// finalWaitChan := make(chan struct{})
 	ackTokenChan := make(chan string)
 	checkinHandlerProvider := func(next fleetservertest.ActionsGenerator) func(
 		ctx context.Context,
@@ -67,9 +83,11 @@ func testAgentRestartsBeforeActionsProcessed(t *testing.T) {
 			t.Logf("Count: %d, CheckinRequest: Status=%s, Message=%s, AckToken='%s'", checkinCounter.Load(), checkinRequest.Status, checkinRequest.Message, checkinRequest.AckToken)
 
 			if int(checkinCounter.Load()) == 2 {
-				<-waitChan
+				// <-waitChan
+				checkinSem.Wait()
 				ackTokenChan <- checkinRequest.AckToken
-				<-finalWaitChan
+				// <-finalWaitChan
+				checkinSem.Wait()
 			}
 
 			data, hErr := next()
@@ -98,7 +116,7 @@ func testAgentRestartsBeforeActionsProcessed(t *testing.T) {
 		}
 	}
 
-	waitAckChan := make(chan struct{})
+	// waitAckChan := make(chan struct{})
 
 	ackHandlerProvider := func(acker fleetservertest.Acker) func(
 		ctx context.Context,
@@ -123,10 +141,11 @@ func testAgentRestartsBeforeActionsProcessed(t *testing.T) {
 			for _, e := range ackRequest.Events {
 				t.Logf("ACTION ID: %s", e.ActionId)
 				if e.ActionId == "test-action-id-3" {
-					close(waitAckChan)
+					// close(waitAckChan)
+					ackSem.Release()
 					t.Log("Acker waiting for waitChan")
 
-					<-waitChan
+					ackSem.Wait()
 				}
 				t.Logf("Acking action event with id: %s", e.ActionId)
 				r, isErr := acker(e.ActionId)
@@ -191,25 +210,31 @@ func testAgentRestartsBeforeActionsProcessed(t *testing.T) {
 	client := fixture.Client()
 	client.Connect(ctx)
 
-	<-waitAckChan
+	// <-waitAckChan
+	ackSem.Wait()
 
 	err = client.Restart(ctx)
 	assert.NoError(t, err)
 	t.Log("Agent restarted")
 
-	close(waitChan)
+	// close(waitChan)
+	checkinSem.Release()
+	ackSem.Release()
 
 	ackToken := <-ackTokenChan
 
-	for _, action := range actions {
-		acked := checkinWithAcker.Acked(action.ActionID)
-		assert.True(t, acked, fmt.Sprintf("Action with id %s", action.ActionID))
+	actionFilter := func(ackableAction fleetservertest.AckableAction) bool {
+		return ackableAction.Acked()
 	}
+
+	require.Eventually(t, func() bool {
+		return len(checkinWithAcker.Actions(actionFilter)) == 9
+	}, 30*time.Second, time.Second)
 
 	t.Logf("Asserting AckToken: %s", ackToken)
 	assert.Equal(t, "AckToken-0", ackToken)
 
-	close(finalWaitChan)
+	checkinSem.Release()
 
 	status, err := fixture.Client().State(ctx)
 	require.NoError(t, err)

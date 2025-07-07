@@ -128,6 +128,10 @@ func NewActionPolicyChangeWithFakeComponent(actionID string, data TmplPolicy) (A
 	})
 }
 
+func (a *AckableAction) Acked() bool {
+	return a.acked
+}
+
 // template functions
 var funcMap = map[string]any{"toJson": toJson}
 

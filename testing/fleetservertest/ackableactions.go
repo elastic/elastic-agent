@@ -123,8 +123,8 @@ func (c *CheckinActionsWithAcker) Ack(actionID string) (AckResponseItem, bool) {
 func (c *CheckinActionsWithAcker) AddCheckin(
 	ackToken string,
 	delay time.Duration,
-	actions ...AckableAction) {
-
+	actions ...AckableAction,
+) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -169,4 +169,20 @@ func (c *CheckinActionsWithAcker) Acked(actionID string) bool {
 	}
 
 	return false
+}
+
+func (c *CheckinActionsWithAcker) Actions(filterFunc func(action AckableAction) bool) []AckableAction {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	actions := []AckableAction{}
+
+	for _, checkin := range c.checkinDatas[:c.checkinsSent] {
+		for _, actionData := range checkin.AckableAction {
+			if filterFunc(actionData) {
+				actions = append(actions, actionData)
+			}
+		}
+	}
+
+	return actions
 }
