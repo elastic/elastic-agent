@@ -354,7 +354,7 @@ func TestPreviousMinor(t *testing.T) {
 			expectError:            false,
 		},
 		"should return error when the current version is the first minor release and fallbackReleaseVersion is true and only prerelease versions exist in the previous major": {
-			currentVersion: "9.1.0",
+			currentVersion: "9.1.0-SNAPSHOT",
 			upgradeableVersions: []string{
 				"8.19.0-SNAPSHOT",
 				"8.18.2-SNAPSHOT",
