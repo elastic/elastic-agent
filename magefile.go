@@ -610,84 +610,6 @@ func DownloadManifest(ctx context.Context) error {
 	return nil
 }
 
-<<<<<<< HEAD
-=======
-func ExtractComponentsFromSelectedPkgSpecs(pkgSpecs []devtools.OSPackageArgs) ([]packaging.BinarySpec, error) {
-	// Extract the dependencies from the selected packages
-	mappedDependencies := map[string]packaging.BinarySpec{}
-	for _, pkg := range pkgSpecs {
-		if isSelected(pkg) {
-			if mg.Verbose() {
-				log.Printf("package %s is selected, collecting dependencies", pkg.Spec.Name)
-			}
-
-			for _, component := range pkg.Spec.Components {
-				if existingComp, ok := mappedDependencies[component.PackageName]; ok {
-					// sanity check: verify that for the same packageName we have the same component spec
-					if !existingComp.Equal(component) {
-						return nil, fmt.Errorf("found component %+v and %+v sharing the same package name %q but they are not equal",
-							existingComp, component, component.PackageName)
-					}
-				} else {
-					mappedDependencies[component.PackageName] = component
-					if mg.Verbose() {
-						log.Printf("Added component %s to the list of component to download from manifest", component.PackageName)
-					}
-				}
-			}
-		}
-	}
-
-	// collect the dependencies into a slice
-	dependencies := make([]packaging.BinarySpec, 0, len(mappedDependencies))
-	for _, pkg := range mappedDependencies {
-		dependencies = append(dependencies, pkg)
-	}
-
-	return dependencies, nil
-}
-
-func isSelected(pkg devtools.OSPackageArgs) bool {
-	// Checks if this package is compatible with the FIPS settings
-	if pkg.Spec.FIPS != devtools.FIPSBuild {
-		log.Printf("Skipping %s/%s package type because FIPS flag doesn't match [pkg=%v, build=%v]", pkg.Spec.Name, pkg.OS, pkg.Spec.FIPS, devtools.FIPSBuild)
-		return false
-	}
-
-	platforms := devtools.Platforms
-	for _, platform := range platforms {
-		if !isPackageSelectedForPlatform(pkg, platform) {
-			continue
-		}
-
-		pkgTypesSelected := 0
-		for _, pkgType := range pkg.Types {
-			if !devtools.IsPackageTypeSelected(pkgType) {
-				log.Printf("Skipping %s package type because it is not selected", pkgType)
-				continue
-			}
-
-			if pkgType == devtools.Docker && !devtools.IsDockerVariantSelected(pkg.Spec.DockerVariant) {
-				log.Printf("Skipping %s docker variant type because it is not selected", pkg.Spec.DockerVariant)
-				continue
-			}
-			pkgTypesSelected++
-		}
-		// if we found at least one package type for one platform the package spec is selected
-		return pkgTypesSelected > 0
-	}
-	return true
-}
-
-func isPackageSelectedForPlatform(pkg devtools.OSPackageArgs, platform devtools.BuildPlatform) bool {
-	if pkg.OS == platform.GOOS() && (pkg.Arch == "" || pkg.Arch == platform.Arch()) {
-		return true
-	}
-
-	return false
-}
-
->>>>>>> 502cd5c1a (add logs only edot kube-stack configuration (#8785))
 // FixDRADockerArtifacts is a workaround for the DRA artifacts produced by the package target. We had to do
 // because the initial unified release manager DSL code required specific names that the package does not produce,
 // we wanted to keep backwards compatibility with the artifacts of the unified release and the DRA.
@@ -1326,16 +1248,8 @@ func removePythonWheels(matches []string, version string) []string {
 
 // flattenDependencies will extract all the required packages collected in archivePath and dropPath in flatPath and
 // regenerate checksums
-<<<<<<< HEAD
 func flattenDependencies(requiredPackages []string, packageVersion, archivePath, dropPath, flatPath string, manifestResponse *manifest.Build) {
 	for _, rp := range requiredPackages {
-=======
-func flattenDependencies(platforms []string, dependenciesVersion, archivePath, dropPath, flatPath string, manifestResponse *manifest.Build, dependencies []packaging.BinarySpec) {
-	for _, pltf := range platforms {
-
-		rp := manifest.PlatformPackages[pltf]
-
->>>>>>> 502cd5c1a (add logs only edot kube-stack configuration (#8785))
 		targetPath := filepath.Join(archivePath, rp)
 		versionedFlatPath := filepath.Join(flatPath, rp)
 		versionedDropPath := filepath.Join(dropPath, rp)
@@ -1413,31 +1327,7 @@ type branchInfo struct {
 // FetchLatestAgentCoreStagingDRA is a mage target that will retrieve the elastic-agent-core DRA artifacts and
 // place them under build/dra/buildID. It accepts one argument that has to be a release branch present in staging DRA
 func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
-<<<<<<< HEAD
 	branchInfo, err := findLatestBuildForBranch(ctx, baseURLForStagingDRA, branch)
-=======
-	components, err := packaging.Components()
-	if err != nil {
-		return fmt.Errorf("retrieving defined components: %w", err)
-	}
-	elasticAgentCoreComponents := packaging.FilterComponents(components, packaging.WithProjectName(agentCoreProjectName), packaging.WithFIPS(devtools.FIPSBuild))
-
-	if len(elasticAgentCoreComponents) != 1 {
-		return fmt.Errorf(
-			"found an unexpected number of elastic-agent-core components (should be 1) [projectName: %q, fips: %v]: %v",
-			agentCoreProjectName,
-			devtools.FIPSBuild,
-			elasticAgentCoreComponents,
-		)
-	}
-
-	elasticAgentCoreComponent := elasticAgentCoreComponents[0]
-
-	branchInformation, err := findLatestBuildForBranch(ctx, baseURLForSnapshotDRA, branch)
-	if err != nil {
-		return fmt.Errorf("getting latest build for branch %q: %v", err)
-	}
->>>>>>> 502cd5c1a (add logs only edot kube-stack configuration (#8785))
 
 	// Create a dir with the buildID at <root>/build/dra/<buildID>
 	repositoryRoot, err := findRepositoryRoot()
@@ -1576,7 +1466,6 @@ func mapManifestPlatformToAgentPlatform(manifestPltf string) (string, bool) {
 	return mappedPltf, found
 }
 
-<<<<<<< HEAD
 func filterPackagesByPlatform(pkgs map[string]manifest.Package) map[string]manifest.Package {
 	if mg.Verbose() {
 		log.Printf("unfiltered packages: %v", pkgs)
@@ -1606,10 +1495,6 @@ func filterPackagesByPlatform(pkgs map[string]manifest.Package) map[string]manif
 
 func downloadDRAArtifacts(ctx context.Context, manifestUrl string, downloadDir string, projects ...string) (map[string]manifest.Package, error) {
 	build, err := manifest.DownloadManifest(ctx, manifestUrl)
-=======
-func downloadDRAArtifacts(ctx context.Context, build *manifest.Build, version string, draDownloadDir string, components ...packaging.BinarySpec) (map[string]manifest.Package, error) {
-	err := os.MkdirAll(draDownloadDir, 0o770)
->>>>>>> 502cd5c1a (add logs only edot kube-stack configuration (#8785))
 	if err != nil {
 		return nil, fmt.Errorf("downloading manifest from %q: %w", manifestUrl, err)
 	}
