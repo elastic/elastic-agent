@@ -14,3 +14,6 @@
 /deploy/kubernetes @elastic/elastic-agent-control-plane
 /dev-tools/kubernetes @elastic/elastic-agent-control-plane
 /internal/pkg/composable/providers/kubernetes @elastic/elastic-agent-control-plane
+/internal/pkg/otel/samples/darwin/autoops_es.yml @elastic/opex
+/internal/pkg/otel/samples/linux/autoops_es.yml @elastic/opex
+/internal/pkg/otel/samples/windows/autoops_es.yml @elastic/opex
