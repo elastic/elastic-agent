@@ -277,3 +277,46 @@ func TestElasticApiVersion(t *testing.T) {
 		assert.NotEmptyf(t, logs, "warning was not logged")
 	})
 }
+
+func Test_CheckRemote(t *testing.T) {
+	var reportedStatus int
+	statusServer := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !strings.Contains(r.URL.Path, "status") {
+				w.WriteHeader(http.StatusNotFound)
+				_, err := w.Write(nil)
+				require.NoError(t, err)
+				return
+			}
+
+			w.WriteHeader(reportedStatus)
+			_, err := w.Write(nil)
+			require.NoError(t, err)
+
+		}))
+	defer statusServer.Close()
+
+	cases := []struct {
+		name          string
+		serverStatus  int
+		expectedError bool
+	}{
+		{"ok", http.StatusOK, false},
+		{"4xx", http.StatusNotFound, true},
+		{"5xx", http.StatusInternalServerError, true},
+	}
+
+	testLogger, _ := loggertest.New("test_CheckRemote")
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			reportedStatus = tc.serverStatus
+			c, err := NewWithConfig(testLogger, remote.Config{
+				Host: statusServer.URL,
+			})
+
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedError, CheckRemote(t.Context(), c) != nil)
+		})
+	}
+}
