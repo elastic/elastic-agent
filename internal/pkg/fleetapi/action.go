@@ -34,6 +34,8 @@ const (
 	ActionTypeCancel = "CANCEL"
 	// ActionTypeDiagnostics specifies a diagnostics action.
 	ActionTypeDiagnostics = "REQUEST_DIAGNOSTICS"
+	// ActionTypeDiagnostics specifies a diagnostics action.
+	ActionTypeMigrate = "MIGRATE"
 )
 
 // Error values that the Action interface can return
@@ -115,6 +117,8 @@ func NewAction(actionType string) Action {
 		action = &ActionUnenroll{}
 	case ActionTypeUpgrade:
 		action = &ActionUpgrade{}
+	case ActionTypeMigrate:
+		action = &ActionMigrate{}
 	default:
 		action = &ActionUnknown{OriginalType: actionType}
 	}
@@ -427,6 +431,52 @@ func (a *ActionSettings) String() string {
 	s.WriteString(", log_level: ")
 	s.WriteString(a.Data.LogLevel)
 	return s.String()
+}
+
+type ActionMigrate struct {
+	ActionID   string            `json:"id" yaml:"id"`
+	ActionType string            `json:"type" yaml:"type"`
+	Data       ActionMigrateData `json:"data,omitempty"`
+
+	Err error `json:"-" yaml:"-" mapstructure:"-"`
+}
+
+// ID returns the ID of the Action.
+func (a *ActionMigrate) ID() string {
+	return a.ActionID
+}
+
+// Type returns the type of the Action.
+func (a *ActionMigrate) Type() string {
+	return a.ActionType
+}
+
+func (a *ActionMigrate) String() string {
+	var s strings.Builder
+	s.WriteString("id: ")
+	s.WriteString(a.ActionID)
+	s.WriteString(", type: ")
+	s.WriteString(a.ActionType)
+	return s.String()
+}
+
+func (a *ActionMigrate) AckEvent() AckEvent {
+	event := newAckEvent(a.ActionID, a.ActionType)
+	if a.Err != nil {
+		event.Error = a.Err.Error()
+	}
+	return event
+}
+
+type ActionMigrateData struct {
+	// TargetURI: URI of Fleet Server in a target cluster.
+	TargetURI string `json:"target_uri" yaml:"target_uri"`
+
+	// EnrollmentToken: Enrollment token used to enroll agent to a new cluster.
+	EnrollmentToken string `json:"enrollment_token" yaml:"enrollment_token"`
+
+	// Settings: An embedded JSON object that holds user-provided settings like TLS.
+	Settings json.RawMessage `json:"settings" yaml:"settings,omitempty"`
 }
 
 func (a *ActionSettings) AckEvent() AckEvent {

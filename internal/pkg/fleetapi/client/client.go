@@ -12,11 +12,17 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+)
+
+const (
+	apiStatusTimeout = 15 * time.Second
+	statusPath       = "/api/status"
 )
 
 // Sender is an sender interface describing client behavior.
@@ -120,4 +126,24 @@ func ExtractError(resp io.Reader) error {
 	}
 
 	return fmt.Errorf("could not decode the response, raw response: %s", string(data))
+}
+
+func CheckRemote(ctx context.Context, c Sender) error {
+	ctx, cancel := context.WithTimeout(ctx, apiStatusTimeout)
+	defer cancel()
+
+	resp, err := c.Send(ctx, http.MethodGet, statusPath, nil, nil, nil)
+	if err != nil {
+		return fmt.Errorf("fail to communicate with Fleet Server API client hosts: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("fleet server ping returned a bad status code: %d", resp.StatusCode)
+	}
+
+	// discard body for proper cancellation and connection reuse
+	_, _ = io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+
+	return nil
 }

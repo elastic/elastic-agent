@@ -389,6 +389,11 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 	)
 
 	m.dispatcher.MustRegister(
+		&fleetapi.ActionMigrate{},
+		handlers.NewMigrate(m.log, m.agentInfo, m.coord),
+	)
+
+	m.dispatcher.MustRegister(
 		&fleetapi.ActionUnknown{},
 		handlers.NewUnknown(m.log),
 	)
