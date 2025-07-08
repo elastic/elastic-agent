@@ -176,12 +176,12 @@ collectors:
               - "k8s.pod.uid"
               - "k8s.pod.start_time"
             labels:
-                - tag_name: app.label.name
-                  key: app.kubernetes.io/name
-                  from: pod
-                - tag_name: app.label.version
-                  key: app.kubernetes.io/version
-                  from: pod
+              - tag_name: app.label.name
+                key: app.kubernetes.io/name
+                from: pod
+              - tag_name: app.label.version
+                key: app.kubernetes.io/version
+                from: pod
       receivers:
         otlp: null
         # [File Log Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/filelogreceiver)
