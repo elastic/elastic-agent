@@ -9,8 +9,6 @@ package upgrade
 import (
 	"os/exec"
 	"time"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
 const (
@@ -19,11 +17,6 @@ const (
 	afterRestartDelay = 20 * time.Second
 )
 
-func invokeCmd(agentExecutable string) *exec.Cmd {
-	// #nosec G204 -- user cannot inject any parameters to this command
-	cmd := exec.Command(agentExecutable, watcherSubcommand,
-		"--path.config", paths.Config(),
-		"--path.home", paths.Top(),
-	)
-	return cmd
+func makeOSWatchCmd(baseWatchCmd *exec.Cmd) *exec.Cmd {
+	return baseWatchCmd
 }
