@@ -45,7 +45,7 @@ spec:
         build_pull_requests: true
         build_tags: false
         filter_enabled: true
-        # TODO: what's the reason for this filter?
+        # required by "build_pull_requests: true" when used with buildkite-pr-bot
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       schedules:
@@ -175,7 +175,13 @@ spec:
       repository: elastic/elastic-agent
       pipeline_file: ".buildkite/macos.integration.pipeline.yml"
       provider_settings:
-        trigger_mode: none # don't trigger jobs from github activity
+        build_pull_request_forks: false
+        build_pull_requests: true
+        build_tags: false
+        filter_enabled: true
+        # required by "build_pull_requests: true" when used with buildkite-pr-bot
+        filter_condition: >-
+          build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       cancel_intermediate_builds: false
       skip_intermediate_builds: false
       teams:
@@ -222,6 +228,7 @@ spec:
         build_tags: false
         build_branches: false
         filter_enabled: true
+        # required by "build_pull_requests: true" when used with buildkite-pr-bot
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       cancel_intermediate_builds: true
@@ -271,7 +278,7 @@ spec:
         build_tags: false
         build_branches: true # enable build for branches. This relies on the filter in .buildkite/pipeline.elastic-agent-binary-dra.yml
         filter_enabled: true
-        # TODO: what's the reason for this filter?
+        # required by "build_pull_requests: true" when used with buildkite-pr-bot
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       repository: elastic/elastic-agent
@@ -362,7 +369,7 @@ spec:
         build_tags: false
         build_branches: false
         filter_enabled: true
-        # TODO: what's the reason for this filter?
+        # required by "build_pull_requests: true" when used with buildkite-pr-bot
         filter_condition: >-
           build.pull_request.id == null || (build.creator.name == 'elasticmachine' && build.pull_request.id != null)
       repository: elastic/elastic-agent
