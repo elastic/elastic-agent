@@ -40,6 +40,12 @@ type Semaphore struct {
 	c chan (struct{})
 }
 
+func NewSemaphore() *Semaphore {
+	return &Semaphore{
+		c: make(chan struct{}),
+	}
+}
+
 func (s *Semaphore) Wait() {
 	<-s.c
 }
@@ -48,9 +54,38 @@ func (s *Semaphore) Release() {
 	s.c <- struct{}{}
 }
 
+func (s *Semaphore) Close() {
+	close(s.c)
+}
+
+func generateTestActions(policy fleetservertest.TmplPolicy, idPrefix, actionType, data string, count int) ([]fleetservertest.AckableAction, error) {
+	actions := []fleetservertest.AckableAction{}
+	for i := range count {
+		action, err := fleetservertest.NewAction(fleetservertest.ActionTmpl{
+			AgentID:  policy.AgentID,
+			ActionID: fmt.Sprintf("%s-%d", idPrefix, i),
+			Type:     actionType,
+			Data:     data,
+		})
+		if err != nil {
+			return nil, err
+		}
+		actions = append(actions, action)
+
+	}
+	return actions, nil
+}
+
+// func pickRandom([]fleetservertest.AckableAction) fleetservertest.AckableAction {
+// }
+
 func testAgentRestartsBeforeActionsProcessed(t *testing.T) {
-	checkinSem := Semaphore{}
-	ackSem := Semaphore{}
+	checkinSem := NewSemaphore()
+	ackSem := NewSemaphore()
+	t.Cleanup(func() {
+		checkinSem.Close()
+		ackSem.Close()
+	})
 
 	ctx := t.Context()
 
@@ -83,10 +118,13 @@ func testAgentRestartsBeforeActionsProcessed(t *testing.T) {
 			t.Logf("Count: %d, CheckinRequest: Status=%s, Message=%s, AckToken='%s'", checkinCounter.Load(), checkinRequest.Status, checkinRequest.Message, checkinRequest.AckToken)
 
 			if int(checkinCounter.Load()) == 2 {
+				t.Log("Waiting for checkinSem")
 				// <-waitChan
 				checkinSem.Wait()
+				t.Log("Sending ack token to token chan")
 				ackTokenChan <- checkinRequest.AckToken
 				// <-finalWaitChan
+				t.Log("Waiting for checkin sem")
 				checkinSem.Wait()
 			}
 
@@ -141,10 +179,10 @@ func testAgentRestartsBeforeActionsProcessed(t *testing.T) {
 			for _, e := range ackRequest.Events {
 				t.Logf("ACTION ID: %s", e.ActionId)
 				if e.ActionId == "test-action-id-3" {
-					// close(waitAckChan)
+					t.Logf("Releasing ackSem after test-action-id-3")
 					ackSem.Release()
-					t.Log("Acker waiting for waitChan")
 
+					t.Log("Acker waiting")
 					ackSem.Wait()
 				}
 				t.Logf("Acking action event with id: %s", e.ActionId)
@@ -211,6 +249,7 @@ func testAgentRestartsBeforeActionsProcessed(t *testing.T) {
 	client.Connect(ctx)
 
 	// <-waitAckChan
+	t.Log("Waiting for ackSem after connecting client")
 	ackSem.Wait()
 
 	err = client.Restart(ctx)
