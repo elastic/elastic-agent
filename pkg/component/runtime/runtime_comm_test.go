@@ -186,7 +186,10 @@ func TestRuntimeComm_CheckinFlow(t *testing.T) {
 				// stop the server
 				srv.stop(nil)
 				select {
-				case <-errCh:
+				case err = <-errCh:
+					s, ok := status.FromError(err)
+					assert.True(t, ok, "error must be a gRPC status")
+					assert.Equal(t, codes.Unavailable, s.Code(), "status code must be unavailable")
 				case <-time.After(waitDuration):
 					t.Fatal("timed out waiting for the checkin to return")
 				}
@@ -246,7 +249,10 @@ func TestRuntimeComm_CheckinFlow(t *testing.T) {
 				// destroy the communicator and check that it exits without blocking
 				c.destroy()
 				select {
-				case <-errCh:
+				case err := <-errCh:
+					s, ok := status.FromError(err)
+					assert.True(t, ok, "error must be a gRPC status")
+					assert.Equal(t, codes.Unavailable, s.Code(), "status code must be unavailable")
 				case <-time.After(waitDuration):
 					t.Fatal("timed out waiting for the checkin to return")
 				}
@@ -295,7 +301,10 @@ func TestRuntimeComm_CheckinFlow(t *testing.T) {
 				// stop the server and wait for communicator checkin to exit
 				srv.stop(nil)
 				select {
-				case <-errCh:
+				case err := <-errCh:
+					s, ok := status.FromError(err)
+					assert.True(t, ok, "error must be a gRPC status")
+					assert.Equal(t, codes.Unavailable, s.Code(), "status code must be unavailable")
 				case <-time.After(waitDuration):
 					t.Fatal("timed out waiting for the checkin to return")
 				}
@@ -541,7 +550,10 @@ func TestRuntimeComm_CheckinFlow(t *testing.T) {
 				// stop the server and wait for communicator checkin to exit
 				srv.stop(nil)
 				select {
-				case <-errCh:
+				case err := <-errCh:
+					s, ok := status.FromError(err)
+					assert.True(t, ok, "error must be a gRPC status")
+					assert.Equal(t, codes.Unavailable, s.Code(), "status code must be unavailable")
 				case <-time.After(waitDuration):
 					t.Fatal("timed out waiting for the checkin to return")
 				}
