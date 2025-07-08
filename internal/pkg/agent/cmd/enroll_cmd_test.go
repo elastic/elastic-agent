@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
@@ -101,7 +103,7 @@ func TestEnroll(t *testing.T) {
 			store := &mockStore{Err: errors.New("fail to save")}
 			cmd, err := newEnrollCmd(
 				log,
-				&enrollCmdOption{
+				&enroll.EnrollOptions{
 					URL:                  url,
 					CAs:                  []string{caFile},
 					EnrollAPIKey:         "my-enrollment-token",
@@ -246,7 +248,7 @@ func TestEnroll(t *testing.T) {
 			store := &mockStore{}
 			cmd, err := newEnrollCmd(
 				log,
-				&enrollCmdOption{
+				&enroll.EnrollOptions{
 					URL:                  url,
 					CAs:                  []string{caFile},
 					EnrollAPIKey:         "my-enrollment-api-key",
@@ -308,7 +310,7 @@ func TestEnroll(t *testing.T) {
 			store := &mockStore{}
 			cmd, err := newEnrollCmd(
 				log,
-				&enrollCmdOption{
+				&enroll.EnrollOptions{
 					URL:                  url,
 					CAs:                  []string{},
 					EnrollAPIKey:         "my-enrollment-api-key",
@@ -373,7 +375,7 @@ func TestEnroll(t *testing.T) {
 			store := &mockStore{}
 			cmd, err := newEnrollCmd(
 				log,
-				&enrollCmdOption{
+				&enroll.EnrollOptions{
 					URL:                  url,
 					CAs:                  []string{},
 					EnrollAPIKey:         "my-enrollment-api-key",
@@ -419,7 +421,7 @@ func TestEnroll(t *testing.T) {
 			store := &mockStore{}
 			cmd, err := newEnrollCmd(
 				log,
-				&enrollCmdOption{
+				&enroll.EnrollOptions{
 					URL:                  url,
 					CAs:                  []string{},
 					EnrollAPIKey:         "my-enrollment-token",
@@ -484,10 +486,90 @@ func TestEnroll(t *testing.T) {
 			return mux
 		}, func(t *testing.T, host string) {
 			url := "http://" + host
+<<<<<<< HEAD
+=======
+			store := &mockSaver{}
+			store.On("Save", mock.MatchedBy(func(in io.Reader) bool {
+				buf := new(bytes.Buffer)
+				_, err := io.Copy(buf, in)
+				if err != nil {
+					return false
+				}
+				cfg, err := readConfig(buf.Bytes())
+				if err != nil {
+					return false
+				}
+				return cfg.Client.Host == host && cfg.AccessAPIKey == "my-access-api-key"
+			})).Return(nil).Once()
+			cmd, err := newEnrollCmd(
+				log,
+				&enroll.EnrollOptions{
+					URL:                  url,
+					CAs:                  []string{},
+					EnrollAPIKey:         "my-enrollment-api-key",
+					Insecure:             true,
+					UserProvidedMetadata: map[string]interface{}{"custom": "customize"},
+					SkipCreateSecret:     skipCreateSecret,
+					SkipDaemonRestart:    true,
+				},
+				"",
+				store,
+				nil,
+			)
+			require.NoError(t, err)
+
+			streams, _, _, _ := cli.NewTestingIOStreams()
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+			defer cancel()
+			err = cmd.Execute(ctx, streams)
+			require.NoError(t, err, "enroll command should return no error")
+			store.AssertExpectations(t)
+		},
+	))
+
+	t.Run("headers are sent to server", withServer(
+		func(t *testing.T) *http.ServeMux {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/api/fleet/agents/enroll", func(w http.ResponseWriter, r *http.Request) {
+				if r.Header.Get("X-Test-Header") != "Test-Value" {
+					w.WriteHeader(http.StatusInternalServerError)
+					_, _ = w.Write([]byte(`
+{
+		"statusCode": 500,
+		"error": "Missing required X-Test-Header header"
+}`))
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`
+{
+    "action": "created",
+    "item": {
+        "id": "a9328860-ec54-11e9-93c4-d72ab8a69391",
+        "active": true,
+        "policy_id": "69f3f5a0-ec52-11e9-93c4-d72ab8a69391",
+        "type": "PERMANENT",
+        "enrolled_at": "2019-10-11T18:26:37.158Z",
+        "user_provided_metadata": {
+						"custom": "customize"
+				},
+        "local_metadata": {
+            "platform": "linux",
+            "version": "8.0.0"
+        },
+        "actions": [],
+        "access_api_key": "my-access-api-key"
+    }
+}`))
+			})
+			return mux
+		}, func(t *testing.T, host string) {
+			url := "http://" + host
+>>>>>>> 1c27e4e3d (Migrate agent to a different cluster (#8014))
 			store := &mockStore{}
 			cmd, err := newEnrollCmd(
 				log,
-				&enrollCmdOption{
+				&enroll.EnrollOptions{
 					URL:                  url,
 					CAs:                  []string{},
 					EnrollAPIKey:         "my-enrollment-api-key",
@@ -881,4 +963,20 @@ func readConfig(raw []byte) (*configuration.FleetAgentConfig, error) {
 		return nil, err
 	}
 	return cfg.Fleet, nil
+}
+
+func cleanTags(tags []string) []string {
+	var r []string
+	// Create a map to store unique elements
+	seen := make(map[string]bool)
+	for _, str := range tags {
+		tag := strings.TrimSpace(str)
+		if tag != "" {
+			if _, ok := seen[tag]; !ok {
+				seen[tag] = true
+				r = append(r, tag)
+			}
+		}
+	}
+	return r
 }

@@ -7,39 +7,26 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
 	"io"
-	"math/rand/v2"
 	"net"
 	"os"
 	"os/exec"
 	"strconv"
-	"strings"
 	"time"
 
 	"go.elastic.co/apm/v2"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
-	monitoringConfig "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	"github.com/elastic/elastic-agent/internal/pkg/crypto"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client/wait"
@@ -56,8 +43,6 @@ const (
 	defaultFleetServerPort         = 8220
 	defaultFleetServerInternalHost = "localhost"
 	defaultFleetServerInternalPort = 8221
-	enrollBackoffInit              = time.Second * 5
-	enrollBackoffMax               = time.Minute * 10
 )
 
 var (
@@ -72,8 +57,7 @@ type saver interface {
 // enrollCmd is an enroll subcommand that interacts between the Kibana API and the Agent.
 type enrollCmd struct {
 	log            *logger.Logger
-	options        *enrollCmdOption
-	client         fleetclient.Sender
+	options        *enroll.EnrollOptions
 	configStore    saver
 	remoteConfig   remote.Config
 	agentProc      *process.Info
@@ -84,6 +68,7 @@ type enrollCmd struct {
 	daemonReloadFunc func(context.Context) error
 }
 
+<<<<<<< HEAD
 // enrollCmdFleetServerOption define all the supported enrollment options for bootstrapping with Fleet Server.
 type enrollCmdFleetServerOption struct {
 	ConnStr               string
@@ -175,17 +160,19 @@ func (e *enrollCmdOption) remoteConfig() (remote.Config, error) {
 	return cfg, nil
 }
 
+=======
+>>>>>>> 1c27e4e3d (Migrate agent to a different cluster (#8014))
 // newEnrollCmd creates a new enrollment with the given store.
 func newEnrollCmd(
 	log *logger.Logger,
-	options *enrollCmdOption,
+	options *enroll.EnrollOptions,
 	configPath string,
 	store saver,
 	backoffFactory func(done <-chan struct{}) backoff.Backoff,
 ) (*enrollCmd, error) {
 	if backoffFactory == nil {
 		backoffFactory = func(done <-chan struct{}) backoff.Backoff {
-			return backoff.NewEqualJitterBackoff(done, enrollBackoffInit, enrollBackoffMax)
+			return backoff.NewEqualJitterBackoff(done, enroll.EnrollBackoffInit, enroll.EnrollBackoffMax)
 		}
 	}
 	return &enrollCmd{
@@ -226,7 +213,7 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		}
 	}
 
-	persistentConfig, err := getPersistentConfig(c.configPath)
+	persistentConfig, err := enroll.LoadPersistentConfig(c.configPath)
 	if err != nil {
 		return err
 	}
@@ -245,7 +232,7 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		}
 	}
 
-	c.remoteConfig, err = c.options.remoteConfig()
+	c.remoteConfig, err = c.options.RemoteConfig(true)
 	if err != nil {
 		return errors.New(
 			err, "Error",
@@ -258,14 +245,6 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		// Note that when running fleet-server the enroll request will be sent to :8220,
 		// however when the agent is running afterward requests will be sent to :8221
 		c.remoteConfig.Transport.Proxy.Disable = true
-	}
-
-	c.client, err = fleetclient.NewWithConfig(c.log, c.remoteConfig)
-	if err != nil {
-		return errors.New(
-			err, "Error",
-			errors.TypeNetwork,
-			errors.M(errors.MetaKeyURI, c.options.URL))
 	}
 
 	if c.options.DelayEnroll {
@@ -286,7 +265,12 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		return nil
 	}
 
-	err = c.enrollWithBackoff(ctx, persistentConfig)
+	err = enroll.EnrollWithBackoff(ctx, c.log,
+		persistentConfig,
+		enrollDelay,
+		*c.options,
+		c.configStore,
+		c.backoffFactory)
 	if err != nil {
 		return fmt.Errorf("fail to enroll: %w", err)
 	}
@@ -366,10 +350,10 @@ func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig m
 		return "", err
 	}
 
-	agentConfig := c.createAgentConfig("", persistentConfig, c.options.FleetServer.Headers)
+	agentConfig := enroll.CreateAgentConfig("", persistentConfig, c.options.FleetServer.Headers, c.options.Staging)
 
 	//nolint:dupl // duplicate because same params are passed
-	fleetConfig, err := createFleetServerBootstrapConfig(
+	fleetConfig, err := enroll.CreateFleetServerBootstrapConfig(
 		c.options.FleetServer.ConnStr, c.options.FleetServer.ServiceToken, c.options.FleetServer.ServiceTokenPath,
 		c.options.FleetServer.PolicyID,
 		c.options.FleetServer.Host, c.options.FleetServer.Port, c.options.FleetServer.InternalPort,
@@ -396,7 +380,7 @@ func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig m
 		return "", err
 	}
 
-	if err := safelyStoreAgentInfo(c.configStore, reader); err != nil {
+	if err := enroll.SafelyStoreAgentInfo(c.configStore, reader); err != nil {
 		return "", err
 	}
 
@@ -528,6 +512,7 @@ func daemonReload(ctx context.Context) error {
 	return daemon.Restart(ctx)
 }
 
+<<<<<<< HEAD
 func (c *enrollCmd) enrollWithBackoff(ctx context.Context, persistentConfig map[string]interface{}) error {
 	delay(ctx, enrollDelay)
 
@@ -669,6 +654,8 @@ func (c *enrollCmd) enroll(ctx context.Context, persistentConfig map[string]inte
 	return nil
 }
 
+=======
+>>>>>>> 1c27e4e3d (Migrate agent to a different cluster (#8014))
 func (c *enrollCmd) startAgent(ctx context.Context) (<-chan *os.ProcessState, error) {
 	cmd, err := os.Executable()
 	if err != nil {
@@ -720,15 +707,6 @@ func yamlToReader(in interface{}) (io.Reader, error) {
 		return nil, errors.New(err, "could not marshal to YAML")
 	}
 	return bytes.NewReader(data), nil
-}
-
-func delay(ctx context.Context, d time.Duration) {
-	t := time.NewTimer(rand.N(d))
-	defer t.Stop()
-	select {
-	case <-ctx.Done():
-	case <-t.C:
-	}
 }
 
 func getDaemonState(ctx context.Context) (*client.AgentState, error) {
@@ -890,6 +868,7 @@ func getCompUnitFromStatus(state *client.AgentState, name string) *client.Compon
 	return nil
 }
 
+<<<<<<< HEAD
 func safelyStoreAgentInfo(s saver, reader io.Reader) error {
 	var err error
 	signal := make(chan struct{})
@@ -1124,6 +1103,8 @@ func getPersistentConfig(pathConfigFile string) (map[string]interface{}, error) 
 	return persistentMap, nil
 }
 
+=======
+>>>>>>> 1c27e4e3d (Migrate agent to a different cluster (#8014))
 func expBackoffWithContext(ctx context.Context, init, max time.Duration) backoff.Backoff {
 	signal := make(chan struct{})
 	bo := backoff.NewExpBackoff(signal, init, max)
@@ -1132,20 +1113,4 @@ func expBackoffWithContext(ctx context.Context, init, max time.Duration) backoff
 		close(signal)
 	}()
 	return bo
-}
-
-func cleanTags(tags []string) []string {
-	var r []string
-	// Create a map to store unique elements
-	seen := make(map[string]bool)
-	for _, str := range tags {
-		tag := strings.TrimSpace(str)
-		if tag != "" {
-			if _, ok := seen[tag]; !ok {
-				seen[tag] = true
-				r = append(r, tag)
-			}
-		}
-	}
-	return r
 }

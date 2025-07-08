@@ -32,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -1166,7 +1167,7 @@ func shouldFleetEnroll(setupCfg setupConfig) (bool, error) {
 			return false, errors.New("could not marshal config")
 		}
 
-		if err := safelyStoreAgentInfo(store, bytes.NewReader(data)); err != nil {
+		if err := enroll.SafelyStoreAgentInfo(store, bytes.NewReader(data)); err != nil {
 			return false, fmt.Errorf("failed to store agent config: %w", err)
 		}
 	}

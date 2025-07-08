@@ -17,7 +17,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -42,7 +43,7 @@ func newEnrollCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command
 		Short: "Enroll the Elastic Agent into Fleet",
 		Long:  "This command will enroll the Elastic Agent into Fleet.",
 		Run: func(c *cobra.Command, args []string) {
-			if err := enroll(streams, c); err != nil {
+			if err := doEnroll(streams, c); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 				logExternal(fmt.Sprintf("%s enroll failed: %s", paths.BinaryName, err))
 				os.Exit(1)
@@ -358,7 +359,7 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	return args
 }
 
-func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
+func doEnroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	err := validateEnrollFlags(cmd)
 	if err != nil {
 		return err
@@ -494,7 +495,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		fixPermissions = nil
 	}
 
-	options := enrollCmdOption{
+	options := enroll.EnrollOptions{
 		EnrollAPIKey:         enrollmentToken,
 		ID:                   id,
 		ReplaceToken:         replaceToken,
@@ -515,7 +516,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		DaemonTimeout:        daemonTimeout,
 		SkipDaemonRestart:    skipDaemonReload,
 		Tags:                 tags,
-		FleetServer: enrollCmdFleetServerOption{
+		FleetServer: enroll.EnrollCmdFleetServerOption{
 			ConnStr:               fServer,
 			ElasticsearchCA:       fElasticSearchCA,
 			ElasticsearchCASHA256: fElasticSearchCASHA256,
@@ -551,7 +552,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 	store := storage.NewReplaceOnSuccessStore(
 		pathConfigFile,
-		application.DefaultAgentFleetConfig,
+		info.DefaultAgentFleetConfig,
 		encStore,
 		storeOpts...,
 	)
