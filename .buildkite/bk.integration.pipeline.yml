@@ -67,6 +67,8 @@ steps:
       provider: "gcp"
       machineType: "n2-standard-8"
       image: "${IMAGE_UBUNTU_2404_X86_64}"
+    plugins:
+      - *vault_ec_key_prod
 
   - label: Start ESS stack for integration tests
     key: integration-ess
