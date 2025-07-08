@@ -170,7 +170,7 @@ spec:
     kind: Pipeline
     metadata:
       name: elastic-agent-macos-integration
-      description: Elastic Agent macos integration test pipeline
+      description: Elastic Agent extended testing using Orka agents
     spec:
       repository: elastic/elastic-agent
       pipeline_file: ".buildkite/macos.integration.pipeline.yml"
