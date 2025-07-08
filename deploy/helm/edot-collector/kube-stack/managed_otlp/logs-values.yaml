@@ -17,7 +17,7 @@ crds:
 defaultCRConfig:
   image:
     repository: "docker.elastic.co/elastic-agent/elastic-agent"
-    tag: "9.2.0"
+    tag: "9.0.4"
   targetAllocator:
     enabled: false # Enable/disable the Operator's Target allocator.
     # Refer to: https://github.com/open-telemetry/opentelemetry-operator/tree/main/cmd/otel-allocator
@@ -124,6 +124,22 @@ collectors:
                 enabled: false
               host.id:
                 enabled: true
+        # [Resource Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourceprocessor)
+        resource/k8s: # Resource attributes tailored for services within Kubernetes.
+          attributes:
+            - key: service.name # Set the service.name resource attribute based on the well-known app.kubernetes.io/name label
+              from_attribute: app.label.name
+              action: insert
+            - key: service.name # Set the service.name resource attribute based on the k8s.container.name attribute
+              from_attribute: k8s.container.name
+              action: insert
+            - key: app.label.name # Delete app.label.name attribute previously used for service.name
+              action: delete
+            - key: service.version # Set the service.version resource attribute based on the well-known app.kubernetes.io/version label
+              from_attribute: app.label.version
+              action: insert
+            - key: app.label.version # Delete app.label.version attribute previously used for service.version
+              action: delete
         resource/cloud:
           attributes:
             - key: cloud.instance.id
@@ -159,9 +175,13 @@ collectors:
               - "k8s.pod.ip"
               - "k8s.pod.uid"
               - "k8s.pod.start_time"
-              # Service attributes added based on https://opentelemetry.io/docs/specs/semconv/non-normative/k8s-attributes/#service-attributes
-              - "service.name"
-              - "service.version"
+            labels:
+                - tag_name: app.label.name
+                  key: app.kubernetes.io/name
+                  from: pod
+                - tag_name: app.label.version
+                  key: app.kubernetes.io/version
+                  from: pod
       receivers:
         otlp: null
         # [File Log Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/filelogreceiver)
@@ -185,6 +205,7 @@ collectors:
               - resourcedetection/eks
               - resourcedetection/gcp
               - resourcedetection/aks
+              - resource/k8s
               - resource/hostname
               - resource/cloud
             exporters:
