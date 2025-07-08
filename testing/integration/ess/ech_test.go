@@ -116,4 +116,5 @@ func TestECH(t *testing.T) {
 
 		return status.State == int(cproto.State_HEALTHY) && status.FleetState == int(cproto.State_HEALTHY)
 	}, time.Minute, time.Second, "agent never became healthy or connected to Fleet")
+	t.Run("run uninstall", testUninstallAuditUnenroll(t.Context() fixture, info))
 }

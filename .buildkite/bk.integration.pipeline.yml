@@ -3,6 +3,7 @@
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   ASDF_MAGE_VERSION: 1.14.0
+  ASDF_TERRAFORM_VERSION: 1.9.3
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
@@ -41,7 +42,7 @@ common:
       elastic/vault-secrets#v0.1.0:
         path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
         field: "apiKey"
-        env_var: "EC_API_KEY"  
+        env_var: "EC_API_KEY"
 
 steps:
   - label: "Custom ECH Testing"
@@ -49,14 +50,13 @@ steps:
     depends_on:
       - packaging-ubuntu-x86-64
     env:
-      ASDF_TERRAFORM_VERSION: 1.9.3
       TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
+      FORCE_ESS_CREATE: "true"
     command: |
       #!/usr/bin/env bash
       set -euo pipefail
       buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
-      source .buildkite/scripts/steps/ess_start.sh
-      .buildkite/scripts/steps/integration_tests_custom_ech_tf.sh
+      .buildkite/scripts/steps/integration_tests_tf.sh
     artifact_paths:
       - build/**
       - build/diagnostics/**
@@ -73,8 +73,6 @@ steps:
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - ESS stack provision"
-    env:
-      ASDF_TERRAFORM_VERSION: 1.9.2
     command: .buildkite/scripts/steps/ess_start.sh
     retry:
       automatic:
@@ -137,7 +135,7 @@ steps:
           image: "${IMAGE_WIN_2025}"
         plugins:
           - *vault_ec_key_prod
-  
+
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-ubuntu-x86-64
         env:
@@ -322,7 +320,7 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         plugins:
-          - *vault_ec_key_prod  
+          - *vault_ec_key_prod
         matrix:
           - default
           - upgrade
