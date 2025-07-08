@@ -55,7 +55,7 @@ steps:
       #!/usr/bin/env bash
       set -euo pipefail
       buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
-      .buildkite/scripts/steps/integration_tests_tf.sh
+      .buildkite/scripts/steps/integration_tests_tf.sh ech true
     artifact_paths:
       - build/**
       - build/diagnostics/**
