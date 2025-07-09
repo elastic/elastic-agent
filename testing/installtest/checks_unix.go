@@ -8,6 +8,7 @@ package installtest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"math"
@@ -47,13 +48,13 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opt
 		if uid > math.MaxUint32 {
 			return fmt.Errorf("provided UID %d does is higher than %d", uid, math.MaxInt32)
 		}
-		uid32 = uint32(uid)
+		uid32 = uint32(uid) //nolint:gosec // G115 Conversion from int to uint32 is safe here.
 
 		var gid32 uint32
 		if gid > math.MaxUint32 {
 			return fmt.Errorf("provided GID %d does is higher than %d", gid, math.MaxInt32)
 		}
-		gid32 = uint32(gid)
+		gid32 = uint32(gid) //nolint:gosec // G115 Conversion from int to uint32 is safe here.
 
 		// Ensure entire installation tree has the correct permissions.
 		err = validateFileTree(topPath, uid32, gid32)
@@ -128,6 +129,9 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opt
 func validateFileTree(dir string, uid uint32, gid uint32) error {
 	return filepath.WalkDir(dir, func(file string, d fs.DirEntry, err error) error {
 		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil
+			}
 			return fmt.Errorf("error traversing the file tree: %w", err)
 		}
 		if d.Type() == os.ModeSymlink {
@@ -136,6 +140,9 @@ func validateFileTree(dir string, uid uint32, gid uint32) error {
 		}
 		info, err := d.Info()
 		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil
+			}
 			return fmt.Errorf("error caling info: %w", err)
 		}
 		fs, ok := info.Sys().(*syscall.Stat_t)
