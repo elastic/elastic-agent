@@ -32,8 +32,6 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 	"gopkg.in/yaml.v3"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
