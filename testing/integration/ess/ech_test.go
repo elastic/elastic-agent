@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -43,7 +44,7 @@ func TestECH(t *testing.T) {
 	statusUrl, err := url.JoinPath(fleetServerHost, "/api/status")
 	require.NoError(t, err)
 
-	require.EventuallyWithT(t, func(c *require.CollectT) {
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
 		resp, err := http.Get(statusUrl)
 		require.NoError(c, err)
 		defer resp.Body.Close()
@@ -101,7 +102,7 @@ func TestECH(t *testing.T) {
 	}
 
 	var agentID string
-	require.EventuallyWithT(t, func(c *require.CollectT) {
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
 		status, err := fixture.ExecStatus(t.Context())
 		require.NoError(c, err)
 		statusBuffer := new(strings.Builder)
@@ -114,8 +115,8 @@ func TestECH(t *testing.T) {
 		agentID = status.Info.ID
 	}, time.Minute, time.Second, "agent never became healthy or connected to Fleet")
 
-	require.EventuallyWithT(t, func(c *require.CollectT) {
-		status, err := fleettools.GetAgentStatus(t.Context, info.KibanaClient, agentID)
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		status, err := fleettools.GetAgentStatus(t.Context(), info.KibanaClient, agentID)
 		require.NoError(c, err)
 		require.Equal(c, "online", status)
 	}, time.Minute, time.Second, "agent does not show as online in fleet")
