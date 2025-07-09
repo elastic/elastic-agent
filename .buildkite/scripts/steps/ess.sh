@@ -3,64 +3,56 @@ set -euo pipefail
 
 function ess_up() {
   echo "~~~ Starting ESS Stack"
-  local WORKSPACE=$(git rev-parse --show-toplevel)
-  local TF_DIR="${WORKSPACE}/test_infra/ess/"
   local STACK_VERSION=$1
-  local ESS_REGION=${2:-"gcp-us-west2"}
     
   if [ -z "$STACK_VERSION" ]; then
     echo "Error: Specify stack version: ess_up [stack_version]" >&2
     return 1
   fi
 
-  BUILDKITE_BUILD_CREATOR="${BUILDKITE_BUILD_CREATOR:-"$(get_git_user_email)"}"
-  BUILDKITE_BUILD_NUMBER="${BUILDKITE_BUILD_NUMBER:-"0"}"
-  BUILDKITE_PIPELINE_SLUG="${BUILDKITE_PIPELINE_SLUG:-"elastic-agent-integration-tests"}"
-  
-  pushd "${TF_DIR}"    
-  terraform init
-  terraform apply \
-    -auto-approve \
-    -var="stack_version=${STACK_VERSION}" \
-    -var="ess_region=${ESS_REGION}" \
-    -var="creator=${BUILDKITE_BUILD_CREATOR}" \
-    -var="buildkite_id=${BUILDKITE_BUILD_NUMBER}" \
-    -var="pipeline=${BUILDKITE_PIPELINE_SLUG}"
+  # Create a cluster with the specified stack version and store the cluster information in a file
+  oblt-cli cluster create custom \
+      --template ess-ea-it \
+      --cluster-name-prefix ea-hosted-it \
+      --parameters="{\"GitOps\":\"true\",\"GitHubRepository\":\"${BUILDKITE_REPO}\",\"GitHubCommit\":\"${BUILDKITE_COMMIT}\",\"EphemeralCluster\":\"true\",\"StackVersion\":\"$STACK_VERSION\"}" \
+      --output-file="${PWD}/cluster-info.json" \
+      --wait 15
 
-  export ELASTICSEARCH_HOST=$(terraform output -raw es_host)
-  export ELASTICSEARCH_USERNAME=$(terraform output -raw es_username)
-  export ELASTICSEARCH_PASSWORD=$(terraform output -raw es_password)
-  export KIBANA_HOST=$(terraform output -raw kibana_endpoint)
-  export KIBANA_USERNAME=$ELASTICSEARCH_USERNAME
-  export KIBANA_PASSWORD=$ELASTICSEARCH_PASSWORD
-  export INTEGRATIONS_SERVER_HOST=$(terraform output -raw integrations_server_endpoint)
-  popd
+  # Extract the cluster name from the cluster information file
+  CLUSTER_NAME=$(jq -r '.ClusterName' cluster-info.json)
+
+  # Store the cluster name as a meta-data
+  buildkite-agent meta-data set cluster-name "${CLUSTER_NAME}"
+
+  ess_load_secrets
 }
 
 function ess_down() {
-  echo "~~~ Tearing down the ESS Stack"  
-  local WORKSPACE=$(git rev-parse --show-toplevel)
-  local TF_DIR="${WORKSPACE}/test_infra/ess/"
-  
-  pushd "${TF_DIR}"
-  terraform init
-  terraform destroy -auto-approve
-  popd
+  echo "~~~ Tearing down the ESS Stack"
+  # Get the cluster name from the meta-data
+  CLUSTER_NAME="$(buildkite-agent meta-data get cluster-name)"
+
+  # Destroy the cluster
+  oblt-cli cluster destroy --cluster-name "${CLUSTER_NAME}" --force
 }
 
-function get_git_user_email() {
-  if ! git rev-parse --is-inside-work-tree &>/dev/null; then
-    echo "unknown"  
-    return
-  fi
+function ess_load_secrets() {
+  echo "~~~ Load secrets ESS Stack"
 
-  local email
-  email=$(git config --get user.email)
-  
-  if [ -z "$email" ]; then
-    echo "unknown"  
-  else
-    echo "$email"
-  fi
+  # Get the cluster name from the meta-data
+  CLUSTER_NAME="$(buildkite-agent meta-data get cluster-name)"
+
+  # Load the ESS stack secrets
+  secrets_file="secrets.env.sh"
+  # QUESTION: should we support the case when using the ESS stack in local environment?
+  oblt-cli cluster secrets env --cluster-name="${CLUSTER_NAME}" --output-file="${secrets_file}"
+
+  # Source the secrets file
+  # shellcheck source=/dev/null
+  source "${secrets_file}" || rm "$secrets_file"
+  rm $secrets_file || true
+
+  # NOTE: only for debugging purposes
+  #       so we know they have been loaded
+  env | grep -E '^(ELASTICSEARCH|KIBANA|FLEET_SERVER|AGENT_POLICY_ID)' | cut -d= -f1
 }
-

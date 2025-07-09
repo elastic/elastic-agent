@@ -1,7 +1,5 @@
-# update-cli configuration for automated go updates
 ---
 name: Bump ESS snapshots
-
 pipelineid: 'bump-ess-snapshot-{{ requiredEnv "BRANCH_NAME" }}'
 
 scms:
@@ -24,6 +22,7 @@ sources:
     spec:
       file: 'https://storage.googleapis.com/artifacts-api/channels/{{ requiredEnv "BRANCH_NAME" }}.json'
       key: .build
+
 targets:
   updateStackImages:
     name: "Update create_deployment_csp_configuration.yaml"
@@ -31,9 +30,10 @@ targets:
     scmid: githubConfig
     kind: file
     spec:
-      file: "pkg/testing/ess/create_deployment_csp_configuration.yaml"
-      matchpattern: '(\S*_image: ".*docker.*):(.+)"'
-      replacepattern: '$1:{{ source "lastStableStackSnapshot" }}-SNAPSHOT"'
+      file: .hosted-stack-version
+      content: '{{ source "lastStableStackSnapshot" }}-SNAPSHOT'
+      matchpattern: '\d+.\d+.\d+.*'
+
 actions:
   elastic-agent:
     kind: github/pullrequest

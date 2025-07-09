@@ -11,11 +11,17 @@ env:
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
 common:
-  - vault_ec_key_prod: &vault_ec_key_prod
-      elastic/vault-secrets#v0.1.0:
-        path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-        field: "apiKey"
-        env_var: "EC_API_KEY"
+  - google_oidc_observability_plugin: &google_oidc_observability_plugin
+      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-gcp-oidc.tf
+      # This plugin authenticates to Google Cloud using the OIDC token.
+      elastic/oblt-google-auth#v1.3.0:
+        lifetime: 10800 # seconds
+  # TODO: maybe we can rely on the VM and install only if not present?
+  - oblt_cli_plugin: &oblt_cli_plugin
+      elastic/oblt-cli#v0.2.0:
+        version-file: .oblt-cli-version
+  - vault_github_token: &vault_github_token
+      elastic/vault-github-token#v0.1.0:
 
 steps:
   - label: Build and push custom elastic-agent image
@@ -39,23 +45,19 @@ steps:
       - elastic/vault-docker-login#v0.5.2:
           secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
 
-  - label: Start ESS stack for FIPS integration tests
+  - label: Start ESS stack for FIPS integration tests using oblt-cli
     key: integration-fips-ess
     depends_on:
       - integration-fips-cloud-image
     env:
       ASDF_TERRAFORM_VERSION: 1.9.2
       TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
-    command: |
-      source .buildkite/scripts/steps/ess_start.sh
-    artifact_paths:
-      - test_infra/ess/*.tfstate
-      - test_infra/ess/*.lock.hcl
+    command: .buildkite/scripts/steps/ess_start.sh
     agents:
-      image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
-      useCustomGlobalHooks: true
+      image: "docker.elastic.co/ci-agent-images/platform-ingest/oblt-cli:7.21.3"
     plugins:
-      - *vault_ec_key_prod  
+      - *google_oidc_observability_plugin
+      - *vault_github_token
 
   - group: "fips:Stateful:Ubuntu"
     key: integration-tests-ubuntu-fips
@@ -91,6 +93,10 @@ steps:
               - "true"
             groups:
               - fleet # currently there is only a single test in the fleet group, add more tests once they have been defined
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
 
       - label: "fips:arm64:sudo-{{matrix.sudo}}:{{matrix.groups}}"
         depends_on:
@@ -121,6 +127,10 @@ steps:
               - "true"
             groups:
               - fleet
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
 
       - label: "fips:upgrade-ech-deployment"
         if: build.env("BUILDKITE_PULL_REQUEST") != "false" &&  build.env("GITHUB_PR_LABELS") =~ /.*(Testing:run:TestUpgradeIntegrationsServer).*/
@@ -145,15 +155,11 @@ steps:
     depends_on:
       - integration-tests-ubuntu-fips
     allow_dependency_failure: true
-    command: |
-      buildkite-agent artifact download "test_infra/ess/**" . --step "integration-fips-ess"
-      ls -lah test_infra/ess
-      .buildkite/scripts/steps/ess_down.sh
+    command: .buildkite/scripts/steps/ess_down.sh
     agents:
-      image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
-      useCustomGlobalHooks: true
+      image: "docker.elastic.co/ci-agent-images/platform-ingest/oblt-cli:7.21.3"
     plugins:
-      - *vault_ec_key_prod  
+      - *vault_github_token
 
   - label: Aggregate test reports
     depends_on:
