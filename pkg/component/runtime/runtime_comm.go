@@ -247,11 +247,12 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 	default:
 	}
 	c.initCheckinObserved = init
-	c.runtimeCheckinDone = make(chan struct{})
+	runtimeCheckinDone := make(chan struct{})
+	c.runtimeCheckinDone = runtimeCheckinDone
 	c.initCheckinObservedMx.Unlock()
-	defer func() {
-		close(c.runtimeCheckinDone)
-	}()
+	defer func(ch chan struct{}) {
+		close(ch)
+	}(runtimeCheckinDone)
 
 	// send the initial observed message, so the respective runtime (e.g. commandRuntime, serviceRuntime, etc. )
 	// then calls CheckinExpected method with the result
