@@ -257,40 +257,27 @@ func PreviousMinor() (*version.ParsedSemVer, error) {
 }
 
 // previousMinor returns the previous minor version available for upgrade from the given list of upgradeable versions.
-//
-// The function follows these logic rules:
-//  1. If the current version is a first minor release (minor = 0) or a prerelease of the first minor (minor = 1 with prerelease),
-//     it returns the most recent version from the previous major that is less than the current version.
-//  2. For all other cases, it returns the most recent previous minor version within the same major version.
-//  3. The function skips versions with prerelease tags or build metadata when looking for previous minors.
-//  4. If no suitable previous minor version is found, it returns ErrNoPreviousMinor.
 func previousMinor(currentVersion string, upgradeableVersions []*version.ParsedSemVer) (*version.ParsedSemVer, error) {
 	current, err := version.ParseVersion(currentVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse the current version %s: %w", currentVersion, err)
 	}
 
-	var mostRecentVersion *version.ParsedSemVer
-
-	isFirstMajorOrFirstMinorPrerelease := current.Minor() == 0 || (current.Minor() == 1 && current.Prerelease() != "")
-
-	for _, v := range upgradeableVersions {
-		if isFirstMajorOrFirstMinorPrerelease && v.Less(*current) {
-			if mostRecentVersion == nil || mostRecentVersion.Less(*v) {
-				mostRecentVersion = v
+	if current.Minor() == 0 {
+		for _, v := range upgradeableVersions {
+			if v.Less(*current) {
+				return v, nil
 			}
 		}
+	}
 
+	for _, v := range upgradeableVersions {
 		if v.Prerelease() != "" || v.BuildMetadata() != "" {
 			continue
 		}
 		if v.Major() == current.Major() && v.Minor() < current.Minor() {
 			return v, nil
 		}
-	}
-
-	if mostRecentVersion != nil {
-		return mostRecentVersion, nil
 	}
 
 	return nil, ErrNoPreviousMinor
