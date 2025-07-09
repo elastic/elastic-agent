@@ -43,22 +43,22 @@ func TestECH(t *testing.T) {
 	statusUrl, err := url.JoinPath(fleetServerHost, "/api/status")
 	require.NoError(t, err)
 
-	require.Eventually(t, func() bool {
+	require.EventuallyWithT(t, func(c *require.CollectT) {
 		resp, err := http.Get(statusUrl)
-		require.NoError(t, err)
+		require.NoError(c, err)
 		defer resp.Body.Close()
 
-		require.Equal(t, http.StatusOK, resp.StatusCode)
+		require.Equal(c, http.StatusOK, resp.StatusCode)
 
 		var body struct {
 			Name   string `json:"name"`
 			Status string `json:"status"`
 		}
 		err = json.NewDecoder(resp.Body).Decode(&body)
-		require.NoError(t, err)
+		require.NoError(c, err)
 
 		t.Logf("body.status = %s", body.Status)
-		return body.Status == "HEALTHY"
+		require.Equal(c, "HEALTHY", body.Status)
 	}, 5*time.Minute, 10*time.Second, "Fleet Server in ECH deployment is not healthy")
 
 	// Create a policy and install an agent
@@ -100,21 +100,25 @@ func TestECH(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	require.Eventuallyf(t, func() bool {
+	var agentID string
+	require.EventuallyWithT(t, func(c *require.CollectT) {
 		status, err := fixture.ExecStatus(t.Context())
-		if err != nil {
-			t.Logf("error fetching agent status: %v", err)
-			return false
-		}
+		require.NoError(c, err)
 		statusBuffer := new(strings.Builder)
 		err = json.NewEncoder(statusBuffer).Encode(status)
-		if err != nil {
-			t.Logf("error marshaling agent status: %v", err)
-		} else {
-			t.Logf("agent status: %v", statusBuffer.String())
-		}
+		require.NoError(c, err)
+		t.Logf("agent status: %v", statusBuffer.String())
 
-		return status.State == int(cproto.State_HEALTHY) && status.FleetState == int(cproto.State_HEALTHY)
+		require.Equal(c, int(cproto.State_HEALTHY), status.State, "agent state is not healthy")
+		require.Equal(c, int(cproto.State_HEALTHY), status.FleetState, "agent's fleet-server state is not healthy")
+		agentID = status.Info.ID
 	}, time.Minute, time.Second, "agent never became healthy or connected to Fleet")
+
+	require.EventuallyWithT(t, func(c *require.CollectT) {
+		status, err := fleettools.GetAgentStatus(t.Context, info.KibanaClient, agentID)
+		require.NoError(c, err)
+		require.Equal(c, "online", status)
+	}, time.Minute, time.Second, "agent does not show as online in fleet")
+
 	t.Run("run uninstall", testUninstallAuditUnenroll(t.Context(), fixture, info))
 }

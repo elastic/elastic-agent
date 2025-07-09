@@ -102,6 +102,7 @@ steps:
         command: |
           source .buildkite/scripts/common.sh
           .buildkite/scripts/steps/integration-package.sh
+          echo "~~~ Pushing cloud image"
           mage cloud:push
         artifact_paths:
           - build/distributions/**
@@ -139,6 +140,7 @@ steps:
         command: |
           source .buildkite/scripts/common.sh
           .buildkite/scripts/steps/integration-package.sh
+          echo "~~~ Pushing cloud image"
           mage cloud:push
         artifact_paths:
           - build/distributions/**
