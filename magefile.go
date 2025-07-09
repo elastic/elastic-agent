@@ -380,11 +380,6 @@ func GolangCrossBuild() error {
 	return nil
 }
 
-// BuildGoDaemon builds the go-daemon binary (use crossBuildGoDaemon).
-func BuildGoDaemon() error {
-	return devtools.BuildGoDaemon()
-}
-
 // BinaryOSS build the fleet artifact.
 func (Build) BinaryOSS() error {
 	mg.Deps(Prepare.Env)
@@ -648,7 +643,6 @@ func ExtractComponentsFromSelectedPkgSpecs(pkgSpecs []devtools.OSPackageArgs) ([
 			}
 
 			for _, component := range pkg.Spec.Components {
-
 				if existingComp, ok := mappedDependencies[component.PackageName]; ok {
 					// sanity check: verify that for the same packageName we have the same component spec
 					if !existingComp.Equal(component) {
@@ -675,7 +669,6 @@ func ExtractComponentsFromSelectedPkgSpecs(pkgSpecs []devtools.OSPackageArgs) ([
 }
 
 func isSelected(pkg devtools.OSPackageArgs) bool {
-
 	// Checks if this package is compatible with the FIPS settings
 	if pkg.Spec.FIPS != devtools.FIPSBuild {
 		log.Printf("Skipping %s/%s package type because FIPS flag doesn't match [pkg=%v, build=%v]", pkg.Spec.Name, pkg.OS, pkg.Spec.FIPS, devtools.FIPSBuild)
@@ -832,19 +825,13 @@ func CrossBuild() error {
 	return devtools.CrossBuild()
 }
 
-// CrossBuildGoDaemon cross-builds the go-daemon binary using Docker.
-func CrossBuildGoDaemon() error {
-	mg.Deps(EnsureCrossBuildOutputDir)
-	return devtools.CrossBuildGoDaemon()
-}
-
 // PackageAgentCore cross-builds and packages distribution artifacts containing
 // only elastic-agent binaries with no extra files or dependencies.
 func PackageAgentCore() {
 	start := time.Now()
 	defer func() { fmt.Println("packageAgentCore ran for", time.Since(start)) }()
 
-	mg.Deps(CrossBuild, CrossBuildGoDaemon)
+	mg.Deps(CrossBuild)
 
 	devtools.UseElasticAgentCorePackaging()
 
@@ -1232,7 +1219,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	// package agent
 	log.Println("--- Running post packaging ")
 	mg.Deps(Update)
-	mg.Deps(agentBinaryTarget, CrossBuildGoDaemon)
+	mg.Deps(agentBinaryTarget)
 
 	// compile the elastic-agent.exe proxy binary for the windows archive
 	if slices.Contains(platforms, "windows/amd64") {
@@ -1427,7 +1414,6 @@ func removePythonWheels(matches []string, version string, dependencies []packagi
 // flattenDependencies will extract all the required packages collected in archivePath and dropPath in flatPath and
 // regenerate checksums
 func flattenDependencies(platforms []string, dependenciesVersion, archivePath, dropPath, flatPath string, manifestResponse *manifest.Build, dependencies []packaging.BinarySpec) {
-
 	for _, pltf := range platforms {
 
 		rp := manifest.PlatformPackages[pltf]
@@ -1509,7 +1495,6 @@ type branchInfo struct {
 // FetchLatestAgentCoreStagingDRA is a mage target that will retrieve the elastic-agent-core DRA artifacts and
 // place them under build/dra/buildID. It accepts one argument that has to be a release branch present in staging DRA
 func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
-
 	components, err := packaging.Components()
 	if err != nil {
 		return fmt.Errorf("retrieving defined components: %w", err)
@@ -1528,7 +1513,6 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 	elasticAgentCoreComponent := elasticAgentCoreComponents[0]
 
 	branchInformation, err := findLatestBuildForBranch(ctx, baseURLForSnapshotDRA, branch)
-
 	if err != nil {
 		return fmt.Errorf("getting latest build for branch %q: %v", err)
 	}
@@ -1676,7 +1660,6 @@ func mapManifestPlatformToAgentPlatform(manifestPltf string) (string, bool) {
 }
 
 func downloadDRAArtifacts(ctx context.Context, build *manifest.Build, version string, draDownloadDir string, components ...packaging.BinarySpec) (map[string]manifest.Package, error) {
-
 	err := os.MkdirAll(draDownloadDir, 0o770)
 	if err != nil {
 		return nil, fmt.Errorf("creating %q directory: %w", draDownloadDir, err)
@@ -3819,6 +3802,9 @@ func (Helm) UpdateAgentVersion() error {
 			{"defaultCRConfig.image.tag", agentVersion},
 		},
 		filepath.Join(helmMOtelChartPath, "values.yaml"): {
+			{"defaultCRConfig.image.tag", agentVersion},
+		},
+		filepath.Join(helmMOtelChartPath, "logs-values.yaml"): {
 			{"defaultCRConfig.image.tag", agentVersion},
 		},
 	} {
