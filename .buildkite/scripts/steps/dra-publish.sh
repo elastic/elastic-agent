@@ -9,6 +9,9 @@ BRANCH="${DRA_BRANCH:="${BUILDKITE_BRANCH:=""}"}"
 PACKAGE_VERSION="${DRA_VERSION:="${BEAT_VERSION:=""}"}"
 VERSION_QUALIFIER="${VERSION_QUALIFIER:=""}"
 
+# XXX: Temp testing
+BRANCH=main
+
 # force main branch on PR's or it won't execute
 # because the PR branch does not have a project folder in release-manager
 if [[ "${BUILDKITE_PULL_REQUEST:="false"}" != "false" ]]; then
