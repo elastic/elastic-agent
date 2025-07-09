@@ -6,6 +6,7 @@ package upgradetest
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,6 +14,55 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/version"
 )
+
+// generateTestVersions generates a slice of version strings from startVersion to endVersion (inclusive).
+// For each minor version in the range, and for each patch version 0-9, it generates:
+//   - base version (e.g., 8.17.0)
+//   - base-SNAPSHOT
+//   - base+metadata
+//   - base-SNAPSHOT+metadata
+//
+// For intermediate major versions (not start or end), minor versions are limited to 0-19.
+func generateTestVersions(startVersion, endVersion string) []string {
+	var versions []string
+	start, err := version.ParseVersion(startVersion)
+	if err != nil {
+		panic("invalid startVersion: " + err.Error())
+	}
+	end, err := version.ParseVersion(endVersion)
+	if err != nil {
+		panic("invalid endVersion: " + err.Error())
+	}
+
+	for major := start.Major(); major <= end.Major(); major++ {
+		minMinor := 0
+		maxMinor := 19 // limit to 0-19 for intermediate majors
+		if major == start.Major() {
+			minMinor = start.Minor()
+		}
+		if major == end.Major() {
+			maxMinor = end.Minor()
+		}
+		for minor := minMinor; minor <= maxMinor; minor++ {
+			minPatch := 0
+			maxPatch := 9
+			if major == start.Major() && minor == start.Minor() {
+				minPatch = start.Patch()
+			}
+			if major == end.Major() && minor == end.Minor() {
+				maxPatch = end.Patch()
+			}
+			for patch := minPatch; patch <= maxPatch; patch++ {
+				base := fmt.Sprintf("%d.%d.%d", major, minor, patch)
+				versions = append(versions, base)
+				versions = append(versions, base+"-SNAPSHOT")
+				versions = append(versions, base+"+metadata")
+				versions = append(versions, base+"-SNAPSHOT+metadata")
+			}
+		}
+	}
+	return versions
+}
 
 func TestFetchUpgradableVersionsAfterFeatureFreeze(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
