@@ -13,8 +13,7 @@ import (
 	"go.opentelemetry.io/collector/receiver"
 
 	// Receivers:
-	elasticapmintakereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/elasticapmintakereceiver" // for collecting APM data from Elastic APM agents
-	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver"                   // for collecting log files
+	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
 	hostmetricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver"
 	httpcheckreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver"
 	jaegerreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver"
@@ -28,6 +27,8 @@ import (
 	zipkinreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver"
 	nopreceiver "go.opentelemetry.io/collector/receiver/nopreceiver"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
+
+	elasticapmintakereceiver "github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver" // for collecting APM data from Elastic APM agents
 
 	fbreceiver "github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
 	mbreceiver "github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
