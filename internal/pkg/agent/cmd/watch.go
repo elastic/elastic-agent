@@ -104,24 +104,6 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		_ = locker.Unlock()
 	}()
 
-	isWithinGrace, tilGrace := gracePeriod(marker, cfg.GracePeriod)
-	if isTerminalState(marker) || !isWithinGrace {
-		stateString := ""
-		if marker.Details != nil {
-			stateString = string(marker.Details.State)
-		}
-		log.Infof("not within grace [updatedOn %v] %v or agent have been rolled back [state: %s]", marker.UpdatedOn.String(), time.Since(marker.UpdatedOn).String(), stateString)
-		// if it is started outside of upgrade loop
-		// if we're not within grace and marker is still there it might mean
-		// that cleanup was not performed ok, cleanup everything except current version
-		// hash is the same as hash of agent which initiated watcher.
-		if err := installModifier.Cleanup(log, paths.Top(), paths.VersionedHome(topDir), release.ShortCommit(), true, false); err != nil {
-			log.Error("clean up of prior watcher run failed", err)
-		}
-		// exit nicely
-		return nil
-	}
-
 	if marker.DesiredOutcome == upgrade.OUTCOME_ROLLBACK {
 		// TODO: there should be some sanity check in rollback functions like the installation we are going back to should exist and work
 		log.Info("rolling back because of DesiredOutcome=%s", marker.DesiredOutcome.String())
@@ -143,6 +125,24 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 			return fmt.Errorf("saving marker after rolling back: %w", err)
 		}
 
+		return nil
+	}
+
+	isWithinGrace, tilGrace := gracePeriod(marker, cfg.GracePeriod)
+	if isTerminalState(marker) || !isWithinGrace {
+		stateString := ""
+		if marker.Details != nil {
+			stateString = string(marker.Details.State)
+		}
+		log.Infof("not within grace [updatedOn %v] %v or agent have been rolled back [state: %s]", marker.UpdatedOn.String(), time.Since(marker.UpdatedOn).String(), stateString)
+		// if it is started outside of upgrade loop
+		// if we're not within grace and marker is still there it might mean
+		// that cleanup was not performed ok, cleanup everything except current version
+		// hash is the same as hash of agent which initiated watcher.
+		if err := installModifier.Cleanup(log, paths.Top(), paths.VersionedHome(topDir), release.ShortCommit(), true, false); err != nil {
+			log.Error("clean up of prior watcher run failed", err)
+		}
+		// exit nicely
 		return nil
 	}
 
