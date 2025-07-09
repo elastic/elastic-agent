@@ -285,9 +285,6 @@ shared:
         content: >
           {{ commit }}
         mode: 0644
-      /usr/share/{{.BeatName}}/bin/{{.BeatName}}-god:
-        source: build/golang-crossbuild/god-{{.GOOS}}-{{.Platform.Arch}}
-        mode: 0755
       /usr/bin/{{.BeatName}}:
         template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/elastic-agent.sh.tmpl'
         mode: 0755
@@ -703,9 +700,6 @@ shared:
       /usr/share/{{.BeatName}}/kibana:
         source: _meta/kibana.generated
         mode: 0644
-      /usr/share/{{.BeatName}}/bin/{{.BeatName}}-god:
-        source: build/golang-crossbuild/god-{{.GOOS}}-{{.Platform.Arch}}
-        mode: 0755
       /usr/bin/{{.BeatName}}:
         template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/beatname.sh.tmpl'
         mode: 0755
