@@ -7,6 +7,7 @@ package upgradetest
 import (
 	"context"
 	"fmt"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,53 +16,165 @@ import (
 	"github.com/elastic/elastic-agent/pkg/version"
 )
 
-// generateTestVersions generates a slice of version strings from startVersion to endVersion (inclusive).
-// For each minor version in the range, and for each patch version 0-9, it generates:
-//   - base version (e.g., 8.17.0)
-//   - base-SNAPSHOT
-//   - base+metadata
-//   - base-SNAPSHOT+metadata
-//
-// For intermediate major versions (not start or end), minor versions are limited to 0-19.
-func generateTestVersions(startVersion, endVersion string) []string {
-	var versions []string
+func generateTestVersions(startVersion, endVersion string) ([]*version.ParsedSemVer, error) {
+	var versionStrings []string
 	start, err := version.ParseVersion(startVersion)
 	if err != nil {
-		panic("invalid startVersion: " + err.Error())
+		return nil, fmt.Errorf("invalid startVersion: %w", err)
 	}
 	end, err := version.ParseVersion(endVersion)
 	if err != nil {
-		panic("invalid endVersion: " + err.Error())
+		return nil, fmt.Errorf("invalid endVersion: %w", err)
+	}
+
+	if !start.Less(*end) && !start.Equal(*end) {
+		return nil, fmt.Errorf("start version %s is newer than end version %s", startVersion, endVersion)
 	}
 
 	for major := start.Major(); major <= end.Major(); major++ {
-		minMinor := 0
-		maxMinor := 19 // limit to 0-19 for intermediate majors
+		// Arbitrarily chosen well defined range of minor versions
+		minorStart := 0
+		minorEnd := 19
+
 		if major == start.Major() {
-			minMinor = start.Minor()
+			minorStart = start.Minor()
 		}
+
 		if major == end.Major() {
-			maxMinor = end.Minor()
+			minorEnd = end.Minor()
 		}
-		for minor := minMinor; minor <= maxMinor; minor++ {
-			minPatch := 0
-			maxPatch := 9
+
+		for minor := minorStart; minor <= minorEnd; minor++ {
+			// Arbitrarily chosen well defined range of patch versions
+			patchStart := 0
+			patchEnd := 9
 			if major == start.Major() && minor == start.Minor() {
-				minPatch = start.Patch()
+				patchStart = start.Patch()
 			}
+
 			if major == end.Major() && minor == end.Minor() {
-				maxPatch = end.Patch()
+				patchEnd = end.Patch()
 			}
-			for patch := minPatch; patch <= maxPatch; patch++ {
+
+			for patch := patchStart; patch <= patchEnd; patch++ {
 				base := fmt.Sprintf("%d.%d.%d", major, minor, patch)
-				versions = append(versions, base)
-				versions = append(versions, base+"-SNAPSHOT")
-				versions = append(versions, base+"+metadata")
-				versions = append(versions, base+"-SNAPSHOT+metadata")
+				versionStrings = append(versionStrings, base)
+				versionStrings = append(versionStrings, base+"-SNAPSHOT")
+				versionStrings = append(versionStrings, base+"+metadata")
+				versionStrings = append(versionStrings, base+"-SNAPSHOT+metadata")
 			}
 		}
 	}
-	return versions
+
+	var versions []*version.ParsedSemVer
+	for _, vStr := range versionStrings {
+		parsed, err := version.ParseVersion(vStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse generated version %s: %w", vStr, err)
+		}
+		versions = append(versions, parsed)
+	}
+
+	// Sort from newest to oldest
+	// Release and metadata versions are equal, sort lexicographicall
+	sort.SliceStable(versions, func(i, j int) bool {
+		if !versions[i].Equal(*versions[j]) {
+			return versions[j].Less(*versions[i])
+		}
+		return versions[i].Original() < versions[j].Original()
+	})
+
+	return versions, nil
+}
+
+func TestGenerateTestVersions(t *testing.T) {
+	testCases := map[string]struct {
+		startVersion          string
+		endVersion            string
+		expectedNewestVersion string
+		expectedOldestVersion string
+		error                 string
+	}{
+		"8.17.2 to 9.2.0": {
+			startVersion:          "8.17.2",
+			endVersion:            "9.2.0",
+			expectedNewestVersion: "9.2.0",
+			expectedOldestVersion: "8.17.2-SNAPSHOT+metadata",
+			error:                 "",
+		},
+		"9.0.0 to 9.20.0": {
+			startVersion:          "9.0.0",
+			endVersion:            "9.20.0",
+			expectedNewestVersion: "9.20.0",
+			expectedOldestVersion: "9.0.0-SNAPSHOT+metadata",
+			error:                 "",
+		},
+		"9.0.0 to 9.0.0": {
+			startVersion:          "9.0.0",
+			endVersion:            "9.0.0",
+			expectedNewestVersion: "9.0.0",
+			expectedOldestVersion: "9.0.0-SNAPSHOT+metadata",
+			error:                 "",
+		},
+		"invalid start version": {
+			startVersion:          "invalid.version",
+			endVersion:            "",
+			expectedNewestVersion: "",
+			expectedOldestVersion: "",
+			error:                 "invalid startVersion:",
+		},
+		"invalid end version": {
+			startVersion:          "9.0.0",
+			endVersion:            "invalid.version",
+			expectedNewestVersion: "",
+			expectedOldestVersion: "",
+			error:                 "invalid endVersion:",
+		},
+		"start version newer than end version": {
+			startVersion:          "9.2.0",
+			endVersion:            "9.0.0",
+			expectedNewestVersion: "",
+			expectedOldestVersion: "",
+			error:                 "start version 9.2.0 is newer than end version 9.0.0",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			versions, err := generateTestVersions(tc.startVersion, tc.endVersion)
+
+			if tc.error != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.error)
+				require.Nil(t, versions)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotEmpty(t, versions)
+
+			for i := 1; i < len(versions); i++ {
+				require.False(t, versions[i-1].Less(*versions[i]),
+					"versions not sorted correctly: %s should not be less than %s",
+					versions[i-1].Original(), versions[i].Original())
+			}
+
+			expectedNewestParsed, err := version.ParseVersion(tc.expectedNewestVersion)
+			require.NoError(t, err)
+			expectedOldestParsed, err := version.ParseVersion(tc.expectedOldestVersion)
+			require.NoError(t, err)
+
+			firstVersion := versions[0]
+			require.True(t, firstVersion.Equal(*expectedNewestParsed),
+				"first version %s should be equal to expected newest version %s",
+				firstVersion.Original(), tc.expectedNewestVersion)
+
+			lastVersion := versions[len(versions)-1]
+			require.True(t, lastVersion.Equal(*expectedOldestParsed),
+				"last version %s should be equal to expected oldest version %s",
+				lastVersion.Original(), tc.expectedOldestVersion)
+		})
+	}
 }
 
 func TestFetchUpgradableVersionsAfterFeatureFreeze(t *testing.T) {
@@ -308,745 +421,302 @@ func TestPreviousMinor(t *testing.T) {
 	type releaseTypes struct {
 		expected string
 		err      string
-		message  string
 	}
 
-	type upgradeableSet struct {
-		upgradeableVersions []string
-		releaseTypes        map[string]releaseTypes
+	allSameResult := func(expected, err string) map[string]releaseTypes {
+		return map[string]releaseTypes{
+			release:          {expected: expected, err: err},
+			snapshot:         {expected: expected, err: err},
+			metadata:         {expected: expected, err: err},
+			snapshotMetadata: {expected: expected, err: err},
+		}
 	}
+
+	noPreviousMinorResult := allSameResult("", ErrNoPreviousMinor.Error())
 
 	type testCase struct {
-		currentVersion  string
-		upgradeableSets map[string]upgradeableSet
+		currentVersion    string
+		oldestCoreVersion string
+		newestCoreVersion string
+		expected          map[string]releaseTypes
 	}
 
-	testSuite := map[string]testCase{
-		"First major version": {
-			currentVersion: "9.0.0",
-			upgradeableSets: map[string]upgradeableSet{
-				"only previous major versions": {
-					upgradeableVersions: []string{
-						"8.19.0-SNAPSHOT+metadata",
-						"8.19.0+metadata",
-						"8.19.0-SNAPSHOT",
-						"8.19.0",
-						"8.18.2",
-						"8.17.6",
-					},
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "8.19.0-SNAPSHOT+metadata",
-							err:      "",
-							message:  "Should return the first release version less than current",
-						},
-						snapshot: {
-							expected: "8.19.0-SNAPSHOT+metadata",
-							err:      "",
-							message:  "Should return the first snapshot version less than current",
-						},
-						metadata: {
-							expected: "8.19.0-SNAPSHOT+metadata",
-							err:      "",
-							message:  "Should return the first metadata version less than current",
-						},
-						snapshotMetadata: {
-							expected: "8.19.0-SNAPSHOT+metadata",
-							err:      "",
-							message:  "Should return the first snapshotMetadata version less than current",
-						},
-					},
+	type testCases map[string]testCase
+
+	tests := testCases{
+		"First major version - only previous major versions": {
+			currentVersion:    "9.0.0",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "8.19.0",
+			expected:          allSameResult("8.19.0", ""),
+		},
+		"First major version - only newer major versions": {
+			currentVersion:    "9.0.0",
+			oldestCoreVersion: "9.1.0",
+			newestCoreVersion: "9.2.0",
+			expected:          noPreviousMinorResult,
+		},
+		"First major version - only current major version": {
+			currentVersion:    "9.0.0",
+			oldestCoreVersion: "9.0.0",
+			newestCoreVersion: "9.0.0",
+			expected: map[string]releaseTypes{
+				release: {
+					expected: "9.0.0-SNAPSHOT",
+					err:      "",
 				},
-				"only current and higher major versions": {
-					upgradeableVersions: []string{
-						"9.1.0",
-						"9.1.0-SNAPSHOT",
-						"9.1.0+metadata",
-						"9.1.0-SNAPSHOT+metadata",
-					},
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-						snapshot: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-						metadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-						snapshotMetadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-					},
+				snapshot: {
+					expected: "",
+					err:      ErrNoPreviousMinor.Error(),
+				},
+				metadata: {
+					expected: "9.0.0-SNAPSHOT",
+					err:      "",
+				},
+				snapshotMetadata: {
+					expected: "",
+					err:      ErrNoPreviousMinor.Error(),
 				},
 			},
 		},
-		"First patch release of a new version": {
-			currentVersion: "9.0.1",
-			upgradeableSets: map[string]upgradeableSet{
-				"only previous major versions": {
-					upgradeableVersions: []string{
-						"8.19.0-SNAPSHOT+metadata",
-						"8.19.0+metadata",
-						"8.19.0-SNAPSHOT",
-						"8.19.0",
-						"8.18.2",
-						"8.17.6",
-					},
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "8.19.0-SNAPSHOT+metadata",
-							err:      "",
-							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
-						},
-						snapshot: {
-							expected: "8.19.0-SNAPSHOT+metadata",
-							err:      "",
-							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
-						},
-						metadata: {
-							expected: "8.19.0-SNAPSHOT+metadata",
-							err:      "",
-							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
-						},
-						snapshotMetadata: {
-							expected: "8.19.0-SNAPSHOT+metadata",
-							err:      "",
-							message:  "Should return the latest version from the previous major found first in the upgradeable versions list",
-						},
-					},
+		"First major version - current major, newer versions and older versions": {
+			currentVersion:    "9.0.0",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "9.2.0",
+			expected: map[string]releaseTypes{
+				release: {
+					expected: "9.0.0-SNAPSHOT",
+					err:      "",
 				},
-				"only current and higher major versions": {
-					upgradeableVersions: []string{
-						"9.1.0",
-						"9.1.0-SNAPSHOT",
-						"9.1.0+metadata",
-						"9.1.0-SNAPSHOT+metadata",
-					},
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-						snapshot: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-						metadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-						snapshotMetadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-					},
+				snapshot: {
+					expected: "8.19.9",
+					err:      "",
+				},
+				metadata: {
+					expected: "9.0.0-SNAPSHOT",
+					err:      "",
+				},
+				snapshotMetadata: {
+					expected: "8.19.9",
+					err:      "",
 				},
 			},
 		},
-		"First minor release": {
-			currentVersion: "9.1.0",
-			upgradeableSets: map[string]upgradeableSet{
-				"previous minor from the same major and previous major versions": {
-					upgradeableVersions: []string{
-						"9.0.1-SNAPSHOT+metadata",
-						"9.0.1+metadata",
-						"9.0.1-SNAPSHOT",
-						"9.0.1",
-						"9.0.0-SNAPSHOT+metadata",
-						"9.0.0+metadata",
-						"9.0.0-SNAPSHOT",
-						"9.0.0",
-						"8.19.0-SNAPSHOT+metadata",
-						"8.19.0+metadata",
-						"8.19.0-SNAPSHOT",
-						"8.19.0",
-						"8.18.2",
-						"8.17.6",
-					},
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "9.0.1",
-							err:      "",
-							message:  "Should return the previous minor from the same major",
-						},
-						snapshot: {
-							expected: "9.0.1",
-							err:      "",
-							message:  "Should return the previous minor from the same major",
-						},
-						metadata: {
-							expected: "9.0.1",
-							err:      "",
-							message:  "Should return the previous minor from the same major",
-						},
-						snapshotMetadata: {
-							expected: "9.0.1",
-							err:      "",
-							message:  "Should return the previous minor from the same major",
-						},
-					},
+		"First patch release of a new version - only previous major versions": {
+			currentVersion:    "9.0.1",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "8.19.0",
+			expected:          allSameResult("8.19.0", ""),
+		},
+		"First patch release of a new version - only newer major versions": {
+			currentVersion:    "9.0.1",
+			oldestCoreVersion: "9.1.0",
+			newestCoreVersion: "9.2.0",
+			expected:          noPreviousMinorResult,
+		},
+		"First patch release of a new version - only current major versions": {
+			currentVersion:    "9.0.1",
+			oldestCoreVersion: "9.0.1",
+			newestCoreVersion: "9.0.1",
+			expected: map[string]releaseTypes{
+				release: {
+					expected: "9.0.1-SNAPSHOT",
+					err:      "",
 				},
-				"only current major versions": {
-					upgradeableVersions: []string{
-						"9.1.0-SNAPSHOT+metadata",
-						"9.1.0+metadata",
-						"9.1.0-SNAPSHOT",
-						"9.1.0",
-					},
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-						snapshot: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-						metadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-						snapshotMetadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-					},
+				snapshot: {
+					expected: "",
+					err:      ErrNoPreviousMinor.Error(),
+				},
+				metadata: {
+					expected: "9.0.1-SNAPSHOT",
+					err:      "",
+				},
+				snapshotMetadata: {
+					expected: "",
+					err:      ErrNoPreviousMinor.Error(),
 				},
 			},
 		},
-		"First patch of first minor": {
-			currentVersion: "9.1.1",
-			upgradeableSets: map[string]upgradeableSet{
-				"previous minor from the same major and previous major versions": {
-					upgradeableVersions: []string{
-						"9.0.1-SNAPSHOT+metadata",
-						"9.0.1+metadata",
-						"9.0.1-SNAPSHOT",
-						"9.0.1",
-						"9.0.0-SNAPSHOT+metadata",
-						"9.0.0+metadata",
-						"9.0.0-SNAPSHOT",
-						"9.0.0",
-						"8.19.0-SNAPSHOT+metadata",
-						"8.19.0+metadata",
-						"8.19.0-SNAPSHOT",
-						"8.19.0",
-						"8.18.2",
-						"8.17.6",
-					},
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "9.0.1",
-							err:      "",
-							message:  "Should return the previous minor from the same major",
-						},
-						snapshot: {
-							expected: "9.0.1",
-							err:      "",
-							message:  "Should return the previous minor from the same major",
-						},
-						metadata: {
-							expected: "9.0.1",
-							err:      "",
-							message:  "Should return the previous minor from the same major",
-						},
-						snapshotMetadata: {
-							expected: "9.0.1",
-							err:      "",
-							message:  "Should return the previous minor from the same major",
-						},
-					},
+		"First patch release of a new version - current major, newer versions and older versions": {
+			currentVersion:    "9.0.1",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "9.2.0",
+			expected: map[string]releaseTypes{
+				release: {
+					expected: "9.0.1-SNAPSHOT",
+					err:      "",
 				},
-				"only current major versions": {
-					upgradeableVersions: []string{
-						"9.1.0-SNAPSHOT+metadata",
-						"9.1.0+metadata",
-						"9.1.0-SNAPSHOT",
-						"9.1.0",
-					},
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-						snapshot: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-						metadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-						snapshotMetadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-					},
+				snapshot: {
+					expected: "9.0.0",
+					err:      "",
+				},
+				metadata: {
+					expected: "9.0.1-SNAPSHOT",
+					err:      "",
+				},
+				snapshotMetadata: {
+					expected: "9.0.0",
+					err:      "",
 				},
 			},
 		},
-		"Nth patch of first minor": {
-			currentVersion: "9.1.15",
-			upgradeableSets: map[string]upgradeableSet{
-				"previous minor from the same major and previous major versions": {
-					upgradeableVersions: []string{
-						"9.1.15-SNAPSHOT+metadata",
-						"9.1.15+metadata",
-						"9.1.15-SNAPSHOT",
-						"9.1.15",
-						"9.1.1-SNAPSHOT+metadata",
-						"9.1.1+metadata",
-						"9.1.1-SNAPSHOT",
-						"9.1.1",
-						"9.1.0-SNAPSHOT+metadata",
-						"9.1.0+metadata",
-						"9.1.0-SNAPSHOT",
-						"9.1.0",
-						"9.0.1-SNAPSHOT+metadata",
-						"9.0.1+metadata",
-						"9.0.1-SNAPSHOT",
-						"9.0.1",
-						"9.0.0-SNAPSHOT+metadata",
-						"9.0.0+metadata",
-						"9.0.0-SNAPSHOT",
-						"9.0.0",
-						"8.19.0-SNAPSHOT+metadata",
-						"8.19.0+metadata",
-						"8.19.0-SNAPSHOT",
-						"8.19.0",
-						"8.18.2",
-						"8.17.6",
-					},
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "9.0.1",
-							err:      "",
-							message:  "Should return the previous minor from the same major",
-						},
-						snapshot: {
-							expected: "9.0.1",
-							err:      "",
-							message:  "Should return the previous minor from the same major",
-						},
-						metadata: {
-							expected: "9.0.1",
-							err:      "",
-							message:  "Should return the previous minor from the same major",
-						},
-						snapshotMetadata: {
-							expected: "9.0.1",
-							err:      "",
-							message:  "Should return the previous minor from the same major",
-						},
-					},
-				},
-				"only current major versions": {
-					upgradeableVersions: []string{
-						"9.1.15-SNAPSHOT+metadata",
-						"9.1.15+metadata",
-						"9.1.15-SNAPSHOT",
-						"9.1.15",
-						"9.1.1-SNAPSHOT+metadata",
-						"9.1.1+metadata",
-						"9.1.1-SNAPSHOT",
-						"9.1.1",
-						"9.1.0-SNAPSHOT+metadata",
-						"9.1.0+metadata",
-						"9.1.0-SNAPSHOT",
-						"9.1.0",
-					},
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-						snapshot: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-						metadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-						snapshotMetadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-					},
-				},
-			},
+		"First minor release - previous minor from the same major and previous major versions": {
+			currentVersion:    "9.1.0",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "9.1.0",
+			expected:          allSameResult("9.0.9", ""),
 		},
-		"Nth major": {
-			currentVersion: "9.2.0",
-			upgradeableSets: map[string]upgradeableSet{
-				"previous minor from the same major and previous major versions": {
-					upgradeableVersions: []string{
-						"9.1.15-SNAPSHOT+metadata",
-						"9.1.15+metadata",
-						"9.1.15-SNAPSHOT",
-						"9.1.15",
-						"9.1.1-SNAPSHOT+metadata",
-						"9.1.1+metadata",
-						"9.1.1-SNAPSHOT",
-						"9.1.1",
-						"9.1.0-SNAPSHOT+metadata",
-						"9.1.0+metadata",
-						"9.1.0-SNAPSHOT",
-						"9.1.0",
-						"9.0.1-SNAPSHOT+metadata",
-						"9.0.1+metadata",
-						"9.0.1-SNAPSHOT",
-						"9.0.1",
-						"9.0.0-SNAPSHOT+metadata",
-						"9.0.0+metadata",
-						"9.0.0-SNAPSHOT",
-						"9.0.0",
-						"8.19.0-SNAPSHOT+metadata",
-						"8.19.0+metadata",
-						"8.19.0-SNAPSHOT",
-						"8.19.0",
-						"8.18.2",
-						"8.17.6",
-					},
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "9.1.15",
-							err:      "",
-							message:  "Should return the previous minor from the same major",
-						},
-						snapshot: {
-							expected: "9.1.15",
-							err:      "",
-							message:  "Should return the previous minor from the same major",
-						},
-						metadata: {
-							expected: "9.1.15",
-							err:      "",
-							message:  "Should return the previous minor from the same major",
-						},
-						snapshotMetadata: {
-							expected: "9.1.15",
-							err:      "",
-							message:  "Should return the previous minor from the same major",
-						},
-					},
-				},
-				"only current major versions": {
-					upgradeableVersions: []string{
-						"9.2.0-SNAPSHOT+metadata",
-						"9.2.0+metadata",
-						"9.2.0-SNAPSHOT",
-						"9.2.0",
-					},
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-						snapshot: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-						metadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-						snapshotMetadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-					},
-				},
-			},
+		"First minor release - only current major or higher versions": {
+			currentVersion:    "9.1.0",
+			oldestCoreVersion: "9.1.0",
+			newestCoreVersion: "9.2.0",
+			expected:          noPreviousMinorResult,
 		},
-		"Nth major first patch": {
-			currentVersion: "9.2.1",
-			upgradeableSets: map[string]upgradeableSet{
-				"previous minor from the same major and previous major versions": {
-					upgradeableVersions: []string{
-						"9.2.1-SNAPSHOT+metadata",
-						"9.2.1+metadata",
-						"9.2.1-SNAPSHOT",
-						"9.2.1",
-						"9.2.0-SNAPSHOT+metadata",
-						"9.2.0+metadata",
-						"9.2.0-SNAPSHOT",
-						"9.2.0",
-						"9.1.15-SNAPSHOT+metadata",
-						"9.1.15+metadata",
-						"9.1.15-SNAPSHOT",
-						"9.1.15",
-						"9.1.1-SNAPSHOT+metadata",
-						"9.1.1+metadata",
-						"9.1.1-SNAPSHOT",
-						"9.1.1",
-						"9.1.0-SNAPSHOT+metadata",
-						"9.1.0+metadata",
-						"9.1.0-SNAPSHOT",
-						"9.1.0",
-						"9.0.1-SNAPSHOT+metadata",
-						"9.0.1+metadata",
-						"9.0.1-SNAPSHOT",
-						"9.0.1",
-						"9.0.0-SNAPSHOT+metadata",
-						"9.0.0+metadata",
-						"9.0.0-SNAPSHOT",
-						"9.0.0",
-						"8.19.0-SNAPSHOT+metadata",
-						"8.19.0+metadata",
-						"8.19.0-SNAPSHOT",
-						"8.19.0",
-						"8.18.2",
-						"8.17.6",
-					},
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "9.1.15",
-							err:      "",
-							message:  "Should return the previous minor from the same major",
-						},
-						snapshot: {
-							expected: "9.1.15",
-							err:      "",
-							message:  "Should return the previous minor from the same major",
-						},
-						metadata: {
-							expected: "9.1.15",
-							err:      "",
-							message:  "Should return the previous minor from the same major",
-						},
-						snapshotMetadata: {
-							expected: "9.1.15",
-							err:      "",
-							message:  "Should return the previous minor from the same major",
-						},
-					},
-				},
-				"only current major versions": {
-					upgradeableVersions: []string{
-						"9.2.1-SNAPSHOT+metadata",
-						"9.2.1+metadata",
-						"9.2.1-SNAPSHOT",
-						"9.2.1",
-						"9.2.0-SNAPSHOT+metadata",
-						"9.2.0+metadata",
-						"9.2.0-SNAPSHOT",
-						"9.2.0",
-					},
-					releaseTypes: map[string]releaseTypes{
-						release: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-						snapshot: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-						metadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-						snapshotMetadata: {
-							expected: "",
-							err:      ErrNoPreviousMinor.Error(),
-							message:  "Should return error when no previous minor version is found",
-						},
-					},
-				},
-			},
+		"First minor release - only previous major versions": {
+			currentVersion:    "9.1.0",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "8.19.0",
+			expected:          noPreviousMinorResult,
+		},
+		"First patch of first minor - previous minor from the same major and previous major versions": {
+			currentVersion:    "9.1.1",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "9.1.1",
+			expected:          allSameResult("9.0.9", ""),
+		},
+		"First patch of first minor - only current major or higher versions": {
+			currentVersion:    "9.1.1",
+			oldestCoreVersion: "9.1.1",
+			newestCoreVersion: "9.2.0",
+			expected:          noPreviousMinorResult,
+		},
+		"First patch of first minor - only previous major versions": {
+			currentVersion:    "9.1.1",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "8.19.0",
+			expected:          noPreviousMinorResult,
+		},
+		"Nth patch of first minor - previous minor from the same major and previous major versions": {
+			currentVersion:    "9.1.15",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "9.1.15",
+			expected:          allSameResult("9.0.9", ""),
+		},
+		"Nth patch of first minor - only current major or higher versions": {
+			currentVersion:    "9.1.15",
+			oldestCoreVersion: "9.1.15",
+			newestCoreVersion: "9.2.0",
+			expected:          noPreviousMinorResult,
+		},
+		"Nth patch of first minor - only previous major versions": {
+			currentVersion:    "9.1.15",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "8.19.0",
+			expected:          noPreviousMinorResult,
+		},
+		"Nth major - previous minor from the same major and previous major versions": {
+			currentVersion:    "9.2.0",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "9.2.0",
+			expected:          allSameResult("9.1.9", ""),
+		},
+		"Nth major - only current major or higher versions": {
+			currentVersion:    "9.2.0",
+			oldestCoreVersion: "9.2.0",
+			newestCoreVersion: "9.3.0",
+			expected:          noPreviousMinorResult,
+		},
+		"Nth major - only previous major versions": {
+			currentVersion:    "9.2.0",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "8.19.0",
+			expected:          noPreviousMinorResult,
+		},
+		"Nth major first patch - previous minor from the same major and previous major versions": {
+			currentVersion:    "9.2.1",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "9.2.1",
+			expected:          allSameResult("9.1.9", ""),
+		},
+		"Nth major first patch - only current major or higher versions": {
+			currentVersion:    "9.2.1",
+			oldestCoreVersion: "9.2.0",
+			newestCoreVersion: "9.3.0",
+			expected:          noPreviousMinorResult,
+		},
+		"Nth major first patch - only previous major versions": {
+			currentVersion:    "9.2.1",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "8.19.0",
+			expected:          noPreviousMinorResult,
+		},
+		"Nth major Nth patch - previous minor from the same major and previous major versions": {
+			currentVersion:    "9.2.15",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "9.2.15",
+			expected:          allSameResult("9.1.9", ""),
+		},
+		"Nth major Nth patch - only current major or higher versions": {
+			currentVersion:    "9.2.15",
+			oldestCoreVersion: "9.2.15",
+			newestCoreVersion: "9.3.0",
+			expected:          noPreviousMinorResult,
+		},
+		"Nth major Nth patch - only previous major versions": {
+			currentVersion:    "9.2.15",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "8.19.0",
+			expected:          noPreviousMinorResult,
+		},
+		"Empty version range": {
+			currentVersion:    "9.2.15",
+			oldestCoreVersion: "",
+			newestCoreVersion: "",
+			expected:          noPreviousMinorResult,
+		},
+		"Unparsable current version": {
+			currentVersion:    "invalid version",
+			oldestCoreVersion: "8.17.0",
+			newestCoreVersion: "8.19.0",
+			expected:          allSameResult("", "failed to parse the current version"),
 		},
 	}
 
-	for suiteName, testCase := range testSuite {
-		for setName, set := range testCase.upgradeableSets {
-			upgradeableVersions := []*version.ParsedSemVer{}
-			for _, v := range set.upgradeableVersions {
-				parsed, err := version.ParseVersion(v)
-				require.NoError(t, err)
-				upgradeableVersions = append(upgradeableVersions, parsed)
+	for name, testCase := range tests {
+		versions := version.SortableParsedVersions{}
+		var err error
+		if testCase.oldestCoreVersion != "" && testCase.newestCoreVersion != "" {
+			versions, err = generateTestVersions(testCase.oldestCoreVersion, testCase.newestCoreVersion)
+			require.NoError(t, err)
+		}
+
+		for versionType, vcase := range testCase.expected {
+			testVersion := testCase.currentVersion
+			if versionType != "" {
+				testVersion = testCase.currentVersion + versionType
 			}
-			for versionType, vcase := range set.releaseTypes {
-				testVersion := testCase.currentVersion
-				if versionType != "" {
-					testVersion = testCase.currentVersion + versionType
+			t.Run(name+" "+versionType, func(t *testing.T) {
+				result, err := previousMinor(testVersion, versions)
+				if vcase.err != "" {
+					require.Error(t, err, func() string {
+						if result != nil {
+							return fmt.Sprintf("expected: %s, got: %s", vcase.expected, result.Original())
+						}
+						return fmt.Sprintf("expected: %s, got: <nil>", vcase.expected)
+					}())
+
+					require.Contains(t, err.Error(), vcase.err)
+					return
 				}
-				testName := suiteName + " " + setName + " " + testVersion
-				t.Run(testName, func(t *testing.T) {
-					result, err := previousMinor(testVersion, upgradeableVersions)
-					if vcase.err != "" {
-						require.Error(t, err, vcase.message)
-						require.Equal(t, vcase.err, err.Error(), vcase.message)
-						return
-					}
-					require.NoError(t, err, vcase.message)
-					expected, err := version.ParseVersion(vcase.expected)
-					require.NoError(t, err, vcase.message)
-					require.Equal(t, expected, result, vcase.message)
-				})
-			}
+
+				require.NoError(t, err)
+				expected, err := version.ParseVersion(vcase.expected)
+				require.NoError(t, err)
+				require.Equal(t, expected, result)
+			})
 		}
 	}
 }
-
-// func TestPreviousMinor(t *testing.T) {
-// 	testCases := map[string]struct {
-// 		currentVersion      string
-// 		upgradeableVersions []string
-// 		expectedVersion     string
-// 		expectError         bool
-// 	}{
-// 		"should return the previous minor from the same major and skip prerelease versions and versions with metadata": {
-// 			currentVersion: "9.1.0",
-// 			upgradeableVersions: []string{
-// 				"9.0.3-SNAPSHOT",
-// 				"9.0.2+metadata",
-// 				"9.0.1",
-// 				"8.19.0-SNAPSHOT",
-// 				"8.18.2",
-// 			},
-// 			expectedVersion: "9.0.1",
-// 			expectError:     false,
-// 		},
-// 		"should return the most recent version from the previous major when the current version is the first major release with a patch version": {
-// 			currentVersion: "9.0.1",
-// 			upgradeableVersions: []string{
-// 				"8.19.0-SNAPSHOT+metadata",
-// 				"8.18.2",
-// 				"8.17.6",
-// 				"7.17.29-SNAPSHOT",
-// 			},
-// 			expectedVersion: "8.19.0-SNAPSHOT+metadata",
-// 			expectError:     false,
-// 		},
-// 		"should return the most recent version from previous major when the current version is the first major release": {
-// 			currentVersion: "9.0.0",
-// 			upgradeableVersions: []string{
-// 				// "8.19.0-SNAPSHOT+metadata",
-// 				// "8.18.2",
-// 				// "8.17.6",
-// 				// "7.17.29-SNAPSHOT",
-
-// 				"8.19.0-SNAPSHOT+metadata",
-// 				"8.19.0+metadata",
-// 				"8.19.0-SNAPSHOT",
-// 				"8.19.0",
-// 				"8.18.2",
-// 				"8.17.6",
-// 			},
-// 			expectedVersion: "8.19.0-SNAPSHOT+metadata",
-// 			expectError:     false,
-// 		},
-// 		"should return the previous minor from the same major when the current version is a prerelease version": {
-// 			currentVersion: "9.1.0-SNAPSHOT",
-// 			upgradeableVersions: []string{
-// 				"9.0.3-SNAPSHOT",
-// 				"9.0.2",
-// 				"9.0.1",
-// 				"8.19.0-SNAPSHOT",
-// 				"8.18.2",
-// 			},
-// 			expectedVersion: "9.0.2",
-// 			expectError:     false,
-// 		},
-// 		"should return the most recent version from the previous major when the current version is the first major release with a prerelease version and metadata": {
-// 			currentVersion: "9.0.0-SNAPSHOT+metadata",
-// 			upgradeableVersions: []string{
-// 				"8.19.0-SNAPSHOT+metadata",
-// 				"8.18.2",
-// 				"8.17.6",
-// 				"7.17.29-SNAPSHOT",
-// 			},
-// 			expectedVersion: "8.19.0-SNAPSHOT+metadata",
-// 			expectError:     false,
-// 		},
-// 		"should return the most recent version from previous major when current version is first minor prerelease with no other minors in current major": {
-// 			currentVersion: "9.1.0-SNAPSHOT",
-// 			upgradeableVersions: []string{
-// 				"8.19.0-SNAPSHOT+metadata",
-// 				"8.18.2",
-// 				"8.17.6",
-// 				"7.17.29-SNAPSHOT",
-// 			},
-// 			expectedVersion: "8.19.0-SNAPSHOT+metadata",
-// 			expectError:     false,
-// 		},
-// 		"should return error when no previous minor is found": {
-// 			currentVersion: "9.1.0",
-// 			upgradeableVersions: []string{
-// 				"9.2.0",
-// 				"9.1.1",
-// 				"8.19.0-SNAPSHOT+metadata",
-// 				"8.18.2",
-// 				"8.17.6",
-// 				"7.17.29-SNAPSHOT",
-// 			},
-// 			expectedVersion: "",
-// 			expectError:     true,
-// 		},
-// 		"should return error when no versions are available": {
-// 			currentVersion:      "9.1.0",
-// 			upgradeableVersions: []string{},
-// 			expectedVersion:     "",
-// 			expectError:         true,
-// 		},
-// 	}
-
-// 	for testName, tc := range testCases {
-// 		t.Run(testName, func(t *testing.T) {
-// 			upgradeableVersions := []*version.ParsedSemVer{}
-// 			for _, v := range tc.upgradeableVersions {
-// 				parsed, err := version.ParseVersion(v)
-// 				require.NoError(t, err)
-// 				upgradeableVersions = append(upgradeableVersions, parsed)
-// 			}
-
-// 			result, err := previousMinor(tc.currentVersion, upgradeableVersions)
-
-// 			if tc.expectError {
-// 				require.Nil(t, result)
-// 				require.Error(t, err)
-// 				require.Equal(t, ErrNoPreviousMinor, err)
-// 				return
-// 			}
-
-// 			expected, err := version.ParseVersion(tc.expectedVersion)
-// 			require.NoError(t, err)
-// 			require.Equal(t, expected, result)
-// 		})
-// 	}
-// }
 
 func buildVersionList(t *testing.T, versions []string) version.SortableParsedVersions {
 	result := make(version.SortableParsedVersions, 0, len(versions))

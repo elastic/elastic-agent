@@ -263,12 +263,21 @@ func previousMinor(currentVersion string, upgradeableVersions []*version.ParsedS
 		return nil, fmt.Errorf("failed to parse the current version %s: %w", currentVersion, err)
 	}
 
+	// Special case: if we are in the first release (or a patch release of the first release) of a new major (so vX.0.x), we should
+	// return the latest release from the previous major.
 	if current.Minor() == 0 {
+		// Since the current version is the first release of a new major (vX.0.0), there
+		// will be no minor versions in the versions list from the same major (vX). The list
+		// will only contain minors from the previous major (vX-1). Further, since the
+		// version list is sorted in descending order (newer versions first), we can return the
+		// first item from the list as it will be the newest minor of the previous major.
 		for _, v := range upgradeableVersions {
 			if v.Less(*current) {
 				return v, nil
 			}
 		}
+
+		return nil, ErrNoPreviousMinor
 	}
 
 	for _, v := range upgradeableVersions {
