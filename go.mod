@@ -299,7 +299,11 @@ require (
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/lunes v0.1.0 // indirect
+<<<<<<< HEAD
 	github.com/elastic/mito v1.19.0 // indirect
+=======
+	github.com/elastic/mito v1.22.0 // indirect
+>>>>>>> afb1ae0ab (build(deps): bump github.com/elastic/mito from 1.21.0 to 1.22.0 (#8891))
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.4.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.16.1 // indirect
