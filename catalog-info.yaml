@@ -174,9 +174,10 @@ spec:
     spec:
       repository: elastic/elastic-agent
       pipeline_file: ".buildkite/macos.integration.pipeline.yml"
+      branch_configuration: "main 8.* 9.*"
       provider_settings:
         build_pull_request_forks: false
-        build_pull_requests: true
+        build_pull_requests: false # Don't run MacOS tests for Pull Requests ATM
         build_tags: false
         filter_enabled: true
         # required by "build_pull_requests: true" when used with buildkite-pr-bot
