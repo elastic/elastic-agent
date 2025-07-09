@@ -986,17 +986,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 
 	log.Println("--- Running post packaging ")
 	mg.Deps(Update)
-<<<<<<< HEAD
-	mg.Deps(agentBinaryTarget, CrossBuildGoDaemon)
-=======
 	mg.Deps(agentBinaryTarget)
-
-	// compile the elastic-agent.exe proxy binary for the windows archive
-	if slices.Contains(platforms, "windows/amd64") {
-		mg.Deps(Build.WindowsArchiveRootBinary)
-	}
-
->>>>>>> 21e89cb7f (Fix: Elastic Agent is not enabled on SUSE after installation from RPM package (#8896))
 	mg.SerialDeps(devtools.Package, TestPackages)
 	return nil
 }
