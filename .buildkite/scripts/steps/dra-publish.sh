@@ -10,7 +10,7 @@ PACKAGE_VERSION="${DRA_VERSION:="${BEAT_VERSION:=""}"}"
 VERSION_QUALIFIER="${VERSION_QUALIFIER:=""}"
 
 # XXX: Temp testing
-BRANCH=main
+BRANCH="9.0"
 
 # force main branch on PR's or it won't execute
 # because the PR branch does not have a project folder in release-manager
