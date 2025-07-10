@@ -15,10 +15,6 @@ import (
 // On non-Windows platforms, readMarkerFile simply reads the marker file.
 // See marker_access_windows.go for behavior on Windows platforms.
 func readMarkerFile(markerFile string) (bytes []byte, err error) {
-	if _, err := os.Stat(markerFile); errors.Is(err, os.ErrNotExist) {
-		// marker doesn't exist, nothing to do
-		return nil, nil
-	}
 	fileLock, err := newMarkerFileLocker(markerFile)
 	if err != nil {
 		return nil, fmt.Errorf("creating update marker locker for reading: %w", err)
