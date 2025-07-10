@@ -473,8 +473,8 @@ func (u *Upgrader) takeOverWatcher(ctx context.Context) (*filelock.AppLocker, er
 	defer takeOverTicker.Stop()
 	for {
 		select {
-		case err := <-takeoverCtx.Done():
-			return nil, fmt.Errorf("taking over watcher applocker: %w", err)
+		case <-takeoverCtx.Done():
+			return nil, fmt.Errorf("timed out taking over watcher applocker")
 		case <-takeOverTicker.C:
 			locker := filelock.NewAppLocker(paths.Top(), "watcher.lock")
 			err := locker.TryLock()
