@@ -86,7 +86,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| [apikeyauthextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apikeyauthextension/v0.2.0/extension/apikeyauthextension/README.md) | v0.2.0 |
+| [apikeyauthextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apikeyauthextension/v0.3.0/extension/apikeyauthextension/README.md) | v0.3.0 |
 | [apmconfigextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apmconfigextension/v0.4.0/extension/apmconfigextension/README.md) | v0.4.0 |
 | [bearertokenauthextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/bearertokenauthextension/v0.129.0/extension/bearertokenauthextension/README.md) | v0.129.0 |
 | [filestorage](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/storage/filestorage/v0.129.0/extension/storage/filestorage/README.md) | v0.129.0 |
