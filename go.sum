@@ -403,8 +403,8 @@ github.com/cpuguy83/dockercfg v0.3.2/go.mod h1:sugsbF4//dDlL/i+S+rtpIWp+5h0BHJHf
 github.com/cpuguy83/go-md2man/v2 v2.0.6 h1:XJtiaUW6dEEqVuZiMTn1ldk455QWwEIsMIJlo5vtkx0=
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
-github.com/creack/pty v1.1.18 h1:n56/Zwd5o6whRC5PMGretI4IdRLlmBXYNjScPaBgsbY=
-github.com/creack/pty v1.1.18/go.mod h1:MOBLtS5ELjhRRrroQr9kyvTxUAFNvYEK993ew/Vr4O4=
+github.com/creack/pty v1.1.20 h1:VIPb/a2s17qNeQgDnkfZC35RScx+blkKF8GV68n80J4=
+github.com/creack/pty v1.1.20/go.mod h1:MOBLtS5ELjhRRrroQr9kyvTxUAFNvYEK993ew/Vr4O4=
 github.com/cyphar/filepath-securejoin v0.3.6 h1:4d9N5ykBnSp5Xn2JkhocYDkOpURL/18CYMpo6xB9uWM=
 github.com/cyphar/filepath-securejoin v0.3.6/go.mod h1:Sdj7gXlvMcPZsbhwhQ33GguGLDGQL7h7bg04C/+u9jI=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
@@ -477,6 +477,8 @@ github.com/eclipse/paho.mqtt.golang v1.3.5 h1:sWtmgNxYM9P2sP+xEItMozsR3w0cqZFlqn
 github.com/eclipse/paho.mqtt.golang v1.3.5/go.mod h1:eTzb4gxwwyWpqBUHGQZ4ABAV7+Jgm1PklsYT/eo8Hcc=
 github.com/edsrzf/mmap-go v1.2.0 h1:hXLYlkbaPzt1SaQk+anYwKSRNhufIDCchSPkUD6dD84=
 github.com/edsrzf/mmap-go v1.2.0/go.mod h1:19H/e8pUPLicwkyNgOykDXkJ9F0MHE+Z52B8EIth78Q=
+github.com/elastic/apm-data v1.18.0 h1:GaWnrIoh7+UPmsbkQGls3tSCVk54sJng2v2YCYGpwyM=
+github.com/elastic/apm-data v1.18.0/go.mod h1:Bm4VpGkWHwVRAA32kVyVk1f9urv0dnh86DGFdOIiewk=
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic h1:fxOiGmMPr1dVDAKRGOkp9MV2amPmaZrWPtWJygFxcG0=
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic/go.mod h1:0vCBR1wgGwZeGmloJ+eCWIZF2S47grTXRzj2mftg2Nk=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
@@ -551,6 +553,8 @@ github.com/elastic/opentelemetry-collector-components/processor/elastictraceproc
 github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.7.0/go.mod h1:J3GYiuoaqLpjL/KmxOa/i5qwufSVUtow5UEVBdccaY8=
 github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.7.0 h1:E8IFePA8yhrSzDBwZKdyHyrKl3RN8p0AUBHmHI9svBc=
 github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.7.0/go.mod h1:K+ca61TBvLpT3/kZQXL/zPPdh9fn2YoJoPeJHA3W72A=
+github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.1.1 h1:YIiyedkp3bZvvk9u4WjmiZtpxuoOnTchSjOJkhtQuIA=
+github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.1.1/go.mod h1:S2IJ+XY4Ca7nm1s8/BunyYE19448StroBT8Ee4IDN/4=
 github.com/elastic/opentelemetry-lib v0.18.0 h1:LZqpQE++kt+0yovIjKeKRVc8gqURDegaqaF1saNuYwc=
 github.com/elastic/opentelemetry-lib v0.18.0/go.mod h1:VuHd1u65FsvUk82Iq3Ocb9j+r2iW1FRpRhg0H8UTm5Y=
 github.com/elastic/pkcs8 v1.0.0 h1:HhitlUKxhN288kcNcYkjW6/ouvuwJWd9ioxpjnD9jVA=
