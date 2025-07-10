@@ -1637,13 +1637,15 @@ func AssertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg 
 	flatM1 := m1.Flatten()
 	flatM2 := m2.Flatten()
 	for _, f := range ignoredFields {
-		hasKeyM1, _ := flatM1.HasKey(f)
-		hasKeyM2, _ := flatM2.HasKey(f)
-
-		if !hasKeyM1 && !hasKeyM2 {
-			assert.Failf(t, msg, "ignored field %q does not exist in either map, please remove it from the ignored fields", f)
-		}
-
+		// Checking ignored fields is disabled until we resolve an issue with event.ingested not being set
+		// in some cases.
+		// See https://github.com/elastic/elastic-agent/issues/8486 for details.
+		//hasKeyM1, _ := flatM1.HasKey(f)
+		//hasKeyM2, _ := flatM2.HasKey(f)
+		//
+		//if !hasKeyM1 && !hasKeyM2 {
+		//	assert.Failf(t, msg, "ignored field %q does not exist in either map, please remove it from the ignored fields", f)
+		//}
 		flatM1.Delete(f)
 		flatM2.Delete(f)
 	}
