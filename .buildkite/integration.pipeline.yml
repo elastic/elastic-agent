@@ -3,6 +3,11 @@
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
 
+common:
+  - vault_docker_login: &vault_docker_login
+      elastic/vault-docker-login#v0.5.2:
+        secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+
 steps:
   - group: "Integration tests: packaging"
     key: "int-packaging"
@@ -111,8 +116,7 @@ steps:
           machineType: "n2-standard-8"
           diskSizeGb: 200
         plugins:
-          - elastic/vault-docker-login#v0.5.2:
-              secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+          - *vault_docker_login
 
       - label: "Packaging: Containers linux/arm64"
         key: packaging-containers-arm64
@@ -149,8 +153,7 @@ steps:
           machineType: "n2-standard-8"
           diskSizeGb: 200
         plugins:
-          - elastic/vault-docker-login#v0.5.2:
-              secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+          - *vault_docker_login
 
       - label: "Packaging: Containers linux/arm64 FIPS"
         key: packaging-containers-arm64-fips
