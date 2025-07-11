@@ -159,7 +159,7 @@ type OTelManager interface {
 	WatchCollector() <-chan *status.AggregateStatus
 
 	// WatchComponents returns a channel to watch for component state updates.
-	WatchComponents() <-chan runtime.ComponentComponentState
+	WatchComponents() <-chan []runtime.ComponentComponentState
 
 	// MergedOtelConfig returns the merged Otel collector configuration, containing both the plain config and the
 	// component config.
@@ -369,7 +369,7 @@ type managerChans struct {
 	varsManagerError  <-chan error
 
 	otelManagerCollectorUpdate <-chan *status.AggregateStatus
-	otelManagerComponentUpdate <-chan runtime.ComponentComponentState
+	otelManagerComponentUpdate <-chan []runtime.ComponentComponentState
 	otelManagerError           <-chan error
 
 	upgradeMarkerUpdate <-chan upgrade.UpdateMarker
@@ -797,7 +797,7 @@ func (c *Coordinator) SetLogLevel(ctx context.Context, lvl *logp.Level) error {
 func (c *Coordinator) watchRuntimeComponents(
 	ctx context.Context,
 	runtimeComponentStates <-chan runtime.ComponentComponentState,
-	otelComponentStates <-chan runtime.ComponentComponentState,
+	otelComponentStates <-chan []runtime.ComponentComponentState,
 ) {
 	// We need to track otel component state separately because otel components may not always get a STOPPED status
 	// If we receive an otel status without the state of a component we're tracking, we need to emit a fake STOPPED
@@ -817,14 +817,16 @@ func (c *Coordinator) watchRuntimeComponents(
 			case <-ctx.Done():
 				return
 			}
-		case componentState := <-otelComponentStates:
-			logComponentStateChange(c.logger, state, &componentState)
-			// Forward the final changes back to Coordinator, unless our context
-			// has ended.
-			select {
-			case c.managerChans.runtimeManagerUpdate <- componentState:
-			case <-ctx.Done():
-				return
+		case componentStates := <-otelComponentStates:
+			for _, componentState := range componentStates {
+				logComponentStateChange(c.logger, state, &componentState)
+				// Forward the final changes back to Coordinator, unless our context
+				// has ended.
+				select {
+				case c.managerChans.runtimeManagerUpdate <- componentState:
+				case <-ctx.Done():
+					return
+				}
 			}
 		}
 	}
@@ -910,7 +912,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	defer watchCanceller()
 
 	var subChan <-chan runtime.ComponentComponentState
-	var otelChan <-chan runtime.ComponentComponentState
+	var otelChan <-chan []runtime.ComponentComponentState
 	// A real Coordinator will always have a runtime manager, but unit tests
 	// may not initialize all managers -- in that case we leave subChan nil,
 	// and just idle until Coordinator shuts down.

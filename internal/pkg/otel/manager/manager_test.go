@@ -538,6 +538,7 @@ func TestOTelManager_Run(t *testing.T) {
 				errCh:             make(chan error, 1), // holds at most one error
 				updateCh:          make(chan configUpdate),
 				collectorStatusCh: make(chan *status.AggregateStatus),
+				componentStateCh:  make(chan []runtime.ComponentComponentState, 1),
 				doneChan:          make(chan struct{}),
 				recoveryTimer:     tc.restarter,
 				execution:         tc.exec,
@@ -1097,8 +1098,8 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		baseLogger:                 testLogger,
 		errCh:                      make(chan error, 1), // holds at most one error
 		updateCh:                   make(chan configUpdate),
-		collectorStatusCh:          make(chan *status.AggregateStatus, statusUpdateChannelSize),
-		componentStateCh:           make(chan runtime.ComponentComponentState, statusUpdateChannelSize),
+		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
+		componentStateCh:           make(chan []runtime.ComponentComponentState, 1),
 		doneChan:                   make(chan struct{}),
 		recoveryTimer:              newRestarterNoop(),
 		execution:                  execution,
@@ -1233,7 +1234,8 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		componentState, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchComponents(), mgr.Errors())
 		require.NoError(t, err)
 		require.NotNil(t, componentState)
-		assert.Equal(t, componentState.Component, testComp)
+		require.Len(t, componentState, 1)
+		assert.Equal(t, componentState[0].Component, testComp)
 	})
 
 	t.Run("collector error is passed up to the component manager", func(t *testing.T) {

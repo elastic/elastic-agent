@@ -1345,7 +1345,7 @@ type fakeOTelManager struct {
 	updateComponentCallback func([]component.Component) error
 	errChan                 chan error
 	collectorStatusChan     chan *status.AggregateStatus
-	componentStateChan      chan runtime.ComponentComponentState
+	componentStateChan      chan []runtime.ComponentComponentState
 }
 
 func (f *fakeOTelManager) Run(ctx context.Context) error {
@@ -1379,7 +1379,7 @@ func (f *fakeOTelManager) WatchCollector() <-chan *status.AggregateStatus {
 	return f.collectorStatusChan
 }
 
-func (f *fakeOTelManager) WatchComponents() <-chan runtime.ComponentComponentState {
+func (f *fakeOTelManager) WatchComponents() <-chan []runtime.ComponentComponentState {
 	return f.componentStateChan
 }
 

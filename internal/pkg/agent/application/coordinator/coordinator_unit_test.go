@@ -1357,7 +1357,7 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 	logger := logp.NewLogger("testing")
 
 	runtimeStateChan := make(chan runtime.ComponentComponentState)
-	componentUpdateChan := make(chan runtime.ComponentComponentState)
+	componentUpdateChan := make(chan []runtime.ComponentComponentState)
 
 	otelComponent := component.Component{
 		ID:             "filestream-default",
@@ -1420,7 +1420,7 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 
 	// push the otel component state into the coordinator
 	select {
-	case componentUpdateChan <- compState:
+	case componentUpdateChan <- []runtime.ComponentComponentState{compState}:
 	case <-ctx.Done():
 		t.Fatal("timeout waiting for coordinator to receive status")
 	}
@@ -1457,12 +1457,12 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 
 	// Push a stopped status, there should be no otel component state
 	select {
-	case componentUpdateChan <- runtime.ComponentComponentState{
+	case componentUpdateChan <- []runtime.ComponentComponentState{{
 		Component: otelComponent,
 		State: runtime.ComponentState{
 			State: client.UnitStateStopped,
 		},
-	}:
+	}}:
 	case <-ctx.Done():
 		t.Fatal("timeout waiting for coordinator to receive status")
 	}

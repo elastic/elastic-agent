@@ -34,11 +34,6 @@ type ExecutionMode string
 const (
 	SubprocessExecutionMode ExecutionMode = "subprocess"
 	EmbeddedExecutionMode   ExecutionMode = "embedded"
-	// Status update channels are buffered for this manager. The reason is that otherwise it's easy for the caller to
-	// deadlock themselves by updating the configuration concurrently with the manager pushing a status update.
-	// The manager also pushes two status updates sequentially, for the collector and the components, which increases the
-	// probability of this happening.
-	statusUpdateChannelSize = 100
 )
 
 type collectorRecoveryTimer interface {
@@ -85,7 +80,7 @@ type OTelManager struct {
 
 	// Status channels for reading status from the run loop
 	collectorStatusCh chan *status.AggregateStatus
-	componentStateCh  chan runtime.ComponentComponentState
+	componentStateCh  chan []runtime.ComponentComponentState
 
 	// This mutex is used to protect access to attributes read outside the run loop. This happens when reading the
 	// merged config and generating diagnostics.
@@ -144,8 +139,8 @@ func NewOTelManager(
 		agentInfo:                  agentInfo,
 		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
 		errCh:                      make(chan error, 1), // holds at most one error
-		collectorStatusCh:          make(chan *status.AggregateStatus, statusUpdateChannelSize),
-		componentStateCh:           make(chan runtime.ComponentComponentState, statusUpdateChannelSize),
+		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
+		componentStateCh:           make(chan []runtime.ComponentComponentState, 1),
 		updateCh:                   make(chan configUpdate),
 		doneChan:                   make(chan struct{}),
 		execution:                  exec,
@@ -433,7 +428,7 @@ func (m *OTelManager) WatchCollector() <-chan *status.AggregateStatus {
 }
 
 // WatchComponents returns a read-only channel that provides component state updates.
-func (m *OTelManager) WatchComponents() <-chan runtime.ComponentComponentState {
+func (m *OTelManager) WatchComponents() <-chan []runtime.ComponentComponentState {
 	return m.componentStateCh
 }
 
@@ -516,14 +511,22 @@ func (m *OTelManager) processComponentStates(componentStates []runtime.Component
 	return componentStates
 }
 
-// reportComponentStateUpdates sends component state updates to the component watch channel.
+// reportComponentStateUpdates sends component state updates to the component watch channel. It first drains
+// the channel to ensure that only the most recent status is kept, as intermediate statuses can be safely discarded.
+// This ensures the receiver always observes the latest reported status.
 func (m *OTelManager) reportComponentStateUpdates(ctx context.Context, componentUpdates []runtime.ComponentComponentState) {
-	for _, componentState := range componentUpdates {
-		select {
-		case m.componentStateCh <- componentState:
-		case <-ctx.Done():
-			// Manager is shutting down, ignore the update
-			return
-		}
+	select {
+	case <-ctx.Done():
+		// context is already done
+		return
+	case <-m.componentStateCh:
+	// drain the channel first
+	default:
+	}
+	select {
+	case m.componentStateCh <- componentUpdates:
+	case <-ctx.Done():
+		// Manager is shutting down, ignore the update
+		return
 	}
 }
