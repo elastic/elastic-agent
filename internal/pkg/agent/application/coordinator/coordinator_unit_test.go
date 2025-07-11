@@ -461,11 +461,7 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 		}
 	}()
 
-	upgradeMgr, err := upgrade.NewUpgrader(
-		log,
-		&artifact.Config{},
-		&info.AgentInfo{},
-	)
+	upgradeMgr, err := upgrade.NewUpgrader(log, &artifact.Config{}, nil, &info.AgentInfo{})
 	require.NoError(t, err, "errored when creating a new upgrader")
 
 	// Channels have buffer length 1, so we don't have to run on multiple
@@ -1588,7 +1584,7 @@ func TestCoordinatorInitiatesUpgrade(t *testing.T) {
 	}
 
 	// Call upgrade and make sure the upgrade manager receives an Upgrade call
-	err := coord.Upgrade(ctx, "1.2.3", "", nil, false, false)
+	err := coord.Upgrade(ctx, "1.2.3", false, "", nil, false, false)
 	assert.True(t, upgradeMgr.upgradeCalled, "Coordinator Upgrade should call upgrade manager Upgrade")
 	assert.Equal(t, upgradeMgr.upgradeErr, err, "Upgrade should report upgrade manager error")
 

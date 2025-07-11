@@ -19,6 +19,7 @@ import (
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm/v2"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
@@ -35,6 +36,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/process"
+	"github.com/elastic/elastic-agent/pkg/utils"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 	currentagtversion "github.com/elastic/elastic-agent/version"
 )
@@ -70,12 +73,13 @@ func init() {
 
 // Upgrader performs an upgrade
 type Upgrader struct {
-	log            *logger.Logger
-	settings       *artifact.Config
-	agentInfo      info.Agent
-	upgradeable    bool
-	fleetServerURI string
-	markerWatcher  MarkerWatcher
+	log             *logger.Logger
+	settings        *artifact.Config
+	upgradeSettings *configuration.UpgradeConfig
+	agentInfo       info.Agent
+	upgradeable     bool
+	fleetServerURI  string
+	markerWatcher   MarkerWatcher
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -86,13 +90,14 @@ func IsUpgradeable() bool {
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
-func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.Agent) (*Upgrader, error) {
+func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *configuration.UpgradeConfig, agentInfo info.Agent) (*Upgrader, error) {
 	return &Upgrader{
-		log:           log,
-		settings:      settings,
-		agentInfo:     agentInfo,
-		upgradeable:   IsUpgradeable(),
-		markerWatcher: newMarkerFileWatcher(markerFilePath(paths.Data()), log),
+		log:             log,
+		settings:        settings,
+		upgradeSettings: upgradeConfig,
+		agentInfo:       agentInfo,
+		upgradeable:     IsUpgradeable(),
+		markerWatcher:   newMarkerFileWatcher(markerFilePath(paths.Data()), log),
 	}, nil
 }
 
@@ -144,6 +149,8 @@ func (u *Upgrader) Reload(rawConfig *config.Config) error {
 	}
 
 	u.settings = cfg.Settings.DownloadConfig
+	u.upgradeSettings = cfg.Settings.Upgrade
+
 	return nil
 }
 
@@ -194,7 +201,12 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 }
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
-func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+
+	if rollback {
+		return u.forceRollbackToPreviousVersion(ctx, version, action, det)
+	}
+
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 
 	currentVersion := agentVersion{
@@ -338,12 +350,11 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		hash:          release.Commit(),
 		versionedHome: currentVersionedHome,
 	}
-
-	if err := markUpgrade(u.log,
-		paths.Data(), // data dir to place the marker in
-		current,      // new agent version data
-		previous,     // old agent version data
-		action, det, OUTCOME_UPGRADE); err != nil {
+	rollbackWindow := time.Duration(0)
+	if u.upgradeSettings != nil && u.upgradeSettings.Rollback != nil { // TODO && target version supports manual rollback and deferred cleanup
+		rollbackWindow = u.upgradeSettings.Rollback.Window
+	}
+	if err := markUpgrade(u.log, paths.Data(), current, previous, action, det, OUTCOME_UPGRADE, rollbackWindow); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
 		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
 		return nil, goerrors.Join(err, rollbackErr)
@@ -375,6 +386,108 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	return cb, nil
+}
+
+func (u *Upgrader) forceRollbackToPreviousVersion(ctx context.Context, version string, action *fleetapi.ActionUpgrade, d *details.Details) (reexec.ShutdownCallbackFn, error) {
+	// Formal checks for verifying we can rollback properly:
+	// 1. d.Metadata.RollbacksAvailable should contain the desired version with a valid TTL (it may need to be written by main agent process before starting watcher)
+	// 2. there has been at least the first restart with the new agent (i.e. we are not still downloading/extracting/rotating)
+	// 3. upgrade marker exists
+	// these should be revalidated after taking over watcher
+	err := u.PersistManualRollback(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Invoke watcher again
+	_, err = InvokeWatcher(u.log, paths.BinaryPath(paths.VersionedHome(paths.Top()), agentName))
+	if err != nil {
+		return nil, fmt.Errorf("invoking watcher: %w", err)
+	}
+
+	return nil, nil
+
+}
+
+func (u *Upgrader) PersistManualRollback(ctx context.Context) error {
+	watcherApplock, err := u.takeOverWatcher(ctx)
+	if err != nil {
+		return fmt.Errorf("taking over watcher processes: %w", err)
+	}
+	defer func(watcherApplock *filelock.AppLocker) {
+		releaseWatcherAppLockerErr := watcherApplock.Unlock()
+		if releaseWatcherAppLockerErr != nil {
+			u.log.Warnw("error releasing watcher applock", "error", releaseWatcherAppLockerErr)
+		}
+	}(watcherApplock)
+
+	// read the upgrade marker
+	updateMarker, err := LoadMarker(paths.Data())
+	if err != nil {
+		return fmt.Errorf("loading marker: %w", err)
+	}
+	updateMarker.DesiredOutcome = OUTCOME_ROLLBACK
+	err = SaveMarker(paths.Data(), updateMarker, true)
+	if err != nil {
+		return fmt.Errorf("saving marker: %w", err)
+	}
+
+	return nil
+}
+
+func (u *Upgrader) takeOverWatcher(ctx context.Context) (*filelock.AppLocker, error) {
+
+	takeoverCtx, takeoverCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer takeoverCancel()
+	go func() {
+		killingTicker := time.NewTicker(500 * time.Millisecond)
+		defer killingTicker.Stop()
+		for {
+			select {
+			case <-takeoverCtx.Done():
+				return
+			case <-killingTicker.C:
+				pids, err := utils.GetWatcherPIDs()
+				if err != nil {
+					u.log.Errorf("error listing watcher processes: %s", err)
+					continue
+				}
+
+				// this should be run continuously and concurrently attempting to get the app locker
+				for _, pid := range pids {
+					u.log.Debugf("attempting to kill watcher process with PID: %d", pid)
+					watcherProcess, findProcErr := os.FindProcess(pid)
+					if findProcErr != nil {
+						u.log.Errorf("error finding process with PID: %d: %s", pid, findProcErr)
+						continue
+					}
+					killProcErr := process.Terminate(watcherProcess)
+					if killProcErr != nil {
+						u.log.Errorf("error killing process with PID: %d: %s", pid, killProcErr)
+					}
+					u.log.Debugf("killed watcher process with PID: %d", pid)
+				}
+			}
+		}
+	}()
+
+	// we should retry to take over the AppLocker for 30s, but AppLocker interface is limited
+	takeOverTicker := time.NewTicker(100 * time.Millisecond)
+	defer takeOverTicker.Stop()
+	for {
+		select {
+		case <-takeoverCtx.Done():
+			return nil, fmt.Errorf("timed out taking over watcher applocker")
+		case <-takeOverTicker.C:
+			locker := filelock.NewAppLocker(paths.Top(), "watcher.lock")
+			err := locker.TryLock()
+			if err != nil {
+				u.log.Errorf("error locking watcher applocker: %s", err)
+				continue
+			}
+			return locker, nil
+		}
+	}
 }
 
 func selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string {
