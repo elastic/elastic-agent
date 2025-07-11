@@ -124,7 +124,7 @@ func New(
 
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
 	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled
-	upgrader, err := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, agentInfo)
+	upgrader, err := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, cfg.Settings.Upgrade, agentInfo)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create upgrader: %w", err)
 	}
