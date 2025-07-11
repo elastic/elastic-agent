@@ -392,7 +392,7 @@ app.kubernetes.io/version: {{ .Values.agent.version}}
 {{- define "elasticagent.preset.mutate.tolerations" -}}
 {{- $preset := index . 0 -}}
 {{- $tolerations := index . 1 -}}
-{{- $tolerationsToAdd := dig "tolerations" (list) (include $tolerations $ | fromYaml) }}
+{{- $tolerationsToAdd := dig "tolerations" (list) $tolerations -}}
 {{- $presetTolerations := dig "tolerations" (list) $preset -}}
 {{- $presetTolerations = uniq (concat $presetTolerations $tolerationsToAdd) -}}
 {{- $_ := set $preset "tolerations" $tolerationsToAdd -}}

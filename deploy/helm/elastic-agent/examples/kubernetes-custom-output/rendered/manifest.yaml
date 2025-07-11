@@ -369,6 +369,24 @@ stringData:
     inputs:
       - data_stream:
           namespace: test
+        id: kubernetes/metrics-kube-controllermanager
+        streams:
+        - bearer_token_file: var/run/secrets/kubernetes.io/serviceaccount/token
+          condition: ${kubernetes.labels.component} == 'kube-controller-manager'
+          data_stream:
+            dataset: kubernetes.controllermanager
+            type: metrics
+          hosts:
+          - https://0.0.0.0:10257
+          id: kubernetes/metrics-kubernetes.controllermanager
+          metricsets:
+          - controllermanager
+          period: 10s
+          ssl.verification_mode: none
+        type: kubernetes/metrics
+        use_output: test
+      - data_stream:
+          namespace: test
         id: filestream-container-logs
         streams:
         - data_stream:
@@ -507,6 +525,24 @@ stringData:
           id: kubernetes/metrics-kubernetes.volume
           metricsets:
           - volume
+          period: 10s
+          ssl.verification_mode: none
+        type: kubernetes/metrics
+        use_output: test
+      - data_stream:
+          namespace: test
+        id: kubernetes/metrics-kubernetes.scheduler
+        streams:
+        - bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          condition: ${kubernetes.labels.component} == 'kube-scheduler'
+          data_stream:
+            dataset: kubernetes.scheduler
+            type: metrics
+          hosts:
+          - https://0.0.0.0:10259
+          id: kubernetes/metrics-kubernetes.scheduler
+          metricsets:
+          - scheduler
           period: 10s
           ssl.verification_mode: none
         type: kubernetes/metrics
@@ -984,7 +1020,7 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: e83e759e39d1b355956ea605c2fa0f583b9c7a9c8b7516382bf2c41ea8ee7cfe
+        checksum/config: e985ca1d58cc517ae1cfd727bb30a013ebdb6ab103397e87bb1ffa334cf3a360
     spec:
       automountServiceAccountToken: true
       containers:
@@ -1070,6 +1106,11 @@ spec:
       nodeSelector:
         kubernetes.io/os: linux
       serviceAccountName: agent-pernode-example
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
       volumes:
       - hostPath:
           path: /var/lib/docker/containers
