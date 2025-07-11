@@ -12,6 +12,9 @@ const (
 	// Default group.
 	Default = define.Default
 
+	// ECH group of tests. Used to test against a custom integration server.
+	ECH = "ech"
+
 	// Fleet group of tests. Used for testing Elastic Agent with Fleet.
 	Fleet = "fleet"
 
