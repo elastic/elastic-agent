@@ -130,7 +130,7 @@ func (c *runtimeComm) WriteStartUpInfo(w io.Writer, services ...client.Service) 
 		Services:   srvs,
 		// chunking is always allowed if the client supports it
 		Supports:       []proto.ConnectionSupports{proto.ConnectionSupports_CheckinChunking},
-		MaxMessageSize: uint32(c.maxMessageSize),
+		MaxMessageSize: uint32(c.maxMessageSize), //nolint:gosec // G115 Conversion from int to uint32 is safe here.
 		AgentInfo: &proto.AgentInfo{
 			Id:           c.agentInfo.AgentID(),
 			Version:      c.agentInfo.Version(),
