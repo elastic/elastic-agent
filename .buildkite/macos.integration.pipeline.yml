@@ -45,10 +45,12 @@ steps:
   - group: "Stateful: MacOS"
     key: integration-tests-macos
     depends_on:
-      - integration-macos-ess
+      - integration-macos-ess    
     steps:
       - label: "macos:arm64:non-sudo: {{matrix}}"
         depends_on: packaging-macos-arm64
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"  
         command: |
           source .buildkite/scripts/macos_install_asdf.sh
           buildkite-agent artifact download build/distributions/** . --step packaging-macos-arm64
@@ -66,6 +68,8 @@ steps:
           - default
       - label: "macos:arm64:sudo: {{matrix}}"
         depends_on: packaging-macos-arm64
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"  
         command: |
           buildkite-agent artifact download build/distributions/** . --step packaging-macos-arm64
           source .buildkite/scripts/macos_install_asdf.sh
