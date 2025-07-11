@@ -59,6 +59,19 @@ type Metadata struct {
 	// Reason is a string that may give out more information about transitioning to the current state. It has been
 	// introduced initially to distinguish between manual and automatic rollbacks
 	Reason string `json:"reason,omitempty" yaml:"reason,omitempty"`
+
+	RollbacksAvailable []RollbackAvailable `json:"rollbacks_available,omitempty" yaml:"rollbacks_available,omitempty"`
+}
+
+//rollback_available:
+//- version: 8.16.0-SNAPSHOT,
+//home: data/elastic-agent-8.16.0-SNAPSHOT-b65953
+//valid_until: "2024-11-21T14:42:21Z"
+
+type RollbackAvailable struct {
+	Version    string    `json:"version" yaml:"version"`
+	Home       string    `json:"home" yaml:"home"`
+	ValidUntil time.Time `json:"valid_until" yaml:"valid_until"`
 }
 
 func NewDetails(targetVersion string, initialState State, actionID string) *Details {
