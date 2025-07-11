@@ -322,7 +322,7 @@ func TestMarkUpgrade(t *testing.T) {
 			baseDir := t.TempDir()
 			paths.SetTop(baseDir)
 
-			err := tc.markUpgrade(log, paths.Data(), agent, previousAgent, action, upgradeDetails, desiredOutcome)
+			err := tc.markUpgrade(log, paths.Data(), agent, previousAgent, action, upgradeDetails, desiredOutcome, 0)
 			require.Error(t, err)
 			require.ErrorIs(t, err, tc.expectedError)
 		})

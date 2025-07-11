@@ -32,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -1508,7 +1509,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {
 					return nil
 				}
-				upgrader.markUpgrade = func(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, desiredOutcome UpgradeOutcome) error {
+				upgrader.markUpgrade = func(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, desiredOutcome UpgradeOutcome, rollbackWindow time.Duration) error {
 					return testError
 				}
 			},
@@ -1529,7 +1530,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			upgrader, err := NewUpgrader(log, &artifact.Config{}, mockAgentInfo)
+			upgrader, err := NewUpgrader(log, &artifact.Config{}, &configuration.UpgradeConfig{}, mockAgentInfo)
 			require.NoError(t, err)
 
 			tc.upgraderMocker(upgrader)
@@ -1538,7 +1539,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				return tc.isDiskSpaceErrorResult
 			}
 
-			_, err = upgrader.Upgrade(context.Background(), "9.0.0", "", nil, details.NewDetails("9.0.0", details.StateRequested, "test"), true, true)
+			_, err = upgrader.Upgrade(context.Background(), "9.0.0", false, "", nil, details.NewDetails("9.0.0", details.StateRequested, "test"), true, true)
 			require.ErrorIs(t, err, tc.expectedError)
 		})
 	}
