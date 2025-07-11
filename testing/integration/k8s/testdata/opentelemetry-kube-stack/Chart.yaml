@@ -1,14 +1,18 @@
 apiVersion: v2
-appVersion: 0.107.0
+appVersion: 0.120.0
 dependencies:
-- condition: crds.install
-  name: crds
+- condition: crds.install,crds.installOtel
+  name: otel-crds
+  repository: ""
+  version: 0.0.0
+- condition: crds.install,crds.installPrometheus
+  name: prometheus-crds
   repository: ""
   version: 0.0.0
 - condition: opentelemetry-operator.enabled
   name: opentelemetry-operator
   repository: https://open-telemetry.github.io/opentelemetry-helm-charts
-  version: 0.71.1
+  version: 0.84.2
 - condition: kubeStateMetrics.enabled
   name: kube-state-metrics
   repository: https://prometheus-community.github.io/helm-charts
@@ -30,4 +34,4 @@ name: opentelemetry-kube-stack
 sources:
 - https://github.com/open-telemetry/opentelemetry-operator
 type: application
-version: 0.3.9
+version: 0.6.2

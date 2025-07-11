@@ -92,6 +92,7 @@ rules:
     resources:
       - nodes
       - namespaces
+      - secrets
     verbs:
       - get
       - list
@@ -235,6 +236,40 @@ rules:
       - patch
       - update
       - watch
+  - apiGroups:
+    - opentelemetry.io
+    resources:
+      - targetallocators
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+    - opentelemetry.io
+    resources:
+    - targetallocators/status
+    verbs:
+    - get
+    - patch
+    - update
+  - apiGroups:
+      - cert-manager.io
+    resources:
+      - issuers
+      - certificaterequests
+      - certificates
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+      - patch
+      - delete
 
 {{ if .Values.kubeRBACProxy.enabled }}
 ---

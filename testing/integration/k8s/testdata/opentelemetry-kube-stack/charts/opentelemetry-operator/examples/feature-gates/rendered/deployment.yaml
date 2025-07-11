@@ -40,6 +40,7 @@ spec:
             - --health-probe-addr=:8081
             - --webhook-port=9443
             - --collector-image=otel/opentelemetry-collector-k8s:0.120.0
+            - --feature-gates=-operator.collector.targetallocatorcr,-operator.observability.prometheus,operator.targetallocator.mtls
           command:
             - /manager
           env:
