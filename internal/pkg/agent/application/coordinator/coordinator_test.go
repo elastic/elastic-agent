@@ -1342,7 +1342,7 @@ var _ OTelManager = (*fakeOTelManager)(nil)
 
 type fakeOTelManager struct {
 	updateCollectorCallback func(*confmap.Conf) error
-	updateComponentCallback func(component.Model) error
+	updateComponentCallback func([]component.Component) error
 	errChan                 chan error
 	collectorStatusChan     chan *status.AggregateStatus
 	componentStateChan      chan runtime.ComponentComponentState
@@ -1357,30 +1357,26 @@ func (f *fakeOTelManager) Errors() <-chan error {
 	return f.errChan
 }
 
-func (f *fakeOTelManager) UpdateCollector(cfg *confmap.Conf) {
-	var result error
+func (f *fakeOTelManager) Update(cfg *confmap.Conf, components []component.Component) {
+	var collectorResult, componentResult error
 	if f.updateCollectorCallback != nil {
-		result = f.updateCollectorCallback(cfg)
+		collectorResult = f.updateCollectorCallback(cfg)
 	}
-	if f.errChan != nil && result != nil {
-		// If a reporting channel is set, send the result to it
-		f.errChan <- result
+	if f.errChan != nil && collectorResult != nil {
+		// If a reporting channel is set, send the collectorResult to it
+		f.errChan <- collectorResult
+	}
+	if f.updateComponentCallback != nil {
+		componentResult = f.updateComponentCallback(components)
+	}
+	if f.errChan != nil && componentResult != nil {
+		// If a reporting channel is set, send the componentResult to it
+		f.errChan <- componentResult
 	}
 }
 
 func (f *fakeOTelManager) WatchCollector() <-chan *status.AggregateStatus {
 	return f.collectorStatusChan
-}
-
-func (f *fakeOTelManager) UpdateComponents(componentModel component.Model) {
-	var result error
-	if f.updateComponentCallback != nil {
-		result = f.updateComponentCallback(componentModel)
-	}
-	if f.errChan != nil && result != nil {
-		// If a reporting channel is set, send the result to it
-		f.errChan <- result
-	}
 }
 
 func (f *fakeOTelManager) WatchComponents() <-chan runtime.ComponentComponentState {

@@ -287,17 +287,17 @@ func TestOTelManager_Run(t *testing.T) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
-				m.UpdateCollector(cfg)
+				m.Update(cfg, nil)
 				e.EnsureHealthy(t, updateTime)
 
 				// trigger update (no config compare is due externally to otel collector)
 				updateTime = time.Now()
-				m.UpdateCollector(cfg)
+				m.Update(cfg, nil)
 				e.EnsureHealthy(t, updateTime)
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
-				m.UpdateCollector(nil)
+				m.Update(nil, nil)
 				e.EnsureOffWithoutError(t, updateTime)
 				require.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 			},
@@ -310,17 +310,17 @@ func TestOTelManager_Run(t *testing.T) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
-				m.UpdateCollector(cfg)
+				m.Update(cfg, nil)
 				e.EnsureHealthy(t, updateTime)
 
 				// trigger update (no config compare is due externally to otel collector)
 				updateTime = time.Now()
-				m.UpdateCollector(cfg)
+				m.Update(cfg, nil)
 				e.EnsureHealthy(t, updateTime)
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
-				m.UpdateCollector(nil)
+				m.Update(nil, nil)
 				e.EnsureOffWithoutError(t, updateTime)
 				assert.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 				assert.Equal(t, uint32(0), m.recoveryRetries.Load(), "recovery retries should be 0")
@@ -334,7 +334,7 @@ func TestOTelManager_Run(t *testing.T) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
-				m.UpdateCollector(cfg)
+				m.Update(cfg, nil)
 				e.EnsureHealthy(t, updateTime)
 
 				// stop it, this should be restarted by the manager
@@ -345,7 +345,7 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
-				m.UpdateCollector(nil)
+				m.Update(nil, nil)
 				e.EnsureOffWithoutError(t, updateTime)
 				require.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 			},
@@ -358,7 +358,7 @@ func TestOTelManager_Run(t *testing.T) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
-				m.UpdateCollector(cfg)
+				m.Update(cfg, nil)
 				e.EnsureHealthy(t, updateTime)
 
 				// stop it, this should be restarted by the manager
@@ -369,7 +369,7 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
-				m.UpdateCollector(nil)
+				m.Update(nil, nil)
 				e.EnsureOffWithoutError(t, updateTime)
 				assert.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 				assert.Equal(t, uint32(0), m.recoveryRetries.Load(), "recovery retries should be 0")
@@ -383,7 +383,7 @@ func TestOTelManager_Run(t *testing.T) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
-				m.UpdateCollector(cfg)
+				m.Update(cfg, nil)
 				e.EnsureHealthy(t, updateTime)
 
 				var oldPHandle *procHandle
@@ -408,7 +408,7 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
-				m.UpdateCollector(nil)
+				m.Update(nil, nil)
 				e.EnsureOffWithoutError(t, updateTime)
 				assert.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 				assert.Equal(t, uint32(3), seenRecoveredTimes, "recovery retries should be 3")
@@ -427,7 +427,7 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
-				m.UpdateCollector(cfg)
+				m.Update(cfg, nil)
 
 				seenRecoveredTimes := uint32(0)
 				require.Eventually(t, func() bool {
@@ -442,7 +442,7 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
-				m.UpdateCollector(nil)
+				m.Update(nil, nil)
 				e.EnsureOffWithoutError(t, updateTime)
 				require.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 				assert.GreaterOrEqual(t, uint32(3), seenRecoveredTimes, "recovery retries should be 3")
@@ -458,7 +458,7 @@ func TestOTelManager_Run(t *testing.T) {
 				// times without it blocking on sending over the errCh.
 				for range 3 {
 					cfg := confmap.New() // invalid config
-					m.UpdateCollector(cfg)
+					m.Update(cfg, nil)
 
 					// delay between updates to ensure the collector will have to fail
 					<-time.After(100 * time.Millisecond)
@@ -497,7 +497,7 @@ func TestOTelManager_Run(t *testing.T) {
 				// times without it blocking on sending over the errCh.
 				for range 3 {
 					cfg := confmap.New() // invalid config
-					m.UpdateCollector(cfg)
+					m.Update(cfg, nil)
 
 					// delay between updates to ensure the collector will have to fail
 					<-time.After(100 * time.Millisecond)
@@ -536,7 +536,7 @@ func TestOTelManager_Run(t *testing.T) {
 				logger:            l,
 				baseLogger:        base,
 				errCh:             make(chan error, 1), // holds at most one error
-				collectorUpdateCh: make(chan *confmap.Conf),
+				updateCh:          make(chan configUpdate),
 				collectorStatusCh: make(chan *status.AggregateStatus),
 				doneChan:          make(chan struct{}),
 				recoveryTimer:     tc.restarter,
@@ -609,7 +609,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	}()
 
 	cfg := confmap.NewFromStringMap(testConfig)
-	m.UpdateCollector(cfg)
+	m.Update(cfg, nil)
 
 	// the collector should log to the base logger
 	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -754,38 +754,35 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 	}
 }
 
-func TestOTelManager_handleComponentUpdate(t *testing.T) {
+func TestOTelManager_handleConfigUpdate(t *testing.T) {
 	testComp := testComponent("test-component")
-	t.Run("successful update with empty model", func(t *testing.T) {
+	t.Run("successful update with empty collector config and components", func(t *testing.T) {
 		mgr := &OTelManager{
 			logger:                     newTestLogger(),
 			agentInfo:                  &info.AgentInfo{},
 			beatMonitoringConfigGetter: mockBeatMonitoringConfigGetter,
 		}
 
-		model := component.Model{Components: nil}
-		err := mgr.handleComponentUpdate(model)
+		err := mgr.handleConfigUpdate(nil, nil)
 
 		assert.NoError(t, err)
-		assert.Equal(t, model.Components, mgr.components)
+		assert.Nil(t, mgr.components)
 		// Verify that Update was called with nil config (empty components should result in nil config)
 		assert.Nil(t, mgr.mergedCollectorCfg)
 	})
 
-	t.Run("successful update with components", func(t *testing.T) {
+	t.Run("successful update with components and empty collector config", func(t *testing.T) {
 		mgr := &OTelManager{
 			logger:                     newTestLogger(),
 			agentInfo:                  &info.AgentInfo{},
 			beatMonitoringConfigGetter: mockBeatMonitoringConfigGetter,
 		}
 
-		// Use a valid component that will generate otel config
-		model := component.Model{Components: []component.Component{testComp}}
-
-		err := mgr.handleComponentUpdate(model)
+		components := []component.Component{testComp}
+		err := mgr.handleConfigUpdate(nil, components)
 
 		assert.NoError(t, err)
-		assert.Equal(t, model.Components, mgr.components)
+		assert.Equal(t, components, mgr.components)
 		// Verify that Update was called with a valid configuration
 		assert.NotNil(t, mgr.mergedCollectorCfg)
 		// Verify that the configuration contains expected OpenTelemetry sections
@@ -793,26 +790,8 @@ func TestOTelManager_handleComponentUpdate(t *testing.T) {
 		assert.True(t, mgr.mergedCollectorCfg.IsSet("exporters"), "Expected exporters section in config")
 		assert.True(t, mgr.mergedCollectorCfg.IsSet("service"), "Expected service section in config")
 	})
-}
 
-func TestOTelManager_handleCollectorUpdate(t *testing.T) {
-	t.Run("successful update with nil collector config", func(t *testing.T) {
-		mgr := &OTelManager{
-			logger:                     newTestLogger(),
-			agentInfo:                  &info.AgentInfo{},
-			beatMonitoringConfigGetter: mockBeatMonitoringConfigGetter,
-		}
-
-		err := mgr.handleCollectorUpdate(nil)
-
-		assert.NoError(t, err)
-		assert.Nil(t, mgr.collectorCfg)
-		assert.Nil(t, mgr.MergedOtelConfig())
-		// Verify that Update was called with nil config (no collector config should result in nil config)
-		assert.Nil(t, mgr.mergedCollectorCfg)
-	})
-
-	t.Run("successful update with collector config", func(t *testing.T) {
+	t.Run("successful update with empty components and collector config", func(t *testing.T) {
 		mgr := &OTelManager{
 			logger:                     newTestLogger(),
 			agentInfo:                  &info.AgentInfo{},
@@ -828,7 +807,7 @@ func TestOTelManager_handleCollectorUpdate(t *testing.T) {
 			},
 		})
 
-		err := mgr.handleCollectorUpdate(collectorConfig)
+		err := mgr.handleConfigUpdate(collectorConfig, nil)
 
 		assert.NoError(t, err)
 		assert.Equal(t, collectorConfig, mgr.collectorCfg)
@@ -840,15 +819,13 @@ func TestOTelManager_handleCollectorUpdate(t *testing.T) {
 		assert.True(t, mgr.mergedCollectorCfg.IsSet("processors"), "Expected processors section in config")
 	})
 
-	t.Run("successful update with both collector config and existing components", func(t *testing.T) {
+	t.Run("successful update with both collector config and components", func(t *testing.T) {
 		mgr := &OTelManager{
 			logger:                     newTestLogger(),
 			agentInfo:                  &info.AgentInfo{},
 			beatMonitoringConfigGetter: mockBeatMonitoringConfigGetter,
-			// Set existing components to test merging
-			components: []component.Component{
-				testComponent("test-component")},
 		}
+		components := []component.Component{testComponent("test-component")}
 
 		collectorConfig := confmap.NewFromStringMap(map[string]any{
 			"processors": map[string]any{
@@ -856,7 +833,7 @@ func TestOTelManager_handleCollectorUpdate(t *testing.T) {
 			},
 		})
 
-		err := mgr.handleCollectorUpdate(collectorConfig)
+		err := mgr.handleConfigUpdate(collectorConfig, components)
 
 		assert.NoError(t, err)
 		assert.Equal(t, collectorConfig, mgr.collectorCfg)
@@ -1119,8 +1096,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		logger:                     testLogger,
 		baseLogger:                 testLogger,
 		errCh:                      make(chan error, 1), // holds at most one error
-		collectorUpdateCh:          make(chan *confmap.Conf),
-		componentUpdateCh:          make(chan component.Model),
+		updateCh:                   make(chan configUpdate),
 		collectorStatusCh:          make(chan *status.AggregateStatus, statusUpdateChannelSize),
 		componentStateCh:           make(chan runtime.ComponentComponentState, statusUpdateChannelSize),
 		doneChan:                   make(chan struct{}),
@@ -1155,15 +1131,10 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	})
 
 	testComp := testComponent("test")
-
-	componentModel := component.Model{
-		Components: []component.Component{
-			testComp,
-		},
-	}
+	components := []component.Component{testComp}
 
 	t.Run("collector config is passed down to the collector execution", func(t *testing.T) {
-		mgr.UpdateCollector(collectorCfg)
+		mgr.Update(collectorCfg, nil)
 		select {
 		case <-collectorStarted:
 		case <-ctx.Done():
@@ -1190,7 +1161,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	})
 
 	t.Run("component config is passed down to the otel manager", func(t *testing.T) {
-		mgr.UpdateComponents(componentModel)
+		mgr.Update(collectorCfg, components)
 		select {
 		case <-collectorStarted:
 		case <-ctx.Done():
@@ -1210,7 +1181,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	})
 
 	t.Run("empty collector config leaves the component config running", func(t *testing.T) {
-		mgr.UpdateCollector(nil)
+		mgr.Update(nil, components)
 		select {
 		case <-collectorStarted:
 		case <-ctx.Done():

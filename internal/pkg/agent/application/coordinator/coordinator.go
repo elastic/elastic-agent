@@ -152,14 +152,11 @@ type RuntimeManager interface {
 type OTelManager interface {
 	Runner
 
-	// UpdateCollector updates the current plain configuration for the otel collector.
-	UpdateCollector(cfg *confmap.Conf)
+	// Update updates the current plain configuration for the otel collector and components.
+	Update(*confmap.Conf, []component.Component)
 
 	// WatchCollector returns a channel to watch for collector status updates.
 	WatchCollector() <-chan *status.AggregateStatus
-
-	// UpdateComponents updates the current components model.
-	UpdateComponents(model component.Model)
 
 	// WatchComponents returns a channel to watch for component state updates.
 	WatchComponents() <-chan runtime.ComponentComponentState
@@ -1441,7 +1438,6 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (err error) {
 	if c.otelMgr != nil {
 		c.otelCfg = cfg.OTel
-		c.otelMgr.UpdateCollector(c.otelCfg)
 	}
 	return c.processConfigAgent(ctx, cfg)
 }
@@ -1652,7 +1648,7 @@ func (c *Coordinator) updateManagersWithConfig(model *component.Model) {
 		}
 		c.logger.With("component_ids", componentIDs).Warn("The Otel runtime manager is HIGHLY EXPERIMENTAL and only intended for testing. Use at your own risk.")
 	}
-	c.otelMgr.UpdateComponents(*otelModel)
+	c.otelMgr.Update(c.otelCfg, otelModel.Components)
 }
 
 // splitModelBetweenManager splits the model components between the runtime manager and the otel manager.

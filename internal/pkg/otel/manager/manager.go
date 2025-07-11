@@ -54,6 +54,11 @@ type collectorRecoveryTimer interface {
 	C() <-chan time.Time
 }
 
+type configUpdate struct {
+	collectorCfg *confmap.Conf
+	components   []component.Component
+}
+
 // OTelManager is a manager that manages the lifecycle of the OTel collector inside of the Elastic Agent.
 type OTelManager struct {
 	// baseLogger is the base logger for the otel collector, and doesn't include any agent-specific fields.
@@ -77,8 +82,7 @@ type OTelManager struct {
 	currentComponentStates map[string]runtime.ComponentComponentState
 
 	// Update channels for forwarding updates to the run loop
-	collectorUpdateCh chan *confmap.Conf
-	componentUpdateCh chan component.Model
+	updateCh chan configUpdate
 
 	// Status channels for reading status from the run loop
 	collectorStatusCh chan *status.AggregateStatus
@@ -139,8 +143,7 @@ func NewOTelManager(
 		errCh:                      make(chan error, 1), // holds at most one error
 		collectorStatusCh:          make(chan *status.AggregateStatus, statusUpdateChannelSize),
 		componentStateCh:           make(chan runtime.ComponentComponentState, statusUpdateChannelSize),
-		collectorUpdateCh:          make(chan *confmap.Conf),
-		componentUpdateCh:          make(chan component.Model),
+		updateCh:                   make(chan configUpdate),
 		doneChan:                   make(chan struct{}),
 		execution:                  exec,
 		recoveryTimer:              recoveryTimer,
@@ -259,12 +262,12 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				}
 			}
 
-		case cfg := <-m.collectorUpdateCh:
+		case cfgUpdate := <-m.updateCh:
 			// we received a new configuration, thus stop the recovery timer
 			// and reset the retry count
 			m.recoveryTimer.Stop()
 			m.recoveryRetries.Store(0)
-			err = m.handleCollectorUpdate(cfg)
+			err = m.handleConfigUpdate(cfgUpdate.collectorCfg, cfgUpdate.components)
 			if err != nil {
 				reportErr(ctx, m.errCh, err)
 				continue
@@ -273,20 +276,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			err = m.applyMergedConfig(ctx, collectorStatusCh, collectorRunErr)
 			// report the error unconditionally to indicate that the config was applied
 			reportErr(ctx, m.errCh, err)
-		case componentModel := <-m.componentUpdateCh:
-			// we received a new configuration, thus stop the recovery timer
-			// and reset the retry count
-			m.recoveryTimer.Stop()
-			m.recoveryRetries.Store(0)
-			err = m.handleComponentUpdate(componentModel)
-			if err != nil {
-				reportErr(ctx, m.errCh, err)
-				continue
-			}
 
-			err = m.applyMergedConfig(ctx, collectorStatusCh, collectorRunErr)
-			// report the error unconditionally to indicate that the config was applied
-			reportErr(ctx, m.errCh, err)
 		case otelStatus := <-collectorStatusCh:
 			err = m.reportOtelStatusUpdate(ctx, otelStatus)
 			if err != nil {
@@ -301,19 +291,12 @@ func (m *OTelManager) Errors() <-chan error {
 	return m.errCh
 }
 
-// handleCollectorUpdate processes collector configuration updates received through the collectorUpdateCh.
-// This method updates the internal collector configuration and triggers a rebuild of the merged
-// configuration that combines collector and component configurations.
-func (m *OTelManager) handleCollectorUpdate(cfg *confmap.Conf) error {
+// handleConfigUpdate processes collector and component configuration updates received through the updateCh.
+// This method updates the internal collector and component configurations and triggers a rebuild of the merged
+// configuration that combines them.
+func (m *OTelManager) handleConfigUpdate(cfg *confmap.Conf, components []component.Component) error {
 	m.collectorCfg = cfg
-	return m.updateMergedConfig()
-}
-
-// handleComponentUpdate processes component model updates received through the componentUpdateCh.
-// This method updates the internal component list and triggers a rebuild of the merged
-// configuration that combines collector and component configurations.
-func (m *OTelManager) handleComponentUpdate(model component.Model) error {
-	m.components = model.Components
+	m.components = components
 	return m.updateMergedConfig()
 }
 
@@ -432,19 +415,14 @@ func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh c
 	return nil
 }
 
-// UpdateCollector sends a collector configuration update to the manager's run loop.
-func (m *OTelManager) UpdateCollector(cfg *confmap.Conf) {
-	select {
-	case m.collectorUpdateCh <- cfg:
-	case <-m.doneChan:
-		// Manager is shutting down, ignore the update
+// Update sends collector configuration and component updates to the manager's run loop.
+func (m *OTelManager) Update(cfg *confmap.Conf, components []component.Component) {
+	cfgUpdate := configUpdate{
+		collectorCfg: cfg,
+		components:   components,
 	}
-}
-
-// UpdateComponents sends a component model update to the manager's run loop.
-func (m *OTelManager) UpdateComponents(model component.Model) {
 	select {
-	case m.componentUpdateCh <- model:
+	case m.updateCh <- cfgUpdate:
 	case <-m.doneChan:
 		// Manager is shutting down, ignore the update
 	}
