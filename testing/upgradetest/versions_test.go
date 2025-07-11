@@ -295,61 +295,61 @@ func TestPreviousMinor(t *testing.T) {
 		"8.17.0-SNAPSHOT+metadata",
 	}
 
-	versions_9_0_0 := []string{
+	versions9_0_0 := []string{
 		"9.0.0",
 		"9.0.0+metadata",
 		"9.0.0-SNAPSHOT",
 		"9.0.0-SNAPSHOT+metadata",
 	}
-	versions_9_0_1 := []string{
+	versions9_0_1 := []string{
 		"9.0.1",
 		"9.0.1+metadata",
 		"9.0.1-SNAPSHOT",
 		"9.0.1-SNAPSHOT+metadata",
 	}
-	versions_9_0_15 := []string{
+	versions9_0_15 := []string{
 		"9.0.15",
 		"9.0.15+metadata",
 		"9.0.15-SNAPSHOT",
 		"9.0.15-SNAPSHOT+metadata",
 	}
-	versions_9_1_0 := []string{
+	versions9_1_0 := []string{
 		"9.1.0",
 		"9.1.0+metadata",
 		"9.1.0-SNAPSHOT",
 		"9.1.0-SNAPSHOT+metadata",
 	}
-	versions_9_1_1 := []string{
+	versions9_1_1 := []string{
 		"9.1.1",
 		"9.1.1+metadata",
 		"9.1.1-SNAPSHOT",
 		"9.1.1-SNAPSHOT+metadata",
 	}
-	versions_9_1_15 := []string{
+	versions9_1_15 := []string{
 		"9.1.15",
 		"9.1.15+metadata",
 		"9.1.15-SNAPSHOT",
 		"9.1.15-SNAPSHOT+metadata",
 	}
-	versions_9_2_0 := []string{
+	versions9_2_0 := []string{
 		"9.2.0",
 		"9.2.0+metadata",
 		"9.2.0-SNAPSHOT",
 		"9.2.0-SNAPSHOT+metadata",
 	}
-	versions_9_2_1 := []string{
+	versions9_2_1 := []string{
 		"9.2.1",
 		"9.2.1+metadata",
 		"9.2.1-SNAPSHOT",
 		"9.2.1-SNAPSHOT+metadata",
 	}
-	versions_9_2_15 := []string{
+	versions9_2_15 := []string{
 		"9.2.15",
 		"9.2.15+metadata",
 		"9.2.15-SNAPSHOT",
 		"9.2.15-SNAPSHOT+metadata",
 	}
-	versions_9_3_0 := []string{
+	versions9_3_0 := []string{
 		"9.3.0",
 		"9.3.0+metadata",
 		"9.3.0-SNAPSHOT",
@@ -397,12 +397,12 @@ func TestPreviousMinor(t *testing.T) {
 		},
 		"First major version - only newer major versions": {
 			currentVersion:      "9.0.0",
-			upgradeableVersions: combineSlices(versions_9_2_0, versions_9_1_0),
+			upgradeableVersions: combineSlices(versions9_2_0, versions9_1_0),
 			expected:            noPreviousMinorResult,
 		},
 		"First major version - only current major version": {
 			currentVersion:      "9.0.0",
-			upgradeableVersions: versions_9_0_0,
+			upgradeableVersions: versions9_0_0,
 			expected: map[string]releaseTypes{
 				release: {
 					expected: "9.0.0-SNAPSHOT",
@@ -425,13 +425,13 @@ func TestPreviousMinor(t *testing.T) {
 		"First major version - current major, newer versions and older versions": {
 			currentVersion: "9.0.0",
 			upgradeableVersions: combineSlices(
-				versions_9_2_0,
-				versions_9_1_15,
-				versions_9_1_1,
-				versions_9_1_0,
-				versions_9_0_15,
-				versions_9_0_1,
-				versions_9_0_0,
+				versions9_2_0,
+				versions9_1_15,
+				versions9_1_1,
+				versions9_1_0,
+				versions9_0_15,
+				versions9_0_1,
+				versions9_0_0,
 				previousMinorVersions,
 			),
 			expected: map[string]releaseTypes{
@@ -461,16 +461,16 @@ func TestPreviousMinor(t *testing.T) {
 		"First patch release of a new version - only newer major versions": {
 			currentVersion: "9.0.1",
 			upgradeableVersions: combineSlices(
-				versions_9_2_0,
-				versions_9_1_15,
-				versions_9_1_1,
-				versions_9_1_0,
+				versions9_2_0,
+				versions9_1_15,
+				versions9_1_1,
+				versions9_1_0,
 			),
 			expected: noPreviousMinorResult,
 		},
 		"First patch release of a new version - only current major versions": {
 			currentVersion:      "9.0.1",
-			upgradeableVersions: versions_9_0_1,
+			upgradeableVersions: versions9_0_1,
 			expected: map[string]releaseTypes{
 				release: {
 					expected: "9.0.1-SNAPSHOT",
@@ -493,13 +493,13 @@ func TestPreviousMinor(t *testing.T) {
 		"First patch release of a new version - current major, newer versions and older versions": {
 			currentVersion: "9.0.1",
 			upgradeableVersions: combineSlices(
-				versions_9_2_0,
-				versions_9_1_15,
-				versions_9_1_1,
-				versions_9_1_0,
-				versions_9_0_15,
-				versions_9_0_1,
-				versions_9_0_0,
+				versions9_2_0,
+				versions9_1_15,
+				versions9_1_1,
+				versions9_1_0,
+				versions9_0_15,
+				versions9_0_1,
+				versions9_0_0,
 				previousMinorVersions,
 			),
 			expected: map[string]releaseTypes{
@@ -524,10 +524,10 @@ func TestPreviousMinor(t *testing.T) {
 		"First minor release - previous minor from the same major and previous major versions": {
 			currentVersion: "9.1.0",
 			upgradeableVersions: combineSlices(
-				versions_9_1_0,
-				versions_9_0_15,
-				versions_9_0_1,
-				versions_9_0_0,
+				versions9_1_0,
+				versions9_0_15,
+				versions9_0_1,
+				versions9_0_0,
 				previousMinorVersions,
 			),
 			expected: allSameResult("9.0.15", ""),
@@ -535,10 +535,10 @@ func TestPreviousMinor(t *testing.T) {
 		"First minor release - only current major or higher versions": {
 			currentVersion: "9.1.0",
 			upgradeableVersions: combineSlices(
-				versions_9_2_0,
-				versions_9_1_15,
-				versions_9_1_1,
-				versions_9_1_0,
+				versions9_2_0,
+				versions9_1_15,
+				versions9_1_1,
+				versions9_1_0,
 			),
 			expected: noPreviousMinorResult,
 		},
@@ -550,11 +550,11 @@ func TestPreviousMinor(t *testing.T) {
 		"First patch of first minor - previous minor from the same major and previous major versions": {
 			currentVersion: "9.1.1",
 			upgradeableVersions: combineSlices(
-				versions_9_1_1,
-				versions_9_1_0,
-				versions_9_0_15,
-				versions_9_0_1,
-				versions_9_0_0,
+				versions9_1_1,
+				versions9_1_0,
+				versions9_0_15,
+				versions9_0_1,
+				versions9_0_0,
 				previousMinorVersions,
 			),
 			expected: allSameResult("9.0.15", ""),
@@ -562,10 +562,10 @@ func TestPreviousMinor(t *testing.T) {
 		"First patch of first minor - only current major or higher versions": {
 			currentVersion: "9.1.1",
 			upgradeableVersions: combineSlices(
-				versions_9_2_0,
-				versions_9_1_15,
-				versions_9_1_1,
-				versions_9_1_0,
+				versions9_2_0,
+				versions9_1_15,
+				versions9_1_1,
+				versions9_1_0,
 			),
 			expected: noPreviousMinorResult,
 		},
@@ -577,11 +577,11 @@ func TestPreviousMinor(t *testing.T) {
 		"Nth patch of first minor - previous minor from the same major and previous major versions": {
 			currentVersion: "9.1.15",
 			upgradeableVersions: combineSlices(
-				versions_9_1_15,
-				versions_9_1_1,
-				versions_9_1_0,
-				versions_9_0_15,
-				versions_9_0_1,
+				versions9_1_15,
+				versions9_1_1,
+				versions9_1_0,
+				versions9_0_15,
+				versions9_0_1,
 				previousMinorVersions,
 			),
 			expected: allSameResult("9.0.15", ""),
@@ -589,10 +589,10 @@ func TestPreviousMinor(t *testing.T) {
 		"Nth patch of first minor - only current major or higher versions": {
 			currentVersion: "9.1.15",
 			upgradeableVersions: combineSlices(
-				versions_9_2_0,
-				versions_9_1_15,
-				versions_9_1_1,
-				versions_9_1_0,
+				versions9_2_0,
+				versions9_1_15,
+				versions9_1_1,
+				versions9_1_0,
 			),
 			expected: noPreviousMinorResult,
 		},
@@ -604,12 +604,12 @@ func TestPreviousMinor(t *testing.T) {
 		"Nth major - previous minor from the same major and previous major versions": {
 			currentVersion: "9.2.0",
 			upgradeableVersions: combineSlices(
-				versions_9_1_15,
-				versions_9_1_1,
-				versions_9_1_0,
-				versions_9_0_15,
-				versions_9_0_1,
-				versions_9_0_0,
+				versions9_1_15,
+				versions9_1_1,
+				versions9_1_0,
+				versions9_0_15,
+				versions9_0_1,
+				versions9_0_0,
 				previousMinorVersions,
 			),
 			expected: allSameResult("9.1.15", ""),
@@ -617,10 +617,10 @@ func TestPreviousMinor(t *testing.T) {
 		"Nth major - only current major or higher versions": {
 			currentVersion: "9.2.0",
 			upgradeableVersions: combineSlices(
-				versions_9_3_0,
-				versions_9_2_15,
-				versions_9_2_1,
-				versions_9_2_0,
+				versions9_3_0,
+				versions9_2_15,
+				versions9_2_1,
+				versions9_2_0,
 			),
 			expected: noPreviousMinorResult,
 		},
@@ -632,14 +632,14 @@ func TestPreviousMinor(t *testing.T) {
 		"Nth major first patch - previous minor from the same major and previous major versions": {
 			currentVersion: "9.2.1",
 			upgradeableVersions: combineSlices(
-				versions_9_2_1,
-				versions_9_2_0,
-				versions_9_1_15,
-				versions_9_1_1,
-				versions_9_1_0,
-				versions_9_0_15,
-				versions_9_0_1,
-				versions_9_0_0,
+				versions9_2_1,
+				versions9_2_0,
+				versions9_1_15,
+				versions9_1_1,
+				versions9_1_0,
+				versions9_0_15,
+				versions9_0_1,
+				versions9_0_0,
 				previousMinorVersions,
 			),
 			expected: allSameResult("9.1.15", ""),
@@ -647,10 +647,10 @@ func TestPreviousMinor(t *testing.T) {
 		"Nth major first patch - only current major or higher versions": {
 			currentVersion: "9.2.1",
 			upgradeableVersions: combineSlices(
-				versions_9_3_0,
-				versions_9_2_15,
-				versions_9_2_1,
-				versions_9_2_0,
+				versions9_3_0,
+				versions9_2_15,
+				versions9_2_1,
+				versions9_2_0,
 			),
 			expected: noPreviousMinorResult,
 		},
@@ -662,15 +662,15 @@ func TestPreviousMinor(t *testing.T) {
 		"Nth major Nth patch - previous minor from the same major and previous major versions": {
 			currentVersion: "9.2.15",
 			upgradeableVersions: combineSlices(
-				versions_9_2_15,
-				versions_9_2_1,
-				versions_9_2_0,
-				versions_9_1_15,
-				versions_9_1_1,
-				versions_9_1_0,
-				versions_9_0_15,
-				versions_9_0_1,
-				versions_9_0_0,
+				versions9_2_15,
+				versions9_2_1,
+				versions9_2_0,
+				versions9_1_15,
+				versions9_1_1,
+				versions9_1_0,
+				versions9_0_15,
+				versions9_0_1,
+				versions9_0_0,
 				previousMinorVersions,
 			),
 			expected: allSameResult("9.1.15", ""),
@@ -678,10 +678,10 @@ func TestPreviousMinor(t *testing.T) {
 		"Nth major Nth patch - only current major or higher versions": {
 			currentVersion: "9.2.15",
 			upgradeableVersions: combineSlices(
-				versions_9_3_0,
-				versions_9_2_15,
-				versions_9_2_1,
-				versions_9_2_0,
+				versions9_3_0,
+				versions9_2_15,
+				versions9_2_1,
+				versions9_2_0,
 			),
 			expected: noPreviousMinorResult,
 		},
