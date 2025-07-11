@@ -70,8 +70,13 @@ require (
 	github.com/winlabs/gowin32 v0.0.0-20240930213947-f504d7e14639
 	go.elastic.co/apm/module/apmgorilla/v2 v2.6.0
 	go.elastic.co/apm/module/apmgrpc/v2 v2.6.0
+<<<<<<< HEAD
 	go.elastic.co/apm/v2 v2.7.0
 	go.elastic.co/ecszap v1.0.2
+=======
+	go.elastic.co/apm/v2 v2.7.1
+	go.elastic.co/ecszap v1.0.3
+>>>>>>> 2a3a51853 (build(deps): bump github.com/elastic/go-docappender/v2 from 2.10.0 to 2.11.0 (#8939))
 	go.elastic.co/go-licence-detector v0.7.0
 	go.opentelemetry.io/collector/component/componentstatus v0.121.0
 	go.opentelemetry.io/collector/pipeline v0.122.0
@@ -295,8 +300,13 @@ require (
 	github.com/ebitengine/purego v0.8.3 // indirect
 	github.com/eclipse/paho.mqtt.golang v1.3.5 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
+<<<<<<< HEAD
 	github.com/elastic/go-concert v0.3.0 // indirect
 	github.com/elastic/go-docappender/v2 v2.8.0 // indirect
+=======
+	github.com/elastic/go-concert v0.3.1 // indirect
+	github.com/elastic/go-docappender/v2 v2.11.0 // indirect
+>>>>>>> 2a3a51853 (build(deps): bump github.com/elastic/go-docappender/v2 from 2.10.0 to 2.11.0 (#8939))
 	github.com/elastic/go-freelru v0.16.0 // indirect
 	github.com/elastic/go-grok v0.3.1 // indirect
 	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
@@ -331,7 +341,7 @@ require (
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/go-ldap/ldap/v3 v3.4.6 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
-	github.com/go-logr/logr v1.4.2 // indirect
+	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
@@ -548,12 +558,18 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
-	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.0 // indirect
-	go.elastic.co/apm/module/apmhttp/v2 v2.7.0 // indirect
+	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.1 // indirect
+	go.elastic.co/apm/module/apmhttp/v2 v2.7.1 // indirect
 	go.elastic.co/apm/module/apmzap/v2 v2.7.0 // indirect
+<<<<<<< HEAD
 	go.elastic.co/fastjson v1.5.0 // indirect
 	go.etcd.io/bbolt v1.4.0 // indirect
 	go.mongodb.org/mongo-driver v1.14.0 // indirect
+=======
+	go.elastic.co/fastjson v1.5.1 // indirect
+	go.etcd.io/bbolt v1.4.1 // indirect
+	go.mongodb.org/mongo-driver v1.17.4 // indirect
+>>>>>>> 2a3a51853 (build(deps): bump github.com/elastic/go-docappender/v2 from 2.10.0 to 2.11.0 (#8939))
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/collector v0.121.0 // indirect
@@ -609,6 +625,7 @@ require (
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.59.0 // indirect
 	go.opentelemetry.io/contrib/propagators/b3 v1.34.0 // indirect
 	go.opentelemetry.io/ebpf-profiler v0.0.0-20250212075250-7bf12d3f962f // indirect
+<<<<<<< HEAD
 	go.opentelemetry.io/otel v1.35.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.10.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.10.0 // indirect
@@ -628,6 +645,27 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.35.0 // indirect
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
+=======
+	go.opentelemetry.io/otel v1.37.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.12.2 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.12.2 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.36.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.36.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.36.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.36.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.36.0 // indirect
+	go.opentelemetry.io/otel/exporters/prometheus v0.58.0 // indirect
+	go.opentelemetry.io/otel/exporters/stdout/stdoutlog v0.12.2 // indirect
+	go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.36.0 // indirect
+	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.36.0 // indirect
+	go.opentelemetry.io/otel/log v0.12.2 // indirect
+	go.opentelemetry.io/otel/metric v1.37.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.37.0 // indirect
+	go.opentelemetry.io/otel/sdk/log v0.12.2 // indirect
+	go.opentelemetry.io/otel/sdk/metric v1.37.0 // indirect
+	go.opentelemetry.io/otel/trace v1.37.0 // indirect
+	go.opentelemetry.io/proto/otlp v1.6.0 // indirect
+>>>>>>> 2a3a51853 (build(deps): bump github.com/elastic/go-docappender/v2 from 2.10.0 to 2.11.0 (#8939))
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/mock v0.5.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
