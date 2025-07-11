@@ -350,8 +350,11 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		hash:          release.Commit(),
 		versionedHome: currentVersionedHome,
 	}
-
-	if err := markUpgrade(u.log, paths.Data(), current, previous, action, det, OUTCOME_UPGRADE, 0); err != nil {
+	rollbackWindow := time.Duration(0)
+	if u.upgradeSettings != nil && u.upgradeSettings.Rollback != nil { // TODO && target version supports manual rollback and deferred cleanup
+		rollbackWindow = u.upgradeSettings.Rollback.Window
+	}
+	if err := markUpgrade(u.log, paths.Data(), current, previous, action, det, OUTCOME_UPGRADE, rollbackWindow); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
 		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
 		return nil, goerrors.Join(err, rollbackErr)

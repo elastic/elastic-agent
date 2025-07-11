@@ -217,9 +217,13 @@ func markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent ag
 	}
 
 	if rollbackWindow > 0 {
-		upgradeDetails.Metadata.
+		// if we have a not empty rollback window, write the prev version in the rollbacks_available field
+		upgradeDetails.Metadata.RollbacksAvailable = []details.RollbackAvailable{details.RollbackAvailable{
+			Version:    previousAgent.version,
+			Home:       previousAgent.versionedHome,
+			ValidUntil: time.Now().Add(rollbackWindow),
+		}}
 	}
-
 
 	markerBytes, err := yaml.Marshal(newMarkerSerializer(marker))
 	if err != nil {
@@ -227,7 +231,7 @@ func markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent ag
 	}
 
 	markerPath := markerFilePath(dataDirPath)
-	log.Infow("Writing upgrade marker file", "file.path", markerPath, "hash", marker.Hash, "prev_hash", marker.PrevHash)
+	log.Infow("Writing upgrade marker file", "file.path", markerPath, "hash", marker.Hash, "prev_hash", marker.PrevHash, "content", string(markerBytes))
 	if err := os.WriteFile(markerPath, markerBytes, 0600); err != nil {
 		return errors.New(err, errors.TypeFilesystem, "failed to create update marker file", errors.M(errors.MetaKeyPath, markerPath))
 	}

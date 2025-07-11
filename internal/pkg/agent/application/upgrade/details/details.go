@@ -59,6 +59,8 @@ type Metadata struct {
 	// Reason is a string that may give out more information about transitioning to the current state. It has been
 	// introduced initially to distinguish between manual and automatic rollbacks
 	Reason string `json:"reason,omitempty" yaml:"reason,omitempty"`
+
+	RollbacksAvailable []RollbackAvailable `json:"rollbacks_available,omitempty" yaml:"rollbacks_available,omitempty"`
 }
 
 //rollback_available:
