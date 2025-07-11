@@ -470,7 +470,7 @@ func TestOTelManager_Run(t *testing.T) {
 				//
 				// a nil error just means that the collector is trying to restart
 				// which clears the error on the restart loop
-				timeoutCh := time.After(time.Minute * 5)
+				timeoutCh := time.After(time.Second * 5)
 				var err error
 			outer:
 				for {
