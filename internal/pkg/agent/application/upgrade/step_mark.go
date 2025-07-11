@@ -197,7 +197,7 @@ type agentInstall struct {
 }
 
 // markUpgrade marks update happened so we can handle grace period
-func markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, desiredOutcome UpgradeOutcome) error {
+func markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, desiredOutcome UpgradeOutcome, rollbackWindow time.Duration) error {
 
 	if len(previousAgent.hash) > hashLen {
 		previousAgent.hash = previousAgent.hash[:hashLen]
@@ -215,6 +215,11 @@ func markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent ag
 		Details:           upgradeDetails,
 		DesiredOutcome:    desiredOutcome,
 	}
+
+	if rollbackWindow > 0 {
+		upgradeDetails.Metadata.
+	}
+
 
 	markerBytes, err := yaml.Marshal(newMarkerSerializer(marker))
 	if err != nil {

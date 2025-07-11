@@ -61,6 +61,17 @@ type Metadata struct {
 	Reason string `json:"reason,omitempty" yaml:"reason,omitempty"`
 }
 
+//rollback_available:
+//- version: 8.16.0-SNAPSHOT,
+//home: data/elastic-agent-8.16.0-SNAPSHOT-b65953
+//valid_until: "2024-11-21T14:42:21Z"
+
+type RollbackAvailable struct {
+	Version    string    `json:"version" yaml:"version"`
+	Home       string    `json:"home" yaml:"home"`
+	ValidUntil time.Time `json:"valid_until" yaml:"valid_until"`
+}
+
 func NewDetails(targetVersion string, initialState State, actionID string) *Details {
 	return &Details{
 		TargetVersion: targetVersion,
