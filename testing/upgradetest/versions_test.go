@@ -703,7 +703,6 @@ func TestPreviousMinor(t *testing.T) {
 	}
 
 	for name, testCase := range tests {
-		// versions := version.SortableParsedVersions{}
 		versions := []*version.ParsedSemVer{}
 		for _, v := range testCase.upgradeableVersions {
 			parsed, err := version.ParseVersion(v)
