@@ -205,7 +205,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		Inputs           []map[string]any `yaml:"inputs"`
 		Signed           map[string]any   `yaml:"signed"`
 		SecretReferences []map[string]any `yaml:"secret_references"`
-		Namespaces       []map[string]any `yaml:"namespaces"`
+		Namespaces       []string         `yaml:"namespaces"`
 	}
 
 	policy := PolicyStruct{}
