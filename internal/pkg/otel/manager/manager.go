@@ -13,6 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
@@ -156,7 +158,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 	// collectorRunErr is used to signal that the collector has exited.
 	collectorRunErr := make(chan error)
 
-	// collectorStatusCh is used by the otel collector to send status updates to the manager
+	// collectorStatusCh is used internally by the otel collector to send status updates to the manager
 	// this channel is buffered because it's possible for the collector to send a status update while the manager is
 	// waiting for the collector to exit
 	collectorStatusCh := make(chan *status.AggregateStatus, statusUpdateChannelSize)
@@ -198,9 +200,10 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				if m.proc != nil {
 					m.proc.Stop(ctx)
 					m.proc = nil
-					// NOTE: emit this status to the collector's status channel to ensure that it is processed after the
-					// collector's status updates that it emits while stopping.
-					reportCollectorStatus(ctx, collectorStatusCh, nil)
+					updateErr := m.reportOtelStatusUpdate(ctx, nil)
+					if updateErr != nil {
+						reportErr(ctx, m.errCh, updateErr)
+					}
 				}
 
 				if m.mergedCollectorCfg == nil {
@@ -242,9 +245,10 @@ func (m *OTelManager) Run(ctx context.Context) error {
 					m.proc = nil
 					// don't wait here for <-collectorRunErr, already occurred
 					// clear status, no longer running
-					// NOTE: emit this status to the collector's status channel to ensure that it is processed after the
-					// collector's status updates that it emits while stopping.
-					reportCollectorStatus(ctx, collectorStatusCh, nil)
+					updateErr := m.reportOtelStatusUpdate(ctx, nil)
+					if updateErr != nil {
+						err = errors.Join(err, updateErr)
+					}
 				}
 				// pass the error to the errCh so the coordinator, unless it's a cancel error
 				if !errors.Is(err, context.Canceled) {
@@ -284,12 +288,10 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			// report the error unconditionally to indicate that the config was applied
 			reportErr(ctx, m.errCh, err)
 		case otelStatus := <-collectorStatusCh:
-			componentUpdates, err := m.handleOtelStatusUpdate(otelStatus)
+			err = m.reportOtelStatusUpdate(ctx, otelStatus)
 			if err != nil {
 				reportErr(ctx, m.errCh, err)
 			}
-			reportCollectorStatus(ctx, m.collectorStatusCh, m.currentCollectorStatus)
-			m.reportComponentStateUpdates(ctx, componentUpdates)
 		}
 	}
 }
@@ -378,9 +380,28 @@ func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh c
 			// our caller ctx is Done
 			return ctx.Err()
 		}
-		// NOTE: emit this status to the collector's status channel to ensure that it is processed after the collector's
-		// status updates that it emits while stopping.
-		reportCollectorStatus(ctx, collectorStatusCh, nil)
+		// drain the internal status update channel
+		// this status handling is normally done in the main loop, but in this case we want to ensure that we emit a
+		// nil status after the collector has stopped
+	outer:
+		for {
+			select {
+			case statusCh := <-collectorStatusCh:
+				updateErr := m.reportOtelStatusUpdate(ctx, statusCh)
+				if updateErr != nil {
+					m.logger.Error("failed to update otel status", zap.Error(updateErr))
+				}
+			case <-ctx.Done():
+				// our caller ctx is Done
+				return ctx.Err()
+			default:
+				break outer
+			}
+		}
+		err := m.reportOtelStatusUpdate(ctx, nil)
+		if err != nil {
+			return err
+		}
 	}
 
 	if m.mergedCollectorCfg == nil {
@@ -467,6 +488,18 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 
 	// Handle component state updates
 	return m.processComponentStates(componentStates), nil
+}
+
+// reportOtelStatusUpdate processes status updates from the underlying otel collector and reports separate collector
+// and component state updates to the external watch channels.
+func (m *OTelManager) reportOtelStatusUpdate(ctx context.Context, otelStatus *status.AggregateStatus) error {
+	componentUpdates, err := m.handleOtelStatusUpdate(otelStatus)
+	if err != nil {
+		return err
+	}
+	reportCollectorStatus(ctx, m.collectorStatusCh, m.currentCollectorStatus)
+	m.reportComponentStateUpdates(ctx, componentUpdates)
+	return nil
 }
 
 // processComponentStates updates the internal component state tracking and handles cleanup

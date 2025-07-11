@@ -1274,9 +1274,19 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		case execution.errCh <- collectorErr:
 		}
 
-		collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
-		require.Nil(t, collectorStatus)
-		assert.Equal(t, err, collectorErr)
+		// we should get a nil status and an error
+		select {
+		case <-ctx.Done():
+			t.Fatal("timeout waiting for collector status update")
+		case s := <-mgr.WatchCollector():
+			assert.Nil(t, s)
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatal("timeout waiting for collector status update")
+		case err := <-mgr.Errors():
+			assert.Equal(t, collectorErr, err)
+		}
 	})
 }
 
