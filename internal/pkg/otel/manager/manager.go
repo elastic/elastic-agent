@@ -75,8 +75,7 @@ type OTelManager struct {
 
 	// The current configuration that the OTel collector is using. In the case that
 	// the mergedCollectorCfg is nil then the collector is not running.
-	collectorConfigMutex sync.RWMutex
-	mergedCollectorCfg   *confmap.Conf
+	mergedCollectorCfg *confmap.Conf
 
 	currentCollectorStatus *status.AggregateStatus
 	currentComponentStates map[string]runtime.ComponentComponentState
@@ -87,6 +86,10 @@ type OTelManager struct {
 	// Status channels for reading status from the run loop
 	collectorStatusCh chan *status.AggregateStatus
 	componentStateCh  chan runtime.ComponentComponentState
+
+	// This mutex is used to protect access to attributes read outside the run loop. This happens when reading the
+	// merged config and generating diagnostics.
+	mx sync.RWMutex
 
 	// doneChan is closed when Run is stopped to signal that any
 	// pending update calls should be ignored.
@@ -347,8 +350,8 @@ func (m *OTelManager) updateMergedConfig() error {
 		return err
 	}
 
-	m.collectorConfigMutex.Lock()
-	defer m.collectorConfigMutex.Unlock()
+	m.mx.Lock()
+	defer m.mx.Unlock()
 	m.mergedCollectorCfg = mergedCfg
 	return nil
 }
@@ -439,8 +442,8 @@ func (m *OTelManager) WatchComponents() <-chan runtime.ComponentComponentState {
 }
 
 func (m *OTelManager) MergedOtelConfig() *confmap.Conf {
-	m.collectorConfigMutex.RLock()
-	defer m.collectorConfigMutex.RUnlock()
+	m.mx.RLock()
+	defer m.mx.RUnlock()
 	return m.mergedCollectorCfg
 }
 
