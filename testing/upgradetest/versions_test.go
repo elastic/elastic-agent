@@ -705,16 +705,10 @@ func TestPreviousMinor(t *testing.T) {
 	for name, testCase := range tests {
 		// versions := version.SortableParsedVersions{}
 		versions := []*version.ParsedSemVer{}
-		var err error
-		if testCase.upgradeableVersions != nil {
-			for _, v := range testCase.upgradeableVersions {
-				parsed, err := version.ParseVersion(v)
-				require.NoError(t, err)
-				versions = append(versions, parsed)
-			}
-		} else if testCase.oldestCoreVersion != "" && testCase.newestCoreVersion != "" {
-			versions, err = generateTestVersions(testCase.oldestCoreVersion, testCase.newestCoreVersion)
+		for _, v := range testCase.upgradeableVersions {
+			parsed, err := version.ParseVersion(v)
 			require.NoError(t, err)
+			versions = append(versions, parsed)
 		}
 
 		for versionType, vcase := range testCase.expected {
