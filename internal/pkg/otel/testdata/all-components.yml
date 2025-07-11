@@ -65,6 +65,8 @@ receivers:
           scrape_interval: 5s
           static_configs:
             - targets: ['0.0.0.0:8888']
+  elasticapmintake:
+    
 
 connectors:
   spanmetrics:
@@ -118,6 +120,7 @@ service:
         - filelog
         - otlp
         - nop
+        - elasticapmintake
 
     logs/forward_receive:
       receivers:
@@ -151,6 +154,7 @@ service:
         - httpcheck
         - spanmetrics
         - prometheus
+        - elasticapmintake
 
     metrics/aggregated:
       receivers:
@@ -182,3 +186,4 @@ service:
         - otlp
         - jaeger
         - zipkin
+        - elasticapmintake
