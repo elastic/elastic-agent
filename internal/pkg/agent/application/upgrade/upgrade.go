@@ -73,12 +73,13 @@ func init() {
 
 // Upgrader performs an upgrade
 type Upgrader struct {
-	log            *logger.Logger
-	settings       *artifact.Config
-	agentInfo      info.Agent
-	upgradeable    bool
-	fleetServerURI string
-	markerWatcher  MarkerWatcher
+	log             *logger.Logger
+	settings        *artifact.Config
+	upgradeSettings *configuration.UpgradeConfig
+	agentInfo       info.Agent
+	upgradeable     bool
+	fleetServerURI  string
+	markerWatcher   MarkerWatcher
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -89,13 +90,14 @@ func IsUpgradeable() bool {
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
-func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.Agent) (*Upgrader, error) {
+func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *configuration.UpgradeConfig, agentInfo info.Agent) (*Upgrader, error) {
 	return &Upgrader{
-		log:           log,
-		settings:      settings,
-		agentInfo:     agentInfo,
-		upgradeable:   IsUpgradeable(),
-		markerWatcher: newMarkerFileWatcher(markerFilePath(paths.Data()), log),
+		log:             log,
+		settings:        settings,
+		upgradeSettings: upgradeConfig,
+		agentInfo:       agentInfo,
+		upgradeable:     IsUpgradeable(),
+		markerWatcher:   newMarkerFileWatcher(markerFilePath(paths.Data()), log),
 	}, nil
 }
 
@@ -147,6 +149,8 @@ func (u *Upgrader) Reload(rawConfig *config.Config) error {
 	}
 
 	u.settings = cfg.Settings.DownloadConfig
+	u.upgradeSettings = cfg.Settings.Upgrade
+
 	return nil
 }
 
@@ -346,12 +350,11 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		hash:          release.Commit(),
 		versionedHome: currentVersionedHome,
 	}
-
-	if err := markUpgrade(u.log,
-		paths.Data(), // data dir to place the marker in
-		current,      // new agent version data
-		previous,     // old agent version data
-		action, det, OUTCOME_UPGRADE); err != nil {
+	rollbackWindow := time.Duration(0)
+	if u.upgradeSettings != nil && u.upgradeSettings.Rollback != nil { // TODO && target version supports manual rollback and deferred cleanup
+		rollbackWindow = u.upgradeSettings.Rollback.Window
+	}
+	if err := markUpgrade(u.log, paths.Data(), current, previous, action, det, OUTCOME_UPGRADE, rollbackWindow); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
 		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
 		return nil, goerrors.Join(err, rollbackErr)
