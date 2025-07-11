@@ -210,7 +210,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 
 	policy := PolicyStruct{}
 	err = yaml.Unmarshal(policyBytes, &policy)
-	require.NoError(t, err, "error unmarshalling policy")
+	require.NoError(t, err, "error unmarshalling policy: %s", string(policyBytes))
 	d, prs := policy.Outputs["default"]
 	require.True(t, prs, "default must be in outputs")
 	d.ApiKey = string(apiKey)
