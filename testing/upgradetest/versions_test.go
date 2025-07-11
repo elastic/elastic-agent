@@ -381,8 +381,6 @@ func TestPreviousMinor(t *testing.T) {
 
 	type testCase struct {
 		currentVersion      string
-		oldestCoreVersion   string
-		newestCoreVersion   string
 		upgradeableVersions []string
 		expected            map[string]releaseTypes
 	}
