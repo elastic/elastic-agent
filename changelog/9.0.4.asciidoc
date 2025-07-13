@@ -1,0 +1,44 @@
+// begin 9.0.4 relnotes
+
+[[release-notes-9.0.4]]
+==  9.0.4
+
+Review important information about the  9.0.4 release.
+
+
+
+
+
+
+
+
+
+[discrete]
+[[new-features-9.0.4]]
+=== New features
+
+The 9.0.4 release adds the following new and notable features.
+
+
+elastic-agent::
+
+* Add File Logs Only Motel Kube-Stack Configuration. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8785[#https://github.com/elastic/elastic-agent/pull/8785] 
+
+
+
+
+
+
+[discrete]
+[[bug-fixes-9.0.4]]
+=== Bug fixes
+
+
+elastic-agent::
+
+* Remove Incorrect Logging That Unprivileged Installations Are In Beta. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8715[#https://github.com/elastic/elastic-agent/pull/8715] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/8689[#https://github.com/elastic/elastic-agent/issues/8689]
+* Ensure Standalone Elastic Agent Uses Log Level From Configuration Instead Of Persisted State. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8784[#https://github.com/elastic/elastic-agent/pull/8784] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/8137[#https://github.com/elastic/elastic-agent/issues/8137]
+* Resolve Deadlocks In Runtime Checkin Communication. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8881[#https://github.com/elastic/elastic-agent/pull/8881] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/7944[#https://github.com/elastic/elastic-agent/issues/7944]
+* Removed Init.d Support From Rpm Packages. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8896[#https://github.com/elastic/elastic-agent/pull/8896] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/8840[#https://github.com/elastic/elastic-agent/issues/8840]
+
+// end 9.0.4 relnotes
