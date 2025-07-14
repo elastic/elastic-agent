@@ -2,6 +2,10 @@ kubernetes:
   enabled: true
   output: test
   namespace: test
+  scheduler:
+    enabled: true
+  controller_manager:
+    enabled: true
 
 outputs:
   test:
