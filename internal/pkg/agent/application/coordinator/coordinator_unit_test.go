@@ -18,11 +18,6 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-<<<<<<< HEAD
-	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
-=======
-	"github.com/elastic/elastic-agent/internal/pkg/testutils"
->>>>>>> 503421fc8 (Move beat receiver component logic to the otel manager (#8737))
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
