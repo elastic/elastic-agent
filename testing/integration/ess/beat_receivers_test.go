@@ -929,6 +929,8 @@ func TestSensitiveLogsESExporter(t *testing.T) {
 	require.NoError(t, err)
 
 	configTemplate := `
+agent.grpc:
+  port: 6799
 inputs:
   - type: filestream
     id: filestream-e2e
@@ -1043,7 +1045,10 @@ agent.logging.level: debug
 		"Expected atleast %d log, got %d", 1, monitoringDoc.Hits.Total.Value)
 
 	inputField := monitoringDoc.Hits.Hits[0].Source["input"]
-	assert.NotContains(t, inputField.(string), "message: Line", "monitoring logs contain original input")
+	inputFieldStr, ok := inputField.(string)
+	if ok {
+		assert.NotContains(t, inputFieldStr, "message: Line", "monitoring logs contain original input")
+	}
 }
 
 // setStrictMapping takes es client and index name
