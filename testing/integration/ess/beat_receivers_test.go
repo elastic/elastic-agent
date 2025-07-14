@@ -205,12 +205,12 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		Inputs           []map[string]any `yaml:"inputs"`
 		Signed           map[string]any   `yaml:"signed"`
 		SecretReferences []map[string]any `yaml:"secret_references"`
-		Namespaces       []map[string]any `yaml:"namespaces"`
+		Namespaces       []string         `yaml:"namespaces"`
 	}
 
 	policy := PolicyStruct{}
 	err = yaml.Unmarshal(policyBytes, &policy)
-	require.NoError(t, err, "error unmarshalling policy")
+	require.NoError(t, err, "error unmarshalling policy: %s", string(policyBytes))
 	d, prs := policy.Outputs["default"]
 	require.True(t, prs, "default must be in outputs")
 	d.ApiKey = string(apiKey)
