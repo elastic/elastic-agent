@@ -6,9 +6,6 @@ package manager
 
 import (
 	"errors"
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/pkg/component"
 	"net"
 	"path/filepath"
 	"testing"

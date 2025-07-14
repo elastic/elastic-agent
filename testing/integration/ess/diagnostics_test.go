@@ -372,7 +372,7 @@ agent.monitoring.enabled: false
 				"Runtime": "otel",
 			}))
 		// currently we don't expect any diagnostics files for beats receivers
-		var expectedCompDiagnosticsFiles []string
+		expectedCompDiagnosticsFiles := []string{"registry.tar.gz"}
 		err = f.Run(ctx, integrationtest.State{
 			Configure:  configBuffer.String(),
 			AgentState: integrationtest.NewClientState(client.Healthy),
