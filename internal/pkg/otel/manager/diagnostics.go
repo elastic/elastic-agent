@@ -62,23 +62,6 @@ func (m *OTelManager) PerformDiagnostics(ctx context.Context, req ...runtime.Com
 		}
 	}
 
-	// we don't do per-unit diagnostics for beats receivers, instead we just return component diagnostics
-	componentDiagnostics, err := m.PerformComponentDiagnostics(ctx, nil, m.components...)
-	if err != nil {
-		m.logger.Errorf("error performing component diagnostics: %v", err)
-		return nil
-	}
-	compIdToDiag := make(map[string]*runtime.ComponentDiagnostic)
-	for _, diag := range componentDiagnostics {
-		compIdToDiag[diag.Component.ID] = &diag
-	}
-
-	for i := range diagnostics {
-		if compDiag, ok := compIdToDiag[diagnostics[i].Component.ID]; ok {
-			diagnostics[i].Results = compDiag.Results
-		}
-	}
-
 	return diagnostics
 }
 
