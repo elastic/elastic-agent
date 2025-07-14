@@ -1006,7 +1006,6 @@ agent.logging.level: debug
 		status, statusErr := fixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
 		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 2)
-		return
 	}, 1*time.Minute, 1*time.Second)
 
 	rawQuery := map[string]any{
