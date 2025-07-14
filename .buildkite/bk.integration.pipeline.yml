@@ -12,6 +12,8 @@ env:
   IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1753491662"
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1753491662"
   IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1753491662"
+  # Remove AGENT_VERSION pinning once 8.19.1 DRA and stack are released
+  AGENT_VERSION: "8.19.0-SNAPSHOT"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
