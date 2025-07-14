@@ -33,12 +33,22 @@ func reportErr(ctx context.Context, errCh chan error, err error) {
 	}
 }
 
-// reportStatus sends the new status to the status channel.
-func reportStatus(ctx context.Context, statusCh chan *status.AggregateStatus, statuses *status.AggregateStatus) {
+// reportCollectorStatus sends a status to the provided channel. It first drains the channel
+// to ensure that only the most recent status is kept, as intermediate statuses can be safely discarded.
+// This ensures the receiver always observes the latest reported status.
+func reportCollectorStatus(ctx context.Context, statusCh chan *status.AggregateStatus, collectorStatus *status.AggregateStatus) {
+	select {
+	case <-ctx.Done():
+		// context is already done
+		return
+	case <-statusCh:
+	// drain the channel first
+	default:
+	}
 	select {
 	case <-ctx.Done():
 		return
-	case statusCh <- statuses:
+	case statusCh <- collectorStatus:
 	}
 }
 

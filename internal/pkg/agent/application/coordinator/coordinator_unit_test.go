@@ -15,7 +15,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -26,7 +25,6 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -206,7 +204,7 @@ func TestCoordinatorReportsUnhealthyOTelComponents(t *testing.T) {
 			InputChan: stateChan,
 		},
 		managerChans: managerChans{
-			otelManagerUpdate: otelChan,
+			otelManagerCollectorUpdate: otelChan,
 		},
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 	}
@@ -829,7 +827,7 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManager(t *testing.T) {
 	var otelUpdated bool         // Set by otel manager callback
 	var otelConfig *confmap.Conf // Set by otel manager callback
 	otelManager := &fakeOTelManager{
-		updateCallback: func(cfg *confmap.Conf) error {
+		updateCollectorCallback: func(cfg *confmap.Conf) error {
 			otelUpdated = true
 			otelConfig = cfg
 			return nil
@@ -972,7 +970,7 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 	var otelUpdated bool         // Set by otel manager callback
 	var otelConfig *confmap.Conf // Set by otel manager callback
 	otelManager := &fakeOTelManager{
-		updateCallback: func(cfg *confmap.Conf) error {
+		updateCollectorCallback: func(cfg *confmap.Conf) error {
 			otelUpdated = true
 			otelConfig = cfg
 			return nil
@@ -1158,7 +1156,7 @@ func TestCoordinatorReportsOTelManagerUpdateFailure(t *testing.T) {
 	const errorStr = "update failed for testing reasons"
 	runtimeManager := &fakeRuntimeManager{}
 	otelManager := &fakeOTelManager{
-		updateCallback: func(retrieved *confmap.Conf) error {
+		updateCollectorCallback: func(retrieved *confmap.Conf) error {
 			return errors.New(errorStr)
 		},
 		errChan: updateErrChan,
@@ -1358,9 +1356,8 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 	defer cancel()
 	logger := logp.NewLogger("testing")
 
-	statusChan := make(chan *status.AggregateStatus)
-
 	runtimeStateChan := make(chan runtime.ComponentComponentState)
+	componentUpdateChan := make(chan []runtime.ComponentComponentState)
 
 	otelComponent := component.Component{
 		ID:             "filestream-default",
@@ -1392,33 +1389,15 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 			},
 		},
 	}
+
 	processComponent := otelComponent
 	processComponent.RuntimeManager = component.ProcessRuntimeManager
 	processComponent.ID = "filestream-process"
 
-	otelStatus := &status.AggregateStatus{
-		Event: componentstatus.NewEvent(componentstatus.StatusOK),
-		ComponentStatusMap: map[string]*status.AggregateStatus{
-			fmt.Sprintf("pipeline:logs/%sfilestream-default", translate.OtelNamePrefix): {
-				Event: componentstatus.NewEvent(componentstatus.StatusOK),
-				ComponentStatusMap: map[string]*status.AggregateStatus{
-					fmt.Sprintf("receiver:filebeat/%sfilestream-unit", translate.OtelNamePrefix): {
-						Event: componentstatus.NewEvent(componentstatus.StatusOK),
-					},
-					fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", translate.OtelNamePrefix): {
-						Event: componentstatus.NewEvent(componentstatus.StatusOK),
-					},
-				},
-			},
-		},
-	}
-
-	invalidOtelStatus := &status.AggregateStatus{
-		Event: componentstatus.NewEvent(componentstatus.StatusOK),
-		ComponentStatusMap: map[string]*status.AggregateStatus{
-			"unknown:logs/filestream-default": {
-				Event: componentstatus.NewEvent(componentstatus.StatusOK),
-			},
+	compState := runtime.ComponentComponentState{
+		Component: otelComponent,
+		State: runtime.ComponentState{
+			State: client.UnitStateHealthy,
 		},
 	}
 
@@ -1427,31 +1406,21 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 		agentInfo:        &info.AgentInfo{},
 		stateBroadcaster: broadcaster.New(State{}, 0, 0),
 		managerChans: managerChans{
-			otelManagerUpdate:    make(chan *status.AggregateStatus),
-			runtimeManagerUpdate: make(chan runtime.ComponentComponentState),
+			otelManagerComponentUpdate: componentUpdateChan,
+			runtimeManagerUpdate:       make(chan runtime.ComponentComponentState),
 		},
 		state: State{},
 	}
 
 	// start runtime status watching
-	go coord.watchRuntimeComponents(ctx, runtimeStateChan, statusChan)
+	go coord.watchRuntimeComponents(ctx, runtimeStateChan, componentUpdateChan)
 
 	// no component status
 	assert.Empty(t, coord.state.Components)
 
-	coord.componentModel = []component.Component{otelComponent}
-
-	// push the status into the coordinator
+	// push the otel component state into the coordinator
 	select {
-	case statusChan <- otelStatus:
-	case <-ctx.Done():
-		t.Fatal("timeout waiting for coordinator to receive status")
-	}
-
-	select {
-	case finalOtelStatus := <-coord.managerChans.otelManagerUpdate:
-		// we shouldn't have any status remaining for the otel collector
-		assert.Empty(t, finalOtelStatus.ComponentStatusMap)
+	case componentUpdateChan <- []runtime.ComponentComponentState{compState}:
 	case <-ctx.Done():
 		t.Fatal("timeout waiting for coordinator to receive status")
 	}
@@ -1464,9 +1433,6 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 	}
 
 	assert.Len(t, coord.state.Components, 1)
-
-	// Add both a process component and an otel component, in that order. Both should appear in the state.
-	coord.componentModel = []component.Component{otelComponent, processComponent}
 
 	// push the process component state into the coordinator
 	select {
@@ -1487,45 +1453,16 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 		t.Fatal("timeout waiting for coordinator to receive status")
 	}
 
-	// push the otel status into the coordinator
-	select {
-	case statusChan <- otelStatus:
-	case <-ctx.Done():
-		t.Fatal("timeout waiting for coordinator to receive status")
-	}
-
-	select {
-	case finalOtelStatus := <-coord.managerChans.otelManagerUpdate:
-		// we shouldn't have any status remaining for the otel collector, as the status we've pushed earlier only
-		// contains beats receiver status for the "filestream-default" component
-		// this status is removed from the otel collector status, because it's reported as component state instead
-		assert.Empty(t, finalOtelStatus.ComponentStatusMap)
-	case <-ctx.Done():
-		t.Fatal("timeout waiting for coordinator to receive status")
-	}
-
-	select {
-	case componentState := <-coord.managerChans.runtimeManagerUpdate:
-		coord.applyComponentState(componentState)
-	case <-ctx.Done():
-		t.Fatal("timeout waiting for coordinator to receive status")
-	}
-
 	assert.Len(t, coord.state.Components, 2)
 
-	// Now, we remove the component and resend the same status. The component state should be deleted.
-	coord.componentModel = []component.Component{}
-	coord.state = State{}
+	// Push a stopped status, there should be no otel component state
 	select {
-	case statusChan <- otelStatus:
-	case <-ctx.Done():
-		t.Fatal("timeout waiting for coordinator to receive status")
-	}
-
-	select {
-	case finalOtelStatus := <-coord.managerChans.otelManagerUpdate:
-		// we shouldn't have any status remaining for the otel collector
-		assert.Empty(t, finalOtelStatus.ComponentStatusMap)
+	case componentUpdateChan <- []runtime.ComponentComponentState{{
+		Component: otelComponent,
+		State: runtime.ComponentState{
+			State: client.UnitStateStopped,
+		},
+	}}:
 	case <-ctx.Done():
 		t.Fatal("timeout waiting for coordinator to receive status")
 	}
@@ -1537,25 +1474,7 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 		t.Fatal("timeout waiting for coordinator to receive status")
 	}
 
-	assert.Empty(t, coord.state.Components)
-
-	// Push an invalid status, there should be no otel component state, but there should be an otel status
-	select {
-	case statusChan <- invalidOtelStatus:
-	case <-ctx.Done():
-		t.Fatal("timeout waiting for coordinator to receive status")
-	}
-
-	select {
-	case finalOtelStatus := <-coord.managerChans.otelManagerUpdate:
-		// we should have otel status with pipelines that didn't parse correctly
-		assert.NotEmpty(t, finalOtelStatus.ComponentStatusMap)
-	case <-ctx.Done():
-		t.Fatal("timeout waiting for coordinator to receive status")
-	}
-
-	assert.Empty(t, coord.state.Components)
-	assert.Equal(t, coord.otelErr.Error(), "pipeline status id unknown:logs/filestream-default is not a pipeline")
+	assert.Len(t, coord.state.Components, 1)
 }
 
 func TestCoordinatorInitiatesUpgrade(t *testing.T) {
