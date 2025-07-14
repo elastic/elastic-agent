@@ -966,7 +966,7 @@ agent.logging.level: debug
 				Namespace:  info.Namespace,
 			}))
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
 	defer cancel()
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
