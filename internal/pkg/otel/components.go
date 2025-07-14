@@ -31,6 +31,7 @@ import (
 	elasticapmintakereceiver "github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver" // for collecting APM data from Elastic APM agents
 
 	fbreceiver "github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
+	"github.com/elastic/beats/v7/x-pack/libbeat/processors/beatprocessor"
 	mbreceiver "github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
 
 	// Processors:
@@ -125,6 +126,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			resourcedetectionprocessor.NewFactory(),
 			memorylimiterprocessor.NewFactory(),
 			elastictraceprocessor.NewFactory(),
+			beatprocessor.NewFactory(),
 		)
 		if err != nil {
 			return otelcol.Factories{}, err
