@@ -901,6 +901,8 @@ func TestSensitiveLogsESExporter(t *testing.T) {
 	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
 	require.NoError(t, err, "failed to create temp file to hold data to ingest")
 	inputFilePath := inputFile.Name()
+
+	// these messages will fail to index as message is expected to be of integer type
 	for i := 0; i < numEvents; i++ {
 		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
 		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
@@ -1019,6 +1021,9 @@ agent.logging.level: debug
 				"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestamp}}},
 			},
 		},
+		"sort": []map[string]any{
+			{"@timestamp": map[string]any{"order": "asc"}},
+		},
 	}
 
 	// Make sure find the logs
@@ -1038,13 +1043,12 @@ agent.logging.level: debug
 		"Expected atleast %d log, got %d", 1, monitoringDoc.Hits.Total.Value)
 
 	inputField := monitoringDoc.Hits.Hits[0].Source["input"]
-	_, ok := inputField.(string)
-	assert.False(t, ok, "ES logs contains sensitive data that includes the original input")
+	assert.NotContains(t, inputField.(string), "message: Line", "monitoring logs contain original input")
 }
 
 // setStrictMapping takes es client and index name
 // and sets strict mapping for that index.
-// Useful to reproduce mapping conflict errors required for testing
+// Useful to reproduce mapping conflicts required for testing
 func setStrictMapping(client *elasticsearch.Client, index string) error {
 	// Define the body
 	body := map[string]interface{}{
