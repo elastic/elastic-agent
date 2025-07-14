@@ -885,8 +885,6 @@ func genIgnoredFields(goos string) []string {
 func TestSensitiveLogsESExporter(t *testing.T) {
 	// ES exporter logs the original document if they are failed to index only when
 	// "telemetry::log_failed_docs_input" setting is true and debug level is set
-	// This is the format of the log message
-	// This test ensures filestream monitoring does not index the the input field containing sensitive information
 	info := define.Require(t, define.Requirements{
 		Group: integration.Default,
 		Local: true,
@@ -929,8 +927,6 @@ func TestSensitiveLogsESExporter(t *testing.T) {
 	require.NoError(t, err)
 
 	configTemplate := `
-agent.grpc:
-  port: 6790	
 inputs:
   - type: filestream
     id: filestream-e2e
@@ -982,6 +978,7 @@ agent.logging.level: debug
 
 	err = setStrictMapping(info.ESClient, index)
 	require.NoError(t, err, "could not set strict mapping due to %w", err)
+
 	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
 	output := strings.Builder{}
