@@ -12,6 +12,8 @@ env:
   IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1753491662"
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1753491662"
   IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1753491662"
+  # Remove AGENT_VERSION pinning once 9.1.1 DRA and stack are released
+  AGENT_VERSION: "9.1.0-SNAPSHOT"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -41,7 +43,7 @@ common:
       elastic/vault-secrets#v0.1.0:
         path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
         field: "apiKey"
-        env_var: "EC_API_KEY"  
+        env_var: "EC_API_KEY"
 
 steps:
   - label: Start ESS stack for integration tests
@@ -113,7 +115,7 @@ steps:
           image: "${IMAGE_WIN_2025}"
         plugins:
           - *vault_ec_key_prod
-  
+
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-ubuntu-x86-64
         env:
@@ -298,7 +300,7 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         plugins:
-          - *vault_ec_key_prod  
+          - *vault_ec_key_prod
         matrix:
           - default
           - upgrade
