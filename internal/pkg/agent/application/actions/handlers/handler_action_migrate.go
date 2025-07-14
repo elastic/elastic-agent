@@ -6,6 +6,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -13,6 +14,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
@@ -26,6 +28,7 @@ type migrateCoordinator interface {
 	Migrate(_ context.Context, _ *fleetapi.ActionMigrate, _ func(done <-chan struct{}) backoff.Backoff) error
 	ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string)
 	HasEndpoint() bool
+	Protection() protection.Config
 }
 
 // Migrate handles migrate change coming from fleet.
@@ -35,6 +38,7 @@ type Migrate struct {
 	coord     migrateCoordinator
 
 	tamperProtectionFn func() bool // allows to inject the flag for tests, defaults to features.TamperProtection
+
 }
 
 // NewMigrate creates a new Migrate handler.
@@ -67,6 +71,17 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 		return err
 	}
 
+	signedData, err := protection.ValidateAction(action, h.coord.Protection().SignatureValidationKey, h.agentInfo.AgentID())
+	if err != nil && !errors.Is(err, protection.ErrNotSigned) {
+		return err
+	}
+
+	if signedData != nil {
+		if err := json.Unmarshal(signedData, &action.Data); err != nil {
+			return fmt.Errorf("failed to convert signed data to action data: %w", err)
+		}
+	}
+
 	if err := h.coord.Migrate(ctx, action, fleetgateway.RequestBackoff); err != nil {
 		// this should not happen, unmanaged agent should not receive the action
 		// defensive coding to avoid misbehavior
@@ -82,7 +97,6 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 		}
 
 		return fmt.Errorf("migration of agent to a new cluster failed: %w", err)
-
 	}
 
 	// reexec and load new config

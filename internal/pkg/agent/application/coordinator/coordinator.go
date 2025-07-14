@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -34,6 +35,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
@@ -329,11 +331,9 @@ type Coordinator struct {
 	// value that is sent to the runtime manager).
 	componentModel []component.Component
 
-	// Disabled for 8.8.0 release in order to limit the surface
-	// https://github.com/elastic/security-team/issues/6501
-
-	// mx         sync.RWMutex
-	// protection protection.Config
+	// Protection section
+	mx         sync.RWMutex
+	protection protection.Config
 
 	// a sync channel that can be called by other components to check if the main coordinator
 	// loop in runLoopIteration() is active and listening.
@@ -539,20 +539,20 @@ func (c *Coordinator) StateSubscribe(ctx context.Context, bufferLen int) chan St
 // Disabled for 8.8.0 release in order to limit the surface
 // https://github.com/elastic/security-team/issues/6501
 
-// // Protection returns the current agent protection configuration
-// // This is needed to be able to access the protection configuration for actions validation
-// func (c *Coordinator) Protection() protection.Config {
-// 	c.mx.RLock()
-// 	defer c.mx.RUnlock()
-// 	return c.protection
-// }
+// Protection returns the current agent protection configuration
+// This is needed to be able to access the protection configuration for actions validation
+func (c *Coordinator) Protection() protection.Config {
+	c.mx.RLock()
+	defer c.mx.RUnlock()
+	return c.protection
+}
 
-// // setProtection sets protection configuration
-// func (c *Coordinator) setProtection(protectionConfig protection.Config) {
-// 	c.mx.Lock()
-// 	c.protection = protectionConfig
-// 	c.mx.Unlock()
-// }
+// setProtection sets protection configuration
+func (c *Coordinator) setProtection(protectionConfig protection.Config) {
+	c.mx.Lock()
+	c.protection = protectionConfig
+	c.mx.Unlock()
+}
 
 // ReExec performs the re-execution.
 // Called from external goroutines.
@@ -1469,7 +1469,13 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 		span.End()
 	}()
 
-	err = c.generateAST(cfg)
+	// perform and verify ast translation
+	m, err := cfg.ToMapStr()
+	if err != nil {
+		return fmt.Errorf("could not create the map from the configuration: %w", err)
+	}
+
+	err = c.generateAST(cfg, m)
 	c.setConfigError(err)
 	if err != nil {
 		return err
@@ -1482,10 +1488,11 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 		return err
 	}
 
-	// Disabled for 8.8.0 release in order to limit the surface
-	// https://github.com/elastic/security-team/issues/6501
-
-	// c.setProtection(protectionConfig)
+	protectionConfig, err := protection.GetAgentProtectionConfig(m)
+	if err != nil && !errors.Is(err, protection.ErrNotFound) {
+		return fmt.Errorf("could not read the agent protection configuration: %w", err)
+	}
+	c.setProtection(protectionConfig)
 
 	if c.vars != nil {
 		return c.refreshComponentModel(ctx)
@@ -1495,7 +1502,7 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 
 // Generate the AST for a new incoming configuration and, if successful,
 // assign it to the Coordinator's ast field.
-func (c *Coordinator) generateAST(cfg *config.Config) (err error) {
+func (c *Coordinator) generateAST(cfg *config.Config, m map[string]interface{}) (err error) {
 	defer func() {
 		// Update configErr, which stores the results of the most recent policy
 		// update and is merged into the Coordinator state in
@@ -1506,19 +1513,6 @@ func (c *Coordinator) generateAST(cfg *config.Config) (err error) {
 	if err = info.InjectAgentConfig(cfg); err != nil {
 		return err
 	}
-
-	// perform and verify ast translation
-	m, err := cfg.ToMapStr()
-	if err != nil {
-		return fmt.Errorf("could not create the map from the configuration: %w", err)
-	}
-
-	// Disabled for 8.8.0 release in order to limit the surface
-	// https://github.com/elastic/security-team/issues/6501
-	// protectionConfig, err := protection.GetAgentProtectionConfig(m)
-	// if err != nil && !errors.Is(err, protection.ErrNotFound) {
-	// 	return fmt.Errorf("could not read the agent protection configuration: %w", err)
-	// }
 
 	rawAst, err := transpiler.NewAST(m)
 	if err != nil {

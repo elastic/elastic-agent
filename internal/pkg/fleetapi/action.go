@@ -438,12 +438,19 @@ type ActionMigrate struct {
 	ActionType string            `json:"type" yaml:"type"`
 	Data       ActionMigrateData `json:"data,omitempty"`
 
+	Signature *Signed `json:"signed,omitempty" yaml:"signed,omitempty" mapstructure:"signed,omitempty"`
+
 	Err error `json:"-" yaml:"-" mapstructure:"-"`
 }
 
 // ID returns the ID of the Action.
 func (a *ActionMigrate) ID() string {
 	return a.ActionID
+}
+
+// Signed returns the Signed portion of the Action.
+func (a *ActionMigrate) Signed() *Signed {
+	return a.Signature
 }
 
 // Type returns the type of the Action.
