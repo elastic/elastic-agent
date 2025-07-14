@@ -14,7 +14,7 @@ require (
 	github.com/docker/docker v28.1.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250710195820-152cefcea928
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250713072427-c051a6bde55b
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.9.2
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
@@ -25,7 +25,7 @@ require (
 	github.com/elastic/go-licenser v0.4.2
 	github.com/elastic/go-sysinfo v1.15.3
 	github.com/elastic/go-ucfg v0.8.9-0.20250307075119-2a22403faaea
-	github.com/elastic/mock-es v0.0.0-20241101195702-0a41fa3d30d9
+	github.com/elastic/mock-es v0.0.0-20250324153755-573fc6c0ac4b
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.4.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.3.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.4.0
