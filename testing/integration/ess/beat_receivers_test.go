@@ -1,6 +1,7 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
+
 //go:build integration
 
 package ess
@@ -13,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -21,6 +23,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/go-elasticsearch/v8"
 
 	"github.com/gofrs/uuid/v5"
 	"gopkg.in/yaml.v2"
@@ -876,4 +879,227 @@ func genIgnoredFields(goos string) []string {
 			"log.offset",
 		}
 	}
+}
+
+// TestSensitiveLogsESExporter tests sensitive logs from ex-exporter are not sent to fleet
+func TestSensitiveLogsESExporter(t *testing.T) {
+	// ES exporter logs the original document if they are failed to index only when
+	// "telemetry::log_failed_docs_input" setting is true and debug level is set
+	// This is the format of the log message
+	// This test ensures filestream monitoring does not index the the input field containing sensitive information
+	info := define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+	tmpDir := t.TempDir()
+	numEvents := 50
+	// Create the data file to ingest
+	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
+	require.NoError(t, err, "failed to create temp file to hold data to ingest")
+	inputFilePath := inputFile.Name()
+	for i := 0; i < numEvents; i++ {
+		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
+		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+	}
+	err = inputFile.Close()
+	require.NoError(t, err, "failed to close data temp file")
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	// Create the otel configuration file
+	type otelConfigOptions struct {
+		InputPath  string
+		ESEndpoint string
+		ESApiKey   string
+		Namespace  string
+	}
+	esEndpoint, err := integration.GetESHost()
+	require.NoError(t, err, "error getting elasticsearch endpoint")
+	esApiKey, err := createESApiKey(info.ESClient)
+	require.NoError(t, err, "error creating API key")
+	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	decodedApiKey, err := getDecodedApiKey(esApiKey)
+	require.NoError(t, err)
+
+	configTemplate := `
+agent.grpc:
+  port: 6790	
+inputs:
+  - type: filestream
+    id: filestream-e2e
+    use_output: default
+    _runtime_experimental: otel
+    streams:
+      - id: e2e
+        data_stream:
+          dataset: sensitive
+          namespace: {{ .Namespace }}
+        paths:
+          - {{.InputPath}}
+        prospector.scanner.fingerprint.enabled: false
+        file_identity.native: ~
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [{{.ESEndpoint}}]
+    api_key: "{{.ESApiKey}}"
+    preset: "balanced"
+agent:
+  monitoring:
+    enabled: true
+    metrics: false
+    logs: true
+    _runtime_experimental: otel
+agent.logging.level: debug
+`
+	index := "logs-sensitive-" + info.Namespace
+	var configBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			otelConfigOptions{
+				InputPath:  inputFilePath,
+				ESEndpoint: esEndpoint,
+				ESApiKey:   decodedApiKey,
+				Namespace:  info.Namespace,
+			}))
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err, "cannot prepare Elastic-Agent command: %w", err)
+
+	err = setStrictMapping(info.ESClient, index)
+	require.NoError(t, err, "could not set strict mapping due to %w", err)
+	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+
+	output := strings.Builder{}
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	err = cmd.Start()
+	require.NoError(t, err)
+
+	// Make sure the Elastic-Agent process is not running before
+	// exiting the test
+	t.Cleanup(func() {
+		// Ignore the error because we cancelled the context,
+		// and that always returns an error
+		_ = cmd.Wait()
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 2)
+		return
+	}, 1*time.Minute, 1*time.Second)
+
+	rawQuery := map[string]any{
+		"query": map[string]any{
+			"bool": map[string]any{
+				"must": map[string]any{
+					"match_phrase": map[string]any{
+						"message": "failed to index document; input may contain sensitive data",
+					},
+				},
+				"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestamp}}},
+			},
+		},
+	}
+
+	// Make sure find the logs
+	var monitoringDoc estools.Documents
+
+	assert.EventuallyWithT(t,
+		func(ct *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer findCancel()
+
+			monitoringDoc, err = estools.PerformQueryForRawQuery(findCtx, rawQuery, "logs-elastic_agent-default*", info.ESClient)
+			require.NoError(ct, err)
+
+			assert.GreaterOrEqual(ct, monitoringDoc.Hits.Total.Value, 1)
+		},
+		2*time.Minute, 5*time.Second,
+		"Expected atleast %d log, got %d", 1, monitoringDoc.Hits.Total.Value)
+
+	inputField := monitoringDoc.Hits.Hits[0].Source["input"]
+	_, ok := inputField.(string)
+	assert.False(t, ok, "ES logs contains sensitive data that includes the original input")
+}
+
+// setStrictMapping takes es client and index name
+// and sets strict mapping for that index.
+// Useful to reproduce mapping conflict errors required for testing
+func setStrictMapping(client *elasticsearch.Client, index string) error {
+	// Define the body
+	body := map[string]interface{}{
+		"index_patterns": []string{index + "*"},
+		"template": map[string]interface{}{
+			"mappings": map[string]interface{}{
+				"dynamic": "strict",
+				"properties": map[string]interface{}{
+					"@timestamp": map[string]string{"type": "date"},
+					"message":    map[string]string{"type": "integer"}, // we set message type to integer to cause mapping conflict
+				},
+			},
+		},
+		"priority": 500,
+	}
+
+	// Marshal body to JSON
+	jsonData, err := json.Marshal(body)
+	if err != nil {
+		panic(err)
+	}
+
+	esEndpoint, err := integration.GetESHost()
+	if err != nil {
+		return fmt.Errorf("error getting elasticsearch endpoint: %v", err)
+	}
+
+	user := os.Getenv("ELASTICSEARCH_USERNAME")
+	pass := os.Getenv("ELASTICSEARCH_PASSWORD")
+
+	// Create a context
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Build request
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut,
+		esEndpoint+"/_index_template/no-dynamic-template",
+		bytes.NewReader(jsonData))
+	if err != nil {
+		return fmt.Errorf("could not create http request to ES server: %v", err)
+	}
+
+	// Set content type header
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth(user, pass)
+
+	resp, err := client.Perform(req)
+	if err != nil {
+		return fmt.Errorf("error performing request: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("incorrect response code: %v", err)
+	}
+	return nil
 }
