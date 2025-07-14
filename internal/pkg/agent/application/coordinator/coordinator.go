@@ -13,12 +13,6 @@ import (
 	"sync/atomic"
 	"time"
 
-<<<<<<< HEAD
-	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
-=======
-	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
->>>>>>> 503421fc8 (Move beat receiver component logic to the otel manager (#8737))
-
 	"go.opentelemetry.io/collector/component/componentstatus"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
