@@ -80,7 +80,7 @@ func (i *Info) KubeClient() (klient.Client, error) {
 
 // Version returns the version of the Elastic Agent the tests should be using.
 func Version() string {
-	ver := os.Getenv("AGENT_VERSION")
+	ver := "9.0.4-SNAPSHOT"
 	if ver == "" {
 		return version.GetDefaultVersion()
 	}

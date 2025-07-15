@@ -567,7 +567,7 @@ func Package(ctx context.Context) error {
 
 	var dependenciesVersion string
 	if beatVersion, found := os.LookupEnv("BEAT_VERSION"); !found {
-		dependenciesVersion = bversion.GetDefaultVersion()
+		dependenciesVersion = "9.0.4"
 	} else {
 		dependenciesVersion = beatVersion
 	}
@@ -945,7 +945,7 @@ func dockerCommitHash() string {
 func getVersion() string {
 	version, found := os.LookupEnv("BEAT_VERSION")
 	if !found {
-		version = bversion.GetDefaultVersion()
+		version = "9.0.4"
 	}
 	if !strings.Contains(version, "SNAPSHOT") {
 		if _, ok := os.LookupEnv(snapshotEnv); ok {
@@ -976,7 +976,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	if !strings.Contains(dockerImageOut, tag) {
 		var dependenciesVersion string
 		if beatVersion, found := os.LookupEnv("BEAT_VERSION"); !found {
-			dependenciesVersion = bversion.GetDefaultVersion()
+			dependenciesVersion = "9.0.4"
 		} else {
 			dependenciesVersion = beatVersion
 		}
@@ -2670,7 +2670,7 @@ func (i Integration) testForResourceLeaks(ctx context.Context, matrix bool, test
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
 func (Integration) TestOnRemote(ctx context.Context) error {
 	mg.Deps(Build.TestBinaries)
-	version := os.Getenv("AGENT_VERSION")
+	version := "9.0.4-SNAPSHOT"
 	if version == "" {
 		return errors.New("AGENT_VERSION environment variable must be set")
 	}
@@ -2864,7 +2864,7 @@ func integRunnerOnce(ctx context.Context, matrix bool, testDir string, singleTes
 func getTestRunnerVersions() (string, string, error) {
 	var err error
 	agentStackVersion := os.Getenv("AGENT_STACK_VERSION")
-	agentVersion := os.Getenv("AGENT_VERSION")
+	agentVersion := "9.0.4-SNAPSHOT"
 	if agentVersion == "" {
 		agentVersion, err = mage.DefaultBeatBuildVariableSources.GetBeatVersion()
 		if err != nil {

@@ -162,7 +162,7 @@ func initGlobals() {
 
 	versionQualifier, versionQualified = os.LookupEnv("VERSION_QUALIFIER")
 
-	agentPackageVersion = EnvOr(agentPackageVersionEnvVar, "")
+	agentPackageVersion = EnvOr(agentPackageVersionEnvVar, "9.0.4")
 
 	ManifestURL = EnvOr(ManifestUrlEnvVar, "")
 	PackagingFromManifest = ManifestURL != ""
@@ -510,7 +510,7 @@ func BeatQualifiedVersion() (string, error) {
 // setting BEAT_VERSION in the environment.
 func beatVersion() (string, error) {
 	beatVersionOnce.Do(func() {
-		beatVersionValue = os.Getenv("BEAT_VERSION")
+		beatVersionValue = "9.0.4"
 		if beatVersionValue != "" {
 			return
 		}
