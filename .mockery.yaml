@@ -40,3 +40,13 @@ packages:
       installationModifier:
         config:
           mockname: "InstallationModifier"
+  github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade:
+    interfaces:
+      WatcherHelper:
+        config:
+          inpackage: True
+          with-expecter: True
+          dir: "{{.InterfaceDirRelative}}"
+          mockname: "{{.Mock}}{{.InterfaceName}}"
+          outpkg: "{{.PackageName}}"
+          filename: "mocks_test.go"
