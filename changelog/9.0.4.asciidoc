@@ -22,7 +22,7 @@ The 9.0.4 release adds the following new and notable features.
 
 elastic-agent::
 
-* Add File Logs Only Motel Kube-Stack Configuration. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8785[#https://github.com/elastic/elastic-agent/pull/8785] 
+* Add File Logs Only Managed OTLP input Kube-Stack Configuration. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8785[#https://github.com/elastic/elastic-agent/pull/8785] 
 
 
 
