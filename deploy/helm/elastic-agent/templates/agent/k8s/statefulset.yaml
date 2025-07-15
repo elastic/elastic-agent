@@ -14,6 +14,7 @@ metadata:
     {{- toYaml . | nindent 4 }}
     {{- end }}
 spec:
+  serviceName: {{ $agentName }}-headless
   selector:
     matchLabels:
       name: {{ $agentName }}
