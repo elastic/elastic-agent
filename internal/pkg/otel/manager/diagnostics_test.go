@@ -32,15 +32,18 @@ func TestPerformComponentDiagnostics(t *testing.T) {
 		components: []component.Component{filebeatComp, otherComp},
 	}
 
+	expectedDiags := []runtime.ComponentDiagnostic{
+		{
+			Component: filebeatComp,
+		},
+		{
+			Component: otherComp,
+		},
+	}
+
 	diags, err := m.PerformComponentDiagnostics(context.Background(), nil)
 	require.NoError(t, err)
-	require.Len(t, diags, 2)
-
-	for _, d := range diags {
-		assert.NotNil(t, d)
-		assert.NotNil(t, d.Component)
-		assert.Len(t, d.Results, 0)
-	}
+	assert.Equal(t, expectedDiags, diags)
 }
 
 func TestPerformDiagnostics(t *testing.T) {
@@ -59,11 +62,26 @@ func TestPerformDiagnostics(t *testing.T) {
 	}
 
 	t.Run("diagnose all units when no request is provided", func(t *testing.T) {
+		expectedDiags := []runtime.ComponentUnitDiagnostic{
+			{
+				Component: filebeatComp,
+				Unit:      filebeatComp.Units[0],
+			},
+			{
+				Component: filebeatComp,
+				Unit:      filebeatComp.Units[1],
+			},
+			{
+				Component: otherComp,
+				Unit:      otherComp.Units[0],
+			},
+			{
+				Component: otherComp,
+				Unit:      otherComp.Units[1],
+			},
+		}
 		diags := m.PerformDiagnostics(t.Context())
-		require.Len(t, diags, 4) // two components, two units per component
-		assert.Equal(t, "filestream-unit", diags[0].Unit.ID)
-		assert.Equal(t, "filestream-default", diags[1].Unit.ID)
-		assert.Len(t, diags[0].Results, 0)
+		assert.Equal(t, expectedDiags, diags)
 	})
 
 	t.Run("diagnose specific unit", func(t *testing.T) {
@@ -71,9 +89,13 @@ func TestPerformDiagnostics(t *testing.T) {
 			Component: filebeatComp,
 			Unit:      filebeatComp.Units[0],
 		}
+		expectedDiags := []runtime.ComponentUnitDiagnostic{
+			{
+				Component: filebeatComp,
+				Unit:      filebeatComp.Units[0],
+			},
+		}
 		diags := m.PerformDiagnostics(t.Context(), req)
-		require.Len(t, diags, 1)
-		assert.Equal(t, "filestream-unit", diags[0].Unit.ID)
-		assert.Len(t, diags[0].Results, 0)
+		assert.Equal(t, expectedDiags, diags)
 	})
 }
