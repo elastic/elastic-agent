@@ -13,9 +13,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
-	"sync"
 	"testing"
 	"time"
 
@@ -24,14 +24,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -42,7 +43,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
-	"github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/info"
+	infomocks "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/info"
 	ackermocks "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/fleetapi/acker"
 	clientmocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
 )
@@ -960,242 +961,6 @@ func TestCheckUpgrade(t *testing.T) {
 	}
 }
 
-func TestWaitForWatcher(t *testing.T) {
-	wantErrWatcherNotStarted := func(t assert.TestingT, err error, i ...interface{}) bool {
-		return assert.ErrorIs(t, err, ErrWatcherNotStarted, i)
-	}
-
-	tests := []struct {
-		name                string
-		states              []details.State
-		stateChangeInterval time.Duration
-		cancelWaitContext   bool
-		wantErr             assert.ErrorAssertionFunc
-	}{
-		{
-			name:                "Happy path: watcher is watching already",
-			states:              []details.State{details.StateWatching},
-			stateChangeInterval: 1 * time.Millisecond,
-			wantErr:             assert.NoError,
-		},
-		{
-			name:                "Sad path: watcher is never starting",
-			states:              []details.State{details.StateReplacing},
-			stateChangeInterval: 1 * time.Millisecond,
-			cancelWaitContext:   true,
-			wantErr:             wantErrWatcherNotStarted,
-		},
-		{
-			name: "Runaround path: marker is jumping around and landing on watching",
-			states: []details.State{
-				details.StateRequested,
-				details.StateScheduled,
-				details.StateDownloading,
-				details.StateExtracting,
-				details.StateReplacing,
-				details.StateRestarting,
-				details.StateWatching,
-			},
-			stateChangeInterval: 1 * time.Millisecond,
-			wantErr:             assert.NoError,
-		},
-		{
-			name:                "Timeout: marker is never created",
-			states:              nil,
-			stateChangeInterval: 1 * time.Millisecond,
-			cancelWaitContext:   true,
-			wantErr:             wantErrWatcherNotStarted,
-		},
-		{
-			name: "Timeout2: state doesn't get there in time",
-			states: []details.State{
-				details.StateRequested,
-				details.StateScheduled,
-				details.StateDownloading,
-				details.StateExtracting,
-				details.StateReplacing,
-				details.StateRestarting,
-			},
-
-			stateChangeInterval: 1 * time.Millisecond,
-			cancelWaitContext:   true,
-			wantErr:             wantErrWatcherNotStarted,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			deadline, ok := t.Deadline()
-			if !ok {
-				deadline = time.Now().Add(5 * time.Second)
-			}
-			testCtx, testCancel := context.WithDeadline(context.Background(), deadline)
-			defer testCancel()
-
-			tmpDir := t.TempDir()
-			updMarkerFilePath := filepath.Join(tmpDir, markerFilename)
-
-			waitContext, waitCancel := context.WithCancel(testCtx)
-			defer waitCancel()
-
-			fakeTimeout := 30 * time.Second
-
-			// in order to take timing out of the equation provide a context that we can cancel manually
-			// still assert that the parent context and timeout passed are correct
-			var createContextFunc createContextWithTimeout = func(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
-				assert.Same(t, testCtx, ctx, "parent context should be the same as the waitForWatcherCall")
-				assert.Equal(t, fakeTimeout, timeout, "timeout used in new context should be the same as testcase")
-
-				return waitContext, waitCancel
-			}
-
-			if len(tt.states) > 0 {
-				initialState := tt.states[0]
-				writeState(t, updMarkerFilePath, initialState)
-			}
-
-			wg := new(sync.WaitGroup)
-
-			var furtherStates []details.State
-			if len(tt.states) > 1 {
-				// we have more states to produce
-				furtherStates = tt.states[1:]
-			}
-
-			wg.Add(1)
-
-			// worker goroutine: writes out additional states while the test is blocked on waitOnWatcher() call and expires
-			// the wait context if cancelWaitContext is set to true. Timing of the goroutine is driven by stateChangeInterval.
-			go func() {
-				defer wg.Done()
-				tick := time.NewTicker(tt.stateChangeInterval)
-				defer tick.Stop()
-				for _, state := range furtherStates {
-					select {
-					case <-testCtx.Done():
-						return
-					case <-tick.C:
-						writeState(t, updMarkerFilePath, state)
-					}
-				}
-				if tt.cancelWaitContext {
-					<-tick.C
-					waitCancel()
-				}
-			}()
-
-			log, _ := loggertest.New(tt.name)
-
-			tt.wantErr(t, waitForWatcherWithTimeoutCreationFunc(testCtx, log, updMarkerFilePath, fakeTimeout, createContextFunc), fmt.Sprintf("waitForWatcher %s, %v, %s, %s)", updMarkerFilePath, tt.states, tt.stateChangeInterval, fakeTimeout))
-
-			// wait for goroutines to finish
-			wg.Wait()
-		})
-	}
-}
-
-func writeState(t *testing.T, path string, state details.State) {
-	ms := newMarkerSerializer(&UpdateMarker{
-		Version:           "version",
-		Hash:              "hash",
-		VersionedHome:     "versionedHome",
-		UpdatedOn:         time.Now(),
-		PrevVersion:       "prev_version",
-		PrevHash:          "prev_hash",
-		PrevVersionedHome: "prev_versionedhome",
-		Acked:             false,
-		Action:            nil,
-		Details: &details.Details{
-			TargetVersion: "version",
-			State:         state,
-			ActionID:      "",
-			Metadata:      details.Metadata{},
-		},
-	})
-
-	bytes, err := yaml.Marshal(ms)
-	if assert.NoError(t, err, "error marshaling the test upgrade marker") {
-		err = os.WriteFile(path, bytes, 0770)
-		assert.NoError(t, err, "error writing out the test upgrade marker")
-	}
-}
-
-func Test_selectWatcherExecutable(t *testing.T) {
-	type args struct {
-		previous agentInstall
-		current  agentInstall
-	}
-	tests := []struct {
-		name string
-		args args
-		want string
-	}{
-		{
-			name: "Simple upgrade, we should launch the new (current) watcher",
-			args: args{
-				previous: agentInstall{
-					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "", ""),
-					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-somehash"),
-				},
-				current: agentInstall{
-					parsedVersion: agtversion.NewParsedSemVer(4, 5, 6, "", ""),
-					versionedHome: filepath.Join("data", "elastic-agent-4.5.6-someotherhash"),
-				},
-			},
-			want: filepath.Join("data", "elastic-agent-4.5.6-someotherhash"),
-		},
-		{
-			name: "Simple downgrade, we should launch the currently installed (previous) watcher",
-			args: args{
-				previous: agentInstall{
-					parsedVersion: agtversion.NewParsedSemVer(4, 5, 6, "", ""),
-					versionedHome: filepath.Join("data", "elastic-agent-4.5.6-someotherhash"),
-				},
-				current: agentInstall{
-					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "", ""),
-					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-somehash"),
-				},
-			},
-			want: filepath.Join("data", "elastic-agent-4.5.6-someotherhash"),
-		},
-		{
-			name: "Upgrade from snapshot to released version, we should launch the new (current) watcher",
-			args: args{
-				previous: agentInstall{
-					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", ""),
-					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-somehash"),
-				},
-				current: agentInstall{
-					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "", ""),
-					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-someotherhash"),
-				},
-			},
-			want: filepath.Join("data", "elastic-agent-1.2.3-someotherhash"),
-		},
-		{
-			name: "Downgrade from released version to SNAPSHOT, we should launch the currently installed (previous) watcher",
-			args: args{
-				previous: agentInstall{
-					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "", ""),
-					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-somehash"),
-				},
-				current: agentInstall{
-					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", ""),
-					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-someotherhash"),
-				},
-			},
-
-			want: filepath.Join("data", "elastic-agent-1.2.3-somehash"),
-		},
-	}
-	// Just need a top dir path. This test does not make any operation on the filesystem, so a temp dir path is as good as any
-	fakeTopDir := filepath.Join(t.TempDir(), "Elastic", "Agent")
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, paths.BinaryPath(filepath.Join(fakeTopDir, tt.want), agentName), selectWatcherExecutable(fakeTopDir, tt.args.previous, tt.args.current), "selectWatcherExecutable(%v, %v)", tt.args.previous, tt.args.current)
-		})
-	}
-}
-
 func TestIsSameReleaseVersion(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -1274,6 +1039,127 @@ func TestIsSameReleaseVersion(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			log, _ := loggertest.New(tc.name)
 			assert.Equal(t, tc.expect, isSameReleaseVersion(log, tc.current, tc.target))
+		})
+	}
+}
+
+func TestManualRollback(t *testing.T) {
+	const updatemarkerwatching456 = `
+    version: 4.5.6
+    hash: newver
+    versioned_home: data/elastic-agent-4.5.6-newver
+    updated_on: 2025-07-11T10:11:12.131415Z
+    prev_version: 1.2.3
+    prev_hash: oldver
+    prev_versioned_home: data/elastic-agent-1.2.3-oldver
+    acked: false
+    action: null
+    details:
+        target_version: 4.5.6
+        state: UPG_WATCHING
+        metadata:
+            retry_until: null
+            rollbacks_available:
+                - version: 1.2.3
+                  home: data/elastic-agent-1.2.3-oldver
+                  valid_until: 2025-07-18T10:11:12.131415Z
+    desired_outcome: UPGRADE
+    `
+	parsed123Version, err := agtversion.ParseVersion("1.2.3")
+	require.NoError(t, err)
+	parsed456Version, err := agtversion.ParseVersion("4.5.6")
+	require.NoError(t, err)
+
+	agentInstall123 := agentInstall{
+		parsedVersion: parsed123Version,
+		version:       "1.2.3",
+		hash:          "oldver",
+		versionedHome: "data/elastic-agent-1.2.3-oldver",
+	}
+
+	agentInstall456 := agentInstall{
+		parsedVersion: parsed456Version,
+		version:       "4.5.6",
+		hash:          "newver",
+		versionedHome: "data/elastic-agent-4.5.6-newver",
+	}
+
+	type setupF func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper)
+	type postRollbackAssertionsF func(t *testing.T, topDir string)
+	type testcase struct {
+		name              string
+		setup             setupF
+		artifactSettings  *artifact.Config
+		upgradeSettings   *configuration.UpgradeConfig
+		version           string
+		wantErr           assert.ErrorAssertionFunc
+		additionalAsserts postRollbackAssertionsF
+	}
+
+	testcases := []testcase{
+		{
+			name: "no update marker - rollback fails",
+			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
+				//do not setup anything here, let the rollback fail
+			},
+			artifactSettings: artifact.DefaultConfig(),
+			upgradeSettings:  configuration.DefaultUpgradeConfig(),
+			version:          "1.2.3",
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, fs.ErrNotExist)
+			},
+			additionalAsserts: nil,
+		},
+		{
+			name: "update marker ok - takeover watcher, persist rollback and restart most recent watcher",
+			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
+				err := os.WriteFile(markerFilePath(paths.DataFrom(topDir)), []byte(updatemarkerwatching456), 0600)
+				require.NoError(t, err, "error setting up update marker")
+				locker := filelock.NewAppLocker(topDir, "watcher.lock")
+				err = locker.TryLock()
+				require.NoError(t, err, "error locking initial watcher AppLocker")
+				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(locker, nil)
+				newerWatcherExecutable := filepath.Join(topDir, "data", "elastic-agent-4.5.6-newver", "elastic-agent")
+				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstall456).Return(newerWatcherExecutable)
+				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable).Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for realsies"}}, nil)
+			},
+			artifactSettings: artifact.DefaultConfig(),
+			upgradeSettings:  configuration.DefaultUpgradeConfig(),
+			version:          "1.2.3",
+			wantErr:          assert.NoError,
+			additionalAsserts: func(t *testing.T, topDir string) {
+				marker, loadMarkerErr := LoadMarker(paths.DataFrom(topDir))
+				require.NoError(t, loadMarkerErr, "error loading marker")
+				require.NotNil(t, marker, "marker is nil")
+
+				assert.Equal(t, OUTCOME_ROLLBACK, marker.DesiredOutcome)
+				require.NotNil(t, marker.Details)
+				assert.NotEmpty(t, marker.Details.Metadata.RollbacksAvailable)
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			log, _ := loggertest.New(t.Name())
+			mockAgentInfo := infomocks.NewAgent(t)
+			mockWatcherHelper := NewMockWatcherHelper(t)
+			topDir := t.TempDir()
+			err := os.MkdirAll(paths.DataFrom(topDir), 0777)
+			require.NoError(t, err, "error creating data directory in topDir %q", topDir)
+
+			if tc.setup != nil {
+				tc.setup(t, topDir, mockAgentInfo, mockWatcherHelper)
+			}
+
+			upgrader, err := NewUpgrader(log, tc.artifactSettings, tc.upgradeSettings, mockAgentInfo, mockWatcherHelper)
+			require.NoError(t, err, "error instantiating upgrader")
+
+			_, err = upgrader.forceRollbackToPreviousVersion(t.Context(), topDir, tc.version, nil, nil)
+			tc.wantErr(t, err, "unexpected error returned by forceRollbackToPreviousVersion()")
+			if tc.additionalAsserts != nil {
+				tc.additionalAsserts(t, topDir)
+			}
 		})
 	}
 }
@@ -1502,12 +1388,13 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		},
 	}
 
-	mockAgentInfo := info.NewAgent(t)
+	mockAgentInfo := infomocks.NewAgent(t)
 	mockAgentInfo.On("Version").Return("9.0.0")
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			upgrader, err := NewUpgrader(log, &artifact.Config{}, nil, mockAgentInfo)
+			mockWatcherHelper := NewMockWatcherHelper(t)
+			upgrader, err := NewUpgrader(log, &artifact.Config{}, nil, mockAgentInfo, mockWatcherHelper)
 			require.NoError(t, err)
 
 			tc.upgraderMocker(upgrader)
