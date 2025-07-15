@@ -24,7 +24,7 @@ entries:
         name: 1751037802-Stop-logging-that-unprivileged-installations-are-in-beta.yaml
         checksum: 2c2f731f90638eaf61e8ec021ce3c4dd8885ff3a
     - kind: feature
-      summary: Add file logs only mOTEL kube-stack configuration.
+      summary: Add file logs only managed OTLP input kube-stack configuration.
       description: ""
       component: elastic-agent
       pr:
