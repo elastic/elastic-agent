@@ -879,7 +879,7 @@ func TestCoordinatorPerformComponentDiagnostics(t *testing.T) {
 				},
 			},
 			expectedRuntimeDiagCount: 0,
-			expectedOtelDiagCount:    0,
+			expectedOtelDiagCount:    1,
 		},
 		{
 			name: "otel manager returns error",
@@ -891,7 +891,7 @@ func TestCoordinatorPerformComponentDiagnostics(t *testing.T) {
 			},
 			otelDiags:                []runtime.ComponentDiagnostic{},
 			otelErr:                  errors.New("otel manager error"),
-			expectedRuntimeDiagCount: 0,
+			expectedRuntimeDiagCount: 1,
 			expectedOtelDiagCount:    0,
 		},
 		{
@@ -950,12 +950,12 @@ func TestCoordinatorPerformComponentDiagnostics(t *testing.T) {
 			result, err := coord.PerformComponentDiagnostics(ctx, additionalMetrics, comp1, comp2)
 
 			// Verify error handling
-			if tt.otelErr != nil || tt.runtimeErr != nil {
-				assert.Error(t, err, "Should return error when expected")
-				assert.Nil(t, result, "Result should be nil when error occurs")
-				return
+			if tt.otelErr != nil {
+				assert.ErrorIs(t, err, tt.otelErr, "Returned error should include otel manager error")
 			}
-			assert.NoError(t, err, "Should not return error when not expected")
+			if tt.runtimeErr != nil {
+				assert.ErrorIs(t, err, tt.runtimeErr, "Returned error should include runtime manager error")
+			}
 
 			// Verify results
 			runtimeDiagFound := 0

@@ -786,17 +786,18 @@ func (c *Coordinator) PerformDiagnostics(ctx context.Context, req ...runtime.Com
 // PerformComponentDiagnostics executes the diagnostic action for the provided components.
 func (c *Coordinator) PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error) {
 	var diags []runtime.ComponentDiagnostic
-	runtimeDiags, err := c.runtimeMgr.PerformComponentDiagnostics(ctx, additionalMetrics, req...)
-	if err != nil {
-		return nil, err
+	runtimeDiags, runtimeErr := c.runtimeMgr.PerformComponentDiagnostics(ctx, additionalMetrics, req...)
+	if runtimeErr != nil {
+		runtimeErr = fmt.Errorf("runtime diagnostics failed: %w", runtimeErr)
 	}
 	diags = append(diags, runtimeDiags...)
-	otelDiags, err := c.otelMgr.PerformComponentDiagnostics(ctx, additionalMetrics, req...)
-	if err != nil {
-		return nil, err
+	otelDiags, otelErr := c.otelMgr.PerformComponentDiagnostics(ctx, additionalMetrics, req...)
+	if otelErr != nil {
+		otelErr = fmt.Errorf("otel diagnostics failed: %w", otelErr)
 	}
 	diags = append(diags, otelDiags...)
-	return diags, nil
+	err := errors.Join(runtimeErr, otelErr)
+	return diags, err
 }
 
 // SetLogLevel changes the entire log level for the running Elastic Agent.
