@@ -265,15 +265,19 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			// and reset the retry count
 			m.recoveryTimer.Stop()
 			m.recoveryRetries.Store(0)
+			// this is the only place where we mutate the internal config attributes, take a write lock for the duration
+			m.mx.Lock()
 			err = m.handleConfigUpdate(cfgUpdate.collectorCfg, cfgUpdate.components)
 			if err != nil {
 				reportErr(ctx, m.errCh, err)
+				m.mx.Unlock()
 				continue
 			}
 
 			err = m.applyMergedConfig(ctx, collectorStatusCh, collectorRunErr)
 			// report the error unconditionally to indicate that the config was applied
 			reportErr(ctx, m.errCh, err)
+			m.mx.Unlock()
 
 		case otelStatus := <-collectorStatusCh:
 			err = m.reportOtelStatusUpdate(ctx, otelStatus)
@@ -293,10 +297,8 @@ func (m *OTelManager) Errors() <-chan error {
 // This method updates the internal collector and component configurations and triggers a rebuild of the merged
 // configuration that combines them.
 func (m *OTelManager) handleConfigUpdate(cfg *confmap.Conf, components []component.Component) error {
-	m.mx.Lock()
 	m.collectorCfg = cfg
 	m.components = components
-	m.mx.Unlock()
 	return m.updateMergedConfig()
 }
 
@@ -346,9 +348,6 @@ func (m *OTelManager) updateMergedConfig() error {
 	if err != nil {
 		return err
 	}
-
-	m.mx.Lock()
-	defer m.mx.Unlock()
 	m.mergedCollectorCfg = mergedCfg
 	return nil
 }
