@@ -62,12 +62,7 @@ var DefaultOptions = []interface{}{
 	ucfg.IgnoreCommas,
 	ucfg.ResolveEnv,
 	ucfg.VarExp,
-<<<<<<< HEAD
-	VarSkipKeys("inputs"),
-	ucfg.IgnoreCommas,
-=======
 	VarSkipKeys("inputs", "outputs"),
->>>>>>> 96b9a4ca4 (Fix issue with ToMapStr not expanding path separator when reading configuration (#7445))
 	OTelKeys("connectors", "receivers", "processors", "exporters", "extensions", "service"),
 }
 
