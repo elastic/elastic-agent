@@ -1,9 +1,20 @@
 {{- include "elasticagent.init" $ -}}
 {{- range $presetName, $presetVal := $.Values.agent.presets -}}
+{{- $agentName := include "elasticagent.preset.fullname" (list $ $presetName)  -}}
+{{- if eq ($presetVal).mode "statefulset" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $agentName }}-headless
+spec:
+  clusterIP: None
+  selector:
+    name: {{ $agentName }}
+---
+{{- end }}
 {{- $presetService := dig "service" dict $presetVal -}}
 {{- $ports := dig "ports" list $presetVal -}}
-{{- if and $presetService $ports -}}
-{{- $agentName := include "elasticagent.preset.fullname" (list $ $presetName)  -}}
+{{- if and $presetService $ports }}
 apiVersion: v1
 kind: Service
 metadata:
