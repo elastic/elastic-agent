@@ -20,7 +20,8 @@
     "priorityClassName",
     "securityContext",
     "testFramework",
-    "additionalLabels"
+    "additionalLabels",
+    "automountServiceAccountToken"
   ],
   "additionalProperties": false,
   "properties": {
@@ -35,6 +36,14 @@
       "type": "integer",
       "default": 0,
       "title": "The replicaCount Schema",
+      "examples": [
+        1
+      ]
+    },
+    "revisionHistoryLimit": {
+      "type": "integer",
+      "default": 10,
+      "title": "The revisionHistoryLimit Schema",
       "examples": [
         1
       ]
@@ -182,6 +191,14 @@
               "title": "The tag Schema",
               "examples": [
                 "v0.93.0"
+              ]
+            },
+            "imagePullPolicy": {
+              "type": "string",
+              "default": "IfNotPresent",
+              "title": "The imagePullPolicy Schema",
+              "examples": [
+                "IfNotPresent"
               ]
             }
           },
@@ -582,14 +599,6 @@
               "type": "boolean",
               "default": false,
               "title": "Inject sidecar containers using native K8s API",
-              "examples": [
-                false
-              ]
-            },
-            "operator.observability.prometheus": {
-              "type": "boolean",
-              "default": false,
-              "title": "Whether the Prometheus Operator is installed",
               "examples": [
                 false
               ]
@@ -2118,6 +2127,14 @@
       "properties": {},
       "examples": [
         {}
+      ]
+    },
+    "automountServiceAccountToken": {
+      "type": "boolean",
+      "default": true,
+      "title": "Controls automounting of the service account token in both the operator pod and the associated service account object.",
+      "examples": [
+        false
       ]
     }
   },

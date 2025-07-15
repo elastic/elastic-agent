@@ -4,6 +4,10 @@
 
 replicaCount: 1
 
+## The number of old history to retain to allow rollback.
+##
+revisionHistoryLimit: 10
+
 ## Provide a name in place of opentelemetry-operator (includes the chart's release name).
 ##
 nameOverride: ""
@@ -40,9 +44,10 @@ manager:
   image:
     repository: ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator
     tag: ""
+    imagePullPolicy: IfNotPresent
   collectorImage:
-    repository: ""
-    tag: 0.120.0
+    repository: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s
+    tag: 0.127.0
   opampBridgeImage:
     repository: ""
     tag: ""
@@ -83,7 +88,6 @@ manager:
   # operator.targetallocator.fallbackstrategy: false
   # operator.collector.targetallocatorcr: false
   # operator.sidecarcontainers.native: false
-  # operator.observability.prometheus: false
   # operator.golang.flags: false
   # operator.collector.default.config: false
   ports:
@@ -219,7 +223,7 @@ kubeRBACProxy:
   enabled: true
   image:
     repository: quay.io/brancz/kube-rbac-proxy
-    tag: v0.18.1
+    tag: v0.19.1
   ports:
     proxyPort: 8443
   resources: {}
@@ -317,7 +321,9 @@ admissionWebhooks:
   serviceAnnotations: {}
 
   ## Secret annotations
-  secretAnnotations: {}
+  secretAnnotations:
+    "helm.sh/hook": "pre-install,pre-upgrade"
+    "helm.sh/hook-delete-policy": "before-hook-creation"
   ## Secret labels
   secretLabels: {}
 
@@ -339,7 +345,8 @@ clusterRole:
 
 affinity: {}
 tolerations: []
-nodeSelector: {}
+nodeSelector:
+  kubernetes.io/os: linux
 topologySpreadConstraints: []
 hostNetwork: false
 
@@ -353,6 +360,17 @@ securityContext:
   runAsNonRoot: true
   runAsUser: 65532
   fsGroup: 65532
+
+# Determines how the operator pod mounts the service account token and also
+# sets the corresponding field in the associated service account object.
+# - When set to `true` (default), the service account token is automatically
+#   mounted to the pod, and the service account object will have the
+#   `automountServiceAccountToken` field set to `true`.
+# - When set to `false`, automounting of the service account token is disabled,
+#   and the token is manually mounted using a volume and volumeMounts in
+#   the pod spec by the chart. This also updates the `automountServiceAccountToken`
+#   field in the service account object to `false`.
+automountServiceAccountToken: true
 
 testFramework:
   image:
