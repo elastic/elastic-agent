@@ -35,7 +35,7 @@ inputs:
     - drop_event:
         when:
           equals:
-            log.type: "event"
+            log.type: event
     - copy_fields:
         fields:
         - from: data_stream.dataset
