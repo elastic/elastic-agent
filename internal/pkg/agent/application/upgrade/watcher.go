@@ -284,11 +284,15 @@ func (a AgentWatcherHelper) WaitForWatcher(ctx context.Context, log *logger.Logg
 }
 
 func (a AgentWatcherHelper) TakeOverWatcher(ctx context.Context, log *logger.Logger, topDir string) (*filelock.AppLocker, error) {
-	return takeOverWatcher(ctx, log, topDir)
+	return takeOverWatcher(ctx, log, topDir, utils.GetWatcherPIDs)
 }
 
+// watcherPIDsFetcher defines the type of function responsible for fetching watcher PIDs.
+// This will allow for easier testing of takeOverWatcher using fake binaries
+type watcherPIDsFetcher func() ([]int, error)
+
 // Private functions providing implementation of AgentWatcherHelper
-func takeOverWatcher(ctx context.Context, log *logger.Logger, topDir string) (*filelock.AppLocker, error) {
+func takeOverWatcher(ctx context.Context, log *logger.Logger, topDir string, pidFetchFunc watcherPIDsFetcher) (*filelock.AppLocker, error) {
 	takeoverCtx, takeoverCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer takeoverCancel()
 	go func() {
@@ -299,7 +303,7 @@ func takeOverWatcher(ctx context.Context, log *logger.Logger, topDir string) (*f
 			case <-takeoverCtx.Done():
 				return
 			case <-killingTicker.C:
-				pids, err := utils.GetWatcherPIDs()
+				pids, err := pidFetchFunc()
 				if err != nil {
 					log.Errorf("error listing watcher processes: %s", err)
 					continue
@@ -316,6 +320,7 @@ func takeOverWatcher(ctx context.Context, log *logger.Logger, topDir string) (*f
 					killProcErr := process.Terminate(watcherProcess)
 					if killProcErr != nil {
 						log.Errorf("error killing process with PID: %d: %s", pid, killProcErr)
+						continue
 					}
 					log.Debugf("killed watcher process with PID: %d", pid)
 				}
