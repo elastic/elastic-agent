@@ -25,12 +25,13 @@ func (m *OTelManager) PerformDiagnostics(ctx context.Context, req ...runtime.Com
 	if len(req) == 0 {
 		for _, comp := range currentComponents {
 			for _, unit := range comp.Units {
-				req = append(req, runtime.ComponentUnitDiagnosticRequest{
+				diagnostics = append(diagnostics, runtime.ComponentUnitDiagnostic{
 					Component: comp,
 					Unit:      unit,
 				})
 			}
 		}
+		return diagnostics
 	}
 
 	// create a map of unit by component and unit id, this is used to filter out units that
