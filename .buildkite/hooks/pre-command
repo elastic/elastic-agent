@@ -13,6 +13,19 @@ if [[ -z "${GO_VERSION-""}" ]]; then
     export GO_VERSION=$(cat "${WORKSPACE}/.go-version")
 fi
 
+# Begin DRA override
+# When DRA is not creating the binaries, we can use the files
+# to override
+if [[ -f "${WORKSPACE}/.beat-version" ]]; then
+  export BEAT_VERSION=$(cat "${WORKSPACE}/.beat-version")
+fi
+
+if [[ -f "${WORKSPACE}/.agent-version" ]]; then
+  export AGENT_PACKAGE_VERSION=$(cat "${WORKSPACE}/.agent-version")
+  export AGENT_VERSION="$(cat "${WORKSPACE}/.agent-version")-SNAPSHOT"
+fi
+# End DRA override
+
 CI_DRA_ROLE_PATH="kv/ci-shared/release/dra-role"
 CI_GCP_OBS_PATH="kv/ci-shared/observability-ingest/cloud/gcp"
 # This key exists for backward compatibility with OGC framework
