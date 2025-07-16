@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -508,6 +509,7 @@ func createUpdateMarker(t *testing.T, log *logger.Logger, topDir, newAgentVersio
 	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile)
 	err := markUpgrade(log,
 		paths.DataFrom(topDir),
+		time.Now(),
 		newAgentInstall,
 		oldAgentInstall,
 		nil, nil, OUTCOME_UPGRADE, 0)

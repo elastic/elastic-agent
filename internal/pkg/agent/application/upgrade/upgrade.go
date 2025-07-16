@@ -84,7 +84,7 @@ type unpackHandler interface {
 type copyActionStoreFunc func(log *logger.Logger, newHome string) error
 type copyRunDirectoryFunc func(log *logger.Logger, oldRunPath, newRunPath string) error
 type fileDirCopyFunc func(from, to string, opts ...copy.Options) error
-type markUpgradeFunc func(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, desiredOutcome UpgradeOutcome, rollbackWindow time.Duration) error
+type markUpgradeFunc func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, desiredOutcome UpgradeOutcome, rollbackWindow time.Duration) error
 type changeSymlinkFunc func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error
 type rollbackInstallFunc func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error
 
@@ -429,8 +429,9 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	}
 	if err := u.markUpgrade(u.log,
 		paths.Data(), // data dir to place the marker in
-		current,      // new agent version data
-		previous,     // old agent version data
+		time.Now(),
+		current,  // new agent version data
+		previous, // old agent version data
 		action, det, OUTCOME_UPGRADE, rollbackWindow); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
 		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)

@@ -201,7 +201,7 @@ type updateActiveCommitFunc func(log *logger.Logger, topDirPath, hash string, wr
 
 // markUpgrade marks update happened so we can handle grace period
 func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile writeFileFunc) markUpgradeFunc {
-	return func(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, desiredOutcome UpgradeOutcome, rollbackWindow time.Duration) error {
+	return func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, desiredOutcome UpgradeOutcome, rollbackWindow time.Duration) error {
 
 		if len(previousAgent.hash) > hashLen {
 			previousAgent.hash = previousAgent.hash[:hashLen]
@@ -211,7 +211,7 @@ func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile wr
 			Version:           agent.version,
 			Hash:              agent.hash,
 			VersionedHome:     agent.versionedHome,
-			UpdatedOn:         time.Now(),
+			UpdatedOn:         updatedOn,
 			PrevVersion:       previousAgent.version,
 			PrevHash:          previousAgent.hash,
 			PrevVersionedHome: previousAgent.versionedHome,
@@ -221,12 +221,15 @@ func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile wr
 		}
 
 		if rollbackWindow > 0 {
+
 			// if we have a not empty rollback window, write the prev version in the rollbacks_available field
-			upgradeDetails.Metadata.RollbacksAvailable = []details.RollbackAvailable{details.RollbackAvailable{
-				Version:    previousAgent.version,
-				Home:       previousAgent.versionedHome,
-				ValidUntil: time.Now().Add(rollbackWindow),
-			}}
+			upgradeDetails.Metadata.RollbacksAvailable = []details.RollbackAvailable{
+				{
+					Version:    previousAgent.version,
+					Home:       previousAgent.versionedHome,
+					ValidUntil: updatedOn.Add(rollbackWindow),
+				},
+			}
 		}
 
 		markerBytes, err := yaml.Marshal(newMarkerSerializer(marker))

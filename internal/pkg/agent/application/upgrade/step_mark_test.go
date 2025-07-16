@@ -8,9 +8,11 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -18,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 func TestSaveAndLoadMarker_NoLoss(t *testing.T) {
@@ -265,7 +268,7 @@ desired_outcome: true
 	}
 }
 
-func TestMarkUpgrade(t *testing.T) {
+func TestMarkUpgradeError(t *testing.T) {
 	log, _ := loggertest.New("test")
 	agent := agentInstall{
 		version:       "8.5.0",
@@ -322,7 +325,7 @@ func TestMarkUpgrade(t *testing.T) {
 			baseDir := t.TempDir()
 			paths.SetTop(baseDir)
 
-			err := tc.markUpgrade(log, paths.Data(), agent, previousAgent, action, upgradeDetails, desiredOutcome, 0)
+			err := tc.markUpgrade(log, paths.Data(), time.Now(), agent, previousAgent, action, upgradeDetails, desiredOutcome, 0)
 			require.Error(t, err)
 			require.ErrorIs(t, err, tc.expectedError)
 		})
@@ -356,4 +359,191 @@ func TestUpdateActiveCommit(t *testing.T) {
 		})
 	}
 
+}
+
+func TestMarkUpgrade(t *testing.T) {
+	var parsed123SNAPSHOT = agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")
+	var parsed456SNAPSHOT = agtversion.NewParsedSemVer(4, 5, 6, "SNAPSHOT", "")
+
+	// fix a timestamp (truncated to the second because of loss of precision during marshalling/unmarshalling)
+	updatedOnNow := time.Now().UTC().Truncate(time.Second)
+
+	type args struct {
+		updatedOn      time.Time
+		currentAgent   agentInstall
+		previousAgent  agentInstall
+		action         *fleetapi.ActionUpgrade
+		details        *details.Details
+		desiredOutcome UpgradeOutcome
+		rollbackWindow time.Duration
+	}
+	type workingDirHook func(t *testing.T, dataDir string)
+
+	testcases := []struct {
+		name            string
+		setupBeforeMark workingDirHook
+		args            args
+		wantErr         assert.ErrorAssertionFunc
+		assertAfterMark workingDirHook
+	}{
+		{
+			name: "error writing update marker - check error",
+			setupBeforeMark: func(t *testing.T, dataDir string) {
+
+				// read-only permissions on directories don't work on windows, skip
+				if runtime.GOOS == "windows" {
+					t.Skip("skipping test on windows since readonly permissions on directory don't work")
+				}
+
+				err := os.Chmod(dataDir, 0555)
+				require.NoError(t, err, "error setting dataDir read-only")
+			},
+			args: args{
+				updatedOn: updatedOnNow,
+				currentAgent: agentInstall{
+					parsedVersion: parsed456SNAPSHOT,
+					version:       "4.5.6-SNAPSHOT",
+					hash:          "curagt",
+					versionedHome: filepath.Join("data", "elastic-agent-4.5.6-SNAPSHOT-curagt"),
+				},
+				previousAgent: agentInstall{
+					parsedVersion: parsed123SNAPSHOT,
+					version:       "1.2.3-SNAPSHOT",
+					hash:          "prvagt",
+					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
+				},
+				action:         nil,
+				details:        details.NewDetails("4.5.6-SNAPSHOT", details.StateReplacing, ""),
+				desiredOutcome: OUTCOME_UPGRADE,
+				rollbackWindow: 0,
+			},
+			wantErr: assert.Error,
+		},
+		{
+			name: "no rollback window specified - no available rollbacks",
+			args: args{
+				updatedOn: updatedOnNow,
+				currentAgent: agentInstall{
+					parsedVersion: parsed456SNAPSHOT,
+					version:       "4.5.6-SNAPSHOT",
+					hash:          "curagt",
+					versionedHome: filepath.Join("data", "elastic-agent-4.5.6-SNAPSHOT-curagt"),
+				},
+				previousAgent: agentInstall{
+					parsedVersion: parsed123SNAPSHOT,
+					version:       "1.2.3-SNAPSHOT",
+					hash:          "prvagt",
+					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
+				},
+				action:         nil,
+				details:        details.NewDetails("4.5.6-SNAPSHOT", details.StateReplacing, ""),
+				desiredOutcome: OUTCOME_UPGRADE,
+				rollbackWindow: 0,
+			},
+			wantErr: assert.NoError,
+			assertAfterMark: func(t *testing.T, dataDir string) {
+				actualMarker, err := LoadMarker(dataDir)
+				require.NoError(t, err, "error reading actualMarker content after writing")
+
+				expectedMarker := &UpdateMarker{
+					Version:           "4.5.6-SNAPSHOT",
+					Hash:              "curagt",
+					VersionedHome:     filepath.Join("data", "elastic-agent-4.5.6-SNAPSHOT-curagt"),
+					UpdatedOn:         updatedOnNow,
+					PrevVersion:       "1.2.3-SNAPSHOT",
+					PrevHash:          "prvagt",
+					PrevVersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
+					Acked:             false,
+					Action:            nil,
+					Details: &details.Details{
+						TargetVersion: "4.5.6-SNAPSHOT",
+						State:         "UPG_REPLACING",
+						ActionID:      "",
+						Metadata:      details.Metadata{},
+					},
+					DesiredOutcome: OUTCOME_UPGRADE,
+				}
+				assert.Equal(t, expectedMarker, actualMarker)
+			},
+		},
+		{
+			name: "rollback window specified - available rollbacks must be present",
+			args: args{
+				updatedOn: updatedOnNow,
+				currentAgent: agentInstall{
+					parsedVersion: parsed456SNAPSHOT,
+					version:       "4.5.6-SNAPSHOT",
+					hash:          "curagt",
+					versionedHome: filepath.Join("data", "elastic-agent-4.5.6-SNAPSHOT-curagt"),
+				},
+				previousAgent: agentInstall{
+					parsedVersion: parsed123SNAPSHOT,
+					version:       "1.2.3-SNAPSHOT",
+					hash:          "prvagt",
+					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
+				},
+				action:         nil,
+				details:        details.NewDetails("4.5.6-SNAPSHOT", details.StateReplacing, ""),
+				desiredOutcome: OUTCOME_UPGRADE,
+				rollbackWindow: 7 * 24 * time.Hour,
+			},
+			wantErr: assert.NoError,
+			assertAfterMark: func(t *testing.T, dataDir string) {
+				actualMarker, err := LoadMarker(dataDir)
+				require.NoError(t, err, "error reading actualMarker content after writing")
+
+				expectedMarker := &UpdateMarker{
+					Version:           "4.5.6-SNAPSHOT",
+					Hash:              "curagt",
+					VersionedHome:     filepath.Join("data", "elastic-agent-4.5.6-SNAPSHOT-curagt"),
+					UpdatedOn:         updatedOnNow,
+					PrevVersion:       "1.2.3-SNAPSHOT",
+					PrevHash:          "prvagt",
+					PrevVersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
+					Acked:             false,
+					Action:            nil,
+					Details: &details.Details{
+						TargetVersion: "4.5.6-SNAPSHOT",
+						State:         "UPG_REPLACING",
+						ActionID:      "",
+						Metadata: details.Metadata{
+							RollbacksAvailable: []details.RollbackAvailable{
+								{
+									Version:    "1.2.3-SNAPSHOT",
+									Home:       filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
+									ValidUntil: updatedOnNow.Add(7 * 24 * time.Hour),
+								},
+							},
+						},
+					},
+					DesiredOutcome: OUTCOME_UPGRADE,
+				}
+				assert.Equal(t, expectedMarker, actualMarker)
+			},
+		},
+	}
+
+	// use the regular markUpgrade function, disabling the updateActiveCommitFunction that is bundled together
+	markUpgrade := markUpgradeProvider(
+		func(log *logger.Logger, topDirPath, hash string, writeFile writeFileFunc) error {
+			return nil
+		},
+		os.WriteFile,
+	)
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			dataDir := t.TempDir()
+			log, _ := loggertest.New(t.Name())
+
+			if tc.setupBeforeMark != nil {
+				tc.setupBeforeMark(t, dataDir)
+			}
+
+			err := markUpgrade(log, dataDir, tc.args.updatedOn, tc.args.currentAgent, tc.args.previousAgent, tc.args.action, tc.args.details, tc.args.desiredOutcome, tc.args.rollbackWindow)
+			tc.wantErr(t, err)
+			if tc.assertAfterMark != nil {
+				tc.assertAfterMark(t, dataDir)
+			}
+		})
+	}
 }
