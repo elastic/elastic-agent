@@ -722,15 +722,11 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mgr := &OTelManager{
-				logger:                     newTestLogger(),
-				collectorCfg:               tt.collectorCfg,
-				components:                 tt.components,
-				agentInfo:                  commonAgentInfo,
-				beatMonitoringConfigGetter: commonBeatMonitoringConfigGetter,
+			cfgUpdate := configUpdate{
+				collectorCfg: tt.collectorCfg,
+				components:   tt.components,
 			}
-
-			result, err := mgr.buildMergedConfig()
+			result, err := buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter)
 
 			if tt.expectedErrorString != "" {
 				assert.Error(t, err)
@@ -752,97 +748,6 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestOTelManager_handleConfigUpdate(t *testing.T) {
-	testComp := testComponent("test-component")
-	t.Run("successful update with empty collector config and components", func(t *testing.T) {
-		mgr := &OTelManager{
-			logger:                     newTestLogger(),
-			agentInfo:                  &info.AgentInfo{},
-			beatMonitoringConfigGetter: mockBeatMonitoringConfigGetter,
-		}
-
-		err := mgr.handleConfigUpdate(nil, nil)
-
-		assert.NoError(t, err)
-		assert.Nil(t, mgr.components)
-		// Verify that Update was called with nil config (empty components should result in nil config)
-		assert.Nil(t, mgr.mergedCollectorCfg)
-	})
-
-	t.Run("successful update with components and empty collector config", func(t *testing.T) {
-		mgr := &OTelManager{
-			logger:                     newTestLogger(),
-			agentInfo:                  &info.AgentInfo{},
-			beatMonitoringConfigGetter: mockBeatMonitoringConfigGetter,
-		}
-
-		components := []component.Component{testComp}
-		err := mgr.handleConfigUpdate(nil, components)
-
-		assert.NoError(t, err)
-		assert.Equal(t, components, mgr.components)
-		// Verify that Update was called with a valid configuration
-		assert.NotNil(t, mgr.mergedCollectorCfg)
-		// Verify that the configuration contains expected OpenTelemetry sections
-		assert.True(t, mgr.mergedCollectorCfg.IsSet("receivers"), "Expected receivers section in config")
-		assert.True(t, mgr.mergedCollectorCfg.IsSet("exporters"), "Expected exporters section in config")
-		assert.True(t, mgr.mergedCollectorCfg.IsSet("service"), "Expected service section in config")
-	})
-
-	t.Run("successful update with empty components and collector config", func(t *testing.T) {
-		mgr := &OTelManager{
-			logger:                     newTestLogger(),
-			agentInfo:                  &info.AgentInfo{},
-			beatMonitoringConfigGetter: mockBeatMonitoringConfigGetter,
-		}
-
-		collectorConfig := confmap.NewFromStringMap(map[string]any{
-			"receivers": map[string]any{
-				"nop": map[string]any{},
-			},
-			"processors": map[string]any{
-				"batch": map[string]any{},
-			},
-		})
-
-		err := mgr.handleConfigUpdate(collectorConfig, nil)
-
-		assert.NoError(t, err)
-		assert.Equal(t, collectorConfig, mgr.collectorCfg)
-		assert.Equal(t, collectorConfig, mgr.MergedOtelConfig())
-		// Verify that Update was called with the collector configuration
-		assert.NotNil(t, mgr.mergedCollectorCfg)
-		// Verify that the configuration contains expected collector sections
-		assert.True(t, mgr.mergedCollectorCfg.IsSet("receivers"), "Expected receivers section in config")
-		assert.True(t, mgr.mergedCollectorCfg.IsSet("processors"), "Expected processors section in config")
-	})
-
-	t.Run("successful update with both collector config and components", func(t *testing.T) {
-		mgr := &OTelManager{
-			logger:                     newTestLogger(),
-			agentInfo:                  &info.AgentInfo{},
-			beatMonitoringConfigGetter: mockBeatMonitoringConfigGetter,
-		}
-		components := []component.Component{testComponent("test-component")}
-
-		collectorConfig := confmap.NewFromStringMap(map[string]any{
-			"processors": map[string]any{
-				"batch": map[string]any{},
-			},
-		})
-
-		err := mgr.handleConfigUpdate(collectorConfig, components)
-
-		assert.NoError(t, err)
-		assert.Equal(t, collectorConfig, mgr.collectorCfg)
-		// Verify that the configuration contains both collector and component sections
-		assert.True(t, mgr.mergedCollectorCfg.IsSet("receivers"), "Expected receivers section from components")
-		assert.True(t, mgr.mergedCollectorCfg.IsSet("exporters"), "Expected exporters section from components")
-		assert.True(t, mgr.mergedCollectorCfg.IsSet("service"), "Expected service section from components")
-		assert.True(t, mgr.mergedCollectorCfg.IsSet("processors"), "Expected processors section from collector config")
-	})
 }
 
 func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
