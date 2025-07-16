@@ -125,7 +125,7 @@ func DefaultConfig() *MonitoringConfig {
 		Namespace:      defaultNamespace,
 		APM:            defaultAPMConfig(),
 		Diagnostics:    defaultDiagnostics(),
-		RuntimeManager: DefaultRuntimeManager,
+		RuntimeManager: OtelRuntimeManager,
 	}
 }
 
