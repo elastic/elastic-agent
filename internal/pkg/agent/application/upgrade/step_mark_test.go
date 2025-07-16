@@ -280,14 +280,42 @@ func TestMarkUpgrade(t *testing.T) {
 		desiredOutcome UpgradeOutcome
 		rollbackWindow time.Duration
 	}
-	type assertWorkingDir func(t *testing.T, dataDir string)
+	type workingDirHook func(t *testing.T, dataDir string)
 
 	testcases := []struct {
-		name              string
-		args              args
-		wantErr           assert.ErrorAssertionFunc
-		assertOnDirectory assertWorkingDir
+		name            string
+		setupBeforeMark workingDirHook
+		args            args
+		wantErr         assert.ErrorAssertionFunc
+		assertAfterMark workingDirHook
 	}{
+		{
+			name: "error writing update marker - check error",
+			setupBeforeMark: func(t *testing.T, dataDir string) {
+				err := os.Chmod(dataDir, 0555)
+				require.NoError(t, err, "error setting dataDir read-only")
+			},
+			args: args{
+				updatedOn: updatedOnNow,
+				currentAgent: agentInstall{
+					parsedVersion: parsed456SNAPSHOT,
+					version:       "4.5.6-SNAPSHOT",
+					hash:          "curagt",
+					versionedHome: filepath.Join("data", "elastic-agent-4.5.6-SNAPSHOT-curagt"),
+				},
+				previousAgent: agentInstall{
+					parsedVersion: parsed123SNAPSHOT,
+					version:       "1.2.3-SNAPSHOT",
+					hash:          "prvagt",
+					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
+				},
+				action:         nil,
+				details:        details.NewDetails("4.5.6-SNAPSHOT", details.StateReplacing, ""),
+				desiredOutcome: OUTCOME_UPGRADE,
+				rollbackWindow: 0,
+			},
+			wantErr: assert.Error,
+		},
 		{
 			name: "no rollback window specified - no available rollbacks",
 			args: args{
@@ -310,7 +338,7 @@ func TestMarkUpgrade(t *testing.T) {
 				rollbackWindow: 0,
 			},
 			wantErr: assert.NoError,
-			assertOnDirectory: func(t *testing.T, dataDir string) {
+			assertAfterMark: func(t *testing.T, dataDir string) {
 				actualMarker, err := LoadMarker(dataDir)
 				require.NoError(t, err, "error reading actualMarker content after writing")
 
@@ -357,7 +385,7 @@ func TestMarkUpgrade(t *testing.T) {
 				rollbackWindow: 7 * 24 * time.Hour,
 			},
 			wantErr: assert.NoError,
-			assertOnDirectory: func(t *testing.T, dataDir string) {
+			assertAfterMark: func(t *testing.T, dataDir string) {
 				actualMarker, err := LoadMarker(dataDir)
 				require.NoError(t, err, "error reading actualMarker content after writing")
 
@@ -396,10 +424,15 @@ func TestMarkUpgrade(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dataDir := t.TempDir()
 			log, _ := loggertest.New(t.Name())
+
+			if tc.setupBeforeMark != nil {
+				tc.setupBeforeMark(t, dataDir)
+			}
+
 			err := markUpgrade(log, dataDir, tc.args.updatedOn, tc.args.currentAgent, tc.args.previousAgent, tc.args.action, tc.args.details, tc.args.desiredOutcome, tc.args.rollbackWindow)
 			tc.wantErr(t, err)
-			if tc.assertOnDirectory != nil {
-				tc.assertOnDirectory(t, dataDir)
+			if tc.assertAfterMark != nil {
+				tc.assertAfterMark(t, dataDir)
 			}
 		})
 	}
