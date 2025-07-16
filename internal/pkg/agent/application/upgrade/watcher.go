@@ -28,6 +28,8 @@ const (
 	statusCheckMissesAllowed      = 4 // enable 2 minute start (30 second periods)
 	statusLossesAllowed           = 2 // enable connection lost to agent twice
 	statusFailureFlipFlopsAllowed = 3 // no more than three failure flip-flops allowed
+
+	watcherApplockerFileName = "watcher.lock"
 )
 
 var (
@@ -284,22 +286,26 @@ func (a AgentWatcherHelper) WaitForWatcher(ctx context.Context, log *logger.Logg
 }
 
 func (a AgentWatcherHelper) TakeOverWatcher(ctx context.Context, log *logger.Logger, topDir string) (*filelock.AppLocker, error) {
-	return takeOverWatcher(ctx, log, topDir)
+	return takeOverWatcher(ctx, log, topDir, utils.GetWatcherPIDs, 30*time.Second, 500*time.Millisecond, 100*time.Millisecond)
 }
 
+// watcherPIDsFetcher defines the type of function responsible for fetching watcher PIDs.
+// This will allow for easier testing of takeOverWatcher using fake binaries
+type watcherPIDsFetcher func() ([]int, error)
+
 // Private functions providing implementation of AgentWatcherHelper
-func takeOverWatcher(ctx context.Context, log *logger.Logger, topDir string) (*filelock.AppLocker, error) {
-	takeoverCtx, takeoverCancel := context.WithTimeout(ctx, 30*time.Second)
+func takeOverWatcher(ctx context.Context, log *logger.Logger, topDir string, pidFetchFunc watcherPIDsFetcher, timeout time.Duration, watcherSweepInterval time.Duration, takeOverInterval time.Duration) (*filelock.AppLocker, error) {
+	takeoverCtx, takeoverCancel := context.WithTimeout(ctx, timeout)
 	defer takeoverCancel()
 	go func() {
-		killingTicker := time.NewTicker(500 * time.Millisecond)
-		defer killingTicker.Stop()
+		sweepTicker := time.NewTicker(watcherSweepInterval)
+		defer sweepTicker.Stop()
 		for {
 			select {
 			case <-takeoverCtx.Done():
 				return
-			case <-killingTicker.C:
-				pids, err := utils.GetWatcherPIDs()
+			case <-sweepTicker.C:
+				pids, err := pidFetchFunc()
 				if err != nil {
 					log.Errorf("error listing watcher processes: %s", err)
 					continue
@@ -316,6 +322,7 @@ func takeOverWatcher(ctx context.Context, log *logger.Logger, topDir string) (*f
 					killProcErr := process.Terminate(watcherProcess)
 					if killProcErr != nil {
 						log.Errorf("error killing process with PID: %d: %s", pid, killProcErr)
+						continue
 					}
 					log.Debugf("killed watcher process with PID: %d", pid)
 				}
@@ -324,14 +331,14 @@ func takeOverWatcher(ctx context.Context, log *logger.Logger, topDir string) (*f
 	}()
 
 	// we should retry to take over the AppLocker for 30s, but AppLocker interface is limited
-	takeOverTicker := time.NewTicker(100 * time.Millisecond)
+	takeOverTicker := time.NewTicker(takeOverInterval)
 	defer takeOverTicker.Stop()
 	for {
 		select {
 		case <-takeoverCtx.Done():
 			return nil, fmt.Errorf("timed out taking over watcher applocker")
 		case <-takeOverTicker.C:
-			locker := filelock.NewAppLocker(topDir, "watcher.lock")
+			locker := filelock.NewAppLocker(topDir, watcherApplockerFileName)
 			err := locker.TryLock()
 			if err != nil {
 				log.Errorf("error locking watcher applocker: %s", err)
