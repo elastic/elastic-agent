@@ -215,7 +215,9 @@ func getRegexpsForRegistryFiles() []*regexp.Regexp {
 	}
 
 	for _, lst := range preFilesList {
-		pathRe := filepath.Join(lst...)
+		// On windows, we need to ensure we escape the path separator, because backslash has a special meaning
+		separator := regexp.QuoteMeta(string(filepath.Separator))
+		pathRe := strings.Join(lst, separator)
 		re := regexp.MustCompile(pathRe)
 		registryFileRegExps = append(registryFileRegExps, re)
 	}
