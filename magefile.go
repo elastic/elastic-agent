@@ -990,14 +990,11 @@ func (Cloud) Load() error {
 
 	// Need to get the FIPS env var flag to see if we are using the normal source cloud image name, or the FIPS variant
 	fips := os.Getenv(fipsEnv)
-	defer os.Setenv(fipsEnv, fips)
 	fipsVal, err := strconv.ParseBool(fips)
 	if err != nil {
 		fipsVal = false
 	}
-	if err := os.Setenv(fipsEnv, strconv.FormatBool(fipsVal)); err != nil {
-		return fmt.Errorf("failed to set fips env var: %w", err)
-	}
+
 	devtools.FIPSBuild = fipsVal
 
 	source := "build/distributions/elastic-agent-cloud-" + agentVersion + "-SNAPSHOT-linux-" + runtime.GOARCH + ".docker.tar.gz"

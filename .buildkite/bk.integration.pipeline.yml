@@ -6,12 +6,12 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1751677239"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1751677239"
-  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1751677239"
-  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1751677239"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1751677239"
-  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1751677239"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1752282044"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1752282044"
+  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1752282044"
+  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1752282044"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1752282044"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1752282044"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -41,9 +41,34 @@ common:
       elastic/vault-secrets#v0.1.0:
         path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
         field: "apiKey"
-        env_var: "EC_API_KEY"  
+        env_var: "EC_API_KEY"
 
 steps:
+  - label: "Custom ECH Testing"
+    key: integration-tests-ech
+    depends_on:
+      - packaging-ubuntu-x86-64
+    env:
+      TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+      TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
+      FORCE_ESS_CREATE: "true"
+    command: |
+      #!/usr/bin/env bash
+      buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
+      .buildkite/scripts/steps/integration_tests_tf.sh ech true
+    artifact_paths:
+      - build/**
+      - build/diagnostics/**
+    retry:
+      automatic:
+        limit: 1
+    agents:
+      provider: "gcp"
+      machineType: "n2-standard-8"
+      image: "${IMAGE_UBUNTU_2404_X86_64}"
+    plugins:
+      - *vault_ec_key_prod
+
   - label: Start ESS stack for integration tests
     key: integration-ess
     notify:
@@ -113,7 +138,7 @@ steps:
           image: "${IMAGE_WIN_2025}"
         plugins:
           - *vault_ec_key_prod
-  
+
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-ubuntu-x86-64
         env:
@@ -298,7 +323,7 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         plugins:
-          - *vault_ec_key_prod  
+          - *vault_ec_key_prod
         matrix:
           - default
           - upgrade
@@ -614,6 +639,7 @@ steps:
     # Warning: The key has a hook in pre-command
     key: aggregate-reports
     depends_on:
+      - integration-tests-ech
       - integration-tests-ubuntu
       - integration-tests-win
       - integration-tests-rhel8
