@@ -85,9 +85,7 @@ type AgentVersions struct {
 	TestVersions []string `yaml:"testVersions"`
 }
 
-var (
-	agentVersions *AgentVersions
-)
+var agentVersions *AgentVersions
 
 func init() {
 	AgentVersionsFilename = filepath.Join("testing", "integration", "testdata", ".upgrade-test-agent-versions.yml")
@@ -248,15 +246,21 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 	return upgradableVersions, nil
 }
 
-// PreviousMinor returns the previous minor version available for upgrade.
 func PreviousMinor() (*version.ParsedSemVer, error) {
-	versions, err := GetUpgradableVersions()
+	currentVersion := define.Version()
+	upgradeableVersions, err := GetUpgradableVersions()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get upgradable versions: %w", err)
+		return nil, err
 	}
-	current, err := version.ParseVersion(define.Version())
+
+	return previousMinor(currentVersion, upgradeableVersions)
+}
+
+// previousMinor returns the previous minor version available for upgrade from the given list of upgradeable versions.
+func previousMinor(currentVersion string, upgradeableVersions []*version.ParsedSemVer) (*version.ParsedSemVer, error) {
+	current, err := version.ParseVersion(currentVersion)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse the current version %s: %w", define.Version(), err)
+		return nil, fmt.Errorf("failed to parse the current version %s: %w", currentVersion, err)
 	}
 
 	// Special case: if we are in the first release (or a patch release of the first release) of a new major (so vX.0.x), we should
@@ -267,7 +271,7 @@ func PreviousMinor() (*version.ParsedSemVer, error) {
 		// will only contain minors from the previous major (vX-1). Further, since the
 		// version list is sorted in descending order (newer versions first), we can return the
 		// first item from the list as it will be the newest minor of the previous major.
-		for _, v := range versions {
+		for _, v := range upgradeableVersions {
 			if v.Less(*current) {
 				return v, nil
 			}
@@ -276,7 +280,7 @@ func PreviousMinor() (*version.ParsedSemVer, error) {
 		return nil, ErrNoPreviousMinor
 	}
 
-	for _, v := range versions {
+	for _, v := range upgradeableVersions {
 		if v.Prerelease() != "" || v.BuildMetadata() != "" {
 			continue
 		}
@@ -284,6 +288,7 @@ func PreviousMinor() (*version.ParsedSemVer, error) {
 			return v, nil
 		}
 	}
+
 	return nil, ErrNoPreviousMinor
 }
 
