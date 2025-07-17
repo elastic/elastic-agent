@@ -992,11 +992,7 @@ func (Cloud) Load() error {
 	if err != nil {
 		fipsVal = false
 	}
-<<<<<<< HEAD
-	os.Setenv(fipsEnv, strconv.FormatBool(fipsVal))
-=======
 
->>>>>>> c1136e4ab (Use a custom image for the ECH deployment when running integration tests (#8337))
 	devtools.FIPSBuild = fipsVal
 
 	source := "build/distributions/elastic-agent-cloud-" + version + "-linux-" + runtime.GOARCH + ".docker.tar.gz"
