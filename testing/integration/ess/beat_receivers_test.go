@@ -929,8 +929,6 @@ func TestSensitiveLogsESExporter(t *testing.T) {
 	require.NoError(t, err)
 
 	configTemplate := `
-agent.grpc:
-  port: 6799
 inputs:
   - type: filestream
     id: filestream-e2e
@@ -950,7 +948,6 @@ outputs:
     type: elasticsearch
     hosts: [{{.ESEndpoint}}]
     api_key: "{{.ESApiKey}}"
-    preset: "balanced"
 agent:
   monitoring:
     enabled: true
@@ -983,7 +980,7 @@ agent.logging.to_stderr: true
 	require.NoError(t, err, "cannot prepare Elastic-Agent command: %w", err)
 
 	err = setStrictMapping(info.ESClient, index)
-	require.NoError(t, err, "could not set strict mapping due to %w", err)
+	require.NoError(t, err, "could not set strict mapping due to %v", err)
 
 	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
@@ -1082,9 +1079,6 @@ func setStrictMapping(client *elasticsearch.Client, index string) error {
 		return fmt.Errorf("error getting elasticsearch endpoint: %v", err)
 	}
 
-	user := os.Getenv("ELASTICSEARCH_USERNAME")
-	pass := os.Getenv("ELASTICSEARCH_PASSWORD")
-
 	// Create a context
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -1099,7 +1093,6 @@ func setStrictMapping(client *elasticsearch.Client, index string) error {
 
 	// Set content type header
 	req.Header.Set("Content-Type", "application/json")
-	req.SetBasicAuth(user, pass)
 
 	resp, err := client.Perform(req)
 	if err != nil {
