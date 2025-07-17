@@ -45,7 +45,7 @@ func TestCoordinatorExpectedDiagnosticHooks(t *testing.T) {
 		"components-actual",
 		"state",
 		"otel",
-		"otel-final",
+		"otel-merged",
 	}
 
 	coord := &Coordinator{}

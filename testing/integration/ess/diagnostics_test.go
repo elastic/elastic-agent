@@ -48,7 +48,7 @@ var diagnosticsFiles = []string{
 	"local-config.yaml",
 	"mutex.pprof.gz",
 	"otel.yaml",
-	"otel-final.yaml",
+	"otel-merged.yaml",
 	"pre-config.yaml",
 	"local-config.yaml",
 	"state.yaml",
