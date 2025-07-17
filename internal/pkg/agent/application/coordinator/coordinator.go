@@ -1118,8 +1118,8 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			},
 		},
 		diagnostics.Hook{
-			Name:        "otel-final",
-			Filename:    "otel-final.yaml",
+			Name:        "otel-merged",
+			Filename:    "otel-merged.yaml",
 			Description: "Final otel configuration used by the Elastic Agent. Includes hybrid mode config and component config.",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
