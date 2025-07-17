@@ -44,6 +44,7 @@ else
   else
     JOB_ID=$(buildkite-agent meta-data get "ess.job")
   fi
+  echo "Using JOB_ID: ${JOB_ID}"
   export ELASTICSEARCH_HOST=$(buildkite-agent meta-data get "es.host" --job ${JOB_ID})
   export ELASTICSEARCH_USERNAME=$(buildkite-agent meta-data get "es.username" --job ${JOB_ID})
   export ELASTICSEARCH_PASSWORD=$(buildkite-agent meta-data get "es.pwd" --job ${JOB_ID})
