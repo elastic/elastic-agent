@@ -265,11 +265,18 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			// and reset the retry count
 			m.recoveryTimer.Stop()
 			m.recoveryRetries.Store(0)
-			err = m.handleConfigUpdate(cfgUpdate.collectorCfg, cfgUpdate.components)
+			mergedCfg, err := buildMergedConfig(cfgUpdate, m.agentInfo, m.beatMonitoringConfigGetter)
 			if err != nil {
 				reportErr(ctx, m.errCh, err)
 				continue
 			}
+
+			// this is the only place where we mutate the internal config attributes, take a write lock for the duration
+			m.mx.Lock()
+			m.mergedCollectorCfg = mergedCfg
+			m.collectorCfg = cfgUpdate.collectorCfg
+			m.components = cfgUpdate.components
+			m.mx.Unlock()
 
 			err = m.applyMergedConfig(ctx, collectorStatusCh, collectorRunErr)
 			// report the error unconditionally to indicate that the config was applied
@@ -289,32 +296,23 @@ func (m *OTelManager) Errors() <-chan error {
 	return m.errCh
 }
 
-// handleConfigUpdate processes collector and component configuration updates received through the updateCh.
-// This method updates the internal collector and component configurations and triggers a rebuild of the merged
-// configuration that combines them.
-func (m *OTelManager) handleConfigUpdate(cfg *confmap.Conf, components []component.Component) error {
-	m.collectorCfg = cfg
-	m.components = components
-	return m.updateMergedConfig()
-}
-
 // buildMergedConfig combines collector configuration with component-derived configuration.
-func (m *OTelManager) buildMergedConfig() (*confmap.Conf, error) {
+func buildMergedConfig(cfgUpdate configUpdate, agentInfo info.Agent, monitoringConfigGetter translate.BeatMonitoringConfigGetter) (*confmap.Conf, error) {
 	mergedOtelCfg := confmap.New()
 
 	// Generate component otel config if there are components
 	var componentOtelCfg *confmap.Conf
-	if len(m.components) > 0 {
-		model := &component.Model{Components: m.components}
+	if len(cfgUpdate.components) > 0 {
+		model := &component.Model{Components: cfgUpdate.components}
 		var err error
-		componentOtelCfg, err = translate.GetOtelConfig(model, m.agentInfo, m.beatMonitoringConfigGetter)
+		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, monitoringConfigGetter)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}
 	}
 
 	// If both configs are nil, return nil so the manager knows to stop the collector
-	if componentOtelCfg == nil && m.collectorCfg == nil {
+	if componentOtelCfg == nil && cfgUpdate.collectorCfg == nil {
 		return nil, nil
 	}
 
@@ -327,28 +325,14 @@ func (m *OTelManager) buildMergedConfig() (*confmap.Conf, error) {
 	}
 
 	// Merge with base collector config if it exists
-	if m.collectorCfg != nil {
-		err := mergedOtelCfg.Merge(m.collectorCfg)
+	if cfgUpdate.collectorCfg != nil {
+		err := mergedOtelCfg.Merge(cfgUpdate.collectorCfg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to merge collector otel config: %w", err)
 		}
 	}
 
 	return mergedOtelCfg, nil
-}
-
-// updateMergedConfig builds the merged configuration for the otel manager by merging the base collector configuration
-// with the component configuration, and updates the otel manager with the merged configuration.
-func (m *OTelManager) updateMergedConfig() error {
-	mergedCfg, err := m.buildMergedConfig()
-	if err != nil {
-		return err
-	}
-
-	m.mx.Lock()
-	defer m.mx.Unlock()
-	m.mergedCollectorCfg = mergedCfg
-	return nil
 }
 
 func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh chan *status.AggregateStatus, collectorRunErr chan error) error {
