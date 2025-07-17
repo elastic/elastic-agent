@@ -5,7 +5,7 @@ $env:BUILDKITE_MESSAGE = $env:BUILDKITE_MESSAGE.Substring(0, [System.Math]::Min(
 # When DRA is not creating the binaries, we can use the files
 # to override
 if (Test-Path -Path .beat-version) {
-    $beat_version = Get-Content -Path .agent-version -Raw
+    $beat_version = Get-Content -Path .beat-version -Raw
     $env:BEAT_VERSION = $beat_version.Trim()
 }
 
