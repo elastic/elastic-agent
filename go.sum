@@ -543,8 +543,8 @@ github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnec
 github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.4.0/go.mod h1:7WDRAi1Og4t400pyOOzjm9FtrOdufvRTOiUBbNC389Y=
 github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.4.0 h1:KAYWonds39o9JgywH2UfX1bwN3SBGuwTePSSX07SCt0=
 github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.4.0/go.mod h1:LhL6139qsKkm1HLvdS6SpaaH2JYEs6IV9tFm4fj3Z/8=
-github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.4.0 h1:/RaVOCdJjFcLVshu5XL/crKGFb1cjVV/jYQWpqrsbqs=
-github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.4.0/go.mod h1:NbdjpM601OGL+vygiO72dB+Muh8EJd0WsQRQNjTdJZg=
+github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.5.0 h1:ZMa57/H3ZXC1vkxoXAWP7zPW83NLi672LvxXI0p1fWM=
+github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.5.0/go.mod h1:7nkWdi3b6ncwuEFZzYmzqX56+V2Qzb5x6jX+DfnQSWI=
 github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced h1:XcWi/S3OoeE5Qwmj381AoO3nr3AVXl4Z4QO0mqyjlzU=
 github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced/go.mod h1:8e9NcGfE2xeor8r+WV9a+hKBEkzJEDnqZN7tqb3GUe8=
 github.com/elastic/opentelemetry-collector-components/internal/testutil v0.0.0-20250613082151-282de5af1c9b h1:NWuTKdMCJlU9ehRH8V0w1Kk1QI5Vn+9OcJWIO9wI+pE=
@@ -1170,8 +1170,8 @@ github.com/onsi/gomega v1.7.1/go.mod h1:XdKZgCCFLUoM/7CFJVPcG8C1xQ1AJ0vpAezJrB7J
 github.com/onsi/gomega v1.10.1/go.mod h1:iN09h71vgCQne3DLsj+A5owkum+a2tYe+TOCB1ybHNo=
 github.com/onsi/gomega v1.36.1 h1:bJDPBO7ibjxcbHMgSCoo4Yj18UWbKDlLwX1x9sybDcw=
 github.com/onsi/gomega v1.36.1/go.mod h1:PvZbdDc8J6XJEpDK4HCuRBm8a6Fzp9/DmhC9C7yFlog=
-github.com/open-telemetry/opamp-go v0.19.1-0.20250423191708-8d78a5169350 h1:W+DzUrFsc2tzZH8h+oIwno9rXV0hskXsR2dGNZ3LXPQ=
-github.com/open-telemetry/opamp-go v0.19.1-0.20250423191708-8d78a5169350/go.mod h1:/ks8JtVfx2wtZINPRTp/IxaGoMFAB6Uberx1Jcaur6M=
+github.com/open-telemetry/opamp-go v0.20.0 h1:GV4KbQVlRWBorvVm/a9WT9BuWhLHQfpmf0iSe/og5AY=
+github.com/open-telemetry/opamp-go v0.20.0/go.mod h1:/ks8JtVfx2wtZINPRTp/IxaGoMFAB6Uberx1Jcaur6M=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.130.0 h1:xURf0/x3v+HYru6dqUjbK6lfMf72UQQqIUZv7mOKf3k=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.130.0/go.mod h1:9/Rb9amgOpqTW6oO9UY5iBbeYeWdkZAaatIbCfxDkqY=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/signaltometricsconnector v0.130.0 h1:XBWumNqTjEEhAgr9lyHmPiUaj8O1nTPzP45QYgdKCiw=

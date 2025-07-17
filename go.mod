@@ -28,7 +28,7 @@ require (
 	github.com/elastic/mock-es v0.0.0-20250324153755-573fc6c0ac4b
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.4.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.4.0
-	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.4.0
+	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.5.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.16.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.9.0
 	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.2.0
@@ -520,7 +520,7 @@ require (
 	github.com/nxadm/tail v1.4.11 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
-	github.com/open-telemetry/opamp-go v0.19.1-0.20250423191708-8d78a5169350 // indirect
+	github.com/open-telemetry/opamp-go v0.20.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/signaltometricsconnector v0.130.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.130.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer v0.130.0 // indirect
