@@ -10,12 +10,21 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/rand"
+	"encoding/json"
+	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/elastic/elastic-agent/pkg/utils"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -53,7 +62,13 @@ func TestPerformComponentDiagnostics(t *testing.T) {
 
 	diags, err := m.PerformComponentDiagnostics(context.Background(), nil)
 	require.NoError(t, err)
-	assert.Equal(t, expectedDiags, diags)
+	for i, d := range diags {
+		assert.Equal(t, expectedDiags[i].Component.ID, d.Component.ID)
+		// we should have errors set about not being able to connect to monitoring endpoints
+		require.NotNil(t, d.Err)
+		assert.ErrorContains(t, d.Err, "failed to get beat metrics")
+		assert.ErrorContains(t, d.Err, "failed to get input metrics")
+	}
 }
 
 func TestPerformDiagnostics(t *testing.T) {
@@ -107,6 +122,70 @@ func TestPerformDiagnostics(t *testing.T) {
 		}
 		diags := m.PerformDiagnostics(t.Context(), req)
 		assert.Equal(t, expectedDiags, diags)
+	})
+}
+
+func TestBeatMetrics(t *testing.T) {
+	setTemporaryAgentPath(t)
+	logger, obs := loggertest.New("test")
+	compID := "filebeat-comp-1"
+
+	filebeatComp := testComponent(compID)
+	filebeatComp.InputSpec.Spec.Command.Args = []string{"filebeat"}
+
+	m := &OTelManager{
+		logger:     logger,
+		components: []component.Component{filebeatComp},
+	}
+	expectedMetricData, err := json.MarshalIndent(map[string]any{"test": "test"}, "", "  ")
+	require.NoError(t, err)
+
+	fileName := strings.TrimPrefix(monitoring.BeatsMonitoringEndpoint(compID), fmt.Sprintf("%s://", utils.SocketScheme))
+	err = os.MkdirAll(filepath.Dir(fileName), 0o755)
+	require.NoError(t, err)
+
+	listener, err := net.Listen("unix", fileName)
+	require.NoError(t, err)
+	server := http.Server{
+		ReadHeaderTimeout: time.Second, // needed to silence gosec
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, wErr := w.Write(expectedMetricData)
+			require.NoError(t, wErr)
+		})}
+	go func() {
+		sErr := server.Serve(listener)
+		assert.ErrorIs(t, sErr, http.ErrServerClosed)
+	}()
+	t.Cleanup(func() {
+		cErr := server.Close()
+		assert.NoError(t, cErr)
+	})
+
+	diags, err := m.PerformComponentDiagnostics(context.Background(), nil)
+	require.NoError(t, err)
+	assert.Len(t, obs.All(), 1) // one debug log line about the registry
+	assert.Len(t, diags, 1)
+
+	diag := diags[0]
+	assert.Equal(t, filebeatComp, diag.Component)
+	assert.Len(t, diag.Results, 3) // two metrics diagnostics and one filebeat registry
+
+	t.Run("beat metrics", func(t *testing.T) {
+		beatMetrics := diag.Results[0]
+		assert.Equal(t, "beat_metrics", beatMetrics.Name)
+		assert.Equal(t, "Metrics from the default monitoring namespace and expvar.", beatMetrics.Description)
+		assert.Equal(t, "beat_metrics.json", beatMetrics.Filename)
+		assert.Equal(t, "application/json", beatMetrics.ContentType)
+		assert.Equal(t, expectedMetricData, beatMetrics.Content)
+	})
+
+	t.Run("input metrics", func(t *testing.T) {
+		inputMetrics := diag.Results[1]
+		assert.Equal(t, "input_metrics", inputMetrics.Name)
+		assert.Equal(t, "Metrics from active inputs.", inputMetrics.Description)
+		assert.Equal(t, "input_metrics.json", inputMetrics.Filename)
+		assert.Equal(t, "application/json", inputMetrics.ContentType)
+		assert.Equal(t, expectedMetricData, inputMetrics.Content)
 	})
 }
 

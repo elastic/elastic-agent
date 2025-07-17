@@ -324,6 +324,14 @@ agent.monitoring.enabled: false
 	var filebeatSetup = map[string]integrationtest.ComponentState{
 		"filestream-default": {
 			State: integrationtest.NewClientState(client.Healthy),
+			Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
+				integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "filestream-default"}: {
+					State: integrationtest.NewClientState(client.Healthy),
+				},
+				integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "filestream-default-filestream-filebeat"}: {
+					State: integrationtest.NewClientState(client.Healthy),
+				},
+			},
 		},
 	}
 
@@ -351,10 +359,14 @@ agent.monitoring.enabled: false
 			expectedAgentState: integrationtest.NewClientState(client.Healthy),
 		},
 		{
-			name:                         "filebeat container",
-			runtime:                      "otel",
-			expectedCompDiagnosticsFiles: []string{"registry.tar.gz"},
-			expectedAgentState:           integrationtest.NewClientState(client.Degraded),
+			name:    "filebeat container",
+			runtime: "otel",
+			expectedCompDiagnosticsFiles: []string{
+				"registry.tar.gz",
+				"beat_metrics.json",
+				"input_metrics.json",
+			},
+			expectedAgentState: integrationtest.NewClientState(client.Degraded),
 		},
 	}
 
@@ -385,6 +397,7 @@ agent.monitoring.enabled: false
 			err = f.Run(ctx, integrationtest.State{
 				Configure:  configBuffer.String(),
 				AgentState: tc.expectedAgentState,
+				Components: filebeatSetup,
 				After:      testDiagnosticsFactory(t, filebeatSetup, diagnosticsFiles, tc.expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
 			})
 			assert.NoError(t, err)
