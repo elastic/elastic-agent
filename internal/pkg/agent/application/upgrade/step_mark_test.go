@@ -269,7 +269,7 @@ func TestMarkUpgrade(t *testing.T) {
 	var parsed456SNAPSHOT = agtversion.NewParsedSemVer(4, 5, 6, "SNAPSHOT", "")
 
 	// fix a timestamp (truncated to the second because of loss of precision during marshalling/unmarshalling)
-	updatedOnNow := time.Now().Truncate(time.Second)
+	updatedOnNow := time.Now().UTC().Truncate(time.Second)
 
 	type args struct {
 		updatedOn      time.Time
