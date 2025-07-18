@@ -20,13 +20,15 @@ import (
 const AcquiredLockLogFmt = "Acquired lock on file %s\n"
 
 const lockFileFlagName = "lockfile"
+const ignoreSignalFlagName = "ignoresignals"
 
 var lockFile = flag.String(lockFileFlagName, "", "path to lock file")
+var ignoreSignals = flag.Bool(ignoreSignalFlagName, false, "ignore signals")
 
 func main() {
 
 	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
 
 	flag.Parse()
 	if *lockFile == "" {
@@ -49,6 +51,14 @@ func main() {
 
 	log.Printf(AcquiredLockLogFmt, *lockFile)
 
-	s := <-signalCh
-	log.Printf("Received signal: %s, exiting", s.String())
+	for {
+		s := <-signalCh
+		if *ignoreSignals {
+			log.Printf("Received signal: %s, ignoring it...", s.String())
+			continue
+		}
+
+		log.Printf("Received signal: %s, exiting", s.String())
+		break
+	}
 }
