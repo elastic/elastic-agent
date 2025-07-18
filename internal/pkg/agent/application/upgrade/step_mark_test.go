@@ -7,6 +7,7 @@ package upgrade
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -292,6 +293,12 @@ func TestMarkUpgrade(t *testing.T) {
 		{
 			name: "error writing update marker - check error",
 			setupBeforeMark: func(t *testing.T, dataDir string) {
+
+				// read-only permissions on directories don't work on windows, skip
+				if runtime.GOOS == "windows" {
+					t.Skip("skipping test on windows since readonly permissions on directory don't work")
+				}
+
 				err := os.Chmod(dataDir, 0555)
 				require.NoError(t, err, "error setting dataDir read-only")
 			},
