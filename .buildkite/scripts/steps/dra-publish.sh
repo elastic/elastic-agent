@@ -2,19 +2,18 @@
 
 set -euo pipefail
 
-DRY_RUN="${DRA_DRY_RUN:=""}"
 WORKFLOW="${DRA_WORKFLOW:=""}"
 COMMIT="${DRA_COMMIT:="${BUILDKITE_COMMIT:=""}"}"
 BRANCH="${DRA_BRANCH:="${BUILDKITE_BRANCH:=""}"}"
 PACKAGE_VERSION="${DRA_VERSION:="${BEAT_VERSION:=""}"}"
 VERSION_QUALIFIER="${VERSION_QUALIFIER:=""}"
 
-# force main branch on PR's or it won't execute
-# because the PR branch does not have a project folder in release-manager
-if [[ "${BUILDKITE_PULL_REQUEST:="false"}" != "false" ]]; then
-    BRANCH=main
-    DRY_RUN="--dry-run"
-    echo "+++ Running in PR and setting branch main and --dry-run"
+if [[ "${DRA_DRY_RUN:="false"}" == "true" ]]; then
+  echo "~~~ Running in dry-run mode -- will NOT publish artifacts"
+  DRY_RUN="--dry-run"
+else
+  echo "~~~ Running in publish mode"
+  DRY_RUN=""
 fi
 
 if [[ -z "${WORKFLOW}" ]]; then
