@@ -58,8 +58,7 @@ var getK8sClientFunc = func(kubeconfig string, opt kubernetes.KubeClientOptions)
 func (p *contextProvider) Run(ctx context.Context, comm corecomp.ContextProviderComm) error {
 	client, err := getK8sClientFunc(p.config.KubeConfig, p.config.KubeClientOptions)
 	if err != nil {
-		p.logger.Debugf("Kubernetes leaderelection provider skipped, unable to connect: %s", err)
-		return nil
+		return fmt.Errorf("Kubernetes leader election provider skipped, unable to connect: %w", err)
 	}
 
 	agentInfo, err := info.NewAgentInfo(ctx, false)
