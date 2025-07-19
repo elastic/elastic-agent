@@ -8,11 +8,17 @@ set -euo pipefail
 DOCKER_VARIANTS="${DOCKER_VARIANTS:-basic,wolfi,complete,complete-wolfi,service,cloud}"
 CLUSTER_NAME="${K8S_VERSION}-kubernetes"
 
-if [[ -z "${AGENT_VERSION:-}" ]]; then
-  # If not specified, use the version in version/version.go
+if [[ -f "${WORKSPACE}/.package-version" ]]; then
+  AGENT_VERSION="$(jq -r '.version' .package-version)"
+  echo "~~~ Agent version: ${AGENT_VERSION} (from .package-version)"
+else
   AGENT_VERSION="$(grep "const defaultBeatVersion =" version/version.go | cut -d\" -f2)"
   AGENT_VERSION="${AGENT_VERSION}-SNAPSHOT"
+  echo "~~~ Agent version: ${AGENT_VERSION} (from version/version.go)"
 fi
+
+export AGENT_VERSION
+echo "~~~ Agent version: ${AGENT_VERSION}"
 
 echo "~~~ Create kind cluster '${CLUSTER_NAME}'"
 kind create cluster --image  "kindest/node:${K8S_VERSION}" --name "${CLUSTER_NAME}" --wait 60s --config - <<EOF
