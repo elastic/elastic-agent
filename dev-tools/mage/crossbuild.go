@@ -5,6 +5,7 @@
 package mage
 
 import (
+	"context"
 	"fmt"
 	"go/build"
 	"log"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
+	"go.opentelemetry.io/otel"
 
 	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
@@ -131,7 +133,10 @@ type crossBuildParams struct {
 }
 
 // CrossBuild executes a given build target once for each target platform.
-func CrossBuild(options ...CrossBuildOption) error {
+func CrossBuild(ctx context.Context, options ...CrossBuildOption) error {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "CrossBuild")
+	defer span.End()
+
 	fmt.Println("--- CrossBuild Elastic-Agent")
 	params := crossBuildParams{Platforms: Platforms, Target: defaultCrossBuildTarget, ImageSelector: CrossBuildImage}
 	for _, opt := range options {
@@ -176,7 +181,7 @@ func CrossBuild(options ...CrossBuildOption) error {
 	}
 
 	// Build the magefile for Linux, so we can run it inside the container.
-	mg.Deps(buildMage)
+	mg.CtxDeps(ctx, buildMage)
 
 	log.Println("crossBuild: Platform list =", params.Platforms)
 	var deps []interface{}
@@ -186,7 +191,7 @@ func CrossBuild(options ...CrossBuildOption) error {
 		}
 		builder := GolangCrossBuilder{buildPlatform.Name, params.Target, params.InDir, params.ImageSelector}
 		if params.Serial {
-			if err := builder.Build(); err != nil {
+			if err := builder.Build(ctx); err != nil {
 				return fmt.Errorf("failed cross-building target=%s for platform=%s: %w",
 					params.Target, buildPlatform.Name, err)
 			}
@@ -196,7 +201,7 @@ func CrossBuild(options ...CrossBuildOption) error {
 	}
 
 	// Each build runs in parallel.
-	Parallel(deps...)
+	ParallelCtx(ctx, deps...)
 
 	return nil
 }
@@ -207,13 +212,16 @@ func CrossBuild(options ...CrossBuildOption) error {
 func CrossBuildXPack(options ...CrossBuildOption) error {
 	o := []CrossBuildOption{InDir("x-pack", BeatName)}
 	o = append(o, options...)
-	return CrossBuild(o...)
+	return CrossBuild(context.TODO(), o...)
 }
 
 // buildMage pre-compiles the magefile to a binary using the GOARCH parameter.
 // It has the benefit of speeding up the build because the
 // mage -compile is done only once rather than in each Docker container.
-func buildMage() error {
+func buildMage(ctx context.Context) error {
+	ctx, span := otel.Tracer("my-service").Start(ctx, "buildMage")
+	defer span.End()
+
 	arch := runtime.GOARCH
 	return sh.RunWith(map[string]string{"CGO_ENABLED": "0"}, "mage", "-f", "-goos=linux", "-goarch="+arch,
 		"-compile", CreateDir(filepath.Join("build", "mage-linux-"+arch)))
@@ -266,7 +274,10 @@ type GolangCrossBuilder struct {
 }
 
 // Build executes the build inside of Docker.
-func (b GolangCrossBuilder) Build() error {
+func (b GolangCrossBuilder) Build(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "GolangCrossBuilder.Build")
+	defer span.End()
+
 	fmt.Printf(">> %v: Building for %v\n", b.Target, b.Platform)
 
 	repoInfo, err := GetProjectRepoInfo()
@@ -325,7 +336,7 @@ func (b GolangCrossBuilder) Build() error {
 	if CrossBuildMountModcache {
 		// Mount $GOPATH/pkg/mod into the container, read-only.
 		hostDir := filepath.Join(build.Default.GOPATH, "pkg", "mod")
-		args = append(args, "-v", hostDir+":/go/pkg/mod:ro")
+		args = append(args, "-v", hostDir+":/go/pkg/mod")
 	}
 
 	if !ExternalBuild {
@@ -338,7 +349,6 @@ func (b GolangCrossBuilder) Build() error {
 
 	args = append(args,
 		"--rm",
-		"--env", "GOFLAGS=-mod=readonly",
 		"--env", "MAGEFILE_VERBOSE="+verbose,
 		"--env", "MAGEFILE_TIMEOUT="+EnvOr("MAGEFILE_TIMEOUT", ""),
 		"--env", fmt.Sprintf("SNAPSHOT=%v", Snapshot),

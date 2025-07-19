@@ -8,7 +8,7 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"bytes"
-	"compress/gzip"
+	"context"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -25,8 +25,10 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/klauspost/compress/gzip"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
+	"go.opentelemetry.io/otel"
 	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
@@ -297,16 +299,19 @@ func (typ PackageType) PackagingDir(home string, target BuildPlatform, spec Pack
 }
 
 // Build builds a package based on the provided spec.
-func (typ PackageType) Build(spec PackageSpec) error {
+func (typ PackageType) Build(ctx context.Context, spec PackageSpec) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "PackageType.Build")
+	defer span.End()
+
 	switch typ {
 	case RPM:
-		return PackageRPM(spec)
+		return PackageRPM(ctx, spec)
 	case Deb:
-		return PackageDeb(spec)
+		return PackageDeb(ctx, spec)
 	case Zip:
 		return PackageZip(spec)
 	case TarGz:
-		return PackageTarGz(spec)
+		return PackageTarGz(ctx, spec)
 	case Docker:
 		return PackageDocker(spec)
 	default:
@@ -645,8 +650,10 @@ func PackageZip(spec PackageSpec) error {
 	return nil
 }
 
-// PackageTarGz packages a gzipped tar file.
-func PackageTarGz(spec PackageSpec) error {
+func PackageTarGz(ctx context.Context, spec PackageSpec) error {
+		ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "PackageTarGz")
+		defer span.End()
+
 	// Create a buffer to write our archive to.
 	buf := new(bytes.Buffer)
 
@@ -749,16 +756,25 @@ func PackageTarGz(spec PackageSpec) error {
 }
 
 // PackageDeb packages a deb file. This requires Docker to execute FPM.
-func PackageDeb(spec PackageSpec) error {
-	return runFPM(spec, Deb)
+func PackageDeb(ctx context.Context, spec PackageSpec) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "PackageDeb")
+	defer span.End()
+
+	return runFPM(ctx, spec, Deb)
 }
 
 // PackageRPM packages a RPM file. This requires Docker to execute FPM.
-func PackageRPM(spec PackageSpec) error {
-	return runFPM(spec, RPM)
+func PackageRPM(ctx context.Context, spec PackageSpec) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "PackageRPM")
+	defer span.End()
+
+	return runFPM(ctx, spec, RPM)
 }
 
-func runFPM(spec PackageSpec, packageType PackageType) error {
+func runFPM(ctx context.Context, spec PackageSpec, packageType PackageType) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "runFPM")
+	defer span.End()
+
 	var fpmPackageType string
 	switch packageType {
 	case RPM, Deb:
@@ -774,7 +790,7 @@ func runFPM(spec PackageSpec, packageType PackageType) error {
 	// Build a tar file as the input to FPM.
 	inputTar := filepath.Join(distributionsDir, "tmp-"+fpmPackageType+"-"+spec.rootDir()+"-"+spec.hash()+".tar.gz")
 	spec.OutputFile = inputTar
-	if err := PackageTarGz(spec); err != nil {
+	if err := PackageTarGz(ctx, spec); err != nil {
 		return err
 	}
 	defer os.Remove(inputTar)

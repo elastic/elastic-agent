@@ -33,7 +33,7 @@ func TestGetSnapshotArtifactVersion(t *testing.T) {
 
 		mockURL := mockServer.URL + "/beats/latest/8.8.3-SNAPSHOT.json"
 		artifactsSnapshot := newArtifactsSnapshotCustom(mockURL)
-		version, err := artifactsSnapshot.GetSnapshotArtifactVersion("beats", "8.8.3-SNAPSHOT")
+		version, err := artifactsSnapshot.GetSnapshotArtifactVersion(t.Context(), "beats", "8.8.3-SNAPSHOT")
 		assert.NoError(t, err, "Expected no error")
 		assert.Equal(t, "8.8.3-b1d8691a-SNAPSHOT", version, "Expected version to match")
 	})
@@ -54,7 +54,7 @@ func TestGetSnapshotArtifactVersion(t *testing.T) {
 
 		mockURL := mockServer.URL + "/beats/latest/8.8.3-SNAPSHOT.json"
 		artifactsSnapshot := newArtifactsSnapshotCustom(mockURL)
-		version, err := artifactsSnapshot.GetSnapshotArtifactVersion("beats", "8.8.3-SNAPSHOT")
+		version, err := artifactsSnapshot.GetSnapshotArtifactVersion(t.Context(), "beats", "8.8.3-SNAPSHOT")
 		assert.ErrorContains(t, err, "could not parse the response body")
 		assert.Empty(t, version)
 	})
@@ -75,7 +75,7 @@ func TestGetSnapshotArtifactVersion(t *testing.T) {
 
 		mockURL := mockServer.URL + "/beats/latest/8.8.3-SNAPSHOT.json"
 		artifactsSnapshot := newArtifactsSnapshotCustom(mockURL)
-		version, err := artifactsSnapshot.GetSnapshotArtifactVersion("beats", "8.8.3-SNAPSHOT")
+		version, err := artifactsSnapshot.GetSnapshotArtifactVersion(t.Context(), "beats", "8.8.3-SNAPSHOT")
 		assert.ErrorContains(t, err, "could not parse the build_id")
 		assert.ErrorContains(t, err, "bd8691a")
 		assert.Empty(t, version)
@@ -121,8 +121,8 @@ func TestArtifactsSnapshotResolver(t *testing.T) {
 		server := httptest.NewServer(mockHandler)
 		defer server.Close()
 
-		urlResolver := newCustomSnapshotURLResolver("auditbeat-8.9.0-SNAPSHOT-amd64.deb", "auditbeat", "beats", "8.9.0-SNAPSHOT", server.URL)
-		url, shaUrl, err := urlResolver.Resolve()
+		urlResolver := newCustomSnapshotURLResolver(t.Context(), "auditbeat-8.9.0-SNAPSHOT-amd64.deb", "auditbeat", "beats", "8.9.0-SNAPSHOT", server.URL)
+		url, shaUrl, err := urlResolver.Resolve(t.Context())
 		assert.Equal(t, "https://artifacts-snapshot.elastic.co/auditbeat-8.9.0-SNAPSHOT-amd64.deb", url)
 		assert.Equal(t, "https://artifacts-snapshot.elastic.co/auditbeat-8.9.0-SNAPSHOT-amd64.deb.sha512", shaUrl)
 		assert.NoError(t, err, "Expected no error")

@@ -34,7 +34,15 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	otelCodes "go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/trace"
+	trace2 "go.opentelemetry.io/otel/trace"
+
+	otelmage "github.com/elastic/elastic-agent/dev-tools/mage/otel"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/otiai10/copy"
@@ -203,6 +211,77 @@ func CheckNoChanges() error {
 	return nil
 }
 
+// setupOTelSDK bootstraps the OpenTelemetry pipeline.
+// If it does not return an error, make sure to call shutdown for proper cleanup.
+func setupOTelSDK(ctx context.Context) (shutdown func(context.Context) error, err error) {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "setupOTelSDK")
+	defer span.End()
+	defer func() {
+		if err != nil {
+			span.SetStatus(otelCodes.Error, "error")
+			span.RecordError(err)
+		}
+	}()
+
+	var shutdownFuncs []func(context.Context) error
+
+	// shutdown calls cleanup functions registered via shutdownFuncs.
+	// The errors from the calls are joined.
+	// Each registered cleanup will be invoked once.
+	shutdown = func(ctx context.Context) error {
+		ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "anonymous")
+		defer span.End()
+
+		var err error
+		for _, fn := range shutdownFuncs {
+			err = errors.Join(err, fn(ctx))
+		}
+		shutdownFuncs = nil
+		return err
+	}
+
+	// handleErr calls shutdown for cleanup and makes sure that all errors are returned.
+	handleErr := func(inErr error) {
+		err = errors.Join(inErr, shutdown(ctx))
+	}
+
+	// Set up propagator.
+	prop := newPropagator()
+	otel.SetTextMapPropagator(prop)
+
+	// Set up trace provider.
+	tracerProvider, err := newTracerProvider()
+	if err != nil {
+		handleErr(err)
+		return
+	}
+	shutdownFuncs = append(shutdownFuncs, tracerProvider.Shutdown)
+	otel.SetTracerProvider(tracerProvider)
+
+	return
+}
+
+func newPropagator() propagation.TextMapPropagator {
+	return propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	)
+}
+
+func newTracerProvider() (*trace.TracerProvider, error) {
+	traceExporter, err := otlptracehttp.New(context.TODO())
+	if err != nil {
+		return nil, err
+	}
+
+	tracerProvider := trace.NewTracerProvider(
+		trace.WithBatcher(traceExporter,
+			// Default is 5s. Set to 1s for demonstrative purposes.
+			trace.WithBatchTimeout(time.Second)),
+	)
+	return tracerProvider, nil
+}
+
 // Env returns information about the environment.
 func (Prepare) Env() {
 	mg.Deps(Mkdir("build"), Build.GenerateConfig)
@@ -221,7 +300,10 @@ func (Dev) Build() {
 }
 
 // Package bundles the agent binary with DEV flag set.
-func (Dev) Package(ctx context.Context) {
+func (Dev) Package(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Dev.Package")
+	defer span.End()
+
 	dev := os.Getenv(devEnv)
 	defer os.Setenv(devEnv, dev)
 
@@ -232,7 +314,7 @@ func (Dev) Package(ctx context.Context) {
 	}
 
 	devtools.DevBuild = true
-	Package(ctx)
+	return Package(ctx)
 }
 
 func mocksPath() (string, error) {
@@ -502,6 +584,9 @@ func (Test) All() {
 
 // Unit runs all the unit tests.
 func (Test) Unit(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Test.Unit")
+	defer span.End()
+
 	mg.Deps(Prepare.Env, Build.TestBinaries)
 	params := devtools.DefaultGoTestUnitArgs()
 	return devtools.GoTest(ctx, params)
@@ -509,6 +594,9 @@ func (Test) Unit(ctx context.Context) error {
 
 // FIPSOnlyUnit runs all the unit tests with GODEBUG=fips140=only.
 func (Test) FIPSOnlyUnit(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Test.FIPSOnlyUnit")
+	defer span.End()
+
 	mg.Deps(Prepare.Env, Build.TestBinaries)
 	params := devtools.DefaultGoTestUnitArgs()
 	params.Env["GODEBUG"] = "fips140=only"
@@ -563,6 +651,22 @@ func AssembleDarwinUniversal() error {
 // Use PLATFORMS to control the target platforms.
 // Use VERSION_QUALIFIER to control the version qualifier.
 func Package(ctx context.Context) error {
+	shutdown, otelErr := setupOTelSDK(ctx)
+	if otelErr != nil {
+		return otelErr
+	}
+	defer func() {
+		if sErr := shutdown(ctx); sErr != nil {
+			panic(sErr)
+		}
+	}()
+
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Package", trace2.WithAttributes(attribute.KeyValue{
+		Key:   "service.name",
+		Value: attribute.StringValue("elastic-agent-mage"),
+	}))
+	defer span.End()
+
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
@@ -596,6 +700,9 @@ func Package(ctx context.Context) error {
 
 // DownloadManifest downloads the provided manifest file into the predefined folder and downloads all components in the manifest.
 func DownloadManifest(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "DownloadManifest")
+	defer span.End()
+
 	fmt.Println("--- Downloading manifest")
 	start := time.Now()
 	defer func() { fmt.Println("Downloading manifest took", time.Since(start)) }()
@@ -806,11 +913,17 @@ func commitID() string {
 }
 
 // Update is an alias for executing control protocol, configs, and specs.
-func Update() {
-	mg.Deps(Config, BuildPGP, BuildFleetCfg)
+func Update(ctx context.Context) {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Update")
+	defer span.End()
+
+	mg.CtxDeps(ctx, Config, BuildPGP, BuildFleetCfg)
 }
 
-func EnsureCrossBuildOutputDir() error {
+func EnsureCrossBuildOutputDir(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "EnsureCrossBuildOutputDir")
+	defer span.End()
+
 	repositoryRoot, err := findRepositoryRoot()
 	if err != nil {
 		return fmt.Errorf("finding repository root: %w", err)
@@ -819,9 +932,12 @@ func EnsureCrossBuildOutputDir() error {
 }
 
 // CrossBuild cross-builds the beat for all target platforms.
-func CrossBuild() error {
-	mg.Deps(EnsureCrossBuildOutputDir)
-	return devtools.CrossBuild()
+func CrossBuild(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "CrossBuild")
+	defer span.End()
+
+	mg.CtxDeps(ctx, EnsureCrossBuildOutputDir)
+	return devtools.CrossBuild(ctx)
 }
 
 // PackageAgentCore cross-builds and packages distribution artifacts containing
@@ -838,8 +954,11 @@ func PackageAgentCore() {
 }
 
 // Config generates both the short/reference/docker.
-func Config() {
-	mg.Deps(configYML)
+func Config(ctx context.Context) {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Config")
+	defer span.End()
+
+	mg.CtxDeps(ctx, configYML)
 }
 
 // ControlProto generates pkg/agent/control/proto module.
@@ -874,8 +993,11 @@ func BuildPGP() error {
 	return RunGo("run", goF, "--in", in, "--output", out)
 }
 
-func configYML() error {
-	return devtools.Config(devtools.AllConfigTypes, ConfigFileParams(), ".")
+func configYML(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "configYML")
+	defer span.End()
+
+	return devtools.Config(ctx, devtools.AllConfigTypes, ConfigFileParams(), ".")
 }
 
 // ConfigFileParams returns the parameters for generating OSS config.
@@ -912,6 +1034,9 @@ func BuildFleetCfg() error {
 
 // Enroll runs agent which enrolls before running.
 func (Demo) Enroll(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Demo.Enroll")
+	defer span.End()
+
 	env := map[string]string{
 		"FLEET_ENROLL": "1",
 	}
@@ -920,6 +1045,9 @@ func (Demo) Enroll(ctx context.Context) error {
 
 // NoEnroll runs agent which does not enroll before running.
 func (Demo) NoEnroll(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Demo.NoEnroll")
+	defer span.End()
+
 	env := map[string]string{
 		"FLEET_ENROLL": "0",
 	}
@@ -928,6 +1056,9 @@ func (Demo) NoEnroll(ctx context.Context) error {
 
 // Image builds a cloud image
 func (Cloud) Image(ctx context.Context) {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Cloud.Image")
+	defer span.End()
+
 	platforms := os.Getenv(platformsEnv)
 	defer os.Setenv(platformsEnv, platforms)
 
@@ -1103,6 +1234,9 @@ func getVersion() string {
 }
 
 func runAgent(ctx context.Context, env map[string]string) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "runAgent")
+	defer span.End()
+
 	prevPlatforms := os.Getenv("PLATFORMS")
 	defer os.Setenv("PLATFORMS", prevPlatforms)
 
@@ -1178,6 +1312,9 @@ func runAgent(ctx context.Context, env map[string]string) error {
 }
 
 func packageAgent(ctx context.Context, platforms []string, dependenciesVersion string, manifestResponse *manifest.Build, agentPackaging, agentBinaryTarget mg.Fn, packageTypes []mage.PackageType) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "packageAgent")
+	defer span.End()
+
 	fmt.Println("--- Package Elastic-Agent")
 
 	if mg.Verbose() {
@@ -1185,7 +1322,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	}
 
 	log.Println("--- Running packaging function")
-	mg.Deps(agentPackaging)
+	mg.CtxDeps(ctx, agentPackaging)
 
 	dependencies, err := ExtractComponentsFromSelectedPkgSpecs(devtools.Packages)
 	if err != nil {
@@ -1197,7 +1334,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	}
 
 	// download/copy all the necessary dependencies for packaging elastic-agent
-	archivePath, dropPath, dependencies := collectPackageDependencies(platforms, dependenciesVersion, packageTypes, dependencies)
+	archivePath, dropPath, dependencies := collectPackageDependencies(ctx, platforms, dependenciesVersion, packageTypes, dependencies)
 
 	// cleanup after build
 	defer os.RemoveAll(archivePath)
@@ -1213,19 +1350,19 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	defer os.RemoveAll(flatPath)
 
 	// extract all dependencies from their archives into flat dir
-	flattenDependencies(platforms, dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse, dependencies)
+	flattenDependencies(ctx, platforms, dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse, dependencies)
 
 	// package agent
 	log.Println("--- Running post packaging ")
-	mg.Deps(Update)
-	mg.Deps(agentBinaryTarget)
+	mg.CtxDeps(ctx, Update)
+	mg.CtxDeps(ctx, agentBinaryTarget)
 
 	// compile the elastic-agent.exe proxy binary for the windows archive
 	if slices.Contains(platforms, "windows/amd64") {
 		mg.Deps(Build.WindowsArchiveRootBinary)
 	}
 
-	mg.SerialDeps(devtools.Package, TestPackages)
+	mg.SerialCtxDeps(ctx, devtools.Package, TestPackages)
 	return nil
 }
 
@@ -1234,7 +1371,10 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 // NOTE: after the build is done the caller must:
 // - delete archivePath and dropPath contents
 // - unset AGENT_DROP_PATH environment variable
-func collectPackageDependencies(platforms []string, packageVersion string, packageTypes []devtools.PackageType, dependencies []packaging.BinarySpec) (archivePath, dropPath string, d []packaging.BinarySpec) {
+func collectPackageDependencies(ctx context.Context, platforms []string, packageVersion string, packageTypes []devtools.PackageType, dependencies []packaging.BinarySpec) (archivePath, dropPath string, d []packaging.BinarySpec) {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "collectPackageDependencies")
+	defer span.End()
+
 	dropPath, found := os.LookupEnv(agentDropPath)
 
 	// try not to shadow too many variables
@@ -1252,7 +1392,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 		if mg.Verbose() {
 			log.Printf(">> Creating drop-in folder %+v \n", dropPath)
 		}
-		archivePath = movePackagesToArchive(dropPath, platforms, packageVersion, dependencies)
+		archivePath = movePackagesToArchive(ctx, dropPath, platforms, packageVersion, dependencies)
 
 		os.Setenv(agentDropPath, dropPath)
 
@@ -1271,7 +1411,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 			// Change this to InfoLevel to see exactly what the downloader is doing.
 			downloads.LogLevel.Set(downloads.FatalLevel)
 
-			errGroup, ctx := errgroup.WithContext(context.Background())
+			errGroup, ctx := errgroup.WithContext(ctx)
 			completedDownloads := &atomic.Int32{}
 
 			for _, spec := range dependencies {
@@ -1384,7 +1524,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 			}
 		}
 	} else {
-		archivePath = movePackagesToArchive(dropPath, platforms, packageVersion, dependencies)
+		archivePath = movePackagesToArchive(ctx, dropPath, platforms, packageVersion, dependencies)
 	}
 	return archivePath, dropPath, dependencies
 }
@@ -1412,7 +1552,10 @@ func removePythonWheels(matches []string, version string, dependencies []packagi
 
 // flattenDependencies will extract all the required packages collected in archivePath and dropPath in flatPath and
 // regenerate checksums
-func flattenDependencies(platforms []string, dependenciesVersion, archivePath, dropPath, flatPath string, manifestResponse *manifest.Build, dependencies []packaging.BinarySpec) {
+func flattenDependencies(ctx context.Context, platforms []string, dependenciesVersion, archivePath, dropPath, flatPath string, manifestResponse *manifest.Build, dependencies []packaging.BinarySpec) {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "flattenDependencies")
+	defer span.End()
+
 	for _, pltf := range platforms {
 
 		rp := manifest.PlatformPackages[pltf]
@@ -1463,7 +1606,7 @@ func flattenDependencies(platforms []string, dependenciesVersion, archivePath, d
 				log.Printf(">>> Extracting %s to %s", m, versionedFlatPath)
 			}
 
-			if err := devtools.Extract(m, versionedFlatPath); err != nil {
+			if err := devtools.Extract(ctx, m, versionedFlatPath); err != nil {
 				panic(err)
 			}
 		}
@@ -1494,6 +1637,9 @@ type branchInfo struct {
 // FetchLatestAgentCoreStagingDRA is a mage target that will retrieve the elastic-agent-core DRA artifacts and
 // place them under build/dra/buildID. It accepts one argument that has to be a release branch present in staging DRA
 func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "FetchLatestAgentCoreStagingDRA")
+	defer span.End()
+
 	components, err := packaging.Components()
 	if err != nil {
 		return fmt.Errorf("retrieving defined components: %w", err)
@@ -1546,6 +1692,9 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 
 // PackageUsingDRA packages elastic-agent for distribution using Daily Released Artifacts specified in manifest.
 func PackageUsingDRA(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "PackageUsingDRA")
+	defer span.End()
+
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
@@ -1577,6 +1726,9 @@ func PackageUsingDRA(ctx context.Context) error {
 }
 
 func downloadManifestAndSetVersion(ctx context.Context, url string) (*manifest.Build, *version.ParsedSemVer, error) {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "downloadManifestAndSetVersion")
+	defer span.End()
+
 	resp, err := manifest.DownloadManifest(ctx, url)
 	if err != nil {
 		return nil, nil, fmt.Errorf("downloading manifest: %w", err)
@@ -1603,6 +1755,9 @@ func findRepositoryRoot() (string, error) {
 }
 
 func findLatestBuildForBranch(ctx context.Context, baseURL string, branch string) (*branchInfo, error) {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "findLatestBuildForBranch")
+	defer span.End()
+
 	// latest build info for a branch is at "<base url>/latest/<branch>.json"
 	branchLatestBuildUrl := strings.TrimSuffix(baseURL, "/") + fmt.Sprintf("/latest/%s.json", branch)
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, branchLatestBuildUrl, nil)
@@ -1659,6 +1814,9 @@ func mapManifestPlatformToAgentPlatform(manifestPltf string) (string, bool) {
 }
 
 func downloadDRAArtifacts(ctx context.Context, build *manifest.Build, version string, draDownloadDir string, components ...packaging.BinarySpec) (map[string]manifest.Package, error) {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "downloadDRAArtifacts")
+	defer span.End()
+
 	err := os.MkdirAll(draDownloadDir, 0o770)
 	if err != nil {
 		return nil, fmt.Errorf("creating %q directory: %w", draDownloadDir, err)
@@ -1739,6 +1897,9 @@ func downloadDRAArtifacts(ctx context.Context, build *manifest.Build, version st
 }
 
 func useDRAAgentBinaryForPackage(ctx context.Context, manifestURL string, version string) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "useDRAAgentBinaryForPackage")
+	defer span.End()
+
 	components, err := packaging.Components()
 	if err != nil {
 		return fmt.Errorf("retrieving defined components: %w", err)
@@ -1800,7 +1961,7 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestURL string, versio
 		const extractionSubdir = "extracted"
 		extractDir := filepath.Join(draDownloadDir, extractionSubdir)
 		artifactFile := filepath.Join(draDownloadDir, expectedPackageName)
-		err = devtools.Extract(artifactFile, extractDir)
+		err = devtools.Extract(ctx, artifactFile, extractDir)
 		if err != nil {
 			return fmt.Errorf("extracting %q: %w", artifactFile, err)
 		}
@@ -1839,6 +2000,9 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestURL string, versio
 // Helper that wraps the fetchBinaryFromArtifactsApi in a way that is compatible with the errgroup.Go() function.
 // Ensures the arguments are captured by value before starting the goroutine.
 func downloadBinary(ctx context.Context, project string, packageName string, binary string, platform string, version string, targetPath string, compl *atomic.Int32) func() error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "downloadBinary")
+	defer span.End()
+
 	return func() error {
 		_, err := downloads.FetchProjectBinary(ctx, project, packageName, binary, version, 3, false, targetPath, true)
 		if err != nil {
@@ -1882,7 +2046,10 @@ func appendComponentChecksums(versionedDropPath string, checksums map[string]str
 }
 
 // movePackagesToArchive Create archive folder and move any pre-existing artifacts into it.
-func movePackagesToArchive(dropPath string, platforms []string, packageVersion string, dependencies []packaging.BinarySpec) string {
+func movePackagesToArchive(ctx context.Context, dropPath string, platforms []string, packageVersion string, dependencies []packaging.BinarySpec) string {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "movePackagesToArchive")
+	defer span.End()
+
 	archivePath := filepath.Join(dropPath, "archives")
 	os.MkdirAll(archivePath, 0o755)
 
@@ -2254,6 +2421,9 @@ func (Integration) Check() error {
 // Local runs only the integration tests that support local mode
 // it takes as argument the test name to run or all if we want to run them all.
 func (Integration) Local(ctx context.Context, testName string) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Integration.Local")
+	defer span.End()
+
 	if shouldBuildAgent() {
 		// need only local package for current platform
 		devtools.Platforms = devtools.Platforms.Select(fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH))
@@ -2286,6 +2456,9 @@ func (Integration) Local(ctx context.Context, testName string) error {
 
 // Auth authenticates users who run it to various IaaS CSPs and ESS
 func (Integration) Auth(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Integration.Auth")
+	defer span.End()
+
 	if err := authGCP(ctx); err != nil {
 		return fmt.Errorf("unable to authenticate to GCP: %w", err)
 	}
@@ -2305,30 +2478,47 @@ func (Integration) Auth(ctx context.Context) error {
 
 // Test runs integration tests on remote hosts
 func (Integration) Test(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Integration.Test")
+	defer span.End()
+
 	return integRunner(ctx, "testing/integration/ess", false, "")
 }
 
 // Matrix runs integration tests on a matrix of all supported remote hosts
 func (Integration) Matrix(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Integration.Matrix")
+	defer span.End()
+
 	return integRunner(ctx, "testing/integration/ess", true, "")
 }
 
 // Single runs single integration test on remote host
 func (Integration) Single(ctx context.Context, testName string) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Integration.Single")
+	defer span.End()
+
 	return integRunner(ctx, "testing/integration/ess", false, testName)
 }
 
 // TestServerless runs the integration tests defined in testing/integration/serverless
 func (i Integration) TestServerless(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Integration.TestServerless")
+	defer span.End()
 	return i.testServerless(ctx, false, "")
 }
 
 // TestServerlessSingle runs a single integration test defined in testing/integration/serverless
 func (i Integration) TestServerlessSingle(ctx context.Context, testName string) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Integration.TestServerlessSingle")
+	defer span.End()
+
 	return i.testServerless(ctx, false, testName)
 }
 
 func (i Integration) testServerless(ctx context.Context, matrix bool, testName string) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Integration.testServerless")
+	defer span.End()
+
 	err := os.Setenv("STACK_PROVISIONER", "serverless")
 	if err != nil {
 		return fmt.Errorf("error setting serverless stack env var: %w", err)
@@ -2339,20 +2529,29 @@ func (i Integration) testServerless(ctx context.Context, matrix bool, testName s
 
 // TestKubernetes runs the integration tests defined in testing/integration/k8s
 func (i Integration) TestKubernetes(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Integration.TestKubernetes")
+	defer span.End()
 	return i.testKubernetes(ctx, false, "")
 }
 
 // TestKubernetesSingle runs a single integration test defined in testing/integration/k8s
 func (i Integration) TestKubernetesSingle(ctx context.Context, testName string) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Integration.TestKubernetesSingle")
+	defer span.End()
 	return i.testKubernetes(ctx, false, testName)
 }
 
 // TestKubernetesMatrix runs a matrix of integration tests defined in testing/integration/k8s
 func (i Integration) TestKubernetesMatrix(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Integration.TestKubernetesMatrix")
+	defer span.End()
 	return i.testKubernetes(ctx, true, "")
 }
 
 func (i Integration) testKubernetes(ctx context.Context, matrix bool, testName string) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Integration.testKubernetes")
+	defer span.End()
+
 	mg.Deps(Integration.BuildKubernetesTestData)
 	// invoke integration tests
 	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
@@ -2364,6 +2563,9 @@ func (i Integration) testKubernetes(ctx context.Context, matrix bool, testName s
 
 // BuildKubernetesTestData builds the test data required to run k8s integration tests
 func (Integration) BuildKubernetesTestData(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Integration.BuildKubernetesTestData")
+	defer span.End()
+
 	// build the dependencies for the elastic-agent helm chart
 	mg.Deps(Helm.BuildDependencies)
 
@@ -2378,7 +2580,7 @@ func (Integration) BuildKubernetesTestData(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to download opentelemetry-kube-stack helm chart %q: %w", k8s.KubeStackChartURL, err)
 	}
-	if err := devtools.Extract(downloadedKubeStackHelmChartPath, kubeStackHelmChartTargetDir); err != nil {
+	if err := devtools.Extract(ctx, downloadedKubeStackHelmChartPath, kubeStackHelmChartTargetDir); err != nil {
 		return fmt.Errorf("failed to extract opentelemetry-kube-stack helm chart %q: %w", downloadedKubeStackHelmChartPath, err)
 	}
 	if err := os.Remove(downloadedKubeStackHelmChartPath); err != nil {
@@ -2400,6 +2602,8 @@ func (Integration) BuildKubernetesTestData(ctx context.Context) error {
 // UpdateVersions runs an update on the `.agent-versions.yml` fetching
 // the latest version list from the artifact API.
 func (Integration) UpdateVersions(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Integration.UpdateVersions")
+	defer span.End()
 	agentVersion, err := version.ParseVersion(bversion.Agent)
 	if err != nil {
 		return fmt.Errorf("failed to parse agent version %s: %w", bversion.Agent, err)
@@ -2481,6 +2685,9 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 
 // UpdatePackageVersion update the file that contains the latest available snapshot version
 func (Integration) UpdatePackageVersion(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Integration.UpdatePackageVersion")
+	defer span.End()
+
 	const packageVersionFilename = ".package-version"
 
 	currentReleaseBranch, err := git.GetCurrentReleaseBranch(ctx)
@@ -2703,6 +2910,9 @@ func generateEnvFile(stack tcommon.Stack) error {
 
 // PrintState prints details about cloud stacks and VMs
 func (Integration) PrintState(ctx context.Context) {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Integration.PrintState")
+	defer span.End()
+
 	fmt.Println("Virtual Machines")
 	mg.Deps(Integration.ListInstances)
 	fmt.Print("\n\n")
@@ -2871,6 +3081,9 @@ func (Integration) PrepareOnRemote() {
 
 // TestBeatServerless runs beats-oriented serverless tests
 func (Integration) TestBeatServerless(ctx context.Context, beatname string) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Integration.TestBeatServerless")
+	defer span.End()
+
 	beatBuildPath := filepath.Join("..", "beats", "x-pack", beatname, "build", "distributions")
 	if os.Getenv("AGENT_BUILD_DIR") == "" {
 		err := os.Setenv("AGENT_BUILD_DIR", beatBuildPath)
@@ -2898,20 +3111,30 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 
 // TestForResourceLeaks runs the integration tests defined in testing/integration/leak
 func (i Integration) TestForResourceLeaks(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Integration.TestForResourceLeaks")
+	defer span.End()
 	return i.testForResourceLeaks(ctx, false, "")
 }
 
 // TestForResourceLeaksSingle runs a single integration test defined in testing/integration/leak
 func (i Integration) TestForResourceLeaksSingle(ctx context.Context, testName string) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Integration.TestForResourceLeaksSingle")
+	defer span.End()
 	return i.testForResourceLeaks(ctx, false, testName)
 }
 
 func (i Integration) testForResourceLeaks(ctx context.Context, matrix bool, testName string) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Integration.testForResourceLeaks")
+	defer span.End()
+
 	return integRunner(ctx, "testing/integration/leak", matrix, testName)
 }
 
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
 func (Integration) TestOnRemote(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Integration.TestOnRemote")
+	defer span.End()
+
 	mg.Deps(Build.TestBinaries)
 	version := os.Getenv("AGENT_VERSION")
 	if version == "" {
@@ -3035,6 +3258,9 @@ func (Integration) Buildkite() error {
 }
 
 func integRunner(ctx context.Context, testDir string, matrix bool, singleTest string) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "integRunner")
+	defer span.End()
+
 	if _, ok := ctx.Deadline(); !ok {
 		// If the context doesn't have a timeout (usually via the mage -t option), give it one.
 		var cancel context.CancelFunc
@@ -3063,6 +3289,9 @@ func integRunner(ctx context.Context, testDir string, matrix bool, singleTest st
 }
 
 func integRunnerOnce(ctx context.Context, matrix bool, testDir string, singleTest string) (int, error) {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "integRunnerOnce")
+	defer span.End()
+
 	goTestFlags := os.Getenv("GOTEST_FLAGS")
 
 	batches, err := define.DetermineBatches(testDir, goTestFlags, "integration")
@@ -3351,6 +3580,9 @@ func testGroups() []string {
 
 // Pre-requisite: user must have the gcloud CLI installed
 func authGCP(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "authGCP")
+	defer span.End()
+
 	// We only need the service account token to exist.
 	tokenPath, ok, err := getGCEServiceTokenPath()
 	if err != nil {
@@ -3534,6 +3766,9 @@ func getGCEServiceTokenPath() (string, bool, error) {
 }
 
 func authESS(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "authESS")
+	defer span.End()
+
 	essAPIKeyFile, err := ess.GetESSAPIKeyFilePath()
 	if err != nil {
 		return err
@@ -3650,7 +3885,7 @@ func (Otel) Readme() error {
 		return fmt.Errorf("failed to parse README template: %w", err)
 	}
 
-	data, err := otel.GetOtelDependencies("go.mod")
+	data, err := otelmage.GetOtelDependencies("go.mod")
 	if err != nil {
 		return fmt.Errorf("Failed to get OTel dependencies: %w", err)
 	}
@@ -3940,7 +4175,10 @@ func (Helm) ensureRepository(repoName, repoURL string, settings *cli.EnvSettings
 // directory but does not untar them. For our integration tests, we require the subcharts to be
 // extracted. This method downloads and extracts each `.tgz` archive and removes the archive afterward,
 // so that only the extracted subcharts remain in the `charts/` directory.
-func (h Helm) BuildDependencies() error {
+func (h Helm) BuildDependencies(ctx context.Context) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "Helm.BuildDependencies")
+	defer span.End()
+
 	settings := cli.New()
 	settings.SetNamespace("")
 	actionConfig := &action.Configuration{}
@@ -4025,7 +4263,7 @@ func (h Helm) BuildDependencies() error {
 	}
 
 	for _, subChartArchive := range subChartArchives {
-		err := mage.Extract(subChartArchive, subChartDir)
+		err := mage.Extract(ctx, subChartArchive, subChartDir)
 		if err != nil {
 			return fmt.Errorf("failed to extract %q: %w", subChartArchive, err)
 		}
