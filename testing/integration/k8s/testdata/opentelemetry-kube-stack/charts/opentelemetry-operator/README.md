@@ -1,10 +1,11 @@
 # OpenTelemetry Operator Helm Chart
 
-> [!WARNING]  
+> [!WARNING]
 > Version 0.58.0 of this Chart includes a new version of the `OpenTelemetryCollector` CRD. See [this document][v1beta1_migration] for upgrade instructions for the new Operator CRD. Please make sure you also follow the [helm upgrade instructions](./UPGRADING.md#0560-to-0570) for helm chart 0.57.0.
 
-The Helm chart installs [OpenTelemetry Operator](https://github.com/open-telemetry/opentelemetry-operator) in Kubernetes cluster.
+The Helm chart installs [OpenTelemetry Operator](https://github.com/open-telemetry/opentelemetry-operator) in a Kubernetes cluster.
 The OpenTelemetry Operator is an implementation of a [Kubernetes Operator](https://www.openshift.com/learn/topics/operators).
+The Operator's Docker image supports **only Linux** and cannot run on Windows nodes.
 At this point, it has [OpenTelemetry Collector](https://github.com/open-telemetry/opentelemetry-collector) as the only managed component.
 
 ## Prerequisites
@@ -37,12 +38,12 @@ _See [helm repo](https://helm.sh/docs/helm/helm_repo/) for command documentation
 
 ## Install Chart
 
-> [!NOTE]  
+> [!NOTE]
 > This Chart uses templated CRDs, and therefore does not support `--skip-crds`. Use `crds.create=false` instead if you do not want the chart to install the OpenTelemetry Operator's CRDs.
 
 ```console
 $ helm install opentelemetry-operator open-telemetry/opentelemetry-operator \
---set "manager.collectorImage.repository=otel/opentelemetry-collector-k8s"
+--set "manager.collectorImage.repository=ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s"
 ```
 
 If you created a custom namespace, like in the TLS Certificate Requirement section above, you will need to specify the namespace with the `--namespace` helm option:
@@ -50,14 +51,14 @@ If you created a custom namespace, like in the TLS Certificate Requirement secti
 ```console
 $ helm install opentelemetry-operator open-telemetry/opentelemetry-operator \
 --namespace opentelemetry-operator-system \
---set "manager.collectorImage.repository=otel/opentelemetry-collector-k8s"
+--set "manager.collectorImage.repository=ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s"
 ```
 
 If you wish for helm to create an automatically generated self-signed certificate, make sure to set the appropriate values when installing the chart:
 
 ```console
 $ helm install opentelemetry-operator open-telemetry/opentelemetry-operator \
---set "manager.collectorImage.repository=otel/opentelemetry-collector-k8s" \
+--set "manager.collectorImage.repository=ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s" \
 --set admissionWebhooks.certManager.enabled=false \
 --set admissionWebhooks.autoGenerateCert.enabled=true
 ```
@@ -82,6 +83,7 @@ The OpenTelemetry Collector CRD created by this chart won't be removed by defaul
 $ kubectl delete crd opentelemetrycollectors.opentelemetry.io
 $ kubectl delete crd opampbridges.opentelemetry.io
 $ kubectl delete crd instrumentations.opentelemetry.io
+$ kubectl delete crd targetallocators.opentelemetry.io
 ```
 
 ## Upgrade Chart

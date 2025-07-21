@@ -148,6 +148,14 @@ type OTelManager interface {
 	// MergedOtelConfig returns the merged Otel collector configuration, containing both the plain config and the
 	// component config.
 	MergedOtelConfig() *confmap.Conf
+
+	// PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
+	// it performs diagnostics for all current units.
+	PerformDiagnostics(context.Context, ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic
+
+	// PerformComponentDiagnostics executes the diagnostic action for the provided components. If no components are provided,
+	// then it performs the diagnostics for all current units.
+	PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error)
 }
 
 // ConfigChange provides an interface for receiving a new configuration.
@@ -649,12 +657,29 @@ func (c *Coordinator) PerformAction(ctx context.Context, comp component.Componen
 // it performs diagnostics for all current units.
 // Called from external goroutines.
 func (c *Coordinator) PerformDiagnostics(ctx context.Context, req ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic {
-	return c.runtimeMgr.PerformDiagnostics(ctx, req...)
+	var diags []runtime.ComponentUnitDiagnostic
+	runtimeDiags := c.runtimeMgr.PerformDiagnostics(ctx, req...)
+	diags = append(diags, runtimeDiags...)
+	otelDiags := c.otelMgr.PerformDiagnostics(ctx, req...)
+	diags = append(diags, otelDiags...)
+	return diags
 }
 
 // PerformComponentDiagnostics executes the diagnostic action for the provided components.
 func (c *Coordinator) PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error) {
-	return c.runtimeMgr.PerformComponentDiagnostics(ctx, additionalMetrics, req...)
+	var diags []runtime.ComponentDiagnostic
+	runtimeDiags, runtimeErr := c.runtimeMgr.PerformComponentDiagnostics(ctx, additionalMetrics, req...)
+	if runtimeErr != nil {
+		runtimeErr = fmt.Errorf("runtime diagnostics failed: %w", runtimeErr)
+	}
+	diags = append(diags, runtimeDiags...)
+	otelDiags, otelErr := c.otelMgr.PerformComponentDiagnostics(ctx, additionalMetrics, req...)
+	if otelErr != nil {
+		otelErr = fmt.Errorf("otel diagnostics failed: %w", otelErr)
+	}
+	diags = append(diags, otelDiags...)
+	err := errors.Join(runtimeErr, otelErr)
+	return diags, err
 }
 
 // SetLogLevel changes the entire log level for the running Elastic Agent.
@@ -1093,8 +1118,8 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			},
 		},
 		diagnostics.Hook{
-			Name:        "otel-final",
-			Filename:    "otel-final.yaml",
+			Name:        "otel-merged",
+			Filename:    "otel-merged.yaml",
 			Description: "Final otel configuration used by the Elastic Agent. Includes hybrid mode config and component config.",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
