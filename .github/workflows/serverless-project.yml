@@ -50,7 +50,7 @@ jobs:
           # NOTE: use a different username to avoid conflicts with the weekly tear-down
           #       some usernames have a hard requirement to be destroyed always on Saturdays
           #       regardless of the expiration date.
-          username: "ea-automation"
+          username: 'ea-automation'
           template: 'serverless-ea-it'
           parameters: '{"Target":"production","ProjectType":"observability"}'
           cluster-name-prefix: "${{ env.PREFIX }}-${{ steps.get_day.outputs.day }}"
