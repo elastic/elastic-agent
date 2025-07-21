@@ -21,27 +21,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-<<<<<<< HEAD
-      - name: Install Updatecli in the runner
-        uses: updatecli/updatecli-action@f11c0cb3aca7a018d6000dc86a57eb3442277219 # 2.81.0
-
-      - name: Run Updatecli in Apply mode
-        run: updatecli apply --config .ci/updatecli/updatecli-bump-golang.yml --values .ci/updatecli/values.d/scm.yml
-=======
       - uses: elastic/oblt-actions/updatecli/run@v1
         with:
           command: apply --config .ci/updatecli/updatecli-bump-golang.yml --values .ci/updatecli/values.d/scm.yml
           version-file: .updatecli-version
->>>>>>> 58886e60c (deps: use the latest updatecli version and use oblt-actions (#9082))
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - if: ${{ failure()  }}
-<<<<<<< HEAD
-        uses: slackapi/slack-github-action@485a9d42d3a73031f12ec201c457e2162c45d02d # v2.0.0
-=======
         uses: elastic/oblt-actions/slack/send@v1
->>>>>>> 58886e60c (deps: use the latest updatecli version and use oblt-actions (#9082))
         with:
           bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
           channel-id: "#ingest-notifications"
