@@ -39,6 +39,7 @@ jobs:
       uses: elastic/oblt-actions/updatecli/run@v1
       with:
         command: apply --config .ci/updatecli/update-otel.yml --values .ci/updatecli/values.d/scm.yml
+        version-file: .updatecli-version
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         BRANCH_NAME: ${{ matrix.branch }}
