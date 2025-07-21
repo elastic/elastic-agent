@@ -52,6 +52,7 @@ else
   export KIBANA_USERNAME=$(buildkite-agent meta-data get "kibana.username" --job ${JOB_ID})
   export KIBANA_PASSWORD=$(buildkite-agent meta-data get "kibana.pwd" --job ${JOB_ID})
   export INTEGRATIONS_SERVER_HOST=$(buildkite-agent meta-data get "integrations_server.host" --job ${JOB_ID})
+  echo "Elasticsearch Host: ${ELASTICSEARCH_HOST}"
 fi
 
 # Run integration tests
