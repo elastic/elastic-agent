@@ -6,6 +6,7 @@ components:
 #
 
 # Receivers
+  - elasticapmintakereceiver
   - filelogreceiver
   - hostmetricsreceiver
   - k8sclusterreceiver
