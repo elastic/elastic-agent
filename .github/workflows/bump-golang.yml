@@ -21,32 +21,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Updatecli in the runner
-        uses: updatecli/updatecli-action@1536e372d5f433385f11b5b133b23a9833c510ce # 2.86.0
-
-      - name: Run Updatecli in Apply mode
-        run: updatecli apply --config .ci/updatecli/updatecli-bump-golang.yml --values .ci/updatecli/values.d/scm.yml
+      - uses: elastic/oblt-actions/updatecli/run@v1
+        with:
+          command: apply --config .ci/updatecli/updatecli-bump-golang.yml --values .ci/updatecli/values.d/scm.yml
+          version-file: .updatecli-version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - if: ${{ failure()  }}
-        uses: slackapi/slack-github-action@485a9d42d3a73031f12ec201c457e2162c45d02d # v2.0.0
+        uses: elastic/oblt-actions/slack/send@v1
         with:
-          method: chat.postMessage
-          token: ${{ secrets.SLACK_BOT_TOKEN }}
-          payload: |
-            {
-              "channel": "#ingest-notifications",
-              "text": "${{ env.SLACK_MESSAGE }}",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "${{ env.SLACK_MESSAGE }}"
-                  }
-                }
-              ]
-            }
-        env:
-          SLACK_MESSAGE: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@agent-team` please look what's going on <${{ env.JOB_URL }}|here>"
+          bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel-id: "#ingest-notifications"
+          message: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@agent-team` please look what's going on <${{ env.JOB_URL }}|here>"
