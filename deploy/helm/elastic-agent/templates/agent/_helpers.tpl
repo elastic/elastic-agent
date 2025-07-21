@@ -66,6 +66,7 @@ Validate fleet configuration
 {{- include "elasticagent.init.valueFrom" (list $ $.Values.agent.fleet.agentCert "fleet.agentcert") -}}
 {{- include "elasticagent.init.valueFrom" (list $ $.Values.agent.fleet.agentCertKey "fleet.agentcert.key") -}}
 {{- include "elasticagent.init.valueFrom" (list $ $.Values.agent.fleet.kibanaCA "fleet.kibana.ca") -}}
+{{- include "elasticagent.init.valueFrom" (list $ $.Values.agent.fleet.token "fleet-enrollment-token") -}}
 {{- end -}}
 {{- end -}}
 
@@ -248,7 +249,11 @@ Mutate an agent preset based on agent.fleet
 {{- if $.Values.agent.fleet.url -}}
 {{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_URL" "value" $.Values.agent.fleet.url) -}}
 {{- end -}}
-{{- if $.Values.agent.fleet.token -}}
+{{- if ($.Values.agent.fleet.token).valueFromSecret.name -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_ENROLLMENT_TOKEN" "valueFrom" (dict "secretKeyRef" (dict "name" ($.Values.agent.fleet.token).valueFromSecret.name "key" ($.Values.agent.fleet.token).valueFromSecret.key))) -}}
+{{- else if ($.Values.agent.fleet.token).value -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_ENROLLMENT_TOKEN" "value" ($.Values.agent.fleet.token).value) -}}
+{{- else if $.Values.agent.fleet.token -}}
 {{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_ENROLLMENT_TOKEN" "value" $.Values.agent.fleet.token) -}}
 {{- end -}}
 {{- if $.Values.agent.fleet.insecure -}}

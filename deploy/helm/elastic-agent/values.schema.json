@@ -418,7 +418,7 @@
                             "description": "Fleet server URL."
                         },
                         "token": {
-                            "type": "string",
+                            "$ref": "#/definitions/ValueFrom",
                             "description": "Fleet enrollment token."
                         },
                         "insecure": {
@@ -469,8 +469,7 @@
                                         "format": "uri"
                                     },
                                     "token": {
-                                        "type": "string",
-                                        "minLength": 1
+                                        "$ref": "#/definitions/ValueFrom"
                                     }
                                 }
                             },
@@ -1042,8 +1041,7 @@
                                 "format": "uri"
                             },
                             "token": {
-                                "type": "string",
-                                "minLength": 1
+                                "$ref": "#/definitions/ValueFrom"
                             }
                         }
                     },
