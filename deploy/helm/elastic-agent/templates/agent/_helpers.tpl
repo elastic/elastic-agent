@@ -66,7 +66,9 @@ Validate fleet configuration
 {{- include "elasticagent.init.valueFrom" (list $ $.Values.agent.fleet.agentCert "fleet.agentcert") -}}
 {{- include "elasticagent.init.valueFrom" (list $ $.Values.agent.fleet.agentCertKey "fleet.agentcert.key") -}}
 {{- include "elasticagent.init.valueFrom" (list $ $.Values.agent.fleet.kibanaCA "fleet.kibana.ca") -}}
+{{- if kindIs "map" $.Values.agent.fleet.token -}}
 {{- include "elasticagent.init.valueFrom" (list $ $.Values.agent.fleet.token "fleet-enrollment-token") -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 
@@ -249,12 +251,17 @@ Mutate an agent preset based on agent.fleet
 {{- if $.Values.agent.fleet.url -}}
 {{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_URL" "value" $.Values.agent.fleet.url) -}}
 {{- end -}}
-{{- if ($.Values.agent.fleet.token).valueFromSecret.name -}}
-{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_ENROLLMENT_TOKEN" "valueFrom" (dict "secretKeyRef" (dict "name" ($.Values.agent.fleet.token).valueFromSecret.name "key" ($.Values.agent.fleet.token).valueFromSecret.key))) -}}
-{{- else if ($.Values.agent.fleet.token).value -}}
-{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_ENROLLMENT_TOKEN" "value" ($.Values.agent.fleet.token).value) -}}
-{{- else if $.Values.agent.fleet.token -}}
-{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_ENROLLMENT_TOKEN" "value" $.Values.agent.fleet.token) -}}
+{{- $token := $.Values.agent.fleet.token -}}
+{{- if kindIs "string" $token -}}
+{{- if $token -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_ENROLLMENT_TOKEN" "value" $token) -}}
+{{- end -}}
+{{- else if kindIs "map" $token -}}
+{{- if ($token).valueFromSecret.name -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_ENROLLMENT_TOKEN" "valueFrom" (dict "secretKeyRef" (dict "name" ($token).valueFromSecret.name "key" ($token).valueFromSecret.key))) -}}
+{{- else if ($token).value -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_ENROLLMENT_TOKEN" "value" ($token).value) -}}
+{{- end -}}
 {{- end -}}
 {{- if $.Values.agent.fleet.insecure -}}
 {{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_INSECURE" "value" (quote $.Values.agent.fleet.insecure)) -}}
