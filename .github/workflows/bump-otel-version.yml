@@ -1,9 +1,9 @@
-name: update-beats
+name: bump-otel-version
 
 on:
   workflow_dispatch:
   schedule:
-  - cron: '0 0 * * 1-5'
+  - cron: '24 5 * * 1-5'
 
 permissions:
   contents: read
@@ -12,34 +12,17 @@ env:
   JOB_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
 jobs:
-  filter:
-    runs-on: ubuntu-latest
-    timeout-minutes: 1
-    outputs:
-      matrix: ${{ steps.generator.outputs.matrix }}
-    permissions:
-      contents: read
-    steps:
-    - id: generator
-      uses: elastic/oblt-actions/elastic/active-branches@v1
-      with:
-        exclude-branches: "7.17,8.17,8.18,9.0"
-        filter-branches: true
-
-  update-beats:
+  update-otel:
     permissions:
       contents: write
       pull-requests: write
-    needs:
-    - filter
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.filter.outputs.matrix) }}
+      matrix:
+        branch: ["main", "8.19"]
     steps:
     - uses: actions/checkout@v4
-      with:
-        ref: ${{ matrix.branch }}
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -55,7 +38,7 @@ jobs:
     - name: Run Updatecli in Apply mode
       uses: elastic/oblt-actions/updatecli/run@v1
       with:
-        command: apply --config .ci/updatecli/update-beats.yml --values .ci/updatecli/values.d/scm.yml
+        command: apply --config .ci/updatecli/update-otel.yml --values .ci/updatecli/values.d/scm.yml
         version-file: .updatecli-version
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
