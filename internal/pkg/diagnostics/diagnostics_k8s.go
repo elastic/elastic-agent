@@ -14,71 +14,139 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 
-	"gopkg.in/yaml.v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	clientk8s "k8s.io/client-go/kubernetes"
 	yamlk8s "sigs.k8s.io/yaml"
 
 	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
+	"github.com/elastic/elastic-agent-libs/logp"
 )
 
-func k8sDiagnostics() func(ctx context.Context) []byte {
+func k8sDiagnostics(l *logp.Logger) func(ctx context.Context) []byte {
 	return func(ctx context.Context) []byte {
 		if _, ok := os.LookupEnv("KUBERNETES_SERVICE_HOST"); !ok {
 			return nil
 		}
 
-		// TODO create a temp dir here and an errors file where to dump all the errors ?
-
 		var k8sError error
+
+		const zipSubdir = "k8s"
+		tmpDir, err := os.MkdirTemp("", "elastic-agent-k8s-diag-*")
+		if err != nil {
+			k8sError = errors.Join(k8sError, fmt.Errorf("error creating k8s diag temp directory: %w", err))
+			errorOnlyZip, zipCreateErr := createErrorOnlyZip(k8sError)
+			if zipCreateErr != nil {
+				l.Errorf("error creating error-only k8s diag zip: %s", zipCreateErr)
+			}
+			return errorOnlyZip
+		}
+		defer os.RemoveAll(tmpDir)
+
+		k8sDir := filepath.Join(tmpDir, zipSubdir)
+		err = os.MkdirAll(k8sDir, 0755)
+		if err != nil {
+			k8sError = errors.Join(fmt.Errorf("error creating k8s diag subdirectory %q: %w", k8sDir, err))
+			errorOnlyZip, zipCreateErr := createErrorOnlyZip(k8sError)
+			if zipCreateErr != nil {
+				l.Errorf("error creating error-only k8s diag zip: %s. Diagnostics errors: %s", zipCreateErr, k8sError)
+			}
+			return errorOnlyZip
+		}
 
 		kubernetesClient, err := kubernetes.GetKubernetesClient("", kubernetes.KubeClientOptions{})
 		if err != nil {
 			k8sError = errors.Join(k8sError, fmt.Errorf("error instantiating k8s client: %w", err))
-			//return createErrorFile(k8sErrors)
+			errorOnlyZip, zipCreateErr := createErrorOnlyZip(k8sError)
+			if zipCreateErr != nil {
+				l.Errorf("error creating error-only k8s diag zip: %s. Diagnostics errors: %s", zipCreateErr, k8sError)
+			}
+			return errorOnlyZip
 		}
 
 		tokenPayload, err := readServiceAccountToken("/var/run/secrets/kubernetes.io/serviceaccount/token")
 		if err != nil {
 			k8sError = errors.Join(k8sError, fmt.Errorf("error reading service account token: %w", err))
+			errorOnlyZip, zipCreateErr := createErrorOnlyZip(k8sError)
+			if zipCreateErr != nil {
+				l.Errorf("error creating error-only k8s diag zip: %s. Diagnostics errors: %s", zipCreateErr, k8sError)
+			}
+			return errorOnlyZip
 		}
 
 		pod, err := kubernetesClient.CoreV1().Pods(tokenPayload.Namespace).Get(ctx, tokenPayload.Pod.Name, metav1.GetOptions{})
 		if err != nil {
 			k8sError = errors.Join(k8sError, fmt.Errorf("error getting pod %s/%s: %w", tokenPayload.Namespace, tokenPayload.Pod.Name, err))
+			errorOnlyZip, zipCreateErr := createErrorOnlyZip(k8sError)
+			if zipCreateErr != nil {
+				l.Errorf("error creating error-only k8s diag zip: %s. Diagnostics errors: %s", zipCreateErr, k8sError)
+			}
+			return errorOnlyZip
 		}
-
-		tmpDir, err := os.MkdirTemp("", "elastic-agent-k8s-diag-*")
-		if err != nil {
-			k8sError = errors.Join(k8sError, fmt.Errorf("error creating k8s diag temp directory: %w", err))
-		}
-		defer os.RemoveAll(tmpDir)
-
-		k8sDir := filepath.Join(tmpDir, "k8s")
-		err = os.MkdirAll(k8sDir, 0755)
 
 		podMashalledBytes, err := yamlk8s.Marshal(pod)
 		if err != nil {
-			return []byte(fmt.Sprintf("error marshalling pod: %q", err))
+			k8sError = errors.Join(k8sError, fmt.Errorf("error marshalling pod %s/%s: %w", tokenPayload.Namespace, tokenPayload.Pod.Name, err))
 		}
 
-		err = os.WriteFile(filepath.Join(k8sDir, fmt.Sprintf("pod-%s.yaml", tokenPayload.Pod.Name)), podMashalledBytes, 0644)
-		if err != nil {
-			return []byte(fmt.Sprintf("error writing pod.yaml: %q", err))
+		if podMashalledBytes != nil {
+			err = os.WriteFile(filepath.Join(k8sDir, fmt.Sprintf("pod-%s.yaml", tokenPayload.Pod.Name)), podMashalledBytes, 0644)
+			if err != nil {
+				k8sError = errors.Join(k8sError, fmt.Errorf("error writing pod.yaml for %s/%s: %w", tokenPayload.Namespace, tokenPayload.Pod.Name, err))
+			}
 		}
 
 		k8sError = errors.Join(k8sError, dumpOwnerReferences(ctx, kubernetesClient, tokenPayload.Namespace, pod.OwnerReferences, k8sDir))
 
 		buf := new(bytes.Buffer)
-		err = writeZipFileFromDir(buf, tmpDir)
+		err = writeZipFileFromDir(buf, tmpDir, k8sError)
 		if err != nil {
-			return []byte(fmt.Sprintf("error creating zipped elastic-agent-k8s-*.zip: %q", err))
+			l.Errorf("error creating k8s diagnostics zip: %s. Diagnostics errors: %s", err, k8sError)
+			return nil
 		}
 
 		return buf.Bytes()
 	}
+}
+
+func createErrorOnlyZip(diagErr error) ([]byte, error) {
+	if diagErr == nil {
+		return nil, nil
+	}
+
+	buf := new(bytes.Buffer)
+	writeErr := writeErrorOnlyZip(buf, diagErr)
+	if writeErr != nil {
+		return nil, writeErr
+	}
+	return buf.Bytes(), nil
+}
+
+func writeErrorOnlyZip(w io.Writer, diagErr error) error {
+	zipWriter := zip.NewWriter(w)
+	defer zipWriter.Close()
+
+	err := addDiagnosticsErrorFileToZip(zipWriter, diagErr)
+	if err != nil {
+		return fmt.Errorf("adding error file to diagnostics zip writer: %w", err)
+	}
+	return nil
+}
+
+func addDiagnosticsErrorFileToZip(zipWriter *zip.Writer, diagErr error) error {
+	errWriter, err := zipWriter.Create(path.Join("k8s-diag-errors.txt"))
+	if err != nil {
+		return fmt.Errorf("error creating zip writer: %w", err)
+	}
+	_, err = errWriter.Write([]byte(diagErr.Error()))
+	if err != nil {
+		return fmt.Errorf("error writing diagnostics error file: %w", err)
+	}
+	return nil
 }
 
 type PodInfoToken struct {
@@ -134,42 +202,85 @@ func dumpOwnerReferences(ctx context.Context, kubernetesClient clientk8s.Interfa
 	var k8sError error
 
 	for _, ownerRef := range references {
+
+		var k8sObject runtime.Object
+		var err error
+
 		switch ownerRef.Kind {
 		case "DaemonSet":
-			daemonset, err := kubernetesClient.AppsV1().DaemonSets(namespace).Get(ctx, ownerRef.Name, metav1.GetOptions{})
+			k8sObject, err = kubernetesClient.AppsV1().DaemonSets(namespace).Get(ctx, ownerRef.Name, metav1.GetOptions{})
 			if err != nil {
 				k8sError = errors.Join(k8sError, fmt.Errorf("error getting daemonset %q: %w", ownerRef.Name, err))
 				continue
 			}
-			dsMarshalledBytes, err := yaml.Marshal(daemonset)
+
+		case "StatefulSet":
+			k8sObject, err = kubernetesClient.AppsV1().StatefulSets(namespace).Get(ctx, ownerRef.Name, metav1.GetOptions{})
 			if err != nil {
-				k8sError = errors.Join(k8sError, fmt.Errorf("error marshalling daemonset %q: %w", ownerRef.Name, err))
+				k8sError = errors.Join(k8sError, fmt.Errorf("error getting statefulset %q: %w", ownerRef.Name, err))
 				continue
 			}
-			err = os.WriteFile(filepath.Join(outputdir, fmt.Sprintf("daemonset-%s.yaml", ownerRef.Name)), dsMarshalledBytes, 0644)
+
+		case "Deployment":
+			k8sObject, err = kubernetesClient.AppsV1().Deployments(namespace).Get(ctx, ownerRef.Name, metav1.GetOptions{})
 			if err != nil {
-				k8sError = errors.Join(k8sError, fmt.Errorf("error writing pod.yaml: %w", err))
+				k8sError = errors.Join(k8sError, fmt.Errorf("error getting deployment %q: %w", ownerRef.Name, err))
 				continue
 			}
-		case "StatefulSet", "Deployment":
-			k8sError = errors.Join(k8sError, fmt.Errorf("support for %s not implemented", ownerRef.Kind))
-			continue
+
 		case "ReplicaSet":
 			replicaSet, err := kubernetesClient.AppsV1().ReplicaSets(namespace).Get(ctx, ownerRef.Name, metav1.GetOptions{})
 			if err != nil {
 				k8sError = errors.Join(k8sError, fmt.Errorf("error getting replicaset %q: %w", ownerRef.Name, err))
 				continue
 			}
-			return dumpOwnerReferences(ctx, kubernetesClient, namespace, replicaSet.OwnerReferences, outputdir)
+			// recursively search for owners of replicasets
+			err = dumpOwnerReferences(ctx, kubernetesClient, namespace, replicaSet.OwnerReferences, outputdir)
+			if err != nil {
+				k8sError = errors.Join(k8sError, err)
+			}
+			k8sObject = replicaSet
+
 		default:
-			// recursively go to the owner of the object
+			k8sError = errors.Join(k8sError, fmt.Errorf("unsupported owner ref %s/%s, skipping", ownerRef.Kind, ownerRef.Name))
+			continue
+		}
+
+		if k8sObject != nil {
+			outputFile := fmt.Sprintf("%s-%s.yaml", strings.ToLower(ownerRef.Kind), ownerRef.Name)
+			err = dumpK8sObject(k8sObject, ownerRef.Name, filepath.Join(outputdir, outputFile))
+
+			if err != nil {
+				k8sError = errors.Join(k8sError, fmt.Errorf("error dumping %s: %w", outputFile, err))
+			}
 		}
 	}
 	return k8sError
 }
 
-func writeZipFileFromDir(baseWriter io.Writer, dir string) error {
+func dumpK8sObject(obj runtime.Object, objName string, outputfile string) error {
+	marshalledBytes, err := yamlk8s.Marshal(obj)
+	if err != nil {
+		return fmt.Errorf("error marshalling %s %s: %w", obj.GetObjectKind().GroupVersionKind().Kind, objName, err)
+	}
+	err = os.WriteFile(outputfile, marshalledBytes, 0644)
+	if err != nil {
+		return fmt.Errorf("error writing output file %s: %w", outputfile, err)
+	}
+	return nil
+}
+
+func writeZipFileFromDir(baseWriter io.Writer, dir string, diagErr error) error {
 	writer := zip.NewWriter(baseWriter)
 	defer writer.Close()
-	return writer.AddFS(os.DirFS(dir))
+	err := writer.AddFS(os.DirFS(dir))
+	if err != nil {
+		diagErr = errors.Join(diagErr, fmt.Errorf("error adding diagnostics dir %s to zip: %w", dir, err))
+	}
+
+	if diagErr != nil {
+		return addDiagnosticsErrorFileToZip(writer, diagErr)
+	}
+
+	return nil
 }

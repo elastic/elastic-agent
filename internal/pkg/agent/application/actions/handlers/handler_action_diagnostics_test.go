@@ -49,7 +49,9 @@ var globalHooksNameAndFiles map[string]string
 
 func init() {
 	globalHooksNameAndFiles = map[string]string{}
-	for _, gh := range diagnostics.GlobalHooks() {
+
+	testLogger, _ := loggertest.New("test_global_hook")
+	for _, gh := range diagnostics.GlobalHooks(testLogger) {
 		globalHooksNameAndFiles[gh.Name] = gh.Filename
 	}
 }

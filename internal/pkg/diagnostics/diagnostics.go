@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/go-ucfg"
 
@@ -61,7 +62,7 @@ type Hook struct {
 type Hooks []Hook
 
 // GlobalHooks returns the global hooks that can be used at anytime with no other references.
-func GlobalHooks() Hooks {
+func GlobalHooks(l *logp.Logger) Hooks {
 	return Hooks{
 		{
 			Name:        "version",
@@ -141,7 +142,7 @@ func GlobalHooks() Hooks {
 			Filename:    "elastic-agent-k8s.zip",
 			Description: " kubernetes pod describe for elastic-agent",
 			ContentType: "application/octet-stream",
-			Hook:        k8sDiagnostics(),
+			Hook:        k8sDiagnostics(l),
 		},
 	}
 }
