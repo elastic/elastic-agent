@@ -25,6 +25,7 @@ rules:
       - namespaces
       - events
       - pods
+      - pods/log
       - services
       - configmaps
       - persistentvolumes
