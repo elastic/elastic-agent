@@ -30,21 +30,20 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 )
 
+const zipSubdir = "k8s"
+
 func k8sDiagnostics(l *logp.Logger) func(ctx context.Context) []byte {
 	return func(ctx context.Context) []byte {
 		if _, ok := os.LookupEnv("KUBERNETES_SERVICE_HOST"); !ok {
 			return nil
 		}
 
-		var k8sError error
-
-		const zipSubdir = "k8s"
 		tmpDir, err := os.MkdirTemp("", "elastic-agent-k8s-diag-*")
 		if err != nil {
-			k8sError = errors.Join(k8sError, fmt.Errorf("error creating k8s diag temp directory: %w", err))
-			errorOnlyZip, zipCreateErr := createErrorOnlyZip(k8sError)
+			err = fmt.Errorf("error creating k8s diag temp directory: %w", err)
+			errorOnlyZip, zipCreateErr := createErrorOnlyZip(err)
 			if zipCreateErr != nil {
-				l.Errorf("error creating error-only k8s diag zip: %s", zipCreateErr)
+				l.Errorf("error creating error-only k8s diag zip: %s. Diagnostics errors: %s", zipCreateErr, err)
 			}
 			return errorOnlyZip
 		}
@@ -53,79 +52,95 @@ func k8sDiagnostics(l *logp.Logger) func(ctx context.Context) []byte {
 		k8sDir := filepath.Join(tmpDir, zipSubdir)
 		err = os.MkdirAll(k8sDir, 0755)
 		if err != nil {
-			k8sError = errors.Join(fmt.Errorf("error creating k8s diag subdirectory %q: %w", k8sDir, err))
-			errorOnlyZip, zipCreateErr := createErrorOnlyZip(k8sError)
+			err = fmt.Errorf("error creating k8s diag subdirectory %q: %w", k8sDir, err)
+			errorOnlyZip, zipCreateErr := createErrorOnlyZip(err)
 			if zipCreateErr != nil {
-				l.Errorf("error creating error-only k8s diag zip: %s. Diagnostics errors: %s", zipCreateErr, k8sError)
+				l.Errorf("error creating error-only k8s diag zip: %s. Diagnostics errors: %s", zipCreateErr, err)
 			}
 			return errorOnlyZip
 		}
 
 		kubernetesClient, err := kubernetes.GetKubernetesClient("", kubernetes.KubeClientOptions{})
 		if err != nil {
-			k8sError = errors.Join(k8sError, fmt.Errorf("error instantiating k8s client: %w", err))
-			errorOnlyZip, zipCreateErr := createErrorOnlyZip(k8sError)
+			err = fmt.Errorf("error instantiating k8s client: %w", err)
+			errorOnlyZip, zipCreateErr := createErrorOnlyZip(err)
 			if zipCreateErr != nil {
-				l.Errorf("error creating error-only k8s diag zip: %s. Diagnostics errors: %s", zipCreateErr, k8sError)
+				l.Errorf("error creating error-only k8s diag zip: %s. Diagnostics errors: %s", zipCreateErr, err)
 			}
 			return errorOnlyZip
 		}
 
 		tokenPayload, err := readServiceAccountToken("/var/run/secrets/kubernetes.io/serviceaccount/token")
 		if err != nil {
-			k8sError = errors.Join(k8sError, fmt.Errorf("error reading service account token: %w", err))
-			errorOnlyZip, zipCreateErr := createErrorOnlyZip(k8sError)
+			err = fmt.Errorf("error reading service account token: %w", err)
+			errorOnlyZip, zipCreateErr := createErrorOnlyZip(err)
 			if zipCreateErr != nil {
-				l.Errorf("error creating error-only k8s diag zip: %s. Diagnostics errors: %s", zipCreateErr, k8sError)
+				l.Errorf("error creating error-only k8s diag zip: %s. Diagnostics errors: %s", zipCreateErr, err)
 			}
 			return errorOnlyZip
 		}
-
-		pod, err := kubernetesClient.CoreV1().Pods(tokenPayload.Namespace).Get(ctx, tokenPayload.Pod.Name, metav1.GetOptions{})
-		if err != nil {
-			k8sError = errors.Join(k8sError, fmt.Errorf("error getting pod %s/%s: %w", tokenPayload.Namespace, tokenPayload.Pod.Name, err))
-			errorOnlyZip, zipCreateErr := createErrorOnlyZip(k8sError)
-			if zipCreateErr != nil {
-				l.Errorf("error creating error-only k8s diag zip: %s. Diagnostics errors: %s", zipCreateErr, k8sError)
-			}
-			return errorOnlyZip
-		}
-
-		podMashalledBytes, err := yamlk8s.Marshal(pod)
-		if err != nil {
-			k8sError = errors.Join(k8sError, fmt.Errorf("error marshalling pod %s/%s: %w", tokenPayload.Namespace, tokenPayload.Pod.Name, err))
-		}
-
-		if podMashalledBytes != nil {
-			err = os.WriteFile(filepath.Join(k8sDir, fmt.Sprintf("pod-%s.yaml", tokenPayload.Pod.Name)), podMashalledBytes, 0644)
-			if err != nil {
-				k8sError = errors.Join(k8sError, fmt.Errorf("error writing pod.yaml for %s/%s: %w", tokenPayload.Namespace, tokenPayload.Pod.Name, err))
-			}
-		}
-
-		// Follow OwnerRefs to get to the deployment/statefulset/daemonset that spawned this agent
-		k8sError = errors.Join(k8sError, dumpOwnerReferences(ctx, kubernetesClient, tokenPayload.Namespace, pod.OwnerReferences, k8sDir))
-		k8sError = errors.Join(k8sError, writeNamespaceLeases(ctx, kubernetesClient, tokenPayload.Namespace, filepath.Join(k8sDir, "leases.yaml")))
-
-		// Collect logs for this pod
-		podLogsDir := filepath.Join(k8sDir, "logs", pod.Namespace, pod.Name)
-		k8sError = errors.Join(os.MkdirAll(podLogsDir, 0755))
-		k8sError = errors.Join(k8sError, collectLogsFromPod(ctx, kubernetesClient, pod, podLogsDir))
-
-		buf := new(bytes.Buffer)
-		err = writeZipFileFromDir(buf, tmpDir, k8sError)
-		if err != nil {
-			l.Errorf("error creating k8s diagnostics zip: %s. Diagnostics errors: %s", err, k8sError)
-			return nil
-		}
-
-		return buf.Bytes()
+		return collectK8sDiagnosticsWithClientAndToken(ctx, l, kubernetesClient, tokenPayload.Namespace, tokenPayload.Pod.Name, k8sDir)
 	}
+}
+func collectK8sDiagnosticsWithClientAndToken(ctx context.Context, l *logp.Logger, k8sClient clientk8s.Interface, namespace string, podName string, outputDir string) []byte {
+	k8sDir := filepath.Join(outputDir, zipSubdir)
+	var diagnosticsAccumulatedError error
+
+	pod, err := k8sClient.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+	if err != nil {
+		diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, fmt.Errorf("error getting pod %s/%s: %w", namespace, podName, err))
+		errorOnlyZip, zipCreateErr := createErrorOnlyZip(diagnosticsAccumulatedError)
+		if zipCreateErr != nil {
+			l.Errorf("error creating error-only k8s diag zip: %s. Diagnostics errors: %s", zipCreateErr, diagnosticsAccumulatedError)
+		}
+		return errorOnlyZip
+	}
+
+	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, dumpK8sManifests(ctx, k8sClient, pod, k8sDir))
+	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, writeNamespaceLeases(ctx, k8sClient, namespace, filepath.Join(k8sDir, "leases.yaml")))
+
+	// Collect logs for this pod
+	podLogsDir := filepath.Join(k8sDir, "logs")
+	diagnosticsAccumulatedError = errors.Join(os.MkdirAll(podLogsDir, 0755))
+	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, collectLogsFromPod(ctx, k8sClient, pod, podLogsDir))
+
+	buf := new(bytes.Buffer)
+	err = writeZipFileFromDir(buf, outputDir, diagnosticsAccumulatedError)
+	if err != nil {
+		l.Errorf("error creating k8s diagnostics zip: %s. Diagnostics errors: %s", err, diagnosticsAccumulatedError)
+		return nil
+	}
+
+	return buf.Bytes()
+}
+
+func dumpK8sManifests(ctx context.Context, k8sClient clientk8s.Interface, pod *v1.Pod, k8sDir string) error {
+	var diagnosticsAccumulatedError error
+
+	podMashalledBytes, err := yamlk8s.Marshal(pod)
+	if err != nil {
+		diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, fmt.Errorf("error marshalling pod %s/%s: %w", pod.Namespace, pod.Name, err))
+	}
+
+	if podMashalledBytes != nil {
+		err = os.WriteFile(filepath.Join(k8sDir, fmt.Sprintf("pod-%s.yaml", pod.Name)), podMashalledBytes, 0644)
+		if err != nil {
+			diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, fmt.Errorf("error writing pod.yaml for %s/%s: %w", pod.Namespace, pod.Name, err))
+		}
+	}
+
+	// Follow OwnerRefs to get to the deployment/statefulset/daemonset that spawned this agent
+	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, dumpOwnerReferences(ctx, k8sClient, pod.Namespace, pod.OwnerReferences, k8sDir))
+	return diagnosticsAccumulatedError
 }
 
 func collectLogsFromPod(ctx context.Context, client clientk8s.Interface, pod *v1.Pod, dir string) error {
 
 	var retrieveLogsErr error
+
+	for _, container := range pod.Spec.InitContainers {
+		retrieveLogsErr = errors.Join(retrieveLogsErr, retrieveContainerLogs(ctx, client, pod, container, false, dir))
+	}
 
 	for _, container := range pod.Spec.Containers {
 		retrieveLogsErr = errors.Join(retrieveLogsErr, retrieveContainerLogs(ctx, client, pod, container, false, dir))
@@ -159,9 +174,9 @@ func retrieveContainerLogs(ctx context.Context, client clientk8s.Interface, pod 
 		return fmt.Errorf("retrieving (previous=%v) logs for %s/%s container %s: %w", previous, pod.Namespace, pod.Name, container.Name, err)
 	}
 
-	outputFileName := fmt.Sprintf("%s-current.log", container.Name)
+	outputFileName := fmt.Sprintf("%s-%s-current.log", pod.Name, container.Name)
 	if previous {
-		outputFileName = fmt.Sprintf("%s-previous.log", container.Name)
+		outputFileName = fmt.Sprintf("%s-%s-previous.log", pod.Name, container.Name)
 	}
 
 	oFile, err := os.Create(filepath.Join(outputDir, outputFileName))

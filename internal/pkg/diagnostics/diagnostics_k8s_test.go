@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	yamlk8s "sigs.k8s.io/yaml"
 	"testing"
+
+	yamlk8s "sigs.k8s.io/yaml"
 
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/coordination/v1"
