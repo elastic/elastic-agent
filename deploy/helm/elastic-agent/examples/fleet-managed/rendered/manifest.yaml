@@ -373,6 +373,10 @@ spec:
   template:
     metadata:
       labels:
+        helm.sh/chart: elastic-agent-9.2.0-beta
+        app.kubernetes.io/name: elastic-agent
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/version: 9.2.0
         name: agent-pernode-example
       annotations:
         checksum/config: cd7c5c4f03cc8377d18ee22cf236428090959fc194ee647bd97a39b79f38c807

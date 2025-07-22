@@ -7,6 +7,7 @@ package diagnostics
 import (
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -20,8 +21,12 @@ import (
 	"strings"
 	"time"
 
+	"gopkg.in/yaml.v3"
+	"helm.sh/helm/v3/pkg/chartutil"
+	"helm.sh/helm/v3/pkg/release"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientk8s "k8s.io/client-go/kubernetes"
 	yamlk8s "sigs.k8s.io/yaml"
@@ -103,7 +108,7 @@ func collectK8sDiagnosticsWithClientAndToken(ctx context.Context, l *logp.Logger
 	podLogsDir := filepath.Join(k8sDir, "logs")
 	diagnosticsAccumulatedError = errors.Join(os.MkdirAll(podLogsDir, 0755))
 	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, collectLogsFromPod(ctx, k8sClient, pod, podLogsDir))
-
+	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, dumpHelmChartValues(ctx, k8sClient, pod, k8sDir, filepath.Join(k8sDir, "values.yaml")))
 	buf := new(bytes.Buffer)
 	err = writeZipFileFromDir(buf, outputDir, diagnosticsAccumulatedError)
 	if err != nil {
@@ -346,6 +351,100 @@ func dumpK8sObject(obj runtime.Object, objName string, outputfile string) error 
 		return fmt.Errorf("error writing output file %s: %w", outputfile, err)
 	}
 	return nil
+}
+
+func dumpHelmChartValues(ctx context.Context, kubernetesClient clientk8s.Interface, agentPod *v1.Pod, chartOutputDir, valuesOutputFilePath string) error {
+	if agentPod == nil {
+		return nil
+	}
+
+	agentPodLabels := agentPod.GetObjectMeta().GetLabels()
+	agentHelmChart, ok := agentPodLabels["helm.sh/chart"]
+	if !ok || !strings.HasPrefix(agentHelmChart, "elastic-agent-") {
+		return nil
+	}
+
+	agentHelmRelease, ok := agentPodLabels["app.kubernetes.io/instance"]
+	if !ok || agentHelmRelease == "" {
+		return nil
+	}
+
+	namespace := agentPod.GetObjectMeta().GetNamespace()
+
+	labelSelector := metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			"owner":  "helm",
+			"name":   agentHelmRelease,
+			"status": "deployed",
+		},
+	}
+	helmReleaseSecrets, err := kubernetesClient.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: labels.Set(labelSelector.MatchLabels).String(),
+		Limit:         1,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list helm release secrets: %w", err)
+	}
+	if len(helmReleaseSecrets.Items) == 0 {
+		return fmt.Errorf("no helm release secrets found for release %s", agentHelmRelease)
+	}
+
+	r, err := decodeHelmRelease(string(helmReleaseSecrets.Items[0].Data["release"]))
+	if err != nil {
+		return fmt.Errorf("failed to decode helm release: %w", err)
+	}
+
+	if _, err = chartutil.Save(r.Chart, chartOutputDir); err != nil {
+		return fmt.Errorf("failed to save helm chart: %w", err)
+	}
+
+	yamlBytes, err := yaml.Marshal(r.Config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal helm values from release: %w", err)
+	}
+
+	if err = os.WriteFile(valuesOutputFilePath, yamlBytes, 0644); err != nil {
+		return fmt.Errorf("failed to write helm values to file: %w", err)
+	}
+
+	return nil
+}
+
+// decodeHelmRelease decodes the bytes of data into a release
+// type. Data must contain a base64 encoded gzipped string of a
+// valid release, otherwise an error is returned.
+func decodeHelmRelease(data string) (*release.Release, error) {
+	var b64 = base64.StdEncoding
+	var magicGzip = []byte{0x1f, 0x8b, 0x08}
+
+	// base64 decode string
+	b, err := b64.DecodeString(data)
+	if err != nil {
+		return nil, err
+	}
+
+	// For backwards compatibility with releases that were stored before
+	// compression was introduced we skip decompression if the
+	// gzip magic header is not found
+	if len(b) > 3 && bytes.Equal(b[0:3], magicGzip) {
+		r, err := gzip.NewReader(bytes.NewReader(b))
+		if err != nil {
+			return nil, err
+		}
+		defer r.Close()
+		b2, err := io.ReadAll(r)
+		if err != nil {
+			return nil, err
+		}
+		b = b2
+	}
+
+	var rls release.Release
+	// unmarshal release object bytes
+	if err := json.Unmarshal(b, &rls); err != nil {
+		return nil, err
+	}
+	return &rls, nil
 }
 
 func writeNamespaceLeases(ctx context.Context, kubernetesClient clientk8s.Interface, namespace string, outputFile string) error {

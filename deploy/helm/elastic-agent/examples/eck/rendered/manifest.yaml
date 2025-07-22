@@ -977,6 +977,13 @@ spec:
       namespace: elastic-system
   daemonSet:
     podTemplate:
+      metadata:
+        labels:
+          name: agent-pernode-example
+          helm.sh/chart: elastic-agent-9.2.0-beta
+          app.kubernetes.io/name: elastic-agent
+          app.kubernetes.io/instance: example
+          app.kubernetes.io/version: 9.2.0
       spec:
         automountServiceAccountToken: true
         containers:
@@ -1060,6 +1067,13 @@ spec:
       namespace: elastic-system
   deployment:
     podTemplate:
+      metadata:
+        labels:
+          name: agent-clusterwide-example
+          helm.sh/chart: elastic-agent-9.2.0-beta
+          app.kubernetes.io/name: elastic-agent
+          app.kubernetes.io/instance: example
+          app.kubernetes.io/version: 9.2.0
       spec:
         automountServiceAccountToken: true
         containers:

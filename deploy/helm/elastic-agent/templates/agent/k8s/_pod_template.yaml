@@ -57,21 +57,6 @@ template:
         secret:
           defaultMode: 0444
           secretName: {{ $agentName }}
-      - name: podinfo
-        downwardAPI:
-          items:
-            - path: "labels"
-              fieldRef:
-                fieldPath: metadata.labels
-            - path: "annotations"
-              fieldRef:
-                fieldPath: metadata.annotations
-            - path: "namespace"
-              fieldRef:
-                fieldPath: metadata.namespace
-            - path: "name"
-              fieldRef:
-                fieldPath: metadata.name
     {{- with $.Values.agent.imagePullSecrets }}
     imagePullSecrets:
       {{- . | toYaml | nindent 8 }}
@@ -128,9 +113,6 @@ template:
             mountPath: /etc/elastic-agent/agent.yml
             readOnly: true
             subPath: agent.yml
-          - name: podinfo
-            mountPath: /etc/podinfo
-            readOnly: true
         env:
           - name: NODE_NAME
             valueFrom:

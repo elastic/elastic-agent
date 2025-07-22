@@ -38,6 +38,13 @@ spec:
     replicas: {{ ($presetVal).replicaCount }}
     {{- end }}
     podTemplate:
+      metadata:
+        labels:
+          name: {{ $agentName }}
+          {{- include "elasticagent.labels" $ | nindent 10 }}
+          {{- with ($presetVal).labels }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
 {{- toYaml ($podTemplateResource).template | nindent 6 }}
 ---
 {{- end -}}

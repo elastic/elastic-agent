@@ -1,18 +1,19 @@
 package diagnostics
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
-	yamlk8s "sigs.k8s.io/yaml"
-
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/coordination/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
+	yamlk8s "sigs.k8s.io/yaml"
 )
 
 func Test_readServiceAccountToken(t *testing.T) {
@@ -187,6 +188,91 @@ func Test_writeNamespaceLeases(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_dumpHelmChartValues(t *testing.T) {
+	for _, tc := range []struct {
+		name                       string
+		agentPod                   *corev1.Pod
+		secrets                    []*corev1.Secret
+		releaseSecretsDataFilePath map[string]string
+		expectedErr                bool
+	}{
+		{
+			name: "should read the values file",
+			agentPod: &corev1.Pod{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Pod",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod1",
+					Namespace: "namespace1",
+					Labels: map[string]string{
+						"helm.sh/chart":              "elastic-agent-test",
+						"app.kubernetes.io/instance": "release1",
+					},
+				},
+			},
+			secrets: []*corev1.Secret{
+				{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Secret",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "secret1",
+						Namespace: "namespace1",
+						Labels: map[string]string{
+							"owner":  "helm",
+							"name":   "release1",
+							"status": "deployed",
+						},
+					},
+					Data: map[string][]byte{
+						"release": nil, // filled by releaseSecretsDataFilePath
+					},
+				},
+			},
+			releaseSecretsDataFilePath: map[string]string{
+				"namespace1/secret1": "testdata/helm.release.v1.secret.data",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			chartArchiveTmpFile := filepath.Join(tmpDir, "chart")
+			valuesTmpFile := filepath.Join(tmpDir, "chart", "values.yaml")
+			_, _ = chartArchiveTmpFile, valuesTmpFile
+			var objs []runtime.Object
+			for _, secret := range tc.secrets {
+				id := fmt.Sprintf("%s/%s", secret.Namespace, secret.Name)
+				if filePath, ok := tc.releaseSecretsDataFilePath[id]; ok {
+					var err error
+					secret.Data["release"], err = readSecretDataFromFile(filePath)
+					require.NoError(t, err, "expected no error in reading secret data file but got one")
+				}
+				objs = append(objs, secret)
+			}
+
+			clientSet := k8sfake.NewClientset(objs...)
+			err := dumpHelmChartValues(t.Context(), clientSet, tc.agentPod, chartArchiveTmpFile, valuesTmpFile)
+			if tc.expectedErr {
+				require.Error(t, err, "expected error in dumping helm chart values but got one")
+				return
+			}
+			require.NoError(t, err, "expected no error in dumping helm chart values but got one")
+			require.FileExists(t, valuesTmpFile, "expected values file to exist but it does not")
+		})
+	}
+}
+
+func readSecretDataFromFile(filePath string) ([]byte, error) {
+	secretData, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	return base64.StdEncoding.DecodeString(string(secretData))
 }
 
 func ptrOf[T any](s T) *T {
