@@ -16,8 +16,11 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
+	"time"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientk8s "k8s.io/client-go/kubernetes"
@@ -100,8 +103,14 @@ func k8sDiagnostics(l *logp.Logger) func(ctx context.Context) []byte {
 			}
 		}
 
+		// Follow OwnerRefs to get to the deployment/statefulset/daemonset that spawned this agent
 		k8sError = errors.Join(k8sError, dumpOwnerReferences(ctx, kubernetesClient, tokenPayload.Namespace, pod.OwnerReferences, k8sDir))
 		k8sError = errors.Join(k8sError, writeNamespaceLeases(ctx, kubernetesClient, tokenPayload.Namespace, filepath.Join(k8sDir, "leases.yaml")))
+
+		// Collect logs for this pod
+		podLogsDir := filepath.Join(k8sDir, "logs", pod.Namespace, pod.Name)
+		k8sError = errors.Join(os.MkdirAll(podLogsDir, 0755))
+		k8sError = errors.Join(k8sError, collectLogsFromPod(ctx, kubernetesClient, pod, podLogsDir))
 
 		buf := new(bytes.Buffer)
 		err = writeZipFileFromDir(buf, tmpDir, k8sError)
@@ -112,6 +121,59 @@ func k8sDiagnostics(l *logp.Logger) func(ctx context.Context) []byte {
 
 		return buf.Bytes()
 	}
+}
+
+func collectLogsFromPod(ctx context.Context, client clientk8s.Interface, pod *v1.Pod, dir string) error {
+
+	var retrieveLogsErr error
+
+	for _, container := range pod.Spec.Containers {
+		retrieveLogsErr = errors.Join(retrieveLogsErr, retrieveContainerLogs(ctx, client, pod, container, false, dir))
+
+		// Find container state to check if there has been a restart
+		containerStatusIdx := slices.IndexFunc(pod.Status.ContainerStatuses, func(status v1.ContainerStatus) bool {
+			return status.Name == container.Name
+		})
+		if containerStatusIdx != -1 {
+			containerStatus := pod.Status.ContainerStatuses[containerStatusIdx]
+			if containerStatus.RestartCount > 0 {
+				// collect the previous container logs as well
+				retrieveLogsErr = errors.Join(retrieveLogsErr, retrieveContainerLogs(ctx, client, pod, container, true, dir))
+			}
+		}
+	}
+
+	return retrieveLogsErr
+}
+
+func retrieveContainerLogs(ctx context.Context, client clientk8s.Interface, pod *v1.Pod, container v1.Container, previous bool, outputDir string) error {
+	logsReq := client.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &v1.PodLogOptions{
+		Container: container.Name,
+		Previous:  previous,
+	})
+
+	streamCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	podLogsStream, err := logsReq.Stream(streamCtx)
+	if err != nil {
+		return fmt.Errorf("retrieving (previous=%v) logs for %s/%s container %s: %w", previous, pod.Namespace, pod.Name, container.Name, err)
+	}
+
+	outputFileName := fmt.Sprintf("%s-current.log", container.Name)
+	if previous {
+		outputFileName = fmt.Sprintf("%s-previous.log", container.Name)
+	}
+
+	oFile, err := os.Create(filepath.Join(outputDir, outputFileName))
+	if err != nil {
+		return fmt.Errorf("creating error creating output file %s: %w", outputFileName, err)
+	}
+	defer oFile.Close()
+	_, err = io.Copy(oFile, podLogsStream)
+	if err != nil {
+		return fmt.Errorf("writing (previous=%v) pod logs for %s/%s container %s: %w", previous, pod.Namespace, pod.Name, container.Name, err)
+	}
+	return nil
 }
 
 func createErrorOnlyZip(diagErr error) ([]byte, error) {
