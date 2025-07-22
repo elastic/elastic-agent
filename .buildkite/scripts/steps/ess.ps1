@@ -107,11 +107,9 @@ function Get-Ess-Stack {
       ess_up $StackVersion
       Write-Output "ESS stack is up. ES_HOST: $Env:ELASTICSEARCH_HOST"
   } else {
-      if ($Env:BUILDKITE_STEP_KEY -eq "integration-fips-ess") {
-          $job_id = & buildkite-agent meta-data get "ess.job.fips"
-      } else {
-          $job_id = & buildkite-agent meta-data get "ess.job"
-      }
+      # TODO: Use "ess.job.fips" if we need to build and test fips artifacts for Windows releases; Env:BUILDKITE_GROUP_KEY can be used to deterimine jpw tp set $job_id
+      $job_id = & buildkite-agent meta-data get "ess.job"
+
       # For the first run, we retrieve ESS stack metadata
       Write-Output "~~~ Receiving ESS stack metadata"
       Write-Output "Using JOB ID: $job_id"

@@ -39,7 +39,7 @@ if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 || "${FORCE_ESS_CREATE:-false}" == "true"
 else
   # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data
   echo "~~~ Receiving ESS stack metadata"
-  if [[ $BUILDKITE_STEP_KEY == "integration-fips-ess" ]]; then
+  if [[ $BUILDKITE_GROUP_KEY == "integration-tests-ubuntu-fips" ]]; then
     JOB_ID=$(buildkite-agent meta-data get "ess.job.fips")
   else
     JOB_ID=$(buildkite-agent meta-data get "ess.job")
