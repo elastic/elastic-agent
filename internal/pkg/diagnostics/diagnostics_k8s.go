@@ -118,6 +118,11 @@ func collectK8sDiagnosticsWithClientAndToken(ctx context.Context, l *logp.Logger
 	cgroupOutputDir := filepath.Join(tmpDir, cgroupSubDir)
 	diagnosticsAccumulatedError = errors.Join(os.MkdirAll(cgroupOutputDir, 0755))
 	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, collectCgroup(ctx, "/sys/fs/cgroup/", cgroupOutputDir))
+
+	// Collect k8s events of this pod
+	k8sEventsDir := filepath.Join(k8sDir, "events.yaml")
+	diagnosticsAccumulatedError = errors.Join(os.MkdirAll(k8sEventsDir, 0755))
+
 	buf := new(bytes.Buffer)
 	err = writeZipFileFromDir(buf, tmpDir, diagnosticsAccumulatedError)
 	if err != nil {
@@ -496,6 +501,32 @@ func decodeHelmRelease(data string) (*release.Release, error) {
 		return nil, err
 	}
 	return &rls, nil
+}
+
+func dumpK8sEvents(ctx context.Context, kubernetesClient clientk8s.Interface, agentPod *v1.Pod, outputFile string) error {
+	if agentPod == nil {
+		return nil
+	}
+	namespace := agentPod.GetObjectMeta().GetNamespace()
+	events, err := kubernetesClient.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{
+		FieldSelector: fmt.Sprintf("involvedObject.kind=Pod,involvedObject.name=%s", agentPod.GetName()),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list events: %w", err)
+	}
+	if len(events.Items) == 0 {
+		return nil
+	}
+
+	eventsMarshalledBytes, err := yamlk8s.Marshal(events.Items)
+	if err != nil {
+		return fmt.Errorf("error marshalling leases for %q: %w", namespace, err)
+	}
+	err = os.WriteFile(outputFile, eventsMarshalledBytes, 0644)
+	if err != nil {
+		return fmt.Errorf("error writing pod.yaml: %w", err)
+	}
+	return nil
 }
 
 func writeNamespaceLeases(ctx context.Context, kubernetesClient clientk8s.Interface, namespace string, outputFile string) error {

@@ -282,3 +282,57 @@ func readSecretDataFromFile(filePath string) ([]byte, error) {
 func ptrOf[T any](s T) *T {
 	return &s
 }
+
+func Test_dumpK8sEvents(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		namespace   string
+		agentPod    *corev1.Pod
+		events      []corev1.Event
+		expectedErr bool
+	}{
+		{
+			name:      "should dump k8s events",
+			namespace: "namespace1",
+			agentPod: &corev1.Pod{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Pod",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod1",
+					Namespace: "namespace1",
+				},
+			},
+			events: []corev1.Event{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "event1",
+						Namespace: "namespace1",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						Name:      "pod1",
+						Namespace: "namespace1",
+					},
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			eventsTmpFile := filepath.Join(tmpDir, "events.yaml")
+			var objs []runtime.Object
+			for _, event := range tc.events {
+				objs = append(objs, &event)
+			}
+			clientSet := k8sfake.NewClientset(objs...)
+			err := dumpK8sEvents(t.Context(), clientSet, tc.agentPod, eventsTmpFile)
+			if tc.expectedErr {
+				require.Error(t, err, "expected error in dumping k8s events but got one")
+				return
+			}
+			require.NoError(t, err, "expected no error in dumping k8s events but got one")
+			require.FileExists(t, eventsTmpFile, "expected events file to exist but it does not")
+		})
+	}
+}
