@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+
 	koanfmaps "github.com/knadh/koanf/maps"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
@@ -397,7 +399,8 @@ func getDefaultDatastreamTypeForComponent(comp *component.Component) (string, er
 
 // translateEsOutputToExporter translates an elasticsearch output configuration to an elasticsearch exporter configuration.
 func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
-	esConfig, err := elasticsearchtranslate.ToOTelConfig(cfg)
+	// TODO: Figure out a way to avoid needing a logger for this function
+	esConfig, err := elasticsearchtranslate.ToOTelConfig(cfg, logp.L())
 	if err != nil {
 		return nil, err
 	}
