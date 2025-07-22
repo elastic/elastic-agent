@@ -35,34 +35,16 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 )
 
-const zipSubdir = "k8s"
+const (
+	k8sSubdir    = "k8s"
+	cgroupSubDir = "cgroup"
+	logsSubDir   = "logs"
+)
 
 func k8sDiagnostics(l *logp.Logger) func(ctx context.Context) []byte {
 	return func(ctx context.Context) []byte {
 		if _, ok := os.LookupEnv("KUBERNETES_SERVICE_HOST"); !ok {
 			return nil
-		}
-
-		tmpDir, err := os.MkdirTemp("", "elastic-agent-k8s-diag-*")
-		if err != nil {
-			err = fmt.Errorf("error creating k8s diag temp directory: %w", err)
-			errorOnlyZip, zipCreateErr := createErrorOnlyZip(err)
-			if zipCreateErr != nil {
-				l.Errorf("error creating error-only k8s diag zip: %s. Diagnostics errors: %s", zipCreateErr, err)
-			}
-			return errorOnlyZip
-		}
-		defer os.RemoveAll(tmpDir)
-
-		k8sDir := filepath.Join(tmpDir, zipSubdir)
-		err = os.MkdirAll(k8sDir, 0755)
-		if err != nil {
-			err = fmt.Errorf("error creating k8s diag subdirectory %q: %w", k8sDir, err)
-			errorOnlyZip, zipCreateErr := createErrorOnlyZip(err)
-			if zipCreateErr != nil {
-				l.Errorf("error creating error-only k8s diag zip: %s. Diagnostics errors: %s", zipCreateErr, err)
-			}
-			return errorOnlyZip
 		}
 
 		kubernetesClient, err := kubernetes.GetKubernetesClient("", kubernetes.KubeClientOptions{})
@@ -84,11 +66,33 @@ func k8sDiagnostics(l *logp.Logger) func(ctx context.Context) []byte {
 			}
 			return errorOnlyZip
 		}
-		return collectK8sDiagnosticsWithClientAndToken(ctx, l, kubernetesClient, tokenPayload.Namespace, tokenPayload.Pod.Name, k8sDir)
+		return collectK8sDiagnosticsWithClientAndToken(ctx, l, kubernetesClient, tokenPayload.Namespace, tokenPayload.Pod.Name)
 	}
 }
-func collectK8sDiagnosticsWithClientAndToken(ctx context.Context, l *logp.Logger, k8sClient clientk8s.Interface, namespace string, podName string, outputDir string) []byte {
-	k8sDir := filepath.Join(outputDir, zipSubdir)
+func collectK8sDiagnosticsWithClientAndToken(ctx context.Context, l *logp.Logger, k8sClient clientk8s.Interface, namespace string, podName string) []byte {
+
+	tmpDir, err := os.MkdirTemp("", "elastic-agent-k8s-diag-*")
+	if err != nil {
+		err = fmt.Errorf("error creating k8s diag temp directory: %w", err)
+		errorOnlyZip, zipCreateErr := createErrorOnlyZip(err)
+		if zipCreateErr != nil {
+			l.Errorf("error creating error-only k8s diag zip: %s. Diagnostics errors: %s", zipCreateErr, err)
+		}
+		return errorOnlyZip
+	}
+	defer os.RemoveAll(tmpDir)
+
+	k8sDir := filepath.Join(tmpDir, k8sSubdir)
+	err = os.MkdirAll(k8sDir, 0755)
+	if err != nil {
+		err = fmt.Errorf("error creating k8s diag subdirectory %q: %w", k8sDir, err)
+		errorOnlyZip, zipCreateErr := createErrorOnlyZip(err)
+		if zipCreateErr != nil {
+			l.Errorf("error creating error-only k8s diag zip: %s. Diagnostics errors: %s", zipCreateErr, err)
+		}
+		return errorOnlyZip
+	}
+
 	var diagnosticsAccumulatedError error
 
 	pod, err := k8sClient.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
@@ -105,18 +109,69 @@ func collectK8sDiagnosticsWithClientAndToken(ctx context.Context, l *logp.Logger
 	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, writeNamespaceLeases(ctx, k8sClient, namespace, filepath.Join(k8sDir, "leases.yaml")))
 
 	// Collect logs for this pod
-	podLogsDir := filepath.Join(k8sDir, "logs")
+	podLogsDir := filepath.Join(k8sDir, logsSubDir)
 	diagnosticsAccumulatedError = errors.Join(os.MkdirAll(podLogsDir, 0755))
 	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, collectLogsFromPod(ctx, k8sClient, pod, podLogsDir))
 	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, dumpHelmChartValues(ctx, k8sClient, pod, k8sDir, filepath.Join(k8sDir, "values.yaml")))
+
+	// Collect cgroup stats
+	cgroupOutputDir := filepath.Join(tmpDir, cgroupSubDir)
+	diagnosticsAccumulatedError = errors.Join(os.MkdirAll(cgroupOutputDir, 0755))
+	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, collectCgroup(ctx, "/sys/fs/cgroup/", cgroupOutputDir))
 	buf := new(bytes.Buffer)
-	err = writeZipFileFromDir(buf, outputDir, diagnosticsAccumulatedError)
+	err = writeZipFileFromDir(buf, tmpDir, diagnosticsAccumulatedError)
 	if err != nil {
 		l.Errorf("error creating k8s diagnostics zip: %s. Diagnostics errors: %s", err, diagnosticsAccumulatedError)
 		return nil
 	}
 
 	return buf.Bytes()
+}
+
+func collectCgroup(ctx context.Context, cgroupBaseDir string, outputDir string) error {
+	cgroupFiles := []string{
+		"memory.events",
+		"memory.stat",
+		"memory.low",
+		"memory.high",
+		"memory.min",
+		"memory.max",
+	}
+
+	var accumulatedError error
+
+	for _, cgroupFile := range cgroupFiles {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
+		inputFileName := filepath.Join(cgroupBaseDir, cgroupFile)
+		outputFileName := filepath.Join(outputDir, cgroupFile)
+
+		accumulatedError = errors.Join(accumulatedError, copyFile(inputFileName, outputFileName))
+	}
+	return accumulatedError
+}
+
+func copyFile(inputFileName string, outputFileName string) error {
+	inputFile, err := os.Open(inputFileName)
+	if err != nil {
+		return fmt.Errorf("error opening %q: %w", inputFileName, err)
+	}
+	defer inputFile.Close()
+
+	outputFile, err := os.Create(outputFileName)
+	if err != nil {
+		return fmt.Errorf("error creating outputfile %q: %w", outputFileName, err)
+	}
+	defer outputFile.Close()
+
+	_, err = io.Copy(outputFile, inputFile)
+	if err != nil {
+		return fmt.Errorf("error copying %q into %q: %w", inputFileName, outputFileName, err)
+	}
+
+	return nil
 }
 
 func dumpK8sManifests(ctx context.Context, k8sClient clientk8s.Interface, pod *v1.Pod, k8sDir string) error {
@@ -318,10 +373,7 @@ func dumpOwnerReferences(ctx context.Context, kubernetesClient clientk8s.Interfa
 				continue
 			}
 			// recursively search for owners of replicasets
-			err = dumpOwnerReferences(ctx, kubernetesClient, namespace, replicaSet.OwnerReferences, outputdir)
-			if err != nil {
-				k8sError = errors.Join(k8sError, err)
-			}
+			k8sError = errors.Join(k8sError, dumpOwnerReferences(ctx, kubernetesClient, namespace, replicaSet.OwnerReferences, outputdir))
 			k8sObject = replicaSet
 
 		default:
@@ -332,7 +384,6 @@ func dumpOwnerReferences(ctx context.Context, kubernetesClient clientk8s.Interfa
 		if k8sObject != nil {
 			outputFile := fmt.Sprintf("%s-%s.yaml", strings.ToLower(ownerRef.Kind), ownerRef.Name)
 			err = dumpK8sObject(k8sObject, ownerRef.Name, filepath.Join(outputdir, outputFile))
-
 			if err != nil {
 				k8sError = errors.Join(k8sError, fmt.Errorf("error dumping %s: %w", outputFile, err))
 			}
