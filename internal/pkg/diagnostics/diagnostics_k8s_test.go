@@ -1,10 +1,17 @@
 package diagnostics
 
 import (
-	"github.com/stretchr/testify/require"
+	"fmt"
 	"os"
 	"path/filepath"
+	yamlk8s "sigs.k8s.io/yaml"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/coordination/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	k8sfake "k8s.io/client-go/kubernetes/fake"
 )
 
 func Test_readServiceAccountToken(t *testing.T) {
@@ -74,5 +81,113 @@ func Test_readServiceAccountToken(t *testing.T) {
 			}
 		})
 	}
+}
 
+func Test_writeNamespaceLeases(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		namespace      string
+		leases         []v1.Lease
+		expectedOutput string
+		expectedErr    bool
+	}{
+		{
+			name:      "should write leases to a file",
+			namespace: "namespace1",
+			leases: []v1.Lease{
+				{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Lease",
+						APIVersion: "coordination.k8s.io/v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "lease1",
+						Namespace: "namespace1",
+					},
+					Spec: v1.LeaseSpec{
+						HolderIdentity:       ptrOf("holder1"),
+						LeaseDurationSeconds: nil,
+						AcquireTime:          nil,
+						RenewTime:            nil,
+						LeaseTransitions:     nil,
+						Strategy:             ptrOf(v1.OldestEmulationVersion),
+						PreferredHolder:      ptrOf("holder1"),
+					},
+				},
+			},
+		},
+		{
+			name:      "should not write leases because namespace does not match",
+			namespace: "namespace2",
+			leases: []v1.Lease{
+				{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Lease",
+						APIVersion: "coordination.k8s.io/v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "lease1",
+						Namespace: "namespace1",
+					},
+					Spec: v1.LeaseSpec{
+						HolderIdentity:       ptrOf("holder1"),
+						LeaseDurationSeconds: nil,
+						AcquireTime:          nil,
+						RenewTime:            nil,
+						LeaseTransitions:     nil,
+						Strategy:             ptrOf(v1.OldestEmulationVersion),
+						PreferredHolder:      ptrOf("holder1"),
+					},
+				},
+			},
+		},
+		{
+			name:      "should not write leases because there are no leases",
+			namespace: "namespace1",
+			leases:    []v1.Lease{},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			tmpFile := filepath.Join(tmpDir, "leases.yaml")
+			var objs []runtime.Object
+			compareMap := make(map[string]*v1.Lease)
+			for _, lease := range tc.leases {
+				objs = append(objs, &lease)
+
+				if lease.Namespace != tc.namespace {
+					continue
+				}
+				id := fmt.Sprintf("%s/%s", lease.Namespace, lease.Name)
+				compareMap[id] = &lease
+			}
+			clientSet := k8sfake.NewClientset(objs...)
+
+			err := writeNamespaceLeases(t.Context(), clientSet, tc.namespace, tmpFile)
+			if tc.expectedErr {
+				require.Error(t, err, "expected error in writing leases but got one")
+				return
+			}
+			if len(compareMap) == 0 {
+				require.NoFileExists(t, tmpFile)
+				return
+			}
+			require.NoError(t, err, "expected no error in writing leases but got one")
+			leasesBytes, err := os.ReadFile(tmpFile)
+			require.NoError(t, err, "expected no error in reading leases but got one")
+			var writtenLeases []v1.Lease
+			err = yamlk8s.Unmarshal(leasesBytes, &writtenLeases)
+			require.NoError(t, err, "expected no error in unmarshalling leases but got one")
+			for _, lease := range writtenLeases {
+				id := fmt.Sprintf("%s/%s", lease.Namespace, lease.Name)
+				existingLease, ok := compareMap[id]
+				require.True(t, ok, "unexpected lease %s", id)
+				require.EqualValues(t, existingLease.Spec, lease.Spec)
+			}
+		})
+	}
+}
+
+func ptrOf[T any](s T) *T {
+	return &s
 }

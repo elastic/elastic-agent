@@ -10,6 +10,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/hex"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"io"
 	"os"
 	"path/filepath"
@@ -428,7 +429,8 @@ func zipLogsAndAssertFiles(t *testing.T, topPath string, excludeEvents bool, exp
 func TestGlobalHooks(t *testing.T) {
 	testPkgVer := "1.2.3-test"
 	setupPkgVersion(t, testPkgVer, 0o644)
-	hooks := GlobalHooks()
+	testLogger, _ := loggertest.New("test_global_hook")
+	hooks := GlobalHooks(testLogger)
 	assert.NotEmpty(t, hooks, "multiple hooks should be returned")
 	deadline, _ := t.Deadline()
 	ctx, cancel := context.WithDeadline(context.Background(), deadline)
@@ -454,7 +456,8 @@ func TestGlobalHooks(t *testing.T) {
 }
 
 func TestPackageVersionHook(t *testing.T) {
-	for _, h := range GlobalHooks() {
+	testLogger, _ := loggertest.New("test_global_hook")
+	for _, h := range GlobalHooks(testLogger) {
 		if h.Name == "package version" {
 			testPackageVersionHook(t, h)
 			return

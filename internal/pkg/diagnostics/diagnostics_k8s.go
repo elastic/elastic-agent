@@ -101,6 +101,7 @@ func k8sDiagnostics(l *logp.Logger) func(ctx context.Context) []byte {
 		}
 
 		k8sError = errors.Join(k8sError, dumpOwnerReferences(ctx, kubernetesClient, tokenPayload.Namespace, pod.OwnerReferences, k8sDir))
+		k8sError = errors.Join(k8sError, writeNamespaceLeases(ctx, kubernetesClient, tokenPayload.Namespace, filepath.Join(k8sDir, "leases.yaml")))
 
 		buf := new(bytes.Buffer)
 		err = writeZipFileFromDir(buf, tmpDir, k8sError)
@@ -266,6 +267,27 @@ func dumpK8sObject(obj runtime.Object, objName string, outputfile string) error 
 	err = os.WriteFile(outputfile, marshalledBytes, 0644)
 	if err != nil {
 		return fmt.Errorf("error writing output file %s: %w", outputfile, err)
+	}
+	return nil
+}
+
+func writeNamespaceLeases(ctx context.Context, kubernetesClient clientk8s.Interface, namespace string, outputFile string) error {
+	leases, err := kubernetesClient.CoordinationV1().Leases(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	if len(leases.Items) == 0 {
+		return nil
+	}
+
+	leasesMarshalledBytes, err := yamlk8s.Marshal(leases.Items)
+	if err != nil {
+		return fmt.Errorf("error marshalling leases for %q: %w", namespace, err)
+	}
+	err = os.WriteFile(outputFile, leasesMarshalledBytes, 0644)
+	if err != nil {
+		return fmt.Errorf("error writing pod.yaml: %w", err)
 	}
 	return nil
 }
