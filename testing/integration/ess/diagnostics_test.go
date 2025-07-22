@@ -308,7 +308,7 @@ inputs:
   - id: filestream-filebeat
     type: filestream
     paths:
-      - /var/log/system.log
+      - {{ .InputFile }}
     prospector.scanner.fingerprint.enabled: false
     file_identity.native: ~
     use_output: default
@@ -324,29 +324,27 @@ agent.monitoring.enabled: false
 	var filebeatSetup = map[string]integrationtest.ComponentState{
 		"filestream-default": {
 			State: integrationtest.NewClientState(client.Healthy),
-			Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
-				integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "filestream-default"}: {
-					State: integrationtest.NewClientState(client.Healthy),
-				},
-				integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "filestream-filebeat"}: {
-					State: integrationtest.NewClientState(client.Healthy),
-				},
-			},
 		},
 	}
-	f, err := define.NewFixtureFromLocalBuild(t, define.Version(), integrationtest.WithAllowErrors())
-	require.NoError(t, err)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
-	err = f.Prepare(ctx)
-	require.NoError(t, err)
 
 	t.Run("filebeat process", func(t *testing.T) {
+		f, err := define.NewFixtureFromLocalBuild(t, define.Version(), integrationtest.WithAllowErrors())
+		require.NoError(t, err)
+		err = f.Prepare(ctx)
+		require.NoError(t, err)
+		// Create the data file to ingest
+		inputFile, err := os.CreateTemp(t.TempDir(), "input.txt")
+		require.NoError(t, err, "failed to create temp file to hold data to ingest")
+		err = os.WriteFile(inputFile.Name(), []byte("hello world\n"), 0644)
+		require.NoError(t, err, "failed to write data to temp file")
 		var configBuffer bytes.Buffer
 		require.NoError(t,
 			template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, map[string]any{
-				"Runtime": "process",
+				"Runtime":   "process",
+				"InputFile": inputFile.Name(),
 			}))
 		expectedCompDiagnosticsFiles := append(compDiagnosticsFiles,
 			"registry.tar.gz",
@@ -366,13 +364,24 @@ agent.monitoring.enabled: false
 	})
 
 	t.Run("filebeat receiver", func(t *testing.T) {
+		f, err := define.NewFixtureFromLocalBuild(t, define.Version(), integrationtest.WithAllowErrors())
+		require.NoError(t, err)
+		err = f.Prepare(ctx)
+		require.NoError(t, err)
+		// Create the data file to ingest
+		inputFile, err := os.CreateTemp(t.TempDir(), "input.txt")
+		require.NoError(t, err, "failed to create temp file to hold data to ingest")
+		err = os.WriteFile(inputFile.Name(), []byte("hello world\n"), 0644)
+		require.NoError(t, err, "failed to write data to temp file")
 		var configBuffer bytes.Buffer
 		require.NoError(t,
 			template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, map[string]any{
-				"Runtime": "otel",
+				"Runtime":   "otel",
+				"InputFile": inputFile.Name(),
 			}))
-		// currently we don't expect any diagnostics files for beats receivers
-		expectedCompDiagnosticsFiles := []string{"registry.tar.gz"}
+		expectedCompDiagnosticsFiles := []string{
+			"registry.tar.gz",
+		}
 		err = f.Run(ctx, integrationtest.State{
 			Configure:  configBuffer.String(),
 			AgentState: integrationtest.NewClientState(client.Healthy),
