@@ -10,7 +10,6 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/hex"
-	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"io"
 	"os"
 	"path/filepath"
@@ -18,6 +17,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
