@@ -384,7 +384,7 @@ agent.monitoring.enabled: false
 		}
 		err = f.Run(ctx, integrationtest.State{
 			Configure:  configBuffer.String(),
-			AgentState: integrationtest.NewClientState(client.Healthy),
+			AgentState: integrationtest.NewClientState(client.Degraded),
 			After:      testDiagnosticsFactory(t, filebeatSetup, diagnosticsFiles, expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
 		})
 		assert.NoError(t, err)
@@ -400,6 +400,11 @@ func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.C
 		require.NoError(t, err)
 
 		verifyDiagnosticArchive(t, compSetup, diagZip, diagFiles, diagCompFiles, avi)
+
+		// preserve the diagnostic archive if the test failed
+		if t.Failed() {
+			fix.MoveToDiagnosticsDir(diagZip)
+		}
 
 		return nil
 	}
