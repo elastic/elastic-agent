@@ -25,7 +25,6 @@ rules:
       - namespaces
       - events
       - pods
-      - pods/log
       - services
       - configmaps
       - persistentvolumes
@@ -59,6 +58,7 @@ rules:
       - get
       - create
       - update
+      - list
   - nonResourceURLs:
       - /healthz
       - /healthz/*

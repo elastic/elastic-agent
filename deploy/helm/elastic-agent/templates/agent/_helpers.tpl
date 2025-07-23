@@ -110,6 +110,8 @@ Validate and initialise the defined agent presets
 {{- include "elasticagent.presets.pernode.init" $ -}}
 {{- include "elasticagent.presets.ksm.sidecar.init" $ -}}
 {{- range $presetName, $presetVal := $.Values.agent.presets -}}
+{{- $roleCreate := dig "role" "create" false $presetVal -}}
+{{- $_ := set $presetVal "role" (dict "create" $roleCreate) -}}
 {{- include "elasticagent.preset.mutate.unprivileged" (list $ $presetVal) -}}
 {{- include "elasticagent.preset.mutate.fleet" (list $ $presetVal) -}}
 {{- $presetMode := ($presetVal).mode -}}
