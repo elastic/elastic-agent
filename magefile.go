@@ -2481,8 +2481,6 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 
 // UpdatePackageVersion update the file that contains the latest available snapshot version
 func (Integration) UpdatePackageVersion(ctx context.Context) error {
-	const packageVersionFilename = ".package-version"
-
 	currentReleaseBranch, err := git.GetCurrentReleaseBranch(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to identify the current release branch: %w", err)
@@ -2493,34 +2491,18 @@ func (Integration) UpdatePackageVersion(ctx context.Context) error {
 		return fmt.Errorf("failed to get latest build for branch %q: %w", currentReleaseBranch, err)
 	}
 
-	type branchInfoExtended struct {
-		branchInfo
-		CoreVersion  string `json:"core_version"`
-		StackBuildID string `json:"stack_build_id"`
-	}
-
-	branchInfoExtra := branchInfoExtended{
-		branchInfo:   *branchInformation,
-		CoreVersion:  strings.ReplaceAll(branchInformation.Version, "-SNAPSHOT", ""),
-		StackBuildID: fmt.Sprintf("%s-SNAPSHOT", branchInformation.BuildID),
-	}
-
-	branchInfoExtraBytes, err := json.MarshalIndent(branchInfoExtra, "", "  ")
+	err = devtools.UpdatePackageVersion(
+		branchInformation.Version, branchInformation.BuildID,
+		branchInformation.ManifestURL, branchInformation.SummaryURL)
 	if err != nil {
-		return fmt.Errorf("failed to marshal branch information: %w", err)
+		return fmt.Errorf("failed to write package version: %w", err)
 	}
 
-	file, err := os.OpenFile(packageVersionFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+	packageVersionBytes, err := os.ReadFile(devtools.PackageVersionFilename)
 	if err != nil {
-		return fmt.Errorf("failed to open %s for write: %w", packageVersionFilename, err)
+		return fmt.Errorf("failed to read file: %w", err)
 	}
-	defer file.Close()
-	_, err = file.Write(branchInfoExtraBytes)
-	if err != nil {
-		return fmt.Errorf("failed to write the package version file %s: %w", packageVersionFilename, err)
-	}
-
-	fmt.Println(string(branchInfoExtraBytes))
+	fmt.Println(string(packageVersionBytes))
 
 	return nil
 }

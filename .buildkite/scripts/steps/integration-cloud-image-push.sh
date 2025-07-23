@@ -15,10 +15,6 @@ echo "CI_ELASTIC_AGENT_DOCKER_IMAGE: ${CI_ELASTIC_AGENT_DOCKER_IMAGE}"
 
 
 export CUSTOM_IMAGE_TAG="git-${BUILDKITE_COMMIT:0:12}"
-if [[ -f .package-version ]]; then
-  BEAT_VERSION="$(jq -r '.core_version' .package-version)"
-  export BEAT_VERSION
-  echo "BEAT_VERSION: ${BEAT_VERSION} (from .package-version)"
-fi
+export USE_PACKAGE_VERSION="true"
 
 mage cloud:push
