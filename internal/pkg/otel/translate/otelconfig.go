@@ -10,8 +10,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/elastic/elastic-agent-libs/logp"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 
 	koanfmaps "github.com/knadh/koanf/maps"
