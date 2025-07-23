@@ -20,10 +20,6 @@ connectors:
   elasticapm: {} # Elastic APM Connector
 
 processors:
-  # DEPRECATED: The elasticinframetrics processor is deprecated and will be removed in 9.2.0.
-  elasticinframetrics:
-    add_system_metrics: true
-    drop_original: true
   attributes/dataset:
     actions:
       - key: event.dataset
@@ -69,7 +65,6 @@ service:
     metrics/infra/ecs:
       receivers: [routing]
       processors:
-        - elasticinframetrics
         - attributes/dataset
         - resource/process
         - batch/metrics

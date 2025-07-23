@@ -49,8 +49,6 @@ connectors:
   elasticapm:
 
 processors:
-  # DEPRECATED: The elasticinframetrics processor is deprecated and will be removed in 9.2.0.
-  elasticinframetrics:
   resourcedetection:
     detectors: ["system"]
     system:
@@ -123,7 +121,7 @@ service:
 
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
-      processors: [elasticinframetrics, resourcedetection, attributes/dataset, resource/process]
+      processors: [resourcedetection, attributes/dataset, resource/process]
       exporters: [elasticsearch/ecs]
 
     metrics/aggregated-metrics:
