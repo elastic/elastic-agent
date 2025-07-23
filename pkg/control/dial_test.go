@@ -1,0 +1,112 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
+
+package control
+
+import (
+	"context"
+	"net"
+	"testing"
+	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/test/bufconn"
+)
+
+func TestDialContextBlocking_Success(t *testing.T) {
+	// Create a buffer connection for testing
+	buffer := bufconn.Listen(1024 * 1024)
+	defer buffer.Close()
+
+	// Start a mock gRPC server
+	server := grpc.NewServer()
+	go func() {
+		if err := server.Serve(buffer); err != nil {
+			t.Logf("Server serve error: %v", err)
+		}
+	}()
+	defer server.Stop()
+
+	// Test successful connection
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conn, err := DialContextBlocking(ctx, "bufconn",
+		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+			return buffer.Dial()
+		}),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+
+	if err != nil {
+		t.Fatalf("DialContextBlocking failed: %v", err)
+	}
+	defer conn.Close()
+
+	// Verify connection is ready
+	state := conn.GetState()
+	if state != connectivity.Ready {
+		t.Errorf("Expected connection state to be Ready, got %v", state)
+	}
+}
+
+func TestDialContextBlocking_ContextCancellation(t *testing.T) {
+	// Create a context that cancels immediately
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	// Try to establish connection with cancelled context
+	conn, err := DialContextBlocking(ctx, "unreachable:12345",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+
+	// Should return an error due to context cancellation
+	if err == nil {
+		conn.Close()
+		t.Fatal("Expected DialContextBlocking to fail with cancelled context")
+	}
+
+	if err != context.Canceled {
+		t.Errorf("Expected context.Canceled error, got %v", err)
+	}
+}
+
+func TestDialContextBlocking_InvalidTarget(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	// Try to connect to an invalid target
+	conn, err := DialContextBlocking(ctx, "invalid-scheme://invalid-target",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+
+	// Should return an error
+	if err == nil {
+		conn.Close()
+		t.Fatal("Expected DialContextBlocking to fail with invalid target")
+	}
+}
+
+func TestDialContextBlocking_Timeout(t *testing.T) {
+	// Create a very short timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	// Try to connect to a non-existent service
+	conn, err := DialContextBlocking(ctx, "127.0.0.1:1",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+
+	// Should return an error due to timeout
+	if err == nil {
+		conn.Close()
+		t.Fatal("Expected DialContextBlocking to fail with timeout")
+	}
+
+	if err != context.DeadlineExceeded {
+		t.Errorf("Expected context.DeadlineExceeded error, got %v", err)
+	}
+}
