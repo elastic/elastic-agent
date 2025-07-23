@@ -273,6 +273,9 @@ func (b GolangCrossBuilder) Build() error {
 		return fmt.Errorf("failed to determine repo root and package sub dir: %w", err)
 	}
 
+	uid := os.Getuid()
+	gid := os.Getgid()
+
 	mountPoint := filepath.ToSlash(filepath.Join("/go", "src", repoInfo.CanonicalRootImportPath))
 	// use custom dir for build if given, subdir if not:
 	cwd := repoInfo.SubDir
@@ -314,8 +317,8 @@ func (b GolangCrossBuilder) Build() error {
 
 	if runtime.GOOS != "windows" {
 		args = append(args,
-			"--env", "EXEC_UID="+strconv.Itoa(os.Getuid()),
-			"--env", "EXEC_GID="+strconv.Itoa(os.Getgid()),
+			"--env", fmt.Sprintf("EXEC_UID=%d", uid),
+			"--env", fmt.Sprintf("EXEC_GID=%d", gid),
 		)
 	}
 	if versionQualified {
@@ -358,6 +361,7 @@ func (b GolangCrossBuilder) Build() error {
 		"--env", fmt.Sprintf("DEV=%v", DevBuild),
 		"--env", fmt.Sprintf("EXTERNAL=%v", ExternalBuild),
 		"--env", fmt.Sprintf("FIPS=%v", FIPSBuild),
+		"--user", fmt.Sprintf("%d:%d", uid, gid),
 		"-v", repoInfo.RootDir+":"+mountPoint,
 		"-w", workDir,
 		image,
