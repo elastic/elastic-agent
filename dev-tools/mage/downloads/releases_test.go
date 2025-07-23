@@ -80,6 +80,21 @@ func TestGetSnapshotArtifactVersion(t *testing.T) {
 		assert.ErrorContains(t, err, "bd8691a")
 		assert.Empty(t, version)
 	})
+
+	t.Run("Negative: HTTP error", func(t *testing.T) {
+
+		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+		}))
+		defer mockServer.Close()
+
+		mockURL := mockServer.URL + "/beats/latest/8.8.3-SNAPSHOT.json"
+		artifactsSnapshot := newArtifactsSnapshotCustom(mockURL)
+		version, err := artifactsSnapshot.GetSnapshotArtifactVersion("beats", "8.8.3-SNAPSHOT")
+		assert.ErrorContains(t, err, "404: Not Found")
+		assert.ErrorContains(t, err, "GET request failed")
+		assert.Empty(t, version)
+	})
 }
 
 type MockHandler struct {
