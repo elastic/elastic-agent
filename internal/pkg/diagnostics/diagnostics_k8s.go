@@ -115,7 +115,7 @@ func collectK8sDiagnosticsWithClientAndToken(ctx context.Context, l *logp.Logger
 	} else {
 		diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, podLogsDirErr)
 	}
-	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, dumpHelmRelease(ctx, k8sClient, pod, k8sDir, filepath.Join(k8sDir, "values.yaml")))
+	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, dumpHelmRelease(ctx, k8sClient, pod, filepath.Join(k8sDir, "helm-manifest.yaml"), filepath.Join(k8sDir, "helm-values.yaml")))
 
 	// Collect cgroup stats
 	cgroupOutputDir := filepath.Join(tmpDir, cgroupSubDir)
