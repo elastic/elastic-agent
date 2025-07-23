@@ -194,7 +194,7 @@ func Test_writeNamespaceLeases(t *testing.T) {
 	}
 }
 
-func Test_dumpHelmChartValues(t *testing.T) {
+func Test_dumpHelmRelease(t *testing.T) {
 	for _, tc := range []struct {
 		name                       string
 		agentPod                   *corev1.Pod
@@ -245,9 +245,9 @@ func Test_dumpHelmChartValues(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
-			chartArchiveTmpFile := filepath.Join(tmpDir, "chart")
-			valuesTmpFile := filepath.Join(tmpDir, "chart", "values.yaml")
-			_, _ = chartArchiveTmpFile, valuesTmpFile
+			manifestTmpFile := filepath.Join(tmpDir, "manifest.yaml")
+			valuesTmpFile := filepath.Join(tmpDir, "values.yaml")
+			_, _ = manifestTmpFile, valuesTmpFile
 			var objs []runtime.Object
 			for _, secret := range tc.secrets {
 				id := fmt.Sprintf("%s/%s", secret.Namespace, secret.Name)
@@ -260,13 +260,14 @@ func Test_dumpHelmChartValues(t *testing.T) {
 			}
 
 			clientSet := k8sfake.NewClientset(objs...)
-			err := dumpHelmChartValues(t.Context(), clientSet, tc.agentPod, chartArchiveTmpFile, valuesTmpFile)
+			err := dumpHelmRelease(t.Context(), clientSet, tc.agentPod, manifestTmpFile, valuesTmpFile)
 			if tc.expectedErr {
 				require.Error(t, err, "expected error in dumping helm chart values but got one")
 				return
 			}
 			require.NoError(t, err, "expected no error in dumping helm chart values but got one")
 			require.FileExists(t, valuesTmpFile, "expected values file to exist but it does not")
+			require.FileExists(t, manifestTmpFile, "expected manifest file to exist but it does not")
 		})
 	}
 }

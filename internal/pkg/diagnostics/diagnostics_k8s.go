@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
-	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/release"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -112,7 +111,7 @@ func collectK8sDiagnosticsWithClientAndToken(ctx context.Context, l *logp.Logger
 	podLogsDir := filepath.Join(k8sDir, logsSubDir)
 	diagnosticsAccumulatedError = errors.Join(os.MkdirAll(podLogsDir, 0755))
 	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, collectLogsFromPod(ctx, k8sClient, pod, podLogsDir))
-	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, dumpHelmChartValues(ctx, k8sClient, pod, k8sDir, filepath.Join(k8sDir, "values.yaml")))
+	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, dumpHelmRelease(ctx, k8sClient, pod, k8sDir, filepath.Join(k8sDir, "values.yaml")))
 
 	// Collect cgroup stats
 	cgroupOutputDir := filepath.Join(tmpDir, cgroupSubDir)
@@ -409,7 +408,7 @@ func dumpK8sObject(obj runtime.Object, objName string, outputfile string) error 
 	return nil
 }
 
-func dumpHelmChartValues(ctx context.Context, kubernetesClient clientk8s.Interface, agentPod *v1.Pod, chartOutputDir, valuesOutputFilePath string) error {
+func dumpHelmRelease(ctx context.Context, kubernetesClient clientk8s.Interface, agentPod *v1.Pod, renderedManifestFilePath, valuesOutputFilePath string) error {
 	if agentPod == nil {
 		return nil
 	}
@@ -450,16 +449,17 @@ func dumpHelmChartValues(ctx context.Context, kubernetesClient clientk8s.Interfa
 		return fmt.Errorf("failed to decode helm release: %w", err)
 	}
 
-	if _, err = chartutil.Save(r.Chart, chartOutputDir); err != nil {
-		return fmt.Errorf("failed to save helm chart: %w", err)
+	err = os.WriteFile(renderedManifestFilePath, []byte(r.Manifest), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write rendered manifest to file: %w", err)
 	}
 
-	yamlBytes, err := yaml.Marshal(r.Config)
+	valuesMarshalledBytes, err := yaml.Marshal(r.Config)
 	if err != nil {
 		return fmt.Errorf("failed to marshal helm values from release: %w", err)
 	}
 
-	if err = os.WriteFile(valuesOutputFilePath, yamlBytes, 0644); err != nil {
+	if err = os.WriteFile(valuesOutputFilePath, valuesMarshalledBytes, 0644); err != nil {
 		return fmt.Errorf("failed to write helm values to file: %w", err)
 	}
 
