@@ -11,7 +11,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -334,6 +337,251 @@ func Test_dumpK8sEvents(t *testing.T) {
 			}
 			require.NoError(t, err, "expected no error in dumping k8s events but got one")
 			require.FileExists(t, eventsTmpFile, "expected events file to exist but it does not")
+		})
+	}
+}
+
+func Test_dumpK8sManifests(t *testing.T) {
+
+	type args struct {
+		pod *corev1.Pod
+	}
+	tests := []struct {
+		name          string
+		args          args
+		setupObjects  []runtime.Object
+		wantErr       assert.ErrorAssertionFunc
+		expectedFiles []string
+	}{
+		{
+			name: "simple free-range pod, no owners",
+			args: args{
+				pod: &corev1.Pod{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Pod",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "free-range-pod",
+						Namespace: "namespace1",
+					},
+				},
+			},
+			setupObjects: nil,
+			wantErr:      assert.NoError,
+			expectedFiles: []string{
+				"pod-free-range-pod.yaml",
+			},
+		},
+		{
+			name: "pod owned by replicaset and deployment",
+			args: args{
+				pod: &corev1.Pod{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Pod",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "one-from-deployment",
+						Namespace: "namespace1",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "apps/v1",
+								Kind:       "ReplicaSet",
+								Name:       "replicaset1",
+							},
+						},
+					},
+				},
+			},
+			setupObjects: []runtime.Object{
+				&appsv1.ReplicaSet{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "ReplicaSet",
+						APIVersion: "apps/v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "replicaset1",
+						Namespace: "namespace1",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "apps/v1",
+								Kind:       "Deployment",
+								Name:       "deployment1",
+							},
+						},
+					},
+				},
+				&appsv1.Deployment{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Deployment",
+						APIVersion: "apps/v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "deployment1",
+						Namespace: "namespace1",
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			expectedFiles: []string{
+				"pod-one-from-deployment.yaml",
+				"replicaset-replicaset1.yaml",
+				"deployment-deployment1.yaml",
+			},
+		},
+		{
+			name: "pod owned by daemonset",
+			args: args{
+				pod: &corev1.Pod{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Pod",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "one-from-daemon",
+						Namespace: "namespace1",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "apps/v1",
+								Kind:       "DaemonSet",
+								Name:       "daemon1",
+							},
+						},
+					},
+				},
+			},
+			setupObjects: []runtime.Object{
+				&appsv1.DaemonSet{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "DaemonSet",
+						APIVersion: "apps/v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "daemon1",
+						Namespace: "namespace1",
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			expectedFiles: []string{
+				"pod-one-from-daemon.yaml",
+				"daemonset-daemon1.yaml",
+			},
+		},
+		{
+			name: "pod owned by statefulset",
+			args: args{
+				pod: &corev1.Pod{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Pod",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "born-to-be-stateful-0",
+						Namespace: "namespace1",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "apps/v1",
+								Kind:       "StatefulSet",
+								Name:       "born-to-be-stateful",
+							},
+						},
+					},
+				},
+			},
+			setupObjects: []runtime.Object{
+				&appsv1.StatefulSet{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "StatefulSet",
+						APIVersion: "apps/v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "born-to-be-stateful",
+						Namespace: "namespace1",
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			expectedFiles: []string{
+				"pod-born-to-be-stateful-0.yaml",
+				"statefulset-born-to-be-stateful.yaml",
+			},
+		},
+		{
+			name: "pod owner not found, we should get back an error",
+			args: args{
+				pod: &corev1.Pod{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Pod",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod-with-non-existing-owner",
+						Namespace: "namespace1",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "v1",
+								Kind:       "ReplicaSet",
+								Name:       "non-existing-replicaset",
+							},
+						},
+					},
+				},
+			},
+			setupObjects: nil,
+			wantErr:      assert.Error,
+			expectedFiles: []string{
+				"pod-pod-with-non-existing-owner.yaml",
+			},
+		},
+		{
+			name: "unsupported owner refs are skipped with error",
+			args: args{
+				pod: &corev1.Pod{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Pod",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod-with-a-job",
+						Namespace: "namespace1",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "batch/v1",
+								Kind:       "Job",
+								Name:       "jobber",
+							},
+						},
+					},
+				},
+			},
+			setupObjects: []runtime.Object{
+				&batchv1.Job{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Job",
+						APIVersion: "batch/v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "jobber",
+						Namespace: "namespace1",
+					},
+				},
+			},
+			wantErr: assert.Error,
+			expectedFiles: []string{
+				"pod-pod-with-a-job.yaml",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			k8sDir := t.TempDir()
+			fakeClientset := k8sfake.NewClientset(tt.setupObjects...)
+			tt.wantErr(t, dumpK8sManifests(t.Context(), fakeClientset, tt.args.pod, k8sDir), fmt.Sprintf("dumpK8sManifests(%v, %v, %v, %v)", t.Context(), fakeClientset, tt.args.pod, k8sDir))
+			for _, ef := range tt.expectedFiles {
+				assert.FileExists(t, filepath.Join(k8sDir, ef))
+			}
 		})
 	}
 }
