@@ -5,11 +5,14 @@
 package downloads
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"go.opentelemetry.io/otel"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/gofrs/uuid/v5"
@@ -25,7 +28,10 @@ type downloadRequest struct {
 // downloadFile will download a url and store it in a temporary path.
 // It writes to the destination file as it downloads it, without
 // loading the entire file into memory.
-func downloadFile(downloadRequest *downloadRequest) error {
+func downloadFile(ctx context.Context, downloadRequest *downloadRequest) error {
+	ctx, span := otel.Tracer("elastic-agent-mage").Start(ctx, "downloadFile")
+	defer span.End()
+
 	var filePath string
 	if downloadRequest.DownloadPath == "" {
 		u, err := uuid.NewV4()
@@ -63,7 +69,7 @@ func downloadFile(downloadRequest *downloadRequest) error {
 	retryCount := 1
 	var fileReader io.Reader
 	download := func() error {
-		r := httpRequest{URL: downloadRequest.URL}
+		r := httpRequest{URL: downloadRequest.URL, Context: ctx}
 		bodyStr, err := get(r)
 		if err != nil {
 			retryCount++
