@@ -585,3 +585,192 @@ func Test_dumpK8sManifests(t *testing.T) {
 		})
 	}
 }
+
+func Test_collectLogsFromPod(t *testing.T) {
+	type args struct {
+		pod *corev1.Pod
+	}
+	tests := []struct {
+		name          string
+		args          args
+		wantErr       assert.ErrorAssertionFunc
+		expectedFiles []string
+	}{
+		{
+			name: "single quiet elastic-agent container",
+			args: args{
+				pod: &corev1.Pod{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Pod",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod1",
+						Namespace: "namespace1",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "agent",
+							},
+						},
+					},
+					Status: corev1.PodStatus{
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name:         "agent",
+								RestartCount: 0,
+							},
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			expectedFiles: []string{
+				"pod1-agent-current.log",
+			},
+		},
+		{
+			name: "one log file per container",
+			args: args{
+				pod: &corev1.Pod{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Pod",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod1",
+						Namespace: "namespace1",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "agent",
+							},
+							{
+								Name: "sidecar",
+							},
+						},
+					},
+					Status: corev1.PodStatus{
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name:         "agent",
+								RestartCount: 0,
+							},
+							{
+								Name:         "sidecar",
+								RestartCount: 0,
+							},
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			expectedFiles: []string{
+				"pod1-agent-current.log",
+				"pod1-sidecar-current.log",
+			},
+		},
+		{
+			name: "restarted elastic-agent container will trigger collection of previous logs",
+			args: args{
+				pod: &corev1.Pod{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Pod",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod1",
+						Namespace: "namespace1",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "agent",
+							},
+							{
+								Name: "sidecar",
+							},
+						},
+					},
+					Status: corev1.PodStatus{
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name:         "agent",
+								RestartCount: 1,
+							},
+							{
+								Name:         "sidecar",
+								RestartCount: 0,
+							},
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			expectedFiles: []string{
+				"pod1-agent-current.log",
+				"pod1-agent-previous.log",
+				"pod1-sidecar-current.log",
+			},
+		},
+		{
+			name: "init containers will join the fun but not the previous ones",
+			args: args{
+				pod: &corev1.Pod{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Pod",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod1",
+						Namespace: "namespace1",
+					},
+					Spec: corev1.PodSpec{
+						InitContainers: []corev1.Container{
+							{
+								Name: "init-agent",
+							},
+						},
+						Containers: []corev1.Container{
+							{
+								Name: "agent",
+							},
+						},
+					},
+					Status: corev1.PodStatus{
+						InitContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name:         "init-agent",
+								RestartCount: 1,
+							},
+						},
+						ContainerStatuses: []corev1.ContainerStatus{
+							{
+								Name:         "agent",
+								RestartCount: 1,
+							},
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			expectedFiles: []string{
+				"pod1-init-agent-current.log",
+				"pod1-agent-current.log",
+				"pod1-agent-previous.log",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logsDir := t.TempDir()
+			fakeClientset := k8sfake.NewClientset()
+			tt.wantErr(t, collectLogsFromPod(t.Context(), fakeClientset, tt.args.pod, logsDir), fmt.Sprintf("collectLogsFromPod(%v, %v, %v, %v)", t.Context(), fakeClientset, tt.args.pod, logsDir))
+			for _, ef := range tt.expectedFiles {
+				assert.FileExists(t, filepath.Join(logsDir, ef))
+			}
+		})
+	}
+}
