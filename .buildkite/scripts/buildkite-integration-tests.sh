@@ -37,14 +37,16 @@ echo "~~~ Running integration tests as $USER"
 
 make install-gotestsum
 
-if [[ -z "${AGENT_VERSION:-}" ]]; then
-  # Parsing version.go. Will be simplified here: https://github.com/elastic/ingest-dev/issues/4925
+if [[ -f "${WORKSPACE}/.package-version" ]]; then
+  AGENT_VERSION="$(jq -r '.version' .package-version)"
+  echo "~~~ Agent version: ${AGENT_VERSION} (from .package-version)"
+else
   AGENT_VERSION=$(grep "const defaultBeatVersion =" version/version.go | cut -d\" -f2)
   AGENT_VERSION="${AGENT_VERSION}-SNAPSHOT"
+  echo "~~~ Agent version: ${AGENT_VERSION} (from version/version.go)"
 fi
 
 export AGENT_VERSION
-echo "~~~ Agent version: ${AGENT_VERSION}"
 
 os_data=$(uname -spr | tr ' ' '_')
 root_suffix=""

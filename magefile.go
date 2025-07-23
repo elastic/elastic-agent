@@ -2488,26 +2488,39 @@ func (Integration) UpdatePackageVersion(ctx context.Context) error {
 		return fmt.Errorf("failed to identify the current release branch: %w", err)
 	}
 
-	sc := snapshots.NewSnapshotsClient()
-	versions, err := sc.FindLatestSnapshots(ctx, []string{currentReleaseBranch})
+	branchInformation, err := findLatestBuildForBranch(ctx, baseURLForSnapshotDRA, currentReleaseBranch)
 	if err != nil {
-		return fmt.Errorf("failed to fetch a manifest for the latest snapshot: %w", err)
+		return fmt.Errorf("failed to get latest build for branch %q: %w", currentReleaseBranch, err)
 	}
-	if len(versions) != 1 {
-		return fmt.Errorf("expected a single version, got %v", versions)
+
+	type branchInfoExtended struct {
+		branchInfo
+		CoreVersion  string `json:"core_version"`
+		StackBuildID string `json:"stack_build_id"`
 	}
-	packageVersion := versions[0].CoreVersion()
+
+	branchInfoExtra := branchInfoExtended{
+		branchInfo:   *branchInformation,
+		CoreVersion:  strings.ReplaceAll(branchInformation.Version, "-SNAPSHOT", ""),
+		StackBuildID: fmt.Sprintf("%s-SNAPSHOT", branchInformation.BuildID),
+	}
+
+	branchInfoExtraBytes, err := json.MarshalIndent(branchInfoExtra, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal branch information: %w", err)
+	}
+
 	file, err := os.OpenFile(packageVersionFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
 		return fmt.Errorf("failed to open %s for write: %w", packageVersionFilename, err)
 	}
 	defer file.Close()
-	_, err = file.WriteString(packageVersion)
+	_, err = file.Write(branchInfoExtraBytes)
 	if err != nil {
 		return fmt.Errorf("failed to write the package version file %s: %w", packageVersionFilename, err)
 	}
 
-	fmt.Println(packageVersion)
+	fmt.Println(string(branchInfoExtraBytes))
 
 	return nil
 }

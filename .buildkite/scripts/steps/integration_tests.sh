@@ -12,10 +12,7 @@ MAGE_SUBTARGET="${3:-""}"
 # There is a time when the current snapshot is not available on cloud yet, so we cannot use the latest version automatically
 # This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
 
-STACK_VERSION="$(cat .package-version)"
-if [[ -n "$STACK_VERSION" ]]; then
-    STACK_VERSION=${STACK_VERSION}"-SNAPSHOT"
-fi
+STACK_VERSION="$(jq -r '.version' .package-version)"
 
 # Run integration tests
 set +e
