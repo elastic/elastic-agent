@@ -35,9 +35,10 @@ import (
 )
 
 const (
-	k8sSubdir    = "k8s"
-	cgroupSubDir = "cgroup"
-	logsSubDir   = "logs"
+	k8sSubdir     = "k8s"
+	cgroupSubDir  = "cgroup"
+	logsSubDir    = "logs"
+	cgroupBaseDir = "/sys/fs/cgroup/"
 )
 
 func k8sDiagnostics(l *logp.Logger) func(ctx context.Context) []byte {
@@ -121,7 +122,7 @@ func collectK8sDiagnosticsWithClientAndToken(ctx context.Context, l *logp.Logger
 	cgroupOutputDir := filepath.Join(tmpDir, cgroupSubDir)
 	cgroupDirErr := errors.Join(os.MkdirAll(cgroupOutputDir, 0755))
 	if cgroupDirErr == nil {
-		diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, collectCgroup(ctx, "/sys/fs/cgroup/", cgroupOutputDir))
+		diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, collectCgroup(ctx, cgroupBaseDir, cgroupOutputDir))
 	} else {
 		diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, cgroupDirErr)
 	}

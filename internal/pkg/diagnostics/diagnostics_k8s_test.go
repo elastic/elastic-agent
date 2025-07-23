@@ -774,3 +774,139 @@ func Test_collectLogsFromPod(t *testing.T) {
 		})
 	}
 }
+
+func populateFakeCgroupDir(t *testing.T, dir string) {
+	cGroupFiles := []string{
+		"cgroup.controllers",
+		"cgroup.events",
+		"cgroup.freeze",
+		"cgroup.kill",
+		"cgroup.max.depth",
+		"cgroup.max.descendants",
+		"cgroup.pressure",
+		"cgroup.procs",
+		"cgroup.stat",
+		"cgroup.subtree_control",
+		"cgroup.threads",
+		"cgroup.type",
+		"cpu.idle",
+		"cpu.max",
+		"cpu.max.burst",
+		"cpu.pressure",
+		"cpu.stat",
+		"cpu.stat.local",
+		"cpu.uclamp.max",
+		"cpu.uclamp.min",
+		"cpu.weight",
+		"cpu.weight.nice",
+		"cpuset.cpus",
+		"cpuset.cpus.effective",
+		"cpuset.cpus.exclusive",
+		"cpuset.cpus.exclusive.effective",
+		"cpuset.cpus.partition",
+		"cpuset.mems",
+		"cpuset.mems.effective",
+		"hugetlb.1GB.current",
+		"hugetlb.1GB.events",
+		"hugetlb.1GB.events.local",
+		"hugetlb.1GB.max",
+		"hugetlb.1GB.numa_stat",
+		"hugetlb.1GB.rsvd.current",
+		"hugetlb.1GB.rsvd.max",
+		"hugetlb.2MB.current",
+		"hugetlb.2MB.events",
+		"hugetlb.2MB.events.local",
+		"hugetlb.2MB.max",
+		"hugetlb.2MB.numa_stat",
+		"hugetlb.2MB.rsvd.current",
+		"hugetlb.2MB.rsvd.max",
+		"io.max",
+		"io.pressure",
+		"io.prio.class",
+		"io.stat",
+		"io.weight",
+		"memory.current",
+		"memory.events",
+		"memory.events.local",
+		"memory.high",
+		"memory.low",
+		"memory.max",
+		"memory.min",
+		"memory.numa_stat",
+		"memory.oom.group",
+		"memory.peak",
+		"memory.pressure",
+		"memory.reclaim",
+		"memory.stat",
+		"memory.swap.current",
+		"memory.swap.events",
+		"memory.swap.high",
+		"memory.swap.max",
+		"memory.swap.peak",
+		"memory.zswap.current",
+		"memory.zswap.max",
+		"memory.zswap.writeback",
+		"misc.current",
+		"misc.events",
+		"misc.events.local",
+		"misc.max",
+		"misc.peak",
+		"pids.current",
+		"pids.events",
+		"pids.events.local",
+		"pids.max",
+		"pids.peak",
+		"rdma.current",
+		"rdma.max",
+	}
+
+	for _, f := range cGroupFiles {
+		create, err := os.Create(filepath.Join(dir, f))
+		require.NoErrorf(t, err, "error creating fake cgroup file %s", f)
+		err = create.Close()
+		require.NoErrorf(t, err, "error closing fake cgroup file %s", f)
+	}
+}
+
+func Test_collectCgroup(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupCgroupDir func(t *testing.T, cgroupDir string)
+		wantErr        assert.ErrorAssertionFunc
+		wantFiles      []string
+	}{
+		{
+			name:           "empty cgroup directory will cause an error",
+			setupCgroupDir: nil, // nothing to do here
+			wantErr:        assert.Error,
+			wantFiles:      []string{},
+		},
+		{
+			name:           "collect memory events from fully-populated cgroup directory",
+			setupCgroupDir: populateFakeCgroupDir,
+			wantErr:        assert.NoError,
+			wantFiles: []string{
+				"memory.events",
+				"memory.stat",
+				"memory.low",
+				"memory.high",
+				"memory.min",
+				"memory.max",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			cgroupDir := t.TempDir()
+			if tt.setupCgroupDir != nil {
+				tt.setupCgroupDir(t, cgroupDir)
+			}
+			outputDir := t.TempDir()
+			tt.wantErr(t, collectCgroup(t.Context(), cgroupDir, outputDir), fmt.Sprintf("collectCgroup(%v, %v, %v)", t.Context(), cgroupDir, outputDir))
+			for _, file := range tt.wantFiles {
+				assert.FileExists(t, filepath.Join(outputDir, file))
+			}
+		})
+	}
+}
