@@ -14,8 +14,9 @@ preinstall_fleet_packages
 echo "ES_HOST: ${ELASTICSEARCH_HOST}"
 echo "BUILDKITE_JOB_ID: ${BUILDKITE_JOB_ID}"
 
-if [[ $BUILDKITE_STEP_KEY == "integration-fips-ess" ]]; then
+if [[ "${FIPS:-false}" == "true" ]]; then
     buildkite-agent meta-data set "ess.job.fips" ${BUILDKITE_JOB_ID}
+    echo "FIPS metadata has been set"
 else
     buildkite-agent meta-data set "ess.job" ${BUILDKITE_JOB_ID}
 fi
