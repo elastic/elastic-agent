@@ -40,6 +40,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
+	k8sDiagnostics "github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	aclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -577,7 +578,7 @@ func checkK8sDiagnosticsArchive(archivePath string, agentPodName string) error {
 		err      error
 	}
 
-	podYamlPath := fmt.Sprintf("k8s/pod-%s.yaml", agentPodName)
+	podYamlPath := filepath.Join(k8sDiagnostics.K8sSubdir, fmt.Sprintf(k8sDiagnostics.PodK8sManifestFormat, agentPodName))
 	validators := map[string]*zipFileValidator{
 		podYamlPath: {
 			err: fmt.Errorf("%s is not present in diagnostics", podYamlPath),
@@ -585,7 +586,7 @@ func checkK8sDiagnosticsArchive(archivePath string, agentPodName string) error {
 				validator.err = nil
 			},
 		},
-		"errors.txt": {
+		k8sDiagnostics.K8sDiagnosticsErrorFile: {
 			validate: func(f *zip.File, validator *zipFileValidator) {
 				validatorErr := errors.New("errors.txt file should not be present")
 				reader, err := f.Open()
