@@ -5,9 +5,13 @@
 package diagnostics
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 
@@ -21,6 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 	yamlk8s "sigs.k8s.io/yaml"
+
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 func Test_readServiceAccountToken(t *testing.T) {
@@ -909,4 +915,137 @@ func Test_collectCgroup(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_collectK8sDiagnosticsWithClientAndToken(t *testing.T) {
+	type args struct {
+		namespace string
+		podName   string
+	}
+	tests := []struct {
+		name       string
+		k8sObjects []runtime.Object
+		args       args
+		assertFunc func(t *testing.T, actual []byte)
+	}{
+		{
+			name:       "pod does not exist, will return a zip with an error file",
+			k8sObjects: nil,
+			args: args{
+				namespace: "default",
+				podName:   "nonexistingpod",
+			},
+			assertFunc: func(t *testing.T, actual []byte) {
+				reader := bytes.NewReader(actual)
+				tempAssertDir := t.TempDir()
+				err := extractZipArchive(reader, tempAssertDir)
+				require.NoError(t, err)
+				assert.FileExists(t, filepath.Join(tempAssertDir, K8sDiagnosticsErrorFile), "k8s diagnostics should contain an error file")
+				assert.NoDirExists(t, filepath.Join(tempAssertDir, K8sSubdir))
+			},
+		},
+		{
+			name: "simple pod",
+			k8sObjects: []runtime.Object{
+				&corev1.Pod{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Pod",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "simplepod",
+						Namespace: "namespace1",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "agent",
+							},
+						},
+					},
+					Status: corev1.PodStatus{},
+				},
+			},
+			args: args{
+				namespace: "namespace1",
+				podName:   "simplepod",
+			},
+			assertFunc: func(t *testing.T, actual []byte) {
+				reader := bytes.NewReader(actual)
+				tempAssertDir := t.TempDir()
+				err := extractZipArchive(reader, tempAssertDir)
+				require.NoError(t, err)
+				// Some cgroup stuff will fail so we still have a diag-errors.txt file
+				assert.FileExists(t, filepath.Join(tempAssertDir, K8sDiagnosticsErrorFile), "k8s diagnostics should contain an error file")
+				// We have at least the pod manifest
+				assert.DirExists(t, filepath.Join(tempAssertDir, K8sSubdir))
+				assert.FileExists(t, filepath.Join(tempAssertDir, K8sSubdir, fmt.Sprintf(PodK8sManifestFormat, "simplepod")))
+				// We have the fake logs for the agent container
+				assert.DirExists(t, filepath.Join(tempAssertDir, K8sSubdir, logsSubDir))
+				assert.FileExists(t, filepath.Join(tempAssertDir, K8sSubdir, logsSubDir, fmt.Sprintf(CurrentLogFileFormat, "simplepod", "agent")))
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, _ := loggertest.New(t.Name())
+			k8sClient := k8sfake.NewClientset(tt.k8sObjects...)
+			tmpDir := t.TempDir()
+			actualBytes := collectK8sDiagnosticsWithClientAndToken(t.Context(), logger, k8sClient, tt.args.namespace, tt.args.podName, tmpDir)
+			require.NotEmpty(t, actualBytes, "returned bytes should not be empty")
+			tt.assertFunc(t, actualBytes)
+		})
+	}
+}
+
+func extractZipArchive(reader *bytes.Reader, outputDir string) error {
+	newReader, err := zip.NewReader(reader, reader.Size())
+	if err != nil {
+		return fmt.Errorf("bytes do not look like a .zip file: %w", err)
+	}
+
+	for _, f := range newReader.File {
+
+		if f.FileInfo().IsDir() {
+			err = os.MkdirAll(f.Name, f.FileInfo().Mode())
+			if err != nil {
+				return fmt.Errorf("error creating dir %q: %w", f.Name, err)
+			}
+			continue
+		}
+
+		outputFile := filepath.Join(outputDir, f.Name)
+		containingDir := path.Dir(outputFile)
+		err = os.MkdirAll(containingDir, 0755)
+		if err != nil {
+			return fmt.Errorf("error creating output dir %q: %w", containingDir, err)
+		}
+
+		err = extractFile(f, outputFile)
+		if err != nil {
+			return fmt.Errorf("error extracting file %q to %q: %w", f.Name, outputFile, err)
+		}
+	}
+
+	return nil
+}
+
+func extractFile(f *zip.File, outputFile string) error {
+	fileReader, err := f.Open()
+	if err != nil {
+		return fmt.Errorf("error reading file %q: %w", f.Name, err)
+	}
+	defer fileReader.Close()
+
+	fileWriter, err := os.Create(outputFile)
+	if err != nil {
+		return fmt.Errorf("error creating output file %q: %w", outputFile, err)
+	}
+	defer fileWriter.Close()
+
+	_, err = io.Copy(fileWriter, fileReader)
+	if err != nil {
+		return fmt.Errorf("error copying file %q to %q: %w", f.Name, outputFile, err)
+	}
+	return nil
 }

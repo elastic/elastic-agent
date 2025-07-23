@@ -35,10 +35,14 @@ import (
 )
 
 const (
-	k8sSubdir     = "k8s"
-	cgroupSubDir  = "cgroup"
-	logsSubDir    = "logs"
-	cgroupBaseDir = "/sys/fs/cgroup/"
+	K8sSubdir               = "k8s"
+	cgroupSubDir            = "cgroup"
+	logsSubDir              = "logs"
+	cgroupBaseDir           = "/sys/fs/cgroup/"
+	K8sDiagnosticsErrorFile = "k8s-diag-errors.txt"
+	PodK8sManifestFormat    = "pod-%s.yaml"
+	CurrentLogFileFormat    = "%s-%s-current.log"
+	PreviousLogFileFormat   = "%s-%s-previous.log"
 )
 
 func k8sDiagnostics(l *logp.Logger) func(ctx context.Context) []byte {
@@ -66,12 +70,12 @@ func k8sDiagnostics(l *logp.Logger) func(ctx context.Context) []byte {
 			}
 			return errorOnlyZip
 		}
-		return collectK8sDiagnosticsWithClientAndToken(ctx, l, kubernetesClient, tokenPayload.Namespace, tokenPayload.Pod.Name)
+		return collectK8sDiagnosticsWithClientAndToken(ctx, l, kubernetesClient, tokenPayload.Namespace, tokenPayload.Pod.Name, "")
 	}
 }
-func collectK8sDiagnosticsWithClientAndToken(ctx context.Context, l *logp.Logger, k8sClient clientk8s.Interface, namespace string, podName string) []byte {
+func collectK8sDiagnosticsWithClientAndToken(ctx context.Context, l *logp.Logger, k8sClient clientk8s.Interface, namespace string, podName string, baseOutDir string) []byte {
 
-	tmpDir, err := os.MkdirTemp("", "elastic-agent-k8s-diag-*")
+	tmpDir, err := os.MkdirTemp(baseOutDir, "elastic-agent-k8s-diag-*")
 	if err != nil {
 		err = fmt.Errorf("error creating k8s diag temp directory: %w", err)
 		errorOnlyZip, zipCreateErr := createErrorOnlyZip(err)
@@ -82,7 +86,7 @@ func collectK8sDiagnosticsWithClientAndToken(ctx context.Context, l *logp.Logger
 	}
 	defer os.RemoveAll(tmpDir)
 
-	k8sDir := filepath.Join(tmpDir, k8sSubdir)
+	k8sDir := filepath.Join(tmpDir, K8sSubdir)
 	err = os.MkdirAll(k8sDir, 0755)
 	if err != nil {
 		err = fmt.Errorf("error creating k8s diag subdirectory %q: %w", k8sDir, err)
@@ -196,7 +200,7 @@ func dumpK8sManifests(ctx context.Context, k8sClient clientk8s.Interface, pod *v
 	}
 
 	if podMashalledBytes != nil {
-		err = os.WriteFile(filepath.Join(k8sDir, fmt.Sprintf("pod-%s.yaml", pod.Name)), podMashalledBytes, 0644)
+		err = os.WriteFile(filepath.Join(k8sDir, fmt.Sprintf(PodK8sManifestFormat, pod.Name)), podMashalledBytes, 0644)
 		if err != nil {
 			diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, fmt.Errorf("error writing pod.yaml for %s/%s: %w", pod.Namespace, pod.Name, err))
 		}
@@ -247,9 +251,9 @@ func retrieveContainerLogs(ctx context.Context, client clientk8s.Interface, pod 
 		return fmt.Errorf("retrieving (previous=%v) logs for %s/%s container %s: %w", previous, pod.Namespace, pod.Name, container.Name, err)
 	}
 
-	outputFileName := fmt.Sprintf("%s-%s-current.log", pod.Name, container.Name)
+	outputFileName := fmt.Sprintf(CurrentLogFileFormat, pod.Name, container.Name)
 	if previous {
-		outputFileName = fmt.Sprintf("%s-%s-previous.log", pod.Name, container.Name)
+		outputFileName = fmt.Sprintf(PreviousLogFileFormat, pod.Name, container.Name)
 	}
 
 	oFile, err := os.Create(filepath.Join(outputDir, outputFileName))
@@ -289,7 +293,7 @@ func writeErrorOnlyZip(w io.Writer, diagErr error) error {
 }
 
 func addDiagnosticsErrorFileToZip(zipWriter *zip.Writer, diagErr error) error {
-	errWriter, err := zipWriter.Create(path.Join("k8s-diag-errors.txt"))
+	errWriter, err := zipWriter.Create(path.Join(K8sDiagnosticsErrorFile))
 	if err != nil {
 		return fmt.Errorf("error creating zip writer: %w", err)
 	}
