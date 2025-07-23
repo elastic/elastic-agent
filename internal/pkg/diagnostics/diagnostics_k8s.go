@@ -128,7 +128,7 @@ func collectK8sDiagnosticsWithClientAndToken(ctx context.Context, l *logp.Logger
 
 	// Collect k8s events of this pod
 	k8sEventsDir := filepath.Join(k8sDir, "events.yaml")
-	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, os.MkdirAll(k8sEventsDir, 0755))
+	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, dumpK8sEvents(ctx, k8sClient, pod, k8sEventsDir))
 
 	buf := new(bytes.Buffer)
 	err = writeZipFileFromDir(buf, tmpDir, diagnosticsAccumulatedError)
