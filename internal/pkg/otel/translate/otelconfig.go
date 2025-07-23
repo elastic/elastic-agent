@@ -10,6 +10,13 @@ import (
 	"slices"
 	"strings"
 
+<<<<<<< HEAD
+=======
+	"github.com/elastic/elastic-agent-libs/logp"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
+
+>>>>>>> b9e37efef (Always enable beat receiver http monitoring endpoints (#9095))
 	koanfmaps "github.com/knadh/koanf/maps"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
@@ -231,7 +238,18 @@ func getReceiversConfigForComponent(
 	}
 
 	// add monitoring config if necessary
+	// we enable the basic monitoring endpoint by default, because we want to use it for diagnostics even if
+	// agent self-monitoring is disabled
 	monitoringConfig := beatMonitoringConfigGetter(comp.ID, beatName)
+	if monitoringConfig == nil {
+		endpoint := monitoring.BeatsMonitoringEndpoint(comp.ID)
+		monitoringConfig = map[string]any{
+			"http": map[string]any{
+				"enabled": true,
+				"host":    endpoint,
+			},
+		}
+	}
 	koanfmaps.Merge(monitoringConfig, receiverConfig)
 
 	return map[string]any{
