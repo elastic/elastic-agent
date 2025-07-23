@@ -10,6 +10,10 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
+
 	koanfmaps "github.com/knadh/koanf/maps"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
@@ -232,7 +236,18 @@ func getReceiversConfigForComponent(
 	}
 
 	// add monitoring config if necessary
+	// we enable the basic monitoring endpoint by default, because we want to use it for diagnostics even if
+	// agent self-monitoring is disabled
 	monitoringConfig := beatMonitoringConfigGetter(comp.ID, beatName)
+	if monitoringConfig == nil {
+		endpoint := monitoring.BeatsMonitoringEndpoint(comp.ID)
+		monitoringConfig = map[string]any{
+			"http": map[string]any{
+				"enabled": true,
+				"host":    endpoint,
+			},
+		}
+	}
 	koanfmaps.Merge(monitoringConfig, receiverConfig)
 
 	return map[string]any{
@@ -397,7 +412,8 @@ func getDefaultDatastreamTypeForComponent(comp *component.Component) (string, er
 
 // translateEsOutputToExporter translates an elasticsearch output configuration to an elasticsearch exporter configuration.
 func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
-	esConfig, err := elasticsearchtranslate.ToOTelConfig(cfg)
+	// TODO: Figure out a way to avoid needing a logger for this function
+	esConfig, err := elasticsearchtranslate.ToOTelConfig(cfg, logp.L())
 	if err != nil {
 		return nil, err
 	}

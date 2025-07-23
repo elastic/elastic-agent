@@ -18,6 +18,8 @@ import (
 	"sync"
 	"time"
 
+	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
+
 	"github.com/Jeffail/gabs/v2"
 	"github.com/cenkalti/backoff/v4"
 	"go.elastic.co/apm/v2"
@@ -463,10 +465,19 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 	}
 
 	// look up the binaries, first checking releases, then artifacts
-	downloadURLResolvers := []DownloadURLResolver{
-		NewReleaseURLResolver(elasticAgentNamespace, artifactName, artifact),
-		NewArtifactURLResolver(artifactName, artifact, version),
-		NewArtifactSnapshotURLResolver(artifactName, artifact, project, version),
+	// if a snapshot is requested, check snapshots first
+	var downloadURLResolvers []DownloadURLResolver
+	if strings.HasSuffix(version, devtools.SnapshotSuffix()) {
+		downloadURLResolvers = []DownloadURLResolver{
+			NewArtifactSnapshotURLResolver(artifactName, artifact, project, version),
+			NewArtifactURLResolver(artifactName, artifact, version),
+			NewReleaseURLResolver(elasticAgentNamespace, artifactName, artifact)}
+	} else {
+		downloadURLResolvers = []DownloadURLResolver{
+			NewReleaseURLResolver(elasticAgentNamespace, artifactName, artifact),
+			NewArtifactURLResolver(artifactName, artifact, version),
+			NewArtifactSnapshotURLResolver(artifactName, artifact, project, version),
+		}
 	}
 	downloadURL, downloadShaURL, err = getDownloadURLFromResolvers(downloadURLResolvers)
 	if err != nil {
