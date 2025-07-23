@@ -8,6 +8,7 @@ package ess
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"io"
 	"io/fs"
@@ -16,6 +17,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -46,7 +48,7 @@ var diagnosticsFiles = []string{
 	"local-config.yaml",
 	"mutex.pprof.gz",
 	"otel.yaml",
-	"otel-final.yaml",
+	"otel-merged.yaml",
 	"pre-config.yaml",
 	"local-config.yaml",
 	"state.yaml",
@@ -293,6 +295,91 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 	assert.ElementsMatch(t, []string{"inputs.0.custom_attr"}, yObj.SecretPaths)
 	require.Len(t, yObj.Inputs, 1)
 	assert.Equal(t, "<REDACTED>", yObj.Inputs[0].CustomAttr)
+}
+
+func TestBeatDiagnostics(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: false,
+	})
+
+	configTemplate := `
+inputs:
+  - id: filestream-filebeat
+    type: filestream
+    paths:
+      - /var/log/system.log
+    prospector.scanner.fingerprint.enabled: false
+    file_identity.native: ~
+    use_output: default
+    _runtime_experimental: {{ .Runtime }}
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [http://localhost:9200]
+    api_key: placeholder
+agent.monitoring.enabled: false
+`
+
+	var filebeatSetup = map[string]integrationtest.ComponentState{
+		"filestream-default": {
+			State: integrationtest.NewClientState(client.Healthy),
+			Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
+				integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "filestream-default"}: {
+					State: integrationtest.NewClientState(client.Healthy),
+				},
+				integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "filestream-filebeat"}: {
+					State: integrationtest.NewClientState(client.Healthy),
+				},
+			},
+		},
+	}
+	f, err := define.NewFixtureFromLocalBuild(t, define.Version(), integrationtest.WithAllowErrors())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+	err = f.Prepare(ctx)
+	require.NoError(t, err)
+
+	t.Run("filebeat process", func(t *testing.T) {
+		var configBuffer bytes.Buffer
+		require.NoError(t,
+			template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, map[string]any{
+				"Runtime": "process",
+			}))
+		expectedCompDiagnosticsFiles := append(compDiagnosticsFiles,
+			"registry.tar.gz",
+			"input_metrics.json",
+			"beat_metrics.json",
+			"beat-rendered-config.yml",
+			"global_processors.txt",
+			"filestream-filebeat/error.txt",
+			"filestream-default/error.txt",
+		)
+		err = f.Run(ctx, integrationtest.State{
+			Configure:  configBuffer.String(),
+			AgentState: integrationtest.NewClientState(client.Healthy),
+			After:      testDiagnosticsFactory(t, filebeatSetup, diagnosticsFiles, expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
+		})
+		assert.NoError(t, err)
+	})
+
+	t.Run("filebeat receiver", func(t *testing.T) {
+		var configBuffer bytes.Buffer
+		require.NoError(t,
+			template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, map[string]any{
+				"Runtime": "otel",
+			}))
+		// currently we don't expect any diagnostics files for beats receivers
+		var expectedCompDiagnosticsFiles []string
+		err = f.Run(ctx, integrationtest.State{
+			Configure:  configBuffer.String(),
+			AgentState: integrationtest.NewClientState(client.Healthy),
+			After:      testDiagnosticsFactory(t, filebeatSetup, diagnosticsFiles, expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
+		})
+		assert.NoError(t, err)
+	})
 }
 
 func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string) func(ctx context.Context) error {

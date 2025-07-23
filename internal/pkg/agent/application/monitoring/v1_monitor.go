@@ -277,7 +277,7 @@ func (b *BeatsMonitor) ComponentMonitoringConfig(unitID, binary string) map[stri
 	}
 
 	configMap := make(map[string]any)
-	endpoint := utils.SocketURLWithFallback(unitID, paths.TempDir())
+	endpoint := BeatsMonitoringEndpoint(unitID)
 	if endpoint != "" {
 		httpConfigMap := map[string]any{
 			"enabled": true,
@@ -831,6 +831,8 @@ func processorsForAgentFilestream() []any {
 		dropEventsFromMonitoringComponentsProcessor(),
 		// drop periodic metrics logs (those are useful mostly in diagnostic dumps where we collect log files)
 		dropPeriodicMetricsLogsProcessor(),
+		// drop event logs
+		dropEventLogs(),
 	}
 	// if the event is from a component, use the component's dataset
 	processors = append(processors, useComponentDatasetProcessors()...)
@@ -1026,6 +1028,19 @@ func dropFieldsProcessor(fields []any, ignoreMissing bool) map[string]any {
 		"drop_fields": map[string]interface{}{
 			"fields":         fields,
 			"ignore_missing": ignoreMissing,
+		},
+	}
+}
+
+// dropEventLogs returns a processor which drops all event that contains log.type:event field
+func dropEventLogs() map[string]any {
+	return map[string]interface{}{
+		"drop_event": map[string]interface{}{
+			"when": map[string]interface{}{
+				"equals": map[string]interface{}{
+					"log.type": "event",
+				},
+			},
 		},
 	}
 }
@@ -1253,6 +1268,10 @@ func AgentMonitoringEndpoint(operatingSystem string, cfg *monitoringCfg.Monitori
 	// place in global /tmp to ensure that its small enough to fit; current path is way to long
 	// for it to be used, but needs to be unique per Agent (in the case that multiple are running)
 	return fmt.Sprintf(`unix:///tmp/elastic-agent/%x.sock`, sha256.Sum256([]byte(path)))
+}
+
+func BeatsMonitoringEndpoint(componentID string) string {
+	return utils.SocketURLWithFallback(componentID, paths.TempDir())
 }
 
 func httpCopyRules() []interface{} {
