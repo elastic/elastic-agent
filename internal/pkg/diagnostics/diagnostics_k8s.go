@@ -109,18 +109,26 @@ func collectK8sDiagnosticsWithClientAndToken(ctx context.Context, l *logp.Logger
 
 	// Collect logs for this pod
 	podLogsDir := filepath.Join(k8sDir, logsSubDir)
-	diagnosticsAccumulatedError = errors.Join(os.MkdirAll(podLogsDir, 0755))
-	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, collectLogsFromPod(ctx, k8sClient, pod, podLogsDir))
+	podLogsDirErr := errors.Join(os.MkdirAll(podLogsDir, 0755))
+	if podLogsDirErr == nil {
+		diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, collectLogsFromPod(ctx, k8sClient, pod, podLogsDir))
+	} else {
+		diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, podLogsDirErr)
+	}
 	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, dumpHelmRelease(ctx, k8sClient, pod, k8sDir, filepath.Join(k8sDir, "values.yaml")))
 
 	// Collect cgroup stats
 	cgroupOutputDir := filepath.Join(tmpDir, cgroupSubDir)
-	diagnosticsAccumulatedError = errors.Join(os.MkdirAll(cgroupOutputDir, 0755))
-	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, collectCgroup(ctx, "/sys/fs/cgroup/", cgroupOutputDir))
+	cgroupDirErr := errors.Join(os.MkdirAll(cgroupOutputDir, 0755))
+	if cgroupDirErr == nil {
+		diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, collectCgroup(ctx, "/sys/fs/cgroup/", cgroupOutputDir))
+	} else {
+		diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, cgroupDirErr)
+	}
 
 	// Collect k8s events of this pod
 	k8sEventsDir := filepath.Join(k8sDir, "events.yaml")
-	diagnosticsAccumulatedError = errors.Join(os.MkdirAll(k8sEventsDir, 0755))
+	diagnosticsAccumulatedError = errors.Join(diagnosticsAccumulatedError, os.MkdirAll(k8sEventsDir, 0755))
 
 	buf := new(bytes.Buffer)
 	err = writeZipFileFromDir(buf, tmpDir, diagnosticsAccumulatedError)
