@@ -18,7 +18,6 @@ else
 fi
 
 export AGENT_VERSION
-echo "~~~ Agent version: ${AGENT_VERSION}"
 
 echo "~~~ Create kind cluster '${CLUSTER_NAME}'"
 kind create cluster --image  "kindest/node:${K8S_VERSION}" --name "${CLUSTER_NAME}" --wait 60s --config - <<EOF

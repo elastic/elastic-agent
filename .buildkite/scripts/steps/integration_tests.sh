@@ -6,13 +6,7 @@ source .buildkite/scripts/common.sh
 STACK_PROVISIONER="${1:-"stateful"}"
 MAGE_TARGET="${2:-"integration:test"}"
 MAGE_SUBTARGET="${3:-""}"
-
-
-# Override the stack version from `.package-version` contents
-# There is a time when the current snapshot is not available on cloud yet, so we cannot use the latest version automatically
-# This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
-
-STACK_VERSION="$(jq -r '.version' .package-version)"
+USE_PACKAGE_VERSION="true"
 
 # Run integration tests
 set +e

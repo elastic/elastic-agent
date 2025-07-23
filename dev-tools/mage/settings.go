@@ -166,6 +166,10 @@ func initGlobals() {
 
 	ManifestURL = EnvOr(ManifestUrlEnvVar, "")
 	PackagingFromManifest = ManifestURL != ""
+
+	// order matters this must be called last as it will override some of the
+	// values above
+	initPackageVersion()
 }
 
 // ProjectType specifies the type of project (OSS vs X-Pack).
