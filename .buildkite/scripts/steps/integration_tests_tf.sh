@@ -44,7 +44,6 @@ else
     METADATA_PREFIX="fips."
     echo "Using FIPS metadata prefix: ${METADATA_PREFIX}"
   fi
-  echo "Using JOB_ID: ${JOB_ID}"
   export ELASTICSEARCH_HOST=$(buildkite-agent meta-data get "${METADATA_PREFIX}es.host")
   export ELASTICSEARCH_USERNAME=$(buildkite-agent meta-data get "${METADATA_PREFIX}es.username")
   export ELASTICSEARCH_PASSWORD=$(buildkite-agent meta-data get "${METADATA_PREFIX}es.pwd")
