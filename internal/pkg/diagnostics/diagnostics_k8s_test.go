@@ -999,29 +999,35 @@ func Test_collectK8sDiagnosticsWithClientAndToken(t *testing.T) {
 }
 
 func extractZipArchive(reader *bytes.Reader, outputDir string) error {
+
+	const maxUncompressedTotalSize = 10 * 1024 * 1024 // 10 MB per archive
+	const maxUncompressedFileSize = 1 * 1024 * 1024   // 1 MB per file
 	newReader, err := zip.NewReader(reader, reader.Size())
 	if err != nil {
 		return fmt.Errorf("bytes do not look like a .zip file: %w", err)
 	}
-
+	totalSize := uint64(0)
 	for _, f := range newReader.File {
-
 		if f.FileInfo().IsDir() {
-			err = os.MkdirAll(f.Name, f.FileInfo().Mode())
+			err = os.MkdirAll(filepath.Join(outputDir, filepath.FromSlash(f.Name)), f.FileInfo().Mode())
 			if err != nil {
 				return fmt.Errorf("error creating dir %q: %w", f.Name, err)
 			}
 			continue
 		}
 
-		outputFile := filepath.Join(outputDir, f.Name)
+		totalSize += f.UncompressedSize64
+		if totalSize > maxUncompressedTotalSize {
+			return fmt.Errorf("archive exceeds maximum total size (%d bytes)", totalSize)
+		}
+		outputFile := filepath.Join(outputDir, filepath.Clean(filepath.FromSlash(f.Name)))
 		containingDir := path.Dir(outputFile)
 		err = os.MkdirAll(containingDir, 0755)
 		if err != nil {
 			return fmt.Errorf("error creating output dir %q: %w", containingDir, err)
 		}
 
-		err = extractFile(f, outputFile)
+		err = extractFile(f, outputFile, maxUncompressedFileSize)
 		if err != nil {
 			return fmt.Errorf("error extracting file %q to %q: %w", f.Name, outputFile, err)
 		}
@@ -1030,7 +1036,10 @@ func extractZipArchive(reader *bytes.Reader, outputDir string) error {
 	return nil
 }
 
-func extractFile(f *zip.File, outputFile string) error {
+func extractFile(f *zip.File, outputFile string, maxFileSize int64) error {
+	if maxFileSize > 0 && f.UncompressedSize64 > uint64(maxFileSize) {
+		return fmt.Errorf("file size (%d bytes) exceeds maximum uncompressed size (%d bytes)", f.UncompressedSize64, maxFileSize)
+	}
 	fileReader, err := f.Open()
 	if err != nil {
 		return fmt.Errorf("error reading file %q: %w", f.Name, err)
@@ -1043,7 +1052,7 @@ func extractFile(f *zip.File, outputFile string) error {
 	}
 	defer fileWriter.Close()
 
-	_, err = io.Copy(fileWriter, fileReader)
+	_, err = io.Copy(fileWriter, io.LimitReader(fileReader, maxFileSize+1))
 	if err != nil {
 		return fmt.Errorf("error copying file %q to %q: %w", f.Name, outputFile, err)
 	}
