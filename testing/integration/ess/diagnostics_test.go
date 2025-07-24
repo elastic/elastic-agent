@@ -371,7 +371,7 @@ agent.monitoring.enabled: false
 			require.NoError(t, err, "failed to create temp file to hold data to ingest")
 			t.Cleanup(func() {
 				cErr := inputFile.Close()
-				assert.NoError(cErr)
+				assert.NoError(t, cErr)
 			})
 			_, err = inputFile.WriteString("hello world\n")
 			require.NoError(t, err, "failed to write data to temp file")
