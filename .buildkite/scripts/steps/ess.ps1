@@ -107,18 +107,16 @@ function Get-Ess-Stack {
       ess_up $StackVersion
       Write-Output "ESS stack is up. ES_HOST: $Env:ELASTICSEARCH_HOST"
   } else {
-      # TODO: Use "ess.job.fips" if we need to build and test fips artifacts for Windows releases; Env:FIPS can be used to deterimine this.
-      $job_id = & buildkite-agent meta-data get "ess.job"
+      # TODO: Use a metadata prefix for "fips." if we ever need to test Windows artifacts for FIPS.
 
       # For the first run, we retrieve ESS stack metadata
       Write-Output "~~~ Receiving ESS stack metadata"
-      Write-Output "Using JOB ID: $job_id"
-      $Env:ELASTICSEARCH_HOST = & buildkite-agent meta-data get "es.host" --job "$job_id"
-      $Env:ELASTICSEARCH_USERNAME = & buildkite-agent meta-data get "es.username" --job "$job_id"
-      $Env:ELASTICSEARCH_PASSWORD = & buildkite-agent meta-data get "es.pwd" --job "$job_id"
-      $Env:KIBANA_HOST = & buildkite-agent meta-data get "kibana.host" --job "$job_id"
-      $Env:KIBANA_USERNAME = & buildkite-agent meta-data get "kibana.username" --job "$job_id"
-      $Env:KIBANA_PASSWORD = & buildkite-agent meta-data get "kibana.pwd" --job "$job_id"
+      $Env:ELASTICSEARCH_HOST = & buildkite-agent meta-data get "es.host"
+      $Env:ELASTICSEARCH_USERNAME = & buildkite-agent meta-data get "es.username"
+      $Env:ELASTICSEARCH_PASSWORD = & buildkite-agent meta-data get "es.pwd"
+      $Env:KIBANA_HOST = & buildkite-agent meta-data get "kibana.host"
+      $Env:KIBANA_USERNAME = & buildkite-agent meta-data get "kibana.username"
+      $Env:KIBANA_PASSWORD = & buildkite-agent meta-data get "kibana.pwd"
       Write-Output "Received ESS stack data from previous step. ES_HOST: $Env:ELASTICSEARCH_HOST"
   }
 }
