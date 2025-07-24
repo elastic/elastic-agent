@@ -360,17 +360,21 @@ agent.monitoring.enabled: false
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Create the data file to ingest
-			inputFile, err := os.CreateTemp(t.TempDir(), "input.txt")
-			require.NoError(t, err, "failed to create temp file to hold data to ingest")
-			err = os.WriteFile(inputFile.Name(), []byte("hello world\n"), 0644)
-			require.NoError(t, err, "failed to write data to temp file")
-
 			// Create the fixture
 			f, err := define.NewFixtureFromLocalBuild(t, define.Version(), integrationtest.WithAllowErrors())
 			require.NoError(t, err)
 			err = f.Prepare(ctx)
 			require.NoError(t, err)
+
+			// Create the data file to ingest
+			inputFile, err := os.CreateTemp(t.TempDir(), "input.txt")
+			require.NoError(t, err, "failed to create temp file to hold data to ingest")
+			t.Cleanup(func() {
+				cErr := inputFile.Close()
+				assert.NoError(cErr)
+			})
+			_, err = inputFile.WriteString("hello world\n")
+			require.NoError(t, err, "failed to write data to temp file")
 
 			var configBuffer bytes.Buffer
 			require.NoError(t,
