@@ -22,6 +22,7 @@ steps:
     key: integration-fips-ess
     env:
       ASDF_TERRAFORM_VERSION: 1.9.2
+      FIPS: "true"
       TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
     command: |
       source .buildkite/scripts/steps/ess_start.sh
