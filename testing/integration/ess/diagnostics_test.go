@@ -334,6 +334,7 @@ agent.monitoring.enabled: false
 		name                         string
 		runtime                      string
 		expectedCompDiagnosticsFiles []string
+		expectedAgentState           *client.State
 	}{
 		{
 			name:    "filebeat process",
@@ -347,11 +348,13 @@ agent.monitoring.enabled: false
 				"filestream-filebeat/error.txt",
 				"filestream-default/error.txt",
 			),
+			expectedAgentState: integrationtest.NewClientState(client.Healthy),
 		},
 		{
 			name:                         "filebeat container",
 			runtime:                      "otel",
 			expectedCompDiagnosticsFiles: []string{"registry.tar.gz"},
+			expectedAgentState:           integrationtest.NewClientState(client.Degraded),
 		},
 	}
 
@@ -377,7 +380,7 @@ agent.monitoring.enabled: false
 				}))
 			err = f.Run(ctx, integrationtest.State{
 				Configure:  configBuffer.String(),
-				AgentState: integrationtest.NewClientState(client.Healthy),
+				AgentState: tc.expectedAgentState,
 				After:      testDiagnosticsFactory(t, filebeatSetup, diagnosticsFiles, tc.expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
 			})
 			assert.NoError(t, err)
