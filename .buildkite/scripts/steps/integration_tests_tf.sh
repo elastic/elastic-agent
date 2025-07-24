@@ -39,20 +39,19 @@ if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 || "${FORCE_ESS_CREATE:-false}" == "true"
 else
   # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data
   echo "~~~ Receiving ESS stack metadata"
+  METADATA_PREFIX=""
   if [[ "${FIPS:-false}" == "true" ]]; then
-    JOB_ID=$(buildkite-agent meta-data get "ess.job.fips")
-    echo "FIPS metadata has been retrieved"
-  else
-    JOB_ID=$(buildkite-agent meta-data get "ess.job")
+    METADATA_PREFIX="fips."
+    echo "Using FIPS metadata prefix: ${METADATA_PREFIX}"
   fi
   echo "Using JOB_ID: ${JOB_ID}"
-  export ELASTICSEARCH_HOST=$(buildkite-agent meta-data get "es.host" --job ${JOB_ID})
-  export ELASTICSEARCH_USERNAME=$(buildkite-agent meta-data get "es.username" --job ${JOB_ID})
-  export ELASTICSEARCH_PASSWORD=$(buildkite-agent meta-data get "es.pwd" --job ${JOB_ID})
-  export KIBANA_HOST=$(buildkite-agent meta-data get "kibana.host" --job ${JOB_ID})
-  export KIBANA_USERNAME=$(buildkite-agent meta-data get "kibana.username" --job ${JOB_ID})
-  export KIBANA_PASSWORD=$(buildkite-agent meta-data get "kibana.pwd" --job ${JOB_ID})
-  export INTEGRATIONS_SERVER_HOST=$(buildkite-agent meta-data get "integrations_server.host" --job ${JOB_ID})
+  export ELASTICSEARCH_HOST=$(buildkite-agent meta-data get "${METADATA_PREFIX}es.host")
+  export ELASTICSEARCH_USERNAME=$(buildkite-agent meta-data get "${METADATA_PREFIX}es.username")
+  export ELASTICSEARCH_PASSWORD=$(buildkite-agent meta-data get "${METADATA_PREFIX}es.pwd")
+  export KIBANA_HOST=$(buildkite-agent meta-data get "${METADATA_PREFIX}kibana.host")
+  export KIBANA_USERNAME=$(buildkite-agent meta-data get "${METADATA_PREFIX}kibana.username")
+  export KIBANA_PASSWORD=$(buildkite-agent meta-data get "${METADATA_PREFIX}kibana.pwd")
+  export INTEGRATIONS_SERVER_HOST=$(buildkite-agent meta-data get "${METADATA_PREFIX}integrations_server.host")
   echo "Elasticsearch Host: ${ELASTICSEARCH_HOST}"
 fi
 
