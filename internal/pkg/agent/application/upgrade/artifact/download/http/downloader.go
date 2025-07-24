@@ -219,7 +219,7 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	if err != nil {
 		dp.ReportFailed(err)
 		// return path, file already exists and needs to be cleaned up
-		return fullPath, errors.New(err, "copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
+		return fullPath, fmt.Errorf("%s: %w", errors.New("copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI)).Error(), err)
 	}
 	dp.ReportComplete()
 

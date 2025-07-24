@@ -102,7 +102,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 
 	path, err := downloaderFunc(ctx, factory, parsedVersion, &settings, upgradeDetails, u.diskSpaceErrorFunc)
 	if err != nil {
-		return "", errors.New(err, "failed download of agent binary")
+		return "", fmt.Errorf("failed download of agent binary: %w", err)
 	}
 
 	if skipVerifyOverride {
