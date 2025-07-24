@@ -463,6 +463,7 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 		log,
 		&artifact.Config{},
 		&info.AgentInfo{},
+		upgrade.ToDiskSpaceError,
 	)
 	require.NoError(t, err, "errored when creating a new upgrader")
 

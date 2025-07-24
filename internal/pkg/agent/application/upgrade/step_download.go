@@ -36,9 +36,9 @@ const (
 	fleetUpgradeFallbackPGPFormat = "/api/agents/upgrades/%d.%d.%d/pgp-public-key"
 )
 
-type downloaderFactory func(*agtversion.ParsedSemVer, *logger.Logger, *artifact.Config, *details.Details) (download.Downloader, error)
+type downloaderFactory func(*agtversion.ParsedSemVer, *logger.Logger, *artifact.Config, *details.Details, func(error) error) (download.Downloader, error)
 
-type downloader func(context.Context, downloaderFactory, *agtversion.ParsedSemVer, *artifact.Config, *details.Details) (string, error)
+type downloader func(context.Context, downloaderFactory, *agtversion.ParsedSemVer, *artifact.Config, *details.Details, func(error) error) (string, error)
 
 func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
 	span, ctx := apm.StartSpan(ctx, "downloadArtifact", "app.internal")
@@ -66,8 +66,8 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 
 			// set specific downloader, local file just uses the fs.NewDownloader
 			// no fallback is allowed because it was requested that this specific source be used
-			factory = func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
-				return fs.NewDownloader(config), nil
+			factory = func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details, diskSpaceErrorFunc func(error) error) (download.Downloader, error) {
+				return fs.NewDownloader(config, diskSpaceErrorFunc), nil
 			}
 
 			// set specific verifier, local file verifies locally only
@@ -100,7 +100,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 		return "", errors.New(err, fmt.Sprintf("failed to create download directory at %s", paths.Downloads()))
 	}
 
-	path, err := downloaderFunc(ctx, factory, parsedVersion, &settings, upgradeDetails)
+	path, err := downloaderFunc(ctx, factory, parsedVersion, &settings, upgradeDetails, u.diskSpaceErrorFunc)
 	if err != nil {
 		return "", errors.New(err, "failed download of agent binary")
 	}
@@ -148,25 +148,25 @@ func (u *Upgrader) appendFallbackPGP(targetVersion *agtversion.ParsedSemVer, pgp
 	return pgpBytes
 }
 
-func newDownloader(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
+func newDownloader(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details, diskSpaceErrorFunc func(error) error) (download.Downloader, error) {
 	if !version.IsSnapshot() {
-		return localremote.NewDownloader(log, settings, upgradeDetails)
+		return localremote.NewDownloader(log, settings, upgradeDetails, diskSpaceErrorFunc)
 	}
 
 	// TODO since we know if it's a snapshot or not, shouldn't we add EITHER the snapshot downloader OR the release one ?
 
 	// try snapshot repo before official
-	snapDownloader, err := snapshot.NewDownloader(log, settings, version, upgradeDetails)
+	snapDownloader, err := snapshot.NewDownloader(log, settings, version, upgradeDetails, diskSpaceErrorFunc)
 	if err != nil {
 		return nil, err
 	}
 
-	httpDownloader, err := http.NewDownloader(log, settings, upgradeDetails)
+	httpDownloader, err := http.NewDownloader(log, settings, upgradeDetails, diskSpaceErrorFunc)
 	if err != nil {
 		return nil, err
 	}
 
-	return composed.NewDownloader(fs.NewDownloader(settings), snapDownloader, httpDownloader), nil
+	return composed.NewDownloader(fs.NewDownloader(settings, diskSpaceErrorFunc), snapDownloader, httpDownloader), nil
 }
 
 func newVerifier(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
@@ -200,8 +200,9 @@ func (u *Upgrader) downloadOnce(
 	version *agtversion.ParsedSemVer,
 	settings *artifact.Config,
 	upgradeDetails *details.Details,
+	diskSpaceErrorFunc func(error) error,
 ) (string, error) {
-	downloader, err := factory(version, u.log, settings, upgradeDetails)
+	downloader, err := factory(version, u.log, settings, upgradeDetails, diskSpaceErrorFunc)
 	if err != nil {
 		return "", fmt.Errorf("unable to create fetcher: %w", err)
 	}
@@ -223,8 +224,10 @@ func (u *Upgrader) downloadWithRetries(
 	version *agtversion.ParsedSemVer,
 	settings *artifact.Config,
 	upgradeDetails *details.Details,
+	diskSpaceErrorFunc func(error) error,
 ) (string, error) {
-	cancelDeadline := time.Now().Add(settings.Timeout)
+	// cancelDeadline := time.Now().Add(settings.Timeout)
+	cancelDeadline := time.Now().Add(5 * time.Minute)
 	cancelCtx, cancel := context.WithDeadline(ctx, cancelDeadline)
 	defer cancel()
 
@@ -237,12 +240,17 @@ func (u *Upgrader) downloadWithRetries(
 	var path string
 	var attempt uint
 
+	var downloadErr error
+
 	opFn := func() error {
 		attempt++
 		u.log.Infof("download attempt %d", attempt)
 		var err error
-		path, err = u.downloadOnce(cancelCtx, factory, version, settings, upgradeDetails)
+		path, err = u.downloadOnce(cancelCtx, factory, version, settings, upgradeDetails, diskSpaceErrorFunc)
 		if err != nil {
+			if !errors.Is(err, context.DeadlineExceeded) {
+				downloadErr = err
+			}
 			return err
 		}
 		return nil
@@ -255,6 +263,9 @@ func (u *Upgrader) downloadWithRetries(
 	}
 
 	if err := backoff.RetryNotify(opFn, boCtx, opFailureNotificationFn); err != nil {
+		if downloadErr != nil {
+			return "", downloadErr
+		}
 		return "", err
 	}
 

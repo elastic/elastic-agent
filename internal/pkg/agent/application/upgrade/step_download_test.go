@@ -87,11 +87,11 @@ func TestDownloadWithRetries(t *testing.T) {
 
 	// Successful immediately (no retries)
 	t.Run("successful_immediately", func(t *testing.T) {
-		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
+		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details, diskSpaceErrorFunc func(error) error) (download.Downloader, error) {
 			return &mockDownloader{expectedDownloadPath, nil}, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{}, nil)
 		require.NoError(t, err)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
@@ -100,7 +100,7 @@ func TestDownloadWithRetries(t *testing.T) {
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(settings.Timeout)
 
-		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails, nil)
 		require.NoError(t, err)
 		require.Equal(t, expectedDownloadPath, path)
 
@@ -122,7 +122,7 @@ func TestDownloadWithRetries(t *testing.T) {
 	// Downloader constructor failing on first attempt, but succeeding on second attempt (= first retry)
 	t.Run("constructor_failure_once", func(t *testing.T) {
 		attemptIdx := 0
-		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
+		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details, diskSpaceErrorFunc func(error) error) (download.Downloader, error) {
 			defer func() {
 				attemptIdx++
 			}()
@@ -141,7 +141,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return nil, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{}, nil)
 		require.NoError(t, err)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
@@ -150,7 +150,7 @@ func TestDownloadWithRetries(t *testing.T) {
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(settings.Timeout)
 
-		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails, nil)
 		require.NoError(t, err)
 		require.Equal(t, expectedDownloadPath, path)
 
@@ -177,7 +177,7 @@ func TestDownloadWithRetries(t *testing.T) {
 	// Download failing on first attempt, but succeeding on second attempt (= first retry)
 	t.Run("download_failure_once", func(t *testing.T) {
 		attemptIdx := 0
-		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
+		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details, diskSpaceErrorFunc func(error) error) (download.Downloader, error) {
 			defer func() {
 				attemptIdx++
 			}()
@@ -196,7 +196,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return nil, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{}, nil)
 		require.NoError(t, err)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
@@ -205,7 +205,7 @@ func TestDownloadWithRetries(t *testing.T) {
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(settings.Timeout)
 
-		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails, nil)
 		require.NoError(t, err)
 		require.Equal(t, expectedDownloadPath, path)
 
@@ -237,11 +237,11 @@ func TestDownloadWithRetries(t *testing.T) {
 		// exponential backoff with 10ms init and 500ms timeout should fit at least 3 attempts.
 		minNmExpectedAttempts := 3
 
-		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
+		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details, diskSpaceErrorFunc func(error) error) (download.Downloader, error) {
 			return &mockDownloader{"", errors.New("download failed")}, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{}, nil)
 		require.NoError(t, err)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
@@ -250,7 +250,7 @@ func TestDownloadWithRetries(t *testing.T) {
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(testCaseSettings.Timeout)
 
-		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &testCaseSettings, upgradeDetails)
+		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &testCaseSettings, upgradeDetails, nil)
 		require.Equal(t, "context deadline exceeded", err.Error())
 		require.Equal(t, "", path)
 
