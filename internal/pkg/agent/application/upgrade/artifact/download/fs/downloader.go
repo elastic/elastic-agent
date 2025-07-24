@@ -25,15 +25,17 @@ const (
 
 // Downloader is a downloader able to fetch artifacts from elastic.co web page.
 type Downloader struct {
-	dropPath string
-	config   *artifact.Config
+	dropPath           string
+	config             *artifact.Config
+	diskSpaceErrorFunc func(error) error
 }
 
 // NewDownloader creates and configures Elastic Downloader
-func NewDownloader(config *artifact.Config) *Downloader {
+func NewDownloader(config *artifact.Config, diskSpaceErrorFunc func(error) error) *Downloader {
 	return &Downloader{
-		config:   config,
-		dropPath: getDropPath(config),
+		config:             config,
+		dropPath:           getDropPath(config),
+		diskSpaceErrorFunc: diskSpaceErrorFunc,
 	}
 }
 
@@ -121,7 +123,7 @@ func (e *Downloader) downloadFile(filename, fullPath string) (string, error) {
 
 	_, err = io.Copy(destinationFile, sourceFile)
 	if err != nil {
-		return "", err
+		return "", e.diskSpaceErrorFunc(err)
 	}
 
 	return fullPath, nil

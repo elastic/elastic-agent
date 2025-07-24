@@ -45,14 +45,15 @@ const (
 
 // Downloader is a downloader able to fetch artifacts from elastic.co web page.
 type Downloader struct {
-	log            *logger.Logger
-	config         *artifact.Config
-	client         http.Client
-	upgradeDetails *details.Details
+	log                *logger.Logger
+	config             *artifact.Config
+	client             http.Client
+	upgradeDetails     *details.Details
+	diskSpaceErrorFunc func(error) error
 }
 
 // NewDownloader creates and configures Elastic Downloader
-func NewDownloader(log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details) (*Downloader, error) {
+func NewDownloader(log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details, diskSpaceErrorFunc func(error) error) (*Downloader, error) {
 	client, err := config.HTTPTransportSettings.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 		httpcommon.WithKeepaliveSettings{Disable: false, IdleConnTimeout: 30 * time.Second},
@@ -62,16 +63,17 @@ func NewDownloader(log *logger.Logger, config *artifact.Config, upgradeDetails *
 	}
 
 	client.Transport = download.WithHeaders(client.Transport, download.Headers)
-	return NewDownloaderWithClient(log, config, *client, upgradeDetails), nil
+	return NewDownloaderWithClient(log, config, *client, upgradeDetails, diskSpaceErrorFunc), nil
 }
 
 // NewDownloaderWithClient creates Elastic Downloader with specific client used
-func NewDownloaderWithClient(log *logger.Logger, config *artifact.Config, client http.Client, upgradeDetails *details.Details) *Downloader {
+func NewDownloaderWithClient(log *logger.Logger, config *artifact.Config, client http.Client, upgradeDetails *details.Details, diskSpaceErrorFunc func(error) error) *Downloader {
 	return &Downloader{
-		log:            log,
-		config:         config,
-		client:         client,
-		upgradeDetails: upgradeDetails,
+		log:                log,
+		config:             config,
+		client:             client,
+		upgradeDetails:     upgradeDetails,
+		diskSpaceErrorFunc: diskSpaceErrorFunc,
 	}
 }
 
@@ -211,7 +213,7 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 
 	loggingObserver := newLoggingProgressObserver(e.log, e.config.HTTPTransportSettings.Timeout)
 	detailsObserver := newDetailsProgressObserver(e.upgradeDetails)
-	dp := newDownloadProgressReporter(sourceURI, e.config.HTTPTransportSettings.Timeout, fileSize, loggingObserver, detailsObserver)
+	dp := newDownloadProgressReporter(sourceURI, e.config.HTTPTransportSettings.Timeout, fileSize, e.diskSpaceErrorFunc, loggingObserver, detailsObserver)
 	dp.Report(ctx)
 	_, err = io.Copy(destinationFile, io.TeeReader(resp.Body, dp))
 	if err != nil {

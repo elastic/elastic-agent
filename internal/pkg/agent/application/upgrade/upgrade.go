@@ -70,12 +70,13 @@ func init() {
 
 // Upgrader performs an upgrade
 type Upgrader struct {
-	log            *logger.Logger
-	settings       *artifact.Config
-	agentInfo      info.Agent
-	upgradeable    bool
-	fleetServerURI string
-	markerWatcher  MarkerWatcher
+	log                *logger.Logger
+	settings           *artifact.Config
+	agentInfo          info.Agent
+	upgradeable        bool
+	fleetServerURI     string
+	markerWatcher      MarkerWatcher
+	diskSpaceErrorFunc func(error) error
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -86,13 +87,14 @@ func IsUpgradeable() bool {
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
-func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.Agent) (*Upgrader, error) {
+func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.Agent, diskSpaceErrorFunc func(error) error) (*Upgrader, error) {
 	return &Upgrader{
-		log:           log,
-		settings:      settings,
-		agentInfo:     agentInfo,
-		upgradeable:   IsUpgradeable(),
-		markerWatcher: newMarkerFileWatcher(markerFilePath(paths.Data()), log),
+		log:                log,
+		settings:           settings,
+		agentInfo:          agentInfo,
+		upgradeable:        IsUpgradeable(),
+		markerWatcher:      newMarkerFileWatcher(markerFilePath(paths.Data()), log),
+		diskSpaceErrorFunc: diskSpaceErrorFunc,
 	}, nil
 }
 
