@@ -239,17 +239,12 @@ func (u *Upgrader) downloadWithRetries(
 	var path string
 	var attempt uint
 
-	var downloadErr error
-
 	opFn := func() error {
 		attempt++
 		u.log.Infof("download attempt %d", attempt)
 		var err error
 		path, err = u.downloadOnce(cancelCtx, factory, version, settings, upgradeDetails, diskSpaceErrorFunc)
 		if err != nil {
-			if !errors.Is(err, context.DeadlineExceeded) {
-				downloadErr = err
-			}
 			return err
 		}
 		return nil
@@ -262,9 +257,6 @@ func (u *Upgrader) downloadWithRetries(
 	}
 
 	if err := backoff.RetryNotify(opFn, boCtx, opFailureNotificationFn); err != nil {
-		if downloadErr != nil {
-			return "", downloadErr
-		}
 		return "", err
 	}
 
