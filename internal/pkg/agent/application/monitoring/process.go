@@ -120,8 +120,8 @@ func isProcessRedirectable(componentID string) bool {
 }
 
 func redirectToPath(w http.ResponseWriter, r *http.Request, id, path, operatingSystem string) error {
-	endpoint := prefixedEndpoint(utils.SocketURLWithFallback(id, paths.TempDir()))
-	metricsBytes, statusCode, metricsErr := processMetrics(r.Context(), endpoint, path)
+	endpoint := PrefixedEndpoint(utils.SocketURLWithFallback(id, paths.TempDir()))
+	metricsBytes, statusCode, metricsErr := GetProcessMetrics(r.Context(), endpoint, path)
 	if metricsErr != nil {
 		return metricsErr
 	}
@@ -134,7 +134,7 @@ func redirectToPath(w http.ResponseWriter, r *http.Request, id, path, operatingS
 	return nil
 }
 
-func processMetrics(ctx context.Context, endpoint, path string) ([]byte, int, error) {
+func GetProcessMetrics(ctx context.Context, endpoint, path string) ([]byte, int, error) {
 	hostData, err := parseURL(endpoint, "http", "", "", path, "")
 	if err != nil {
 		return nil, 0, errorWithStatus(http.StatusInternalServerError, err)
