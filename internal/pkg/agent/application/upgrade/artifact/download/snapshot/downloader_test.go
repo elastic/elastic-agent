@@ -138,7 +138,7 @@ func TestDownloadVersion(t *testing.T) {
 				_ = s
 				return net.Dial(network, server.Listener.Addr().String())
 			}
-			downloader, err := NewDownloaderWithClient(log, config, tt.args.version, client, upgradeDetails)
+			downloader, err := NewDownloaderWithClient(log, config, tt.args.version, client, upgradeDetails, nil)
 			require.NoError(t, err)
 			got, err := downloader.Download(context.TODO(), tt.args.a, tt.args.version)
 

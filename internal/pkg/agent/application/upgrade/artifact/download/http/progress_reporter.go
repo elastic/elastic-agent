@@ -19,23 +19,25 @@ type downloadProgressReporter struct {
 	downloaded atomic.Int64
 	started    time.Time
 
-	progressObservers []progressObserver
-	done              chan struct{}
+	progressObservers  []progressObserver
+	done               chan struct{}
+	diskSpaceErrorFunc func(error) error
 }
 
-func newDownloadProgressReporter(sourceURI string, timeout time.Duration, length int, progressObservers ...progressObserver) *downloadProgressReporter {
+func newDownloadProgressReporter(sourceURI string, timeout time.Duration, length int, diskSpaceErrorFunc func(error) error, progressObservers ...progressObserver) *downloadProgressReporter {
 	interval := time.Duration(float64(timeout) * downloadProgressIntervalPercentage)
 	if interval == 0 {
 		interval = downloadProgressMinInterval
 	}
 
 	return &downloadProgressReporter{
-		sourceURI:         sourceURI,
-		interval:          interval,
-		warnTimeout:       time.Duration(float64(timeout) * warningProgressIntervalPercentage),
-		length:            float64(length),
-		progressObservers: progressObservers,
-		done:              make(chan struct{}),
+		sourceURI:          sourceURI,
+		interval:           interval,
+		warnTimeout:        time.Duration(float64(timeout) * warningProgressIntervalPercentage),
+		length:             float64(length),
+		diskSpaceErrorFunc: diskSpaceErrorFunc,
+		progressObservers:  progressObservers,
+		done:               make(chan struct{}),
 	}
 }
 
@@ -112,6 +114,7 @@ func (dp *downloadProgressReporter) ReportComplete() {
 // either ReportFailed or ReportComplete when they no longer need the downloadProgressReporter
 // to avoid resource leaks.
 func (dp *downloadProgressReporter) ReportFailed(err error) {
+	err = dp.diskSpaceErrorFunc(err)
 	defer close(dp.done)
 
 	// If there are no observers to report progress to, there is nothing to do!

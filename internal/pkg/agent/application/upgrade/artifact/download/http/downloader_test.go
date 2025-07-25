@@ -64,7 +64,7 @@ func TestDownload(t *testing.T) {
 			config.Architecture = testCase.arch
 
 			upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
-			testClient := NewDownloaderWithClient(log, config, elasticClient, upgradeDetails)
+			testClient := NewDownloaderWithClient(log, config, elasticClient, upgradeDetails, nil)
 			artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
 			if err != nil {
 				t.Fatal(err)
@@ -114,7 +114,7 @@ func TestDownloadBodyError(t *testing.T) {
 
 	log, obs := loggertest.New("downloader")
 	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
-	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails)
+	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails, nil)
 	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
 	os.Remove(artifactPath)
 	if err == nil {
@@ -171,7 +171,7 @@ func TestDownloadLogProgressWithLength(t *testing.T) {
 
 	log, obs := loggertest.New("downloader")
 	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
-	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails)
+	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails, nil)
 	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
 	os.Remove(artifactPath)
 	require.NoError(t, err, "Download should not have errored")
@@ -254,7 +254,7 @@ func TestDownloadLogProgressWithoutLength(t *testing.T) {
 
 	log, obs := loggertest.New("downloader")
 	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
-	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails)
+	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails, nil)
 	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
 	os.Remove(artifactPath)
 	require.NoError(t, err, "Download should not have errored")
@@ -516,7 +516,7 @@ func TestDownloadVersion(t *testing.T) {
 			config := tt.fields.config
 			config.SourceURI = server.URL
 			config.TargetDirectory = targetDirPath
-			downloader := NewDownloaderWithClient(log, config, *elasticClient, upgradeDetails)
+			downloader := NewDownloaderWithClient(log, config, *elasticClient, upgradeDetails, nil)
 
 			got, err := downloader.Download(context.TODO(), tt.args.a, tt.args.version)
 

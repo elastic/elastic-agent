@@ -95,7 +95,7 @@ func TestFetchVerify(t *testing.T) {
 	// second one should pass
 	// download not skipped: package missing
 	// verify passes because hash is not correct
-	_, err = NewDownloader(config).Download(ctx, a, version)
+	_, err = NewDownloader(config, nil).Download(ctx, a, version)
 	require.NoError(t, err)
 	asc, err := os.ReadFile(filepath.Join(dropPath, filename+".asc"))
 	require.NoErrorf(t, err, "could not open .asc for copy")
@@ -224,7 +224,7 @@ func TestVerify(t *testing.T) {
 
 			pgpKey := prepareTestCase(t, agentSpec, testVersion, config)
 
-			testClient := NewDownloader(config)
+			testClient := NewDownloader(config, nil)
 			artifactPath, err := testClient.Download(ctx, agentSpec, testVersion)
 			require.NoError(t, err, "fs.Downloader could not download artifacts")
 			_, err = testClient.DownloadAsc(context.Background(), agentSpec, *testVersion)
