@@ -68,6 +68,7 @@ func TestPerformComponentDiagnostics(t *testing.T) {
 		require.NotNil(t, d.Err)
 		assert.ErrorContains(t, d.Err, "failed to get beat metrics")
 		assert.ErrorContains(t, d.Err, "failed to get input metrics")
+		assert.ErrorContains(t, d.Err, "no such file or directory")
 	}
 }
 

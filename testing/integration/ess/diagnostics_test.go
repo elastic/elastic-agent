@@ -324,14 +324,6 @@ agent.monitoring.enabled: false
 	var filebeatSetup = map[string]integrationtest.ComponentState{
 		"filestream-default": {
 			State: integrationtest.NewClientState(client.Healthy),
-			Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
-				integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "filestream-default"}: {
-					State: integrationtest.NewClientState(client.Healthy),
-				},
-				integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "filestream-default-filestream-filebeat"}: {
-					State: integrationtest.NewClientState(client.Healthy),
-				},
-			},
 		},
 	}
 
@@ -343,6 +335,7 @@ agent.monitoring.enabled: false
 		runtime                      string
 		expectedCompDiagnosticsFiles []string
 		expectedAgentState           *client.State
+		expectedComponentState       map[string]integrationtest.ComponentState
 	}{
 		{
 			name:    "filebeat process",
@@ -353,13 +346,24 @@ agent.monitoring.enabled: false
 				"beat_metrics.json",
 				"beat-rendered-config.yml",
 				"global_processors.txt",
-				"filestream-filebeat/error.txt",
-				"filestream-default/error.txt",
 			),
 			expectedAgentState: integrationtest.NewClientState(client.Healthy),
+			expectedComponentState: map[string]integrationtest.ComponentState{
+				"filestream-default": {
+					State: integrationtest.NewClientState(client.Healthy),
+					Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
+						integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "filestream-default"}: {
+							State: integrationtest.NewClientState(client.Healthy),
+						},
+						integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "filestream-default-filestream-filebeat"}: {
+							State: integrationtest.NewClientState(client.Healthy),
+						},
+					},
+				},
+			},
 		},
 		{
-			name:    "filebeat container",
+			name:    "filebeat receiver",
 			runtime: "otel",
 			expectedCompDiagnosticsFiles: []string{
 				"registry.tar.gz",
@@ -397,7 +401,7 @@ agent.monitoring.enabled: false
 			err = f.Run(ctx, integrationtest.State{
 				Configure:  configBuffer.String(),
 				AgentState: tc.expectedAgentState,
-				Components: filebeatSetup,
+				Components: tc.expectedComponentState,
 				After:      testDiagnosticsFactory(t, filebeatSetup, diagnosticsFiles, tc.expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
 			})
 			assert.NoError(t, err)
