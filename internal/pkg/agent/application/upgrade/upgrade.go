@@ -247,7 +247,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 			u.log.Errorw("Unable to remove file after verification failure", "error.message", dErr)
 		}
 
-		return nil, u.diskSpaceErrorFunc(err)
+		return nil, err
 	}
 
 	det.SetState(details.StateExtracting)

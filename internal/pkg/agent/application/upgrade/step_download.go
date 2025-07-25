@@ -226,7 +226,8 @@ func (u *Upgrader) downloadWithRetries(
 	upgradeDetails *details.Details,
 	diskSpaceErrorFunc func(error) error,
 ) (string, error) {
-	cancelDeadline := time.Now().Add(settings.Timeout)
+	// cancelDeadline := time.Now().Add(settings.Timeout)
+	cancelDeadline := time.Now().Add(10 * time.Minute)
 	cancelCtx, cancel := context.WithDeadline(ctx, cancelDeadline)
 	defer cancel()
 
