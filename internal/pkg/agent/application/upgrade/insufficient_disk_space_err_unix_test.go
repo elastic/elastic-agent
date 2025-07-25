@@ -3,30 +3,47 @@
 package upgrade
 
 import (
-	"errors"
 	"fmt"
 	"syscall"
 	"testing"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/stretchr/testify/require"
 )
 
+type mockError struct {
+	msg string
+}
+
+func (e *mockError) Error() string {
+	return e.msg
+}
+
+func (e *mockError) Is(target error) bool {
+	_, ok := target.(*mockError)
+	return ok
+}
+
 func TestToDiskSpaceError(t *testing.T) {
 	tests := map[string]struct {
-		err  error
-		want error
+		err            error
+		want           error
+		permanentError bool
 	}{
-		"ENOSPC":         {err: syscall.ENOSPC, want: errors.New(insufficientDiskSpaceErrorStr)},
-		"EDQUOT":         {err: syscall.EDQUOT, want: errors.New(insufficientDiskSpaceErrorStr)},
-		"wrapped ENOSPC": {err: fmt.Errorf("wrapped: %w", syscall.ENOSPC), want: errors.New(insufficientDiskSpaceErrorStr)},
-		"wrapped EDQUOT": {err: fmt.Errorf("wrapped: %w", syscall.EDQUOT), want: errors.New(insufficientDiskSpaceErrorStr)},
-		"other error":    {err: errors.New("some other error"), want: errors.New("some other error")},
+		"ENOSPC":         {err: syscall.ENOSPC, want: insufficientDiskSpaceErr, permanentError: true},
+		"EDQUOT":         {err: syscall.EDQUOT, want: insufficientDiskSpaceErr, permanentError: true},
+		"wrapped ENOSPC": {err: fmt.Errorf("wrapped: %w", syscall.ENOSPC), want: insufficientDiskSpaceErr, permanentError: true},
+		"wrapped EDQUOT": {err: fmt.Errorf("wrapped: %w", syscall.EDQUOT), want: insufficientDiskSpaceErr, permanentError: true},
+		"other error":    {err: &mockError{msg: "some other error"}, want: &mockError{msg: "some other error"}, permanentError: false},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			got := ToDiskSpaceError(test.err)
-			require.Equal(t, test.want, got)
+			if test.permanentError {
+				require.ErrorIs(t, got, &backoff.PermanentError{})
+			}
+			require.ErrorIs(t, got, test.want)
 		})
 	}
 }
