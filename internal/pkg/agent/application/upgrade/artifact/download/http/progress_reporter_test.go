@@ -1,23 +1,99 @@
 package http
 
 import (
-	"fmt"
+	"context"
+	"errors"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
+type mockProgressObserver struct {
+	reportFailedCalls []reportFailedCall
+}
+
+type reportFailedCall struct {
+	sourceURI       string
+	timePast        time.Duration
+	downloadedBytes float64
+	totalBytes      float64
+	percentComplete float64
+	downloadRate    float64
+	err             error
+}
+
+func (m *mockProgressObserver) Report(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRate float64) {
+	// noop
+}
+
+func (m *mockProgressObserver) ReportCompleted(sourceURI string, timePast time.Duration, downloadRate float64) {
+	// noop
+}
+
+func (m *mockProgressObserver) ReportFailed(sourceURI string, timePast time.Duration, downloadedBytes, totalBytes, percentComplete, downloadRate float64, err error) {
+	m.reportFailedCalls = append(m.reportFailedCalls, reportFailedCall{
+		sourceURI:       sourceURI,
+		timePast:        timePast,
+		downloadedBytes: downloadedBytes,
+		totalBytes:      totalBytes,
+		percentComplete: percentComplete,
+		downloadRate:    downloadRate,
+		err:             err,
+	})
+}
+
 func TestReportFailed(t *testing.T) {
-	t.Run("should call diskSpaceErrorFunc with the provided error", func(t *testing.T) {
-		count := 0
+	t.Run("should call ReportFailed on all observers with correct parameters", func(t *testing.T) {
+		testErr := errors.New("test error")
+		convertedErr := errors.New("converted error")
 		diskSpaceErrorFunc := func(err error) error {
-			count++
+			if err == testErr {
+				return convertedErr
+			}
 			return err
 		}
-		dp := newDownloadProgressReporter("test", 10*time.Second, 100, diskSpaceErrorFunc)
-		dp.ReportFailed(fmt.Errorf("test"))
 
-		if count != 1 {
-			t.Errorf("expected diskSpaceErrorFunc to be called once, got %d", count)
+		observer1 := &mockProgressObserver{}
+		observer2 := &mockProgressObserver{}
+		observers := []progressObserver{observer1, observer2}
+
+		dp := newDownloadProgressReporter("mockurl", 10*time.Second, 1000, diskSpaceErrorFunc, observers...)
+
+		dp.downloaded.Store(500)
+		dp.started = time.Now().Add(-2 * time.Second)
+
+		testCtx, cnFn := context.WithTimeout(t.Context(), 10*time.Second)
+		defer cnFn()
+
+		dp.ReportFailed(testErr)
+
+		select {
+		case <-testCtx.Done():
+			t.Error("expected done channel to be closed")
+		case <-dp.done:
+			// noop
+		}
+
+		for _, obs := range observers {
+			mockObs, ok := obs.(*mockProgressObserver)
+			require.True(t, ok, "expected mockProgressObserver, got %T", obs)
+
+			require.Equal(t, 1, len(mockObs.reportFailedCalls))
+
+			call := mockObs.reportFailedCalls[0]
+
+			expected := reportFailedCall{
+				sourceURI:       "mockurl",
+				timePast:        time.Now().Add(-2 * time.Second).Sub(dp.started),
+				downloadedBytes: 500,
+				totalBytes:      1000,
+				percentComplete: 50.0,
+				downloadRate:    250.0,
+				err:             testErr,
+			}
+
+			require.NotEqual(t, expected, call)
 		}
 	})
 }
