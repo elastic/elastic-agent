@@ -217,6 +217,7 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	dp.Report(ctx)
 	_, err = io.Copy(destinationFile, io.TeeReader(resp.Body, dp))
 	if err != nil {
+		err = e.diskSpaceErrorFunc(err)
 		dp.ReportFailed(err)
 		// return path, file already exists and needs to be cleaned up
 		return fullPath, fmt.Errorf("%s: %w", errors.New("copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI)).Error(), err)

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/cenkalti/backoff/v4"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,16 +31,19 @@ func TestToDiskSpaceError(t *testing.T) {
 		want           error
 		permanentError bool
 	}{
-		"ENOSPC":         {err: syscall.ENOSPC, want: insufficientDiskSpaceErr, permanentError: true},
-		"EDQUOT":         {err: syscall.EDQUOT, want: insufficientDiskSpaceErr, permanentError: true},
-		"wrapped ENOSPC": {err: fmt.Errorf("wrapped: %w", syscall.ENOSPC), want: insufficientDiskSpaceErr, permanentError: true},
-		"wrapped EDQUOT": {err: fmt.Errorf("wrapped: %w", syscall.EDQUOT), want: insufficientDiskSpaceErr, permanentError: true},
+		"ENOSPC":         {err: syscall.ENOSPC, want: ErrInsufficientDiskSpace, permanentError: true},
+		"EDQUOT":         {err: syscall.EDQUOT, want: ErrInsufficientDiskSpace, permanentError: true},
+		"wrapped ENOSPC": {err: fmt.Errorf("wrapped: %w", syscall.ENOSPC), want: ErrInsufficientDiskSpace, permanentError: true},
+		"wrapped EDQUOT": {err: fmt.Errorf("wrapped: %w", syscall.EDQUOT), want: ErrInsufficientDiskSpace, permanentError: true},
 		"other error":    {err: &mockError{msg: "some other error"}, want: &mockError{msg: "some other error"}, permanentError: false},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			got := ToDiskSpaceError(test.err)
+			log, err := logger.New("test", true)
+			require.NoError(t, err)
+
+			got := ToDiskSpaceErrorFunc(log)(test.err)
 			if test.permanentError {
 				require.ErrorIs(t, got, &backoff.PermanentError{})
 			}

@@ -8,7 +8,7 @@ import (
 
 const insufficientDiskSpaceErrorStr = "insufficient disk space"
 
-var insufficientDiskSpaceErr = &InsufficientDiskSpaceError{Err: backoff.Permanent(errors.New(insufficientDiskSpaceErrorStr))}
+var ErrInsufficientDiskSpace = &InsufficientDiskSpaceError{Err: backoff.Permanent(errors.New(insufficientDiskSpaceErrorStr))}
 
 type InsufficientDiskSpaceError struct {
 	Err error
