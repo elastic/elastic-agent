@@ -167,13 +167,13 @@ func TestBeatMetrics(t *testing.T) {
 
 	diags, err := m.PerformComponentDiagnostics(context.Background(), nil)
 	require.NoError(t, err)
-	assert.Len(t, obs.All(), 1) // one debug log line about the registry
+	assert.Len(t, obs.All(), 0)
 	require.Len(t, diags, 1)
 
 	diag := diags[0]
 	assert.Equal(t, filebeatComp, diag.Component)
 	// two metrics diagnostics and one filebeat registry
-	require.Len(t, diag.Results, 3, "expected 3 diagnostics, got error: %w", diag.Err)
+	require.Len(t, diag.Results, 2, "expected 2 diagnostics, got error: %w", diag.Err)
 
 	t.Run("beat metrics", func(t *testing.T) {
 		beatMetrics := diag.Results[0]
