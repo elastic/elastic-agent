@@ -23,13 +23,7 @@ type downloadRequest struct {
 // It writes to the destination file as it downloads it, without
 // loading the entire file into memory.
 func downloadFile(downloadRequest *downloadRequest) error {
-	targetFile, err := os.Create(downloadRequest.TargetPath)
-	if err != nil {
-		return fmt.Errorf("creating file: %w", err)
-	}
-	defer func() {
-		_ = targetFile.Close()
-	}()
+	stat, _ := os.Stat(downloadRequest.TargetPath)
 
 	exp := getExponentialBackoff(3)
 
@@ -40,20 +34,41 @@ func downloadFile(downloadRequest *downloadRequest) error {
 		if err != nil {
 			return fmt.Errorf("creating request: %w", err)
 		}
+		// if the target file already exists, add the If-Modified-Since header
+		if stat != nil {
+			req.Header.Add("If-Modified-Since", stat.ModTime().Format(http.TimeFormat))
+		}
+
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			retryCount++
 			return fmt.Errorf("downloading file %s: %w", downloadRequest.URL, err)
 		}
 
+		if resp.StatusCode == http.StatusNotModified {
+			return nil
+		}
+
 		fileReader = resp.Body
 		return nil
 	}
 
-	err = backoff.Retry(download, exp)
+	err := backoff.Retry(download, exp)
 	if err != nil {
 		return err
 	}
+
+	if fileReader == nil { // file already exists with the same content
+		return nil
+	}
+
+	targetFile, err := os.Create(downloadRequest.TargetPath)
+	if err != nil {
+		return fmt.Errorf("creating file: %w", err)
+	}
+	defer func() {
+		_ = targetFile.Close()
+	}()
 
 	_, err = io.Copy(targetFile, fileReader)
 	if err != nil {
