@@ -32,9 +32,7 @@ func downloadFile(downloadRequest *downloadRequest) error {
 	retryCount := 1
 	var fileReader io.ReadCloser
 	download := func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-		defer cancel()
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadRequest.URL, nil)
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, downloadRequest.URL, nil)
 		if err != nil {
 			return fmt.Errorf("creating request: %w", err)
 		}
