@@ -32,7 +32,7 @@ func downloadFile(downloadRequest *downloadRequest) error {
 	retryCount := 1
 	var fileReader io.ReadCloser
 	download := func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadRequest.URL, nil)
 		if err != nil {
@@ -43,7 +43,7 @@ func downloadFile(downloadRequest *downloadRequest) error {
 			req.Header.Add("If-Modified-Since", stat.ModTime().Format(http.TimeFormat))
 		}
 
-		resp, err := http.DefaultClient.Do(req) //nolint:bodycloser
+		resp, err := http.DefaultClient.Do(req) //nolint:bodyclose // we do close this outside of the function
 		if err != nil {
 			retryCount++
 			return fmt.Errorf("downloading file %s: %w", downloadRequest.URL, err)
