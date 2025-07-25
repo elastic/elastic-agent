@@ -300,6 +300,15 @@ kubernetes:
       # -- system metric stream vars
       # @section -- 2 - Kubernetes integration
       vars: {}
+  event:
+    # -- enable [event](https://www.elastic.co/guide/en/beats/metricbeat/8.11/metricbeat-metricset-kubernetes-event.html)
+    # input
+    # @section -- 2 - Kubernetes integration
+    enabled: false
+    # -- event stream variables such as `hosts`, `period`, `bearer_token_file`,
+    # `ssl.verification_mode`, `condition`.
+    # @section -- 2 - Kubernetes integration
+    vars: {}
 system:
   # -- enable System integration.
   # @section -- 4 - System integration
