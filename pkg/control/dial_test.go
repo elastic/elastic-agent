@@ -43,16 +43,12 @@ func TestDialContextBlocking_Success(t *testing.T) {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 
-	if err != nil {
-		require.NoError(t, err, "DialContextBlocking failed")
-	}
+	require.NoError(t, err, "DialContextBlocking failed")
 	defer conn.Close()
 
 	// Verify connection is ready
 	state := conn.GetState()
-	if state != connectivity.Ready {
-		assert.Equal(t, connectivity.Ready, state, "Expected connection state to be Ready")
-	}
+	assert.Equal(t, connectivity.Ready, state, "Expected connection state to be Ready")
 }
 
 func TestDialContextBlocking_ContextCancellation(t *testing.T) {
