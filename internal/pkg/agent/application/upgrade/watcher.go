@@ -8,19 +8,28 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"time"
 
 	"google.golang.org/grpc"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/process"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
 	statusCheckMissesAllowed      = 4 // enable 2 minute start (30 second periods)
 	statusLossesAllowed           = 2 // enable connection lost to agent twice
 	statusFailureFlipFlopsAllowed = 3 // no more than three failure flip-flops allowed
+
+	watcherApplockerFileName = "watcher.lock"
 )
 
 var (
@@ -256,4 +265,132 @@ func (ch *AgentWatcher) checkFailures() bool {
 		return true
 	}
 	return false
+}
+
+// Ensure that AgentWatcherHelper implements the WatcherHelper interface
+var _ WatcherHelper = &AgentWatcherHelper{}
+
+type AgentWatcherHelper struct {
+}
+
+func (a AgentWatcherHelper) InvokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error) {
+	return InvokeWatcher(log, agentExecutable)
+}
+
+func (a AgentWatcherHelper) SelectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string {
+	return selectWatcherExecutable(topDir, previous, current)
+}
+
+func (a AgentWatcherHelper) WaitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration) error {
+	return waitForWatcher(ctx, log, markerFilePath, waitTime)
+}
+
+func (a AgentWatcherHelper) TakeOverWatcher(ctx context.Context, log *logger.Logger, topDir string) (*filelock.AppLocker, error) {
+	return takeOverWatcher(ctx, log, topDir, utils.GetWatcherPIDs, 30*time.Second, 500*time.Millisecond, 100*time.Millisecond)
+}
+
+// watcherPIDsFetcher defines the type of function responsible for fetching watcher PIDs.
+// This will allow for easier testing of takeOverWatcher using fake binaries
+type watcherPIDsFetcher func() ([]int, error)
+
+// Private functions providing implementation of AgentWatcherHelper
+func takeOverWatcher(ctx context.Context, log *logger.Logger, topDir string, pidFetchFunc watcherPIDsFetcher, timeout time.Duration, watcherSweepInterval time.Duration, takeOverInterval time.Duration) (*filelock.AppLocker, error) {
+	takeoverCtx, takeoverCancel := context.WithTimeout(ctx, timeout)
+	defer takeoverCancel()
+	go func() {
+		sweepTicker := time.NewTicker(watcherSweepInterval)
+		defer sweepTicker.Stop()
+		for {
+			select {
+			case <-takeoverCtx.Done():
+				return
+			case <-sweepTicker.C:
+				pids, err := pidFetchFunc()
+				if err != nil {
+					log.Errorf("error listing watcher processes: %s", err)
+					continue
+				}
+
+				// this should be run continuously and concurrently attempting to get the app locker
+				for _, pid := range pids {
+					log.Debugf("attempting to kill watcher process with PID: %d", pid)
+					watcherProcess, findProcErr := os.FindProcess(pid)
+					if findProcErr != nil {
+						log.Errorf("error finding process with PID: %d: %s", pid, findProcErr)
+						continue
+					}
+					killProcErr := process.Terminate(watcherProcess)
+					if killProcErr != nil {
+						log.Errorf("error killing process with PID: %d: %s", pid, killProcErr)
+						continue
+					}
+					log.Debugf("killed watcher process with PID: %d", pid)
+				}
+			}
+		}
+	}()
+
+	// we should retry to take over the AppLocker for 30s, but AppLocker interface is limited
+	takeOverTicker := time.NewTicker(takeOverInterval)
+	defer takeOverTicker.Stop()
+	for {
+		select {
+		case <-takeoverCtx.Done():
+			return nil, fmt.Errorf("timed out taking over watcher applocker")
+		case <-takeOverTicker.C:
+			locker := filelock.NewAppLocker(topDir, watcherApplockerFileName)
+			err := locker.TryLock()
+			if err != nil {
+				log.Errorf("error locking watcher applocker: %s", err)
+				continue
+			}
+			return locker, nil
+		}
+	}
+}
+
+func selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string {
+	// check if the upgraded version is less than the previous (currently installed) version
+	if current.parsedVersion.Less(*previous.parsedVersion) {
+		// use the current agent executable for watch, if downgrading the old agent doesn't understand the current agent's path structure.
+		return paths.BinaryPath(filepath.Join(topDir, previous.versionedHome), agentName)
+	} else {
+		// use the new agent executable as it should be able to parse the new update marker
+		return paths.BinaryPath(filepath.Join(topDir, current.versionedHome), agentName)
+	}
+}
+
+func waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration) error {
+	return waitForWatcherWithTimeoutCreationFunc(ctx, log, markerFilePath, waitTime, context.WithTimeout)
+}
+
+type createContextWithTimeout func(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc)
+
+func waitForWatcherWithTimeoutCreationFunc(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout) error {
+	// Wait for the watcher to be up and running
+	watcherContext, cancel := createTimeoutContext(ctx, waitTime)
+	defer cancel()
+
+	markerWatcher := newMarkerFileWatcher(markerFilePath, log)
+	err := markerWatcher.Run(watcherContext)
+	if err != nil {
+		return fmt.Errorf("error starting update marker watcher: %w", err)
+	}
+
+	log.Infof("waiting up to %s for upgrade watcher to set %s state in upgrade marker", waitTime, details.StateWatching)
+
+	for {
+		select {
+		case updMarker := <-markerWatcher.Watch():
+			if updMarker.Details != nil && updMarker.Details.State == details.StateWatching {
+				// watcher started and it is watching, all good
+				log.Infof("upgrade watcher set %s state in upgrade marker: exiting wait loop", details.StateWatching)
+				return nil
+			}
+
+		case <-watcherContext.Done():
+			log.Errorf("upgrade watcher did not start watching within %s or context has expired", waitTime)
+			return errors.Join(ErrWatcherNotStarted, watcherContext.Err())
+		}
+	}
 }

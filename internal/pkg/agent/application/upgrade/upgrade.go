@@ -19,6 +19,7 @@ import (
 	"github.com/otiai10/copy"
 	"go.elastic.co/apm/v2"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
@@ -60,6 +61,7 @@ var (
 	ErrUpgradeSameVersion = errors.New("upgrade did not occur because it is the same version")
 	ErrNonFipsToFips      = errors.New("cannot switch to fips mode when upgrading")
 	ErrFipsToNonFips      = errors.New("cannot switch to non-fips mode when upgrading")
+	ErrNilUpdateMarker    = errors.New("loaded a nil update marker")
 )
 
 func init() {
@@ -68,14 +70,33 @@ func init() {
 	}
 }
 
+// WatcherHelper is an abstraction of operations that Upgrader will trigger on elastic-agent watcher.
+// This is defined to help with Upgrader testing and verify interactions with elastic-agent watcher
+type WatcherHelper interface {
+	// InvokeWatcher invokes an elastic-agent watcher using the agentExecutable passed as argument
+	InvokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error)
+	// SelectWatcherExecutable will return the path to the newer elastic-agent executable that will be used to invoke the
+	// more recent watcher between the previous (the agent that started the upgrade) and current (the agent that will run after restart)
+	// agent installation
+	SelectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string
+	// WaitForWatcher will listen for changes to the update marker, waiting for the elastic-agent watcher to set UPG_WATCHING state
+	// in the upgrade details' metadata
+	WaitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration) error
+	// TakeOverWatcher will look for watcher processes and terminate them while at the same time trying to acquire the watcher AppLocker.
+	// It will return once it managed to get the AppLocker or with an error if the lock could not be acquired.
+	TakeOverWatcher(ctx context.Context, log *logger.Logger, topDir string) (*filelock.AppLocker, error)
+}
+
 // Upgrader performs an upgrade
 type Upgrader struct {
-	log            *logger.Logger
-	settings       *artifact.Config
-	agentInfo      info.Agent
-	upgradeable    bool
-	fleetServerURI string
-	markerWatcher  MarkerWatcher
+	log             *logger.Logger
+	settings        *artifact.Config
+	upgradeSettings *configuration.UpgradeConfig
+	agentInfo       info.Agent
+	upgradeable     bool
+	fleetServerURI  string
+	markerWatcher   MarkerWatcher
+	watcherHelper   WatcherHelper
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -86,13 +107,15 @@ func IsUpgradeable() bool {
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
-func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.Agent) (*Upgrader, error) {
+func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *configuration.UpgradeConfig, agentInfo info.Agent, watcherHelper WatcherHelper) (*Upgrader, error) {
 	return &Upgrader{
-		log:           log,
-		settings:      settings,
-		agentInfo:     agentInfo,
-		upgradeable:   IsUpgradeable(),
-		markerWatcher: newMarkerFileWatcher(markerFilePath(paths.Data()), log),
+		log:             log,
+		settings:        settings,
+		upgradeSettings: upgradeConfig,
+		agentInfo:       agentInfo,
+		upgradeable:     IsUpgradeable(),
+		markerWatcher:   newMarkerFileWatcher(markerFilePath(paths.Data()), log),
+		watcherHelper:   watcherHelper,
 	}, nil
 }
 
@@ -144,6 +167,8 @@ func (u *Upgrader) Reload(rawConfig *config.Config) error {
 	}
 
 	u.settings = cfg.Settings.DownloadConfig
+	u.upgradeSettings = cfg.Settings.Upgrade
+
 	return nil
 }
 
@@ -194,7 +219,12 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 }
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
-func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+
+	if rollback {
+		return u.forceRollbackToPreviousVersion(ctx, paths.Top(), version, action, det)
+	}
+
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 
 	currentVersion := agentVersion{
@@ -338,27 +368,26 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		hash:          release.Commit(),
 		versionedHome: currentVersionedHome,
 	}
-
-	if err := markUpgrade(u.log,
-		paths.Data(), // data dir to place the marker in
-		current,      // new agent version data
-		previous,     // old agent version data
-		action, det, OUTCOME_UPGRADE); err != nil {
+	rollbackWindow := time.Duration(0)
+	if u.upgradeSettings != nil && u.upgradeSettings.Rollback != nil { // TODO && target version supports manual rollback and deferred cleanup
+		rollbackWindow = u.upgradeSettings.Rollback.Window
+	}
+	if err := markUpgrade(u.log, paths.Data(), time.Now(), current, previous, action, det, OUTCOME_UPGRADE, rollbackWindow); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
 		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
 		return nil, goerrors.Join(err, rollbackErr)
 	}
 
-	watcherExecutable := selectWatcherExecutable(paths.Top(), previous, current)
+	watcherExecutable := u.watcherHelper.SelectWatcherExecutable(paths.Top(), previous, current)
 
 	var watcherCmd *exec.Cmd
-	if watcherCmd, err = InvokeWatcher(u.log, watcherExecutable); err != nil {
+	if watcherCmd, err = u.watcherHelper.InvokeWatcher(u.log, watcherExecutable); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
 		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
 		return nil, goerrors.Join(err, rollbackErr)
 	}
 
-	watcherWaitErr := waitForWatcher(ctx, u.log, markerFilePath(paths.Data()), watcherMaxWaitTime)
+	watcherWaitErr := u.watcherHelper.WaitForWatcher(ctx, u.log, markerFilePath(paths.Data()), watcherMaxWaitTime)
 	if watcherWaitErr != nil {
 		killWatcherErr := watcherCmd.Process.Kill()
 		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
@@ -377,50 +406,95 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	return cb, nil
 }
 
-func selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string {
-	// check if the upgraded version is less than the previous (currently installed) version
-	if current.parsedVersion.Less(*previous.parsedVersion) {
-		// use the current agent executable for watch, if downgrading the old agent doesn't understand the current agent's path structure.
-		return paths.BinaryPath(filepath.Join(topDir, previous.versionedHome), agentName)
-	} else {
-		// use the new agent executable as it should be able to parse the new update marker
-		return paths.BinaryPath(filepath.Join(topDir, current.versionedHome), agentName)
-	}
-}
-
-func waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration) error {
-	return waitForWatcherWithTimeoutCreationFunc(ctx, log, markerFilePath, waitTime, context.WithTimeout)
-}
-
-type createContextWithTimeout func(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc)
-
-func waitForWatcherWithTimeoutCreationFunc(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout) error {
-	// Wait for the watcher to be up and running
-	watcherContext, cancel := createTimeoutContext(ctx, waitTime)
-	defer cancel()
-
-	markerWatcher := newMarkerFileWatcher(markerFilePath, log)
-	err := markerWatcher.Run(watcherContext)
+func (u *Upgrader) forceRollbackToPreviousVersion(ctx context.Context, topDir string, version string, action *fleetapi.ActionUpgrade, d *details.Details) (reexec.ShutdownCallbackFn, error) {
+	// check that the upgrade marker exists and is accessible
+	updateMarkerPath := markerFilePath(paths.DataFrom(topDir))
+	_, err := os.Stat(updateMarkerPath)
 	if err != nil {
-		return fmt.Errorf("error starting update marker watcher: %w", err)
+		return nil, fmt.Errorf("stat() on upgrade marker %q failed: %w", updateMarkerPath, err)
 	}
 
-	log.Infof("waiting up to %s for upgrade watcher to set %s state in upgrade marker", waitTime, details.StateWatching)
+	// TODO Formal checks for verifying we can rollback properly:
+	// 1. d.Metadata.RollbacksAvailable should contain the desired version with a valid TTL (it may need to be written by main agent process before starting watcher)
+	// 2. there has been at least the first restart with the new agent (i.e. we are not still downloading/extracting/rotating)
+	// 3. upgrade marker exists
+	// these should be revalidated after taking over watcher
+	updateMarker, err := u.persistManualRollback(ctx, topDir)
+	if err != nil {
+		return nil, fmt.Errorf("persisting rollback in update marker: %w", err)
+	}
 
-	for {
-		select {
-		case updMarker := <-markerWatcher.Watch():
-			if updMarker.Details != nil && updMarker.Details.State == details.StateWatching {
-				// watcher started and it is watching, all good
-				log.Infof("upgrade watcher set %s state in upgrade marker: exiting wait loop", details.StateWatching)
-				return nil
-			}
+	previous, current, err := extractAgentInstallsFromMarker(updateMarker)
+	if err != nil {
+		return nil, fmt.Errorf("extracting current and previous install details: %w", err)
+	}
 
-		case <-watcherContext.Done():
-			log.Errorf("upgrade watcher did not start watching within %s or context has expired", waitTime)
-			return goerrors.Join(ErrWatcherNotStarted, watcherContext.Err())
+	// Invoke watcher again
+	watcherExecutable := u.watcherHelper.SelectWatcherExecutable(topDir, previous, current)
+	_, err = u.watcherHelper.InvokeWatcher(u.log, watcherExecutable)
+	if err != nil {
+		return nil, fmt.Errorf("invoking watcher: %w", err)
+	}
+
+	return nil, nil
+
+}
+
+func extractAgentInstallsFromMarker(updateMarker *UpdateMarker) (previous agentInstall, current agentInstall, err error) {
+	previousParsedVersion, err := agtversion.ParseVersion(updateMarker.PrevVersion)
+	if err != nil {
+		return previous, current, fmt.Errorf("parsing previous version %q: %w", updateMarker.PrevVersion, err)
+	}
+	previous = agentInstall{
+		parsedVersion: previousParsedVersion,
+		version:       updateMarker.PrevVersion,
+		hash:          updateMarker.PrevHash,
+		versionedHome: updateMarker.PrevVersionedHome,
+	}
+
+	currentParsedVersion, err := agtversion.ParseVersion(updateMarker.Version)
+	if err != nil {
+		return previous, current, fmt.Errorf("parsing current version %q: %w", updateMarker.Version, err)
+	}
+	current = agentInstall{
+		parsedVersion: currentParsedVersion,
+		version:       updateMarker.Version,
+		hash:          updateMarker.Hash,
+		versionedHome: updateMarker.VersionedHome,
+	}
+
+	return previous, current, nil
+}
+
+func (u *Upgrader) persistManualRollback(ctx context.Context, topDir string) (*UpdateMarker, error) {
+	watcherApplock, err := u.watcherHelper.TakeOverWatcher(ctx, u.log, topDir)
+	if err != nil {
+		return nil, fmt.Errorf("taking over watcher processes: %w", err)
+	}
+	defer func(watcherApplock *filelock.AppLocker) {
+		releaseWatcherAppLockerErr := watcherApplock.Unlock()
+		if releaseWatcherAppLockerErr != nil {
+			u.log.Warnw("error releasing watcher applock", "error", releaseWatcherAppLockerErr)
 		}
+	}(watcherApplock)
+
+	// read the upgrade marker
+	updateMarker, err := LoadMarker(paths.DataFrom(topDir))
+	if err != nil {
+		return nil, fmt.Errorf("loading marker: %w", err)
 	}
+
+	if updateMarker == nil {
+		return nil, ErrNilUpdateMarker
+	}
+
+	updateMarker.DesiredOutcome = OUTCOME_ROLLBACK
+	err = SaveMarker(paths.DataFrom(topDir), updateMarker, true)
+	if err != nil {
+		return updateMarker, fmt.Errorf("saving marker: %w", err)
+	}
+
+	return updateMarker, nil
 }
 
 // Ack acks last upgrade action

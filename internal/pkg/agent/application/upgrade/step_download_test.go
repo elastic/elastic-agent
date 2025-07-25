@@ -91,7 +91,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return &mockDownloader{expectedDownloadPath, nil}, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		u, err := NewUpgrader(testLogger, &settings, nil, &info.AgentInfo{}, new(AgentWatcherHelper))
 		require.NoError(t, err)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
@@ -141,7 +141,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return nil, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		u, err := NewUpgrader(testLogger, &settings, nil, &info.AgentInfo{}, new(AgentWatcherHelper))
 		require.NoError(t, err)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
@@ -196,7 +196,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return nil, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		u, err := NewUpgrader(testLogger, &settings, nil, &info.AgentInfo{}, new(AgentWatcherHelper))
 		require.NoError(t, err)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
@@ -241,7 +241,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return &mockDownloader{"", errors.New("download failed")}, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		u, err := NewUpgrader(testLogger, &settings, nil, &info.AgentInfo{}, new(AgentWatcherHelper))
 		require.NoError(t, err)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
