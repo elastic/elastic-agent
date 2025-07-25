@@ -2,9 +2,6 @@
 
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
-  # Remove AGENT_PACKAGE_VERSION and BEAT_VERSION pinning once 9.0.5 DRA and stack are released
-  AGENT_PACKAGE_VERSION: "9.0.4"
-  BEAT_VERSION: "9.0.4"
 
 steps:
   - group: "Integration tests: packaging"
