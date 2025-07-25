@@ -5,10 +5,12 @@
 package downloads
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/cenkalti/backoff/v4"
 )
@@ -30,7 +32,9 @@ func downloadFile(downloadRequest *downloadRequest) error {
 	retryCount := 1
 	var fileReader io.ReadCloser
 	download := func() error {
-		req, err := http.NewRequest(http.MethodGet, downloadRequest.URL, nil)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadRequest.URL, nil)
 		if err != nil {
 			return fmt.Errorf("creating request: %w", err)
 		}
@@ -39,7 +43,7 @@ func downloadFile(downloadRequest *downloadRequest) error {
 			req.Header.Add("If-Modified-Since", stat.ModTime().Format(http.TimeFormat))
 		}
 
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := http.DefaultClient.Do(req) //nolint:bodycloser
 		if err != nil {
 			retryCount++
 			return fmt.Errorf("downloading file %s: %w", downloadRequest.URL, err)
