@@ -45,6 +45,7 @@ steps:
       - integration-fips-cloud-image
     env:
       ASDF_TERRAFORM_VERSION: 1.9.2
+      FIPS: "true"
       TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
     command: |
       source .buildkite/scripts/steps/ess_start.sh
@@ -128,7 +129,6 @@ steps:
           FIPS: "true"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          export EC_API_KEY=$(retry -t 5 -- vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
           .buildkite/scripts/buildkite-integration-tests.sh ech-deployment false
         artifact_paths:
           - build/**
@@ -140,6 +140,8 @@ steps:
           provider: "aws"
           image: "${IMAGE_UBUNTU_X86_64_FIPS}"
           instanceType: "m5.2xlarge"
+        plugins:
+          - *vault_ec_key_prod
 
   - label: ESS FIPS stack cleanup
     depends_on:
