@@ -294,7 +294,7 @@ func (b GolangCrossBuilder) Build() error {
 	// container. So we ensure that all path separators are `/`.
 	buildCmd = filepath.ToSlash(buildCmd)
 
-	dockerRun := sh.RunCmd("docker", "run")
+	dockerRun := sh.RunCmd("docker", "run", "--quiet")
 	image, err := b.ImageSelector(b.Platform)
 	if err != nil {
 		return fmt.Errorf("failed to determine golang-crossbuild image tag: %w", err)
