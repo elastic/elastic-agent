@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
@@ -42,14 +44,14 @@ func TestDialContextBlocking_Success(t *testing.T) {
 	)
 
 	if err != nil {
-		t.Fatalf("DialContextBlocking failed: %v", err)
+		require.NoError(t, err, "DialContextBlocking failed")
 	}
 	defer conn.Close()
 
 	// Verify connection is ready
 	state := conn.GetState()
 	if state != connectivity.Ready {
-		t.Errorf("Expected connection state to be Ready, got %v", state)
+		assert.Equal(t, connectivity.Ready, state, "Expected connection state to be Ready")
 	}
 }
 
