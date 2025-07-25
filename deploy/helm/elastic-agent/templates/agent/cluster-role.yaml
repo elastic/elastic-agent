@@ -58,6 +58,7 @@ rules:
       - get
       - create
       - update
+      - list
   - nonResourceURLs:
       - /healthz
       - /healthz/*

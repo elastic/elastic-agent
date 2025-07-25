@@ -20,6 +20,10 @@ spec:
   template:
     metadata:
       labels:
+        {{- include "elasticagent.labels" $ | nindent 8 }}
+        {{- with ($presetVal).labels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         name: {{ $agentName }}
       annotations:
         checksum/config: {{ print (include "elasticagent.engine.k8s.secretData" (list $ $presetVal $agentName)) | sha256sum }}

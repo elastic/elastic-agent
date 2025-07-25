@@ -1507,6 +1507,9 @@
                 "clusterRole": {
                     "$ref": "#/definitions/AgentPresetClusterRole"
                 },
+                "role": {
+                    "$ref": "#/definitions/AgentPresetRole"
+                },
                 "priorityClass": {
                     "$ref": "#/definitions/AgentPriorityClass"
                 },
@@ -1801,6 +1804,76 @@
                             "name": {
                                 "type": "string",
                                 "minLength": 1
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        "AgentPresetRole": {
+            "type": "object",
+            "properties": {
+                "create": {
+                    "type": "boolean",
+                    "description": "Create the role.",
+                    "default": true
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Name of the role to use if create is set to false."
+                },
+                "annotations": {
+                    "type": "object",
+                    "description": "Annotations for the role if create is set to true."
+                },
+                "rules": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    },
+                    "description": "Rules for the role to create if create is set to true.",
+                    "examples": [
+                        [
+                            {
+                                "apiGroups": [
+                                    ""
+                                ],
+                                "resources": [
+                                    "pods"
+                                ],
+                                "verbs": [
+                                    "get",
+                                    "watch",
+                                    "list"
+                                ]
+                            }
+                        ]
+                    ]
+                }
+            },
+            "examples": [
+                {
+                    "create": true,
+                    "name": ""
+                }
+            ],
+            "required": [
+                "create"
+            ],
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "create": {
+                                "const": true
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "maxLength": 0
                             }
                         }
                     }

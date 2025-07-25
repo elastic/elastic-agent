@@ -18,6 +18,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -428,7 +430,8 @@ func zipLogsAndAssertFiles(t *testing.T, topPath string, excludeEvents bool, exp
 func TestGlobalHooks(t *testing.T) {
 	testPkgVer := "1.2.3-test"
 	setupPkgVersion(t, testPkgVer, 0o644)
-	hooks := GlobalHooks()
+	testLogger, _ := loggertest.New("test_global_hook")
+	hooks := GlobalHooks(testLogger)
 	assert.NotEmpty(t, hooks, "multiple hooks should be returned")
 	deadline, _ := t.Deadline()
 	ctx, cancel := context.WithDeadline(context.Background(), deadline)
@@ -442,19 +445,28 @@ func TestGlobalHooks(t *testing.T) {
 		case "version":
 			ok, err = isVersion(output)
 			assert.Truef(t, ok, "hook %q returned incompatible data: %q", h.Name, hex.EncodeToString(output))
-			assert.NoErrorf(t, err, "hook %q validation error: %v", err)
+			assert.NoErrorf(t, err, "hook %q validation error: %v", h.Name, err)
 		case "package version":
 			assert.Equal(t, testPkgVer, string(output), "hook package version does not match")
+		case "k8s diagnostics":
+			// check if k8s diagnostics didn't return anything (it can happen when not running in kubernetes)
+			if output == nil {
+				continue
+			}
+			ok, _, err = isZip(output)
+			assert.True(t, ok, "hook %q returned incompatible data: %q", h.Name, hex.EncodeToString(output))
+			assert.NoErrorf(t, err, "hook %q validation error: %v", h.Name, err)
 		default:
 			ok, err = isPprof(output)
 			assert.Truef(t, ok, "hook %q returned incompatible data: %q", h.Name, hex.EncodeToString(output))
-			assert.NoErrorf(t, err, "hook %q validation error: %v", err)
+			assert.NoErrorf(t, err, "hook %q validation error: %v", h.Name, err)
 		}
 	}
 }
 
 func TestPackageVersionHook(t *testing.T) {
-	for _, h := range GlobalHooks() {
+	testLogger, _ := loggertest.New("test_global_hook")
+	for _, h := range GlobalHooks(testLogger) {
 		if h.Name == "package version" {
 			testPackageVersionHook(t, h)
 			return
@@ -516,6 +528,20 @@ func isPprof(input []byte) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+func isZip(input []byte) (bool, []string, error) {
+	zr, err := zip.NewReader(bytes.NewReader(input), int64(len(input)))
+	if err != nil {
+		return false, nil, err
+	}
+	files := zr.File
+	fileNames := make([]string, 0, len(files))
+	for _, f := range files {
+		fileNames = append(fileNames, f.Name)
+	}
+
+	return true, fileNames, nil
 }
 
 func TestRedactSecretPaths(t *testing.T) {

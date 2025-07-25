@@ -699,6 +699,7 @@ rules:
       - get
       - create
       - update
+      - list
   - nonResourceURLs:
       - /healthz
       - /healthz/*
@@ -779,6 +780,7 @@ rules:
       - get
       - create
       - update
+      - list
   - nonResourceURLs:
       - /healthz
       - /healthz/*
@@ -869,6 +871,90 @@ roleRef:
   name: agent-perNode-example-default
   apiGroup: rbac.authorization.k8s.io
 ---
+# Source: elastic-agent/templates/agent/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: agent-clusterwide-example
+  labels:
+    helm.sh/chart: elastic-agent-9.2.0-beta
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 9.2.0
+rules:
+  - apiGroups: [ "" ]
+    resources:
+      - pods
+      - pods/log
+      - services
+      - configmaps
+      - secrets
+    verbs:
+      - get
+      - watch
+      - list
+---
+# Source: elastic-agent/templates/agent/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: agent-pernode-example
+  labels:
+    helm.sh/chart: elastic-agent-9.2.0-beta
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 9.2.0
+rules:
+  - apiGroups: [ "" ]
+    resources:
+      - pods
+      - pods/log
+      - services
+      - configmaps
+      - secrets
+    verbs:
+      - get
+      - watch
+      - list
+---
+# Source: elastic-agent/templates/agent/role-binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: agent-clusterwide-example
+  labels:
+    helm.sh/chart: elastic-agent-9.2.0-beta
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 9.2.0
+subjects:
+  - kind: ServiceAccount
+    name: agent-clusterwide-example
+    namespace: "default"
+roleRef:
+  kind: Role
+  name: agent-clusterwide-example
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: elastic-agent/templates/agent/role-binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: agent-pernode-example
+  labels:
+    helm.sh/chart: elastic-agent-9.2.0-beta
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 9.2.0
+subjects:
+  - kind: ServiceAccount
+    name: agent-pernode-example
+    namespace: "default"
+roleRef:
+  kind: Role
+  name: agent-pernode-example
+  apiGroup: rbac.authorization.k8s.io
+---
 # Source: elastic-agent/charts/kube-state-metrics/templates/service.yaml
 apiVersion: v1
 kind: Service
@@ -915,6 +1001,10 @@ spec:
   template:
     metadata:
       labels:
+        helm.sh/chart: elastic-agent-9.2.0-beta
+        app.kubernetes.io/name: elastic-agent
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/version: 9.2.0
         name: agent-pernode-example
       annotations:
         checksum/config: daca0d998edb3afa587d96e69b0833f6919ca6ba72f58f3a1f83b22d7e5ffaf6
@@ -1086,6 +1176,10 @@ spec:
   template:
     metadata:
       labels:
+        helm.sh/chart: elastic-agent-9.2.0-beta
+        app.kubernetes.io/name: elastic-agent
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/version: 9.2.0
         name: agent-clusterwide-example
       annotations:
         checksum/config: b27b8c59cca12784fcd6fba96f6ea4923afffa2c6ec373b6e02d763e0f342091

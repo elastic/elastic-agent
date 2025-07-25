@@ -100,6 +100,10 @@ spec:
   template:
     metadata:
       labels:
+        helm.sh/chart: elastic-agent-9.2.0-beta
+        app.kubernetes.io/name: elastic-agent
+        app.kubernetes.io/instance: example
+        app.kubernetes.io/version: 9.2.0
         name: agent-netflow-example
       annotations:
         checksum/config: 4e9f48f0d6ae172f2f6aa5d526b0ca3af7dd28250e7c06c9d4e67ec0a2fc4573
