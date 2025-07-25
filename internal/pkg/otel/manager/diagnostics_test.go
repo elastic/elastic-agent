@@ -18,16 +18,16 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/utils"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/utils"
 
-	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	componentruntime "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 
 	"github.com/stretchr/testify/assert"
@@ -51,7 +51,7 @@ func TestPerformComponentDiagnostics(t *testing.T) {
 		components: []component.Component{filebeatComp, otherComp},
 	}
 
-	expectedDiags := []runtime.ComponentDiagnostic{
+	expectedDiags := []componentruntime.ComponentDiagnostic{
 		{
 			Component: filebeatComp,
 		},
@@ -87,7 +87,7 @@ func TestPerformDiagnostics(t *testing.T) {
 	}
 
 	t.Run("diagnose all units when no request is provided", func(t *testing.T) {
-		expectedDiags := []runtime.ComponentUnitDiagnostic{
+		expectedDiags := []componentruntime.ComponentUnitDiagnostic{
 			{
 				Component: filebeatComp,
 				Unit:      filebeatComp.Units[0],
@@ -110,11 +110,11 @@ func TestPerformDiagnostics(t *testing.T) {
 	})
 
 	t.Run("diagnose specific unit", func(t *testing.T) {
-		req := runtime.ComponentUnitDiagnosticRequest{
+		req := componentruntime.ComponentUnitDiagnosticRequest{
 			Component: filebeatComp,
 			Unit:      filebeatComp.Units[0],
 		}
-		expectedDiags := []runtime.ComponentUnitDiagnostic{
+		expectedDiags := []componentruntime.ComponentUnitDiagnostic{
 			{
 				Component: filebeatComp,
 				Unit:      filebeatComp.Units[0],
@@ -126,6 +126,9 @@ func TestPerformDiagnostics(t *testing.T) {
 }
 
 func TestBeatMetrics(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skip test on Windows, it's annoying to set up an npipe http server.")
+	}
 	setTemporaryAgentPath(t)
 	logger, obs := loggertest.New("test")
 	compID := "filebeat-comp-1"
@@ -164,11 +167,12 @@ func TestBeatMetrics(t *testing.T) {
 	diags, err := m.PerformComponentDiagnostics(context.Background(), nil)
 	require.NoError(t, err)
 	assert.Len(t, obs.All(), 1) // one debug log line about the registry
-	assert.Len(t, diags, 1)
+	require.Len(t, diags, 1)
 
 	diag := diags[0]
 	assert.Equal(t, filebeatComp, diag.Component)
-	assert.Len(t, diag.Results, 3) // two metrics diagnostics and one filebeat registry
+	// two metrics diagnostics and one filebeat registry
+	require.Len(t, diag.Results, 3, "expected 3 diagnostics, got error: %w", diag.Err)
 
 	t.Run("beat metrics", func(t *testing.T) {
 		beatMetrics := diag.Results[0]
