@@ -5,7 +5,7 @@ function ess_up {
   )
 
   Write-Output "~~~ Starting ESS Stack"
-  
+
   $Workspace = & git rev-parse --show-toplevel
   $TfDir = Join-Path -Path $Workspace -ChildPath "test_infra/ess/"
 
@@ -13,7 +13,7 @@ function ess_up {
       Write-Error "Error: Specify stack version: ess_up [stack_version]"
       return 1
   }
-  
+
   $BuildkiteBuildCreator = if ($Env:BUILDKITE_BUILD_CREATOR) { $Env:BUILDKITE_BUILD_CREATOR } else { get_git_user_email }
   $BuildkiteBuildNumber = if ($Env:BUILDKITE_BUILD_NUMBER) { $Env:BUILDKITE_BUILD_NUMBER } else { "0" }
   $BuildkitePipelineSlug = if ($Env:BUILDKITE_PIPELINE_SLUG) { $Env:BUILDKITE_PIPELINE_SLUG } else { "elastic-agent-integration-tests" }
@@ -37,7 +37,7 @@ function ess_up {
   Pop-Location
 }
 
-function ess_down {  
+function ess_down {
   $Workspace = & git rev-parse --show-toplevel
   $TfDir = Join-Path -Path $Workspace -ChildPath "test_infra/ess/"
   $stateFilePath = Join-Path -Path $TfDir -ChildPath "terraform.tfstate"
@@ -81,11 +81,11 @@ function Retry-Command {
   $lastError = $null
 
   for ($attempt = 1; $attempt -le $MaxRetries; $attempt++) {
-      try {          
-        $result = & $ScriptBlock        
+      try {
+        $result = & $ScriptBlock
         return $result
       }
-      catch {          
+      catch {
           $lastError = $_
           Write-Warning "Attempt $attempt failed: $($_.Exception.Message)"
           Write-Warning "Retrying in $DelaySeconds seconds..."
@@ -101,12 +101,14 @@ function Get-Ess-Stack {
   param (
       [string]$StackVersion
   )
-  
+
   if ($Env:BUILDKITE_RETRY_COUNT -gt 0) {
-      Write-Output "The step is retried, starting the ESS stack again"        
+      Write-Output "The step is retried, starting the ESS stack again"
       ess_up $StackVersion
       Write-Output "ESS stack is up. ES_HOST: $Env:ELASTICSEARCH_HOST"
   } else {
+      # TODO: Use a metadata prefix for "fips." if we ever need to test Windows artifacts for FIPS.
+
       # For the first run, we retrieve ESS stack metadata
       Write-Output "~~~ Receiving ESS stack metadata"
       $Env:ELASTICSEARCH_HOST = & buildkite-agent meta-data get "es.host"
