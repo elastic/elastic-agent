@@ -9,6 +9,7 @@ import (
 	"go/build"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -169,11 +170,9 @@ func CrossBuild(options ...CrossBuildOption) error {
 		return err
 	}
 
-	if CrossBuildMountModcache {
-		// Make sure the module dependencies are downloaded on the host,
-		// as they will be mounted into the container read-only.
-		mg.Deps(func() error { return gotool.Mod.Download() })
-	}
+	// Make sure the module dependencies are downloaded on the host,
+	// as they will be mounted into the container read-only.
+	mg.Deps(func() error { return gotool.Mod.Download() })
 
 	// Build the magefile for Linux, so we can run it inside the container.
 	mg.Deps(buildMage)
@@ -274,6 +273,9 @@ func (b GolangCrossBuilder) Build() error {
 		return fmt.Errorf("failed to determine repo root and package sub dir: %w", err)
 	}
 
+	uid := os.Getuid()
+	gid := os.Getgid()
+
 	mountPoint := filepath.ToSlash(filepath.Join("/go", "src", repoInfo.CanonicalRootImportPath))
 	// use custom dir for build if given, subdir if not:
 	cwd := repoInfo.SubDir
@@ -315,18 +317,26 @@ func (b GolangCrossBuilder) Build() error {
 
 	if runtime.GOOS != "windows" {
 		args = append(args,
-			"--env", "EXEC_UID="+strconv.Itoa(os.Getuid()),
-			"--env", "EXEC_GID="+strconv.Itoa(os.Getgid()),
+			"--env", fmt.Sprintf("EXEC_UID=%d", uid),
+			"--env", fmt.Sprintf("EXEC_GID=%d", gid),
 		)
 	}
 	if versionQualified {
 		args = append(args, "--env", "VERSION_QUALIFIER="+versionQualifier)
 	}
-	if CrossBuildMountModcache {
-		// Mount $GOPATH/pkg/mod into the container, read-only.
-		hostDir := filepath.Join(build.Default.GOPATH, "pkg", "mod")
-		args = append(args, "-v", hostDir+":/go/pkg/mod:ro")
+
+	// Mount $GOPATH/pkg/mod into the container, read-only.
+	hostDir := filepath.Join(build.Default.GOPATH, "pkg", "mod")
+	args = append(args, "-v", hostDir+":/go/pkg/mod:ro")
+
+	// Mount the go build cache into the container.
+	out, err := exec.Command("go", "env", "GOCACHE").Output()
+	if err != nil {
+		return fmt.Errorf("failed to get GOCACHE: %w", err)
 	}
+	cacheDir := strings.TrimSpace(string(out))
+	buildCacheMountPoint := "/tmp/.cache/go-build"
+	args = append(args, "-v", fmt.Sprintf("%s:%s", cacheDir, buildCacheMountPoint))
 
 	if !ExternalBuild {
 		beatsPath, err := filepath.Abs(filepath.Join("../beats"))
@@ -339,12 +349,14 @@ func (b GolangCrossBuilder) Build() error {
 	args = append(args,
 		"--rm",
 		"--env", "GOFLAGS=-mod=readonly",
+		"--env", fmt.Sprintf("GOCACHE=%s", buildCacheMountPoint),
 		"--env", "MAGEFILE_VERBOSE="+verbose,
 		"--env", "MAGEFILE_TIMEOUT="+EnvOr("MAGEFILE_TIMEOUT", ""),
 		"--env", fmt.Sprintf("SNAPSHOT=%v", Snapshot),
 		"--env", fmt.Sprintf("DEV=%v", DevBuild),
 		"--env", fmt.Sprintf("EXTERNAL=%v", ExternalBuild),
 		"--env", fmt.Sprintf("FIPS=%v", FIPSBuild),
+		"--user", fmt.Sprintf("%d:%d", uid, gid),
 		"-v", repoInfo.RootDir+":"+mountPoint,
 		"-w", workDir,
 		image,
