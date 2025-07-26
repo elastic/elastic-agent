@@ -6,12 +6,12 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1752886846"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1752886846"
-  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1752886846"
-  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1752886846"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1752886846"
-  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1752886846"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1753491662"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1753491662"
+  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1753491662"
+  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1753491662"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1753491662"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1753491662"
   # Remove AGENT_VERSION pinning once 9.0.5 DRA and stack are released
   AGENT_VERSION: "9.0.4-SNAPSHOT"
 
