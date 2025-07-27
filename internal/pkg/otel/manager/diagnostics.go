@@ -135,7 +135,7 @@ func (m *OTelManager) PerformComponentDiagnostics(
 		if translate.GetBeatNameForComponent(&diag.Component) == "filebeat" {
 			// include filebeat registry, reimplementation of a filebeat diagnostic hook
 			registryTarGzBytes, err := FileBeatRegistryTarGz(m.logger, diag.Component.ID)
-			errs = append(errs, err)
+			errs = append(errs, fmt.Errorf("failed to create filebeat registry archive: %w", err))
 			if registryTarGzBytes != nil {
 				m.logger.Debugf("created registry tar.gz, size %d", len(registryTarGzBytes))
 				results = append(results, &proto.ActionDiagnosticUnitResult{

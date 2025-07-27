@@ -8,7 +8,6 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
-	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -22,6 +21,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -60,7 +61,7 @@ func TestPerformComponentDiagnostics(t *testing.T) {
 		},
 	}
 
-	diags, err := m.PerformComponentDiagnostics(context.Background(), nil)
+	diags, err := m.PerformComponentDiagnostics(t.Context(), nil)
 	require.NoError(t, err)
 	for i, d := range diags {
 		assert.Equal(t, expectedDiags[i].Component.ID, d.Component.ID)
@@ -68,7 +69,9 @@ func TestPerformComponentDiagnostics(t *testing.T) {
 		require.NotNil(t, d.Err)
 		assert.ErrorContains(t, d.Err, "failed to get beat metrics")
 		assert.ErrorContains(t, d.Err, "failed to get input metrics")
-		assert.ErrorContains(t, d.Err, "no such file or directory")
+		if translate.GetBeatNameForComponent(&d.Component) == "filebeat" {
+			assert.ErrorContains(t, d.Err, "failed to create filebeat registry archive")
+		}
 	}
 }
 
@@ -165,7 +168,7 @@ func TestBeatMetrics(t *testing.T) {
 		assert.NoError(t, cErr)
 	})
 
-	diags, err := m.PerformComponentDiagnostics(context.Background(), nil)
+	diags, err := m.PerformComponentDiagnostics(t.Context(), nil)
 	require.NoError(t, err)
 	assert.Len(t, obs.All(), 0)
 	require.Len(t, diags, 1)
